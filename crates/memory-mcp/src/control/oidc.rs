@@ -838,10 +838,121 @@ async fn upsert_account_for_identity(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::http::registry::storage::RegistryStore;
 
     #[test]
     fn form_urlencode_component_escapes_reserved_bytes() {
         assert_eq!(form_urlencode_component("a b+c/&"), "a+b%2Bc%2F%26");
+    }
+
+    /// `logout` must (1) delete the server-side session keyed by
+    /// `cookie_hash`, (2) reply with a clearing
+    /// `__Host-memory_mcp_session` cookie (Max-Age=0), and (3)
+    /// redirect to `/`. The route is mounted behind
+    /// `authenticate_control_plane_session` + CSRF in production;
+    /// this test exercises the handler contract in isolation.
+    #[tokio::test]
+    async fn logout_revokes_session_and_clears_cookie() {
+        use crate::control::session::ControlPlaneSession;
+        use crate::http::registry::RegistryHandle;
+        use crate::http::registry::storage::InMemoryStore;
+        use std::sync::Arc;
+
+        let store: Arc<InMemoryStore> = Arc::new(InMemoryStore::default());
+        let registry = RegistryHandle::in_memory().with_inner_store(store.clone());
+        let state = Arc::new(crate::http::HttpState {
+            config: crate::http::config::HttpConfig::default_for_test(),
+            pool: Arc::new(crate::http::runtime::pool::Pool::with_defaults(Arc::new(
+                registry.clone(),
+            ))),
+            shutdown: crate::http::shutdown::ShutdownState::new(),
+            admission: Arc::new(crate::http::runtime::pool::AdmissionGate::open()),
+            registry,
+            authenticator: Arc::new(crate::http::principal::auth::Authenticator::new(
+                store.clone(),
+                Arc::new(crate::http::principal::cache::PrincipalCache::new(4)),
+                b"pepper".to_vec(),
+                Arc::new(crate::http::principal::auth::RateLimiter::new(
+                    4,
+                    std::time::Duration::from_secs(60),
+                    100,
+                )),
+            )),
+            account_resolver: Arc::new(crate::http::registry::account::AccountResolver::new(
+                store.clone(),
+            )),
+            #[cfg(feature = "control-plane")]
+            oidc_client: None,
+        });
+        let now = chrono::Utc::now();
+        store
+            .store_session(&ControlPlaneSession {
+                id: "ses_logout".into(),
+                cookie_hash: "cookie_logout".into(),
+                account_id: "acct_logout".into(),
+                auth_time: now,
+                idle_expiry: now + chrono::Duration::minutes(30),
+                absolute_expiry: now + chrono::Duration::hours(1),
+            })
+            .await
+            .expect("store session");
+
+        let (headers, redirect) = logout(
+            axum::extract::State(state.clone()),
+            axum::extract::Extension(ControlPlaneSession {
+                id: "ses_logout".into(),
+                cookie_hash: "cookie_logout".into(),
+                account_id: "acct_logout".into(),
+                auth_time: now,
+                idle_expiry: now + chrono::Duration::minutes(30),
+                absolute_expiry: now + chrono::Duration::hours(1),
+            }),
+        )
+        .await
+        .map_err(|_| "logout returned ApiError".to_string())
+        .expect("logout ok");
+        // 1) Server-side session is gone.
+        assert!(
+            store
+                .find_session("cookie_logout")
+                .await
+                .expect("session lookup")
+                .is_none(),
+            "logout must delete the server-side session"
+        );
+        // 2) Set-Cookie clears the browser cookie.
+        let cookie = headers
+            .get(axum::http::header::SET_COOKIE)
+            .expect("Set-Cookie present")
+            .to_str()
+            .expect("ascii cookie");
+        assert!(
+            cookie.starts_with("__Host-memory_mcp_session=;"),
+            "got: {cookie}"
+        );
+        assert!(cookie.contains("Max-Age=0"), "got: {cookie}");
+        assert!(cookie.contains("HttpOnly"), "got: {cookie}");
+        assert!(cookie.contains("Secure"), "got: {cookie}");
+        // 3) Cache-Control no-store prevents the redirect from being cached.
+        assert_eq!(
+            headers
+                .get(axum::http::header::CACHE_CONTROL)
+                .expect("Cache-Control present"),
+            "no-store"
+        );
+        // 4) Redirect to "/".
+        let redirect_response = axum::response::IntoResponse::into_response(redirect);
+        assert_eq!(
+            redirect_response.status(),
+            axum::http::StatusCode::SEE_OTHER
+        );
+        assert_eq!(
+            redirect_response
+                .headers()
+                .get(axum::http::header::LOCATION)
+                .expect("Location header"),
+            "/"
+        );
     }
 
     #[test]

@@ -848,6 +848,84 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn cancel_before_commit_fenced_marks_running_task_as_cancelled_before_commit() {
+        let store = fresh_store().await;
+        let id = store
+            .enqueue("fp_cancel_before_commit", json!({}))
+            .await
+            .expect("enqueue");
+        let handle = store
+            .claim_next_due("replica_a")
+            .await
+            .expect("claim")
+            .expect("task due");
+        // Cancel arrives while the worker is still mid-flight and
+        // no facts have been committed yet.
+        store
+            .set_cancellation_intent(&id)
+            .await
+            .expect("set intent");
+        store
+            .cancel_before_commit_fenced(&handle)
+            .await
+            .expect("fenced cancel");
+        let record = store.load(&id).await.expect("load").expect("present");
+        assert_eq!(record.state, TaskState::CancelledBeforeCommit);
+        // The fenced update is one-shot: once the row is in a
+        // terminal state, a repeated call surfaces as Conflict
+        // so the lease-loss branch is observable to the worker.
+        let result = store.cancel_before_commit_fenced(&handle).await;
+        assert!(
+            matches!(result, Err(MemoryError::Conflict(_))),
+            "repeat fenced cancel on terminal task must be Conflict, got: {result:?}"
+        );
+        let after = store.load(&id).await.expect("load").expect("present");
+        assert_eq!(after.state, TaskState::CancelledBeforeCommit);
+        assert_eq!(after.version, record.version);
+    }
+
+    #[tokio::test]
+    async fn cancel_before_commit_fenced_rejects_stale_lease() {
+        let store = fresh_store().await;
+        let id = store
+            .enqueue("fp_cancel_stale", json!({}))
+            .await
+            .expect("enqueue");
+        let handle = store
+            .claim_next_due("replica_a")
+            .await
+            .expect("claim")
+            .expect("task due");
+        // Another replica steals the lease; the original worker's
+        // fenced cancel must be rejected as a conflict. We
+        // backdate the lease so the running task becomes
+        // claimable, matching the real-world steal path.
+        let _ = id;
+        let now = Utc::now();
+        let _ = store
+            .db
+            .query(
+                "UPDATE tenant_task SET lease_expiry = type::datetime($past) WHERE id = type::record('tenant_task', $id);",
+                Some(json!({
+                    "past": DurableTaskStore::to_datetime(now - chrono::Duration::seconds(1)),
+                    "id": handle.task_id,
+                })),
+            )
+            .await;
+        let stolen = store
+            .claim_next_due("replica_b")
+            .await
+            .expect("claim")
+            .expect("steal");
+        assert_eq!(stolen.lease_generation, handle.lease_generation + 1);
+        let result = store.cancel_before_commit_fenced(&handle).await;
+        assert!(
+            matches!(result, Err(MemoryError::Conflict(_))),
+            "stale cancel must return Conflict, got: {result:?}"
+        );
+    }
+
+    #[tokio::test]
     async fn cancelling_terminal_task_is_idempotent_and_immutable() {
         let store = fresh_store().await;
         let id = store

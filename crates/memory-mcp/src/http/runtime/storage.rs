@@ -36,8 +36,15 @@ impl Default for RuntimeOptions {
 
 impl RuntimeOptions {
     pub fn from_http_config(config: &crate::http::config::HttpConfig) -> Self {
+        // `HttpConfig::validate` constrains `task_retention_secs`
+        // to values representable in `i64`; the saturating cast
+        // would otherwise silently turn any oversight into a
+        // 68-year retention window. Surface the violation loudly
+        // so the regression is visible.
+        let task_retention_secs = i64::try_from(config.task_retention_secs)
+            .expect("HttpConfig::validate bounds task_retention_secs within i64::MAX");
         Self {
-            task_retention_secs: i64::try_from(config.task_retention_secs).unwrap_or(i64::MAX),
+            task_retention_secs,
             task_queue_capacity: config.task_queue_capacity,
             task_sync_max_bytes: config.task_sync_max_bytes,
         }

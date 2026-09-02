@@ -140,14 +140,15 @@ impl Drop for AdmissionPermit {
 
 // ─── Pool ─────────────────────────────────────────────────
 
-/// Defaults: 32 active, 15-min idle, 2-sec capacity wait,
-/// 30-sec activation timeout, 4 per-tenant concurrency.
-/// Environment overrides arrive with the quota system.
-pub const DEFAULT_POOL_CAP: usize = 32;
-pub const DEFAULT_IDLE_TTL: Duration = Duration::from_secs(15 * 60);
-pub const DEFAULT_CAPACITY_WAIT: Duration = Duration::from_secs(2);
-pub const DEFAULT_ACTIVATION_TIMEOUT: Duration = Duration::from_secs(30);
-pub const DEFAULT_PER_TENANT_CONCURRENCY: u32 = 4;
+// Pool defaults live in `crate::http::config` so the 12-factor
+// environment loader, the spec-default pool, and the public
+// re-exports below share a single source of truth.
+pub use crate::http::config::{
+    DEFAULT_POOL_CAP, DEFAULT_RUNTIME_ACTIVATION_TIMEOUT as DEFAULT_ACTIVATION_TIMEOUT,
+    DEFAULT_RUNTIME_CAPACITY_WAIT as DEFAULT_CAPACITY_WAIT,
+    DEFAULT_RUNTIME_IDLE_TTL as DEFAULT_IDLE_TTL,
+};
+pub use crate::http::registry::models::DEFAULT_PER_TENANT_REQUEST_CONCURRENCY as DEFAULT_PER_TENANT_CONCURRENCY;
 
 /// LRU pool of Tenant Runtimes. `acquire_or_wait` is the
 /// single production entry point used by the HTTP pipeline.
@@ -157,12 +158,12 @@ pub struct Pool {
     map: Mutex<LruCache<String, Arc<Mutex<TenantRuntimeSlot>>>>,
     registry: Arc<crate::http::registry::RegistryHandle>,
     cap: usize,
-    #[allow(dead_code)] // Read by future idle-eviction tick.
+    // Read by `evict_idle` and the tracked scheduler job.
     idle_ttl: Duration,
     capacity_wait: Duration,
-    #[allow(dead_code)] // Used by future per-tenant activation timeout.
+    // Enforced by `acquire_or_wait_with_limit` when waiting for a tenant slot.
     activation_timeout: Duration,
-    #[allow(dead_code)] // Used by the default non-HTTP test constructor.
+    // Bound for concurrent in-flight requests against a single tenant runtime.
     per_tenant_concurrency: u32,
     runtime_options: super::storage::RuntimeOptions,
 }
@@ -610,6 +611,50 @@ mod tests {
             .expect("idle runtime makes capacity available");
         assert!(pool.contains_ready("ten_y").await);
         drop(second);
+    }
+
+    /// `evict_idle` drops only Ready, unpinned slots whose `last_used`
+    /// is older than `idle_ttl`. Pinned runtimes must be retained so
+    /// in-flight requests can finish.
+    #[tokio::test]
+    async fn evict_idle_drops_only_idle_unpinned_slots() {
+        let db = Surreal::new::<Mem>(()).await.unwrap();
+        db.use_ns("control").use_db("control").await.unwrap();
+        let registry = Arc::new(RegistryHandle::in_memory_with_mem_engine(Arc::new(db)));
+        let pool = Arc::new(Pool::new(
+            4,
+            // ttl > 0 so freshly-pinned slots are not eligible.
+            Duration::from_millis(50),
+            Duration::from_millis(20),
+            DEFAULT_ACTIVATION_TIMEOUT,
+            DEFAULT_PER_TENANT_CONCURRENCY,
+            registry,
+        ));
+        // Slot A: idle past TTL — eligible for eviction.
+        let guard_a = pool
+            .acquire_or_wait(&ready_tenant("ten_a", "tns_a"))
+            .await
+            .expect("acquire A");
+        drop(guard_a);
+        // Wait past the idle TTL.
+        tokio::time::sleep(Duration::from_millis(80)).await;
+        // Slot B: held by a guard — pin count > 0, must NOT be evicted.
+        let _guard_b = pool
+            .acquire_or_wait(&ready_tenant("ten_b", "tns_b"))
+            .await
+            .expect("acquire B");
+        // Slot C: freshly activated, last_used == now — not eligible.
+        let guard_c = pool
+            .acquire_or_wait(&ready_tenant("ten_c", "tns_c"))
+            .await
+            .expect("acquire C");
+        drop(guard_c);
+
+        let evicted = pool.evict_idle().await;
+        assert_eq!(evicted, 1, "only ten_a is idle and unpinned");
+        assert!(!pool.contains_ready("ten_a").await);
+        assert!(pool.contains_ready("ten_b").await);
+        assert!(pool.contains_ready("ten_c").await);
     }
 
     #[tokio::test]
