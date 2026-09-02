@@ -212,13 +212,13 @@ impl KeyedVerifier {
     /// Compute HMAC-SHA256(pepper, secret) into a fixed-size
     /// verifier. Used when issuing new API keys.
     pub fn compute(pepper: &[u8], secret: &[u8]) -> Self {
-        use hmac::{Hmac, Mac};
+        use hmac::{Hmac, KeyInit, Mac};
         use sha2::Sha256;
         // HMAC-SHA256 accepts a key of any length. Keep the
         // public infallible constructor fail-closed if the
         // dependency ever violates that contract instead of
         // allowing malformed configuration to panic the server.
-        let Ok(mut mac) = <Hmac<Sha256> as Mac>::new_from_slice(pepper) else {
+        let Ok(mut mac) = Hmac::<Sha256>::new_from_slice(pepper) else {
             return Self([0; 32]);
         };
         mac.update(secret);

@@ -3,7 +3,7 @@
 //! CSRF tokens are HMACs of `(account_id, session_id, csrf_key)`.
 //! Required on all `/api/v1` state-changing endpoints.
 
-use hmac::{Hmac, Mac};
+use hmac::{Hmac, KeyInit, Mac};
 use sha2::Sha256;
 
 use crate::error::MemoryError;
