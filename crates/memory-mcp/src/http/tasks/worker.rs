@@ -34,11 +34,27 @@ pub const RETENTION_SECS: i64 = 7 * 24 * 60 * 60;
 pub struct DurableTaskStore {
     db: Arc<BoundDbClient>,
     tenant_id: String,
+    retention_secs: i64,
+    queue_capacity: usize,
 }
 
 impl DurableTaskStore {
     pub fn new(db: Arc<BoundDbClient>, tenant_id: String) -> Self {
-        Self { db, tenant_id }
+        Self::new_with_options(db, tenant_id, RETENTION_SECS, 256)
+    }
+
+    pub fn new_with_options(
+        db: Arc<BoundDbClient>,
+        tenant_id: String,
+        retention_secs: i64,
+        queue_capacity: usize,
+    ) -> Self {
+        Self {
+            db,
+            tenant_id,
+            retention_secs: retention_secs.max(1),
+            queue_capacity: queue_capacity.max(1),
+        }
     }
 
     fn to_datetime(t: DateTime<Utc>) -> String {
@@ -68,7 +84,7 @@ fn record_id_str(v: &Value) -> Option<String> {
 impl TaskStore for DurableTaskStore {
     async fn enqueue(&self, fingerprint: &str, params: Value) -> Result<String, MemoryError> {
         let now = Utc::now();
-        let retention = now + chrono::Duration::seconds(RETENTION_SECS);
+        let retention = now + chrono::Duration::seconds(self.retention_secs);
         let id = uuid::Uuid::new_v4().to_string();
         // Dedup: if a non-failed task with this fingerprint
         // exists, return its id. The UNIQUE index on
@@ -80,7 +96,12 @@ impl TaskStore for DurableTaskStore {
         let create_result = self
             .db
             .query(
-                "CREATE type::record('tenant_task', $id) SET tenant_id = $tenant_id, fingerprint = $fingerprint, state = 'queued', version = 1, cancellation_intent = false, params = $params, created_at = type::datetime($now), updated_at = type::datetime($now), retention_expiry = type::datetime($retention);",
+                "BEGIN TRANSACTION; \
+                 LET $active = (SELECT VALUE count() FROM tenant_task \
+                    WHERE tenant_id = $tenant_id AND state IN ['queued', 'running', 'cancel_requested'])[0]; \
+                 IF $active >= $queue_capacity { THROW 'task queue capacity reached'; }; \
+                 CREATE type::record('tenant_task', $id) SET tenant_id = $tenant_id, fingerprint = $fingerprint, state = 'queued', version = 1, cancellation_intent = false, params = $params, created_at = type::datetime($now), updated_at = type::datetime($now), retention_expiry = type::datetime($retention); \
+                 COMMIT TRANSACTION;",
                 Some(json!({
                     "id": id,
                     "tenant_id": self.tenant_id.as_str(),
@@ -88,11 +109,17 @@ impl TaskStore for DurableTaskStore {
                     "params": params,
                     "now": Self::to_datetime(now),
                     "retention": Self::to_datetime(retention),
+                    "queue_capacity": i64::try_from(self.queue_capacity).unwrap_or(i64::MAX),
                 })),
             )
             .await;
         match create_result {
             Ok(_) => Ok(id),
+            Err(MemoryError::Storage(message))
+                if message.contains("task queue capacity reached") =>
+            {
+                Err(MemoryError::Conflict("task queue capacity reached".into()))
+            }
             Err(error) if is_unique_conflict(&error) => {
                 self.find_existing_id(fingerprint).await?.ok_or(error)
             }
@@ -246,6 +273,15 @@ impl TaskStore for DurableTaskStore {
                 "result": result,
                 "now": Self::to_datetime(Utc::now()),
             })),
+        )
+        .await
+    }
+
+    async fn cancel_before_commit_fenced(&self, handle: &TaskHandle) -> Result<(), MemoryError> {
+        self.fenced_update(
+            handle,
+            "UPDATE tenant_task SET state = 'cancelled_before_commit', version = version + 1, updated_at = type::datetime($now) WHERE id = type::record('tenant_task', $id) AND tenant_id = $tenant_id AND lease_owner = $owner AND lease_generation = $gen AND state IN ['running', 'cancel_requested']",
+            Some(json!({"now": Self::to_datetime(Utc::now())})),
         )
         .await
     }
@@ -625,6 +661,22 @@ mod tests {
             .await
             .expect("duplicate enqueue");
         assert_eq!(id1, id2, "same fingerprint must return the same task id");
+    }
+
+    #[cfg(feature = "streamable-http")]
+    #[tokio::test]
+    async fn configured_task_queue_capacity_is_enforced_atomically() {
+        let store = fresh_store().await;
+        let capped =
+            DurableTaskStore::new_with_options(store.db.clone(), "test_tenant".into(), 3600, 1);
+        capped
+            .enqueue("queue-first", json!({}))
+            .await
+            .expect("first queued task");
+        let second = capped.enqueue("queue-second", json!({})).await;
+        assert!(
+            matches!(second, Err(MemoryError::Conflict(message)) if message.contains("queue capacity"))
+        );
     }
 
     #[tokio::test]

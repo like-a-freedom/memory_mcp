@@ -18,13 +18,32 @@ use crate::storage::client::BoundDbClient;
 /// The retention/retry/execution job. Registers itself with the process-level
 /// scheduler; it never creates an untracked per-tenant loop.
 pub fn scheduler_job() -> SchedulerJob {
-    Arc::new(|registry| Box::pin(async move { retry_reconcile_and_retain(&registry).await }))
+    scheduler_job_with_options(crate::http::runtime::storage::RuntimeOptions::default())
+}
+
+pub fn scheduler_job_with_options(
+    options: crate::http::runtime::storage::RuntimeOptions,
+) -> SchedulerJob {
+    Arc::new(move |registry| {
+        Box::pin(async move { retry_reconcile_and_retain_with_options(&registry, options).await })
+    })
 }
 
 /// Walk a bounded ready-tenant batch, recover expired tasks, execute one due
 /// extraction per tenant, reconcile durable artifacts, and delete only terminal
 /// rows past retention.
 pub async fn retry_reconcile_and_retain(registry: &RegistryHandle) -> Result<(), MemoryError> {
+    retry_reconcile_and_retain_with_options(
+        registry,
+        crate::http::runtime::storage::RuntimeOptions::default(),
+    )
+    .await
+}
+
+async fn retry_reconcile_and_retain_with_options(
+    registry: &RegistryHandle,
+    options: crate::http::runtime::storage::RuntimeOptions,
+) -> Result<(), MemoryError> {
     let store = registry.store_clone();
     let tenants = store.list_ready_tenants(None, 100).await?;
     let Some(engine) = registry.tenant_engine_optional() else {
@@ -43,7 +62,12 @@ pub async fn retry_reconcile_and_retain(registry: &RegistryHandle) -> Result<(),
             db.clone(),
             tenant.namespace_binding.namespace.clone(),
         ));
-        let task_store = DurableTaskStore::new(bound_db, tenant.id.clone());
+        let task_store = DurableTaskStore::new_with_options(
+            bound_db,
+            tenant.id.clone(),
+            options.task_retention_secs,
+            options.task_queue_capacity,
+        );
         if let Err(error) = task_store.requeue_expired_running().await {
             if error.to_string().contains("tenant_task")
                 && error.to_string().contains("does not exist")
@@ -88,12 +112,16 @@ async fn execute_one_task(
     db: Arc<crate::storage::client::SurrealDbClient>,
     namespace: &str,
 ) -> Result<(), MemoryError> {
-    let Some(handle) = task_store.claim_next_due("scheduler").await? else {
+    let replica_id = crate::http::leases::scheduler::replica_id();
+    let Some(handle) = task_store.claim_next_due(&replica_id).await? else {
         return Ok(());
     };
     let record = task_store.load(&handle.task_id).await?.ok_or_else(|| {
         MemoryError::NotFound(format!("task {} disappeared after claim", handle.task_id))
     })?;
+    if record.cancellation_intent {
+        return task_store.cancel_before_commit_fenced(&handle).await;
+    }
     let params: crate::tools::params::ExtractParams = serde_json::from_value(record.params.clone())
         .map_err(|error| {
             MemoryError::Validation(format!("invalid durable extract parameters: {error}"))
@@ -102,16 +130,18 @@ async fn execute_one_task(
         crate::service::MemoryService::new(db, namespace.to_owned(), "info".into(), 100, 100)?
             .with_http_outbox();
     let extraction = crate::tools::extract(&service.build_context(), params).await;
-    let current = task_store.load(&handle.task_id).await?;
-    let cancelled_after_commit = current
-        .as_ref()
-        .is_some_and(|task| task.cancellation_intent);
     match extraction {
         Ok(result) => {
             let value = serde_json::to_value(result).map_err(|error| {
                 MemoryError::Storage(format!("serialize extract result: {error}"))
             })?;
+            // The artifact is the durable commit boundary. Once it exists, a
+            // cancellation request is reported as completed_before_cancel.
             task_store.record_artifact_fenced(&handle, &value).await?;
+            let cancelled_after_commit = task_store
+                .load(&handle.task_id)
+                .await?
+                .is_some_and(|task| task.cancellation_intent);
             task_store
                 .complete_fenced(&handle, value, cancelled_after_commit)
                 .await

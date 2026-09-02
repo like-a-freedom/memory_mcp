@@ -580,9 +580,24 @@ For `MEMORY_MCP_HTTP_SIGNUP_MODE=open`, also set all seven durable plan seed
 variables: `MEMORY_MCP_HTTP_MAX_INGESTED_BYTES`,
 `MEMORY_MCP_HTTP_MAX_EPISODE_COUNT`, `MEMORY_MCP_HTTP_INGEST_PER_MINUTE`,
 `MEMORY_MCP_HTTP_MAX_OPEN_APP_SESSIONS`, `MEMORY_MCP_HTTP_MAX_ACTIVE_API_KEYS`,
-`MEMORY_MCP_HTTP_REQUEST_CONCURRENCY`, and
+`MEMORY_MCP_HTTP_PER_TENANT_REQUEST_CONCURRENCY`, and
 `MEMORY_MCP_HTTP_EXTRACTION_CONCURRENCY`. They are used only to create Registry
 plan version 1 when it is absent; an existing durable plan is not overwritten.
+Runtime tuning is also environment-driven: `MEMORY_MCP_HTTP_POOL_CAP`,
+`MEMORY_MCP_HTTP_RUNTIME_IDLE_TTL_SECS`,
+`MEMORY_MCP_HTTP_RUNTIME_CAPACITY_WAIT_MS`,
+`MEMORY_MCP_HTTP_RUNTIME_ACTIVATION_TIMEOUT_SECS`,
+`MEMORY_MCP_HTTP_GLOBAL_REQUEST_LIMIT`,
+`MEMORY_MCP_HTTP_SUBSCRIPTION_LIMIT`,
+`MEMORY_MCP_HTTP_MAINTENANCE_PARALLELISM`,
+`MEMORY_MCP_HTTP_SUBSCRIPTION_QUEUE_CAPACITY`,
+`MEMORY_MCP_HTTP_SUBSCRIPTION_AUTH_RECHECK_SECS`,
+`MEMORY_MCP_HTTP_TASK_RETENTION_SECS`,
+`MEMORY_MCP_HTTP_TASK_QUEUE_CAPACITY`, and
+`MEMORY_MCP_HTTP_TASK_SYNC_MAX_BYTES` have validated safe defaults.
+
+Set `MEMORY_MCP_HTTP_REPLICA_ID` to a stable deployment identity when running
+multiple replicas; worker leases otherwise use a process-lifetime PID fallback.
 
 The embedded `rocksdb://` backend is suitable only for development, demos, and
 single-process tests. Public production requires remote SurrealDB, reverse-proxy

@@ -130,6 +130,18 @@ use separate bindings:
   `ALLOWED_ORIGINS`, `MEMORY_MCP_HTTP_BODY_LIMIT`,
   `MEMORY_MCP_HTTP_REQUEST_DEADLINE_SECS`, and
   `MEMORY_MCP_HTTP_SHUTDOWN_GRACE_SECS` configure the HTTP boundary;
+- runtime/admission tuning is explicit through
+  `MEMORY_MCP_HTTP_POOL_CAP`, `MEMORY_MCP_HTTP_RUNTIME_IDLE_TTL_SECS`,
+  `MEMORY_MCP_HTTP_RUNTIME_CAPACITY_WAIT_MS`,
+  `MEMORY_MCP_HTTP_RUNTIME_ACTIVATION_TIMEOUT_SECS`,
+  `MEMORY_MCP_HTTP_GLOBAL_REQUEST_LIMIT`,
+  `MEMORY_MCP_HTTP_SUBSCRIPTION_LIMIT`,
+  `MEMORY_MCP_HTTP_MAINTENANCE_PARALLELISM`,
+  `MEMORY_MCP_HTTP_SUBSCRIPTION_QUEUE_CAPACITY`, and
+  `MEMORY_MCP_HTTP_SUBSCRIPTION_AUTH_RECHECK_SECS`; Task policy uses
+  `MEMORY_MCP_HTTP_TASK_RETENTION_SECS`,
+  `MEMORY_MCP_HTTP_TASK_QUEUE_CAPACITY`, and
+  `MEMORY_MCP_HTTP_TASK_SYNC_MAX_BYTES`;
 - `MEMORY_MCP_API_KEY_PEPPER` plus the five
   `MEMORY_MCP_HTTP_*_KEY` variables configure keyed verifiers; raw secrets are
   never persisted or logged;
@@ -140,11 +152,14 @@ use separate bindings:
   `MEMORY_MCP_HTTP_INGEST_PER_MINUTE`,
   `MEMORY_MCP_HTTP_MAX_OPEN_APP_SESSIONS`,
   `MEMORY_MCP_HTTP_MAX_ACTIVE_API_KEYS`,
-  `MEMORY_MCP_HTTP_REQUEST_CONCURRENCY`, and
+  `MEMORY_MCP_HTTP_PER_TENANT_REQUEST_CONCURRENCY`, and
   `MEMORY_MCP_HTTP_EXTRACTION_CONCURRENCY`. These seed durable plan version 1
   only when it does not already exist;
 - `MEMORY_MCP_HTTP_OPERATOR_IDENTITIES` is a comma-separated immutable allowlist
   of `issuer|hex(subject_verifier)` entries;
+- `MEMORY_MCP_HTTP_REPLICA_ID` identifies the process for durable worker leases;
+  it should be explicitly set for multi-replica deployments, while the PID-based
+  fallback is safe only for a single process;
 - `MEMORY_MCP_CONTROL_PLANE_UI_DIST` is a build-time absolute path to a complete
   Dioxus 0.7 web bundle. It is embedded deterministically; enabling the UI
   feature without `index.html` is a build error, not a runtime placeholder.

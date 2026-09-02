@@ -49,11 +49,24 @@ async fn main() -> ExitCode {
             |hooks| {
                 hooks
                     .with_additional_job(memory_mcp::http::app_sessions::scheduler::scheduler_job())
-                    .with_additional_job(memory_mcp::http::tasks::scheduler::scheduler_job())
+                    .with_additional_job(
+                        memory_mcp::http::tasks::scheduler::scheduler_job_with_options(
+                            memory_mcp::http::runtime::storage::RuntimeOptions::from_http_config(&cfg),
+                        ),
+                    )
                     .with_additional_job(memory_mcp::http::subscriptions::scheduler::scheduler_job())
                     .with_additional_job(memory_mcp::http::registry::plan::scheduler_job())
+                    .with_additional_job(memory_mcp::http::runtime::pool::Pool::eviction_scheduler_job(
+                        state.pool.clone(),
+                    ))
+                    .with_additional_job(
+                        memory_mcp::http::registry::provisioning::reconciliation_scheduler_job(),
+                    )
             },
-        ) {
+        )
+        .and_then(|hooks| {
+            hooks.with_maintenance_parallelism(cfg.maintenance_parallelism)
+        }) {
             Ok(hooks) => hooks,
             Err(err) => {
                 eprintln!("scheduler config error: {err}");

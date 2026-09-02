@@ -167,6 +167,27 @@ impl ApiClient {
         }
     }
 
+    /// POST /auth/oidc/logout — revoke the current browser session.
+    pub async fn logout(&self) -> Result<(), ApiError> {
+        let csrf = self.csrf().await?;
+        let resp = gloo_net::http::Request::post(&format!("{}/auth/oidc/logout", self.base))
+            .header("X-CSRF-Token", &csrf)
+            .send()
+            .await
+            .map_err(|e| ApiError {
+                message: e.to_string(),
+                status: 0,
+            })?;
+        if resp.ok() {
+            Ok(())
+        } else {
+            Err(ApiError {
+                message: "logout failed".into(),
+                status: resp.status(),
+            })
+        }
+    }
+
     /// POST /api/v1/account/delete — start deletion flow.
     pub async fn start_delete(&self) -> Result<DeleteChallenge, ApiError> {
         let csrf = self.csrf().await?;

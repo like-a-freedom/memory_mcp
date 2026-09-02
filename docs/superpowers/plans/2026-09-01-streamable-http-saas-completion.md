@@ -294,7 +294,7 @@ GIT_EDITOR=true git commit -m "feat: wire durable surreal registry"
 
 **Interfaces:**
 - Consumes: Task 2 connected `SurrealRegistryStore` and `SurrealDbClient` execution helpers.
-- Produces: `apply_registry_migrations(&SurrealRegistryStore)`, `tenant_versioned_migrations()`, and `run_migrations_for(client, namespace, catalog)` with durable ledger/checksum/postcondition behavior. `CURRENT_SCHEMA_VERSION` must derive from the final tenant catalog entry (`045` in this plan) rather than remain `30`.
+- Produces: `apply_registry_migrations(&SurrealRegistryStore)`, `tenant_versioned_migrations()`, and `run_migrations_for(client, namespace, catalog)` with durable ledger/checksum/postcondition behavior. The tenant catalog ends at `044_task_artifacts`; registry-only deletion/usage hardening is tracked separately as `045`, and the tenant `CURRENT_SCHEMA_VERSION` therefore remains `44`.
 
 - [ ] **Step 1: Write failing schema tests.** Assert that `001_registry.surql` defines account, tenant, external identity, API key, control session, OIDC request, provisioning event, plan, usage, deletion challenge, tombstone, audit, and migration-ledger tables with unique constraints for identity, tenant ownership, namespace binding, cookie/state hashes, and API-key IDs. Assert the tenant catalog contains every script through `045` in order.
 - [ ] **Step 2: Run migration tests and verify the catalog/schema assertions fail.**
@@ -415,11 +415,12 @@ MEMORY_MCP_HTTP_MAX_ACTIVE_API_KEYS
 MEMORY_MCP_HTTP_PER_TENANT_REQUEST_CONCURRENCY
 MEMORY_MCP_HTTP_EXTRACTION_CONCURRENCY
 MEMORY_MCP_HTTP_INGEST_PER_MINUTE
-MEMORY_MCP_HTTP_OPERATOR_IDENTITIES
-MEMORY_MCP_CONTROL_PLANE_UI_DIST
+- `MEMORY_MCP_HTTP_OPERATOR_IDENTITIES`
+- `MEMORY_MCP_HTTP_REPLICA_ID`
+- `MEMORY_MCP_CONTROL_PLANE_UI_DIST`
 ```
 
-`MEMORY_MCP_HTTP_MAX_*`, `MEMORY_MCP_HTTP_PER_TENANT_REQUEST_CONCURRENCY`, `MEMORY_MCP_HTTP_EXTRACTION_CONCURRENCY`, and `MEMORY_MCP_HTTP_INGEST_PER_MINUTE` are required explicitly when `MEMORY_MCP_HTTP_SIGNUP_MODE=open`; other profiles may use documented safe defaults.
+`MEMORY_MCP_HTTP_MAX_*`, `MEMORY_MCP_HTTP_PER_TENANT_REQUEST_CONCURRENCY`, `MEMORY_MCP_HTTP_EXTRACTION_CONCURRENCY`, and `MEMORY_MCP_HTTP_INGEST_PER_MINUTE` are required explicitly when `MEMORY_MCP_HTTP_SIGNUP_MODE=open`; other profiles may use documented safe defaults. `MEMORY_MCP_HTTP_REPLICA_ID` should be set in multi-replica deployments so lease ownership is stable and observable; the process-id fallback is safe only for single-process/local operation.
 
 - [ ] **Step 1: Add failing config tests for every operational limit.** Cover pool capacity, idle TTL, capacity wait, activation timeout, global request/subscription admission, maintenance parallelism, Task retention/queue, subscription queue/recheck intervals, synchronous extract policy, and all quota values. Verify open signup fails unless each required quota is explicitly present.
 - [ ] **Step 2: Run config/runtime tests and verify unused-field/no-op behavior is exposed.**

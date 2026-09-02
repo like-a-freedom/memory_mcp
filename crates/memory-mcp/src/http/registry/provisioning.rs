@@ -12,6 +12,7 @@
 //! only path that destroys records, and it requires a
 //! fenced-CAS update of the Tenant's `version`.
 
+use std::collections::HashSet;
 use std::sync::Arc;
 
 use crate::error::MemoryError;
@@ -114,6 +115,77 @@ pub async fn enqueue_provisioning(
     store
         .append_provisioning_event(&tenant.id, "reserved")
         .await
+}
+
+/// Tracked reconciliation job for server-generated Tenant namespaces. It only
+/// reports missing/orphan bindings; it never deletes or rebinds a namespace.
+#[cfg(feature = "streamable-http")]
+pub fn reconciliation_scheduler_job() -> crate::http::leases::scheduler::SchedulerJob {
+    Arc::new(|registry| Box::pin(reconcile_namespaces(registry)))
+}
+
+#[cfg(feature = "streamable-http")]
+async fn reconcile_namespaces(
+    registry: crate::http::registry::RegistryHandle,
+) -> Result<(), MemoryError> {
+    static LAST_RUN: std::sync::OnceLock<std::sync::Mutex<Option<std::time::Instant>>> =
+        std::sync::OnceLock::new();
+    {
+        let mut last = LAST_RUN
+            .get_or_init(|| std::sync::Mutex::new(None))
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        if last.is_some_and(|instant| instant.elapsed() < std::time::Duration::from_secs(60)) {
+            return Ok(());
+        }
+        *last = Some(std::time::Instant::now());
+    }
+    let registered = registry.store_clone().list_tenants(10_000).await?;
+    let Some(engine) = registry.tenant_engine_optional() else {
+        return Ok(());
+    };
+    let actual = engine.list_namespaces().await?;
+    let registered_namespaces: HashSet<String> = registered
+        .iter()
+        .map(|tenant| tenant.namespace_binding.namespace.clone())
+        .collect();
+    let actual_namespaces: HashSet<String> = actual
+        .into_iter()
+        .filter(|namespace| namespace.starts_with("tns_"))
+        .collect();
+    for tenant in registered {
+        if !actual_namespaces.contains(&tenant.namespace_binding.namespace) {
+            metrics::counter!(
+                "memory_http_registry_reconciliation_total",
+                "kind" => "missing_namespace"
+            )
+            .increment(1);
+            eprintln!(
+                "memory_mcp::http::registry: missing namespace binding tenant_fingerprint={} namespace_fingerprint={}",
+                identifier_fingerprint(&tenant.id),
+                identifier_fingerprint(&tenant.namespace_binding.namespace)
+            );
+        }
+    }
+    for namespace in actual_namespaces.difference(&registered_namespaces) {
+        metrics::counter!(
+            "memory_http_registry_reconciliation_total",
+            "kind" => "orphan_namespace"
+        )
+        .increment(1);
+        eprintln!(
+            "memory_mcp::http::registry: orphan namespace namespace_fingerprint={}",
+            identifier_fingerprint(namespace)
+        );
+    }
+    Ok(())
+}
+
+#[cfg(feature = "streamable-http")]
+fn identifier_fingerprint(value: &str) -> String {
+    use sha2::{Digest, Sha256};
+    let digest = Sha256::digest(value.as_bytes());
+    hex::encode(&digest[..8])
 }
 
 /// Reconcile a tenant list against the privileged database.

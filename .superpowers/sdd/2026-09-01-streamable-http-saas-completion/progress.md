@@ -39,15 +39,15 @@
 - Task 2: complete — remote/embedded SurrealRegistryStore and startup wiring
 - Task 3: complete — registry/tenant migration catalogs, checksums, postconditions, recovery
 - Task 4: complete — immutable tenant runtime binding, LRU/admission, fencing
-- Task 5: complete — tracked scheduler with provisioning, task, app-session, subscription, deletion, and quota jobs
-- Task 6: complete — durable App Sessions with optimistic CAS and bounded cleanup
-- Task 7: complete — durable extraction Tasks, worker fencing, cancellation intent, artifacts, retention
+- Task 5: complete — tracked scheduler with provisioning, task, app-session, subscription, deletion, quota reconciliation, namespace reconciliation, and runtime eviction jobs; typed pool/admission/task/subscription limits
+- Task 6: complete — durable App Sessions with optimistic CAS, plan cap, bounded cleanup, and atomic outbox invalidations
+- Task 7: complete — durable extraction Tasks, worker fencing, cancellation intent (`cancelled_before_commit`), artifacts, queue cap, sync-extract ceiling, and retention
 - Task 8: complete — modern-only rmcp Streamable HTTP transport and black-box conformance
 - Task 9: complete — validated subscriptions, bounded/coalescing delivery, durable outbox polling/repair
 - Task 10: complete — OIDC/PKCE, secure sessions, CSRF, operator routes, Dioxus SPA API/pages
 - Task 11: complete — durable plan/usage admission, HTTP 429 mapping, app/API-key/extraction concurrency
-- Task 12: complete — one-use account deletion, operator deletion, durable tombstones, worker cleanup
-- Task 13: complete — control-plane and runtime integration, safe error/auth/cache handling
+- Task 12: complete — one-use account deletion, operator deletion, durable tombstones, worker cleanup, and logout session revocation
+- Task 13: complete — control-plane and runtime integration, safe error/auth/cache handling, stable replica lease identity
 - Task 14: complete — router/static assets/build contract and environment documentation
 - Task 15: operator gate — real Dioxus `dx bundle` unavailable in this environment; temporary bundle path validated
 - Task 16: operator/CI gate — expected 20-tenant load is covered by repository tests; 500-tenant contingency requires dedicated infrastructure

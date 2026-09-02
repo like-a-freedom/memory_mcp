@@ -85,7 +85,6 @@ pub async fn execute_deletion(
     Ok(())
 }
 
-const DELETION_OWNER_ID: &str = "deletion-scheduler";
 const DELETION_LEASE_TTL_SECS: i64 = 60;
 const DELETION_BATCH_SIZE: usize = 64;
 const APP_SESSION_CLEANUP_SQL: &str =
@@ -104,16 +103,12 @@ pub async fn run_deletion_worker(registry: RegistryHandle) -> Result<(), MemoryE
     }
     let engine = registry.tenant_engine()?;
     let mut first_error = None;
+    let owner_id = crate::http::leases::scheduler::replica_id();
 
     for tenant in tenants {
         let lease_id = uuid::Uuid::new_v4().to_string();
         let Some(lease) = store
-            .claim_provisioning(
-                &tenant.id,
-                DELETION_OWNER_ID,
-                &lease_id,
-                DELETION_LEASE_TTL_SECS,
-            )
+            .claim_provisioning(&tenant.id, &owner_id, &lease_id, DELETION_LEASE_TTL_SECS)
             .await?
         else {
             continue;

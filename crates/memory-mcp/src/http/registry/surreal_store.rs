@@ -1430,6 +1430,7 @@ impl RegistryStore for SurrealRegistryStore {
             IF array::len($tenant) = 0 { THROW 'tenant deletion tombstone is already purged or missing'; }; \
             UPDATE api_key SET status = 'revoked', version = version + 1 \
                 WHERE account_id = $account_id AND status = 'active'; \
+            DELETE FROM control_plane_session WHERE account_id = $account_id; \
             LET $consumed = UPDATE deletion_challenge \
                 SET consumed_at = type::datetime($now) \
                 WHERE verifier = $verifier AND account_id = $account_id \
@@ -1830,6 +1831,18 @@ impl RegistryStore for SurrealRegistryStore {
         rows.into_iter().map(|row| decode_tenant(&row)).collect()
     }
 
+    async fn list_tenants(&self, limit: usize) -> Result<Vec<Tenant>, MemoryError> {
+        let rows = self
+            .handle()
+            .query_json(
+                "SELECT * FROM tenant ORDER BY id LIMIT $limit",
+                Some(json!({"limit": limit})),
+            )
+            .await
+            .map_err(|error| map_storage_error("list tenants", error))?;
+        rows.into_iter().map(|row| decode_tenant(&row)).collect()
+    }
+
     #[cfg(feature = "control-plane")]
     async fn finalize_account_deletion(
         &self,
@@ -2197,6 +2210,22 @@ impl RegistryStore for SurrealRegistryStore {
             )
             .await
             .map_err(|error| map_storage_error("touch session", error))?;
+        if rows.is_empty() {
+            return Err(MemoryError::NotFound("session not found".into()));
+        }
+        Ok(())
+    }
+
+    #[cfg(feature = "control-plane")]
+    async fn delete_session(&self, cookie_hash: &str) -> Result<(), MemoryError> {
+        let rows = self
+            .handle()
+            .query_json(
+                "DELETE FROM control_plane_session WHERE cookie_hash = $cookie_hash RETURN BEFORE",
+                Some(json!({"cookie_hash": cookie_hash})),
+            )
+            .await
+            .map_err(|error| map_storage_error("delete session", error))?;
         if rows.is_empty() {
             return Err(MemoryError::NotFound("session not found".into()));
         }

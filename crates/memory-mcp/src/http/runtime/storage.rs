@@ -16,6 +16,34 @@ use crate::mcp::handlers::MemoryMcp;
 use crate::storage::client::BoundDbClient;
 use crate::storage::client::SurrealDbClient;
 
+/// Options that are fixed for a process and copied into each tenant runtime.
+#[derive(Debug, Clone, Copy)]
+pub struct RuntimeOptions {
+    pub task_retention_secs: i64,
+    pub task_queue_capacity: usize,
+    pub task_sync_max_bytes: usize,
+}
+
+impl Default for RuntimeOptions {
+    fn default() -> Self {
+        Self {
+            task_retention_secs: crate::http::config::DEFAULT_TASK_RETENTION_SECS as i64,
+            task_queue_capacity: crate::http::config::DEFAULT_TASK_QUEUE_CAPACITY,
+            task_sync_max_bytes: crate::http::config::DEFAULT_TASK_SYNC_MAX_BYTES,
+        }
+    }
+}
+
+impl RuntimeOptions {
+    pub fn from_http_config(config: &crate::http::config::HttpConfig) -> Self {
+        Self {
+            task_retention_secs: i64::try_from(config.task_retention_secs).unwrap_or(i64::MAX),
+            task_queue_capacity: config.task_queue_capacity,
+            task_sync_max_bytes: config.task_sync_max_bytes,
+        }
+    }
+}
+
 /// Per-tenant runtime bundle. Lives in the LRU pool; the
 /// `mcp_service` is the per-request dispatch target once the
 /// HTTP pipeline has resolved and acquired the runtime.
@@ -44,10 +72,11 @@ impl TenantRuntime {
         tenant: &Tenant,
         tenant_db: Arc<SurrealDbClient>,
     ) -> Result<Self, MemoryError> {
-        Self::from_bound_client_with_plan(
+        Self::from_bound_client_with_runtime_options(
             tenant,
             tenant_db,
             crate::http::registry::plan::Plan::default(),
+            RuntimeOptions::default(),
         )
     }
 
@@ -58,6 +87,20 @@ impl TenantRuntime {
         tenant: &Tenant,
         tenant_db: Arc<SurrealDbClient>,
         plan: crate::http::registry::plan::Plan,
+    ) -> Result<Self, MemoryError> {
+        Self::from_bound_client_with_runtime_options(
+            tenant,
+            tenant_db,
+            plan,
+            RuntimeOptions::default(),
+        )
+    }
+
+    pub fn from_bound_client_with_runtime_options(
+        tenant: &Tenant,
+        tenant_db: Arc<SurrealDbClient>,
+        plan: crate::http::registry::plan::Plan,
+        options: RuntimeOptions,
     ) -> Result<Self, MemoryError> {
         let namespace = tenant.namespace_binding.namespace.clone();
         let database = tenant.namespace_binding.database.clone();
@@ -72,7 +115,8 @@ impl TenantRuntime {
         .with_http_outbox();
         let mut mcp_service = MemoryMcp::new_modern(service)
             .with_tenant_id(tenant.id.clone())
-            .with_tenant_plan(plan);
+            .with_tenant_plan(plan)
+            .with_task_sync_max_bytes(options.task_sync_max_bytes);
 
         // Wire durable backends. The stdio path never reaches
         // this function (it uses the test pool), so the
@@ -86,9 +130,11 @@ impl TenantRuntime {
                 ));
             }
             mcp_service = mcp_service.with_durable_tasks(Arc::new(
-                crate::http::tasks::worker::DurableTaskStore::new(
+                crate::http::tasks::worker::DurableTaskStore::new_with_options(
                     bound_db.clone(),
                     tenant.id.clone(),
+                    options.task_retention_secs,
+                    options.task_queue_capacity,
                 ),
             ));
             mcp_service = mcp_service.with_durable_subscriptions(Arc::new(
@@ -118,6 +164,14 @@ impl TenantRuntime {
 pub async fn build_runtime(
     registry: &super::super::registry::RegistryHandle,
     tenant: &Tenant,
+) -> Result<TenantRuntime, MemoryError> {
+    build_runtime_with_options(registry, tenant, RuntimeOptions::default()).await
+}
+
+pub async fn build_runtime_with_options(
+    registry: &super::super::registry::RegistryHandle,
+    tenant: &Tenant,
+    options: RuntimeOptions,
 ) -> Result<TenantRuntime, MemoryError> {
     let plan = crate::http::registry::plan::Plan::from(
         &registry
@@ -166,7 +220,7 @@ pub async fn build_runtime(
             ))
         }
     };
-    TenantRuntime::from_bound_client_with_plan(tenant, tenant_db, plan)
+    TenantRuntime::from_bound_client_with_runtime_options(tenant, tenant_db, plan, options)
 }
 
 #[cfg(test)]

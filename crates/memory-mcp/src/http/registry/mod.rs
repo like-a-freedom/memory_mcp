@@ -20,6 +20,7 @@ pub use storage::InMemoryStore;
 
 use std::sync::{Arc, OnceLock};
 
+use serde_json::Value;
 use surrealdb::Surreal;
 use surrealdb::engine::local::Db;
 use surrealdb::engine::remote::ws::Client;
@@ -47,6 +48,47 @@ impl PrivilegedEngine {
     /// `SurrealDbClient` ready for queries. The cleanup
     /// scheduler uses this to issue per-tenant DELETEs
     /// against `app_session`.
+    pub async fn list_namespaces(&self) -> Result<Vec<String>, crate::error::MemoryError> {
+        async fn root_info<C: surrealdb::Connection>(
+            db: &Surreal<C>,
+        ) -> Result<Value, crate::error::MemoryError> {
+            let mut response = db.query("INFO FOR ROOT").await.map_err(|error| {
+                crate::error::MemoryError::Storage(format!("root namespace probe failed: {error}"))
+            })?;
+            let errors = response.take_errors();
+            if !errors.is_empty() {
+                return Err(crate::error::MemoryError::Storage(
+                    "root namespace probe returned a database error".into(),
+                ));
+            }
+            response
+                .take::<Option<Value>>(0)
+                .map_err(|error| {
+                    crate::error::MemoryError::Storage(format!(
+                        "root namespace probe decode failed: {error}"
+                    ))
+                })?
+                .ok_or_else(|| {
+                    crate::error::MemoryError::Storage(
+                        "root namespace probe returned no data".into(),
+                    )
+                })
+        }
+        let info = match self {
+            Self::Remote(db) => root_info(db).await?,
+            Self::Local(db) | Self::LocalMem(db) => root_info(db).await?,
+        };
+        let namespaces = info
+            .get("namespaces")
+            .and_then(Value::as_object)
+            .ok_or_else(|| {
+                crate::error::MemoryError::Storage(
+                    "root namespace probe returned no namespace catalog".into(),
+                )
+            })?;
+        Ok(namespaces.keys().cloned().collect())
+    }
+
     pub async fn bind(
         &self,
         tenant: &super::registry::models::Tenant,
@@ -240,5 +282,26 @@ impl RegistryHandle {
             store,
             engine: Some(Arc::new(engine)),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn privileged_engine_lists_server_namespaces() {
+        let db = Surreal::new::<surrealdb::engine::local::Mem>(())
+            .await
+            .expect("mem engine");
+        storage::ensure_namespace(&db, "control", "registry")
+            .await
+            .expect("control namespace");
+        storage::ensure_namespace(&db, "tns_probe", "memory")
+            .await
+            .expect("tenant namespace");
+        let engine = PrivilegedEngine::LocalMem(Arc::new(db));
+        let namespaces = engine.list_namespaces().await.expect("namespace catalog");
+        assert!(namespaces.iter().any(|name| name == "tns_probe"));
     }
 }

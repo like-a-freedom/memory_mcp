@@ -126,8 +126,12 @@ pub async fn mcp_handler(
         .get::<super::principal::AuthenticatedPrincipal>()
         .cloned()
     {
-        request_handler =
-            request_handler.with_subscription_authorization(principal, state.authenticator.clone());
+        request_handler = request_handler
+            .with_subscription_authorization(principal, state.authenticator.clone())
+            .with_subscription_limits(
+                state.config.subscription_queue_capacity,
+                state.config.subscription_auth_recheck,
+            );
     }
     let svc = build_mcp_service(
         move || Ok(request_handler.clone()),
