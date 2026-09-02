@@ -1,9 +1,8 @@
 # One-Active-Namespace Identity Compatibility
 
-> **Status:** implemented compatibility contract; the checked-in tests and
-> [2026-08-12 implementation plan](../superpowers/plans/2026-08-12-one-active-namespace.md)
-> track any remaining release-gate work. The ADR records the accepted product
-> decision and the hard-break boundaries.
+> **Status:** implemented compatibility contract. The checked-in tests in
+> `crates/memory-mcp/tests/` track any remaining release-gate work. The ADR
+> records the accepted product decision and the hard-break boundaries.
 >
 > This document is the compatibility slice of ADR-0038. It defines how
 > pre-change identity inputs are looked up after the server becomes scope-free.
