@@ -784,6 +784,95 @@ The following settings are optional for power users. They are read by the same e
 
 Advanced provider selection may cause network access or model downloads. Keep these variables unset for the local-first quick start.
 
+### Streamable HTTP environment variables
+
+Read only by the `memory_mcp_http` binary built with the `streamable-http` feature. Set these to deploy the SaaS profile; the [Streamable HTTP SaaS profile](#streamable-http-saas-profile) section above explains the operational behavior and reverse-proxy contract, and the [Streamable HTTP SaaS specification](docs/superpowers/specs/2026-08-27-streamable-http-saas.md) is the contract of record.
+
+**HTTP boundary**
+
+| Variable | Type | Default | Description |
+| --- | --- | --- | --- |
+| `MEMORY_MCP_HTTP_BIND` | socket address (`IP:port`) | `0.0.0.0:8080` | Listen address |
+| `MEMORY_MCP_HTTP_PUBLIC_BASE_URL` | URL | unset | Required. Public base URL used for OIDC redirects and absolute links |
+| `ALLOWED_HOSTS` | comma-separated list | unset | Required for production. Wildcard and unset values are rejected at startup; missing `Host` returns `403` |
+| `ALLOWED_ORIGINS` | comma-separated list | unset | Required for production. Wildcard values are rejected; missing `Origin` is allowed only for non-browser MCP clients, present `Origin` must match |
+| `MEMORY_MCP_HTTP_TRUSTED_PROXY_CIDRS` | comma-separated `CIDR` list | unset | Trusted reverse-proxy CIDRs for forwarded `Host`/`Origin`; if unset, the values are ignored entirely |
+| `MEMORY_MCP_HTTP_BODY_LIMIT` | bytes | `8388608` (8 MiB) | Maximum request body size; oversized bodies return `413` |
+| `MEMORY_MCP_HTTP_REQUEST_DEADLINE_SECS` | seconds | `120` | Ordinary request handler deadline; does not apply to `subscriptions/listen` |
+| `MEMORY_MCP_HTTP_SHUTDOWN_GRACE_SECS` | seconds | `30` | Time the server waits for in-flight requests and SSE streams during shutdown |
+
+**SurrealDB (control Registry and tenant engine)** — required
+
+| Variable | Type | Description |
+| --- | --- | --- |
+| `SURREALDB_CONTROL_URL` | URL | Remote `ws`, `wss`, `http`, or `https` connection URL for the control Registry |
+| `SURREALDB_CONTROL_USERNAME` | string | Registry username; non-empty for remote |
+| `SURREALDB_CONTROL_PASSWORD` | string | Registry password; non-empty for remote |
+| `SURREALDB_CONTROL_NAMESPACE` | string | Registry namespace (separate from tenant namespaces) |
+| `SURREALDB_CONTROL_DB` | string | Registry database name |
+| `SURREALDB_TENANT_URL` | URL | Remote URL for the tenant engine that creates and binds immutable tenant namespaces |
+| `SURREALDB_TENANT_USERNAME` | string | Tenant engine username |
+| `SURREALDB_TENANT_PASSWORD` | string | Tenant engine password |
+| `SURREALDB_TENANT_NAMESPACE` | string | Tenant engine namespace |
+| `SURREALDB_TENANT_DB` | string | Tenant engine database name |
+
+**Keyed verifiers and secrets** — required, 32-byte hex each (raw secrets are never persisted or logged)
+
+| Variable | Description |
+| --- | --- |
+| `MEMORY_MCP_API_KEY_PEPPER` | Pepper for the keyed HMAC verifier of Account API keys; rotating it invalidates every existing key |
+| `MEMORY_MCP_HTTP_IDENTITY_INDEX_KEY` | Blind index key for OIDC subject verifiers; rotating it requires every OIDC identity to relink |
+| `MEMORY_MCP_HTTP_SESSION_KEY` | HMAC key for browser-session cookie verifiers; rotating it invalidates every browser session |
+| `MEMORY_MCP_HTTP_OIDC_STATE_KEY` | AEAD key for OIDC state nonces; rotating it invalidates in-flight login flows |
+| `MEMORY_MCP_HTTP_OIDC_NONCE_KEY` | AEAD key for OIDC ID-token nonces; rotating it invalidates in-flight login flows |
+| `MEMORY_MCP_HTTP_CSRF_KEY` | HMAC key for CSRF tokens; rotating it invalidates every active browser session |
+
+**Signup policy, control plane, and OIDC**
+
+| Variable | Type | Default | Description |
+| --- | --- | --- | --- |
+| `MEMORY_MCP_HTTP_SIGNUP_MODE` | enum: `invite_only` \| `open` | unset | Required. `invite_only` rejects self-service sign-up; `open` requires the seven plan seed variables below |
+| `MEMORY_MCP_HTTP_ENABLE_CONTROL_PLANE` | boolean | `false` | Enable OIDC, browser sessions, and `/api/v1` endpoints |
+| `MEMORY_MCP_HTTP_ENABLE_CONTROL_PLANE_UI` | boolean | `false` | Serve the embedded Dioxus SPA from `/` (requires `control-plane-ui` build) |
+| `MEMORY_MCP_HTTP_OIDC_ISSUER` | URL | unset | Required when the control plane is enabled. Exact issuer match is enforced on every login |
+| `MEMORY_MCP_HTTP_OIDC_CLIENT_ID` | string | unset | Required when the control plane is enabled |
+| `MEMORY_MCP_HTTP_OIDC_AUDIENCE` | URL or comma-separated list | unset | Required when the control plane is enabled. Exact audience match is enforced |
+| `MEMORY_MCP_HTTP_OIDC_REDIRECT_URI` | URL | unset | Required when the control plane is enabled. Must match the registered redirect URI exactly |
+| `MEMORY_MCP_HTTP_OIDC_ALLOWED_ALG` | string | `RS256` | JWT algorithm allowlist; tokens signed with any other algorithm are rejected |
+| `MEMORY_MCP_HTTP_OPERATOR_IDENTITIES` | comma-separated `issuer\|hex(subject_verifier)` list | unset | Immutable operator allowlist. Account APIs cannot grant operator status |
+
+**Plan seed (required for `signup_mode=open`)** — if any one of these is set, all seven must parse as `u64`/`usize`. The values seed Registry plan version 1 only when no plan exists; an existing durable plan is never overwritten.
+
+| Variable | Type | Description |
+| --- | --- | --- |
+| `MEMORY_MCP_HTTP_MAX_INGESTED_BYTES` | `u64` | Cumulative ingested source bytes per tenant |
+| `MEMORY_MCP_HTTP_MAX_EPISODE_COUNT` | `u64` | Total episode count per tenant |
+| `MEMORY_MCP_HTTP_INGEST_PER_MINUTE` | `u64` | Token-bucket ingest rate per tenant |
+| `MEMORY_MCP_HTTP_MAX_OPEN_APP_SESSIONS` | `usize` | Concurrent App Sessions per tenant |
+| `MEMORY_MCP_HTTP_MAX_ACTIVE_API_KEYS` | `usize` | Active API keys per account |
+| `MEMORY_MCP_HTTP_PER_TENANT_REQUEST_CONCURRENCY` | `usize` | Concurrent ordinary requests per tenant |
+| `MEMORY_MCP_HTTP_EXTRACTION_CONCURRENCY` | `usize` | Concurrent `extract` operations per tenant |
+
+**Runtime pool, subscriptions, tasks, replica identity**
+
+| Variable | Type | Default | Description |
+| --- | --- | --- | --- |
+| `MEMORY_MCP_HTTP_POOL_CAP` | `usize` | `32` | Maximum number of tenant runtimes kept warm |
+| `MEMORY_MCP_HTTP_RUNTIME_IDLE_TTL_SECS` | seconds | `900` (15 min) | Idle eviction window for unpinned runtimes |
+| `MEMORY_MCP_HTTP_RUNTIME_CAPACITY_WAIT_MS` | milliseconds | `2000` | Maximum time a request waits for runtime capacity before returning `503` |
+| `MEMORY_MCP_HTTP_RUNTIME_ACTIVATION_TIMEOUT_SECS` | seconds | `30` | Maximum time the activator waits for a tenant runtime to become ready |
+| `MEMORY_MCP_HTTP_GLOBAL_REQUEST_LIMIT` | `u32` | `256` | Global concurrent ordinary-request admission budget |
+| `MEMORY_MCP_HTTP_SUBSCRIPTION_LIMIT` | `u32` | `32` | Global concurrent `subscriptions/listen` admission budget (separate from ordinary requests) |
+| `MEMORY_MCP_HTTP_MAINTENANCE_PARALLELISM` | `usize` | `4` | Scheduler maintenance-job concurrency |
+| `MEMORY_MCP_HTTP_SUBSCRIPTION_QUEUE_CAPACITY` | `usize` | `64` | Bounded per-listener event queue; slow consumers are disconnected |
+| `MEMORY_MCP_HTTP_SUBSCRIPTION_AUTH_RECHECK_SECS` | seconds | `30` | Maximum interval between authorization re-checks for an open stream |
+| `MEMORY_MCP_HTTP_TASK_RETENTION_SECS` | seconds | `604800` (7 days) | How long completed durable Tasks are kept before the scheduler removes them |
+| `MEMORY_MCP_HTTP_TASK_QUEUE_CAPACITY` | `usize` | `256` | Bounded durable Task queue capacity |
+| `MEMORY_MCP_HTTP_TASK_SYNC_MAX_BYTES` | `usize` | `1048576` (1 MiB) | Preflight size limit: `extract` work above this returns a preflight rejection for clients that did not advertise Tasks |
+| `MEMORY_MCP_HTTP_REPLICA_ID` | string | unset (falls back to process PID) | Stable replica identity. Set in multi-replica deployments; the PID fallback is safe only for a single process |
+
+`MEMORY_INGESTION_INBOX` and any other stdio-only filesystem variable are rejected as a fatal startup error in the HTTP profile.
+
 ### Runtime metrics
 
 Build with the optional `prometheus` feature and set
