@@ -460,7 +460,6 @@ pub async fn create_account(
 mod tests {
     use super::*;
     use crate::control::operator;
-    use crate::http::registry::account::AccountResolver;
     use crate::http::registry::storage::InMemoryStore;
     use axum::Router;
     use axum::body::Body;
@@ -474,35 +473,14 @@ mod tests {
     /// `RegistryHandle::in_memory()`.
     async fn build_test_router() -> (Router, Arc<InMemoryStore>) {
         let store: Arc<InMemoryStore> = Arc::new(InMemoryStore::default());
-        let cache = Arc::new(crate::http::principal::cache::PrincipalCache::new(8));
-        let rate = Arc::new(crate::http::principal::auth::RateLimiter::new(
-            4,
-            std::time::Duration::from_secs(60),
-            100,
-        ));
-        let authenticator = Arc::new(crate::http::principal::auth::Authenticator::new(
-            store.clone(),
-            cache,
-            b"pepper".to_vec(),
-            rate,
-        ));
-        let account_resolver = Arc::new(AccountResolver::new(store.clone()));
         let registry =
             crate::http::registry::RegistryHandle::in_memory().with_inner_store(store.clone());
-        let pool = Arc::new(crate::http::runtime::pool::Pool::with_defaults(
-            std::sync::Arc::new(registry.clone()),
-        ));
-        let state = Arc::new(HttpState {
-            config: crate::http::config::HttpConfig::default_for_test(),
-            pool,
-            shutdown: crate::http::shutdown::ShutdownState::new(),
-            admission: Arc::new(crate::http::runtime::pool::AdmissionGate::open()),
-            registry,
-            authenticator,
-            account_resolver,
-            #[cfg(feature = "control-plane")]
-            oidc_client: None,
-        });
+        let state = crate::http::test_state::HttpStateTestBuilder::new()
+            .await
+            .with_registry(registry)
+            .build()
+            .await
+            .expect("test HTTP state");
         let router = Router::new()
             .route(
                 "/api/v1/operator/accounts",
