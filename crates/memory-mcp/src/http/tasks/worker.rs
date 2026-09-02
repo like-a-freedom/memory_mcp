@@ -887,7 +887,7 @@ mod tests {
     #[tokio::test]
     async fn cancel_before_commit_fenced_rejects_stale_lease() {
         let store = fresh_store().await;
-        let id = store
+        store
             .enqueue("fp_cancel_stale", json!({}))
             .await
             .expect("enqueue");
@@ -900,9 +900,8 @@ mod tests {
         // fenced cancel must be rejected as a conflict. We
         // backdate the lease so the running task becomes
         // claimable, matching the real-world steal path.
-        let _ = id;
         let now = Utc::now();
-        let _ = store
+        store
             .db
             .query(
                 "UPDATE tenant_task SET lease_expiry = type::datetime($past) WHERE id = type::record('tenant_task', $id);",
@@ -911,7 +910,8 @@ mod tests {
                     "id": handle.task_id,
                 })),
             )
-            .await;
+            .await
+            .expect("expire lease");
         let stolen = store
             .claim_next_due("replica_b")
             .await
