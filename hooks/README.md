@@ -12,6 +12,7 @@ They are intentionally deterministic:
 
 - `hooks/memory_stop_hook.sh` — capture a session snapshot when an agent run completes
 - `hooks/memory_precompact_hook.sh` — capture an emergency snapshot before context compaction
+- `hooks/memory_profile.sh` — internal RSS/footprint sampling helper (not part of the public lifecycle contract)
 
 ## Zero-config default
 
@@ -319,8 +320,10 @@ capture and recall with policy classification:
 
 These are internal (hidden from `--help`) and consumed by hook scripts
 that need selective capture/recall with trust derivation, salience
-policy, and ephemeral trace management per ADR-0016 AD-4/AD-5. See
-`docs/agent_integration/CONTRACT.md` for the full hook examples.
+policy, and ephemeral trace management per ADR-0016 AD-4/AD-5. The full
+hook contract, including all environment variables, payload schemas, and
+editor-by-editor configuration examples, is documented inline in this
+README.
 
 The ordinary `ingest` path used by the scripts in this directory is
 always available and works without lifecycle configuration.
