@@ -132,7 +132,21 @@ pub fn build_router(state: Arc<HttpState>) -> Router {
         let oidc = Router::new()
             .route("/auth/oidc/authorize", get(crate::control::oidc::authorize))
             .route("/auth/oidc/callback", get(crate::control::oidc::callback));
-        router.merge(account).merge(operator).merge(oidc)
+        let logout = Router::new()
+            .route("/auth/oidc/logout", post(crate::control::oidc::logout))
+            .layer(axum::middleware::from_fn_with_state(
+                state.clone(),
+                super::middleware::require_control_plane_csrf,
+            ))
+            .layer(axum::middleware::from_fn_with_state(
+                state.clone(),
+                super::middleware::authenticate_control_plane_session,
+            ));
+        router
+            .merge(account)
+            .merge(operator)
+            .merge(oidc)
+            .merge(logout)
     } else {
         router
     };

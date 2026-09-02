@@ -125,6 +125,9 @@ pub trait TaskStore: Send + Sync + 'static {
         completed_before_cancel: bool,
     ) -> Result<(), MemoryError>;
 
+    /// Mark a running task cancelled before its durable artifact commit.
+    async fn cancel_before_commit_fenced(&self, handle: &TaskHandle) -> Result<(), MemoryError>;
+
     /// Mark the task failed with a CAS.
     async fn fail_fenced(
         &self,

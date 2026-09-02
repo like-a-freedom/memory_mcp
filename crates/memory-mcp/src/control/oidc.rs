@@ -650,6 +650,37 @@ pub async fn authorize(
     Ok(axum::response::Redirect::to(&url))
 }
 
+/// POST /auth/oidc/logout — revoke the current browser session and clear its
+/// cookie. The route is mounted behind cookie authentication and CSRF.
+pub async fn logout(
+    axum::extract::State(state): axum::extract::State<std::sync::Arc<crate::http::HttpState>>,
+    axum::extract::Extension(session): axum::extract::Extension<
+        super::session::ControlPlaneSession,
+    >,
+) -> Result<(axum::http::HeaderMap, axum::response::Redirect), super::error::ApiError> {
+    state
+        .registry
+        .store_clone()
+        .delete_session(&session.cookie_hash)
+        .await?;
+    let mut headers = axum::http::HeaderMap::new();
+    headers.insert(
+        axum::http::header::SET_COOKIE,
+        "__Host-memory_mcp_session=; Path=/; Secure; HttpOnly; SameSite=Lax; Max-Age=0"
+            .parse()
+            .map_err(|_| {
+                super::error::ApiError::Internal(MemoryError::ConfigInvalid(
+                    "invalid logout cookie header".into(),
+                ))
+            })?,
+    );
+    headers.insert(
+        axum::http::header::CACHE_CONTROL,
+        axum::http::HeaderValue::from_static("no-store"),
+    );
+    Ok((headers, axum::response::Redirect::to("/")))
+}
+
 /// GET /api/v1/auth/callback — OIDC provider redirects here.
 pub async fn callback(
     axum::extract::State(state): axum::extract::State<std::sync::Arc<crate::http::HttpState>>,

@@ -113,6 +113,14 @@ pub struct MemoryMcp {
     /// Tenant-scoped extraction concurrency for synchronous tool calls.
     #[cfg(feature = "streamable-http")]
     extraction_semaphore: Option<Arc<tokio::sync::Semaphore>>,
+    /// Validated HTTP subscription delivery limits.
+    #[cfg(feature = "streamable-http")]
+    subscription_queue_capacity: usize,
+    #[cfg(feature = "streamable-http")]
+    subscription_auth_recheck_secs: u64,
+    /// Maximum inline extraction size when the client did not advertise Tasks.
+    #[cfg(feature = "streamable-http")]
+    task_sync_max_bytes: usize,
     tasks: TaskManager,
     tool_router: ToolRouter<Self>,
     /// When true, advertise and negotiate only MCP 2026-07-28. Stdio
@@ -149,6 +157,13 @@ impl MemoryMcp {
             tenant_plan: None,
             #[cfg(feature = "streamable-http")]
             extraction_semaphore: None,
+            #[cfg(feature = "streamable-http")]
+            subscription_queue_capacity: crate::http::config::DEFAULT_SUBSCRIPTION_QUEUE_CAPACITY,
+            #[cfg(feature = "streamable-http")]
+            subscription_auth_recheck_secs: crate::http::config::DEFAULT_SUBSCRIPTION_AUTH_RECHECK
+                .as_secs(),
+            #[cfg(feature = "streamable-http")]
+            task_sync_max_bytes: crate::http::config::DEFAULT_TASK_SYNC_MAX_BYTES,
             tasks: TaskManager::new(),
             tool_router: Self::tool_router(),
             modern_protocol_only: false,
@@ -236,6 +251,26 @@ impl MemoryMcp {
         };
         self.extraction_semaphore = Some(Arc::new(tokio::sync::Semaphore::new(permits)));
         self.tenant_plan = Some(plan);
+        self
+    }
+
+    /// Attach validated subscription delivery limits from HTTP config.
+    #[cfg(feature = "streamable-http")]
+    pub fn with_subscription_limits(
+        mut self,
+        queue_capacity: usize,
+        auth_recheck: Duration,
+    ) -> Self {
+        self.subscription_queue_capacity = queue_capacity.max(1);
+        self.subscription_auth_recheck_secs = auth_recheck.as_secs().max(1);
+        self
+    }
+
+    /// Attach the bounded synchronous extraction policy for clients without
+    /// the Tasks capability.
+    #[cfg(feature = "streamable-http")]
+    pub fn with_task_sync_max_bytes(mut self, max_bytes: usize) -> Self {
+        self.task_sync_max_bytes = max_bytes.max(1);
         self
     }
 
@@ -369,6 +404,26 @@ impl ServerHandler for MemoryMcp {
         let client_supports_tasks = context
             .client_capabilities()
             .is_some_and(|caps| caps.supports_tasks());
+
+        #[cfg(feature = "streamable-http")]
+        if request.name == "extract" && !client_supports_tasks {
+            let inline_bytes = request
+                .arguments
+                .as_ref()
+                .and_then(|arguments| {
+                    arguments
+                        .get("content")
+                        .or_else(|| arguments.get("text"))
+                        .and_then(|value| value.as_str())
+                })
+                .map(str::len);
+            if inline_bytes.is_some_and(|bytes| bytes > self.task_sync_max_bytes) {
+                return Err(ErrorData::invalid_params(
+                    "inline extract exceeds the synchronous limit; advertise MCP Tasks",
+                    None,
+                ));
+            }
+        }
 
         if request.name == "extract" && client_supports_tasks {
             let params: ExtractParams = serde_json::from_value(serde_json::Value::Object(
@@ -638,14 +693,16 @@ impl ServerHandler for MemoryMcp {
 
             let mut last_auth_check = Instant::now();
             let mut queue = crate::http::subscriptions::stream::CoalescingQueue::new(
-                crate::http::subscriptions::stream::DEFAULT_QUEUE_CAPACITY,
+                self.subscription_queue_capacity,
             );
             let mut poll_tick = tokio::time::interval(Duration::from_secs(1));
             loop {
                 tokio::select! {
                     _ = context.cancelled() => return Ok(()),
                     _ = poll_tick.tick() => {
-                        if last_auth_check.elapsed() >= Duration::from_secs(30) {
+                        if last_auth_check.elapsed()
+                            >= Duration::from_secs(self.subscription_auth_recheck_secs)
+                        {
                             ensure_subscription_authorization(&authenticator, &principal).await?;
                             last_auth_check = Instant::now();
                         }
@@ -669,7 +726,9 @@ impl ServerHandler for MemoryMcp {
                             })?;
                         }
                         while let Some(event) = queue.pop_front() {
-                            if last_auth_check.elapsed() >= Duration::from_secs(30) {
+                            if last_auth_check.elapsed()
+                                >= Duration::from_secs(self.subscription_auth_recheck_secs)
+                            {
                                 ensure_subscription_authorization(&authenticator, &principal).await?;
                                 last_auth_check = Instant::now();
                             }

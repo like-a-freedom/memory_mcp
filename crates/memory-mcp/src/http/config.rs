@@ -12,6 +12,18 @@ pub const DEFAULT_BIND: &str = "0.0.0.0:8080";
 pub const DEFAULT_BODY_LIMIT_BYTES: usize = 8 * 1024 * 1024; // 8 MiB
 pub const DEFAULT_REQUEST_DEADLINE: Duration = Duration::from_secs(120);
 pub const DEFAULT_SHUTDOWN_GRACE: Duration = Duration::from_secs(30);
+pub const DEFAULT_POOL_CAP: usize = 32;
+pub const DEFAULT_RUNTIME_IDLE_TTL: Duration = Duration::from_secs(15 * 60);
+pub const DEFAULT_RUNTIME_CAPACITY_WAIT: Duration = Duration::from_secs(2);
+pub const DEFAULT_RUNTIME_ACTIVATION_TIMEOUT: Duration = Duration::from_secs(30);
+pub const DEFAULT_GLOBAL_REQUEST_LIMIT: u32 = 256;
+pub const DEFAULT_SUBSCRIPTION_LIMIT: u32 = 32;
+pub const DEFAULT_MAINTENANCE_PARALLELISM: usize = 4;
+pub const DEFAULT_SUBSCRIPTION_QUEUE_CAPACITY: usize = 64;
+pub const DEFAULT_SUBSCRIPTION_AUTH_RECHECK: Duration = Duration::from_secs(30);
+pub const DEFAULT_TASK_RETENTION_SECS: u64 = 7 * 24 * 60 * 60;
+pub const DEFAULT_TASK_QUEUE_CAPACITY: usize = 256;
+pub const DEFAULT_TASK_SYNC_MAX_BYTES: usize = 1024 * 1024;
 pub const DEFAULT_ALLOWED_HOSTS: &[&str] = &[]; // must be set explicitly in production
 pub const DEFAULT_ALLOWED_ORIGINS: &[&str] = &[];
 pub const DEFAULT_OIDC_ALG: &str = "RS256";
@@ -28,6 +40,22 @@ pub struct HttpConfig {
     pub request_deadline: Duration,
     #[serde(deserialize_with = "deserialize_duration_secs")]
     pub shutdown_grace: Duration,
+    pub pool_cap: usize,
+    #[serde(deserialize_with = "deserialize_duration_secs")]
+    pub runtime_idle_ttl: Duration,
+    #[serde(deserialize_with = "deserialize_duration_secs")]
+    pub runtime_capacity_wait: Duration,
+    #[serde(deserialize_with = "deserialize_duration_secs")]
+    pub runtime_activation_timeout: Duration,
+    pub global_request_limit: u32,
+    pub subscription_limit: u32,
+    pub maintenance_parallelism: usize,
+    pub subscription_queue_capacity: usize,
+    #[serde(deserialize_with = "deserialize_duration_secs")]
+    pub subscription_auth_recheck: Duration,
+    pub task_retention_secs: u64,
+    pub task_queue_capacity: usize,
+    pub task_sync_max_bytes: usize,
     pub control_db: SurrealTargetConfig,
     pub tenant_db: SurrealTargetConfig,
     pub api_key_pepper: String,
@@ -219,7 +247,7 @@ fn load_signup_plan_limits() -> Result<Option<PlanLimits>, MemoryError> {
         "MEMORY_MCP_HTTP_INGEST_PER_MINUTE",
         "MEMORY_MCP_HTTP_MAX_OPEN_APP_SESSIONS",
         "MEMORY_MCP_HTTP_MAX_ACTIVE_API_KEYS",
-        "MEMORY_MCP_HTTP_REQUEST_CONCURRENCY",
+        "MEMORY_MCP_HTTP_PER_TENANT_REQUEST_CONCURRENCY",
         "MEMORY_MCP_HTTP_EXTRACTION_CONCURRENCY",
     ];
     let any_set = KEYS.iter().any(|key| optional_env(key).is_some());
@@ -257,6 +285,51 @@ impl HttpConfig {
             "MEMORY_MCP_HTTP_SHUTDOWN_GRACE_SECS",
             DEFAULT_SHUTDOWN_GRACE.as_secs(),
         )?);
+        let pool_cap = parse_env_or("MEMORY_MCP_HTTP_POOL_CAP", DEFAULT_POOL_CAP)?;
+        let runtime_idle_ttl = Duration::from_secs(parse_env_or(
+            "MEMORY_MCP_HTTP_RUNTIME_IDLE_TTL_SECS",
+            DEFAULT_RUNTIME_IDLE_TTL.as_secs(),
+        )?);
+        let runtime_capacity_wait = Duration::from_millis(parse_env_or(
+            "MEMORY_MCP_HTTP_RUNTIME_CAPACITY_WAIT_MS",
+            DEFAULT_RUNTIME_CAPACITY_WAIT.as_millis() as u64,
+        )?);
+        let runtime_activation_timeout = Duration::from_secs(parse_env_or(
+            "MEMORY_MCP_HTTP_RUNTIME_ACTIVATION_TIMEOUT_SECS",
+            DEFAULT_RUNTIME_ACTIVATION_TIMEOUT.as_secs(),
+        )?);
+        let global_request_limit = parse_env_or(
+            "MEMORY_MCP_HTTP_GLOBAL_REQUEST_LIMIT",
+            DEFAULT_GLOBAL_REQUEST_LIMIT,
+        )?;
+        let subscription_limit = parse_env_or(
+            "MEMORY_MCP_HTTP_SUBSCRIPTION_LIMIT",
+            DEFAULT_SUBSCRIPTION_LIMIT,
+        )?;
+        let maintenance_parallelism = parse_env_or(
+            "MEMORY_MCP_HTTP_MAINTENANCE_PARALLELISM",
+            DEFAULT_MAINTENANCE_PARALLELISM,
+        )?;
+        let subscription_queue_capacity = parse_env_or(
+            "MEMORY_MCP_HTTP_SUBSCRIPTION_QUEUE_CAPACITY",
+            DEFAULT_SUBSCRIPTION_QUEUE_CAPACITY,
+        )?;
+        let subscription_auth_recheck = Duration::from_secs(parse_env_or(
+            "MEMORY_MCP_HTTP_SUBSCRIPTION_AUTH_RECHECK_SECS",
+            DEFAULT_SUBSCRIPTION_AUTH_RECHECK.as_secs(),
+        )?);
+        let task_retention_secs = parse_env_or(
+            "MEMORY_MCP_HTTP_TASK_RETENTION_SECS",
+            DEFAULT_TASK_RETENTION_SECS,
+        )?;
+        let task_queue_capacity = parse_env_or(
+            "MEMORY_MCP_HTTP_TASK_QUEUE_CAPACITY",
+            DEFAULT_TASK_QUEUE_CAPACITY,
+        )?;
+        let task_sync_max_bytes = parse_env_or(
+            "MEMORY_MCP_HTTP_TASK_SYNC_MAX_BYTES",
+            DEFAULT_TASK_SYNC_MAX_BYTES,
+        )?;
         let trusted_proxy_cidrs = parse_csv("MEMORY_MCP_HTTP_TRUSTED_PROXY_CIDRS")?
             .into_iter()
             .map(|s| TrustedCidr::parse(&s))
@@ -312,6 +385,18 @@ impl HttpConfig {
             body_limit_bytes,
             request_deadline,
             shutdown_grace,
+            pool_cap,
+            runtime_idle_ttl,
+            runtime_capacity_wait,
+            runtime_activation_timeout,
+            global_request_limit,
+            subscription_limit,
+            maintenance_parallelism,
+            subscription_queue_capacity,
+            subscription_auth_recheck,
+            task_retention_secs,
+            task_queue_capacity,
+            task_sync_max_bytes,
             control_db,
             tenant_db,
             api_key_pepper,
@@ -369,9 +454,28 @@ impl HttpConfig {
                 "MEMORY_MCP_HTTP_BODY_LIMIT must be positive".into(),
             ));
         }
-        if self.request_deadline.is_zero() || self.shutdown_grace.is_zero() {
+        if self.request_deadline.is_zero()
+            || self.shutdown_grace.is_zero()
+            || self.pool_cap == 0
+            || self.runtime_idle_ttl.is_zero()
+            || self.runtime_capacity_wait.is_zero()
+            || self.runtime_activation_timeout.is_zero()
+            || self.global_request_limit == 0
+            || self.subscription_limit == 0
+            || self.maintenance_parallelism == 0
+            || self.subscription_queue_capacity == 0
+            || self.subscription_auth_recheck.is_zero()
+            || self.task_retention_secs == 0
+            || self.task_queue_capacity == 0
+            || self.task_sync_max_bytes == 0
+        {
             return Err(MemoryError::ConfigInvalid(
-                "HTTP request deadline and shutdown grace must be positive".into(),
+                "HTTP request deadline, shutdown grace, runtime, and admission limits must be positive".into(),
+            ));
+        }
+        if self.subscription_auth_recheck > Duration::from_secs(60) {
+            return Err(MemoryError::ConfigInvalid(
+                "subscription authorization recheck must be no more than 60 seconds".into(),
             ));
         }
         if self.allowed_hosts.is_empty() {
@@ -397,6 +501,11 @@ impl HttpConfig {
         if self.signup_mode == SignupMode::Open && !self.open_signup_quotas_set() {
             return Err(MemoryError::ConfigInvalid(
                 "open signup requires explicit quota values (spec §12)".into(),
+            ));
+        }
+        if self.task_retention_secs > i64::MAX as u64 {
+            return Err(MemoryError::ConfigInvalid(
+                "HTTP task retention must fit a signed duration".into(),
             ));
         }
         if let Some(limits) = &self.signup_plan_limits {
@@ -495,6 +604,18 @@ impl HttpConfig {
             body_limit_bytes: DEFAULT_BODY_LIMIT_BYTES,
             request_deadline: DEFAULT_REQUEST_DEADLINE,
             shutdown_grace: DEFAULT_SHUTDOWN_GRACE,
+            pool_cap: DEFAULT_POOL_CAP,
+            runtime_idle_ttl: DEFAULT_RUNTIME_IDLE_TTL,
+            runtime_capacity_wait: DEFAULT_RUNTIME_CAPACITY_WAIT,
+            runtime_activation_timeout: DEFAULT_RUNTIME_ACTIVATION_TIMEOUT,
+            global_request_limit: DEFAULT_GLOBAL_REQUEST_LIMIT,
+            subscription_limit: DEFAULT_SUBSCRIPTION_LIMIT,
+            maintenance_parallelism: DEFAULT_MAINTENANCE_PARALLELISM,
+            subscription_queue_capacity: DEFAULT_SUBSCRIPTION_QUEUE_CAPACITY,
+            subscription_auth_recheck: DEFAULT_SUBSCRIPTION_AUTH_RECHECK,
+            task_retention_secs: DEFAULT_TASK_RETENTION_SECS,
+            task_queue_capacity: DEFAULT_TASK_QUEUE_CAPACITY,
+            task_sync_max_bytes: DEFAULT_TASK_SYNC_MAX_BYTES,
             control_db,
             tenant_db,
             api_key_pepper: "x".repeat(40),
@@ -566,8 +687,20 @@ mod tests {
             "MEMORY_MCP_HTTP_INGEST_PER_MINUTE",
             "MEMORY_MCP_HTTP_MAX_OPEN_APP_SESSIONS",
             "MEMORY_MCP_HTTP_MAX_ACTIVE_API_KEYS",
-            "MEMORY_MCP_HTTP_REQUEST_CONCURRENCY",
+            "MEMORY_MCP_HTTP_PER_TENANT_REQUEST_CONCURRENCY",
             "MEMORY_MCP_HTTP_EXTRACTION_CONCURRENCY",
+            "MEMORY_MCP_HTTP_POOL_CAP",
+            "MEMORY_MCP_HTTP_RUNTIME_IDLE_TTL_SECS",
+            "MEMORY_MCP_HTTP_RUNTIME_CAPACITY_WAIT_MS",
+            "MEMORY_MCP_HTTP_RUNTIME_ACTIVATION_TIMEOUT_SECS",
+            "MEMORY_MCP_HTTP_GLOBAL_REQUEST_LIMIT",
+            "MEMORY_MCP_HTTP_SUBSCRIPTION_LIMIT",
+            "MEMORY_MCP_HTTP_MAINTENANCE_PARALLELISM",
+            "MEMORY_MCP_HTTP_SUBSCRIPTION_QUEUE_CAPACITY",
+            "MEMORY_MCP_HTTP_SUBSCRIPTION_AUTH_RECHECK_SECS",
+            "MEMORY_MCP_HTTP_TASK_RETENTION_SECS",
+            "MEMORY_MCP_HTTP_TASK_QUEUE_CAPACITY",
+            "MEMORY_MCP_HTTP_TASK_SYNC_MAX_BYTES",
         ] {
             // SAFETY: serialized by ENV_LOCK; no other thread reads these vars in tests.
             unsafe {
@@ -667,7 +800,7 @@ mod tests {
             ("MEMORY_MCP_HTTP_INGEST_PER_MINUTE", "3".into()),
             ("MEMORY_MCP_HTTP_MAX_OPEN_APP_SESSIONS", "8".into()),
             ("MEMORY_MCP_HTTP_MAX_ACTIVE_API_KEYS", "2".into()),
-            ("MEMORY_MCP_HTTP_REQUEST_CONCURRENCY", "6".into()),
+            ("MEMORY_MCP_HTTP_PER_TENANT_REQUEST_CONCURRENCY", "6".into()),
             ("MEMORY_MCP_HTTP_EXTRACTION_CONCURRENCY", "4".into()),
         ]);
         let refs: Vec<(&str, &str)> = vars.iter().map(|(k, v)| (*k, v.as_str())).collect();
@@ -679,6 +812,44 @@ mod tests {
             assert_eq!(limits.max_ingested_bytes, 1000);
             assert_eq!(limits.ingest_per_minute, 3);
             assert_eq!(limits.extraction_concurrency, 4);
+        });
+    }
+
+    #[test]
+    fn http_config_loads_operational_limits() {
+        let mut vars = base_required_env();
+        vars.extend([
+            ("MEMORY_MCP_HTTP_POOL_CAP", "8".into()),
+            ("MEMORY_MCP_HTTP_RUNTIME_IDLE_TTL_SECS", "60".into()),
+            ("MEMORY_MCP_HTTP_RUNTIME_CAPACITY_WAIT_MS", "250".into()),
+            (
+                "MEMORY_MCP_HTTP_RUNTIME_ACTIVATION_TIMEOUT_SECS",
+                "10".into(),
+            ),
+            ("MEMORY_MCP_HTTP_GLOBAL_REQUEST_LIMIT", "20".into()),
+            ("MEMORY_MCP_HTTP_SUBSCRIPTION_LIMIT", "3".into()),
+            ("MEMORY_MCP_HTTP_MAINTENANCE_PARALLELISM", "2".into()),
+            ("MEMORY_MCP_HTTP_SUBSCRIPTION_QUEUE_CAPACITY", "16".into()),
+            (
+                "MEMORY_MCP_HTTP_SUBSCRIPTION_AUTH_RECHECK_SECS",
+                "30".into(),
+            ),
+            ("MEMORY_MCP_HTTP_TASK_RETENTION_SECS", "3600".into()),
+            ("MEMORY_MCP_HTTP_TASK_QUEUE_CAPACITY", "64".into()),
+            ("MEMORY_MCP_HTTP_TASK_SYNC_MAX_BYTES", "4096".into()),
+        ]);
+        let refs: Vec<(&str, &str)> = vars.iter().map(|(k, v)| (*k, v.as_str())).collect();
+        with_env(&refs, || {
+            let cfg = HttpConfig::from_env().expect("config loads");
+            cfg.validate().expect("operational limits are valid");
+            assert_eq!(cfg.pool_cap, 8);
+            assert_eq!(cfg.runtime_capacity_wait, Duration::from_millis(250));
+            assert_eq!(cfg.global_request_limit, 20);
+            assert_eq!(cfg.subscription_limit, 3);
+            assert_eq!(cfg.subscription_queue_capacity, 16);
+            assert_eq!(cfg.task_retention_secs, 3600);
+            assert_eq!(cfg.task_queue_capacity, 64);
+            assert_eq!(cfg.task_sync_max_bytes, 4096);
         });
     }
 

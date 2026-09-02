@@ -38,6 +38,15 @@ pub fn StatusPage() -> Element {
             nav {
                 a { href: "/keys", "API Keys" }
                 a { href: "/delete", "Delete Account" }
+                button {
+                    onclick: move |_| {
+                        spawn(async move {
+                            let api = ApiClient::new("/".to_string());
+                            let _ = api.logout().await;
+                        });
+                    },
+                    "Log out"
+                }
             }
         }
     }

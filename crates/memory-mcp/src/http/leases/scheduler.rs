@@ -26,6 +26,16 @@ use crate::http::registry::RegistryHandle;
 pub type JobFuture = Pin<Box<dyn Future<Output = Result<(), MemoryError>> + Send>>;
 pub type SchedulerJob = Arc<dyn Fn(RegistryHandle) -> JobFuture + Send + Sync>;
 
+/// Stable owner identity shared by all fenced workers in one process. Deployments
+/// should set `MEMORY_MCP_HTTP_REPLICA_ID` to a durable replica identity; the PID
+/// fallback is unique for the process lifetime and remains safe after restart.
+pub fn replica_id() -> String {
+    std::env::var("MEMORY_MCP_HTTP_REPLICA_ID")
+        .ok()
+        .filter(|value| !value.trim().is_empty())
+        .unwrap_or_else(|| format!("memory-mcp-{}", std::process::id()))
+}
+
 #[derive(Clone)]
 pub struct SchedulerHooks {
     jobs: Arc<Vec<SchedulerJob>>,
@@ -68,6 +78,19 @@ impl SchedulerHooks {
     /// value is immutable thereafter (the inner Vec is in
     /// `Arc`, so `with_additional_job` rebuilds a new
     /// `SchedulerHooks` rather than mutating the old one).
+    pub fn with_maintenance_parallelism(
+        mut self,
+        maintenance_parallelism: usize,
+    ) -> Result<Self, MemoryError> {
+        if maintenance_parallelism == 0 {
+            return Err(MemoryError::ConfigInvalid(
+                "scheduler maintenance parallelism must be positive".into(),
+            ));
+        }
+        self.maintenance_parallelism = maintenance_parallelism;
+        Ok(self)
+    }
+
     pub fn with_additional_job(self, job: SchedulerJob) -> Self {
         let mut jobs = (*self.jobs).clone();
         jobs.push(job);

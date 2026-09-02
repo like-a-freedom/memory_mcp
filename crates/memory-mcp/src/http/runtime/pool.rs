@@ -17,7 +17,6 @@ use crate::error::MemoryError;
 use crate::http::registry::models::Tenant;
 
 use super::lifecycle::{RuntimePhase, TenantRuntimeSlot};
-use super::storage::build_runtime;
 
 /// Errors returned by bounded runtime acquisition.
 #[derive(Debug, thiserror::Error)]
@@ -52,10 +51,14 @@ impl AdmissionGate {
     /// Default global in-flight request bound. Environment-configurable
     /// override arrives with the quota system.
     pub fn new(global_limit: u32) -> Self {
+        Self::new_with_limits(global_limit, 32)
+    }
+
+    pub fn new_with_limits(global_limit: u32, subscription_limit: u32) -> Self {
         Self {
-            global_limit,
+            global_limit: global_limit.max(1),
             global_active: AtomicU32::new(0),
-            subscription_limit: 32,
+            subscription_limit: subscription_limit.max(1),
             subscription_active: AtomicU32::new(0),
             closed: AtomicBool::new(false),
         }
@@ -159,8 +162,9 @@ pub struct Pool {
     capacity_wait: Duration,
     #[allow(dead_code)] // Used by future per-tenant activation timeout.
     activation_timeout: Duration,
-    #[allow(dead_code)] // Used by future per-tenant semaphore.
+    #[allow(dead_code)] // Used by the default non-HTTP test constructor.
     per_tenant_concurrency: u32,
+    runtime_options: super::storage::RuntimeOptions,
 }
 
 impl Pool {
@@ -183,6 +187,7 @@ impl Pool {
             capacity_wait,
             activation_timeout,
             per_tenant_concurrency,
+            runtime_options: super::storage::RuntimeOptions::default(),
         }
     }
 
@@ -198,10 +203,72 @@ impl Pool {
         )
     }
 
+    /// Build the runtime pool from the validated HTTP environment contract.
+    pub fn from_http_config(
+        config: &crate::http::config::HttpConfig,
+        registry: Arc<crate::http::registry::RegistryHandle>,
+    ) -> Self {
+        let mut pool = Self::new(
+            config.pool_cap,
+            config.runtime_idle_ttl,
+            config.runtime_capacity_wait,
+            config.runtime_activation_timeout,
+            config
+                .signup_plan_limits
+                .as_ref()
+                .map_or(DEFAULT_PER_TENANT_CONCURRENCY, |limits| {
+                    limits.per_tenant_request_concurrency
+                }),
+            registry,
+        );
+        pool.runtime_options = super::storage::RuntimeOptions::from_http_config(config);
+        pool
+    }
+
     /// Capacity as reported to /health/ready and metrics.
     #[allow(dead_code)]
     pub fn capacity(&self) -> usize {
         self.cap
+    }
+
+    /// Remove only idle, unpinned Ready runtimes. Dropping the last runtime
+    /// handle closes its tenant-bound stores; no data or Registry row is removed.
+    pub async fn evict_idle(&self) -> usize {
+        let threshold = Instant::now().checked_sub(self.idle_ttl);
+        let mut map = self.map.lock().await;
+        let candidates: Vec<String> = map
+            .iter()
+            .filter_map(|(tenant_id, slot)| {
+                let mut slot_guard = slot.try_lock().ok()?;
+                if slot_guard.phase == RuntimePhase::Ready
+                    && slot_guard.pin_count.load(Ordering::SeqCst) == 0
+                    && threshold.is_some_and(|limit| slot_guard.last_used <= limit)
+                {
+                    slot_guard.phase = RuntimePhase::Draining;
+                    slot_guard.runtime = None;
+                    slot_guard.phase = RuntimePhase::Unloaded;
+                    Some(tenant_id.clone())
+                } else {
+                    None
+                }
+            })
+            .collect();
+        let evicted = candidates.len();
+        for tenant_id in candidates {
+            map.pop(&tenant_id);
+        }
+        evicted
+    }
+
+    /// Tracked scheduler job for idle runtime eviction.
+    pub fn eviction_scheduler_job(pool: Arc<Self>) -> crate::http::leases::scheduler::SchedulerJob {
+        Arc::new(move |_registry| {
+            let pool = pool.clone();
+            Box::pin(async move {
+                let _ = pool.evict_idle().await;
+                Ok(())
+            })
+        })
     }
 
     async fn acquire_tenant_permit(
@@ -294,7 +361,11 @@ impl Pool {
         drop(guard);
         let activation_result = tokio::time::timeout(
             self.activation_timeout,
-            build_runtime(&registry, &tenant_clone),
+            super::storage::build_runtime_with_options(
+                &registry,
+                &tenant_clone,
+                self.runtime_options,
+            ),
         )
         .await
         .map_err(|_| MemoryError::Unavailable("tenant runtime activation timed out".into()))

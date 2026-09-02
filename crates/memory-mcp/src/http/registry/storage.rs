@@ -358,6 +358,15 @@ pub trait RegistryStore: Send + Sync + 'static {
         Ok(Vec::new())
     }
 
+    /// Return a bounded page of every durable Tenant binding for reconciliation.
+    async fn list_tenants(
+        &self,
+        limit: usize,
+    ) -> Result<Vec<crate::http::registry::models::Tenant>, MemoryError> {
+        let _ = limit;
+        Ok(Vec::new())
+    }
+
     /// Append a provisioning event (durable seam consumed by the
     /// scheduler; written by `enqueue_provisioning`).
     async fn append_provisioning_event(
@@ -458,6 +467,14 @@ pub trait RegistryStore: Send + Sync + 'static {
         Err(unavailable("touch_session"))
     }
 
+    /// Delete one browser session by its keyed cookie hash.
+    #[cfg(feature = "control-plane")]
+    async fn delete_session(&self, cookie_hash: &str) -> Result<(), MemoryError> {
+        let _ = cookie_hash;
+        Err(unavailable("delete_session"))
+    }
+
+    /// Delete a session.
     /// Persist a one-use deletion challenge keyed by a
     /// verifier; the raw token is never stored.
     #[cfg(feature = "control-plane")]
@@ -830,6 +847,10 @@ impl RegistryStore for InMemoryStore {
                 key.status = ApiKeyStatus::Revoked;
             }
         }
+        self.sessions
+            .lock()
+            .expect("poisoned")
+            .retain(|_, session| session.account_id != account_id);
         challenges[challenge_index].consumed_at = Some(now);
         audit_events.push((account_id.to_owned(), "account_deletion_started".to_owned()));
         Ok(())
@@ -1424,6 +1445,14 @@ impl RegistryStore for InMemoryStore {
         Ok(out)
     }
 
+    async fn list_tenants(
+        &self,
+        limit: usize,
+    ) -> Result<Vec<crate::http::registry::models::Tenant>, MemoryError> {
+        let tenants = self.tenants.lock().expect("poisoned");
+        Ok(tenants.iter().take(limit).cloned().collect())
+    }
+
     async fn load_plan(&self, version: u32) -> Result<Plan, MemoryError> {
         Ok(self
             .plans
@@ -1579,6 +1608,16 @@ impl RegistryStore for InMemoryStore {
         }
         updated.idle_expiry = idle_expiry.min(updated.absolute_expiry);
         Ok(())
+    }
+
+    #[cfg(feature = "control-plane")]
+    async fn delete_session(&self, cookie_hash: &str) -> Result<(), MemoryError> {
+        self.sessions
+            .lock()
+            .expect("poisoned")
+            .remove(cookie_hash)
+            .map(|_| ())
+            .ok_or_else(|| MemoryError::NotFound("session not found".into()))
     }
 
     #[cfg(feature = "control-plane")]
@@ -2127,7 +2166,13 @@ mod tests {
             s.find_api_key("ak_delete").await.unwrap().unwrap().status,
             ApiKeyStatus::Revoked
         );
-        assert!(s.find_session("cookie_delete").await.unwrap().is_some());
+        assert!(
+            s.find_session("cookie_delete")
+                .await
+                .expect("session lookup")
+                .is_none(),
+            "account deletion must revoke every browser session"
+        );
         assert_eq!(
             s.find_external_identities(&account.id).await.unwrap().len(),
             1

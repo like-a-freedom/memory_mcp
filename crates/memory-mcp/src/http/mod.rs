@@ -77,9 +77,10 @@ impl HttpState {
             limits: config.signup_plan_limits.clone().unwrap_or_default(),
         };
         registry.ensure_plan(&signup_plan).await?;
-        let pool = Arc::new(runtime::pool::Pool::with_defaults(Arc::new(
-            registry.clone(),
-        )));
+        let pool = Arc::new(runtime::pool::Pool::from_http_config(
+            &config,
+            Arc::new(registry.clone()),
+        ));
         let store = registry.store_clone();
         let authenticator = Arc::new(principal::auth::Authenticator::new(
             store.clone(),
@@ -108,10 +109,13 @@ impl HttpState {
             None
         };
         Ok(Arc::new(Self {
-            config,
+            config: config.clone(),
             pool,
             shutdown: shutdown::ShutdownState::new(),
-            admission: Arc::new(runtime::pool::AdmissionGate::open()),
+            admission: Arc::new(runtime::pool::AdmissionGate::new_with_limits(
+                config.global_request_limit,
+                config.subscription_limit,
+            )),
             registry,
             authenticator,
             account_resolver,
@@ -131,9 +135,10 @@ impl HttpState {
             limits: config.signup_plan_limits.clone().unwrap_or_default(),
         };
         registry.ensure_plan(&signup_plan).await?;
-        let pool = Arc::new(runtime::pool::Pool::with_defaults(Arc::new(
-            registry.clone(),
-        )));
+        let pool = Arc::new(runtime::pool::Pool::from_http_config(
+            &config,
+            Arc::new(registry.clone()),
+        ));
         let store = registry.store_clone();
         let authenticator = Arc::new(principal::auth::Authenticator::new(
             store.clone(),
@@ -162,10 +167,13 @@ impl HttpState {
             None
         };
         Ok(Arc::new(Self {
-            config,
+            config: config.clone(),
             pool,
             shutdown: shutdown::ShutdownState::new(),
-            admission: Arc::new(runtime::pool::AdmissionGate::open()),
+            admission: Arc::new(runtime::pool::AdmissionGate::new_with_limits(
+                config.global_request_limit,
+                config.subscription_limit,
+            )),
             registry,
             authenticator,
             account_resolver,

@@ -400,7 +400,7 @@ pub async fn run_due_provisioning_for(
     let due = store.list_due_provisioning(limit, now).await?;
     for tenant in due {
         let lease_id = uuid::Uuid::new_v4().to_string();
-        let owner_id = "scheduler".to_string();
+        let owner_id = crate::http::leases::scheduler::replica_id();
         let claim = match store
             .claim_provisioning(&tenant.id, &owner_id, &lease_id, 60)
             .await
