@@ -97,6 +97,17 @@ jobs:
           --features streamable-http,prometheus,control-plane,test-fixtures
           --locked
 
+      - name: Run 20-tenant HTTP load gate
+        # Every push exercises the executable 20-tenant load gate.
+        # The 500-tenant release gate is gated by MEMORY_MCP_RUN_500_LOAD=1
+        # and is invoked only from the release job, not from this matrix.
+        run: >-
+          cargo test -p memory_mcp
+          --features streamable-http,mcp-apps,control-plane,test-fixtures
+          --test http_load_concurrency
+          load_20_active_tenants_under_expected_qps
+          -- --test-threads=1
+
   clippy_macos:
     name: Rust clippy (macOS features)
     runs-on: macos-latest
