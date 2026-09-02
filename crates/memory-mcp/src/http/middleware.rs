@@ -486,7 +486,8 @@ pub async fn acquire_runtime(
     let store = state.registry.store_clone();
     let registry_plan = match store.load_plan(tenant.plan_version).await {
         Ok(plan) => plan,
-        Err(_) => {
+        Err(error) => {
+            eprintln!("memory_mcp::http: quota plan load failed: {error}");
             return (
                 StatusCode::SERVICE_UNAVAILABLE,
                 "quota registry unavailable",
@@ -501,7 +502,8 @@ pub async fn acquire_runtime(
             .await
         {
             Ok(decision) => decision,
-            Err(_) => {
+            Err(error) => {
+                eprintln!("memory_mcp::http: ingest quota reserve failed: {error}");
                 return (
                     StatusCode::SERVICE_UNAVAILABLE,
                     "quota registry unavailable",

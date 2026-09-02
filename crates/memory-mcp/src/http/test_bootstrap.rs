@@ -8,10 +8,12 @@
 //! list of `<name>=<api_key>` pairs. Each entry is parsed
 //! through `ApiKeyCredential::parse`, and a deterministic
 //! Account + Tenant + ApiKey triple is written to the
-//! registry. The tenant is then transitioned to `Ready`
-//! synchronously through `provision_one` against a stub
-//! `ApplyMigrations` so the conformance suite sees a
-//! `Ready` tenant without touching the real SurrealDB.
+//! already-selected registry state. The tenant is then
+//! transitioned to `Ready` synchronously through
+//! `provision_one` against the state's own tenant engine.
+//! This module only seeds data against the composition the
+//! process already selected; it never creates or swaps
+//! Registry adapters (ADR-0053).
 
 #![cfg(feature = "test-fixtures")]
 
@@ -36,6 +38,14 @@ pub async fn apply_test_bootstrap(state: &Arc<HttpState>) -> Result<(), MemoryEr
     else {
         return Ok(());
     };
+    apply_bootstrap_entries(state, &raw).await
+}
+
+/// Seed the `<name>=<api_key>` entries against the state's
+/// already-selected adapters. Split out from
+/// `apply_test_bootstrap` so tests can call it without
+/// mutating the process environment.
+pub async fn apply_bootstrap_entries(state: &Arc<HttpState>, raw: &str) -> Result<(), MemoryError> {
     let migrations: Arc<dyn ApplyMigrations> = Arc::new(SurrealTenantMigrations::new(
         state.registry.tenant_engine()?,
     ));
@@ -126,9 +136,41 @@ async fn bootstrap_one(
     store.write_tenant(&tenant).await?;
 
     // provision_one is generic over the migrations
-    // implementation; NoopMigrations is a no-op so the
-    // registry holds a Ready tenant without the real DDL
-    // running.
+    // implementation; the caller supplies the adapter that the
+    // composition selected, so seeding proves the same state
+    // machine the scheduler would run.
     provision_one(store.clone(), &tenant.id, lease, migrations).await?;
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::http::test_state::HttpStateTestBuilder;
+
+    const UNIT_KEY: &str =
+        "mem_sk_ak_aaaa0000-0000-4000-8000-000000000000_isolationtest0000000000000000000";
+
+    #[tokio::test]
+    async fn seeding_uses_the_explicitly_composed_state() {
+        let state = HttpStateTestBuilder::new()
+            .await
+            .build()
+            .await
+            .expect("composed test state");
+        apply_bootstrap_entries(&state, &format!("unit_one={UNIT_KEY}"))
+            .await
+            .expect("bootstrap entries");
+        use sha2::{Digest, Sha256};
+        let digest = Sha256::digest(b"unit_one");
+        let suffix = hex::encode(&digest[..8]);
+        let tenant = state
+            .registry
+            .store_clone()
+            .find_tenant_by_id(&format!("ten_test_{suffix}"))
+            .await
+            .expect("tenant lookup")
+            .expect("bootstrapped tenant exists");
+        assert_eq!(tenant.status, TenantStatus::Ready);
+    }
 }

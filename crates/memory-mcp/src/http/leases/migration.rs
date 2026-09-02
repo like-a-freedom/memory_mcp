@@ -377,13 +377,9 @@ pub async fn provision_one(
 /// happen through `provision_one`.
 pub async fn run_due_provisioning(
     registry: crate::http::registry::RegistryHandle,
+    migrations: Arc<dyn ApplyMigrations>,
 ) -> Result<(), MemoryError> {
     let store = registry.store_clone();
-    #[cfg(any(test, feature = "test-fixtures"))]
-    let migrations: Arc<dyn ApplyMigrations> = Arc::new(NoopMigrations);
-    #[cfg(not(any(test, feature = "test-fixtures")))]
-    let migrations: Arc<dyn ApplyMigrations> =
-        Arc::new(SurrealTenantMigrations::new(registry.tenant_engine()?));
     run_due_provisioning_for(registry, store, migrations, 100, chrono::Utc::now()).await
 }
 
