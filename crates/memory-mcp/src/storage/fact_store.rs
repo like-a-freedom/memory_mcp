@@ -58,6 +58,7 @@ impl FactStoreClient {
                 change_kind: "fact_created".into(),
                 created_at: chrono::Utc::now(),
             },
+            &self.db.fault_injector,
         )
         .await
     }

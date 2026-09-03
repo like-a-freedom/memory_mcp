@@ -42,6 +42,9 @@ pub use agent_memory::{
 };
 
 pub use app_store::AppStoreClient;
+#[cfg(any(test, feature = "test-fixtures"))]
+pub use client::BoundDbClient;
+#[cfg(not(any(test, feature = "test-fixtures")))]
 pub(crate) use client::BoundDbClient;
 pub use client::{ContextFactQuery, DbClient, SurrealDbClient};
 pub(crate) use close::{CloseStoreClient, CloseTimestamps};

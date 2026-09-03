@@ -18,6 +18,7 @@
 use std::sync::Arc;
 
 use crate::error::MemoryError;
+use crate::http::fault_injection::{FaultInjector, FaultPoint};
 use crate::http::leases::ProvisioningLease;
 use crate::http::registry::RegistryStore;
 use crate::http::registry::models::TenantStatus;
@@ -200,11 +201,18 @@ impl ApplyMigrations for SurrealTenantMigrations {
 /// transitioned to `Failed` on every error path so a stale
 /// worker can never leave a partially-migrated Tenant in
 /// `Migrating`.
+///
+/// The fault injector is consulted after every durable
+/// transition named by [`FaultPoint`]; the hit must fire
+/// after the transition has committed so the next worker,
+/// on a fresh process, sees the partial state and advances
+/// it forward.
 pub async fn provision_one(
     store: Arc<dyn RegistryStore>,
     tenant_id: &str,
     lease: ProvisioningLease,
     migrations: Arc<dyn ApplyMigrations>,
+    fault_injector: Arc<dyn FaultInjector>,
 ) -> Result<(), MemoryError> {
     let mut tenant = store
         .find_tenant_by_id(tenant_id)
@@ -290,6 +298,22 @@ pub async fn provision_one(
         migrations
             .ensure_namespace(&binding.namespace, &binding.database)
             .await?;
+        // Hit after the namespace DDL is durable but before the
+        // migration script runs; a crash here leaves the
+        // namespace in place and the next worker re-applies.
+        if let Err(transient) = fault_injector.hit(FaultPoint::NamespaceCreated) {
+            // Release the lease so the next worker re-claims
+            // and re-runs the migration scripts.
+            let _ = store
+                .release_provisioning_lease(
+                    tenant_id,
+                    &lease.owner_id,
+                    &lease.lease_id,
+                    lease.fencing_generation,
+                )
+                .await;
+            return Err(transient);
+        }
         let new_version = migrations
             .apply_migrations(&binding.namespace, &binding.database)
             .await?;
@@ -300,9 +324,29 @@ pub async fn provision_one(
     let schema_version = match migration_result {
         Ok(version) => version,
         Err(error) => {
-            // Best-effort failure transition. If this fails we
-            // still propagate the original error.
-            if let Ok(Some(failed)) = store.find_tenant_by_id(tenant_id).await
+            // Best-effort failure transition. A `Transient`
+            // error is the simulated crash boundary the
+            // recovery test exercises; the durable state is
+            // unchanged and the next worker re-runs the
+            // migrations without operator intervention, so
+            // we MUST NOT regress the tenant to `Failed`,
+            // and we MUST release the lease so the next
+            // scheduler tick re-claims the tenant
+            // immediately. Non-transient errors (real
+            // migration failures, connection errors) still
+            // transition so a stale worker can never leave a
+            // partially-migrated tenant stuck in
+            // `Migrating`.
+            if matches!(error, MemoryError::Transient(_)) {
+                let _ = store
+                    .release_provisioning_lease(
+                        tenant_id,
+                        &lease.owner_id,
+                        &lease.lease_id,
+                        lease.fencing_generation,
+                    )
+                    .await;
+            } else if let Ok(Some(failed)) = store.find_tenant_by_id(tenant_id).await
                 && matches!(
                     failed.status,
                     TenantStatus::NamespaceCreating | TenantStatus::Migrating
@@ -321,6 +365,25 @@ pub async fn provision_one(
             return Err(error);
         }
     };
+
+    // Hit after the schema-version update is durable. The
+    // `Migrating → Ready` CAS is the next transition; firing
+    // here leaves the tenant at Migrating with the new
+    // schema version, so the next worker re-reads it and
+    // completes the Ready transition.
+    if let Err(transient) = fault_injector.hit(FaultPoint::TenantMigrationsApplied) {
+        // Transient: release the lease so the next worker
+        // re-claims and finishes the Ready transition.
+        let _ = store
+            .release_provisioning_lease(
+                tenant_id,
+                &lease.owner_id,
+                &lease.lease_id,
+                lease.fencing_generation,
+            )
+            .await;
+        return Err(transient);
+    }
 
     // Persist the new schema_version with a fenced CAS.
     tenant = store
@@ -346,6 +409,10 @@ pub async fn provision_one(
         &lease,
     )
     .await?;
+    // Hit after the `Ready` transition is committed. The lease
+    // release that follows is best-effort, so we fire the hit
+    // before it.
+    fault_injector.hit(FaultPoint::TenantReadyCommitted)?;
     // Release the lease. Best-effort: a stale release is
     // surfaced as `Conflict`; the tenant is already Ready and
     // the operator can clear the lease via the next scheduler
@@ -374,31 +441,47 @@ pub async fn provision_one(
 /// meantime) is recorded as a bounded warning and the
 /// scheduler continues with the next row. Tenants are never
 /// mutated directly by the scheduler: all state advances
-/// happen through `provision_one`.
+/// happen through `provision_one`. The lease TTL is fixed at
+/// 60 seconds; tests that need a shorter window use
+/// [`run_due_provisioning_for`] directly.
 pub async fn run_due_provisioning(
     registry: crate::http::registry::RegistryHandle,
     migrations: Arc<dyn ApplyMigrations>,
+    fault_injector: Arc<dyn FaultInjector>,
 ) -> Result<(), MemoryError> {
     let store = registry.store_clone();
-    run_due_provisioning_for(registry, store, migrations, 100, chrono::Utc::now()).await
+    run_due_provisioning_for(
+        registry,
+        store,
+        migrations,
+        fault_injector,
+        100,
+        chrono::Utc::now(),
+        60,
+    )
+    .await
 }
 
 /// Test-friendly seam: walk up to `limit` due tenants. The
 /// `now` parameter lets tests pin time without freezing
-/// the clock.
+/// the clock. The `lease_ttl_secs` parameter lets recovery
+/// tests shorten the lease window so the next worker can
+/// re-claim without waiting for a 60-second TTL.
 pub async fn run_due_provisioning_for(
     registry: crate::http::registry::RegistryHandle,
     store: Arc<dyn crate::http::registry::RegistryStore>,
     migrations: Arc<dyn ApplyMigrations>,
+    fault_injector: Arc<dyn FaultInjector>,
     limit: usize,
     now: chrono::DateTime<chrono::Utc>,
+    lease_ttl_secs: i64,
 ) -> Result<(), MemoryError> {
     let due = store.list_due_provisioning(limit, now).await?;
     for tenant in due {
         let lease_id = uuid::Uuid::new_v4().to_string();
         let owner_id = crate::http::leases::scheduler::replica_id();
         let claim = match store
-            .claim_provisioning(&tenant.id, &owner_id, &lease_id, 60)
+            .claim_provisioning(&tenant.id, &owner_id, &lease_id, lease_ttl_secs)
             .await
         {
             Ok(Some(l)) => l,
@@ -424,6 +507,24 @@ pub async fn run_due_provisioning_for(
                 continue;
             }
         };
+        // Hit after the claim is durable. The next worker
+        // sees the lease, calls `provision_one`, and observes
+        // the tenant is already past `Reserved` because of
+        // the `NamespaceCreating → Migrating` transition
+        // that follows. We release the lease on transient
+        // faults so the recovery tick can re-claim without
+        // waiting for the TTL.
+        if let Err(transient) = fault_injector.hit(FaultPoint::ProvisioningLeaseClaimed) {
+            let _ = store
+                .release_provisioning_lease(
+                    &tenant.id,
+                    &owner_id,
+                    &lease_id,
+                    claim.fencing_generation,
+                )
+                .await;
+            return Err(transient);
+        }
         // Re-derive a typed `ProvisioningLease` for the
         // claim so we can hand it to `provision_one`.
         let typed = ProvisioningLease {
@@ -442,8 +543,14 @@ pub async fn run_due_provisioning_for(
         // long-running. The current migration pass is
         // bounded; if it ever exceeds the lease window
         // the next scheduler tick will reclaim.
-        let migration_result =
-            provision_one(store.clone(), &tenant.id, typed, migrations.clone()).await;
+        let migration_result = provision_one(
+            store.clone(),
+            &tenant.id,
+            typed,
+            migrations.clone(),
+            fault_injector.clone(),
+        )
+        .await;
         if let Err(error) = migration_result {
             tracing_warn(&format!(
                 "scheduler: provision_one failed for {}: {error}",
@@ -535,9 +642,16 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::http::fault_injection::NoFaults;
     use crate::http::registry::models::*;
     use crate::http::registry::storage::InMemoryStore;
     use chrono::Utc;
+
+    /// Tests that just want to exercise the state machine
+    /// without exercising the fault injector use this constant.
+    fn no_faults() -> std::sync::Arc<dyn crate::http::fault_injection::FaultInjector> {
+        std::sync::Arc::new(NoFaults)
+    }
 
     fn lease_for(tenant_id: &str) -> ProvisioningLease {
         ProvisioningLease {
@@ -615,9 +729,15 @@ mod tests {
         seed_reserved(&store, &tenant).await;
         let lease = lease_for("ten_1");
         seed_with_lease(&store, "ten_1", &lease).await;
-        provision_one(store.clone(), "ten_1", lease, Arc::new(NoopMigrations))
-            .await
-            .expect("provision succeeds");
+        provision_one(
+            store.clone(),
+            "ten_1",
+            lease,
+            Arc::new(NoopMigrations),
+            no_faults(),
+        )
+        .await
+        .expect("provision succeeds");
         let t = store.find_tenant_by_id("ten_1").await.unwrap().unwrap();
         assert_eq!(t.status, TenantStatus::Ready);
     }
@@ -653,7 +773,14 @@ mod tests {
         seed_reserved(&store, &tenant).await;
         let lease = lease_for("ten_2");
         seed_with_lease(&store, "ten_2", &lease).await;
-        let res = provision_one(store.clone(), "ten_2", lease, Arc::new(FailingMigrations)).await;
+        let res = provision_one(
+            store.clone(),
+            "ten_2",
+            lease,
+            Arc::new(FailingMigrations),
+            no_faults(),
+        )
+        .await;
         assert!(res.is_err());
         let t = store.find_tenant_by_id("ten_2").await.unwrap().unwrap();
         assert_eq!(t.status, TenantStatus::Failed);
@@ -678,9 +805,15 @@ mod tests {
         };
         seed_reserved(&store, &tenant).await;
         let lease = lease_for("ten_3");
-        provision_one(store.clone(), "ten_3", lease, Arc::new(NoopMigrations))
-            .await
-            .expect("no-op succeeds");
+        provision_one(
+            store.clone(),
+            "ten_3",
+            lease,
+            Arc::new(NoopMigrations),
+            no_faults(),
+        )
+        .await
+        .expect("no-op succeeds");
     }
 
     #[tokio::test]
@@ -708,8 +841,10 @@ mod tests {
             registry.clone(),
             store.clone(),
             Arc::new(NoopMigrations),
+            no_faults(),
             1,
             Utc::now(),
+            60,
         )
         .await
         .expect("scheduler tick");
@@ -733,7 +868,14 @@ mod tests {
         seed_reserved(&store, &tenant).await;
         let lease = lease_for("ten_old");
         seed_with_lease(&store, "ten_old", &lease).await;
-        let result = provision_one(store.clone(), "ten_old", lease, Arc::new(NoopMigrations)).await;
+        let result = provision_one(
+            store.clone(),
+            "ten_old",
+            lease,
+            Arc::new(NoopMigrations),
+            no_faults(),
+        )
+        .await;
         assert!(
             matches!(result, Err(MemoryError::Unavailable(_))),
             "expected Unavailable for out-of-range schema, got: {result:?}"
@@ -786,7 +928,7 @@ mod tests {
             .expect("claim")
             .expect("lease");
         let adapter = Arc::new(SurrealTenantMigrations::new(durable.privileged_engine()));
-        provision_one(durable.clone(), &tenant.id, lease, adapter)
+        provision_one(durable.clone(), &tenant.id, lease, adapter, no_faults())
             .await
             .expect("durable provisioning");
         let ready = durable
@@ -809,9 +951,15 @@ mod tests {
         seed_reserved(&store, &tenant).await;
         let lease = lease_for("ten_roll");
         seed_with_lease(&store, "ten_roll", &lease).await;
-        provision_one(store.clone(), "ten_roll", lease, Arc::new(NoopMigrations))
-            .await
-            .expect("provision succeeds on N-1");
+        provision_one(
+            store.clone(),
+            "ten_roll",
+            lease,
+            Arc::new(NoopMigrations),
+            no_faults(),
+        )
+        .await
+        .expect("provision succeeds on N-1");
         let after = store
             .find_tenant_by_id("ten_roll")
             .await

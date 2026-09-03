@@ -4,6 +4,7 @@
 pub mod app_sessions;
 pub mod composition;
 pub mod config;
+pub mod fault_injection;
 pub mod health;
 pub mod leases;
 pub mod logging;
@@ -32,6 +33,7 @@ pub mod test_state;
 use std::sync::Arc;
 
 use config::HttpConfig;
+use fault_injection::FaultInjector;
 
 /// Process-wide HTTP state. Config + the
 /// runtime pool + shutdown/admission/registry/auth/resolver.
@@ -60,6 +62,11 @@ pub struct HttpState {
     /// not wired into the router.
     #[cfg(feature = "prometheus")]
     pub metrics_handle: Option<MetricsHandle>,
+    /// The fault injector threaded into the control-plane handlers
+    /// (e.g. account deletion). Production always installs
+    /// [`NoFaults`](fault_injection::NoFaults); tests may install a
+    /// `FailOnceAt` so the recovery path is exercised.
+    pub fault_injector: Arc<dyn FaultInjector>,
 }
 
 #[cfg(feature = "prometheus")]
@@ -84,14 +91,16 @@ impl HttpState {
         metrics_handle: Option<MetricsHandle>,
     ) -> Result<Arc<Self>, crate::error::MemoryError> {
         let composition = composition::HttpProductionComposition::connect(&config).await?;
-        Self::assemble(config, composition.registry, metrics_handle).await
+        let injector = composition.fault_injector.clone();
+        Self::assemble(config, composition.registry, injector, metrics_handle).await
     }
 
     /// Production constructor (no Prometheus).
     #[cfg(not(feature = "prometheus"))]
     pub async fn new(config: HttpConfig) -> Result<Arc<Self>, crate::error::MemoryError> {
         let composition = composition::HttpProductionComposition::connect(&config).await?;
-        Self::assemble(config, composition.registry, None).await
+        let injector = composition.fault_injector.clone();
+        Self::assemble(config, composition.registry, injector, None).await
     }
 
     /// The single state-assembly path shared by every constructor and
@@ -100,6 +109,7 @@ impl HttpState {
     pub(crate) async fn assemble(
         config: HttpConfig,
         registry: registry::RegistryHandle,
+        fault_injector: Arc<dyn FaultInjector>,
         _metrics_handle: AssembleMetrics,
     ) -> Result<Arc<Self>, crate::error::MemoryError> {
         let signup_plan = registry::models::Plan {
@@ -156,6 +166,7 @@ impl HttpState {
             oidc_client,
             #[cfg(feature = "prometheus")]
             metrics_handle,
+            fault_injector,
         }))
     }
 }

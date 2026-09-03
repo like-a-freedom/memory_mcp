@@ -287,6 +287,7 @@ impl AppSessionStore {
                 change_kind: "app_session_updated".into(),
                 created_at: now,
             },
+            &self.db.fault_injector,
         )
         .await
         .map(|()| expected_version.saturating_add(1))
@@ -314,6 +315,7 @@ impl AppSessionStore {
                     change_kind: "app_session_closed".into(),
                     created_at: chrono::Utc::now(),
                 },
+                &self.db.fault_injector,
             )
             .await;
         }

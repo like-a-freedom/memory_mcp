@@ -132,6 +132,7 @@ impl EntityStoreClient {
                 change_kind: "entity_created".into(),
                 created_at: chrono::Utc::now(),
             },
+            &self.db.fault_injector,
         )
         .await
     }
@@ -156,6 +157,7 @@ impl EntityStoreClient {
                 change_kind: "entity_alias_added".into(),
                 created_at: chrono::Utc::now(),
             },
+            &self.db.fault_injector,
         )
         .await
     }

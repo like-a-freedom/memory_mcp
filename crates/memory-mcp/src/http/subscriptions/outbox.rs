@@ -9,10 +9,13 @@
 //! the event. Any statement error rolls back the entire
 //! transaction without emitting an event.
 
+use std::sync::Arc;
+
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 
 use crate::error::MemoryError;
+use crate::http::fault_injection::{FaultInjector, FaultPoint};
 use crate::storage::client::BoundDbClient;
 
 /// A durable change event committed atomically with the
@@ -37,16 +40,13 @@ pub struct TenantChangeEvent {
 /// separately so user-controlled content never has to be interpolated into the
 /// transaction script.
 #[derive(Debug, Clone)]
-pub(crate) struct TenantMutation {
+pub struct TenantMutation {
     sql: String,
     vars: serde_json::Value,
 }
 
 impl TenantMutation {
-    pub(crate) fn new(
-        sql: impl Into<String>,
-        vars: serde_json::Value,
-    ) -> Result<Self, MemoryError> {
+    pub fn new(sql: impl Into<String>, vars: serde_json::Value) -> Result<Self, MemoryError> {
         if !vars.is_null() && !vars.is_object() {
             return Err(MemoryError::Validation(
                 "outbox mutation variables must be a JSON object".to_string(),
@@ -65,10 +65,17 @@ impl TenantMutation {
 /// SurrealDB transaction. A failed mutation therefore rolls back both the
 /// event and the sequence increment. The event sequence is always assigned by
 /// the transaction; `event.sequence` is intentionally ignored.
-pub(crate) async fn commit_tenant_mutation_with_event(
+///
+/// The fault injector is consulted AFTER the transaction commits
+/// successfully. A transient here leaves the outbox row committed
+/// but raises the error so the caller surfaces the failure to the
+/// client; the next mutation will use a fresh `event_seq`.
+#[cfg_attr(not(any(test, feature = "test-fixtures")), allow(dead_code))]
+pub async fn commit_tenant_mutation_with_event(
     db: &BoundDbClient,
     mutation: TenantMutation,
     event: TenantChangeEvent,
+    fault_injector: &Arc<dyn FaultInjector>,
 ) -> Result<(), MemoryError> {
     let mut vars = match mutation.vars {
         serde_json::Value::Null => serde_json::Map::new(),
@@ -106,7 +113,13 @@ pub(crate) async fn commit_tenant_mutation_with_event(
     let vars = serde_json::Value::Object(vars);
     for attempt in 0..5u64 {
         match db.query(&script, Some(vars.clone())).await {
-            Ok(_) => return Ok(()),
+            Ok(_) => {
+                // Hit AFTER the transaction is durable. The event
+                // row and sequence increment are committed; the
+                // caller observes the transient and the row stays.
+                fault_injector.hit(FaultPoint::OutboxMutationCommitted)?;
+                return Ok(());
+            }
             Err(error) if is_retryable_transaction_conflict(&error) && attempt < 4 => {
                 tokio::time::sleep(std::time::Duration::from_millis(10 * (attempt + 1))).await;
             }
@@ -130,14 +143,19 @@ pub async fn commit_mutation_with_event(
     db: &BoundDbClient,
     mutation_sql: &str,
     event: TenantChangeEvent,
+    fault_injector: &Arc<dyn FaultInjector>,
 ) -> Result<(), MemoryError> {
     let mutation = TenantMutation::new(mutation_sql, serde_json::Value::Null)?;
-    commit_tenant_mutation_with_event(db, mutation, event).await
+    commit_tenant_mutation_with_event(db, mutation, event, fault_injector).await
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn no_faults() -> std::sync::Arc<dyn crate::http::fault_injection::FaultInjector> {
+        std::sync::Arc::new(crate::http::fault_injection::NoFaults)
+    }
 
     async fn fresh_db() -> BoundDbClient {
         use crate::storage::client::{DbClient, SurrealDbClient};
@@ -187,7 +205,7 @@ mod tests {
         };
         // Simple mutation: create a placeholder record.
         let mutation = "CREATE tenant_outbox_test SET name = 'test';";
-        commit_mutation_with_event(&db, mutation, event)
+        commit_mutation_with_event(&db, mutation, event, &no_faults())
             .await
             .expect("commit");
 
@@ -228,7 +246,7 @@ mod tests {
         };
         // Intentionally invalid SQL to trigger a rollback.
         let mutation = "INVALID SQL STATEMENT;";
-        let result = commit_mutation_with_event(&db, mutation, event).await;
+        let result = commit_mutation_with_event(&db, mutation, event, &no_faults()).await;
         assert!(result.is_err());
 
         // No event should have been emitted.

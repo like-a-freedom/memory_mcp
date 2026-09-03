@@ -59,22 +59,30 @@ impl SchedulerHooks {
     }
 
     /// The only production provisioning-hook construction path. The
-    /// migration adapter comes from the startup composition
-    /// (ADR-0053); the scheduler never selects one itself.
+    /// migration adapter and fault injector come from the startup
+    /// composition (ADR-0053); the scheduler never selects either
+    /// itself.
     pub fn with_provisioning_only(
         migrations: Arc<dyn crate::http::leases::migration::ApplyMigrations>,
+        fault_injector: Arc<dyn crate::http::fault_injection::FaultInjector>,
     ) -> Result<Self, MemoryError> {
+        let provisioning_injector = Arc::clone(&fault_injector);
         let provisioning: SchedulerJob = Arc::new(move |registry| {
             let migrations = Arc::clone(&migrations);
+            let injector = Arc::clone(&provisioning_injector);
             Box::pin(crate::http::leases::migration::run_due_provisioning(
-                registry, migrations,
+                registry, migrations, injector,
             ))
         });
         let mut jobs: Vec<SchedulerJob> = vec![provisioning];
         #[cfg(feature = "control-plane")]
         {
-            jobs.push(Arc::new(|registry| {
-                Box::pin(crate::control::deletion::run_deletion_worker(registry))
+            let deletion_injector = Arc::clone(&fault_injector);
+            jobs.push(Arc::new(move |registry| {
+                let injector = Arc::clone(&deletion_injector);
+                Box::pin(crate::control::deletion::run_deletion_worker(
+                    registry, injector,
+                ))
             }));
         }
         Self::new(jobs, 4)
@@ -219,9 +227,10 @@ mod tests {
     #[cfg(feature = "control-plane")]
     #[test]
     fn provisioning_hooks_include_deletion_worker() {
-        let hooks = SchedulerHooks::with_provisioning_only(Arc::new(
-            crate::http::leases::migration::NoopMigrations,
-        ))
+        let hooks = SchedulerHooks::with_provisioning_only(
+            Arc::new(crate::http::leases::migration::NoopMigrations),
+            Arc::new(crate::http::fault_injection::NoFaults),
+        )
         .expect("provisioning hooks");
         assert_eq!(hooks.jobs.len(), 2);
     }
