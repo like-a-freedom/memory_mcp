@@ -399,8 +399,15 @@ pub async fn confirm_account_deletion(
         &request.confirmation_token,
     )?;
     let store = state.registry.store_clone();
-    super::deletion::execute_deletion(&session, &request.typed_phrase, &verifier, store.as_ref())
-        .await?;
+    let injector = state.fault_injector.clone();
+    super::deletion::execute_deletion(
+        &session,
+        &request.typed_phrase,
+        &verifier,
+        store.as_ref(),
+        &injector,
+    )
+    .await?;
     Ok(StatusCode::NO_CONTENT)
 }
 

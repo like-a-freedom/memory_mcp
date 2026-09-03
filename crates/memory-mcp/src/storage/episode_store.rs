@@ -123,6 +123,7 @@ impl EpisodeStoreClient {
                 change_kind: "episode_created".into(),
                 created_at: chrono::Utc::now(),
             },
+            &self.db.fault_injector,
         )
         .await
     }

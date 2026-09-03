@@ -180,6 +180,7 @@ impl CloseStoreClient {
                     change_kind: "record_invalidated".into(),
                     created_at: chrono::Utc::now(),
                 },
+                &self.db.fault_injector,
             )
             .await;
         }

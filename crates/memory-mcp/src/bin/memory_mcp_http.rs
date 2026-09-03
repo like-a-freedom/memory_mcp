@@ -43,19 +43,27 @@ async fn main() -> ExitCode {
         return ExitCode::from(2);
     }
 
+    #[cfg(feature = "test-fixtures")]
+    if let Err(err) = memory_mcp::http::test_bootstrap::apply_test_seed_reserved(&state).await {
+        eprintln!("test seed reserved error: {err}");
+        return ExitCode::from(2);
+    }
+
     signal_watcher::spawn(state.shutdown.clone(), state.admission.clone());
 
     let scheduler_hooks =
         match memory_mcp::http::leases::scheduler::SchedulerHooks::with_provisioning_only(
             runtime.tenant_migrations.clone(),
+            runtime.fault_injector.clone(),
         )
         .map(|hooks| {
+            let task_options =
+                memory_mcp::http::runtime::storage::RuntimeOptions::from_http_config(&cfg)
+                    .with_fault_injector(runtime.fault_injector.clone());
             hooks
                 .with_additional_job(memory_mcp::http::app_sessions::scheduler::scheduler_job())
                 .with_additional_job(
-                    memory_mcp::http::tasks::scheduler::scheduler_job_with_options(
-                        memory_mcp::http::runtime::storage::RuntimeOptions::from_http_config(&cfg),
-                    ),
+                    memory_mcp::http::tasks::scheduler::scheduler_job_with_options(task_options),
                 )
                 .with_additional_job(memory_mcp::http::subscriptions::scheduler::scheduler_job())
                 .with_additional_job(memory_mcp::http::registry::plan::scheduler_job())

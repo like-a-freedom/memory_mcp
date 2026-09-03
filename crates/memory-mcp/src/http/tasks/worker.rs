@@ -57,9 +57,84 @@ impl DurableTaskStore {
         }
     }
 
+    /// Test-only accessor: number of durable tasks in
+    /// `state = 'completed'`. Added for the HTTP crash-recovery
+    /// test suite (ADR-0053, Task 6) so the recovery assertions
+    /// do not have to duplicate the SQL the store already owns.
+    #[cfg(any(test, feature = "test-fixtures"))]
+    pub async fn count_completed_tasks(&self) -> Result<u64, MemoryError> {
+        let result = self
+            .db
+            .query(
+                "SELECT count() AS n FROM tenant_task WHERE tenant_id = $tenant_id AND state = 'completed' GROUP ALL",
+                Some(json!({"tenant_id": self.tenant_id.as_str()})),
+            )
+            .await?;
+        count_rows(&result)
+    }
+
+    /// Test-only accessor: number of committed `task_artifact`
+    /// rows for this tenant. The recovery suite uses it to
+    /// assert the durable artifact boundary is reached exactly
+    /// once after the `TaskArtifactCommitted` fault fires.
+    #[cfg(any(test, feature = "test-fixtures"))]
+    pub async fn count_committed_artifacts(&self) -> Result<u64, MemoryError> {
+        let result = self
+            .db
+            .query(
+                "SELECT count() AS n FROM task_artifact WHERE tenant_id = $tenant_id AND state = 'committed' GROUP ALL",
+                Some(json!({"tenant_id": self.tenant_id.as_str()})),
+            )
+            .await;
+        let result = match result {
+            Ok(r) => r,
+            Err(MemoryError::Storage(message))
+                if message.contains("task_artifact") && message.contains("does not exist") =>
+            {
+                return Ok(0);
+            }
+            Err(error) => return Err(error),
+        };
+        count_rows(&result)
+    }
+
+    /// Test-only seam: force a `running` task back to `queued`
+    /// with the lease cleared. Simulates the production
+    /// `requeue_expired_running` path when the test cannot
+    /// afford to wait for the real 60-second lease TTL.
+    #[cfg(any(test, feature = "test-fixtures"))]
+    pub async fn force_requeue_all_for_test(&self) -> Result<u64, MemoryError> {
+        let now = Utc::now();
+        let result = self
+            .db
+            .query(
+                "UPDATE tenant_task SET state = IF cancellation_intent = true THEN 'cancelled' ELSE 'queued' END, lease_owner = NONE, lease_expiry = NONE, updated_at = type::datetime($now) WHERE tenant_id = $tenant_id AND state = 'running' RETURN id",
+                Some(json!({
+                    "tenant_id": self.tenant_id.as_str(),
+                    "now": Self::to_datetime(now),
+                })),
+            )
+            .await?;
+        let rows: Vec<Value> = serde_json::from_value(result)
+            .map_err(|e| MemoryError::Storage(format!("test requeue: {e}")))?;
+        Ok(rows.len() as u64)
+    }
+
     fn to_datetime(t: DateTime<Utc>) -> String {
         t.to_rfc3339_opts(chrono::SecondsFormat::AutoSi, true)
     }
+}
+
+#[cfg(any(test, feature = "test-fixtures"))]
+fn count_rows(result: &Value) -> Result<u64, MemoryError> {
+    let rows: Vec<Value> = serde_json::from_value(result.clone())
+        .map_err(|e| MemoryError::Storage(format!("count rows: {e}")))?;
+    let first = rows.first();
+    let n = first
+        .and_then(|row| row.get("n"))
+        .and_then(|v| v.as_u64())
+        .unwrap_or(0);
+    Ok(n)
 }
 
 /// Extract the string uuid from a Surreal record id. The

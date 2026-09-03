@@ -17,6 +17,7 @@ use super::error::ApiError;
 use super::recent_auth;
 use super::session::ControlPlaneSession;
 use crate::error::MemoryError;
+use crate::http::fault_injection::{FaultInjector, FaultPoint};
 use crate::http::registry::RegistryHandle;
 use crate::http::registry::storage::RegistryStore;
 
@@ -64,11 +65,17 @@ pub fn token_verifier(key: &[u8; 32], token: &str) -> Result<String, crate::erro
 /// Execute the safe deletion-start path. The caller supplies only the durable
 /// challenge verifier; the store consumes the challenge and performs every
 /// control-plane mutation in one transaction/critical section.
+///
+/// The fault injector is consulted after the durable
+/// `AccountDeletionStarted` transition; a transient there leaves the
+/// account+tenant in `Deleting` so the deletion worker can finalize on
+/// the next tick.
 pub async fn execute_deletion(
     session: &ControlPlaneSession,
     typed_phrase: &str,
     challenge_verifier: &str,
     store: &dyn RegistryStore,
+    fault_injector: &Arc<dyn FaultInjector>,
 ) -> Result<(), ApiError> {
     recent_auth::require_recent_auth(session, recent_auth::DEFAULT_REAUTH_MAX_AGE)?;
     if !validate_typed_phrase(typed_phrase) {
@@ -82,6 +89,7 @@ pub async fn execute_deletion(
             Utc::now(),
         )
         .await?;
+    fault_injector.hit(FaultPoint::AccountDeletionStarted)?;
     Ok(())
 }
 
@@ -93,7 +101,15 @@ const TASK_CLEANUP_SQL: &str = "DELETE FROM tenant_task WHERE retention_expiry <
 
 /// Run one crash-safe deletion pass. The registry lease is the only worker
 /// lease: it fences both tenant-local cleanup and the final tombstone update.
-pub async fn run_deletion_worker(registry: RegistryHandle) -> Result<(), MemoryError> {
+///
+/// The fault injector is consulted after the durable
+/// `AccountDeletionFinalized` transition; a transient there leaves the
+/// tenant in `Deleting` with a still-valid lease, so the next worker
+/// re-claims and finalizes.
+pub async fn run_deletion_worker(
+    registry: RegistryHandle,
+    fault_injector: Arc<dyn FaultInjector>,
+) -> Result<(), MemoryError> {
     let store = registry.store_clone();
     let tenants = store
         .list_deleting_tenants(DELETION_BATCH_SIZE, Utc::now())
@@ -119,6 +135,7 @@ pub async fn run_deletion_worker(registry: RegistryHandle) -> Result<(), MemoryE
         let store_for_work = Arc::clone(&store);
         let engine_for_work = engine.clone();
         let lease_for_work = lease.clone();
+        let injector_for_work = fault_injector.clone();
         let cleanup = lease
             .run_with_heartbeat(registry.clone(), &tenant_id, async move {
                 let client = engine_for_work.bind(&tenant).await?;
@@ -146,7 +163,17 @@ pub async fn run_deletion_worker(registry: RegistryHandle) -> Result<(), MemoryE
                         lease_for_work.fencing_generation,
                         Utc::now(),
                     )
-                    .await
+                    .await?;
+                // Hit after the tenant is finalized. The next
+                // worker sees the same tenant again via
+                // `list_deleting_tenants`? No — finalize moves
+                // the tenant to `Purged`. So the recovery
+                // scenario is: a transient here leaves the
+                // cleanup SQLs (which run before finalize) and
+                // the lease release unwritten; the next worker
+                // re-runs the cleanup + finalize.
+                injector_for_work.hit(FaultPoint::AccountDeletionFinalized)?;
+                Ok(())
             })
             .await;
 

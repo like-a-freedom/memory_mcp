@@ -16,6 +16,7 @@ use std::time::Duration;
 use serde_json::Value;
 use tokio::task::JoinHandle;
 
+#[derive(Clone)]
 pub struct TestTenant {
     pub name: String,
     pub api_key: String,
@@ -167,6 +168,15 @@ impl HttpServerFixture {
     pub fn kill(&mut self) {
         let _ = self.child.kill();
         let _ = self.child.wait();
+        // RocksDB releases its LOCK file lazily after the
+        // process is reaped; tests that immediately
+        // spawn another subprocess against the same
+        // path benefit from a brief wait so the kernel
+        // releases the file descriptor. 500ms is
+        // empirically bounded on macOS and Linux; the
+        // LOCK file is gone well before any production
+        // scheduler tick.
+        std::thread::sleep(Duration::from_millis(500));
     }
 
     /// Restart the server while preserving the durable storage

@@ -365,7 +365,7 @@ impl Pool {
             super::storage::build_runtime_with_options(
                 &registry,
                 &tenant_clone,
-                self.runtime_options,
+                self.runtime_options.clone(),
             ),
         )
         .await

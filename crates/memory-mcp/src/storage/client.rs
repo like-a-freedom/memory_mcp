@@ -94,14 +94,39 @@ pub struct ContextFactQuery<'a> {
 pub struct BoundDbClient {
     db: Arc<dyn DbClient>,
     namespace: String,
+    /// Fault injector consulted by the outbox commit path. The
+    /// production default is [`NoFaults`]; the per-tenant runtime
+    /// overrides it via [`Self::set_fault_injector`].
+    ///
+    /// Field exists only when the HTTP SaaS profile is compiled
+    /// in; stdio builds carry the default [`NoFaults`] and never
+    /// touch the outbox commit path.
+    #[cfg(feature = "streamable-http")]
+    pub fault_injector: Arc<dyn crate::http::fault_injection::FaultInjector>,
 }
 
 impl BoundDbClient {
-    pub(crate) fn new(db: Arc<dyn DbClient>, namespace: impl Into<String>) -> Self {
+    #[cfg_attr(not(any(test, feature = "test-fixtures")), allow(dead_code))]
+    pub fn new(db: Arc<dyn DbClient>, namespace: impl Into<String>) -> Self {
         Self {
             db,
             namespace: namespace.into(),
+            #[cfg(feature = "streamable-http")]
+            fault_injector: Arc::new(crate::http::fault_injection::NoFaults),
         }
+    }
+
+    /// Override the fault injector consulted by the outbox
+    /// commit path. Used by `TenantRuntime` so the
+    /// composition-owned injector reaches the per-tenant
+    /// store clients without an explicit constructor
+    /// argument everywhere.
+    #[cfg(feature = "streamable-http")]
+    pub fn set_fault_injector(
+        &mut self,
+        injector: Arc<dyn crate::http::fault_injection::FaultInjector>,
+    ) {
+        self.fault_injector = injector;
     }
 
     pub(crate) async fn select_one(&self, record_id: &str) -> Result<Option<Value>, MemoryError> {

@@ -11,17 +11,32 @@ use std::sync::Arc;
 use std::time::Instant;
 
 use crate::error::MemoryError;
+use crate::http::fault_injection::{FaultInjector, NoFaults};
 use crate::http::registry::models::Tenant;
 use crate::mcp::handlers::MemoryMcp;
 use crate::storage::client::BoundDbClient;
 use crate::storage::client::SurrealDbClient;
 
 /// Options that are fixed for a process and copied into each tenant runtime.
-#[derive(Debug, Clone, Copy)]
+#[derive(Clone)]
 pub struct RuntimeOptions {
     pub task_retention_secs: i64,
     pub task_queue_capacity: usize,
     pub task_sync_max_bytes: usize,
+    /// The fault injector the scheduler copies into the task worker.
+    /// Production uses [`NoFaults`]; tests substitute a `FailOnceAt`.
+    pub fault_injector: Arc<dyn FaultInjector>,
+}
+
+impl std::fmt::Debug for RuntimeOptions {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("RuntimeOptions")
+            .field("task_retention_secs", &self.task_retention_secs)
+            .field("task_queue_capacity", &self.task_queue_capacity)
+            .field("task_sync_max_bytes", &self.task_sync_max_bytes)
+            .field("fault_injector", &"<dyn FaultInjector>")
+            .finish()
+    }
 }
 
 impl Default for RuntimeOptions {
@@ -30,6 +45,7 @@ impl Default for RuntimeOptions {
             task_retention_secs: crate::http::config::DEFAULT_TASK_RETENTION_SECS as i64,
             task_queue_capacity: crate::http::config::DEFAULT_TASK_QUEUE_CAPACITY,
             task_sync_max_bytes: crate::http::config::DEFAULT_TASK_SYNC_MAX_BYTES,
+            fault_injector: Arc::new(NoFaults),
         }
     }
 }
@@ -47,7 +63,16 @@ impl RuntimeOptions {
             task_retention_secs,
             task_queue_capacity: config.task_queue_capacity,
             task_sync_max_bytes: config.task_sync_max_bytes,
+            fault_injector: Arc::new(NoFaults),
         }
+    }
+
+    /// Override the fault injector. The binary uses this in
+    /// startup so the composition-owned injector reaches every
+    /// scheduler option object (ADR-0053).
+    pub fn with_fault_injector(mut self, injector: Arc<dyn FaultInjector>) -> Self {
+        self.fault_injector = injector;
+        self
     }
 }
 
@@ -112,6 +137,20 @@ impl TenantRuntime {
         let namespace = tenant.namespace_binding.namespace.clone();
         let database = tenant.namespace_binding.database.clone();
         let bound_db = Arc::new(BoundDbClient::new(tenant_db.clone(), namespace.clone()));
+        // Propagate the composition-owned injector to the
+        // per-tenant bound client so the outbox commit path
+        // consults the same injector the scheduler does. We
+        // hold the only reference to bound_db at this point
+        // (the stores below clone from it), so `Arc::try_unwrap`
+        // succeeds and the in-place mutation propagates to
+        // every clone.
+        #[cfg(feature = "streamable-http")]
+        let bound_db = {
+            let injector = options.fault_injector.clone();
+            let mut owned = Arc::try_unwrap(bound_db).unwrap_or_else(|arc| (*arc).clone());
+            owned.set_fault_injector(injector);
+            Arc::new(owned)
+        };
         let service = crate::service::MemoryService::new(
             tenant_db.clone(),
             namespace.clone(),

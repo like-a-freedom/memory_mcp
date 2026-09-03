@@ -444,6 +444,22 @@ impl HttpConfig {
                 "test-fixtures HTTP builds require MEMORY_MCP_HTTP_TEST_BOOTSTRAP".into(),
             ));
         }
+        // The fault-injection test env var is gated on the
+        // test-fixtures feature too, but it is independent
+        // of MEMORY_MCP_HTTP_TEST_BOOTSTRAP — a recovery test
+        // may set MEMORY_MCP_HTTP_TEST_SEED_RESERVED (or the
+        // bootstrap var) and the fault var separately.
+        #[cfg(not(feature = "test-fixtures"))]
+        if std::env::var("MEMORY_MCP_HTTP_TEST_FAULT_POINT")
+            .ok()
+            .filter(|value| !value.trim().is_empty())
+            .is_some()
+        {
+            return Err(MemoryError::ConfigInvalid(
+                "MEMORY_MCP_HTTP_TEST_FAULT_POINT is only valid with the test-fixtures feature"
+                    .into(),
+            ));
+        }
         if self.bind.ip().is_unspecified() && !self.public_base_url.contains("localhost") {
             eprintln!(
                 "memory_mcp::http::config: binding to unspecified address; production must run behind a reverse proxy"

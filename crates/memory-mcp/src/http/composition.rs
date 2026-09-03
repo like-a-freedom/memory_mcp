@@ -11,6 +11,7 @@ use std::sync::Arc;
 use crate::error::MemoryError;
 
 use super::config::HttpConfig;
+use super::fault_injection::{FaultInjector, NoFaults};
 use super::leases::migration::{ApplyMigrations, SurrealTenantMigrations};
 use super::registry::{RegistryHandle, SurrealRegistryStore};
 
@@ -20,6 +21,10 @@ use super::registry::{RegistryHandle, SurrealRegistryStore};
 pub struct HttpProductionComposition {
     pub registry: RegistryHandle,
     pub tenant_migrations: Arc<dyn ApplyMigrations>,
+    /// The fault injector threaded into the scheduler and the deletion
+    /// worker. Production always installs [`NoFaults`]; tests may
+    /// substitute `FailOnceAt` via the `test-fixtures` feature.
+    pub fault_injector: Arc<dyn FaultInjector>,
 }
 
 impl HttpProductionComposition {
@@ -27,6 +32,8 @@ impl HttpProductionComposition {
     /// from config. Embedded RocksDB permits one process handle per
     /// path, so both targets pointing at the same endpoint share one
     /// connection; remote deployments may use independent connections.
+    /// The fault injector defaults to [`NoFaults`]; callers wanting a
+    /// test injector should construct the composition manually.
     pub async fn connect(config: &HttpConfig) -> Result<Self, MemoryError> {
         let store = SurrealRegistryStore::connect(&config.control_db)
             .await
@@ -49,7 +56,21 @@ impl HttpProductionComposition {
         Ok(Self {
             registry: RegistryHandle::from_durable(Arc::new(store), engine),
             tenant_migrations: migrations,
+            fault_injector: Arc::new(NoFaults),
         })
+    }
+
+    /// Connect with an explicit fault injector. Production code uses
+    /// [`Self::connect`]; tests construct the composition manually so
+    /// the scheduler + deletion worker run with a deterministic
+    /// injector.
+    pub async fn connect_with_injector(
+        config: &HttpConfig,
+        fault_injector: Arc<dyn FaultInjector>,
+    ) -> Result<Self, MemoryError> {
+        let mut composition = Self::connect(config).await?;
+        composition.fault_injector = fault_injector;
+        Ok(composition)
     }
 }
 
@@ -60,6 +81,7 @@ impl HttpProductionComposition {
 pub struct HttpTestComposition {
     pub registry: RegistryHandle,
     pub tenant_migrations: Arc<dyn ApplyMigrations>,
+    pub fault_injector: Arc<dyn FaultInjector>,
 }
 
 #[cfg(any(test, feature = "test-fixtures"))]
@@ -68,6 +90,12 @@ impl HttpTestComposition {
         Self {
             registry: RegistryHandle::in_memory_with_default_mem_engine().await,
             tenant_migrations: Arc::new(super::leases::migration::NoopMigrations),
+            fault_injector: Arc::new(NoFaults),
         }
+    }
+
+    pub fn with_fault_injector(mut self, injector: Arc<dyn FaultInjector>) -> Self {
+        self.fault_injector = injector;
+        self
     }
 }
