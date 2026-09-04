@@ -128,12 +128,7 @@ pub trait RegistryStore: Send + Sync + 'static {
         account: &Account,
         tenant: &Tenant,
         identity: Option<&ExternalIdentity>,
-    ) -> Result<(), MemoryError> {
-        let _ = identity;
-        self.write_account(account).await?;
-        self.write_tenant(tenant).await?;
-        Ok(())
-    }
+    ) -> Result<(), MemoryError>;
 
     async fn find_tenant_by_account(&self, account_id: &str)
     -> Result<Option<Tenant>, MemoryError>;
@@ -146,28 +141,19 @@ pub trait RegistryStore: Send + Sync + 'static {
     async fn find_external_identities(
         &self,
         account_id: &str,
-    ) -> Result<Vec<ExternalIdentity>, MemoryError> {
-        let _ = account_id;
-        Ok(Vec::new())
-    }
+    ) -> Result<Vec<ExternalIdentity>, MemoryError>;
 
     /// Add an external identity to an account. Implementations
     /// must enforce that the (issuer, subject_verifier) tuple
     /// is unique and that the account exists.
-    async fn link_external_identity(&self, identity: &ExternalIdentity) -> Result<(), MemoryError> {
-        let _ = identity;
-        Err(unavailable("link_external_identity"))
-    }
+    async fn link_external_identity(&self, identity: &ExternalIdentity) -> Result<(), MemoryError>;
 
     /// Remove a linked identity by id.
     async fn unlink_external_identity(
         &self,
         account_id: &str,
         identity_id: &str,
-    ) -> Result<(), MemoryError> {
-        let _ = (account_id, identity_id);
-        Err(unavailable("unlink_external_identity"))
-    }
+    ) -> Result<(), MemoryError>;
 
     async fn find_api_key(&self, key_id: &str) -> Result<Option<ApiKey>, MemoryError>;
     async fn write_api_key(&self, key: &ApiKey) -> Result<(), MemoryError>;
@@ -181,17 +167,11 @@ pub trait RegistryStore: Send + Sync + 'static {
         &self,
         key: &ApiKey,
         max_active: u32,
-    ) -> Result<(), MemoryError> {
-        let _ = (key, max_active);
-        Err(unavailable("create_api_key_if_below_limit"))
-    }
+    ) -> Result<(), MemoryError>;
 
     /// Revoke every active key for an account; returns the
     /// number of keys revoked.
-    async fn revoke_all_api_keys(&self, account_id: &str) -> Result<u64, MemoryError> {
-        let _ = account_id;
-        Err(unavailable("revoke_all_api_keys"))
-    }
+    async fn revoke_all_api_keys(&self, account_id: &str) -> Result<u64, MemoryError>;
 
     async fn write_account(&self, account: &Account) -> Result<(), MemoryError>;
     async fn write_tenant(&self, tenant: &Tenant) -> Result<(), MemoryError>;
@@ -204,10 +184,7 @@ pub trait RegistryStore: Send + Sync + 'static {
         account_id: &str,
         from: AccountStatus,
         to: AccountStatus,
-    ) -> Result<(), MemoryError> {
-        let _ = (account_id, from, to);
-        Err(unavailable("transition_account_state"))
-    }
+    ) -> Result<(), MemoryError>;
 
     /// Atomically consume a valid deletion challenge, fence the account and
     /// tenant into their deleting states, revoke all API keys, and append the
@@ -220,10 +197,7 @@ pub trait RegistryStore: Send + Sync + 'static {
         account_id: &str,
         session_id: &str,
         now: DateTime<Utc>,
-    ) -> Result<(), MemoryError> {
-        let _ = (verifier, account_id, session_id, now);
-        Err(unavailable("begin_account_deletion"))
-    }
+    ) -> Result<(), MemoryError>;
 
     /// Start operator-initiated deletion without a user confirmation token.
     /// The same control-plane revocation and tombstone invariants apply.
@@ -233,10 +207,7 @@ pub trait RegistryStore: Send + Sync + 'static {
         tenant_id: &str,
         actor: &str,
         now: DateTime<Utc>,
-    ) -> Result<(), MemoryError> {
-        let _ = (tenant_id, actor, now);
-        Err(unavailable("begin_operator_deletion"))
-    }
+    ) -> Result<(), MemoryError>;
 
     /// Fenced, idempotent completion of a deletion pass. The account and
     /// tenant tombstones remain durable; only the tenant-local worker removes
@@ -249,16 +220,7 @@ pub trait RegistryStore: Send + Sync + 'static {
         lease_id: &str,
         fencing_generation: u64,
         completed_at: DateTime<Utc>,
-    ) -> Result<(), MemoryError> {
-        let _ = (
-            tenant_id,
-            lease_owner_id,
-            lease_id,
-            fencing_generation,
-            completed_at,
-        );
-        Err(unavailable("finalize_account_deletion"))
-    }
+    ) -> Result<(), MemoryError>;
 
     /// CAS-update the tenant's status. The predicate is
     /// `version = $expected_version AND status = $from`. Returns
@@ -357,10 +319,7 @@ pub trait RegistryStore: Send + Sync + 'static {
         &self,
         cursor: Option<&str>,
         limit: usize,
-    ) -> Result<Vec<crate::http::registry::models::Tenant>, MemoryError> {
-        let _ = (cursor, limit);
-        Ok(Vec::new())
-    }
+    ) -> Result<Vec<crate::http::registry::models::Tenant>, MemoryError>;
 
     /// List tenants currently in `Deleting` state that are
     /// eligible for the deletion worker.
@@ -368,19 +327,13 @@ pub trait RegistryStore: Send + Sync + 'static {
         &self,
         limit: usize,
         now: chrono::DateTime<chrono::Utc>,
-    ) -> Result<Vec<crate::http::registry::models::Tenant>, MemoryError> {
-        let _ = (limit, now);
-        Ok(Vec::new())
-    }
+    ) -> Result<Vec<crate::http::registry::models::Tenant>, MemoryError>;
 
     /// Return a bounded page of every durable Tenant binding for reconciliation.
     async fn list_tenants(
         &self,
         limit: usize,
-    ) -> Result<Vec<crate::http::registry::models::Tenant>, MemoryError> {
-        let _ = limit;
-        Ok(Vec::new())
-    }
+    ) -> Result<Vec<crate::http::registry::models::Tenant>, MemoryError>;
 
     /// Append a provisioning event (durable seam consumed by the
     /// scheduler; written by `enqueue_provisioning`).
@@ -392,27 +345,18 @@ pub trait RegistryStore: Send + Sync + 'static {
 
     /// Load the named Plan version. The durable default is the
     /// `Plan::default()` if no rows exist.
-    async fn load_plan(&self, version: u32) -> Result<Plan, MemoryError> {
-        let _ = version;
-        Err(unavailable("load_plan"))
-    }
+    async fn load_plan(&self, version: u32) -> Result<Plan, MemoryError>;
 
     /// Create the version-1 signup plan when it is absent. Existing durable
     /// plan rows are authoritative and must not be overwritten at startup.
-    async fn ensure_plan(&self, plan: &Plan) -> Result<(), MemoryError> {
-        let _ = plan;
-        Err(unavailable("ensure_plan"))
-    }
+    async fn ensure_plan(&self, plan: &Plan) -> Result<(), MemoryError>;
 
     /// Load the durable usage snapshot for a tenant. Returns
     /// an empty `UsageSnapshot` when no row exists.
     async fn load_usage(
         &self,
         tenant_id: &str,
-    ) -> Result<crate::http::registry::plan::UsageCounter, MemoryError> {
-        let _ = tenant_id;
-        Err(unavailable("load_usage"))
-    }
+    ) -> Result<crate::http::registry::plan::UsageCounter, MemoryError>;
 
     /// Reserve ingest usage against the tenant's plan. Returns
     /// `Allow`/`Deny` and atomically increments the counter
@@ -423,20 +367,14 @@ pub trait RegistryStore: Send + Sync + 'static {
         source_bytes: u64,
         plan: &crate::http::registry::plan::Plan,
         now: chrono::DateTime<chrono::Utc>,
-    ) -> Result<crate::http::registry::plan::QuotaDecision, MemoryError> {
-        let _ = (tenant_id, source_bytes, plan, now);
-        Err(unavailable("reserve_ingest_usage"))
-    }
+    ) -> Result<crate::http::registry::plan::QuotaDecision, MemoryError>;
 
     /// Reconcile usage counters after drift detection.
     async fn reconcile_usage(
         &self,
         tenant_id: &str,
         expected: crate::http::registry::plan::UsageCounter,
-    ) -> Result<(), MemoryError> {
-        let _ = (tenant_id, expected);
-        Err(unavailable("reconcile_usage"))
-    }
+    ) -> Result<(), MemoryError>;
 
     /// Store OIDC request sealed payload with explicit expiry
     /// and AEAD nonce.
@@ -477,29 +415,19 @@ pub trait RegistryStore: Send + Sync + 'static {
         &self,
         session_id: &str,
         idle_expiry: chrono::DateTime<chrono::Utc>,
-    ) -> Result<(), MemoryError> {
-        let _ = (session_id, idle_expiry);
-        Err(unavailable("touch_session"))
-    }
+    ) -> Result<(), MemoryError>;
 
     /// Delete one browser session by its keyed cookie hash.
     #[cfg(feature = "control-plane")]
-    async fn delete_session(&self, cookie_hash: &str) -> Result<(), MemoryError> {
-        let _ = cookie_hash;
-        Err(unavailable("delete_session"))
-    }
+    async fn delete_session(&self, cookie_hash: &str) -> Result<(), MemoryError>;
 
-    /// Delete a session.
     /// Persist a one-use deletion challenge keyed by a
     /// verifier; the raw token is never stored.
     #[cfg(feature = "control-plane")]
     async fn create_deletion_challenge(
         &self,
         challenge: &crate::http::registry::models::DeletionChallengeRecord,
-    ) -> Result<(), MemoryError> {
-        let _ = challenge;
-        Err(unavailable("create_deletion_challenge"))
-    }
+    ) -> Result<(), MemoryError>;
 
     /// Atomically consume a deletion challenge by verifier,
     /// ensuring the same Account + session tuple match.
@@ -512,21 +440,12 @@ pub trait RegistryStore: Send + Sync + 'static {
         account_id: &str,
         session_id: &str,
         now: chrono::DateTime<chrono::Utc>,
-    ) -> Result<(), MemoryError> {
-        let _ = (verifier, account_id, session_id, now);
-        Err(unavailable("consume_deletion_challenge"))
-    }
+    ) -> Result<(), MemoryError>;
 }
 
 /// Canonical durable implementation. Kept available through this
 /// module path for callers that imported the original storage seam.
 pub use super::surreal_store::SurrealRegistryStore;
-
-fn unavailable(method: &str) -> MemoryError {
-    MemoryError::Unavailable(format!(
-        "SurrealRegistryStore::{method} is not yet wired; the production store returns Unavailable and the test path uses InMemoryStore through the test-fixtures bootstrap"
-    ))
-}
 
 /// In-memory `RegistryStore` for unit tests. The fields are
 /// behind a single `Mutex`; the contention is acceptable for

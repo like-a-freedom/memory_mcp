@@ -99,7 +99,7 @@ async fn main() -> ExitCode {
     bootstrap::emit_startup_log(&logger, &cfg);
     let server_result = server::serve(
         cfg,
-        router::build_router(state.clone()),
+        router::build_router(state.clone(), Some(runtime.fault_injector.clone())),
         state.shutdown.clone(),
     )
     .await;

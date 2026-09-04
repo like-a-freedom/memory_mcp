@@ -5,12 +5,9 @@
 //! `metrics_handle` consistent across every build so test call sites
 //! never encode the Cargo feature matrix themselves.
 
-use std::sync::Arc;
-
 pub struct HttpStateTestBuilder {
     config: super::config::HttpConfig,
     registry: super::registry::RegistryHandle,
-    fault_injector: Arc<dyn super::fault_injection::FaultInjector>,
     #[cfg(feature = "prometheus")]
     metrics_handle: Option<super::MetricsHandle>,
 }
@@ -20,7 +17,6 @@ impl HttpStateTestBuilder {
         Self {
             config: super::config::HttpConfig::default_for_test(),
             registry: super::registry::RegistryHandle::in_memory_with_default_mem_engine().await,
-            fault_injector: Arc::new(super::fault_injection::NoFaults),
             #[cfg(feature = "prometheus")]
             metrics_handle: super::HttpState::test_metrics_handle(),
         }
@@ -36,14 +32,6 @@ impl HttpStateTestBuilder {
         self
     }
 
-    pub fn with_fault_injector(
-        mut self,
-        injector: Arc<dyn super::fault_injection::FaultInjector>,
-    ) -> Self {
-        self.fault_injector = injector;
-        self
-    }
-
     #[cfg(feature = "prometheus")]
     pub fn with_metrics_handle(mut self, handle: Option<super::MetricsHandle>) -> Self {
         self.metrics_handle = handle;
@@ -55,17 +43,11 @@ impl HttpStateTestBuilder {
     ) -> Result<std::sync::Arc<super::HttpState>, crate::error::MemoryError> {
         #[cfg(feature = "prometheus")]
         {
-            super::HttpState::assemble(
-                self.config,
-                self.registry,
-                self.fault_injector,
-                self.metrics_handle,
-            )
-            .await
+            super::HttpState::assemble(self.config, self.registry, self.metrics_handle).await
         }
         #[cfg(not(feature = "prometheus"))]
         {
-            super::HttpState::assemble(self.config, self.registry, self.fault_injector, None).await
+            super::HttpState::assemble(self.config, self.registry, None).await
         }
     }
 }

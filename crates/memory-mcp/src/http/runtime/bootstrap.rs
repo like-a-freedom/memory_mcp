@@ -53,15 +53,7 @@ pub async fn build_state(cfg: &HttpConfig) -> Result<HttpRuntime, (ExitCode, Str
                 ));
             }
         };
-    let injector_for_state = composition.fault_injector.clone();
-    let state = match HttpState::assemble(
-        cfg.clone(),
-        composition.registry,
-        injector_for_state,
-        metrics_handle,
-    )
-    .await
-    {
+    let state = match HttpState::assemble(cfg.clone(), composition.registry, metrics_handle).await {
         Ok(s) => s,
         Err(err) => {
             return Err((
