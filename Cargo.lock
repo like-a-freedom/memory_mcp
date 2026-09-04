@@ -2764,6 +2764,7 @@ dependencies = [
  "chrono",
  "clap",
  "criterion",
+ "csv",
  "hex",
  "memory_mcp",
  "reqwest 0.13.4",

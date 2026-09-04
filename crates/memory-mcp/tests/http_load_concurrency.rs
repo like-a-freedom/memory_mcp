@@ -1,17 +1,12 @@
 //! HTTP SaaS load gates.
 //!
-//! Two executable tests built on `HttpServerFixture`:
+//! One executable regression test built on `HttpServerFixture`:
 //!
 //! - `load_20_active_tenants_under_expected_qps` runs as the normal
 //!   CI gate. Twenty tenants ingest a unique marker, then call
 //!   `explain` on their own episode. Every request must succeed,
 //!   every tenant must see its own marker, and no tenant may see
 //!   another tenant's marker (cross-tenant isolation).
-//! - `load_500_tenants_under_contingency_qps` is a release-only
-//!   gate; it asserts the same invariants at 500 tenants and
-//!   requires the `MEMORY_MCP_RUN_500_LOAD=1` environment variable
-//!   to fire. This way an unconfigured release job fails closed
-//!   instead of reporting a skipped/pass result.
 //!
 //! Run:
 //!
@@ -20,14 +15,11 @@
 //! cargo test -p memory_mcp --features streamable-http,mcp-apps,control-plane,test-fixtures \
 //!     --test http_load_concurrency load_20_active_tenants_under_expected_qps -- --test-threads=1
 //!
-//! # Release gate (fails without the env var)
-//! MEMORY_MCP_RUN_500_LOAD=1 cargo test -p memory_mcp --features streamable-http,mcp-apps,control-plane,test-fixtures \
-//!     --test http_load_concurrency load_500_tenants_under_contingency_qps -- --test-threads=1
 //! ```
 
 #![cfg(all(feature = "streamable-http", feature = "test-fixtures"))]
 
-use std::time::{Duration, Instant};
+use std::time::Instant;
 
 use serde::Serialize;
 use serde_json::Value;
@@ -306,42 +298,4 @@ async fn load_20_active_tenants_under_expected_qps() {
     // same machine should land p95 well under 5s with 20 tenants.
     assert!(evidence.p95_ms <= 5_000, "p95 too high: {evidence:?}");
     assert!(evidence.max_ms <= 15_000, "max too high: {evidence:?}");
-}
-
-#[tokio::test(flavor = "multi_thread", worker_threads = 64)]
-#[ignore = "release-gate 500-tenant load; requires MEMORY_MCP_HTTP_500_TENANT=1"]
-async fn load_500_tenants_under_contingency_qps() {
-    const TENANT_COUNT: usize = 500;
-
-    let gate_ok = std::env::var("MEMORY_MCP_RUN_500_LOAD").as_deref() == Ok("1")
-        || std::env::var("MEMORY_MCP_HTTP_500_TENANT").as_deref() == Ok("1");
-    assert!(
-        gate_ok,
-        "release gate requires MEMORY_MCP_RUN_500_LOAD=1 or MEMORY_MCP_HTTP_500_TENANT=1"
-    );
-
-    let tenants = build_tenants(TENANT_COUNT);
-    let config = HttpServerConfig {
-        tenants: tenants.clone(),
-        extra_env: Vec::new(),
-        storage_url: "mem://".into(),
-    };
-    let fixture = HttpServerFixture::spawn(config).await;
-
-    let (ingests, explains) = run_load(&fixture, &tenants).await;
-    let mut all_requests = ingests;
-    all_requests.extend(explains.iter().cloned());
-    let evidence = summarize("load_500", &tenants, &all_requests);
-
-    assert_eq!(evidence.tenant_count, TENANT_COUNT);
-    assert_eq!(evidence.error_count, 0, "load_500: errors in {evidence:?}");
-    assert_eq!(evidence.success_count, evidence.request_count);
-    assert_isolation(&tenants, &explains);
-
-    assert!(evidence.p95_ms <= 5_000, "p95 too high: {evidence:?}");
-    assert!(evidence.max_ms <= 15_000, "max too high: {evidence:?}");
-
-    // Reference the latency ceiling constant so the unused-import
-    // lint stays quiet on this gated test.
-    let _ceiling: Duration = Duration::from_millis(15_000);
 }

@@ -109,7 +109,7 @@ impl Runner {
         let suite_total = selected_suites.len();
 
         let mut all_outcomes = Vec::new();
-        let mut expected_ids = Vec::new();
+        let mut expected_cases = Vec::new();
         let mut suite_summaries = Vec::new();
         let mut issues = request.issues.clone();
 
@@ -121,7 +121,13 @@ impl Runner {
                 suite.id(),
                 suite.expected_case_ids().len(),
             );
-            expected_ids.extend(suite.expected_case_ids().iter().cloned());
+            expected_cases.extend(
+                suite
+                    .expected_case_ids()
+                    .iter()
+                    .map(|case_id| CaseKey::parse(suite.id(), case_id.as_str()))
+                    .collect::<Result<Vec<_>, _>>()?,
+            );
 
             let suite_started = Instant::now();
             let outcomes = suite.run(&context).await;
@@ -165,8 +171,8 @@ impl Runner {
                 .then(a.case_id().cmp(b.case_id()))
         });
 
-        expected_ids.sort();
-        expected_ids.dedup();
+        expected_cases.sort();
+        expected_cases.dedup();
 
         let duration_ms = started.elapsed().as_millis() as u64;
 
@@ -204,12 +210,14 @@ impl Runner {
                 profile,
                 started_at: chrono::Utc::now(),
                 duration_ms,
-                expected_case_ids: expected_ids.clone(),
-                expected_cases: vec![],
+                expected_case_ids: vec![],
+                expected_cases: expected_cases.clone(),
                 outcomes: all_outcomes.clone(),
                 suite_summaries: suite_summaries.clone(),
                 gates: vec![],
-                fingerprint: crate::RunFingerprint::capture(),
+                fingerprint: crate::RunFingerprint::capture_with_profile(Some(
+                    &request.manifest_path,
+                )),
                 budget_status: None,
                 verdict: crate::domain::RunVerdict::default(),
                 issues: vec![],
@@ -217,7 +225,7 @@ impl Runner {
             request.baseline.as_ref(),
         )?;
 
-        let fingerprint = crate::RunFingerprint::capture();
+        let fingerprint = crate::RunFingerprint::capture_with_profile(Some(&request.manifest_path));
 
         let budget = budget_status.unwrap_or(GateStatus::Invalid);
         let verdict = derive_run_verdict(&all_outcomes, &gates, budget.clone(), &issues);
@@ -228,8 +236,8 @@ impl Runner {
             profile,
             started_at: chrono::Utc::now(),
             duration_ms,
-            expected_case_ids: expected_ids,
-            expected_cases: vec![],
+            expected_case_ids: vec![],
+            expected_cases,
             outcomes: all_outcomes,
             suite_summaries,
             gates,

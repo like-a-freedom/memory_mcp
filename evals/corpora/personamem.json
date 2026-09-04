@@ -1,12 +1,21 @@
 {
   "schema_version": "memory-mcp-corpus/v1",
   "corpus_id": "personamem",
-  "source_url": "https://huggingface.co/datasets/bowen-upenn/PersonaMem/resolve/main/questions_32k.csv",
-  "revision": "personamem-32k",
-  "sha256": "0244acf99872f5bc2f4460fcbfa6a0f2e07314c05a841de83de92afa08d0a4a0",
+  "source_url": "https://huggingface.co/datasets/bowen-upenn/PersonaMem/resolve/fd7c30f071d5c2ee2a211506783be222d7b6002e/questions_32k.csv",
+  "revision": "fd7c30f071d5c2ee2a211506783be222d7b6002e",
+  "sha256": "cccd34cf53e0bc4d9536c04cff5ca045156d9a4e227e83327112482840bbc93c",
   "license": "cc-by-4.0",
-  "byte_size": 7394049,
+  "byte_size": 1305366,
   "case_count": 589,
   "adapter_version": "1",
-  "data_file": "personamem_32k.bundle.json"
+  "data_file": "questions_32k.csv",
+  "auxiliary_files": [
+    {
+      "source_url": "https://huggingface.co/datasets/bowen-upenn/PersonaMem/resolve/fd7c30f071d5c2ee2a211506783be222d7b6002e/shared_contexts_32k.jsonl",
+      "revision": "fd7c30f071d5c2ee2a211506783be222d7b6002e",
+      "sha256": "217247ebfec9e8442fc53570c795ab69f21aad08745f7de78d9beab51b122d4a",
+      "byte_size": 5613210,
+      "data_file": "shared_contexts_32k.jsonl"
+    }
+  ]
 }

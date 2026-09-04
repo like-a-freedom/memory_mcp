@@ -21,6 +21,18 @@ pub struct CorpusManifest {
     pub case_count: usize,
     pub adapter_version: String,
     pub data_file: PathBuf,
+    #[serde(default)]
+    pub auxiliary_files: Vec<CorpusFile>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct CorpusFile {
+    pub source_url: String,
+    pub revision: String,
+    pub sha256: String,
+    pub byte_size: u64,
+    pub data_file: PathBuf,
 }
 
 #[derive(Debug)]
@@ -49,6 +61,7 @@ impl CorpusManifest {
                 "corpus_id must not be empty".into(),
             ));
         }
+        validate_identifier(&self.corpus_id, "corpus_id")?;
         if self.revision.trim().is_empty() {
             return Err(EvalError::InvalidConfig(
                 "revision must not be empty".into(),
@@ -61,6 +74,7 @@ impl CorpusManifest {
                 self.revision
             )));
         }
+        validate_identifier(&self.revision, "revision")?;
         if self.license.trim().is_empty() {
             return Err(EvalError::InvalidConfig("license must not be empty".into()));
         }
@@ -85,17 +99,43 @@ impl CorpusManifest {
                 "data_file must not contain parent traversal".into(),
             ));
         }
+        validate_corpus_file_path(&self.data_file, "data_file")?;
+        for auxiliary in &self.auxiliary_files {
+            validate_corpus_file(auxiliary)?;
+            if auxiliary.data_file == self.data_file {
+                return Err(EvalError::InvalidConfig(
+                    "auxiliary data_file must differ from data_file".into(),
+                ));
+            }
+        }
+        for (index, left) in self.auxiliary_files.iter().enumerate() {
+            if self
+                .auxiliary_files
+                .iter()
+                .skip(index + 1)
+                .any(|right| right.data_file == left.data_file)
+            {
+                return Err(EvalError::InvalidConfig(
+                    "auxiliary data_file paths must be unique".into(),
+                ));
+            }
+        }
         Ok(())
     }
 
     pub fn resolve_source_url(&self) -> Result<String, EvalError> {
-        if self.source_url.contains("/main/") || self.source_url.contains("/master/") {
-            return Err(EvalError::InvalidConfig(format!(
-                "source_url contains mutable branch path: {}",
-                self.source_url
+        validate_source_url(&self.source_url)?;
+        Ok(self.source_url.clone())
+    }
+
+    pub fn validate_case_count(&self, actual: usize) -> Result<(), EvalError> {
+        if actual != self.case_count {
+            return Err(EvalError::InvalidInput(format!(
+                "case count mismatch for {}: expected {}, got {}",
+                self.corpus_id, self.case_count, actual
             )));
         }
-        Ok(self.source_url.clone())
+        Ok(())
     }
 
     pub fn validate_at(&self, root: &Path) -> Result<PreparedCorpus, EvalError> {
@@ -148,11 +188,123 @@ impl CorpusManifest {
             )));
         }
 
-        Ok(PreparedCorpus {
+        for auxiliary in &self.auxiliary_files {
+            let path = root.join(&auxiliary.data_file);
+            validate_file_digest(&path, auxiliary.byte_size, &auxiliary.sha256)?;
+        }
+
+        let prepared = PreparedCorpus {
             manifest: self.clone(),
             data_path,
-        })
+        };
+        if let Some(kind) = crate::corpus::adapters::DatasetKind::parse_name(&self.corpus_id) {
+            let adapter = crate::corpus::adapters::adapter_for(kind);
+            if self.adapter_version != adapter.adapter_version() {
+                return Err(EvalError::InvalidConfig(format!(
+                    "unsupported adapter version for {}: {}",
+                    self.corpus_id, self.adapter_version
+                )));
+            }
+            let cases = crate::corpus::adapters::load_and_normalize(kind, &prepared)?;
+            self.validate_case_count(cases.len())?;
+        }
+        Ok(prepared)
     }
+}
+
+fn validate_source_url(source_url: &str) -> Result<(), EvalError> {
+    if source_url.contains("/main/") || source_url.contains("/master/") {
+        return Err(EvalError::InvalidConfig(format!(
+            "source_url contains mutable branch path: {source_url}"
+        )));
+    }
+    Ok(())
+}
+
+fn validate_identifier(value: &str, field: &str) -> Result<(), EvalError> {
+    let path = Path::new(value);
+    let mut components = path.components();
+    if path.is_absolute()
+        || !matches!(components.next(), Some(std::path::Component::Normal(_)))
+        || components.next().is_some()
+    {
+        return Err(EvalError::InvalidConfig(format!(
+            "{field} must be a single path-safe component"
+        )));
+    }
+    Ok(())
+}
+
+fn validate_corpus_file_path(path: &Path, field: &str) -> Result<(), EvalError> {
+    if path.is_absolute()
+        || path
+            .components()
+            .any(|component| component.as_os_str() == "..")
+        || path == Path::new(".")
+        || path == Path::new("manifest.json")
+    {
+        return Err(EvalError::InvalidConfig(format!(
+            "{field} must be a relative data path"
+        )));
+    }
+    Ok(())
+}
+
+fn validate_corpus_file(file: &CorpusFile) -> Result<(), EvalError> {
+    if file.revision.trim().is_empty()
+        || ["main", "master", "latest", "HEAD", "head"].contains(&file.revision.as_str())
+    {
+        return Err(EvalError::InvalidConfig(
+            "auxiliary revision must be immutable".into(),
+        ));
+    }
+    validate_identifier(&file.revision, "auxiliary revision")?;
+    if file.byte_size == 0 {
+        return Err(EvalError::InvalidConfig(
+            "auxiliary byte_size must be positive".into(),
+        ));
+    }
+    if file.sha256.len() != 64 || !file.sha256.chars().all(|c| c.is_ascii_hexdigit()) {
+        return Err(EvalError::InvalidConfig(
+            "auxiliary sha256 must be 64 hex characters".into(),
+        ));
+    }
+    validate_source_url(&file.source_url)?;
+    validate_corpus_file_path(&file.data_file, "auxiliary data_file")
+}
+
+fn validate_file_digest(
+    path: &Path,
+    expected_size: u64,
+    expected_hash: &str,
+) -> Result<(), EvalError> {
+    let file = std::fs::File::open(path).map_err(|source| EvalError::Io {
+        path: path.to_path_buf(),
+        source,
+    })?;
+    let mut reader = std::io::BufReader::new(file);
+    let mut hasher = Sha256::new();
+    let mut buffer = [0u8; 8192];
+    let mut total_bytes = 0u64;
+    loop {
+        let bytes_read = reader.read(&mut buffer).map_err(|source| EvalError::Io {
+            path: path.to_path_buf(),
+            source,
+        })?;
+        if bytes_read == 0 {
+            break;
+        }
+        hasher.update(&buffer[..bytes_read]);
+        total_bytes += bytes_read as u64;
+    }
+    let computed_hash = hex::encode(hasher.finalize());
+    if total_bytes != expected_size || computed_hash != expected_hash {
+        return Err(EvalError::InvalidInput(format!(
+            "auxiliary file integrity mismatch for {}",
+            path.display()
+        )));
+    }
+    Ok(())
 }
 
 #[cfg(test)]
@@ -247,8 +399,16 @@ mod tests {
             case_count: 1,
             adapter_version: "1".into(),
             data_file: "data.json".into(),
+            auxiliary_files: vec![],
         };
         assert!(manifest.resolve_source_url().is_err());
+    }
+
+    #[test]
+    fn case_count_mismatch_is_rejected() {
+        let manifest = CorpusManifest::parse(&valid_manifest_json()).unwrap();
+        let error = manifest.validate_case_count(2).unwrap_err();
+        assert!(error.to_string().contains("case count mismatch"));
     }
 
     #[test]
@@ -276,6 +436,24 @@ mod tests {
             "\"data_file\":\"../data.json\"",
         );
         assert!(CorpusManifest::parse(&raw).is_err());
+    }
+
+    #[test]
+    fn manifest_paths_cannot_escape_or_overwrite_metadata() {
+        for (field, value) in [
+            ("corpus_id", "../escape"),
+            ("revision", "/tmp/escape"),
+            ("data_file", "/tmp/data.json"),
+            ("data_file", "manifest.json"),
+            ("data_file", "."),
+        ] {
+            let mut raw: serde_json::Value = serde_json::from_str(&valid_manifest_json()).unwrap();
+            raw[field] = value.into();
+            assert!(
+                CorpusManifest::parse(&raw.to_string()).is_err(),
+                "accepted {field}={value}"
+            );
+        }
     }
 
     #[test]

@@ -1,0 +1,10 @@
+{
+  "benchmark": "LongMemEval-V2",
+  "adapter": "memory_mcp_backend.MemoryMcpBackend",
+  "upstream_repository": "https://github.com/xiaowu0162/LongMemEval-V2",
+  "upstream_commit": "6f020ac2fc3275e46c706d3406e02c3ed79b7be2",
+  "dataset_revision": "f152293e235517d504809563c833d7190b8c713b",
+  "retrieval_protocol": "ingest_then_extract_then_assemble_context",
+  "multimodal": false,
+  "budget": { "max_cases": 500, "max_tokens": 4096 }
+}

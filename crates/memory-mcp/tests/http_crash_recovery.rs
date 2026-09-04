@@ -524,58 +524,10 @@ async fn deletion_recovers_after_finalize_transient() {
         .begin_operator_deletion(&tenant_id, "test", chrono::Utc::now())
         .await
         .expect("begin operator deletion");
-    // The deletion worker races the heartbeat task that
-    // `run_with_heartbeat` spawns. The heartbeat fires
-    // immediately (delay = ZERO on the first iteration) and
-    // can race ahead of the work body, so the work body is
-    // sometimes cancelled before `finalize_account_deletion`
-    // commits. When that happens the worker returns
-    // `Err(Conflict("provisioning lease lost"))` and the
-    // tenant is still `Deleting`. We retry by re-issuing
-    // `begin_operator_deletion` (which is idempotent) and
-    // re-running the worker with a fresh injector so the
-    // hit still has a chance to fire. The terminal state we
-    // care about is the `Purged` row plus the sibling
-    // being untouched.
-    let mut fault_injector: Option<Arc<FailOnceAt>> = None;
-    for attempt in 0..8 {
-        let injector = Arc::new(FailOnceAt::new(FaultPoint::AccountDeletionFinalized));
-        let _ =
-            memory_mcp::control::deletion::run_deletion_worker(registry.clone(), injector.clone())
-                .await;
-        let after = store
-            .find_tenant_by_id(&tenant_id)
-            .await
-            .expect("tenant lookup")
-            .expect("tenant present");
-        if after.status == TenantStatus::Purged {
-            fault_injector = Some(injector);
-            break;
-        }
-        // The heartbeat won the race; the work body was
-        // cancelled before `finalize_account_deletion`. The
-        // tenant is still `Deleting`; the worker released
-        // the lease on the way out. Re-claim the deletion
-        // path and try again. `begin_operator_deletion` is
-        // idempotent on a `Deleting` tenant.
-        if attempt < 7 {
-            store
-                .begin_operator_deletion(&tenant_id, "test", chrono::Utc::now())
-                .await
-                .expect("begin operator deletion (retry)");
-        }
-    }
-    let fault_injector = fault_injector.expect("deletion must converge to Purged");
-    // The plan's `finalized_deletion_count, 1` invariant is
-    // satisfied by the Purged terminal state. The injector
-    // on the path that converged to Purged may report
-    // `consumed() == 0` if the heartbeat task fired
-    // immediately and won the race against the work body
-    // between `finalize_account_deletion` and the hit. We
-    // accept that as a known production race in
-    // `run_with_heartbeat` (see the known issues in
-    // `docs/operations/`); the `FaultInjector` unit tests
-    // cover the injector semantics directly.
+    let fault_injector = Arc::new(FailOnceAt::new(FaultPoint::AccountDeletionFinalized));
+    memory_mcp::control::deletion::run_deletion_worker(registry.clone(), fault_injector.clone())
+        .await
+        .expect("a durably committed deletion is reported as success");
     let after_first = store
         .find_tenant_by_id(&tenant_id)
         .await
@@ -601,11 +553,7 @@ async fn deletion_recovers_after_finalize_transient() {
     // targeted tenant only.
     assert_eq!(sibling_after.status, TenantStatus::Ready);
     assert_eq!(sibling_after.schema_version, sibling_schema_before);
-    let consumed = fault_injector.consumed();
-    assert!(
-        consumed <= 1,
-        "FailOnceAt fired more than once on the converging attempt; got {consumed}"
-    );
+    assert_eq!(fault_injector.consumed(), 1);
 }
 
 // ---------------------------------------------------------------------------

@@ -65,10 +65,48 @@ async fn cmd_run(
         }
     };
 
-    let baseline_artifact = baseline.and_then(|path| {
-        let raw = std::fs::read_to_string(&path).ok()?;
-        serde_json::from_str::<RunArtifact>(&raw).ok()
-    });
+    let baseline_artifact = match baseline {
+        Some(path) => {
+            let raw = match std::fs::read_to_string(&path) {
+                Ok(raw) => raw,
+                Err(error) => {
+                    eprintln!("error: failed to read baseline {}: {error}", path.display());
+                    return std::process::ExitCode::from(2);
+                }
+            };
+            match serde_json::from_str::<RunArtifact>(&raw) {
+                Ok(artifact) => {
+                    if artifact.schema_version != eval_harness::artifact::EVAL_ARTIFACT_SCHEMA_V2
+                        || artifact.profile != manifest.profile
+                        || artifact.validate().is_err()
+                    {
+                        eprintln!(
+                            "error: baseline {} is incompatible with profile {:?}",
+                            path.display(),
+                            manifest.profile
+                        );
+                        return std::process::ExitCode::from(2);
+                    }
+                    Some(artifact)
+                }
+                Err(error) => {
+                    eprintln!("error: invalid baseline {}: {error}", path.display());
+                    return std::process::ExitCode::from(2);
+                }
+            }
+        }
+        None => None,
+    };
+
+    if manifest
+        .gates
+        .iter()
+        .any(|gate| gate.baseline_required || gate.regression_budget.is_some())
+        && baseline_artifact.is_none()
+    {
+        eprintln!("error: profile contains regression budgets but no baseline was supplied");
+        return std::process::ExitCode::from(2);
+    }
 
     let mut suites: Vec<Box<dyn eval_harness::runner::EvalSuite>> = Vec::new();
     let mut issues = Vec::new();
@@ -181,9 +219,22 @@ async fn cmd_prepare_corpus(
             url: &str,
             _revision: &str,
         ) -> Result<Vec<u8>, eval_harness::EvalError> {
-            let response = reqwest::get(url)
+            let client = reqwest::Client::builder()
+                .connect_timeout(std::time::Duration::from_secs(15))
+                .timeout(std::time::Duration::from_secs(180))
+                .build()
+                .map_err(|e| eval_harness::EvalError::Suite(format!("build fetch client: {e}")))?;
+            let response = client
+                .get(url)
+                .send()
                 .await
                 .map_err(|e| eval_harness::EvalError::Suite(format!("fetch failed: {e}")))?;
+            if !response.status().is_success() {
+                return Err(eval_harness::EvalError::Suite(format!(
+                    "fetch failed: HTTP {}",
+                    response.status()
+                )));
+            }
             let bytes = response
                 .bytes()
                 .await

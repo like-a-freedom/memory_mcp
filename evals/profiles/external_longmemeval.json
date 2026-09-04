@@ -1,0 +1,11 @@
+{
+  "schema_version": "memory-mcp-eval-profile/v1",
+  "profile": "external_longmemeval",
+  "time_budget_seconds": 21600,
+  "suites": [{
+    "id": "external-retrieval",
+    "corpus_root": "target/eval-corpora/longmemeval-cleaned/98d7416c24c778c2fee6e6f3006e7a073259d48f",
+    "expected_coverage": { "exact_cases": 500 }
+  }],
+  "gates": []
+}

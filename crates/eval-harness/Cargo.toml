@@ -19,6 +19,7 @@ memory_mcp = { path = "../memory-mcp", features = ["eval-support"] }
 async-trait.workspace = true
 chrono.workspace = true
 clap.workspace = true
+csv.workspace = true
 hex.workspace = true
 reqwest.workspace = true
 serde.workspace = true

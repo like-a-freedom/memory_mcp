@@ -1,5 +1,7 @@
 use std::fs;
+use std::net::IpAddr;
 use std::path::Path;
+use std::time::Duration;
 
 use sha2::{Digest, Sha256};
 
@@ -196,7 +198,28 @@ async fn maybe_prepare_url_content(
         return Ok(None);
     }
 
-    let response = reqwest::get(content).await.map_err(|err| {
+    let (url, resolved_addresses) = validate_remote_url(content).await?;
+    const MAX_URL_BODY_BYTES: u64 = 4 * 1024 * 1024;
+    let host = url
+        .host_str()
+        .ok_or_else(|| MemoryError::Validation(format!("ingest url has no host: {content}")))?;
+    let resolve_host = host
+        .strip_prefix('[')
+        .and_then(|host| host.strip_suffix(']'))
+        .unwrap_or(host);
+    let client = reqwest::Client::builder()
+        // A proxy resolves the target independently and would bypass our
+        // validated, pinned destination addresses.
+        .no_proxy()
+        .connect_timeout(Duration::from_secs(5))
+        .timeout(Duration::from_secs(20))
+        .redirect(reqwest::redirect::Policy::none())
+        .resolve_to_addrs(resolve_host, &resolved_addresses)
+        .build()
+        .map_err(|err| {
+            MemoryError::Validation(format!("failed to build ingest url client: {err}"))
+        })?;
+    let response = client.get(url.clone()).send().await.map_err(|err| {
         MemoryError::Validation(format!("failed to fetch ingest url {content}: {err}"))
     })?;
     let status = response.status();
@@ -206,8 +229,28 @@ async fn maybe_prepare_url_content(
         )));
     }
 
-    let body = response.text().await.map_err(|err| {
+    if response
+        .content_length()
+        .is_some_and(|length| length > MAX_URL_BODY_BYTES)
+    {
+        return Err(MemoryError::Validation(format!(
+            "ingest url body exceeds {MAX_URL_BODY_BYTES} bytes: {content}"
+        )));
+    }
+    let mut body = Vec::new();
+    let mut response = response;
+    while let Some(chunk) = response.chunk().await.map_err(|err| {
         MemoryError::Validation(format!("failed to read ingest url body {content}: {err}"))
+    })? {
+        if body.len() as u64 + chunk.len() as u64 > MAX_URL_BODY_BYTES {
+            return Err(MemoryError::Validation(format!(
+                "ingest url body exceeds {MAX_URL_BODY_BYTES} bytes: {content}"
+            )));
+        }
+        body.extend_from_slice(&chunk);
+    }
+    let body = String::from_utf8(body).map_err(|err| {
+        MemoryError::Validation(format!("ingest url body is not UTF-8 {content}: {err}"))
     })?;
     let extracted = normalize_extracted_text(&strip_html_to_text(&body));
     if extracted.is_empty() {
@@ -220,6 +263,82 @@ async fn maybe_prepare_url_content(
         content: finalize_text_chunks(vec![TextChunk::new(extracted)])?,
         source_id: Some(stable_transport_source_id(content)),
     }))
+}
+
+async fn validate_remote_url(
+    content: &str,
+) -> Result<(reqwest::Url, Vec<std::net::SocketAddr>), MemoryError> {
+    let url = reqwest::Url::parse(content)
+        .map_err(|err| MemoryError::Validation(format!("invalid ingest url {content}: {err}")))?;
+    if !matches!(url.scheme(), "http" | "https") || url.username() != "" || url.password().is_some()
+    {
+        return Err(MemoryError::Validation(format!(
+            "ingest url must be HTTP(S) without credentials: {content}"
+        )));
+    }
+    let host = url
+        .host_str()
+        .ok_or_else(|| MemoryError::Validation(format!("ingest url has no host: {content}")))?;
+    let port = url
+        .port_or_known_default()
+        .ok_or_else(|| MemoryError::Validation(format!("ingest url has no port: {content}")))?;
+    // URL serialization retains brackets around IPv6 literals; socket IP
+    // parsing expects the address without those URI delimiters.
+    let address_host = host
+        .strip_prefix('[')
+        .and_then(|host| host.strip_suffix(']'))
+        .unwrap_or(host);
+    let addresses = if let Ok(ip) = address_host.parse::<IpAddr>() {
+        vec![std::net::SocketAddr::new(ip, port)]
+    } else {
+        tokio::time::timeout(
+            Duration::from_secs(5),
+            tokio::net::lookup_host((host, port)),
+        )
+        .await
+        .map_err(|_| MemoryError::Validation("ingest url DNS resolution timed out".into()))?
+        .map_err(|err| {
+            MemoryError::Validation(format!("cannot resolve ingest url {content}: {err}"))
+        })?
+        .collect::<Vec<_>>()
+    };
+    if addresses.is_empty() || addresses.iter().any(|address| !is_public_ip(&address.ip())) {
+        return Err(MemoryError::Validation(format!(
+            "ingest url resolves to a non-public address: {content}"
+        )));
+    }
+    Ok((url, addresses))
+}
+
+fn is_public_ip(ip: &IpAddr) -> bool {
+    match ip {
+        IpAddr::V4(ip) => {
+            let octets = ip.octets();
+            !ip.is_loopback()
+                && octets[0] != 0
+                && octets[0] < 240
+                && !ip.is_documentation()
+                && !ip.is_private()
+                && !ip.is_link_local()
+                && !ip.is_unspecified()
+                && !ip.is_multicast()
+                && !(octets[0] == 100 && (64..=127).contains(&octets[1]))
+                && !(octets[0] == 192 && octets[1] == 0 && octets[2] == 0)
+                && !(octets[0] == 198 && (18..=19).contains(&octets[1]))
+        }
+        IpAddr::V6(ip) => {
+            let segments = ip.segments();
+            !ip.is_loopback()
+                && !ip.is_unspecified()
+                && !ip.is_multicast()
+                && !(segments[0] & 0xfe00 == 0xfc00)
+                && !(segments[0] & 0xffc0 == 0xfe80)
+                && !(segments[0] == 0x2001 && segments[1] == 0x0db8)
+                && !ip
+                    .to_ipv4()
+                    .is_some_and(|v4| !is_public_ip(&IpAddr::V4(v4)))
+        }
+    }
 }
 
 fn extract_file_content(path: &Path) -> Result<String, MemoryError> {
@@ -597,6 +716,70 @@ mod tests {
     fn detect_ingest_transport_identifies_url() {
         assert_eq!(detect_ingest_transport("https://example.com/doc"), "url");
         assert_eq!(detect_ingest_transport("http://localhost:8080/api"), "url");
+    }
+
+    #[test]
+    fn private_and_special_addresses_are_not_fetchable() {
+        for address in [
+            "127.0.0.1",
+            "10.0.0.1",
+            "172.16.0.1",
+            "192.168.1.1",
+            "169.254.1.1",
+            "::1",
+            "fc00::1",
+            "fe80::1",
+            "fe90::1",
+            "febf::1",
+            "0.0.0.1",
+            "240.0.0.1",
+            "255.255.255.255",
+            "192.0.2.1",
+            "198.51.100.1",
+            "203.0.113.1",
+            "2001:db8::1",
+        ] {
+            let ip = address.parse().expect("valid test address");
+            assert!(!is_public_ip(&ip), "{address} must not be fetchable");
+        }
+    }
+
+    #[test]
+    fn public_addresses_remain_fetchable() {
+        for address in ["1.1.1.1", "8.8.8.8", "2606:4700:4700::1111"] {
+            let ip = address.parse().expect("valid test address");
+            assert!(is_public_ip(&ip), "{address} should be fetchable");
+        }
+    }
+
+    #[tokio::test]
+    async fn remote_url_validation_rejects_credentials_and_non_http_schemes() {
+        for url in [
+            "ftp://example.com/file.txt",
+            "https://user:secret@example.com/private",
+            "file:///etc/passwd",
+        ] {
+            assert!(
+                validate_remote_url(url).await.is_err(),
+                "{url} must be rejected"
+            );
+        }
+    }
+
+    #[tokio::test]
+    async fn remote_url_validation_accepts_public_ipv6_literals() {
+        let (_, addresses) = validate_remote_url("https://[2606:4700:4700::1111]/")
+            .await
+            .expect("public IPv6 literal needs no DNS lookup");
+        assert_eq!(addresses[0].to_string(), "[2606:4700:4700::1111]:443");
+    }
+
+    #[tokio::test]
+    async fn remote_url_validation_rejects_loopback_hostname() {
+        let error = validate_remote_url("http://localhost:8080/private")
+            .await
+            .expect_err("localhost must not be fetchable");
+        assert!(error.to_string().contains("non-public"));
     }
 
     #[test]

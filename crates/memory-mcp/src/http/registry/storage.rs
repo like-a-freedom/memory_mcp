@@ -472,11 +472,19 @@ pub struct InMemoryStore {
     >,
     #[cfg(feature = "control-plane")]
     deletion_challenges: std::sync::Mutex<Vec<DeletionChallengeRecord>>,
+    #[cfg(feature = "control-plane")]
+    oidc_conflict: std::sync::Mutex<Option<AccountBundleConflict>>,
 }
 
 /// Sealed OIDC payload: ciphertext + AEAD nonce.
 #[cfg(all(feature = "control-plane", any(test, feature = "test-fixtures")))]
 type SealedOidcPayload = (Vec<u8>, [u8; 12]);
+
+#[cfg(all(feature = "control-plane", any(test, feature = "test-fixtures")))]
+enum AccountBundleConflict {
+    WithWinner(Box<(Account, Tenant, ExternalIdentity)>),
+    WithoutWinner,
+}
 
 #[cfg(any(test, feature = "test-fixtures"))]
 impl Default for InMemoryStore {
@@ -496,7 +504,20 @@ impl Default for InMemoryStore {
             sessions: Mutex::new(std::collections::HashMap::new()),
             #[cfg(feature = "control-plane")]
             deletion_challenges: Mutex::new(Vec::new()),
+            #[cfg(feature = "control-plane")]
+            oidc_conflict: Mutex::new(None),
         }
+    }
+}
+
+#[cfg(any(test, feature = "test-fixtures"))]
+impl InMemoryStore {
+    #[cfg(feature = "control-plane")]
+    pub fn inject_oidc_conflict(&self, winner: Option<(Account, Tenant, ExternalIdentity)>) {
+        *self.oidc_conflict.lock().expect("poisoned") = Some(match winner {
+            Some(bundle) => AccountBundleConflict::WithWinner(Box::new(bundle)),
+            None => AccountBundleConflict::WithoutWinner,
+        });
     }
 }
 
@@ -550,6 +571,16 @@ impl RegistryStore for InMemoryStore {
             return Err(MemoryError::Validation(
                 "identity.account_id must equal account.id".into(),
             ));
+        }
+        #[cfg(feature = "control-plane")]
+        if let Some(conflict) = self.oidc_conflict.lock().expect("poisoned").take() {
+            if let AccountBundleConflict::WithWinner(bundle) = conflict {
+                let (account, tenant, identity) = *bundle;
+                self.accounts.lock().expect("poisoned").push(account);
+                self.tenants.lock().expect("poisoned").push(tenant);
+                self.identities.lock().expect("poisoned").push(identity);
+            }
+            return Err(MemoryError::Conflict("injected OIDC create race".into()));
         }
         let mut accounts = self.accounts.lock().expect("poisoned");
         let mut tenants = self.tenants.lock().expect("poisoned");

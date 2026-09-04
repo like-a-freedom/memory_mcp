@@ -228,7 +228,7 @@ pub(super) async fn assemble_default_context(
     let channels = retrieve_fact_channels(service, &params).await?;
     let ranked = rank_fact_channels(service, &params, channels).await?;
     let selection = select_context_facts(service, &params, ranked).await?;
-    finalize_with_first_person_appenders(service, &params, selection).await
+    finalize_with_first_person_appenders(&params, selection).await
 }
 
 /// The four fact channels produced by `retrieve_fact_channels`
@@ -259,6 +259,7 @@ struct SelectedContext {
     selected: Vec<RankedContextFact>,
     ranked_candidates: Vec<RankedContextFact>,
     episode_fallback_items: Vec<AssembledContextItem>,
+    prefer_episode_content: bool,
 }
 
 /// Phase 1: collect fact records from every retrieval channel.
@@ -560,12 +561,14 @@ async fn select_context_facts(
                 selected: Vec::new(),
                 ranked_candidates: Vec::new(),
                 episode_fallback_items,
+                prefer_episode_content: false,
             });
         }
         return Ok(SelectedContext {
             selected: Vec::new(),
             ranked_candidates: Vec::new(),
             episode_fallback_items: Vec::new(),
+            prefer_episode_content: false,
         });
     }
 
@@ -625,11 +628,11 @@ async fn select_context_facts(
     // return. The pre-selection clone is what the
     // first-person appender references, regardless of the
     // fallback decision.
-    let _ = prefer_episode_content; // logged above; orchestrator below.
     Ok(SelectedContext {
         selected: selected_ranked,
         ranked_candidates,
         episode_fallback_items,
+        prefer_episode_content,
     })
 }
 
@@ -641,7 +644,6 @@ async fn select_context_facts(
 /// re-evaluates it here because the decision affects which
 /// stream is returned.
 async fn finalize_with_first_person_appenders(
-    service: &RetrievalContext,
     params: &DefaultContextParams<'_>,
     selection: SelectedContext,
 ) -> Result<Vec<AssembledContextItem>, MemoryError> {
@@ -650,11 +652,11 @@ async fn finalize_with_first_person_appenders(
     // log through the same logger. The current phase does
     // not use it because the rescue log was emitted in
     // `select_context_facts`.
-    let _ = service;
     let SelectedContext {
         selected: selected_ranked,
         ranked_candidates,
         episode_fallback_items,
+        prefer_episode_content,
     } = selection;
 
     if selected_ranked.is_empty() && !episode_fallback_items.is_empty() {
@@ -669,12 +671,6 @@ async fn finalize_with_first_person_appenders(
     if selected_ranked.is_empty() {
         return Ok(Vec::new());
     }
-
-    let prefer_episode_content = EpisodeFallbackStrategy.decide(
-        &selected_ranked,
-        &episode_fallback_items,
-        params.query_terms,
-    ) == FallbackDecision::UseEpisodes;
 
     if prefer_episode_content {
         return Ok(episode_fallback_items);
@@ -772,6 +768,17 @@ mod tests {
             retrieval_tier: Some("fallback".to_string()),
             ..Default::default()
         }
+    }
+
+    #[test]
+    fn selected_context_carries_episode_fallback_decision() {
+        let selection = SelectedContext {
+            selected: Vec::new(),
+            ranked_candidates: Vec::new(),
+            episode_fallback_items: Vec::new(),
+            prefer_episode_content: true,
+        };
+        assert!(selection.prefer_episode_content);
     }
 
     fn query_terms() -> Vec<String> {

@@ -1,8 +1,8 @@
 {
   "schema_version": "memory-mcp-corpus/v1",
   "corpus_id": "longmemeval-cleaned",
-  "source_url": "https://huggingface.co/datasets/xiaowu0162/longmemeval-cleaned/resolve/main/longmemeval_s_cleaned.json",
-  "revision": "e47becba",
+  "source_url": "https://huggingface.co/datasets/xiaowu0162/longmemeval-cleaned/resolve/98d7416c24c778c2fee6e6f3006e7a073259d48f/longmemeval_s_cleaned.json",
+  "revision": "98d7416c24c778c2fee6e6f3006e7a073259d48f",
   "sha256": "d6f21ea9d60a0d56f34a05b609c79c88a451d2ae03597821ea3d5a9678c3a442",
   "license": "cc-by-4.0",
   "byte_size": 277383467,

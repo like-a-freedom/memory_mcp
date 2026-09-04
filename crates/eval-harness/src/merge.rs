@@ -47,8 +47,12 @@ pub fn merge_shards(
 
     for shard in shards {
         all_outcomes.extend(shard.outcomes.iter().cloned());
-        for id in &shard.expected_case_ids {
-            all_expected.insert(id.as_str());
+        if !shard.expected_cases.is_empty() {
+            all_expected.extend(shard.expected_cases.iter().cloned());
+        } else {
+            for outcome in &shard.outcomes {
+                all_expected.insert(outcome.case_key.clone());
+            }
         }
     }
 
@@ -67,15 +71,15 @@ pub fn merge_shards(
         }
     }
 
-    // Expected ids are bare corpus case ids; outcomes are suite-scoped, so a
-    // bare id is covered when any suite produced a case with that id.
-    let outcome_case_ids: BTreeSet<&str> =
-        all_outcomes.iter().map(|o| o.case_id().as_str()).collect();
+    let outcome_case_keys: BTreeSet<CaseKey> =
+        all_outcomes.iter().map(|o| o.case_key.clone()).collect();
 
-    for id in &all_expected {
-        if !outcome_case_ids.contains(*id) {
+    for key in &all_expected {
+        if !outcome_case_keys.contains(key) {
             return Err(EvalError::InvalidInput(format!(
-                "missing outcome for expected case: {id}"
+                "missing outcome for expected case: {}::{}",
+                key.suite_id.as_str(),
+                key.case_id.as_str()
             )));
         }
     }
@@ -86,11 +90,7 @@ pub fn merge_shards(
             .then(a.case_id().cmp(b.case_id()))
     });
 
-    let mut expected_ids: Vec<EvalCaseId> = all_expected
-        .into_iter()
-        .map(|s| EvalCaseId::parse(s.to_string()))
-        .collect::<Result<Vec<_>, _>>()?;
-    expected_ids.sort();
+    let expected_cases: Vec<CaseKey> = all_expected.into_iter().collect();
 
     // Reduce through the suite reducers so a merged artifact cannot disagree
     // with a direct run of the same suites. `all_outcomes` is consumed by the
@@ -138,8 +138,8 @@ pub fn merge_shards(
         profile: manifest.profile,
         started_at: chrono::Utc::now(),
         duration_ms,
-        expected_case_ids: expected_ids.clone(),
-        expected_cases: vec![],
+        expected_case_ids: vec![],
+        expected_cases: expected_cases.clone(),
         outcomes: pending_outcomes,
         suite_summaries: suite_summaries.clone(),
         gates: vec![],
@@ -162,8 +162,8 @@ pub fn merge_shards(
         profile: manifest.profile,
         started_at: first.started_at,
         duration_ms,
-        expected_case_ids: expected_ids,
-        expected_cases: vec![],
+        expected_case_ids: vec![],
+        expected_cases,
         outcomes: pending.outcomes,
         suite_summaries: pending.suite_summaries,
         gates,
@@ -299,7 +299,7 @@ mod tests {
 
         let merged = merge_shards(&[shard0, shard1, shard2, shard3], &manifest).unwrap();
         assert_eq!(merged.outcomes.len(), 8);
-        assert_eq!(merged.expected_case_ids.len(), 8);
+        assert_eq!(merged.expected_cases.len(), 8);
         assert_eq!(merged.verdict, RunVerdict::Passed);
     }
 
@@ -318,7 +318,7 @@ mod tests {
         let shard1 = make_shard_with_suite(1, "ner-quality-regex", vec!["q-en-1", "q-en-2"]);
         let merged = merge_shards(&[shard0, shard1], &manifest).unwrap();
         assert_eq!(merged.outcomes.len(), 4);
-        assert_eq!(merged.expected_case_ids.len(), 2);
+        assert_eq!(merged.expected_cases.len(), 4);
         assert_eq!(merged.suite_summaries.len(), 2);
     }
 

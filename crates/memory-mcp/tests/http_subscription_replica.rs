@@ -3,11 +3,12 @@
 //!
 //! Black-box coverage for one tenant's durable subscription store,
 //! exercised through the `SubscriptionTestDriver` exposed by
-//! `http::subscriptions`. The "restart from cursor" and "missed
-//! wakeup repaired by durable polling" cases use two independent
+//! `http::subscriptions`. The "second replica from cursor" and
+//! "missed wakeup repaired by durable polling" cases use two independent
 //! `BoundDbClient` handles against the same tenant namespace so
 //! the second reader can observe the first writer's durable
-//! commits and prove the polling path repairs a missed wake hint.
+//! commits and prove the polling path repairs a missed wake hint. These tests
+//! do not prove process-restart persistence.
 //!
 //! Run:
 //! cargo test -p memory_mcp --features streamable-http,mcp-apps,control-plane,test-fixtures \
@@ -193,7 +194,7 @@ async fn missed_wakeup_is_repaired_by_durable_polling() {
 }
 
 #[tokio::test]
-async fn restart_picks_up_from_committed_cursor() {
+async fn second_replica_picks_up_from_committed_cursor() {
     // A second replica that opens after the writer commits must
     // see the same committed events when it polls from
     // after_sequence = 0.

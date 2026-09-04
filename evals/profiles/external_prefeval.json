@@ -1,0 +1,11 @@
+{
+  "schema_version": "memory-mcp-eval-profile/v1",
+  "profile": "external_prefeval",
+  "time_budget_seconds": 21600,
+  "suites": [{
+    "id": "external-retrieval",
+    "corpus_root": "target/eval-corpora/prefeval/50795054b5ff5f418d2b768a331d71e480f93331",
+    "expected_coverage": { "exact_cases": 52 }
+  }],
+  "gates": []
+}

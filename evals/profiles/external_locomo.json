@@ -1,0 +1,11 @@
+{
+  "schema_version": "memory-mcp-eval-profile/v1",
+  "profile": "external_locomo",
+  "time_budget_seconds": 21600,
+  "suites": [{
+    "id": "external-retrieval",
+    "corpus_root": "target/eval-corpora/locomo/3eb6f2c585f5e1699204e3c3bdf7adc5c28cb376",
+    "expected_coverage": { "exact_cases": 1986 }
+  }],
+  "gates": []
+}

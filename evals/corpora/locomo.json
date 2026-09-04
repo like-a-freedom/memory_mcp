@@ -1,8 +1,8 @@
 {
   "schema_version": "memory-mcp-corpus/v1",
   "corpus_id": "locomo",
-  "source_url": "https://raw.githubusercontent.com/snap-research/locomo/main/data/locomo10.json",
-  "revision": "locomo10",
+  "source_url": "https://raw.githubusercontent.com/snap-research/locomo/3eb6f2c585f5e1699204e3c3bdf7adc5c28cb376/data/locomo10.json",
+  "revision": "3eb6f2c585f5e1699204e3c3bdf7adc5c28cb376",
   "sha256": "79fa87e90f04081343b8c8debecb80a9a6842b76a7aa537dc9fdf651ea698ff4",
   "license": "mit",
   "byte_size": 2805274,

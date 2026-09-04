@@ -629,11 +629,7 @@ where
         }
     });
 
-    tokio::pin!(body);
-    let result = tokio::select! {
-        result = &mut body => result,
-        _ = &mut lost_rx => Err(MemoryError::Conflict("provisioning lease lost".into())),
-    };
+    let result = crate::http::leases::await_body_or_lease_loss(body, &mut lost_rx).await;
     heartbeat_cancel.cancel();
     let _ = heartbeat.await;
     result

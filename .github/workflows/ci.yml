@@ -56,7 +56,7 @@ jobs:
         run: cargo metadata --locked --no-deps
 
   msrv:
-    name: Rust MSRV
+    name: Pinned Rust
     runs-on: ubuntu-latest
     timeout-minutes: 40
     steps:
@@ -65,7 +65,7 @@ jobs:
       - name: Set up Rust toolchain
         uses: actions-rust-lang/setup-rust-toolchain@v1.17.0
         with:
-          toolchain: 1.88
+          toolchain: 1.97.1
           cache: true
 
       - name: Check MSRV
@@ -89,7 +89,7 @@ jobs:
         # `metal` is a macOS-only Candle backend.  Keep the Linux gate focused
         # on the features that are supported by the runner instead of making
         # `--all-features` try to compile Metal on Ubuntu.
-        run: cargo clippy --workspace --all-targets --features fs-watch,mcp-apps --locked -- -D warnings
+        run: cargo clippy --workspace --all-targets --features fs-watch,mcp-apps,streamable-http,control-plane --locked -- -D warnings
 
       - name: Check additive HTTP feature composition
         run: >-
@@ -98,9 +98,7 @@ jobs:
           --locked
 
       - name: Run 20-tenant HTTP load gate
-        # Every push exercises the executable 20-tenant load gate.
-        # The 500-tenant release gate is gated by MEMORY_MCP_RUN_500_LOAD=1
-        # and is invoked only from the release job, not from this matrix.
+        # Cheap in-memory isolation/concurrency regression, not a capacity SLA.
         run: >-
           cargo test -p memory_mcp
           --features streamable-http,mcp-apps,control-plane,test-fixtures
@@ -140,6 +138,23 @@ jobs:
 
       - name: Run tests
         run: cargo test --workspace --lib --bins --tests --locked
+
+  benchmark_compile:
+    name: Benchmark profiles compile
+    if: github.event_name == 'pull_request' || github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7.0.0
+
+      - name: Set up Rust toolchain
+        uses: actions-rust-lang/setup-rust-toolchain@v1.17.0
+        with:
+          toolchain: stable
+          cache: true
+
+      - name: Compile Criterion benchmark targets
+        run: make bench-check
 
   fs_watch_windows:
     name: Filesystem ingestion (Windows)
@@ -184,14 +199,18 @@ jobs:
           mkdir -p target/evals
           cargo run -p eval-harness --bin memory-eval -- run \
             --profile evals/profiles/pr.json \
-            --artifact target/evals/pr.json
+            --artifact target/evals/pr.json \
+            --baseline evals/baselines/one-active-namespace-pr.json
+
+      - name: Run response-size evaluation
+        run: make eval-response-size
 
       - name: Upload eval artifact
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: eval-pr-artifact
-          path: target/evals/pr.json
+          path: target/evals/*.json
           retention-days: 30
 
   eval-nightly:
@@ -214,14 +233,57 @@ jobs:
           cargo run -p eval-harness --bin memory-eval -- run \
             --profile evals/profiles/nightly.json \
             --artifact target/evals/nightly.json
-        continue-on-error: true
+
+      - name: Run response-size benchmark profile
+        run: make eval-response-size
+
+      - name: Run NER quality benchmark profile
+        if: vars.MEMORY_NER_FIXTURES_PROVISIONED == 'true'
+        run: make eval-ner-quality
+
+      - name: Record NER fixture prerequisite
+        if: vars.MEMORY_NER_FIXTURES_PROVISIONED != 'true'
+        run: echo 'NER quality not executed; run make eval-ner-quality on a host with the pinned model fixtures.' >> "$GITHUB_STEP_SUMMARY"
 
       - name: Upload nightly artifact
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: eval-nightly-artifact
-          path: target/evals/nightly.json
+          path: target/evals/*.json
+          retention-days: 30
+
+  benchmark-nightly:
+    name: CPU benchmark profiles
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v7.0.0
+
+      - name: Set up Rust toolchain
+        uses: actions-rust-lang/setup-rust-toolchain@v1.17.0
+        with:
+          toolchain: stable
+          cache: true
+
+      - name: Run CPU Criterion benchmarks
+        run: |
+          make bench-cpu-core
+          if test -d crates/memory-mcp/tests/models/ner; then
+            MEMORY_MCP_BENCH_REQUIRE_FIXTURES=1 cargo bench -p eval-harness --bench ner_cpu --locked
+          else
+            echo "NER CPU benchmark not executed: model fixtures are not provisioned in CI"
+            echo "Run MEMORY_MCP_BENCH_REQUIRE_FIXTURES=1 make bench-cpu on a fixture-equipped host"
+          fi
+
+      - name: Upload Criterion reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: criterion-cpu-nightly
+          path: target/criterion
+          if-no-files-found: warn
           retention-days: 30
 
   eval-release:
@@ -243,8 +305,8 @@ jobs:
           mkdir -p target/evals
           cargo run -p eval-harness --bin memory-eval -- run \
             --profile evals/profiles/release.json \
-            --artifact target/evals/release.json
-        continue-on-error: true
+            --artifact target/evals/release.json \
+            --baseline evals/baselines/one-active-namespace-release.json
 
       - name: Upload release artifact
         if: always()
@@ -257,7 +319,7 @@ jobs:
   build_binaries:
     name: Build ${{ matrix.platform.os_name }}
     if: github.event_name == 'release'
-    needs: [fmt, metadata, clippy, clippy_macos, test, msrv]
+    needs: [fmt, metadata, clippy, clippy_macos, test, msrv, eval-release]
     runs-on: ${{ matrix.platform.os }}
     timeout-minutes: 60
     permissions:

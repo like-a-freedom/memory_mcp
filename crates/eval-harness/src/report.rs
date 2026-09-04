@@ -48,10 +48,12 @@ pub fn render_markdown(artifact: &RunArtifact) -> Result<String, EvalError> {
         .count();
 
     out.push_str("\n## Coverage\n\n");
-    out.push_str(&format!(
-        "**Expected cases:** {}\n",
+    let expected_cases = if artifact.expected_cases.is_empty() {
         artifact.expected_case_ids.len()
-    ));
+    } else {
+        artifact.expected_cases.len()
+    };
+    out.push_str(&format!("**Expected cases:** {}\n", expected_cases));
     out.push_str(&format!(
         "**Outcomes:** {} (failed: {}, invalid: {})\n\n",
         artifact.outcomes.len(),

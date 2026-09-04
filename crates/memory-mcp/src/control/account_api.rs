@@ -198,7 +198,7 @@ pub async fn create_api_key(
     let now = chrono::Utc::now();
     let created = super::application::api_keys::ApiKeyCreation::new(
         state.registry.store_clone(),
-        state.config.api_key_pepper.clone(),
+        std::borrow::Cow::Borrowed(state.config.api_key_pepper.as_str()),
     )
     .execute(
         super::application::api_keys::CreateApiKeyCommand {

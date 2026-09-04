@@ -25,7 +25,7 @@ to a prepared location outside the measured run.
 | longmemeval | `longmemeval_s_cleaned.json` (265 MB) | xiaowu0162/longmemeval-cleaned (HF) | 500 records |
 | locomo | `locomo10.json` (3 MB) | snap-research/locomo (GitHub) | 10 convs / 1986 QAs |
 | personamem | `questions_32k.csv` + `shared_contexts_32k.jsonl` | bowen-upenn/PersonaMem (HF) | 589 questions / 37 contexts |
-| prefeval | `travel_hotel_overall300_topk_history_persona.json` (340 KB) | amazon-science/PrefEval (GitHub) | 52 records |
+| prefeval | `travel_hotel_overall300_topk_history_persona.json` (347 KB) | amazon-science/PrefEval (GitHub) | 52 records |
 
 ## File inventory
 
@@ -39,11 +39,11 @@ to a prepared location outside the measured run.
   - 10 conversations with QA annotations (1986 QA items total)
 - `personamem/questions_32k.csv`
   - source: `bowen-upenn/PersonaMem`
-  - URL: <https://huggingface.co/datasets/bowen-upenn/PersonaMem/resolve/main/questions_32k.csv>
+  - URL: <https://huggingface.co/datasets/bowen-upenn/PersonaMem/resolve/fd7c30f071d5c2ee2a211506783be222d7b6002e/questions_32k.csv>
   - Paired with `shared_contexts_32k.jsonl` (bundled at load time)
 - `prefeval/travel_hotel_overall300_topk_history_persona.json`
   - source: `amazon-science/PrefEval`
-  - URL: <https://raw.githubusercontent.com/amazon-science/PrefEval/main/benchmark_dataset/rag_retrieval/simcse_implicit_persona/travel_hotel_overall300_topk_history_persona.json>
+  - URL: <https://raw.githubusercontent.com/amazon-science/PrefEval/50795054b5ff5f418d2b768a331d71e480f93331/benchmark_dataset/rag_retrieval/simcse_implicit_persona/travel_hotel_overall300_topk_history_persona.json>
   - PrefEval retrieval track for travel/hotel queries
 
 ## Corpus manifests

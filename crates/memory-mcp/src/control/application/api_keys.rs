@@ -29,12 +29,23 @@ pub(crate) struct CreateApiKeyCommand {
 /// Result of a successful API-key creation. The `secret` is
 /// shown once and never persisted; the caller is responsible
 /// for delivering it to the end user.
-#[derive(Debug)]
 pub(crate) struct CreatedApiKey {
     pub id: String,
     pub secret: String,
     pub name: String,
     pub expires_at: Option<chrono::DateTime<chrono::Utc>>,
+}
+
+impl std::fmt::Debug for CreatedApiKey {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter
+            .debug_struct("CreatedApiKey")
+            .field("id", &self.id)
+            .field("secret", &"[REDACTED]")
+            .field("name", &self.name)
+            .field("expires_at", &self.expires_at)
+            .finish()
+    }
 }
 
 /// The application-layer API-key creation workflow.
@@ -44,22 +55,23 @@ pub(crate) struct CreatedApiKey {
 /// deferred. The four-capability field shape documented in the
 /// plan returns when the `RegistryStores` aggregator is
 /// available.
-pub(crate) struct ApiKeyCreation {
+pub(crate) struct ApiKeyCreation<'a> {
     store: Arc<dyn RegistryStore>,
-    api_key_pepper: String,
+    api_key_pepper: std::borrow::Cow<'a, str>,
 }
 
-impl ApiKeyCreation {
+impl<'a> ApiKeyCreation<'a> {
     /// Build a workflow from the registry store the HTTP
     /// composition selected and the API-key pepper the
-    /// operator configured. The pepper is held by `String`
-    /// to match the `HttpConfig::api_key_pepper` field
-    /// type; the workflow converts to bytes once at use
-    /// time.
-    pub(crate) fn new(store: Arc<dyn RegistryStore>, api_key_pepper: String) -> Self {
+    /// operator configured. The workflow borrows the configured pepper when
+    /// possible and converts to bytes only at use time.
+    pub(crate) fn new(
+        store: Arc<dyn RegistryStore>,
+        api_key_pepper: impl Into<std::borrow::Cow<'a, str>>,
+    ) -> Self {
         Self {
             store,
-            api_key_pepper,
+            api_key_pepper: api_key_pepper.into(),
         }
     }
 
@@ -149,6 +161,19 @@ mod tests {
         Account, AccountStatus, NamespaceBinding, Plan, PlanLimits, Tenant, TenantStatus,
     };
     use crate::http::registry::storage::InMemoryStore;
+
+    #[test]
+    fn created_api_key_debug_redacts_secret() {
+        let created = CreatedApiKey {
+            id: "ak_test".to_string(),
+            secret: "mem_sk_should_never_appear".to_string(),
+            name: "test key".to_string(),
+            expires_at: None,
+        };
+        let rendered = format!("{created:?}");
+        assert!(!rendered.contains("mem_sk_should_never_appear"));
+        assert!(rendered.contains("[REDACTED]"));
+    }
 
     /// Helper: build an in-memory registry pre-seeded with
     /// one account + tenant + free plan.

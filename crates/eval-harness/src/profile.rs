@@ -117,6 +117,21 @@ impl ProfileManifest {
                     "gate suite_id must not be empty".into(),
                 ));
             }
+            if !seen_ids.contains(gate.target.suite_id.as_str()) {
+                return Err(EvalError::InvalidConfig(format!(
+                    "gate references undeclared suite: {}",
+                    gate.target.suite_id
+                )));
+            }
+            if gate.target.mode.is_some()
+                || gate.target.split.is_some()
+                || gate.target.label_trust.is_some()
+            {
+                return Err(EvalError::InvalidConfig(format!(
+                    "gate target selectors are unsupported for suite {}",
+                    gate.target.suite_id
+                )));
+            }
             if gate.hard_floor.is_none() && gate.regression_budget.is_none() {
                 return Err(EvalError::InvalidConfig(format!(
                     "gate for {} must declare at least one of hard_floor or regression_budget",
@@ -203,6 +218,70 @@ mod tests {
             "suites":[{"id":"s1","expected_coverage":{"exact_cases":1}}],
             "gates":[{"target":{"suite_id":"s1","metric":"recall"}}]}"#;
         assert!(ProfileManifest::parse(raw).is_err());
+    }
+
+    #[test]
+    fn external_profiles_pin_distinct_corpus_roots_and_coverage() {
+        let profiles = [
+            (
+                include_str!("../../../evals/profiles/external_longmemeval.json"),
+                500,
+            ),
+            (
+                include_str!("../../../evals/profiles/external_locomo.json"),
+                1986,
+            ),
+            (
+                include_str!("../../../evals/profiles/external_personamem.json"),
+                589,
+            ),
+            (
+                include_str!("../../../evals/profiles/external_prefeval.json"),
+                52,
+            ),
+        ];
+        for (raw, expected_cases) in profiles {
+            let manifest = ProfileManifest::parse(raw).unwrap();
+            assert_eq!(manifest.suites.len(), 1);
+            assert_eq!(manifest.suites[0].id, "external-retrieval");
+            assert_eq!(
+                manifest.suites[0]
+                    .expected_coverage
+                    .as_ref()
+                    .unwrap()
+                    .exact_cases,
+                expected_cases
+            );
+            assert!(manifest.suites[0].corpus_root.is_some());
+        }
+    }
+
+    #[test]
+    fn gate_rejects_undeclared_suite() {
+        let raw = r#"{"schema_version":"memory-mcp-eval-profile/v1","profile":"pr",
+            "time_budget_seconds":600,
+            "suites":[{"id":"s1","expected_coverage":{"exact_cases":1}}],
+            "gates":[{"target":{"suite_id":"missing","metric":"recall"},"hard_floor":0.9}]}"#;
+        assert!(ProfileManifest::parse(raw).is_err());
+    }
+
+    #[test]
+    fn gate_rejects_unsupported_target_selectors() {
+        let raw = r#"{"schema_version":"memory-mcp-eval-profile/v1","profile":"pr",
+            "time_budget_seconds":600,
+            "suites":[{"id":"s1","expected_coverage":{"exact_cases":1}}],
+            "gates":[{"target":{"suite_id":"s1","metric":"recall","mode":"test"},"hard_floor":0.9}]}"#;
+        assert!(ProfileManifest::parse(raw).is_err());
+    }
+
+    #[test]
+    fn baseline_required_gate_is_explicitly_supported() {
+        let raw = r#"{"schema_version":"memory-mcp-eval-profile/v1","profile":"pr",
+            "time_budget_seconds":600,
+            "suites":[{"id":"s1","expected_coverage":{"exact_cases":1}}],
+            "gates":[{"target":{"suite_id":"s1","metric":"recall"},"hard_floor":0.9,"baseline_required":true}]}"#;
+        let manifest = ProfileManifest::parse(raw).expect("valid baseline policy");
+        assert!(manifest.gates[0].baseline_required);
     }
 
     #[test]

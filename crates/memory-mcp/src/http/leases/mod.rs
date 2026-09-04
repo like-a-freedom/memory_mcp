@@ -17,6 +17,24 @@
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 
+pub(crate) async fn await_body_or_lease_loss<T, F>(
+    body: F,
+    lost_rx: &mut tokio::sync::oneshot::Receiver<()>,
+) -> Result<T, crate::error::MemoryError>
+where
+    F: std::future::Future<Output = Result<T, crate::error::MemoryError>>,
+{
+    tokio::pin!(body);
+    tokio::select! {
+        // Once the fenced operation has completed, its result is authoritative.
+        // This prevents a simultaneous stale-heartbeat signal from turning a
+        // committed operation into an ambiguous Conflict for the caller.
+        biased;
+        result = &mut body => result,
+        _ = &mut *lost_rx => Err(crate::error::MemoryError::Conflict("provisioning lease lost".into())),
+    }
+}
+
 pub mod migration;
 pub mod scheduler;
 
@@ -117,15 +135,11 @@ impl ProvisioningLease {
         let lease = self.clone();
         let cancel = heartbeat_cancel.clone();
         let heartbeat = tokio::spawn(async move {
-            let mut first = true;
             loop {
-                let delay = if first {
-                    std::time::Duration::ZERO
-                } else {
-                    // 16–24 seconds: lease_ttl / 3 with ±20% jitter.
-                    std::time::Duration::from_secs(16 + u64::from(rand_u8_below(9)))
-                };
-                first = false;
+                // 16–24 seconds: lease_ttl / 3 with ±20% jitter.  Waiting
+                // before the first heartbeat prevents a fresh lease from
+                // racing the operation it was created to fence.
+                let delay = std::time::Duration::from_secs(16 + u64::from(rand_u8_below(9)));
                 tokio::select! {
                     _ = cancel.cancelled() => break,
                     _ = tokio::time::sleep(delay) => {
@@ -139,10 +153,7 @@ impl ProvisioningLease {
                 }
             }
         });
-        let result = tokio::select! {
-            result = work => result,
-            _ = &mut lost_rx => Err(crate::error::MemoryError::Conflict("provisioning lease lost".into())),
-        };
+        let result = await_body_or_lease_loss(work, &mut lost_rx).await;
         heartbeat_cancel.cancel();
         let _ = heartbeat.await;
         result
@@ -182,6 +193,25 @@ fn rand_u8_below(upper: u8) -> u8 {
     // it in directly. A deterministic 0 keeps the cadence
     // predictable.
     0u8.min(upper.saturating_sub(1))
+}
+
+#[cfg(test)]
+mod heartbeat_tests {
+    use super::await_body_or_lease_loss;
+
+    #[tokio::test]
+    async fn completed_body_wins_over_simultaneous_lease_loss() {
+        let (lost_tx, mut lost_rx) = tokio::sync::oneshot::channel();
+        lost_tx.send(()).expect("receiver is still alive");
+
+        let result = await_body_or_lease_loss(
+            async { Ok::<_, crate::error::MemoryError>(42) },
+            &mut lost_rx,
+        )
+        .await;
+
+        assert_eq!(result.unwrap(), 42);
+    }
 }
 
 impl ProvisioningLease {
