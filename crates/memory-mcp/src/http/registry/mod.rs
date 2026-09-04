@@ -5,6 +5,7 @@
 //! explicitly; there is no silent in-memory fallback.
 
 pub mod account;
+pub mod capabilities;
 pub mod migrations;
 pub mod models;
 pub mod plan;
