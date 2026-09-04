@@ -2,6 +2,18 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
+> **Status note (2026-09-04):** Task 10 is **deferred** to a follow-up milestone. The
+> eight capability traits in
+> `crates/memory-mcp/src/http/registry/capabilities.rs` are declared and the
+> compile-time assertion (`assert_registry_capabilities`) is in place, but the
+> `RegistryStores` aggregator that holds `Arc<dyn Capability>` views over one
+> concrete allocation is not buildable in stable Rust 1.97. The reason is
+> recorded in ADR-0054 (Stable Rust constraint note): trait upcasting
+> (`Arc<dyn Source> -> Arc<dyn Target>` for two different traits) is not
+> stable (RFC 3324). Tasks 11 and 12 are re-scoped below to hold the omnibus
+> `Arc<dyn RegistryStore>` instead of multiple `Arc<dyn Capability>` fields;
+> the workflow-extraction value of those tasks is preserved.
+
 **Goal:** Resolve every verified architecture-audit finding while preserving the frozen MCP surface, stdio behavior, namespace isolation, existing schemas, and public compatibility.
 
 **Architecture:** Repair the feature matrix first, then make HTTP production/test composition explicit before building release evidence on that seam. After correctness and release coverage are trustworthy, replace the monolithic Registry interface with capability-specific interfaces, extract two verified control-plane workflows, deepen internal service seams, and reconcile public interfaces and documentation.
@@ -978,9 +990,18 @@ git commit -m "refactor: split control registry capabilities"
 
 ---
 
-### Task 10: Migrate Registry consumers and remove the omnibus seam
+### Task 10: ~~Migrate Registry consumers and remove the omnibus seam~~ **DEFERRED**
 
-**Files:**
+**Status:** Deferred to a follow-up milestone. The capability split
+from Task 9 is in place; the per-consumer migration cannot proceed
+in stable Rust 1.97 because the `Arc<dyn Capability>` views the
+plan assumes are not buildable. See the plan's status note and
+ADR-0054 for the rationale and the conditions under which this
+task is unblocked.
+
+When this task resumes, the consumer migration will:
+
+**Files (when resumed):**
 - Modify: `crates/memory-mcp/src/http/principal/auth.rs`
 - Modify: `crates/memory-mcp/src/http/registry/account.rs`
 - Modify: `crates/memory-mcp/src/http/registry/plan.rs`
@@ -994,50 +1015,86 @@ git commit -m "refactor: split control registry capabilities"
 - Modify: `crates/memory-mcp/src/control/{account_api.rs,oidc.rs,session.rs,deletion.rs,operator.rs}`
 - Modify: `crates/memory-mcp/src/http/registry/{mod.rs,storage.rs}`
 
+**Re-scoping impact on Tasks 11 and 12:** Those two tasks are still
+in scope. The plan's original interface had `ApiKeyCreation` and
+`OidcSignup` hold multiple `Arc<dyn Capability>` fields. While
+Task 10 is deferred, both structs hold a single
+`Arc<dyn RegistryStore>` (the omnibus trait) instead. The
+workflow-extraction value (HTTP transport decoupled from business
+workflow) is preserved; the per-capability narrowing lands when
+the aggregator is available.
+
+### Task 11: Extract API-key creation from Axum (re-scoped)
+
+**Files:**
+- Create: `crates/memory-mcp/src/control/application/mod.rs`
+- Create: `crates/memory-mcp/src/control/application/api_keys.rs`
+- Modify: `crates/memory-mcp/src/control/mod.rs`
+- Modify: `crates/memory-mcp/src/control/account_api.rs:95-208`
+
 **Interfaces:**
-- Consumes: capability traits and accessors from Task 9.
-- Produces: consumers that know only required capabilities; removes `RegistryStore` and `RegistryHandle::store_clone()`.
+- Consumes: the omnibus `RegistryStore` (Task 10 deferred; the
+  capability narrowing lands when the aggregator is available).
+- Produces: `ApiKeyCreation`, `CreateApiKeyCommand`, and
+  `CreatedApiKey`.
 
-- [ ] **Step 1: Migrate authentication and account resolution**
+- [ ] **Step 1: Write application tests first**
 
-Change `Authenticator` to own `Arc<dyn AccountIdentityStore>` and `Arc<dyn CredentialStore>`. Change `AccountResolver` to own `Arc<dyn TenantProvisioningStore>`. Update constructors and tests.
+Cover missing account, missing tenant, active-key cap, deterministic expiry from supplied `now`, generated verifier matching the returned secret, and successful one-time-secret result. Tests instantiate `ApiKeyCreation` with an in-memory `RegistryStore` and no Axum router.
 
-- [ ] **Step 2: Migrate OIDC and session consumers**
+- [ ] **Step 2: Implement the workflow**
 
-Use `oidc_requests()`, `sessions()`, `accounts()`, and `provisioning()` accessors. No handler receives the aggregate stores object.
+```rust
+pub(crate) struct CreateApiKeyCommand {
+    pub account_id: String,
+    pub name: String,
+    pub expires_in_days: Option<u32>,
+}
 
-- [ ] **Step 3: Migrate plan, quota, and maintenance consumers**
+pub(crate) struct CreatedApiKey {
+    pub id: String,
+    pub secret: String,
+    pub name: String,
+    pub expires_at: Option<chrono::DateTime<chrono::Utc>>,
+}
 
-Schedulers receive `Arc<dyn TenantProvisioningStore>` for tenant enumeration plus their tenant-local stores. Plan reconciliation receives `PlanUsageStore`. Middleware receives only account, credential, provisioning, and plan capabilities used by each step.
+pub(crate) struct ApiKeyCreation {
+    // One omnibus store while Task 10 is deferred. The
+    // four-capability field shape returns when the
+    // RegistryStores aggregator is available.
+    store: std::sync::Arc<dyn crate::http::registry::storage::RegistryStore>,
+    api_key_pepper: std::sync::Arc<[u8]>,
+}
 
-- [ ] **Step 4: Migrate provisioning and deletion workers**
-
-Change `ProvisioningLease::{heartbeat,release}`, `provision_one`, transitions, reconciliation, and deletion operations to the narrow traits. Preserve all atomic operation calls.
-
-- [ ] **Step 5: Remove low-level production writes from the broad surface**
-
-Keep direct `write_account`, `write_tenant`, and `write_api_key` behind fixture-only setup helpers or adapter tests. Normal application code must use `create_account_bundle` and `create_api_key_if_below_limit`.
-
-- [ ] **Step 6: Prove the broad seam is gone**
-
-Run structural searches and require zero production references to `RegistryStore` and `store_clone`. Then delete the old trait and accessor.
-
-- [ ] **Step 7: Run focused suites**
-
-```bash
-cargo test -p memory_mcp --features streamable-http,control-plane,test-fixtures http::principal::auth
-cargo test -p memory_mcp --features streamable-http,control-plane,test-fixtures http::registry
-cargo test -p memory_mcp --features streamable-http,control-plane,test-fixtures http::leases
-cargo test -p memory_mcp --features streamable-http,control-plane,test-fixtures control::
+impl ApiKeyCreation {
+    pub(crate) async fn execute(
+        &self,
+        command: CreateApiKeyCommand,
+        now: chrono::DateTime<chrono::Utc>,
+    ) -> Result<CreatedApiKey, crate::error::MemoryError>;
+}
 ```
 
-Expected: pass with no capability fallback behavior.
+Generate the secret inside `execute`; return it once. Use the supplied `now` for both creation and expiry.
 
-- [ ] **Step 8: Commit**
+- [ ] **Step 3: Thin the handler**
+
+Keep body parsing/default-name compatibility and response serialization in `account_api.rs`. Replace lines 153–189 with construction and execution of `ApiKeyCreation`. Preserve `Cache-Control: no-store` and `201 Created`.
+
+- [ ] **Step 4: Run workflow and handler tests**
 
 ```bash
-git add crates/memory-mcp/src/http crates/memory-mcp/src/control
-git commit -m "refactor: narrow registry dependencies by use case"
+cargo test -p memory_mcp --features streamable-http,control-plane,test-fixtures control::application::api_keys
+cargo test -p memory_mcp --features streamable-http,control-plane,test-fixtures control::account_api
+```
+
+Expected: pass.
+
+- [ ] **Step 5: Commit**
+
+```bash
+git add crates/memory-mcp/src/control/application crates/memory-mcp/src/control/mod.rs crates/memory-mcp/src/control/account_api.rs
+git commit -m "refactor: extract API key creation workflow"
 ```
 
 ---
@@ -1115,7 +1172,7 @@ git commit -m "refactor: extract API key creation workflow"
 
 ---
 
-### Task 12: Extract OIDC signup from the HTTP adapter
+### Task 12: Extract OIDC signup from the HTTP adapter (re-scoped)
 
 **Files:**
 - Create: `crates/memory-mcp/src/control/application/oidc_signup.rs`
@@ -1123,7 +1180,8 @@ git commit -m "refactor: extract API key creation workflow"
 - Modify: `crates/memory-mcp/src/control/oidc.rs:684-835`
 
 **Interfaces:**
-- Consumes: account and provisioning capabilities from Task 10.
+- Consumes: the omnibus `RegistryStore` (Task 10 deferred; the
+  capability narrowing lands when the aggregator is available).
 - Produces: `VerifiedExternalIdentity` and `OidcSignup::resolve_or_create`.
 
 - [ ] **Step 1: Write application tests first**
@@ -1139,8 +1197,10 @@ pub(crate) struct VerifiedExternalIdentity {
 }
 
 pub(crate) struct OidcSignup {
-    accounts: Arc<dyn AccountIdentityStore>,
-    provisioning: Arc<dyn TenantProvisioningStore>,
+    // One omnibus store while Task 10 is deferred. Two
+    // capability fields return when the RegistryStores
+    // aggregator is available.
+    store: std::sync::Arc<dyn crate::http::registry::storage::RegistryStore>,
 }
 
 impl OidcSignup {
