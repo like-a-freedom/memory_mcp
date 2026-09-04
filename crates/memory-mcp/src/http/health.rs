@@ -52,9 +52,10 @@ mod tests {
     async fn ready_returns_ok_when_registry_reachable() {
         // Build a state whose registry is the in-memory backend
         // (which always reports reachable), then construct the
-        // router. The Phase 4 default state uses the production
-        // placeholder (ping == false); this test exercises the
-        // /health/ready path with a reachable backend.
+        // router. The `default_for_test` state builds against
+        // the production Surreal registry; this test swaps in
+        // the in-memory backend to exercise the
+        // registry-reachable path.
         let mut state = super::super::HttpState::default_for_test().await;
         let inner = std::sync::Arc::get_mut(&mut state).expect("single owner");
         inner.registry = super::super::registry::RegistryHandle::in_memory();

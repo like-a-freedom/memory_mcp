@@ -1,7 +1,39 @@
 //! Control-plane Account/Tenant endpoints.
 //!
-//! Stub: create-account writes a reserved Tenant + the
-//! matching Account, then enqueues a provisioning event.
+//! Implements the `/api/v1/account/*` and `/api/v1/operator/*`
+//! routes mounted by `http::router` when the `control-plane`
+//! feature is enabled. The HTTP adapter owns transport
+//! (body parsing, headers, status codes, cookies); the
+//! business workflows live in `super::application::*` so
+//! each can be exercised in isolation against an in-memory
+//! `RegistryStore`.
+//!
+//! Routes:
+//!
+//! - `GET    /api/v1/account`                  — read the
+//!   account record + tenant status.
+//! - `GET    /api/v1/account/csrf`             — return the
+//!   session-bound CSRF token.
+//! - `GET    /api/v1/account/api_keys`         — list
+//!   non-secret API-key metadata.
+//! - `POST   /api/v1/account/api_keys`         — create a
+//!   new API key (one-time secret in the response body).
+//! - `DELETE /api/v1/account/api_keys/:id`     — revoke
+//!   an API key by id.
+//! - `GET    /api/v1/account/identity_links`   — list
+//!   linked external identities.
+//! - `POST   /api/v1/account/identity_links`   — link a
+//!   new external identity.
+//! - `DELETE /api/v1/account/identity_links/:id` —
+//!   unlink a previously linked identity.
+//! - `POST   /api/v1/account/delete`           — start
+//!   account deletion; the response carries the
+//!   one-time confirmation token.
+//! - `POST   /api/v1/account/delete/confirm`   — confirm
+//!   account deletion with the typed phrase.
+//! - `POST   /api/v1/operator/...`              —
+//!   operator-only tenant lifecycle endpoints, gated
+//!   by the operator identity allowlist.
 
 use std::sync::Arc;
 
@@ -80,6 +112,10 @@ pub async fn get_account(
 }
 
 /// GET /api/v1/account/csrf — return the session-bound CSRF token.
+///
+/// The response carries `Cache-Control: no-store` because the
+/// token is a per-session capability; intermediaries must
+/// not cache it.
 pub async fn csrf_token(
     State(state): State<Arc<HttpState>>,
     axum::extract::Extension(session): axum::extract::Extension<
@@ -88,7 +124,12 @@ pub async fn csrf_token(
 ) -> Result<Response, ApiError> {
     let token =
         super::csrf::compute_csrf(&state.config.keys.csrf, &session.account_id, &session.id)?;
-    json_response(StatusCode::OK, &serde_json::json!({"csrf_token": token}))
+    let mut response = json_response(StatusCode::OK, &serde_json::json!({"csrf_token": token}))?;
+    response.headers_mut().insert(
+        axum::http::header::CACHE_CONTROL,
+        HeaderValue::from_static("no-store"),
+    );
+    Ok(response)
 }
 
 /// Request body for creating an API key.

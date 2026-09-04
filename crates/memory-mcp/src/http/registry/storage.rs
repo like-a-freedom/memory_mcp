@@ -1,10 +1,25 @@
 //! Control-namespace storage trait.
 //!
-//! Ships the trait surface, the production placeholder that returns
-//! `MemoryError::Unavailable` (so a misrouted production request
-//! becomes a 503, not a panic), and an in-memory test backend. The
-//! SurrealDB-backed production store is added in a later milestone
-//! against the migrations in `migrations.rs`.
+//! The trait surface ships the abstract API the control plane and
+//! the provisioning worker depend on. Two implementations are
+//! available:
+//!
+//! - `SurrealRegistryStore` is the production adapter; it issues
+//!   SurrealQL against the privileged control namespace. The
+//!   schema lives in `migrations.rs` and is applied through
+//!   `SurrealTenantMigrations`.
+//! - `InMemoryStore` is the test backend, gated on
+//!   `test-fixtures`. Production startup never selects it; the
+//!   `memory_mcp_http` composition root builds
+//!   `SurrealRegistryStore` from validated environment
+//!   configuration.
+//!
+//! Required methods (every capability) have no default body; the
+//! four atomic operations (`create_account_bundle`,
+//! `begin_account_deletion`, `begin_operator_deletion`,
+//! `finalize_account_deletion`) remain single methods so the
+//! application layer cannot reconstruct multi-row writes as
+//! sequences.
 
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};

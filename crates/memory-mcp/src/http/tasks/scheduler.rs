@@ -35,6 +35,12 @@ pub type ExtractorFn =
 
 /// The retention/retry/execution job. Registers itself with the process-level
 /// scheduler; it never creates an untracked per-tenant loop.
+///
+/// This entry point is retained for compatibility but
+/// accepts no options. Use `scheduler_job_with_options`
+/// when a non-default task retention, queue capacity, or
+/// fault injector override is needed.
+#[deprecated(note = "use scheduler_job_with_options")]
 pub fn scheduler_job() -> SchedulerJob {
     scheduler_job_with_options(crate::http::runtime::storage::RuntimeOptions::default())
 }

@@ -2,6 +2,24 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
+> **Status (2026-09-04):** Core implementation complete; release
+> verification incomplete; not production-ready. The
+> `memory_mcp_http` binary composes durable production
+> storage and migration adapters, the test-fixtures
+> feature does not select them, the control plane
+> workflow, application services, registry capabilities,
+> and HTTP release evidence are all in place. External
+> gates (proxy, 500-tenant, interop, restore, credential
+> rotation) are recorded in
+> `docs/operations/HTTP_RELEASE_GATE.md` and remain
+> `Not executed — release blocked` until they run
+> against a supported environment. The
+> architecture-audit-remediation plan
+> (`docs/superpowers/plans/2026-09-02-architecture-audit-remediation.md`)
+> tracks the deferred Task 10 (Registry consumer
+> migration) which is blocked on stable trait
+> upcasting (RFC 3324).
+
 **Goal:** Довести feature-gated `memory_mcp_http` до production-ready multi-user Streamable HTTP SaaS профиля, сохранив существующий stdio-профиль без изменения его поведения.
 
 **Architecture:** HTTP binary остаётся отдельным composition root: authenticated Bearer API key → Account → ready Tenant → immutable namespace-bound Tenant Runtime. Control Registry хранится в отдельной SurrealDB namespace/database, а данные Tenant — в его server-generated namespace; ни MCP arguments, ни URL, ни произвольные OAuth claims не участвуют в выборе namespace. Все correctness-sensitive фоновые операции выполняются tracked process-level scheduler jobs с durable CAS/fencing, а `rmcp` остаётся только протокольным адаптером поверх durable service/storage seams.
@@ -914,7 +932,7 @@ GET  /auth/oidc/authorize
 GET  /auth/oidc/callback
 POST /auth/oidc/logout
 GET  /api/v1/account
-GET  /api/v1/account/session/csrf
+GET  /api/v1/account/csrf
 GET|POST|DELETE /api/v1/account/api_keys...
 GET|POST|DELETE /api/v1/account/identity_links...
 POST /api/v1/account/delete

@@ -207,6 +207,12 @@ impl TenantRuntime {
 /// handle from the registry, binding it once, and wrapping
 /// the result. The engine variant determines which
 /// `from_prebound*` constructor to call.
+///
+/// This entry point is retained for compatibility but
+/// accepts no options. Use `build_runtime_with_options`
+/// when a task retention or queue capacity override is
+/// needed.
+#[deprecated(note = "use build_runtime_with_options")]
 pub async fn build_runtime(
     registry: &super::super::registry::RegistryHandle,
     tenant: &Tenant,
