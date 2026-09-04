@@ -115,17 +115,15 @@ impl MemoryServiceDependencies {
     /// `AnnoEntityExtractor`, and the
     /// `RuleBasedTripleExtractor`. The caller supplies
     /// the `db_client` because it is connection-bound.
-    pub(crate) fn with_db_client(db_client: Arc<dyn DbClient>) -> Self {
-        Self {
+    pub(crate) fn with_db_client(db_client: Arc<dyn DbClient>) -> Result<Self, MemoryError> {
+        Ok(Self {
             db_client,
-            entity_extractor: Arc::new(
-                AnnoEntityExtractor::new().expect("default entity extractor"),
-            ),
+            entity_extractor: Arc::new(AnnoEntityExtractor::new()?),
             embedding_provider: Arc::new(DisabledEmbeddingProvider::new(
                 crate::config::DEFAULT_EMBEDDING_DIMENSION,
             )),
             triple_extractor: Arc::new(RuleBasedTripleExtractor::new()),
-        }
+        })
     }
 
     /// Build a bundle from an already-constructed
@@ -483,7 +481,7 @@ impl MemoryService {
         rate_limit_burst: i32,
     ) -> Result<Self, MemoryError> {
         Self::build(
-            MemoryServiceDependencies::with_db_client(db_client),
+            MemoryServiceDependencies::with_db_client(db_client)?,
             active_namespace,
             log_level,
             ServiceBuildConfig {

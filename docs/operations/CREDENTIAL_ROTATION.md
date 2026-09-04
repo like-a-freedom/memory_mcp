@@ -28,22 +28,16 @@ Rotate in this order to minimize disruption:
 
 ## Verification
 
-After rotating any key above, re-run the release-evidence script
-so the new key material is exercised against the full HTTP gate
-matrix:
+After rotating any key above, run the focused conformance and isolation checks
+against the intended deployment:
 
 ```bash
-# Re-validate the entire gate matrix after the rotation.
-# Set MEMORY_MCP_HTTP_CREDENTIAL_ROTATION_TARGET so the external
-# gate picks up evidence instead of `not_executed`.
-MEMORY_MCP_HTTP_CREDENTIAL_ROTATION_TARGET=<deployment> \
-    scripts/http_release_evidence.sh release
+# Re-validate the relevant control-plane and isolation behavior after rotation.
+cargo test -p memory_mcp --features streamable-http,control-plane,test-fixtures --test http_control_plane -- --test-threads=1
+cargo test -p memory_mcp --features streamable-http,control-plane,test-fixtures --test http_isolation -- --test-threads=1
 ```
 
-The control-plane test (`http_control_plane`) seeds a session via
-the `MEMORY_MCP_HTTP_TEST_SEED_SESSION` env var, so it covers
-the cookie/key rotation path. The conformance and isolation
-tests re-provision tenants through `MEMORY_MCP_HTTP_TEST_BOOTSTRAP`
-and exercise the rotated `MEMORY_MCP_API_KEY_PEPPER`. A successful
-run produces a `target/http-release-evidence/<ts>/gates.tsv` row
-with `result=pass` for every row, including `credential_rotation`.
+The control-plane test seeds a session via its test fixture and exercises the
+cookie/key path; the isolation test re-provisions tenants and exercises the
+rotated API-key pepper. Record deployment and commit manually when this
+runbook is used for a remote deployment.

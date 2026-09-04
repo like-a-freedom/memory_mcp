@@ -1,0 +1,11 @@
+{
+  "schema_version": "memory-mcp-eval-profile/v1",
+  "profile": "external_personamem",
+  "time_budget_seconds": 21600,
+  "suites": [{
+    "id": "external-retrieval",
+    "corpus_root": "target/eval-corpora/personamem/fd7c30f071d5c2ee2a211506783be222d7b6002e",
+    "expected_coverage": { "exact_cases": 589 }
+  }],
+  "gates": []
+}

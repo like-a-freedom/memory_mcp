@@ -223,6 +223,10 @@ pub enum EvalProfile {
     Nightly,
     ResponseSize,
     NerQuality,
+    ExternalLongmemeval,
+    ExternalLocomo,
+    ExternalPersonamem,
+    ExternalPrefeval,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]

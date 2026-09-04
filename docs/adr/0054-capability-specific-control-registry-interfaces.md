@@ -2,7 +2,22 @@
 
 ## Status
 
-Accepted — 2026-09-04, architecture audit remediation.
+Superseded — 2026-09-04, hobby-scope simplification.
+
+## Superseding decision
+
+The project keeps the existing crate-private `RegistryStore` seam. The
+proposed eight capability traits had no production consumers or adapter
+implementations, so they increased surface area without changing runtime
+boundaries, security, or testability for the current single-user deployment.
+
+Reconsider a narrower split only when at least two production consumers need
+materially different subsets of Registry operations, or when a concrete test
+cannot be written without implementing unrelated methods. At that point,
+design the smallest split demanded by those callers rather than restoring all
+speculative traits.
+
+The remainder of this document is historical context.
 
 ## Context
 

@@ -23,6 +23,9 @@ fn bench_extractor(c: &mut Criterion, label: &str, kind: NerExtractorKind) {
     let Some(extractor): Option<Arc<dyn EntityExtractor>> =
         rt.block_on(ner_fixtures::build_extractor(kind))
     else {
+        if std::env::var_os("MEMORY_MCP_BENCH_REQUIRE_FIXTURES").is_some() {
+            panic!("{label} benchmark fixture is required but missing");
+        }
         eprintln!("{label} benches skipped: local fixture missing");
         return;
     };
@@ -37,6 +40,9 @@ fn bench_extractor(c: &mut Criterion, label: &str, kind: NerExtractorKind) {
     // note, not panic the whole bench on the first timed iteration. This also
     // warms the model, so the timed region measures steady-state only.
     if let Err(err) = rt.block_on(extractor.extract_candidates(&single)) {
+        if std::env::var_os("MEMORY_MCP_BENCH_REQUIRE_FIXTURES").is_some() {
+            panic!("{label} benchmark smoke probe failed: {err}");
+        }
         eprintln!("{label} benches skipped: extraction fails ({err})");
         return;
     }

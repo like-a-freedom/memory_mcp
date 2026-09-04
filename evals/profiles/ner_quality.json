@@ -9,5 +9,11 @@
     { "id": "ner-quality-gliner", "expected_coverage": { "exact_cases": 10 } },
     { "id": "ner-quality-vago", "expected_coverage": { "exact_cases": 10 } }
   ],
-  "gates": []
+  "gates": [
+    { "target": { "suite_id": "ner-quality-anno", "metric": "entity_mention_f1" }, "hard_floor": 0.70 },
+    { "target": { "suite_id": "ner-quality-regex", "metric": "entity_mention_f1" }, "hard_floor": 0.70 },
+    { "target": { "suite_id": "ner-quality-anno-onnx", "metric": "entity_mention_f1" }, "hard_floor": 0.15 },
+    { "target": { "suite_id": "ner-quality-gliner", "metric": "entity_mention_f1" }, "hard_floor": 0.85 },
+    { "target": { "suite_id": "ner-quality-vago", "metric": "entity_mention_f1" }, "hard_floor": 0.85 }
+  ]
 }

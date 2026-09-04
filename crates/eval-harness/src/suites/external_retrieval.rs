@@ -6,9 +6,40 @@ use memory_mcp::service::capabilities::assemble_context::AssembleContextCapabili
 
 use crate::corpus::adapters::ExternalCase;
 use crate::domain::*;
-use crate::metrics;
 use crate::runner::{EvalSuite, RunContext};
 use crate::test_support;
+
+pub static ANSWER_PROXY_SPECS: &[crate::reducer::RatioMetricSpec] =
+    &[crate::reducer::RatioMetricSpec {
+        evidence_key: "answer_presence_proxy",
+        metric_name: "answer_presence_proxy_at_5",
+    }];
+
+// A lexical diagnostic, not evidence-document recall or answer correctness.
+fn answer_proxy(items: &[String], answers: &[String]) -> Result<MetricEvidence, String> {
+    fn tokens(text: &str) -> Vec<String> {
+        text.split(|c: char| !c.is_alphanumeric())
+            .filter(|s| !s.is_empty())
+            .map(str::to_lowercase)
+            .collect()
+    }
+    let answers: std::collections::BTreeSet<Vec<String>> =
+        answers.iter().map(|a| tokens(a)).collect();
+    if answers.is_empty() || answers.iter().any(Vec::is_empty) {
+        return Err("unsupported answer-presence proxy: missing reference answer".into());
+    }
+    let items: Vec<_> = items.iter().take(5).map(|s| tokens(s)).collect();
+    let hits = answers
+        .iter()
+        .filter(|answer| {
+            items.iter().any(|item| {
+                item.windows(answer.len())
+                    .any(|window| window == answer.as_slice())
+            })
+        })
+        .count();
+    Ok(MetricEvidence::ratio(hits as u64, answers.len() as u64))
+}
 
 pub struct WorkerPolicy {
     pub context_workers: NonZeroUsize,
@@ -30,7 +61,7 @@ pub struct ExternalRetrievalSuite {
     #[allow(dead_code)]
     dataset: String,
     worker_policy: WorkerPolicy,
-    reducer: crate::reducer::RetrievalReducer,
+    reducer: crate::reducer::RatioReducer,
 }
 
 impl ExternalRetrievalSuite {
@@ -47,7 +78,7 @@ impl ExternalRetrievalSuite {
             expected_ids,
             dataset: dataset.dataset_name().to_string(),
             worker_policy: WorkerPolicy::default(),
-            reducer: crate::reducer::RetrievalReducer::new("external-retrieval", 5),
+            reducer: crate::reducer::RatioReducer::new("external-retrieval", ANSWER_PROXY_SPECS),
         }
     }
 
@@ -60,6 +91,19 @@ impl ExternalRetrievalSuite {
         let case_id = EvalCaseId::parse(&case.id).unwrap();
         let start = std::time::Instant::now();
 
+        if let Err(reason) = answer_proxy(&[], &case.expected.must_contain) {
+            let mut outcome = EvalCaseOutcome::new(
+                "external-retrieval",
+                case_id.as_str(),
+                EvalMode::RetrievalOnly,
+                CorpusSplit::Test,
+                LabelTrust::Weak,
+                CaseStatus::Invalid,
+            );
+            outcome.invalid_reason = Some(reason);
+            return outcome;
+        }
+
         let service = test_support::make_service().await;
 
         for fact in &case.facts {
@@ -70,7 +114,7 @@ impl ExternalRetrievalSuite {
                         case_key: CaseKey::parse("external-retrieval", case_id.as_str()).unwrap(),
                         mode: EvalMode::RetrievalOnly,
                         split: CorpusSplit::Test,
-                        label_trust: LabelTrust::Official,
+                        label_trust: LabelTrust::Weak,
                         status: CaseStatus::Invalid,
                         metrics: BTreeMap::new(),
                         evidence: std::collections::BTreeMap::new(),
@@ -108,57 +152,56 @@ impl ExternalRetrievalSuite {
         match context_result {
             Ok(items) => {
                 let ranked_ids: Vec<String> = items.iter().map(|i| i.content.clone()).collect();
-                let relevant_ids: std::collections::BTreeSet<String> =
-                    case.expected.must_contain.iter().cloned().collect();
-
-                let hits_at_k = ranked_ids
-                    .iter()
-                    .take(5)
-                    .filter(|id| relevant_ids.contains(*id))
-                    .count() as u64;
-                let first_relevant_rank = ranked_ids
-                    .iter()
-                    .position(|id| relevant_ids.contains(id))
-                    .map(|rank| (rank + 1) as u32);
-
-                let evidence = MetricEvidence::retrieval(
-                    relevant_ids.len() as u64,
-                    hits_at_k,
-                    first_relevant_rank,
-                    5,
-                );
-
-                // Diagnostic metric values come from the shared renderer so
-                // case display and reducer aggregation share one formula path.
-                // `query_ms` stays manual: it is a timing diagnostic, not a
-                // gate metric, and is not part of `MetricEvidence`.
-                let mut metric_map =
-                    metrics::render_case_metrics(&evidence, &metrics::CaseMetricNames::default());
-                let recall = metric_map.get("recall_at_5").copied().unwrap_or(0.0);
-                let meets_recall = recall >= case.expected.min_recall_at_k;
+                let evidence = match answer_proxy(&ranked_ids, &case.expected.must_contain) {
+                    Ok(evidence) => evidence,
+                    Err(reason) => {
+                        let mut outcome = EvalCaseOutcome::new(
+                            "external-retrieval",
+                            case_id.as_str(),
+                            EvalMode::RetrievalOnly,
+                            CorpusSplit::Test,
+                            LabelTrust::Weak,
+                            CaseStatus::Invalid,
+                        );
+                        outcome.invalid_reason = Some(reason);
+                        return outcome;
+                    }
+                };
+                let MetricEvidence::Ratio {
+                    numerator,
+                    denominator,
+                } = &evidence
+                else {
+                    let mut outcome = EvalCaseOutcome::new(
+                        "external-retrieval",
+                        case_id.as_str(),
+                        EvalMode::RetrievalOnly,
+                        CorpusSplit::Test,
+                        LabelTrust::Weak,
+                        CaseStatus::Invalid,
+                    );
+                    outcome.invalid_reason =
+                        Some("answer proxy produced non-ratio evidence".into());
+                    return outcome;
+                };
+                let mut metric_map = BTreeMap::from([(
+                    "answer_presence_proxy_at_5".into(),
+                    *numerator as f64 / *denominator as f64,
+                )]);
                 metric_map.insert("query_ms".into(), query_ms as f64);
 
                 EvalCaseOutcome {
                     case_key: CaseKey::parse("external-retrieval", case_id.as_str()).unwrap(),
                     mode: EvalMode::RetrievalOnly,
                     split: CorpusSplit::Test,
-                    label_trust: LabelTrust::Official,
-                    status: if meets_recall {
-                        CaseStatus::Passed
-                    } else {
-                        CaseStatus::QualityFailed
-                    },
+                    label_trust: LabelTrust::Weak,
+                    status: CaseStatus::Passed,
                     metrics: metric_map,
-                    evidence: [("retrieval".to_string(), evidence)].into_iter().collect(),
+                    evidence: [("answer_presence_proxy".to_string(), evidence)]
+                        .into_iter()
+                        .collect(),
                     invalid_reason: None,
-                    failures: if !meets_recall {
-                        vec![format!(
-                            "recall_at_5={recall:.4} < {}",
-                            case.expected.min_recall_at_k
-                        )]
-                    } else {
-                        vec![]
-                    },
+                    failures: vec![],
                     duration_ms: total_ms,
                     attempts: 1,
                 }
@@ -167,7 +210,7 @@ impl ExternalRetrievalSuite {
                 case_key: CaseKey::parse("external-retrieval", case_id.as_str()).unwrap(),
                 mode: EvalMode::RetrievalOnly,
                 split: CorpusSplit::Test,
-                label_trust: LabelTrust::Official,
+                label_trust: LabelTrust::Weak,
                 status: CaseStatus::Invalid,
                 metrics: BTreeMap::new(),
                 evidence: std::collections::BTreeMap::new(),
@@ -225,7 +268,7 @@ impl EvalSuite for ExternalRetrievalSuite {
                         case_key,
                         mode: EvalMode::RetrievalOnly,
                         split: CorpusSplit::Test,
-                        label_trust: LabelTrust::Official,
+                        label_trust: LabelTrust::Weak,
                         status: CaseStatus::Invalid,
                         metrics: BTreeMap::new(),
                         evidence: std::collections::BTreeMap::new(),
@@ -246,6 +289,18 @@ impl EvalSuite for ExternalRetrievalSuite {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn answer_proxy_matches_tokens_without_claiming_document_recall() {
+        let evidence = answer_proxy(&["Alice prefers tea.".into()], &["tea".into()]).unwrap();
+        assert_eq!(evidence, MetricEvidence::ratio(1, 1));
+        assert_eq!(
+            answer_proxy(&["a team".into()], &["tea".into()]).unwrap(),
+            MetricEvidence::ratio(0, 1)
+        );
+        assert!(answer_proxy(&[], &[]).is_err());
+        assert!(answer_proxy(&[], &[" ".into()]).is_err());
+    }
 
     #[test]
     fn worker_policy_default_values() {

@@ -93,7 +93,7 @@
     {
       "target": {
         "suite_id": "external-retrieval",
-        "metric": "recall_at_5"
+        "metric": "answer_presence_proxy_at_5"
       },
       "hard_floor": 0.90
     }

@@ -4,10 +4,9 @@
 //! Black-box coverage for one tenant's durable Task store, exercised
 //! through the `DurableTaskTestDriver` exposed by `http::tasks`.
 //! Every case uses a fresh in-memory namespace bound to a fresh
-//! `PrivilegedEngine`; the "restart persistence" and "cross-tenant
-//! denial" cases use two independent `BoundDbClient` handles against
-//! the same namespace so the second reader can observe the first
-//! writer's durable commit without sharing any client state.
+//! `PrivilegedEngine`; cross-handle visibility and cross-tenant denial
+//! use two independent `BoundDbClient` handles against the same namespace.
+//! These tests do not prove process-restart persistence.
 //!
 //! Run:
 //! cargo test -p memory_mcp --features streamable-http,mcp-apps,control-plane,test-fixtures \

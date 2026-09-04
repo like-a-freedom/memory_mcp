@@ -303,6 +303,33 @@ mod tests {
         assert_eq!(account.id, existing_account.id);
     }
 
+    #[tokio::test]
+    async fn create_conflict_rereads_the_concurrent_winner() {
+        let store = Arc::new(InMemoryStore::default());
+        let now = chrono::Utc::now();
+        let (winner, winner_tenant, winner_identity) =
+            build_bundle("https://issuer.example.com".into(), verifier(0xCD), now);
+        let winner_id = winner.id.clone();
+        store.inject_oidc_conflict(Some((winner, winner_tenant, winner_identity)));
+
+        let account = OidcSignup::new(store)
+            .resolve_or_create(verified("https://issuer.example.com", 0xCD), now)
+            .await
+            .expect("conflict must resolve to the concurrent winner");
+        assert_eq!(account.id, winner_id);
+    }
+
+    #[tokio::test]
+    async fn create_conflict_without_winner_remains_conflict() {
+        let store = Arc::new(InMemoryStore::default());
+        let now = chrono::Utc::now();
+        store.inject_oidc_conflict(None);
+        let result = OidcSignup::new(store)
+            .resolve_or_create(verified("https://issuer.example.com", 0xCE), now)
+            .await;
+        assert!(matches!(result, Err(MemoryError::Conflict(_))));
+    }
+
     /// Two different identities produce two different
     /// accounts. Distinct `(issuer, subject_verifier)`
     /// tuples never collide.

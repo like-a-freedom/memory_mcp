@@ -3,6 +3,7 @@ use std::path::Path;
 
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
+use sha2::Digest;
 
 use crate::domain::*;
 use crate::error::EvalError;
@@ -30,26 +31,89 @@ pub struct RunFingerprint {
 
 impl RunFingerprint {
     pub fn capture() -> Self {
+        Self::capture_with_profile(None)
+    }
+
+    pub fn capture_with_profile(profile_path: Option<&Path>) -> Self {
+        let profile_digest = profile_path
+            .and_then(|path| std::fs::read(path).ok())
+            .map(|bytes| {
+                let mut hasher = sha2::Sha256::new();
+                hasher.update(bytes);
+                hex::encode(hasher.finalize())
+            })
+            .unwrap_or_else(|| "not-applicable".to_string());
+        let git_commit = std::process::Command::new("git")
+            .args(["rev-parse", "HEAD"])
+            .output()
+            .ok()
+            .filter(|output| output.status.success())
+            .and_then(|output| String::from_utf8(output.stdout).ok())
+            .map(|commit| commit.trim().to_string())
+            .filter(|commit| !commit.is_empty())
+            .or_else(|| option_env!("GIT_COMMIT").map(String::from));
+        let build_profile = if cfg!(debug_assertions) {
+            "debug"
+        } else {
+            "release"
+        }
+        .to_string();
+        let provider = std::env::var("MEMORY_MCP_PROVIDER").ok();
+        let model = std::env::var("MEMORY_MCP_MODEL").ok();
+        let device = std::env::var("MEMORY_MCP_DEVICE").ok();
+        let enabled_features: Vec<String> = std::env::var("MEMORY_MCP_ENABLED_FEATURES")
+            .ok()
+            .map(|raw| {
+                raw.split(',')
+                    .map(str::trim)
+                    .filter(|feature| !feature.is_empty())
+                    .map(str::to_string)
+                    .collect()
+            })
+            .unwrap_or_default();
+        let enabled_features_serialized = enabled_features.join(",");
+        let rust_version = std::process::Command::new("rustc")
+            .arg("--version")
+            .output()
+            .ok()
+            .filter(|output| output.status.success())
+            .and_then(|output| String::from_utf8(output.stdout).ok())
+            .map(|version| version.trim().to_string())
+            .filter(|version| !version.is_empty())
+            .unwrap_or_else(|| "unknown".to_string());
+        let mut configuration_hasher = sha2::Sha256::new();
+        for (name, value) in [
+            ("profile_digest", profile_digest.as_str()),
+            ("build_profile", build_profile.as_str()),
+            ("provider", provider.as_deref().unwrap_or("")),
+            ("model", model.as_deref().unwrap_or("")),
+            ("device", device.as_deref().unwrap_or("")),
+            ("enabled_features", enabled_features_serialized.as_str()),
+        ] {
+            configuration_hasher.update(name.as_bytes());
+            configuration_hasher.update([0]);
+            configuration_hasher.update(value.as_bytes());
+            configuration_hasher.update([0]);
+        }
+        let configuration_hash = hex::encode(configuration_hasher.finalize());
         Self {
-            rust_version: option_env!("CARGO_PKG_RUST_VERSION")
-                .unwrap_or("unknown")
-                .to_string(),
+            rust_version,
             os_arch: std::env::consts::OS.to_string() + "/" + std::env::consts::ARCH,
             package_version: env!("CARGO_PKG_VERSION").to_string(),
-            build_profile: if cfg!(debug_assertions) {
-                "debug"
-            } else {
-                "release"
-            }
-            .to_string(),
-            enabled_features: vec![],
-            provider: None,
-            model: None,
-            device: None,
-            configuration_hash: "uncomputed".to_string(),
-            git_commit: option_env!("GIT_COMMIT").map(String::from),
-            evaluator_versions: BTreeMap::new(),
-            profile_digest: "uncomputed".to_string(),
+            build_profile,
+            enabled_features,
+            provider,
+            model,
+            device,
+            configuration_hash,
+            git_commit,
+            evaluator_versions: [(
+                "eval-harness".to_string(),
+                env!("CARGO_PKG_VERSION").to_string(),
+            )]
+            .into_iter()
+            .collect(),
+            profile_digest,
         }
     }
 
@@ -167,14 +231,14 @@ impl RunArtifact {
 
         let mut seen_case_keys = std::collections::HashSet::new();
         for case_key in &self.expected_cases {
-            let key_str = format!(
-                "{}::{}",
-                case_key.suite_id.as_str(),
-                case_key.case_id.as_str()
+            let key = (
+                case_key.suite_id.as_str().to_string(),
+                case_key.case_id.as_str().to_string(),
             );
-            if !seen_case_keys.insert(key_str.clone()) {
+            if !seen_case_keys.insert(key.clone()) {
                 return Err(EvalError::InvalidInput(format!(
-                    "duplicate expected case key: {key_str}"
+                    "duplicate expected case key: {}::{}",
+                    key.0, key.1
                 )));
             }
         }
@@ -188,18 +252,21 @@ impl RunArtifact {
                 outcome.case_key.case_id.as_str(),
             );
 
-            if !seen_expected.contains(outcome.case_id().as_str()) {
-                let key_str = format!(
-                    "{}::{}",
+            let scoped_v2 = self.schema_version == EVAL_ARTIFACT_SCHEMA_V2;
+            let expected = if scoped_v2 {
+                seen_case_keys.contains(&(
+                    outcome.case_key.suite_id.as_str().to_string(),
+                    outcome.case_key.case_id.as_str().to_string(),
+                ))
+            } else {
+                seen_expected.contains(outcome.case_id().as_str())
+            };
+            if !expected {
+                return Err(EvalError::InvalidInput(format!(
+                    "outcome for unexpected case: {}::{}",
                     outcome.case_key.suite_id.as_str(),
-                    outcome.case_key.case_id.as_str()
-                );
-                if !seen_expected.contains(key_str.as_str()) {
-                    return Err(EvalError::InvalidInput(format!(
-                        "outcome for unexpected case: {}",
-                        outcome.case_id().as_str()
-                    )));
-                }
+                    outcome.case_id().as_str()
+                )));
             }
 
             if !seen_outcomes.insert(outcome_key) {
@@ -221,18 +288,31 @@ impl RunArtifact {
                 )
             })
             .collect();
-        for id in &self.expected_case_ids {
-            // Expected ids are bare corpus case ids; outcomes are
-            // suite-scoped, so a bare id is covered when any suite produced a
-            // case with that id.
-            let present = outcome_keys
-                .iter()
-                .any(|(_, case_id)| case_id == id.as_str());
-            if !present {
-                return Err(EvalError::InvalidInput(format!(
-                    "missing outcome for expected case ID: {}",
-                    id.as_str()
-                )));
+        let scoped_v2 = self.schema_version == EVAL_ARTIFACT_SCHEMA_V2;
+        if scoped_v2 {
+            for case_key in &self.expected_cases {
+                let key = (
+                    case_key.suite_id.as_str().to_string(),
+                    case_key.case_id.as_str().to_string(),
+                );
+                if !outcome_keys.contains(&key) {
+                    return Err(EvalError::InvalidInput(format!(
+                        "missing outcome for expected case: {}::{}",
+                        key.0, key.1
+                    )));
+                }
+            }
+        } else {
+            for id in &self.expected_case_ids {
+                let present = outcome_keys
+                    .iter()
+                    .any(|(_, case_id)| case_id == id.as_str());
+                if !present {
+                    return Err(EvalError::InvalidInput(format!(
+                        "missing outcome for expected case ID: {}",
+                        id.as_str()
+                    )));
+                }
             }
         }
 
@@ -382,6 +462,61 @@ mod tests {
                 EvalCaseId::parse("case-1").unwrap(),
             ],
         );
+        assert!(artifact.validate().is_err());
+    }
+
+    #[test]
+    fn v2_expected_cases_are_scoped_by_suite() {
+        let first = EvalCaseOutcome::new(
+            "suite-a",
+            "shared-id",
+            EvalMode::RetrievalOnly,
+            CorpusSplit::Development,
+            LabelTrust::Official,
+            CaseStatus::Passed,
+        );
+        let second = EvalCaseOutcome::new(
+            "suite-b",
+            "shared-id",
+            EvalMode::RetrievalOnly,
+            CorpusSplit::Development,
+            LabelTrust::Official,
+            CaseStatus::Passed,
+        );
+        let mut artifact = RunArtifact::fixture(vec![first, second], vec![]);
+        artifact.schema_version = EVAL_ARTIFACT_SCHEMA_V2.to_string();
+        artifact.expected_cases = vec![
+            CaseKey::parse("suite-a", "shared-id").unwrap(),
+            CaseKey::parse("suite-b", "shared-id").unwrap(),
+        ];
+        artifact.verdict = derive_run_verdict(
+            &artifact.outcomes,
+            &artifact.gates,
+            artifact.budget_status.clone().unwrap(),
+            &artifact.issues,
+        );
+        assert!(artifact.validate().is_ok());
+
+        artifact.outcomes.pop();
+        assert!(matches!(
+            artifact.validate(),
+            Err(EvalError::InvalidInput(message)) if message.contains("suite-b::shared-id")
+        ));
+    }
+
+    #[test]
+    fn v2_artifact_cannot_fall_back_to_bare_expected_ids() {
+        let outcome = EvalCaseOutcome::new(
+            "suite-a",
+            "case-1",
+            EvalMode::RetrievalOnly,
+            CorpusSplit::Development,
+            LabelTrust::Official,
+            CaseStatus::Passed,
+        );
+        let mut artifact = RunArtifact::fixture(vec![outcome], vec![]);
+        artifact.schema_version = EVAL_ARTIFACT_SCHEMA_V2.to_string();
+        artifact.expected_case_ids = vec![EvalCaseId::parse("case-1").unwrap()];
         assert!(artifact.validate().is_err());
     }
 

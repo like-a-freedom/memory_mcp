@@ -69,6 +69,16 @@ pub trait DatasetAdapter: Send + Sync {
     fn dataset_kind(&self) -> DatasetKind;
     fn adapter_version(&self) -> &str;
     fn normalize(&self, raw: &str) -> Result<Vec<ExternalCase>, EvalError>;
+    fn normalize_prepared(
+        &self,
+        prepared: &PreparedCorpus,
+    ) -> Result<Vec<ExternalCase>, EvalError> {
+        let raw = std::fs::read_to_string(&prepared.data_path).map_err(|source| EvalError::Io {
+            path: prepared.data_path.clone(),
+            source,
+        })?;
+        self.normalize(&raw)
+    }
     fn validate_case(&self, case: &ExternalCase) -> Result<(), EvalError> {
         if case.id.is_empty() {
             return Err(EvalError::InvalidInput("case id must not be empty".into()));
@@ -102,12 +112,8 @@ pub fn load_and_normalize(
     kind: DatasetKind,
     prepared: &PreparedCorpus,
 ) -> Result<Vec<ExternalCase>, EvalError> {
-    let raw = std::fs::read_to_string(&prepared.data_path).map_err(|source| EvalError::Io {
-        path: prepared.data_path.clone(),
-        source,
-    })?;
     let adapter = adapter_for(kind);
-    let cases = adapter.normalize(&raw)?;
+    let cases = adapter.normalize_prepared(prepared)?;
     for case in &cases {
         adapter.validate_case(case)?;
         crate::domain::EvalCaseId::parse(&case.id).map_err(|error| {
@@ -320,7 +326,9 @@ fn normalize_locomo_record(
             let must_contain = if let Some(answer) = &qa.answer {
                 vec![json_scalar_to_string(answer)]
             } else {
-                vec![qa.question.clone()]
+                // Unanswerable cases require a reader/abstention evaluator.
+                // An empty reference becomes explicitly Invalid in the proxy suite.
+                vec![]
             };
             let tier = map_locomo_question_to_tier(&qa.question, qa.evidence.len()).to_string();
             ExternalCase {
@@ -478,6 +486,111 @@ impl DatasetAdapter for PersonaMemAdapter {
             .map(|q| normalize_personamem_question(q, &fixture.shared_contexts))
             .collect()
     }
+
+    fn normalize_prepared(
+        &self,
+        prepared: &PreparedCorpus,
+    ) -> Result<Vec<ExternalCase>, EvalError> {
+        let raw = std::fs::read_to_string(&prepared.data_path).map_err(|source| EvalError::Io {
+            path: prepared.data_path.clone(),
+            source,
+        })?;
+        // The checked-in smoke fixture is a compact JSON bundle. The pinned
+        // upstream corpus is the published CSV plus JSONL context file.
+        if let Ok(fixture) = serde_json::from_str::<PersonaMemFixture>(&raw) {
+            return fixture
+                .questions
+                .into_iter()
+                .map(|q| normalize_personamem_question(q, &fixture.shared_contexts))
+                .collect();
+        }
+
+        let auxiliary = prepared
+            .manifest
+            .auxiliary_files
+            .iter()
+            .find(|file| {
+                file.data_file.file_name().and_then(|name| name.to_str())
+                    == Some("shared_contexts_32k.jsonl")
+            })
+            .ok_or_else(|| {
+                EvalError::InvalidConfig(
+                    "PersonaMem CSV requires shared_contexts_32k.jsonl auxiliary file".into(),
+                )
+            })?;
+        let context_path = prepared
+            .data_path
+            .parent()
+            .unwrap_or_else(|| std::path::Path::new("."))
+            .join(&auxiliary.data_file);
+        let context_file = std::fs::File::open(&context_path).map_err(|source| EvalError::Io {
+            path: context_path.clone(),
+            source,
+        })?;
+        let mut shared_contexts = BTreeMap::new();
+        use std::io::BufRead;
+        for line in std::io::BufReader::new(context_file).lines() {
+            let line = line.map_err(|source| EvalError::Io {
+                path: context_path.clone(),
+                source,
+            })?;
+            if line.trim().is_empty() {
+                continue;
+            }
+            let chunk: BTreeMap<String, Vec<PersonaMemContextMessage>> =
+                serde_json::from_str(&line).map_err(|e| {
+                    EvalError::InvalidInput(format!("invalid PersonaMem context JSONL: {e}"))
+                })?;
+            shared_contexts.extend(chunk);
+        }
+
+        let mut reader = csv::Reader::from_reader(raw.as_bytes());
+        let headers = reader
+            .headers()
+            .map_err(|e| EvalError::InvalidInput(format!("invalid PersonaMem CSV header: {e}")))?
+            .clone();
+        let required = [
+            "persona_id",
+            "question_id",
+            "question_type",
+            "user_question_or_message",
+            "correct_answer",
+            "shared_context_id",
+            "end_index_in_shared_context",
+        ];
+        let indexes = required
+            .map(|name| {
+                headers
+                    .iter()
+                    .position(|header| header == name)
+                    .ok_or_else(|| {
+                        EvalError::InvalidInput(format!("PersonaMem CSV missing column {name}"))
+                    })
+            })
+            .into_iter()
+            .collect::<Result<Vec<_>, _>>()?;
+        let mut cases = Vec::new();
+        for record in reader.records() {
+            let record = record
+                .map_err(|e| EvalError::InvalidInput(format!("invalid PersonaMem CSV row: {e}")))?;
+            let field = |index: usize| record.get(index).unwrap_or_default();
+            let question = PersonaMemQuestion {
+                persona_id: field(indexes[0])
+                    .parse()
+                    .map_err(|e| EvalError::InvalidInput(format!("invalid persona_id: {e}")))?,
+                question_id: field(indexes[1]).to_string(),
+                question_type: field(indexes[2]).to_string(),
+                user_question_or_message: field(indexes[3]).to_string(),
+                correct_answer: field(indexes[4]).to_string(),
+                shared_context_id: field(indexes[5]).to_string(),
+                end_index_in_shared_context: field(indexes[6]).parse().map_err(|e| {
+                    EvalError::InvalidInput(format!("invalid end_index_in_shared_context: {e}"))
+                })?,
+            };
+            cases.push(normalize_personamem_question(question, &shared_contexts)?);
+        }
+        Ok(cases)
+    }
 }
 
 fn normalize_personamem_question(
@@ -576,13 +689,21 @@ impl DatasetAdapter for PrefEvalAdapter {
     }
 
     fn normalize(&self, raw: &str) -> Result<Vec<ExternalCase>, EvalError> {
-        let fixture: PrefEvalFixture =
+        let value: serde_json::Value =
             serde_json::from_str(raw).map_err(|e| EvalError::InvalidInput(e.to_string()))?;
-        fixture
-            .records
+        let (track, records) = if value.is_array() {
+            let records: Vec<PrefEvalRecord> = serde_json::from_value(value)
+                .map_err(|e| EvalError::InvalidInput(e.to_string()))?;
+            ("simcse_implicit_persona".to_string(), records)
+        } else {
+            let fixture: PrefEvalFixture = serde_json::from_value(value)
+                .map_err(|e| EvalError::InvalidInput(e.to_string()))?;
+            (fixture.track, fixture.records)
+        };
+        records
             .into_iter()
             .enumerate()
-            .map(|(idx, record)| normalize_prefeval_record(&fixture.track, idx, record))
+            .map(|(idx, record)| normalize_prefeval_record(&track, idx, record))
             .collect()
     }
 }
@@ -783,6 +904,55 @@ mod tests {
     }
 
     #[test]
+    fn personamem_pinned_csv_and_jsonl_normalize_together() {
+        use sha2::Digest;
+        let dir = tempfile::tempdir().unwrap();
+        let csv = "persona_id,question_id,question_type,user_question_or_message,correct_answer,shared_context_id,end_index_in_shared_context\n1,pm1,recall_user_shared_facts,What pet?,(a),ctx1,1\n";
+        let contexts = "{\"ctx1\":[{\"role\":\"user\",\"content\":\"I have a cat.\"}]}\n";
+        let data_path = dir.path().join("questions_32k.csv");
+        let context_path = dir.path().join("shared_contexts_32k.jsonl");
+        std::fs::write(&data_path, csv).unwrap();
+        std::fs::write(&context_path, contexts).unwrap();
+        let digest = |bytes: &[u8]| {
+            let mut hasher = sha2::Sha256::new();
+            hasher.update(bytes);
+            hex::encode(hasher.finalize())
+        };
+        let manifest = crate::corpus::manifest::CorpusManifest::parse(
+            &serde_json::json!({
+                "schema_version": "memory-mcp-corpus/v1",
+                "corpus_id": "personamem",
+                "source_url": "https://example.com/questions.csv",
+                "revision": "abc123",
+                "sha256": digest(csv.as_bytes()),
+                "license": "cc-by-4.0",
+                "byte_size": csv.len(),
+                "case_count": 1,
+                "adapter_version": "1",
+                "data_file": "questions_32k.csv",
+                "auxiliary_files": [{
+                    "source_url": "https://example.com/contexts.jsonl",
+                    "revision": "abc123",
+                    "sha256": digest(contexts.as_bytes()),
+                    "byte_size": contexts.len(),
+                    "data_file": "shared_contexts_32k.jsonl"
+                }]
+            })
+            .to_string(),
+        )
+        .unwrap();
+        let prepared = PreparedCorpus {
+            manifest,
+            data_path,
+        };
+        let cases = adapter_for(DatasetKind::PersonaMem)
+            .normalize_prepared(&prepared)
+            .unwrap();
+        assert_eq!(cases.len(), 1);
+        assert_eq!(cases[0].facts[0].content, "I have a cat.");
+    }
+
+    #[test]
     fn prefeval_adapter_normalizes() {
         let raw = r#"{
             "track": "test_track",
@@ -804,6 +974,19 @@ mod tests {
             cases[0].expected.must_contain,
             vec!["I prefer window seats"]
         );
+    }
+
+    #[test]
+    fn prefeval_upstream_array_format_normalizes() {
+        let raw = r#"[{
+            "preference": "I avoid red-eye flights",
+            "question": "What flight should I choose?",
+            "persona": "traveler",
+            "conversation": {"0": {"user": "I avoid red-eye flights."}}
+        }]"#;
+        let cases = PrefEvalAdapter.normalize(raw).unwrap();
+        assert_eq!(cases.len(), 1);
+        assert_eq!(cases[0].id, "prefeval:simcse_implicit_persona:0");
     }
 
     #[test]

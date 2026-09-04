@@ -82,7 +82,10 @@ async fn run_one_refresh(
 ) {
     logger.log(
         structured_event("ner.artifact_refresh.started", json!({}), json!({})),
-        LogLevel::Info,
+        // Keep the lifecycle marker visible with the default `warn` log
+        // level: operators and readiness tests must be able to distinguish a
+        // refresh that never started from one that failed during resolution.
+        LogLevel::Warn,
     );
     let store = match super::model_artifacts::NerArtifactStore::new(store_root, progress) {
         Ok(store) => store,

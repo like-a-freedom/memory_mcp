@@ -178,6 +178,9 @@ pub async fn run_deletion_worker(
             .await;
 
         if let Err(error) = cleanup {
+            if deletion_is_purged(store.as_ref(), &tenant_id).await? {
+                continue;
+            }
             let _ = lease.release(store.as_ref(), &tenant_id).await;
             if first_error.is_none() {
                 first_error = Some(error);
@@ -190,6 +193,16 @@ pub async fn run_deletion_worker(
 
 fn missing_app_session_table(error: &MemoryError) -> bool {
     missing_table(error, "app_session")
+}
+
+async fn deletion_is_purged(
+    store: &dyn RegistryStore,
+    tenant_id: &str,
+) -> Result<bool, MemoryError> {
+    Ok(store
+        .find_tenant_by_id(tenant_id)
+        .await?
+        .is_some_and(|tenant| tenant.status == crate::http::registry::models::TenantStatus::Purged))
 }
 
 fn missing_task_table(error: &MemoryError) -> bool {

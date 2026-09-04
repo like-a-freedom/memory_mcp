@@ -27,7 +27,10 @@ pub fn reducer_for(suite_id: &str) -> Box<dyn SuiteReducer> {
             Box::new(ClassificationReducer::new("claim-reconciliation", "claim"))
         }
         "end-to-end" => Box::new(RatioReducer::new("end-to-end", E2E_SPECS)),
-        "external-retrieval" => Box::new(RetrievalReducer::new("external-retrieval", 5)),
+        "external-retrieval" => Box::new(crate::reducer::RatioReducer::new(
+            "external-retrieval",
+            crate::suites::external_retrieval::ANSWER_PROXY_SPECS,
+        )),
         "action-grounding" => Box::new(CountReducer::new("action-grounding")),
         "capacity" => Box::new(CountReducer::new("capacity")),
         "poisoning" => Box::new(CountReducer::new("poisoning")),
@@ -94,6 +97,7 @@ fn build_external_retrieval(decl: &SuiteDecl) -> Result<Box<dyn EvalSuite>, Eval
         })?;
     let prepared = manifest.validate_at(&root)?;
     let cases = crate::corpus::adapters::load_and_normalize(kind, &prepared)?;
+    manifest.validate_case_count(cases.len())?;
     Ok(Box::new(
         crate::suites::external_retrieval::ExternalRetrievalSuite::new(kind, cases),
     ))
@@ -202,6 +206,29 @@ mod tests {
                     0,
                     1,
                 )]
+            }
+            "response-size" => {
+                let mut outcome = crate::domain::EvalCaseOutcome::new(
+                    "response-size",
+                    "x1",
+                    EvalMode::RetrievalOnly,
+                    CorpusSplit::Development,
+                    LabelTrust::Official,
+                    CaseStatus::Passed,
+                );
+                outcome.metrics.insert("assemble_delta_pct".into(), 20.0);
+                outcome.metrics.insert("explain_delta_pct".into(), 30.0);
+                outcome
+                    .metrics
+                    .insert("assemble_verbose_bytes".into(), 100.0);
+                outcome
+                    .metrics
+                    .insert("assemble_compact_bytes".into(), 80.0);
+                outcome
+                    .metrics
+                    .insert("explain_verbose_bytes".into(), 100.0);
+                outcome.metrics.insert("explain_compact_bytes".into(), 70.0);
+                vec![outcome]
             }
             _ => vec![crate::domain::EvalCaseOutcome::new(
                 suite_id,

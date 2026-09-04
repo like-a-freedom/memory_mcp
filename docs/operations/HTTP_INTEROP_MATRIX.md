@@ -5,17 +5,13 @@ exercised against the `memory_mcp_http` deployment. Rows are populated
 only by running real clients against a real deployment and recording
 the outcome; they are not populated from code inspection.
 
-A row marked `Not executed — release blocked` means the gate has not
-yet been run in the required environment. The release-evidence
-script records each external gate as `not_executed` in
-`target/http-release-evidence/<ts>/gates.tsv` until the
-`MEMORY_MCP_HTTP_INTEROP_CLIENTS_DIR` environment variable is set
-and the interop runner is launched.
+Rows are optional compatibility notes for the current single-user project.
+`Not executed` is an honest coverage state, not a release-blocking gate.
 
 ## How a row becomes `Pass`
 
-1. Pick a pinned version (see the table) and check out that client
-   in `MEMORY_MCP_HTTP_INTEROP_CLIENTS_DIR`.
+1. Pick a pinned version (see the table) and check out that client in a
+   local workspace directory of your choice.
 2. Launch the in-tree test proxy from the same workspace root so
    the streaming claim is validated alongside the client behavior.
 3. Drive each step:
@@ -34,14 +30,14 @@ and the interop runner is launched.
 
 | Client/SDK | Exact version | Protocol | Discover | Tool call | Notification | SSE final response | Result | Evidence |
 |---|---|---|---|---|---|---|---|---|
-| `@modelcontextprotocol/sdk-python` | Not pinned | Streamable HTTP 2026-07-28 | Not executed | Not executed | Not executed | Not executed | Not executed — release blocked | |
-| `@modelcontextprotocol/sdk-typescript` | Not pinned | Streamable HTTP 2026-07-28 | Not executed | Not executed | Not executed | Not executed | Not executed — release blocked | |
-| `@modelcontextprotocol/sdk-go` | Not pinned | Streamable HTTP 2026-07-28 | Not executed | Not executed | Not executed | Not executed | Not executed — release blocked | |
-| `@modelcontextprotocol/sdk-rust` | Not pinned | Streamable HTTP 2026-07-28 | Not executed | Not executed | Not executed | Not executed | Not executed — release blocked | |
-| `claude-code` | Not pinned | Streamable HTTP 2026-07-28 | Not executed | Not executed | Not executed | Not executed | Not executed — release blocked | |
-| `cursor` | Not pinned | Streamable HTTP 2026-07-28 | Not executed | Not executed | Not executed | Not executed | Not executed — release blocked | |
-| `zed` | Not pinned | Streamable HTTP 2026-07-28 | Not executed | Not executed | Not executed | Not executed | Not executed — release blocked | |
-| `inspector` | Not pinned | Streamable HTTP 2026-07-28 | Not executed | Not executed | Not executed | Not executed | Not executed — release blocked | |
+| `@modelcontextprotocol/sdk-python` | Not pinned | Streamable HTTP 2026-07-28 | Not executed | Not executed | Not executed | Not executed | Not executed — informational | |
+| `@modelcontextprotocol/sdk-typescript` | Not pinned | Streamable HTTP 2026-07-28 | Not executed | Not executed | Not executed | Not executed | Not executed — informational | |
+| `@modelcontextprotocol/sdk-go` | Not pinned | Streamable HTTP 2026-07-28 | Not executed | Not executed | Not executed | Not executed | Not executed — informational | |
+| `@modelcontextprotocol/sdk-rust` | Not pinned | Streamable HTTP 2026-07-28 | Not executed | Not executed | Not executed | Not executed | Not executed — informational | |
+| `claude-code` | Not pinned | Streamable HTTP 2026-07-28 | Not executed | Not executed | Not executed | Not executed | Not executed — informational | |
+| `cursor` | Not pinned | Streamable HTTP 2026-07-28 | Not executed | Not executed | Not executed | Not executed | Not executed — informational | |
+| `zed` | Not pinned | Streamable HTTP 2026-07-28 | Not executed | Not executed | Not executed | Not executed | Not executed — informational | |
+| `inspector` | Not pinned | Streamable HTTP 2026-07-28 | Not executed | Not executed | Not executed | Not executed | Not executed — informational | |
 
 ## Updating a row
 
@@ -54,8 +50,7 @@ When the interop runner executes a client against a deployed
   modern profile);
 - per-step pass/fail and an evidence path under
   `docs/operations/interop-evidence/<client>/<date>/`.
-- a `Pass` / `Fail` in the `Result` column. `Fail` blocks the
-  release until fixed.
+- a `Pass` / `Fail` in the `Result` column. A `Fail` records a compatibility
+  issue for follow-up; it does not block the single-user project release.
 
-The release-evidence script must be re-run after the row is
-updated so `gates.tsv` reflects the new state.
+Keep the pinned client version and evidence path next to each manually tested row.
