@@ -64,7 +64,7 @@ pub fn build_router(state: Arc<HttpState>) -> Router {
                     .post(crate::control::account_api::create_api_key),
             )
             .route(
-                "/api/v1/account/api_keys/:id",
+                "/api/v1/account/api_keys/{id}",
                 delete(crate::control::account_api::revoke_api_key),
             )
             .route(
@@ -73,7 +73,7 @@ pub fn build_router(state: Arc<HttpState>) -> Router {
                     .post(crate::control::account_api::link_identity),
             )
             .route(
-                "/api/v1/account/identity_links/:id",
+                "/api/v1/account/identity_links/{id}",
                 delete(crate::control::account_api::unlink_identity),
             )
             .route(
@@ -94,23 +94,23 @@ pub fn build_router(state: Arc<HttpState>) -> Router {
             ));
         let operator = Router::new()
             .route(
-                "/api/v1/operator/tenants/:id",
+                "/api/v1/operator/tenants/{id}",
                 get(crate::control::operator::get_tenant),
             )
             .route(
-                "/api/v1/operator/tenants/:id/retry",
+                "/api/v1/operator/tenants/{id}/retry",
                 post(crate::control::operator::retry_tenant),
             )
             .route(
-                "/api/v1/operator/tenants/:id/suspend",
+                "/api/v1/operator/tenants/{id}/suspend",
                 post(crate::control::operator::suspend_tenant),
             )
             .route(
-                "/api/v1/operator/tenants/:id/resume",
+                "/api/v1/operator/tenants/{id}/resume",
                 post(crate::control::operator::resume_tenant),
             )
             .route(
-                "/api/v1/operator/tenants/:id/purge",
+                "/api/v1/operator/tenants/{id}/purge",
                 post(crate::control::operator::purge_tenant),
             )
             .route(

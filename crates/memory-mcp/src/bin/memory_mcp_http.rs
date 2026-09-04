@@ -49,6 +49,12 @@ async fn main() -> ExitCode {
         return ExitCode::from(2);
     }
 
+    #[cfg(all(feature = "test-fixtures", feature = "control-plane"))]
+    if let Err(err) = memory_mcp::http::test_bootstrap::apply_test_seed_session(&state).await {
+        eprintln!("test seed session error: {err}");
+        return ExitCode::from(2);
+    }
+
     signal_watcher::spawn(state.shutdown.clone(), state.admission.clone());
 
     let scheduler_hooks =

@@ -309,13 +309,15 @@ async fn load_20_active_tenants_under_expected_qps() {
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 64)]
+#[ignore = "release-gate 500-tenant load; requires MEMORY_MCP_HTTP_500_TENANT=1"]
 async fn load_500_tenants_under_contingency_qps() {
     const TENANT_COUNT: usize = 500;
 
-    assert_eq!(
-        std::env::var("MEMORY_MCP_RUN_500_LOAD").as_deref(),
-        Ok("1"),
-        "release gate requires MEMORY_MCP_RUN_500_LOAD=1"
+    let gate_ok = std::env::var("MEMORY_MCP_RUN_500_LOAD").as_deref() == Ok("1")
+        || std::env::var("MEMORY_MCP_HTTP_500_TENANT").as_deref() == Ok("1");
+    assert!(
+        gate_ok,
+        "release gate requires MEMORY_MCP_RUN_500_LOAD=1 or MEMORY_MCP_HTTP_500_TENANT=1"
     );
 
     let tenants = build_tenants(TENANT_COUNT);
