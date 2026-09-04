@@ -6,8 +6,12 @@ use axum::Router;
 use axum::routing::{delete, get, post};
 
 use super::HttpState;
+use super::fault_injection::FaultInjector;
 
-pub fn build_router(state: Arc<HttpState>) -> Router {
+pub fn build_router(
+    state: Arc<HttpState>,
+    control_plane_injector: Option<Arc<dyn FaultInjector>>,
+) -> Router {
     // Route-scoped layers added EARLIER are INNER (run
     // later). `acquire_runtime` runs after `authenticate`
     // because the principal must be in the request
@@ -47,6 +51,9 @@ pub fn build_router(state: Arc<HttpState>) -> Router {
     #[cfg(feature = "prometheus")]
     let router = router.route("/metrics", get(super::metrics::prometheus));
 
+    #[cfg(feature = "control-plane")]
+    let control_extension: Option<axum::Extension<Arc<dyn FaultInjector>>> =
+        control_plane_injector.map(axum::Extension);
     #[cfg(feature = "control-plane")]
     let router = if state.config.enable_control_plane {
         let account = Router::new()
@@ -92,6 +99,11 @@ pub fn build_router(state: Arc<HttpState>) -> Router {
                 state.clone(),
                 super::middleware::authenticate_control_plane_session,
             ));
+        let account = if let Some(ext) = control_extension {
+            account.layer(ext)
+        } else {
+            account
+        };
         let operator = Router::new()
             .route(
                 "/api/v1/operator/tenants/{id}",

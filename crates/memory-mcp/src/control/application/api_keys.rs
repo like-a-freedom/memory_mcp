@@ -102,7 +102,7 @@ impl ApiKeyCreation {
         // can return it once. The verifier is derived from
         // the secret + the configured pepper and is what the
         // registry actually persists.
-        let secret = generate_secret();
+        let secret = crate::control::secret::random_token();
         let expires_at = command
             .expires_in_days
             .map(|d| now + chrono::Duration::days(d as i64));
@@ -133,15 +133,6 @@ impl ApiKeyCreation {
             expires_at,
         })
     }
-}
-
-/// Generate a random API-key secret. Matches the production
-/// helper in `account_api::generate_secret` exactly: 32
-/// random bytes, hex-encoded.
-fn generate_secret() -> String {
-    let mut bytes = [0u8; 32];
-    rand::fill(&mut bytes);
-    hex::encode(bytes)
 }
 
 #[cfg(test)]

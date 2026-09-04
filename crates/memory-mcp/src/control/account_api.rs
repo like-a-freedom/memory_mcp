@@ -149,13 +149,6 @@ pub struct CreateApiKeyResponse {
     pub expires_at: Option<chrono::DateTime<chrono::Utc>>,
 }
 
-/// Generate a random API key secret.
-fn generate_secret() -> String {
-    let mut bytes = [0u8; 32];
-    rand::fill(&mut bytes);
-    hex::encode(bytes)
-}
-
 /// POST /api/v1/account/api_keys — create a new API key.
 ///
 /// Thin HTTP adapter: parses the request body, delegates the
@@ -370,7 +363,7 @@ pub async fn start_account_deletion(
     >,
 ) -> Result<Response, ApiError> {
     super::recent_auth::require_recent_auth(&session, super::recent_auth::DEFAULT_REAUTH_MAX_AGE)?;
-    let raw_token = generate_secret();
+    let raw_token = super::secret::random_token();
     let verifier =
         super::deletion::token_verifier(&state.config.keys.control_plane_session, &raw_token)?;
     let challenge = DeletionChallengeRecord {
@@ -424,6 +417,9 @@ pub async fn confirm_account_deletion(
     axum::extract::Extension(session): axum::extract::Extension<
         super::session::ControlPlaneSession,
     >,
+    axum::extract::Extension(injector): axum::extract::Extension<
+        std::sync::Arc<dyn crate::http::fault_injection::FaultInjector>,
+    >,
     body: Body,
 ) -> Result<StatusCode, ApiError> {
     super::recent_auth::require_recent_auth(&session, super::recent_auth::DEFAULT_REAUTH_MAX_AGE)?;
@@ -444,7 +440,6 @@ pub async fn confirm_account_deletion(
         &request.confirmation_token,
     )?;
     let store = state.registry.store_clone();
-    let injector = state.fault_injector.clone();
     super::deletion::execute_deletion(
         &session,
         &request.typed_phrase,

@@ -81,7 +81,7 @@ mod tests {
         use tower_service::Service;
 
         let state = crate::http::HttpState::default_for_test().await;
-        let router = crate::http::router::build_router(state);
+        let router = crate::http::router::build_router(state, None);
         let req = Request::builder()
             .uri("/metrics")
             .header("host", "localhost")

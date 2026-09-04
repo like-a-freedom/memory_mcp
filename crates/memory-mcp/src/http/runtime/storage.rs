@@ -139,11 +139,18 @@ impl TenantRuntime {
         let bound_db = Arc::new(BoundDbClient::new(tenant_db.clone(), namespace.clone()));
         // Propagate the composition-owned injector to the
         // per-tenant bound client so the outbox commit path
-        // consults the same injector the scheduler does. We
-        // hold the only reference to bound_db at this point
-        // (the stores below clone from it), so `Arc::try_unwrap`
-        // succeeds and the in-place mutation propagates to
-        // every clone.
+        // consults the same injector the scheduler does.
+        // `Arc::try_unwrap` succeeds in the common path: this
+        // function is the only `Arc` holder at this point and
+        // the stores below clone from the rebound handle, so
+        // the in-place mutation propagates to every clone. If
+        // a pre-existing `Arc` holds the same `BoundDbClient`
+        // the fallback clones the inner value; the old
+        // outstanding `Arc`s keep their pre-injection state.
+        // In practice the caller is the composition root, so
+        // the pre-existing-`Arc` branch is not exercised, but
+        // the comment records the invariant so a future
+        // refactor does not silently lose the propagation.
         #[cfg(feature = "streamable-http")]
         let bound_db = {
             let injector = options.fault_injector.clone();
