@@ -44,6 +44,49 @@ pub enum PrivilegedEngine {
 }
 
 impl PrivilegedEngine {
+    /// Test-only convenience: bind the engine to a fresh
+    /// `use_ns(<namespace>).use_db("memory")` and return a
+    /// `SurrealDbClient` ready to wrap in a `BoundDbClient`.
+    /// Mirrors what `RegistryHandle::bind` does in production.
+    /// The Task 7 integration suite uses this to construct
+    /// two independent `BoundDbClient` handles against the same
+    /// engine.
+    #[cfg(any(test, feature = "test-fixtures"))]
+    pub async fn bind_to_test_namespace(
+        self,
+        namespace: &str,
+    ) -> Arc<crate::storage::client::SurrealDbClient> {
+        use crate::storage::client::SurrealDbClient;
+        match self {
+            Self::LocalMem(db) => {
+                let session = Arc::clone(&db).as_ref().clone();
+                session
+                    .use_ns(namespace)
+                    .use_db("memory")
+                    .await
+                    .expect("mem bind");
+                Arc::new(SurrealDbClient::from_prebound_mem(
+                    session, namespace, "warn",
+                ))
+            }
+            Self::Local(db) => {
+                let session = Arc::clone(&db).as_ref().clone();
+                session
+                    .use_ns(namespace)
+                    .use_db("memory")
+                    .await
+                    .expect("rocksdb bind");
+                Arc::new(SurrealDbClient::from_prebound(session, namespace, "warn"))
+            }
+            Self::Remote(_db) => {
+                // bind_to_test_namespace is for embedded engines only;
+                // the integration suites that need a remote session
+                // should build it themselves.
+                panic!("bind_to_test_namespace is for embedded engines only")
+            }
+        }
+    }
+
     /// Bind the engine to a tenant namespace and return a
     /// `SurrealDbClient` ready for queries. The cleanup
     /// scheduler uses this to issue per-tenant DELETEs

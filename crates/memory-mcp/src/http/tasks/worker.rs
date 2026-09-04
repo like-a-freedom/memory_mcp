@@ -32,8 +32,8 @@ use super::state::{TaskHandle, TaskState, TaskStore, TenantTaskRecord, is_termin
 pub const RETENTION_SECS: i64 = 7 * 24 * 60 * 60;
 
 pub struct DurableTaskStore {
-    db: Arc<BoundDbClient>,
-    tenant_id: String,
+    pub(crate) db: Arc<BoundDbClient>,
+    pub(crate) tenant_id: String,
     retention_secs: i64,
     queue_capacity: usize,
 }

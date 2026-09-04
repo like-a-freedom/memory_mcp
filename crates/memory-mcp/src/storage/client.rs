@@ -92,7 +92,7 @@ pub struct ContextFactQuery<'a> {
 /// operations, but cannot choose another namespace per call.
 #[derive(Clone)]
 pub struct BoundDbClient {
-    db: Arc<dyn DbClient>,
+    pub(crate) db: Arc<dyn DbClient>,
     namespace: String,
     /// Fault injector consulted by the outbox commit path. The
     /// production default is [`NoFaults`]; the per-tenant runtime
