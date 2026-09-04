@@ -116,6 +116,12 @@ fn generate_secret() -> String {
 }
 
 /// POST /api/v1/account/api_keys — create a new API key.
+///
+/// Thin HTTP adapter: parses the request body, delegates the
+/// business workflow to `super::application::api_keys::ApiKeyCreation`,
+/// then serializes the response. The `Cache-Control: no-store`
+/// header and `201 Created` status are transport-level
+/// concerns that stay here.
 pub async fn create_api_key(
     State(state): State<Arc<HttpState>>,
     axum::extract::Extension(session): axum::extract::Extension<
@@ -150,42 +156,40 @@ pub async fn create_api_key(
         })?
     };
 
-    let secret = generate_secret();
-    let expires_at = req
-        .expires_in_days
-        .map(|d| chrono::Utc::now() + chrono::Duration::days(d as i64));
-
-    let key = ApiKey {
-        id: new_api_key_id(),
-        account_id: session.account_id.clone(),
-        name: req.name.clone(),
-        verifier: KeyedVerifier::compute(state.config.api_key_pepper.as_bytes(), secret.as_bytes()),
-        status: ApiKeyStatus::Active,
-        created_at: chrono::Utc::now(),
-        expires_at,
-        last_used_at: None,
-        version: 0,
-    };
-
-    let store = state.registry.store_clone();
-    let account = store
-        .find_account_by_id(&session.account_id)
-        .await?
-        .ok_or(ApiError::NotFound)?;
-    let tenant = store
-        .find_tenant_by_id(&account.tenant_id)
-        .await?
-        .ok_or(ApiError::NotFound)?;
-    let plan = store.load_plan(tenant.plan_version).await?;
-    store
-        .create_api_key_if_below_limit(&key, plan.limits.max_active_api_keys)
-        .await?;
+    // Delegate the business workflow to the application
+    // layer. The handler is responsible for transport
+    // (parsing, headers, status code) only; the workflow
+    // owns account/tenant/plan resolution, secret
+    // generation, and the atomic cap check.
+    let now = chrono::Utc::now();
+    let created = super::application::api_keys::ApiKeyCreation::new(
+        state.registry.store_clone(),
+        state.config.api_key_pepper.clone(),
+    )
+    .execute(
+        super::application::api_keys::CreateApiKeyCommand {
+            account_id: session.account_id.clone(),
+            name: req.name,
+            expires_in_days: req.expires_in_days,
+        },
+        now,
+    )
+    .await
+    .map_err(|err| match err {
+        // 404 mapping: missing account or tenant.
+        crate::error::MemoryError::Validation(_) => ApiError::NotFound,
+        // 409 mapping: cap exhausted.
+        crate::error::MemoryError::Conflict(_) => ApiError::Internal(
+            crate::error::MemoryError::Conflict("api key cap exhausted".into()),
+        ),
+        other => ApiError::Internal(other),
+    })?;
 
     let resp = CreateApiKeyResponse {
-        id: key.id.clone(),
-        secret,
-        name: req.name,
-        expires_at,
+        id: created.id,
+        secret: created.secret,
+        name: created.name,
+        expires_at: created.expires_at,
     };
 
     let headers = [(
