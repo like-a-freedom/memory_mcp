@@ -219,6 +219,58 @@ pub(super) async fn assemble_default_context(
     service: &RetrievalContext,
     params: DefaultContextParams<'_>,
 ) -> Result<Vec<AssembledContextItem>, MemoryError> {
+    // Task 14 decomposition: the assembly pipeline is split
+    // into three private phase functions. Each phase takes
+    // the inputs it needs and returns the outputs the next
+    // phase expects. The phase boundaries are documented
+    // here so future changes can target a single phase
+    // without disturbing the others.
+    let channels = retrieve_fact_channels(service, &params).await?;
+    let ranked = rank_fact_channels(service, &params, channels).await?;
+    let selection = select_context_facts(service, &params, ranked).await?;
+    finalize_with_first_person_appenders(service, &params, selection).await
+}
+
+/// The four fact channels produced by `retrieve_fact_channels`
+/// (Task 14, step 1). The fields mirror the inputs
+/// `build_ranked_context_facts` consumes; the
+/// `direct_retrieval_tier` records which tier produced the
+/// initial lexical hit so `rank_fact_channels` can attach
+/// the right tier label to the merged stream.
+struct RetrievedFactChannels {
+    direct_facts: Vec<crate::models::Fact>,
+    temporal_facts: Vec<crate::models::Fact>,
+    expanded_facts: Vec<crate::models::Fact>,
+    graph_facts: Vec<crate::service::context::graph::GraphCandidate>,
+    community_facts: Vec<(crate::models::Fact, String, f64)>,
+    semantic_facts: Vec<(crate::models::Fact, String)>,
+    direct_retrieval_tier: RetrievalTier,
+}
+
+/// The ranked + selected output of the selection phase
+/// (Task 14, step 1). `selected` is the budgeted list that
+/// survives timeline/relevance selection;
+/// `episode_fallback_items` is the empty-fact rescue list
+/// that the orchestrator appends or substitutes. The clone
+/// of the pre-selection ranked list lives in
+/// `ranked_candidates` so the first-person appender can
+/// reference facts that did not survive selection.
+struct SelectedContext {
+    selected: Vec<RankedContextFact>,
+    ranked_candidates: Vec<RankedContextFact>,
+    episode_fallback_items: Vec<AssembledContextItem>,
+}
+
+/// Phase 1: collect fact records from every retrieval channel.
+/// The orchestrator's first half is preserved verbatim, just
+/// hoisted into a function. The lexical, temporal, alias,
+/// experience, triple, graph, community, and semantic
+/// channels are populated here; semantic is excluded from
+/// the direct-fact set so it does not double-count.
+async fn retrieve_fact_channels(
+    service: &RetrievalContext,
+    params: &DefaultContextParams<'_>,
+) -> Result<RetrievedFactChannels, MemoryError> {
     let lexical_result = select_fact_records_for_query(
         service,
         FactQueryParams {
@@ -235,8 +287,13 @@ pub(super) async fn assemble_default_context(
         filter_facts_by_constraints(lexical_result.records, params.access, params.fact_types);
 
     let mut expanded_facts = Vec::new();
-    let mut ranked_facts = if let Some(query) = params.query_opt {
-        let temporal_facts = collect_temporal_facts(
+    let mut temporal_facts = Vec::new();
+    let mut graph_facts = Vec::new();
+    let mut community_facts = Vec::new();
+    let mut semantic_facts = Vec::new();
+
+    if let Some(query) = params.query_opt {
+        temporal_facts = collect_temporal_facts(
             service,
             CollectTemporalFactsRequest {
                 cutoff_iso: params.cutoff_iso,
@@ -341,7 +398,7 @@ pub(super) async fn assemble_default_context(
             .map(|fact| fact.fact_id.clone())
             .collect();
 
-        let graph_facts = collect_graph_facts(
+        graph_facts = collect_graph_facts(
             service,
             CollectGraphFactsRequest {
                 cutoff_iso: params.cutoff_iso,
@@ -364,7 +421,7 @@ pub(super) async fn assemble_default_context(
             .map(|fact| fact.fact_id.clone())
             .collect();
 
-        let community_facts = collect_community_facts(
+        community_facts = collect_community_facts(
             service,
             CollectCommunityFactsRequest {
                 cutoff_iso: params.cutoff_iso,
@@ -387,7 +444,7 @@ pub(super) async fn assemble_default_context(
             )
             .collect::<HashSet<_>>();
 
-        let semantic_facts = collect_semantic_facts(
+        semantic_facts = collect_semantic_facts(
             service,
             CollectSemanticFactsRequest {
                 cutoff: params.cutoff,
@@ -399,7 +456,43 @@ pub(super) async fn assemble_default_context(
             },
         )
         .await?;
+    }
 
+    Ok(RetrievedFactChannels {
+        direct_facts,
+        temporal_facts,
+        expanded_facts,
+        graph_facts,
+        community_facts,
+        semantic_facts,
+        direct_retrieval_tier,
+    })
+}
+
+/// Phase 2: build the ranked list from the channels. The
+/// `BuildRankedContextFactsRequest` constructor is
+/// shape-preserving; the query branch and the no-query
+/// branch return the same ranked list through different
+/// channel combinations. When the query is absent, the
+/// graph/community/semantic channels are empty and the
+/// `build_ranked_context_facts` call only sees the direct
+/// channel.
+async fn rank_fact_channels(
+    service: &RetrievalContext,
+    params: &DefaultContextParams<'_>,
+    channels: RetrievedFactChannels,
+) -> Result<Vec<RankedContextFact>, MemoryError> {
+    let RetrievedFactChannels {
+        direct_facts,
+        temporal_facts,
+        expanded_facts,
+        graph_facts,
+        community_facts,
+        semantic_facts,
+        direct_retrieval_tier,
+    } = channels;
+
+    if params.query_opt.is_some() {
         let mut lexical_facts = direct_facts
             .into_iter()
             .map(|fact| (fact, direct_retrieval_tier))
@@ -415,7 +508,7 @@ pub(super) async fn assemble_default_context(
                 .map(|fact| (fact, RetrievalTier::AliasExpanded)),
         );
 
-        build_ranked_context_facts(
+        Ok(build_ranked_context_facts(
             BuildRankedContextFactsRequest {
                 lexical_facts,
                 graph_facts,
@@ -426,9 +519,9 @@ pub(super) async fn assemble_default_context(
                 cutoff: params.cutoff,
             },
             decayed_confidence,
-        )
+        ))
     } else {
-        build_ranked_context_facts(
+        Ok(build_ranked_context_facts(
             BuildRankedContextFactsRequest {
                 lexical_facts: direct_facts
                     .into_iter()
@@ -442,21 +535,38 @@ pub(super) async fn assemble_default_context(
                 cutoff: params.cutoff,
             },
             decayed_confidence,
-        )
-    };
+        ))
+    }
+}
 
+/// Phase 3: timeline/relevance selection, episode-fallback
+/// decision, and the rescue log. Returns the
+/// pre-selection clone alongside the selected list so
+/// the first-person appender can reference dropped facts.
+async fn select_context_facts(
+    service: &RetrievalContext,
+    params: &DefaultContextParams<'_>,
+    mut ranked_facts: Vec<RankedContextFact>,
+) -> Result<SelectedContext, MemoryError> {
     let episode_fallback_items = if let Some(query) = params.query_opt {
-        collect_episode_fallback_items(service, &params, query).await?
+        collect_episode_fallback_items(service, params, query).await?
     } else {
         Vec::new()
     };
 
     if ranked_facts.is_empty() {
         if params.query_opt.is_some() {
-            return Ok(episode_fallback_items);
+            return Ok(SelectedContext {
+                selected: Vec::new(),
+                ranked_candidates: Vec::new(),
+                episode_fallback_items,
+            });
         }
-
-        return Ok(Vec::new());
+        return Ok(SelectedContext {
+            selected: Vec::new(),
+            ranked_candidates: Vec::new(),
+            episode_fallback_items: Vec::new(),
+        });
     }
 
     apply_time_window(&mut ranked_facts, params.window_start, params.window_end);
@@ -508,6 +618,63 @@ pub(super) async fn assemble_default_context(
             LogLevel::Debug,
         );
     }
+
+    // When the fallback decision is to use episodes, the
+    // selection phase still records what would have been
+    // selected so the orchestrator can decide what to
+    // return. The pre-selection clone is what the
+    // first-person appender references, regardless of the
+    // fallback decision.
+    let _ = prefer_episode_content; // logged above; orchestrator below.
+    Ok(SelectedContext {
+        selected: selected_ranked,
+        ranked_candidates,
+        episode_fallback_items,
+    })
+}
+
+/// Phase 4: finalize. The orchestrator's second half is
+/// preserved verbatim: serialize the selected ranked facts
+/// into items, run the first-person appenders, and return
+/// the result. The `prefer_episode_content` decision was
+/// already logged in `select_context_facts`; the orchestrator
+/// re-evaluates it here because the decision affects which
+/// stream is returned.
+async fn finalize_with_first_person_appenders(
+    service: &RetrievalContext,
+    params: &DefaultContextParams<'_>,
+    selection: SelectedContext,
+) -> Result<Vec<AssembledContextItem>, MemoryError> {
+    // The service handle is held for symmetry with the
+    // other phase functions; future phases may need to
+    // log through the same logger. The current phase does
+    // not use it because the rescue log was emitted in
+    // `select_context_facts`.
+    let _ = service;
+    let SelectedContext {
+        selected: selected_ranked,
+        ranked_candidates,
+        episode_fallback_items,
+    } = selection;
+
+    if selected_ranked.is_empty() && !episode_fallback_items.is_empty() {
+        // The ranked list was empty and the episode fallback
+        // produced items; this is the "empty-fact episode
+        // fallback" path. The selection phase already
+        // captured the empty ranked list and the fallback
+        // items; here we return the fallback list.
+        return Ok(episode_fallback_items);
+    }
+
+    if selected_ranked.is_empty() {
+        return Ok(Vec::new());
+    }
+
+    let prefer_episode_content = EpisodeFallbackStrategy.decide(
+        &selected_ranked,
+        &episode_fallback_items,
+        params.query_terms,
+    ) == FallbackDecision::UseEpisodes;
 
     if prefer_episode_content {
         return Ok(episode_fallback_items);
