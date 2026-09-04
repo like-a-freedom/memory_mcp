@@ -177,6 +177,10 @@ impl DurableSubscriptionStore {
         Self { db, tenant_id }
     }
 
+    pub fn tenant_id(&self) -> &str {
+        &self.tenant_id
+    }
+
     fn ensure_tenant<'a>(
         &'a self,
         filter: &'a AcceptedSubscriptionFilter,
@@ -272,6 +276,109 @@ impl SubscriptionStore for DurableSubscriptionStore {
             .await?;
         serde_json::from_value(serde_json::Value::Array(rows))
             .map_err(|error| MemoryError::Storage(format!("subscription batch parse: {error}")))
+    }
+}
+
+/// Black-box test driver for one tenant's durable subscription store.
+///
+/// Used by the durable-subscription integration suite (Task 7). The driver
+/// is the only surface those tests touch; raw SurrealDB queries stay
+/// inside the driver's `append_event_for_test` helper so the public
+/// surface is purely typed.
+#[cfg(any(test, feature = "test-fixtures"))]
+pub struct SubscriptionTestDriver {
+    store: DurableSubscriptionStore,
+}
+
+#[cfg(any(test, feature = "test-fixtures"))]
+impl SubscriptionTestDriver {
+    pub fn new(db: std::sync::Arc<BoundDbClient>, tenant_id: String) -> Self {
+        Self {
+            store: DurableSubscriptionStore::new(db, tenant_id),
+        }
+    }
+
+    pub fn tenant_id(&self) -> &str {
+        self.store.tenant_id()
+    }
+
+    pub async fn current_sequence(&self) -> Result<u64, MemoryError> {
+        self.store.current_sequence().await
+    }
+
+    pub async fn validate_filter(
+        &self,
+        filter: &AcceptedSubscriptionFilter,
+    ) -> Result<(), MemoryError> {
+        self.store.validate_filter(filter).await
+    }
+
+    pub async fn next_batch(
+        &self,
+        after_sequence: u64,
+        filter: &AcceptedSubscriptionFilter,
+    ) -> Result<Vec<TenantChangeEvent>, MemoryError> {
+        self.store.next_batch(after_sequence, filter).await
+    }
+
+    /// Append a single change event to the durable outbox. Used by the
+    /// integration suite to seed scenarios without going through the
+    /// production mutation path.
+    pub async fn append_event_for_test(
+        &self,
+        event: &TenantChangeEvent,
+    ) -> Result<(), MemoryError> {
+        // `created_at` is a `datetime` column; nested datetimes
+        // inside a SCHEMAFULL object are not coerced from a
+        // string, so we wrap the value with `type::datetime` to
+        // match the production outbox commit path. The event
+        // lives in the bound namespace (not the tenant_id SQL
+        // filter column).
+        self.store
+            .db
+            .db
+            .query(
+                "CREATE tenant_change_event SET event_seq = $seq, resource_id = $resource_id, rev = $rev, change_kind = $change_kind, created_at = type::datetime($created_at)",
+                Some(serde_json::json!({
+                    "seq": event.sequence,
+                    "resource_id": event.resource_id,
+                    "rev": event.revision,
+                    "change_kind": event.change_kind,
+                    "created_at": event.created_at.to_rfc3339(),
+                })),
+                self.store.db.namespace(),
+            )
+            .await
+            .map_err(|err| MemoryError::Storage(format!("append_event_for_test: {err}")))?;
+        Ok(())
+    }
+
+    /// Apply the durable subscription schema (tenant_change_event,
+    /// tenant_change_sequence, and app_session) to the bound
+    /// namespace. Required before any of the driver's read or
+    /// append methods in a fresh test namespace.
+    pub async fn apply_schema_for_test(&self, namespace: &str) -> Result<(), MemoryError> {
+        const SCHEMA: &str = "DEFINE TABLE tenant_change_sequence SCHEMAFULL; \
+             DEFINE FIELD value ON tenant_change_sequence TYPE int DEFAULT 0; \
+             UPSERT tenant_change_sequence:default SET value = 0; \
+             DEFINE TABLE tenant_change_event SCHEMAFULL; \
+             DEFINE FIELD event_seq ON tenant_change_event TYPE int; \
+             DEFINE FIELD resource_id ON tenant_change_event TYPE string; \
+             DEFINE FIELD rev ON tenant_change_event TYPE int; \
+             DEFINE FIELD change_kind ON tenant_change_event TYPE string; \
+             DEFINE FIELD created_at ON tenant_change_event TYPE datetime; \
+             DEFINE TABLE app_session SCHEMAFULL; \
+             DEFINE FIELD tenant_id ON app_session TYPE string; \
+             DEFINE FIELD app ON app_session TYPE string; \
+             DEFINE FIELD handle ON app_session TYPE string; \
+             DEFINE FIELD absolute_expiry ON app_session TYPE datetime;";
+        self.store
+            .db
+            .db
+            .query(SCHEMA, None, namespace)
+            .await
+            .map_err(|err| MemoryError::Storage(format!("apply_schema_for_test: {err}")))?;
+        Ok(())
     }
 }
 
