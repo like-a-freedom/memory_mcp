@@ -21,6 +21,8 @@ use crate::service::startup::{
     EmbeddingActivationMode, EmbeddingStartupDecision, apply_startup_migrations,
     build_startup_versions_event, resolve_embedding_startup, write_bootstrap_ready_state,
 };
+use crate::service::triple_extractor::RuleBasedTripleExtractor;
+use crate::service::triple_extractor::TripleExtractor;
 use crate::service::util::RateLimiter;
 use crate::storage::{DbClient, SurrealDbClient};
 
@@ -87,6 +89,63 @@ pub(super) struct ServiceBuildConfig {
     pub(super) rate_limit_burst: i32,
     pub(super) cache_size: usize,
     pub(super) embedding_similarity_threshold: f64,
+}
+
+/// Crate-private dependency bundle for the `MemoryService`
+/// private builder (Task 13, architecture-audit
+/// remediation). The four fields are the seam that lets
+/// tests inject a custom `TripleExtractor` (and, in the
+/// future, alternate `DbClient` / `EntityExtractor` /
+/// `EmbeddingProvider` adapters) without changing the
+/// public constructor signatures. The bundle does NOT
+/// include caches, loggers, rate limiters, stores derived
+/// from `DbClient`, semaphores, lifecycle workers, or
+/// runtime state — those are constructed inside `build`
+/// from the build config and the dependency inputs.
+pub(crate) struct MemoryServiceDependencies {
+    pub(crate) db_client: Arc<dyn DbClient>,
+    pub(crate) entity_extractor: Arc<dyn EntityExtractor>,
+    pub(crate) embedding_provider: Arc<dyn EmbeddingProvider>,
+    pub(crate) triple_extractor: Arc<dyn TripleExtractor>,
+}
+
+impl MemoryServiceDependencies {
+    /// Production-default bundle: the
+    /// `DisabledEmbeddingProvider`, the built-in
+    /// `AnnoEntityExtractor`, and the
+    /// `RuleBasedTripleExtractor`. The caller supplies
+    /// the `db_client` because it is connection-bound.
+    pub(crate) fn with_db_client(db_client: Arc<dyn DbClient>) -> Self {
+        Self {
+            db_client,
+            entity_extractor: Arc::new(
+                AnnoEntityExtractor::new().expect("default entity extractor"),
+            ),
+            embedding_provider: Arc::new(DisabledEmbeddingProvider::new(
+                crate::config::DEFAULT_EMBEDDING_DIMENSION,
+            )),
+            triple_extractor: Arc::new(RuleBasedTripleExtractor::new()),
+        }
+    }
+
+    /// Build a bundle from an already-constructed
+    /// `embedding_provider` and `entity_extractor`,
+    /// keeping the production
+    /// `RuleBasedTripleExtractor` as the triple
+    /// extractor. Used by the public
+    /// `new_with_embedding_provider` constructor.
+    pub(crate) fn with_db_and_providers(
+        db_client: Arc<dyn DbClient>,
+        embedding_provider: Arc<dyn EmbeddingProvider>,
+        entity_extractor: Arc<dyn EntityExtractor>,
+    ) -> Self {
+        Self {
+            db_client,
+            entity_extractor,
+            embedding_provider,
+            triple_extractor: Arc::new(RuleBasedTripleExtractor::new()),
+        }
+    }
 }
 
 fn startup_config_events(
@@ -424,7 +483,7 @@ impl MemoryService {
         rate_limit_burst: i32,
     ) -> Result<Self, MemoryError> {
         Self::build(
-            db_client,
+            MemoryServiceDependencies::with_db_client(db_client),
             active_namespace,
             log_level,
             ServiceBuildConfig {
@@ -434,10 +493,6 @@ impl MemoryService {
                 embedding_similarity_threshold:
                     crate::config::DEFAULT_EMBEDDING_SIMILARITY_THRESHOLD,
             },
-            Arc::new(DisabledEmbeddingProvider::new(
-                crate::config::DEFAULT_EMBEDDING_DIMENSION,
-            )),
-            Arc::new(AnnoEntityExtractor::new()?),
         )
     }
 
@@ -453,7 +508,11 @@ impl MemoryService {
         entity_extractor: Arc<dyn EntityExtractor>,
     ) -> Result<Self, MemoryError> {
         Self::build(
-            db_client,
+            MemoryServiceDependencies::with_db_and_providers(
+                db_client,
+                embedding_provider,
+                entity_extractor,
+            ),
             active_namespace,
             log_level,
             ServiceBuildConfig {
@@ -462,18 +521,14 @@ impl MemoryService {
                 cache_size: crate::service::CONTEXT_CACHE_SIZE,
                 embedding_similarity_threshold,
             },
-            embedding_provider,
-            entity_extractor,
         )
     }
 
     fn build(
-        db_client: Arc<dyn DbClient>,
+        dependencies: MemoryServiceDependencies,
         active_namespace: String,
         log_level: String,
         build_config: ServiceBuildConfig,
-        embedding_provider: Arc<dyn EmbeddingProvider>,
-        entity_extractor: Arc<dyn EntityExtractor>,
     ) -> Result<Self, MemoryError> {
         if active_namespace.trim().is_empty() {
             return Err(MemoryError::ConfigInvalid(
@@ -494,6 +549,7 @@ impl MemoryService {
             build_config.rate_limit_rps,
             build_config.rate_limit_burst,
         ));
+        let db_client = dependencies.db_client.clone();
         let ingestion_service = super::super::ingestion::IngestionService::new(
             db_client.clone(),
             active_namespace.clone(),
@@ -516,7 +572,7 @@ impl MemoryService {
         ));
         let fuzzy_threshold = crate::config::ner::entity_fuzzy_threshold()?;
         Ok(Self {
-            db_client,
+            db_client: dependencies.db_client,
             active_namespace,
             logger,
             rate_limiter,
@@ -525,9 +581,9 @@ impl MemoryService {
             fact_service,
             explanation_service,
             context_cache: Arc::new(tokio::sync::RwLock::new(LruCache::new(cache_size))),
-            entity_extractor,
+            entity_extractor: dependencies.entity_extractor,
             embedding_runtime_state: Arc::new(std::sync::RwLock::new(EmbeddingRuntimeState::new(
-                embedding_provider,
+                dependencies.embedding_provider,
                 None,
                 None,
                 None,
@@ -542,9 +598,7 @@ impl MemoryService {
             query_logging_enabled: false,
             query_log_retention_days: crate::config::DEFAULT_QUERY_LOG_RETENTION_DAYS,
             entity_resolver: super::super::entity_resolution::EntityResolver::new(fuzzy_threshold),
-            triple_extractor: Arc::new(
-                super::super::triple_extractor::RuleBasedTripleExtractor::new(),
-            ),
+            triple_extractor: dependencies.triple_extractor,
             lifecycle_config: crate::config::LifecycleConfig::default(),
             claim_service: super::super::claims::projection::ClaimService::new(claim_store),
             trace_registry: Arc::new(
@@ -677,5 +731,75 @@ mod tests {
             events[0].get("path"),
             Some(&serde_json::json!("/tmp/legacy/surrealdb"))
         );
+    }
+
+    /// The `MemoryServiceDependencies` seam (Task 13) lets a
+    /// caller inject a custom `TripleExtractor` without
+    /// changing the public constructor signatures. The
+    /// test builds a service through the public
+    /// `new_with_embedding_provider` constructor and
+    /// verifies the seam by exercising the stored
+    /// `triple_extractor` field directly. A future caller
+    /// that needs to swap the extractor can route through
+    /// the new `MemoryServiceDependencies::with_db_client`
+    /// builder, which the public constructors use
+    /// internally; this test pins the wiring so the seam
+    /// is observable in CI.
+    #[tokio::test]
+    async fn triple_extractor_is_retained_by_the_service() {
+        use crate::service::triple_extractor::TripleExtractor;
+        use std::sync::Arc;
+
+        // Build a real `DbClient` against an in-memory
+        // Surreal engine. The service holds the
+        // `Arc<dyn DbClient>`; no background workers are
+        // spawned because the service is built without
+        // env-driven startup, so the in-memory client
+        // never tries to open a real socket.
+        let db: surrealdb::Surreal<surrealdb::engine::local::Db> =
+            surrealdb::Surreal::new::<surrealdb::engine::local::Mem>(())
+                .await
+                .expect("mem engine init");
+        db.use_ns("test_namespace")
+            .use_db("memory")
+            .await
+            .expect("bind");
+        let db_client: Arc<dyn crate::storage::DbClient> = Arc::new(
+            crate::storage::SurrealDbClient::from_prebound_mem(db, "test_namespace", "error"),
+        );
+
+        // Build a service through the public constructor.
+        // The seam is exercised by the constructor: the
+        // `with_db_and_providers` helper injects the
+        // production `RuleBasedTripleExtractor`, and the
+        // service retains it.
+        let service = MemoryService::new_with_embedding_provider(
+            db_client,
+            "test_namespace".to_string(),
+            "error".to_string(),
+            100,
+            10,
+            Arc::new(crate::service::embedding::DisabledEmbeddingProvider::new(
+                crate::config::DEFAULT_EMBEDDING_DIMENSION,
+            )),
+            crate::config::DEFAULT_EMBEDDING_SIMILARITY_THRESHOLD,
+            Arc::new(crate::service::AnnoEntityExtractor::new().expect("default entity extractor")),
+        )
+        .expect("service builds");
+
+        // Exercise the stored extractor through the trait
+        // object. A regression that swapped the extractor
+        // out would surface as a panic or a type error.
+        let extractor: Arc<dyn TripleExtractor> = service.triple_extractor.clone();
+        let triples = extractor
+            .extract("X works at Y", "src-1")
+            .await
+            .expect("production extractor succeeds");
+        // The rule-based extractor recognizes "X works at Y".
+        assert!(
+            !triples.is_empty(),
+            "rule-based extractor should produce at least one triple"
+        );
+        assert!(triples.iter().any(|t| t.predicate == "works_at"));
     }
 }
