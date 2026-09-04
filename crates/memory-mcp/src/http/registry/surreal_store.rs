@@ -292,9 +292,21 @@ fn required_datetime(row: &Value, field: &str) -> Result<DateTime<Utc>, MemoryEr
 
 fn record_id_value(value: &Value) -> Option<String> {
     fn key_without_table(value: &str) -> String {
-        value
+        // Surreal's textual record id looks like
+        // `<table>:<key>`. The `<key>` may be a UUID, a number, or
+        // a backtick-quoted string for arbitrary identifiers; strip
+        // both the table prefix and any surrounding backticks so
+        // downstream `type::record($table, $id)` calls receive a
+        // bare key. The textual id is sufficient for the InMemory
+        // bootstrap path; the Surreal side uses the same key.
+        let stripped = value
             .rsplit_once(':')
-            .map_or_else(|| value.to_owned(), |(_, key)| key.to_owned())
+            .map_or_else(|| value.to_owned(), |(_, key)| key.to_owned());
+        stripped
+            .strip_prefix('`')
+            .and_then(|s| s.strip_suffix('`'))
+            .map(str::to_owned)
+            .unwrap_or(stripped)
     }
     match value {
         Value::String(value) => Some(key_without_table(value)),
@@ -1288,7 +1300,7 @@ impl RegistryStore for SurrealRegistryStore {
         let rows = self
             .handle()
             .query_json(
-                "SELECT id, name, status, created_at, expires_at, last_used_at \
+                "SELECT id, name, status, created_at, expires_at, last_used_at, verifier \
                  FROM type::table($table) WHERE account_id = $account_id",
                 Some(json!({"table": "api_key", "account_id": account_id})),
             )

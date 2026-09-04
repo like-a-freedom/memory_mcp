@@ -54,3 +54,24 @@ After restore and rotation:
 - Verify tenant isolation: `cargo test -p memory_mcp --features streamable-http,control-plane,test-fixtures --test http_isolation`
 - Check that old API keys are rejected (pepper rotated)
 - Confirm OIDC login requires re-linking
+
+## Verification with the release gate
+
+The release-evidence script re-validates the restore path against
+the full HTTP gate matrix. After restoring the database and
+rotating the keys:
+
+```bash
+# Re-run the entire gate matrix against the restored deployment.
+# Set MEMORY_MCP_HTTP_RESTORE_DRILL_DB to the restored target so
+# the external gate picks up evidence instead of `not_executed`.
+MEMORY_MCP_HTTP_RESTORE_DRILL_DB=<target-db> \
+    scripts/http_release_evidence.sh release
+```
+
+The script also exercises the new control-plane test suite
+(`http_control_plane`) which seeds an authenticated session
+through the `MEMORY_MCP_HTTP_TEST_SEED_SESSION` env var and drives
+`/api/v1/account/*` end to end. A successful run produces a
+`target/http-release-evidence/<ts>/gates.tsv` row with
+`result=pass` for every row, including `restore_drill`.

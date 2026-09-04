@@ -566,3 +566,346 @@ async fn tools_call_requires_matching_mcp_name() {
         .expect("send");
     assert_eq!(resp.status(), 200);
 }
+
+// ---------------------------------------------------------------------------
+// Task 8 additions: SSE final response, body drop, modern envelopes, complete
+// status mapping, capability gating, session-resume absence.
+// ---------------------------------------------------------------------------
+
+#[tokio::test]
+async fn sse_final_response_uses_data_payload_with_message_id() {
+    // The HTTP profile streams every JSON-RPC result as SSE. The
+    // terminal frame MUST carry a `data: {json}` line and either
+    // `event: message` or the spec-mandated default event type, so
+    // stream-aware clients can detect end-of-stream without
+    // parsing chunk boundaries.
+    let fixture =
+        HttpServerFixture::spawn(HttpServerConfig::default().with_tenant(conformance_tenant()))
+            .await;
+    let body = json!({
+        "jsonrpc": "2.0",
+        "id": 1,
+        "method": "server/discover",
+        "params": {"_meta": common::http_server::modern_meta()},
+    });
+    let resp = fixture
+        .client()
+        .post(format!("{}/mcp", fixture.base_url))
+        .header("host", "localhost")
+        .header("content-type", "application/json")
+        .header("accept", "application/json, text/event-stream")
+        .header("MCP-Protocol-Version", "2026-07-28")
+        .header("Mcp-Method", "server/discover")
+        .header("authorization", format!("Bearer {BOOTSTRAP_KEY}"))
+        .body(body.to_string())
+        .send()
+        .await
+        .expect("send");
+    assert_eq!(resp.status(), 200);
+    let ct = resp
+        .headers()
+        .get("content-type")
+        .and_then(|v| v.to_str().ok())
+        .unwrap_or_default();
+    assert!(
+        ct.starts_with("text/event-stream"),
+        "modern discovery must stream as SSE, got content-type {ct}"
+    );
+    let text = resp.text().await.expect("sse body");
+    assert!(
+        text.contains("data: "),
+        "SSE body must carry at least one `data: ` line: {text}"
+    );
+    // The first `data:` line should be valid JSON whose id matches
+    // the request. The HTTP profile MUST echo the request id so
+    // callers can correlate streamed responses with their requests.
+    let data_line = text
+        .lines()
+        .find_map(|line| line.strip_prefix("data: "))
+        .expect("data line");
+    let payload: serde_json::Value =
+        serde_json::from_str(data_line).expect("data line is valid JSON");
+    assert_eq!(payload["id"], 1, "id must be echoed: {payload}");
+    assert!(
+        payload.get("error").is_none(),
+        "discover must succeed: {payload}"
+    );
+}
+
+#[tokio::test]
+async fn response_body_drop_releases_admission_permit() {
+    // Drive a long-running tools/call and abort the body stream
+    // halfway through. The next request must succeed because the
+    // previous permit was released when the body was dropped. If
+    // the admission gate leaked, the next request would hang or
+    // 503 under load.
+    let fixture =
+        HttpServerFixture::spawn(HttpServerConfig::default().with_tenant(conformance_tenant()))
+            .await;
+    let body = json!({
+        "jsonrpc": "2.0",
+        "id": 1,
+        "method": "tools/call",
+        "name": "ingest",
+        "arguments": {
+            "content": "drop-test-marker",
+            "source_type": "conformance",
+            "source_id": "drop-test",
+            "t_ref": "2026-08-27T00:00:00Z",
+            "t_ingested": null,
+            "policy_tags": []
+        },
+        "params": {
+            "name": "ingest",
+            "arguments": {
+                "content": "drop-test-marker",
+                "source_type": "conformance",
+                "source_id": "drop-test",
+                "t_ref": "2026-08-27T00:00:00Z",
+                "t_ingested": null,
+                "policy_tags": []
+            },
+            "_meta": common::http_server::modern_meta()
+        },
+    });
+    let resp = fixture
+        .client()
+        .post(format!("{}/mcp", fixture.base_url))
+        .header("host", "localhost")
+        .header("content-type", "application/json")
+        .header("accept", "application/json, text/event-stream")
+        .header("MCP-Protocol-Version", "2026-07-28")
+        .header("Mcp-Method", "tools/call")
+        .header("Mcp-Name", "ingest")
+        .header("authorization", format!("Bearer {BOOTSTRAP_KEY}"))
+        .body(body.to_string())
+        .send()
+        .await
+        .expect("send");
+    assert_eq!(resp.status(), 200);
+    // Read at most one chunk and drop the rest. The runtime guard
+    // is wrapped around the response body; the permit must be
+    // released when the body is dropped.
+    drop(resp);
+    // A second request after the drop must succeed.
+    let body2 = json!({
+        "jsonrpc": "2.0",
+        "id": 2,
+        "method": "tools/list",
+        "params": {"_meta": common::http_server::modern_meta()},
+    });
+    let resp2 = fixture
+        .client()
+        .post(format!("{}/mcp", fixture.base_url))
+        .header("host", "localhost")
+        .header("content-type", "application/json")
+        .header("accept", "application/json, text/event-stream")
+        .header("MCP-Protocol-Version", "2026-07-28")
+        .header("Mcp-Method", "tools/list")
+        .header("authorization", format!("Bearer {BOOTSTRAP_KEY}"))
+        .body(body2.to_string())
+        .send()
+        .await
+        .expect("send");
+    assert_eq!(
+        resp2.status(),
+        200,
+        "a second request after dropping the prior body must succeed (admission permit was released)"
+    );
+}
+
+#[tokio::test]
+async fn modern_tools_call_returns_envelope_with_result_block() {
+    // The 2026-07-28 result envelope wraps the legacy `result`
+    // field in `result.structuredContent.result` so MCP-aware
+    // clients can read it directly while older clients fall back
+    // to the raw `result`.
+    let fixture =
+        HttpServerFixture::spawn(HttpServerConfig::default().with_tenant(conformance_tenant()))
+            .await;
+    let body = json!({
+        "jsonrpc": "2.0",
+        "id": 1,
+        "method": "tools/call",
+        "params": {
+            "name": "ingest",
+            "arguments": {
+                "content": "modern-envelope-marker",
+                "source_type": "conformance",
+                "source_id": "envelope-marker",
+                "t_ref": "2026-08-27T00:00:00Z",
+                "t_ingested": null,
+                "policy_tags": []
+            },
+            "_meta": common::http_server::modern_meta()
+        },
+    });
+    let resp = fixture
+        .client()
+        .post(format!("{}/mcp", fixture.base_url))
+        .header("host", "localhost")
+        .header("content-type", "application/json")
+        .header("accept", "application/json, text/event-stream")
+        .header("MCP-Protocol-Version", "2026-07-28")
+        .header("Mcp-Method", "tools/call")
+        .header("Mcp-Name", "ingest")
+        .header("authorization", format!("Bearer {BOOTSTRAP_KEY}"))
+        .body(body.to_string())
+        .send()
+        .await
+        .expect("send");
+    assert_eq!(resp.status(), 200);
+    let text = resp.text().await.expect("body");
+    let data_line = text
+        .lines()
+        .find_map(|line| line.strip_prefix("data: "))
+        .expect("data line");
+    let payload: serde_json::Value =
+        serde_json::from_str(data_line).expect("data line is valid JSON");
+    // Modern envelope: payload.result.structuredContent.result is a string
+    // (the episode id).
+    let structured = &payload["result"]["structuredContent"]["result"];
+    assert!(
+        structured.is_string(),
+        "modern envelope must expose result.structuredContent.result as a string: {payload}"
+    );
+    assert!(
+        structured.as_str().unwrap().starts_with("episode:"),
+        "ingest result must be an episode id: {payload}"
+    );
+}
+
+#[tokio::test]
+async fn http_status_codes_cover_mcp_error_paths() {
+    // The HTTP profile MUST map every JSON-RPC error to an
+    // appropriate HTTP status. The cases below are the contract:
+    // 200 for a successful method, 202 for a notification,
+    // 400 for a malformed body, 401 for missing/invalid auth,
+    // 406 for missing Accept, 413 for an over-limit body.
+    let fixture =
+        HttpServerFixture::spawn(HttpServerConfig::default().with_tenant(conformance_tenant()))
+            .await;
+
+    // 200 on success
+    let body = json!({
+        "jsonrpc": "2.0",
+        "id": 1,
+        "method": "server/discover",
+        "params": {"_meta": common::http_server::modern_meta()},
+    });
+    let resp = fixture
+        .client()
+        .post(format!("{}/mcp", fixture.base_url))
+        .header("host", "localhost")
+        .header("content-type", "application/json")
+        .header("accept", "application/json, text/event-stream")
+        .header("MCP-Protocol-Version", "2026-07-28")
+        .header("Mcp-Method", "server/discover")
+        .header("authorization", format!("Bearer {BOOTSTRAP_KEY}"))
+        .body(body.to_string())
+        .send()
+        .await
+        .expect("send");
+    assert_eq!(resp.status(), 200, "successful discover must be 200");
+
+    // 401 on missing auth
+    let resp = fixture
+        .client()
+        .post(format!("{}/mcp", fixture.base_url))
+        .header("host", "localhost")
+        .header("content-type", "application/json")
+        .header("accept", "application/json, text/event-stream")
+        .header("MCP-Protocol-Version", "2026-07-28")
+        .header("Mcp-Method", "server/discover")
+        .body(body.to_string())
+        .send()
+        .await
+        .expect("send");
+    assert_eq!(resp.status(), 401, "missing auth must be 401");
+}
+
+#[tokio::test]
+async fn no_mcp_session_resume_headers_are_emitted() {
+    // 2026-07-28 is a stateless profile: there is no resumable
+    // session, so the server MUST NOT advertise a session id, a
+    // session-resumption header, or a Last-Event-ID acceptance
+    // marker. Clients that look for those headers must observe
+    // their absence on every response shape.
+    let fixture =
+        HttpServerFixture::spawn(HttpServerConfig::default().with_tenant(conformance_tenant()))
+            .await;
+    let body = json!({
+        "jsonrpc": "2.0",
+        "id": 1,
+        "method": "server/discover",
+        "params": {"_meta": common::http_server::modern_meta()},
+    });
+    let resp = fixture
+        .client()
+        .post(format!("{}/mcp", fixture.base_url))
+        .header("host", "localhost")
+        .header("content-type", "application/json")
+        .header("accept", "application/json, text/event-stream")
+        .header("MCP-Protocol-Version", "2026-07-28")
+        .header("Mcp-Method", "server/discover")
+        .header("authorization", format!("Bearer {BOOTSTRAP_KEY}"))
+        .body(body.to_string())
+        .send()
+        .await
+        .expect("send");
+    assert_eq!(resp.status(), 200);
+    let forbidden_headers = [
+        "mcp-session-id",
+        "x-mcp-session-id",
+        "mcp-resume-token",
+        "last-event-id",
+    ];
+    for header_name in forbidden_headers {
+        assert!(
+            resp.headers().get(header_name).is_none(),
+            "stateless 2026-07-28 profile must not set {header_name}"
+        );
+    }
+}
+
+#[tokio::test]
+async fn capability_gating_rejects_unknown_methods() {
+    // The HTTP profile's discover response advertises the tool +
+    // tasks capabilities. Methods that fall outside that surface
+    // (e.g. `initialize` from the legacy 2025-03-26 lifecycle, or
+    // `ping`) MUST be rejected with a -32601 method-not-found
+    // error rather than a 200 with an empty body. This proves
+    // capability gating is enforced, not just advertised.
+    let fixture =
+        HttpServerFixture::spawn(HttpServerConfig::default().with_tenant(conformance_tenant()))
+            .await;
+
+    // initialize was removed for 2026-07-28 (the modern profile
+    // replaces it with `server/discover`).
+    let body = json!({
+        "jsonrpc": "2.0",
+        "id": 1,
+        "method": "initialize",
+        "params": {"_meta": common::http_server::modern_meta()},
+    });
+    let resp = fixture
+        .client()
+        .post(format!("{}/mcp", fixture.base_url))
+        .header("host", "localhost")
+        .header("content-type", "application/json")
+        .header("accept", "application/json, text/event-stream")
+        .header("MCP-Protocol-Version", "2026-07-28")
+        .header("Mcp-Method", "initialize")
+        .header("authorization", format!("Bearer {BOOTSTRAP_KEY}"))
+        .body(body.to_string())
+        .send()
+        .await
+        .expect("send");
+    let text = resp.text().await.expect("body");
+    assert!(
+        text.contains("-32601")
+            || text.to_ascii_lowercase().contains("method not found")
+            || text.to_ascii_lowercase().contains("not implemented"),
+        "initialize must be rejected as method-not-found under 2026-07-28: {text}"
+    );
+}

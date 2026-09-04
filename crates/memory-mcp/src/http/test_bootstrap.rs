@@ -41,6 +41,21 @@ pub const ENV_TEST_BOOTSTRAP: &str = "MEMORY_MCP_HTTP_TEST_BOOTSTRAP";
 /// scheduler is the one that advances the tenant.
 pub const ENV_TEST_SEED_RESERVED: &str = "MEMORY_MCP_HTTP_TEST_SEED_RESERVED";
 
+/// Black-box control-plane session seeding for Task 8.
+///
+/// Format: `<account_name>=<cookie_value>`. The bootstrap account
+/// must already exist (typically because
+/// `MEMORY_MCP_HTTP_TEST_BOOTSTRAP` was processed for the same
+/// name). A new `ControlPlaneSession` is generated and persisted
+/// with `state.registry.store_clone().store_session(...)`. The
+/// middleware verifies the cookie by re-hashing the raw value with
+/// `MEMORY_MCP_HTTP_SESSION_KEY`, so the test owns the raw value and
+/// sends it as `Cookie: __Host-memory_mcp_session=<value>` on every
+/// control-plane request. Multiple entries may be separated by
+/// commas; the cookie value is opaque to the server.
+#[cfg(feature = "control-plane")]
+pub const ENV_TEST_SEED_SESSION: &str = "MEMORY_MCP_HTTP_TEST_SEED_SESSION";
+
 /// Idempotently provision the ready tenants listed in the
 /// env var. Returns `Ok(())` when the env var is unset, the
 /// value is empty, or every entry is already provisioned.
@@ -55,8 +70,8 @@ pub async fn apply_test_bootstrap(state: &Arc<HttpState>) -> Result<(), MemoryEr
 }
 
 /// Idempotently seed the named tenants as `Reserved` without
-/// running `provision_one`. Returns `Ok(())` when the env var
-/// is unset or empty.
+/// running `provision_one`. Returns `Ok(())` when the env var is
+/// unset or empty.
 pub async fn apply_test_seed_reserved(state: &Arc<HttpState>) -> Result<(), MemoryError> {
     let Some(raw) = std::env::var(ENV_TEST_SEED_RESERVED)
         .ok()
@@ -70,6 +85,30 @@ pub async fn apply_test_seed_reserved(state: &Arc<HttpState>) -> Result<(), Memo
         })?;
         let cred = ApiKeyCredential::parse(key)?;
         seed_reserved_one(state, name, &cred).await?;
+    }
+    Ok(())
+}
+
+/// Idempotently seed control-plane sessions for the named
+/// bootstrap accounts. Format: `<account_name>=<cookie_value>`
+/// pairs separated by commas. Used by Task 8 control-plane
+/// black-box tests so they can drive `/api/v1/account/*` without
+/// the OIDC callback flow.
+#[cfg(feature = "control-plane")]
+pub async fn apply_test_seed_session(state: &Arc<HttpState>) -> Result<(), MemoryError> {
+    let Some(raw) = std::env::var(ENV_TEST_SEED_SESSION)
+        .ok()
+        .filter(|v| !v.trim().is_empty())
+    else {
+        return Ok(());
+    };
+    for entry in raw.split(',') {
+        let (name, cookie) = entry.split_once('=').ok_or_else(|| {
+            MemoryError::ConfigInvalid(
+                "session seed entry must be <account_name>=<cookie_value>".into(),
+            )
+        })?;
+        seed_session_one(state, name, cookie).await?;
     }
     Ok(())
 }
@@ -258,6 +297,51 @@ async fn seed_reserved_one(
     store.write_account(&account).await?;
     store.write_tenant(&tenant).await?;
     store.write_api_key(&api_key).await?;
+    Ok(())
+}
+
+/// Seed a `ControlPlaneSession` for a bootstrap account so the
+/// `/api/v1/account/*` middleware will accept a
+/// `Cookie: __Host-memory_mcp_session=<cookie>` header. The
+/// account MUST already exist (typically bootstrapped via
+/// `apply_test_bootstrap`). The cookie value is opaque to the
+/// server: it is hashed with `MEMORY_MCP_HTTP_SESSION_KEY` before
+/// being persisted as a blind index, and the same raw value must
+/// be sent back on the wire.
+#[cfg(feature = "control-plane")]
+async fn seed_session_one(
+    state: &Arc<HttpState>,
+    name: &str,
+    cookie_value: &str,
+) -> Result<(), MemoryError> {
+    if name.is_empty() || !name.chars().all(|c| c.is_ascii_alphanumeric() || c == '_') {
+        return Err(MemoryError::ConfigInvalid(
+            "test seed session account name must be alphanumeric/underscore".into(),
+        ));
+    }
+    use sha2::{Digest, Sha256};
+    let digest = Sha256::digest(name.as_bytes());
+    let suffix = hex::encode(&digest[..8]);
+    let account_id = format!("acct_test_{suffix}");
+    let store = state.registry.store_clone();
+    let account = store
+        .find_account_by_id(&account_id)
+        .await?
+        .ok_or_else(|| {
+            MemoryError::ConfigInvalid(format!(
+                "test seed session: bootstrap account {name} ({account_id}) not found; \
+                 ensure MEMORY_MCP_HTTP_TEST_BOOTSTRAP runs first"
+            ))
+        })?;
+    let session =
+        crate::control::session::ControlPlaneSession::new(&account, cookie_value, &state.config)?;
+    // The InMemoryStore refuses to overwrite an existing cookie hash
+    // or session id. Restart-safe: if we have already seeded this
+    // exact session in a prior run, do nothing.
+    if store.find_session(&session.cookie_hash).await?.is_some() {
+        return Ok(());
+    }
+    store.store_session(&session).await?;
     Ok(())
 }
 
