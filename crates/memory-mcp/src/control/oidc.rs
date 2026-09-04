@@ -746,11 +746,43 @@ pub async fn callback(
         return Err(super::error::ApiError::Unauthorized);
     }
 
-    let subject_verifier =
+    let subject_verifier_bytes =
         identity_subject_verifier(&state.config.keys.identity_index, &claims.iss, &claims.sub)?;
+    let subject_verifier = crate::http::registry::models::SubjectVerifier(subject_verifier_bytes);
 
-    let account =
-        upsert_account_for_identity(state.clone(), &claims.iss, &subject_verifier).await?;
+    // The HTTP callback enforces the signup policy before
+    // delegating to the application workflow. The workflow
+    // itself is policy-agnostic: it does not know about
+    // `SignupMode` and the test suite exercises it without
+    // an Axum router.
+    if matches!(
+        state.config.signup_mode,
+        crate::http::config::SignupMode::InviteOnly
+    ) {
+        // Look up first; only reject if the identity is
+        // genuinely new. An existing account linked to this
+        // identity is allowed to re-login even under
+        // invite-only policy.
+        let store = state.registry.store_clone();
+        if store
+            .find_account_by_identity(&claims.iss, &subject_verifier)
+            .await?
+            .is_none()
+        {
+            return Err(super::error::ApiError::Forbidden);
+        }
+    }
+
+    let account = super::application::oidc_signup::OidcSignup::new(state.registry.store_clone())
+        .resolve_or_create(
+            super::application::oidc_signup::VerifiedExternalIdentity {
+                issuer: claims.iss.clone(),
+                subject_verifier,
+            },
+            chrono::Utc::now(),
+        )
+        .await
+        .map_err(super::error::ApiError::Internal)?;
 
     let cookie_value = super::session::generate_session_cookie_value();
     let session = super::session::ControlPlaneSession::new(&account, &cookie_value, &state.config)?;
@@ -767,72 +799,6 @@ pub async fn callback(
         })?,
     );
     Ok((headers, axum::response::Redirect::to("/")))
-}
-
-/// Find or create an Account for an OIDC identity. Idempotent:
-/// if an account already exists for this (issuer, subject_verifier),
-/// return it; otherwise create a new one when signup policy permits.
-async fn upsert_account_for_identity(
-    state: std::sync::Arc<crate::http::HttpState>,
-    issuer: &str,
-    subject_verifier: &[u8; 32],
-) -> Result<crate::http::registry::models::Account, super::error::ApiError> {
-    use crate::http::registry::models::SubjectVerifier;
-
-    let sv = SubjectVerifier(*subject_verifier);
-    let store = state.registry.store_clone();
-
-    // Try to find existing account by identity.
-    if let Some(account) = store.find_account_by_identity(issuer, &sv).await? {
-        return Ok(account);
-    }
-
-    // Check signup policy.
-    match state.config.signup_mode {
-        crate::http::config::SignupMode::InviteOnly => {
-            return Err(super::error::ApiError::Forbidden);
-        }
-        crate::http::config::SignupMode::Open => {}
-    }
-
-    // Reserve the complete Account → Tenant → ExternalIdentity bundle in one
-    // durable transaction. The namespace is opaque, server-generated, and is
-    // never derived from the external subject.
-    let now = chrono::Utc::now();
-    let account = crate::http::registry::models::Account {
-        id: crate::http::registry::models::new_account_id(),
-        status: crate::http::registry::models::AccountStatus::Active,
-        tenant_id: crate::http::registry::models::new_tenant_id(),
-        created_at: now,
-    };
-    let tenant = crate::http::registry::models::Tenant {
-        id: account.tenant_id.clone(),
-        status: crate::http::registry::models::TenantStatus::Reserved,
-        namespace_binding: crate::http::registry::models::NamespaceBinding {
-            namespace: crate::http::registry::models::new_namespace_name(),
-            database: "memory".into(),
-        },
-        plan_version: 1,
-        schema_version: 0,
-        retry_stage: None,
-        provisioning_lease: None,
-        created_at: now,
-        version: 0,
-    };
-    let identity = crate::http::registry::models::ExternalIdentity {
-        id: crate::http::registry::models::new_external_identity_id(),
-        issuer: issuer.to_owned(),
-        subject_verifier: sv,
-        account_id: account.id.clone(),
-        created_at: now,
-    };
-    store
-        .create_account_bundle(&account, &tenant, Some(&identity))
-        .await?;
-    store
-        .append_provisioning_event(&tenant.id, "reserved")
-        .await?;
-    Ok(account)
 }
 
 #[cfg(test)]
