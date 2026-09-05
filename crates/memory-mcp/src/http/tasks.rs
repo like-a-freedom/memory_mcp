@@ -151,7 +151,7 @@ impl DurableTaskTestDriver {
         // (which `DbClient::apply_migrations` runs). Apply the
         // HTTP tenant migration script that creates it so the
         // driver can enqueue without the table-missing error.
-        const TENANT_TASK_DDL: &str = include_str!("../../../migrations/041_tenant_tasks.surql");
+        const TENANT_TASK_DDL: &str = include_str!("../../migrations/041_tenant_tasks.surql");
         crate::storage::client::DbClient::query(
             &*self.store.db.db,
             TENANT_TASK_DDL,
