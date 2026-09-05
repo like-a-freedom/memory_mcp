@@ -60,3 +60,7 @@ of the Rust workspace dependencies and must be installed separately.
 - Tests spawn the `memory_mcp_http` binary on an ephemeral port
 - Each test is independent and cleans up after itself
 - The bootstrap API key is `mem_sk_ak_01234567-89ab-4cde-8f01-23456789abcd_conformancesuite0123456789abcdef`
+
+## Test-fixtures builds
+
+Binaries compiled with `--features test-fixtures` require `MEMORY_MCP_HTTP_TEST_BOOTSTRAP` to be set to a non-empty value, otherwise `HttpConfig::validate` returns `ConfigInvalid` at startup. Production builds (without `test-fixtures`) reject the same variable with the same error so the fixture cannot leak into a release image. The fault-injection variables `MEMORY_MCP_HTTP_TEST_FAULT_POINT` and `MEMORY_MCP_HTTP_TEST_FAULT_AT` are also feature-gated to `test-fixtures` and rejected in production.
