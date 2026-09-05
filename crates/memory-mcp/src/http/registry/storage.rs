@@ -512,9 +512,60 @@ impl Default for InMemoryStore {
 
 #[cfg(any(test, feature = "test-fixtures"))]
 impl InMemoryStore {
+    /// Inherent lockers. They centralize the "poisoned" recovery so
+    /// the test backend can never silently panic on a stuck lock; the
+    /// single `expect` text is also what the support tooling searches
+    /// for when triaging a regression.
+    fn lock_accounts(&self) -> std::sync::MutexGuard<'_, Vec<Account>> {
+        self.accounts.lock().expect("poisoned")
+    }
+    fn lock_tenants(&self) -> std::sync::MutexGuard<'_, Vec<Tenant>> {
+        self.tenants.lock().expect("poisoned")
+    }
+    fn lock_api_keys(&self) -> std::sync::MutexGuard<'_, Vec<ApiKey>> {
+        self.api_keys.lock().expect("poisoned")
+    }
+    fn lock_identities(&self) -> std::sync::MutexGuard<'_, Vec<ExternalIdentity>> {
+        self.identities.lock().expect("poisoned")
+    }
+    fn lock_audit_events(&self) -> std::sync::MutexGuard<'_, Vec<(String, String)>> {
+        self.audit_events.lock().expect("poisoned")
+    }
+    fn lock_usage(
+        &self,
+    ) -> std::sync::MutexGuard<
+        '_,
+        std::collections::HashMap<String, crate::http::registry::plan::UsageCounter>,
+    > {
+        self.usage.lock().expect("poisoned")
+    }
+    #[cfg(feature = "control-plane")]
+    fn lock_oidc_requests(
+        &self,
+    ) -> std::sync::MutexGuard<'_, std::collections::HashMap<String, SealedOidcPayload>> {
+        self.oidc_requests.lock().expect("poisoned")
+    }
+    #[cfg(feature = "control-plane")]
+    fn lock_sessions(
+        &self,
+    ) -> std::sync::MutexGuard<
+        '_,
+        std::collections::HashMap<String, crate::control::session::ControlPlaneSession>,
+    > {
+        self.sessions.lock().expect("poisoned")
+    }
+    #[cfg(feature = "control-plane")]
+    fn lock_deletion_challenges(&self) -> std::sync::MutexGuard<'_, Vec<DeletionChallengeRecord>> {
+        self.deletion_challenges.lock().expect("poisoned")
+    }
+    #[cfg(feature = "control-plane")]
+    fn lock_oidc_conflict(&self) -> std::sync::MutexGuard<'_, Option<AccountBundleConflict>> {
+        self.oidc_conflict.lock().expect("poisoned")
+    }
+
     #[cfg(feature = "control-plane")]
     pub fn inject_oidc_conflict(&self, winner: Option<(Account, Tenant, ExternalIdentity)>) {
-        *self.oidc_conflict.lock().expect("poisoned") = Some(match winner {
+        *self.lock_oidc_conflict() = Some(match winner {
             Some(bundle) => AccountBundleConflict::WithWinner(Box::new(bundle)),
             None => AccountBundleConflict::WithoutWinner,
         });
@@ -542,7 +593,7 @@ impl RegistryStore for InMemoryStore {
         subject_verifier: &SubjectVerifier,
     ) -> Result<Option<Account>, MemoryError> {
         let account_id = {
-            let identities = self.identities.lock().expect("poisoned");
+            let identities = self.lock_identities();
             identities
                 .iter()
                 .find(|i| i.issuer == issuer && i.subject_verifier.0 == subject_verifier.0)
@@ -573,18 +624,18 @@ impl RegistryStore for InMemoryStore {
             ));
         }
         #[cfg(feature = "control-plane")]
-        if let Some(conflict) = self.oidc_conflict.lock().expect("poisoned").take() {
+        if let Some(conflict) = self.lock_oidc_conflict().take() {
             if let AccountBundleConflict::WithWinner(bundle) = conflict {
                 let (account, tenant, identity) = *bundle;
-                self.accounts.lock().expect("poisoned").push(account);
-                self.tenants.lock().expect("poisoned").push(tenant);
-                self.identities.lock().expect("poisoned").push(identity);
+                self.lock_accounts().push(account);
+                self.lock_tenants().push(tenant);
+                self.lock_identities().push(identity);
             }
             return Err(MemoryError::Conflict("injected OIDC create race".into()));
         }
-        let mut accounts = self.accounts.lock().expect("poisoned");
-        let mut tenants = self.tenants.lock().expect("poisoned");
-        let mut identities = self.identities.lock().expect("poisoned");
+        let mut accounts = self.lock_accounts();
+        let mut tenants = self.lock_tenants();
+        let mut identities = self.lock_identities();
         if accounts.iter().any(|a| a.id == account.id) {
             return Err(MemoryError::Conflict(format!(
                 "account {} already exists",
@@ -649,7 +700,7 @@ impl RegistryStore for InMemoryStore {
                 identity.account_id
             )));
         }
-        let mut identities = self.identities.lock().expect("poisoned");
+        let mut identities = self.lock_identities();
         if identities.iter().any(|i| i.id == identity.id) {
             return Err(MemoryError::Conflict(format!(
                 "identity {} already exists",
@@ -673,7 +724,7 @@ impl RegistryStore for InMemoryStore {
         account_id: &str,
         identity_id: &str,
     ) -> Result<(), MemoryError> {
-        let mut identities = self.identities.lock().expect("poisoned");
+        let mut identities = self.lock_identities();
         let before = identities.len();
         identities.retain(|i| !(i.account_id == account_id && i.id == identity_id));
         if identities.len() == before {
@@ -687,7 +738,7 @@ impl RegistryStore for InMemoryStore {
         key: &ApiKey,
         max_active: u32,
     ) -> Result<(), MemoryError> {
-        let mut keys = self.api_keys.lock().expect("poisoned");
+        let mut keys = self.lock_api_keys();
         let now = chrono::Utc::now();
         let active = keys
             .iter()
@@ -714,7 +765,7 @@ impl RegistryStore for InMemoryStore {
     }
 
     async fn revoke_all_api_keys(&self, account_id: &str) -> Result<u64, MemoryError> {
-        let mut keys = self.api_keys.lock().expect("poisoned");
+        let mut keys = self.lock_api_keys();
         let mut count = 0u64;
         for k in keys.iter_mut() {
             if k.account_id == account_id && matches!(k.status, ApiKeyStatus::Active) {
@@ -731,7 +782,7 @@ impl RegistryStore for InMemoryStore {
         from: AccountStatus,
         to: AccountStatus,
     ) -> Result<(), MemoryError> {
-        let mut accounts = self.accounts.lock().expect("poisoned");
+        let mut accounts = self.lock_accounts();
         let a = accounts
             .iter_mut()
             .find(|a| a.id == account_id)
@@ -759,7 +810,7 @@ impl RegistryStore for InMemoryStore {
         session_id: &str,
         now: DateTime<Utc>,
     ) -> Result<(), MemoryError> {
-        let mut challenges = self.deletion_challenges.lock().expect("poisoned");
+        let mut challenges = self.lock_deletion_challenges();
         let challenge_index = challenges
             .iter()
             .position(|challenge| challenge.verifier == verifier)
@@ -776,7 +827,7 @@ impl RegistryStore for InMemoryStore {
             ));
         }
 
-        let mut accounts = self.accounts.lock().expect("poisoned");
+        let mut accounts = self.lock_accounts();
         let account_index = accounts
             .iter()
             .position(|account| account.id == account_id)
@@ -786,7 +837,7 @@ impl RegistryStore for InMemoryStore {
         }
         let tenant_id = accounts[account_index].tenant_id.clone();
 
-        let mut tenants = self.tenants.lock().expect("poisoned");
+        let mut tenants = self.lock_tenants();
         let tenant_index = tenants
             .iter()
             .position(|tenant| tenant.id == tenant_id)
@@ -797,8 +848,8 @@ impl RegistryStore for InMemoryStore {
             ));
         }
 
-        let mut keys = self.api_keys.lock().expect("poisoned");
-        let mut audit_events = self.audit_events.lock().expect("poisoned");
+        let mut keys = self.lock_api_keys();
+        let mut audit_events = self.lock_audit_events();
         let next_tenant_version = tenants[tenant_index]
             .version
             .checked_add(1)
@@ -828,7 +879,7 @@ impl RegistryStore for InMemoryStore {
         actor: &str,
         now: DateTime<Utc>,
     ) -> Result<(), MemoryError> {
-        let mut accounts = self.accounts.lock().expect("poisoned");
+        let mut accounts = self.lock_accounts();
         let account_index = accounts
             .iter()
             .position(|account| account.tenant_id == tenant_id)
@@ -840,7 +891,7 @@ impl RegistryStore for InMemoryStore {
         if accounts[account_index].status != AccountStatus::Active {
             return Err(MemoryError::Conflict("account is not active".into()));
         }
-        let mut tenants = self.tenants.lock().expect("poisoned");
+        let mut tenants = self.lock_tenants();
         let tenant_index = tenants
             .iter()
             .position(|tenant| tenant.id == tenant_id)
@@ -858,7 +909,7 @@ impl RegistryStore for InMemoryStore {
         tenants[tenant_index].status = TenantStatus::Deleting;
         tenants[tenant_index].provisioning_lease = None;
         tenants[tenant_index].version = next_version;
-        for key in self.api_keys.lock().expect("poisoned").iter_mut() {
+        for key in self.lock_api_keys().iter_mut() {
             if key.account_id == account_id {
                 key.status = ApiKeyStatus::Revoked;
             }
@@ -867,7 +918,7 @@ impl RegistryStore for InMemoryStore {
             .lock()
             .expect("poisoned")
             .retain(|_, session| session.account_id != account_id);
-        let mut audit_events = self.audit_events.lock().expect("poisoned");
+        let mut audit_events = self.lock_audit_events();
         if !audit_events
             .iter()
             .any(|(id, action)| id == &account_id && action == "account_deletion_started_operator")
@@ -887,7 +938,7 @@ impl RegistryStore for InMemoryStore {
         fencing_generation: u64,
         _completed_at: DateTime<Utc>,
     ) -> Result<(), MemoryError> {
-        let mut tenants = self.tenants.lock().expect("poisoned");
+        let mut tenants = self.lock_tenants();
         let tenant_index = tenants
             .iter()
             .position(|tenant| tenant.id == tenant_id)
@@ -914,7 +965,7 @@ impl RegistryStore for InMemoryStore {
                 "tenant {tenant_id} deletion lease is stale"
             )));
         }
-        let accounts = self.accounts.lock().expect("poisoned");
+        let accounts = self.lock_accounts();
         let account_id = accounts
             .iter()
             .find(|account| account.tenant_id == tenant_id)
@@ -935,7 +986,7 @@ impl RegistryStore for InMemoryStore {
             .version
             .checked_add(1)
             .ok_or_else(|| MemoryError::Conflict("tenant version overflow".into()))?;
-        let mut audit_events = self.audit_events.lock().expect("poisoned");
+        let mut audit_events = self.lock_audit_events();
         audit_events.push((account_id, "account_deletion_completed".to_owned()));
         Ok(())
     }
@@ -975,7 +1026,7 @@ impl RegistryStore for InMemoryStore {
             .cloned())
     }
     async fn write_api_key(&self, key: &ApiKey) -> Result<(), MemoryError> {
-        let mut keys = self.api_keys.lock().expect("in-memory store poisoned");
+        let mut keys = self.lock_api_keys();
         if keys.iter().any(|stored| stored.id == key.id) {
             return Err(MemoryError::Conflict(format!(
                 "api key {} already exists",
@@ -1003,7 +1054,7 @@ impl RegistryStore for InMemoryStore {
             .collect())
     }
     async fn revoke_api_key(&self, account_id: &str, key_id: &str) -> Result<(), MemoryError> {
-        let mut keys = self.api_keys.lock().expect("in-memory store poisoned");
+        let mut keys = self.lock_api_keys();
         let k = keys
             .iter_mut()
             .find(|k| k.id == key_id && k.account_id == account_id)
@@ -1021,7 +1072,7 @@ impl RegistryStore for InMemoryStore {
         Ok(())
     }
     async fn touch_api_key(&self, key_id: &str, used_at: DateTime<Utc>) -> Result<(), MemoryError> {
-        let mut keys = self.api_keys.lock().expect("in-memory store poisoned");
+        let mut keys = self.lock_api_keys();
         if let Some(k) = keys.iter_mut().find(|k| {
             k.id == key_id
                 && k.status == ApiKeyStatus::Active
@@ -1032,7 +1083,7 @@ impl RegistryStore for InMemoryStore {
         Ok(())
     }
     async fn write_account(&self, account: &Account) -> Result<(), MemoryError> {
-        let mut accounts = self.accounts.lock().expect("in-memory store poisoned");
+        let mut accounts = self.lock_accounts();
         if let Some(slot) = accounts.iter_mut().find(|a| a.id == account.id) {
             if slot.status == AccountStatus::Deleting && account.status != AccountStatus::Deleting {
                 return Err(MemoryError::Conflict(
@@ -1046,7 +1097,7 @@ impl RegistryStore for InMemoryStore {
         Ok(())
     }
     async fn write_tenant(&self, tenant: &Tenant) -> Result<(), MemoryError> {
-        let mut tenants = self.tenants.lock().expect("in-memory store poisoned");
+        let mut tenants = self.lock_tenants();
         if let Some(slot) = tenants.iter_mut().find(|t| t.id == tenant.id) {
             if slot.namespace_binding.namespace != tenant.namespace_binding.namespace
                 || slot.namespace_binding.database != tenant.namespace_binding.database
@@ -1080,7 +1131,7 @@ impl RegistryStore for InMemoryStore {
         from: TenantStatus,
         to: TenantStatus,
     ) -> Result<u64, MemoryError> {
-        let mut tenants = self.tenants.lock().expect("in-memory store poisoned");
+        let mut tenants = self.lock_tenants();
         let t = tenants
             .iter_mut()
             .find(|t| t.id == tenant_id)
@@ -1106,7 +1157,7 @@ impl RegistryStore for InMemoryStore {
         to: TenantStatus,
         lease: &LeaseFence<'_>,
     ) -> Result<u64, MemoryError> {
-        let mut tenants = self.tenants.lock().expect("in-memory store poisoned");
+        let mut tenants = self.lock_tenants();
         let t = tenants
             .iter_mut()
             .find(|t| t.id == tenant_id)
@@ -1156,7 +1207,7 @@ impl RegistryStore for InMemoryStore {
         lease_id: &str,
         fencing_generation: u64,
     ) -> Result<u64, MemoryError> {
-        let mut tenants = self.tenants.lock().expect("in-memory store poisoned");
+        let mut tenants = self.lock_tenants();
         let t = tenants
             .iter_mut()
             .find(|t| t.id == tenant_id)
@@ -1211,7 +1262,7 @@ impl RegistryStore for InMemoryStore {
                 "provisioning lease TTL must be positive".into(),
             ));
         }
-        let mut tenants = self.tenants.lock().expect("in-memory store poisoned");
+        let mut tenants = self.lock_tenants();
         let t = tenants
             .iter_mut()
             .find(|t| t.id == tenant_id)
@@ -1265,7 +1316,7 @@ impl RegistryStore for InMemoryStore {
         lease_id: &str,
         fencing_generation: u64,
     ) -> Result<(), MemoryError> {
-        let mut tenants = self.tenants.lock().expect("in-memory store poisoned");
+        let mut tenants = self.lock_tenants();
         let t = tenants
             .iter_mut()
             .find(|t| t.id == tenant_id)
@@ -1296,7 +1347,7 @@ impl RegistryStore for InMemoryStore {
         heartbeat_at: chrono::DateTime<chrono::Utc>,
         expires_at: chrono::DateTime<chrono::Utc>,
     ) -> Result<(), MemoryError> {
-        let mut tenants = self.tenants.lock().expect("in-memory store poisoned");
+        let mut tenants = self.lock_tenants();
         let t = tenants
             .iter_mut()
             .find(|t| t.id == tenant_id)
@@ -1331,7 +1382,7 @@ impl RegistryStore for InMemoryStore {
         limit: usize,
         now: chrono::DateTime<chrono::Utc>,
     ) -> Result<Vec<crate::http::registry::models::Tenant>, MemoryError> {
-        let tenants = self.tenants.lock().expect("in-memory store poisoned");
+        let tenants = self.lock_tenants();
         let mut out = Vec::new();
         for t in tenants.iter() {
             if !matches!(
@@ -1364,7 +1415,7 @@ impl RegistryStore for InMemoryStore {
         cursor: Option<&str>,
         limit: usize,
     ) -> Result<Vec<crate::http::registry::models::Tenant>, MemoryError> {
-        let tenants = self.tenants.lock().expect("poisoned");
+        let tenants = self.lock_tenants();
         let mut out = Vec::new();
         let mut started = cursor.is_none();
         for t in tenants.iter() {
@@ -1393,7 +1444,7 @@ impl RegistryStore for InMemoryStore {
         if limit == 0 {
             return Ok(Vec::new());
         }
-        let tenants = self.tenants.lock().expect("poisoned");
+        let tenants = self.lock_tenants();
         let mut out = Vec::new();
         for t in tenants.iter() {
             if matches!(t.status, TenantStatus::Deleting)
@@ -1414,7 +1465,7 @@ impl RegistryStore for InMemoryStore {
         &self,
         limit: usize,
     ) -> Result<Vec<crate::http::registry::models::Tenant>, MemoryError> {
-        let tenants = self.tenants.lock().expect("poisoned");
+        let tenants = self.lock_tenants();
         Ok(tenants.iter().take(limit).cloned().collect())
     }
 
@@ -1460,7 +1511,7 @@ impl RegistryStore for InMemoryStore {
         plan: &crate::http::registry::plan::Plan,
         now: chrono::DateTime<chrono::Utc>,
     ) -> Result<crate::http::registry::plan::QuotaDecision, MemoryError> {
-        let mut usage = self.usage.lock().expect("poisoned");
+        let mut usage = self.lock_usage();
         let counter = usage.entry(tenant_id.to_owned()).or_default();
         Ok(crate::http::registry::plan::enforce_ingest(
             plan,
@@ -1500,7 +1551,7 @@ impl RegistryStore for InMemoryStore {
         sealed_payload: &[u8],
         aead_nonce: &[u8; 12],
     ) -> Result<(), MemoryError> {
-        let mut requests = self.oidc_requests.lock().expect("poisoned");
+        let mut requests = self.lock_oidc_requests();
         if requests.contains_key(state_hash) {
             return Err(MemoryError::Conflict(
                 "OIDC request state already exists".into(),
@@ -1530,7 +1581,7 @@ impl RegistryStore for InMemoryStore {
         &self,
         session: &crate::control::session::ControlPlaneSession,
     ) -> Result<(), MemoryError> {
-        let mut sessions = self.sessions.lock().expect("poisoned");
+        let mut sessions = self.lock_sessions();
         if sessions.contains_key(&session.cookie_hash)
             || sessions.values().any(|stored| stored.id == session.id)
         {
@@ -1561,7 +1612,7 @@ impl RegistryStore for InMemoryStore {
         session_id: &str,
         idle_expiry: chrono::DateTime<chrono::Utc>,
     ) -> Result<(), MemoryError> {
-        let mut sessions = self.sessions.lock().expect("poisoned");
+        let mut sessions = self.lock_sessions();
         let updated = sessions
             .values_mut()
             .find(|s| s.id == session_id)
@@ -1590,7 +1641,7 @@ impl RegistryStore for InMemoryStore {
         &self,
         challenge: &DeletionChallengeRecord,
     ) -> Result<(), MemoryError> {
-        let mut challenges = self.deletion_challenges.lock().expect("poisoned");
+        let mut challenges = self.lock_deletion_challenges();
         if challenges.iter().any(|c| c.verifier == challenge.verifier) {
             return Err(MemoryError::Conflict(
                 "deletion challenge already exists".into(),
@@ -1608,7 +1659,7 @@ impl RegistryStore for InMemoryStore {
         session_id: &str,
         now: chrono::DateTime<chrono::Utc>,
     ) -> Result<(), MemoryError> {
-        let mut challenges = self.deletion_challenges.lock().expect("poisoned");
+        let mut challenges = self.lock_deletion_challenges();
         let c = challenges
             .iter_mut()
             .find(|c| c.verifier == verifier)
