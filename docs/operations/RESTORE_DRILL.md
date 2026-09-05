@@ -39,7 +39,7 @@ backup into a fresh deployment.
 4. **Provisioning workers** detect missing tenants; no resurrection of "deleted" Tenants is auto-attempted.
 
 5. **Before opening ingress**, rotate:
-   - API-key pepper (`MEMORY_MCP_API_KEY_PEPPER`)
+   - API-key pepper (`MEMORY_MCP_API_KEY_PEPPER`; must be ≥ 32 bytes of secret material)
    - OIDC identity-index key (`MEMORY_MCP_HTTP_IDENTITY_INDEX_KEY`); require users to relink restored OIDC identities
    - Control Plane Session cookie/verifier key (`MEMORY_MCP_HTTP_SESSION_KEY`)
    - OIDC state and nonce keys (`MEMORY_MCP_HTTP_OIDC_STATE_KEY`, `MEMORY_MCP_HTTP_OIDC_NONCE_KEY`)

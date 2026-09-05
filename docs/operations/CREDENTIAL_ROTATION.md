@@ -4,7 +4,7 @@
 
 | Variable | Purpose | Rotation Impact |
 |----------|---------|-----------------|
-| `MEMORY_MCP_API_KEY_PEPPER` | HMAC pepper for API key verification | Invalidates all existing API keys |
+| `MEMORY_MCP_API_KEY_PEPPER` | HMAC pepper for API key verification; must be ≥ 32 bytes of secret material (hex encoding is conventional but not required) | Invalidates all existing API keys |
 | `MEMORY_MCP_HTTP_IDENTITY_INDEX_KEY` | Blind index key for OIDC subject verifiers | Requires OIDC identity relinking |
 | `MEMORY_MCP_HTTP_SESSION_KEY` | HMAC key for browser-session cookie verifiers | Invalidates all browser sessions |
 | `MEMORY_MCP_HTTP_OIDC_STATE_KEY` | OIDC state nonce encryption key | Invalidates in-flight login flows |

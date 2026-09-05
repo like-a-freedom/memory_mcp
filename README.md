@@ -820,7 +820,7 @@ Read only by the `memory_mcp_http` binary built with the `streamable-http` featu
 
 | Variable | Description |
 | --- | --- |
-| `MEMORY_MCP_API_KEY_PEPPER` | Pepper for the keyed HMAC verifier of Account API keys; rotating it invalidates every existing key |
+| `MEMORY_MCP_API_KEY_PEPPER` | Pepper for the keyed HMAC verifier of Account API keys; rotating it invalidates every existing key. Must be **≥ 32 bytes** of secret material; the server does not require hex encoding for this field |
 | `MEMORY_MCP_HTTP_IDENTITY_INDEX_KEY` | Blind index key for OIDC subject verifiers; rotating it requires every OIDC identity to relink |
 | `MEMORY_MCP_HTTP_SESSION_KEY` | HMAC key for browser-session cookie verifiers; rotating it invalidates every browser session |
 | `MEMORY_MCP_HTTP_OIDC_STATE_KEY` | AEAD key for OIDC state nonces; rotating it invalidates in-flight login flows |
@@ -836,9 +836,9 @@ Read only by the `memory_mcp_http` binary built with the `streamable-http` featu
 | `MEMORY_MCP_HTTP_ENABLE_CONTROL_PLANE_UI` | boolean | `false` | Serve the embedded Dioxus SPA from `/` (requires `control-plane-ui` build) |
 | `MEMORY_MCP_HTTP_OIDC_ISSUER` | URL | unset | Required when the control plane is enabled. Exact issuer match is enforced on every login |
 | `MEMORY_MCP_HTTP_OIDC_CLIENT_ID` | string | unset | Required when the control plane is enabled |
-| `MEMORY_MCP_HTTP_OIDC_AUDIENCE` | URL or comma-separated list | unset | Required when the control plane is enabled. Exact audience match is enforced |
+| `MEMORY_MCP_HTTP_OIDC_AUDIENCE` | URL string | unset | Required when the control plane is enabled. Exact audience match is enforced against the ID token's `aud` claim; supply a single audience identifier (the server does not currently parse a list) |
 | `MEMORY_MCP_HTTP_OIDC_REDIRECT_URI` | URL | unset | Required when the control plane is enabled. Must match the registered redirect URI exactly |
-| `MEMORY_MCP_HTTP_OIDC_ALLOWED_ALG` | string | `RS256` | JWT algorithm allowlist; tokens signed with any other algorithm are rejected |
+| `MEMORY_MCP_HTTP_OIDC_ALLOWED_ALG` | enum | `RS256` | JWT algorithm allowlist; accepted values are `RS256`, `ES256`, and `EdDSA`. Tokens signed with any other algorithm are rejected. Mismatched values fail startup with `ConfigInvalid` |
 | `MEMORY_MCP_HTTP_OPERATOR_IDENTITIES` | comma-separated `issuer\|hex(subject_verifier)` list | unset | Immutable operator allowlist. Account APIs cannot grant operator status |
 
 **Plan seed (required for `signup_mode=open`)** — if any one of these is set, all seven must parse as `u64`/`usize`. The values seed Registry plan version 1 only when no plan exists; an existing durable plan is never overwritten.
@@ -872,6 +872,13 @@ Read only by the `memory_mcp_http` binary built with the `streamable-http` featu
 | `MEMORY_MCP_HTTP_REPLICA_ID` | string | unset (falls back to process PID) | Stable replica identity. Set in multi-replica deployments; the PID fallback is safe only for a single process |
 
 `MEMORY_INGESTION_INBOX` and any other stdio-only filesystem variable are rejected as a fatal startup error in the HTTP profile.
+
+**Additional startup-failure rules** (not optional):
+
+- `ALLOWED_HOSTS` and `ALLOWED_ORIGINS` are required and must be non-empty in any HTTP build. Missing or wildcard origins are rejected at startup (`ConfigInvalid`), and the server does not fall back to permissive defaults.
+- The control and tenant SurrealDB targets (`SURREALDB_CONTROL_*` vs `SURREALDB_TENANT_*`) must differ in at least one of `url`, `namespace`, or `database`. The server rejects identical bindings at startup to prevent the control Registry from writing into a tenant namespace.
+- `mem://` is rejected at startup in any non-test HTTP build. Production HTTP must use a remote `ws`/`wss`/`http`/`https` SurrealDB target or a documented embedded `rocksdb://` profile.
+- `SURREALDB_FS_WATCH_INBOX` is rejected as a fatal startup error if set. Filesystem ingestion is the stdio-only ingestion path; setting it in the HTTP profile means the deployment is misconfigured.
 
 ### Runtime metrics
 
