@@ -2385,7 +2385,7 @@ fn base64_encode(bytes: &[u8]) -> String {
     String::from_utf8_lossy(&buf).into_owned()
 }
 
-#[allow(dead_code, clippy::perf)]
+#[allow(dead_code, clippy::all)]
 fn base64_decode(input: &str) -> Result<Vec<u8>, &'static str> {
     fn val(c: u8) -> Option<u8> {
         match c {
