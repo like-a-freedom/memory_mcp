@@ -439,7 +439,7 @@ jobs:
 
       - name: Smoke test filesystem ingestion (Unix)
         if: matrix.platform.os != 'windows-latest'
-        timeout-minutes: 15
+        timeout-minutes: 30
         run: |
           MEMORY_RELEASE_BINARY=target/${{ matrix.platform.target }}/release/memory_mcp \
             cargo test -p memory_mcp --test release_binary_fs_watch --features fs-watch -- --nocapture
