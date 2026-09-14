@@ -201,6 +201,8 @@ jobs:
     name: Filesystem ingestion (Windows)
     runs-on: windows-latest
     timeout-minutes: 40
+    env:
+      CFLAGS: "/MT"
     steps:
       - uses: actions/checkout@v7.0.0
 
@@ -425,6 +427,7 @@ jobs:
             os: windows-latest
             target: x86_64-pc-windows-msvc
             bin: memory_mcp_windows_x86_64.exe
+            cflags: "/MT"
     steps:
       - uses: actions/checkout@v7.0.0
 
@@ -445,6 +448,8 @@ jobs:
 
       - name: Build binary
         run: cargo build -p memory_mcp --release --target ${{ matrix.platform.target }} --features fs-watch --locked
+        env:
+          CFLAGS: ${{ matrix.platform.cflags }}
 
       - name: Prepare artifact (Unix)
         if: matrix.platform.os != 'windows-latest'
