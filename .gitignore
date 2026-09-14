@@ -48,6 +48,7 @@ scripts/*
 
 # Cargo-specific
 .cargo/
+!.cargo/config.toml
 Cargo.toml.orig
 
 # Rust Analyzer

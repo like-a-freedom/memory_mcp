@@ -334,7 +334,7 @@ jobs:
             target: x86_64-unknown-linux-gnu
             bin: memory_mcp_linux_x86_64
           - os_name: macOS-x86_64
-            os: macos-latest
+            os: macos-13
             target: x86_64-apple-darwin
             bin: memory_mcp_macos_x86_64
           - os_name: macOS-aarch64
