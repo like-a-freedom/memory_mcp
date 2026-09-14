@@ -40,7 +40,6 @@ pub(crate) fn project_fact(
 
 #[cfg(test)]
 mod tests {
-    use super::super::schema::*;
     use super::*;
     use crate::models::claim::{ClaimSchemaFamily, ExtractorFingerprint};
 

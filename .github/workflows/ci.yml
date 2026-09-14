@@ -207,7 +207,7 @@ jobs:
 
       - name: Upload eval artifact
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v4.6.2
         with:
           name: eval-pr-artifact
           path: target/evals/*.json
@@ -247,7 +247,7 @@ jobs:
 
       - name: Upload nightly artifact
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v4.6.2
         with:
           name: eval-nightly-artifact
           path: target/evals/*.json
@@ -279,7 +279,7 @@ jobs:
 
       - name: Upload Criterion reports
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v4.6.2
         with:
           name: criterion-cpu-nightly
           path: target/criterion
@@ -310,7 +310,7 @@ jobs:
 
       - name: Upload release artifact
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v4.6.2
         with:
           name: eval-release-artifact
           path: target/evals/release.json
