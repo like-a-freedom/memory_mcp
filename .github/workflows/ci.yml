@@ -9,8 +9,6 @@ on:
         description: Enable debug mode
         required: false
         default: "false"
-  push:
-    branches: [main, master]
   schedule:
     - cron: "3 9 * * *"
 
