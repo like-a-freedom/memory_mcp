@@ -113,6 +113,7 @@ jobs:
   fs_watch_windows:
     name: Filesystem ingestion (Windows)
     needs: [clippy, clippy_macos, msrv]
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' || github.event_name == 'release'
     runs-on: windows-latest
     timeout-minutes: 40
     continue-on-error: true
