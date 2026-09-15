@@ -68,21 +68,13 @@ jobs:
           toolchain: 1.97.1
           cache: true
 
-      - name: Cache target directory
-        uses: actions/cache@v4
-        with:
-          path: target
-          key: target-${{ runner.os }}-1.97.1-${{ hashFiles('Cargo.lock') }}-v2
-          restore-keys: |
-            target-${{ runner.os }}-1.97.1-
-
       - name: Check MSRV
         run: cargo check --workspace --all-targets --locked
 
   clippy:
     name: Rust clippy
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v7.0.0
 
@@ -92,14 +84,6 @@ jobs:
           toolchain: stable
           components: clippy
           cache: true
-
-      - name: Cache target directory
-        uses: actions/cache@v4
-        with:
-          path: target
-          key: target-${{ runner.os }}-${{ hashFiles('Cargo.lock') }}-v2
-          restore-keys: |
-            target-${{ runner.os }}-
 
       - name: Run clippy
         # `metal` is a macOS-only Candle backend.  Keep the Linux gate focused
@@ -136,14 +120,6 @@ jobs:
           components: clippy
           cache: true
 
-      - name: Cache target directory
-        uses: actions/cache@v4
-        with:
-          path: target
-          key: target-${{ runner.os }}-${{ hashFiles('Cargo.lock') }}-v2
-          restore-keys: |
-            target-${{ runner.os }}-
-
       - name: Run clippy with macOS features
         # control-plane-ui requires a pre-built Dioxus bundle; skip it here.
         run: cargo clippy --workspace --all-targets --features fs-watch,mcp-apps,streamable-http,control-plane,metal --locked -- -D warnings
@@ -160,14 +136,6 @@ jobs:
         with:
           toolchain: stable
           cache: true
-
-      - name: Cache target directory
-        uses: actions/cache@v4
-        with:
-          path: target
-          key: target-${{ runner.os }}-${{ hashFiles('Cargo.lock') }}-v2
-          restore-keys: |
-            target-${{ runner.os }}-
 
       - name: Run tests
         run: cargo test --workspace --lib --bins --tests --locked
@@ -186,14 +154,6 @@ jobs:
           toolchain: stable
           cache: true
 
-      - name: Cache target directory
-        uses: actions/cache@v4
-        with:
-          path: target
-          key: target-${{ runner.os }}-${{ hashFiles('Cargo.lock') }}-v2
-          restore-keys: |
-            target-${{ runner.os }}-
-
       - name: Compile Criterion benchmark targets
         run: make bench-check
 
@@ -203,6 +163,7 @@ jobs:
     timeout-minutes: 40
     env:
       CFLAGS: "/MT"
+      CMAKE_C_FLAGS: "/MT"
     steps:
       - uses: actions/checkout@v7.0.0
 
@@ -211,14 +172,6 @@ jobs:
         with:
           toolchain: stable
           cache: true
-
-      - name: Cache target directory
-        uses: actions/cache@v4
-        with:
-          path: target
-          key: target-${{ runner.os }}-${{ hashFiles('Cargo.lock') }}-v2
-          restore-keys: |
-            target-${{ runner.os }}-
 
       - name: Run candidate path-normalization tests
         shell: pwsh
@@ -244,14 +197,6 @@ jobs:
         with:
           toolchain: stable
           cache: true
-
-      - name: Cache target directory
-        uses: actions/cache@v4
-        with:
-          path: target
-          key: target-${{ runner.os }}-${{ hashFiles('Cargo.lock') }}-v2
-          restore-keys: |
-            target-${{ runner.os }}-
 
       - name: Run PR evaluation
         run: |
@@ -285,14 +230,6 @@ jobs:
         with:
           toolchain: stable
           cache: true
-
-      - name: Cache target directory
-        uses: actions/cache@v4
-        with:
-          path: target
-          key: target-${{ runner.os }}-${{ hashFiles('Cargo.lock') }}-v2
-          restore-keys: |
-            target-${{ runner.os }}-
 
       - name: Run nightly evaluation
         run: |
@@ -334,14 +271,6 @@ jobs:
           toolchain: stable
           cache: true
 
-      - name: Cache target directory
-        uses: actions/cache@v4
-        with:
-          path: target
-          key: target-${{ runner.os }}-${{ hashFiles('Cargo.lock') }}-v2
-          restore-keys: |
-            target-${{ runner.os }}-
-
       - name: Run CPU Criterion benchmarks
         run: |
           make bench-cpu-core
@@ -374,14 +303,6 @@ jobs:
         with:
           toolchain: stable
           cache: true
-
-      - name: Cache target directory
-        uses: actions/cache@v4
-        with:
-          path: target
-          key: target-${{ runner.os }}-${{ hashFiles('Cargo.lock') }}-v2
-          restore-keys: |
-            target-${{ runner.os }}-
 
       - name: Run release evaluation
         run: |
@@ -428,6 +349,7 @@ jobs:
             target: x86_64-pc-windows-msvc
             bin: memory_mcp_windows_x86_64.exe
             cflags: "/MT"
+            cmake_c_flags: "/MT"
     steps:
       - uses: actions/checkout@v7.0.0
 
@@ -438,18 +360,11 @@ jobs:
           cache: true
           target: ${{ matrix.platform.target }}
 
-      - name: Cache target directory
-        uses: actions/cache@v4
-        with:
-          path: target
-          key: target-${{ runner.os }}-${{ matrix.platform.target }}-${{ hashFiles('Cargo.lock') }}-v2
-          restore-keys: |
-            target-${{ runner.os }}-${{ matrix.platform.target }}-
-
       - name: Build binary
         run: cargo build -p memory_mcp --release --target ${{ matrix.platform.target }} --features fs-watch --locked
         env:
           CFLAGS: ${{ matrix.platform.cflags }}
+          CMAKE_C_FLAGS: ${{ matrix.platform.cmake_c_flags }}
 
       - name: Prepare artifact (Unix)
         if: matrix.platform.os != 'windows-latest'
