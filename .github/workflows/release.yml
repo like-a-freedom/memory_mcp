@@ -1,0 +1,51 @@
+name: Release
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing release tag; select the same tag in Run workflow
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ inputs.tag || github.ref_name }}
+  cancel-in-progress: false
+
+jobs:
+  ref:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Require the exact release tag
+        env:
+          REF_TYPE: ${{ github.ref_type }}
+          REF_NAME: ${{ github.ref_name }}
+          TAG: ${{ inputs.tag || github.ref_name }}
+        run: test "$REF_TYPE" = tag && test "$REF_NAME" = "$TAG"
+  build:
+    needs: ref
+    uses: ./.github/workflows/ci.yml
+    with:
+      release: true
+  publish:
+    needs: build
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v7
+        with:
+          pattern: binaries-*
+          path: dist
+          merge-multiple: true
+      - name: Upload only after all platforms and gates pass
+        uses: softprops/action-gh-release@v3.0.1
+        with:
+          tag_name: ${{ inputs.tag || github.ref_name }}
+          files: dist/*
+          fail_on_unmatched_files: true

@@ -1,0 +1,62 @@
+name: Rust build environment
+description: Native toolchain, consistent CRT flags and isolated dependency cache
+inputs:
+  target:
+    description: Native Rust host triple
+    required: true
+  cache-key:
+    description: Separate check and release build caches
+    required: true
+runs:
+  using: composite
+  steps:
+    - name: Configure native build
+      shell: bash
+      run: echo "CARGO_BUILD_TARGET=${{ inputs.target }}" >> "$GITHUB_ENV"
+    - name: Linux dependencies
+      if: runner.os == 'Linux'
+      shell: bash
+      run: |
+        sudo apt-get update -qq
+        sudo apt-get install -y --no-install-recommends libclang-dev cmake libssl-dev pkg-config
+    - name: Windows native dependencies
+      if: runner.os == 'Windows'
+      shell: pwsh
+      run: |
+        $clang = Join-Path $env:ProgramFiles 'LLVM\bin'
+        if (!(Test-Path "$clang\libclang.dll")) { throw 'LLVM libclang.dll is required by RocksDB' }
+        "LIBCLANG_PATH=$clang" >> $env:GITHUB_ENV
+        'CFLAGS=/MT' >> $env:GITHUB_ENV
+        'CXXFLAGS=/MT' >> $env:GITHUB_ENV
+        'CMAKE_C_FLAGS=/MT' >> $env:GITHUB_ENV
+        'CMAKE_CXX_FLAGS=/MT' >> $env:GITHUB_ENV
+    - uses: actions-rust-lang/setup-rust-toolchain@v1.17.0
+      with:
+        toolchain: 1.97.1
+        target: ${{ inputs.target }}
+        components: rustfmt,clippy
+        # The action default (-D warnings) overrides .cargo/config.toml,
+        # silently dropping +crt-static on Windows. Clippy owns lint policy.
+        rustflags: ""
+        cache: true
+        cache-key: native-v3-${{ inputs.target }}-${{ inputs.cache-key }}
+        cache-on-failure: false
+        cache-save-if: ${{ github.event_name != 'pull_request' }}
+    - name: Restore Intel macOS ONNX Runtime
+      if: inputs.target == 'x86_64-apple-darwin'
+      id: ort
+      uses: actions/cache@v5
+      with:
+        path: .ci/onnxruntime
+        key: ort-1.24.2-058787ce-macos-15-intel-v1
+    - name: Build Intel macOS ONNX Runtime
+      if: inputs.target == 'x86_64-apple-darwin' && steps.ort.outputs.cache-hit != 'true'
+      shell: bash
+      run: bash scripts/ci/build-ort-macos.sh
+    - name: Configure Intel macOS ONNX Runtime
+      if: inputs.target == 'x86_64-apple-darwin'
+      shell: bash
+      run: |
+        echo "ORT_LIB_LOCATION=$GITHUB_WORKSPACE/.ci/onnxruntime/lib" >> "$GITHUB_ENV"
+        echo 'ORT_PREFER_DYNAMIC_LINK=1' >> "$GITHUB_ENV"
+        echo "DYLD_LIBRARY_PATH=$GITHUB_WORKSPACE/.ci/onnxruntime/lib" >> "$GITHUB_ENV"

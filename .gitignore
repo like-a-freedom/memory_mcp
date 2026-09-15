@@ -21,6 +21,10 @@ docs/BACKLOG.md
 scripts/*
 !scripts/http_release_evidence.sh
 !scripts/test_proxy.py
+!scripts/ci/
+scripts/ci/__pycache__/
+/.ci/
+/dist/
 
 # Python dev tooling (see pyproject.toml)
 .venv/

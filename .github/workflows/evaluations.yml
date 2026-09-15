@@ -1,0 +1,80 @@
+name: Extended evaluations
+
+on:
+  schedule:
+    - cron: "3 9 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: extended-evaluations-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_INCREMENTAL: "0"
+  CARGO_PROFILE_DEV_DEBUG: "0"
+  CARGO_PROFILE_TEST_DEBUG: "0"
+
+jobs:
+  eval-nightly:
+    name: Evaluation nightly profile
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    steps:
+    - uses: actions/checkout@v7.0.0
+    - uses: ./.github/actions/setup
+      with:
+        target: x86_64-unknown-linux-gnu
+        cache-key: eval-nightly
+    - name: Run nightly evaluation
+      run: |
+        mkdir -p target/evals
+        cargo run -p eval-harness --bin memory-eval --locked -- run \
+          --profile evals/profiles/nightly.json \
+          --artifact target/evals/nightly.json
+    - name: Run response-size benchmark profile
+      run: make eval-response-size
+    - name: Run NER quality benchmark profile
+      if: vars.MEMORY_NER_FIXTURES_PROVISIONED == 'true'
+      run: make eval-ner-quality
+    - name: Record NER fixture prerequisite
+      if: vars.MEMORY_NER_FIXTURES_PROVISIONED != 'true'
+      run: echo 'NER quality not executed; run make eval-ner-quality on a host with the pinned model fixtures.' >> "$GITHUB_STEP_SUMMARY"
+    - name: Upload nightly artifact
+      if: always()
+      uses: actions/upload-artifact@v6
+      with:
+        name: eval-nightly-artifact
+        path: target/evals/*.json
+        retention-days: 30
+  benchmark-nightly:
+    name: CPU benchmark profiles
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    steps:
+    - uses: actions/checkout@v7.0.0
+    - uses: ./.github/actions/setup
+      with:
+        target: x86_64-unknown-linux-gnu
+        cache-key: benchmark-nightly
+    - name: Compile all benchmark targets
+      run: make bench-check
+    - name: Run CPU Criterion benchmarks
+      run: |
+        make bench-cpu-core
+        if test -d crates/memory-mcp/tests/models/ner; then
+          MEMORY_MCP_BENCH_REQUIRE_FIXTURES=1 cargo bench -p eval-harness --bench ner_cpu --locked
+        else
+          echo "NER CPU benchmark not executed: model fixtures are not provisioned in CI"
+          echo "Run MEMORY_MCP_BENCH_REQUIRE_FIXTURES=1 make bench-cpu on a fixture-equipped host"
+        fi
+    - name: Upload Criterion reports
+      if: always()
+      uses: actions/upload-artifact@v6
+      with:
+        name: criterion-cpu-nightly
+        path: target/criterion
+        if-no-files-found: warn
+        retention-days: 30
