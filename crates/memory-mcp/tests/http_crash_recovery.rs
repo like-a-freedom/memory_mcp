@@ -297,13 +297,11 @@ async fn provisioning_recovers_after_lease_claim_fault() {
     let store = registry.store_clone();
     let started = Instant::now();
     let mut fault_seen = false;
-    // Use a 2-second TTL so the recovery tick re-claims
-    // quickly. The fault fires on the first tick; the
-    // scheduler then skips the tenant until the lease
-    // expires; the next tick re-claims and advances to
-    // Ready.
+    // The injected claim fault releases the lease immediately, so a short
+    // lease is unnecessary here. Keep enough headroom for a busy CI runner;
+    // the next tick reclaims the tenant without racing the heartbeat.
     for _ in 0..120 {
-        tick_provisioning_with_injector_and_ttl(registry.clone(), injector_dyn.clone(), 2).await;
+        tick_provisioning_with_injector_and_ttl(registry.clone(), injector_dyn.clone(), 30).await;
         let tenant = store
             .find_tenant_by_id(&tenant_id)
             .await

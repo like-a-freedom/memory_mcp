@@ -55,8 +55,8 @@ class PackagingTests(unittest.TestCase):
         with tarfile.open(next(Path("dist").glob("*.tar.gz"))) as content:
             self.assertIn("libdependency.so", {Path(n).name for n in content.getnames()})
 
-    def test_windows_setup_keeps_rust_and_c_runtime_static(self):
+    def test_windows_setup_does_not_override_dependency_crt(self):
         setup = (self.previous / ".github/actions/setup/action.yml").read_text()
-        self.assertIn("CFLAGS=/MT", setup)
-        self.assertIn("CXXFLAGS=/MT", setup)
-        self.assertIn("RUSTFLAGS=-C target-feature=+crt-static", setup)
+        for flag in ("CFLAGS=/MT", "CXXFLAGS=/MT", "CMAKE_C_FLAGS=/MT", "CMAKE_CXX_FLAGS=/MT"):
+            self.assertNotIn(flag, setup)
+        self.assertNotIn("crt-static", setup)

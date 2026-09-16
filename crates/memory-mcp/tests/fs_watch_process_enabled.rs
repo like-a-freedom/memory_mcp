@@ -55,6 +55,18 @@ impl ServeDriver {
             .env("NER_EXTRACTOR", "anno")
             .env("RUST_LOG", "warn")
             .env_remove("SURREALDB_URL");
+        // Keep the loader settings supplied by the CI setup action. Intel
+        // macOS uses a locally built ONNX Runtime dylib, and `env_clear` would
+        // otherwise make the child exit before it can answer `initialize`.
+        for key in [
+            "ORT_LIB_LOCATION",
+            "ORT_PREFER_DYNAMIC_LINK",
+            "DYLD_LIBRARY_PATH",
+        ] {
+            if let Some(value) = std::env::var_os(key) {
+                command.env(key, value);
+            }
+        }
         if let Some(inbox) = inbox {
             command.env("MEMORY_INGESTION_INBOX", inbox);
         } else {
@@ -104,7 +116,13 @@ impl ServeDriver {
             let line = self
                 .responses
                 .recv_timeout(Duration::from_secs(30))
-                .unwrap_or_else(|error| panic!("timed out waiting for MCP response {id}: {error}"));
+                .unwrap_or_else(|error| {
+                    let status = self.child.try_wait().ok().flatten();
+                    let stderr = self_stderr(&self.stderr_lines);
+                    panic!(
+                        "timed out waiting for MCP response {id}: {error}; child_status={status:?}; stderr:\n{stderr}"
+                    )
+                });
             let value: serde_json::Value = serde_json::from_str(&line).expect("valid JSON-RPC");
             if value.get("id").and_then(serde_json::Value::as_i64) == Some(id) {
                 return value;

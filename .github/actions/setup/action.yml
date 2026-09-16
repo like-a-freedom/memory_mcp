@@ -1,5 +1,5 @@
 name: Rust build environment
-description: Native toolchain, consistent CRT flags and isolated dependency cache
+description: Native toolchain and isolated dependency cache
 inputs:
   target:
     description: Native Rust host triple
@@ -26,21 +26,16 @@ runs:
         $clang = Join-Path $env:ProgramFiles 'LLVM\bin'
         if (!(Test-Path "$clang\libclang.dll")) { throw 'LLVM libclang.dll is required by RocksDB' }
         "LIBCLANG_PATH=$clang" >> $env:GITHUB_ENV
-        'CFLAGS=/MT' >> $env:GITHUB_ENV
-        'CXXFLAGS=/MT' >> $env:GITHUB_ENV
-        'CMAKE_C_FLAGS=/MT' >> $env:GITHUB_ENV
-        'CMAKE_CXX_FLAGS=/MT' >> $env:GITHUB_ENV
-        # Keep Rust and the native dependencies on the same static MSVC CRT.
-        # Set this before setup-rust-toolchain so its default -D warnings value
-        # cannot replace the target runtime setting.
-        'RUSTFLAGS=-C target-feature=+crt-static' >> $env:GITHUB_ENV
+        # Keep the toolchain's default dynamic MSVC CRT for every dependency.
+        # ONNX Runtime is built with /MD, while exporting /MT here is also
+        # interpreted as a Git-for-Windows path by clang-cl on ARM runners.
     - uses: actions-rust-lang/setup-rust-toolchain@v1.17.0
       with:
         toolchain: 1.97.1
         target: ${{ inputs.target }}
         components: rustfmt,clippy
-        # The action default (-D warnings) overrides .cargo/config.toml,
-        # silently dropping +crt-static on Windows. Clippy owns lint policy.
+        # Keep the setup action from injecting project-wide flags; clippy owns
+        # the lint policy in the quality job.
         rustflags: ""
         cache: true
         cache-key: native-v3-${{ inputs.target }}-${{ inputs.cache-key }}

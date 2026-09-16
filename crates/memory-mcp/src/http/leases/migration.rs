@@ -337,7 +337,7 @@ pub async fn provision_one(
             // transition so a stale worker can never leave a
             // partially-migrated tenant stuck in
             // `Migrating`.
-            if matches!(error, MemoryError::Transient(_)) {
+            if matches!(error, MemoryError::Transient(_)) || is_lease_loss(&error) {
                 let _ = store
                     .release_provisioning_lease(
                         tenant_id,
@@ -566,6 +566,14 @@ pub async fn run_due_provisioning_for(
         let _ = registry;
     }
     Ok(())
+}
+
+/// Losing a provisioning lease is an expected race with another worker (or
+/// with a delayed heartbeat). Leave the tenant in its current stage so the
+/// next scheduler pass can reclaim it; treating this as a permanent failure
+/// would create a `Failed` tenant without a retry stage.
+fn is_lease_loss(error: &MemoryError) -> bool {
+    matches!(error, MemoryError::Conflict(reason) if reason == "provisioning lease lost")
 }
 
 /// Heartbeat the lease on a `lease_ttl / 3` cadence with
