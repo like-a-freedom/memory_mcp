@@ -83,16 +83,20 @@ fn absent_inbox_starts_serve_normally_without_feature() {
         .spawn()
         .expect("start serve");
 
-    // Give the process time to either start serving or fail fast.
-    std::thread::sleep(Duration::from_millis(1500));
-    match child.try_wait() {
-        Ok(Some(status)) => panic!("serve exited unexpectedly with {status}"),
-        Ok(None) => {
-            // Still running: close stdin to trigger a clean shutdown.
-            drop(child.stdin.take());
+    // Give the process enough time to initialize on a cold CI runner while
+    // still catching an immediate startup failure. A fixed 1.5s sleep was
+    // flaky when the embedded database was under load.
+    let deadline = std::time::Instant::now() + Duration::from_secs(10);
+    loop {
+        match child.try_wait() {
+            Ok(Some(status)) => panic!("serve exited unexpectedly with {status}"),
+            Ok(None) if std::time::Instant::now() >= deadline => break,
+            Ok(None) => std::thread::sleep(Duration::from_millis(100)),
+            Err(err) => panic!("failed to poll serve process: {err}"),
         }
-        Err(err) => panic!("failed to poll serve process: {err}"),
     }
+    // Still running: close stdin to trigger a clean shutdown.
+    drop(child.stdin.take());
 
     let output = child.wait_with_output().expect("wait for serve exit");
     // A clean shutdown after stdin close is success (exit 0), or the process

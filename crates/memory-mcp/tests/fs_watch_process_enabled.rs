@@ -25,12 +25,10 @@ struct ServeDriver {
 
 impl ServeDriver {
     fn spawn(inbox: Option<&std::path::Path>) -> Self {
-        let temp = tempfile::tempdir().expect("temp dir");
-        let data_dir = temp.path().join("db");
-        Self::spawn_with_data_dir(
-            inbox.map(std::path::Path::to_path_buf).as_deref(),
-            Some(&data_dir),
-        )
+        // Let the helper own the temporary directory that backs the child
+        // database. The previous implementation passed a path from a
+        // temporary directory that was dropped before the child started.
+        Self::spawn_with_data_dir(inbox, None)
     }
 
     fn spawn_with_data_dir(
@@ -59,6 +57,11 @@ impl ServeDriver {
         // macOS uses a locally built ONNX Runtime dylib, and `env_clear` would
         // otherwise make the child exit before it can answer `initialize`.
         for key in [
+            // Windows uses PATH to locate the dynamic MSVC/ONNX Runtime
+            // libraries copied next to the test binary. Keep the normal
+            // process search path on every host; the explicit test variables
+            // below still make the application configuration deterministic.
+            "PATH",
             "ORT_LIB_LOCATION",
             "ORT_PREFER_DYNAMIC_LINK",
             "DYLD_LIBRARY_PATH",
@@ -165,20 +168,21 @@ impl ServeDriver {
 }
 
 #[test]
-fn serve_reaches_readiness_and_ingests_dropped_file() {
+fn serve_reaches_readiness_and_ingests_startup_file() {
     let inbox = tempfile::tempdir().expect("temp inbox");
-    let mut driver = ServeDriver::spawn(Some(inbox.path()));
-    driver.initialize();
-
-    // Drop a supported file into the inbox; the watcher should eventually
-    // produce an episode and facts.
+    // Seed the inbox before starting the child. The in-process runtime has a
+    // dedicated watcher-event test; this process-level gate focuses on the
+    // real binary's startup scan and ingestion path without racing the
+    // asynchronous watcher attachment.
     std::fs::write(
         inbox.path().join("note.md"),
         "Alice Smith reports ARR is $5M.",
     )
     .expect("write markdown");
+    let mut driver = ServeDriver::spawn(Some(inbox.path()));
+    driver.initialize();
 
-    // Poll through the assemble-context tool until a fact from the dropped
+    // Poll through the assemble-context tool until a fact from the startup
     // file is queryable.
     let deadline = std::time::Instant::now() + Duration::from_secs(20);
     let mut found = false;
@@ -206,7 +210,7 @@ fn serve_reaches_readiness_and_ingests_dropped_file() {
     let stderr_snapshot = self_stderr(&driver.stderr_lines);
     assert!(
         found,
-        "expected the dropped file to be ingested and queryable; last response: {last_response}\nstderr:\n{stderr_snapshot}",
+        "expected the startup file to be ingested and queryable; last response: {last_response}\nstderr:\n{stderr_snapshot}",
     );
 
     driver.shutdown();
