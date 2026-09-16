@@ -54,8 +54,17 @@ impl ServeDriver {
             .env("RUST_LOG", "warn")
             .env_remove("SURREALDB_URL");
         // Keep the normal process search path after clearing the environment.
-        // Windows needs it to locate the dynamic MSVC/ONNX Runtime libraries.
+        // Windows also needs the directory beside the test binary: when
+        // Developer Mode is unavailable, ort-sys copies its DLLs there rather
+        // than creating symlinks in the test `deps` directory.
+        let mut path_entries = Vec::new();
+        if let Some(parent) = std::path::Path::new(binary()).parent() {
+            path_entries.push(parent.to_path_buf());
+        }
         if let Some(value) = std::env::var_os("PATH") {
+            path_entries.extend(std::env::split_paths(&value));
+        }
+        if let Ok(value) = std::env::join_paths(path_entries) {
             command.env("PATH", value);
         }
         if let Some(inbox) = inbox {
