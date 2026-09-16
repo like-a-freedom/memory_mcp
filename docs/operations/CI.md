@@ -43,8 +43,11 @@ both ordinary NER selector ingestion paths, MCP initialization with an inbox,
 and bounded shutdown. HTTP must load and reject invalid configuration with
 its expected error code; this is a loader check, not a live HTTP deployment
 test. HTTP integration tests run separately on Linux. Native unit and watcher
-process tests run on all five platforms during ordinary CI; release platform
-jobs use the executable smoke checks to avoid compiling a second test profile.
+process tests run on Linux and macOS during ordinary CI. Windows x64 and ARM64
+run the same packaged executable smoke checks after building, which exercises
+the actual shipped binaries and bundled runtime libraries without the
+unreliable hosted Windows Rust test harness. Release platform jobs use those
+smoke checks as well and skip compiling a second test profile.
 
 ## Why these build settings matter
 
