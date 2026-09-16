@@ -1,0 +1,29 @@
+#[cfg(feature = "cpp")]
+#[cfg(not(target_os = "macos"))]
+fn main() {
+    // ONNX Runtime prebuilt libraries use the dynamic MSVC CRT (/MD).
+    // Do not force esaxx to /MT on Windows or the linker reports LNK2038.
+    cc::Build::new()
+        .cpp(true)
+        .flag("-std=c++11")
+        .file("src/esaxx.cpp")
+        .include("src")
+        .compile("esaxx");
+}
+
+#[cfg(feature = "cpp")]
+#[cfg(target_os = "macos")]
+fn main() {
+    // ONNX Runtime prebuilt libraries use the dynamic MSVC CRT (/MD).
+    // Do not force esaxx to /MT on Windows or the linker reports LNK2038.
+    cc::Build::new()
+        .cpp(true)
+        .flag("-std=c++11")
+        .flag("-stdlib=libc++")
+        .file("src/esaxx.cpp")
+        .include("src")
+        .compile("esaxx");
+}
+
+#[cfg(not(feature = "cpp"))]
+fn main() {}
