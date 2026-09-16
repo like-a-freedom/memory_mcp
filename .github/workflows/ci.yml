@@ -59,6 +59,7 @@ jobs:
           path: target/evals/*.json
 
   native:
+    needs: quality
     name: ${{ matrix.target }}
     runs-on: ${{ matrix.os }}
     timeout-minutes: 150
@@ -70,8 +71,6 @@ jobs:
             target: x86_64-unknown-linux-gnu
           - os: ubuntu-24.04-arm
             target: aarch64-unknown-linux-gnu
-          - os: macos-15-intel
-            target: x86_64-apple-darwin
           - os: macos-15
             target: aarch64-apple-darwin
           - os: windows-2025
@@ -116,7 +115,7 @@ jobs:
     needs: [quality, native]
     runs-on: ubuntu-24.04
     steps:
-      - name: Require all checks and all six platforms
+      - name: Require all checks and all five platforms
         env:
           QUALITY: ${{ needs.quality.result }}
           NATIVE: ${{ needs.native.result }}

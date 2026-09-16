@@ -53,22 +53,10 @@ impl ServeDriver {
             .env("NER_EXTRACTOR", "anno")
             .env("RUST_LOG", "warn")
             .env_remove("SURREALDB_URL");
-        // Keep the loader settings supplied by the CI setup action. Intel
-        // macOS uses a locally built ONNX Runtime dylib, and `env_clear` would
-        // otherwise make the child exit before it can answer `initialize`.
-        for key in [
-            // Windows uses PATH to locate the dynamic MSVC/ONNX Runtime
-            // libraries copied next to the test binary. Keep the normal
-            // process search path on every host; the explicit test variables
-            // below still make the application configuration deterministic.
-            "PATH",
-            "ORT_LIB_LOCATION",
-            "ORT_PREFER_DYNAMIC_LINK",
-            "DYLD_LIBRARY_PATH",
-        ] {
-            if let Some(value) = std::env::var_os(key) {
-                command.env(key, value);
-            }
+        // Keep the normal process search path after clearing the environment.
+        // Windows needs it to locate the dynamic MSVC/ONNX Runtime libraries.
+        if let Some(value) = std::env::var_os("PATH") {
+            command.env("PATH", value);
         }
         if let Some(inbox) = inbox {
             command.env("MEMORY_INGESTION_INBOX", inbox);

@@ -94,20 +94,9 @@ def package(build_dir, target):
         for pattern in ("*.dll", "*.so*", "*.dylib"):
             for library in build_dir.glob(pattern):
                 shutil.copy2(library, bundle / library.name)
-        if target == "x86_64-apple-darwin":
-            runtime = Path(".ci/onnxruntime")
-            libraries = list((runtime / "lib").glob("*.dylib"))
-            if not libraries:
-                raise RuntimeError("Intel macOS requires the bundled ONNX Runtime")
-            for library in libraries:
-                shutil.copy2(library, bundle / library.name)
-            for notice in ("LICENSE", "ThirdPartyNotices.txt"):
-                shutil.copy2(runtime / notice, bundle / ("ONNX-" + notice))
-            for binary in binaries:
-                run(["install_name_tool", "-add_rpath", "@executable_path", str(binary)])
-                run(["codesign", "--force", "--sign", "-", str(binary)])
         shutil.copy2("LICENSE", bundle / "LICENSE")
-        # No DYLD_LIBRARY_PATH: catch missing runtime libraries in the shipped folder.
+        # Do not add development library search paths: catch missing runtime
+        # libraries in the shipped folder.
         smoke(*binaries, work)
         archive = shutil.make_archive(str(dist / ("memory_mcp-" + target)),
                                       "zip" if suffix else "gztar", bundle)

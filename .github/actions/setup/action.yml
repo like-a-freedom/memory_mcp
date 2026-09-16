@@ -41,21 +41,3 @@ runs:
         cache-key: native-v3-${{ inputs.target }}-${{ inputs.cache-key }}
         cache-on-failure: false
         cache-save-if: ${{ github.event_name != 'pull_request' }}
-    - name: Restore Intel macOS ONNX Runtime
-      if: inputs.target == 'x86_64-apple-darwin'
-      id: ort
-      uses: actions/cache@v5
-      with:
-        path: .ci/onnxruntime
-        key: ort-1.24.2-058787ce-macos-15-intel-v1
-    - name: Build Intel macOS ONNX Runtime
-      if: inputs.target == 'x86_64-apple-darwin' && steps.ort.outputs.cache-hit != 'true'
-      shell: bash
-      run: bash scripts/ci/build-ort-macos.sh
-    - name: Configure Intel macOS ONNX Runtime
-      if: inputs.target == 'x86_64-apple-darwin'
-      shell: bash
-      run: |
-        echo "ORT_LIB_LOCATION=$GITHUB_WORKSPACE/.ci/onnxruntime/lib" >> "$GITHUB_ENV"
-        echo 'ORT_PREFER_DYNAMIC_LINK=1' >> "$GITHUB_ENV"
-        echo "DYLD_LIBRARY_PATH=$GITHUB_WORKSPACE/.ci/onnxruntime/lib" >> "$GITHUB_ENV"

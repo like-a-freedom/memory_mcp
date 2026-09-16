@@ -36,11 +36,6 @@ class PackagingTests(unittest.TestCase):
         expected = hashlib.sha256(archive.read_bytes()).hexdigest()
         self.assertEqual(Path(str(archive) + ".sha256").read_text().strip(), expected)
 
-    def test_missing_intel_runtime_is_fatal(self):
-        with self.assertRaisesRegex(RuntimeError, "bundled ONNX Runtime"):
-            package.package(self.build, "x86_64-apple-darwin")
-        self.assertEqual(list(Path("dist").iterdir()), [])
-
     def test_failed_smoke_never_produces_release_assets(self):
         with patch.object(package, "smoke", side_effect=RuntimeError("MCP failed")):
             with self.assertRaisesRegex(RuntimeError, "MCP failed"):

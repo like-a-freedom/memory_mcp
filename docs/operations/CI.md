@@ -3,7 +3,8 @@
 ## Everyday flow
 
 1. Open a pull request. **CI** runs Linux lint, workspace tests, optional-feature
-   tests and the PR evaluation gate, alongside six native build/test jobs.
+   tests and the PR evaluation gate. Native build/test jobs start after the
+   quality gate passes.
 2. Require **CI passed** in branch protection. This check fails if any required
    job fails, is cancelled or is skipped. Windows failures are mandatory.
 3. Merge to `master`. CI checks the merged commit. Feature-branch pushes do not
@@ -23,7 +24,7 @@ retroactively use a newer workflow. Create a new version/tag after merging.
 | OS | x64 | ARM64 |
 |---|---|---|
 | Linux | `ubuntu-24.04` | `ubuntu-24.04-arm` |
-| macOS | `macos-15-intel` | `macos-15` |
+| macOS | — | `macos-15` |
 | Windows | `windows-2025` | `windows-11-arm` |
 
 All jobs use native hosts and Rust **1.97.1**, matching `rust-version` and
@@ -42,25 +43,19 @@ both ordinary NER selector ingestion paths, MCP initialization with an inbox,
 and bounded shutdown. HTTP must load and reject invalid configuration with
 its expected error code; this is a loader check, not a live HTTP deployment
 test. HTTP integration tests run separately on Linux. Native unit and watcher
-process tests run on all six platforms during ordinary CI; release platform
+process tests run on all five platforms during ordinary CI; release platform
 jobs use the executable smoke checks to avoid compiling a second test profile.
 
 ## Why these build settings matter
 
-- `setup-rust-toolchain` defaults to `RUSTFLAGS=-D warnings`. That overrides
-  `.cargo/config.toml` and drops Windows `+crt-static`. Our setup explicitly
-  disables that override; Clippy supplies `-D warnings` itself. C/C++ and Rust
-  therefore use the same static Windows CRT.
+- `setup-rust-toolchain` defaults to `RUSTFLAGS=-D warnings`. Our setup
+  explicitly disables that override; Clippy supplies `-D warnings` itself.
+  Windows and its native dependencies use the toolchain's dynamic MSVC CRT.
 - Cache policy is explicit: successful dependency builds are cached separately
   by target and dev/release/quality role. Failed builds are not saved. Pull
   requests restore caches but do not save them. Rust, lockfile and Cargo config
   changes invalidate Rust caches. Bump `native-v3` if changing native compiler
   policy outside Cargo configuration.
-- `ort-sys 2.0.0-rc.12` has no Intel macOS prebuilt. Changing runner labels cannot
-  fix that. The Intel job builds ONNX Runtime 1.24.2 from pinned commit
-  `058787ceead760166e3c50a0a4cba8a833a6f53f`, caches its libraries, and ships them
-  with notices beside the binaries. It tests the bundle without a development
-  library search path. Intel macOS users must keep the archive contents together.
 - The first uncached build is expensive: SurrealDB, RocksDB, ML libraries and
   release LTO still need compilation. Job timeouts are ceilings, not expected
   durations. Do not infer an optimization gain until comparing completed runs.
