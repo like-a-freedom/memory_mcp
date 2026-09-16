@@ -54,3 +54,9 @@ class PackagingTests(unittest.TestCase):
         self.assertFalse(Path("dist/memory_mcp_linux_aarch64").exists())
         with tarfile.open(next(Path("dist").glob("*.tar.gz"))) as content:
             self.assertIn("libdependency.so", {Path(n).name for n in content.getnames()})
+
+    def test_windows_setup_keeps_rust_and_c_runtime_static(self):
+        setup = (self.previous / ".github/actions/setup/action.yml").read_text()
+        self.assertIn("CFLAGS=/MT", setup)
+        self.assertIn("CXXFLAGS=/MT", setup)
+        self.assertIn("RUSTFLAGS=-C target-feature=+crt-static", setup)
