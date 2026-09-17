@@ -314,6 +314,30 @@ development and functional debugging.
 
 The binary uses stdio transport, which makes it suitable for local MCP client integration.
 
+### Docker Compose (Streamable HTTP, Linux x64)
+
+The repository includes a Linux/amd64 Compose setup with a persistent SurrealDB
+and a shell-free distroless `memory_mcp_http` image. It starts the Streamable HTTP
+endpoint on `http://localhost:8080` and keeps separate control and tenant
+namespace/database bindings in the same SurrealDB instance:
+
+```bash
+docker compose up --build
+```
+
+`/health/live` and `/health/ready` are public health endpoints. MCP requests at
+`POST /mcp` require a provisioned Bearer API key; this local profile keeps the
+control plane disabled by default, so production deployments must replace the
+development HMAC defaults and provision accounts/keys through the documented
+control-plane workflow. Set `MEMORY_MCP_HTTP_ENABLE_CONTROL_PLANE=true` together
+with the OIDC variables when enabling that workflow.
+
+The database is exposed on `localhost:8000` for local inspection and its data is
+stored in the `surrealdb-data` volume. Set `SURREALDB_USERNAME` and
+`SURREALDB_PASSWORD` before the first start to use different local credentials.
+The image is built from source with Cargo and its final stage is
+`gcr.io/distroless/cc-debian13:nonroot`.
+
 ### Run with environment
 
 The default embedded mode needs no `SURREALDB_*` variables. To select a remote
