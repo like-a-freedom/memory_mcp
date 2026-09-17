@@ -29,6 +29,9 @@ jobs:
         run: test "$REF_TYPE" = tag && test "$REF_NAME" = "$TAG"
   build:
     needs: ref
+    permissions:
+      contents: read
+      packages: write
     uses: ./.github/workflows/ci.yml
     with:
       release: true

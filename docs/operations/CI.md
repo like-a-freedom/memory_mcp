@@ -9,10 +9,14 @@
    job fails, is cancelled or is skipped. Windows failures are mandatory.
 3. Merge to `master`. CI checks the merged commit. Feature-branch pushes do not
    also trigger a duplicate push workflow.
-4. Publish a GitHub Release on a tag containing these workflows. **Release**
+4. A successful `master` run publishes the Linux/amd64 Streamable HTTP image to
+   GitHub Container Registry as `ghcr.io/like-a-freedom/memory_mcp:latest` and
+   `sha-<commit>`. Pull requests build and test the image without publishing it.
+5. Publish a GitHub Release on a tag containing these workflows. **Release**
    calls the same CI with optimized builds and the release evaluation gate,
-   then uploads assets only after every job passes. Pushing a tag alone does
-   not start another build. Re-run failed jobs from the original Actions run.
+   publishes the matching container tag, then uploads assets only after every
+   job passes. Pushing a tag alone does not start another build. Re-run failed
+   jobs from the original Actions run.
 
 Manual **CI** runs build development binaries. Manual **Release** rebuilds must
 select the existing release tag under **Run workflow** and supply the same tag

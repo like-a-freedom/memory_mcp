@@ -29,7 +29,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    image: memory-mcp-http:local
+    image: "${MEMORY_MCP_IMAGE:-memory-mcp-http:local}"
     platform: linux/amd64
     ports:
       - "8080:8080"

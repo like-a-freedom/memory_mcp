@@ -338,6 +338,18 @@ stored in the `surrealdb-data` volume. Set `SURREALDB_USERNAME` and
 The image is built from source with Cargo and its final stage is
 `gcr.io/distroless/cc-debian13:nonroot`.
 
+Pushes to `master` publish the same image to GitHub Container Registry as
+`ghcr.io/like-a-freedom/memory_mcp:latest` and a commit tag. Published release
+tags receive a matching image tag. To deploy a published image instead of
+building locally, log in to GHCR and pull it before starting Compose:
+
+```bash
+export MEMORY_MCP_IMAGE=ghcr.io/like-a-freedom/memory_mcp:latest
+docker login ghcr.io
+docker compose pull memory_mcp
+docker compose up -d
+```
+
 ### Run with environment
 
 The default embedded mode needs no `SURREALDB_*` variables. To select a remote
