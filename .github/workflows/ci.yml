@@ -142,9 +142,23 @@ jobs:
             exit 1
           fi
       - name: Start the HTTP service and probe liveness
+        shell: bash
         run: |
+          set -euo pipefail
           docker compose -f docker-compose.yml up -d --no-build
-          curl --fail --retry 30 --retry-delay 2 http://127.0.0.1:8080/health/live
+          curl --fail --silent --show-error \
+            --retry 60 --retry-all-errors --retry-delay 2 \
+            --connect-timeout 2 --max-time 10 \
+            http://127.0.0.1:8080/health/live
+          curl --fail --silent --show-error \
+            --retry 60 --retry-all-errors --retry-delay 2 \
+            --connect-timeout 2 --max-time 10 \
+            http://127.0.0.1:8080/health/ready
+      - name: Show Compose logs on failure
+        if: failure()
+        run: |
+          docker compose -f docker-compose.yml ps
+          docker compose -f docker-compose.yml logs --no-color
       - name: Stop Compose services
         if: always()
         run: docker compose -f docker-compose.yml down -v
