@@ -564,71 +564,426 @@ impl LocalAdminStore for SurrealRegistryStore {
 
     async fn create_client(
         &self,
-        _fence: &AdminFence,
-        _request: &RequestContext,
-        _bundle: ClientBundle,
+        fence: &AdminFence,
+        request: &RequestContext,
+        bundle: ClientBundle,
     ) -> LocalResult<ClientView> {
-        Err(LocalAdminError::Unavailable)
+        let account_id = bundle.account.id.clone();
+        let operation_id = bundle.operation_id.to_string();
+
+        let sql = "
+            BEGIN TRANSACTION;
+            -- Check idempotency
+            LET $existing = (
+                SELECT id FROM local_admin_operation
+                WHERE operation_id = $operation_id AND kind = 'client_create'
+                LIMIT 1
+            );
+            IF array::len($existing) > 0 THEN
+                -- Return existing client
+                LET $client = (
+                    SELECT account_id, tenant_id, display_name, account_status,
+                           tenant_status, plan_version, schema_version, version
+                    FROM local_admin_client WHERE account_id = $account_id LIMIT 1
+                );
+                COMMIT TRANSACTION;
+                RETURN $client;
+            END;
+            -- Guard: check client cap (max 32)
+            LET $count = (SELECT count() FROM local_admin_client);
+            IF $count[0].count > 32 THEN
+                THROW 'client_cap_reached';
+            END;
+            -- Create client record
+            CREATE local_admin_client SET
+                account_id = $account_id,
+                tenant_id = $tenant_id,
+                display_name = $display_name,
+                account_status = 'active',
+                tenant_status = 'reserved',
+                plan_version = 1,
+                schema_version = 0,
+                version = 1,
+                admin_id = $admin_id,
+                created_at = time::now(),
+                updated_at = time::now();
+            -- Record operation
+            CREATE local_admin_operation SET
+                operation_id = $operation_id,
+                kind = 'client_create',
+                admin_id = $admin_id,
+                resource_id = $account_id,
+                created_at = time::now();
+            -- Audit
+            INSERT INTO local_admin_audit SET
+                admin_id = $admin_id,
+                action = 'client_created',
+                resource_id = $account_id,
+                request_id = $request_id,
+                created_at = time::now();
+            COMMIT TRANSACTION;
+            SELECT $account_id AS account_id;
+        ";
+
+        let result = self
+            .db
+            .as_dyn()
+            .query_json(
+                sql,
+                Some(json!({
+                    "account_id": account_id,
+                    "tenant_id": bundle.tenant.id,
+                    "display_name": bundle.display_name,
+                    "operation_id": operation_id,
+                    "admin_id": fence.admin_id,
+                    "request_id": request.request_id.to_string(),
+                })),
+            )
+            .await
+            .map_err(infra)?;
+
+        Ok(ClientView {
+            account_id: account_id.clone(),
+            tenant_id: bundle.tenant.id,
+            display_name: bundle.display_name,
+            account_status: crate::http::registry::models::AccountStatus::Active,
+            tenant_status: crate::http::registry::models::TenantStatus::Reserved,
+            plan_version: 1,
+            schema_version: 0,
+            version: 1,
+            provisioning_reason: None,
+        })
     }
 
     async fn list_clients(
         &self,
-        _fence: &AdminFence,
-        _page: PageRequest,
+        fence: &AdminFence,
+        page: PageRequest,
     ) -> LocalResult<Page<ClientView>> {
+        let limit = page.limit.min(100).max(1);
+        let sql = "
+            SELECT account_id, tenant_id, display_name, account_status,
+                   tenant_status, plan_version, schema_version, version
+            FROM local_admin_client
+            WHERE admin_id = $admin_id
+            ORDER BY account_id ASC
+            LIMIT $limit;
+        ";
+
+        let result = self
+            .db
+            .as_dyn()
+            .query_json(sql, Some(json!({"admin_id": fence.admin_id, "limit": limit})))
+            .await
+            .map_err(infra)?;
+
+        let items: Vec<ClientView> = result
+            .first()
+            .and_then(|v| v.as_array())
+            .map(|arr| {
+                arr.iter()
+                    .filter_map(|row| {
+                        Some(ClientView {
+                            account_id: require_str(row, "account_id").ok()?,
+                            tenant_id: require_str(row, "tenant_id").ok()?,
+                            display_name: require_str(row, "display_name").ok()?,
+                            account_status: crate::http::registry::models::AccountStatus::Active,
+                            tenant_status: crate::http::registry::models::TenantStatus::Reserved,
+                            plan_version: require_u64(row, "plan_version").ok()? as u32,
+                            schema_version: require_u64(row, "schema_version").ok()? as u32,
+                            version: require_u64(row, "version").ok()?,
+                            provisioning_reason: None,
+                        })
+                    })
+                    .collect()
+            })
+            .unwrap_or_default();
+
         Ok(Page {
-            items: vec![],
-            next_cursor: None,
+            next_cursor: items.last().map(|c| c.account_id.clone()),
+            items,
         })
     }
 
     async fn client(
         &self,
-        _fence: &AdminFence,
-        _account_id: &str,
+        fence: &AdminFence,
+        account_id: &str,
     ) -> LocalResult<ClientView> {
-        Err(LocalAdminError::NotFound)
+        let sql = "
+            SELECT account_id, tenant_id, display_name, account_status,
+                   tenant_status, plan_version, schema_version, version
+            FROM local_admin_client
+            WHERE account_id = $account_id AND admin_id = $admin_id
+            LIMIT 1;
+        ";
+
+        let result = self
+            .db
+            .as_dyn()
+            .query_json(
+                sql,
+                Some(json!({"account_id": account_id, "admin_id": fence.admin_id})),
+            )
+            .await
+            .map_err(infra)?;
+
+        let row = result
+            .first()
+            .and_then(|v| v.as_array()?.first())
+            .ok_or(LocalAdminError::NotFound)?;
+
+        Ok(ClientView {
+            account_id: require_str(row, "account_id")?,
+            tenant_id: require_str(row, "tenant_id")?,
+            display_name: require_str(row, "display_name")?,
+            account_status: crate::http::registry::models::AccountStatus::Active,
+            tenant_status: crate::http::registry::models::TenantStatus::Reserved,
+            plan_version: require_u64(row, "plan_version")? as u32,
+            schema_version: require_u64(row, "schema_version")? as u32,
+            version: require_u64(row, "version")?,
+            provisioning_reason: None,
+        })
     }
 
     async fn list_client_keys(
         &self,
-        _fence: &AdminFence,
-        _account_id: &str,
-        _page: PageRequest,
+        fence: &AdminFence,
+        account_id: &str,
+        page: PageRequest,
     ) -> LocalResult<Page<crate::http::registry::models::ApiKeyMeta>> {
+        let limit = page.limit.min(100).max(1);
+        let sql = "
+            SELECT key_id, name, created_at, expires_at, revoked
+            FROM local_admin_client_key
+            WHERE account_id = $account_id
+            ORDER BY key_id ASC
+            LIMIT $limit;
+        ";
+
+        let result = self
+            .db
+            .as_dyn()
+            .query_json(
+                sql,
+                Some(json!({"account_id": account_id, "limit": limit})),
+            )
+            .await
+            .map_err(infra)?;
+
+        let items: Vec<crate::http::registry::models::ApiKeyMeta> = result
+            .first()
+            .and_then(|v| v.as_array())
+            .map(|arr| {
+                arr.iter()
+                    .filter_map(|row| {
+                        Some(crate::http::registry::models::ApiKeyMeta {
+                            id: require_str(row, "key_id").ok()?,
+                            name: require_str(row, "name").ok()?,
+                            status: if row.get("revoked").and_then(|v| v.as_bool()).unwrap_or(false) {
+                                crate::http::registry::models::ApiKeyStatus::Revoked
+                            } else {
+                                crate::http::registry::models::ApiKeyStatus::Active
+                            },
+                            created_at: parse_datetime(row, "created_at").ok()?,
+                            expires_at: parse_datetime(row, "expires_at").ok(),
+                            last_used_at: None,
+                        })
+                    })
+                    .collect()
+            })
+            .unwrap_or_default();
+
         Ok(Page {
-            items: vec![],
-            next_cursor: None,
+            next_cursor: items.last().map(|k| k.id.clone()),
+            items,
         })
     }
 
     async fn insert_client_key(
         &self,
-        _fence: &AdminFence,
-        _request: &RequestContext,
-        _command: AdminKeyInsert,
+        fence: &AdminFence,
+        request: &RequestContext,
+        command: AdminKeyInsert,
     ) -> LocalResult<KeyInsertOutcome> {
-        Err(LocalAdminError::Unavailable)
+        let operation_id = command.operation_id.to_string();
+
+        let sql = "
+            BEGIN TRANSACTION;
+            -- Check idempotency
+            LET $existing = (
+                SELECT key_id FROM local_admin_client_key
+                WHERE key_id = $key_id LIMIT 1
+            );
+            IF array::len($existing) > 0 THEN
+                COMMIT TRANSACTION;
+                RETURN 'already_issued';
+            END;
+            -- Guard: check key cap
+            LET $count = (
+                SELECT count() FROM local_admin_client_key
+                WHERE account_id = $account_id AND revoked = false
+            );
+            IF $count[0].count >= 32 THEN
+                THROW 'key_cap_reached';
+            END;
+            -- Insert key
+            CREATE local_admin_client_key SET
+                key_id = $key_id,
+                account_id = $account_id,
+                name = $name,
+                verifier = $verifier,
+                created_at = time::now(),
+                expires_at = NULL,
+                revoked = false;
+            -- Record operation
+            CREATE local_admin_operation SET
+                operation_id = $operation_id,
+                kind = 'key_issue',
+                admin_id = $admin_id,
+                resource_id = $key_id,
+                created_at = time::now();
+            -- Audit
+            INSERT INTO local_admin_audit SET
+                admin_id = $admin_id,
+                action = 'key_issued',
+                resource_id = $key_id,
+                request_id = $request_id,
+                created_at = time::now();
+            COMMIT TRANSACTION;
+        ";
+
+        self.db
+            .as_dyn()
+            .query_json(
+                sql,
+                Some(json!({
+                    "key_id": command.key_id,
+                    "account_id": command.account_id,
+                    "name": command.name,
+                    "verifier": hex::encode(command.verifier.0),
+                    "operation_id": operation_id,
+                    "admin_id": fence.admin_id,
+                    "request_id": request.request_id.to_string(),
+                })),
+            )
+            .await
+            .map_err(infra)?;
+
+        Ok(KeyInsertOutcome::Created(crate::http::registry::models::ApiKeyMeta {
+            id: command.key_id,
+            name: command.name,
+            status: crate::http::registry::models::ApiKeyStatus::Active,
+            created_at: Utc::now(),
+            expires_at: None,
+            last_used_at: None,
+        }))
     }
 
     async fn revoke_client_key(
         &self,
-        _fence: &AdminFence,
-        _request: &RequestContext,
-        _account_id: &str,
-        _key_id: &str,
+        fence: &AdminFence,
+        request: &RequestContext,
+        account_id: &str,
+        key_id: &str,
     ) -> LocalResult<()> {
+        let sql = "
+            BEGIN TRANSACTION;
+            LET $key = (
+                SELECT id, revoked FROM local_admin_client_key
+                WHERE key_id = $key_id AND account_id = $account_id
+                LIMIT 1
+            );
+            IF array::len($key) = 0 THEN
+                THROW 'key_not_found';
+            END;
+            IF $key[0].revoked = true THEN
+                COMMIT TRANSACTION;
+                RETURN;
+            END;
+            UPDATE $key[0].id SET revoked = true;
+            -- Audit
+            INSERT INTO local_admin_audit SET
+                admin_id = $admin_id,
+                action = 'key_revoked',
+                resource_id = $key_id,
+                request_id = $request_id,
+                created_at = time::now();
+            COMMIT TRANSACTION;
+        ";
+
+        self.db
+            .as_dyn()
+            .query_json(
+                sql,
+                Some(json!({
+                    "key_id": key_id,
+                    "account_id": account_id,
+                    "admin_id": fence.admin_id,
+                    "request_id": request.request_id.to_string(),
+                })),
+            )
+            .await
+            .map_err(infra)?;
+
         Ok(())
     }
 
     async fn set_client_state(
         &self,
-        _fence: &AdminFence,
-        _request: &RequestContext,
-        _account_id: &str,
-        _expected_version: u64,
-        _action: ClientStateAction,
+        fence: &AdminFence,
+        request: &RequestContext,
+        account_id: &str,
+        expected_version: u64,
+        action: ClientStateAction,
     ) -> LocalResult<()> {
+        let (new_status, action_str) = match action {
+            ClientStateAction::Suspend => ("suspended", "client_suspended"),
+            ClientStateAction::Resume => ("active", "client_resumed"),
+        };
+
+        let sql = "
+            BEGIN TRANSACTION;
+            LET $client = (
+                SELECT id, version, account_status FROM local_admin_client
+                WHERE account_id = $account_id AND admin_id = $admin_id
+                LIMIT 1
+            );
+            IF array::len($client) = 0 THEN
+                THROW 'client_not_found';
+            END;
+            IF $client[0].version != $expected_version THEN
+                THROW 'version_conflict';
+            END;
+            UPDATE $client[0].id SET
+                account_status = $new_status,
+                version = version + 1,
+                updated_at = time::now();
+            -- Audit
+            INSERT INTO local_admin_audit SET
+                admin_id = $admin_id,
+                action = $action_str,
+                resource_id = $account_id,
+                request_id = $request_id,
+                created_at = time::now();
+            COMMIT TRANSACTION;
+        ";
+
+        self.db
+            .as_dyn()
+            .query_json(
+                sql,
+                Some(json!({
+                    "account_id": account_id,
+                    "admin_id": fence.admin_id,
+                    "expected_version": expected_version,
+                    "new_status": new_status,
+                    "request_id": request.request_id.to_string(),
+                })),
+            )
+            .await
+            .map_err(infra)?;
+
         Ok(())
     }
 }
