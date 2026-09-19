@@ -103,6 +103,7 @@ impl AdminManagementService {
 }
 
 /// Browser-facing auth service. Owns the PasswordHasher.
+#[derive(Clone)]
 pub struct LocalAdminService {
     authority: Arc<LocalAdminAuthority>,
     hasher: Arc<PasswordHasher>,

@@ -7,8 +7,8 @@ use super::contracts::{
     AdminFence, AdminKeyInsert, AdminPrincipal, AdminState, AttemptDecision, AttemptInput,
     BrowserPolicyFence, ChallengeFinish, ChallengeIssue, ChallengeKind, ChallengeView,
     ClientBundle, ClientStateAction, ClientView, CredentialSnapshot, FailureAudit, IssuedChallenge,
-    KeyInsertOutcome, LocalAdminStore, LocalKeyFingerprints, LocalResult, Page, PageRequest,
-    RequestContext, SessionOpen, SessionRotate,
+    KeyInsertOutcome, LocalAdminError, LocalAdminStore, LocalKeyFingerprints, LocalResult, Page,
+    PageRequest, RequestContext, SessionOpen, SessionRotate,
 };
 
 /// In-memory mock implementation of `LocalAdminStore` for tests.
@@ -22,6 +22,7 @@ struct Inner {
     credentials: HashMap<String, CredentialSnapshot>,
     challenges: HashMap<[u8; 32], ChallengeRecord>,
     sessions: HashMap<[u8; 32], SessionRecord>,
+    clients: HashMap<String, ClientView>,
     next_admin_id: u64,
     next_generation: u64,
 }
@@ -47,6 +48,7 @@ impl InMemoryLocalAdminStore {
                 credentials: HashMap::new(),
                 challenges: HashMap::new(),
                 sessions: HashMap::new(),
+                clients: HashMap::new(),
                 next_admin_id: 1,
                 next_generation: 1,
             }),
@@ -272,9 +274,30 @@ impl LocalAdminStore for InMemoryLocalAdminStore {
         &self,
         _fence: &AdminFence,
         _request: &RequestContext,
-        _bundle: ClientBundle,
+        bundle: ClientBundle,
     ) -> LocalResult<ClientView> {
-        Err(super::contracts::LocalAdminError::Unavailable)
+        let mut inner = self.inner.lock().unwrap();
+        // Check cap
+        if inner.clients.len() >= 32 {
+            return Err(LocalAdminError::InvalidInput("client cap reached".into()));
+        }
+        // Check idempotency
+        if let Some(existing) = inner.clients.get(&bundle.account.id) {
+            return Ok(existing.clone());
+        }
+        let view = ClientView {
+            account_id: bundle.account.id.clone(),
+            tenant_id: bundle.tenant.id.clone(),
+            display_name: bundle.display_name,
+            account_status: crate::http::registry::models::AccountStatus::Active,
+            tenant_status: crate::http::registry::models::TenantStatus::Reserved,
+            plan_version: 1,
+            schema_version: 0,
+            version: 1,
+            provisioning_reason: None,
+        };
+        inner.clients.insert(bundle.account.id, view.clone());
+        Ok(view)
     }
 
     async fn list_clients(

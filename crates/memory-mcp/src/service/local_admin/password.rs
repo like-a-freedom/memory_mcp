@@ -10,10 +10,11 @@ use crate::service::local_admin::contracts::{LocalAdminError, LocalResult};
 /// Bounded password hasher with Argon2id v19, m=19456/t2/p1.
 /// Two running blocking jobs, at most eight queued, two-second
 /// admission deadline.
+#[derive(Clone)]
 pub struct PasswordHasher {
     params: Params,
     dummy_phc: String,
-    admission: tokio::sync::Semaphore,
+    admission: Arc<tokio::sync::Semaphore>,
     running: Arc<tokio::sync::Semaphore>,
 }
 
@@ -37,7 +38,7 @@ impl PasswordHasher {
         Ok(Self {
             params,
             dummy_phc,
-            admission: tokio::sync::Semaphore::new(8),
+            admission: Arc::new(tokio::sync::Semaphore::new(8)),
             running: Arc::new(tokio::sync::Semaphore::new(2)),
         })
     }

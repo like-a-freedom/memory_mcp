@@ -195,7 +195,7 @@ pub enum AttemptDomain {
 }
 
 /// Attempt input for throttle reservation.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct AttemptInput {
     pub domain: AttemptDomain,
     pub username_bucket: Option<u16>,
