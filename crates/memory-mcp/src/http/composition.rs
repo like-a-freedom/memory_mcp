@@ -13,7 +13,7 @@ use crate::error::MemoryError;
 use super::config::HttpConfig;
 use super::fault_injection::{FaultInjector, NoFaults};
 use super::leases::migration::{ApplyMigrations, SurrealTenantMigrations};
-use super::registry::{RegistryHandle, SurrealRegistryStore};
+use super::registry::{RegistryHandle, RegistryStore, SurrealRegistryStore};
 
 /// The production adapter bundle: durable control Registry plus the
 /// tenant migration worker. Selected once at startup; request
@@ -53,8 +53,22 @@ impl HttpProductionComposition {
                 })?
         };
         let migrations = Arc::new(SurrealTenantMigrations::new(engine.clone()));
+        // The concrete durable store is shared by two trait objects: the
+        // registry surface used by request handling and (under
+        // `control-plane`) the local-admin surface used by the browser
+        // authentication routes. Trait objects cannot be downcast, so
+        // both clones are taken here, once, at composition time.
+        let store = Arc::new(store);
+        let registry_store: Arc<dyn RegistryStore> = store.clone();
+        #[cfg(feature = "control-plane")]
+        let local_admin_store = store;
         Ok(Self {
-            registry: RegistryHandle::from_durable(Arc::new(store), engine),
+            registry: RegistryHandle::from_durable(
+                registry_store,
+                #[cfg(feature = "control-plane")]
+                Some(local_admin_store),
+                engine,
+            ),
             tenant_migrations: migrations,
             fault_injector: Arc::new(NoFaults),
         })

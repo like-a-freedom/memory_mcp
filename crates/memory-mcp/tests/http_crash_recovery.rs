@@ -347,6 +347,75 @@ async fn provisioning_recovers_after_ready_committed_fault() {
     run_provisioning_recovery_in_process("recovery_ready", FaultPoint::TenantReadyCommitted).await;
 }
 
+/// A worker that dies between `Reserved -> NamespaceCreating` and
+/// `NamespaceCreating -> Migrating` leaves the tenant at `NamespaceCreating`
+/// with `schema_version = 0`. That pair sits outside the replica's N/N-1
+/// window, so the next tick must both discover it and skip the schema-range
+/// guard; otherwise the tenant is stranded forever.
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn provisioning_resumes_a_tenant_stranded_in_namespace_creating() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let registry = open_registry_at(&dir).await;
+    let label = "recovery_namespace_creating";
+    let suffix = hex::encode(&Sha256::digest(label.as_bytes())[..8]);
+    let tenant_id = tenant_id_for(label);
+    let store = registry.store_clone();
+    let now = chrono::Utc::now();
+    store
+        .write_account(&Account {
+            id: account_id_for(label),
+            status: AccountStatus::Active,
+            tenant_id: tenant_id.clone(),
+            created_at: now,
+        })
+        .await
+        .expect("write account");
+    store
+        .write_tenant(&Tenant {
+            id: tenant_id.clone(),
+            status: TenantStatus::NamespaceCreating,
+            namespace_binding: NamespaceBinding {
+                namespace: format!("tns_test_{suffix}"),
+                database: "memory".into(),
+            },
+            plan_version: 1,
+            schema_version: 0,
+            retry_stage: None,
+            provisioning_lease: None,
+            created_at: now,
+            version: 1,
+        })
+        .await
+        .expect("write stranded tenant");
+
+    // The worker must see it as due work at all.
+    let due = store
+        .list_due_provisioning(100, chrono::Utc::now())
+        .await
+        .expect("due list");
+    assert!(
+        due.iter().any(|tenant| tenant.id == tenant_id),
+        "a tenant stranded in namespace_creating must be discovered"
+    );
+
+    let injector: Arc<dyn FaultInjector> =
+        Arc::new(FailOnceAt::new(FaultPoint::TenantReadyCommitted));
+    for _ in 0..400 {
+        tick_provisioning_with_injector(registry.clone(), injector.clone()).await;
+        let tenant = store
+            .find_tenant_by_id(&tenant_id)
+            .await
+            .expect("tenant lookup")
+            .expect("tenant present");
+        if tenant.status == TenantStatus::Ready {
+            assert_eq!(tenant.schema_version, CURRENT_SCHEMA_VERSION);
+            return;
+        }
+        tokio::time::sleep(Duration::from_millis(50)).await;
+    }
+    panic!("the stranded tenant never reached Ready");
+}
+
 // ---------------------------------------------------------------------------
 // Outbox recovery
 // ---------------------------------------------------------------------------

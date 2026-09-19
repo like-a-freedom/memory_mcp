@@ -195,6 +195,28 @@ pub struct LifecycleCaptureArgs {
     pub context: String,
 }
 
+#[derive(Debug, Args)]
+pub struct AdminArgs {
+    #[command(subcommand)]
+    pub operation: AdminOperation,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Subcommand)]
+pub enum AdminOperation {
+    /// Create a new administrator (CLI path).
+    Create {
+        /// Canonical username (ASCII lowercase a-z0-9._-, 3-64 chars).
+        #[arg(long)]
+        username: String,
+    },
+    /// Recover an administrator by issuing a reset code.
+    Recover {
+        /// Canonical username to recover.
+        #[arg(long)]
+        username: String,
+    },
+}
+
 /// Internal lifecycle-recall args — consumed by hook scripts, not a public tool.
 ///
 /// Hidden from `--help` via `#[command(hide = true)]` on the subcommand variant.

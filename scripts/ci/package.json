@@ -1,0 +1,10 @@
+{
+  "name": "memory-mcp-local-admin-ci",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Pinned browser-runner dependency for scripts/ci/local_admin_browser.mjs",
+  "dependencies": {
+    "playwright": "1.63.0"
+  }
+}

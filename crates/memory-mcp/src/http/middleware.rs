@@ -18,6 +18,8 @@
 //!   `X-Accel-Buffering: no` on SSE responses.
 //! - `host_origin` — host and origin allowlist enforcement with
 //!   trusted-proxy CIDR awareness.
+//! - `local_deadline` — local admin deadline that reports `503`, not the
+//!   generic `408`, for routes merged after the base router.
 //!
 //! This file is a thin façade: every public name is re-exported so
 //! callers continue to use the `crate::http::middleware::X` paths.
@@ -26,18 +28,22 @@ mod acquire_runtime;
 mod auth;
 mod deadline;
 mod host_origin;
+mod local_deadline;
 mod preflight;
 mod sse_headers;
 
 // Public re-exports. Adding a new middleware should add it here and
 // in the corresponding submodule, never in this file.
 pub use acquire_runtime::acquire_runtime;
+pub use auth::authenticate;
+#[cfg(feature = "control-plane")]
 pub use auth::{
-    authenticate, authenticate_control_plane_operator, authenticate_control_plane_session,
+    authenticate_control_plane_operator, authenticate_control_plane_session,
     require_control_plane_csrf,
 };
 pub use deadline::request_deadline;
 pub use host_origin::host_origin;
+pub use local_deadline::local_admin_deadline;
 pub use preflight::{prevalidate_mcp, reject_non_post_mcp};
 pub use sse_headers::inject_sse_headers;
 

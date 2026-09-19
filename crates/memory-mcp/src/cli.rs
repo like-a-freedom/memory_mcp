@@ -76,6 +76,12 @@ pub enum Command {
     /// Consumed by hook scripts, not a public tool. Legacy scope/project event fields are rejected.
     #[command(hide = true)]
     LifecycleCapture(args::LifecycleCaptureArgs),
+    /// Admin create/recover commands.
+    ///
+    /// Runs before MemoryService/NER construction. Connects directly
+    /// to the control registry to manage admin accounts.
+    #[cfg(all(feature = "streamable-http", feature = "control-plane"))]
+    Admin(args::AdminArgs),
     /// Internal: recall scope-free lifecycle context (hidden from --help).
     /// Consumed by hook scripts, not a public tool. Legacy scope/project event fields are rejected.
     #[command(hide = true)]
@@ -114,6 +120,8 @@ impl Command {
             Command::AssembleContext(_) => "cli.assemble_context",
             Command::LifecycleCapture(_) => "cli.lifecycle_capture",
             Command::LifecycleRecall(_) => "cli.lifecycle_recall",
+            #[cfg(all(feature = "streamable-http", feature = "control-plane"))]
+            Command::Admin(_) => "cli.admin",
         }
     }
 
@@ -143,6 +151,8 @@ impl Command {
             Command::AssembleContext(args) => one_shot!(run_assemble_context, args),
             Command::LifecycleCapture(args) => one_shot!(run_lifecycle_capture, args),
             Command::LifecycleRecall(args) => one_shot!(run_lifecycle_recall, args),
+            #[cfg(all(feature = "streamable-http", feature = "control-plane"))]
+            Command::Admin(_) => None,
         }
     }
 }

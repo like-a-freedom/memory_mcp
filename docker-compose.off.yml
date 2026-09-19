@@ -1,0 +1,18 @@
+# Data-plane-only overlay: neither browser surface is mounted.
+#
+#   docker compose -f docker-compose.yml -f docker-compose.off.yml up -d
+#
+# Existing API keys and per-tenant isolation keep working; there is no OIDC
+# discovery, no local-admin route, and no browser UI. The control plane may not
+# be enabled with these credentials, so no OIDC issuer/client value is set.
+services:
+  memory_mcp:
+    environment:
+      MEMORY_MCP_HTTP_ENABLE_CONTROL_PLANE: "false"
+      MEMORY_MCP_HTTP_ENABLE_CONTROL_PLANE_UI: "false"
+      MEMORY_MCP_HTTP_SIGNUP_MODE: "invite_only"
+      # Required by the HTTP profile even with the control plane disabled; these
+      # keys are never defaulted.
+      MEMORY_MCP_HTTP_IDENTITY_INDEX_KEY: "${MEMORY_MCP_HTTP_IDENTITY_INDEX_KEY:?MEMORY_MCP_HTTP_IDENTITY_INDEX_KEY is required (64 hex chars); supply an operator-generated value}"
+      MEMORY_MCP_HTTP_OIDC_STATE_KEY: "${MEMORY_MCP_HTTP_OIDC_STATE_KEY:?MEMORY_MCP_HTTP_OIDC_STATE_KEY is required (64 hex chars); supply an operator-generated value}"
+      MEMORY_MCP_HTTP_OIDC_NONCE_KEY: "${MEMORY_MCP_HTTP_OIDC_NONCE_KEY:?MEMORY_MCP_HTTP_OIDC_NONCE_KEY is required (64 hex chars); supply an operator-generated value}"

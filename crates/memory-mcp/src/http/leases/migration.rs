@@ -226,6 +226,13 @@ pub async fn provision_one(
     if tenant.status == TenantStatus::Ready {
         return Ok(());
     }
+    // A suspended tenant is terminal for this worker: suspension is an
+    // operator decision, never a provisioning stage. A tenant suspended
+    // between the due-list read and this call must not produce a conflict
+    // warning on every scheduler tick.
+    if tenant.status == TenantStatus::Suspended {
+        return Ok(());
+    }
 
     // N/N-1 schema compatibility. A tenant whose
     // schema_version sits outside this replica's range is
@@ -233,8 +240,17 @@ pub async fn provision_one(
     // compatible replica, or the data plane will surface
     // the Unavailable (→503) until the tenant is migrated
     // forward.
-    let is_fresh_reserved = tenant.status == TenantStatus::Reserved && tenant.schema_version == 0;
-    if !is_fresh_reserved && !REPLICA_SCHEMA_RANGE.contains(&tenant.schema_version) {
+    // A tenant that has never completed a migration: a fresh reservation, or
+    // one whose worker died after the `Reserved -> NamespaceCreating`
+    // transition but before `NamespaceCreating -> Migrating`. Its
+    // `schema_version` is still 0, which is deliberately outside this
+    // replica's N/N-1 window, so it must bypass that guard rather than be
+    // skipped forever.
+    let is_unprovisioned = matches!(
+        tenant.status,
+        TenantStatus::Reserved | TenantStatus::NamespaceCreating
+    ) && tenant.schema_version == 0;
+    if !is_unprovisioned && !REPLICA_SCHEMA_RANGE.contains(&tenant.schema_version) {
         return Err(MemoryError::Unavailable(format!(
             "tenant {tenant_id} schema_version {} outside replica range {:?}",
             tenant.schema_version, REPLICA_SCHEMA_RANGE

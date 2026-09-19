@@ -333,15 +333,29 @@ async fn seed_session_one(
                  ensure MEMORY_MCP_HTTP_TEST_BOOTSTRAP runs first"
             ))
         })?;
-    let session =
-        crate::control::session::ControlPlaneSession::new(&account, cookie_value, &state.config)?;
+    let policy = state.browser_policy.as_ref().ok_or_else(|| {
+        MemoryError::ConfigInvalid(
+            "test seed session requires an OIDC browser policy; the fixture must enable the control plane in OIDC mode"
+                .into(),
+        )
+    })?;
+    let session = crate::control::session::ControlPlaneSession::new(
+        &account,
+        cookie_value,
+        policy.epoch,
+        &state.config,
+    )?;
     // The InMemoryStore refuses to overwrite an existing cookie hash
     // or session id. Restart-safe: if we have already seeded this
     // exact session in a prior run, do nothing.
-    if store.find_session(&session.cookie_hash).await?.is_some() {
+    if store
+        .find_session(policy, &session.cookie_hash)
+        .await?
+        .is_some()
+    {
         return Ok(());
     }
-    store.store_session(&session).await?;
+    store.store_session(policy, &session).await?;
     Ok(())
 }
 

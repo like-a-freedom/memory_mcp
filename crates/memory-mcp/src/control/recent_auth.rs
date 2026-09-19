@@ -40,7 +40,7 @@ mod tests {
             created_at: Utc::now(),
         };
         let cfg = crate::http::config::HttpConfig::default_for_test();
-        let mut session = ControlPlaneSession::new(&account, "raw-cookie", &cfg).unwrap();
+        let mut session = ControlPlaneSession::new(&account, "raw-cookie", 1, &cfg).unwrap();
         session.auth_time = Utc::now() - chrono::Duration::minutes(minutes_ago);
         session
     }

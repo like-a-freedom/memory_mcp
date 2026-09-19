@@ -1,68 +1,77 @@
-//! E2E tests for local admin auth service using the in-memory mock store.
+//! E2E tests for local admin auth service against the real, migrated
+//! in-memory SurrealDB control registry.
 
 #[cfg(test)]
-mod tests {
+mod service_cases {
+    use std::net::{IpAddr, Ipv4Addr};
     use std::sync::Arc;
 
-    use crate::service::local_admin::auth::{
-        AdminManagementService, LocalAdminAuthority, LocalAdminService,
+    use crate::http::registry::SurrealRegistryStore;
+    use crate::service::local_admin::{
+        AdminManagementService, AuthAttemptContext, ChallengeKind, LocalAdminAuthority,
+        LocalAdminService, LocalAdminStore, PasswordHasher, RequestContext,
     };
-    use crate::service::local_admin::contracts::{
-        AuthAttemptContext, BrowserAuthMode, RequestContext,
-    };
-    use crate::service::local_admin::mock_store::InMemoryLocalAdminStore;
-    use crate::service::local_admin::password::PasswordHasher;
 
-    fn make_request_context() -> RequestContext {
+    async fn service() -> (AdminManagementService, LocalAdminService) {
+        let namespace = format!("local_admin_test_{}", uuid::Uuid::new_v4().simple());
+        let concrete = Arc::new(
+            SurrealRegistryStore::connect_in_memory(&namespace, "registry")
+                .await
+                .expect("migrated Mem registry"),
+        );
+        let store: Arc<dyn LocalAdminStore> = concrete;
+        let authority = LocalAdminAuthority::join(store, [1; 32], [2; 32])
+            .await
+            .expect("local policy");
+        let management = AdminManagementService::new(authority.clone());
+        let auth = LocalAdminService::new(
+            authority,
+            Arc::new(PasswordHasher::new().expect("supported KDF")),
+        );
+        (management, auth)
+    }
+
+    fn request() -> RequestContext {
         RequestContext {
             request_id: uuid::Uuid::new_v4(),
         }
     }
 
-    fn make_auth_context() -> AuthAttemptContext {
+    fn attempt() -> AuthAttemptContext {
         AuthAttemptContext {
-            request: make_request_context(),
-            source: std::net::IpAddr::from([127, 0, 0, 1]),
+            request: request(),
+            source: IpAddr::V4(Ipv4Addr::LOCALHOST),
         }
     }
 
-    fn session_key() -> [u8; 32] {
-        [0x01; 32]
-    }
-
-    fn csrf_key() -> [u8; 32] {
-        [0x02; 32]
-    }
-
-    async fn setup() -> (Arc<LocalAdminAuthority>, Arc<PasswordHasher>) {
-        let store = Arc::new(InMemoryLocalAdminStore::new());
-        let authority = LocalAdminAuthority::join(store, session_key(), csrf_key())
-            .await
-            .expect("join policy");
-        let hasher = Arc::new(PasswordHasher::new().expect("init hasher"));
-        (authority, hasher)
+    /// Decode the session cookie into the raw verifier `resolve` expects.
+    fn cookie_verifier(cookie: &str) -> [u8; 32] {
+        let value = cookie
+            .strip_prefix("__Host-memory_mcp_admin=")
+            .expect("session cookie prefix");
+        hex::decode(value)
+            .expect("hex cookie verifier")
+            .try_into()
+            .expect("32-byte cookie verifier")
     }
 
     #[tokio::test]
     async fn create_and_activate_admin() {
-        let (authority, hasher) = setup().await;
-        let mgmt = AdminManagementService::new(authority.clone());
-        let auth = LocalAdminService::new(authority.clone(), hasher);
+        let (mgmt, auth) = service().await;
 
         // Create admin
-        let ctx = make_request_context();
         let challenge = mgmt
-            .create_admin("ops.one", &ctx)
+            .create_admin("ops.one", &request())
             .await
             .expect("create admin");
         assert_eq!(challenge.issued.username, "ops.one");
 
         // Finish activation
-        let auth_ctx = make_auth_context();
+        let auth_ctx = attempt();
         auth.finish_challenge(
             &auth_ctx,
             &challenge.code,
-            crate::service::local_admin::contracts::ChallengeKind::Activate,
+            ChallengeKind::Activate,
             "SecureP@ssw0rd123".to_string(),
         )
         .await
@@ -79,22 +88,22 @@ mod tests {
 
     #[tokio::test]
     async fn login_wrong_password_fails() {
-        let (authority, hasher) = setup().await;
-        let mgmt = AdminManagementService::new(authority.clone());
-        let auth = LocalAdminService::new(authority.clone(), hasher);
+        let (mgmt, auth) = service().await;
 
         // Create and activate
-        let ctx = make_request_context();
-        let challenge = mgmt.create_admin("ops.one", &ctx).await.unwrap();
-        let auth_ctx = make_auth_context();
+        let challenge = mgmt
+            .create_admin("ops.one", &request())
+            .await
+            .expect("create admin");
+        let auth_ctx = attempt();
         auth.finish_challenge(
             &auth_ctx,
             &challenge.code,
-            crate::service::local_admin::contracts::ChallengeKind::Activate,
+            ChallengeKind::Activate,
             "SecureP@ssw0rd123".to_string(),
         )
         .await
-        .unwrap();
+        .expect("finish challenge");
 
         // Login with wrong password
         let result = auth
@@ -105,121 +114,112 @@ mod tests {
 
     #[tokio::test]
     async fn login_unknown_user_fails_with_dummy_hash() {
-        let (authority, hasher) = setup().await;
-        let auth = LocalAdminService::new(authority.clone(), hasher);
+        let (_mgmt, auth) = service().await;
 
         // Login with unknown user
-        let auth_ctx = make_auth_context();
         let result = auth
-            .login(&auth_ctx, "nonexistent", "SecureP@ssw0rd123".to_string())
+            .login(&attempt(), "nonexistent", "SecureP@ssw0rd123".to_string())
             .await;
         assert!(result.is_err());
     }
 
     #[tokio::test]
     async fn resolve_session_after_login() {
-        let (authority, hasher) = setup().await;
-        let mgmt = AdminManagementService::new(authority.clone());
-        let auth = LocalAdminService::new(authority.clone(), hasher);
+        let (mgmt, auth) = service().await;
 
         // Create, activate, login
-        let ctx = make_request_context();
-        let challenge = mgmt.create_admin("ops.one", &ctx).await.unwrap();
-        let auth_ctx = make_auth_context();
+        let challenge = mgmt
+            .create_admin("ops.one", &request())
+            .await
+            .expect("create admin");
+        let auth_ctx = attempt();
         auth.finish_challenge(
             &auth_ctx,
             &challenge.code,
-            crate::service::local_admin::contracts::ChallengeKind::Activate,
+            ChallengeKind::Activate,
             "SecureP@ssw0rd123".to_string(),
         )
         .await
-        .unwrap();
+        .expect("finish challenge");
         let login = auth
             .login(&auth_ctx, "ops.one", "SecureP@ssw0rd123".to_string())
             .await
-            .unwrap();
-
-        // Parse cookie verifier
-        let cookie_val = login
-            .cookie
-            .strip_prefix("__Host-memory_mcp_admin=")
-            .unwrap();
-        let verifier: [u8; 32] = hex::decode(cookie_val).unwrap().try_into().unwrap();
+            .expect("login");
 
         // Resolve session
+        let verifier = cookie_verifier(&login.cookie);
         let principal = auth
-            .resolve(&make_request_context(), &verifier)
+            .resolve(&request(), &verifier)
             .await
-            .unwrap();
+            .expect("resolve session");
         assert_eq!(principal.username, "ops.one");
     }
 
     #[tokio::test]
     async fn logout_invalidates_session() {
-        let (authority, hasher) = setup().await;
-        let mgmt = AdminManagementService::new(authority.clone());
-        let auth = LocalAdminService::new(authority.clone(), hasher);
+        let (mgmt, auth) = service().await;
 
         // Create, activate, login
-        let ctx = make_request_context();
-        let challenge = mgmt.create_admin("ops.one", &ctx).await.unwrap();
-        let auth_ctx = make_auth_context();
+        let challenge = mgmt
+            .create_admin("ops.one", &request())
+            .await
+            .expect("create admin");
+        let auth_ctx = attempt();
         auth.finish_challenge(
             &auth_ctx,
             &challenge.code,
-            crate::service::local_admin::contracts::ChallengeKind::Activate,
+            ChallengeKind::Activate,
             "SecureP@ssw0rd123".to_string(),
         )
         .await
-        .unwrap();
+        .expect("finish challenge");
         let login = auth
             .login(&auth_ctx, "ops.one", "SecureP@ssw0rd123".to_string())
             .await
-            .unwrap();
+            .expect("login");
 
         // Logout
-        auth.logout(&make_request_context(), &login.principal)
+        auth.logout(&request(), &login.principal)
             .await
-            .unwrap();
+            .expect("logout");
 
         // Try to resolve session — should fail
-        let cookie_val = login
-            .cookie
-            .strip_prefix("__Host-memory_mcp_admin=")
-            .unwrap();
-        let verifier: [u8; 32] = hex::decode(cookie_val).unwrap().try_into().unwrap();
-        let result = auth.resolve(&make_request_context(), &verifier).await;
-        assert!(result.is_err());
+        let verifier = cookie_verifier(&login.cookie);
+        assert!(auth.resolve(&request(), &verifier).await.is_err());
     }
 
     #[tokio::test]
     async fn reauthenticate_rotates_session() {
-        let (authority, hasher) = setup().await;
-        let mgmt = AdminManagementService::new(authority.clone());
-        let auth = LocalAdminService::new(authority.clone(), hasher);
+        let (mgmt, auth) = service().await;
 
         // Create, activate, login
-        let ctx = make_request_context();
-        let challenge = mgmt.create_admin("ops.one", &ctx).await.unwrap();
-        let auth_ctx = make_auth_context();
+        let challenge = mgmt
+            .create_admin("ops.one", &request())
+            .await
+            .expect("create admin");
+        let auth_ctx = attempt();
         auth.finish_challenge(
             &auth_ctx,
             &challenge.code,
-            crate::service::local_admin::contracts::ChallengeKind::Activate,
+            ChallengeKind::Activate,
             "SecureP@ssw0rd123".to_string(),
         )
         .await
-        .unwrap();
+        .expect("finish challenge");
         let login = auth
             .login(&auth_ctx, "ops.one", "SecureP@ssw0rd123".to_string())
             .await
-            .unwrap();
+            .expect("login");
 
         // Reauthenticate
         let reauth = auth
-            .reauthenticate(&auth_ctx, &login.principal, "SecureP@ssw0rd123".to_string())
+            .reauthenticate(
+                &attempt(),
+                &login.principal,
+                "SecureP@ssw0rd123".to_string(),
+            )
             .await
-            .unwrap();
+            .expect("reauthenticate");
         assert_eq!(reauth.principal.username, "ops.one");
         // New cookie should be different
         assert_ne!(login.cookie, reauth.cookie);
@@ -227,42 +227,91 @@ mod tests {
 
     #[tokio::test]
     async fn recover_admin_issues_reset_challenge() {
-        let (authority, hasher) = setup().await;
-        let mgmt = AdminManagementService::new(authority.clone());
-        let auth = LocalAdminService::new(authority.clone(), hasher);
+        let (mgmt, auth) = service().await;
 
         // Create and activate
-        let ctx = make_request_context();
-        let challenge = mgmt.create_admin("ops.one", &ctx).await.unwrap();
-        let auth_ctx = make_auth_context();
+        let challenge = mgmt
+            .create_admin("ops.one", &request())
+            .await
+            .expect("create admin");
+        let auth_ctx = attempt();
         auth.finish_challenge(
             &auth_ctx,
             &challenge.code,
-            crate::service::local_admin::contracts::ChallengeKind::Activate,
+            ChallengeKind::Activate,
             "SecureP@ssw0rd123".to_string(),
         )
         .await
-        .unwrap();
+        .expect("finish challenge");
 
         // Recover
-        let reset = mgmt.recover_admin("ops.one", &ctx).await.unwrap();
+        let reset = mgmt
+            .recover_admin("ops.one", &request())
+            .await
+            .expect("recover");
         assert_eq!(reset.issued.username, "ops.one");
 
         // Finish reset with new password
         auth.finish_challenge(
             &auth_ctx,
             &reset.code,
-            crate::service::local_admin::contracts::ChallengeKind::Reset,
+            ChallengeKind::Reset,
             "NewSecureP@ss456".to_string(),
         )
         .await
-        .unwrap();
+        .expect("finish reset");
 
         // Login with new password
         let login = auth
             .login(&auth_ctx, "ops.one", "NewSecureP@ss456".to_string())
             .await
-            .unwrap();
+            .expect("login");
         assert_eq!(login.principal.username, "ops.one");
+    }
+
+    #[tokio::test]
+    async fn local_admin_recovery_invalidates_old_credentials() {
+        let (management, auth) = service().await;
+        let invitation = management
+            .create_admin("ops.one", &request())
+            .await
+            .expect("create");
+        auth.finish_challenge(
+            &attempt(),
+            &invitation.code,
+            ChallengeKind::Activate,
+            "first correct password".into(),
+        )
+        .await
+        .expect("activate");
+        let login = auth
+            .login(&attempt(), "ops.one", "first correct password".into())
+            .await
+            .expect("login");
+        let reset = management
+            .recover_admin("ops.one", &request())
+            .await
+            .expect("recover");
+        let old_cookie = cookie_verifier(&login.cookie);
+        assert!(auth.resolve(&request(), &old_cookie).await.is_err());
+        assert!(
+            auth.login(&attempt(), "ops.one", "first correct password".into())
+                .await
+                .is_err()
+        );
+        auth.finish_challenge(
+            &attempt(),
+            &reset.code,
+            ChallengeKind::Reset,
+            "second correct password".into(),
+        )
+        .await
+        .expect("reset");
+        assert!(
+            auth.login(&attempt(), "ops.one", "second correct password".into())
+                .await
+                .is_ok()
+        );
+        assert!(auth.resolve(&request(), &old_cookie).await.is_err());
     }
 }

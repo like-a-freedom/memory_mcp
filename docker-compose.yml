@@ -1,3 +1,20 @@
+# Shared service definitions for the three runtime modes. Compose merges this
+# file with exactly one mode overlay:
+#
+#   local : docker compose -f docker-compose.yml -f docker-compose.local.yml up -d
+#   oidc  : docker compose -f docker-compose.yml -f docker-compose.oidc.yml  up -d
+#   off   : docker compose -f docker-compose.yml -f docker-compose.off.yml   up -d
+#
+# Validate a mode without printing secrets:
+#
+#   docker compose -f docker-compose.yml -f docker-compose.local.yml config --quiet
+#
+# SECURITY: no secret is defaulted anywhere. Every `${VAR:?message}` must be
+# supplied by the operator from a protected environment file; there are no
+# example browser keys, no `root/root` database credentials, and no OIDC-only
+# value is injected into the local or off configurations. This file does not
+# configure the browser surface at all — the overlays do.
+
 services:
   surrealdb:
     image: surrealdb/surrealdb:v3.2.4
@@ -9,9 +26,9 @@ services:
     command:
       - start
       - --user
-      - "${SURREALDB_USERNAME:-root}"
+      - "${SURREALDB_USERNAME:?SURREALDB_USERNAME is required; supply an operator-generated value}"
       - --pass
-      - "${SURREALDB_PASSWORD:-root}"
+      - "${SURREALDB_PASSWORD:?SURREALDB_PASSWORD is required; supply an operator-generated value}"
       - rocksdb:/data/memory.db
     ports:
       - "8000:8000"
@@ -37,35 +54,39 @@ services:
       surrealdb:
         condition: service_healthy
     environment:
+      # ── Non-secret shared settings ────────────────────────────────────
       MEMORY_MCP_HTTP_BIND: "0.0.0.0:8080"
-      MEMORY_MCP_HTTP_PUBLIC_BASE_URL: "${MEMORY_MCP_HTTP_PUBLIC_BASE_URL:-http://localhost:8080}"
-      ALLOWED_HOSTS: "${ALLOWED_HOSTS:-localhost:8080,127.0.0.1:8080}"
-      ALLOWED_ORIGINS: "${ALLOWED_ORIGINS:-http://localhost:8080}"
+      MEMORY_MCP_HTTP_PUBLIC_BASE_URL: "${MEMORY_MCP_HTTP_PUBLIC_BASE_URL:?MEMORY_MCP_HTTP_PUBLIC_BASE_URL is required (https://... in local mode)}"
+      ALLOWED_HOSTS: "${ALLOWED_HOSTS:?ALLOWED_HOSTS is required (comma-separated)}"
+      ALLOWED_ORIGINS: "${ALLOWED_ORIGINS:?ALLOWED_ORIGINS is required (comma-separated, no wildcard)}"
       MEMORY_MCP_HTTP_REPLICA_ID: "${MEMORY_MCP_HTTP_REPLICA_ID:-memory-http-1}"
-      MEMORY_MCP_HTTP_SIGNUP_MODE: "${MEMORY_MCP_HTTP_SIGNUP_MODE:-invite_only}"
-      MEMORY_MCP_HTTP_ENABLE_CONTROL_PLANE: "${MEMORY_MCP_HTTP_ENABLE_CONTROL_PLANE:-false}"
-      MEMORY_MCP_HTTP_ENABLE_CONTROL_PLANE_UI: "${MEMORY_MCP_HTTP_ENABLE_CONTROL_PLANE_UI:-false}"
-      MEMORY_MCP_HTTP_AUTH_MODE: "${MEMORY_MCP_HTTP_AUTH_MODE:-}"
-      MEMORY_MCP_HTTP_LOCAL_DEFAULT_PLAN_VERSION: "${MEMORY_MCP_HTTP_LOCAL_DEFAULT_PLAN_VERSION:-}"
-      MEMORY_MCP_API_KEY_PEPPER: "${MEMORY_MCP_API_KEY_PEPPER:-local-development-pepper-change-me-0123456789}"
-      MEMORY_MCP_HTTP_IDENTITY_INDEX_KEY: "${MEMORY_MCP_HTTP_IDENTITY_INDEX_KEY:-0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef}"
-      MEMORY_MCP_HTTP_SESSION_KEY: "${MEMORY_MCP_HTTP_SESSION_KEY:-1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef}"
-      MEMORY_MCP_HTTP_OIDC_STATE_KEY: "${MEMORY_MCP_HTTP_OIDC_STATE_KEY:-abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789}"
-      MEMORY_MCP_HTTP_OIDC_NONCE_KEY: "${MEMORY_MCP_HTTP_OIDC_NONCE_KEY:-fedcba9876543210fedcba9876543210fedcba9876543210fedcba9876543210}"
-      MEMORY_MCP_HTTP_CSRF_KEY: "${MEMORY_MCP_HTTP_CSRF_KEY:-00112233445566778899aabbccddeeff00112233445566778899aabbccddeeff}"
-      SURREALDB_CONTROL_URL: ws://surrealdb:8000/rpc
-      SURREALDB_CONTROL_USERNAME: "${SURREALDB_USERNAME:-root}"
-      SURREALDB_CONTROL_PASSWORD: "${SURREALDB_PASSWORD:-root}"
-      SURREALDB_CONTROL_NAMESPACE: "${SURREALDB_CONTROL_NAMESPACE:-control}"
-      SURREALDB_CONTROL_DB: "${SURREALDB_CONTROL_DB:-registry}"
-      SURREALDB_TENANT_URL: ws://surrealdb:8000/rpc
-      SURREALDB_TENANT_USERNAME: "${SURREALDB_USERNAME:-root}"
-      SURREALDB_TENANT_PASSWORD: "${SURREALDB_PASSWORD:-root}"
-      SURREALDB_TENANT_NAMESPACE: "${SURREALDB_TENANT_NAMESPACE:-tenant}"
-      SURREALDB_TENANT_DB: "${SURREALDB_TENANT_DB:-tenant}"
       RUST_LOG: "${RUST_LOG:-info}"
       NER_EXTRACTOR: "${NER_EXTRACTOR:-anno}"
       EMBEDDINGS_ENABLED: "${EMBEDDINGS_ENABLED:-false}"
+
+      # ── Operator-generated secrets (never defaulted) ──────────────────
+      MEMORY_MCP_API_KEY_PEPPER: "${MEMORY_MCP_API_KEY_PEPPER:?MEMORY_MCP_API_KEY_PEPPER is required (>=32 bytes); supply an operator-generated value}"
+      MEMORY_MCP_HTTP_SESSION_KEY: "${MEMORY_MCP_HTTP_SESSION_KEY:?MEMORY_MCP_HTTP_SESSION_KEY is required (64 hex chars); supply an operator-generated value}"
+      MEMORY_MCP_HTTP_CSRF_KEY: "${MEMORY_MCP_HTTP_CSRF_KEY:?MEMORY_MCP_HTTP_CSRF_KEY is required (64 hex chars); supply an operator-generated value}"
+
+      # ── Storage ───────────────────────────────────────────────────────
+      SURREALDB_CONTROL_URL: ws://surrealdb:8000/rpc
+      SURREALDB_CONTROL_USERNAME: "${SURREALDB_USERNAME:?SURREALDB_USERNAME is required; supply an operator-generated value}"
+      SURREALDB_CONTROL_PASSWORD: "${SURREALDB_PASSWORD:?SURREALDB_PASSWORD is required; supply an operator-generated value}"
+      SURREALDB_CONTROL_NAMESPACE: "${SURREALDB_CONTROL_NAMESPACE:-control}"
+      SURREALDB_CONTROL_DB: "${SURREALDB_CONTROL_DB:-registry}"
+      SURREALDB_TENANT_URL: ws://surrealdb:8000/rpc
+      SURREALDB_TENANT_USERNAME: "${SURREALDB_USERNAME:?SURREALDB_USERNAME is required; supply an operator-generated value}"
+      SURREALDB_TENANT_PASSWORD: "${SURREALDB_PASSWORD:?SURREALDB_PASSWORD is required; supply an operator-generated value}"
+      SURREALDB_TENANT_NAMESPACE: "${SURREALDB_TENANT_NAMESPACE:-tenant}"
+      SURREALDB_TENANT_DB: "${SURREALDB_TENANT_DB:-tenant}"
+
+      # ── Browser surface: disabled in the base file ────────────────────
+      # Exactly one overlay turns this on. Leaving it false here means the
+      # base configuration alone never mounts a browser surface and never
+      # demands OIDC or local browser material.
+      MEMORY_MCP_HTTP_ENABLE_CONTROL_PLANE: "false"
+      MEMORY_MCP_HTTP_ENABLE_CONTROL_PLANE_UI: "false"
 
 volumes:
   surrealdb-data:

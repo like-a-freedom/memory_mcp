@@ -204,6 +204,9 @@ impl PrivilegedEngine {
 #[derive(Clone)]
 pub struct RegistryHandle {
     pub(crate) store: Arc<dyn RegistryStore>,
+    #[cfg(feature = "control-plane")]
+    pub(crate) local_admin_store:
+        Option<Arc<dyn crate::service::local_admin::contracts::LocalAdminStore>>,
     engine: Option<Arc<PrivilegedEngine>>,
 }
 
@@ -215,6 +218,8 @@ impl RegistryHandle {
     pub fn in_memory() -> Self {
         Self {
             store: Arc::new(InMemoryStore::default()),
+            #[cfg(feature = "control-plane")]
+            local_admin_store: None,
             engine: None,
         }
     }
@@ -227,6 +232,8 @@ impl RegistryHandle {
     pub fn in_memory_with_mem_engine(privileged: Arc<Surreal<Db>>) -> Self {
         Self {
             store: Arc::new(InMemoryStore::default()),
+            #[cfg(feature = "control-plane")]
+            local_admin_store: None,
             engine: Some(Arc::new(PrivilegedEngine::LocalMem(privileged))),
         }
     }
@@ -244,6 +251,8 @@ impl RegistryHandle {
         let db_arc: Arc<Surreal<Db>> = Arc::new(db);
         Self {
             store: Arc::new(InMemoryStore::default()),
+            #[cfg(feature = "control-plane")]
+            local_admin_store: None,
             engine: Some(Arc::new(PrivilegedEngine::LocalMem(db_arc))),
         }
     }
@@ -263,6 +272,27 @@ impl RegistryHandle {
     #[cfg(any(test, feature = "test-fixtures"))]
     pub fn with_inner_store(mut self, store: Arc<dyn RegistryStore>) -> Self {
         self.store = store;
+        self
+    }
+
+    /// Clone the inner local-admin store if available.
+    #[cfg(feature = "control-plane")]
+    pub fn local_admin_store_clone(
+        &self,
+    ) -> Option<Arc<dyn crate::service::local_admin::contracts::LocalAdminStore>> {
+        self.local_admin_store.as_ref().map(Arc::clone)
+    }
+
+    /// Attach a local-admin store to a handle that was built without
+    /// one. Used by the feature-gated test builder to assemble an
+    /// explicitly durable local composition; production composition
+    /// always supplies the store through [`Self::from_durable`].
+    #[cfg(all(any(test, feature = "test-fixtures"), feature = "control-plane"))]
+    pub fn with_local_admin_store(
+        mut self,
+        store: Arc<dyn crate::service::local_admin::contracts::LocalAdminStore>,
+    ) -> Self {
+        self.local_admin_store = Some(store);
         self
     }
 
@@ -306,6 +336,15 @@ impl RegistryHandle {
         self.store.ensure_plan(plan).await
     }
 
+    /// Ensure the local browser-authentication plan exists and has not
+    /// drifted from the configured limits. Returns the durable plan.
+    pub async fn ensure_local_plan(
+        &self,
+        plan: &models::Plan,
+    ) -> Result<models::Plan, crate::error::MemoryError> {
+        self.store.ensure_local_plan(plan).await
+    }
+
     /// Build a handle from a store without an engine.
     /// This is intentionally available only to tests and fixture
     /// builds: production tenant activation requires an explicit
@@ -314,15 +353,25 @@ impl RegistryHandle {
     pub fn from_store(store: Arc<dyn RegistryStore>) -> Self {
         Self {
             store,
+            #[cfg(feature = "control-plane")]
+            local_admin_store: None,
             engine: None,
         }
     }
 
     /// Build the production handle from the durable registry store and
     /// the separately configured privileged tenant engine.
-    pub fn from_durable(store: Arc<dyn RegistryStore>, engine: PrivilegedEngine) -> Self {
+    pub fn from_durable(
+        store: Arc<dyn RegistryStore>,
+        #[cfg(feature = "control-plane")] local_admin_store: Option<
+            Arc<dyn crate::service::local_admin::contracts::LocalAdminStore>,
+        >,
+        engine: PrivilegedEngine,
+    ) -> Self {
         Self {
             store,
+            #[cfg(feature = "control-plane")]
+            local_admin_store,
             engine: Some(Arc::new(engine)),
         }
     }

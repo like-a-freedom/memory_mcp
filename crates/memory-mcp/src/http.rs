@@ -56,6 +56,18 @@ pub struct HttpState {
     /// `None` when the control plane is disabled.
     #[cfg(feature = "control-plane")]
     pub oidc_client: Option<Arc<crate::control::oidc::OidcClient>>,
+    /// Local admin authentication extension. `Some` only when local auth mode
+    /// is active. Provides the authority, hasher, and auth service.
+    #[cfg(feature = "control-plane")]
+    pub local_admin: Option<crate::control::local_admin::LocalAdminExtension>,
+    /// The durable browser-auth policy fence for OIDC mode, joined at
+    /// composition time from the durable singleton. `None` when the control
+    /// plane is disabled or the deployment runs the local-admin surface
+    /// (which owns its own fence through `LocalAdminAuthority`). It is never
+    /// populated from a browser-supplied value; OIDC handlers and signup pass
+    /// it to the dedicated guarded store operations.
+    #[cfg(feature = "control-plane")]
+    pub browser_policy: Option<crate::http::registry::models::BrowserPolicyFence>,
     /// The Prometheus handle is `Some` only when the `prometheus`
     /// feature is enabled. When `None`, the `/metrics` route is
     /// not wired into the router.
@@ -98,22 +110,69 @@ impl HttpState {
     /// The single state-assembly path shared by every constructor and
     /// by the feature-gated test builder. Storage selection stays in
     /// `build_registry`; this function only wires the state itself.
+    ///
+    /// The OIDC browser policy is always joined from the durable store;
+    /// tests that need an OIDC-shaped state without a live issuer use
+    /// [`Self::assemble_with_browser_policy`].
     pub(crate) async fn assemble(
         config: HttpConfig,
         registry: registry::RegistryHandle,
-        _metrics_handle: AssembleMetrics,
+        metrics_handle: AssembleMetrics,
     ) -> Result<Arc<Self>, crate::error::MemoryError> {
-        let signup_plan = registry::models::Plan {
-            id: "free".into(),
-            version: 1,
-            limits: config.signup_plan_limits.clone().unwrap_or_default(),
-        };
-        registry.ensure_plan(&signup_plan).await?;
+        Self::assemble_with_browser_policy(config, registry, metrics_handle, None).await
+    }
+
+    /// [`Self::assemble`] with an optional pre-joined browser policy.
+    ///
+    /// Production passes `None` and the OIDC policy is joined from the
+    /// durable singleton. The `test-fixtures` builder may pass a fence it
+    /// joined directly so unit tests can drive the OIDC handlers without
+    /// spinning up an identity provider; the value is never accepted from
+    /// a browser.
+    pub(crate) async fn assemble_with_browser_policy(
+        config: HttpConfig,
+        registry: registry::RegistryHandle,
+        _metrics_handle: AssembleMetrics,
+        browser_policy_override: Option<crate::http::registry::models::BrowserPolicyFence>,
+    ) -> Result<Arc<Self>, crate::error::MemoryError> {
+        // The `free` plan backs the OIDC/off data plane: tenants created by
+        // signup, and tenants that predate this change, carry
+        // `plan_version 1`, and the data plane resolves that row on every
+        // ingest. Local mode instead creates its own `local_plan_v{version}`
+        // row and compares the stored limits, so in local mode a hardcoded
+        // `free` plan must not be published at all.
+        let is_local_browser_auth = matches!(
+            config.browser_auth.as_ref(),
+            Some(crate::http::config::BrowserAuthConfig::Local(_))
+        );
+        if !is_local_browser_auth {
+            let signup_plan = registry::models::Plan {
+                id: "free".into(),
+                version: 1,
+                limits: config.signup_plan_limits.clone().unwrap_or_default(),
+            };
+            registry.ensure_plan(&signup_plan).await?;
+        }
         let pool = Arc::new(runtime::pool::Pool::from_http_config(
             &config,
             Arc::new(registry.clone()),
         ));
         let store = registry.store_clone();
+        // OIDC mode joins the durable browser-auth policy singleton at
+        // startup. The join is compare/create and never switches mode: a
+        // pre-existing policy for a different mode fails startup here, before
+        // any browser request is served. The local-admin surface joins its own
+        // policy through `LocalAdminAuthority` below.
+        #[cfg(feature = "control-plane")]
+        let browser_policy = if let Some(policy) = browser_policy_override {
+            Some(policy)
+        } else if config.enable_control_plane && config.browser_auth_is_oidc() {
+            Some(store.join_oidc_policy().await?)
+        } else {
+            None
+        };
+        #[cfg(not(feature = "control-plane"))]
+        let _ = browser_policy_override;
         let authenticator = Arc::new(principal::auth::Authenticator::new(
             store.clone(),
             Arc::new(principal::cache::PrincipalCache::new(1024)),
@@ -125,8 +184,13 @@ impl HttpState {
             )),
         ));
         let account_resolver = Arc::new(registry::account::AccountResolver::new(store));
+        // The OIDC client performs discovery against the configured
+        // issuer at startup. In local mode there is no issuer to reach
+        // and no OIDC route is mounted, so discovery must not run: a
+        // local deployment has no dependency on the identity provider
+        // being online.
         #[cfg(feature = "control-plane")]
-        let oidc_client = if config.enable_control_plane {
+        let oidc_client = if config.enable_control_plane && config.browser_auth_is_oidc() {
             Some(Arc::new(
                 crate::control::oidc::OidcClient::new(
                     &config.oidc_issuer,
@@ -137,6 +201,52 @@ impl HttpState {
                 )
                 .await?,
             ))
+        } else {
+            None
+        };
+        #[cfg(feature = "control-plane")]
+        let local_admin = if config.enable_control_plane {
+            use crate::http::config::BrowserAuthConfig;
+            match &config.browser_auth {
+                Some(BrowserAuthConfig::Local(local_config)) => {
+                    // Ensure the deployment's version-1 local plan exists
+                    // and has not drifted. `ensure_local_plan` returns
+                    // `plan_limit_mismatch` when an operator has already
+                    // stored a different limit set, so a silent downgrade
+                    // or upgrade of limits is impossible.
+                    registry
+                        .ensure_local_plan(&registry::models::Plan {
+                            id: format!("local_plan_v{}", local_config.default_plan_version),
+                            version: local_config.default_plan_version,
+                            limits: local_config.default_plan_limits.clone(),
+                        })
+                        .await?;
+                    let store = registry.local_admin_store_clone().ok_or_else(|| {
+                        crate::error::MemoryError::ConfigInvalid(
+                            "local browser auth requires the durable local admin store".into(),
+                        )
+                    })?;
+                    use crate::service::local_admin::auth::LocalAdminAuthority;
+                    use crate::service::local_admin::password::PasswordHasher;
+                    let authority = LocalAdminAuthority::join(
+                        store,
+                        local_config.session_key,
+                        local_config.csrf_key,
+                    )
+                    .await
+                    .map_err(|e| crate::error::MemoryError::Auth(e.to_string()))?;
+                    let hasher = Arc::new(
+                        PasswordHasher::new()
+                            .map_err(|e| crate::error::MemoryError::Auth(e.to_string()))?,
+                    );
+                    Some(crate::control::local_admin::LocalAdminExtension {
+                        authority,
+                        hasher,
+                        plan_version: local_config.default_plan_version,
+                    })
+                }
+                _ => None,
+            }
         } else {
             None
         };
@@ -155,6 +265,10 @@ impl HttpState {
             account_resolver,
             #[cfg(feature = "control-plane")]
             oidc_client,
+            #[cfg(feature = "control-plane")]
+            local_admin,
+            #[cfg(feature = "control-plane")]
+            browser_policy,
             #[cfg(feature = "prometheus")]
             metrics_handle,
         }))

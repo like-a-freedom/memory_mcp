@@ -12,6 +12,27 @@ use crate::error::MemoryError;
 
 use super::types::{HttpConfig, SignupMode};
 
+/// Whether a public base URL points at a development loopback host.
+///
+/// Local mode allows plain HTTP as a development convenience, but the
+/// exception has to key off the URL's **host**: a substring test would accept
+/// `http://evil.example/?localhost` and let a deployment run these Secure
+/// cookies over public plain HTTP.
+fn is_loopback_public_url(url: &str) -> bool {
+    let authority = url
+        .strip_prefix("http://")
+        .or_else(|| url.strip_prefix("https://"));
+    let Some(authority) = authority else {
+        return false;
+    };
+    // Drop any path, query or fragment, then any port.
+    let host_port = authority.split(['/', '?', '#']).next().unwrap_or_default();
+    let host = host_port
+        .rsplit_once(':')
+        .map_or(host_port, |(host, _port)| host);
+    matches!(host, "localhost" | "127.0.0.1" | "[::1]" | "::1")
+}
+
 pub(super) fn validate(cfg: &HttpConfig) -> Result<(), MemoryError> {
     // Reject the test-only bootstrap env var unless the
     // `test-fixtures` feature is enabled (Task 5.8).
@@ -134,7 +155,12 @@ pub(super) fn validate(cfg: &HttpConfig) -> Result<(), MemoryError> {
             ));
         }
     }
-    if cfg.enable_control_plane
+    // OIDC completeness and algorithm checks apply only when the
+    // deployment actually authenticates browsers through OIDC. Local
+    // mode has no identity provider and must not be forced to configure
+    // one; a disabled control plane mounts neither surface.
+    let uses_oidc = cfg.browser_auth_is_oidc();
+    if uses_oidc
         && (cfg.oidc_issuer.is_empty()
             || cfg.oidc_client_id.is_empty()
             || cfg.oidc_audience.is_empty()
@@ -144,9 +170,7 @@ pub(super) fn validate(cfg: &HttpConfig) -> Result<(), MemoryError> {
             "control plane requires OIDC issuer, client id, audience, and redirect URI".into(),
         ));
     }
-    if cfg.enable_control_plane
-        && !matches!(cfg.oidc_allowed_alg.as_str(), "RS256" | "ES256" | "EdDSA")
-    {
+    if uses_oidc && !matches!(cfg.oidc_allowed_alg.as_str(), "RS256" | "ES256" | "EdDSA") {
         return Err(MemoryError::ConfigInvalid(
             "OIDC allowed algorithm must be RS256, ES256, or EdDSA".into(),
         ));
@@ -168,20 +192,36 @@ pub(super) fn validate(cfg: &HttpConfig) -> Result<(), MemoryError> {
     // ─── Browser auth mode validation ─────────────────────
     match &cfg.browser_auth {
         Some(super::types::BrowserAuthConfig::Local(_local)) => {
-            // Local mode: reject OIDC-only settings
-            if !cfg.oidc_issuer.is_empty() {
+            // Local mode: every OIDC-only setting must be absent. Leaving
+            // one set is an ambiguous deployment, not a harmless extra.
+            for (name, value) in [
+                ("MEMORY_MCP_HTTP_OIDC_ISSUER", &cfg.oidc_issuer),
+                ("MEMORY_MCP_HTTP_OIDC_CLIENT_ID", &cfg.oidc_client_id),
+                ("MEMORY_MCP_HTTP_OIDC_AUDIENCE", &cfg.oidc_audience),
+                ("MEMORY_MCP_HTTP_OIDC_REDIRECT_URI", &cfg.oidc_redirect_uri),
+            ] {
+                if !value.is_empty() {
+                    return Err(MemoryError::ConfigInvalid(format!(
+                        "local mode must not set {name}"
+                    )));
+                }
+            }
+            if !cfg.operator_identity_allowlist.is_empty() {
                 return Err(MemoryError::ConfigInvalid(
-                    "local mode must not set OIDC issuer".into(),
+                    "local mode must not set the operator identity allowlist".into(),
                 ));
             }
-            if !cfg.oidc_client_id.is_empty() {
+            // Open signup is meaningless without an identity provider and
+            // would advertise accounts nobody can create. Invite-only is
+            // the only coherent local setting.
+            if cfg.signup_mode != SignupMode::InviteOnly {
                 return Err(MemoryError::ConfigInvalid(
-                    "local mode must not set OIDC client id".into(),
+                    "local mode requires signup mode 'invite_only'".into(),
                 ));
             }
             // Local mode: require HTTPS in public_base_url
             if !cfg.public_base_url.starts_with("https://")
-                && !cfg.public_base_url.contains("localhost")
+                && !is_loopback_public_url(&cfg.public_base_url)
             {
                 return Err(MemoryError::ConfigInvalid(
                     "local mode requires HTTPS public_base_url (or localhost for development)"

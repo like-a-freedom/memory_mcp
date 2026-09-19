@@ -4,9 +4,15 @@ use dioxus::prelude::*;
 use dioxus_router::{Routable, Router as DioxusRouter};
 
 use crate::pages::{
-    admin_auth::{AdminActivationPage as AdminActivate, AdminLoginPage as AdminLogin, AdminReauthDialog as AdminReauth, AdminResetPage as AdminReset},
-    admin_clients::{AdminClientDetailPage as AdminClientDetail, AdminClientListPage as AdminClientList},
-    delete::DeletePage as Delete, keys::KeysPage as Keys, login::LoginPage as Login,
+    admin_auth::{
+        AdminActivationPage as AdminActivate, AdminLoginPage as AdminLogin,
+        AdminReauthPage as AdminReauth, AdminResetPage as AdminReset,
+    },
+    admin_client::AdminClientDetailPage as AdminClientDetail,
+    admin_clients::AdminClientListPage as AdminClientList,
+    delete::DeletePage as Delete,
+    keys::KeysPage as Keys,
+    login::LoginPage as Login,
     status::StatusPage as Status,
 };
 
@@ -30,8 +36,8 @@ pub enum Route {
     AdminReauth {},
     #[route("/admin/clients")]
     AdminClientList {},
-    #[route("/admin/clients/:client_id")]
-    AdminClientDetail { client_id: String },
+    #[route("/admin/clients/:account_id")]
+    AdminClientDetail { account_id: String },
 }
 
 #[component]

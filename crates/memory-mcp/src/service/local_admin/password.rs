@@ -119,7 +119,7 @@ impl PasswordHasher {
         let result = tokio::task::spawn_blocking(move || {
             let parsed = PasswordHash::new(&phc_str)
                 .map_err(|e| LocalAdminError::InvalidInput(format!("PHC parse: {e}")))?;
-            let argon2 = Argon2::new(Algorithm::Argon2id, Version::V0x13, self_params());
+            let argon2 = Argon2::new(Algorithm::Argon2id, Version::V0x13, self_params()?);
             let ok = argon2.verify_password(password.as_bytes(), &parsed).is_ok();
             Ok::<bool, LocalAdminError>(ok)
         })
@@ -128,6 +128,52 @@ impl PasswordHasher {
         drop(running_permit);
         result
     }
+}
+
+/// Default Argon2id v19 parameters: m=19456, t=2, p=1.
+///
+/// Returns an error rather than panicking so hostile stored parameters can
+/// never abort a request path.
+fn self_params() -> LocalResult<Params> {
+    Params::new(19456, 2, 1, Some(32))
+        .map_err(|e| LocalAdminError::InvalidInput(format!("KDF params: {e}")))
+}
+
+/// Validate PHC parameters before expensive KDF work.
+/// Binds algorithm, version, memory, time, parallelism, and output size.
+/// Corrupt or hostile hashes fail closed without raw error details.
+fn validate_phc(phc: &str) -> LocalResult<()> {
+    // Must start with the expected Argon2id prefix
+    if !phc.starts_with("$argon2id$v=19$m=") {
+        return Err(LocalAdminError::InvalidCredentials);
+    }
+
+    // Parse the hash to validate structure
+    let parsed = PasswordHash::new(phc).map_err(|_| LocalAdminError::InvalidCredentials)?;
+
+    // Verify parameters are within bounds using the argon2 crate
+    let params = Params::try_from(&parsed).map_err(|_| LocalAdminError::InvalidCredentials)?;
+
+    let m_cost = params.m_cost();
+    let t_cost = params.t_cost();
+    let p_cost = params.p_cost();
+
+    // Bound memory: must be reasonable (1MB - 1GB in KiB)
+    if !(1024..=1048576).contains(&m_cost) {
+        return Err(LocalAdminError::InvalidCredentials);
+    }
+
+    // Bound time: must be reasonable (1 - 100)
+    if !(1..=100).contains(&t_cost) {
+        return Err(LocalAdminError::InvalidCredentials);
+    }
+
+    // Bound parallelism: must be reasonable (1 - 64)
+    if !(1..=64).contains(&p_cost) {
+        return Err(LocalAdminError::InvalidCredentials);
+    }
+
+    Ok(())
 }
 
 #[cfg(test)]
@@ -178,46 +224,4 @@ mod tests {
             .await;
         assert!(result.is_err());
     }
-}
-
-/// Default Argon2id v19 parameters: m=19456, t=2, p=1.
-fn self_params() -> Params {
-    Params::new(19456, 2, 1, Some(32)).expect("valid params")
-}
-
-/// Validate PHC parameters before expensive KDF work.
-/// Binds algorithm, version, memory, time, parallelism, and output size.
-/// Corrupt or hostile hashes fail closed without raw error details.
-fn validate_phc(phc: &str) -> LocalResult<()> {
-    // Must start with the expected Argon2id prefix
-    if !phc.starts_with("$argon2id$v=19$m=") {
-        return Err(LocalAdminError::InvalidCredentials);
-    }
-
-    // Parse the hash to validate structure
-    let parsed = PasswordHash::new(phc).map_err(|_| LocalAdminError::InvalidCredentials)?;
-
-    // Verify parameters are within bounds using the argon2 crate
-    let params = Params::try_from(&parsed).map_err(|_| LocalAdminError::InvalidCredentials)?;
-
-    let m_cost = params.m_cost();
-    let t_cost = params.t_cost();
-    let p_cost = params.p_cost();
-
-    // Bound memory: must be reasonable (1MB - 1GB in KiB)
-    if !(1024..=1048576).contains(&m_cost) {
-        return Err(LocalAdminError::InvalidCredentials);
-    }
-
-    // Bound time: must be reasonable (1 - 100)
-    if !(1..=100).contains(&t_cost) {
-        return Err(LocalAdminError::InvalidCredentials);
-    }
-
-    // Bound parallelism: must be reasonable (1 - 64)
-    if !(1..=64).contains(&p_cost) {
-        return Err(LocalAdminError::InvalidCredentials);
-    }
-
-    Ok(())
 }

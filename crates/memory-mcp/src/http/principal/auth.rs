@@ -107,6 +107,16 @@ impl Authenticator {
         let mut principal: Option<AuthenticatedPrincipal> = None;
 
         if let Some(cached) = self.cache.get_positive(cred.key_id()) {
+            // Re-validate the ApiKey status/expiry on every cache hit so
+            // a revoked or expired key is rejected within one request
+            // round-trip rather than waiting for the 60 s positive TTL.
+            let current_key = self.store.find_api_key(cred.key_id()).await.ok().flatten();
+            // Ownership is re-read alongside status/expiry: a key that no
+            // longer belongs to the cached account must not keep acting as
+            // that account just because its verifier still matches.
+            let key_valid = current_key
+                .as_ref()
+                .is_some_and(|k| is_key_current(k, now) && k.account_id == cached.account.id);
             // A positive cache hit still re-reads the account status. This
             // closes the deletion revocation window without requiring the
             // cache to become a second source of account lifecycle truth.
@@ -116,7 +126,8 @@ impl Authenticator {
                 .await
                 .ok()
                 .flatten();
-            if cached.verifier.verify(&self.pepper, cred.secret())
+            if key_valid
+                && cached.verifier.verify(&self.pepper, cred.secret())
                 && let Some(account) = current_account
                 && account.status == AccountStatus::Active
             {
@@ -125,6 +136,11 @@ impl Authenticator {
                     account: Arc::new(account),
                     key_id: cred.key_id().to_owned(),
                 });
+            } else {
+                // Stale entry: key revoked/expired, secret mismatch, or
+                // account suspended/deleted. Evict from both caches so the
+                // next request performs a fresh store lookup.
+                self.cache.invalidate(cred.key_id());
             }
         } else {
             // Store lookup. The verifier check happens against
@@ -132,8 +148,8 @@ impl Authenticator {
             // verifier field from the store (not from the
             // credential) so a rotated key still works.
             let key = self.store.find_api_key(cred.key_id()).await.ok().flatten();
-            if let Some(k) = key
-                && is_key_current(&k, now)
+            if let Some(k) = key.as_ref()
+                && is_key_current(k, now)
                 && k.verifier.verify(&self.pepper, cred.secret())
             {
                 let account = self
@@ -157,6 +173,11 @@ impl Authenticator {
                     });
                     verified = true;
                 }
+            } else if key.is_some() {
+                // Key exists in the store but is expired, revoked, or the
+                // secret does not match. Clear any stale cache entries so
+                // a negative cache entry is recorded below.
+                self.cache.invalidate(cred.key_id());
             }
         }
 
@@ -330,5 +351,73 @@ mod tests {
         );
         let d = auth.authenticate_bearer(&raw).await;
         assert!(matches!(d, AuthDecision::Deny));
+    }
+
+    /// A warm cache entry is only a hint: the key row's owner is re-read on
+    /// every hit, so an entry that names a different Account than the key
+    /// now belongs to cannot authorize that Account.
+    #[tokio::test]
+    async fn cache_hit_with_a_mismatched_owner_is_denied() {
+        let store = Arc::new(InMemoryStore::default());
+        let pepper = b"pepper";
+        let secret = b"Ab3defghij0123456789Ab3defghij0123456789";
+        let verifier = KeyedVerifier::compute(pepper, secret);
+        let key_id = "ak_01234567-89ab-4cde-8f01-23456789abcd";
+        store
+            .write_api_key(&ApiKey {
+                id: key_id.into(),
+                account_id: "acct_owner".into(),
+                name: "k1".into(),
+                verifier: verifier.clone(),
+                status: ApiKeyStatus::Active,
+                created_at: Utc::now(),
+                expires_at: None,
+                last_used_at: None,
+                version: 1,
+            })
+            .await
+            .unwrap();
+        store
+            .write_account(&active_account("acct_owner", "ten_1"))
+            .await
+            .unwrap();
+        store
+            .write_account(&active_account("acct_other", "ten_2"))
+            .await
+            .unwrap();
+        let cache = Arc::new(PrincipalCache::new(8));
+        let auth = Authenticator::new(
+            store,
+            cache.clone(),
+            pepper.to_vec(),
+            Arc::new(RateLimiter::new(4, Duration::from_secs(60), 100)),
+        );
+        let raw = format!("mem_sk_{key_id}_{}", std::str::from_utf8(secret).unwrap());
+
+        // Seed the cache with the wrong Account for this key id, using the
+        // real verifier so only the ownership rule can reject the request.
+        cache.put_positive(
+            key_id.to_string(),
+            Arc::new(active_account("acct_other", "ten_2")),
+            verifier.clone(),
+        );
+        assert!(
+            matches!(auth.authenticate_bearer(&raw).await, AuthDecision::Deny),
+            "a cache entry naming the wrong owner must not authorize"
+        );
+
+        // The same warm cache with the correct owner still authorizes.
+        cache.invalidate(key_id);
+        cache.put_positive(
+            key_id.to_string(),
+            Arc::new(active_account("acct_owner", "ten_1")),
+            verifier,
+        );
+        match auth.authenticate_bearer(&raw).await {
+            AuthDecision::Allow(AuthenticatedPrincipal::ApiKey { account, .. }) => {
+                assert_eq!(account.id, "acct_owner");
+            }
+            other => panic!("expected Allow(ApiKey), got {other:?}"),
+        }
     }
 }

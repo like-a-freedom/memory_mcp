@@ -1,13 +1,13 @@
 use std::sync::Arc;
 
+use sha2::{Digest, Sha256};
+
 use crate::service::local_admin::contracts::{
     AdminFence, AdminKeyInsert, ClientBundle, ClientCreate, ClientStateAction, ClientView,
-    KeyInsertOutcome, LocalAdminStore, LocalResult, Page, PageRequest, RequestContext,
+    KeyExpiry, KeyInsertOutcome, LocalAdminStore, LocalResult, Page, PageRequest, RequestContext,
 };
-use rand_core::RngCore;
 
 /// Service for managing local clients and their API keys.
-#[allow(dead_code)]
 pub struct LocalClientService {
     store: Arc<dyn LocalAdminStore>,
 }
@@ -17,7 +17,13 @@ impl LocalClientService {
         Self { store }
     }
 
-    /// Create a new client. Enforces the 32-client cap.
+    /// Create a new client.
+    ///
+    /// The request fingerprint is derived from the *canonical body*, not
+    /// from randomness: a retry carrying the same `operation_id` and the
+    /// same `display_name` must resolve to the existing resource rather
+    /// than raising an idempotency conflict. A changed body under the
+    /// same operation id is what produces `409 idempotency_conflict`.
     pub async fn create_client(
         &self,
         fence: &AdminFence,
@@ -26,7 +32,7 @@ impl LocalClientService {
         account: crate::http::registry::models::Account,
         tenant: crate::http::registry::models::Tenant,
     ) -> LocalResult<ClientView> {
-        let fingerprint = compute_request_fingerprint();
+        let fingerprint = client_request_fingerprint(command.operation_id, &command.display_name);
         let bundle = ClientBundle {
             account,
             tenant,
@@ -99,9 +105,74 @@ impl LocalClientService {
     }
 }
 
-#[allow(dead_code)]
-fn compute_request_fingerprint() -> [u8; 32] {
-    let mut buf = [0u8; 32];
-    rand_core::OsRng.fill_bytes(&mut buf);
-    buf
+/// Canonical, deterministic fingerprint of a client-create body.
+pub fn client_request_fingerprint(operation_id: uuid::Uuid, display_name: &str) -> [u8; 32] {
+    let mut hasher = Sha256::new();
+    hasher.update(b"local_admin_client_create\0");
+    hasher.update(operation_id.as_bytes());
+    hasher.update(b"\0");
+    hasher.update(display_name.as_bytes());
+    hasher.finalize().into()
+}
+
+/// Canonical, deterministic fingerprint of a key-issue body.
+pub fn key_request_fingerprint(
+    operation_id: uuid::Uuid,
+    name: &str,
+    expiry: &KeyExpiry,
+) -> [u8; 32] {
+    let mut hasher = Sha256::new();
+    hasher.update(b"local_admin_key_create\0");
+    hasher.update(operation_id.as_bytes());
+    hasher.update(b"\0");
+    hasher.update(name.as_bytes());
+    hasher.update(b"\0");
+    match expiry {
+        KeyExpiry::Never => hasher.update(b"never"),
+        KeyExpiry::Days { days } => {
+            hasher.update(b"days\0");
+            hasher.update(days.to_be_bytes());
+        }
+    }
+    hasher.finalize().into()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn client_fingerprint_is_stable_for_identical_bodies() {
+        let operation = uuid::Uuid::new_v4();
+        assert_eq!(
+            client_request_fingerprint(operation, "team-alpha"),
+            client_request_fingerprint(operation, "team-alpha")
+        );
+    }
+
+    #[test]
+    fn client_fingerprint_changes_with_body() {
+        let operation = uuid::Uuid::new_v4();
+        assert_ne!(
+            client_request_fingerprint(operation, "team-alpha"),
+            client_request_fingerprint(operation, "team-beta")
+        );
+        assert_ne!(
+            client_request_fingerprint(operation, "team-alpha"),
+            client_request_fingerprint(uuid::Uuid::new_v4(), "team-alpha")
+        );
+    }
+
+    #[test]
+    fn key_fingerprint_distinguishes_expiry_choices() {
+        let operation = uuid::Uuid::new_v4();
+        assert_ne!(
+            key_request_fingerprint(operation, "k", &KeyExpiry::Never),
+            key_request_fingerprint(operation, "k", &KeyExpiry::Days { days: 30 })
+        );
+        assert_ne!(
+            key_request_fingerprint(operation, "k", &KeyExpiry::Days { days: 30 }),
+            key_request_fingerprint(operation, "k", &KeyExpiry::Days { days: 31 })
+        );
+    }
 }

@@ -14,6 +14,9 @@ pub mod lifecycle_capture;
 pub mod lifecycle_recall;
 pub mod resolve;
 
+#[cfg(all(feature = "streamable-http", feature = "control-plane"))]
+pub mod admin;
+
 pub use assemble_context::run as run_assemble_context;
 pub use explain::run as run_explain;
 pub use extract::run as run_extract;
@@ -23,6 +26,9 @@ pub use lifecycle::run as run_lifecycle;
 pub use lifecycle_capture::run as run_lifecycle_capture;
 pub use lifecycle_recall::run as run_lifecycle_recall;
 pub use resolve::run as run_resolve;
+
+#[cfg(all(feature = "streamable-http", feature = "control-plane"))]
+pub use admin::run as run_admin;
 
 /// Write a tool response as pretty JSON to stdout, followed by a trailing newline.
 pub(crate) fn write_response<T: serde::Serialize>(response: &T) -> std::io::Result<()> {

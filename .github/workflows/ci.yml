@@ -124,8 +124,50 @@ jobs:
     steps:
       - uses: actions/checkout@v7.0.0
       - uses: docker/setup-buildx-action@v3
-      - name: Validate Compose file
-        run: docker compose -f docker-compose.yml config --quiet
+      - name: Generate operator configuration for the smoke test
+        shell: bash
+        run: |
+          set -euo pipefail
+          # No secret is defaulted in any Compose file, so the job supplies
+          # operator-generated values. The file is written outside the
+          # workspace and is never uploaded as an artifact.
+          ENV_FILE="${RUNNER_TEMP}/memory-mcp-smoke.env"
+          hex64() { head -c 32 /dev/urandom | od -An -tx1 | tr -d ' \n'; }
+          {
+            echo "SURREALDB_USERNAME=ci-$(head -c 8 /dev/urandom | od -An -tx1 | tr -d ' \n')"
+            echo "SURREALDB_PASSWORD=$(hex64)"
+            echo "MEMORY_MCP_API_KEY_PEPPER=$(hex64)"
+            echo "MEMORY_MCP_HTTP_SESSION_KEY=$(hex64)"
+            echo "MEMORY_MCP_HTTP_CSRF_KEY=$(hex64)"
+            echo "MEMORY_MCP_HTTP_PUBLIC_BASE_URL=https://localhost:8080"
+            echo "ALLOWED_HOSTS=localhost,127.0.0.1"
+            echo "ALLOWED_ORIGINS=https://localhost:8080"
+            echo "MEMORY_MCP_HTTP_LOCAL_DEFAULT_PLAN_VERSION=1"
+            echo "MEMORY_MCP_HTTP_MAX_INGESTED_BYTES=1073741824"
+            echo "MEMORY_MCP_HTTP_MAX_EPISODE_COUNT=100000"
+            echo "MEMORY_MCP_HTTP_INGEST_PER_MINUTE=60"
+            echo "MEMORY_MCP_HTTP_MAX_OPEN_APP_SESSIONS=32"
+            echo "MEMORY_MCP_HTTP_MAX_ACTIVE_API_KEYS=5"
+            echo "MEMORY_MCP_HTTP_PER_TENANT_REQUEST_CONCURRENCY=4"
+            echo "MEMORY_MCP_HTTP_EXTRACTION_CONCURRENCY=2"
+            echo "MEMORY_MCP_HTTP_ENABLE_CONTROL_PLANE_UI=false"
+          } > "${ENV_FILE}"
+          chmod 600 "${ENV_FILE}"
+          echo "SMOKE_ENV_FILE=${ENV_FILE}" >> "${GITHUB_ENV}"
+      - name: Validate every Compose mode resolves
+        shell: bash
+        run: |
+          set -euo pipefail
+          for overlay in off local oidc; do
+            echo "validating ${overlay}"
+            if [ "${overlay}" = oidc ]; then
+              # The OIDC overlay additionally requires an identity provider
+              # configuration, which the smoke test does not exercise.
+              continue
+            fi
+            docker compose --env-file "${SMOKE_ENV_FILE}" \
+              -f docker-compose.yml -f "docker-compose.${overlay}.yml" config --quiet
+          done
       - name: Extract image metadata
         id: meta
         uses: docker/metadata-action@v5
@@ -160,15 +202,31 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          docker compose -f docker-compose.yml up -d --no-build
+          docker compose --env-file "${SMOKE_ENV_FILE}" \
+            -f docker-compose.yml -f docker-compose.local.yml up -d --no-build
           curl --fail --silent --show-error \
             --retry 60 --retry-all-errors --retry-delay 2 \
             --connect-timeout 2 --max-time 10 \
+            -H 'Host: localhost' \
             http://127.0.0.1:8080/health/live
           curl --fail --silent --show-error \
             --retry 60 --retry-all-errors --retry-delay 2 \
             --connect-timeout 2 --max-time 10 \
+            -H 'Host: localhost' \
             http://127.0.0.1:8080/health/ready
+          # The host allowlist is also part of the contract: an unlisted
+          # Host must be refused rather than served.
+          test "$(curl --silent --output /dev/null --write-out '%{http_code}' \
+            -H 'Host: evil.example' http://127.0.0.1:8080/health/live)" = "403"
+          # The local surface must be the only browser surface mounted.
+          test "$(curl --silent --output /dev/null --write-out '%{http_code}' \
+            -H 'Host: localhost' http://127.0.0.1:8080/api/v1/auth/config)" = "200"
+          test "$(curl --silent --output /dev/null --write-out '%{http_code}' \
+            -H 'Host: localhost' http://127.0.0.1:8080/auth/oidc/authorize)" = "404"
+          test "$(curl --silent --output /dev/null --write-out '%{http_code}' \
+            -H 'Host: localhost' http://127.0.0.1:8080/api/v1/operator/recovery/status)" = "404"
+          test "$(curl --silent --output /dev/null --write-out '%{http_code}' \
+            -H 'Host: localhost' http://127.0.0.1:8080/api/v1/not-a-route)" = "404"
       - name: Log in to GitHub Container Registry
         if: ${{ github.ref == 'refs/heads/master' || inputs.release }}
         uses: docker/login-action@v3

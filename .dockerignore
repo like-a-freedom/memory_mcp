@@ -7,3 +7,6 @@ target
 dist
 data
 **/tests/models
+# Browser-runner dependencies for the local-admin acceptance harness are
+# installed on the host; they are never needed in the build context.
+**/node_modules

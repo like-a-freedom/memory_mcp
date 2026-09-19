@@ -1,10 +1,10 @@
 use std::sync::Arc;
 
 use crate::service::local_admin::contracts::{
-    AdminLogin, AdminPrincipal, AuthAttemptContext, BrowserPolicyFence, ChallengeFinish,
-    ChallengeIssue, ChallengeKind, ChallengeView, LocalAdminError, LocalAdminStore,
-    LocalKeyFingerprints, LocalResult, OneTimeChallenge, RequestContext, SessionOpen,
-    SessionRotate,
+    AdminLogin, AdminPrincipal, AttemptDecision, AttemptDomain, AttemptInput, AuthAttemptContext,
+    BrowserPolicyFence, ChallengeFinish, ChallengeIssue, ChallengeKind, ChallengeView,
+    LocalAdminError, LocalAdminStore, LocalKeyFingerprints, LocalResult, OneTimeChallenge,
+    RequestContext, SessionOpen, SessionRotate,
 };
 use crate::service::local_admin::password::PasswordHasher;
 
@@ -24,7 +24,7 @@ impl LocalAdminAuthority {
         session_key: [u8; 32],
         csrf_key: [u8; 32],
     ) -> LocalResult<Arc<Self>> {
-        let fingerprints = compute_fingerprints(&session_key, &csrf_key);
+        let fingerprints = compute_fingerprints(&session_key, &csrf_key)?;
         let policy = store.join_local_policy(fingerprints).await?;
         Ok(Arc::new(Self {
             store,
@@ -104,27 +104,113 @@ impl AdminManagementService {
     }
 }
 
-/// Browser-facing auth service. Owns the PasswordHasher.
+/// Browser-facing auth service. Owns the PasswordHasher and the
+/// mandatory admission throttle.
 #[derive(Clone)]
-#[allow(dead_code)]
 pub struct LocalAdminService {
     authority: Arc<LocalAdminAuthority>,
     hasher: Arc<PasswordHasher>,
+    /// Domain-separated key used only to bucket attempt inputs into a
+    /// fixed number of throttle slots. Derived from the CSRF key so it
+    /// is per-deployment rather than global.
+    attempt_key: [u8; 32],
 }
+
+/// Number of throttle slots per dimension. Keyed inputs map into this
+/// fixed range so the throttle table can never grow with offered input.
+pub const ATTEMPT_BUCKET_SLOTS: u16 = 4096;
 
 impl LocalAdminService {
     pub fn new(authority: Arc<LocalAdminAuthority>, hasher: Arc<PasswordHasher>) -> Self {
-        Self { authority, hasher }
+        let attempt_key = crate::service::credential_material::hmac_fingerprint(
+            authority.csrf_key(),
+            b"local_admin_attempt_bucket_key\0",
+            b"",
+        );
+        Self {
+            authority,
+            hasher,
+            attempt_key,
+        }
+    }
+
+    /// Reserve one attempt slot **before** any credential lookup or KDF
+    /// work. This is mandatory: every entry point that can consume
+    /// password material or challenge material calls this first, so a
+    /// saturation or storage outage cannot be bypassed by choosing a
+    /// different route.
+    ///
+    /// `username` is the raw offered value. It is normalized when it
+    /// parses, and keyed as bounded raw input when it does not, so an
+    /// attacker cannot escape throttling by submitting malformed
+    /// usernames.
+    async fn admit(
+        &self,
+        context: &AuthAttemptContext,
+        domain: AttemptDomain,
+        username: Option<&str>,
+    ) -> LocalResult<()> {
+        let username_bucket = match domain {
+            AttemptDomain::Credentials => {
+                let raw = username.ok_or_else(|| {
+                    LocalAdminError::InvalidInput("credentials domain requires a username".into())
+                })?;
+                Some(self.username_bucket(raw)?)
+            }
+            AttemptDomain::Challenge => None,
+        };
+        let input = AttemptInput {
+            domain,
+            username_bucket,
+            source_bucket: self.source_bucket(context.source)?,
+            policy: self.authority.policy().clone(),
+            request: context.request.clone(),
+        };
+        match self.authority.store().reserve_attempt(input).await? {
+            AttemptDecision::Allowed => Ok(()),
+            AttemptDecision::Limited {
+                retry_after_seconds,
+            } => Err(LocalAdminError::Throttled {
+                retry_after_seconds,
+            }),
+        }
+    }
+
+    /// Bucket a normalized username, falling back to bounded raw input
+    /// for values that do not satisfy the username policy.
+    fn username_bucket(&self, raw: &str) -> LocalResult<u16> {
+        let normalized = crate::service::local_admin::policy::normalize_username(raw)
+            .unwrap_or_else(|_| bounded_raw(raw));
+        bucket(&self.attempt_key, b"username\0", normalized.as_bytes())
+    }
+
+    /// Bucket a source address. IPv4-mapped IPv6 addresses are
+    /// normalized to their IPv4 form so one client cannot appear as two
+    /// independent buckets.
+    fn source_bucket(&self, source: std::net::IpAddr) -> LocalResult<u16> {
+        let normalized = match source {
+            std::net::IpAddr::V6(v6) => match v6.to_ipv4_mapped() {
+                Some(v4) => std::net::IpAddr::V4(v4),
+                None => std::net::IpAddr::V6(v6),
+            },
+            other => other,
+        };
+        bucket(
+            &self.attempt_key,
+            b"source\0",
+            normalized.to_string().as_bytes(),
+        )
     }
 
     /// Inspect a challenge code without consuming it.
     pub async fn inspect_challenge(
         &self,
-        _context: &AuthAttemptContext,
+        context: &AuthAttemptContext,
         code: &str,
         kind: ChallengeKind,
     ) -> LocalResult<ChallengeView> {
-        let verifier = parse_hex_32(code)?;
+        self.admit(context, AttemptDomain::Challenge, None).await?;
+        let verifier = parse_challenge_code(code)?;
         self.authority
             .store()
             .inspect_challenge(&verifier, kind, self.authority.policy())
@@ -139,8 +225,9 @@ impl LocalAdminService {
         kind: ChallengeKind,
         password: String,
     ) -> LocalResult<()> {
+        self.admit(context, AttemptDomain::Challenge, None).await?;
         crate::service::local_admin::policy::validate_password(&password)?;
-        let verifier = parse_hex_32(code)?;
+        let verifier = parse_challenge_code(code)?;
         let password_phc = self.hasher.hash(password).await?;
         let command = ChallengeFinish {
             verifier,
@@ -159,6 +246,8 @@ impl LocalAdminService {
         username: &str,
         password: String,
     ) -> LocalResult<AdminLogin> {
+        self.admit(context, AttemptDomain::Credentials, Some(username))
+            .await?;
         let credential = self
             .authority
             .store()
@@ -209,6 +298,12 @@ impl LocalAdminService {
         principal: &AdminPrincipal,
         password: String,
     ) -> LocalResult<AdminLogin> {
+        self.admit(
+            context,
+            AttemptDomain::Credentials,
+            Some(&principal.username),
+        )
+        .await?;
         let credential = self
             .authority
             .store()
@@ -256,27 +351,62 @@ impl LocalAdminService {
 
 // ─── Helpers ──────────────────────────────────────────────
 
-fn compute_fingerprints(session_key: &[u8; 32], csrf_key: &[u8; 32]) -> LocalKeyFingerprints {
+fn compute_fingerprints(
+    session_key: &[u8; 32],
+    csrf_key: &[u8; 32],
+) -> LocalResult<LocalKeyFingerprints> {
     use hmac::{Hmac, KeyInit, Mac};
     use sha2::Sha256;
     type HmacSha256 = Hmac<Sha256>;
 
+    let invalid = |e: hmac::digest::InvalidLength| {
+        LocalAdminError::InvalidInput(format!("fingerprint key rejected: {e}"))
+    };
     let session_fp = HmacSha256::new_from_slice(b"local_admin_session_fingerprint")
-        .expect("HMAC accepts any key")
+        .map_err(invalid)?
         .chain_update(session_key)
         .finalize()
         .into_bytes()
         .into();
     let csrf_fp = HmacSha256::new_from_slice(b"local_admin_csrf_fingerprint")
-        .expect("HMAC accepts any key")
+        .map_err(invalid)?
         .chain_update(csrf_key)
         .finalize()
         .into_bytes()
         .into();
-    LocalKeyFingerprints {
+    Ok(LocalKeyFingerprints {
         session: session_fp,
         csrf: csrf_fp,
+    })
+}
+
+/// Map keyed input into the fixed throttle slot range.
+fn bucket(key: &[u8; 32], label: &[u8], data: &[u8]) -> LocalResult<u16> {
+    use hmac::{Hmac, KeyInit, Mac};
+    use sha2::Sha256;
+    let mut mac = Hmac::<Sha256>::new_from_slice(key)
+        .map_err(|e| LocalAdminError::InvalidInput(format!("throttle key rejected: {e}")))?;
+    mac.update(label);
+    mac.update(data);
+    let digest = mac.finalize().into_bytes();
+    Ok(u16::from_be_bytes([digest[0], digest[1]]) % ATTEMPT_BUCKET_SLOTS)
+}
+
+/// Bound raw input for keying when it fails username validation.
+///
+/// Truncating to 64 bytes keeps the keying cost constant regardless of
+/// the offered length; the input is never stored or echoed.
+fn bounded_raw(raw: &str) -> String {
+    let bytes = raw.as_bytes();
+    let end = bytes.len().min(64);
+    // `from_utf8_lossy` on a byte slice can split a scalar value at the
+    // boundary; trimming to a char boundary first keeps the keying
+    // deterministic and avoids replacement characters.
+    let mut end = end;
+    while end > 0 && !raw.is_char_boundary(end) {
+        end -= 1;
     }
+    String::from_utf8_lossy(&bytes[..end]).into_owned()
 }
 
 #[allow(dead_code)]
@@ -293,6 +423,19 @@ fn parse_hex_32(hex_str: &str) -> LocalResult<[u8; 32]> {
     bytes
         .try_into()
         .map_err(|_| LocalAdminError::InvalidInput("hex must be 32 bytes".into()))
+}
+
+/// Parse a challenge code.
+///
+/// Every malformed code collapses to `InvalidChallenge` so a caller
+/// cannot distinguish "not hex", "wrong length" and "unknown code" —
+/// spec §8 requires one identical `400 invalid_challenge` for all of
+/// them, and a syntax error is not an account-existence oracle.
+fn parse_challenge_code(hex_str: &str) -> LocalResult<[u8; 32]> {
+    let bytes = hex::decode(hex_str).map_err(|_| LocalAdminError::InvalidChallenge)?;
+    bytes
+        .try_into()
+        .map_err(|_| LocalAdminError::InvalidChallenge)
 }
 
 use rand_core::RngCore;

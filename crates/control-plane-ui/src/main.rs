@@ -2,6 +2,7 @@
 
 use dioxus::prelude::*;
 
+mod admin_api;
 mod api;
 mod pages;
 mod router;

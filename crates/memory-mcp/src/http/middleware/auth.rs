@@ -10,9 +10,13 @@
 //! `require_control_plane_csrf` is the cross-cutting CSRF check that
 //! sits behind the session authenticator on state-changing API calls.
 
-use axum::http::{Method, StatusCode, header};
+use axum::http::StatusCode;
+#[allow(unused_imports)]
+use axum::http::{Method, header};
 use axum::middleware::Next;
-use axum::response::{IntoResponse, Response};
+#[allow(unused_imports)]
+use axum::response::IntoResponse;
+use axum::response::Response;
 use std::sync::Arc;
 
 use crate::http::HttpState;

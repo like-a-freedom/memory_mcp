@@ -1,5 +1,74 @@
 # syntax=docker/dockerfile:1.7
+#
+# Builds the two binaries that share the `memory_mcp` package:
+#
+#   * memory_mcp_http — the Streamable HTTP SaaS server (image entrypoint)
+#   * memory_mcp      — the CLI, including the `admin create` / `admin recover`
+#                       subcommands (invoked with an entrypoint override, never
+#                       through a shell: the runtime is shell-free)
+#
+# Both are compiled with `streamable-http,control-plane,control-plane-ui` so the
+# local-admin CLI and the bundled browser UI are present in the same image.
+#
+# The runtime keeps the pre-existing contract for the non-local modes: the
+# distroless nonroot user, no shell, the HTTP entrypoint, the native shared
+# libraries, and the compiled migration-asset path.
 
+# ─────────────────────────────────────────────────────────────────────────────
+# Stage 1 — control-plane UI bundle (Dioxus 0.7 -> WASM).
+#
+# VERIFIED: `dx bundle` is run with Dioxus CLI 0.7.10 (the newest 0.7 line, the
+# version the crates/control-plane-ui 0.7 dependency resolves against) from the
+# workspace root. Running it from crates/control-plane-ui panics:
+#
+#   dx 0.7.10 -> find_main_package -> std::fs::canonicalize(default_member)
+#   unwrap on NotFound, because this workspace declares
+#   `default-members = ["crates/memory-mcp"]` and dx resolves those paths
+#   relative to the current directory instead of the workspace root.
+#
+# Invoking from /src with an explicit `--package control-plane-ui` avoids that
+# path. The verified output layout is `<out-dir>/public/` (index.html, JS and
+# WASM under `public/`), which is why `MEMORY_MCP_CONTROL_PLANE_UI_DIST` below
+# points at the `public` subdirectory: `crates/memory-mcp/build.rs` requires a
+# non-empty `index.html` at the root of the dist directory. Bump the pinned CLI
+# only after re-running `dx --version` / `dx bundle --help` and re-checking this
+# layout.
+# ─────────────────────────────────────────────────────────────────────────────
+FROM rust:1.97.1-slim-trixie AS ui-builder
+
+WORKDIR /src
+
+RUN apt-get update \
+    && apt-get install --no-install-recommends --yes \
+        ca-certificates \
+        cmake \
+        libssl-dev \
+        pkg-config \
+    && rm -rf /var/lib/apt/lists/*
+
+ARG DIOXUS_CLI_VERSION=0.7.10
+ARG WASM_TARGET=wasm32-unknown-unknown
+
+RUN rustup target add "${WASM_TARGET}" \
+    && cargo install dioxus-cli --version "${DIOXUS_CLI_VERSION}" --locked
+
+COPY . .
+
+# Absolute, non-symlink output directory containing nonempty index + JS + WASM.
+RUN --mount=type=cache,id=memory-mcp-cargo-registry-ui,target=/usr/local/cargo/registry \
+    --mount=type=cache,id=memory-mcp-cargo-git-ui,target=/usr/local/cargo/git \
+    --mount=type=cache,id=memory-mcp-target-ui,target=/src/target \
+    set -eux; \
+    cd /src; \
+    dx bundle --platform web --release --package control-plane-ui --out-dir /src/control-plane-ui-dist; \
+    test -s /src/control-plane-ui-dist/public/index.html; \
+    find /src/control-plane-ui-dist/public -type f -name '*.js'   | grep -q .; \
+    find /src/control-plane-ui-dist/public -type f -name '*.wasm' | grep -q .
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Stage 2 — Rust binaries. Consumes the UI bundle produced by stage 1 and
+# embeds it at compile time through `MEMORY_MCP_CONTROL_PLANE_UI_DIST`.
+# ─────────────────────────────────────────────────────────────────────────────
 FROM rust:1.97.1-slim-trixie AS builder
 
 WORKDIR /src
@@ -18,12 +87,21 @@ RUN apt-get update \
 
 COPY . .
 
+# The bundle lands at the same literal absolute path `build.rs` reads. Copying
+# it into the build stage (rather than pointing at a stage-relative path) keeps
+# the contract identical to a host build. The dist directory is copied, not
+# symlinked, so `build.rs`'s `symlink_metadata` check passes.
+COPY --from=ui-builder /src/control-plane-ui-dist /src/control-plane-ui-dist
+ENV MEMORY_MCP_CONTROL_PLANE_UI_DIST=/src/control-plane-ui-dist/public
+
 RUN --mount=type=cache,id=memory-mcp-cargo-registry,target=/usr/local/cargo/registry \
     --mount=type=cache,id=memory-mcp-cargo-git,target=/usr/local/cargo/git \
     --mount=type=cache,id=memory-mcp-target-trixie,target=/src/target \
     set -eux; \
-    cargo build --locked --release -p memory_mcp --bin memory_mcp_http --features streamable-http,control-plane,control-plane-ui; \
+    cargo build --locked --release -p memory_mcp --bins \
+        --features streamable-http,control-plane,control-plane-ui; \
     mkdir -p /out/runtime; \
+    install -Dm755 target/release/memory_mcp /out/memory_mcp; \
     install -Dm755 target/release/memory_mcp_http /out/memory_mcp_http; \
     find target/release -maxdepth 1 -type f \( -name '*.so' -o -name '*.so.*' \) -exec cp -v '{}' /out/runtime/ \;
 
@@ -33,16 +111,29 @@ FROM gcr.io/distroless/cc-debian13:nonroot AS runtime
 
 WORKDIR /app
 
+# `memory_mcp` is the CLI; the image entrypoint stays `memory_mcp_http` so the
+# existing HTTP deployments are unchanged. Admin commands run with an
+# entrypoint override, e.g.
+#   docker run --rm --entrypoint /usr/local/bin/memory_mcp <image> admin create --username ops.one
+COPY --from=builder /out/memory_mcp /usr/local/bin/memory_mcp
 COPY --from=builder /out/memory_mcp_http /usr/local/bin/memory_mcp_http
 COPY --from=builder /out/runtime/ /usr/local/lib/
 # Registry migrations currently resolve from the compile-time
 # `CARGO_MANIFEST_DIR`; keep those SQL assets at that path in the runtime
-# image without shipping the source tree or toolchain.
-COPY --from=builder /src/crates/memory-mcp/migrations/ /src/crates/memory-mcp/migrations/
+# image without shipping the source tree or toolchain. `--chmod` normalizes
+# permissions because the runtime user is `nonroot` while some migration files
+# are not world-readable in the working tree (e.g. a newly added file created
+# with a 002 umask lands as 0660 and would fail startup with `Permission denied`).
+COPY --chmod=0755 --from=builder /src/crates/memory-mcp/migrations/ /src/crates/memory-mcp/migrations/
+# The UI is embedded at compile time; the bundle is also carried at the literal
+# absolute dist path the build contract uses so the image and a source build
+# expose the same layout.
+COPY --from=builder /src/control-plane-ui-dist /src/control-plane-ui-dist
 
 ENV HOME=/tmp \
     XDG_DATA_HOME=/tmp/memory-mcp \
     LD_LIBRARY_PATH=/usr/local/lib \
+    MEMORY_MCP_CONTROL_PLANE_UI_DIST=/src/control-plane-ui-dist/public \
     RUST_LOG=info \
     NER_EXTRACTOR=anno \
     EMBEDDINGS_ENABLED=false \

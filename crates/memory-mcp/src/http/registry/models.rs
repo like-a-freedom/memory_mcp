@@ -142,7 +142,7 @@ pub const DEFAULT_MAX_ACTIVE_API_KEYS: u32 = 5;
 pub const DEFAULT_PER_TENANT_REQUEST_CONCURRENCY: u32 = 4;
 pub const DEFAULT_EXTRACTION_CONCURRENCY: u32 = 2;
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct PlanLimits {
     pub max_ingested_bytes: u64,
     pub max_episode_count: u64,
@@ -193,6 +193,15 @@ pub struct SubjectVerifier(pub [u8; 32]);
 pub struct IdentityRef {
     pub issuer: String,
     pub subject_verifier: SubjectVerifier,
+}
+
+/// Browser-auth policy fence returned by `join_oidc_policy`.
+/// The storage layer defines this so the `RegistryStore` trait can
+/// reference it without importing the local_admin service contracts.
+#[derive(Debug, Clone)]
+pub struct BrowserPolicyFence {
+    pub mode: crate::http::config::BrowserAuthMode,
+    pub epoch: u64,
 }
 
 /// One-use deletion challenge keyed by an HMAC verifier.

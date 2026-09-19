@@ -77,6 +77,18 @@ const EXPECTED_CLI_SUBCOMMANDS: &[&str] = &[
     "init",
 ];
 
+/// Subcommands that are part of the approved surface only when the feature
+/// that owns them is compiled in.
+///
+/// `admin` is the local-administrator provisioning CLI (local-admin-auth plan,
+/// Task 5). It is gated behind `streamable-http` + `control-plane`, so the
+/// default stdio surface must never expose it. Any *other* new subcommand
+/// still fails `live_cli_surface_matches_snapshot`.
+#[cfg(all(feature = "streamable-http", feature = "control-plane"))]
+const FEATURE_CLI_SUBCOMMANDS: &[&str] = &["admin"];
+#[cfg(not(all(feature = "streamable-http", feature = "control-plane")))]
+const FEATURE_CLI_SUBCOMMANDS: &[&str] = &[];
+
 /// Ordinary CLI subcommands that must never appear.
 const FORBIDDEN_CLI_SUBCOMMANDS: &[&str] = &[
     "prepare_task",
@@ -164,7 +176,11 @@ fn live_cli_surface_matches_snapshot() {
         .get_subcommands()
         .map(clap::Command::get_name)
         .collect();
-    let expected: HashSet<&str> = EXPECTED_CLI_SUBCOMMANDS.iter().copied().collect();
+    let expected: HashSet<&str> = EXPECTED_CLI_SUBCOMMANDS
+        .iter()
+        .chain(FEATURE_CLI_SUBCOMMANDS.iter())
+        .copied()
+        .collect();
 
     assert_eq!(
         actual, expected,

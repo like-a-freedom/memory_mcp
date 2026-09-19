@@ -614,6 +614,23 @@ in through the UI, creates an API key, and configures that key in the MCP
 client for `POST /mcp`. `MEMORY_MCP_HTTP_OPERATOR_IDENTITIES` is required only
 for operator routes, not for normal account or API-key management.
 
+### Local administrator mode (alternative to OIDC)
+
+`MEMORY_MCP_HTTP_AUTH_MODE=local` selects an alternative control plane for
+single-tenant and air-gapped deployments that have no identity provider:
+locally created administrators sign in with Argon2id passwords and durable
+database-backed sessions, then provision clients and issue client API keys. OIDC
+settings must be absent in this mode, and the `memory_mcp admin create` /
+`admin recover` CLI is the only path that creates an administrator or resets a
+password.
+
+Local mode is documented but **not deployable in this revision**: the
+configuration validator rejects both the presence and the absence of the OIDC
+variables, so no environment combination starts it. See the
+[local administrator authentication runbook](docs/operations/LOCAL_ADMIN_AUTH.md)
+for the exact environment contract, the verified test coverage, the reproduced
+startup failure, and the remaining unverified areas.
+
 ### Build and run
 
 Build with the `streamable-http` feature. Add `control-plane` for the OIDC

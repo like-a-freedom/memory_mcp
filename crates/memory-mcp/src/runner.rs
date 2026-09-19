@@ -87,6 +87,13 @@ async fn dispatch(logger: &StdoutLogger, cli: Cli) -> Result<(), ExitCode> {
 
         Some(Command::Init(args)) => commands::init::run(args).map_err(report_cli_error),
 
+        // Admin commands: dispatch before MemoryService/NER construction.
+        // Connects directly to the control registry via AdminCliConfig.
+        #[cfg(all(feature = "streamable-http", feature = "control-plane"))]
+        Some(Command::Admin(args)) => commands::run_admin(args.operation)
+            .await
+            .map_err(report_cli_error),
+
         // One-shot CLI tool subcommands: build the service once, then run the
         // command's erased runner (label + error policy live in `cli.rs`). No
         // closures, no `Pin<Box>` in this file, no `std::process::exit` inside

@@ -1,5 +1,6 @@
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};
+use serde::Serialize;
 
 use crate::error::MemoryError;
 pub use crate::http::config::BrowserAuthMode;
@@ -137,7 +138,7 @@ pub struct IssuedChallenge {
 }
 
 /// Challenge view returned to browser (no credential data).
-#[derive(Debug)]
+#[derive(Debug, Serialize)]
 pub struct ChallengeView {
     pub username: String,
     pub expires_at: DateTime<Utc>,
@@ -251,7 +252,7 @@ pub struct PageRequest {
     pub limit: u16,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Serialize)]
 pub struct Page<T> {
     pub items: Vec<T>,
     pub next_cursor: Option<String>,
@@ -265,7 +266,7 @@ pub struct ClientCreate {
     pub operation_id: uuid::Uuid,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize)]
 pub struct ClientView {
     pub account_id: String,
     pub tenant_id: String,
@@ -285,13 +286,6 @@ pub struct ClientBundle {
     pub display_name: String,
     pub operation_id: uuid::Uuid,
     pub request_fingerprint: [u8; 32],
-}
-
-#[derive(Debug, Clone, serde::Deserialize)]
-pub struct AdminKeyCreate {
-    pub name: String,
-    pub expiry: KeyExpiry,
-    pub operation_id: uuid::Uuid,
 }
 
 #[derive(Debug, Clone, serde::Deserialize)]
@@ -316,14 +310,6 @@ pub struct AdminKeyInsert {
 pub enum KeyInsertOutcome {
     Created(crate::http::registry::models::ApiKeyMeta),
     AlreadyIssued { key_id: String },
-}
-
-#[derive(Debug)]
-pub struct IssuedClientKey {
-    pub id: String,
-    pub name: String,
-    pub secret: String,
-    pub expires_at: Option<DateTime<Utc>>,
 }
 
 #[derive(Debug, Clone, Copy)]

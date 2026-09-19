@@ -88,23 +88,31 @@ mod tests {
     async fn logout_revokes_session_and_clears_cookie() {
         let store: Arc<crate::http::registry::storage::InMemoryStore> =
             Arc::new(crate::http::registry::storage::InMemoryStore::default());
+        // Join the durable OIDC policy so the session write is guarded by
+        // a current epoch, mirroring startup composition.
+        let policy = store.join_oidc_policy().await.expect("join OIDC policy");
         let registry = RegistryHandle::in_memory().with_inner_store(store.clone());
         let state = crate::http::test_state::HttpStateTestBuilder::new()
             .await
             .with_registry(registry)
+            .with_browser_policy(policy.clone())
             .build()
             .await
             .expect("test HTTP state");
         let now = chrono::Utc::now();
         store
-            .store_session(&ControlPlaneSession {
-                id: "ses_logout".into(),
-                cookie_hash: "cookie_logout".into(),
-                account_id: "acct_logout".into(),
-                auth_time: now,
-                idle_expiry: now + chrono::Duration::minutes(30),
-                absolute_expiry: now + chrono::Duration::hours(1),
-            })
+            .store_session(
+                &policy,
+                &ControlPlaneSession {
+                    id: "ses_logout".into(),
+                    cookie_hash: "cookie_logout".into(),
+                    account_id: "acct_logout".into(),
+                    browser_policy_epoch: Some(policy.epoch),
+                    auth_time: now,
+                    idle_expiry: now + chrono::Duration::minutes(30),
+                    absolute_expiry: now + chrono::Duration::hours(1),
+                },
+            )
             .await
             .expect("store session");
 
@@ -114,6 +122,7 @@ mod tests {
                 id: "ses_logout".into(),
                 cookie_hash: "cookie_logout".into(),
                 account_id: "acct_logout".into(),
+                browser_policy_epoch: Some(policy.epoch),
                 auth_time: now,
                 idle_expiry: now + chrono::Duration::minutes(30),
                 absolute_expiry: now + chrono::Duration::hours(1),
@@ -125,7 +134,7 @@ mod tests {
         // 1) Server-side session is gone.
         assert!(
             store
-                .find_session("cookie_logout")
+                .find_session(&policy, "cookie_logout")
                 .await
                 .expect("session lookup")
                 .is_none(),

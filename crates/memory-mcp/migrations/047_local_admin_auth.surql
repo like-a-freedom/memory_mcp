@@ -1,7 +1,9 @@
--- 047_local_admin_auth.surql
--- Local administrator authentication and client provisioning schema.
--- Approved migration for local admin auth tables.
--- Never edit 001/045/046.
+-- 047_local_admin_auth — Local administrator authentication and client provisioning
+--
+-- Tables for local admin identity, sessions, challenges, throttling,
+-- client sidecars, operations, audit, and the browser-auth policy singleton.
+-- All tables are schemafull; deny unprivileged direct table operations.
+-- Run after approval of the migration and the proposed schema.
 
 -- ─── browser_auth_policy ──────────────────────────────────
 DEFINE TABLE browser_auth_policy SCHEMAFULL;
@@ -59,10 +61,13 @@ DEFINE INDEX idx_local_admin_session_admin ON local_admin_session FIELDS admin_i
 -- ─── local_admin_rate_bucket ──────────────────────────────
 DEFINE TABLE local_admin_rate_bucket SCHEMAFULL;
 DEFINE FIELD bucket_id ON local_admin_rate_bucket TYPE string;
-DEFINE FIELD window_start ON local_admin_rate_bucket TYPE datetime;
-DEFINE FIELD count ON local_admin_rate_bucket TYPE int;
-DEFINE FIELD expires_at ON local_admin_rate_bucket TYPE datetime;
+DEFINE FIELD source_bucket ON local_admin_rate_bucket TYPE int;
+DEFINE FIELD username_bucket ON local_admin_rate_bucket TYPE option<int>;
+DEFINE FIELD action ON local_admin_rate_bucket TYPE string;
+DEFINE FIELD reason ON local_admin_rate_bucket TYPE option<string>;
 DEFINE FIELD denied_count ON local_admin_rate_bucket TYPE int;
+DEFINE FIELD window_start ON local_admin_rate_bucket TYPE datetime;
+DEFINE FIELD expires_at ON local_admin_rate_bucket TYPE datetime;
 DEFINE INDEX idx_local_admin_rate_bucket_id ON local_admin_rate_bucket FIELDS bucket_id UNIQUE;
 
 -- ─── local_admin_client ───────────────────────────────────
@@ -71,11 +76,28 @@ DEFINE FIELD account_id ON local_admin_client TYPE string;
 DEFINE FIELD display_name ON local_admin_client TYPE string;
 DEFINE FIELD creating_admin_id ON local_admin_client TYPE string;
 DEFINE FIELD operation_id ON local_admin_client TYPE string;
-DEFINE FIELD created_at ON local_admin_client TYPE datetime;
+DEFINE FIELD account_status ON local_admin_client TYPE string;
+DEFINE FIELD tenant_status ON local_admin_client TYPE string;
+DEFINE FIELD plan_version ON local_admin_client TYPE int;
+DEFINE FIELD schema_version ON local_admin_client TYPE int;
 DEFINE FIELD version ON local_admin_client TYPE int;
 DEFINE FIELD suspended_from_ready ON local_admin_client TYPE bool;
+DEFINE FIELD created_at ON local_admin_client TYPE datetime;
+DEFINE FIELD updated_at ON local_admin_client TYPE datetime;
 DEFINE INDEX idx_local_admin_client_account ON local_admin_client FIELDS account_id UNIQUE;
 DEFINE INDEX idx_local_admin_client_admin ON local_admin_client FIELDS creating_admin_id;
+
+-- ─── local_admin_client_key ──────────────────────────────
+DEFINE TABLE local_admin_client_key SCHEMAFULL;
+DEFINE FIELD key_id ON local_admin_client_key TYPE string;
+DEFINE FIELD account_id ON local_admin_client_key TYPE string;
+DEFINE FIELD name ON local_admin_client_key TYPE string;
+DEFINE FIELD verifier ON local_admin_client_key TYPE string;
+DEFINE FIELD created_at ON local_admin_client_key TYPE datetime;
+DEFINE FIELD expires_at ON local_admin_client_key TYPE option<datetime>;
+DEFINE FIELD revoked ON local_admin_client_key TYPE bool;
+DEFINE INDEX idx_local_admin_client_key_id ON local_admin_client_key FIELDS key_id UNIQUE;
+DEFINE INDEX idx_local_admin_client_key_account ON local_admin_client_key FIELDS account_id;
 
 -- ─── local_admin_operation ────────────────────────────────
 DEFINE TABLE local_admin_operation SCHEMAFULL;
@@ -104,3 +126,11 @@ DEFINE FIELD reason ON local_admin_audit TYPE option<string>;
 DEFINE FIELD request_id ON local_admin_audit TYPE string;
 DEFINE FIELD grants_client_data_access ON local_admin_audit TYPE option<bool>;
 DEFINE INDEX idx_local_admin_audit_request ON local_admin_audit FIELDS request_id;
+
+-- ─── control_plane_session epoch (OIDC compatibility) ─────
+-- Additive field on the OIDC browser-session table created by
+-- 045_deletion_and_usage_hardening. It binds each session to the durable
+-- browser-auth policy epoch so a mode/epoch change invalidates older
+-- sessions. Rows written before this field decode as NONE and fail
+-- authentication, forcing a fresh login after upgrade.
+DEFINE FIELD IF NOT EXISTS browser_policy_epoch ON control_plane_session TYPE option<int>;

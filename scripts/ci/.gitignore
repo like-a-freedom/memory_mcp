@@ -1,0 +1,4 @@
+# Locally installed browser-runner dependencies (see package.json /
+# package-lock.json). Install with `npm ci` inside this directory; the
+# acceptance harness fails loudly when they are missing.
+node_modules/

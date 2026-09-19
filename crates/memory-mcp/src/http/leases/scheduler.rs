@@ -74,6 +74,7 @@ impl SchedulerHooks {
                 registry, migrations, injector,
             ))
         });
+        #[allow(unused_mut)]
         let mut jobs: Vec<SchedulerJob> = vec![provisioning];
         #[cfg(feature = "control-plane")]
         {

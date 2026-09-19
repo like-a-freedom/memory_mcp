@@ -1,3 +1,5 @@
+#![cfg(all(feature = "streamable-http", feature = "control-plane"))]
+
 //! Remote race tests for local admin authentication.
 //!
 //! These tests require an isolated SurrealDB 3.2.4 instance.
@@ -27,7 +29,8 @@ async fn local_admin_remote_replica_races() {
         .await
         .expect("connect to remote SurrealDB");
 
-    db.use_ns(&namespace).use_db("test_race")
+    db.use_ns(&namespace)
+        .use_db("test_race")
         .await
         .expect("use namespace");
 
@@ -40,34 +43,49 @@ async fn local_admin_remote_replica_races() {
     .expect("signin");
 
     // Run migrations
-    let migrations_dir = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .join("migrations");
+    let migrations_dir = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("migrations");
     let migration = std::fs::read_to_string(migrations_dir.join("047_local_admin_auth.surql"))
         .expect("read migration");
     db.query(&migration).await.expect("apply migration");
 
-    // Test 1: Concurrent admin creation should handle gracefully
+    // Test 1: Concurrent admin creation of the same unique username.
+    //
+    // `local_admin` is SCHEMAFULL and requires `id` (string, unique index),
+    // `version` and `updated_at`; both inserts therefore supply every field.
+    // Distinct record ids keep the conflict on the UNIQUE `username` index so
+    // exactly one insert may commit (statement errors surface through
+    // `Response::take_errors`, not through the outer `Result`).
     let db1 = Arc::new(db.clone());
     let db2 = Arc::new(db.clone());
 
     let handle1 = tokio::spawn(async move {
-        db1.query("CREATE local_admin SET username = 'ops.one', state = 'pending_activation', credential_generation = 1, created_at = time::now()")
+        db1.query("CREATE type::record('local_admin', 'race_one') SET id = 'race_one', username = 'ops.one', state = 'pending_activation', password_phc = NONE, credential_generation = 1, version = 1, created_at = time::now(), updated_at = time::now()")
             .await
     });
     let handle2 = tokio::spawn(async move {
-        db2.query("CREATE local_admin SET username = 'ops.one', state = 'pending_activation', credential_generation = 1, created_at = time::now()")
+        db2.query("CREATE type::record('local_admin', 'race_two') SET id = 'race_two', username = 'ops.one', state = 'pending_activation', password_phc = NONE, credential_generation = 1, version = 1, created_at = time::now(), updated_at = time::now()")
             .await
     });
 
     let (r1, r2) = tokio::join!(handle1, handle2);
 
-    // At least one should succeed (or both if unique constraint allows duplicates)
-    // The important thing is no crash or corruption
-    assert!(r1.is_ok() || r2.is_ok(), "at least one concurrent create should succeed");
+    // Exactly one concurrent create of the same username must commit; the
+    // other is rejected by the UNIQUE username index. Neither may crash.
+    let committed = usize::from(
+        r1.expect("create task 1 joined")
+            .is_ok_and(|mut response| response.take_errors().is_empty()),
+    ) + usize::from(
+        r2.expect("create task 2 joined")
+            .is_ok_and(|mut response| response.take_errors().is_empty()),
+    );
+    assert_eq!(
+        committed, 1,
+        "exactly one concurrent create of the same username should succeed"
+    );
 
     // Cleanup
-    let _ = db.query(&format!("REMOVE DATABASE test_race")).await;
-    let _ = db.query(&format!("REMOVE NAMESPACE {namespace}")).await;
+    let _ = db.query("REMOVE DATABASE test_race").await;
+    let _ = db.query(format!("REMOVE NAMESPACE {namespace}")).await;
 }
 
 /// Test session revocation during concurrent login.
@@ -90,7 +108,8 @@ async fn local_admin_session_revocation_race() {
         .await
         .expect("connect to remote SurrealDB");
 
-    db.use_ns(&namespace).use_db("test_session_race")
+    db.use_ns(&namespace)
+        .use_db("test_session_race")
         .await
         .expect("use namespace");
 
@@ -102,23 +121,24 @@ async fn local_admin_session_revocation_race() {
     .expect("signin");
 
     // Apply migration
-    let migrations_dir = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .join("migrations");
+    let migrations_dir = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("migrations");
     let migration = std::fs::read_to_string(migrations_dir.join("047_local_admin_auth.surql"))
         .expect("read migration");
     db.query(&migration).await.expect("apply migration");
 
-    // Create test admin
-    db.query("CREATE local_admin SET username = 'race.admin', state = 'active', credential_generation = 1, created_at = time::now()")
+    // Create test admin (SCHEMAFULL: id, version and updated_at are required).
+    db.query("CREATE type::record('local_admin', 'race_admin') SET id = 'race_admin', username = 'race.admin', state = 'active', password_phc = NONE, credential_generation = 1, version = 1, created_at = time::now(), updated_at = time::now()")
         .await
         .expect("create admin");
 
-    // Create two sessions
-    db.query("CREATE local_admin_session SET admin_id = (SELECT id FROM local_admin WHERE username = 'race.admin')[0].id, cookie_verifier = 'aaaa', credential_generation = 1, created_at = time::now(), idle_expiry = time::now() + 1800s, absolute_expiry = time::now() + 86400s, revoked = false")
+    // Create two sessions. `local_admin_session` is SCHEMAFULL and has no
+    // `created_at`/`revoked` fields; it requires `id`, `mode_epoch`,
+    // `auth_time` and the `option<datetime>` `revoked_at`.
+    db.query("CREATE type::record('local_admin_session', 'aaaa') SET id = 'aaaa', cookie_verifier = 'aaaa', admin_id = 'race_admin', credential_generation = 1, mode_epoch = 1, auth_time = time::now(), idle_expiry = time::now() + 1800s, absolute_expiry = time::now() + 86400s, revoked_at = NONE")
         .await
         .expect("create session 1");
 
-    db.query("CREATE local_admin_session SET admin_id = (SELECT id FROM local_admin WHERE username = 'race.admin')[0].id, cookie_verifier = 'bbbb', credential_generation = 1, created_at = time::now(), idle_expiry = time::now() + 1800s, absolute_expiry = time::now() + 86400s, revoked = false")
+    db.query("CREATE type::record('local_admin_session', 'bbbb') SET id = 'bbbb', cookie_verifier = 'bbbb', admin_id = 'race_admin', credential_generation = 1, mode_epoch = 1, auth_time = time::now(), idle_expiry = time::now() + 1800s, absolute_expiry = time::now() + 86400s, revoked_at = NONE")
         .await
         .expect("create session 2");
 
@@ -127,19 +147,51 @@ async fn local_admin_session_revocation_race() {
     let db2 = Arc::new(db.clone());
 
     let handle1 = tokio::spawn(async move {
-        db1.query("UPDATE local_admin_session SET revoked = true WHERE cookie_verifier = 'aaaa'")
+        db1.query("UPDATE local_admin_session SET revoked_at = time::now() WHERE cookie_verifier = 'aaaa'")
             .await
     });
     let handle2 = tokio::spawn(async move {
-        db2.query("SELECT * FROM local_admin_session WHERE cookie_verifier = 'bbbb' AND revoked = false")
-            .await
+        db2.query(
+            "SELECT * FROM local_admin_session WHERE cookie_verifier = 'bbbb' AND revoked_at IS NONE",
+        )
+        .await
     });
 
     let (r1, r2) = tokio::join!(handle1, handle2);
-    assert!(r1.is_ok(), "revoke should succeed");
-    assert!(r2.is_ok(), "resolve should succeed");
+    let mut revoke = r1.expect("revoke task joined").expect("revoke query");
+    assert!(
+        revoke.take_errors().is_empty(),
+        "revoke should not raise statement errors"
+    );
+    let mut resolve = r2.expect("resolve task joined").expect("resolve query");
+    assert!(
+        resolve.take_errors().is_empty(),
+        "resolve should not raise statement errors"
+    );
+
+    // Typed postconditions: the independent session stays resolvable while the
+    // other session's revocation is durably recorded.
+    let resolved: Vec<serde_json::Value> = resolve.take(0).expect("resolve rows");
+    assert_eq!(
+        resolved.len(),
+        1,
+        "the independent session must remain resolvable during revoke"
+    );
+    assert_eq!(resolved[0]["cookie_verifier"], "bbbb");
+
+    let revoked: Vec<serde_json::Value> = db
+        .query("SELECT cookie_verifier, revoked_at FROM local_admin_session WHERE cookie_verifier = 'aaaa'")
+        .await
+        .expect("postcondition read")
+        .take(0)
+        .expect("revoked rows");
+    assert_eq!(revoked.len(), 1, "the revoked session row must still exist");
+    assert!(
+        !revoked[0]["revoked_at"].is_null(),
+        "the revoked session must record revoked_at"
+    );
 
     // Cleanup
     let _ = db.query("REMOVE DATABASE test_session_race").await;
-    let _ = db.query(&format!("REMOVE NAMESPACE {namespace}")).await;
+    let _ = db.query(format!("REMOVE NAMESPACE {namespace}")).await;
 }

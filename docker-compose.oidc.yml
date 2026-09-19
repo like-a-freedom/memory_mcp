@@ -1,0 +1,23 @@
+# OIDC browser control-plane overlay — the pre-existing configuration, unchanged
+# in meaning (OIDC issuer/client/audience/redirect + identity/state/nonce keys).
+#
+#   docker compose -f docker-compose.yml -f docker-compose.oidc.yml up -d
+#
+# No value is defaulted except the allowed algorithm (RS256) and the signup
+# policy (invite_only), matching the historical behaviour. There is no
+# `root/root` database credential and no example browser key.
+services:
+  memory_mcp:
+    environment:
+      MEMORY_MCP_HTTP_ENABLE_CONTROL_PLANE: "true"
+      MEMORY_MCP_HTTP_ENABLE_CONTROL_PLANE_UI: "${MEMORY_MCP_HTTP_ENABLE_CONTROL_PLANE_UI:?set to true only with an image built with control-plane-ui}"
+      MEMORY_MCP_HTTP_AUTH_MODE: "oidc"
+      MEMORY_MCP_HTTP_SIGNUP_MODE: "${MEMORY_MCP_HTTP_SIGNUP_MODE:-invite_only}"
+      MEMORY_MCP_HTTP_OIDC_ISSUER: "${MEMORY_MCP_HTTP_OIDC_ISSUER:?MEMORY_MCP_HTTP_OIDC_ISSUER is required in OIDC mode}"
+      MEMORY_MCP_HTTP_OIDC_CLIENT_ID: "${MEMORY_MCP_HTTP_OIDC_CLIENT_ID:?MEMORY_MCP_HTTP_OIDC_CLIENT_ID is required in OIDC mode}"
+      MEMORY_MCP_HTTP_OIDC_AUDIENCE: "${MEMORY_MCP_HTTP_OIDC_AUDIENCE:?MEMORY_MCP_HTTP_OIDC_AUDIENCE is required in OIDC mode}"
+      MEMORY_MCP_HTTP_OIDC_REDIRECT_URI: "${MEMORY_MCP_HTTP_OIDC_REDIRECT_URI:?MEMORY_MCP_HTTP_OIDC_REDIRECT_URI is required in OIDC mode}"
+      MEMORY_MCP_HTTP_OIDC_ALLOWED_ALG: "${MEMORY_MCP_HTTP_OIDC_ALLOWED_ALG:-RS256}"
+      MEMORY_MCP_HTTP_IDENTITY_INDEX_KEY: "${MEMORY_MCP_HTTP_IDENTITY_INDEX_KEY:?MEMORY_MCP_HTTP_IDENTITY_INDEX_KEY is required (64 hex chars); supply an operator-generated value}"
+      MEMORY_MCP_HTTP_OIDC_STATE_KEY: "${MEMORY_MCP_HTTP_OIDC_STATE_KEY:?MEMORY_MCP_HTTP_OIDC_STATE_KEY is required (64 hex chars); supply an operator-generated value}"
+      MEMORY_MCP_HTTP_OIDC_NONCE_KEY: "${MEMORY_MCP_HTTP_OIDC_NONCE_KEY:?MEMORY_MCP_HTTP_OIDC_NONCE_KEY is required (64 hex chars); supply an operator-generated value}"

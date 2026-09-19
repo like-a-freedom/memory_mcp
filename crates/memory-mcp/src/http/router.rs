@@ -3,14 +3,17 @@
 use std::sync::Arc;
 
 use axum::Router;
-use axum::routing::{delete, get, post};
+use axum::routing::{get, post};
+// `delete` is only used by the control-plane routes below.
+#[cfg(feature = "control-plane")]
+use axum::routing::delete;
 
 use super::HttpState;
 use super::fault_injection::FaultInjector;
 
 pub fn build_router(
     state: Arc<HttpState>,
-    control_plane_injector: Option<Arc<dyn FaultInjector>>,
+    #[allow(unused_variables)] control_plane_injector: Option<Arc<dyn FaultInjector>>,
 ) -> Router {
     // Route-scoped layers added EARLIER are INNER (run
     // later). `acquire_runtime` runs after `authenticate`
@@ -54,8 +57,13 @@ pub fn build_router(
     #[cfg(feature = "control-plane")]
     let control_extension: Option<axum::Extension<Arc<dyn FaultInjector>>> =
         control_plane_injector.map(axum::Extension);
+    // The OIDC/account/operator surface is mounted only when the
+    // deployment is in OIDC mode. Local mode must not expose
+    // `/auth/oidc/*`, `/api/v1/account/*` or `/api/v1/operator/*` at
+    // all — not merely leave them unauthenticated — and a disabled
+    // control plane mounts neither surface.
     #[cfg(feature = "control-plane")]
-    let router = if state.config.enable_control_plane {
+    let router = if state.config.browser_auth_is_oidc() {
         let account = Router::new()
             .route(
                 "/api/v1/account",
@@ -170,52 +178,119 @@ pub fn build_router(
         if is_local {
             use crate::control::local_admin::handlers;
             use axum::routing::{delete, get, post};
+            // The local surface deliberately mirrors spec §8 and mounts
+            // none of the OIDC control-plane routes. The OIDC branch is
+            // skipped entirely above, so `/auth/oidc/*`,
+            // `/api/v1/account/*` and `/api/v1/operator/*` are absent
+            // rather than merely unauthenticated.
             let local_admin = Router::new()
+                .route("/api/v1/auth/config", get(handlers::auth_config))
+                .route("/api/v1/auth/local/csrf", get(handlers::preauth_csrf))
                 .route(
-                    "/api/v1/local/admin/challenge",
+                    "/api/v1/auth/local/challenge",
                     post(handlers::inspect_challenge),
                 )
-                .route("/api/v1/local/admin/auth/login", post(handlers::login))
+                .route("/api/v1/auth/local/activate", post(handlers::activate))
+                .route("/api/v1/auth/local/reset", post(handlers::reset))
+                .route("/api/v1/auth/local/login", post(handlers::login))
+                .route("/api/v1/admin/session", get(handlers::session))
+                .route("/api/v1/admin/reauth", post(handlers::reauth))
+                .route("/api/v1/admin/logout", post(handlers::logout))
                 .route(
-                    "/api/v1/local/admin/auth/finish",
-                    post(handlers::finish_challenge),
-                )
-                .route("/api/v1/local/admin/auth/reauth", post(handlers::reauth))
-                .route("/api/v1/local/admin/auth/logout", post(handlers::logout))
-                .route(
-                    "/api/v1/local/admin/clients",
+                    "/api/v1/admin/clients",
                     get(handlers::list_clients).post(handlers::create_client),
                 )
                 .route(
-                    "/api/v1/local/admin/clients/{id}",
+                    "/api/v1/admin/clients/{account_id}",
                     get(handlers::get_client),
                 )
                 .route(
-                    "/api/v1/local/admin/clients/{id}/keys",
+                    "/api/v1/admin/clients/{account_id}/keys",
                     get(handlers::list_keys).post(handlers::issue_key),
                 )
                 .route(
-                    "/api/v1/local/admin/clients/{id}/keys/{key_id}",
+                    "/api/v1/admin/clients/{account_id}/keys/{key_id}",
                     delete(handlers::revoke_key),
                 )
                 .route(
-                    "/api/v1/local/admin/clients/{id}/state",
-                    post(handlers::set_client_state),
-                );
+                    "/api/v1/admin/clients/{account_id}/suspend",
+                    post(handlers::suspend_client),
+                )
+                .route(
+                    "/api/v1/admin/clients/{account_id}/resume",
+                    post(handlers::resume_client),
+                )
+                // Local routes are merged after the base router's
+                // layers were applied, so they need their own copy of the
+                // host and deadline protections. The host layer also
+                // enforces the configured Host allowlist; Origin is
+                // enforced per-handler because only local routes require
+                // its *presence*.
+                .layer(axum::middleware::from_fn_with_state(
+                    state.clone(),
+                    super::middleware::local_admin_deadline,
+                ))
+                .layer(axum::middleware::from_fn_with_state(
+                    state.clone(),
+                    super::middleware::host_origin,
+                ));
+            // The reserved-surface 404 is installed as the single outer
+            // fallback below so the static-asset router cannot shadow it.
             router.merge(local_admin)
         } else {
             router
         }
     };
 
-    #[cfg(feature = "control-plane-ui")]
-    let router = if state.config.enable_control_plane_ui {
-        router.fallback(|uri: axum::http::Uri| async move {
-            crate::control::static_assets::serve_asset(uri.path())
-        })
-    } else {
-        router
+    // ─── Reserved-surface 404 and the SPA fallback ────────
+    //
+    // `/api/` and `/auth/` are reserved for the API and the
+    // authentication surface. An unmatched path under either prefix must
+    // answer `404`, never the SPA shell: serving HTML with `200` for a
+    // route the deployment deliberately does not mount is exactly the
+    // mode-bypass failure spec §8 rules out, and it also disguises a
+    // typo'd API call as success.
+    //
+    // This is installed as the single outer fallback, after any mode
+    // specific fallback, so it cannot be shadowed by the static-asset
+    // router.
+    let ui_enabled = {
+        #[cfg(feature = "control-plane-ui")]
+        {
+            state.config.enable_control_plane_ui
+        }
+        #[cfg(not(feature = "control-plane-ui"))]
+        {
+            false
+        }
     };
+    let router = router.fallback(move |uri: axum::http::Uri| async move {
+        let path = uri.path();
+        if path.starts_with("/api/") || path == "/api" {
+            return axum::response::IntoResponse::into_response((
+                axum::http::StatusCode::NOT_FOUND,
+                [(axum::http::header::CONTENT_TYPE, "application/json")],
+                "{\"error\":{\"code\":\"not_found\",\"message\":\"not found\"}}",
+            ));
+        }
+        if path.starts_with("/auth/") || path == "/auth" {
+            return axum::response::IntoResponse::into_response((
+                axum::http::StatusCode::NOT_FOUND,
+                [(axum::http::header::CONTENT_TYPE, "application/json")],
+                "{\"error\":{\"code\":\"not_found\",\"message\":\"not found\"}}",
+            ));
+        }
+        #[cfg(feature = "control-plane-ui")]
+        if ui_enabled {
+            return crate::control::static_assets::serve_asset(path);
+        }
+        let _ = ui_enabled;
+        axum::response::IntoResponse::into_response((
+            axum::http::StatusCode::NOT_FOUND,
+            [(axum::http::header::CONTENT_TYPE, "application/json")],
+            "{\"error\":{\"code\":\"not_found\",\"message\":\"not found\"}}",
+        ))
+    });
     router.with_state(state)
 }
 

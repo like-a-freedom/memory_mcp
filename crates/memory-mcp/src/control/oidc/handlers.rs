@@ -42,10 +42,11 @@ pub async fn authorize(
         seal_oidc_payload(&state.config.keys.oidc_state, &state_token, &nonce, &pkce)?;
 
     #[cfg(feature = "control-plane")]
+    let policy = state.browser_policy.as_ref().ok_or(ApiError::Unavailable)?;
     state
         .registry
         .store_clone()
-        .store_oidc_request(&state_hash, &sealed, &aead_nonce)
+        .store_oidc_request(policy, &state_hash, &sealed, &aead_nonce)
         .await?;
 
     let oidc = state.oidc_client.as_ref().ok_or(ApiError::Unavailable)?;
@@ -59,10 +60,11 @@ pub async fn logout(
     axum::extract::State(state): axum::extract::State<std::sync::Arc<HttpState>>,
     axum::extract::Extension(session): axum::extract::Extension<ControlPlaneSession>,
 ) -> Result<(axum::http::HeaderMap, axum::response::Redirect), ApiError> {
+    let policy = state.browser_policy.as_ref().ok_or(ApiError::Unavailable)?;
     state
         .registry
         .store_clone()
-        .delete_session(&session.cookie_hash)
+        .delete_session(policy, &session.cookie_hash)
         .await?;
     let mut headers = axum::http::HeaderMap::new();
     headers.insert(
@@ -92,6 +94,11 @@ pub async fn callback(
         return Err(ApiError::Unauthorized);
     }
 
+    // The deployment joined the durable OIDC policy at startup; every
+    // flow/session operation below is guarded by it in the same
+    // transaction.
+    let policy = state.browser_policy.as_ref().ok_or(ApiError::Unavailable)?;
+
     // Hash the incoming state to look up the sealed request.
     let state_hash = hex::encode(identity_subject_verifier(
         &state.config.keys.oidc_state,
@@ -103,7 +110,7 @@ pub async fn callback(
     let (sealed, aead_nonce) = state
         .registry
         .store_clone()
-        .take_oidc_request(&state_hash)
+        .take_oidc_request(policy, &state_hash)
         .await?
         .ok_or(ApiError::Unauthorized)?;
 
@@ -168,8 +175,11 @@ pub async fn callback(
         }
     }
 
+    // The deployment joined the durable OIDC policy at startup; the
+    // signup bundle is guarded by that fence in one transaction.
     let account = OidcSignup::new(state.registry.store_clone())
         .resolve_or_create(
+            policy,
             VerifiedExternalIdentity {
                 issuer: claims.iss.clone(),
                 subject_verifier,
@@ -180,8 +190,12 @@ pub async fn callback(
         .map_err(ApiError::Internal)?;
 
     let cookie_value = crate::control::session::generate_session_cookie_value();
-    let session = ControlPlaneSession::new(&account, &cookie_value, &state.config)?;
-    state.registry.store_clone().store_session(&session).await?;
+    let session = ControlPlaneSession::new(&account, &cookie_value, policy.epoch, &state.config)?;
+    state
+        .registry
+        .store_clone()
+        .store_session(policy, &session)
+        .await?;
 
     let cookie = crate::control::session::build_session_cookie(cookie_value, &state.config);
     let mut headers = axum::http::header::HeaderMap::new();

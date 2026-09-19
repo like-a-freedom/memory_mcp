@@ -1,5 +1,23 @@
 # Local Admin Authentication — Operations Runbook
 
+> **SUPERSEDED — do not follow this document.**
+>
+> This file predates the implementation and contains instructions that do not
+> match the shipped code. It is retained only for history. The authoritative
+> runbook is [`LOCAL_ADMIN_AUTH.md`](LOCAL_ADMIN_AUTH.md).
+>
+> Known false or unsafe statements in the text below:
+>
+> - `memory_mcp admin create ops.one` (positional) — the real CLI requires
+>   `--username`.
+> - The route `/api/v1/local/admin/challenge` — the real route is
+>   `POST /api/v1/auth/local/challenge`.
+> - `SameSite=Lax` — the real cookies are `SameSite=Strict`.
+> - "printable ASCII" passwords — the real rule is 15–128 Unicode scalar values
+>   with no NUL.
+> - `SURREALDB_URL` / `SURREALDB_DB_NAME` for the HTTP profile — it reads
+>   `SURREALDB_CONTROL_*` and `SURREALDB_TENANT_*`.
+
 ## Overview
 
 Local admin authentication provides a self-contained admin access mode for

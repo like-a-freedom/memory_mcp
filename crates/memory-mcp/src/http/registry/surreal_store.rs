@@ -63,6 +63,42 @@ pub trait SurrealHandle: Send + Sync {
     async fn ping(&self) -> bool;
 }
 
+/// Read one statement's result as a list of rows.
+///
+/// `Response::take::<serde_json::Value>` refuses a statement that yields
+/// more than one record: it reports "Tried to take only a single result
+/// from a query that contains multiple". That silently broke every
+/// `SELECT` returning two or more rows, including the provisioning
+/// scheduler's tenant listing. Reading the untyped value first and
+/// converting afterwards keeps the array shape, so both a multi-row read
+/// and a scalar read behave correctly.
+///
+/// Returns `Ok(None)` when the statement index produced no value at all,
+/// so callers can distinguish "empty result" from "missing statement".
+fn take_statement_rows(
+    response: &mut surrealdb::IndexedResults,
+    index: usize,
+) -> Result<Option<Vec<Value>>, MemoryError> {
+    // Take the untyped value directly. `Option<T>` is deliberately avoided:
+    // SurrealDB defines `Option<T>` as "at most one row" and errors on a
+    // multi-element array, which is exactly what a `SELECT` returns.
+    let raw: surrealdb::types::Value = response
+        .take::<surrealdb::types::Value>(index)
+        .map_err(|err| MemoryError::Storage(format!("take failed: {err}")))?;
+    if matches!(raw, surrealdb::types::Value::None) {
+        return Ok(None);
+    }
+    // `into_json_value` is the same flattening `Response::take::<serde_json::Value>`
+    // applies; serialising the typed value directly would instead produce the
+    // externally-tagged form (`{"Datetime": "..."}`).
+    let json: Value = raw.into_json_value();
+    Ok(Some(match json {
+        Value::Null => Vec::new(),
+        Value::Array(values) => values,
+        value => vec![value],
+    }))
+}
+
 #[async_trait]
 impl SurrealHandle for Surreal<Client> {
     async fn use_ns_db(&self, namespace: &str, database: &str) -> Result<(), MemoryError> {
@@ -91,18 +127,9 @@ impl SurrealHandle for Surreal<Client> {
                 "query statement errors: {details}"
             )));
         }
-        let mut out = Vec::new();
-        let result: Option<Value> = response
-            .take::<Option<Value>>(0)
+        let rows = take_statement_rows(&mut response, 0)
             .map_err(|err| MemoryError::Storage(format!("take failed: {err}")))?;
-        if let Some(value) = result {
-            match value {
-                Value::Array(values) => out.extend(values),
-                Value::Null => {}
-                value => out.push(value),
-            }
-        }
-        Ok(out)
+        Ok(rows.unwrap_or_default())
     }
     async fn query_json_at(
         &self,
@@ -128,22 +155,12 @@ impl SurrealHandle for Surreal<Client> {
                 "query statement errors: {details}"
             )));
         }
-        let result: Option<Value> =
-            response
-                .take::<Option<Value>>(result_index)
-                .map_err(|err| {
-                    MemoryError::Storage(format!("take index {result_index} failed: {err}"))
-                })?;
-        let Some(value) = result else {
-            return Err(MemoryError::Storage(format!(
-                "query returned no result at index {result_index}"
-            )));
-        };
-        match value {
-            Value::Array(values) => Ok(values),
-            Value::Null => Ok(Vec::new()),
-            value => Ok(vec![value]),
-        }
+        let rows = take_statement_rows(&mut response, result_index).map_err(|err| {
+            MemoryError::Storage(format!("take index {result_index} failed: {err}"))
+        })?;
+        rows.ok_or_else(|| {
+            MemoryError::Storage(format!("query returned no result at index {result_index}"))
+        })
     }
     async fn ping(&self) -> bool {
         match self.query("INFO FOR DB").await {
@@ -181,18 +198,9 @@ impl SurrealHandle for Surreal<Db> {
                 "query statement errors: {details}"
             )));
         }
-        let mut out = Vec::new();
-        let result: Option<Value> = response
-            .take::<Option<Value>>(0)
+        let rows = take_statement_rows(&mut response, 0)
             .map_err(|err| MemoryError::Storage(format!("take failed: {err}")))?;
-        if let Some(value) = result {
-            match value {
-                Value::Array(values) => out.extend(values),
-                Value::Null => {}
-                value => out.push(value),
-            }
-        }
-        Ok(out)
+        Ok(rows.unwrap_or_default())
     }
     async fn query_json_at(
         &self,
@@ -218,22 +226,12 @@ impl SurrealHandle for Surreal<Db> {
                 "query statement errors: {details}"
             )));
         }
-        let result: Option<Value> =
-            response
-                .take::<Option<Value>>(result_index)
-                .map_err(|err| {
-                    MemoryError::Storage(format!("take index {result_index} failed: {err}"))
-                })?;
-        let Some(value) = result else {
-            return Err(MemoryError::Storage(format!(
-                "query returned no result at index {result_index}"
-            )));
-        };
-        match value {
-            Value::Array(values) => Ok(values),
-            Value::Null => Ok(Vec::new()),
-            value => Ok(vec![value]),
-        }
+        let rows = take_statement_rows(&mut response, result_index).map_err(|err| {
+            MemoryError::Storage(format!("take index {result_index} failed: {err}"))
+        })?;
+        rows.ok_or_else(|| {
+            MemoryError::Storage(format!("query returned no result at index {result_index}"))
+        })
     }
     async fn ping(&self) -> bool {
         match self.query("INFO FOR DB").await {
@@ -1116,6 +1114,24 @@ impl SurrealRegistryStore {
     }
 }
 
+/// OIDC policy guard fragment shared by every OIDC-only session and
+/// flow operation.
+///
+/// It is a constant 4-statement fragment, so within any guarded
+/// transaction it occupies result indices 1..=4 (index 0 is the opening
+/// `BEGIN TRANSACTION`) and the method-specific statement is index 5.
+/// A `THROW` aborts the transaction and is surfaced by `query_json_at`
+/// before any result is decoded. The caller binds `$expected_epoch` to
+/// the fence joined at startup; a missing singleton, a non-OIDC mode, or
+/// a stale epoch all fail the transaction.
+#[cfg(feature = "control-plane")]
+const OIDC_POLICY_GUARD: &str = r#"
+LET $policy = (SELECT mode, epoch FROM browser_auth_policy LIMIT 1);
+IF array::len($policy) = 0 { THROW 'no_policy'; };
+IF $policy[0].mode != 'oidc' { THROW 'mode_mismatch'; };
+IF $policy[0].epoch != $expected_epoch { THROW 'epoch_mismatch'; };
+"#;
+
 #[async_trait]
 impl RegistryStore for SurrealRegistryStore {
     async fn ping(&self) -> bool {
@@ -1929,11 +1945,21 @@ impl RegistryStore for SurrealRegistryStore {
         limit: usize,
         _now: DateTime<Utc>,
     ) -> Result<Vec<Tenant>, MemoryError> {
+        // `Suspended` is deliberately absent: a suspended tenant is a
+        // terminal, operator-chosen state (see `provisioning::reconcile`),
+        // so the worker must not claim a lease for it or attempt to advance
+        // it back to `Ready`. Resume is an explicit operator action that
+        // performs the `Suspended -> Ready` transition itself.
+        //
+        // `namespace_creating` is present because a worker that dies between
+        // the `Reserved -> NamespaceCreating` and `NamespaceCreating ->
+        // Migrating` writes must be resumed by the next tick; omitting it
+        // stranded such a tenant forever.
         let rows = self
             .handle()
             .query_json(
                 "SELECT * FROM type::table($table) \
-                 WHERE status IN ['reserved', 'migrating', 'suspended', 'failed'] \
+                 WHERE status IN ['reserved', 'namespace_creating', 'migrating', 'failed'] \
                  AND (provisioning_lease IS NONE OR provisioning_lease.expires_at <= time::now()) \
                  LIMIT $limit",
                 Some(json!({"table": "tenant", "limit": limit})),
@@ -1951,7 +1977,10 @@ impl RegistryStore for SurrealRegistryStore {
         let rows = self
             .handle()
             .query_json(
-                "SELECT * FROM tenant WHERE status = 'ready' AND ($cursor IS NONE OR id > $cursor) ORDER BY id LIMIT $limit",
+                "SELECT * FROM tenant \
+                 WHERE status = 'ready' \
+                 AND ($cursor IS NONE OR id > type::record('tenant', $cursor)) \
+                 ORDER BY id LIMIT $limit",
                 Some(json!({"cursor": cursor, "limit": limit})),
             )
             .await
@@ -2114,6 +2143,214 @@ impl RegistryStore for SurrealRegistryStore {
         Ok(())
     }
 
+    async fn ensure_local_plan(
+        &self,
+        plan: &super::models::Plan,
+    ) -> Result<super::models::Plan, MemoryError> {
+        if plan.version == 0 {
+            return Err(MemoryError::ConfigInvalid(
+                "local plan version must be at least 1".into(),
+            ));
+        }
+        let plan_id = format!("local_plan_v{}", plan.version);
+        // SurrealDB requires braces around a compound `IF` body and does
+        // not accept a nested `IF` directly inside `ELSE`; a single
+        // `ELSE IF` keeps the drift check in one statement.
+        //
+        // The lookup is by **version**, not by id: `idx_plan_version` is
+        // unique, and a version created by an earlier OIDC or bootstrap
+        // deployment must be reused when its limits agree rather than
+        // colliding with a second row.
+        //
+        // Statement order is BEGIN, LET, IF, LET, IF, SELECT, COMMIT, so
+        // the explicit result index below is 5.
+        let sql = "
+            BEGIN TRANSACTION;
+            LET $existing = (SELECT * FROM plan WHERE version = $version LIMIT 1);
+            IF array::len($existing) = 0 {
+                CREATE type::record('plan', $plan_id) SET
+                    id = $plan_id,
+                    version = $version,
+                    limits = $limits;
+            };
+            LET $current = (SELECT * FROM plan WHERE version = $version LIMIT 1);
+            IF array::len($current) = 0 {
+                THROW 'plan_missing';
+            } ELSE IF $current[0].limits.max_ingested_bytes != $max_ingested_bytes OR
+                      $current[0].limits.max_episode_count != $max_episode_count OR
+                      $current[0].limits.ingest_per_minute != $ingest_per_minute OR
+                      $current[0].limits.max_open_app_sessions != $max_open_app_sessions OR
+                      $current[0].limits.max_active_api_keys != $max_active_api_keys OR
+                      $current[0].limits.per_tenant_request_concurrency != $per_tenant_request_concurrency OR
+                      $current[0].limits.extraction_concurrency != $extraction_concurrency {
+                THROW 'plan_limit_mismatch';
+            };
+            SELECT * FROM plan WHERE version = $version LIMIT 1;
+            COMMIT TRANSACTION;";
+        let vars = Some(json!({
+            "plan_id": plan_id,
+            "version": plan.version,
+            "limits": plan.limits,
+            "max_ingested_bytes": plan.limits.max_ingested_bytes,
+            "max_episode_count": plan.limits.max_episode_count,
+            "ingest_per_minute": plan.limits.ingest_per_minute,
+            "max_open_app_sessions": plan.limits.max_open_app_sessions,
+            "max_active_api_keys": plan.limits.max_active_api_keys,
+            "per_tenant_request_concurrency": plan.limits.per_tenant_request_concurrency,
+            "extraction_concurrency": plan.limits.extraction_concurrency,
+        }));
+        let attempt = self.handle().query_json_at(sql, vars.clone(), 5).await;
+        let rows = match attempt {
+            Ok(rows) => rows,
+            Err(error) => {
+                // A concurrent replica may have created the version while
+                // this transaction was in flight; the unique version index
+                // then aborts this attempt. Re-read once: a compatible row
+                // means the race was harmless, anything else is real drift.
+                self.handle()
+                    .query_json_at(sql, vars, 5)
+                    .await
+                    .map_err(|_| map_storage_error("ensure local plan", error))?
+            }
+        };
+        let Some(row) = rows.into_iter().next() else {
+            return Err(MemoryError::Storage(
+                "ensure_local_plan returned no rows".into(),
+            ));
+        };
+        let id = row
+            .get("id")
+            .and_then(record_id_value)
+            .filter(|value| !value.is_empty())
+            .ok_or_else(|| MemoryError::Storage("plan row has no valid id".into()))?;
+        let stored_version = required_u32(&row, "version")?;
+        let limits_value = row
+            .get("limits")
+            .cloned()
+            .ok_or_else(|| MemoryError::Storage("plan row has no limits".into()))?;
+        let limits = serde_json::from_value(limits_value)
+            .map_err(|error| MemoryError::Storage(format!("decode plan limits: {error}")))?;
+        Ok(super::models::Plan {
+            id,
+            version: stored_version,
+            limits,
+        })
+    }
+
+    #[cfg(feature = "control-plane")]
+    async fn join_oidc_policy(&self) -> Result<BrowserPolicyFence, MemoryError> {
+        // Statement order: `BEGIN`(0) `LET`(1) `IF`(2) `IF`(3) `SELECT`(4)
+        // `COMMIT`(5). Result index 4 is the policy readback. The
+        // compare/create is a singleton and never switches mode: a
+        // pre-existing policy for another mode aborts startup.
+        let sql = "
+            BEGIN TRANSACTION;
+            LET $existing = (SELECT mode, epoch FROM browser_auth_policy LIMIT 1);
+            IF array::len($existing) = 0 {
+                CREATE browser_auth_policy SET
+                    mode = 'oidc',
+                    epoch = 1,
+                    version = 1,
+                    created_at = time::now(),
+                    updated_at = time::now();
+            };
+            IF array::len($existing) > 0 AND $existing[0].mode != 'oidc' {
+                THROW 'mode_mismatch';
+            };
+            SELECT mode, epoch FROM browser_auth_policy LIMIT 1;
+            COMMIT TRANSACTION;";
+        let rows = self
+            .handle()
+            .query_json_at(sql, None, 4)
+            .await
+            .map_err(|error| map_storage_error("join OIDC policy", error))?;
+        let Some(row) = rows.into_iter().next() else {
+            return Err(MemoryError::Storage(
+                "join_oidc_policy returned no rows".into(),
+            ));
+        };
+        let mode_str = row
+            .get("mode")
+            .and_then(|v| v.as_str())
+            .ok_or_else(|| MemoryError::Storage("policy row has no mode".into()))?;
+        let mode = match mode_str {
+            "oidc" => crate::http::config::BrowserAuthMode::Oidc,
+            other => {
+                return Err(MemoryError::Storage(format!(
+                    "unexpected policy mode: {other}"
+                )));
+            }
+        };
+        let epoch = required_u64(&row, "epoch")?;
+        Ok(BrowserPolicyFence { mode, epoch })
+    }
+
+    #[cfg(feature = "control-plane")]
+    async fn create_oidc_account_bundle(
+        &self,
+        policy: &BrowserPolicyFence,
+        account: &Account,
+        tenant: &Tenant,
+        identity: &ExternalIdentity,
+    ) -> Result<(), MemoryError> {
+        let expected_mode = match policy.mode {
+            crate::http::config::BrowserAuthMode::Oidc => "oidc",
+            crate::http::config::BrowserAuthMode::Local => "local",
+        };
+        let account_status = serde_json::to_value(account.status)
+            .map_err(|error| MemoryError::Storage(format!("encode account status: {error}")))?;
+        let tenant_status = serde_json::to_value(tenant.status)
+            .map_err(|error| MemoryError::Storage(format!("encode tenant status: {error}")))?;
+        let (lease_assignment, lease_vars) =
+            lease_write_assignment(tenant.provisioning_lease.as_ref());
+        let retry_stage_assignment = if tenant.retry_stage.is_some() {
+            "retry_stage = $retry_stage"
+        } else {
+            "retry_stage = NONE"
+        };
+        let script = format!(
+            "BEGIN TRANSACTION;
+            LET $policy = (SELECT mode, epoch FROM browser_auth_policy LIMIT 1);
+            IF array::len($policy) = 0 {{ THROW 'no_policy'; }};
+            IF $policy[0].mode != $expected_mode {{ THROW 'mode_mismatch'; }};
+            IF $policy[0].epoch != $expected_epoch {{ THROW 'epoch_mismatch'; }};
+            CREATE type::record('account', $account_id) SET id = $account_id, status = $account_status, tenant_id = $tenant_id, created_at = type::datetime($account_created_at);
+            CREATE type::record('tenant', $tenant_record_id) SET id = $tenant_record_id, status = $tenant_status, namespace_binding = $binding, plan_version = $plan_version, schema_version = $schema_version, {retry_stage_assignment}, {lease_assignment}, created_at = type::datetime($tenant_created_at), version = $version;
+            CREATE type::record('external_identity', $identity_id) SET id = $identity_id, issuer = $issuer, subject_verifier = $subject_verifier, account_id = $identity_account_id, created_at = type::datetime($identity_created_at);
+            COMMIT TRANSACTION;",
+        );
+        let mut vars = json!({
+            "expected_mode": expected_mode,
+            "expected_epoch": policy.epoch,
+            "account_id": account.id,
+            "account_status": account_status,
+            "tenant_id": account.tenant_id,
+            "tenant_record_id": tenant.id,
+            "tenant_status": tenant_status,
+            "namespace": tenant.namespace_binding.namespace,
+            "binding": tenant.namespace_binding,
+            "plan_version": tenant.plan_version,
+            "schema_version": tenant.schema_version,
+            "retry_stage": tenant.retry_stage,
+            "account_created_at": account.created_at.to_rfc3339(),
+            "tenant_created_at": tenant.created_at.to_rfc3339(),
+            "version": tenant.version,
+            "identity_id": identity.id,
+            "issuer": identity.issuer,
+            "subject_verifier": hex::encode(identity.subject_verifier.0),
+            "identity_account_id": identity.account_id,
+            "identity_created_at": identity.created_at.to_rfc3339(),
+        });
+        if let (Some(vars), Some(lease_vars)) = (vars.as_object_mut(), lease_vars.as_object()) {
+            vars.extend(lease_vars.clone());
+        }
+        self.handle()
+            .query_json(&script, Some(vars))
+            .await
+            .map_err(|error| map_storage_error("create OIDC account bundle", error))?;
+        Ok(())
+    }
+
     async fn load_usage(
         &self,
         tenant_id: &str,
@@ -2239,16 +2476,24 @@ impl RegistryStore for SurrealRegistryStore {
     #[cfg(feature = "control-plane")]
     async fn store_oidc_request(
         &self,
+        policy: &BrowserPolicyFence,
         state_hash: &str,
         sealed_payload: &[u8],
         aead_nonce: &[u8; 12],
     ) -> Result<(), MemoryError> {
         let payload_b64 = base64_encode(sealed_payload);
         let nonce_arr: Vec<u8> = aead_nonce.to_vec();
+        // Statement order: `BEGIN`(0) guard(1..=4) `CREATE`(5) `COMMIT`(6).
+        let sql = format!(
+            "BEGIN TRANSACTION;{OIDC_POLICY_GUARD}
+            CREATE type::record($table, $id) SET state_hash = $state, sealed_payload = $payload, aead_nonce = $nonce, expires_at = type::datetime($expires_at), created_at = time::now();
+            COMMIT TRANSACTION;",
+        );
         self.handle()
-            .query_json(
-                "CREATE type::record($table, $id) SET state_hash = $state, sealed_payload = $payload, aead_nonce = $nonce, expires_at = type::datetime($expires_at), created_at = time::now()",
+            .query_json_at(
+                &sql,
                 Some(json!({
+                    "expected_epoch": policy.epoch,
                     "table": "oidc_request",
                     "id": state_hash,
                     "state": state_hash,
@@ -2256,6 +2501,7 @@ impl RegistryStore for SurrealRegistryStore {
                     "nonce": nonce_arr,
                     "expires_at": (Utc::now() + chrono::Duration::minutes(10)).to_rfc3339(),
                 })),
+                5,
             )
             .await
             .map_err(|err| map_storage_error("store_oidc_request", err))?;
@@ -2265,13 +2511,26 @@ impl RegistryStore for SurrealRegistryStore {
     #[cfg(feature = "control-plane")]
     async fn take_oidc_request(
         &self,
+        policy: &BrowserPolicyFence,
         state_hash: &str,
     ) -> Result<Option<(Vec<u8>, [u8; 12])>, MemoryError> {
+        // Statement order: `BEGIN`(0) guard(1..=4) `DELETE`(5) `COMMIT`(6).
+        let sql = format!(
+            "BEGIN TRANSACTION;{OIDC_POLICY_GUARD}
+            DELETE type::record($table, $id) WHERE state_hash = $state AND expires_at > time::now() RETURN BEFORE;
+            COMMIT TRANSACTION;",
+        );
         let rows = self
             .handle()
-            .query_json(
-                "DELETE type::record($table, $id) WHERE state_hash = $state AND expires_at > time::now() RETURN BEFORE",
-                Some(json!({"table": "oidc_request", "id": state_hash, "state": state_hash})),
+            .query_json_at(
+                &sql,
+                Some(json!({
+                    "expected_epoch": policy.epoch,
+                    "table": "oidc_request",
+                    "id": state_hash,
+                    "state": state_hash,
+                })),
+                5,
             )
             .await
             .map_err(|err| map_storage_error("take_oidc_request", err))?;
@@ -2302,12 +2561,25 @@ impl RegistryStore for SurrealRegistryStore {
     #[cfg(feature = "control-plane")]
     async fn store_session(
         &self,
+        policy: &BrowserPolicyFence,
         session: &crate::control::session::ControlPlaneSession,
     ) -> Result<(), MemoryError> {
+        if session.browser_policy_epoch != Some(policy.epoch) {
+            return Err(MemoryError::Conflict(
+                "session epoch does not match the durable policy".into(),
+            ));
+        }
+        // Statement order: `BEGIN`(0) guard(1..=4) `CREATE`(5) `COMMIT`(6).
+        let sql = format!(
+            "BEGIN TRANSACTION;{OIDC_POLICY_GUARD}
+            CREATE type::record($table, $id) SET id = $id, cookie_hash = $cookie_hash, account_id = $account_id, browser_policy_epoch = $expected_epoch, auth_time = type::datetime($auth_time), idle_expiry = type::datetime($idle_expiry), absolute_expiry = type::datetime($absolute_expiry);
+            COMMIT TRANSACTION;",
+        );
         self.handle()
-            .query_json(
-                "CREATE type::record($table, $id) SET id = $id, cookie_hash = $cookie_hash, account_id = $account_id, auth_time = type::datetime($auth_time), idle_expiry = type::datetime($idle_expiry), absolute_expiry = type::datetime($absolute_expiry)",
+            .query_json_at(
+                &sql,
                 Some(json!({
+                    "expected_epoch": policy.epoch,
                     "table": "control_plane_session",
                     "id": session.id,
                     "cookie_hash": session.cookie_hash,
@@ -2316,6 +2588,7 @@ impl RegistryStore for SurrealRegistryStore {
                     "idle_expiry": session.idle_expiry.to_rfc3339(),
                     "absolute_expiry": session.absolute_expiry.to_rfc3339(),
                 })),
+                5,
             )
             .await
             .map_err(|err| map_storage_error("store_session", err))?;
@@ -2325,13 +2598,28 @@ impl RegistryStore for SurrealRegistryStore {
     #[cfg(feature = "control-plane")]
     async fn find_session(
         &self,
+        policy: &BrowserPolicyFence,
         cookie_hash: &str,
     ) -> Result<Option<crate::control::session::ControlPlaneSession>, MemoryError> {
+        // Statement order: `BEGIN`(0) guard(1..=4) `SELECT`(5) `COMMIT`(6).
+        // The `browser_policy_epoch` predicate excludes sessions created
+        // before the epoch column existed (decode as `NONE`), so an
+        // upgraded deployment requires a fresh login.
+        let sql = format!(
+            "BEGIN TRANSACTION;{OIDC_POLICY_GUARD}
+            SELECT * FROM type::table($table) WHERE cookie_hash = $cookie AND browser_policy_epoch = $expected_epoch AND idle_expiry > time::now() AND absolute_expiry > time::now() LIMIT 1;
+            COMMIT TRANSACTION;",
+        );
         let rows = self
             .handle()
-            .query_json(
-                "SELECT * FROM type::table($table) WHERE cookie_hash = $cookie AND idle_expiry > time::now() AND absolute_expiry > time::now() LIMIT 1",
-                Some(json!({"table": "control_plane_session", "cookie": cookie_hash})),
+            .query_json_at(
+                &sql,
+                Some(json!({
+                    "expected_epoch": policy.epoch,
+                    "table": "control_plane_session",
+                    "cookie": cookie_hash,
+                })),
+                5,
             )
             .await
             .map_err(|err| map_storage_error("find_session", err))?;
@@ -2350,11 +2638,15 @@ impl RegistryStore for SurrealRegistryStore {
                 .and_then(Value::as_str)
                 .unwrap_or_default()
                 .to_owned(),
+            browser_policy_epoch: row.get("browser_policy_epoch").and_then(Value::as_u64),
             auth_time: required_datetime(&row, "auth_time")?,
             idle_expiry: required_datetime(&row, "idle_expiry")?,
             absolute_expiry: required_datetime(&row, "absolute_expiry")?,
         };
-        if session.idle_expiry <= Utc::now() || session.absolute_expiry <= Utc::now() {
+        if session.idle_expiry <= Utc::now()
+            || session.absolute_expiry <= Utc::now()
+            || session.browser_policy_epoch != Some(policy.epoch)
+        {
             return Ok(None);
         }
         Ok(Some(session))
@@ -2363,14 +2655,30 @@ impl RegistryStore for SurrealRegistryStore {
     #[cfg(feature = "control-plane")]
     async fn touch_session(
         &self,
+        policy: &BrowserPolicyFence,
         session_id: &str,
-        idle_expiry: DateTime<Utc>,
+        cookie_hash: &str,
     ) -> Result<(), MemoryError> {
+        // Statement order: `BEGIN`(0) guard(1..=4) `UPDATE`(5) `COMMIT`(6).
+        // The idle deadline is computed from database time; the `WHERE`
+        // clause refuses to extend a missing, expired or epoch-stale row,
+        // and `UPDATE` never recreates a row.
+        let sql = format!(
+            "BEGIN TRANSACTION;{OIDC_POLICY_GUARD}
+            UPDATE type::record($table, $id) SET idle_expiry = IF time::now() + 1800s < absolute_expiry THEN time::now() + 1800s ELSE absolute_expiry END WHERE cookie_hash = $cookie AND browser_policy_epoch = $expected_epoch AND idle_expiry > time::now() AND absolute_expiry > time::now() RETURN AFTER;
+            COMMIT TRANSACTION;",
+        );
         let rows = self
             .handle()
-            .query_json(
-                "UPDATE type::record($table, $id) SET idle_expiry = IF type::datetime($idle_expiry) < absolute_expiry THEN type::datetime($idle_expiry) ELSE absolute_expiry END WHERE absolute_expiry > time::now() RETURN AFTER",
-                Some(json!({"table": "control_plane_session", "id": session_id, "idle_expiry": idle_expiry.to_rfc3339()})),
+            .query_json_at(
+                &sql,
+                Some(json!({
+                    "expected_epoch": policy.epoch,
+                    "table": "control_plane_session",
+                    "id": session_id,
+                    "cookie": cookie_hash,
+                })),
+                5,
             )
             .await
             .map_err(|error| map_storage_error("touch session", error))?;
@@ -2381,12 +2689,26 @@ impl RegistryStore for SurrealRegistryStore {
     }
 
     #[cfg(feature = "control-plane")]
-    async fn delete_session(&self, cookie_hash: &str) -> Result<(), MemoryError> {
+    async fn delete_session(
+        &self,
+        policy: &BrowserPolicyFence,
+        cookie_hash: &str,
+    ) -> Result<(), MemoryError> {
+        // Statement order: `BEGIN`(0) guard(1..=4) `DELETE`(5) `COMMIT`(6).
+        let sql = format!(
+            "BEGIN TRANSACTION;{OIDC_POLICY_GUARD}
+            DELETE FROM control_plane_session WHERE cookie_hash = $cookie_hash AND browser_policy_epoch = $expected_epoch RETURN BEFORE;
+            COMMIT TRANSACTION;",
+        );
         let rows = self
             .handle()
-            .query_json(
-                "DELETE FROM control_plane_session WHERE cookie_hash = $cookie_hash RETURN BEFORE",
-                Some(json!({"cookie_hash": cookie_hash})),
+            .query_json_at(
+                &sql,
+                Some(json!({
+                    "expected_epoch": policy.epoch,
+                    "cookie_hash": cookie_hash,
+                })),
+                5,
             )
             .await
             .map_err(|error| map_storage_error("delete session", error))?;
@@ -2763,5 +3085,193 @@ mod tests {
         let sql = "LET $a = 'first'; RETURN $a;";
         let result = registry_db.as_dyn().query_json_at(sql, None, 5).await;
         assert!(result.is_err());
+    }
+
+    /// `join_oidc_policy` creates the singleton on first call and
+    /// returns the same fence on every later call (never switches).
+    #[cfg(feature = "control-plane")]
+    #[tokio::test]
+    async fn join_oidc_policy_creates_singleton_and_is_idempotent() {
+        use crate::http::config::BrowserAuthMode;
+        let namespace = format!("join_oidc_{}", uuid::Uuid::new_v4().simple());
+        let store = SurrealRegistryStore::connect_in_memory(&namespace, "registry")
+            .await
+            .expect("migrated in-memory registry");
+        let first = store.join_oidc_policy().await.expect("join OIDC policy");
+        assert_eq!(first.mode, BrowserAuthMode::Oidc);
+        assert_eq!(first.epoch, 1);
+        let second = store.join_oidc_policy().await.expect("idempotent join");
+        assert_eq!(second.mode, first.mode);
+        assert_eq!(second.epoch, first.epoch);
+    }
+
+    /// An OIDC join over an existing local policy is a mode mismatch
+    /// and must fail (startup fails before serving browser requests).
+    #[cfg(feature = "control-plane")]
+    #[tokio::test]
+    async fn join_oidc_policy_rejects_an_existing_local_policy() {
+        use crate::service::local_admin::contracts::{LocalAdminStore, LocalKeyFingerprints};
+        let namespace = format!("join_oidc_local_{}", uuid::Uuid::new_v4().simple());
+        let store = SurrealRegistryStore::connect_in_memory(&namespace, "registry")
+            .await
+            .expect("migrated in-memory registry");
+        LocalAdminStore::join_local_policy(
+            &store,
+            LocalKeyFingerprints {
+                session: [0x11; 32],
+                csrf: [0x22; 32],
+            },
+        )
+        .await
+        .expect("join local policy");
+        let result = store.join_oidc_policy().await;
+        assert!(
+            result.is_err(),
+            "an OIDC join over a local policy must fail, got {result:?}"
+        );
+    }
+
+    /// The OIDC flow operations that the black-box suite bypasses
+    /// (it seeds sessions directly) are exercised here on the durable
+    /// store: the policy guard parses, the documented result indices
+    /// decode, consumption is one-use, and a stale fence is rejected.
+    #[cfg(feature = "control-plane")]
+    #[tokio::test]
+    async fn oidc_flow_operations_are_policy_guarded() {
+        use crate::http::config::BrowserAuthMode;
+        use crate::http::registry::models::BrowserPolicyFence;
+
+        let namespace = format!("oidc_flow_{}", uuid::Uuid::new_v4().simple());
+        let store = SurrealRegistryStore::connect_in_memory(&namespace, "registry")
+            .await
+            .expect("migrated in-memory registry");
+        let policy = store.join_oidc_policy().await.expect("join OIDC policy");
+
+        // store -> take is a one-use round-trip.
+        store
+            .store_oidc_request(&policy, "state_hash_1", b"sealed", &[7u8; 12])
+            .await
+            .expect("store OIDC request");
+        let (payload, nonce) = store
+            .take_oidc_request(&policy, "state_hash_1")
+            .await
+            .expect("take OIDC request")
+            .expect("request present");
+        assert_eq!(payload, b"sealed");
+        assert_eq!(nonce, [7u8; 12]);
+        assert!(
+            store
+                .take_oidc_request(&policy, "state_hash_1")
+                .await
+                .expect("second take")
+                .is_none(),
+            "an OIDC request is consumed exactly once"
+        );
+
+        // A stale or non-OIDC fence aborts the transaction.
+        let stale = BrowserPolicyFence {
+            mode: BrowserAuthMode::Oidc,
+            epoch: policy.epoch + 1,
+        };
+        assert!(
+            store
+                .store_oidc_request(&stale, "state_hash_2", b"x", &[1u8; 12])
+                .await
+                .is_err(),
+            "a stale fence must not write an OIDC request"
+        );
+        assert!(
+            store
+                .take_oidc_request(&stale, "state_hash_2")
+                .await
+                .is_err(),
+            "a stale fence must not consume an OIDC request"
+        );
+
+        // Session delete is guarded by the current epoch.
+        let now = Utc::now();
+        let session = crate::control::session::ControlPlaneSession {
+            id: "ses_flow".into(),
+            cookie_hash: "cookie_flow".into(),
+            account_id: "acct_flow".into(),
+            browser_policy_epoch: Some(policy.epoch),
+            auth_time: now,
+            idle_expiry: now + chrono::Duration::minutes(30),
+            absolute_expiry: now + chrono::Duration::hours(1),
+        };
+        store
+            .store_session(&policy, &session)
+            .await
+            .expect("store session");
+        assert!(
+            store
+                .find_session(&policy, "cookie_flow")
+                .await
+                .expect("find session")
+                .is_some()
+        );
+        assert!(
+            store.delete_session(&stale, "cookie_flow").await.is_err(),
+            "a stale fence must not delete a session"
+        );
+        store
+            .delete_session(&policy, "cookie_flow")
+            .await
+            .expect("delete session");
+        assert!(
+            store
+                .find_session(&policy, "cookie_flow")
+                .await
+                .expect("find deleted session")
+                .is_none(),
+            "delete removes the session row"
+        );
+    }
+
+    /// The deliberate OIDC compatibility break: a session written before
+    /// the epoch column existed decodes as `None`, and a session carrying
+    /// a stale epoch is excluded, so neither can authenticate. Both rows
+    /// are planted with raw SQL because `store_session` refuses to write
+    /// either shape.
+    #[cfg(feature = "control-plane")]
+    #[tokio::test]
+    async fn find_session_rejects_legacy_and_stale_epoch_rows() {
+        let namespace = format!("session_epoch_{}", uuid::Uuid::new_v4().simple());
+        let store = SurrealRegistryStore::connect_in_memory(&namespace, "registry")
+            .await
+            .expect("migrated in-memory registry");
+        let policy = store.join_oidc_policy().await.expect("join OIDC policy");
+        store
+            .handle()
+            .query_json(
+                "CREATE type::record('control_plane_session', $id) SET id = $id, cookie_hash = $cookie, account_id = 'acct_legacy', auth_time = time::now(), idle_expiry = time::now() + 1800s, absolute_expiry = time::now() + 86400s",
+                Some(json!({"id": "ses_legacy", "cookie": "cookie_legacy"})),
+            )
+            .await
+            .expect("create legacy session");
+        store
+            .handle()
+            .query_json(
+                "CREATE type::record('control_plane_session', $id) SET id = $id, cookie_hash = $cookie, account_id = 'acct_stale', browser_policy_epoch = 99, auth_time = time::now(), idle_expiry = time::now() + 1800s, absolute_expiry = time::now() + 86400s",
+                Some(json!({"id": "ses_stale", "cookie": "cookie_stale"})),
+            )
+            .await
+            .expect("create stale session");
+        assert!(
+            store
+                .find_session(&policy, "cookie_legacy")
+                .await
+                .expect("legacy lookup")
+                .is_none(),
+            "a session without an epoch must not resolve"
+        );
+        assert!(
+            store
+                .find_session(&policy, "cookie_stale")
+                .await
+                .expect("stale lookup")
+                .is_none(),
+            "a session with a stale epoch must not resolve"
+        );
     }
 }

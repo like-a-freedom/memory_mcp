@@ -32,6 +32,16 @@ pub struct ControlPlaneSession {
     /// Keyed hash of the raw cookie value.
     pub cookie_hash: String,
     pub account_id: String,
+    /// The durable browser-auth policy epoch this session was created
+    /// under.
+    ///
+    /// COMPATIBILITY BREAK (deliberate, documented): this field is
+    /// additive but *required*. Sessions written before the epoch column
+    /// existed decode as `None` and fail authentication, so every
+    /// existing OIDC browser user must log in again once the deployment
+    /// starts enforcing the epoch. Newly created sessions always carry
+    /// `Some(current_epoch)`.
+    pub browser_policy_epoch: Option<u64>,
     pub auth_time: DateTime<Utc>,
     pub idle_expiry: DateTime<Utc>,
     pub absolute_expiry: DateTime<Utc>,
@@ -39,9 +49,13 @@ pub struct ControlPlaneSession {
 
 impl ControlPlaneSession {
     /// Create a new session with 30-minute idle / 24-hour absolute expiry.
+    ///
+    /// `browser_policy_epoch` is the durable OIDC policy epoch joined at
+    /// startup; the new session always records it.
     pub fn new(
         account: &Account,
         raw_cookie: &str,
+        browser_policy_epoch: u64,
         cfg: &crate::http::config::HttpConfig,
     ) -> Result<Self, MemoryError> {
         let now = Utc::now();
@@ -52,6 +66,7 @@ impl ControlPlaneSession {
                 raw_cookie.as_bytes(),
             )?),
             account_id: account.id.clone(),
+            browser_policy_epoch: Some(browser_policy_epoch),
             auth_time: now,
             idle_expiry: now + chrono::Duration::minutes(30),
             absolute_expiry: now + chrono::Duration::hours(24),
@@ -74,6 +89,12 @@ pub async fn resolve_session_record(
     state: &crate::http::HttpState,
     cookie_value: &str,
 ) -> Result<ControlPlaneSession, super::error::ApiError> {
+    // The durable OIDC fence is joined at startup. A missing fence means
+    // the session surface is not an OIDC deployment.
+    let policy = state
+        .browser_policy
+        .as_ref()
+        .ok_or(super::error::ApiError::Unauthorized)?;
     let cookie_hash = hex::encode(
         keyed_session_hash(
             &state.config.keys.control_plane_session,
@@ -83,10 +104,16 @@ pub async fn resolve_session_record(
     );
     let store = state.registry.store_clone();
     let session = store
-        .find_session(&cookie_hash)
+        .find_session(policy, &cookie_hash)
         .await
         .map_err(super::error::ApiError::Internal)?
         .ok_or(super::error::ApiError::Unauthorized)?;
+    // Defense in depth: the storage query already filters by epoch, but a
+    // session that predates the epoch column (or carries a stale one) must
+    // never authenticate.
+    if session.browser_policy_epoch != Some(policy.epoch) {
+        return Err(super::error::ApiError::Unauthorized);
+    }
     let account = store
         .find_account_by_id(&session.account_id)
         .await
@@ -99,9 +126,11 @@ pub async fn resolve_session_record(
     if session.absolute_expiry <= now || session.idle_expiry <= now {
         return Err(super::error::ApiError::Unauthorized);
     }
-    let next_idle = (now + chrono::Duration::minutes(30)).min(session.absolute_expiry);
+    // The idle deadline is computed from database time inside the
+    // conditional write; the row is never recreated when missing or
+    // expired, so a stale cookie cannot resurrect a session.
     store
-        .touch_session(&session.id, next_idle)
+        .touch_session(policy, &session.id, &cookie_hash)
         .await
         .map_err(super::error::ApiError::Internal)?;
     Ok(session)

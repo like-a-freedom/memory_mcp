@@ -214,22 +214,66 @@ impl HttpConfig {
             .map(|s| TrustedCidr::parse(&s))
             .collect::<Result<Vec<_>, _>>()?;
         let api_key_pepper = require_env("MEMORY_MCP_API_KEY_PEPPER")?;
-        let keys = HmacKeys {
-            identity_index: parse_hex_32_env("MEMORY_MCP_HTTP_IDENTITY_INDEX_KEY")?,
-            control_plane_session: parse_hex_32_env("MEMORY_MCP_HTTP_SESSION_KEY")?,
-            oidc_state: parse_hex_32_env("MEMORY_MCP_HTTP_OIDC_STATE_KEY")?,
-            oidc_nonce: parse_hex_32_env("MEMORY_MCP_HTTP_OIDC_NONCE_KEY")?,
-            csrf: parse_hex_32_env("MEMORY_MCP_HTTP_CSRF_KEY")?,
-        };
-        let signup_mode = match require_env("MEMORY_MCP_HTTP_SIGNUP_MODE")?.as_str() {
-            "invite_only" => SignupMode::InviteOnly,
-            "open" => SignupMode::Open,
-            other => {
-                return Err(MemoryError::ConfigInvalid(format!("signup mode: {other}")));
-            }
-        };
+        // Mode and enable flags are read before any secret so a local or
+        // disabled deployment is never forced to configure OIDC-only
+        // material, and so the KDF/OIDC keys are only demanded when the
+        // selected mode actually uses them.
         let enable_control_plane = parse_bool("MEMORY_MCP_HTTP_ENABLE_CONTROL_PLANE", false)?;
         let enable_control_plane_ui = parse_bool("MEMORY_MCP_HTTP_ENABLE_CONTROL_PLANE_UI", false)?;
+        let auth_mode = optional_env("MEMORY_MCP_HTTP_AUTH_MODE");
+        let is_local_mode = enable_control_plane && auth_mode.as_deref() == Some("local");
+
+        let identity_index = if is_local_mode {
+            // Local mode has no external identity to index, but the field
+            // is not optional. Rather than zero-fill it (which would make
+            // an accidental use trivially forgeable) derive it from the
+            // local session key under a purpose label.
+            Ok(derive_local_key("MEMORY_MCP_HTTP_IDENTITY_INDEX_KEY")?)
+        } else {
+            parse_hex_32_env("MEMORY_MCP_HTTP_IDENTITY_INDEX_KEY")
+        }?;
+        let oidc_state = if is_local_mode {
+            Ok(derive_local_key("MEMORY_MCP_HTTP_OIDC_STATE_KEY")?)
+        } else {
+            parse_hex_32_env("MEMORY_MCP_HTTP_OIDC_STATE_KEY")
+        }?;
+        let oidc_nonce = if is_local_mode {
+            Ok(derive_local_key("MEMORY_MCP_HTTP_OIDC_NONCE_KEY")?)
+        } else {
+            parse_hex_32_env("MEMORY_MCP_HTTP_OIDC_NONCE_KEY")
+        }?;
+        let keys = HmacKeys {
+            identity_index,
+            control_plane_session: parse_hex_32_env("MEMORY_MCP_HTTP_SESSION_KEY")?,
+            oidc_state,
+            oidc_nonce,
+            csrf: parse_hex_32_env("MEMORY_MCP_HTTP_CSRF_KEY")?,
+        };
+        // Signup policy: local mode has no identity provider, so the only
+        // coherent setting is invite-only. Defaulting it keeps the local
+        // environment from carrying an OIDC-only variable, and an
+        // explicit `open` is rejected rather than silently ignored.
+        let signup_mode = if is_local_mode {
+            match optional_env("MEMORY_MCP_HTTP_SIGNUP_MODE").as_deref() {
+                None | Some("invite_only") => SignupMode::InviteOnly,
+                Some("open") => {
+                    return Err(MemoryError::ConfigInvalid(
+                        "local mode requires signup mode 'invite_only'".into(),
+                    ));
+                }
+                Some(other) => {
+                    return Err(MemoryError::ConfigInvalid(format!("signup mode: {other}")));
+                }
+            }
+        } else {
+            match require_env("MEMORY_MCP_HTTP_SIGNUP_MODE")?.as_str() {
+                "invite_only" => SignupMode::InviteOnly,
+                "open" => SignupMode::Open,
+                other => {
+                    return Err(MemoryError::ConfigInvalid(format!("signup mode: {other}")));
+                }
+            }
+        };
         let signup_plan_limits = load_signup_plan_limits()?;
         let oidc_issuer = optional_env("MEMORY_MCP_HTTP_OIDC_ISSUER").unwrap_or_default();
         let oidc_client_id = optional_env("MEMORY_MCP_HTTP_OIDC_CLIENT_ID").unwrap_or_default();
@@ -242,7 +286,6 @@ impl HttpConfig {
 
         // Mode-specific browser auth configuration.
         let browser_auth = if enable_control_plane {
-            let auth_mode = optional_env("MEMORY_MCP_HTTP_AUTH_MODE");
             match auth_mode.as_deref() {
                 Some("local") => {
                     // Local mode must not have OIDC-only settings.
@@ -366,6 +409,24 @@ impl HttpConfig {
     pub fn validate(&self) -> Result<(), MemoryError> {
         validate(self)
     }
+
+    /// Whether this deployment uses OIDC browser authentication.
+    ///
+    /// `true` when the control plane is enabled and the configured
+    /// browser policy is OIDC, or when the control plane is enabled and
+    /// no explicit policy was supplied (OIDC is the historical
+    /// default). Local mode returns `false`, which suppresses OIDC
+    /// discovery at startup.
+    pub fn browser_auth_is_oidc(&self) -> bool {
+        if !self.enable_control_plane {
+            return false;
+        }
+        match &self.browser_auth {
+            Some(BrowserAuthConfig::Oidc(_)) => true,
+            Some(BrowserAuthConfig::Local(_)) => false,
+            None => true,
+        }
+    }
 }
 
 #[cfg(any(test, feature = "test-fixtures"))]
@@ -434,6 +495,24 @@ impl HttpConfig {
             })),
         }
     }
+}
+
+/// Derive a key for an OIDC-typed slot that local mode does not use.
+///
+/// `label` names the absent environment variable. The derived value comes
+/// from the local session key under a purpose-separated label, so it is
+/// never a zero key (which would make an accidental use trivially
+/// forgeable) and never equal to another slot's value.
+fn derive_local_key(label: &str) -> Result<[u8; 32], MemoryError> {
+    use hmac::{Hmac, KeyInit, Mac};
+    use sha2::Sha256;
+
+    let session = parse_hex_32_env("MEMORY_MCP_HTTP_SESSION_KEY")?;
+    let mut mac = Hmac::<Sha256>::new_from_slice(&session)
+        .map_err(|_| MemoryError::ConfigInvalid("invalid session key".into()))?;
+    mac.update(b"local_mode_derived_key\0");
+    mac.update(label.as_bytes());
+    Ok(mac.finalize().into_bytes().into())
 }
 
 #[cfg(test)]
@@ -764,41 +843,162 @@ mod tests {
         }
     }
 
-    #[test]
-    fn local_mode_rejects_oidc_issuer() {
+    /// A valid, complete local-mode configuration.
+    ///
+    /// The positive case comes first so each negative test below mutates
+    /// exactly one setting from a configuration already known to pass;
+    /// otherwise a test can pass for the wrong reason.
+    fn valid_local_config() -> HttpConfig {
         let mut cfg = HttpConfig::default_for_test();
+        cfg.enable_control_plane = true;
         cfg.browser_auth = Some(BrowserAuthConfig::Local(local_browser_config()));
-        cfg.oidc_issuer = "https://issuer.example.com".into();
+        cfg.public_base_url = "https://memory.example.com".into();
+        cfg.signup_plan_limits = Some(PlanLimits::default());
+        cfg.signup_mode = SignupMode::InviteOnly;
+        // Local mode must carry no OIDC-only setting at all.
+        cfg.oidc_issuer.clear();
+        cfg.oidc_client_id.clear();
+        cfg.oidc_audience.clear();
+        cfg.oidc_redirect_uri.clear();
+        cfg.operator_identity_allowlist.clear();
+        cfg
+    }
+
+    #[test]
+    fn local_mode_valid_config_passes() {
+        let cfg = valid_local_config();
+        assert!(
+            cfg.validate().is_ok(),
+            "a complete local config must validate: {:?}",
+            cfg.validate().err()
+        );
+        assert!(!cfg.browser_auth_is_oidc());
+    }
+
+    #[test]
+    fn local_mode_rejects_each_oidc_only_setting() {
+        // One mutation at a time, each asserting the precise variable name
+        // so a failure points at the actual offender.
+        for (name, mutate) in [
+            (
+                "MEMORY_MCP_HTTP_OIDC_ISSUER",
+                Box::new(|cfg: &mut HttpConfig| {
+                    cfg.oidc_issuer = "https://issuer.example.com".into()
+                }) as Box<dyn Fn(&mut HttpConfig)>,
+            ),
+            (
+                "MEMORY_MCP_HTTP_OIDC_CLIENT_ID",
+                Box::new(|cfg: &mut HttpConfig| cfg.oidc_client_id = "client".into()),
+            ),
+            (
+                "MEMORY_MCP_HTTP_OIDC_AUDIENCE",
+                Box::new(|cfg: &mut HttpConfig| cfg.oidc_audience = "audience".into()),
+            ),
+            (
+                "MEMORY_MCP_HTTP_OIDC_REDIRECT_URI",
+                Box::new(|cfg: &mut HttpConfig| {
+                    cfg.oidc_redirect_uri = "https://memory.example.com/callback".into()
+                }),
+            ),
+        ] {
+            let mut cfg = valid_local_config();
+            mutate(&mut cfg);
+            assert!(
+                matches!(cfg.validate(), Err(MemoryError::ConfigInvalid(ref msg)) if msg.contains(name)),
+                "setting {name} must be rejected"
+            );
+        }
+    }
+
+    #[test]
+    fn local_mode_rejects_operator_allowlist() {
+        let mut cfg = valid_local_config();
+        cfg.operator_identity_allowlist = vec!["someone@example.com".into()];
         assert!(matches!(
             cfg.validate(),
-            Err(MemoryError::ConfigInvalid(msg)) if msg.contains("must not set OIDC")
+            Err(MemoryError::ConfigInvalid(ref msg)) if msg.contains("operator identity allowlist")
+        ));
+    }
+
+    #[test]
+    fn local_mode_rejects_open_signup() {
+        let mut cfg = valid_local_config();
+        cfg.signup_mode = SignupMode::Open;
+        assert!(matches!(
+            cfg.validate(),
+            Err(MemoryError::ConfigInvalid(ref msg)) if msg.contains("invite_only")
+        ));
+    }
+
+    #[test]
+    fn local_mode_requires_explicit_plan_limits() {
+        let mut cfg = valid_local_config();
+        cfg.signup_plan_limits = None;
+        assert!(matches!(
+            cfg.validate(),
+            Err(MemoryError::ConfigInvalid(ref msg)) if msg.contains("plan limits")
         ));
     }
 
     #[test]
     fn local_mode_requires_https() {
-        let mut cfg = HttpConfig::default_for_test();
-        cfg.browser_auth = Some(BrowserAuthConfig::Local(local_browser_config()));
+        let mut cfg = valid_local_config();
         cfg.public_base_url = "http://example.com".into();
-        cfg.signup_plan_limits = Some(PlanLimits::default());
-        cfg.oidc_issuer.clear();
-        cfg.oidc_client_id.clear();
-        let result = cfg.validate();
-        eprintln!("validate result: {:?}", result);
         assert!(matches!(
-            result,
-            Err(MemoryError::ConfigInvalid(msg)) if msg.contains("HTTPS")
+            cfg.validate(),
+            Err(MemoryError::ConfigInvalid(ref msg)) if msg.contains("HTTPS")
         ));
     }
 
     #[test]
+    fn local_mode_rejects_a_loopback_lookalike_host() {
+        // A substring test for "localhost" used to accept these: the URL host
+        // is not loopback, so plain HTTP would be served from a public name.
+        for url in [
+            "http://evil.example/?localhost",
+            "http://localhost.evil.example",
+            "http://notlocal.host/#localhost",
+            "http://evil.example/localhost",
+        ] {
+            let mut cfg = valid_local_config();
+            cfg.public_base_url = url.into();
+            assert!(
+                matches!(
+                    cfg.validate(),
+                    Err(MemoryError::ConfigInvalid(ref msg)) if msg.contains("HTTPS")
+                ),
+                "{url} must not satisfy the loopback exception"
+            );
+        }
+    }
+
+    #[test]
     fn local_mode_allows_localhost() {
-        let mut cfg = HttpConfig::default_for_test();
-        cfg.browser_auth = Some(BrowserAuthConfig::Local(local_browser_config()));
-        cfg.public_base_url = "http://localhost:8080".into();
-        cfg.signup_plan_limits = Some(PlanLimits::default());
-        cfg.oidc_issuer.clear();
-        cfg.oidc_client_id.clear();
+        for url in [
+            "http://localhost:8080",
+            "http://localhost",
+            "http://127.0.0.1:8080/deep/path",
+            "http://[::1]:8080",
+            "https://admin.example.com",
+        ] {
+            let mut cfg = valid_local_config();
+            cfg.public_base_url = url.into();
+            assert!(
+                cfg.validate().is_ok(),
+                "{url} must be an acceptable public base URL"
+            );
+        }
+    }
+
+    #[test]
+    fn local_mode_does_not_require_oidc_completeness() {
+        // The regression that blocked local deployments: the control plane
+        // was enabled but the OIDC fields were empty, and validation
+        // demanded an issuer nobody had configured.
+        let cfg = valid_local_config();
+        assert!(cfg.enable_control_plane);
+        assert!(cfg.oidc_issuer.is_empty());
+        assert!(cfg.oidc_client_id.is_empty());
         assert!(cfg.validate().is_ok());
     }
 

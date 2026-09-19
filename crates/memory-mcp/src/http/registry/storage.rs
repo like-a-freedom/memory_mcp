@@ -26,6 +26,8 @@ use chrono::{DateTime, Utc};
 #[cfg(any(test, feature = "test-fixtures"))]
 use std::sync::Mutex;
 
+#[cfg(feature = "control-plane")]
+use super::models::BrowserPolicyFence;
 use super::models::*;
 use crate::error::MemoryError;
 
@@ -377,10 +379,12 @@ pub trait RegistryStore: Send + Sync + 'static {
     ) -> Result<(), MemoryError>;
 
     /// Store OIDC request sealed payload with explicit expiry
-    /// and AEAD nonce.
+    /// and AEAD nonce. `policy` is the durable OIDC fence; the write is
+    /// rejected unless the singleton mode is OIDC and the epoch matches.
     #[cfg(feature = "control-plane")]
     async fn store_oidc_request(
         &self,
+        policy: &BrowserPolicyFence,
         state_hash: &str,
         sealed_payload: &[u8],
         aead_nonce: &[u8; 12],
@@ -388,38 +392,51 @@ pub trait RegistryStore: Send + Sync + 'static {
 
     /// Atomically consume an OIDC request by state hash.
     /// Returns `None` if the state was already consumed or expired.
+    /// Guarded by the OIDC policy mode/epoch.
     #[cfg(feature = "control-plane")]
     async fn take_oidc_request(
         &self,
+        policy: &BrowserPolicyFence,
         state_hash: &str,
     ) -> Result<Option<(Vec<u8>, [u8; 12])>, MemoryError>;
 
-    /// Store a control-plane session.
+    /// Store a control-plane session under the current OIDC policy epoch.
     #[cfg(feature = "control-plane")]
     async fn store_session(
         &self,
+        policy: &BrowserPolicyFence,
         session: &crate::control::session::ControlPlaneSession,
     ) -> Result<(), MemoryError>;
 
     /// Find a session by keyed cookie hash. Excludes expired
-    /// (idle/absolute) sessions.
+    /// (idle/absolute) sessions and sessions from a different policy
+    /// epoch (a missing or stale `browser_policy_epoch` never resolves).
     #[cfg(feature = "control-plane")]
     async fn find_session(
         &self,
+        policy: &BrowserPolicyFence,
         cookie_hash: &str,
     ) -> Result<Option<crate::control::session::ControlPlaneSession>, MemoryError>;
 
-    /// Update a session's idle_expiry timestamp atomically.
+    /// Refresh a session's idle deadline. The cookie hash binds the
+    /// presented session and the idle expiry is computed from database
+    /// time; the row is never recreated when missing or expired.
     #[cfg(feature = "control-plane")]
     async fn touch_session(
         &self,
+        policy: &BrowserPolicyFence,
         session_id: &str,
-        idle_expiry: chrono::DateTime<chrono::Utc>,
+        cookie_hash: &str,
     ) -> Result<(), MemoryError>;
 
-    /// Delete one browser session by its keyed cookie hash.
+    /// Delete one browser session by its keyed cookie hash under the
+    /// current OIDC policy epoch.
     #[cfg(feature = "control-plane")]
-    async fn delete_session(&self, cookie_hash: &str) -> Result<(), MemoryError>;
+    async fn delete_session(
+        &self,
+        policy: &BrowserPolicyFence,
+        cookie_hash: &str,
+    ) -> Result<(), MemoryError>;
 
     /// Persist a one-use deletion challenge keyed by a
     /// verifier; the raw token is never stored.
@@ -427,6 +444,26 @@ pub trait RegistryStore: Send + Sync + 'static {
     async fn create_deletion_challenge(
         &self,
         challenge: &crate::http::registry::models::DeletionChallengeRecord,
+    ) -> Result<(), MemoryError>;
+
+    /// Create the named local plan when absent; if present, verify every
+    /// limit field matches and fail with `'plan_limit_mismatch'` otherwise.
+    /// Returns the durable plan.
+    async fn ensure_local_plan(&self, plan: &Plan) -> Result<Plan, MemoryError>;
+
+    #[cfg(feature = "control-plane")]
+    async fn join_oidc_policy(&self) -> Result<BrowserPolicyFence, MemoryError>;
+
+    /// Atomically create the account, tenant, and external identity under a
+    /// matching browser auth policy fence. The policy mode/epoch are checked
+    /// before any record is written.
+    #[cfg(feature = "control-plane")]
+    async fn create_oidc_account_bundle(
+        &self,
+        policy: &BrowserPolicyFence,
+        account: &Account,
+        tenant: &Tenant,
+        identity: &ExternalIdentity,
     ) -> Result<(), MemoryError>;
 
     /// Atomically consume a deletion challenge by verifier,
@@ -474,6 +511,8 @@ pub struct InMemoryStore {
     deletion_challenges: std::sync::Mutex<Vec<DeletionChallengeRecord>>,
     #[cfg(feature = "control-plane")]
     oidc_conflict: std::sync::Mutex<Option<AccountBundleConflict>>,
+    #[cfg(feature = "control-plane")]
+    browser_auth_policy: std::sync::Mutex<Option<BrowserPolicyFence>>,
 }
 
 /// Sealed OIDC payload: ciphertext + AEAD nonce.
@@ -506,6 +545,8 @@ impl Default for InMemoryStore {
             deletion_challenges: Mutex::new(Vec::new()),
             #[cfg(feature = "control-plane")]
             oidc_conflict: Mutex::new(None),
+            #[cfg(feature = "control-plane")]
+            browser_auth_policy: Mutex::new(None),
         }
     }
 }
@@ -561,6 +602,34 @@ impl InMemoryStore {
     #[cfg(feature = "control-plane")]
     fn lock_oidc_conflict(&self) -> std::sync::MutexGuard<'_, Option<AccountBundleConflict>> {
         self.oidc_conflict.lock().expect("poisoned")
+    }
+
+    #[cfg(feature = "control-plane")]
+    fn lock_browser_policy(
+        &self,
+    ) -> std::sync::MutexGuard<'_, Option<super::models::BrowserPolicyFence>> {
+        self.browser_auth_policy.lock().expect("poisoned")
+    }
+
+    /// Require the durable policy singleton to be OIDC and to match the
+    /// caller's fence before an OIDC write or consumption proceeds.
+    #[cfg(feature = "control-plane")]
+    fn require_oidc_policy(
+        &self,
+        policy: &super::models::BrowserPolicyFence,
+    ) -> Result<(), MemoryError> {
+        use crate::http::config::BrowserAuthMode;
+        let stored = self.lock_browser_policy();
+        match stored.as_ref() {
+            Some(existing)
+                if existing.mode == BrowserAuthMode::Oidc
+                    && existing.mode == policy.mode
+                    && existing.epoch == policy.epoch =>
+            {
+                Ok(())
+            }
+            _ => Err(MemoryError::Conflict("policy mode/epoch mismatch".into())),
+        }
     }
 
     #[cfg(feature = "control-plane")]
@@ -1385,11 +1454,15 @@ impl RegistryStore for InMemoryStore {
         let tenants = self.lock_tenants();
         let mut out = Vec::new();
         for t in tenants.iter() {
+            // Mirrors the durable query: `Suspended` is a terminal,
+            // operator-chosen state and is not provisioning work, while
+            // `NamespaceCreating` must stay resumable after a crash between
+            // the two provisioning transitions.
             if !matches!(
                 t.status,
                 TenantStatus::Reserved
+                    | TenantStatus::NamespaceCreating
                     | TenantStatus::Migrating
-                    | TenantStatus::Suspended
                     | TenantStatus::Failed
             ) {
                 continue;
@@ -1547,10 +1620,12 @@ impl RegistryStore for InMemoryStore {
     #[cfg(feature = "control-plane")]
     async fn store_oidc_request(
         &self,
+        policy: &BrowserPolicyFence,
         state_hash: &str,
         sealed_payload: &[u8],
         aead_nonce: &[u8; 12],
     ) -> Result<(), MemoryError> {
+        self.require_oidc_policy(policy)?;
         let mut requests = self.lock_oidc_requests();
         if requests.contains_key(state_hash) {
             return Err(MemoryError::Conflict(
@@ -1567,8 +1642,10 @@ impl RegistryStore for InMemoryStore {
     #[cfg(feature = "control-plane")]
     async fn take_oidc_request(
         &self,
+        policy: &BrowserPolicyFence,
         state_hash: &str,
     ) -> Result<Option<(Vec<u8>, [u8; 12])>, MemoryError> {
+        self.require_oidc_policy(policy)?;
         Ok(self
             .oidc_requests
             .lock()
@@ -1579,8 +1656,15 @@ impl RegistryStore for InMemoryStore {
     #[cfg(feature = "control-plane")]
     async fn store_session(
         &self,
+        policy: &BrowserPolicyFence,
         session: &crate::control::session::ControlPlaneSession,
     ) -> Result<(), MemoryError> {
+        self.require_oidc_policy(policy)?;
+        if session.browser_policy_epoch != Some(policy.epoch) {
+            return Err(MemoryError::Conflict(
+                "session epoch does not match the durable policy".into(),
+            ));
+        }
         let mut sessions = self.lock_sessions();
         if sessions.contains_key(&session.cookie_hash)
             || sessions.values().any(|stored| stored.id == session.id)
@@ -1594,43 +1678,63 @@ impl RegistryStore for InMemoryStore {
     #[cfg(feature = "control-plane")]
     async fn find_session(
         &self,
+        policy: &BrowserPolicyFence,
         cookie_hash: &str,
     ) -> Result<Option<crate::control::session::ControlPlaneSession>, MemoryError> {
+        self.require_oidc_policy(policy)?;
         let now = chrono::Utc::now();
         Ok(self
             .sessions
             .lock()
             .expect("in-memory store poisoned")
             .get(cookie_hash)
-            .filter(|session| session.idle_expiry > now && session.absolute_expiry > now)
+            .filter(|session| {
+                session.idle_expiry > now
+                    && session.absolute_expiry > now
+                    && session.browser_policy_epoch == Some(policy.epoch)
+            })
             .cloned())
     }
 
     #[cfg(feature = "control-plane")]
     async fn touch_session(
         &self,
+        policy: &BrowserPolicyFence,
         session_id: &str,
-        idle_expiry: chrono::DateTime<chrono::Utc>,
+        cookie_hash: &str,
     ) -> Result<(), MemoryError> {
+        self.require_oidc_policy(policy)?;
+        let now = chrono::Utc::now();
         let mut sessions = self.lock_sessions();
         let updated = sessions
-            .values_mut()
-            .find(|s| s.id == session_id)
+            .get_mut(cookie_hash)
+            .filter(|s| s.id == session_id && s.browser_policy_epoch == Some(policy.epoch))
             .ok_or_else(|| MemoryError::NotFound(format!("session {session_id}")))?;
-        if updated.absolute_expiry <= chrono::Utc::now() {
+        if updated.absolute_expiry <= now || updated.idle_expiry <= now {
             return Err(MemoryError::Conflict(format!(
                 "session {session_id} has expired"
             )));
         }
-        updated.idle_expiry = idle_expiry.min(updated.absolute_expiry);
+        let next_idle = (now + chrono::Duration::minutes(30)).min(updated.absolute_expiry);
+        updated.idle_expiry = next_idle;
         Ok(())
     }
 
     #[cfg(feature = "control-plane")]
-    async fn delete_session(&self, cookie_hash: &str) -> Result<(), MemoryError> {
-        self.sessions
-            .lock()
-            .expect("poisoned")
+    async fn delete_session(
+        &self,
+        policy: &BrowserPolicyFence,
+        cookie_hash: &str,
+    ) -> Result<(), MemoryError> {
+        self.require_oidc_policy(policy)?;
+        let mut sessions = self.lock_sessions();
+        let matches_epoch = sessions
+            .get(cookie_hash)
+            .is_some_and(|session| session.browser_policy_epoch == Some(policy.epoch));
+        if !matches_epoch {
+            return Err(MemoryError::NotFound("session not found".into()));
+        }
+        sessions
             .remove(cookie_hash)
             .map(|_| ())
             .ok_or_else(|| MemoryError::NotFound("session not found".into()))
@@ -1679,6 +1783,59 @@ impl RegistryStore for InMemoryStore {
         }
         c.consumed_at = Some(now);
         Ok(())
+    }
+
+    async fn ensure_local_plan(&self, plan: &Plan) -> Result<Plan, MemoryError> {
+        let mut plans = self.plans.lock().expect("poisoned");
+        let plan_id = format!("local_plan_v{}", plan.version);
+        if let Some(existing) = plans.get(&plan.version).filter(|p| p.id == plan_id) {
+            if existing.limits != plan.limits {
+                return Err(MemoryError::Conflict("plan limit mismatch".into()));
+            }
+            Ok(existing.clone())
+        } else {
+            plans.insert(plan.version, plan.clone());
+            Ok(plan.clone())
+        }
+    }
+
+    #[cfg(feature = "control-plane")]
+    async fn join_oidc_policy(&self) -> Result<super::models::BrowserPolicyFence, MemoryError> {
+        use crate::http::config::BrowserAuthMode;
+        let mut policy = self.lock_browser_policy();
+        if let Some(existing) = policy.as_ref() {
+            if existing.mode != BrowserAuthMode::Oidc {
+                return Err(MemoryError::Conflict("mode mismatch: expected oidc".into()));
+            }
+            Ok(existing.clone())
+        } else {
+            let fence = super::models::BrowserPolicyFence {
+                mode: BrowserAuthMode::Oidc,
+                epoch: 1,
+            };
+            *policy = Some(fence.clone());
+            Ok(fence)
+        }
+    }
+
+    #[cfg(feature = "control-plane")]
+    async fn create_oidc_account_bundle(
+        &self,
+        policy: &super::models::BrowserPolicyFence,
+        account: &Account,
+        tenant: &Tenant,
+        identity: &ExternalIdentity,
+    ) -> Result<(), MemoryError> {
+        {
+            let stored = self.lock_browser_policy();
+            match stored.as_ref() {
+                Some(existing)
+                    if existing.mode == policy.mode && existing.epoch == policy.epoch => {}
+                _ => return Err(MemoryError::Conflict("policy mode/epoch mismatch".into())),
+            }
+        }
+        self.create_account_bundle(account, tenant, Some(identity))
+            .await
     }
 }
 
@@ -2069,6 +2226,7 @@ mod tests {
     async fn deletion_start_is_atomic_and_retains_control_records() {
         let s = InMemoryStore::default();
         let now = Utc::now();
+        let policy = s.join_oidc_policy().await.expect("join OIDC policy");
         let account = Account {
             id: "acct_delete".into(),
             status: AccountStatus::Active,
@@ -2113,14 +2271,18 @@ mod tests {
         })
         .await
         .unwrap();
-        s.store_session(&crate::control::session::ControlPlaneSession {
-            id: "ses_delete".into(),
-            cookie_hash: "cookie_delete".into(),
-            account_id: account.id.clone(),
-            auth_time: now,
-            idle_expiry: now + chrono::Duration::minutes(5),
-            absolute_expiry: now + chrono::Duration::hours(1),
-        })
+        s.store_session(
+            &policy,
+            &crate::control::session::ControlPlaneSession {
+                id: "ses_delete".into(),
+                cookie_hash: "cookie_delete".into(),
+                account_id: account.id.clone(),
+                browser_policy_epoch: Some(policy.epoch),
+                auth_time: now,
+                idle_expiry: now + chrono::Duration::minutes(5),
+                absolute_expiry: now + chrono::Duration::hours(1),
+            },
+        )
         .await
         .unwrap();
         s.create_deletion_challenge(&DeletionChallengeRecord {
@@ -2183,7 +2345,7 @@ mod tests {
             ApiKeyStatus::Revoked
         );
         assert!(
-            s.find_session("cookie_delete")
+            s.find_session(&policy, "cookie_delete")
                 .await
                 .expect("session lookup")
                 .is_none(),

@@ -1,7 +1,16 @@
-//! Durable rate bucket operations for local admin authentication.
+//! Bounded maintenance for the durable local-admin rate buckets.
 //!
-//! Manages throttling and denied aggregate counts using the
-//! `local_admin_rate_bucket` table.
+//! The bucket *reservation* logic (window arithmetic, saturation, the
+//! denied aggregate, and credential/challenge domain separation) lives in
+//! `super::local_admin::reserve_attempt`, which owns the atomic
+//! transaction. This module implements the remaining obligation from the
+//! approved design: expired counters are reclaimed by a **bounded**
+//! delete so a long-running deployment cannot accumulate rows without
+//! limit, and the delete is driven by database time rather than a
+//! replica clock.
+//!
+//! `local_admin_rate_bucket` is `SCHEMAFULL`; the only field this module
+//! touches is `expires_at`, which every bucket row sets.
 
 use serde_json::json;
 
@@ -10,104 +19,128 @@ use crate::service::local_admin::contracts::{LocalAdminError, LocalResult};
 
 use super::SurrealRegistryStore;
 
+/// Maximum rows a single cleanup pass may remove. Keeps the maintenance
+/// statement bounded so it cannot hold a long write transaction.
+pub const RATE_BUCKET_CLEANUP_BATCH: u64 = 512;
+
 /// Convert a `MemoryError` to `LocalAdminError::Infrastructure`.
 fn infra(e: MemoryError) -> LocalAdminError {
     LocalAdminError::Infrastructure(e)
 }
 
-/// Rate bucket operations for the durable store.
 impl SurrealRegistryStore {
-    /// Reserve a rate bucket entry atomically. Returns the current count
-    /// within the window for the given source/action combination.
-    pub async fn reserve_rate_bucket(
-        &self,
-        source_bucket: u16,
-        action: &str,
-        window_secs: u64,
-    ) -> LocalResult<u64> {
+    /// Delete at most [`RATE_BUCKET_CLEANUP_BATCH`] rate buckets whose
+    /// `expires_at` has passed according to database time.
+    ///
+    /// Returns the number of rows removed. Callers that want to fully
+    /// drain the table call this repeatedly until it returns zero, which
+    /// bounds each individual transaction while still converging.
+    pub async fn cleanup_rate_buckets(&self) -> LocalResult<u64> {
+        // `expires_at` is a real field on the schemafull table, and
+        // `time::now()` is database time, so a replica with a skewed
+        // clock cannot delete a bucket that is still inside its window.
+        //
+        // Statement order is LET, FOR, RETURN, so the result index is 2.
+        // A transaction cannot be used here: a `LET` bound inside a
+        // transaction is gone once it commits, so the count would be
+        // unavailable at `RETURN`. The batch `LIMIT` is what keeps the
+        // write bounded instead.
         let sql = "
-            BEGIN TRANSACTION;
-            INSERT INTO local_admin_rate_bucket SET
-                source_bucket = $source_bucket,
-                action = $action,
-                created_at = time::now();
-            LET $count = (
-                SELECT count() AS cnt FROM local_admin_rate_bucket
-                WHERE source_bucket = $source_bucket
-                AND action = $action
-                AND created_at > time::now() - ${window}s
+            LET $doomed = (
+                SELECT id FROM local_admin_rate_bucket
+                WHERE expires_at < time::now()
+                LIMIT $batch
             );
-            COMMIT TRANSACTION;
-            RETURN $count;
+            FOR $row IN $doomed {
+                DELETE $row.id;
+            };
+            RETURN array::len($doomed);
         ";
 
         let result = self
-            .db
-            .as_dyn()
-            .query_json(
-                sql,
-                Some(json!({
-                    "source_bucket": source_bucket,
-                    "action": action,
-                    "window": window_secs,
-                })),
-            )
+            .handle()
+            .query_json_at(sql, Some(json!({ "batch": RATE_BUCKET_CLEANUP_BATCH })), 2)
             .await
             .map_err(infra)?;
 
-        let count = result
-            .first()
-            .and_then(|v| v.as_array()?.first())
-            .and_then(|v| v.get("cnt")?.as_u64())
-            .unwrap_or(0);
+        // The `RETURN` yields a single number; anything else means the
+        // statement shape changed and the count below would be a lie.
+        let removed = result
+            .last()
+            .and_then(|value| value.as_u64())
+            .ok_or_else(|| {
+                LocalAdminError::Infrastructure(MemoryError::Storage(
+                    "rate bucket cleanup returned no count".into(),
+                ))
+            })?;
 
-        Ok(count)
+        Ok(removed)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    async fn store() -> SurrealRegistryStore {
+        let namespace = format!("rate_bucket_{}", uuid::Uuid::new_v4().simple());
+        SurrealRegistryStore::connect_in_memory(&namespace, "registry")
+            .await
+            .expect("migrated in-memory registry")
     }
 
-    /// Increment a denied aggregate slot. These are saturating counters
-    /// for fixed action/reason combinations, separate from the per-attempt
-    /// rate bucket rows.
-    pub async fn increment_denied_aggregate(
-        &self,
-        source_bucket: u16,
-        action: &str,
-        reason: &str,
-    ) -> LocalResult<()> {
+    async fn insert_bucket(store: &SurrealRegistryStore, id: &str, expires_offset_secs: i64) {
+        // Bind an absolute timestamp rather than a SurrealDB duration
+        // literal: `type::duration` rejects a negative duration, and a
+        // bucket that already expired is exactly what this test needs.
+        let expires_at =
+            (chrono::Utc::now() + chrono::Duration::seconds(expires_offset_secs)).to_rfc3339();
         let sql = "
-            UPSERT local_admin_rate_bucket SET
-                source_bucket = $source_bucket,
-                action = $action,
-                reason = $reason,
-                denied_count = math::max(0, denied_count + 1),
-                updated_at = time::now();
+            CREATE type::record('local_admin_rate_bucket', $id) SET
+                bucket_id = $id,
+                source_bucket = 1,
+                username_bucket = NONE,
+                action = 'credentials',
+                reason = NONE,
+                denied_count = 0,
+                window_start = time::now(),
+                expires_at = type::datetime($expires_at);
         ";
-
-        self.db
-            .as_dyn()
-            .query_json(
-                sql,
-                Some(json!({
-                    "source_bucket": source_bucket,
-                    "action": action,
-                    "reason": reason,
-                })),
-            )
+        store
+            .handle()
+            .query_json(sql, Some(json!({ "id": id, "expires_at": expires_at })))
             .await
-            .map_err(infra)?;
-
-        Ok(())
+            .expect("insert bucket");
     }
 
-    /// Clean up expired rate bucket entries.
-    pub async fn cleanup_rate_buckets(&self, older_than_secs: u64) -> LocalResult<()> {
-        let sql = "DELETE local_admin_rate_bucket WHERE created_at < time::now() - ${window}s;";
-
-        self.db
-            .as_dyn()
-            .query_json(sql, Some(json!({"window": older_than_secs})))
+    async fn count_buckets(store: &SurrealRegistryStore) -> u64 {
+        let result = store
+            .handle()
+            .query_json("RETURN count(SELECT * FROM local_admin_rate_bucket);", None)
             .await
-            .map_err(infra)?;
+            .expect("count buckets");
+        result
+            .last()
+            .and_then(|value| value.as_u64())
+            .expect("count is a number")
+    }
 
-        Ok(())
+    #[tokio::test]
+    async fn cleanup_removes_only_expired_buckets() {
+        let store = store().await;
+        insert_bucket(&store, "expired_a", -120).await;
+        insert_bucket(&store, "expired_b", -1).await;
+        insert_bucket(&store, "live", 600).await;
+        assert_eq!(count_buckets(&store).await, 3);
+
+        let removed = store.cleanup_rate_buckets().await.expect("cleanup");
+        assert_eq!(removed, 2, "both expired buckets are reclaimed");
+        assert_eq!(count_buckets(&store).await, 1, "the live bucket survives");
+    }
+
+    #[tokio::test]
+    async fn cleanup_on_an_empty_table_is_a_no_op() {
+        let store = store().await;
+        assert_eq!(store.cleanup_rate_buckets().await.expect("cleanup"), 0);
     }
 }

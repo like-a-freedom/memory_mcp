@@ -23,15 +23,26 @@ const ASSETS: &[Asset] = &[];
 
 const INDEX_PATH: &str = "/index.html";
 
+/// The single source of truth for the SPA policy, shared by the header
+/// emitter and its test so the two cannot drift apart.
+///
+/// `script-src` carries `'wasm-unsafe-eval'` because the Dioxus client is
+/// compiled to WebAssembly: Chromium classifies WASM compilation as an
+/// eval-like sink, so `script-src 'self'` alone blocks
+/// `WebAssembly.instantiateStreaming` and the SPA never mounts. The token
+/// permits WebAssembly compilation only — it does **not** enable JavaScript
+/// `eval` or `new Function`, which stay blocked. Verified by the
+/// `scripts/ci/local_admin_browser.mjs` `ui` scenario, which loads the real
+/// bundle in a browser under this header.
+const CONTENT_SECURITY_POLICY: &str = "default-src 'self'; \
+     script-src 'self' 'wasm-unsafe-eval'; style-src 'self'; connect-src 'self'; \
+     frame-ancestors 'none'; object-src 'none'; base-uri 'none'; form-action 'self'";
+
 /// Security headers for all responses.
 pub fn attach_security_headers(mut resp: Response) -> Response {
     resp.headers_mut().insert(
         "content-security-policy",
-        HeaderValue::from_static(
-            "default-src 'self'; script-src 'self'; style-src 'self'; \
-             connect-src 'self'; frame-ancestors 'none'; object-src 'none'; \
-             base-uri 'none'; form-action 'self'",
-        ),
+        HeaderValue::from_static(CONTENT_SECURITY_POLICY),
     );
     resp.headers_mut().insert(
         "x-content-type-options",
@@ -138,14 +149,25 @@ mod tests {
     }
 
     fn assert_security_headers(response: &Response) {
-        assert_eq!(
-            response
-                .headers()
-                .get("content-security-policy")
-                .and_then(|value| value.to_str().ok()),
-            Some(
-                "default-src 'self'; script-src 'self'; style-src 'self'; connect-src 'self'; frame-ancestors 'none'; object-src 'none'; base-uri 'none'; form-action 'self'"
-            ),
+        let csp = response
+            .headers()
+            .get("content-security-policy")
+            .and_then(|value| value.to_str().ok())
+            .expect("csp header");
+        assert_eq!(csp, CONTENT_SECURITY_POLICY);
+        // The bundle is WebAssembly, so the policy must permit WASM
+        // compilation — and nothing broader than that.
+        assert!(
+            csp.contains("'wasm-unsafe-eval'"),
+            "the shipped bundle cannot boot without a WASM-compilation allowance: {csp}"
+        );
+        assert!(
+            !csp.contains("'unsafe-eval'"),
+            "general eval must stay blocked: {csp}"
+        );
+        assert!(
+            !csp.contains("'unsafe-inline'"),
+            "inline script must stay blocked: {csp}"
         );
         assert_eq!(
             response
