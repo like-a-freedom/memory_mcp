@@ -2527,6 +2527,8 @@ pub use super::storage::ensure_namespace as ensure_registry_namespace;
 
 #[cfg(feature = "control-plane")]
 mod local_admin;
+#[cfg(feature = "control-plane")]
+mod local_admin_rate;
 
 #[cfg(test)]
 mod tests {

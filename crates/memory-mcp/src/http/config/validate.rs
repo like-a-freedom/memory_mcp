@@ -164,6 +164,48 @@ pub(super) fn validate(cfg: &HttpConfig) -> Result<(), MemoryError> {
             "control and tenant storage must use different namespace/database bindings".into(),
         ));
     }
+
+    // ─── Browser auth mode validation ─────────────────────
+    match &cfg.browser_auth {
+        Some(super::types::BrowserAuthConfig::Local(local)) => {
+            // Local mode: reject OIDC-only settings
+            if !cfg.oidc_issuer.is_empty() {
+                return Err(MemoryError::ConfigInvalid(
+                    "local mode must not set OIDC issuer".into(),
+                ));
+            }
+            if !cfg.oidc_client_id.is_empty() {
+                return Err(MemoryError::ConfigInvalid(
+                    "local mode must not set OIDC client id".into(),
+                ));
+            }
+            // Local mode: require HTTPS in public_base_url
+            if !cfg.public_base_url.starts_with("https://")
+                && !cfg.public_base_url.contains("localhost")
+            {
+                return Err(MemoryError::ConfigInvalid(
+                    "local mode requires HTTPS public_base_url (or localhost for development)".into(),
+                ));
+            }
+            // Local mode: require explicit plan limits
+            if cfg.signup_plan_limits.is_none() {
+                return Err(MemoryError::ConfigInvalid(
+                    "local mode requires explicit signup plan limits".into(),
+                ));
+            }
+        }
+        Some(super::types::BrowserAuthConfig::Oidc(_)) => {
+            // OIDC mode: existing validation applies
+        }
+        None => {
+            // Off mode: no browser keys
+            if !cfg.oidc_issuer.is_empty() || !cfg.oidc_client_id.is_empty() {
+                return Err(MemoryError::ConfigInvalid(
+                    "off mode must not set OIDC credentials".into(),
+                ));
+            }
+        }
+    }
     #[cfg(not(any(test, feature = "test-fixtures")))]
     if cfg.control_db.url.starts_with("mem://") || cfg.tenant_db.url.starts_with("mem://") {
         return Err(MemoryError::ConfigInvalid(

@@ -416,7 +416,22 @@ impl HttpConfig {
             enable_control_plane: false,
             enable_control_plane_ui: false,
             signup_plan_limits: None,
-            browser_auth: None,
+            browser_auth: Some(BrowserAuthConfig::Oidc(OidcBrowserConfig {
+                issuer: "https://issuer.invalid".into(),
+                client_id: "test-client".into(),
+                audience: "memory-mcp".into(),
+                redirect_uri: "http://localhost/auth/oidc/callback".into(),
+                allowed_alg: DEFAULT_OIDC_ALG.into(),
+                operator_identity_allowlist: Vec::new(),
+                signup_mode: SignupMode::InviteOnly,
+                keys: HmacKeys {
+                    identity_index: [0; 32],
+                    control_plane_session: [0; 32],
+                    oidc_state: [0; 32],
+                    oidc_nonce: [0; 32],
+                    csrf: [0; 32],
+                },
+            })),
         }
     }
 }
@@ -554,6 +569,11 @@ mod tests {
     fn open_signup_loads_explicit_plan_limits() {
         let mut vars = base_required_env();
         vars[6] = ("MEMORY_MCP_HTTP_SIGNUP_MODE", "open".into());
+        vars.push(("MEMORY_MCP_HTTP_ENABLE_CONTROL_PLANE", "true".into()));
+        vars.push(("MEMORY_MCP_HTTP_OIDC_ISSUER", "https://issuer.example.com".into()));
+        vars.push(("MEMORY_MCP_HTTP_OIDC_CLIENT_ID", "test-client".into()));
+        vars.push(("MEMORY_MCP_HTTP_OIDC_AUDIENCE", "memory-mcp".into()));
+        vars.push(("MEMORY_MCP_HTTP_OIDC_REDIRECT_URI", "http://localhost/callback".into()));
         vars.extend([
             ("MEMORY_MCP_HTTP_MAX_INGESTED_BYTES", "1000".into()),
             ("MEMORY_MCP_HTTP_MAX_EPISODE_COUNT", "10".into()),
@@ -724,12 +744,67 @@ mod tests {
 
     #[test]
     fn rejects_open_signup_without_quotas() {
-        // open_signup_quotas_set() currently returns false
-        // because the per-tenant plan table is not yet
-        // wired. Until it is, Open signup must be rejected
-        // at startup.
         let mut cfg = HttpConfig::default_for_test();
         cfg.signup_mode = SignupMode::Open;
         assert!(matches!(cfg.validate(), Err(MemoryError::ConfigInvalid(_))));
     }
+
+    fn local_browser_config() -> LocalBrowserConfig {
+        LocalBrowserConfig {
+            session_key: [1u8; 32],
+            csrf_key: [2u8; 32],
+            default_plan_version: 1,
+            default_plan_limits: PlanLimits::default(),
+        }
+    }
+
+    #[test]
+    fn local_mode_rejects_oidc_issuer() {
+        let mut cfg = HttpConfig::default_for_test();
+        cfg.browser_auth = Some(BrowserAuthConfig::Local(local_browser_config()));
+        cfg.oidc_issuer = "https://issuer.example.com".into();
+        assert!(matches!(
+            cfg.validate(),
+            Err(MemoryError::ConfigInvalid(msg)) if msg.contains("must not set OIDC")
+        ));
+    }
+
+    #[test]
+    fn local_mode_requires_https() {
+        let mut cfg = HttpConfig::default_for_test();
+        cfg.browser_auth = Some(BrowserAuthConfig::Local(local_browser_config()));
+        cfg.public_base_url = "http://example.com".into();
+        cfg.signup_plan_limits = Some(PlanLimits::default());
+        cfg.oidc_issuer.clear();
+        cfg.oidc_client_id.clear();
+        let result = cfg.validate();
+        eprintln!("validate result: {:?}", result);
+        assert!(matches!(
+            result,
+            Err(MemoryError::ConfigInvalid(msg)) if msg.contains("HTTPS")
+        ));
+    }
+
+    #[test]
+    fn local_mode_allows_localhost() {
+        let mut cfg = HttpConfig::default_for_test();
+        cfg.browser_auth = Some(BrowserAuthConfig::Local(local_browser_config()));
+        cfg.public_base_url = "http://localhost:8080".into();
+        cfg.signup_plan_limits = Some(PlanLimits::default());
+        cfg.oidc_issuer.clear();
+        cfg.oidc_client_id.clear();
+        assert!(cfg.validate().is_ok());
+    }
+
+    #[test]
+    fn off_mode_rejects_oidc_credentials() {
+        let mut cfg = HttpConfig::default_for_test();
+        cfg.browser_auth = None;
+        cfg.oidc_issuer = "https://issuer.example.com".into();
+        assert!(matches!(
+            cfg.validate(),
+            Err(MemoryError::ConfigInvalid(msg)) if msg.contains("off mode")
+        ));
+    }
+
 }
