@@ -94,7 +94,6 @@ impl PasswordHasher {
                     let parsed = PasswordHash::new(&dummy)
                         .map_err(|e| LocalAdminError::InvalidInput(format!("dummy PHC: {e}")))?;
                     let argon2 = Argon2::new(Algorithm::Argon2id, Version::V0x13, params);
-                    // Dummy verification always returns false; ignore verification result.
                     let _ = argon2.verify_password(password.as_bytes(), &parsed);
                     Ok::<bool, LocalAdminError>(false)
                 })
@@ -102,6 +101,9 @@ impl PasswordHasher {
                 .map_err(|_| LocalAdminError::Unavailable)?;
             }
         };
+
+        // Validate PHC parameters before expensive KDF work.
+        validate_phc(&phc_str)?;
 
         let _permit = tokio::time::timeout(
             std::time::Duration::from_secs(2),
@@ -112,9 +114,7 @@ impl PasswordHasher {
         .map_err(|_| LocalAdminError::Unavailable)?;
 
         let running = self.running.clone();
-        let params = self.params.clone();
 
-        // Acquire running slot before spawn_blocking to queue properly.
         let running_permit = running
             .acquire()
             .await
@@ -123,7 +123,7 @@ impl PasswordHasher {
         let result = tokio::task::spawn_blocking(move || {
             let parsed = PasswordHash::new(&phc_str)
                 .map_err(|e| LocalAdminError::InvalidInput(format!("PHC parse: {e}")))?;
-            let argon2 = Argon2::new(Algorithm::Argon2id, Version::V0x13, params);
+            let argon2 = Argon2::new(Algorithm::Argon2id, Version::V0x13, self_params());
             let ok = argon2
                 .verify_password(password.as_bytes(), &parsed)
                 .is_ok();
@@ -152,4 +152,63 @@ mod tests {
         assert!(!hasher.verify("a different password".into(), Some(second)).await.expect("verify"));
         assert!(!hasher.verify(password, None).await.expect("dummy"));
     }
+
+    #[tokio::test]
+    async fn local_admin_rejects_corrupt_phc() {
+        let hasher = PasswordHasher::new().expect("supported KDF");
+        let result = hasher.verify("password".into(), Some("not-a-phc-hash".into())).await;
+        assert!(result.is_err());
+    }
+
+    #[tokio::test]
+    async fn local_admin_rejects_wrong_algorithm_phc() {
+        let hasher = PasswordHasher::new().expect("supported KDF");
+        // bcrypt-style hash
+        let result = hasher.verify("password".into(), Some("$2b$10$abcdefghijklmnopqrstuuABCDEFGHIJKLMNOPQRSTUVWXYZ012".into())).await;
+        assert!(result.is_err());
+    }
+}
+
+/// Default Argon2id v19 parameters: m=19456, t=2, p=1.
+fn self_params() -> Params {
+    Params::new(19456, 2, 1, Some(32)).expect("valid params")
+}
+
+/// Validate PHC parameters before expensive KDF work.
+/// Binds algorithm, version, memory, time, parallelism, and output size.
+/// Corrupt or hostile hashes fail closed without raw error details.
+fn validate_phc(phc: &str) -> LocalResult<()> {
+    // Must start with the expected Argon2id prefix
+    if !phc.starts_with("$argon2id$v=19$m=") {
+        return Err(LocalAdminError::InvalidCredentials);
+    }
+
+    // Parse the hash to validate structure
+    let parsed = PasswordHash::new(phc)
+        .map_err(|_| LocalAdminError::InvalidCredentials)?;
+
+    // Verify parameters are within bounds using the argon2 crate
+    let params = Params::try_from(&parsed)
+        .map_err(|_| LocalAdminError::InvalidCredentials)?;
+
+    let m_cost = params.m_cost();
+    let t_cost = params.t_cost();
+    let p_cost = params.p_cost();
+
+    // Bound memory: must be reasonable (1MB - 1GB in KiB)
+    if m_cost < 1024 || m_cost > 1048576 {
+        return Err(LocalAdminError::InvalidCredentials);
+    }
+
+    // Bound time: must be reasonable (1 - 100)
+    if t_cost < 1 || t_cost > 100 {
+        return Err(LocalAdminError::InvalidCredentials);
+    }
+
+    // Bound parallelism: must be reasonable (1 - 64)
+    if p_cost < 1 || p_cost > 64 {
+        return Err(LocalAdminError::InvalidCredentials);
+    }
+
+    Ok(())
 }
