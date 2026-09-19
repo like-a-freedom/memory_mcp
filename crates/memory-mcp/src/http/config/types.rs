@@ -25,6 +25,50 @@ use super::parse::{
 use super::validate::validate;
 pub use crate::config::SurrealTargetConfig;
 
+/// The browser authentication mode selected for this deployment.
+#[derive(Debug, Clone, Copy, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum BrowserAuthMode {
+    Local,
+    Oidc,
+}
+
+/// Mode-specific browser configuration. `None` when the control plane
+/// is disabled.
+#[derive(Debug, Clone, Deserialize)]
+#[serde(tag = "mode", rename_all = "snake_case")]
+pub enum BrowserAuthConfig {
+    Local(LocalBrowserConfig),
+    Oidc(OidcBrowserConfig),
+}
+
+/// Configuration for local administrator browser authentication.
+#[derive(Debug, Clone, Deserialize)]
+pub struct LocalBrowserConfig {
+    /// HMAC key for session signing/verification.
+    pub session_key: [u8; 32],
+    /// HMAC key for CSRF token signing/verification.
+    pub csrf_key: [u8; 32],
+    /// Default plan version to ensure at startup.
+    pub default_plan_version: u32,
+    /// Plan limits for the default local plan.
+    pub default_plan_limits: PlanLimits,
+}
+
+/// Configuration for OIDC browser authentication. Owns the existing
+/// OIDC fields that were previously flat on `HttpConfig`.
+#[derive(Debug, Clone, Deserialize)]
+pub struct OidcBrowserConfig {
+    pub issuer: String,
+    pub client_id: String,
+    pub audience: String,
+    pub redirect_uri: String,
+    pub allowed_alg: String,
+    pub operator_identity_allowlist: Vec<String>,
+    pub signup_mode: SignupMode,
+    pub keys: HmacKeys,
+}
+
 #[derive(Debug, Clone, Deserialize)]
 pub struct HttpConfig {
     pub bind: SocketAddr,
@@ -56,14 +100,14 @@ pub struct HttpConfig {
     pub control_db: SurrealTargetConfig,
     pub tenant_db: SurrealTargetConfig,
     pub api_key_pepper: String,
+    /// Legacy flat keys retained for backward compatibility during
+    /// incremental migration to `browser_auth`.
     pub keys: HmacKeys,
     pub oidc_issuer: String,
     pub oidc_client_id: String,
     pub oidc_audience: String,
     pub oidc_redirect_uri: String,
     pub oidc_allowed_alg: String,
-    /// Immutable operator allowlist entries encoded as `issuer|subject_verifier`
-    /// where the verifier is the hex blind index, never the raw OIDC subject.
     pub operator_identity_allowlist: Vec<String>,
     pub signup_mode: SignupMode,
     pub enable_control_plane: bool,
@@ -72,6 +116,11 @@ pub struct HttpConfig {
     /// durable Registry at startup and is never read from request input.
     #[serde(skip)]
     pub signup_plan_limits: Option<PlanLimits>,
+    /// Mode-specific browser authentication configuration. `None` when
+    /// the control plane is disabled. When `Some`, it owns the mode
+    /// selection and all mode-specific secrets/limits.
+    #[serde(skip)]
+    pub browser_auth: Option<BrowserAuthConfig>,
 }
 
 #[derive(Debug, Clone, Copy, Deserialize)]
@@ -191,6 +240,74 @@ impl HttpConfig {
             .unwrap_or_else(|| DEFAULT_OIDC_ALG.into());
         let operator_identity_allowlist = parse_csv("MEMORY_MCP_HTTP_OPERATOR_IDENTITIES")?;
 
+        // Mode-specific browser auth configuration.
+        let browser_auth = if enable_control_plane {
+            let auth_mode = optional_env("MEMORY_MCP_HTTP_AUTH_MODE");
+            match auth_mode.as_deref() {
+                Some("local") => {
+                    // Local mode must not have OIDC-only settings.
+                    if !oidc_issuer.is_empty()
+                        || !oidc_client_id.is_empty()
+                        || !oidc_audience.is_empty()
+                        || !oidc_redirect_uri.is_empty()
+                        || oidc_allowed_alg != DEFAULT_OIDC_ALG
+                        || !operator_identity_allowlist.is_empty()
+                    {
+                        return Err(MemoryError::ConfigInvalid(
+                            "local mode must not have OIDC configuration".into(),
+                        ));
+                    }
+                    let session_key =
+                        parse_hex_32_env("MEMORY_MCP_HTTP_SESSION_KEY")?;
+                    let csrf_key = parse_hex_32_env("MEMORY_MCP_HTTP_CSRF_KEY")?;
+                    let default_plan_version: u32 =
+                        require_env("MEMORY_MCP_HTTP_LOCAL_DEFAULT_PLAN_VERSION")?
+                            .parse()
+                            .map_err(|_| {
+                                MemoryError::ConfigInvalid(
+                                    "MEMORY_MCP_HTTP_LOCAL_DEFAULT_PLAN_VERSION must be a positive u32".into(),
+                                )
+                            })?;
+                    if default_plan_version == 0 {
+                        return Err(MemoryError::ConfigInvalid(
+                            "default plan version must be positive".into(),
+                        ));
+                    }
+                    let default_plan_limits = load_signup_plan_limits()?.ok_or_else(|| {
+                        MemoryError::ConfigInvalid(
+                            "local mode requires all seven plan limit environment variables".into(),
+                        )
+                    })?;
+                    Some(BrowserAuthConfig::Local(LocalBrowserConfig {
+                        session_key,
+                        csrf_key,
+                        default_plan_version,
+                        default_plan_limits,
+                    }))
+                }
+                Some("oidc") | None => {
+                    // OIDC mode (default for backward compatibility).
+                    Some(BrowserAuthConfig::Oidc(OidcBrowserConfig {
+                        issuer: oidc_issuer.clone(),
+                        client_id: oidc_client_id.clone(),
+                        audience: oidc_audience.clone(),
+                        redirect_uri: oidc_redirect_uri.clone(),
+                        allowed_alg: oidc_allowed_alg.clone(),
+                        operator_identity_allowlist: operator_identity_allowlist.clone(),
+                        signup_mode,
+                        keys,
+                    }))
+                }
+                Some(other) => {
+                    return Err(MemoryError::ConfigInvalid(format!(
+                        "MEMORY_MCP_HTTP_AUTH_MODE must be 'local' or 'oidc', got '{other}'"
+                    )));
+                }
+            }
+        } else {
+            None
+        };
+
         let control_db = SurrealTargetConfig {
             url: require_env("SURREALDB_CONTROL_URL")?,
             username: require_env("SURREALDB_CONTROL_USERNAME")?,
@@ -241,6 +358,7 @@ impl HttpConfig {
             enable_control_plane,
             enable_control_plane_ui,
             signup_plan_limits,
+            browser_auth,
         };
         Ok(cfg)
     }
@@ -298,6 +416,7 @@ impl HttpConfig {
             enable_control_plane: false,
             enable_control_plane_ui: false,
             signup_plan_limits: None,
+            browser_auth: None,
         }
     }
 }

@@ -34,4 +34,7 @@ pub use parse::{
     DEFAULT_SUBSCRIPTION_QUEUE_CAPACITY, DEFAULT_TASK_QUEUE_CAPACITY, DEFAULT_TASK_RETENTION_SECS,
     DEFAULT_TASK_SYNC_MAX_BYTES, TrustedCidr,
 };
-pub use types::{HmacKeys, HttpConfig, SignupMode};
+pub use types::{
+    BrowserAuthConfig, BrowserAuthMode, HmacKeys, HttpConfig, LocalBrowserConfig, OidcBrowserConfig,
+    SignupMode,
+};

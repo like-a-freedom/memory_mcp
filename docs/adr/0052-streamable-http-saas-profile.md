@@ -95,6 +95,8 @@ the privileged credential without changing capabilities.
 
 ### Authentication and control plane
 
+[ADR-0055](0055-local-admin-authentication-for-remote-deployment.md) records the accepted direction for a local administrator mode as an alternative to OIDC. Implementation is pending. The OIDC requirements below describe the existing control plane and remain applicable to OIDC mode; they do not require OIDC for the planned local mode. API-key authentication and tenant isolation remain unchanged.
+
 V1 authenticates MCP requests with named Account API Keys sent as
 `Authorization: Bearer`. A key has an opaque public identifier and a
 cryptographically random secret. The secret is shown once. The registry stores a

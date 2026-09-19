@@ -50,6 +50,16 @@ impl RegistryDb {
 pub trait SurrealHandle: Send + Sync {
     async fn use_ns_db(&self, namespace: &str, database: &str) -> Result<(), MemoryError>;
     async fn query_json(&self, sql: &str, vars: Option<Value>) -> Result<Vec<Value>, MemoryError>;
+    /// Like `query_json` but extracts the result at the explicit
+    /// `result_index` instead of 0. Every statement error is checked
+    /// before extraction; a missing or malformed result at the given
+    /// index is an error, not an empty success.
+    async fn query_json_at(
+        &self,
+        sql: &str,
+        vars: Option<Value>,
+        result_index: usize,
+    ) -> Result<Vec<Value>, MemoryError>;
     async fn ping(&self) -> bool;
 }
 
@@ -93,6 +103,44 @@ impl SurrealHandle for Surreal<Client> {
             }
         }
         Ok(out)
+    }
+    async fn query_json_at(
+        &self,
+        sql: &str,
+        vars: Option<Value>,
+        result_index: usize,
+    ) -> Result<Vec<Value>, MemoryError> {
+        let mut q = self.query(sql);
+        if let Some(v) = vars {
+            q = q.bind(v);
+        }
+        let mut response = q
+            .await
+            .map_err(|err| MemoryError::Storage(format!("query failed: {err}")))?;
+        let statement_errors = response.take_errors();
+        if !statement_errors.is_empty() {
+            let details = statement_errors
+                .into_iter()
+                .map(|(index, error)| format!("statement {index}: {error}"))
+                .collect::<Vec<_>>()
+                .join("; ");
+            return Err(MemoryError::Storage(format!(
+                "query statement errors: {details}"
+            )));
+        }
+        let result: Option<Value> = response
+            .take::<Option<Value>>(result_index)
+            .map_err(|err| MemoryError::Storage(format!("take index {result_index} failed: {err}")))?;
+        let Some(value) = result else {
+            return Err(MemoryError::Storage(format!(
+                "query returned no result at index {result_index}"
+            )));
+        };
+        match value {
+            Value::Array(values) => Ok(values),
+            Value::Null => Ok(Vec::new()),
+            value => Ok(vec![value]),
+        }
     }
     async fn ping(&self) -> bool {
         match self.query("INFO FOR DB").await {
@@ -142,6 +190,44 @@ impl SurrealHandle for Surreal<Db> {
             }
         }
         Ok(out)
+    }
+    async fn query_json_at(
+        &self,
+        sql: &str,
+        vars: Option<Value>,
+        result_index: usize,
+    ) -> Result<Vec<Value>, MemoryError> {
+        let mut q = self.query(sql);
+        if let Some(v) = vars {
+            q = q.bind(v);
+        }
+        let mut response = q
+            .await
+            .map_err(|err| MemoryError::Storage(format!("query failed: {err}")))?;
+        let statement_errors = response.take_errors();
+        if !statement_errors.is_empty() {
+            let details = statement_errors
+                .into_iter()
+                .map(|(index, error)| format!("statement {index}: {error}"))
+                .collect::<Vec<_>>()
+                .join("; ");
+            return Err(MemoryError::Storage(format!(
+                "query statement errors: {details}"
+            )));
+        }
+        let result: Option<Value> = response
+            .take::<Option<Value>>(result_index)
+            .map_err(|err| MemoryError::Storage(format!("take index {result_index} failed: {err}")))?;
+        let Some(value) = result else {
+            return Err(MemoryError::Storage(format!(
+                "query returned no result at index {result_index}"
+            )));
+        };
+        match value {
+            Value::Array(values) => Ok(values),
+            Value::Null => Ok(Vec::new()),
+            value => Ok(vec![value]),
+        }
     }
     async fn ping(&self) -> bool {
         match self.query("INFO FOR DB").await {

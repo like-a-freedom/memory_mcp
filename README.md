@@ -20,7 +20,7 @@ It is designed for workflows where agents need more than short-lived chat contex
   - [Read path: context assembly](#read-path-context-assembly)
   - [Bi-temporal data model](#bi-temporal-data-model)
 - [Quick start](#quick-start)
-- [Streamable HTTP SaaS profile](#streamable-http-saas-profile)
+- [Remote deployment](#remote-deployment)
 - [Configuration](#configuration)
 - [MCP tools](#mcp-tools)
 - [Development](#development)
@@ -576,7 +576,7 @@ The generated snippet uses `servers.memory_mcp` with a stdio `command` of
 `cargo install --path crates/memory-mcp --locked`, the installed binary can be
 used directly by the host.
 
-## Streamable HTTP SaaS profile
+## Remote deployment
 
 `memory_mcp_http` is the multi-user, remote deployment of Memory MCP. Each
 authenticated request maps to one Account and one Tenant, then runs against
@@ -590,19 +590,43 @@ request validation, and release gates live in the
 [ADR-0052](docs/adr/0052-streamable-http-saas-profile.md), and the
 [operations runbooks](docs/operations/).
 
+### Control plane and web UI
+
+The Streamable HTTP transport and the control plane are separate. The `POST /mcp`
+route remains enabled when `MEMORY_MCP_HTTP_ENABLE_CONTROL_PLANE=false`.
+That flag controls OIDC login, browser sessions, account management, API-key
+management, and operator routes.
+
+The optional web UI is the browser client for the account control-plane API. It
+lets users sign in through OIDC and create, list, and revoke API keys. To use
+it, enable both runtime flags:
+
+`MEMORY_MCP_HTTP_ENABLE_CONTROL_PLANE=true` and
+`MEMORY_MCP_HTTP_ENABLE_CONTROL_PLANE_UI=true`
+
+The binary must also be built with the `control-plane-ui` feature and include
+the UI assets. If the image was not built with that feature, enabling the UI
+flag causes a startup error. The control plane must be enabled first, and its
+OIDC settings must contain real provider values. The UI is served from `/`.
+
+The browser session and the MCP API key are separate credentials. A user signs
+in through the UI, creates an API key, and configures that key in the MCP
+client for `POST /mcp`. `MEMORY_MCP_HTTP_OPERATOR_IDENTITIES` is required only
+for operator routes, not for normal account or API-key management.
+
 ### Build and run
 
-Build with the `streamable-http` feature. Add `control-plane` for OIDC and
-account management, and `control-plane-ui` to embed the Dioxus SPA.
+Build with the `streamable-http` feature. Add `control-plane` for the OIDC
+and account-management backend. Add `control-plane-ui` to include the optional
+web UI.
 
 ```bash
 cargo build --release --locked --features streamable-http,control-plane
-# HTTP boundary
+
 MEMORY_MCP_HTTP_PUBLIC_BASE_URL=https://mcp.example.com \
 ALLOWED_HOSTS=mcp.example.com \
 ALLOWED_ORIGINS=https://mcp.example.com \
 MEMORY_MCP_HTTP_TRUSTED_PROXY_CIDRS=10.0.0.0/8,172.16.0.0/12 \
-# SurrealDB control (Account/plan/credential Registry) and tenant engine
 SURREALDB_CONTROL_URL=wss://surreal.example.com/rpc \
 SURREALDB_CONTROL_USERNAME=... \
 SURREALDB_CONTROL_PASSWORD=... \
@@ -613,20 +637,18 @@ SURREALDB_TENANT_USERNAME=... \
 SURREALDB_TENANT_PASSWORD=... \
 SURREALDB_TENANT_NAMESPACE=tenant \
 SURREALDB_TENANT_DB=tenant \
-# Keyed verifiers (32-byte hex; raw secrets are never persisted or logged)
 MEMORY_MCP_API_KEY_PEPPER=... \
 MEMORY_MCP_HTTP_IDENTITY_INDEX_KEY=... \
 MEMORY_MCP_HTTP_SESSION_KEY=... \
 MEMORY_MCP_HTTP_OIDC_STATE_KEY=... \
 MEMORY_MCP_HTTP_OIDC_NONCE_KEY=... \
 MEMORY_MCP_HTTP_CSRF_KEY=... \
-# Signup policy and OIDC
 MEMORY_MCP_HTTP_SIGNUP_MODE=invite_only \
+MEMORY_MCP_HTTP_ENABLE_CONTROL_PLANE=true \
 MEMORY_MCP_HTTP_OIDC_ISSUER=https://issuer.example.com \
 MEMORY_MCP_HTTP_OIDC_CLIENT_ID=memory_mcp \
 MEMORY_MCP_HTTP_OIDC_AUDIENCE=https://mcp.example.com \
 MEMORY_MCP_HTTP_OIDC_REDIRECT_URI=https://mcp.example.com/auth/oidc/callback \
-# Stable replica identity (required for multi-replica deployments)
 MEMORY_MCP_HTTP_REPLICA_ID=node-a \
 ./target/release/memory_mcp_http
 ```
@@ -640,34 +662,34 @@ MEMORY_MCP_HTTP_REPLICA_ID=node-a \
 | `/api/v1/operator/*` | OIDC operator + CSRF + recent-auth | Operator-only: provisioning retry, suspend, purge, recovery |
 | `/auth/oidc/*` | OIDC flow | Login, callback, logout (only when the control plane is enabled) |
 | `/health/live`, `/health/ready` | Public | Process liveness and admission readiness |
-| `/metrics` | Public (no app auth) | Prometheus scrape. Restrict at the reverse proxy or network layer. |
-| `/` and SPA fallback | Public | Dioxus control-plane UI (only with the `control-plane-ui` feature) |
+| `/metrics` | Public (no app auth) | Prometheus scrape when built with the `prometheus` feature. Restrict at the reverse proxy or network layer. |
+| `/` and SPA fallback | Public | Control-plane web UI, when the `control-plane-ui` build feature and `MEMORY_MCP_HTTP_ENABLE_CONTROL_PLANE_UI=true` are both enabled |
 
 ### Authentication
 
 MCP requests authenticate with a Bearer API key issued per Account. The
 server-generated key has the shape `mem_sk_<key_id>_<256-bit-secret>`; the
-secret is shown once and never recoverable. Each Account can hold up to ten
-active keys. Revocation is durable immediately and externally effective
-within the documented bound. Account APIs cannot grant operator status.
+secret is shown once and never recoverable. The active-key limit comes from
+the configured plan. Revocation is durable immediately and externally
+effective within the documented bound. Account APIs cannot grant operator
+status.
 
 Browser control-plane endpoints authenticate with a secure server-side
 session cookie (HttpOnly, SameSite). The session has both an idle and an
 absolute expiry and rotates after login. Destructive actions require recent
 authentication, typically within ten minutes.
 
-OIDC is the operator path. When the control plane is enabled, the binary
-requires `MEMORY_MCP_HTTP_OIDC_*` configuration. Enabling the control plane
-without it is a startup error. OIDC login uses Authorization Code with PKCE,
-exact issuer/audience validation, encrypted state and nonce, and an algorithm
-allowlist. The browser session and MCP API keys are independent: a browser
-session never authenticates `POST /mcp`, and an API key never authenticates the
-control plane.
+OIDC authenticates browser control-plane sessions. When the control plane is
+enabled, the binary requires `MEMORY_MCP_HTTP_OIDC_*` configuration. Enabling
+the control plane without it is a startup error. OIDC login uses Authorization
+Code with PKCE, exact issuer and audience validation, encrypted state and
+nonce, and an algorithm allowlist. The browser session and MCP API keys are
+independent: a browser session never authenticates `POST /mcp`, and an API key
+never authenticates the control plane.
 
 Operator access is granted only through `MEMORY_MCP_HTTP_OPERATOR_IDENTITIES`,
 an immutable allowlist of `issuer|hex(subject_verifier)` entries. Operators
-audit, retry, suspend, resume, purge, and inspect recovery status; nothing
-else.
+audit, retry, suspend, resume, purge, and inspect recovery status.
 
 ### Reverse proxy
 
@@ -822,7 +844,7 @@ Advanced provider selection may cause network access or model downloads. Keep th
 
 ### Streamable HTTP environment variables
 
-Read only by the `memory_mcp_http` binary built with the `streamable-http` feature. Set these to deploy the SaaS profile; the [Streamable HTTP SaaS profile](#streamable-http-saas-profile) section above explains the operational behavior and reverse-proxy contract, and the [Streamable HTTP SaaS specification](docs/superpowers/specs/2026-08-27-streamable-http-saas.md) is the contract of record.
+Read only by the `memory_mcp_http` binary built with the `streamable-http` feature. Set these to deploy the remote HTTP service; the [Remote deployment](#remote-deployment) section above explains the operational behavior and reverse-proxy contract, and the [Streamable HTTP SaaS specification](docs/superpowers/specs/2026-08-27-streamable-http-saas.md) is the contract of record.
 
 **HTTP boundary**
 
@@ -868,8 +890,8 @@ Read only by the `memory_mcp_http` binary built with the `streamable-http` featu
 | Variable | Type | Default | Description |
 | --- | --- | --- | --- |
 | `MEMORY_MCP_HTTP_SIGNUP_MODE` | enum: `invite_only` \| `open` | unset | Required. `invite_only` rejects self-service sign-up; `open` requires the seven plan seed variables below |
-| `MEMORY_MCP_HTTP_ENABLE_CONTROL_PLANE` | boolean | `false` | Enable OIDC, browser sessions, and `/api/v1` endpoints |
-| `MEMORY_MCP_HTTP_ENABLE_CONTROL_PLANE_UI` | boolean | `false` | Serve the embedded Dioxus SPA from `/` (requires `control-plane-ui` build) |
+| `MEMORY_MCP_HTTP_ENABLE_CONTROL_PLANE` | boolean | `false` | Enable OIDC, browser sessions, and control-plane `/api/v1` endpoints. The `POST /mcp` endpoint remains available when this is `false` |
+| `MEMORY_MCP_HTTP_ENABLE_CONTROL_PLANE_UI` | boolean | `false` | Serve the embedded web UI from `/`. Requires the control plane and the `control-plane-ui` build feature |
 | `MEMORY_MCP_HTTP_OIDC_ISSUER` | URL | unset | Required when the control plane is enabled. Exact issuer match is enforced on every login |
 | `MEMORY_MCP_HTTP_OIDC_CLIENT_ID` | string | unset | Required when the control plane is enabled |
 | `MEMORY_MCP_HTTP_OIDC_AUDIENCE` | URL string | unset | Required when the control plane is enabled. Exact audience match is enforced against the ID token's `aud` claim; supply a single audience identifier (the server does not currently parse a list) |

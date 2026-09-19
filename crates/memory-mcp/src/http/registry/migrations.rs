@@ -19,6 +19,7 @@ pub const REGISTRY_MIGRATIONS: &[&str] = &[
     "001_registry",
     "045_deletion_and_usage_hardening",
     "046_registry_correctness",
+    "047_local_admin_auth",
 ];
 
 /// Apply the registry migration catalog through the durable store. The store

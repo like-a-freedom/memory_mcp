@@ -5037,6 +5037,7 @@ name = "memory_mcp"
 version = "1.9.10"
 dependencies = [
  "anno",
+ "argon2",
  "async-trait",
  "axum",
  "base64 0.22.1",
@@ -5068,6 +5069,7 @@ dependencies = [
  "ort",
  "proptest",
  "rand 0.10.2",
+ "rand_core 0.6.4",
  "regex",
  "reqwest 0.13.4",
  "rmcp",

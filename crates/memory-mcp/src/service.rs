@@ -95,6 +95,9 @@ pub(crate) use apps::graph_neighbor_expansion;
 pub(crate) use apps::graph_payload;
 
 pub use constants::*;
+#[cfg(feature = "control-plane")]
+pub mod local_admin;
+
 mod constants {
     /// Default context cache size.
     pub const CONTEXT_CACHE_SIZE: usize = 512;
