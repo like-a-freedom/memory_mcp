@@ -22,7 +22,7 @@ RUN --mount=type=cache,id=memory-mcp-cargo-registry,target=/usr/local/cargo/regi
     --mount=type=cache,id=memory-mcp-cargo-git,target=/usr/local/cargo/git \
     --mount=type=cache,id=memory-mcp-target-trixie,target=/src/target \
     set -eux; \
-    cargo build --locked --release -p memory_mcp --bin memory_mcp_http --features streamable-http,control-plane; \
+    cargo build --locked --release -p memory_mcp --bin memory_mcp_http --features streamable-http,control-plane,control-plane-ui; \
     mkdir -p /out/runtime; \
     install -Dm755 target/release/memory_mcp_http /out/memory_mcp_http; \
     find target/release -maxdepth 1 -type f \( -name '*.so' -o -name '*.so.*' \) -exec cp -v '{}' /out/runtime/ \;
