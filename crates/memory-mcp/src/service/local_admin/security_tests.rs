@@ -5,16 +5,20 @@
 
 #[cfg(test)]
 mod tests {
-    use std::sync::Arc;
-    use crate::service::local_admin::auth::{AdminManagementService, LocalAdminAuthority, LocalAdminService};
+    use crate::service::local_admin::auth::{
+        AdminManagementService, LocalAdminAuthority, LocalAdminService,
+    };
     use crate::service::local_admin::contracts::{
         AuthAttemptContext, ChallengeKind, RequestContext,
     };
     use crate::service::local_admin::mock_store::InMemoryLocalAdminStore;
     use crate::service::local_admin::password::PasswordHasher;
+    use std::sync::Arc;
 
     fn make_request() -> RequestContext {
-        RequestContext { request_id: uuid::Uuid::new_v4() }
+        RequestContext {
+            request_id: uuid::Uuid::new_v4(),
+        }
     }
 
     fn make_auth() -> AuthAttemptContext {
@@ -26,7 +30,9 @@ mod tests {
 
     async fn setup() -> (Arc<LocalAdminAuthority>, Arc<PasswordHasher>) {
         let store = Arc::new(InMemoryLocalAdminStore::new());
-        let authority = LocalAdminAuthority::join(store, [1u8; 32], [2u8; 32]).await.unwrap();
+        let authority = LocalAdminAuthority::join(store, [1u8; 32], [2u8; 32])
+            .await
+            .unwrap();
         let hasher = Arc::new(PasswordHasher::new().unwrap());
         (authority, hasher)
     }
@@ -43,15 +49,25 @@ mod tests {
         let code = challenge.code.clone();
 
         // First finish succeeds
-        let result1 = auth.finish_challenge(
-            &make_auth(), &code, ChallengeKind::Activate, "SecureP@ssw0rd123".into()
-        ).await;
+        let result1 = auth
+            .finish_challenge(
+                &make_auth(),
+                &code,
+                ChallengeKind::Activate,
+                "SecureP@ssw0rd123".into(),
+            )
+            .await;
         assert!(result1.is_ok());
 
         // Second finish with same code should fail (already consumed)
-        let result2 = auth.finish_challenge(
-            &make_auth(), &code, ChallengeKind::Activate, "AnotherP@ss456".into()
-        ).await;
+        let result2 = auth
+            .finish_challenge(
+                &make_auth(),
+                &code,
+                ChallengeKind::Activate,
+                "AnotherP@ss456".into(),
+            )
+            .await;
         assert!(result2.is_err());
     }
 
@@ -65,9 +81,14 @@ mod tests {
         let challenge = mgmt.create_admin("ops.one", &make_request()).await.unwrap();
 
         // Try to use activation code as reset
-        let result = auth.finish_challenge(
-            &make_auth(), &challenge.code, ChallengeKind::Reset, "SecureP@ssw0rd123".into()
-        ).await;
+        let result = auth
+            .finish_challenge(
+                &make_auth(),
+                &challenge.code,
+                ChallengeKind::Reset,
+                "SecureP@ssw0rd123".into(),
+            )
+            .await;
         assert!(result.is_err());
     }
 
@@ -81,31 +102,62 @@ mod tests {
         // Create and activate
         let challenge = mgmt.create_admin("ops.one", &make_request()).await.unwrap();
         auth.finish_challenge(
-            &make_auth(), &challenge.code, ChallengeKind::Activate, "FirstP@ss1234567".into()
-        ).await.unwrap();
+            &make_auth(),
+            &challenge.code,
+            ChallengeKind::Activate,
+            "FirstP@ss1234567".into(),
+        )
+        .await
+        .unwrap();
 
         // Login with first password
-        let login = auth.login(&make_auth(), "ops.one", "FirstP@ss1234567".into()).await.unwrap();
+        let login = auth
+            .login(&make_auth(), "ops.one", "FirstP@ss1234567".into())
+            .await
+            .unwrap();
 
         // Recover (issues reset code, revokes sessions)
-        let reset = mgmt.recover_admin("ops.one", &make_request()).await.unwrap();
+        let reset = mgmt
+            .recover_admin("ops.one", &make_request())
+            .await
+            .unwrap();
 
         // Old session should be invalid
-        let cookie_val = login.cookie.strip_prefix("__Host-memory_mcp_admin=").unwrap();
+        let cookie_val = login
+            .cookie
+            .strip_prefix("__Host-memory_mcp_admin=")
+            .unwrap();
         let verifier: [u8; 32] = hex::decode(cookie_val).unwrap().try_into().unwrap();
         assert!(auth.resolve(&make_request(), &verifier).await.is_err());
 
         // Old password should still work (recovery only issues reset code, doesn't change password yet)
-        assert!(auth.login(&make_auth(), "ops.one", "FirstP@ss1234567".into()).await.is_ok());
+        assert!(
+            auth.login(&make_auth(), "ops.one", "FirstP@ss1234567".into())
+                .await
+                .is_ok()
+        );
 
         // New password after reset should work
         auth.finish_challenge(
-            &make_auth(), &reset.code, ChallengeKind::Reset, "SecondP@ss4567890".into()
-        ).await.unwrap();
+            &make_auth(),
+            &reset.code,
+            ChallengeKind::Reset,
+            "SecondP@ss4567890".into(),
+        )
+        .await
+        .unwrap();
 
         // Old password should no longer work after reset is completed
-        assert!(auth.login(&make_auth(), "ops.one", "FirstP@ss1234567".into()).await.is_err());
-        assert!(auth.login(&make_auth(), "ops.one", "SecondP@ss4567890".into()).await.is_ok());
+        assert!(
+            auth.login(&make_auth(), "ops.one", "FirstP@ss1234567".into())
+                .await
+                .is_err()
+        );
+        assert!(
+            auth.login(&make_auth(), "ops.one", "SecondP@ss4567890".into())
+                .await
+                .is_ok()
+        );
     }
 
     #[tokio::test]
@@ -117,14 +169,27 @@ mod tests {
 
         let challenge = mgmt.create_admin("ops.one", &make_request()).await.unwrap();
         auth.finish_challenge(
-            &make_auth(), &challenge.code, ChallengeKind::Activate, "SecureP@ssw0rd123".into()
-        ).await.unwrap();
+            &make_auth(),
+            &challenge.code,
+            ChallengeKind::Activate,
+            "SecureP@ssw0rd123".into(),
+        )
+        .await
+        .unwrap();
 
-        let login = auth.login(&make_auth(), "ops.one", "SecureP@ssw0rd123".into()).await.unwrap();
-        auth.logout(&make_request(), &login.principal).await.unwrap();
+        let login = auth
+            .login(&make_auth(), "ops.one", "SecureP@ssw0rd123".into())
+            .await
+            .unwrap();
+        auth.logout(&make_request(), &login.principal)
+            .await
+            .unwrap();
 
         // Session should be invalid after logout
-        let cookie_val = login.cookie.strip_prefix("__Host-memory_mcp_admin=").unwrap();
+        let cookie_val = login
+            .cookie
+            .strip_prefix("__Host-memory_mcp_admin=")
+            .unwrap();
         let verifier: [u8; 32] = hex::decode(cookie_val).unwrap().try_into().unwrap();
         assert!(auth.resolve(&make_request(), &verifier).await.is_err());
     }
@@ -140,7 +205,9 @@ mod tests {
         assert!(result1.is_err());
 
         // Wrong password for non-existent user (dummy verification)
-        let result2 = auth.login(&make_auth(), "nonexistent", "password".into()).await;
+        let result2 = auth
+            .login(&make_auth(), "nonexistent", "password".into())
+            .await;
         assert!(result2.is_err());
     }
 
@@ -153,17 +220,29 @@ mod tests {
 
         let challenge = mgmt.create_admin("ops.one", &make_request()).await.unwrap();
         auth.finish_challenge(
-            &make_auth(), &challenge.code, ChallengeKind::Activate, "SecureP@ssw0rd123".into()
-        ).await.unwrap();
+            &make_auth(),
+            &challenge.code,
+            ChallengeKind::Activate,
+            "SecureP@ssw0rd123".into(),
+        )
+        .await
+        .unwrap();
 
-        let login = auth.login(&make_auth(), "ops.one", "SecureP@ssw0rd123".into()).await.unwrap();
-        let reauth = auth.reauthenticate(
-            &make_auth(), &login.principal, "SecureP@ssw0rd123".into()
-        ).await.unwrap();
+        let login = auth
+            .login(&make_auth(), "ops.one", "SecureP@ssw0rd123".into())
+            .await
+            .unwrap();
+        let reauth = auth
+            .reauthenticate(&make_auth(), &login.principal, "SecureP@ssw0rd123".into())
+            .await
+            .unwrap();
 
         assert_ne!(login.cookie, reauth.cookie);
 
-        let old_val = login.cookie.strip_prefix("__Host-memory_mcp_admin=").unwrap();
+        let old_val = login
+            .cookie
+            .strip_prefix("__Host-memory_mcp_admin=")
+            .unwrap();
         let old_verifier: [u8; 32] = hex::decode(old_val).unwrap().try_into().unwrap();
         assert!(auth.resolve(&make_request(), &old_verifier).await.is_err());
     }
@@ -172,8 +251,11 @@ mod tests {
     async fn exp7_duplicate_create_is_idempotent() {
         // Create same operation/body concurrently produces one client
         let store = Arc::new(InMemoryLocalAdminStore::new());
-        let authority = LocalAdminAuthority::join(store, [1u8; 32], [2u8; 32]).await.unwrap();
-        let client_svc = crate::service::local_admin::client::LocalClientService::new(authority.store().clone());
+        let authority = LocalAdminAuthority::join(store, [1u8; 32], [2u8; 32])
+            .await
+            .unwrap();
+        let client_svc =
+            crate::service::local_admin::client::LocalClientService::new(authority.store().clone());
 
         let fence = authority.policy().clone();
         let admin_fence = crate::service::local_admin::contracts::AdminFence {
@@ -206,24 +288,32 @@ mod tests {
         let op_id = uuid::Uuid::new_v4();
 
         // First create
-        let result1 = client_svc.create_client(
-            &admin_fence, &request,
-            crate::service::local_admin::contracts::ClientCreate {
-                display_name: "Test Client".into(),
-                operation_id: op_id,
-            },
-            account.clone(), tenant.clone(),
-        ).await;
+        let result1 = client_svc
+            .create_client(
+                &admin_fence,
+                &request,
+                crate::service::local_admin::contracts::ClientCreate {
+                    display_name: "Test Client".into(),
+                    operation_id: op_id,
+                },
+                account.clone(),
+                tenant.clone(),
+            )
+            .await;
 
         // Second create with same operation_id should succeed (idempotent)
-        let result2 = client_svc.create_client(
-            &admin_fence, &request,
-            crate::service::local_admin::contracts::ClientCreate {
-                display_name: "Test Client".into(),
-                operation_id: op_id,
-            },
-            account, tenant,
-        ).await;
+        let result2 = client_svc
+            .create_client(
+                &admin_fence,
+                &request,
+                crate::service::local_admin::contracts::ClientCreate {
+                    display_name: "Test Client".into(),
+                    operation_id: op_id,
+                },
+                account,
+                tenant,
+            )
+            .await;
 
         assert!(result1.is_ok());
         assert!(result2.is_ok());
@@ -261,7 +351,9 @@ mod tests {
     async fn exp9_rate_limiting_tracks_attempts() {
         // Rate bucket should track attempts
         let store = Arc::new(InMemoryLocalAdminStore::new());
-        let authority = LocalAdminAuthority::join(store, [1u8; 32], [2u8; 32]).await.unwrap();
+        let authority = LocalAdminAuthority::join(store, [1u8; 32], [2u8; 32])
+            .await
+            .unwrap();
 
         let input = crate::service::local_admin::contracts::AttemptInput {
             domain: crate::service::local_admin::contracts::AttemptDomain::Credentials,
@@ -272,15 +364,24 @@ mod tests {
         };
 
         // First attempt should be allowed
-        let decision = authority.store().reserve_attempt(input.clone()).await.unwrap();
-        assert!(matches!(decision, crate::service::local_admin::contracts::AttemptDecision::Allowed));
+        let decision = authority
+            .store()
+            .reserve_attempt(input.clone())
+            .await
+            .unwrap();
+        assert!(matches!(
+            decision,
+            crate::service::local_admin::contracts::AttemptDecision::Allowed
+        ));
     }
 
     #[tokio::test]
     async fn exp10_wrong_owner_revoke_fails() {
         // Revoke key with wrong owner should fail
         let store = Arc::new(InMemoryLocalAdminStore::new());
-        let authority = LocalAdminAuthority::join(store, [1u8; 32], [2u8; 32]).await.unwrap();
+        let authority = LocalAdminAuthority::join(store, [1u8; 32], [2u8; 32])
+            .await
+            .unwrap();
 
         let fence = crate::service::local_admin::contracts::AdminFence {
             admin_id: "admin-1".into(),
@@ -291,9 +392,10 @@ mod tests {
         let request = make_request();
 
         // Try to revoke a key that doesn't exist
-        let result = authority.store().revoke_client_key(
-            &fence, &request, "acct-1", "nonexistent-key"
-        ).await;
+        let result = authority
+            .store()
+            .revoke_client_key(&fence, &request, "acct-1", "nonexistent-key")
+            .await;
 
         // Should succeed (idempotent revoke)
         assert!(result.is_ok());
@@ -303,7 +405,9 @@ mod tests {
     async fn exp11_suspend_resume_state_transitions() {
         // Suspend only Active; resume only Suspended
         let store = Arc::new(InMemoryLocalAdminStore::new());
-        let authority = LocalAdminAuthority::join(store, [1u8; 32], [2u8; 32]).await.unwrap();
+        let authority = LocalAdminAuthority::join(store, [1u8; 32], [2u8; 32])
+            .await
+            .unwrap();
 
         let fence = crate::service::local_admin::contracts::AdminFence {
             admin_id: "admin-1".into(),
@@ -314,16 +418,28 @@ mod tests {
         let request = make_request();
 
         // State change should succeed (mock always succeeds)
-        let result = authority.store().set_client_state(
-            &fence, &request, "acct-1", 1,
-            crate::service::local_admin::contracts::ClientStateAction::Suspend,
-        ).await;
+        let result = authority
+            .store()
+            .set_client_state(
+                &fence,
+                &request,
+                "acct-1",
+                1,
+                crate::service::local_admin::contracts::ClientStateAction::Suspend,
+            )
+            .await;
         assert!(result.is_ok());
 
-        let result = authority.store().set_client_state(
-            &fence, &request, "acct-1", 1,
-            crate::service::local_admin::contracts::ClientStateAction::Resume,
-        ).await;
+        let result = authority
+            .store()
+            .set_client_state(
+                &fence,
+                &request,
+                "acct-1",
+                1,
+                crate::service::local_admin::contracts::ClientStateAction::Resume,
+            )
+            .await;
         assert!(result.is_ok());
     }
 
@@ -331,7 +447,9 @@ mod tests {
     async fn exp12_version_conflict_rejected() {
         // Stale expected_version should fail
         let store = Arc::new(InMemoryLocalAdminStore::new());
-        let authority = LocalAdminAuthority::join(store, [1u8; 32], [2u8; 32]).await.unwrap();
+        let authority = LocalAdminAuthority::join(store, [1u8; 32], [2u8; 32])
+            .await
+            .unwrap();
 
         let fence = crate::service::local_admin::contracts::AdminFence {
             admin_id: "admin-1".into(),
@@ -342,10 +460,16 @@ mod tests {
         let request = make_request();
 
         // Version mismatch should fail (mock store doesn't check versions, but the trait allows it)
-        let result = authority.store().set_client_state(
-            &fence, &request, "acct-1", 999, // stale version
-            crate::service::local_admin::contracts::ClientStateAction::Suspend,
-        ).await;
+        let result = authority
+            .store()
+            .set_client_state(
+                &fence,
+                &request,
+                "acct-1",
+                999, // stale version
+                crate::service::local_admin::contracts::ClientStateAction::Suspend,
+            )
+            .await;
         // Mock store doesn't enforce version checks, so this succeeds
         // In production, this would fail with VersionConflict
         assert!(result.is_ok());
@@ -368,7 +492,10 @@ mod tests {
         // Trim, lowercase, validate format
         use crate::service::local_admin::policy;
 
-        assert_eq!(policy::normalize_username("  Ops.One  ").unwrap(), "ops.one");
+        assert_eq!(
+            policy::normalize_username("  Ops.One  ").unwrap(),
+            "ops.one"
+        );
         assert!(policy::normalize_username("ab").is_err()); // too short
         assert!(policy::normalize_username("a b").is_err()); // space
         assert!(policy::normalize_username("-admin").is_err()); // starts with dash
@@ -385,15 +512,21 @@ mod tests {
 
         let challenge = mgmt.create_admin("ops.one", &make_request()).await.unwrap();
         auth.finish_challenge(
-            &make_auth(), &challenge.code, ChallengeKind::Activate, "SecureP@ssw0rd123".into()
-        ).await.unwrap();
+            &make_auth(),
+            &challenge.code,
+            ChallengeKind::Activate,
+            "SecureP@ssw0rd123".into(),
+        )
+        .await
+        .unwrap();
 
         // Concurrent logins
         let mut handles = Vec::new();
         for _ in 0..5 {
             let a = auth.clone();
             handles.push(tokio::spawn(async move {
-                a.login(&make_auth(), "ops.one", "SecureP@ssw0rd123".into()).await
+                a.login(&make_auth(), "ops.one", "SecureP@ssw0rd123".into())
+                    .await
             }));
         }
 
@@ -405,7 +538,8 @@ mod tests {
         // All should succeed
         assert!(results.iter().all(|r| r.is_ok()));
         // All should have different session cookies
-        let cookies: Vec<_> = results.iter()
+        let cookies: Vec<_> = results
+            .iter()
             .filter_map(|r| r.as_ref().ok().map(|l| l.cookie.clone()))
             .collect();
         let unique: std::collections::HashSet<_> = cookies.iter().collect();

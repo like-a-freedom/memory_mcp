@@ -173,6 +173,7 @@ pub struct SessionRotate {
 
 /// One-time challenge code with the issued material.
 #[derive(Debug)]
+#[allow(dead_code)]
 pub struct OneTimeChallenge {
     pub issued: IssuedChallenge,
     pub code: String,
@@ -380,11 +381,8 @@ pub trait LocalAdminStore: Send + Sync + 'static {
     async fn rotate_session(&self, command: SessionRotate) -> LocalResult<AdminPrincipal>;
 
     /// Revoke a session.
-    async fn revoke_session(
-        &self,
-        fence: &AdminFence,
-        request: &RequestContext,
-    ) -> LocalResult<()>;
+    async fn revoke_session(&self, fence: &AdminFence, request: &RequestContext)
+    -> LocalResult<()>;
 
     /// Reserve throttle attempt atomically.
     async fn reserve_attempt(&self, input: AttemptInput) -> LocalResult<AttemptDecision>;
@@ -410,11 +408,7 @@ pub trait LocalAdminStore: Send + Sync + 'static {
     ) -> LocalResult<Page<ClientView>>;
 
     /// Get a single client by account id.
-    async fn client(
-        &self,
-        fence: &AdminFence,
-        account_id: &str,
-    ) -> LocalResult<ClientView>;
+    async fn client(&self, fence: &AdminFence, account_id: &str) -> LocalResult<ClientView>;
 
     /// List keys for a client.
     async fn list_client_keys(

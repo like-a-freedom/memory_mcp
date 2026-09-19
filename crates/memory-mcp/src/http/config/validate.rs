@@ -167,7 +167,7 @@ pub(super) fn validate(cfg: &HttpConfig) -> Result<(), MemoryError> {
 
     // ─── Browser auth mode validation ─────────────────────
     match &cfg.browser_auth {
-        Some(super::types::BrowserAuthConfig::Local(local)) => {
+        Some(super::types::BrowserAuthConfig::Local(_local)) => {
             // Local mode: reject OIDC-only settings
             if !cfg.oidc_issuer.is_empty() {
                 return Err(MemoryError::ConfigInvalid(
@@ -184,7 +184,8 @@ pub(super) fn validate(cfg: &HttpConfig) -> Result<(), MemoryError> {
                 && !cfg.public_base_url.contains("localhost")
             {
                 return Err(MemoryError::ConfigInvalid(
-                    "local mode requires HTTPS public_base_url (or localhost for development)".into(),
+                    "local mode requires HTTPS public_base_url (or localhost for development)"
+                        .into(),
                 ));
             }
             // Local mode: require explicit plan limits

@@ -1,7 +1,9 @@
 use std::sync::Arc;
 
 use argon2::password_hash::{PasswordHash, SaltString};
-use argon2::{Argon2, Algorithm, Version, Params, PasswordHasher as ArgonPasswordHasher, PasswordVerifier};
+use argon2::{
+    Algorithm, Argon2, Params, PasswordHasher as ArgonPasswordHasher, PasswordVerifier, Version,
+};
 use rand_core::OsRng;
 use rand_core::RngCore;
 
@@ -21,15 +23,13 @@ pub struct PasswordHasher {
 impl PasswordHasher {
     /// Initialize with supported parameters and a dummy PHC hash.
     pub fn new() -> LocalResult<Self> {
-        let params = Params::new(19456, 2, 1, Some(32)).map_err(|e| {
-            LocalAdminError::InvalidInput(format!("KDF params: {e}"))
-        })?;
+        let params = Params::new(19456, 2, 1, Some(32))
+            .map_err(|e| LocalAdminError::InvalidInput(format!("KDF params: {e}")))?;
         // Generate a dummy PHC once at startup for unknown/pending users.
         let mut salt_bytes = [0u8; 16];
         OsRng.fill_bytes(&mut salt_bytes);
-        let dummy_salt = SaltString::encode_b64(&salt_bytes).map_err(|e| {
-            LocalAdminError::InvalidInput(format!("salt encode: {e}"))
-        })?;
+        let dummy_salt = SaltString::encode_b64(&salt_bytes)
+            .map_err(|e| LocalAdminError::InvalidInput(format!("salt encode: {e}")))?;
         let argon2 = Argon2::new(Algorithm::Argon2id, Version::V0x13, params.clone());
         let dummy_phc = argon2
             .hash_password(b"dummy", &dummy_salt)
@@ -45,13 +45,11 @@ impl PasswordHasher {
 
     /// Hash a password with Argon2id. Bounded admission.
     pub async fn hash(&self, password: String) -> LocalResult<String> {
-        let _permit = tokio::time::timeout(
-            std::time::Duration::from_secs(2),
-            self.admission.acquire(),
-        )
-        .await
-        .map_err(|_| LocalAdminError::Unavailable)?
-        .map_err(|_| LocalAdminError::Unavailable)?;
+        let _permit =
+            tokio::time::timeout(std::time::Duration::from_secs(2), self.admission.acquire())
+                .await
+                .map_err(|_| LocalAdminError::Unavailable)?
+                .map_err(|_| LocalAdminError::Unavailable)?;
 
         let running = self.running.clone();
         let params = self.params.clone();
@@ -66,9 +64,8 @@ impl PasswordHasher {
         let result = tokio::task::spawn_blocking(move || {
             let mut salt_bytes = [0u8; 16];
             OsRng.fill_bytes(&mut salt_bytes);
-            let salt = SaltString::encode_b64(&salt_bytes).map_err(|e| {
-                LocalAdminError::InvalidInput(format!("salt encode: {e}"))
-            })?;
+            let salt = SaltString::encode_b64(&salt_bytes)
+                .map_err(|e| LocalAdminError::InvalidInput(format!("salt encode: {e}")))?;
             let argon2 = Argon2::new(Algorithm::Argon2id, Version::V0x13, params);
             let phc = argon2
                 .hash_password(password.as_bytes(), &salt)
@@ -106,13 +103,11 @@ impl PasswordHasher {
         // Validate PHC parameters before expensive KDF work.
         validate_phc(&phc_str)?;
 
-        let _permit = tokio::time::timeout(
-            std::time::Duration::from_secs(2),
-            self.admission.acquire(),
-        )
-        .await
-        .map_err(|_| LocalAdminError::Unavailable)?
-        .map_err(|_| LocalAdminError::Unavailable)?;
+        let _permit =
+            tokio::time::timeout(std::time::Duration::from_secs(2), self.admission.acquire())
+                .await
+                .map_err(|_| LocalAdminError::Unavailable)?
+                .map_err(|_| LocalAdminError::Unavailable)?;
 
         let running = self.running.clone();
 
@@ -125,9 +120,7 @@ impl PasswordHasher {
             let parsed = PasswordHash::new(&phc_str)
                 .map_err(|e| LocalAdminError::InvalidInput(format!("PHC parse: {e}")))?;
             let argon2 = Argon2::new(Algorithm::Argon2id, Version::V0x13, self_params());
-            let ok = argon2
-                .verify_password(password.as_bytes(), &parsed)
-                .is_ok();
+            let ok = argon2.verify_password(password.as_bytes(), &parsed).is_ok();
             Ok::<bool, LocalAdminError>(ok)
         })
         .await
@@ -149,15 +142,27 @@ mod tests {
         let second = hasher.hash(password.clone()).await.expect("hash");
         assert_ne!(first, second);
         assert!(first.starts_with("$argon2id$v=19$m=19456,t=2,p=1$"));
-        assert!(hasher.verify(password.clone(), Some(first)).await.expect("verify"));
-        assert!(!hasher.verify("a different password".into(), Some(second)).await.expect("verify"));
+        assert!(
+            hasher
+                .verify(password.clone(), Some(first))
+                .await
+                .expect("verify")
+        );
+        assert!(
+            !hasher
+                .verify("a different password".into(), Some(second))
+                .await
+                .expect("verify")
+        );
         assert!(!hasher.verify(password, None).await.expect("dummy"));
     }
 
     #[tokio::test]
     async fn local_admin_rejects_corrupt_phc() {
         let hasher = PasswordHasher::new().expect("supported KDF");
-        let result = hasher.verify("password".into(), Some("not-a-phc-hash".into())).await;
+        let result = hasher
+            .verify("password".into(), Some("not-a-phc-hash".into()))
+            .await;
         assert!(result.is_err());
     }
 
@@ -165,7 +170,12 @@ mod tests {
     async fn local_admin_rejects_wrong_algorithm_phc() {
         let hasher = PasswordHasher::new().expect("supported KDF");
         // bcrypt-style hash
-        let result = hasher.verify("password".into(), Some("$2b$10$abcdefghijklmnopqrstuuABCDEFGHIJKLMNOPQRSTUVWXYZ012".into())).await;
+        let result = hasher
+            .verify(
+                "password".into(),
+                Some("$2b$10$abcdefghijklmnopqrstuuABCDEFGHIJKLMNOPQRSTUVWXYZ012".into()),
+            )
+            .await;
         assert!(result.is_err());
     }
 }
@@ -185,29 +195,27 @@ fn validate_phc(phc: &str) -> LocalResult<()> {
     }
 
     // Parse the hash to validate structure
-    let parsed = PasswordHash::new(phc)
-        .map_err(|_| LocalAdminError::InvalidCredentials)?;
+    let parsed = PasswordHash::new(phc).map_err(|_| LocalAdminError::InvalidCredentials)?;
 
     // Verify parameters are within bounds using the argon2 crate
-    let params = Params::try_from(&parsed)
-        .map_err(|_| LocalAdminError::InvalidCredentials)?;
+    let params = Params::try_from(&parsed).map_err(|_| LocalAdminError::InvalidCredentials)?;
 
     let m_cost = params.m_cost();
     let t_cost = params.t_cost();
     let p_cost = params.p_cost();
 
     // Bound memory: must be reasonable (1MB - 1GB in KiB)
-    if m_cost < 1024 || m_cost > 1048576 {
+    if !(1024..=1048576).contains(&m_cost) {
         return Err(LocalAdminError::InvalidCredentials);
     }
 
     // Bound time: must be reasonable (1 - 100)
-    if t_cost < 1 || t_cost > 100 {
+    if !(1..=100).contains(&t_cost) {
         return Err(LocalAdminError::InvalidCredentials);
     }
 
     // Bound parallelism: must be reasonable (1 - 64)
-    if p_cost < 1 || p_cost > 64 {
+    if !(1..=64).contains(&p_cost) {
         return Err(LocalAdminError::InvalidCredentials);
     }
 

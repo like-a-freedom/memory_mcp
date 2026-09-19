@@ -3,7 +3,8 @@ use std::sync::Arc;
 use crate::service::local_admin::contracts::{
     AdminLogin, AdminPrincipal, AuthAttemptContext, BrowserPolicyFence, ChallengeFinish,
     ChallengeIssue, ChallengeKind, ChallengeView, LocalAdminError, LocalAdminStore,
-    LocalKeyFingerprints, LocalResult, OneTimeChallenge, RequestContext, SessionOpen, SessionRotate,
+    LocalKeyFingerprints, LocalResult, OneTimeChallenge, RequestContext, SessionOpen,
+    SessionRotate,
 };
 use crate::service::local_admin::password::PasswordHasher;
 
@@ -52,6 +53,7 @@ impl LocalAdminAuthority {
 
 /// CLI-facing management service. No PasswordHasher needed —
 /// the CLI only issues activation/reset codes.
+#[allow(dead_code)]
 pub struct AdminManagementService {
     authority: Arc<LocalAdminAuthority>,
 }
@@ -104,6 +106,7 @@ impl AdminManagementService {
 
 /// Browser-facing auth service. Owns the PasswordHasher.
 #[derive(Clone)]
+#[allow(dead_code)]
 pub struct LocalAdminService {
     authority: Arc<LocalAdminAuthority>,
     hasher: Arc<PasswordHasher>,
@@ -183,7 +186,7 @@ impl LocalAdminService {
             request: context.request.clone(),
         };
         let principal = self.authority.store().open_session(command).await?;
-        let cookie = format!("__Host-memory_mcp_admin={}", hex::encode(&cookie_verifier));
+        let cookie = format!("__Host-memory_mcp_admin={}", hex::encode(cookie_verifier));
         Ok(AdminLogin { principal, cookie })
     }
 
@@ -230,7 +233,7 @@ impl LocalAdminService {
         let new_principal = self.authority.store().rotate_session(command).await?;
         let cookie = format!(
             "__Host-memory_mcp_admin={}",
-            hex::encode(&new_cookie_verifier)
+            hex::encode(new_cookie_verifier)
         );
         Ok(AdminLogin {
             principal: new_principal,
@@ -276,12 +279,14 @@ fn compute_fingerprints(session_key: &[u8; 32], csrf_key: &[u8; 32]) -> LocalKey
     }
 }
 
+#[allow(dead_code)]
 fn generate_random_32() -> [u8; 32] {
     let mut buf = [0u8; 32];
     rand_core::OsRng.fill_bytes(&mut buf);
     buf
 }
 
+#[allow(dead_code)]
 fn parse_hex_32(hex_str: &str) -> LocalResult<[u8; 32]> {
     let bytes = hex::decode(hex_str)
         .map_err(|e| LocalAdminError::InvalidInput(format!("invalid hex: {e}")))?;

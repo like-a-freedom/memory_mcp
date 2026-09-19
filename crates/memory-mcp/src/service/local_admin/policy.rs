@@ -6,13 +6,23 @@ pub fn normalize_username(raw: &str) -> LocalResult<String> {
     let trimmed = raw.trim();
     let lowered: String = trimmed
         .chars()
-        .map(|c| if c.is_ascii_uppercase() { c.to_ascii_lowercase() } else { c })
+        .map(|c| {
+            if c.is_ascii_uppercase() {
+                c.to_ascii_lowercase()
+            } else {
+                c
+            }
+        })
         .collect();
     if lowered.is_empty() {
-        return Err(LocalAdminError::InvalidInput("username must not be empty".into()));
+        return Err(LocalAdminError::InvalidInput(
+            "username must not be empty".into(),
+        ));
     }
     if lowered.len() < 3 || lowered.len() > 64 {
-        return Err(LocalAdminError::InvalidInput("username must be 3-64 characters".into()));
+        return Err(LocalAdminError::InvalidInput(
+            "username must be 3-64 characters".into(),
+        ));
     }
     if !lowered.is_ascii() {
         return Err(LocalAdminError::InvalidInput(

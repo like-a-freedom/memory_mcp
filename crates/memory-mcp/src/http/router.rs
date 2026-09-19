@@ -165,39 +165,26 @@ pub fn build_router(
 
     #[cfg(feature = "control-plane")]
     let router = {
-        use crate::http::config::{BrowserAuthConfig, BrowserAuthMode};
-        let is_local = matches!(
-            state.config.browser_auth,
-            Some(BrowserAuthConfig::Local(_))
-        );
+        use crate::http::config::BrowserAuthConfig;
+        let is_local = matches!(state.config.browser_auth, Some(BrowserAuthConfig::Local(_)));
         if is_local {
-            use axum::routing::{get, post, delete};
             use crate::control::local_admin::handlers;
+            use axum::routing::{delete, get, post};
             let local_admin = Router::new()
                 .route(
                     "/api/v1/local/admin/challenge",
                     post(handlers::inspect_challenge),
                 )
-                .route(
-                    "/api/v1/local/admin/auth/login",
-                    post(handlers::login),
-                )
+                .route("/api/v1/local/admin/auth/login", post(handlers::login))
                 .route(
                     "/api/v1/local/admin/auth/finish",
                     post(handlers::finish_challenge),
                 )
-                .route(
-                    "/api/v1/local/admin/auth/reauth",
-                    post(handlers::reauth),
-                )
-                .route(
-                    "/api/v1/local/admin/auth/logout",
-                    post(handlers::logout),
-                )
+                .route("/api/v1/local/admin/auth/reauth", post(handlers::reauth))
+                .route("/api/v1/local/admin/auth/logout", post(handlers::logout))
                 .route(
                     "/api/v1/local/admin/clients",
-                    get(handlers::list_clients)
-                        .post(handlers::create_client),
+                    get(handlers::list_clients).post(handlers::create_client),
                 )
                 .route(
                     "/api/v1/local/admin/clients/{id}",
@@ -205,8 +192,7 @@ pub fn build_router(
                 )
                 .route(
                     "/api/v1/local/admin/clients/{id}/keys",
-                    get(handlers::list_keys)
-                        .post(handlers::issue_key),
+                    get(handlers::list_keys).post(handlers::issue_key),
                 )
                 .route(
                     "/api/v1/local/admin/clients/{id}/keys/{key_id}",

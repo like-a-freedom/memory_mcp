@@ -8,7 +8,6 @@ use chrono::Utc;
 use serde_json::{Value, json};
 
 use crate::error::MemoryError;
-use crate::http::registry::surreal_store::{RegistryDb, SurrealHandle};
 use crate::service::local_admin::contracts::{
     AdminFence, AdminKeyInsert, AdminPrincipal, AdminState, AttemptDecision, AttemptInput,
     BrowserAuthMode, BrowserPolicyFence, ChallengeFinish, ChallengeIssue, ChallengeKind,
@@ -46,7 +45,11 @@ fn parse_datetime(value: &Value, field: &str) -> LocalResult<chrono::DateTime<Ut
     let raw = value
         .get(field)
         .and_then(|v| v.as_str())
-        .or_else(|| value.get(field).and_then(|v| v.get("Datetime").and_then(Value::as_str)))
+        .or_else(|| {
+            value
+                .get(field)
+                .and_then(|v| v.get("Datetime").and_then(Value::as_str))
+        })
         .ok_or_else(|| LocalAdminError::InvalidInput(format!("missing datetime: {field}")))?;
     chrono::DateTime::parse_from_rfc3339(raw)
         .map(|dt| dt.with_timezone(&Utc))
@@ -85,7 +88,10 @@ impl LocalAdminStore for SurrealRegistryStore {
         let result = self
             .db
             .as_dyn()
-            .query_json(sql, Some(json!({"session_fp": session_fp, "csrf_fp": csrf_fp})))
+            .query_json(
+                sql,
+                Some(json!({"session_fp": session_fp, "csrf_fp": csrf_fp})),
+            )
             .await
             .map_err(infra)?;
 
@@ -339,7 +345,10 @@ impl LocalAdminStore for SurrealRegistryStore {
             username: require_str(row, "username")?,
             state,
             credential_generation: require_u64(row, "credential_generation")?,
-            password_phc: row.get("password_phc").and_then(|v| v.as_str()).map(String::from),
+            password_phc: row
+                .get("password_phc")
+                .and_then(|v| v.as_str())
+                .map(String::from),
         }))
     }
 
@@ -433,22 +442,12 @@ impl LocalAdminStore for SurrealRegistryStore {
             return Err(LocalAdminError::Unauthenticated);
         }
 
-        let state_str = require_str(row, "state")?;
-        let state = match state_str.as_str() {
-            "pending_activation" => AdminState::PendingActivation,
-            "active" => AdminState::Active,
-            "recovery_required" => AdminState::RecoveryRequired,
-            _ => AdminState::Active,
-        };
+        let _state_str = require_str(row, "state")?;
 
         // Touch idle expiry
         let touch_sql = "UPDATE $session_id SET idle_expiry = time::now() + 1800s;";
         // We don't have session_id directly, but the cookie_verifier is the session_id
-        let _ = self
-            .db
-            .as_dyn()
-            .query_json(touch_sql, None)
-            .await;
+        let _ = self.db.as_dyn().query_json(touch_sql, None).await;
 
         Ok(AdminPrincipal {
             fence: AdminFence {
@@ -625,8 +624,7 @@ impl LocalAdminStore for SurrealRegistryStore {
             SELECT $account_id AS account_id;
         ";
 
-        let result = self
-            .db
+        self.db
             .as_dyn()
             .query_json(
                 sql,
@@ -660,7 +658,7 @@ impl LocalAdminStore for SurrealRegistryStore {
         fence: &AdminFence,
         page: PageRequest,
     ) -> LocalResult<Page<ClientView>> {
-        let limit = page.limit.min(100).max(1);
+        let limit = page.limit.clamp(1, 100);
         let sql = "
             SELECT account_id, tenant_id, display_name, account_status,
                    tenant_status, plan_version, schema_version, version
@@ -673,7 +671,10 @@ impl LocalAdminStore for SurrealRegistryStore {
         let result = self
             .db
             .as_dyn()
-            .query_json(sql, Some(json!({"admin_id": fence.admin_id, "limit": limit})))
+            .query_json(
+                sql,
+                Some(json!({"admin_id": fence.admin_id, "limit": limit})),
+            )
             .await
             .map_err(infra)?;
 
@@ -705,11 +706,7 @@ impl LocalAdminStore for SurrealRegistryStore {
         })
     }
 
-    async fn client(
-        &self,
-        fence: &AdminFence,
-        account_id: &str,
-    ) -> LocalResult<ClientView> {
+    async fn client(&self, fence: &AdminFence, account_id: &str) -> LocalResult<ClientView> {
         let sql = "
             SELECT account_id, tenant_id, display_name, account_status,
                    tenant_status, plan_version, schema_version, version
@@ -748,11 +745,11 @@ impl LocalAdminStore for SurrealRegistryStore {
 
     async fn list_client_keys(
         &self,
-        fence: &AdminFence,
+        _fence: &AdminFence,
         account_id: &str,
         page: PageRequest,
     ) -> LocalResult<Page<crate::http::registry::models::ApiKeyMeta>> {
-        let limit = page.limit.min(100).max(1);
+        let limit = page.limit.clamp(1, 100);
         let sql = "
             SELECT key_id, name, created_at, expires_at, revoked
             FROM local_admin_client_key
@@ -764,10 +761,7 @@ impl LocalAdminStore for SurrealRegistryStore {
         let result = self
             .db
             .as_dyn()
-            .query_json(
-                sql,
-                Some(json!({"account_id": account_id, "limit": limit})),
-            )
+            .query_json(sql, Some(json!({"account_id": account_id, "limit": limit})))
             .await
             .map_err(infra)?;
 
@@ -780,7 +774,11 @@ impl LocalAdminStore for SurrealRegistryStore {
                         Some(crate::http::registry::models::ApiKeyMeta {
                             id: require_str(row, "key_id").ok()?,
                             name: require_str(row, "name").ok()?,
-                            status: if row.get("revoked").and_then(|v| v.as_bool()).unwrap_or(false) {
+                            status: if row
+                                .get("revoked")
+                                .and_then(|v| v.as_bool())
+                                .unwrap_or(false)
+                            {
                                 crate::http::registry::models::ApiKeyStatus::Revoked
                             } else {
                                 crate::http::registry::models::ApiKeyStatus::Active
@@ -870,14 +868,16 @@ impl LocalAdminStore for SurrealRegistryStore {
             .await
             .map_err(infra)?;
 
-        Ok(KeyInsertOutcome::Created(crate::http::registry::models::ApiKeyMeta {
-            id: command.key_id,
-            name: command.name,
-            status: crate::http::registry::models::ApiKeyStatus::Active,
-            created_at: Utc::now(),
-            expires_at: None,
-            last_used_at: None,
-        }))
+        Ok(KeyInsertOutcome::Created(
+            crate::http::registry::models::ApiKeyMeta {
+                id: command.key_id,
+                name: command.name,
+                status: crate::http::registry::models::ApiKeyStatus::Active,
+                created_at: Utc::now(),
+                expires_at: None,
+                last_used_at: None,
+            },
+        ))
     }
 
     async fn revoke_client_key(
@@ -978,6 +978,7 @@ impl LocalAdminStore for SurrealRegistryStore {
                     "admin_id": fence.admin_id,
                     "expected_version": expected_version,
                     "new_status": new_status,
+                    "action_str": action_str,
                     "request_id": request.request_id.to_string(),
                 })),
             )

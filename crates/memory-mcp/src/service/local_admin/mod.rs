@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+
 pub(crate) mod auth;
 pub(crate) mod client;
 pub(crate) mod contracts;
@@ -7,6 +9,6 @@ pub(crate) mod mock_store;
 pub(crate) mod password;
 pub(crate) mod policy;
 #[cfg(all(test, feature = "control-plane"))]
-mod tests;
-#[cfg(all(test, feature = "control-plane"))]
 mod security_tests;
+#[cfg(all(test, feature = "control-plane"))]
+mod tests;

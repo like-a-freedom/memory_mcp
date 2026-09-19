@@ -4,8 +4,8 @@
 //! API key material generation. Independent of control-plane adapters.
 
 use hmac::{Hmac, KeyInit, Mac};
-use sha2::Sha256;
 use rand_core::RngCore;
+use sha2::Sha256;
 
 type HmacSha256 = Hmac<Sha256>;
 
@@ -14,8 +14,7 @@ type HmacSha256 = Hmac<Sha256>;
 /// The label prevents cross-purpose key reuse even if the underlying key
 /// is the same. Returns the raw 32-byte MAC output.
 pub fn hmac_fingerprint(key: &[u8; 32], label: &[u8], data: &[u8]) -> [u8; 32] {
-    let mut mac = HmacSha256::new_from_slice(key)
-        .expect("HMAC accepts any key length");
+    let mut mac = HmacSha256::new_from_slice(key).expect("HMAC accepts any key length");
     mac.update(label);
     mac.update(data);
     mac.finalize().into_bytes().into()
@@ -46,13 +45,12 @@ pub fn generate_api_key_material(pepper: &[u8]) -> (String, [u8; 32], String) {
     let key_id = base64url_encode(key_id_bytes);
 
     // Verifier: HMAC of raw credential under pepper
-    let mut mac = HmacSha256::new_from_slice(pepper)
-        .expect("HMAC accepts any key length");
+    let mut mac = HmacSha256::new_from_slice(pepper).expect("HMAC accepts any key length");
     mac.update(&raw);
     let verifier: [u8; 32] = mac.finalize().into_bytes().into();
 
     // Full credential: hex-encoded with prefix
-    let full_credential = format!("mem_sk_{}", hex::encode(&raw));
+    let full_credential = format!("mem_sk_{}", hex::encode(raw));
 
     (key_id, verifier, full_credential)
 }

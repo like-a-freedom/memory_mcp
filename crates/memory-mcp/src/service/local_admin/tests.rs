@@ -4,7 +4,9 @@
 mod tests {
     use std::sync::Arc;
 
-    use crate::service::local_admin::auth::{AdminManagementService, LocalAdminAuthority, LocalAdminService};
+    use crate::service::local_admin::auth::{
+        AdminManagementService, LocalAdminAuthority, LocalAdminService,
+    };
     use crate::service::local_admin::contracts::{
         AuthAttemptContext, BrowserAuthMode, RequestContext,
     };
@@ -37,9 +39,7 @@ mod tests {
         let authority = LocalAdminAuthority::join(store, session_key(), csrf_key())
             .await
             .expect("join policy");
-        let hasher = Arc::new(
-            PasswordHasher::new().expect("init hasher"),
-        );
+        let hasher = Arc::new(PasswordHasher::new().expect("init hasher"));
         (authority, hasher)
     }
 
@@ -144,10 +144,7 @@ mod tests {
             .cookie
             .strip_prefix("__Host-memory_mcp_admin=")
             .unwrap();
-        let verifier: [u8; 32] = hex::decode(cookie_val)
-            .unwrap()
-            .try_into()
-            .unwrap();
+        let verifier: [u8; 32] = hex::decode(cookie_val).unwrap().try_into().unwrap();
 
         // Resolve session
         let principal = auth
@@ -190,10 +187,7 @@ mod tests {
             .cookie
             .strip_prefix("__Host-memory_mcp_admin=")
             .unwrap();
-        let verifier: [u8; 32] = hex::decode(cookie_val)
-            .unwrap()
-            .try_into()
-            .unwrap();
+        let verifier: [u8; 32] = hex::decode(cookie_val).unwrap().try_into().unwrap();
         let result = auth.resolve(&make_request_context(), &verifier).await;
         assert!(result.is_err());
     }
@@ -223,11 +217,7 @@ mod tests {
 
         // Reauthenticate
         let reauth = auth
-            .reauthenticate(
-                &auth_ctx,
-                &login.principal,
-                "SecureP@ssw0rd123".to_string(),
-            )
+            .reauthenticate(&auth_ctx, &login.principal, "SecureP@ssw0rd123".to_string())
             .await
             .unwrap();
         assert_eq!(reauth.principal.username, "ops.one");

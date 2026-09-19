@@ -1,14 +1,15 @@
-use axum::http::StatusCode;
-use axum::response::{IntoResponse, Response};
+#![allow(dead_code)]
+
 use axum::extract::FromRequestParts;
+use axum::http::StatusCode;
 use axum::http::request::Parts;
+use axum::response::{IntoResponse, Response};
 use std::sync::Arc;
 
-use crate::service::local_admin::contracts::{
-    LocalAdminError, AdminPrincipal,
-    AuthAttemptContext, RequestContext,
-};
 use crate::http::HttpState;
+use crate::service::local_admin::contracts::{
+    AdminPrincipal, AuthAttemptContext, LocalAdminError, RequestContext,
+};
 
 /// HTTP error mapping for local admin operations.
 pub enum LocalAdminApiError {
@@ -26,7 +27,11 @@ impl IntoResponse for LocalAdminApiError {
     fn into_response(self) -> Response {
         let (status, code, message) = match self {
             Self::BadRequest(msg) => (StatusCode::BAD_REQUEST, "bad_request", msg),
-            Self::Unauthorized => (StatusCode::UNAUTHORIZED, "unauthorized", "unauthorized".into()),
+            Self::Unauthorized => (
+                StatusCode::UNAUTHORIZED,
+                "unauthorized",
+                "unauthorized".into(),
+            ),
             Self::Forbidden => (StatusCode::FORBIDDEN, "forbidden", "forbidden".into()),
             Self::NotFound => (StatusCode::NOT_FOUND, "not_found", "not found".into()),
             Self::Conflict(msg) => (StatusCode::CONFLICT, "conflict", msg),
@@ -40,11 +45,7 @@ impl IntoResponse for LocalAdminApiError {
                 "temporarily_unavailable",
                 "temporarily unavailable".into(),
             ),
-            Self::Internal(msg) => (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                "internal_error",
-                msg,
-            ),
+            Self::Internal(msg) => (StatusCode::INTERNAL_SERVER_ERROR, "internal_error", msg),
         };
         let body = serde_json::json!({
             "error": {"code": code, "message": message},
@@ -76,9 +77,9 @@ impl From<LocalAdminError> for LocalAdminApiError {
             LocalAdminError::SecretAlreadyIssued { key_id } => {
                 Self::Conflict(format!("secret already issued for key {key_id}"))
             }
-            LocalAdminError::Throttled { retry_after_seconds } => {
-                Self::Throttled(retry_after_seconds)
-            }
+            LocalAdminError::Throttled {
+                retry_after_seconds,
+            } => Self::Throttled(retry_after_seconds),
             LocalAdminError::Unavailable => Self::ServiceUnavailable,
             LocalAdminError::Infrastructure(_) => Self::Internal("internal error".into()),
         }
@@ -103,20 +104,21 @@ impl FromRequestParts<Arc<HttpState>> for RequireAdmin {
         parts: &mut Parts,
         _state: &Arc<HttpState>,
     ) -> Result<Self, Self::Rejection> {
-        let ext = parts
-            .extensions
-            .get::<LocalAdminExtension>()
-            .ok_or(LocalAdminApiError::Internal(
-                "local admin extension not mounted".into(),
-            ))?;
+        let ext =
+            parts
+                .extensions
+                .get::<LocalAdminExtension>()
+                .ok_or(LocalAdminApiError::Internal(
+                    "local admin extension not mounted".into(),
+                ))?;
 
         let cookie_header = parts
             .headers
             .get("cookie")
             .and_then(|v| v.to_str().ok())
             .unwrap_or("");
-        let cookie_verifier = parse_admin_cookie(cookie_header)
-            .ok_or(LocalAdminApiError::Unauthorized)?;
+        let cookie_verifier =
+            parse_admin_cookie(cookie_header).ok_or(LocalAdminApiError::Unauthorized)?;
 
         let principal = ext
             .authority

@@ -2,8 +2,8 @@
 //!
 //! Reads only the env vars needed for admin create/recover commands.
 
-use crate::error::MemoryError;
 use crate::config::SurrealTargetConfig;
+use crate::error::MemoryError;
 
 /// Configuration for the admin CLI commands.
 pub struct AdminCliConfig {

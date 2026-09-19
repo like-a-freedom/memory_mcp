@@ -7,6 +7,7 @@ use crate::service::local_admin::contracts::{
 use rand_core::RngCore;
 
 /// Service for managing local clients and their API keys.
+#[allow(dead_code)]
 pub struct LocalClientService {
     store: Arc<dyn LocalAdminStore>,
 }
@@ -46,11 +47,7 @@ impl LocalClientService {
     }
 
     /// Get a single client by account id.
-    pub async fn client(
-        &self,
-        fence: &AdminFence,
-        account_id: &str,
-    ) -> LocalResult<ClientView> {
+    pub async fn client(&self, fence: &AdminFence, account_id: &str) -> LocalResult<ClientView> {
         self.store.client(fence, account_id).await
     }
 
@@ -82,7 +79,9 @@ impl LocalClientService {
         account_id: &str,
         key_id: &str,
     ) -> LocalResult<()> {
-        self.store.revoke_client_key(fence, request, account_id, key_id).await
+        self.store
+            .revoke_client_key(fence, request, account_id, key_id)
+            .await
     }
 
     /// Suspend or resume a client.
@@ -94,10 +93,13 @@ impl LocalClientService {
         expected_version: u64,
         action: ClientStateAction,
     ) -> LocalResult<()> {
-        self.store.set_client_state(fence, request, account_id, expected_version, action).await
+        self.store
+            .set_client_state(fence, request, account_id, expected_version, action)
+            .await
     }
 }
 
+#[allow(dead_code)]
 fn compute_request_fingerprint() -> [u8; 32] {
     let mut buf = [0u8; 32];
     rand_core::OsRng.fill_bytes(&mut buf);

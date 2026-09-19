@@ -257,16 +257,16 @@ impl HttpConfig {
                             "local mode must not have OIDC configuration".into(),
                         ));
                     }
-                    let session_key =
-                        parse_hex_32_env("MEMORY_MCP_HTTP_SESSION_KEY")?;
+                    let session_key = parse_hex_32_env("MEMORY_MCP_HTTP_SESSION_KEY")?;
                     let csrf_key = parse_hex_32_env("MEMORY_MCP_HTTP_CSRF_KEY")?;
                     let default_plan_version: u32 =
                         require_env("MEMORY_MCP_HTTP_LOCAL_DEFAULT_PLAN_VERSION")?
                             .parse()
                             .map_err(|_| {
                                 MemoryError::ConfigInvalid(
-                                    "MEMORY_MCP_HTTP_LOCAL_DEFAULT_PLAN_VERSION must be a positive u32".into(),
-                                )
+                            "MEMORY_MCP_HTTP_LOCAL_DEFAULT_PLAN_VERSION must be a positive u32"
+                                .into(),
+                        )
                             })?;
                     if default_plan_version == 0 {
                         return Err(MemoryError::ConfigInvalid(
@@ -570,10 +570,16 @@ mod tests {
         let mut vars = base_required_env();
         vars[6] = ("MEMORY_MCP_HTTP_SIGNUP_MODE", "open".into());
         vars.push(("MEMORY_MCP_HTTP_ENABLE_CONTROL_PLANE", "true".into()));
-        vars.push(("MEMORY_MCP_HTTP_OIDC_ISSUER", "https://issuer.example.com".into()));
+        vars.push((
+            "MEMORY_MCP_HTTP_OIDC_ISSUER",
+            "https://issuer.example.com".into(),
+        ));
         vars.push(("MEMORY_MCP_HTTP_OIDC_CLIENT_ID", "test-client".into()));
         vars.push(("MEMORY_MCP_HTTP_OIDC_AUDIENCE", "memory-mcp".into()));
-        vars.push(("MEMORY_MCP_HTTP_OIDC_REDIRECT_URI", "http://localhost/callback".into()));
+        vars.push((
+            "MEMORY_MCP_HTTP_OIDC_REDIRECT_URI",
+            "http://localhost/callback".into(),
+        ));
         vars.extend([
             ("MEMORY_MCP_HTTP_MAX_INGESTED_BYTES", "1000".into()),
             ("MEMORY_MCP_HTTP_MAX_EPISODE_COUNT", "10".into()),
@@ -806,5 +812,4 @@ mod tests {
             Err(MemoryError::ConfigInvalid(msg)) if msg.contains("off mode")
         ));
     }
-
 }

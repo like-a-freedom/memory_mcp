@@ -3,11 +3,9 @@
 //! Manages throttling and denied aggregate counts using the
 //! `local_admin_rate_bucket` table.
 
-use async_trait::async_trait;
-use serde_json::{Value, json};
+use serde_json::json;
 
 use crate::error::MemoryError;
-use crate::http::registry::surreal_store::{RegistryDb, SurrealHandle};
 use crate::service::local_admin::contracts::{LocalAdminError, LocalResult};
 
 use super::SurrealRegistryStore;
@@ -106,10 +104,7 @@ impl SurrealRegistryStore {
 
         self.db
             .as_dyn()
-            .query_json(
-                sql,
-                Some(json!({"window": older_than_secs})),
-            )
+            .query_json(sql, Some(json!({"window": older_than_secs})))
             .await
             .map_err(infra)?;
 
