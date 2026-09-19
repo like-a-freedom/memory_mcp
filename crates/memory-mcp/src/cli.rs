@@ -1,6 +1,7 @@
 //! CLI module — clap-based command surface shared between runtime modes
 //! (serve / watch / reembed) and one-shot memory tool subcommands.
 
+pub mod admin_config;
 pub mod args;
 pub mod commands;
 pub mod runtime;

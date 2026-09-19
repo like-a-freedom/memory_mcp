@@ -176,33 +176,45 @@ pub fn build_router(
             let local_admin = Router::new()
                 .route(
                     "/api/v1/local/admin/challenge",
-                    post(handlers::challenge_handler),
+                    post(handlers::inspect_challenge),
                 )
                 .route(
-                    "/api/v1/local/admin/auth",
-                    post(handlers::auth_handler),
+                    "/api/v1/local/admin/auth/login",
+                    post(handlers::login),
+                )
+                .route(
+                    "/api/v1/local/admin/auth/finish",
+                    post(handlers::finish_challenge),
+                )
+                .route(
+                    "/api/v1/local/admin/auth/reauth",
+                    post(handlers::reauth),
+                )
+                .route(
+                    "/api/v1/local/admin/auth/logout",
+                    post(handlers::logout),
                 )
                 .route(
                     "/api/v1/local/admin/clients",
-                    get(handlers::clients_handler)
-                        .post(handlers::clients_handler),
+                    get(handlers::list_clients)
+                        .post(handlers::create_client),
                 )
                 .route(
                     "/api/v1/local/admin/clients/{id}",
-                    get(handlers::client_handler),
+                    get(handlers::get_client),
                 )
                 .route(
                     "/api/v1/local/admin/clients/{id}/keys",
-                    get(handlers::keys_handler)
-                        .post(handlers::keys_handler),
+                    get(handlers::list_keys)
+                        .post(handlers::issue_key),
                 )
                 .route(
                     "/api/v1/local/admin/clients/{id}/keys/{key_id}",
-                    delete(handlers::revoke_key_handler),
+                    delete(handlers::revoke_key),
                 )
                 .route(
                     "/api/v1/local/admin/clients/{id}/state",
-                    post(handlers::client_state_handler),
+                    post(handlers::set_client_state),
                 );
             router.merge(local_admin)
         } else {
