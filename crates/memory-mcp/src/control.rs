@@ -26,6 +26,8 @@ pub mod csrf;
 pub mod deletion;
 pub mod error;
 #[cfg(feature = "control-plane")]
+pub mod local_admin;
+#[cfg(feature = "control-plane")]
 pub mod oidc;
 pub mod operator;
 #[cfg(feature = "control-plane")]
