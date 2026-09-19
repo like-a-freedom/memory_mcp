@@ -163,6 +163,53 @@ pub fn build_router(
         router
     };
 
+    #[cfg(feature = "control-plane")]
+    let router = {
+        use crate::http::config::{BrowserAuthConfig, BrowserAuthMode};
+        let is_local = matches!(
+            state.config.browser_auth,
+            Some(BrowserAuthConfig::Local(_))
+        );
+        if is_local {
+            use axum::routing::{get, post, delete};
+            use crate::control::local_admin::handlers;
+            let local_admin = Router::new()
+                .route(
+                    "/api/v1/local/admin/challenge",
+                    post(handlers::challenge_handler),
+                )
+                .route(
+                    "/api/v1/local/admin/auth",
+                    post(handlers::auth_handler),
+                )
+                .route(
+                    "/api/v1/local/admin/clients",
+                    get(handlers::clients_handler)
+                        .post(handlers::clients_handler),
+                )
+                .route(
+                    "/api/v1/local/admin/clients/{id}",
+                    get(handlers::client_handler),
+                )
+                .route(
+                    "/api/v1/local/admin/clients/{id}/keys",
+                    get(handlers::keys_handler)
+                        .post(handlers::keys_handler),
+                )
+                .route(
+                    "/api/v1/local/admin/clients/{id}/keys/{key_id}",
+                    delete(handlers::revoke_key_handler),
+                )
+                .route(
+                    "/api/v1/local/admin/clients/{id}/state",
+                    post(handlers::client_state_handler),
+                );
+            router.merge(local_admin)
+        } else {
+            router
+        }
+    };
+
     #[cfg(feature = "control-plane-ui")]
     let router = if state.config.enable_control_plane_ui {
         router.fallback(|uri: axum::http::Uri| async move {

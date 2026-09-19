@@ -2525,6 +2525,9 @@ fn base64_decode(input: &str) -> Result<Vec<u8>, &'static str> {
 
 pub use super::storage::ensure_namespace as ensure_registry_namespace;
 
+#[cfg(feature = "control-plane")]
+mod local_admin;
+
 #[cfg(test)]
 mod tests {
     use super::*;

@@ -142,6 +142,8 @@ fn parse_admin_cookie(cookie_header: &str) -> Option<[u8; 32]> {
     None
 }
 
+pub mod handlers;
+
 /// Build a `RequestContext` from axum request parts.
 pub fn request_context_from_parts(parts: &Parts) -> RequestContext {
     let request_id = parts
