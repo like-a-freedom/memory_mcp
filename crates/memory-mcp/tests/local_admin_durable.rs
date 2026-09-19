@@ -33,8 +33,8 @@ async fn local_admin_remote_replica_races() {
 
     // Authenticate
     db.signin(surrealdb::opt::auth::Root {
-        username: &control_user,
-        password: &control_pass,
+        username: control_user,
+        password: control_pass,
     })
     .await
     .expect("signin");
@@ -95,8 +95,8 @@ async fn local_admin_session_revocation_race() {
         .expect("use namespace");
 
     db.signin(surrealdb::opt::auth::Root {
-        username: &control_user,
-        password: &control_pass,
+        username: control_user,
+        password: control_pass,
     })
     .await
     .expect("signin");
