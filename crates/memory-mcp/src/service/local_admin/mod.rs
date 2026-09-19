@@ -8,3 +8,5 @@ pub(crate) mod password;
 pub(crate) mod policy;
 #[cfg(all(test, feature = "control-plane"))]
 mod tests;
+#[cfg(all(test, feature = "control-plane"))]
+mod security_tests;

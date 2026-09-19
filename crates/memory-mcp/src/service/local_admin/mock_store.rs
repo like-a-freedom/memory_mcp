@@ -84,6 +84,15 @@ impl LocalAdminStore for InMemoryLocalAdminStore {
 
     async fn issue_challenge(&self, command: ChallengeIssue) -> LocalResult<IssuedChallenge> {
         let mut inner = self.inner.lock().unwrap();
+        // For reset challenges, revoke all sessions for this admin
+        if command.kind == super::contracts::ChallengeKind::Reset {
+            let admin_id = inner.credentials.values()
+                .find(|c| c.username == command.username)
+                .map(|c| c.admin_id.clone());
+            if let Some(admin_id) = admin_id {
+                inner.sessions.retain(|_, record| record.admin_id != admin_id);
+            }
+        }
         inner.challenges.insert(
             command.verifier,
             ChallengeRecord {
@@ -211,6 +220,8 @@ impl LocalAdminStore for InMemoryLocalAdminStore {
         let mut inner = self.inner.lock().unwrap();
         let new_verifier = command.cookie_verifier;
         let new_gen = command.credential.credential_generation + 1;
+        // Revoke old sessions for this admin
+        inner.sessions.retain(|_, record| record.admin_id != command.credential.admin_id);
         inner.sessions.insert(
             new_verifier,
             SessionRecord {
