@@ -2726,4 +2726,31 @@ mod tests {
             .await;
         assert!(matches!(replay, Err(MemoryError::Conflict(_))));
     }
+
+    #[cfg(feature = "control-plane")]
+    #[tokio::test]
+    async fn query_json_at_extracts_correct_index() {
+        let db = Arc::new(Surreal::new::<Mem>(()).await.expect("create mem db"));
+        db.use_ns("test_qja").use_db("test_qja").await.expect("use ns/db");
+        let registry_db = RegistryDb::Local(db);
+        let sql = "LET $a = 'first'; LET $b = 'second'; RETURN $b;";
+        let result = registry_db.as_dyn()
+            .query_json_at(sql, None, 2)
+            .await
+            .expect("query_json_at");
+        assert!(!result.is_empty());
+    }
+
+    #[cfg(feature = "control-plane")]
+    #[tokio::test]
+    async fn query_json_at_fails_on_bad_index() {
+        let db = Arc::new(Surreal::new::<Mem>(()).await.expect("create mem db"));
+        db.use_ns("test_qja2").use_db("test_qja2").await.expect("use ns/db");
+        let registry_db = RegistryDb::Local(db);
+        let sql = "LET $a = 'first'; RETURN $a;";
+        let result = registry_db.as_dyn()
+            .query_json_at(sql, None, 5)
+            .await;
+        assert!(result.is_err());
+    }
 }
