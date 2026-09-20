@@ -232,25 +232,30 @@ async fn local_admin_session_revocation_race() {
         auth_two.resolve(&resolve_request, &second_verifier)
     );
     logout.expect("logout commits");
-    assert!(
-        resolved.is_ok(),
-        "resolving an independent session during a logout must succeed: {resolved:?}"
+    // Exact postcondition, not "it did not error": the concurrent read must
+    // return the second session's own principal.
+    let resolved = resolved.expect("resolving an independent session during a logout");
+    assert_eq!(
+        resolved.fence.session_id, second_login.principal.fence.session_id,
+        "the resolved session is the one that was presented"
     );
+    assert_eq!(resolved.username, "race.admin");
 
     // The revoked session no longer resolves; the independent one still does.
     let revoked_request = request();
     let revoked = auth_one.resolve(&revoked_request, &first_verifier).await;
-    assert!(
-        revoked.is_err(),
-        "a revoked session must not resolve on any replica"
-    );
+    match revoked {
+        Err(LocalAdminError::Unauthenticated) => {}
+        other => panic!("a revoked session must be rejected as unauthenticated: {other:?}"),
+    }
     let survivor_request = request();
-    assert!(
-        auth_two
-            .resolve(&survivor_request, &second_verifier)
-            .await
-            .is_ok(),
-        "the independent session must survive the other session's logout"
+    let survivor = auth_two
+        .resolve(&survivor_request, &second_verifier)
+        .await
+        .expect("the independent session must survive the other session's logout");
+    assert_eq!(
+        survivor.fence.admin_id, first_login.principal.fence.admin_id,
+        "the survivor belongs to the same administrator as the revoked session"
     );
 }
 

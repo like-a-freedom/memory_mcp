@@ -4,6 +4,7 @@
 //! The validator lives in `validate.rs`; everything else (struct
 //! shape, env loading, defaults) is here.
 
+use std::fmt;
 use std::net::SocketAddr;
 use std::time::Duration;
 
@@ -25,6 +26,10 @@ use super::parse::{
 use super::validate::validate;
 pub use crate::config::SurrealTargetConfig;
 
+/// Substituted for a secret field by a hand-written `Debug` (plan Task 1:
+/// "Redact Debug of config and keys").
+const REDACTED: &str = "<redacted>";
+
 /// The browser authentication mode selected for this deployment.
 #[derive(Debug, Clone, Copy, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
@@ -43,7 +48,7 @@ pub enum BrowserAuthConfig {
 }
 
 /// Configuration for local administrator browser authentication.
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Clone, Deserialize)]
 pub struct LocalBrowserConfig {
     /// HMAC key for session signing/verification.
     pub session_key: [u8; 32],
@@ -53,6 +58,20 @@ pub struct LocalBrowserConfig {
     pub default_plan_version: u32,
     /// Plan limits for the default local plan.
     pub default_plan_limits: PlanLimits,
+}
+
+/// Both keys are raw HMAC key material: redacted. The OIDC variant needs no
+/// hand-written impl because its only secret is the already-redacted
+/// [`HmacKeys`].
+impl fmt::Debug for LocalBrowserConfig {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("LocalBrowserConfig")
+            .field("session_key", &REDACTED)
+            .field("csrf_key", &REDACTED)
+            .field("default_plan_version", &self.default_plan_version)
+            .field("default_plan_limits", &self.default_plan_limits)
+            .finish()
+    }
 }
 
 /// Configuration for OIDC browser authentication. Owns the existing
@@ -69,7 +88,7 @@ pub struct OidcBrowserConfig {
     pub keys: HmacKeys,
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Clone, Deserialize)]
 pub struct HttpConfig {
     pub bind: SocketAddr,
     pub public_base_url: String,
@@ -123,7 +142,80 @@ pub struct HttpConfig {
     pub browser_auth: Option<BrowserAuthConfig>,
 }
 
-#[derive(Debug, Clone, Copy, Deserialize)]
+/// `HttpConfig` carries four independent secret classes — the API-key pepper,
+/// the five HMAC keys, the local session/CSRF keys (through `browser_auth`) and
+/// the two SurrealDB passwords — so its `Debug` is hand-written rather than
+/// derived. Add any future secret field here as `&REDACTED`.
+impl fmt::Debug for HttpConfig {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("HttpConfig")
+            .field("bind", &self.bind)
+            .field("public_base_url", &self.public_base_url)
+            .field("trusted_proxy_cidrs", &self.trusted_proxy_cidrs)
+            .field("allowed_hosts", &self.allowed_hosts)
+            .field("allowed_origins", &self.allowed_origins)
+            .field("body_limit_bytes", &self.body_limit_bytes)
+            .field("request_deadline", &self.request_deadline)
+            .field("shutdown_grace", &self.shutdown_grace)
+            .field("pool_cap", &self.pool_cap)
+            .field("runtime_idle_ttl", &self.runtime_idle_ttl)
+            .field("runtime_capacity_wait", &self.runtime_capacity_wait)
+            .field(
+                "runtime_activation_timeout",
+                &self.runtime_activation_timeout,
+            )
+            .field("global_request_limit", &self.global_request_limit)
+            .field("subscription_limit", &self.subscription_limit)
+            .field("maintenance_parallelism", &self.maintenance_parallelism)
+            .field(
+                "subscription_queue_capacity",
+                &self.subscription_queue_capacity,
+            )
+            .field("subscription_auth_recheck", &self.subscription_auth_recheck)
+            .field("task_retention_secs", &self.task_retention_secs)
+            .field("task_queue_capacity", &self.task_queue_capacity)
+            .field("task_sync_max_bytes", &self.task_sync_max_bytes)
+            .field("control_db", &RedactedTarget(&self.control_db))
+            .field("tenant_db", &RedactedTarget(&self.tenant_db))
+            .field("api_key_pepper", &REDACTED)
+            .field("keys", &self.keys)
+            .field("oidc_issuer", &self.oidc_issuer)
+            .field("oidc_client_id", &self.oidc_client_id)
+            .field("oidc_audience", &self.oidc_audience)
+            .field("oidc_redirect_uri", &self.oidc_redirect_uri)
+            .field("oidc_allowed_alg", &self.oidc_allowed_alg)
+            .field(
+                "operator_identity_allowlist",
+                &self.operator_identity_allowlist,
+            )
+            .field("signup_mode", &self.signup_mode)
+            .field("enable_control_plane", &self.enable_control_plane)
+            .field("enable_control_plane_ui", &self.enable_control_plane_ui)
+            .field("signup_plan_limits", &self.signup_plan_limits)
+            .field("browser_auth", &self.browser_auth)
+            .finish()
+    }
+}
+
+/// A [`SurrealTargetConfig`] with its password withheld, for use inside the
+/// hand-written [`HttpConfig`] `Debug`. The target type's own `Debug` is left
+/// as it was: it predates this feature and is printed from call sites outside
+/// the local-admin surface.
+struct RedactedTarget<'a>(&'a SurrealTargetConfig);
+
+impl fmt::Debug for RedactedTarget<'_> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("SurrealTargetConfig")
+            .field("url", &self.0.url)
+            .field("username", &self.0.username)
+            .field("password", &REDACTED)
+            .field("database", &self.0.database)
+            .field("namespace", &self.0.namespace)
+            .finish()
+    }
+}
+
+#[derive(Clone, Copy, Deserialize)]
 pub struct HmacKeys {
     #[serde(deserialize_with = "deserialize_hex_32")]
     pub identity_index: [u8; 32],
@@ -135,6 +227,20 @@ pub struct HmacKeys {
     pub oidc_nonce: [u8; 32],
     #[serde(deserialize_with = "deserialize_hex_32")]
     pub csrf: [u8; 32],
+}
+
+/// Every field is raw HMAC key material, so a derived `Debug` would publish all
+/// five keys to any log that prints the config.
+impl fmt::Debug for HmacKeys {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("HmacKeys")
+            .field("identity_index", &REDACTED)
+            .field("control_plane_session", &REDACTED)
+            .field("oidc_state", &REDACTED)
+            .field("oidc_nonce", &REDACTED)
+            .field("csrf", &REDACTED)
+            .finish()
+    }
 }
 
 #[derive(Debug, Clone, Copy, Deserialize, PartialEq, Eq)]

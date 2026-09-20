@@ -63,6 +63,9 @@ fn is_write_conflict(error: &MemoryError) -> bool {
         if message.contains("Write conflict") || message.contains("can be retried"))
 }
 
+/// Retry budget for a transaction that loses a write-write race.
+const CONFLICT_RETRIES: u32 = 5;
+
 /// Convert a `MemoryError` to `LocalAdminError::Infrastructure`.
 fn infra(e: MemoryError) -> LocalAdminError {
     LocalAdminError::Infrastructure(e)
@@ -346,13 +349,23 @@ impl SurrealRegistryStore {
     /// Routing the whole local-admin surface through two helpers keeps the
     /// SQL fault hook (plan §5) in one place and makes it verifiable that no
     /// local-admin statement reaches the engine while bypassing it.
+    ///
+    /// Both helpers also absorb a lost write race. SurrealDB aborts a
+    /// transaction that loses a write-write race (two administrators acting on
+    /// one client, two admissions touching one bucket) instead of blocking on
+    /// it, so without a retry a benign concurrent admin action would surface as
+    /// a spurious `503 temporarily_unavailable`. Retrying is safe because each
+    /// statement here is a single atomic transaction — the guard-row update,
+    /// the resource write, the idempotency operation and the audit row either
+    /// all commit or none do — so an aborted attempt wrote nothing and the
+    /// re-run re-reads the persisted state. A read cannot lose a write race, so
+    /// the retry never fires for one.
     pub(super) async fn admin_query(
         &self,
         sql: &str,
         vars: Option<Value>,
     ) -> Result<Vec<Value>, MemoryError> {
-        self.sql_faults.check(sql)?;
-        self.db.as_dyn().query_json(sql, vars).await
+        self.admin_query_with_retry(sql, vars, None).await
     }
 
     /// [`Self::admin_query`] with the explicit result index.
@@ -362,11 +375,40 @@ impl SurrealRegistryStore {
         vars: Option<Value>,
         result_index: usize,
     ) -> Result<Vec<Value>, MemoryError> {
-        self.sql_faults.check(sql)?;
-        self.db
-            .as_dyn()
-            .query_json_at(sql, vars, result_index)
+        self.admin_query_with_retry(sql, vars, Some(result_index))
             .await
+    }
+
+    async fn admin_query_with_retry(
+        &self,
+        sql: &str,
+        vars: Option<Value>,
+        result_index: Option<usize>,
+    ) -> Result<Vec<Value>, MemoryError> {
+        let mut conflicts = 0_u32;
+        loop {
+            self.sql_faults.check(sql)?;
+            let attempt = match result_index {
+                Some(index) => {
+                    self.db
+                        .as_dyn()
+                        .query_json_at(sql, vars.clone(), index)
+                        .await
+                }
+                None => self.db.as_dyn().query_json(sql, vars.clone()).await,
+            };
+            match attempt {
+                Ok(rows) => return Ok(rows),
+                Err(error) if conflicts < CONFLICT_RETRIES && is_write_conflict(&error) => {
+                    conflicts += 1;
+                    // 2, 4, 8, 16, 32 ms: enough for the winning transaction to
+                    // finish, short enough not to hold a request open.
+                    tokio::time::sleep(std::time::Duration::from_millis(1u64 << conflicts.min(5)))
+                        .await;
+                }
+                Err(error) => return Err(error),
+            }
+        }
     }
 
     /// Arm the SQL fault hook so the next local-admin statement whose SQL
@@ -1154,23 +1196,11 @@ impl LocalAdminStore for SurrealRegistryStore {
         // Every attempt in one window touches the same bucket rows, so
         // genuinely concurrent admissions (two logins at once, or every
         // client behind one proxy sharing the source bucket) can lose the
-        // write race. SurrealDB aborts the transaction atomically, so a
-        // bounded retry re-reads the persisted counters instead of
-        // double-counting; a reservation returns no secret, so retrying it
-        // is always safe.
-        const CONFLICT_RETRIES: u32 = 5;
-        let mut conflicts = 0;
-        let rows = loop {
-            match self.admin_query_at(sql, Some(vars.clone()), 11).await {
-                Ok(rows) => break rows,
-                Err(error) if conflicts < CONFLICT_RETRIES && is_write_conflict(&error) => {
-                    conflicts += 1;
-                    tokio::time::sleep(std::time::Duration::from_millis(1u64 << conflicts.min(5)))
-                        .await;
-                }
-                Err(error) => return Err(infra(error)),
-            }
-        };
+        // write race; the shared execution seam retries that boundedly.
+        let rows = self
+            .admin_query_at(sql, Some(vars.clone()), 11)
+            .await
+            .map_err(infra)?;
 
         let row = rows.into_iter().next().ok_or_else(|| {
             infra(MemoryError::Storage(
@@ -1954,7 +1984,7 @@ mod sql_fault_tests {
 
     const PASSWORD: &str = "SecureP@ssw0rd123";
 
-    fn attempt() -> AuthAttemptContext {
+    pub(super) fn attempt() -> AuthAttemptContext {
         AuthAttemptContext {
             request: RequestContext {
                 request_id: uuid::Uuid::new_v4(),
@@ -1963,13 +1993,13 @@ mod sql_fault_tests {
         }
     }
 
-    fn command_request() -> RequestContext {
+    pub(super) fn command_request() -> RequestContext {
         RequestContext {
             request_id: uuid::Uuid::new_v4(),
         }
     }
 
-    async fn fixture() -> (
+    pub(super) async fn fixture() -> (
         Arc<SurrealRegistryStore>,
         Arc<LocalAdminAuthority>,
         Arc<LocalAdminService>,
@@ -2312,6 +2342,145 @@ mod sql_fault_tests {
             row["actor_kind"],
             serde_json::json!("admin"),
             "a named actor is recorded as such"
+        );
+    }
+}
+
+#[cfg(test)]
+mod secret_hygiene_tests {
+    //! Plan §5: "Generated sentinel secrets through errors/Debug/logs/audit/
+    //! metadata/UI storage" → absent except the authorized one-time hand-off.
+    //!
+    //! This drives the real service over the real durable store, then searches
+    //! every local-admin table for the raw artifact. The only durable form of a
+    //! challenge code, a session cookie or a password is a verifier, a cookie
+    //! verifier or a PHC string, so a raw artifact found in a row would be a
+    //! defect by construction.
+
+    use super::*;
+    use crate::error::MemoryError;
+    use crate::service::local_admin::contracts::{
+        AdminLogin, ChallengeKind, LocalAdminError, OneTimeChallenge,
+    };
+
+    use super::sql_fault_tests::{attempt, command_request, fixture};
+
+    const PASSWORD: &str = "Sentinel-Passphrase-A1B2C3";
+
+    /// Every local-admin table plus the browser-policy singleton.
+    const TABLES: &[&str] = &[
+        "browser_auth_policy",
+        "local_admin",
+        "local_admin_challenge",
+        "local_admin_session",
+        "local_admin_rate_bucket",
+        "local_admin_client",
+        "local_admin_client_key",
+        "local_admin_operation",
+        "local_admin_audit",
+    ];
+
+    /// Assert `needle` appears in no row of any local-admin table.
+    async fn assert_absent_from_every_table(
+        store: &SurrealRegistryStore,
+        needle: &str,
+        what: &str,
+    ) {
+        for table in TABLES {
+            let rows = store
+                .admin_query(&format!("SELECT * FROM {table};"), None)
+                .await
+                .expect("read table");
+            let rendered = serde_json::to_string(&rows).expect("serialize rows");
+            assert!(
+                !rendered.contains(needle),
+                "{what} must not be durably stored in {table}: {rendered}"
+            );
+        }
+    }
+
+    #[tokio::test]
+    async fn sentinel_secrets_never_reach_debug_display_or_a_durable_row() {
+        let (store, _authority, service, management) = fixture().await;
+
+        // ── The one-time activation code ──────────────────────────────
+        let challenge: OneTimeChallenge = management
+            .create_admin("ops.one", &command_request())
+            .await
+            .expect("create admin");
+        // Non-vacuous in the authorized direction: the caller does get the code.
+        assert_eq!(challenge.code.len(), 64, "32-byte hex code");
+        let rendered = format!("{challenge:?}");
+        assert!(
+            !rendered.contains(&challenge.code),
+            "Debug must redact the activation code: {rendered}"
+        );
+        assert!(
+            rendered.contains("<redacted>"),
+            "the code field renders as the redaction marker: {rendered}"
+        );
+        assert_absent_from_every_table(&store, &challenge.code, "the activation code").await;
+
+        // ── The password and the session cookie ───────────────────────
+        service
+            .finish_challenge(
+                &attempt(),
+                &challenge.code,
+                ChallengeKind::Activate,
+                PASSWORD.to_owned(),
+            )
+            .await
+            .expect("activate");
+        let login: AdminLogin = service
+            .login(&attempt(), "ops.one", PASSWORD.to_owned())
+            .await
+            .expect("login");
+
+        let rendered = format!("{login:?}");
+        assert!(
+            !rendered.contains(&login.cookie),
+            "Debug must redact the session cookie: {rendered}"
+        );
+        assert!(
+            !rendered.contains(PASSWORD),
+            "Debug must not carry the password: {rendered}"
+        );
+
+        assert_absent_from_every_table(&store, &login.cookie, "the session cookie").await;
+        assert_absent_from_every_table(&store, PASSWORD, "the administrator password").await;
+        // A consumed code must not linger either.
+        assert_absent_from_every_table(&store, &challenge.code, "the consumed activation code")
+            .await;
+
+        // Non-vacuous in the other direction: the durable rows exist and hold a
+        // derivation rather than the raw value.
+        let admins = store
+            .admin_query("SELECT password_phc FROM local_admin;", None)
+            .await
+            .expect("read the administrator");
+        let phc = admins
+            .first()
+            .and_then(|row| row["password_phc"].as_str())
+            .expect("stored PHC");
+        assert!(
+            phc.starts_with("$argon2id$"),
+            "the stored form is a PHC hash: {phc}"
+        );
+        assert!(!phc.contains(PASSWORD), "a PHC never embeds the password");
+
+        // ── Errors ────────────────────────────────────────────────────
+        let infrastructure = LocalAdminError::Infrastructure(MemoryError::Storage(
+            "SENTINEL-DATABASE-TEXT".to_owned(),
+        ));
+        let rendered = format!("{infrastructure:?}");
+        assert_eq!(
+            rendered, "Infrastructure(<redacted>)",
+            "the wrapped infrastructure error must not be printed"
+        );
+        assert_eq!(
+            infrastructure.to_string(),
+            "internal error",
+            "Display stays constant and safe"
         );
     }
 }

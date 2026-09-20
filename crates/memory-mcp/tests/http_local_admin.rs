@@ -1846,6 +1846,125 @@ async fn active_key_cap_counts_only_live_keys() {
     );
 }
 
+/// Plan §5: "Two admins issue at cap−1". Both administrators have equal
+/// privileges over the same client, so the cap belongs to the client rather
+/// than to the administrator: racing the last slot from two independent
+/// sessions must still yield exactly one key. Issuance serializes on the
+/// client guard row, so the loser is refused by the cap instead of writing a
+/// second live key.
+#[tokio::test]
+async fn two_administrators_racing_the_last_key_slot_issue_exactly_one_key() {
+    let harness = Harness::new().await;
+
+    // Two independent administrators with equal privileges.
+    let first_code = harness.create_admin("ops.one").await;
+    harness
+        .activate(&first_code, "a sufficiently long passphrase")
+        .await;
+    let first = harness
+        .login("ops.one", "a sufficiently long passphrase")
+        .await;
+
+    let second_code = harness.create_admin("ops.two").await;
+    harness
+        .activate(&second_code, "another sufficiently long passphrase")
+        .await;
+    let second = harness
+        .login("ops.two", "another sufficiently long passphrase")
+        .await;
+
+    // One client, created by the first administrator but administrable by both.
+    let (account_id, _tenant_id) = harness.create_ready_client(&first, "team-alpha").await;
+    let seen_by_second = harness
+        .send(
+            "GET",
+            &format!("/api/v1/admin/clients/{account_id}"),
+            None,
+            &[],
+            Some(&second.cookie),
+        )
+        .await;
+    assert_eq!(
+        seen_by_second.status(),
+        StatusCode::OK,
+        "the second administrator must reach the same client"
+    );
+
+    // Fill every slot but the last.
+    let cap = memory_mcp::http::registry::models::PlanLimits::default().max_active_api_keys;
+    assert!(
+        cap >= 2,
+        "this experiment needs at least two slots, got {cap}"
+    );
+    for index in 0..cap - 1 {
+        let (status, body) = harness
+            .issue_key(
+                &first,
+                &account_id,
+                &format!("filler-{index}"),
+                serde_json::json!({"kind": "never"}),
+            )
+            .await;
+        assert_eq!(status, StatusCode::CREATED, "filler-{index}: {body}");
+    }
+
+    // Both administrators race the single remaining slot.
+    let (left, right) = tokio::join!(
+        harness.issue_key(
+            &first,
+            &account_id,
+            "race-one",
+            serde_json::json!({"kind": "never"})
+        ),
+        harness.issue_key(
+            &second,
+            &account_id,
+            "race-two",
+            serde_json::json!({"kind": "never"})
+        )
+    );
+
+    let mut created = 0_u8;
+    let mut refused = 0_u8;
+    for (status, body) in [left, right] {
+        match status {
+            StatusCode::CREATED => created += 1,
+            StatusCode::CONFLICT => {
+                assert_eq!(
+                    body["error"]["code"], "key_cap_reached",
+                    "the losing administrator is refused by the cap: {body}"
+                );
+                refused += 1;
+            }
+            other => panic!("unexpected status {other}: {body}"),
+        }
+    }
+    assert_eq!(
+        (created, refused),
+        (1, 1),
+        "exactly one of the two racing administrators gets the last slot"
+    );
+
+    // The client never exceeds its cap: the durable set agrees with the
+    // single success above.
+    let listed = harness
+        .send(
+            "GET",
+            &format!("/api/v1/admin/clients/{account_id}/keys?limit=100"),
+            None,
+            &[],
+            Some(&second.cookie),
+        )
+        .await;
+    assert_eq!(listed.status(), StatusCode::OK, "list keys");
+    let body = read_json(listed).await;
+    assert_eq!(
+        body["items"].as_array().map(Vec::len),
+        Some(cap as usize),
+        "the cap is the client's, not the administrator's: {body}"
+    );
+}
+
 /// A key issued for client A resolves to A's account and tenant, never to
 /// client B's.
 #[tokio::test]

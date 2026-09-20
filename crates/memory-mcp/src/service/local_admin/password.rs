@@ -171,8 +171,12 @@ fn self_params() -> LocalResult<Params> {
 }
 
 /// Validate PHC parameters before expensive KDF work.
-/// Binds algorithm, version, memory, time, parallelism, and output size.
-/// Corrupt or hostile hashes fail closed without raw error details.
+///
+/// Binds algorithm, version, memory, time and parallelism. The derived output
+/// length is deliberately not bound here: `argon2`'s verifier compares the full
+/// PHC string, so a foreign output length cannot verify against a stored hash
+/// that was produced with `Some(32)`. Corrupt or hostile hashes fail closed
+/// without raw error details.
 fn validate_phc(phc: &str) -> LocalResult<()> {
     // Must start with the expected Argon2id prefix
     if !phc.starts_with("$argon2id$v=19$m=") {

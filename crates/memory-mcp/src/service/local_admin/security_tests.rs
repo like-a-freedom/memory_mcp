@@ -24,14 +24,15 @@
 //! | KDF queue/timeout/cancel/corrupt PHC | `password.rs` unit tests |
 //! | Nonselected SQL statement error / audit insert error | `surreal_store/local_admin.rs::sql_fault_tests` (4 experiments); `surreal_store.rs::query_json_at_*` for the adapter-level propagation |
 //! | DB unavailable during reserve/auth/success audit/failure audit | `sql_fault_tests::reservation_storage_error_fails_closed_without_admitting_the_attempt`; `sql_fault_tests::failure_audit_storage_error_is_sanitized_unavailable_not_a_rejection`; `control::local_admin::handlers::tests::spec_status_table_is_exhaustive` |
-//! | Two admins issue at cap−1 | `http_local_admin.rs::active_key_cap_counts_only_live_keys` |
+//! | Two admins issue at cap−1 | `http_local_admin.rs::two_administrators_racing_the_last_key_slot_issue_exactly_one_key` (two logged-in administrators, one client, exactly one `201`); `active_key_cap_counts_only_live_keys` for the serial cap arithmetic |
 //! | Create same operation/body; different body; lost response | `http_local_admin.rs::client_lifecycle_uses_the_durable_store` |
 //! | Key issue response lost and repeated | `insert_client_key` returns `AlreadyIssued`; `control-plane-ui` `secret_already_issued` tests |
 //! | Provisioner restart | `http_crash_recovery.rs` (11 tests) |
 //! | Coherent suspend/resume, stale CAS | `http_local_admin.rs::suspend_and_resume_follow_the_coherent_state_contract` |
 //! | Warm key cache; revoke/expire | `http_local_admin.rs::revoking_an_issued_key_denies_with_and_without_a_warm_cache`, `expiry_at_the_boundary_is_rejected` |
-//! | Origin/CSRF/content type/body/duplicate cookie/unknown fields | `http_local_admin.rs` (41 tests) |
+//! | Origin/CSRF/content type/body/duplicate cookie/unknown fields | `http_local_admin.rs` (42 tests) |
 //! | Cookie/bearer privilege separation, unmounted APIs | `bearer_keys_cannot_authenticate_local_admin_routes`, `unmatched_api_and_auth_paths_are_json_404_not_html` |
+//! | Generated sentinel secrets through errors/Debug/logs/audit/metadata | `surreal_store/local_admin.rs::secret_hygiene_tests` — code, cookie and password absent from every table and from every `Debug`/`Display`; `http::router::tests::off_mode_mounts_no_browser_auth_route` for the unmounted off-mode surface |
 //! | Packaged UI/CLI over trusted TLS | `scripts/ci/local_admin_image.py --scenario all` (real browser) |
 
 #[cfg(test)]

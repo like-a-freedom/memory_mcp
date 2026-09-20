@@ -33,9 +33,9 @@ All of the following were executed in this repository and passed:
 
 | Layer | Evidence |
 |---|---|
-| Service + durable registry (in-memory SurrealDB) | `cargo test -p memory_mcp --lib --features control-plane,test-fixtures --locked` — 1769 passed, 3 ignored |
+| Service + durable registry (in-memory SurrealDB) | `cargo test -p memory_mcp --lib --features control-plane,test-fixtures --locked` — 1772 passed, 3 ignored |
 | Service security experiments against the **real** store | `... --lib ... service::local_admin` — 31 passed (of which 13 are the plan §5 experiments; see §13.3 for the per-case mapping) |
-| HTTP surface (real router, real pre-auth cookie, CSRF, Origin, session, SQL transactions, migrated in-memory registry) | `cargo test -p memory_mcp --features control-plane,test-fixtures --locked --test http_local_admin` — 41 passed |
+| HTTP surface (real router, real pre-auth cookie, CSRF, Origin, session, SQL transactions, migrated in-memory registry) | `cargo test -p memory_mcp --features control-plane,test-fixtures --locked --test http_local_admin` — 42 passed |
 | OIDC regression | `... --test http_control_plane` — 11 passed |
 | CLI contract (clap surface + real subprocess against file-backed RocksDB) | `... --test local_admin_cli` — 7 passed |
 | Durable query-shape regression | `... --test registry_query_shape` — 4 passed |
@@ -135,7 +135,7 @@ Run from the repository root.
 | `cargo test -p memory_mcp --locked` | ✅ executed, every target green |
 | `cargo test -p memory_mcp --lib --features control-plane,test-fixtures --locked service::local_admin` | ✅ executed, 31 passed |
 | `cargo test -p memory_mcp --features control-plane,test-fixtures --locked --test http_control_plane` | ✅ executed, 11 passed |
-| `cargo test -p memory_mcp --features control-plane,test-fixtures --locked --test http_local_admin` | ✅ executed, 41 passed |
+| `cargo test -p memory_mcp --features control-plane,test-fixtures --locked --test http_local_admin` | ✅ executed, 42 passed |
 | `cargo test -p memory_mcp --features control-plane,test-fixtures --locked --test local_admin_cli` | ✅ executed, 7 passed |
 | `cargo test -p memory_mcp --features control-plane,test-fixtures --locked --test local_admin_durable` | ❌ superseded: the target was not created (§13.4). Its two remote-race cases moved inline into `surreal_store/local_admin_remote.rs`, so the `-- --ignored` row below replaces it. This row is the only plan §6 command that no longer exists verbatim |
 | `cargo test -p memory_mcp --features control-plane,test-fixtures --locked` | ✅ executed, every target green |
@@ -146,7 +146,7 @@ Run from the repository root.
 | `cargo clippy ... --features ...,control-plane-ui,test-fixtures ...` | ✅ executed, clean (with `MEMORY_MCP_CONTROL_PLANE_UI_DIST` set) |
 | `cargo test -p memory_mcp --lib --features control-plane,test-fixtures --locked local_admin_remote_replica_races -- --ignored` | ⚠️ not executed (needs an isolated remote SurrealDB 3.2.4 and the three `LOCAL_ADMIN_TEST_CONTROL_*` variables); the test is now an inline adapter test, so the command selects it, and running it without the variables **fails** rather than skipping |
 | `MEMORY_MCP_CONTROL_PLANE_UI_DIST=<abs dist> cargo test -p memory_mcp --lib --features control-plane-ui,test-fixtures --locked control::static_assets` | ✅ executed, 6 passed — the build script requires an absolute, non-symlink dist directory containing a non-empty `index.html` |
-| `MEMORY_MCP_CONTROL_PLANE_UI_DIST=<abs dist> cargo test -p memory_mcp --features control-plane-ui,test-fixtures --locked --test http_local_admin` | ✅ executed, 41 passed |
+| `MEMORY_MCP_CONTROL_PLANE_UI_DIST=<abs dist> cargo test -p memory_mcp --features control-plane-ui,test-fixtures --locked --test http_local_admin` | ✅ executed, 42 passed |
 | `docker compose --env-file <operator env> -f docker-compose.yml -f docker-compose.{off,local,oidc}.yml config --quiet` | ✅ executed, all three overlays resolve. The base file alone still fails by design: it refuses to default any secret |
 | `docker build --tag memory-mcp-local-admin:test .` | ✅ executed, `25/25 FINISHED` in ~338 s cold / ~321 s warm |
 | `python3 scripts/ci/local_admin_image.py --image memory-mcp-local-admin:test --scenario all` | ✅ executed, 4 scenarios / 54 checks, exit 0 |
@@ -491,6 +491,12 @@ by `tests/local_admin_cli.rs`):
 - The code is 15-minute material (see §4.3) delivered exactly once on stdout.
   It is never echoed to stderr and must not be captured into CI artifacts. If it
   is lost, run `admin recover`.
+- The durable row holds only an **HMAC verifier** derived from the code under
+  the session key with a fixed purpose label (`challenge_verifier`). The raw
+  code is never written to `local_admin_challenge`, so reading the registry — or
+  restoring a backup of it — cannot redeem a live activation or reset code
+  inside its 15-minute window. The derivation and migration `047` shipped
+  together, so no deployment holds a pre-derivation row.
 - Running `create` twice for the same username does not mint a second code: the
   durable transaction rejects a repeated `activate` issue for a non-pending
   administrator (`admin_already_exists` → conflict). To replace lost or expired
@@ -648,7 +654,7 @@ wrapped in the host-allowlist middleware and the local deadline middleware.
 
 | Method | Path | Auth | Success | Failure codes observed in code |
 |---|---|---|---|---|
-| GET | `/api/v1/auth/config` | none | `200 {"mode":"local"}` | mounted in local **and** OIDC mode, so the UI can discover which flow to run; a `503` if the control plane is disabled (spec §8) |
+| GET | `/api/v1/auth/config` | none | `200 {"mode":"local"\|"oidc"}` | mounted in **both** browser-auth modes so the UI can discover which flow to run, and only while the control plane is enabled; an **off** deployment does not mount it and answers the JSON `404` (`http::router::tests::off_mode_mounts_no_browser_auth_route`) |
 | GET | `/api/v1/auth/local/csrf` | none | `200 {"csrf_token": ...}` + pre-auth cookie | `503` if local auth is not configured |
 | POST | `/api/v1/auth/local/challenge` | pre-auth | `200 {username, expires_at}` | `400 invalid_challenge`, `400 bad_request`, `403`, `413`, `415`, `429`, `503` |
 | POST | `/api/v1/auth/local/activate` | pre-auth | `204` | as above + `409` on state conflict |
@@ -902,21 +908,30 @@ account-existence oracle.
 `inspect` + `finish` deliberately share one challenge budget: a normal
 inspect-then-finish flow consumes two attempts of the ten.
 
-### 8.1.1 Concurrent admissions share rows, so the reservation retries
+### 8.1.1 Concurrent writes contend for one row, so the execution seam retries
 
 Every attempt in a window touches the same one or two bucket rows, so
 simultaneous admissions — two logins at once, or every client behind a proxy
 sharing one source bucket — contend for the same row. SurrealDB aborts the
-losing transaction atomically (`Write conflict, retry the transaction`),
-which without handling surfaced as a `503` for an ordinary concurrent login.
+losing transaction atomically (`Write conflict, retry the transaction`), which
+without handling surfaced as a `503` for an ordinary concurrent login.
 
-`reserve_attempt` therefore retries up to five times on exactly that error,
-with a short backoff. The retry is safe because the aborted transaction made no
-change: the retry re-reads the persisted counters and applies its single
-increment, so it can neither lose nor double-count an attempt. A reservation
-returns no secret, so it is never an "ambiguous commit" that must not be
-replayed. `exp15_concurrent_logins_same_user` asserts three simultaneous logins
-for one identity all succeed with distinct cookies.
+The retry lives in the **shared execution seam**
+(`SurrealRegistryStore::admin_query` / `admin_query_at`), not in `reserve_attempt`
+alone: it retries up to five times on exactly that error, with a short backoff
+(2/4/8/16/32 ms). The retry is safe because every statement reaching the seam is
+one atomic transaction — the guard-row update, the resource write, the
+idempotency operation and the audit row either all commit or none do — so an
+aborted attempt made no change and the re-run re-reads the persisted state. A
+read cannot lose a write race, so the retry never fires for one.
+
+Keeping it in the seam also covers the client-administration mutations, where it
+is the difference between "serialized" and "a spurious `503`": two
+administrators issuing a key for one client at `cap − 1` now produce exactly one
+`201` and one `409 key_cap_reached`
+(`http_local_admin.rs::two_administrators_racing_the_last_key_slot_issue_exactly_one_key`),
+and `exp15_concurrent_logins_same_user` asserts three simultaneous logins for one
+identity all succeed with distinct cookies.
 
 ### 8.2 Source identity
 
@@ -1179,6 +1194,9 @@ regardless.
 | A tenant stranded in `NamespaceCreating` is resumable | `http_crash_recovery.rs::provisioning_resumes_a_tenant_stranded_in_namespace_creating` |
 | Concurrent admissions for one identity all succeed | `security_tests.rs::exp15_concurrent_logins_same_user` (three simultaneous logins, distinct cookies) |
 | The durable rate caps are enforced and per-identity | `security_tests.rs::exp9_rate_buckets_enforce_the_cap`, `exp9b_challenge_budget_is_shared_and_source_scoped` |
+| Two administrators racing the last key slot on one client issue exactly one key | `http_local_admin.rs::two_administrators_racing_the_last_key_slot_issue_exactly_one_key` — one `201`, one `409 key_cap_reached`, and the client holds exactly `cap` keys |
+| Generated secrets never reach a durable row, `Debug` or `Display` | `surreal_store/local_admin.rs::secret_hygiene_tests::sentinel_secrets_never_reach_debug_display_or_a_durable_row` |
+| An off deployment mounts no browser-auth route | `http::router::tests::off_mode_mounts_no_browser_auth_route` (paired with `an_enabled_control_plane_mounts_the_mode_disclosure`, so it cannot pass vacuously) |
 
 ### 13.2 Claims NOT demonstrated
 
@@ -1220,15 +1238,16 @@ suite that covers them instead of asserting against a test double.
 | KDF timeout/queue/cancellation/corrupt PHC | `password.rs` unit tests, including `a_saturated_admission_queue_fails_closed` (a held slot fails the bounded deadline for a real *and* a dummy verification) |
 | Nonselected SQL statement error / audit insert error | `surreal_store/local_admin.rs::sql_fault_tests` — `session_insert_statement_error_leaves_no_session_and_rolls_back`, `success_audit_error_rolls_back_the_credential_change`, `failure_audit_storage_error_is_sanitized_unavailable_not_a_rejection` |
 | DB unavailable during reserve/auth/audit | `sql_fault_tests::reservation_storage_error_fails_closed_without_admitting_the_attempt`, `failure_audit_storage_error_is_sanitized_unavailable_not_a_rejection`; `control::local_admin::handlers::tests::spec_status_table_is_exhaustive` pins `Infrastructure → 503` |
-| Two admins issue at `cap − 1` | `active_key_cap_counts_only_live_keys`; issuance serializes on the client guard row |
+| Two admins issue at `cap − 1` | `two_administrators_racing_the_last_key_slot_issue_exactly_one_key` — two logged-in administrators race the last slot on one client: exactly one `201`, one `409 key_cap_reached`, and the client holds exactly `cap` keys; `active_key_cap_counts_only_live_keys` covers the serial cap/revoke arithmetic |
 | Create same operation/body; different body; lost response | `client_lifecycle_uses_the_durable_store`, `missing_idempotency_key_is_rejected` |
 | Key issue response lost and repeated | `insert_client_key` → `AlreadyIssued`; `http_local_admin.rs::a_repeated_key_issue_never_returns_a_second_secret` (409 + public key id, one key row, no second verifier); UI `secret_already_issued` tests |
 | Provisioner restart in `Reserved`/`NamespaceCreating`/`schema 0`/`Migrating` | `http_crash_recovery.rs` (11 tests, including `provisioning_resumes_a_tenant_stranded_in_namespace_creating`) |
 | Coherent suspend/resume, stale CAS, no false `Ready` | `suspend_and_resume_follow_the_coherent_state_contract`, `a_provisioning_client_cannot_be_suspended` |
 | Warm cache; revoke or expire; resume | `revoking_an_issued_key_denies_with_and_without_a_warm_cache`, `expiry_at_the_boundary_is_rejected`, `cache_hit_with_a_mismatched_owner_is_denied` |
-| Public auth and every admin route: Origin/CSRF/content type/body/duplicate cookie/unknown fields | 41 tests in `http_local_admin.rs` |
+| Public auth and every admin route: Origin/CSRF/content type/body/duplicate cookie/unknown fields | 42 tests in `http_local_admin.rs` |
 | Cookie/bearer privilege separation, unmounted APIs | `bearer_keys_cannot_authenticate_local_admin_routes`, `unmatched_api_and_auth_paths_are_json_404_not_html`, `a_key_for_one_client_cannot_reach_another` |
 | Packaged UI/CLI over trusted TLS | `local_admin_image.py --scenario all` — 54 checks in a real browser |
+| Generated sentinel secrets through errors/Debug/logs/audit/metadata | `surreal_store/local_admin.rs::secret_hygiene_tests` — the activation code, the session cookie and the password are absent from all nine tables and from every `Debug`/`Display` rendering, while each is present in the value its authorized caller receives; `LocalAdminError::Infrastructure` prints `<redacted>` instead of the wrapped `MemoryError` |
 
 ### 13.4 Divergences from the approved interface ledger
 

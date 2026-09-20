@@ -50,6 +50,15 @@ in ADR-0016.
 - `src/cli/` — clap-based CLI surface, including hidden internal
   `lifecycle-capture` and `lifecycle-recall` subcommands consumed by
   hook scripts.
+- `src/service/local_admin/` — protocol-agnostic local-administrator
+  business logic (policy, password KDF, authority/service, client and key
+  administration). The HTTP and CLI layers are thin adapters over it.
+- `src/control/local_admin.rs` and `src/control/local_admin/` — the
+  browser-facing HTTP surface for local mode: CSRF/cookie handling and the
+  route handlers. Contains no business rules.
+- `src/http/registry/surreal_store/local_admin{,_rate,_remote}.rs` — the
+  durable `LocalAdminStore` implementation, its rate-bucket maintenance,
+  and the ignored remote-replica race tests.
 
 ## Entity extraction vocabulary
 
@@ -205,8 +214,24 @@ The request-scoped server identity produced by successful credential verificatio
 _Avoid_: Access token, transport session, namespace parameter
 
 **Control Plane Session**:
-A short-lived server-side browser session created after successful OIDC login for Account registration and credential administration. It is represented to the browser only by a secure opaque cookie and is distinct from an App Session, Account API Key, OAuth access token, and MCP transport state.
+A short-lived server-side browser session created after successful login — OIDC for an Account owner, or a local password for a Local Administrator — for credential and client administration. It is represented to the browser only by a secure opaque cookie and is distinct from an App Session, Account API Key, OAuth access token, and MCP transport state. The OIDC and local forms are separate records on separate routes; neither substitutes for the other.
 _Avoid_: App Session, MCP session, API key, browser token
+
+**Browser Authentication Mode**:
+The single browser-login mechanism an enabled control plane serves, `oidc` or `local`, selected at startup and recorded as one durable policy singleton with its epoch and local key fingerprints. A deployment serves exactly one mode and mounts only that mode's routes; a replica joining with a drifted mode or key configuration fails closed instead of adopting it, and a disabled control plane mounts no browser-auth route at all.
+_Avoid_: provider list, per-request mode, fallback login
+
+**Local Administrator**:
+A deployment-scoped operator identity created by the administrator CLI rather than by an identity provider, and authenticated with a password against a stored PHC hash. Local Administrators have equal privileges, are not Accounts and own no Tenant, and their credentials stay separate from every Account API Key. Their shared privileges are why client data is reachable by any of them.
+_Avoid_: admin Account, Tenant owner, OIDC operator identity
+
+**Challenge Code**:
+A one-time activation or reset credential issued by the administrator CLI and handed to the administrator out of band. Only a keyed HMAC verifier is persisted; the code itself never is. Completing the challenge sets the password and revokes prior sessions and sibling challenges.
+_Avoid_: reset token, session cookie, stored code
+
+**Provisioned Client**:
+The Account and Tenant pair a Local Administrator creates and administers for an external consumer, with its local sidecar record and its issued Client API Keys. A client is ready only when its Account is active and its Tenant is ready; provisioning state is observable from the browser but never fabricable there.
+_Avoid_: Tenant, user, approved account
 
 **Tenant Task**:
 A durable, tenant-owned long-running MCP Task used for extraction work that may outlive one HTTP request or replica. Its state, cancellation intent, lease generation, and terminal result live in the Tenant Namespace; process-local task state is never authoritative in the SaaS profile.

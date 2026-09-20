@@ -1,16 +1,24 @@
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};
 use serde::Serialize;
+use std::fmt;
 
 use crate::error::MemoryError;
 pub use crate::http::config::BrowserAuthMode;
 use crate::http::registry::models::{AccountStatus, TenantStatus};
 
+/// Substituted for a secret field by a hand-written `Debug`.
+///
+/// Plan §3 requires that sensitive types redact `Debug`, so a one-time secret,
+/// a session cookie or a password hash can never reach a log line, a panic
+/// message or a test failure report through `{:?}`.
+const REDACTED: &str = "<redacted>";
+
 // ─── Error type ───────────────────────────────────────────
 
 /// Local admin domain error. Wraps `MemoryError` for infrastructure
 /// failures while providing typed domain variants for business logic.
-#[derive(Debug, thiserror::Error)]
+#[derive(thiserror::Error)]
 pub enum LocalAdminError {
     #[error("invalid input: {0}")]
     InvalidInput(String),
@@ -44,6 +52,42 @@ pub enum LocalAdminError {
     Infrastructure(#[from] MemoryError),
 }
 
+/// The wrapped `MemoryError` can carry database text, statement fragments and
+/// paths (plan §3.1: "Its custom Debug also redacts the underlying error"), so
+/// `Debug` names the variant and withholds every payload that could carry
+/// infrastructure detail. `Display` is the operator-facing form and is
+/// unaffected.
+impl fmt::Debug for LocalAdminError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::InvalidInput(_) => f.write_str("InvalidInput(<redacted>)"),
+            Self::InvalidCredentials => f.write_str("InvalidCredentials"),
+            Self::InvalidChallenge => f.write_str("InvalidChallenge"),
+            Self::Unauthenticated => f.write_str("Unauthenticated"),
+            Self::Forbidden => f.write_str("Forbidden"),
+            Self::ReauthRequired => f.write_str("ReauthRequired"),
+            Self::NotFound => f.write_str("NotFound"),
+            Self::StateConflict => f.write_str("StateConflict"),
+            Self::VersionConflict => f.write_str("VersionConflict"),
+            Self::IdempotencyConflict => f.write_str("IdempotencyConflict"),
+            Self::KeyCap => f.write_str("KeyCap"),
+            // A public key id is not a secret: spec §8 returns it to the
+            // caller alongside the 409, so naming it here leaks nothing.
+            Self::SecretAlreadyIssued { key_id } => {
+                write!(f, "SecretAlreadyIssued {{ key_id: {key_id} }}")
+            }
+            Self::Throttled {
+                retry_after_seconds,
+            } => write!(
+                f,
+                "Throttled {{ retry_after_seconds: {retry_after_seconds} }}"
+            ),
+            Self::Unavailable => f.write_str("Unavailable"),
+            Self::Infrastructure(_) => f.write_str("Infrastructure(<redacted>)"),
+        }
+    }
+}
+
 pub type LocalResult<T> = Result<T, LocalAdminError>;
 
 // ─── Common types ─────────────────────────────────────────
@@ -58,10 +102,22 @@ pub use crate::http::registry::models::BrowserPolicyFence;
 
 /// HMAC fingerprints for session and CSRF keys, used to join the
 /// durable policy.
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct LocalKeyFingerprints {
     pub session: [u8; 32],
     pub csrf: [u8; 32],
+}
+
+/// The fingerprints are derived from the keys under fixed labels, so printing
+/// them would publish a stable oracle over secret configuration (plan §3.1:
+/// "never raw keys/log fields").
+impl fmt::Debug for LocalKeyFingerprints {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("LocalKeyFingerprints")
+            .field("session", &REDACTED)
+            .field("csrf", &REDACTED)
+            .finish()
+    }
 }
 
 /// Local admin state.
@@ -111,7 +167,7 @@ pub struct AdminPrincipal {
 }
 
 /// Credential snapshot for login/activation checks.
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct CredentialSnapshot {
     pub admin_id: String,
     pub username: String,
@@ -120,14 +176,43 @@ pub struct CredentialSnapshot {
     pub password_phc: Option<String>,
 }
 
+/// The PHC string is an offline-crackable password hash: redacted.
+impl fmt::Debug for CredentialSnapshot {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("CredentialSnapshot")
+            .field("admin_id", &self.admin_id)
+            .field("username", &self.username)
+            .field("state", &self.state)
+            .field("credential_generation", &self.credential_generation)
+            .field(
+                "password_phc",
+                &self.password_phc.as_ref().map(|_| REDACTED),
+            )
+            .finish()
+    }
+}
+
 /// Challenge creation command.
-#[derive(Debug)]
 pub struct ChallengeIssue {
     pub username: String,
     pub kind: ChallengeKind,
     pub verifier: [u8; 32],
     pub policy: BrowserPolicyFence,
     pub request: RequestContext,
+}
+
+/// The verifier is what the store compares, so possessing it is equivalent to
+/// possessing the one-time code: redacted.
+impl fmt::Debug for ChallengeIssue {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("ChallengeIssue")
+            .field("username", &self.username)
+            .field("kind", &self.kind)
+            .field("verifier", &REDACTED)
+            .field("policy", &self.policy)
+            .field("request", &self.request)
+            .finish()
+    }
 }
 
 /// Issued challenge with expiry.
@@ -146,7 +231,6 @@ pub struct ChallengeView {
 }
 
 /// Challenge finish command (activation or reset).
-#[derive(Debug)]
 pub struct ChallengeFinish {
     pub verifier: [u8; 32],
     pub kind: ChallengeKind,
@@ -155,8 +239,20 @@ pub struct ChallengeFinish {
     pub request: RequestContext,
 }
 
+/// Carries the challenge verifier and the new password hash: both redacted.
+impl fmt::Debug for ChallengeFinish {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("ChallengeFinish")
+            .field("verifier", &REDACTED)
+            .field("kind", &self.kind)
+            .field("password_phc", &REDACTED)
+            .field("policy", &self.policy)
+            .field("request", &self.request)
+            .finish()
+    }
+}
+
 /// Session open command.
-#[derive(Debug)]
 pub struct SessionOpen {
     pub credential: CredentialSnapshot,
     pub cookie_verifier: [u8; 32],
@@ -164,13 +260,36 @@ pub struct SessionOpen {
     pub request: RequestContext,
 }
 
+/// The cookie verifier is a credential-equivalent: redacted.
+impl fmt::Debug for SessionOpen {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("SessionOpen")
+            .field("credential", &self.credential)
+            .field("cookie_verifier", &REDACTED)
+            .field("policy", &self.policy)
+            .field("request", &self.request)
+            .finish()
+    }
+}
+
 /// Session rotate command.
-#[derive(Debug)]
 pub struct SessionRotate {
     pub fence: AdminFence,
     pub credential: CredentialSnapshot,
     pub cookie_verifier: [u8; 32],
     pub request: RequestContext,
+}
+
+/// The cookie verifier is a credential-equivalent: redacted.
+impl fmt::Debug for SessionRotate {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("SessionRotate")
+            .field("fence", &self.fence)
+            .field("credential", &self.credential)
+            .field("cookie_verifier", &REDACTED)
+            .field("request", &self.request)
+            .finish()
+    }
 }
 
 /// Admin key-issue command (plan §3.4).
@@ -189,7 +308,7 @@ pub struct AdminKeyCreate {
 /// `secret` is the full `mem_sk_<key_id>_<secret>` credential — the only time
 /// the raw credential exists outside the operator's clipboard. Only its
 /// verifier is durable.
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct IssuedClientKey {
     pub id: String,
     pub name: String,
@@ -197,18 +316,50 @@ pub struct IssuedClientKey {
     pub expires_at: Option<DateTime<Utc>>,
 }
 
+/// The whole point of the type is the revealed-once secret, so `Debug` must
+/// not be a second reveal. The UI's `CreatedKey` redacts the same field.
+impl fmt::Debug for IssuedClientKey {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("IssuedClientKey")
+            .field("id", &self.id)
+            .field("name", &self.name)
+            .field("secret", &REDACTED)
+            .field("expires_at", &self.expires_at)
+            .finish()
+    }
+}
+
 /// One-time challenge code with the issued material.
-#[derive(Debug)]
 pub struct OneTimeChallenge {
     pub issued: IssuedChallenge,
     pub code: String,
 }
 
+/// `code` is the one-time activation/reset code: redacted, so only the CLI's
+/// own stdout (or the CLI's caller) ever holds it.
+impl fmt::Debug for OneTimeChallenge {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("OneTimeChallenge")
+            .field("issued", &self.issued)
+            .field("code", &REDACTED)
+            .finish()
+    }
+}
+
 /// Admin login result.
-#[derive(Debug)]
 pub struct AdminLogin {
     pub principal: AdminPrincipal,
     pub cookie: String,
+}
+
+/// `cookie` is the session credential, cookie name included: redacted.
+impl fmt::Debug for AdminLogin {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("AdminLogin")
+            .field("principal", &self.principal)
+            .field("cookie", &REDACTED)
+            .finish()
+    }
 }
 
 // ─── Attempt domain and throttle types ────────────────────

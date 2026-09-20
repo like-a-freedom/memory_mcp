@@ -69,17 +69,8 @@ impl AdminManagementService {
         username: &str,
         request: &RequestContext,
     ) -> LocalResult<OneTimeChallenge> {
-        let verifier = generate_random_32();
-        let command = ChallengeIssue {
-            username: username.to_string(),
-            kind: ChallengeKind::Activate,
-            verifier,
-            policy: self.authority.policy().clone(),
-            request: request.clone(),
-        };
-        let issued = self.authority.store().issue_challenge(command).await?;
-        let code = hex::encode(verifier);
-        Ok(OneTimeChallenge { issued, code })
+        self.issue_challenge(username, ChallengeKind::Activate, request)
+            .await
     }
 
     /// Recover an admin (CLI path). Invalidates sessions, issues reset code.
@@ -88,19 +79,37 @@ impl AdminManagementService {
         username: &str,
         request: &RequestContext,
     ) -> LocalResult<OneTimeChallenge> {
-        // Issue a reset challenge — the store implementation handles
-        // generation increment, session revocation, and old challenge revocation.
-        let verifier = generate_random_32();
+        // The store implementation handles the generation increment, session
+        // revocation and old-challenge revocation for a reset.
+        self.issue_challenge(username, ChallengeKind::Reset, request)
+            .await
+    }
+
+    /// Issue one challenge for `username` and return the code to hand over.
+    ///
+    /// Only the code's verifier reaches the store: the code itself is returned
+    /// to the caller (CLI stdout) and never persisted (see
+    /// [`challenge_verifier`]).
+    async fn issue_challenge(
+        &self,
+        username: &str,
+        kind: ChallengeKind,
+        request: &RequestContext,
+    ) -> LocalResult<OneTimeChallenge> {
+        let code_bytes = generate_random_32();
+        let verifier = challenge_verifier(self.authority.session_key(), &code_bytes)?;
         let command = ChallengeIssue {
             username: username.to_string(),
-            kind: ChallengeKind::Reset,
+            kind,
             verifier,
             policy: self.authority.policy().clone(),
             request: request.clone(),
         };
         let issued = self.authority.store().issue_challenge(command).await?;
-        let code = hex::encode(verifier);
-        Ok(OneTimeChallenge { issued, code })
+        Ok(OneTimeChallenge {
+            issued,
+            code: hex::encode(code_bytes),
+        })
     }
 }
 
@@ -249,7 +258,9 @@ impl LocalAdminService {
         kind: ChallengeKind,
     ) -> LocalResult<ChallengeView> {
         self.admit(context, AttemptDomain::Challenge, None).await?;
-        let verifier = match parse_challenge_code(code) {
+        let verifier = match parse_challenge_code(code)
+            .and_then(|bytes| challenge_verifier(self.authority.session_key(), &bytes))
+        {
             Ok(verifier) => verifier,
             Err(error) => return self.reject_invalid_challenge(context, error).await,
         };
@@ -309,7 +320,9 @@ impl LocalAdminService {
     ) -> LocalResult<()> {
         self.admit(context, AttemptDomain::Challenge, None).await?;
         crate::service::local_admin::policy::validate_password(&password)?;
-        let verifier = match parse_challenge_code(code) {
+        let verifier = match parse_challenge_code(code)
+            .and_then(|bytes| challenge_verifier(self.authority.session_key(), &bytes))
+        {
             Ok(verifier) => verifier,
             Err(error) => return self.reject_invalid_challenge(context, error).await,
         };
@@ -535,6 +548,37 @@ fn bounded_raw(raw: &str) -> String {
 
 fn generate_random_32() -> [u8; 32] {
     crate::service::credential_material::random_32()
+}
+
+/// Purpose label for the challenge-verifier HMAC. Fixed application text, never
+/// configuration, so the derivation is stable while the key is.
+const CHALLENGE_VERIFIER_LABEL: &[u8] = b"local_admin_challenge_verifier_v1";
+
+/// Derive the durable form of a challenge code.
+///
+/// Spec §7 requires `local_admin_challenge` to hold an HMAC verifier and to
+/// never store the raw code. The code is therefore not persisted anywhere: it
+/// leaves the process once, as CLI stdout, and the row only lets a caller who
+/// already holds the code prove that fact. Reading the registry (or a database
+/// backup) cannot redeem a live activation or reset code inside its 900-second
+/// window.
+///
+/// The derivation is keyed by the deployment's session key under a distinct
+/// label, so it shares no domain with the session-cookie, CSRF or policy
+/// fingerprint derivations. `new_from_slice` cannot fail for a fixed 32-byte
+/// key; the unreachable case fails closed with a typed error rather than
+/// persisting an inert verifier that any code could match.
+fn challenge_verifier(session_key: &[u8; 32], code: &[u8; 32]) -> LocalResult<[u8; 32]> {
+    use hmac::{Hmac, KeyInit, Mac};
+    use sha2::Sha256;
+    type HmacSha256 = Hmac<Sha256>;
+
+    let mut mac = HmacSha256::new_from_slice(session_key).map_err(|e| {
+        LocalAdminError::InvalidInput(format!("challenge verifier key rejected: {e}"))
+    })?;
+    mac.update(CHALLENGE_VERIFIER_LABEL);
+    mac.update(code);
+    Ok(mac.finalize().into_bytes().into())
 }
 
 /// Parse a challenge code.
