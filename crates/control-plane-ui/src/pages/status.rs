@@ -1,11 +1,14 @@
 //! Account status page.
 
 use dioxus::prelude::*;
+use dioxus_router::hooks::use_navigator;
 
 use crate::api::ApiClient;
+use crate::router::Route;
 
 #[component]
 pub fn StatusPage() -> Element {
+    let navigator = use_navigator();
     let mut account = use_signal(|| None::<crate::api::AccountMeta>);
     let mut error = use_signal(|| None::<String>);
 
@@ -19,41 +22,41 @@ pub fn StatusPage() -> Element {
         });
     });
 
+    let sign_out = move |_| {
+        // Drop the cached account so the SPA stops displaying the previous
+        // identity before the navigation completes. The server-side
+        // `/auth/oidc/logout` clears the cookie and invalidates the session.
+        account.set(None);
+        spawn(async move {
+            let api = ApiClient::new("/".to_string());
+            let _ = api.logout().await;
+            navigator.replace(Route::Login {});
+        });
+    };
+
     rsx! {
         div { class: "container",
-            h1 { "Account Status" }
+            h1 { "Account status" }
             if let Some(err) = error.read().as_ref() {
-                p { class: "error", "Error: {err}" }
+                p { class: "error", role: "alert", "aria-live": "assertive", "{err}" }
             }
             if let Some(meta) = account.read().as_ref() {
                 table {
-                    tr { td { "ID" } td { "{meta.id}" } }
-                    tr { td { "Status" } td { "{meta.status}" } }
-                    tr { td { "Tenant" } td { "{meta.tenant_id}" } }
-                    tr { td { "Created" } td { "{meta.created_at}" } }
+                    caption { class: "visually-hidden", "Account metadata" }
+                    tbody {
+                        tr { th { scope: "row", "ID" } td { code { "{meta.id}" } } }
+                        tr { th { scope: "row", "Status" } td { "{meta.status}" } }
+                        tr { th { scope: "row", "Tenant" } td { code { "{meta.tenant_id}" } } }
+                        tr { th { scope: "row", "Created" } td { "{meta.created_at}" } }
+                    }
                 }
-            } else {
-                p { "Loading..." }
+            } else if error.read().is_none() {
+                p { class: "status", role: "status", "aria-live": "polite", "Loading account…" }
             }
-            nav {
-                a { href: "/keys", "API Keys" }
-                a { href: "/delete", "Delete Account" }
-                button {
-                    onclick: move |_| {
-                        // Drop the cached account so the SPA stops
-                        // displaying the previous identity before
-                        // the navigation completes. The server-side
-                        // `/auth/oidc/logout` clears the cookie and
-                        // invalidates the session; the SPA re-bootstraps
-                        // `/api/v1/me` on the next route load.
-                        account.set(None);
-                        spawn(async move {
-                            let api = ApiClient::new("/".to_string());
-                            let _ = api.logout().await;
-                        });
-                    },
-                    "Log out"
-                }
+            nav { class: "actions", "aria-label": "Account",
+                a { class: "button", href: "/keys", "API keys" }
+                a { class: "button", href: "/delete", "Delete account" }
+                button { r#type: "button", onclick: sign_out, "Sign out" }
             }
         }
     }

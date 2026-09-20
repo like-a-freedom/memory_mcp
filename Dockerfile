@@ -55,15 +55,24 @@ RUN rustup target add "${WASM_TARGET}" \
 COPY . .
 
 # Absolute, non-symlink output directory containing nonempty index + JS + WASM.
+#
+# `target/dx` lives inside the cached target mount, so its staging directory
+# retains the assets of every earlier build and `dx bundle` copies that
+# directory wholesale. Without the clean below the bundle — and the binary that
+# embeds it — grows by one stale JS/WASM pair (about 0.8 MB) on every build, and
+# ships assets nothing references. The counts are asserted so a regression fails
+# the build instead of silently bloating the image.
 RUN --mount=type=cache,id=memory-mcp-cargo-registry-ui,target=/usr/local/cargo/registry \
     --mount=type=cache,id=memory-mcp-cargo-git-ui,target=/usr/local/cargo/git \
     --mount=type=cache,id=memory-mcp-target-ui,target=/src/target \
     set -eux; \
     cd /src; \
+    rm -rf /src/target/dx/control-plane-ui/release/web/public /src/control-plane-ui-dist; \
     dx bundle --platform web --release --package control-plane-ui --out-dir /src/control-plane-ui-dist; \
     test -s /src/control-plane-ui-dist/public/index.html; \
-    find /src/control-plane-ui-dist/public -type f -name '*.js'   | grep -q .; \
-    find /src/control-plane-ui-dist/public -type f -name '*.wasm' | grep -q .
+    test "$(find /src/control-plane-ui-dist/public -type f -name '*.js'   | wc -l)" = "1"; \
+    test "$(find /src/control-plane-ui-dist/public -type f -name '*.wasm' | wc -l)" = "1"; \
+    test "$(find /src/control-plane-ui-dist/public -type f -name '*.css'  | wc -l)" = "1"
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Stage 2 — Rust binaries. Consumes the UI bundle produced by stage 1 and

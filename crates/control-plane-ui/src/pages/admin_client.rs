@@ -468,8 +468,13 @@ pub fn AdminClientDetailPage(account_id: String) -> Element {
                 if let Some(view) = client.read().as_ref() {
                     "{view.display_name}"
                 } else {
-                    "Client"
+                    "Client detail"
                 }
+            }
+            // The way out of this page belongs above the fold, not only after a
+            // long key table.
+            div { class: "actions",
+                button { r#type: "button", onclick: move |_| leave_page(), "Back to clients" }
             }
             AdminSessionBar { session }
             if session.read().has_ended() {
@@ -497,14 +502,15 @@ pub fn AdminClientDetailPage(account_id: String) -> Element {
                 section { class: "client-metadata",
                     h2 { "Client" }
                     table {
+                        caption { class: "visually-hidden", "Client metadata" }
                         tbody {
-                            tr { th { "Client id" } td { code { "{view.account_id}" } } }
-                            tr { th { "Tenant id" } td { code { "{view.tenant_id}" } } }
-                            tr { th { "Account status" } td { "{view.account_status}" } }
-                            tr { th { "Tenant status" } td { "{view.tenant_status}" } }
-                            tr { th { "Plan version" } td { "{view.plan_version}" } }
-                            tr { th { "Schema version" } td { "{view.schema_version}" } }
-                            tr { th { "Version" } td { "{view.version}" } }
+                            tr { th { scope: "row", "Client id" } td { code { "{view.account_id}" } } }
+                            tr { th { scope: "row", "Tenant id" } td { code { "{view.tenant_id}" } } }
+                            tr { th { scope: "row", "Account status" } td { "{view.account_status}" } }
+                            tr { th { scope: "row", "Tenant status" } td { "{view.tenant_status}" } }
+                            tr { th { scope: "row", "Plan version" } td { "{view.plan_version}" } }
+                            tr { th { scope: "row", "Schema version" } td { "{view.schema_version}" } }
+                            tr { th { scope: "row", "Version" } td { "{view.version}" } }
                         }
                     }
                     p { class: "readiness", "{readiness(&view)}" }
@@ -517,8 +523,11 @@ pub fn AdminClientDetailPage(account_id: String) -> Element {
                 section { class: "client-state",
                     h2 { "State" }
                     if let Some(action) = *confirm_action.read() {
-                        div { class: "confirm", role: "alertdialog",
-                            p {
+                        div {
+                            class: "confirm",
+                            role: "group",
+                            "aria-labelledby": "client-state-question",
+                            p { id: "client-state-question",
                                 match action {
                                     ClientStateAction::Suspend => "Suspend this client? Every request made with its keys is rejected until it is resumed.",
                                     ClientStateAction::Resume => "Resume this client? Its existing keys become usable again.",
@@ -526,6 +535,7 @@ pub fn AdminClientDetailPage(account_id: String) -> Element {
                             }
                             button {
                                 r#type: "button",
+                                autofocus: true,
                                 disabled: *pending.read(),
                                 onclick: move |_| run_state_change(action),
                                 "Confirm"
@@ -616,14 +626,17 @@ pub fn AdminClientDetailPage(account_id: String) -> Element {
                         }
                     }
                     if let Some(created) = secret.read().as_ref() {
-                        div { class: "secret", role: "alertdialog",
-                            h3 { "New key secret" }
+                        div {
+                            class: "secret",
+                            role: "alertdialog",
+                            "aria-labelledby": "new-key-secret-title",
+                            h3 { id: "new-key-secret-title", "New key secret" }
                             p { class: "warning",
                                 "Save this now; it cannot be shown again. Deliver it outside this service."
                             }
                             code { class: "secret-value", "{created.secret}" }
                             p { "Key {created.name} ({created.id})" }
-                            button { r#type: "button", onclick: copy_secret, "Copy secret" }
+                            button { r#type: "button", autofocus: true, onclick: copy_secret, "Copy secret" }
                             if *discard_armed.read() {
                                 p { role: "alert",
                                     "The secret will be lost when this panel closes. It cannot be shown again."
@@ -645,34 +658,37 @@ pub fn AdminClientDetailPage(account_id: String) -> Element {
                     } else if keys.read().items().is_empty() {
                         p { class: "empty", "No keys have been issued for this client." }
                     } else {
-                        table {
-                            thead {
-                                tr {
-                                    th { "Name" }
-                                    th { "Status" }
-                                    th { "Created" }
-                                    th { "Expires" }
-                                    th { "Last used" }
-                                    th { "Actions" }
+                        div { class: "table-scroll",
+                            table {
+                                caption { class: "visually-hidden", "API keys issued for this client" }
+                                thead {
+                                    tr {
+                                        th { scope: "col", "Name" }
+                                        th { scope: "col", "Status" }
+                                        th { scope: "col", "Created" }
+                                        th { scope: "col", "Expires" }
+                                        th { scope: "col", "Last used" }
+                                        th { scope: "col", "Actions" }
+                                    }
                                 }
-                            }
-                            tbody {
-                                for key in keys.read().items().to_vec() {
-                                    tr { key: "{key.id}",
-                                        td { "{key.name}" }
-                                        td { "{key.display_status(*now_millis.read()).label()}" }
-                                        td { "{key.created_at}" }
-                                        td { "{key.expires_at.as_deref().unwrap_or(\"never\")}" }
-                                        td { "{key.last_used_at.as_deref().unwrap_or(\"never\")}" }
-                                        td {
-                                            if key.display_status(*now_millis.read()) == KeyDisplayStatus::Revoked {
-                                                span { "revoked" }
-                                            } else {
-                                                button {
-                                                    r#type: "button",
-                                                    disabled: *pending.read(),
-                                                    onclick: move |_| revoke_target.set(Some(key.clone())),
-                                                    "Revoke…"
+                                tbody {
+                                    for key in keys.read().items().to_vec() {
+                                        tr { key: "{key.id}",
+                                            td { "{key.name}" }
+                                            td { "{key.display_status(*now_millis.read()).label()}" }
+                                            td { "{key.created_at}" }
+                                            td { "{key.expires_at.as_deref().unwrap_or(\"never\")}" }
+                                            td { "{key.last_used_at.as_deref().unwrap_or(\"never\")}" }
+                                            td {
+                                                if key.display_status(*now_millis.read()) == KeyDisplayStatus::Revoked {
+                                                    span { "revoked" }
+                                                } else {
+                                                    button {
+                                                        r#type: "button",
+                                                        disabled: *pending.read(),
+                                                        onclick: move |_| revoke_target.set(Some(key.clone())),
+                                                        "Revoke…"
+                                                    }
                                                 }
                                             }
                                         }
@@ -696,10 +712,16 @@ pub fn AdminClientDetailPage(account_id: String) -> Element {
                         }
                     }
                     if let Some(target) = revoke_target.read().as_ref() {
-                        div { class: "confirm", role: "alertdialog",
-                            p { "Revoke key {target.name} ({target.id})? Requests already using it stop working." }
+                        div {
+                            class: "confirm",
+                            role: "group",
+                            "aria-labelledby": "revoke-key-question",
+                            p { id: "revoke-key-question",
+                                "Revoke key {target.name} ({target.id})? Requests already using it stop working."
+                            }
                             button {
                                 r#type: "button",
+                                autofocus: true,
                                 disabled: *pending.read(),
                                 onclick: revoke_key,
                                 "Confirm revoke"
@@ -714,11 +736,10 @@ pub fn AdminClientDetailPage(account_id: String) -> Element {
                 p { class: "hint", "The client could not be loaded." }
                 button { r#type: "button", onclick: move |_| refresh(), "Try again" }
             }
-            div { class: "actions",
-                if secret.read().is_some() {
+            if secret.read().is_some() {
+                div { class: "actions",
                     p { "A key secret is still on screen and will be lost when you leave." }
                 }
-                button { r#type: "button", onclick: move |_| leave_page(), "Back to clients" }
             }
             {if refused.read().is_some() {
                 rsx! {

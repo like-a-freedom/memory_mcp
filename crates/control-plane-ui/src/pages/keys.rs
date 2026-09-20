@@ -1,97 +1,141 @@
 //! API key management page.
 
 use dioxus::prelude::*;
+use dioxus_router::hooks::use_navigator;
 
 use crate::api::ApiClient;
+use crate::router::Route;
 
 #[component]
 pub fn KeysPage() -> Element {
-    let mut keys = use_signal(Vec::<crate::api::ApiKeyMeta>::new);
+    let navigator = use_navigator();
+    let keys = use_signal(Vec::<crate::api::ApiKeyMeta>::new);
     let mut new_key_secret = use_signal(|| None::<String>);
     let mut new_key_name = use_signal(String::new);
     let mut error = use_signal(|| None::<String>);
+    let status_route = Route::Status {}.to_string();
 
-    use_effect(move || {
-        let api = ApiClient::new("/".to_string());
-        spawn(async move {
-            match api.list_keys().await {
-                Ok(list) => keys.set(list),
-                Err(e) => error.set(Some(e.message)),
-            }
-        });
-    });
+    use_effect(move || load_keys(keys, error));
 
-    let create_key = move |_| {
+    let create_key = move |event: FormEvent| {
+        event.prevent_default();
         let api = ApiClient::new("/".to_string());
-        let name = new_key_name.read().clone();
+        let name = new_key_name.read().trim().to_owned();
+        if name.is_empty() {
+            error.set(Some("Enter a key name.".to_owned()));
+            return;
+        }
+        error.set(None);
         spawn(async move {
             match api.create_key(name).await {
                 Ok(resp) => {
+                    new_key_name.set(String::new());
                     new_key_secret.set(Some(resp.secret));
-                    // Refresh list
-                    if let Ok(list) = api.list_keys().await {
-                        keys.set(list);
-                    }
+                    load_keys(keys, error);
                 }
-                Err(e) => error.set(Some(e.message)),
+                Err(value) => error.set(Some(value.message)),
             }
+        });
+    };
+
+    let mut revoke = move |id: String| {
+        error.set(None);
+        spawn(async move {
+            match ApiClient::new("/".to_string()).revoke_key(id).await {
+                Ok(()) => load_keys(keys, error),
+                Err(value) => error.set(Some(value.message)),
+            }
+        });
+    };
+
+    let sign_out = move |_| {
+        spawn(async move {
+            let api = ApiClient::new("/".to_owned());
+            let _ = api.logout().await;
+            navigator.replace(Route::Login {});
         });
     };
 
     rsx! {
         div { class: "container",
-            h1 { "API Keys" }
+            h1 { "API keys" }
             if let Some(err) = error.read().as_ref() {
-                p { class: "error", "Error: {err}" }
+                p { class: "error", role: "alert", "aria-live": "assertive", "{err}" }
             }
             if let Some(secret) = new_key_secret.read().as_ref() {
-                div { class: "alert",
-                    p { "Your new API key (shown once):" }
+                div { class: "alert", role: "status", "aria-live": "polite",
+                    p { "Your new API key. It is shown once." }
                     code { "{secret}" }
-                    p { "Copy this now. It won't be shown again." }
+                    p { "Copy it somewhere safe now; it cannot be shown again." }
                 }
             }
-            div { class: "create-key",
-                input {
-                    placeholder: "Key name",
-                    value: "{new_key_name}",
-                    oninput: move |e| new_key_name.set(e.value()),
+            form { class: "create-key", onsubmit: create_key,
+                div { class: "field",
+                    label { r#for: "new-key-name", "Key name" }
+                    input {
+                        id: "new-key-name",
+                        name: "key-name",
+                        r#type: "text",
+                        autocomplete: "off",
+                        required: true,
+                        value: "{new_key_name}",
+                        oninput: move |event| new_key_name.set(event.value()),
+                    }
                 }
-                button { onclick: create_key, "Create Key" }
+                button { r#type: "submit", "Create key" }
             }
-            table {
-                thead {
-                    tr { th { "Name" } th { "Status" } th { "Created" } th { "Expires" } th { "Actions" } }
-                }
-                tbody {
-                    for key in keys.read().iter() {
-                        tr {
-                            td { "{key.name}" }
-                            td { "{key.status}" }
-                            td { "{key.created_at}" }
-                            td { "{key.expires_at.as_deref().unwrap_or(\"never\")}" }
-                            td {
-                                button {
-                                    onclick: {
-                                        let id = key.id.clone();
-                                        move |_| {
-                                            let api = ApiClient::new("/".to_string());
-                                            let id = id.clone();
-                                            spawn(async move {
-                                                let _ = api.revoke_key(id).await;
-                                            });
+            if keys.read().is_empty() {
+                p { class: "empty", "No API keys have been issued for this account." }
+            } else {
+                div { class: "table-scroll",
+                    table {
+                        caption { class: "visually-hidden", "API keys for this account" }
+                        thead {
+                            tr {
+                                th { scope: "col", "Name" }
+                                th { scope: "col", "Status" }
+                                th { scope: "col", "Created" }
+                                th { scope: "col", "Expires" }
+                                th { scope: "col", "Actions" }
+                            }
+                        }
+                        tbody {
+                            for key in keys.read().iter() {
+                                tr { key: "{key.id}",
+                                    td { "{key.name}" }
+                                    td { "{key.status}" }
+                                    td { "{key.created_at}" }
+                                    td { "{key.expires_at.as_deref().unwrap_or(\"never\")}" }
+                                    td {
+                                        button {
+                                            r#type: "button",
+                                            onclick: {
+                                                let id = key.id.clone();
+                                                move |_| revoke(id.clone())
+                                            },
+                                            "Revoke"
                                         }
-                                    },
-                                    "Revoke"
+                                    }
                                 }
                             }
                         }
                     }
                 }
             }
-            nav {
-                a { href: "/", "Back to Status" }
+            nav { class: "actions", "aria-label": "Account",
+                a { class: "button", href: "{status_route}", "Back to status" }
+                button { r#type: "button", onclick: sign_out, "Sign out" }
             }
         }
     }
+}
+
+/// Re-read the key list, reporting a failure in place.
+fn load_keys(mut keys: Signal<Vec<crate::api::ApiKeyMeta>>, mut error: Signal<Option<String>>) {
+    spawn(async move {
+        match ApiClient::new("/".to_string()).list_keys().await {
+            Ok(list) => keys.set(list),
+            Err(value) => error.set(Some(value.message)),
+        }
+    });
 }

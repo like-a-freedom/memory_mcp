@@ -32,6 +32,13 @@ pub fn build_router(
             state.clone(),
             super::middleware::prevalidate_mcp,
         ));
+    // These two are scoped to the routes mounted right here: the deadline is
+    // the MCP/health one (the local surface carries its own, which has to keep
+    // returning its documented `Retry-After` body), and the method check is
+    // guarded on `/mcp` by path. The deployment-boundary layers are NOT here:
+    // `Router::layer` only wraps what exists at the moment it is called, so
+    // they are applied at the end of this function, after the mode-specific
+    // routes and the fallback exist.
     let router = Router::new()
         .route("/health/live", get(super::health::live))
         .route("/health/ready", get(super::health::ready))
@@ -42,22 +49,15 @@ pub fn build_router(
         ))
         .layer(axum::middleware::from_fn(
             super::middleware::reject_non_post_mcp,
-        ))
-        .layer(axum::middleware::from_fn_with_state(
-            state.clone(),
-            super::middleware::host_origin,
-        ))
-        .layer(axum::middleware::from_fn(
-            super::middleware::inject_sse_headers,
-        ))
-        .layer(axum::middleware::from_fn(super::logging::request_log));
+        ));
     #[cfg(feature = "prometheus")]
     let router = router.route("/metrics", get(super::metrics::prometheus));
 
     // Mode disclosure is mounted in *both* browser-auth modes (spec §8:
     // public `{mode:"local"|"oidc"}` **while the control plane is enabled**), so
-    // an OIDC deployment can tell the UI which flow to run. It lives on the base
-    // router, which already carries the host/origin and deadline layers.
+    // an OIDC deployment can tell the UI which flow to run. It is mounted on the
+    // base router here, so only the boundary layers applied at the end of this
+    // function cover it, not the route-scoped ones above.
     //
     // An off deployment mounts no browser-auth route at all (plan §6 feature
     // matrix: "control off | ... no browser keys/plan/discovery/routes"), so
@@ -239,19 +239,16 @@ pub fn build_router(
                     "/api/v1/admin/clients/{account_id}/resume",
                     post(handlers::resume_client),
                 )
-                // Local routes are merged after the base router's
-                // layers were applied, so they need their own copy of the
-                // host and deadline protections. The host layer also
-                // enforces the configured Host allowlist; Origin is
-                // enforced per-handler because only local routes require
-                // its *presence*.
+                // Local routes are merged after the base router's route-scoped
+                // layers were applied, so they carry their own copy of the local
+                // deadline. Host/Origin is not repeated here: it is a property of
+                // the deployment boundary, applied once at the end of this
+                // function, and that single copy wraps merged routes too. Origin
+                // is enforced per-handler because only local routes require its
+                // *presence*.
                 .layer(axum::middleware::from_fn_with_state(
                     state.clone(),
                     super::middleware::local_admin_deadline,
-                ))
-                .layer(axum::middleware::from_fn_with_state(
-                    state.clone(),
-                    super::middleware::host_origin,
                 ));
             // The reserved-surface 404 is installed as the single outer
             // fallback below so the static-asset router cannot shadow it.
@@ -310,7 +307,25 @@ pub fn build_router(
             "{\"error\":{\"code\":\"not_found\",\"message\":\"not found\"}}",
         ))
     });
-    router.with_state(state)
+
+    // The deployment boundary goes on last, and last is what makes it a
+    // boundary: `Router::layer` wraps only the routes *and the fallback* that
+    // exist at the moment it is called, so a check installed before this point
+    // is silently escaped by everything mounted after it. The relative order of
+    // these three is unchanged from the block that used to sit at the top of
+    // this function, so no route that was already covered changes behaviour:
+    // `request_log` stays outermost, which is why a request the allowlist refuses
+    // is still logged.
+    router
+        .with_state(state.clone())
+        .layer(axum::middleware::from_fn_with_state(
+            state,
+            super::middleware::host_origin,
+        ))
+        .layer(axum::middleware::from_fn(
+            super::middleware::inject_sse_headers,
+        ))
+        .layer(axum::middleware::from_fn(super::logging::request_log))
 }
 
 #[cfg(test)]
@@ -321,13 +336,17 @@ mod tests {
     use axum::http::{Method, Request, StatusCode};
     use tower_service::Service;
 
-    fn request(method: Method, uri: &str) -> Request<Body> {
+    fn request_with_host(method: Method, uri: &str, host: &str) -> Request<Body> {
         Request::builder()
             .method(method)
             .uri(uri)
-            .header(axum::http::header::HOST, "localhost")
+            .header(axum::http::header::HOST, host)
             .body(Body::empty())
             .expect("request")
+    }
+
+    fn request(method: Method, uri: &str) -> Request<Body> {
+        request_with_host(method, uri, "localhost")
     }
 
     /// Plan §6 feature matrix: "control off | … no browser keys/plan/discovery/
@@ -377,6 +396,85 @@ mod tests {
             .await
             .expect("dispatch");
         assert_eq!(response.status(), StatusCode::OK);
+    }
+
+    /// `Router::layer` wraps only the routes that exist at the moment it is
+    /// called, so a layer installed at the top of `build_router` is escaped by
+    /// every route mounted below it. The Host allowlist is a property of the
+    /// deployment boundary (spec §3.3), not of a route, so it is applied last
+    /// and has to hold on all of them. The mode disclosure is the regression
+    /// case: it is mounted after the route-scoped layers and answered an
+    /// arbitrary `Host` before this.
+    #[cfg(feature = "control-plane")]
+    #[tokio::test]
+    async fn the_host_allowlist_covers_routes_mounted_after_the_route_layers() {
+        let (builder, _store) = HttpStateTestBuilder::local_admin().await;
+        let state = builder.build().await.expect("local admin HTTP state");
+
+        let mut refused = build_router(state.clone(), None);
+        let response = refused
+            .call(request_with_host(
+                Method::GET,
+                "/api/v1/auth/config",
+                "evil.example",
+            ))
+            .await
+            .expect("dispatch");
+        assert_eq!(response.status(), StatusCode::FORBIDDEN);
+
+        // The local surface used to carry its own copy of this check. It does
+        // not any more, so a merged route has to be covered by the boundary
+        // layer as well.
+        let mut merged = build_router(state.clone(), None);
+        let response = merged
+            .call(request_with_host(
+                Method::GET,
+                "/api/v1/admin/session",
+                "evil.example",
+            ))
+            .await
+            .expect("dispatch");
+        assert_eq!(response.status(), StatusCode::FORBIDDEN);
+
+        // The same route under an allowlisted host, so the assertions above
+        // cannot pass for an unrelated reason.
+        let mut allowed = build_router(state, None);
+        let response = allowed
+            .call(request(Method::GET, "/api/v1/auth/config"))
+            .await
+            .expect("dispatch");
+        assert_eq!(response.status(), StatusCode::OK);
+    }
+
+    /// The fallback is what an operator's browser reaches for the embedded UI
+    /// shell and every asset under `/assets/`. No route is registered for those
+    /// paths, so the only thing that can enforce the boundary there is a layer
+    /// applied after the fallback itself exists.
+    #[tokio::test]
+    async fn the_host_allowlist_covers_the_fallback() {
+        let state = HttpStateTestBuilder::new()
+            .await
+            .build()
+            .await
+            .expect("off-mode HTTP state");
+
+        let mut refused = build_router(state.clone(), None);
+        let response = refused
+            .call(request_with_host(
+                Method::GET,
+                "/assets/no-such-file.css",
+                "evil.example",
+            ))
+            .await
+            .expect("dispatch");
+        assert_eq!(response.status(), StatusCode::FORBIDDEN);
+
+        let mut allowed = build_router(state, None);
+        let response = allowed
+            .call(request(Method::GET, "/assets/no-such-file.css"))
+            .await
+            .expect("dispatch");
+        assert_eq!(response.status(), StatusCode::NOT_FOUND);
     }
 }
 

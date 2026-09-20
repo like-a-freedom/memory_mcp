@@ -690,6 +690,14 @@ MEMORY_MCP_HTTP_REPLICA_ID=node-a \
 | `/metrics` | Public (no app auth) | Prometheus scrape when built with the `prometheus` feature. Restrict at the reverse proxy or network layer. |
 | `/` and SPA fallback | Public | Control-plane web UI, when the `control-plane-ui` build feature and `MEMORY_MCP_HTTP_ENABLE_CONTROL_PLANE_UI=true` are both enabled |
 
+"Public" is about application auth only. The `Host`/`Origin` allowlist is
+enforced on every row above, including `/` and the SPA fallback: it is a property
+of the deployment boundary, so the middleware is applied after every route and
+the fallback exist rather than to the routes that happen to be mounted first.
+`Origin` is checked when the header is present (a browser navigation does not
+send one). Both values are matched verbatim against the raw header, so a
+non-default port must be part of the allowlisted entry.
+
 ### Authentication
 
 MCP requests authenticate with a Bearer API key issued per Account. The

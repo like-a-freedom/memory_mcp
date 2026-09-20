@@ -174,97 +174,109 @@ pub fn AdminClientListPage() -> Element {
                     p { "Your session ended. Sign in again to manage clients." }
                     a { href: "{login_route}", "Go to sign-in" }
                 }
-            } else if let Some(message) = session.read().error() {
-                p { class: "error", role: "alert", "{message}" }
-            }
-            p { class: "privilege-note",
-                "Administrators can issue keys that access this client's memory. Issuance is audited."
-            }
-            form { class: "create-client", onsubmit: create,
-                div { class: "field",
-                    label { r#for: "client-display-name", "New client name" }
-                    input {
-                        id: "client-display-name",
-                        name: "display-name",
-                        r#type: "text",
-                        autocomplete: "off",
-                        required: true,
-                        value: "{display_name}",
-                        oninput: move |event| display_name.set(event.value()),
-                    }
-                }
-                button { r#type: "submit", disabled: *create_pending.read(),
-                    if *create_pending.read() { "Creating…" } else { "Create client" }
-                }
-                div { class: "error", role: "alert", "aria-live": "assertive",
-                    if let Some(message) = create_error.read().as_ref() {
-                        "{message}"
-                    }
-                }
-                p { class: "status", role: "status", "aria-live": "polite",
-                    if *create_pending.read() { "Creating the client…" }
-                }
-            }
-            if let Some(message) = state.read().error() {
-                p { class: "error", role: "alert", "aria-live": "assertive", "{message}" }
-            }
-            div { class: "actions",
-                button { r#type: "button", onclick: first_page, disabled: state.read().is_loading(),
-                    "Refresh"
-                }
-                button {
-                    r#type: "button",
-                    onclick: previous_page,
-                    disabled: !state.read().has_previous() || state.read().is_loading(),
-                    "Previous page"
-                }
-                button {
-                    r#type: "button",
-                    onclick: next_page,
-                    disabled: !state.read().has_next() || state.read().is_loading(),
-                    "Next page"
-                }
-            }
-            if state.read().is_loading() {
-                p { class: "status", role: "status", "aria-live": "polite", "Loading clients…" }
-            } else if !state.read().is_loaded() {
-                p { class: "hint", "No page of clients has loaded yet." }
-            } else if state.read().items().is_empty() {
-                p { class: "empty", "No clients yet. Create the first one above." }
             } else {
-                table { class: "client-list",
-                    thead {
-                        tr {
-                            th { "Name" }
-                            th { "Client id" }
-                            th { "Account" }
-                            th { "Tenant" }
-                            th { "Plan" }
-                            th { "Schema" }
-                            th { "Version" }
-                            th { "Provisioning" }
+                if let Some(message) = session.read().error() {
+                    p { class: "error", role: "alert", "{message}" }
+                }
+                p { class: "privilege-note",
+                    "Administrators can issue keys that access this client's memory. Issuance is audited."
+                }
+                // The form is offered only once the session is known to be
+                // usable, so a signed-out operator is never invited to fill in
+                // something that cannot be submitted.
+                if session.read().is_ready() {
+                    form { class: "create-client", onsubmit: create,
+                        div { class: "field",
+                            label { r#for: "client-display-name", "New client name" }
+                            input {
+                                id: "client-display-name",
+                                name: "display-name",
+                                r#type: "text",
+                                autocomplete: "off",
+                                required: true,
+                                value: "{display_name}",
+                                oninput: move |event| display_name.set(event.value()),
+                            }
+                        }
+                        button { r#type: "submit", disabled: *create_pending.read(),
+                            if *create_pending.read() { "Creating…" } else { "Create client" }
+                        }
+                        div { class: "error", role: "alert", "aria-live": "assertive",
+                            if let Some(message) = create_error.read().as_ref() {
+                                "{message}"
+                            }
+                        }
+                        p { class: "status", role: "status", "aria-live": "polite",
+                            if *create_pending.read() { "Creating the client…" }
                         }
                     }
-                    tbody {
-                        for client in state.read().items() {
-                            tr { key: "{client.account_id}",
-                                td { a { href: "{client_href(&client.account_id)}", "{client.display_name}" } }
-                                td { code { "{client.account_id}" } }
-                                td { "{client.account_status}" }
-                                td { "{client.tenant_status}" }
-                                td { "{client.plan_version}" }
-                                td { "{client.schema_version}" }
-                                td { "{client.version}" }
-                                td {
-                                    "{provisioning_label(&client)}"
+                } else if !session.read().is_loading() {
+                    p { class: "hint", "Sign in again to create clients." }
+                }
+                if let Some(message) = state.read().error() {
+                    p { class: "error", role: "alert", "aria-live": "assertive", "{message}" }
+                }
+                div { class: "actions",
+                    button { r#type: "button", onclick: first_page, disabled: state.read().is_loading(),
+                        "Refresh"
+                    }
+                    button {
+                        r#type: "button",
+                        onclick: previous_page,
+                        disabled: !state.read().has_previous() || state.read().is_loading(),
+                        "Previous page"
+                    }
+                    button {
+                        r#type: "button",
+                        onclick: next_page,
+                        disabled: !state.read().has_next() || state.read().is_loading(),
+                        "Next page"
+                    }
+                }
+                if state.read().is_loading() {
+                    p { class: "status", role: "status", "aria-live": "polite", "Loading clients…" }
+                } else if !state.read().is_loaded() {
+                    p { class: "hint", "No page of clients has loaded yet." }
+                } else if state.read().items().is_empty() {
+                    p { class: "empty", "No clients yet. Create the first one above." }
+                } else {
+                    div { class: "table-scroll",
+                        table { class: "client-list",
+                            caption { class: "visually-hidden", "Clients on this page" }
+                            thead {
+                                tr {
+                                    th { scope: "col", "Name" }
+                                    th { scope: "col", "Client id" }
+                                    th { scope: "col", "Account" }
+                                    th { scope: "col", "Tenant" }
+                                    th { scope: "col", "Plan" }
+                                    th { scope: "col", "Schema" }
+                                    th { scope: "col", "Version" }
+                                    th { scope: "col", "Provisioning" }
+                                }
+                            }
+                            tbody {
+                                for client in state.read().items() {
+                                    tr { key: "{client.account_id}",
+                                        td { a { href: "{client_href(&client.account_id)}", "{client.display_name}" } }
+                                        td { code { "{client.account_id}" } }
+                                        td { "{client.account_status}" }
+                                        td { "{client.tenant_status}" }
+                                        td { "{client.plan_version}" }
+                                        td { "{client.schema_version}" }
+                                        td { "{client.version}" }
+                                        td {
+                                            "{provisioning_label(&client)}"
+                                        }
+                                    }
                                 }
                             }
                         }
                     }
                 }
-            }
-            p { class: "hint",
-                "Client ids are stable. Failed clients are shown with the reason the backend reported, and are never retried from here."
+                p { class: "hint",
+                    "Client ids are stable. Failed clients are shown with the reason the backend reported, and are never retried from here."
+                }
             }
         }
     }

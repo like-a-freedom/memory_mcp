@@ -258,6 +258,10 @@ fn ChallengeFinishFlow(kind: ChallengeKind) -> Element {
                         value: "{password}",
                         oninput: move |event| password.set(event.value()),
                     }
+                    // The backend enforces 15-128 characters; stating it here is
+                    // the difference between a correctable typo and a round trip
+                    // spent guessing.
+                    p { class: "hint", "15 to 128 characters." }
                 }
                 div { class: "field",
                     label { r#for: "challenge-confirmation", "Repeat new password" }
@@ -372,10 +376,10 @@ pub fn AdminReauthDialog(
         div {
             class: "dialog",
             role: "dialog",
-            "aria-modal": "true",
             "aria-labelledby": "reauth-title",
+            "aria-describedby": "reauth-reason",
             h2 { id: "reauth-title", "Confirm your password" }
-            p {
+            p { id: "reauth-reason",
                 if reason.is_empty() {
                     "Recent authentication is required for this action."
                 } else {
@@ -391,6 +395,7 @@ pub fn AdminReauthDialog(
                         name: "password",
                         r#type: "password",
                         autocomplete: "current-password",
+                        autofocus: true,
                         required: true,
                         value: "{password}",
                         oninput: move |event| password.set(event.value()),

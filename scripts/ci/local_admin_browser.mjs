@@ -481,6 +481,75 @@ async function scenarioUi(context) {
     heading,
   );
 
+  // The console ships its own stylesheet. If the bundle loses it the app still
+  // boots and every other check still passes, while the operator gets raw
+  // user-agent HTML — so assert the link, the parse, and the computed result.
+  const styleState = await page.evaluate(() => {
+    const links = [...document.querySelectorAll('link[rel="stylesheet"]')].map((l) => l.href);
+    const body = getComputedStyle(document.body);
+    let rules = 0;
+    for (const sheet of document.styleSheets) {
+      try {
+        rules += sheet.cssRules.length;
+      } catch {
+        // Cross-origin sheet: unreadable, and it cannot be one of ours.
+      }
+    }
+    return {
+      links,
+      sameOrigin: links.filter((href) => href.startsWith(window.location.origin)),
+      rules,
+      fontFamily: body.fontFamily,
+      backgroundColor: body.backgroundColor,
+      colorScheme: getComputedStyle(document.documentElement).colorScheme,
+    };
+  });
+  check(
+    'console links a same-origin stylesheet',
+    styleState.sameOrigin.length > 0 && styleState.sameOrigin.length === styleState.links.length,
+    styleState.links,
+  );
+  check('stylesheet parses into rules', styleState.rules > 0, styleState.rules);
+  check(
+    'stylesheet is applied to the document',
+    !/rgba?\(0, 0, 0, 0\)|rgb\(255, 255, 255\)/.test(styleState.backgroundColor),
+    styleState.backgroundColor,
+  );
+  check(
+    'console declares the dark theme before paint',
+    styleState.colorScheme.includes('dark'),
+    styleState.colorScheme,
+  );
+
+  // The document head is part of the product: without `lang` assistive
+  // technology guesses the language, and a framework default title leaks into
+  // the tab, the history and every bookmark.
+  const shell = await page.evaluate(() => ({
+    lang: document.documentElement.lang,
+    title: document.title,
+    description: document.querySelector('meta[name="description"]')?.content ?? '',
+    noscript: document.querySelector('noscript')?.textContent?.trim() ?? '',
+    main: !!document.querySelector('main'),
+    icon: document.querySelector('link[rel~="icon"]')?.getAttribute('href') ?? '',
+  }));
+  check('document declares a language', shell.lang.length > 0, shell.lang);
+  check(
+    'document title is the product, not a framework default',
+    /control plane/i.test(shell.title) && !/dioxus/i.test(shell.title),
+    shell.title,
+  );
+  check('document has a description', shell.description.length > 0, shell.description.length);
+  check(
+    'document explains itself to a javascript-disabled client',
+    shell.noscript.length > 0,
+    shell.noscript.length,
+  );
+  check('document has a main landmark', shell.main);
+  // Declared in the served markup, not injected by the app: a browser probes
+  // for an icon before the module boots, and a runtime link arrives after that
+  // request has already 404'd.
+  check('document declares a same-origin favicon', shell.icon.startsWith('/'), shell.icon);
+
   // The shipped pages must not pull third-party assets (no analytics/CDN).
   const external = await page.evaluate(() =>
     performance

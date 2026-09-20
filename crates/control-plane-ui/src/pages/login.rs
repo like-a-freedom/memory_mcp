@@ -33,9 +33,12 @@ pub fn LoginPage() -> Element {
                     h1 { "Sign in" }
                     AdminLoginForm {}
                 } else if mode.is_oidc() {
-                    h1 { "Login" }
+                    h1 { "Sign in" }
                     p { "You will be redirected to your identity provider." }
-                    a { href: PATH_OIDC_AUTHORIZE, button { "Login with OIDC" } }
+                    // An anchor, not a button nested inside one: this leaves the
+                    // SPA for the provider, and nesting interactive content is
+                    // invalid and confuses assistive technology.
+                    a { class: "button", href: PATH_OIDC_AUTHORIZE, "Sign in with OIDC" }
                 } else {
                     h1 { "Sign in" }
                     p { class: "error", role: "alert",

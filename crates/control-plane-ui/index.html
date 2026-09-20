@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <!-- The CLI owns this element and appends the configured application
+             title from `Dioxus.toml` ([web.app] title) into it, so the text
+             stays in exactly one place: leave it empty here. -->
+        <title></title>
+        <!-- Served from the bundle at a stable, unhashed path (see the
+             `favicon.svg` asset in `src/main.rs`). A browser probes
+             `/favicon.ico` before the module boots, so this cannot wait for the
+             app to inject it. -->
+        <link rel="icon" type="image/svg+xml" href="/assets/favicon.svg">
+        <meta
+            name="description"
+            content="Operator console for the Memory MCP control plane: provision clients, issue and revoke API keys, and inspect administrator session state."
+        >
+        <!-- The console has exactly one theme, so it is declared before paint
+             rather than inferred: this is what makes the native form controls,
+             scrollbars and selection colours dark on first render. -->
+        <meta name="color-scheme" content="dark">
+        <meta name="theme-color" content="#0b0e13">
+    </head>
+    <body>
+        <div id="main"></div>
+        <!-- Without this, a client that blocks or cannot run WebAssembly sees a
+             permanently blank page and no explanation. -->
+        <noscript>
+            <div class="container">
+                <h1>JavaScript is required</h1>
+                <p>
+                    This console is a WebAssembly application. It cannot render
+                    with JavaScript disabled, so no client data is shown here.
+                    Enable JavaScript for this site and reload the page.
+                </p>
+            </div>
+        </noscript>
+    </body>
+</html>

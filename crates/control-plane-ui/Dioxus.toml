@@ -1,0 +1,13 @@
+# Dioxus CLI configuration for the control-plane SPA.
+#
+# `dx bundle` otherwise falls back to its built-in defaults, which is why the
+# shipped shell used to be titled "dioxus | ⛺". The document shell itself is
+# `index.html` next to this file.
+
+[application]
+name = "memory-mcp-control-plane"
+
+[web.app]
+# Overrides the CLI's default title. The same string is set in `index.html` so
+# the served bytes are correct whether or not the CLI substitutes this value.
+title = "Memory MCP control plane"

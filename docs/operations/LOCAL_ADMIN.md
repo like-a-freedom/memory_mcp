@@ -41,11 +41,11 @@ All of the following were executed in this repository and passed:
 | Durable query-shape regression | `... --test registry_query_shape` — 4 passed |
 | Provisioning crash recovery | `... --test http_crash_recovery` — 11 passed |
 | Whole conformance suite | `cargo test -p memory_mcp --features control-plane,test-fixtures --locked` and `cargo test -p memory_mcp --locked` — every target green |
-| UI crate | `cargo test -p control-plane-ui --locked` — 53 passed; `cargo check -p control-plane-ui --locked` clean |
+| UI crate | `cargo test -p control-plane-ui --locked` — 55 passed; `cargo check -p control-plane-ui --target wasm32-unknown-unknown` and the matching `cargo clippy … -D warnings` clean |
 | Static assets + CSP | `MEMORY_MCP_CONTROL_PLANE_UI_DIST=<abs dist> cargo test -p memory_mcp --lib --features control-plane-ui,test-fixtures --locked control::static_assets` — 6 passed |
 | Format, lint, non-default builds | `cargo fmt --all --check`; `cargo clippy --workspace --all-targets --features … --locked -- -D warnings` for all four documented feature combinations; `cargo check -p memory_mcp --no-default-features --locked` and `--features streamable-http` |
 | End-to-end against the real binaries | `sh scripts/ci/local_admin_local_check.sh` — local mode starts from env, activation/login/session, client create/list/get, provisioning reaches `ready` in one poll, restart persistence, plan-mismatch startup rejection, recovery invalidates the session, negative route/CSRF/Origin checks |
-| Packaged image over real TLS in a real browser | `docker build --tag memory-mcp-local-admin:test .` then `python3 scripts/ci/local_admin_image.py --image memory-mcp-local-admin:test --scenario all` — 4 scenarios, 54 checks, exit 0 (`auth` 9, `clients` 29, `regression` 6, `ui` 10) |
+| Packaged image over real TLS in a real browser | `docker build --tag memory-mcp-local-admin:test .` then `python3 scripts/ci/local_admin_image.py --image memory-mcp-local-admin:test --scenario all` — 4 scenarios, 64 checks, exit 0 (`auth` 9, `clients` 29, `regression` 6, `ui` 20). The `ui` scenario proves the bundle boots, is styled and ships a correct document shell; the interactive flows are not covered (see below) |
 | Compose modes resolve | `docker compose --env-file <operator env> -f docker-compose.yml -f docker-compose.{off,local,oidc}.yml config --quiet` — all three resolve |
 
 ### What is NOT verified
@@ -83,6 +83,13 @@ All of the following were executed in this repository and passed:
    `http_local_admin.rs::a_second_administrator_sees_and_can_administer_the_same_clients`
    (§6.3). The remaining remote-replica *interleavings* are still unverified
    (§13.2).
+9. **The console's interactive flows.** Nothing automated drives the packaged
+   UI: the `ui` scenario asserts that it boots, is styled and carries a correct
+   document shell, and every other scenario drives the HTTP API directly. The
+   shipped CSP currently blocks the four `dioxus::document::eval` call sites, so
+   data loading, polling, client creation, key issuance and the clipboard are
+   inert, and the assertion that would have caught it is still to be added
+   (§2.6.1).
 
 ### Relationship to other documents
 
@@ -260,6 +267,42 @@ control-plane-ui --out-dir /src/control-plane-ui-dist` (pinned `dioxus-cli
 `MEMORY_MCP_CONTROL_PLANE_UI_DIST=/src/control-plane-ui-dist/public`, then a
 `distroless/cc-debian13:nonroot` runtime.
 
+The bundle is deliberately exactly five files — `index.html`, one `.js`, one
+`.wasm`, one `.css` and the unhashed `assets/favicon.svg` the shell names — and
+the `ui-builder` stage fails the build when any of the three counted extensions
+appears more than once. `dx` stages its output under `target/dx/…/web/public`,
+which lives inside the cached `target` mount, so without the `rm -rf` in the
+Dockerfile every build copied the previous build's assets too: the bundle had
+grown to eight files (3.2 MB) and `crates/memory-mcp/build.rs` embeds all of
+them into the binary.
+
+**The document shell is owned by this repository.**
+`crates/control-plane-ui/index.html` is the served shell — the CLI uses a
+crate-root `index.html` when one exists and injects the script and stylesheet
+tags into it. It carries `lang="en"`, a description, and `color-scheme` and
+`theme-color` metas, and a `<noscript>` block, so a client that cannot run
+WebAssembly reads an explanation instead of a blank page. It also declares the favicon at a stable
+`/assets/favicon.svg`: the icon asset is declared with
+`AssetOptions::builder().with_hash_suffix(false)` so `index.html` can name it
+directly, because a browser probes for an icon before the module boots and
+runtime injection arrives only after that 404. The `<title>` element
+is left empty on purpose: the CLI appends `[web.app] title` from
+`crates/control-plane-ui/Dioxus.toml` into it, so a literal title there is
+duplicated.
+
+**Styling is a first-party bundle asset.**
+`crates/control-plane-ui/assets/main.css` is declared as
+`asset!("/assets/main.css", AssetOptions::css().with_static_head(true))`, which
+makes the CLI write a same-origin `<link rel="stylesheet">` into the served
+head rather than having the app add it from Rust. That keeps the shipped
+`style-src 'self'` sufficient (no inline `<style>`, no CDN) and lets the shell
+paint before the module boots. The stylesheet is the single source of truth for
+the console's visual system: one locked dark theme, one accent colour, one
+corner-radius scale (panels 12px, controls 8px), semantic colour reserved for
+error/success/warning, a platform UI font stack (no webfont request, no layout
+shift), touch targets of at least 44px below 768px, and motion confined to
+focus/hover/press feedback and disabled under `prefers-reduced-motion`.
+
 **The shipped CSP needs `'wasm-unsafe-eval'`.** `script-src 'self'` alone makes
 Chromium refuse `WebAssembly.instantiateStreaming`, so the SPA never mounted:
 
@@ -269,18 +312,101 @@ violates the following Content Security policy directive because 'unsafe-eval' i
 not an allowed source of script … "script-src 'self'"
 ```
 
-`control::static_assets::CONTENT_SECURITY_POLICY` now carries
+`control::static_assets::CONTENT_SECURITY_POLICY` carries
 `script-src 'self' 'wasm-unsafe-eval'`. That token permits WebAssembly
 compilation only; JavaScript `eval`, `new Function` and inline script stay
 blocked, and the unit test asserts exactly that (present `'wasm-unsafe-eval'`,
 absent `'unsafe-eval'` and `'unsafe-inline'`). The policy literal and its
 test share one constant, so the two cannot drift.
 
-The `ui` scenario is what proves it: it loads `/admin/login` in a real page and
-waits for the rendered `#admin-username` field, then asserts there are no CSP
-violations, no uncaught errors, no external assets, and that the served header
-still refuses general `eval` and inline script. Scenario totals: `auth` 9,
-`clients` 32, `regression` 6, `ui` 7.
+The `ui` scenario loads `/admin/login` in a real page and asserts the served
+policy still refuses general `eval` and inline script, that no external assets
+are loaded, that the WASM app boots with no CSP violations and no uncaught
+errors, and — because a bundle that has lost its stylesheet still boots while
+the operator gets raw user-agent HTML — that a same-origin stylesheet is linked,
+parses into rules and is applied, and that the document declares `lang`, its own
+title, a description, a `<noscript>` explanation, a same-origin favicon and one
+`<main>` landmark.
+Scenario totals: `auth` 9, `clients` 29, `regression` 6, `ui` 20.
+
+**CI proves the embedding property without a browser.** The `docker` job builds
+this same image, enables the UI in its smoke configuration and runs
+`scripts/ci/assert_embedded_ui.py` against it. The checker is stdlib-only and
+browser-free, so it needs no service container, no Node and no privileged daemon
+beyond the one the job already has. It fetches the served document, resolves
+every `href`/`src` the browser would fetch, follows those references into the
+served JavaScript — the loader requests the WebAssembly by path from inside the
+module it has already loaded, so the document alone cannot prove the WASM is
+embedded — and requires every one of them to come back from the binary with a
+plausible content type. It re-asserts the CSP, `nosniff` and referrer policy
+against the shipped image rather than a test fixture, and it asserts the property
+that makes this more than a 404 check: a `Host` the deployment does not list is
+refused for `/` and for `/assets/*` too, not only for the routes that happen to
+be registered before the allowlist layer.
+
+`--host-header localhost` is required whenever the checker is pointed at a
+loopback socket. The host middleware compares the raw `Host` header against
+`ALLOWED_HOSTS` verbatim, with no port stripping, so a request to
+`http://127.0.0.1:8080` arrives as `Host: 127.0.0.1:8080` and is refused; without
+the flag every check fails, which is the intended signal rather than a bug in the
+checker.
+
+#### 2.6.1 Known defect: the console's own `new Function` calls are blocked
+
+This is the one open defect in the shipped UI, and it is **not** fixed in this
+revision: the direct-dependency route has been declined, and the remaining route
+is a policy change that has to be agreed before it is made (both below).
+
+`dioxus::document::eval` is implemented on the web target with `new Function`.
+The shipped policy blocks it, and the block is a WebAssembly trap rather than a
+recoverable error, so it aborts the Dioxus scheduler tick that raised it. The
+console calls `document::eval` in four places, for a CSPRNG operation id, a
+`setTimeout`-based sleep, the clipboard write and the browser clock. Every flow
+that reaches one dies silently:
+
+| Page / action | Observed behaviour |
+|---|---|
+| `/admin/clients`, `/admin/clients/:id` | Mount, render, then never load or poll data. The banner reads "No administrator session" and the list stays empty. |
+| Create client | No request is sent at all. No error, no spinner, no row. |
+| Issue key | Same: the click is inert. |
+| Activate / reset success path | The request succeeds (204) but the page stays on "Saving…" forever. |
+| Copy secret | Reports the clipboard as unavailable. |
+
+Reproduced with `agent-browser` against the packaged image: the console log
+carries `wasm-bindgen: imported JS function that was not marked as catch threw
+an error: Evaluating a string as JavaScript violates the following Content
+Security Policy directive … 'unsafe-eval' is not an allowed source of script`,
+and the network log shows no application request after page load.
+
+The `all` scenario does not catch this: it drives the HTTP API directly, and the
+`ui` scenario only asserts that the bundle *boots*. Loading `/admin/login` — the
+one page with no `document::eval` on mount — is what makes it pass.
+
+**The fix direction is to remove the four `document::eval` call sites**, not to
+relax the policy: `'unsafe-eval'` is refused by the unit test, by the browser
+scenario and by the approved specification. Two routes reach that, and neither is
+taken here because each needs a decision the code cannot make on its own:
+
+1. *Call the browser APIs directly.* The four sites need a CSPRNG UUID, a
+   `setTimeout` sleep, a clipboard write and a clock. That means `web-sys`,
+   `js-sys`, `wasm-bindgen-futures` and `gloo-timers` as direct dependencies of
+   `control-plane-ui`. All four are already in `Cargo.lock` and already compiled
+   into this crate's WASM through `dioxus-web` and `gloo-net`, so no new crate
+   and no new version would enter the graph — but they are still four new direct
+   dependencies, and the project constraint is that the image stays one
+   all-in-one binary with no extra dependencies. Declined on that basis.
+2. *Move the primitives into a first-party inline script.* Declare a small
+   `AssetOptions::js()` asset, load it from `index.html` ahead of the module, and
+   expose the four primitives on a global (CSPRNG UUID, `setTimeout` sleep,
+   clipboard write, `Date.now()`); the WASM then calls into it, and no call site
+   evaluates a string. This preserves the embedding property and adds no
+   dependency, but it is a CSP change: the policy has to name the script
+   (`'sha256-…'`), `control/static_assets.rs` has to carry that hash, and the
+   policy's unit test and `scripts/ci/local_admin_browser.mjs` move with it. A
+   CSP change is a security change, so it needs to be agreed before it is made.
+
+The `ui` scenario should also gain an assertion that a flow completes, which is
+what would have caught this.
 
 ## 3. Deployment configuration
 
@@ -294,7 +420,7 @@ Always required by the HTTP profile (all modes; `require_env` / `parse_hex_32_en
 | Variable | Notes |
 |---|---|
 | `MEMORY_MCP_HTTP_PUBLIC_BASE_URL` | Must start with `https://` in local mode, **or** be loopback (`localhost`, `127.0.0.1`, `[::1]`) as a development escape hatch. The exception keys off the URL *host*, so `http://evil.example/?localhost` is rejected |
-| `ALLOWED_HOSTS` | Comma-separated; empty is rejected |
+| `ALLOWED_HOSTS` | Comma-separated; empty is rejected. Compared verbatim against the raw `Host` header, port included, and enforced on **every** route plus the SPA fallback, so `/` and `/assets/*` are refused too |
 | `ALLOWED_ORIGINS` | Comma-separated; empty is rejected, `*` rejected. Every local POST/DELETE requires a present, single, exactly-matching `Origin` |
 | `MEMORY_MCP_API_KEY_PEPPER` | ≥ 32 bytes; used to verify client keys |
 | `MEMORY_MCP_HTTP_IDENTITY_INDEX_KEY` | 64-char hex. **In local mode it is derived** from the session key under a purpose label, and supplying one **fails startup** (OIDC-only configuration must not be silently ignored). OIDC mode requires it |

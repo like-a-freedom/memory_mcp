@@ -55,16 +55,22 @@ impl AdminSession {
     }
 
     /// One-line description of the session for the page header.
+    ///
+    /// Every branch states something the console actually knows: it never
+    /// claims to be signed in as an unknown administrator, which reads as a
+    /// successful sign-in while the session is in fact unusable.
     pub fn summary(&self) -> String {
         if self.loading {
             "Checking your session…".to_owned()
         } else if self.ended {
             "Signed out".to_owned()
+        } else if self.csrf.is_none() {
+            "No administrator session".to_owned()
         } else {
-            format!(
-                "Signed in as {}",
-                self.username().unwrap_or("an unknown administrator")
-            )
+            match self.username() {
+                Some(username) => format!("Signed in as {username}"),
+                None => "Signed in".to_owned(),
+            }
         }
     }
 
@@ -171,5 +177,61 @@ pub fn AdminSessionBar(session: Signal<AdminSession>) -> Element {
                 "Sign out"
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{AdminSession, SessionCsrf, SessionResponse};
+
+    fn adopted() -> AdminSession {
+        let mut session = AdminSession::default();
+        session.adopt(SessionResponse {
+            admin_id: "adm_test".to_owned(),
+            username: "operator".to_owned(),
+            auth_time: "2026-01-01T00:00:00Z".to_owned(),
+            absolute_expiry: "2026-01-02T00:00:00Z".to_owned(),
+            csrf_token: "token".to_owned(),
+        });
+        session
+    }
+
+    #[test]
+    fn summary_never_claims_a_signed_in_unknown_administrator() {
+        // The banner used to read "Signed in as an unknown administrator"
+        // whenever the session was not usable, which reports success for a
+        // state an operator must act on.
+        let loading = AdminSession {
+            loading: true,
+            ..AdminSession::default()
+        };
+        assert_eq!(loading.summary(), "Checking your session…");
+
+        assert_eq!(
+            AdminSession::default().summary(),
+            "No administrator session"
+        );
+
+        let ended = AdminSession {
+            ended: true,
+            ..AdminSession::default()
+        };
+        assert_eq!(ended.summary(), "Signed out");
+
+        // A usable session with no reported name still must not claim a name.
+        let unnamed = AdminSession {
+            csrf: Some(SessionCsrf::new("token")),
+            ..AdminSession::default()
+        };
+        assert_eq!(unnamed.summary(), "Signed in");
+
+        assert_eq!(adopted().summary(), "Signed in as operator");
+    }
+
+    #[test]
+    fn a_usability_ready_session_is_the_one_with_a_csrf_token() {
+        assert!(!AdminSession::default().is_ready());
+        assert!(adopted().is_ready());
+        assert!(adopted().mutation_client().is_some());
     }
 }

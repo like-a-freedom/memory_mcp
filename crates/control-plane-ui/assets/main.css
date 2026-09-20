@@ -1,0 +1,894 @@
+/* Memory MCP control plane — operator console stylesheet.
+ *
+ * Shipped as a first-party bundle asset, which is what lets the served CSP stay
+ * `style-src 'self'`: no inline <style>, no CDN, no runtime style injection.
+ *
+ * House rules this file is the single source of truth for:
+ *   - one locked dark theme (there is no light mode; see LOCAL_ADMIN.md §2.6);
+ *   - one accent colour (teal) reserved for interactive affordances;
+ *   - one corner-radius scale: panels 12px, controls 8px, no pill shapes;
+ *   - colour is semantic: only error/danger, success and warning states carry hue;
+ *   - motion is confined to focus, hover and press feedback and is fully
+ *     suppressed under `prefers-reduced-motion`.
+ *
+ * Typography uses the platform UI stack deliberately. This is an Operate
+ * surface, where matching the operator's own system outranks brand expression,
+ * and a system stack means no webfont request, no layout shift and no
+ * third-party asset inside the CSP.
+ */
+
+/* ═══ tokens ═══════════════════════════════════════════════════════════ */
+
+:root {
+    color-scheme: dark;
+
+    --bg: #0b0e13;
+    --surface: #12161d;
+    --surface-raised: #171c25;
+    --surface-sunken: #0e1218;
+
+    --border: #232a36;
+    --border-strong: #323b4a;
+
+    --fg: #e7eaf0;
+    --fg-muted: #a7b1c2;
+    --fg-subtle: #8b96a5;
+
+    --accent: #2fb8a6;
+    --accent-hover: #46cbb8;
+    --accent-text: #04211d;
+    --focus: #6fd7c9;
+
+    --danger: #ff8b92;
+    --danger-bg: #241316;
+    --danger-border: #7a3038;
+
+    --success: #56d364;
+    --success-bg: #0f1f14;
+    --success-border: #2b6a38;
+
+    --warning: #e8b25c;
+    --warning-bg: #241c0f;
+    --warning-border: #6b5223;
+
+    --radius-panel: 12px;
+    --radius-control: 8px;
+
+    --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto,
+        "Helvetica Neue", Arial, sans-serif;
+    --font-mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas,
+        "Liberation Mono", monospace;
+
+    --shadow-panel: 0 1px 2px rgb(0 0 0 / 40%);
+}
+
+/* ═══ reset ════════════════════════════════════════════════════════════ */
+
+*,
+*::before,
+*::after {
+    box-sizing: border-box;
+}
+
+html {
+    background-color: var(--bg);
+    /* The WASM bundle cannot paint before it boots; painting the shell here is
+       what stops the unstyled white flash on first load. */
+    -webkit-text-size-adjust: 100%;
+}
+
+body {
+    margin: 0;
+    min-height: 100dvh;
+    background-color: var(--bg);
+    color: var(--fg);
+    font-family: var(--font-sans);
+    font-size: 0.9375rem;
+    line-height: 1.55;
+}
+
+h1,
+h2,
+h3 {
+    margin: 0;
+    font-weight: 600;
+    letter-spacing: -0.011em;
+    line-height: 1.25;
+}
+
+h1 {
+    font-size: 1.5rem;
+}
+
+h2 {
+    font-size: 1.0625rem;
+}
+
+h3 {
+    font-size: 0.9375rem;
+}
+
+p {
+    margin: 0;
+    max-width: 68ch;
+}
+
+ul,
+ol {
+    margin: 0;
+    padding-left: 1.25rem;
+}
+
+a {
+    color: var(--accent);
+    text-decoration-thickness: 1px;
+    text-underline-offset: 2px;
+}
+
+a:hover {
+    color: var(--accent-hover);
+}
+
+code {
+    font-family: var(--font-mono);
+    font-size: 0.8125rem;
+    color: var(--fg);
+    background-color: var(--surface-sunken);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-control);
+    padding: 0.0625rem 0.375rem;
+    overflow-wrap: anywhere;
+}
+
+:focus-visible {
+    outline: 2px solid var(--focus);
+    outline-offset: 2px;
+    border-radius: 2px;
+}
+
+::selection {
+    background-color: var(--accent);
+    color: var(--accent-text);
+}
+
+.visually-hidden {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    padding: 0;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+    border: 0;
+}
+
+/* ═══ shell: skip link, header, main ═══════════════════════════════════ */
+
+.skip-link {
+    position: absolute;
+    top: 0.5rem;
+    left: 0.5rem;
+    z-index: 10;
+    transform: translateY(-200%);
+    background-color: var(--accent);
+    color: var(--accent-text);
+    font-weight: 600;
+    text-decoration: none;
+    padding: 0.5rem 0.875rem;
+    border-radius: var(--radius-control);
+}
+
+.skip-link:focus {
+    transform: translateY(0);
+}
+
+/* Reveal a focusable-but-offscreen target (the skip link's destination). */
+main:focus {
+    outline: none;
+}
+
+.app-header {
+    border-bottom: 1px solid var(--border);
+    background-color: var(--surface);
+}
+
+.app-header-inner {
+    display: flex;
+    align-items: baseline;
+    gap: 0.5rem;
+    max-width: 1120px;
+    margin: 0 auto;
+    padding: 0.875rem 1.5rem;
+}
+
+.app-brand {
+    font-weight: 600;
+    letter-spacing: -0.011em;
+}
+
+.app-brand-suffix {
+    color: var(--fg-subtle);
+    font-size: 0.8125rem;
+}
+
+/* ═══ layout ═══════════════════════════════════════════════════════════ */
+
+.container {
+    display: flex;
+    flex-direction: column;
+    gap: 1.25rem;
+    max-width: 1120px;
+    margin: 0 auto;
+    padding: 2rem 1.5rem 4rem;
+}
+
+/* ═══ session bar ══════════════════════════════════════════════════════ */
+
+.session-bar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.5rem 0.75rem;
+    background-color: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-panel);
+    padding: 0.625rem 0.875rem;
+    color: var(--fg-muted);
+    font-size: 0.875rem;
+}
+
+.session-bar > :first-child {
+    color: var(--fg);
+    font-weight: 500;
+}
+
+/* Pushes the sign-out control to the trailing edge without a spacer element. */
+.session-bar > button {
+    margin-left: auto;
+}
+
+.session-expiry {
+    color: var(--fg-subtle);
+    font-family: var(--font-mono);
+    font-size: 0.8125rem;
+}
+
+/* ═══ forms ════════════════════════════════════════════════════════════ */
+
+form {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+    max-width: 34rem;
+}
+
+.field {
+    display: flex;
+    flex-direction: column;
+    gap: 0.375rem;
+}
+
+.field > label,
+.expiry > legend,
+.field > span {
+    color: var(--fg-muted);
+    font-size: 0.8125rem;
+    font-weight: 500;
+}
+
+label {
+    color: var(--fg-muted);
+}
+
+input[type="text"],
+input[type="password"],
+input[type="number"],
+input[type="email"] {
+    width: 100%;
+    background-color: var(--surface-sunken);
+    color: var(--fg);
+    font-family: inherit;
+    font-size: 0.9375rem;
+    line-height: 1.4;
+    border: 1px solid var(--border-strong);
+    border-radius: var(--radius-control);
+    padding: 0.5rem 0.6875rem;
+    transition: border-color 120ms ease, background-color 120ms ease;
+}
+
+input::placeholder {
+    color: var(--fg-subtle);
+}
+
+input[type="text"]:hover,
+input[type="password"]:hover,
+input[type="number"]:hover {
+    border-color: var(--fg-subtle);
+}
+
+input[type="text"]:focus-visible,
+input[type="password"]:focus-visible,
+input[type="number"]:focus-visible {
+    border-color: var(--accent);
+    outline-offset: 0;
+}
+
+input[readonly] {
+    background-color: var(--surface);
+    color: var(--fg-muted);
+    border-style: dashed;
+    cursor: default;
+}
+
+input:disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
+}
+
+input[type="checkbox"] {
+    width: 1rem;
+    height: 1rem;
+    margin: 0;
+    accent-color: var(--accent);
+}
+
+.expiry {
+    display: flex;
+    flex-direction: column;
+    gap: 0.625rem;
+    margin: 0;
+    padding: 0.875rem;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-panel);
+    background-color: var(--surface);
+}
+
+.expiry > legend {
+    padding: 0 0.375rem;
+}
+
+.expiry > div {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.expiry > div > label {
+    font-size: 0.875rem;
+}
+
+.expiry > div > input[type="number"] {
+    width: 7rem;
+}
+
+.expiry > div > span {
+    color: var(--fg-subtle);
+    font-size: 0.8125rem;
+}
+
+/* ═══ buttons ══════════════════════════════════════════════════════════ */
+
+button,
+a.button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.375rem;
+    background-color: var(--surface-raised);
+    color: var(--fg);
+    font-family: inherit;
+    font-size: 0.875rem;
+    font-weight: 500;
+    line-height: 1.2;
+    white-space: nowrap;
+    border: 1px solid var(--border-strong);
+    border-radius: var(--radius-control);
+    padding: 0.5rem 0.875rem;
+    cursor: pointer;
+    text-decoration: none;
+    transition: background-color 120ms ease, border-color 120ms ease,
+        transform 60ms ease;
+}
+
+button:hover:not(:disabled),
+a.button:hover {
+    background-color: #1e242f;
+    border-color: var(--fg-subtle);
+    color: var(--fg);
+}
+
+button:active:not(:disabled),
+a.button:active {
+    transform: translateY(1px);
+}
+
+button:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+/* Primary: every <form> has exactly one submit control, so `type="submit"` is
+   the primary affordance and `type="button"` is always secondary. No page
+   carries two controls with the same intent. */
+button[type="submit"] {
+    background-color: var(--accent);
+    color: var(--accent-text);
+    font-weight: 600;
+    border-color: var(--accent);
+}
+
+button[type="submit"]:hover:not(:disabled) {
+    background-color: var(--accent-hover);
+    border-color: var(--accent-hover);
+    color: var(--accent-text);
+}
+
+/* Destructive confirmation: the confirming control inside a `.confirm` block. */
+.confirm > button:first-of-type {
+    background-color: var(--danger-bg);
+    color: var(--danger);
+    border-color: var(--danger-border);
+}
+
+.confirm > button:first-of-type:hover:not(:disabled) {
+    background-color: #331a1e;
+    border-color: var(--danger);
+    color: var(--danger);
+}
+
+.actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+}
+
+.actions > p {
+    flex-basis: 100%;
+    color: var(--warning);
+    font-size: 0.875rem;
+}
+
+/* ═══ messages ═════════════════════════════════════════════════════════ */
+
+/* Conditional live regions render as empty elements when there is nothing to
+   report; they must not occupy layout in that state. */
+.error:empty,
+.status:empty,
+.success:empty,
+.warning:empty,
+.hint:empty,
+.empty:empty {
+    display: none;
+}
+
+.error {
+    background-color: var(--danger-bg);
+    color: var(--danger);
+    border: 1px solid var(--danger-border);
+    border-radius: var(--radius-panel);
+    padding: 0.625rem 0.875rem;
+    font-size: 0.875rem;
+}
+
+/* A bare <p class="error"> sits directly on the page background. */
+p.error {
+    background-color: transparent;
+    border: 0;
+    border-left: 2px solid var(--danger);
+    border-radius: 0;
+    padding: 0.125rem 0 0.125rem 0.75rem;
+}
+
+.error > p {
+    margin: 0;
+}
+
+.error > a {
+    display: inline-block;
+    margin-top: 0.25rem;
+    color: var(--danger);
+    text-underline-offset: 3px;
+}
+
+.success {
+    background-color: var(--success-bg);
+    color: var(--success);
+    border: 1px solid var(--success-border);
+    border-radius: var(--radius-panel);
+    padding: 0.625rem 0.875rem;
+    font-size: 0.875rem;
+}
+
+.success > p {
+    margin: 0 0 0.25rem;
+}
+
+.warning {
+    background-color: var(--warning-bg);
+    color: var(--warning);
+    border: 1px solid var(--warning-border);
+    border-radius: var(--radius-panel);
+    padding: 0.625rem 0.875rem;
+    font-size: 0.875rem;
+}
+
+.status {
+    color: var(--fg-muted);
+    font-size: 0.875rem;
+}
+
+.hint {
+    color: var(--fg-muted);
+    font-size: 0.8125rem;
+}
+
+.empty {
+    color: var(--fg-muted);
+    font-size: 0.875rem;
+    background-color: var(--surface);
+    border: 1px dashed var(--border-strong);
+    border-radius: var(--radius-panel);
+    padding: 1.5rem 1rem;
+    text-align: center;
+    max-width: none;
+}
+
+.readiness {
+    color: var(--fg-muted);
+    font-size: 0.875rem;
+    border-left: 2px solid var(--border-strong);
+    padding-left: 0.75rem;
+}
+
+.privilege-note {
+    color: var(--fg-muted);
+    font-size: 0.8125rem;
+    background-color: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-panel);
+    padding: 0.5rem 0.75rem;
+}
+
+/* ═══ panels ═══════════════════════════════════════════════════════════ */
+
+section.client-metadata,
+section.client-state,
+section.keys {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+    background-color: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-panel);
+    box-shadow: var(--shadow-panel);
+    padding: 1.25rem;
+}
+
+section.client-state {
+    gap: 0.75rem;
+}
+
+section > h2 {
+    padding-bottom: 0.75rem;
+    border-bottom: 1px solid var(--border);
+}
+
+/* ═══ tables ═══════════════════════════════════════════════════════════ */
+
+.table-scroll {
+    overflow-x: auto;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-panel);
+    background-color: var(--surface);
+}
+
+.table-scroll > table {
+    border: 0;
+}
+
+table {
+    width: 100%;
+    border-collapse: collapse;
+    background-color: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-panel);
+    font-size: 0.875rem;
+}
+
+/* The key/value tables inside a panel are not separately framed. */
+section > table {
+    border: 0;
+    border-radius: 0;
+    background-color: transparent;
+}
+
+thead th {
+    text-align: left;
+    color: var(--fg-subtle);
+    font-size: 0.75rem;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    white-space: nowrap;
+    background-color: var(--surface-raised);
+    border-bottom: 1px solid var(--border-strong);
+    padding: 0.625rem 0.875rem;
+}
+
+tbody td {
+    border-top: 1px solid var(--border);
+    padding: 0.625rem 0.875rem;
+    vertical-align: top;
+    font-variant-numeric: tabular-nums;
+}
+
+tbody tr:hover {
+    background-color: var(--surface-raised);
+}
+
+tbody th[scope="row"] {
+    text-align: left;
+    font-weight: 500;
+    color: var(--fg-subtle);
+    white-space: nowrap;
+    border-top: 1px solid var(--border);
+    padding: 0.5rem 0.875rem;
+    vertical-align: top;
+}
+
+/* The client list is wide; below the tablet breakpoint it scrolls rather than
+   collapsing columns away from the operator. */
+.client-list {
+    min-width: 64rem;
+}
+
+.client-list td:first-child {
+    font-weight: 500;
+}
+
+.client-list td:first-child a {
+    text-decoration: none;
+}
+
+.client-list td:first-child a:hover {
+    text-decoration: underline;
+}
+
+/* ═══ dialogs, confirmations and the one-time secret ═══════════════════ */
+
+.dialog,
+.confirm,
+.secret {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    background-color: var(--surface-raised);
+    border: 1px solid var(--border-strong);
+    border-radius: var(--radius-panel);
+    padding: 1.25rem;
+    max-width: 34rem;
+}
+
+.dialog > h2 {
+    padding: 0;
+    border: 0;
+}
+
+.confirm > p,
+.dialog > p,
+.secret > p {
+    margin: 0;
+    font-size: 0.875rem;
+    color: var(--fg-muted);
+}
+
+.confirm > button,
+.dialog > form > button,
+.secret > button {
+    align-self: flex-start;
+}
+
+.confirm {
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: center;
+    border-color: var(--warning-border);
+    background-color: var(--warning-bg);
+}
+
+.confirm > p {
+    flex-basis: 100%;
+    color: var(--warning);
+}
+
+/* The one-time secret is the highest-risk value this console ever renders: it
+   is visually quarantined and set in mono so it can be read aloud or retyped
+   without ambiguity. */
+.secret {
+    border-color: var(--warning-border);
+}
+
+.secret > h3 {
+    color: var(--warning);
+}
+
+.secret-value {
+    display: block;
+    font-family: var(--font-mono);
+    font-size: 0.8125rem;
+    line-height: 1.6;
+    color: var(--fg);
+    background-color: var(--surface-sunken);
+    border: 1px solid var(--border-strong);
+    border-radius: var(--radius-control);
+    padding: 0.75rem;
+    overflow-wrap: anywhere;
+    user-select: all;
+}
+
+.secret > p[role="alert"] {
+    color: var(--danger);
+}
+
+/* A one-time secret shown outside the admin pages (the OIDC key page). */
+.alert {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    background-color: var(--warning-bg);
+    border: 1px solid var(--warning-border);
+    border-radius: var(--radius-panel);
+    padding: 1rem;
+}
+
+.alert > p {
+    margin: 0;
+    color: var(--warning);
+    font-size: 0.875rem;
+}
+
+.alert > code {
+    display: block;
+    font-size: 0.8125rem;
+    line-height: 1.6;
+    background-color: var(--surface-sunken);
+    border-color: var(--border-strong);
+    padding: 0.75rem;
+    overflow-wrap: anywhere;
+    user-select: all;
+}
+
+/* ═══ auth forms ═══════════════════════════════════════════════════════ */
+
+.admin-login,
+.challenge-inspect,
+.challenge-finish,
+.create-client,
+.create-key,
+.issue-key {
+    background-color: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-panel);
+    padding: 1.25rem;
+}
+
+/* The OIDC key page and the local admin pages stack no more than one column,
+   but a create row reads better as an inline pair on a wide screen. */
+.create-key {
+    flex-direction: row;
+    align-items: flex-end;
+}
+
+.create-key > .field {
+    flex: 1 1 18rem;
+}
+
+.admin-login > p,
+.challenge-inspect > p {
+    margin: 0;
+    color: var(--fg-muted);
+    font-size: 0.875rem;
+}
+
+/* ═══ responsive ═══════════════════════════════════════════════════════ */
+
+@media (max-width: 767px) {
+    .app-header-inner {
+        padding: 0.75rem 1rem;
+    }
+
+    .container {
+        padding: 1.25rem 1rem 3rem;
+        gap: 1rem;
+    }
+
+    h1 {
+        font-size: 1.3125rem;
+    }
+
+    form {
+        max-width: none;
+    }
+
+    .session-bar > button {
+        margin-left: 0;
+    }
+
+    .actions {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .actions > button,
+    .actions > a.button {
+        width: 100%;
+    }
+
+    /* Touch targets: the desktop padding produces ~35px, which is above the
+       24px minimum but short of the 44px comfortably tappable size. */
+    button,
+    a.button {
+        min-height: 2.75rem;
+        padding: 0.625rem 0.875rem;
+    }
+
+    input[type="text"],
+    input[type="password"],
+    input[type="number"],
+    input[type="email"] {
+        min-height: 2.75rem;
+    }
+
+    section.client-metadata,
+    section.client-state,
+    section.keys {
+        padding: 1rem;
+    }
+
+    .dialog,
+    .confirm,
+    .secret,
+    .admin-login,
+    .challenge-inspect,
+    .challenge-finish,
+    .create-client,
+    .create-key,
+    .issue-key {
+        max-width: none;
+        padding: 1rem;
+    }
+
+    .create-key {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .expiry > div > input[type="number"] {
+        width: 5.5rem;
+    }
+
+    .confirm > button,
+    .dialog > form > button,
+    .secret > button {
+        align-self: stretch;
+    }
+}
+
+/* ═══ reduced motion ═══════════════════════════════════════════════════ */
+
+@media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+        transition-duration: 0.01ms !important;
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        scroll-behavior: auto !important;
+    }
+
+    button:active:not(:disabled),
+    a.button:active {
+        transform: none;
+    }
+}

@@ -11,8 +11,10 @@ pub fn DeletePage() -> Element {
     let mut error = use_signal(|| None::<String>);
     let mut complete = use_signal(|| false);
 
-    let start_delete = move |_| {
+    let start_delete = move |event: FormEvent| {
+        event.prevent_default();
         let mut error = error;
+        error.set(None);
         spawn(async move {
             match ApiClient::new("/".to_owned()).start_delete().await {
                 Ok(value) => challenge.set(Some(value)),
@@ -21,13 +23,19 @@ pub fn DeletePage() -> Element {
         });
     };
 
-    let confirm_delete = move |_| {
+    let confirm_delete = move |event: FormEvent| {
+        event.prevent_default();
         let Some(value) = challenge.read().clone() else {
             error.set(Some("Start the deletion confirmation first.".to_owned()));
             return;
         };
-        let typed_phrase = phrase.read().clone();
+        let typed_phrase = phrase.read().trim().to_owned();
+        if typed_phrase.is_empty() {
+            error.set(Some("Type the confirmation phrase.".to_owned()));
+            return;
+        }
         let mut error = error;
+        error.set(None);
         spawn(async move {
             match ApiClient::new("/".to_owned())
                 .confirm_delete(value.confirmation_token, typed_phrase)
@@ -41,26 +49,43 @@ pub fn DeletePage() -> Element {
 
     rsx! {
         div { class: "container",
-            h1 { "Delete Account" }
-            p { "Deletion is irreversible. No export or recovery is available." }
+            h1 { "Delete account" }
+            p { "Deletion is irreversible. No export and no recovery is available." }
             if let Some(value) = error.read().as_ref() {
-                p { class: "error", "Error: {value}" }
+                p { class: "error", role: "alert", "aria-live": "assertive", "{value}" }
             }
             if *complete.read() {
-                p { "Deletion requested. Access has been revoked." }
-            } else if let Some(value) = challenge.read().as_ref() {
-                p { "Type exactly: {value.typed_phrase}" }
-                input {
-                    value: "{phrase}",
-                    oninput: move |event| phrase.set(event.value()),
+                div { class: "success", role: "status", "aria-live": "polite",
+                    p { "Deletion requested. Access has been revoked." }
                 }
-                button { onclick: confirm_delete, "Confirm deletion" }
-                p { "Confirmation expires at {value.expires_at}." }
+            } else if let Some(value) = challenge.read().as_ref() {
+                form { onsubmit: confirm_delete,
+                    p { "Type the phrase below exactly to confirm." }
+                    code { "{value.typed_phrase}" }
+                    div { class: "field",
+                        label { r#for: "delete-confirmation-phrase", "Confirmation phrase" }
+                        input {
+                            id: "delete-confirmation-phrase",
+                            name: "confirmation-phrase",
+                            r#type: "text",
+                            autocomplete: "off",
+                            "autocapitalize": "none",
+                            spellcheck: "false",
+                            required: true,
+                            value: "{phrase}",
+                            oninput: move |event| phrase.set(event.value()),
+                        }
+                    }
+                    button { r#type: "submit", "Confirm deletion" }
+                    p { class: "hint", "This confirmation expires at {value.expires_at}." }
+                }
             } else {
-                button { onclick: start_delete, "Start deletion" }
+                form { onsubmit: start_delete,
+                    button { r#type: "submit", "Start deletion" }
+                }
             }
-            nav {
-                a { href: "/", "Back to Status" }
+            nav { class: "actions", "aria-label": "Account",
+                a { class: "button", href: "/", "Back to status" }
             }
         }
     }
