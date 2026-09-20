@@ -11,12 +11,12 @@ name = "control-plane-ui"
 path = "src/main.rs"
 
 [dependencies]
-dioxus = { version = "0.7", features = ["web"] }
-dioxus-router = "0.7"
+dioxus = { version = "=0.7.10", features = ["web"] }
+dioxus-router = "=0.7.10"
 serde = { workspace = true }
 serde_json = { workspace = true }
-gloo-net = { version = "0.7", features = ["http"] }
-gloo-storage = { version = "0.4" }
+gloo-net = { version = "=0.7.0", features = ["http"] }
+gloo-storage = { version = "=0.4.0" }
 # Direct use of the browser platform. Every one is already in the lock file and
 # already compiled into this crate's WebAssembly through `dioxus-web` and
 # `gloo-net`: naming them here adds no crate to the graph and no byte to the
@@ -27,10 +27,10 @@ gloo-storage = { version = "0.4" }
 # it would link a second copy of the crate into the bundle, which is the one
 # thing this list exists to avoid. `cargo update` reports these as "available"
 # for exactly that reason.
-gloo-timers = { version = "0.3", features = ["futures"] }
-js-sys = "0.3"
-wasm-bindgen-futures = "0.4"
-web-sys = { version = "0.3", features = ["Clipboard", "Crypto", "Navigator", "Window"] }
+gloo-timers = { version = "=0.3.0", features = ["futures"] }
+js-sys = "=0.3.105"
+wasm-bindgen-futures = "=0.4.78"
+web-sys = { version = "=0.3.105", features = ["Clipboard", "Crypto", "Navigator", "Window"] }
 
 [lints]
 workspace = true

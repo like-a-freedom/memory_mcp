@@ -10,24 +10,14 @@ use crate::router::Route;
 #[component]
 pub fn StatusPage() -> Element {
     let navigator = use_navigator();
-    let mut account = use_signal(|| None::<crate::api::AccountMeta>);
-    let mut error = use_signal(|| None::<String>);
-
-    use_effect(move || {
-        let api = ApiClient::new("/".to_string());
-        spawn(async move {
-            match api.me().await {
-                Ok(meta) => account.set(Some(meta)),
-                Err(e) => error.set(Some(e.message)),
-            }
-        });
-    });
+    let account = use_resource(|| async { ApiClient::new("/".to_string()).me().await });
+    let mut signing_out = use_signal(|| false);
 
     let sign_out = move |_| {
-        // Drop the cached account so the SPA stops displaying the previous
-        // identity before the navigation completes. The server-side
-        // `/auth/oidc/logout` clears the cookie and invalidates the session.
-        account.set(None);
+        // Hide the cached account before the navigation completes. The
+        // server-side `/auth/oidc/logout` clears the cookie and invalidates the
+        // session; the resource itself remains read-only.
+        signing_out.set(true);
         spawn(async move {
             let api = ApiClient::new("/".to_string());
             let _ = api.logout().await;
@@ -38,21 +28,28 @@ pub fn StatusPage() -> Element {
     rsx! {
         div { class: "container",
             h1 { "Account status" }
-            if let Some(err) = error.read().as_ref() {
-                p { class: "error", role: "alert", "aria-live": "assertive", "{err}" }
-            }
-            if let Some(meta) = account.read().as_ref() {
-                table {
-                    caption { class: "visually-hidden", "Account metadata" }
-                    tbody {
-                        tr { th { scope: "row", "ID" } td { code { "{meta.id}" } } }
-                        tr { th { scope: "row", "Status" } td { "{meta.status}" } }
-                        tr { th { scope: "row", "Tenant" } td { code { "{meta.tenant_id}" } } }
-                        tr { th { scope: "row", "Created" } td { "{meta.created_at}" } }
-                    }
+            if *signing_out.read() {
+                p { class: "status", role: "status", "aria-live": "polite", "Signing out…" }
+            } else {
+                match account.read().as_ref() {
+                    None => rsx! {
+                        p { class: "status", role: "status", "aria-live": "polite", "Loading account…" }
+                    },
+                    Some(Err(err)) => rsx! {
+                        p { class: "error", role: "alert", "aria-live": "assertive", "{err.message}" }
+                    },
+                    Some(Ok(meta)) => rsx! {
+                        table {
+                            caption { class: "visually-hidden", "Account metadata" }
+                            tbody {
+                                tr { th { scope: "row", "ID" } td { code { "{meta.id}" } } }
+                                tr { th { scope: "row", "Status" } td { "{meta.status}" } }
+                                tr { th { scope: "row", "Tenant" } td { code { "{meta.tenant_id}" } } }
+                                tr { th { scope: "row", "Created" } td { "{meta.created_at}" } }
+                            }
+                        }
+                    },
                 }
-            } else if error.read().is_none() {
-                p { class: "status", role: "status", "aria-live": "polite", "Loading account…" }
             }
             nav { class: "actions", "aria-label": "Account",
                 Link { class: "button", to: Route::Keys {}, "API keys" }

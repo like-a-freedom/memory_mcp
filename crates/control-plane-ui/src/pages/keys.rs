@@ -10,12 +10,10 @@ use crate::router::Route;
 #[component]
 pub fn KeysPage() -> Element {
     let navigator = use_navigator();
-    let keys = use_signal(Vec::<crate::api::ApiKeyMeta>::new);
+    let mut keys = use_resource(|| async { ApiClient::new("/".to_string()).list_keys().await });
     let mut new_key_secret = use_signal(|| None::<String>);
     let mut new_key_name = use_signal(String::new);
     let mut error = use_signal(|| None::<String>);
-
-    use_effect(move || load_keys(keys, error));
 
     let create_key = move |event: FormEvent| {
         event.prevent_default();
@@ -31,7 +29,7 @@ pub fn KeysPage() -> Element {
                 Ok(resp) => {
                     new_key_name.set(String::new());
                     new_key_secret.set(Some(resp.secret));
-                    load_keys(keys, error);
+                    keys.restart();
                 }
                 Err(value) => error.set(Some(value.message)),
             }
@@ -42,7 +40,7 @@ pub fn KeysPage() -> Element {
         error.set(None);
         spawn(async move {
             match ApiClient::new("/".to_string()).revoke_key(id).await {
-                Ok(()) => load_keys(keys, error),
+                Ok(()) => keys.restart(),
                 Err(value) => error.set(Some(value.message)),
             }
         });
@@ -61,6 +59,17 @@ pub fn KeysPage() -> Element {
             h1 { "API keys" }
             if let Some(err) = error.read().as_ref() {
                 p { class: "error", role: "alert", "aria-live": "assertive", "{err}" }
+            }
+            if let Some(Err(value)) = keys.read().as_ref() {
+                p { class: "error", role: "alert", "aria-live": "assertive", "{value.message}" }
+                button {
+                    r#type: "button",
+                    onclick: move |_| {
+                        error.set(None);
+                        keys.restart();
+                    },
+                    "Try again"
+                }
             }
             if let Some(secret) = new_key_secret.read().as_ref() {
                 div { class: "alert", role: "status", "aria-live": "polite",
@@ -84,43 +93,50 @@ pub fn KeysPage() -> Element {
                 }
                 button { r#type: "submit", "Create key" }
             }
-            if keys.read().is_empty() {
-                p { class: "empty", "No API keys have been issued for this account." }
-            } else {
-                div { class: "table-scroll",
-                    table {
-                        caption { class: "visually-hidden", "API keys for this account" }
-                        thead {
-                            tr {
-                                th { scope: "col", "Name" }
-                                th { scope: "col", "Status" }
-                                th { scope: "col", "Created" }
-                                th { scope: "col", "Expires" }
-                                th { scope: "col", "Actions" }
+            match keys.read().as_ref() {
+                None => rsx! {
+                    p { class: "status", role: "status", "aria-live": "polite", "Loading API keys…" }
+                },
+                Some(Err(_)) => rsx! {},
+                Some(Ok(values)) if values.is_empty() => {
+                    rsx! { p { class: "empty", "No API keys have been issued for this account." } }
+                },
+                Some(Ok(values)) => rsx! {
+                    div { class: "table-scroll",
+                        table {
+                            caption { class: "visually-hidden", "API keys for this account" }
+                            thead {
+                                tr {
+                                    th { scope: "col", "Name" }
+                                    th { scope: "col", "Status" }
+                                    th { scope: "col", "Created" }
+                                    th { scope: "col", "Expires" }
+                                    th { scope: "col", "Actions" }
+                                }
                             }
-                        }
-                        tbody {
-                            for key in keys.read().iter() {
-                                tr { key: "{key.id}",
-                                    td { "{key.name}" }
-                                    td { "{key.status}" }
-                                    td { "{key.created_at}" }
-                                    td { "{key.expires_at.as_deref().unwrap_or(\"never\")}" }
-                                    td {
-                                        button {
-                                            r#type: "button",
-                                            onclick: {
-                                                let id = key.id.clone();
-                                                move |_| revoke(id.clone())
-                                            },
-                                            "Revoke"
+                            tbody {
+                                for key in values.iter() {
+                                    tr { key: "{key.id}",
+                                        td { "{key.name}" }
+                                        td { "{key.status}" }
+                                        td { "{key.created_at}" }
+                                        td { "{key.expires_at.as_deref().unwrap_or(\"never\")}" }
+                                        td {
+                                            button {
+                                                r#type: "button",
+                                                onclick: {
+                                                    let id = key.id.clone();
+                                                    move |_| revoke(id.clone())
+                                                },
+                                                "Revoke"
+                                            }
                                         }
                                     }
                                 }
                             }
                         }
                     }
-                }
+                },
             }
             nav { class: "actions", "aria-label": "Account",
                 Link { class: "button", to: Route::Status {}, "Back to status" }
@@ -128,14 +144,4 @@ pub fn KeysPage() -> Element {
             }
         }
     }
-}
-
-/// Re-read the key list, reporting a failure in place.
-fn load_keys(mut keys: Signal<Vec<crate::api::ApiKeyMeta>>, mut error: Signal<Option<String>>) {
-    spawn(async move {
-        match ApiClient::new("/".to_string()).list_keys().await {
-            Ok(list) => keys.set(list),
-            Err(value) => error.set(Some(value.message)),
-        }
-    });
 }

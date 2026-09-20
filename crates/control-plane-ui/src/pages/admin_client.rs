@@ -11,12 +11,19 @@ use crate::admin_api::{
 };
 use crate::pages::admin_auth::AdminReauthDialog;
 use crate::pages::admin_clients::{POLL_INTERVAL_MS, next_backoff};
-use crate::pages::admin_paging::{PageDirection, Paged};
-use crate::pages::admin_session::{AdminSession, AdminSessionBar, use_admin_session};
+use crate::pages::admin_paging::{PageDirection, Paged, next_generation};
+use crate::pages::admin_session::{AdminSession, AdminSessionBar, end_session, use_admin_session};
 use crate::router::Route;
 
 /// Keys requested per page; the backend documents 50 with a maximum of 100.
 const KEY_PAGE_LIMIT: u16 = 50;
+
+#[derive(Clone, PartialEq)]
+struct KeyPageRequest {
+    cursor: Option<String>,
+    direction: PageDirection,
+    generation: u64,
+}
 
 /// A mutation the backend refused with `reauth_required`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -51,9 +58,18 @@ impl RefusedMutation {
 pub fn AdminClientDetailPage(account_id: String) -> Element {
     let navigator = use_navigator();
     let mut session = use_admin_session();
+    let sign_out = move |_| end_session(session, navigator);
     let mut client = use_signal(|| None::<ClientView>);
-    let keys = use_signal(Paged::<ApiKeyMeta>::default);
-    let mut now_millis = use_signal(|| None::<i64>);
+    let mut client_generation = use_signal(|| 0_u64);
+    let mut keys = use_signal(Paged::<ApiKeyMeta>::default);
+    let mut key_request = use_signal(|| KeyPageRequest {
+        cursor: None,
+        direction: PageDirection::Replace,
+        generation: 0,
+    });
+    // The browser clock labels expired keys but never influences an
+    // authorization decision. Initialize it once for this page.
+    let now_millis = use_signal(browser_now_millis);
     let mut error = use_signal(|| None::<String>);
     let mut notice = use_signal(|| None::<String>);
     let mut secret = use_signal(|| None::<CreatedKey>);
@@ -67,17 +83,61 @@ pub fn AdminClientDetailPage(account_id: String) -> Element {
     let mut revoke_target = use_signal(|| None::<ApiKeyMeta>);
     let mut refused = use_signal(|| None::<RefusedMutation>);
 
-    use_effect({
+    let mut client_resource = use_resource({
         let account_id = account_id.clone();
         move || {
             let id = account_id.clone();
-            spawn(async move {
-                // The browser clock is read once, to label expired keys; it
-                // never influences an authorization decision.
-                now_millis.set(browser_now_millis());
-            });
-            load_client(session, client, error, account_id.clone());
-            load_keys(session, keys, id, None, PageDirection::Replace);
+            async move { AdminApi::new().client(&id).await }
+        }
+    });
+    let key_resource = use_resource({
+        let account_id = account_id.clone();
+        move || {
+            let request = key_request.read().clone();
+            let id = account_id.clone();
+            async move {
+                match AdminApi::new()
+                    .keys(&id, request.cursor.as_deref(), KEY_PAGE_LIMIT)
+                    .await
+                {
+                    Ok(page) => Ok((page, request)),
+                    Err(failure) => Err((request, failure)),
+                }
+            }
+        }
+    });
+
+    use_effect(move || {
+        let outcome = client_resource.read().clone();
+        let Some(outcome) = outcome else {
+            return;
+        };
+        match outcome {
+            Ok(view) => client.set(Some(view)),
+            Err(failure) => record_failure(session, error, failure),
+        }
+    });
+    use_effect(move || {
+        let Some(outcome) = key_resource.read().clone() else {
+            keys.write().begin();
+            return;
+        };
+        let current_generation = key_request.peek().generation;
+        match outcome {
+            Ok((page, request)) if request.generation == current_generation => {
+                keys.write().accept(page, request.cursor, request.direction)
+            }
+            Ok(_) => {}
+            Err((request, failure)) if request.generation == current_generation => {
+                if failure.ends_session() {
+                    session
+                        .write()
+                        .mark_ended("Your session ended. Sign in again.".to_owned());
+                } else {
+                    keys.write().fail(failure.user_message().to_owned());
+                }
+            }
+            Err(_) => {}
         }
     });
 
@@ -103,10 +163,16 @@ pub fn AdminClientDetailPage(account_id: String) -> Element {
                     {
                         continue;
                     }
+                    let generation = *client_generation.peek();
                     match AdminApi::new().client(&id).await {
-                        Ok(view) => {
+                        Ok(view) if *client_generation.peek() == generation => {
                             backoff = 0;
                             client.set(Some(view));
+                        }
+                        Ok(_) => {
+                            // A manual refresh won while this poll was in
+                            // flight; its result is no longer authoritative.
+                            backoff = 0;
                         }
                         Err(_) => backoff = next_backoff(backoff),
                     }
@@ -115,18 +181,10 @@ pub fn AdminClientDetailPage(account_id: String) -> Element {
         }
     });
 
-    let refresh = {
-        let account_id = account_id.clone();
-        move || {
-            load_client(session, client, error, account_id.clone());
-            load_keys(
-                session,
-                keys,
-                account_id.clone(),
-                None,
-                PageDirection::Replace,
-            );
-        }
+    let mut refresh = move || {
+        bump_generation(&mut client_generation);
+        client_resource.restart();
+        request_keys(&mut key_request, keys, None, PageDirection::Replace);
     };
 
     let mut leave_page = {
@@ -236,7 +294,7 @@ pub fn AdminClientDetailPage(account_id: String) -> Element {
                         discard_armed.set(false);
                         notice.set(None);
                         secret.set(Some(created));
-                        load_keys(session, keys, id, None, PageDirection::Replace);
+                        request_keys(&mut key_request, keys, None, PageDirection::Replace);
                     }
                     Err(failure) if failure.is_reauth_required() => {
                         // Confirm the password first; issuance is retried by the
@@ -256,7 +314,7 @@ pub fn AdminClientDetailPage(account_id: String) -> Element {
                             ),
                             None => failure.user_message().to_owned(),
                         }));
-                        load_keys(session, keys, id, None, PageDirection::Replace);
+                        request_keys(&mut key_request, keys, None, PageDirection::Replace);
                     }
                     Err(failure) => {
                         if !keeps_operation_id(&failure) {
@@ -265,7 +323,8 @@ pub fn AdminClientDetailPage(account_id: String) -> Element {
                         if failure.code == "conflict" {
                             // The client moved under us: reload before the
                             // operator tries again.
-                            load_client(session, client, error, id.clone());
+                            bump_generation(&mut client_generation);
+                            client_resource.restart();
                         }
                         error.set(Some(failure.user_message().to_owned()));
                     }
@@ -299,7 +358,7 @@ pub fn AdminClientDetailPage(account_id: String) -> Element {
                         pending.set(false);
                         revoke_target.set(None);
                         notice.set(Some("Key revoked.".to_owned()));
-                        load_keys(session, keys, id, None, PageDirection::Replace);
+                        request_keys(&mut key_request, keys, None, PageDirection::Replace);
                     }
                     Err(failure) => {
                         pending.set(false);
@@ -310,7 +369,7 @@ pub fn AdminClientDetailPage(account_id: String) -> Element {
                                 .mark_ended("Your session ended. Sign in again.".to_owned());
                         } else {
                             error.set(Some(failure.user_message().to_owned()));
-                            load_keys(session, keys, id, None, PageDirection::Replace);
+                            request_keys(&mut key_request, keys, None, PageDirection::Replace);
                         }
                     }
                 }
@@ -349,8 +408,9 @@ pub fn AdminClientDetailPage(account_id: String) -> Element {
                             ClientStateAction::Suspend => "Client suspended.".to_owned(),
                             ClientStateAction::Resume => "Client resumed.".to_owned(),
                         }));
-                        load_client(session, client, error, id.clone());
-                        load_keys(session, keys, id, None, PageDirection::Replace);
+                        bump_generation(&mut client_generation);
+                        client_resource.restart();
+                        request_keys(&mut key_request, keys, None, PageDirection::Replace);
                     }
                     Err(failure) if failure.is_reauth_required() => {
                         pending.set(false);
@@ -364,8 +424,9 @@ pub fn AdminClientDetailPage(account_id: String) -> Element {
                         if failure.code == "conflict" {
                             // Stale expected_version: show the current state
                             // instead of retrying with a guessed version.
-                            load_client(session, client, error, id.clone());
-                            load_keys(session, keys, id, None, PageDirection::Replace);
+                            bump_generation(&mut client_generation);
+                            client_resource.restart();
+                            request_keys(&mut key_request, keys, None, PageDirection::Replace);
                         }
                         error.set(Some(failure.user_message().to_owned()));
                     }
@@ -416,8 +477,9 @@ pub fn AdminClientDetailPage(account_id: String) -> Element {
                             ClientStateAction::Suspend => "Client suspended.".to_owned(),
                             ClientStateAction::Resume => "Client resumed.".to_owned(),
                         }));
-                        load_client(session, client, error, id.clone());
-                        load_keys(session, keys, id, None, PageDirection::Replace);
+                        bump_generation(&mut client_generation);
+                        client_resource.restart();
+                        request_keys(&mut key_request, keys, None, PageDirection::Replace);
                     }
                     Err(failure) => {
                         pending.set(false);
@@ -432,31 +494,13 @@ pub fn AdminClientDetailPage(account_id: String) -> Element {
     let refused_reason = (*refused.read())
         .map(RefusedMutation::reason)
         .unwrap_or_default();
-    let key_next = {
-        let account_id = account_id.clone();
-        move |_| {
-            let cursor = keys.peek().next_cursor();
-            load_keys(
-                session,
-                keys,
-                account_id.clone(),
-                cursor,
-                PageDirection::Next,
-            );
-        }
+    let key_next = move |_| {
+        let cursor = keys.peek().next_cursor();
+        request_keys(&mut key_request, keys, cursor, PageDirection::Next);
     };
-    let key_previous = {
-        let account_id = account_id.clone();
-        move |_| {
-            if let Some(cursor) = keys.peek().previous_cursor() {
-                load_keys(
-                    session,
-                    keys,
-                    account_id.clone(),
-                    cursor,
-                    PageDirection::Previous,
-                );
-            }
+    let key_previous = move |_| {
+        if let Some(cursor) = keys.peek().previous_cursor() {
+            request_keys(&mut key_request, keys, cursor, PageDirection::Previous);
         }
     };
 
@@ -474,7 +518,7 @@ pub fn AdminClientDetailPage(account_id: String) -> Element {
             div { class: "actions",
                 button { r#type: "button", onclick: move |_| leave_page(), "Back to clients" }
             }
-            AdminSessionBar { session }
+            AdminSessionBar { session, on_sign_out: sign_out }
             if session.read().has_ended() {
                 div { class: "error", role: "alert",
                     p { "Your session ended. Sign in again to continue." }
@@ -786,48 +830,31 @@ fn record_failure(
     }
 }
 
-/// Load the client view into the page state.
-fn load_client(
-    session: Signal<AdminSession>,
-    mut client: Signal<Option<ClientView>>,
-    error: Signal<Option<String>>,
-    account_id: String,
-) {
-    spawn(async move {
-        match AdminApi::new().client(&account_id).await {
-            Ok(view) => client.set(Some(view)),
-            Err(failure) => {
-                record_failure(session, error, failure);
-            }
-        }
-    });
+fn bump_generation(generation: &mut Signal<u64>) {
+    let next = {
+        let current = *generation.peek();
+        next_generation(current)
+    };
+    generation.set(next);
 }
 
-/// Load one page of key metadata.
-fn load_keys(
-    mut session: Signal<AdminSession>,
+/// Request one page of key metadata. The generation makes a pagination or
+/// refresh action restart the resource even when the cursor is unchanged.
+fn request_keys(
+    request: &mut Signal<KeyPageRequest>,
     mut keys: Signal<Paged<ApiKeyMeta>>,
-    account_id: String,
     cursor: Option<String>,
     direction: PageDirection,
 ) {
     keys.write().begin();
-    spawn(async move {
-        match AdminApi::new()
-            .keys(&account_id, cursor.as_deref(), KEY_PAGE_LIMIT)
-            .await
-        {
-            Ok(page) => keys.write().accept(page, cursor, direction),
-            Err(failure) => {
-                if failure.ends_session() {
-                    session
-                        .write()
-                        .mark_ended("Your session ended. Sign in again.".to_owned());
-                } else {
-                    keys.write().fail(failure.user_message().to_owned());
-                }
-            }
-        }
+    let generation = {
+        let current = request.peek().generation;
+        next_generation(current)
+    };
+    request.set(KeyPageRequest {
+        cursor,
+        direction,
+        generation,
     });
 }
 

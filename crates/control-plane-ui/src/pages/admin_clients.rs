@@ -2,17 +2,25 @@
 
 use dioxus::prelude::*;
 use dioxus_router::Link;
+use dioxus_router::hooks::use_navigator;
 
 use crate::admin_api::{
     AdminApi, ClientView, OperationId, fresh_operation_id, keeps_operation_id, sleep_ms,
     validate_name,
 };
-use crate::pages::admin_paging::{PageDirection, Paged};
-use crate::pages::admin_session::{AdminSession, AdminSessionBar, use_admin_session};
+use crate::pages::admin_paging::{PageDirection, Paged, next_generation};
+use crate::pages::admin_session::{AdminSessionBar, end_session, use_admin_session};
 use crate::router::Route;
 
 /// Clients requested per page; the backend documents 50 with a maximum of 100.
 const CLIENT_PAGE_LIMIT: u16 = 50;
+
+#[derive(Clone, PartialEq)]
+struct ClientPageRequest {
+    cursor: Option<String>,
+    direction: PageDirection,
+    generation: u64,
+}
 
 /// Poll interval while a visible client is still provisioning.
 pub const POLL_INTERVAL_MS: u32 = 2_000;
@@ -40,7 +48,14 @@ pub const fn next_backoff(current: u32) -> u32 {
 #[component]
 pub fn AdminClientListPage() -> Element {
     let mut session = use_admin_session();
+    let navigator = use_navigator();
+    let sign_out = move |_| end_session(session, navigator);
     let mut state = use_signal(Paged::<ClientView>::default);
+    let mut page_request = use_signal(|| ClientPageRequest {
+        cursor: None,
+        direction: PageDirection::Replace,
+        generation: 0,
+    });
     let mut display_name = use_signal(String::new);
     let mut create_pending = use_signal(|| false);
     let mut create_error = use_signal(|| None::<String>);
@@ -48,7 +63,42 @@ pub fn AdminClientListPage() -> Element {
     // that same request so a lost response cannot create a second client.
     let mut operation = use_signal(|| None::<OperationId>);
 
-    use_effect(move || fetch_clients(session, state, None, PageDirection::Replace));
+    let page = use_resource(move || {
+        let request = page_request.read().clone();
+        async move {
+            match AdminApi::new()
+                .clients(request.cursor.as_deref(), CLIENT_PAGE_LIMIT)
+                .await
+            {
+                Ok(page) => Ok((page, request)),
+                Err(failure) => Err((request, failure)),
+            }
+        }
+    });
+
+    use_effect(move || {
+        let Some(outcome) = page.read().clone() else {
+            state.write().begin();
+            return;
+        };
+        let current_generation = page_request.peek().generation;
+        match outcome {
+            Ok((page, request)) if request.generation == current_generation => state
+                .write()
+                .accept(page, request.cursor, request.direction),
+            Ok(_) => {}
+            Err((request, failure)) if request.generation == current_generation => {
+                if failure.ends_session() {
+                    session
+                        .write()
+                        .mark_ended("Your session ended. Sign in again.".to_owned());
+                } else {
+                    state.write().fail(failure.user_message().to_owned());
+                }
+            }
+            Err(_) => {}
+        }
+    });
 
     // Poll the visible page while any row is still provisioning, backing off on
     // failure. The task belongs to this scope, so unmounting cancels it.
@@ -75,13 +125,17 @@ pub fn AdminClientListPage() -> Element {
             if !poll_now {
                 continue;
             }
+            let generation = page_request.peek().generation;
             match AdminApi::new()
                 .clients(cursor.as_deref(), CLIENT_PAGE_LIMIT)
                 .await
             {
-                Ok(page) => {
+                Ok(page) if page_request.peek().generation == generation => {
                     backoff = 0;
                     state.write().accept(page, cursor, PageDirection::Replace);
+                }
+                Ok(_) => {
+                    backoff = 0;
                 }
                 Err(failure) => {
                     // Keep the rows already on screen and retry with backoff.
@@ -137,7 +191,7 @@ pub fn AdminClientListPage() -> Element {
                     operation.set(None);
                     display_name.set(String::new());
                     create_pending.set(false);
-                    fetch_clients(session, state, None, PageDirection::Replace);
+                    request_clients(&mut page_request, state, None, PageDirection::Replace);
                 }
                 Err(failure) => {
                     create_pending.set(false);
@@ -151,21 +205,22 @@ pub fn AdminClientListPage() -> Element {
         });
     };
 
-    let first_page = move |_| fetch_clients(session, state, None, PageDirection::Replace);
+    let first_page =
+        move |_| request_clients(&mut page_request, state, None, PageDirection::Replace);
     let next_page = move |_| {
         let cursor = state.peek().next_cursor();
-        fetch_clients(session, state, cursor, PageDirection::Next);
+        request_clients(&mut page_request, state, cursor, PageDirection::Next);
     };
     let previous_page = move |_| {
         if let Some(cursor) = state.peek().previous_cursor() {
-            fetch_clients(session, state, cursor, PageDirection::Previous);
+            request_clients(&mut page_request, state, cursor, PageDirection::Previous);
         }
     };
 
     rsx! {
         div { class: "container",
             h1 { "Clients" }
-            AdminSessionBar { session }
+            AdminSessionBar { session, on_sign_out: sign_out }
             if session.read().has_ended() {
                 div { class: "error", role: "alert",
                     p { "Your session ended. Sign in again to manage clients." }
@@ -303,30 +358,23 @@ fn provisioning_label(client: &ClientView) -> String {
     }
 }
 
-/// Fetch one page of clients into the list state.
-fn fetch_clients(
-    mut session: Signal<AdminSession>,
+/// Request one page of clients. The generation makes every deliberate request
+/// distinct, so a resource restart cannot reuse a stale cursor request.
+fn request_clients(
+    request: &mut Signal<ClientPageRequest>,
     mut state: Signal<Paged<ClientView>>,
     cursor: Option<String>,
     direction: PageDirection,
 ) {
     state.write().begin();
-    spawn(async move {
-        match AdminApi::new()
-            .clients(cursor.as_deref(), CLIENT_PAGE_LIMIT)
-            .await
-        {
-            Ok(page) => state.write().accept(page, cursor, direction),
-            Err(failure) => {
-                if failure.ends_session() {
-                    session
-                        .write()
-                        .mark_ended("Your session ended. Sign in again.".to_owned());
-                } else {
-                    state.write().fail(failure.user_message().to_owned());
-                }
-            }
-        }
+    let generation = {
+        let current = request.peek().generation;
+        next_generation(current)
+    };
+    request.set(ClientPageRequest {
+        cursor,
+        direction,
+        generation,
     });
 }
 

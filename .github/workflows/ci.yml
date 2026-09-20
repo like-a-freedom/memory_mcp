@@ -39,6 +39,10 @@ jobs:
       - name: Packaging regressions
         run: python3 -m unittest discover -s scripts/ci -p 'test_*.py'
       - run: cargo clippy --workspace --all-targets --features fs-watch,mcp-apps,streamable-http,control-plane --locked -- -D warnings
+      - name: Control-plane UI WASM lint
+        run: |
+          rustup target add wasm32-unknown-unknown
+          cargo clippy -p control-plane-ui --target wasm32-unknown-unknown --all-targets --locked -- -D warnings
       - name: Default workspace tests
         run: cargo test --workspace --lib --bins --tests --locked
       - name: Optional feature tests
@@ -57,6 +61,16 @@ jobs:
         with:
           name: evaluation
           path: target/evals/*.json
+
+  audit:
+    name: Dependency audit
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7.0.0
+      - uses: rustsec/audit-check@v2.0.0
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
 
   native:
     needs: quality
@@ -306,12 +320,13 @@ jobs:
   passed:
     name: CI passed
     if: always()
-    needs: [quality, native, docker]
+    needs: [quality, audit, native, docker]
     runs-on: ubuntu-24.04
     steps:
       - name: Require all checks and all five platforms
         env:
           QUALITY: ${{ needs.quality.result }}
           NATIVE: ${{ needs.native.result }}
+          AUDIT: ${{ needs.audit.result }}
           DOCKER: ${{ needs.docker.result }}
-        run: test "$QUALITY" = success && test "$NATIVE" = success && test "$DOCKER" = success
+        run: test "$QUALITY" = success && test "$AUDIT" = success && test "$NATIVE" = success && test "$DOCKER" = success

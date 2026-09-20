@@ -32,6 +32,12 @@ impl<T> Default for Paged<T> {
     }
 }
 
+/// Produce a fresh token for a request that must supersede an older one.
+/// Wrapping is harmless because only equality with the current request matters.
+pub(crate) const fn next_generation(current: u64) -> u64 {
+    current.wrapping_add(1)
+}
+
 /// How a fetched page relates to the page on screen.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum PageDirection {
@@ -162,6 +168,12 @@ mod tests {
         assert_eq!(paged.items(), ["a"]);
         assert!(!paged.has_previous());
         assert_eq!(paged.cursor(), None);
+    }
+
+    #[test]
+    fn request_generations_wrap_without_panicking() {
+        assert_eq!(next_generation(0), 1);
+        assert_eq!(next_generation(u64::MAX), 0);
     }
 
     #[test]

@@ -7,7 +7,6 @@
 
 use dioxus::prelude::*;
 use dioxus_router::Navigator;
-use dioxus_router::hooks::use_navigator;
 
 use crate::admin_api::{AdminApi, SessionCsrf, SessionResponse};
 use crate::router::Route;
@@ -108,13 +107,23 @@ impl AdminSession {
     }
 }
 
-fn load_session(mut session: Signal<AdminSession>) {
-    session.set(AdminSession {
-        loading: true,
-        ..AdminSession::default()
-    });
-    spawn(async move {
-        match AdminApi::new().session().await {
+/// Load `GET /api/v1/admin/session` once for the calling component.
+///
+/// The request is a client-side derived value, so `use_resource` owns its
+/// lifecycle and cancels it with the component. The writable session signal is
+/// retained because reauthentication and sign-out are explicit page actions,
+/// not derived values.
+pub fn use_admin_session() -> Signal<AdminSession> {
+    let mut session = use_signal(AdminSession::default);
+    let resource = use_resource(|| async { AdminApi::new().session().await });
+
+    use_effect(move || {
+        let Some(outcome) = resource.read().clone() else {
+            session.write().loading = true;
+            return;
+        };
+
+        match outcome {
             Ok(response) => session.write().adopt(response),
             Err(failure) => {
                 let message = failure.user_message().to_owned();
@@ -128,12 +137,6 @@ fn load_session(mut session: Signal<AdminSession>) {
             }
         }
     });
-}
-
-/// Load `GET /api/v1/admin/session` once for the calling component.
-pub fn use_admin_session() -> Signal<AdminSession> {
-    let session = use_signal(AdminSession::default);
-    use_effect(move || load_session(session));
     session
 }
 
@@ -159,11 +162,18 @@ pub fn end_session(mut session: Signal<AdminSession>, navigator: Navigator) {
 
 /// A small banner describing the signed-in administrator, with a sign-out
 /// action. Renders nothing generic on failure: the caller shows errors.
+///
+/// The session is intentionally read-only here. The page that owns the session
+/// performs the mutation through `on_sign_out`, which keeps the component's
+/// data flow one-way and lets the caller decide what navigation should follow.
 #[component]
-pub fn AdminSessionBar(session: Signal<AdminSession>) -> Element {
-    let navigator = use_navigator();
-    let summary = session.read().summary();
-    let expiry = session.read().absolute_expiry().map(ToOwned::to_owned);
+pub fn AdminSessionBar(
+    session: ReadSignal<AdminSession>,
+    on_sign_out: EventHandler<()>,
+) -> Element {
+    let session = session.read();
+    let summary = session.summary();
+    let expiry = session.absolute_expiry().map(ToOwned::to_owned);
 
     rsx! {
         div { class: "session-bar",
@@ -173,7 +183,7 @@ pub fn AdminSessionBar(session: Signal<AdminSession>) -> Element {
             }
             button {
                 r#type: "button",
-                onclick: move |_| end_session(session, navigator),
+                onclick: move |_| on_sign_out.call(()),
                 "Sign out"
             }
         }
