@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted product direction, 2026-09-19. Technical design is proposed; implementation and release verification are pending. This ADR records the approved requirements, not approval of dependencies, migrations, or implementation.
+Accepted product direction, 2026-09-19. Technical design approved and implemented; release verification is incomplete. The evidence-based [runbook](../operations/LOCAL_ADMIN.md) lists what is verified and what is not. This ADR records the approved requirements, not approval of dependencies, migrations, or implementation.
 
 ## Context
 
@@ -43,17 +43,17 @@ MCP requests continue to resolve their Account and Tenant from the authenticated
 
 ## Consequences
 
-Local deployments can onboard clients without an external identity provider once this feature is implemented. The project also takes responsibility for password verification, recovery, session security and abuse prevention. CLI recovery requires privileged access to the deployment; there is no email recovery workflow.
+Local deployments can onboard clients without an external identity provider. The project also takes responsibility for password verification, recovery, session security and abuse prevention. CLI recovery requires privileged access to the deployment; there is no email recovery workflow.
 
 The local UI is an administrator interface, not a client portal. Operators must deliver issued credentials securely. Equal administrator privileges include the ability to issue credentials for client data, not merely manage account metadata.
 
-The [specification](../superpowers/specs/2026-09-18-local-admin-auth.md) separates approved requirements from proposed mechanisms. Dependency selection, password parameters, session and throttle limits, schema, offline mode transitions, legacy OIDC-session handling, key-response loss semantics and image packaging still require technical approval. None becomes accepted solely through this ADR.
+The [specification](../superpowers/specs/2026-09-18-local-admin-auth.md) separates approved requirements from proposed mechanisms. Dependency selection, password parameters, session and throttle limits, schema, offline mode transitions, legacy OIDC-session handling, key-response loss semantics and image packaging still require technical approval. None becomes accepted solely through this ADR. Where the shipped implementation diverges from the proposed mechanisms, the divergence is recorded in the [runbook](../operations/LOCAL_ADMIN.md) §13.4 rather than left implicit.
 
-The [implementation plan](../superpowers/plans/2026-09-18-local-admin-auth.md) and [review findings](../superpowers/plans/2026-09-18-local-admin-auth-review.md) define the pending evidence. Transaction races, credential invalidation, browser/TLS behavior and the final image must be tested before release. This ADR does not claim those checks have passed.
+The [implementation plan](../superpowers/plans/2026-09-18-local-admin-auth.md) and [review findings](../superpowers/plans/2026-09-18-local-admin-auth-review.md) define the pending evidence. Still untested: the replica race tests against an isolated remote SurrealDB, a live identity provider, the `linux/amd64` image, and forced-order transaction interleavings. The [runbook](../operations/LOCAL_ADMIN.md) §13.2 lists every outstanding claim and what does cover it. This ADR does not claim those checks have passed.
 
 ## Relationships
 
-This decision amends ADR-0052's OIDC-only browser control-plane choice for the planned local mode. Its External Identity and self-service rules continue to describe OIDC mode. The existing implementation still requires OIDC when its control plane is enabled until local mode is implemented.
+This decision amends ADR-0052's OIDC-only browser control-plane choice for the planned local mode. Its External Identity and self-service rules continue to describe OIDC mode. In the shipped implementation, an enabled control plane requires exactly one browser authentication mode — `oidc` (the default) or `local`, selected by `MEMORY_MCP_HTTP_AUTH_MODE` — and neither mode exposes the other's authentication or administration routes.
 
 ADR-0052's API-key transport, tenancy and HTTP boundaries remain in force. The reviewed proposal to revalidate key state on cache hits strengthens its authorization checks; exact invalidation guarantees require executed tests and documentation before release.
 

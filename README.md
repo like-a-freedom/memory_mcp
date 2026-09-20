@@ -624,12 +624,20 @@ settings must be absent in this mode, and the `memory_mcp admin create` /
 `admin recover` CLI is the only path that creates an administrator or resets a
 password.
 
-Local mode is documented but **not deployable in this revision**: the
-configuration validator rejects both the presence and the absence of the OIDC
-variables, so no environment combination starts it. See the
-[local administrator authentication runbook](docs/operations/LOCAL_ADMIN_AUTH.md)
-for the exact environment contract, the verified test coverage, the reproduced
-startup failure, and the remaining unverified areas.
+Local mode starts from environment variables. It requires
+`MEMORY_MCP_HTTP_ENABLE_CONTROL_PLANE=true`, an explicit
+`MEMORY_MCP_HTTP_AUTH_MODE=local`, all seven `MEMORY_MCP_HTTP_*` plan-limit
+variables, and a public base URL that is HTTPS (or loopback for development).
+OIDC provider values must be empty: setting any of `MEMORY_MCP_HTTP_OIDC_ISSUER`,
+`..._CLIENT_ID`, `..._AUDIENCE`, `..._REDIRECT_URI`, `..._ALLOWED_ALG` or
+`MEMORY_MCP_HTTP_OPERATOR_IDENTITIES` fails startup with `local mode must not
+have OIDC configuration`. Note the asymmetry — the three OIDC-only HMAC keys
+and `MEMORY_MCP_HTTP_SIGNUP_MODE` are still required even though the provider
+values are not. See the
+[local administrator authentication runbook](docs/operations/LOCAL_ADMIN.md)
+for the complete environment contract, the end-to-end evidence, and the
+remaining unverified areas (a live identity provider, the amd64 image, and
+forced-order transaction interleavings).
 
 ### Build and run
 
