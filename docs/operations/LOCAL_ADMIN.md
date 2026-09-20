@@ -47,6 +47,7 @@ All of the following were executed in this repository and passed:
 | End-to-end against the real binaries | `sh scripts/ci/local_admin_local_check.sh` — local mode starts from env, activation/login/session, client create/list/get, provisioning reaches `ready` in one poll, restart persistence, plan-mismatch startup rejection, recovery invalidates the session, negative route/CSRF/Origin checks |
 | Packaged image over real TLS in a real browser | `docker build --tag memory-mcp-local-admin:test .` then `python3 scripts/ci/local_admin_image.py --image memory-mcp-local-admin:test --scenario all` — 5 scenarios, 78 checks, exit 0 (`auth` 9, `clients` 29, `regression` 6, `ui` 20, `flow` 14). The `ui` scenario proves the bundle boots, is styled and ships a correct document shell; the `flow` scenario drives the console's own interactive paths through the real DOM and is the guard for the defect recorded in §2.6.1 |
 | Compose modes resolve | `docker compose --env-file <operator env> -f docker-compose.yml -f docker-compose.{off,local,oidc}.yml config --quiet` — all three resolve |
+| CI checker unit tests (stdlib only: no Docker, Node or browser) | `python3 -m unittest discover -s scripts/ci -p 'test_*.py'` — 39 passed. Covers `assert_embedded_ui.py`, the packaging helper, and the test that pins `local_admin_image.py`'s scenario registry to `local_admin_browser.mjs`'s — two lists in two languages with no other shared source of truth (§2.6) |
 
 ### What is NOT verified
 
@@ -359,6 +360,13 @@ one. Three properties make it more than a smoke test:
   `history.pushState`, so the check keys on a document-type response.)
 
 Scenario totals: `auth` 9, `clients` 29, `regression` 6, `ui` 20, `flow` 14.
+
+The harness and the runner keep separate scenario lists, in separate languages.
+`scripts/ci/test_local_admin_image.py` pins them to each other — the registry
+sets, the dispatch branch for every registered name, and a target function for
+every branch — because a name added to one and not the other fails only at
+runtime, inside a container, after a build. That test runs in CI with no Docker,
+Node or browser.
 
 **CI proves the embedding property without a browser.** The `docker` job builds
 this same image, enables the UI in its smoke configuration and runs
