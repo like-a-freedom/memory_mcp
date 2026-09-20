@@ -8,7 +8,7 @@ use rmcp::model::{
     CallToolRequestParams, CallToolResponse, CallToolResult, CancelTaskParams, CreateTaskResult,
     GetTaskParams, GetTaskResult, ListResourceTemplatesResult, ListResourcesResult,
     PaginatedRequestParams, ReadResourceRequestParams, ReadResourceResponse, ServerCapabilities,
-    ServerInfo, UpdateTaskParams,
+    ServerConfig, UpdateTaskParams,
 };
 use rmcp::service::RequestContext;
 use rmcp::task_manager::{TaskExit, TaskManager, TaskOptions};
@@ -315,8 +315,8 @@ impl MemoryMcp {
         crate::tools::request_id::next_request_id()
     }
 
-    fn build_server_info() -> ServerInfo {
-        ServerInfo::new(
+    fn build_server_config() -> ServerConfig {
+        ServerConfig::new(
             ServerCapabilities::builder()
                 .enable_tools()
                 .enable_resources()
@@ -326,10 +326,10 @@ impl MemoryMcp {
         .with_instructions(Self::SERVER_INSTRUCTIONS)
     }
 
-    /// HTTP profile server info: tools + tasks always; resources only
+    /// HTTP profile server config: tools + tasks always; resources only
     /// when `mcp-apps` is compiled. Does not advertise MRTR, roots,
     /// sampling, elicitation, prompts-change, or tool-list-change.
-    fn build_http_server_info(&self) -> ServerInfo {
+    fn build_http_server_config(&self) -> ServerConfig {
         let builder = ServerCapabilities::builder().enable_tools().enable_tasks();
         #[cfg(feature = "mcp-apps")]
         let builder = {
@@ -344,7 +344,7 @@ impl MemoryMcp {
             };
             b
         };
-        ServerInfo::new(builder.build()).with_instructions(Self::SERVER_INSTRUCTIONS)
+        ServerConfig::new(builder.build()).with_instructions(Self::SERVER_INSTRUCTIONS)
     }
 
     fn invalid_params(message: impl Into<String>) -> ErrorData {
@@ -399,11 +399,11 @@ async fn extract_response(
 
 #[tool_handler(router = self.tool_router)]
 impl ServerHandler for MemoryMcp {
-    fn get_info(&self) -> ServerInfo {
+    fn get_info(&self) -> ServerConfig {
         let mut info = if self.modern_protocol_only {
-            self.build_http_server_info()
+            self.build_http_server_config()
         } else {
-            Self::build_server_info()
+            Self::build_server_config()
         };
         if self.modern_protocol_only {
             // Pin the negotiation fallback: rmcp falls back to this
@@ -1136,8 +1136,8 @@ mod tests {
     }
 
     #[test]
-    fn build_server_info_enables_tools_resources_and_sets_instructions() {
-        let info = MemoryMcp::build_server_info();
+    fn build_server_config_enables_tools_resources_and_sets_instructions() {
+        let info = MemoryMcp::build_server_config();
         let capabilities = serde_json::to_value(&info.capabilities).unwrap();
 
         assert_eq!(

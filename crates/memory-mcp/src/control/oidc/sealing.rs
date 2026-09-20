@@ -51,7 +51,9 @@ pub fn seal_oidc_payload(
     let cipher = ChaCha20Poly1305::new(key.into());
     let mut nonce_bytes = [0u8; 12];
     rand::fill(&mut nonce_bytes);
-    let nonce = Nonce::from_slice(&nonce_bytes);
+    // `Nonce::from_slice` is deprecated in `chacha20poly1305` 0.11. The length is
+    // known here, so the array reference converts without a runtime check.
+    let nonce: &Nonce = (&nonce_bytes).into();
 
     let ciphertext = cipher
         .encrypt(nonce, plaintext_bytes.as_ref())
@@ -70,7 +72,7 @@ pub fn unseal_oidc_payload(
     use chacha20poly1305::{ChaCha20Poly1305, KeyInit, Nonce, aead::Aead};
 
     let cipher = ChaCha20Poly1305::new(key.into());
-    let nonce = Nonce::from_slice(nonce_bytes);
+    let nonce: &Nonce = nonce_bytes.into();
 
     let plaintext = cipher
         .decrypt(nonce, ciphertext)

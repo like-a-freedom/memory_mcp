@@ -1,11 +1,9 @@
 use std::sync::Arc;
 
-use argon2::password_hash::{PasswordHash, SaltString};
+use argon2::password_hash::phc::PasswordHash;
 use argon2::{
     Algorithm, Argon2, Params, PasswordHasher as ArgonPasswordHasher, PasswordVerifier, Version,
 };
-use rand_core::OsRng;
-use rand_core::RngCore;
 
 use crate::service::local_admin::contracts::{LocalAdminError, LocalResult};
 
@@ -25,14 +23,12 @@ impl PasswordHasher {
     pub fn new() -> LocalResult<Self> {
         let params = Params::new(19456, 2, 1, Some(32))
             .map_err(|e| LocalAdminError::InvalidInput(format!("KDF params: {e}")))?;
-        // Generate a dummy PHC once at startup for unknown/pending users.
-        let mut salt_bytes = [0u8; 16];
-        OsRng.fill_bytes(&mut salt_bytes);
-        let dummy_salt = SaltString::encode_b64(&salt_bytes)
-            .map_err(|e| LocalAdminError::InvalidInput(format!("salt encode: {e}")))?;
+        // Generate a dummy PHC once at startup for unknown/pending users. The
+        // hasher draws the salt from the system RNG itself, so there is no salt
+        // material to hold here.
         let argon2 = Argon2::new(Algorithm::Argon2id, Version::V0x13, params.clone());
         let dummy_phc = argon2
-            .hash_password(b"dummy", &dummy_salt)
+            .hash_password(b"dummy")
             .map_err(|e| LocalAdminError::InvalidInput(format!("dummy KDF: {e}")))?
             .to_string();
         Ok(Self {
@@ -66,13 +62,9 @@ impl PasswordHasher {
         let params = self.params.clone();
 
         self.run_with_running_permit(move |_permit| {
-            let mut salt_bytes = [0u8; 16];
-            OsRng.fill_bytes(&mut salt_bytes);
-            let salt = SaltString::encode_b64(&salt_bytes)
-                .map_err(|e| LocalAdminError::InvalidInput(format!("salt encode: {e}")))?;
             let argon2 = Argon2::new(Algorithm::Argon2id, Version::V0x13, params);
             let phc = argon2
-                .hash_password(password.as_bytes(), &salt)
+                .hash_password(password.as_bytes())
                 .map_err(|e| LocalAdminError::InvalidInput(format!("KDF hash: {e}")))?
                 .to_string();
             Ok::<String, LocalAdminError>(phc)

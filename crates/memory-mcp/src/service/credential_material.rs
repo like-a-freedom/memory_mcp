@@ -6,7 +6,6 @@
 //! local-admin service and HTTP adapter both need live here.
 
 use hmac::{Hmac, KeyInit, Mac};
-use rand_core::RngCore;
 use sha2::Sha256;
 
 use crate::http::registry::models::{KeyedVerifier, new_api_key_id};
@@ -33,11 +32,10 @@ pub fn hmac_fingerprint(key: &[u8; 32], label: &[u8], data: &[u8]) -> [u8; 32] {
     mac.finalize().into_bytes().into()
 }
 
-/// Generate a random 32-byte value from the operating-system CSPRNG.
+/// Generate a random 32-byte value from the thread-local CSPRNG, which is seeded
+/// from the operating system.
 pub fn random_32() -> [u8; 32] {
-    let mut buf = [0u8; 32];
-    rand_core::OsRng.fill_bytes(&mut buf);
-    buf
+    rand::random()
 }
 
 /// A 256-bit random one-time secret as 64 lowercase hex characters.
