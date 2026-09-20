@@ -13,6 +13,7 @@ use crate::pages::admin_auth::AdminReauthDialog;
 use crate::pages::admin_clients::{POLL_INTERVAL_MS, next_backoff};
 use crate::pages::admin_paging::{PageDirection, Paged, next_generation};
 use crate::pages::admin_session::{AdminSession, AdminSessionBar, end_session, use_admin_session};
+use crate::presentation::{compact_timestamp, status_badge_class, status_label};
 use crate::router::Route;
 
 /// Keys requested per page; the backend documents 50 with a maximum of 100.
@@ -58,7 +59,6 @@ impl RefusedMutation {
 pub fn AdminClientDetailPage(account_id: String) -> Element {
     let navigator = use_navigator();
     let mut session = use_admin_session();
-    let sign_out = move |_| end_session(session, navigator);
     let mut client = use_signal(|| None::<ClientView>);
     let mut client_generation = use_signal(|| 0_u64);
     let mut keys = use_signal(Paged::<ApiKeyMeta>::default);
@@ -82,6 +82,17 @@ pub fn AdminClientDetailPage(account_id: String) -> Element {
     let mut confirm_action = use_signal(|| None::<ClientStateAction>);
     let mut revoke_target = use_signal(|| None::<ApiKeyMeta>);
     let mut refused = use_signal(|| None::<RefusedMutation>);
+    let sign_out = move |_| {
+        // Do not wait for navigation to unmount the page: the one-time secret
+        // must disappear as soon as the operator starts signing out.
+        secret.set(None);
+        discard_armed.set(false);
+        operation.set(None);
+        key_name.set(String::new());
+        key_days.set(String::new());
+        pending.set(false);
+        end_session(session, navigator);
+    };
 
     let mut client_resource = use_resource({
         let account_id = account_id.clone();
@@ -215,6 +226,17 @@ pub fn AdminClientDetailPage(account_id: String) -> Element {
     };
 
     let keep_secret = move |_| discard_armed.set(false);
+    let escape_secret = move |event: KeyboardEvent| {
+        if event.key() == Key::Escape {
+            if *discard_armed.peek() {
+                secret.set(None);
+                discard_armed.set(false);
+                notice.set(None);
+            } else {
+                discard_armed.set(true);
+            }
+        }
+    };
 
     let copy_secret = move |_| {
         let Some(value) = secret.peek().as_ref().map(|created| created.secret.clone()) else {
@@ -498,15 +520,18 @@ pub fn AdminClientDetailPage(account_id: String) -> Element {
         let cursor = keys.peek().next_cursor();
         request_keys(&mut key_request, keys, cursor, PageDirection::Next);
     };
+    let modal_open = secret.read().is_some() || refused.read().is_some();
     let key_previous = move |_| {
         if let Some(cursor) = keys.peek().previous_cursor() {
             request_keys(&mut key_request, keys, cursor, PageDirection::Previous);
         }
     };
+    let retry_keys = move |_| request_keys(&mut key_request, keys, None, PageDirection::Replace);
 
     rsx! {
         div { class: "container",
-            h1 {
+            div { class: "page-surface", inert: modal_open,
+                h1 {
                 if let Some(view) = client.read().as_ref() {
                     "{view.display_name}"
                 } else {
@@ -521,8 +546,14 @@ pub fn AdminClientDetailPage(account_id: String) -> Element {
             AdminSessionBar { session, on_sign_out: sign_out }
             if session.read().has_ended() {
                 div { class: "error", role: "alert",
-                    p { "Your session ended. Sign in again to continue." }
-                    Link { to: Route::Login {}, "Go to sign-in" }
+                    p {
+                        if let Some(message) = session.read().error() {
+                            "{message}"
+                        } else {
+                            "Your session ended. Sign in again to continue."
+                        }
+                    }
+                    Link { class: "button", to: Route::Login {}, "Go to sign-in" }
                 }
             } else if let Some(message) = session.read().error() {
                 p { class: "error", role: "alert", "{message}" }
@@ -548,8 +579,24 @@ pub fn AdminClientDetailPage(account_id: String) -> Element {
                         tbody {
                             tr { th { scope: "row", "Client id" } td { code { "{view.account_id}" } } }
                             tr { th { scope: "row", "Tenant id" } td { code { "{view.tenant_id}" } } }
-                            tr { th { scope: "row", "Account status" } td { "{view.account_status}" } }
-                            tr { th { scope: "row", "Tenant status" } td { "{view.tenant_status}" } }
+                            tr {
+                                th { scope: "row", "Account status" }
+                                td {
+                                    span {
+                                        class: "{status_badge_class(&view.account_status)}",
+                                        "{status_label(&view.account_status)}"
+                                    }
+                                }
+                            }
+                            tr {
+                                th { scope: "row", "Tenant status" }
+                                td {
+                                    span {
+                                        class: "{status_badge_class(&view.tenant_status)}",
+                                        "{status_label(&view.tenant_status)}"
+                                    }
+                                }
+                            }
                             tr { th { scope: "row", "Plan version" } td { "{view.plan_version}" } }
                             tr { th { scope: "row", "Schema version" } td { "{view.schema_version}" } }
                             tr { th { scope: "row", "Version" } td { "{view.version}" } }
@@ -667,31 +714,15 @@ pub fn AdminClientDetailPage(account_id: String) -> Element {
                             "Keys can be issued only while the client is ready for data access."
                         }
                     }
-                    if let Some(created) = secret.read().as_ref() {
-                        div {
-                            class: "secret",
-                            role: "alertdialog",
-                            "aria-labelledby": "new-key-secret-title",
-                            h3 { id: "new-key-secret-title", "New key secret" }
-                            p { class: "warning",
-                                "Save this now; it cannot be shown again. Deliver it outside this service."
-                            }
-                            code { class: "secret-value", "{created.secret}" }
-                            p { "Key {created.name} ({created.id})" }
-                            button { r#type: "button", autofocus: true, onclick: copy_secret, "Copy secret" }
-                            if *discard_armed.read() {
-                                p { role: "alert",
-                                    "The secret will be lost when this panel closes. It cannot be shown again."
-                                }
-                                button { r#type: "button", onclick: close_secret, "Discard the secret" }
-                                button { r#type: "button", onclick: keep_secret, "Keep it" }
-                            } else {
-                                button { r#type: "button", onclick: close_secret, "Close" }
-                            }
-                        }
-                    }
+
                     if let Some(message) = keys.read().error() {
                         p { class: "error", role: "alert", "{message}" }
+                        button {
+                            r#type: "button",
+                            onclick: retry_keys,
+                            disabled: keys.read().is_loading(),
+                            "Retry keys"
+                        }
                     }
                     if keys.read().is_loading() {
                         p { class: "status", role: "status", "aria-live": "polite", "Loading keys…" }
@@ -700,7 +731,11 @@ pub fn AdminClientDetailPage(account_id: String) -> Element {
                     } else if keys.read().items().is_empty() {
                         p { class: "empty", "No keys have been issued for this client." }
                     } else {
-                        div { class: "table-scroll",
+                        div {
+                            class: "table-scroll",
+                            role: "region",
+                            "aria-label": "API keys table",
+                            tabindex: "0",
                             table {
                                 caption { class: "visually-hidden", "API keys issued for this client" }
                                 thead {
@@ -717,10 +752,44 @@ pub fn AdminClientDetailPage(account_id: String) -> Element {
                                     for key in keys.read().items().to_vec() {
                                         tr { key: "{key.id}",
                                             td { "{key.name}" }
-                                            td { "{key.display_status(*now_millis.read()).label()}" }
-                                            td { "{key.created_at}" }
-                                            td { "{key.expires_at.as_deref().unwrap_or(\"never\")}" }
-                                            td { "{key.last_used_at.as_deref().unwrap_or(\"never\")}" }
+                                            td {
+                                                span {
+                                                    class: "{status_badge_class(key.display_status(*now_millis.read()).label())}",
+                                                    "{status_label(key.display_status(*now_millis.read()).label())}"
+                                                }
+                                            }
+                                            td {
+                                                time {
+                                                    class: "timestamp",
+                                                    datetime: "{key.created_at}",
+                                                    title: "{key.created_at}",
+                                                    "{compact_timestamp(&key.created_at)}"
+                                                }
+                                            }
+                                            td {
+                                                if let Some(value) = key.expires_at.as_deref() {
+                                                    time {
+                                                        class: "timestamp",
+                                                        datetime: "{value}",
+                                                        title: "{value}",
+                                                        "{compact_timestamp(value)}"
+                                                    }
+                                                } else {
+                                                    "Never"
+                                                }
+                                            }
+                                            td {
+                                                if let Some(value) = key.last_used_at.as_deref() {
+                                                    time {
+                                                        class: "timestamp",
+                                                        datetime: "{value}",
+                                                        title: "{value}",
+                                                        "{compact_timestamp(value)}"
+                                                    }
+                                                } else {
+                                                    "Not used"
+                                                }
+                                            }
                                             td {
                                                 if key.display_status(*now_millis.read()) == KeyDisplayStatus::Revoked {
                                                     span { "revoked" }
@@ -728,7 +797,10 @@ pub fn AdminClientDetailPage(account_id: String) -> Element {
                                                     button {
                                                         r#type: "button",
                                                         disabled: *pending.read(),
-                                                        onclick: move |_| revoke_target.set(Some(key.clone())),
+                                                        onclick: {
+                                                            let target = key.clone();
+                                                            move |_| revoke_target.set(Some(target.clone()))
+                                                        },
                                                         "Revoke…"
                                                     }
                                                 }
@@ -778,9 +850,40 @@ pub fn AdminClientDetailPage(account_id: String) -> Element {
                 p { class: "hint", "The client could not be loaded." }
                 button { r#type: "button", onclick: move |_| refresh(), "Try again" }
             }
-            if secret.read().is_some() {
-                div { class: "actions",
-                    p { "A key secret is still on screen and will be lost when you leave." }
+                if secret.read().is_some() {
+                    div { class: "actions",
+                        p { "A key secret is still on screen and will be lost when you leave." }
+                    }
+                }
+            }
+            if let Some(created) = secret.read().as_ref() {
+                dialog {
+                    class: "modal-layer",
+                    open: true,
+                    role: "alertdialog",
+                    "aria-modal": "true",
+                    "aria-labelledby": "new-key-secret-title",
+                    "aria-describedby": "new-key-secret-warning",
+                    tabindex: "-1",
+                    onkeydown: escape_secret,
+                    div { class: "secret",
+                        h3 { id: "new-key-secret-title", "New key secret" }
+                        p { id: "new-key-secret-warning", class: "warning",
+                            "Save this now; it cannot be shown again. Deliver it outside this service."
+                        }
+                        code { class: "secret-value", "{created.secret}" }
+                        p { "Key {created.name} ({created.id})" }
+                        button { r#type: "button", autofocus: true, onclick: copy_secret, "Copy secret" }
+                        if *discard_armed.read() {
+                            p { role: "alert",
+                                "The secret will be lost when this panel closes. It cannot be shown again."
+                            }
+                            button { r#type: "button", onclick: close_secret, "Discard the secret" }
+                            button { r#type: "button", onclick: keep_secret, "Keep it" }
+                        } else {
+                            button { r#type: "button", onclick: close_secret, "Close" }
+                        }
+                    }
                 }
             }
             {if refused.read().is_some() {
@@ -810,7 +913,7 @@ fn readiness(client: &ClientView) -> String {
     } else if client.is_suspended() {
         "Suspended by this workflow; resume to restore access.".to_owned()
     } else {
-        format!("State: {}.", client.state_label())
+        format!("State: {}.", status_label(client.state_label()))
     }
 }
 
@@ -882,7 +985,7 @@ mod tests {
         assert!(readiness(&view("active", "failed")).contains("Keys cannot be issued"));
         assert!(readiness(&view("active", "ready")).contains("keys can be issued"));
         assert!(readiness(&view("suspended", "suspended")).contains("resume to restore"));
-        assert!(readiness(&view("deleting", "deleting")).contains("deleting"));
+        assert!(readiness(&view("deleting", "deleting")).contains("Deleting"));
     }
 
     #[test]

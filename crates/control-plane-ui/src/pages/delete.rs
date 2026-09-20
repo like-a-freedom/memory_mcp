@@ -4,6 +4,7 @@ use dioxus::prelude::*;
 use dioxus_router::Link;
 
 use crate::api::{ApiClient, DeleteChallenge};
+use crate::presentation::compact_timestamp;
 use crate::router::Route;
 
 #[component]
@@ -79,7 +80,16 @@ pub fn DeletePage() -> Element {
                         }
                     }
                     button { r#type: "submit", "Confirm deletion" }
-                    p { class: "hint", "This confirmation expires at {value.expires_at}." }
+                    p { class: "hint",
+                        "This confirmation expires at "
+                        time {
+                            class: "timestamp",
+                            datetime: "{value.expires_at}",
+                            title: "{value.expires_at}",
+                            "{compact_timestamp(&value.expires_at)}"
+                        }
+                        "."
+                    }
                 }
             } else {
                 form { onsubmit: start_delete,

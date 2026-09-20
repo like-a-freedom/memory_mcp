@@ -10,6 +10,7 @@ use crate::admin_api::{
 };
 use crate::pages::admin_paging::{PageDirection, Paged, next_generation};
 use crate::pages::admin_session::{AdminSessionBar, end_session, use_admin_session};
+use crate::presentation::{status_badge_class, status_label};
 use crate::router::Route;
 
 /// Clients requested per page; the backend documents 50 with a maximum of 100.
@@ -223,8 +224,14 @@ pub fn AdminClientListPage() -> Element {
             AdminSessionBar { session, on_sign_out: sign_out }
             if session.read().has_ended() {
                 div { class: "error", role: "alert",
-                    p { "Your session ended. Sign in again to manage clients." }
-                    Link { to: Route::Login {}, "Go to sign-in" }
+                    p {
+                        if let Some(message) = session.read().error() {
+                            "{message}"
+                        } else {
+                            "Your session ended. Sign in again to manage clients."
+                        }
+                    }
+                    Link { class: "button", to: Route::Login {}, "Go to sign-in" }
                 }
             } else {
                 if let Some(message) = session.read().error() {
@@ -292,7 +299,11 @@ pub fn AdminClientListPage() -> Element {
                 } else if state.read().items().is_empty() {
                     p { class: "empty", "No clients yet. Create the first one above." }
                 } else {
-                    div { class: "table-scroll",
+                    div {
+                        class: "table-scroll",
+                        role: "region",
+                        "aria-label": "Clients table",
+                        tabindex: "0",
                         table { class: "client-list",
                             caption { class: "visually-hidden", "Clients on this page" }
                             thead {
@@ -319,13 +330,33 @@ pub fn AdminClientListPage() -> Element {
                                             }
                                         }
                                         td { code { "{client.account_id}" } }
-                                        td { "{client.account_status}" }
-                                        td { "{client.tenant_status}" }
+                                        td {
+                                            span {
+                                                class: "{status_badge_class(&client.account_status)}",
+                                                "{status_label(&client.account_status)}"
+                                            }
+                                        }
+                                        td {
+                                            span {
+                                                class: "{status_badge_class(&client.tenant_status)}",
+                                                "{provisioning_label(&client)}"
+                                            }
+                                        }
                                         td { "{client.plan_version}" }
                                         td { "{client.schema_version}" }
                                         td { "{client.version}" }
                                         td {
-                                            "{provisioning_label(&client)}"
+                                            div { class: "status-stack",
+                                                span {
+                                                    class: "{status_badge_class(&client.tenant_status)}",
+                                                    "{provisioning_label(&client)}"
+                                                }
+                                                if client.is_failed() {
+                                                    span { class: "status-detail",
+                                                        "{client.safe_provisioning_reason().unwrap_or_else(|| \"no reason reported\".to_owned())}"
+                                                    }
+                                                }
+                                            }
                                         }
                                     }
                                 }
@@ -345,16 +376,9 @@ pub fn AdminClientListPage() -> Element {
 /// backend reported for a failure.
 fn provisioning_label(client: &ClientView) -> String {
     if client.is_provisioning() {
-        "working… (refreshing every 2 s)".to_owned()
-    } else if client.is_failed() {
-        format!(
-            "failed: {}",
-            client
-                .safe_provisioning_reason()
-                .unwrap_or_else(|| "no reason reported".to_owned())
-        )
+        "Provisioning".to_owned()
     } else {
-        client.state_label().to_owned()
+        status_label(client.state_label())
     }
 }
 

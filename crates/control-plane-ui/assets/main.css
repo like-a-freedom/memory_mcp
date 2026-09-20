@@ -26,6 +26,7 @@
     --surface: #12161d;
     --surface-raised: #171c25;
     --surface-sunken: #0e1218;
+    --surface-hover: #1e242f;
 
     --border: #232a36;
     --border-strong: #323b4a;
@@ -41,6 +42,7 @@
 
     --danger: #ff8b92;
     --danger-bg: #241316;
+    --danger-hover: #331a1e;
     --danger-border: #7a3038;
 
     --success: #56d364;
@@ -393,7 +395,7 @@ a.button {
 
 button:hover:not(:disabled),
 a.button:hover {
-    background-color: #1e242f;
+    background-color: var(--surface-hover);
     border-color: var(--fg-subtle);
     color: var(--fg);
 }
@@ -401,6 +403,11 @@ a.button:hover {
 button:active:not(:disabled),
 a.button:active {
     transform: translateY(1px);
+}
+
+button:focus-visible,
+a.button:focus-visible {
+    box-shadow: 0 0 0 3px rgb(111 215 201 / 22%);
 }
 
 button:disabled {
@@ -432,7 +439,7 @@ button[type="submit"]:hover:not(:disabled) {
 }
 
 .confirm > button:first-of-type:hover:not(:disabled) {
-    background-color: #331a1e;
+    background-color: var(--danger-hover);
     border-color: var(--danger);
     color: var(--danger);
 }
@@ -471,20 +478,16 @@ button[type="submit"]:hover:not(:disabled) {
     font-size: 0.875rem;
 }
 
-/* A bare <p class="error"> sits directly on the page background. */
+/* Standalone message paragraphs keep the same panel rhythm as other errors. */
 p.error {
-    background-color: transparent;
-    border: 0;
-    border-left: 2px solid var(--danger);
-    border-radius: 0;
-    padding: 0.125rem 0 0.125rem 0.75rem;
+    margin: 0;
 }
 
 .error > p {
     margin: 0;
 }
 
-.error > a {
+.error > a:not(.button) {
     display: inline-block;
     margin-top: 0.25rem;
     color: var(--danger);
@@ -537,8 +540,70 @@ p.error {
 .readiness {
     color: var(--fg-muted);
     font-size: 0.875rem;
-    border-left: 2px solid var(--border-strong);
-    padding-left: 0.75rem;
+    border-top: 1px solid var(--border);
+    padding-top: 0.75rem;
+}
+
+.status-stack {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.25rem;
+}
+
+.status-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    min-height: 1.75rem;
+    padding: 0.2rem 0.5rem;
+    border: 1px solid var(--border-strong);
+    border-radius: var(--radius-control);
+    font-size: 0.75rem;
+    font-weight: 600;
+    line-height: 1.2;
+    white-space: nowrap;
+}
+
+.status-badge::before {
+    width: 0.45rem;
+    height: 0.45rem;
+    border-radius: 50%;
+    background-color: currentColor;
+    content: "";
+}
+
+.status-badge--success {
+    color: var(--success);
+    background-color: var(--success-bg);
+    border-color: var(--success-border);
+}
+
+.status-badge--warning {
+    color: var(--warning);
+    background-color: var(--warning-bg);
+    border-color: var(--warning-border);
+}
+
+.status-badge--danger {
+    color: var(--danger);
+    background-color: var(--danger-bg);
+    border-color: var(--danger-border);
+}
+
+.status-badge--muted {
+    color: var(--fg-muted);
+    background-color: var(--surface-raised);
+}
+
+.status-detail {
+    color: var(--fg-muted);
+    font-size: 0.8125rem;
+    overflow-wrap: anywhere;
+}
+
+.timestamp {
+    white-space: nowrap;
 }
 
 .privilege-note {
@@ -577,10 +642,18 @@ section > h2 {
 /* ═══ tables ═══════════════════════════════════════════════════════════ */
 
 .table-scroll {
+    max-width: 100%;
     overflow-x: auto;
     border: 1px solid var(--border);
     border-radius: var(--radius-panel);
     background-color: var(--surface);
+    -webkit-overflow-scrolling: touch;
+    scrollbar-color: var(--border-strong) var(--surface-sunken);
+}
+
+.table-scroll:focus-visible {
+    outline: 2px solid var(--focus);
+    outline-offset: 2px;
 }
 
 .table-scroll > table {
@@ -643,8 +716,21 @@ tbody th[scope="row"] {
     min-width: 64rem;
 }
 
+.client-list th:first-child,
+.client-list td:first-child {
+    position: sticky;
+    left: 0;
+    z-index: 1;
+    background-color: var(--surface);
+}
+
+.client-list th:first-child {
+    background-color: var(--surface-raised);
+}
+
 .client-list td:first-child {
     font-weight: 500;
+    box-shadow: 1px 0 0 var(--border);
 }
 
 .client-list td:first-child a {
@@ -657,6 +743,23 @@ tbody th[scope="row"] {
 
 /* ═══ dialogs, confirmations and the one-time secret ═══════════════════ */
 
+dialog.modal-layer {
+    position: fixed;
+    inset: 0;
+    z-index: 20;
+    display: grid;
+    place-items: center;
+    width: 100%;
+    max-width: none;
+    height: 100%;
+    max-height: none;
+    margin: 0;
+    padding: 1rem;
+    background-color: rgb(11 14 19 / 82%);
+    border: 0;
+    color: var(--fg);
+}
+
 .dialog,
 .confirm,
 .secret {
@@ -666,8 +769,10 @@ tbody th[scope="row"] {
     background-color: var(--surface-raised);
     border: 1px solid var(--border-strong);
     border-radius: var(--radius-panel);
+    width: min(100%, 34rem);
+    max-height: calc(100dvh - 2rem);
+    overflow-y: auto;
     padding: 1.25rem;
-    max-width: 34rem;
 }
 
 .dialog > h2 {
@@ -709,6 +814,7 @@ tbody th[scope="row"] {
     border-color: var(--warning-border);
 }
 
+.secret > h2,
 .secret > h3 {
     color: var(--warning);
 }

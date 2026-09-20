@@ -5,6 +5,7 @@ use dioxus_router::Link;
 use dioxus_router::hooks::use_navigator;
 
 use crate::api::ApiClient;
+use crate::presentation::{compact_timestamp, status_badge_class, status_label};
 use crate::router::Route;
 
 #[component]
@@ -14,9 +15,14 @@ pub fn KeysPage() -> Element {
     let mut new_key_secret = use_signal(|| None::<String>);
     let mut new_key_name = use_signal(String::new);
     let mut error = use_signal(|| None::<String>);
+    let mut pending = use_signal(|| false);
+    let mut logout_error = use_signal(|| None::<String>);
 
     let create_key = move |event: FormEvent| {
         event.prevent_default();
+        if *pending.peek() {
+            return;
+        }
         let api = ApiClient::new("/".to_string());
         let name = new_key_name.read().trim().to_owned();
         if name.is_empty() {
@@ -24,6 +30,7 @@ pub fn KeysPage() -> Element {
             return;
         }
         error.set(None);
+        pending.set(true);
         spawn(async move {
             match api.create_key(name).await {
                 Ok(resp) => {
@@ -33,32 +40,58 @@ pub fn KeysPage() -> Element {
                 }
                 Err(value) => error.set(Some(value.message)),
             }
+            pending.set(false);
         });
     };
 
     let mut revoke = move |id: String| {
+        if *pending.peek() {
+            return;
+        }
         error.set(None);
+        pending.set(true);
         spawn(async move {
             match ApiClient::new("/".to_string()).revoke_key(id).await {
                 Ok(()) => keys.restart(),
                 Err(value) => error.set(Some(value.message)),
             }
+            pending.set(false);
         });
     };
 
+    let close_secret = move |_| new_key_secret.set(None);
+    let escape_secret = move |event: KeyboardEvent| {
+        if event.key() == Key::Escape {
+            new_key_secret.set(None);
+        }
+    };
+    let secret_open = new_key_secret.read().is_some();
     let sign_out = move |_| {
+        new_key_secret.set(None);
+        logout_error.set(None);
         spawn(async move {
             let api = ApiClient::new("/".to_owned());
-            let _ = api.logout().await;
-            navigator.replace(Route::Login {});
+            match api.logout().await {
+                Ok(()) => {
+                    navigator.replace(Route::Login {});
+                }
+                Err(_value) => logout_error.set(Some(
+                    "The console could not confirm sign-out. Close this tab or try again."
+                        .to_owned(),
+                )),
+            }
         });
     };
 
     rsx! {
         div { class: "container",
-            h1 { "API keys" }
+            div { class: "page-surface", inert: secret_open,
+                h1 { "API keys" }
             if let Some(err) = error.read().as_ref() {
                 p { class: "error", role: "alert", "aria-live": "assertive", "{err}" }
+            }
+            if let Some(message) = logout_error.read().as_ref() {
+                p { class: "warning", role: "alert", "aria-live": "assertive", "{message}" }
             }
             if let Some(Err(value)) = keys.read().as_ref() {
                 p { class: "error", role: "alert", "aria-live": "assertive", "{value.message}" }
@@ -69,13 +102,6 @@ pub fn KeysPage() -> Element {
                         keys.restart();
                     },
                     "Try again"
-                }
-            }
-            if let Some(secret) = new_key_secret.read().as_ref() {
-                div { class: "alert", role: "status", "aria-live": "polite",
-                    p { "Your new API key. It is shown once." }
-                    code { "{secret}" }
-                    p { "Copy it somewhere safe now; it cannot be shown again." }
                 }
             }
             form { class: "create-key", onsubmit: create_key,
@@ -91,7 +117,9 @@ pub fn KeysPage() -> Element {
                         oninput: move |event| new_key_name.set(event.value()),
                     }
                 }
-                button { r#type: "submit", "Create key" }
+                button { r#type: "submit", disabled: *pending.read(),
+                    if *pending.read() { "Creating…" } else { "Create key" }
+                }
             }
             match keys.read().as_ref() {
                 None => rsx! {
@@ -102,7 +130,11 @@ pub fn KeysPage() -> Element {
                     rsx! { p { class: "empty", "No API keys have been issued for this account." } }
                 },
                 Some(Ok(values)) => rsx! {
-                    div { class: "table-scroll",
+                    div {
+                        class: "table-scroll",
+                        role: "region",
+                        "aria-label": "Account API keys table",
+                        tabindex: "0",
                         table {
                             caption { class: "visually-hidden", "API keys for this account" }
                             thead {
@@ -118,17 +150,41 @@ pub fn KeysPage() -> Element {
                                 for key in values.iter() {
                                     tr { key: "{key.id}",
                                         td { "{key.name}" }
-                                        td { "{key.status}" }
-                                        td { "{key.created_at}" }
-                                        td { "{key.expires_at.as_deref().unwrap_or(\"never\")}" }
+                                        td {
+                                            span {
+                                                class: "{status_badge_class(&key.status)}",
+                                                "{status_label(&key.status)}"
+                                            }
+                                        }
+                                        td {
+                                            time {
+                                                class: "timestamp",
+                                                datetime: "{key.created_at}",
+                                                title: "{key.created_at}",
+                                                "{compact_timestamp(&key.created_at)}"
+                                            }
+                                        }
+                                        td {
+                                            if let Some(value) = key.expires_at.as_deref() {
+                                                time {
+                                                    class: "timestamp",
+                                                    datetime: "{value}",
+                                                    title: "{value}",
+                                                    "{compact_timestamp(value)}"
+                                                }
+                                            } else {
+                                                "Never"
+                                            }
+                                        }
                                         td {
                                             button {
                                                 r#type: "button",
+                                                disabled: *pending.read(),
                                                 onclick: {
                                                     let id = key.id.clone();
                                                     move |_| revoke(id.clone())
                                                 },
-                                                "Revoke"
+                                                if *pending.read() { "Revoking…" } else { "Revoke" }
                                             }
                                         }
                                     }
@@ -138,9 +194,31 @@ pub fn KeysPage() -> Element {
                     }
                 },
             }
-            nav { class: "actions", "aria-label": "Account",
-                Link { class: "button", to: Route::Status {}, "Back to status" }
-                button { r#type: "button", onclick: sign_out, "Sign out" }
+                nav { class: "actions", "aria-label": "Account",
+                    Link { class: "button", to: Route::Status {}, "Back to status" }
+                    button { r#type: "button", onclick: sign_out, "Sign out" }
+                }
+            }
+        }
+        if let Some(secret) = new_key_secret.read().as_ref() {
+            dialog {
+                class: "modal-layer",
+                open: true,
+                role: "alertdialog",
+                "aria-modal": "true",
+                "aria-labelledby": "new-account-key-title",
+                "aria-describedby": "new-account-key-warning",
+                tabindex: "-1",
+                onkeydown: escape_secret,
+                div { class: "secret",
+                    h2 { id: "new-account-key-title", "New API key" }
+                    p { id: "new-account-key-warning", class: "warning",
+                        "Save this now; it cannot be shown again."
+                    }
+                    code { class: "secret-value", "{secret}" }
+                    p { "Copy it somewhere safe now; it cannot be shown again." }
+                    button { r#type: "button", autofocus: true, onclick: close_secret, "Close" }
+                }
             }
         }
     }

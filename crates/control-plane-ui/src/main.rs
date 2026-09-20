@@ -5,6 +5,7 @@ use dioxus::prelude::*;
 mod admin_api;
 mod api;
 mod pages;
+mod presentation;
 mod router;
 
 /// Declares the operator console stylesheet to the bundler.

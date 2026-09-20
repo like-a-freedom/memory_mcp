@@ -9,6 +9,7 @@ use dioxus::prelude::*;
 use dioxus_router::Navigator;
 
 use crate::admin_api::{AdminApi, SessionCsrf, SessionResponse};
+use crate::presentation::compact_timestamp;
 use crate::router::Route;
 
 /// What an authenticated page knows about the current administrator session.
@@ -153,10 +154,19 @@ pub fn end_session(mut session: Signal<AdminSession>, navigator: Navigator) {
         if let Some(csrf) = csrf {
             api = api.with_session_csrf(csrf);
         }
-        let _ = api.logout().await;
+        match api.logout().await {
+            Ok(()) => {
+                navigator.replace(Route::Login {});
+            }
+            Err(_) => {
+                session.write().mark_ended(
+                    "The console cleared local session data, but the server did not confirm sign-out. Close this tab or continue to sign in again."
+                        .to_owned(),
+                );
+            }
+        }
         // The token is dropped whatever the server answered.
         api.forget_session();
-        navigator.replace(Route::Login {});
     });
 }
 
@@ -179,12 +189,22 @@ pub fn AdminSessionBar(
         div { class: "session-bar",
             span { "{summary}" }
             if let Some(expiry) = expiry {
-                span { class: "session-expiry", " Session ends {expiry}" }
+                span { class: "session-expiry",
+                    " Session ends "
+                    time {
+                        class: "timestamp",
+                        datetime: "{expiry}",
+                        title: "{expiry}",
+                        "{compact_timestamp(&expiry)}"
+                    }
+                }
             }
-            button {
-                r#type: "button",
-                onclick: move |_| on_sign_out.call(()),
-                "Sign out"
+            if !session.has_ended() {
+                button {
+                    r#type: "button",
+                    onclick: move |_| on_sign_out.call(()),
+                    "Sign out"
+                }
             }
         }
     }

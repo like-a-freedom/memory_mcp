@@ -15,6 +15,7 @@ use dioxus_router::hooks::use_navigator;
 
 use crate::admin_api::{AdminApi, ChallengeKind, ChallengeResponse, SessionCsrf, sleep_ms};
 use crate::pages::admin_session::use_admin_session;
+use crate::presentation::compact_timestamp;
 use crate::router::Route;
 
 /// How long the success panel stays up before the sign-in redirect.
@@ -246,7 +247,16 @@ fn ChallengeFinishFlow(kind: ChallengeKind) -> Element {
                         value: "{view.username}",
                     }
                 }
-                p { class: "hint", "This code expires at {view.expires_at}." }
+                p { class: "hint",
+                    "This code expires at "
+                    time {
+                        class: "timestamp",
+                        datetime: "{view.expires_at}",
+                        title: "{view.expires_at}",
+                        "{compact_timestamp(&view.expires_at)}"
+                    }
+                    "."
+                }
                 div { class: "field",
                     label { r#for: "challenge-password", "New password" }
                     input {
@@ -371,46 +381,59 @@ pub fn AdminReauthDialog(
             }
         });
     };
+    let cancel_on_escape = move |event: KeyboardEvent| {
+        if event.key() == Key::Escape
+            && let Some(cancel) = on_cancel
+        {
+            cancel.call(());
+        }
+    };
 
     rsx! {
-        div {
-            class: "dialog",
+        dialog {
+            class: "modal-layer",
+            open: true,
             role: "dialog",
+            "aria-modal": "true",
             "aria-labelledby": "reauth-title",
             "aria-describedby": "reauth-reason",
-            h2 { id: "reauth-title", "Confirm your password" }
-            p { id: "reauth-reason",
-                if reason.is_empty() {
-                    "Recent authentication is required for this action."
-                } else {
-                    "Recent authentication is required to {reason}."
-                }
-            }
-            p { class: "hint", "Nothing is retried until you confirm." }
-            form { onsubmit: confirm,
-                div { class: "field",
-                    label { r#for: "reauth-password", "Password" }
-                    input {
-                        id: "reauth-password",
-                        name: "password",
-                        r#type: "password",
-                        autocomplete: "current-password",
-                        autofocus: true,
-                        required: true,
-                        value: "{password}",
-                        oninput: move |event| password.set(event.value()),
+            tabindex: "-1",
+            onkeydown: cancel_on_escape,
+            div { class: "dialog",
+                h2 { id: "reauth-title", "Confirm your password" }
+                p { id: "reauth-reason",
+                    if reason.is_empty() {
+                        "Recent authentication is required for this action."
+                    } else {
+                        "Recent authentication is required to {reason}."
                     }
                 }
-                div { class: "error", role: "alert", "aria-live": "assertive",
-                    if let Some(message) = error.read().as_ref() {
-                        "{message}"
+                p { class: "hint", "Nothing is retried until you confirm." }
+                form { onsubmit: confirm,
+                    div { class: "field",
+                        label { r#for: "reauth-password", "Password" }
+                        input {
+                            id: "reauth-password",
+                            name: "password",
+                            r#type: "password",
+                            autocomplete: "current-password",
+                            autofocus: true,
+                            required: true,
+                            value: "{password}",
+                            oninput: move |event| password.set(event.value()),
+                        }
                     }
-                }
-                button { r#type: "submit", disabled: *pending.read(),
-                    if *pending.read() { "Confirming…" } else { "Confirm" }
-                }
-                if let Some(cancel) = on_cancel {
-                    button { r#type: "button", onclick: move |_| cancel.call(()), "Cancel" }
+                    div { class: "error", role: "alert", "aria-live": "assertive",
+                        if let Some(message) = error.read().as_ref() {
+                            "{message}"
+                        }
+                    }
+                    button { r#type: "submit", disabled: *pending.read(),
+                        if *pending.read() { "Confirming…" } else { "Confirm" }
+                    }
+                    if let Some(cancel) = on_cancel {
+                        button { r#type: "button", onclick: move |_| cancel.call(()), "Cancel" }
+                    }
                 }
             }
         }
@@ -426,24 +449,40 @@ pub fn AdminReauthDialog(
 pub fn AdminReauthPage() -> Element {
     let navigator = use_navigator();
     let session = use_admin_session();
-    let csrf = session.read().csrf();
+    let session_state = session.read();
+    let is_loading = session_state.is_loading();
+    let is_ready = session_state.is_ready();
+    let csrf = session_state.csrf();
+    let session_error = session_state.error().map(str::to_owned);
 
     rsx! {
         div { class: "container",
-            h1 { "Confirm your password" }
-            if session.read().is_loading() {
-                p { class: "status", role: "status", "aria-live": "polite", "Checking your session…" }
-            } else if session.read().is_ready() {
+            div { class: "page-surface", inert: is_ready,
+                h1 { "Confirm your password" }
+                if is_loading {
+                    p { class: "status", role: "status", "aria-live": "polite", "Checking your session…" }
+                } else if !is_ready {
+                    div { class: "error", role: "alert",
+                        p {
+                            if let Some(message) = session_error {
+                                "{message}"
+                            } else {
+                                "Your session ended. Sign in again."
+                            }
+                        }
+                        Link { class: "button", to: Route::Login {}, "Go to sign-in" }
+                    }
+                }
+            }
+            if is_ready {
                 AdminReauthDialog {
                     csrf,
                     on_confirmed: move |_| {
                         navigator.replace(Route::AdminClientList {});
                     },
-                }
-            } else {
-                div { class: "error", role: "alert",
-                    p { "Your session ended. Sign in again." }
-                    Link { to: Route::Login {}, "Go to sign-in" }
+                    on_cancel: move |_| {
+                        navigator.replace(Route::AdminClientList {});
+                    },
                 }
             }
         }
