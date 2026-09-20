@@ -45,6 +45,22 @@ pub fn normalize_username(raw: &str) -> LocalResult<String> {
     Ok(lowered)
 }
 
+/// Normalize a direct peer address for throttling.
+///
+/// An IPv4-mapped IPv6 address (`::ffff:a.b.c.d`) is folded to its IPv4 form
+/// so one client cannot appear as two independent source buckets, and every
+/// caller buckets the same address identically. Forwarding headers are
+/// deliberately not consulted anywhere: a client can set them freely.
+pub fn normalize_peer_ip(peer: std::net::IpAddr) -> std::net::IpAddr {
+    match peer {
+        std::net::IpAddr::V6(v6) => match v6.to_ipv4_mapped() {
+            Some(v4) => std::net::IpAddr::V4(v4),
+            None => std::net::IpAddr::V6(v6),
+        },
+        ip => ip,
+    }
+}
+
 /// Validate a password: 15-128 Unicode scalar values, max 1024 UTF-8 bytes,
 /// no NUL.
 pub fn validate_password(password: &str) -> LocalResult<()> {
@@ -74,7 +90,21 @@ pub fn validate_password(password: &str) -> LocalResult<()> {
 
 #[cfg(test)]
 mod tests {
-    use super::{normalize_username, validate_password};
+    use super::{normalize_peer_ip, normalize_username, validate_password};
+    use std::net::IpAddr;
+
+    #[test]
+    fn local_admin_mapped_peer_addresses_fold_to_ipv4() {
+        let mapped: IpAddr = "::ffff:192.0.2.9".parse().expect("mapped v6");
+        assert_eq!(
+            normalize_peer_ip(mapped),
+            "192.0.2.9".parse::<IpAddr>().unwrap()
+        );
+        let native: IpAddr = "2001:db8::1".parse().expect("native v6");
+        assert_eq!(normalize_peer_ip(native), native);
+        let v4: IpAddr = "198.51.100.4".parse().expect("v4");
+        assert_eq!(normalize_peer_ip(v4), v4);
+    }
 
     #[test]
     fn local_admin_username_policy() {

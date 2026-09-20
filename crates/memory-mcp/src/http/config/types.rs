@@ -288,13 +288,20 @@ impl HttpConfig {
         let browser_auth = if enable_control_plane {
             match auth_mode.as_deref() {
                 Some("local") => {
-                    // Local mode must not have OIDC-only settings.
+                    // Local mode must not have OIDC-only settings. The three
+                    // key variables are checked here rather than in
+                    // `validate` because only the parser can tell a supplied
+                    // value from the derived one; the rest are re-checked on
+                    // the built struct by the validator.
                     if !oidc_issuer.is_empty()
                         || !oidc_client_id.is_empty()
                         || !oidc_audience.is_empty()
                         || !oidc_redirect_uri.is_empty()
                         || oidc_allowed_alg != DEFAULT_OIDC_ALG
                         || !operator_identity_allowlist.is_empty()
+                        || optional_env("MEMORY_MCP_HTTP_IDENTITY_INDEX_KEY").is_some()
+                        || optional_env("MEMORY_MCP_HTTP_OIDC_STATE_KEY").is_some()
+                        || optional_env("MEMORY_MCP_HTTP_OIDC_NONCE_KEY").is_some()
                     {
                         return Err(MemoryError::ConfigInvalid(
                             "local mode must not have OIDC configuration".into(),
@@ -642,6 +649,74 @@ mod tests {
             assert_eq!(cfg.allowed_hosts, vec!["localhost".to_string()]);
             assert_eq!(cfg.signup_mode, SignupMode::InviteOnly);
         });
+    }
+
+    /// The required environment for a *local-mode* control plane, with every
+    /// OIDC-only key removed: local mode derives identity/state/nonce from the
+    /// session key and rejects a supplied value (spec §3).
+    fn local_mode_env() -> Vec<(&'static str, String)> {
+        let mut vars: Vec<(&'static str, String)> = base_required_env()
+            .into_iter()
+            .filter(|(k, _)| {
+                !matches!(
+                    *k,
+                    "MEMORY_MCP_HTTP_IDENTITY_INDEX_KEY"
+                        | "MEMORY_MCP_HTTP_OIDC_STATE_KEY"
+                        | "MEMORY_MCP_HTTP_OIDC_NONCE_KEY"
+                )
+            })
+            .collect();
+        vars.push(("MEMORY_MCP_HTTP_ENABLE_CONTROL_PLANE", "true".into()));
+        vars.push(("MEMORY_MCP_HTTP_AUTH_MODE", "local".into()));
+        vars.push(("MEMORY_MCP_HTTP_LOCAL_DEFAULT_PLAN_VERSION", "1".into()));
+        vars.extend([
+            ("MEMORY_MCP_HTTP_MAX_INGESTED_BYTES", "1000".into()),
+            ("MEMORY_MCP_HTTP_MAX_EPISODE_COUNT", "10".into()),
+            ("MEMORY_MCP_HTTP_INGEST_PER_MINUTE", "3".into()),
+            ("MEMORY_MCP_HTTP_MAX_OPEN_APP_SESSIONS", "8".into()),
+            ("MEMORY_MCP_HTTP_MAX_ACTIVE_API_KEYS", "2".into()),
+            ("MEMORY_MCP_HTTP_PER_TENANT_REQUEST_CONCURRENCY", "6".into()),
+            ("MEMORY_MCP_HTTP_EXTRACTION_CONCURRENCY", "4".into()),
+        ]);
+        vars
+    }
+
+    #[test]
+    fn local_mode_loads_without_oidc_only_keys() {
+        let vars = local_mode_env();
+        let refs: Vec<(&str, &str)> = vars.iter().map(|(k, v)| (*k, v.as_str())).collect();
+        with_env(&refs, || {
+            let cfg = HttpConfig::from_env().expect("a local-mode deployment loads");
+            assert!(!cfg.browser_auth_is_oidc());
+            assert!(cfg.oidc_issuer.is_empty(), "local mode carries no issuer");
+            assert!(cfg.oidc_client_id.is_empty());
+        });
+    }
+
+    #[test]
+    fn local_mode_rejects_a_supplied_oidc_only_key() {
+        // Spec §3: nonempty OIDC-only configuration in enabled local mode
+        // fails startup rather than being silently ignored. Only the parser
+        // can tell a supplied value from the derived one.
+        for name in [
+            "MEMORY_MCP_HTTP_IDENTITY_INDEX_KEY",
+            "MEMORY_MCP_HTTP_OIDC_STATE_KEY",
+            "MEMORY_MCP_HTTP_OIDC_NONCE_KEY",
+        ] {
+            let mut vars = local_mode_env();
+            vars.push((name, "0".repeat(64)));
+            let refs: Vec<(&str, &str)> = vars.iter().map(|(k, v)| (*k, v.as_str())).collect();
+            with_env(&refs, || {
+                assert!(
+                    matches!(
+                        HttpConfig::from_env(),
+                        Err(MemoryError::ConfigInvalid(ref message))
+                            if message.contains("OIDC configuration")
+                    ),
+                    "{name} must fail startup in local mode"
+                );
+            });
+        }
     }
 
     #[test]

@@ -363,6 +363,13 @@ pub struct SurrealRegistryStore {
     db: RegistryDb,
     namespace: String,
     database: String,
+    /// SQL fault seam (plan §5). Production never arms it, so it is inert
+    /// for every real deployment; tests arm a needle to fail a named
+    /// local-admin statement and prove the adapter rolls back cleanly.
+    /// Only the `control-plane` local-admin statements consult it, so it
+    /// is compiled with them.
+    #[cfg(feature = "control-plane")]
+    sql_faults: crate::http::fault_injection::SqlFaultHook,
 }
 
 fn datetime_value(value: &Value) -> Option<DateTime<Utc>> {
@@ -659,6 +666,8 @@ impl SurrealRegistryStore {
             db,
             namespace,
             database,
+            #[cfg(feature = "control-plane")]
+            sql_faults: crate::http::fault_injection::SqlFaultHook::new(),
         })
     }
 
@@ -707,6 +716,8 @@ impl SurrealRegistryStore {
             db: RegistryDb::Local(db),
             namespace: namespace.to_owned(),
             database: database.to_owned(),
+            #[cfg(feature = "control-plane")]
+            sql_faults: crate::http::fault_injection::SqlFaultHook::new(),
         };
         store.handle().use_ns_db(namespace, database).await?;
         Ok(store)
@@ -2856,7 +2867,9 @@ pub use super::storage::ensure_namespace as ensure_registry_namespace;
 #[cfg(feature = "control-plane")]
 mod local_admin;
 #[cfg(feature = "control-plane")]
-mod local_admin_rate;
+pub mod local_admin_rate;
+#[cfg(all(test, feature = "control-plane"))]
+mod local_admin_remote;
 
 #[cfg(test)]
 mod tests {

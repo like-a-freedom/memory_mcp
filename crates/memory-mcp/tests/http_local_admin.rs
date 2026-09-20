@@ -1881,3 +1881,301 @@ async fn a_key_for_one_client_cannot_reach_another() {
         other => panic!("expected Allow(ApiKey), got {other:?}"),
     }
 }
+
+/// Plan §5: "Key issue response lost and repeated". A repeated issuance
+/// request resolves to `409 secret_already_issued` carrying the existing
+/// public key id — never a second secret, and never a second verifier.
+#[tokio::test]
+async fn a_repeated_key_issue_never_returns_a_second_secret() {
+    let harness = Harness::new().await;
+    let code = harness.create_admin("ops.one").await;
+    harness
+        .activate(&code, "a sufficiently long passphrase")
+        .await;
+    let session = harness
+        .login("ops.one", "a sufficiently long passphrase")
+        .await;
+    let (account_id, _tenant_id) = harness.create_ready_client(&session, "team-alpha").await;
+
+    let operation = uuid::Uuid::new_v4().to_string();
+    let path = format!("/api/v1/admin/clients/{account_id}/keys");
+    let body = serde_json::json!({ "name": "ci", "expiry": { "kind": "never" } });
+    let headers = [
+        ("x-csrf-token", session.csrf.as_str()),
+        ("idempotency-key", operation.as_str()),
+    ];
+
+    let first = harness
+        .send(
+            "POST",
+            &path,
+            Some(body.clone()),
+            &headers,
+            Some(&session.cookie),
+        )
+        .await;
+    assert_eq!(first.status(), StatusCode::CREATED);
+    let first = read_json(first).await;
+    let key_id = first["id"].as_str().expect("key id").to_string();
+    let secret = first["secret"].as_str().expect("secret").to_string();
+
+    // The same operation, replayed: the conflict names the existing key and
+    // the response body never repeats or re-derives the secret.
+    let replay = harness
+        .send(
+            "POST",
+            &path,
+            Some(body.clone()),
+            &headers,
+            Some(&session.cookie),
+        )
+        .await;
+    assert_eq!(replay.status(), StatusCode::CONFLICT);
+    let replay = read_json(replay).await;
+    assert_eq!(replay["error"]["code"], "secret_already_issued");
+    assert_eq!(replay["error"]["key_id"], serde_json::json!(key_id));
+    assert!(
+        !replay.to_string().contains(&secret),
+        "a replayed issuance must not echo the first secret"
+    );
+
+    // One stored verifier: the replay created no second key row.
+    let keys = harness
+        .send("GET", &path, None, &[], Some(&session.cookie))
+        .await;
+    assert_eq!(keys.status(), StatusCode::OK);
+    let items = read_json(keys).await;
+    assert_eq!(
+        items["items"].as_array().expect("key page").len(),
+        1,
+        "a replay must not create a second key"
+    );
+
+    // The same operation with a different body is an idempotency conflict,
+    // not a second secret.
+    let changed = harness
+        .send(
+            "POST",
+            &path,
+            Some(serde_json::json!({ "name": "ci-renamed", "expiry": { "kind": "never" } })),
+            &headers,
+            Some(&session.cookie),
+        )
+        .await;
+    assert_eq!(changed.status(), StatusCode::CONFLICT);
+    assert_eq!(
+        read_json(changed).await["error"]["code"],
+        "idempotency_conflict"
+    );
+
+    // A fresh operation is a fresh key, with its own secret.
+    let (status, second) = harness
+        .issue_key(
+            &session,
+            &account_id,
+            "ci",
+            serde_json::json!({"kind": "never"}),
+        )
+        .await;
+    assert_eq!(status, StatusCode::CREATED);
+    assert_ne!(second["secret"].as_str(), Some(secret.as_str()));
+}
+
+/// The local surface exposes no `500`: a storage failure is a sanitized
+/// `503` outage, exactly like an admission failure (spec §7, §8).
+#[tokio::test]
+async fn a_local_admin_error_always_carries_a_request_id_header() {
+    let harness = Harness::new().await;
+    let response = harness
+        .send("GET", "/api/v1/admin/clients", None, &[], None)
+        .await;
+    assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
+    let header = response
+        .headers()
+        .get("x-request-id")
+        .expect("spec §8 requires a request-id response header")
+        .to_str()
+        .expect("ascii request id")
+        .to_owned();
+    let body = read_json(response).await;
+    assert_eq!(body["correlation_id"], serde_json::json!(header));
+}
+
+/// Spec §8: the key listing is metadata only — `id`, `name`, `status`,
+/// `created_at`, `expires_at`, `last_used_at` — and it never replays a
+/// secret. `last_used_at` comes from the authoritative `api_key` row, which
+/// the data plane stamps on each successful bearer request.
+#[tokio::test]
+async fn key_metadata_reports_status_and_last_used_at_without_secrets() {
+    let harness = Harness::new().await;
+    let code = harness.create_admin("ops.one").await;
+    harness
+        .activate(&code, "a sufficiently long passphrase")
+        .await;
+    let session = harness
+        .login("ops.one", "a sufficiently long passphrase")
+        .await;
+    let (account_id, _tenant_id) = harness.create_ready_client(&session, "team-alpha").await;
+    let (status, issued) = harness
+        .issue_key(
+            &session,
+            &account_id,
+            "runtime",
+            serde_json::json!({"kind": "never"}),
+        )
+        .await;
+    assert_eq!(status, StatusCode::CREATED, "issue key: {issued}");
+    let key_id = issued["id"].as_str().expect("key id").to_string();
+    let secret = issued["secret"].as_str().expect("secret").to_string();
+
+    let listed = harness
+        .send(
+            "GET",
+            &format!("/api/v1/admin/clients/{account_id}/keys"),
+            None,
+            &[],
+            Some(&session.cookie),
+        )
+        .await;
+    assert_eq!(listed.status(), StatusCode::OK);
+    let listed = read_json(listed).await;
+    let item = &listed["items"][0];
+    assert_eq!(item["id"], serde_json::json!(key_id));
+    assert_eq!(item["name"], "runtime");
+    assert_eq!(item["status"], "active");
+    assert!(item["created_at"].is_string(), "created_at is reported");
+    assert!(item["expires_at"].is_null(), "a never key has no deadline");
+    assert!(
+        item["last_used_at"].is_null(),
+        "a key that was never used has no last_used_at"
+    );
+    assert!(
+        !listed.to_string().contains(&secret),
+        "the listing must never replay a secret"
+    );
+
+    // A successful data-plane request stamps last_used_at, and the admin
+    // surface reflects it on the next read.
+    assert!(matches!(
+        harness.authenticator().authenticate_bearer(&secret).await,
+        AuthDecision::Allow(_)
+    ));
+    let listed = harness
+        .send(
+            "GET",
+            &format!("/api/v1/admin/clients/{account_id}/keys"),
+            None,
+            &[],
+            Some(&session.cookie),
+        )
+        .await;
+    let listed = read_json(listed).await;
+    assert!(
+        listed["items"][0]["last_used_at"].is_string(),
+        "the data plane's use timestamp must be visible: {listed}"
+    );
+
+    // Revocation is visible as status, and the key stays in the history.
+    assert_eq!(
+        harness.revoke_key(&session, &account_id, &key_id).await,
+        StatusCode::NO_CONTENT
+    );
+    let listed = harness
+        .send(
+            "GET",
+            &format!("/api/v1/admin/clients/{account_id}/keys"),
+            None,
+            &[],
+            Some(&session.cookie),
+        )
+        .await;
+    let listed = read_json(listed).await;
+    assert_eq!(listed["items"][0]["status"], "revoked");
+    assert_eq!(
+        listed["items"].as_array().expect("key page").len(),
+        1,
+        "history keeps the revoked key"
+    );
+}
+
+/// Plan R2: equal local administrators see the same clients. One
+/// administrator's client is listable, readable and suspendable by another;
+/// only the audit trail records who created it.
+#[tokio::test]
+async fn a_second_administrator_sees_and_can_administer_the_same_clients() {
+    let harness = Harness::new().await;
+
+    let first_code = harness.create_admin("ops.one").await;
+    harness
+        .activate(&first_code, "a sufficiently long passphrase")
+        .await;
+    let first = harness
+        .login("ops.one", "a sufficiently long passphrase")
+        .await;
+
+    let second_code = harness.create_admin("ops.two").await;
+    harness
+        .activate(&second_code, "another sufficiently long passphrase")
+        .await;
+    let second = harness
+        .login("ops.two", "another sufficiently long passphrase")
+        .await;
+
+    // The client is created by the *first* administrator.
+    let (account_id, _tenant_id) = harness.create_ready_client(&first, "team-alpha").await;
+
+    // The second administrator lists it.
+    let listed = harness
+        .send(
+            "GET",
+            "/api/v1/admin/clients",
+            None,
+            &[],
+            Some(&second.cookie),
+        )
+        .await;
+    assert_eq!(listed.status(), StatusCode::OK);
+    let listed = read_json(listed).await;
+    let ids: Vec<&str> = listed["items"]
+        .as_array()
+        .expect("client page")
+        .iter()
+        .filter_map(|item| item["account_id"].as_str())
+        .collect();
+    assert!(
+        ids.contains(&account_id.as_str()),
+        "a second equal administrator must see the client: {listed}"
+    );
+
+    // …and reads it.
+    let fetched = harness
+        .send(
+            "GET",
+            &format!("/api/v1/admin/clients/{account_id}"),
+            None,
+            &[],
+            Some(&second.cookie),
+        )
+        .await;
+    assert_eq!(fetched.status(), StatusCode::OK);
+    assert_eq!(read_json(fetched).await["display_name"], "team-alpha");
+
+    // …and can suspend and resume it.
+    let view = read_client(&harness, &second, &account_id).await;
+    let version = view["version"].as_u64().expect("version");
+    assert_eq!(
+        set_client_state(&harness, &second, &account_id, "suspend", version).await,
+        StatusCode::NO_CONTENT
+    );
+    let suspended = read_client(&harness, &second, &account_id).await;
+    assert_eq!(suspended["account_status"], "suspended");
+    let version = suspended["version"].as_u64().expect("version");
+    assert_eq!(
+        set_client_state(&harness, &second, &account_id, "resume", version).await,
+        StatusCode::NO_CONTENT
+    );
+    assert_eq!(
+        read_client(&harness, &second, &account_id).await["account_status"],
+        "active"
+    );
+}

@@ -8,8 +8,23 @@ use crate::cli::args::AdminOperation;
 use crate::error::MemoryError;
 use crate::http::registry::SurrealRegistryStore;
 use crate::service::local_admin::auth::{AdminManagementService, LocalAdminAuthority};
-use crate::service::local_admin::contracts::RequestContext;
+use crate::service::local_admin::contracts::{LocalAdminError, RequestContext};
 use std::sync::Arc;
+
+/// Convert a local-admin domain failure into a safe `MemoryError` category.
+///
+/// The runner's formatter only ever sees this category plus the wrapper's own
+/// constant Display string: `LocalAdminError` renders no storage detail, so no
+/// raw database error text can reach the operator's terminal or the logs.
+pub(crate) fn admin_error(error: LocalAdminError) -> MemoryError {
+    match error {
+        LocalAdminError::InvalidInput(message) => MemoryError::Validation(message),
+        LocalAdminError::Infrastructure(_) | LocalAdminError::Unavailable => {
+            MemoryError::Storage("local administrator store unavailable".into())
+        }
+        other => MemoryError::Auth(other.to_string()),
+    }
+}
 
 pub async fn run(operation: AdminOperation) -> Result<(), MemoryError> {
     let config = AdminCliConfig::from_env()?;
@@ -38,7 +53,7 @@ pub async fn run(operation: AdminOperation) -> Result<(), MemoryError> {
             let challenge = service
                 .create_admin(&normalized, &request)
                 .await
-                .map_err(|e| MemoryError::Storage(e.to_string()))?;
+                .map_err(admin_error)?;
             let output = serde_json::json!({
                 "admin_id": challenge.issued.admin_id,
                 "username": challenge.issued.username,
@@ -46,7 +61,7 @@ pub async fn run(operation: AdminOperation) -> Result<(), MemoryError> {
                 "expires_at": challenge.issued.expires_at.to_rfc3339(),
                 "activation_url": format!("{}/admin/activate", config.public_base_url),
             });
-            println!("{}", serde_json::to_string_pretty(&output).unwrap());
+            println!("{}", render_admin_output(&output)?);
             Ok(())
         }
         AdminOperation::Recover { username } => {
@@ -55,7 +70,7 @@ pub async fn run(operation: AdminOperation) -> Result<(), MemoryError> {
             let challenge = service
                 .recover_admin(&normalized, &request)
                 .await
-                .map_err(|e| MemoryError::Storage(e.to_string()))?;
+                .map_err(admin_error)?;
             let output = serde_json::json!({
                 "admin_id": challenge.issued.admin_id,
                 "username": challenge.issued.username,
@@ -63,8 +78,19 @@ pub async fn run(operation: AdminOperation) -> Result<(), MemoryError> {
                 "expires_at": challenge.issued.expires_at.to_rfc3339(),
                 "reset_url": format!("{}/admin/reset", config.public_base_url),
             });
-            println!("{}", serde_json::to_string_pretty(&output).unwrap());
+            println!("{}", render_admin_output(&output)?);
             Ok(())
         }
     }
+}
+
+/// Serialize the CLI's one-time output for stdout.
+///
+/// The value is a flat object of strings, so serialization cannot fail in
+/// practice; the `Result` exists so the failure mode is a typed error
+/// rather than a panic or a silently empty line on a secret-bearing
+/// output path.
+fn render_admin_output(output: &serde_json::Value) -> Result<String, MemoryError> {
+    serde_json::to_string_pretty(output)
+        .map_err(|e| MemoryError::Storage(format!("admin output serialization: {e}")))
 }

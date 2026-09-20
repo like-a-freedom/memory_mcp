@@ -270,12 +270,16 @@ async function scenarioClients(context) {
   const clientId = location.split('/').filter(Boolean).pop();
 
   // Provisioning is asynchronous: poll the visible nonterminal state until the
-  // tenant is ready (or a terminal failure is reported).
+  // tenant is ready (or a terminal failure is reported). The poll's status is
+  // reported once, after the loop, so the check count does not depend on how
+  // many polls the deployment happened to need.
   let clientView = null;
+  let finalReadStatus = 0;
   const deadline = Date.now() + 45_000;
   while (Date.now() < deadline) {
     const read = await context.request.get(`${BASE_URL}${location}`);
-    check('client read returns 200', read.status() === 200, read.status());
+    finalReadStatus = read.status();
+    if (finalReadStatus !== 200) break;
     clientView = await read.json();
     if (clientView.tenant_status === 'ready') break;
     if (clientView.tenant_status === 'failed') {
@@ -283,6 +287,7 @@ async function scenarioClients(context) {
     }
     await new Promise((resolve) => setTimeout(resolve, 1000));
   }
+  check('client read returns 200', finalReadStatus === 200, finalReadStatus);
   check('client reaches ready', clientView?.tenant_status === 'ready', clientView?.tenant_status);
 
   // Issue a key. The one-time secret exists only in this variable

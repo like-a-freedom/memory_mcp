@@ -43,25 +43,30 @@ impl PasswordHasher {
         })
     }
 
+    /// Build a hasher with explicit bounds. Test-only: production always uses
+    /// the reviewed two-running/eight-queued shape.
+    #[cfg(test)]
+    pub(crate) fn with_bounds(running: usize, admission: usize) -> LocalResult<Self> {
+        let mut hasher = Self::new()?;
+        hasher.admission = Arc::new(tokio::sync::Semaphore::new(admission));
+        hasher.running = Arc::new(tokio::sync::Semaphore::new(running));
+        Ok(hasher)
+    }
+
+    /// The admission semaphore, so a test can hold every slot and prove the
+    /// fail-closed deadline. Test-only.
+    #[cfg(test)]
+    pub(crate) fn admission_semaphore(&self) -> Arc<tokio::sync::Semaphore> {
+        self.admission.clone()
+    }
+
     /// Hash a password with Argon2id. Bounded admission.
     pub async fn hash(&self, password: String) -> LocalResult<String> {
-        let _permit =
-            tokio::time::timeout(std::time::Duration::from_secs(2), self.admission.acquire())
-                .await
-                .map_err(|_| LocalAdminError::Unavailable)?
-                .map_err(|_| LocalAdminError::Unavailable)?;
-
+        let _permit = self.admit().await?;
         let running = self.running.clone();
         let params = self.params.clone();
 
-        // Acquire running slot before spawn_blocking to queue properly.
-        // Permit is held until the spawned task completes.
-        let running_permit = running
-            .acquire()
-            .await
-            .map_err(|_| LocalAdminError::Unavailable)?;
-
-        let result = tokio::task::spawn_blocking(move || {
+        self.run_with_running_permit(running, move |_permit| {
             let mut salt_bytes = [0u8; 16];
             OsRng.fill_bytes(&mut salt_bytes);
             let salt = SaltString::encode_b64(&salt_bytes)
@@ -74,21 +79,25 @@ impl PasswordHasher {
             Ok::<String, LocalAdminError>(phc)
         })
         .await
-        .map_err(|_| LocalAdminError::Unavailable)?;
-        drop(running_permit);
-        result
     }
 
     /// Verify a password against a stored PHC hash. If `phc` is None,
     /// performs one dummy verification and returns false.
+    ///
+    /// The dummy path takes the *same* admission and running bounds as a real
+    /// verification: an unknown username must not be able to spawn unbounded
+    /// blocking KDF work, so the work it does is bounded exactly like the work
+    /// it imitates.
     pub async fn verify(&self, password: String, phc: Option<String>) -> LocalResult<bool> {
-        let phc_str = match phc {
-            Some(p) => p,
+        let _permit = self.admit().await?;
+        let running = self.running.clone();
+
+        match phc {
+            // Dummy verification for unknown/pending users.
             None => {
-                // Dummy verification for unknown/pending users.
                 let params = self.params.clone();
                 let dummy = self.dummy_phc.clone();
-                return tokio::task::spawn_blocking(move || {
+                self.run_with_running_permit(running, move |_permit| {
                     let parsed = PasswordHash::new(&dummy)
                         .map_err(|e| LocalAdminError::InvalidInput(format!("dummy PHC: {e}")))?;
                     let argon2 = Argon2::new(Algorithm::Argon2id, Version::V0x13, params);
@@ -96,37 +105,63 @@ impl PasswordHasher {
                     Ok::<bool, LocalAdminError>(false)
                 })
                 .await
-                .map_err(|_| LocalAdminError::Unavailable)?;
             }
-        };
+            Some(phc_str) => {
+                // Validate PHC parameters before expensive KDF work.
+                validate_phc(&phc_str)?;
+                self.run_with_running_permit(running, move |_permit| {
+                    let parsed = PasswordHash::new(&phc_str)
+                        .map_err(|e| LocalAdminError::InvalidInput(format!("PHC parse: {e}")))?;
+                    let argon2 = Argon2::new(Algorithm::Argon2id, Version::V0x13, self_params()?);
+                    let ok = argon2.verify_password(password.as_bytes(), &parsed).is_ok();
+                    Ok::<bool, LocalAdminError>(ok)
+                })
+                .await
+            }
+        }
+    }
 
-        // Validate PHC parameters before expensive KDF work.
-        validate_phc(&phc_str)?;
+    /// Take one of the eight admission slots, or fail closed with a
+    /// sanitized `503` after the two-second deadline.
+    ///
+    /// The wait is bounded rather than instant: a burst beyond the queue is
+    /// rejected after the same two-second deadline every admission obeys, and
+    /// a saturated queue can never grow without limit.
+    async fn admit(&self) -> LocalResult<tokio::sync::OwnedSemaphorePermit> {
+        tokio::time::timeout(
+            std::time::Duration::from_secs(2),
+            self.admission.clone().acquire_owned(),
+        )
+        .await
+        .map_err(|_| LocalAdminError::Unavailable)?
+        .map_err(|_| LocalAdminError::Unavailable)
+    }
 
-        let _permit =
-            tokio::time::timeout(std::time::Duration::from_secs(2), self.admission.acquire())
+    /// Run `job` on the blocking pool while holding one of the two *running*
+    /// permits.
+    ///
+    /// The permit travels **into** the blocking closure, so it is released when
+    /// the KDF work actually stops rather than when the awaiting future is
+    /// dropped. Cancelling a request therefore cannot free capacity for work
+    /// that is still executing on the pool.
+    async fn run_with_running_permit<T, F>(
+        &self,
+        running: Arc<tokio::sync::Semaphore>,
+        job: F,
+    ) -> LocalResult<T>
+    where
+        F: FnOnce(tokio::sync::OwnedSemaphorePermit) -> LocalResult<T> + Send + 'static,
+        T: Send + 'static,
+    {
+        let running_permit =
+            tokio::time::timeout(std::time::Duration::from_secs(2), running.acquire_owned())
                 .await
                 .map_err(|_| LocalAdminError::Unavailable)?
                 .map_err(|_| LocalAdminError::Unavailable)?;
 
-        let running = self.running.clone();
-
-        let running_permit = running
-            .acquire()
+        tokio::task::spawn_blocking(move || job(running_permit))
             .await
-            .map_err(|_| LocalAdminError::Unavailable)?;
-
-        let result = tokio::task::spawn_blocking(move || {
-            let parsed = PasswordHash::new(&phc_str)
-                .map_err(|e| LocalAdminError::InvalidInput(format!("PHC parse: {e}")))?;
-            let argon2 = Argon2::new(Algorithm::Argon2id, Version::V0x13, self_params()?);
-            let ok = argon2.verify_password(password.as_bytes(), &parsed).is_ok();
-            Ok::<bool, LocalAdminError>(ok)
-        })
-        .await
-        .map_err(|_| LocalAdminError::Unavailable)?;
-        drop(running_permit);
-        result
+            .map_err(|_| LocalAdminError::Unavailable)?
     }
 }
 
@@ -179,6 +214,7 @@ fn validate_phc(phc: &str) -> LocalResult<()> {
 #[cfg(test)]
 mod tests {
     use super::PasswordHasher;
+    use crate::service::local_admin::contracts::LocalAdminError;
 
     #[tokio::test]
     async fn local_admin_password_hashes_are_salted() {
@@ -223,5 +259,47 @@ mod tests {
             )
             .await;
         assert!(result.is_err());
+    }
+
+    #[tokio::test]
+    async fn a_saturated_admission_queue_fails_closed() {
+        // Plan §5: "KDF timeout/queue/cancellation". One slot, held by the
+        // test, so every admission must give up after the bounded deadline
+        // instead of queueing without limit.
+        let hasher = PasswordHasher::with_bounds(1, 1).expect("supported KDF");
+        // Hash first, while admission is still available, so the case below
+        // has real stored material to verify against.
+        let phc = hasher
+            .hash("a sufficiently long passphrase".to_owned())
+            .await
+            .expect("hash for the saturation case");
+        let held = hasher
+            .admission_semaphore()
+            .try_acquire_owned()
+            .expect("hold the only admission slot");
+
+        assert!(matches!(
+            hasher
+                .verify("a sufficiently long passphrase".into(), Some(phc))
+                .await,
+            Err(LocalAdminError::Unavailable)
+        ));
+        // The dummy path for an unknown username is bounded by the same
+        // deadline, so it cannot be used to spawn unbounded KDF work.
+        assert!(matches!(
+            hasher
+                .verify("a sufficiently long passphrase".into(), None)
+                .await,
+            Err(LocalAdminError::Unavailable)
+        ));
+
+        drop(held);
+        assert!(
+            hasher
+                .verify("a sufficiently long passphrase".into(), None)
+                .await
+                .is_ok(),
+            "admission recovers once capacity returns"
+        );
     }
 }

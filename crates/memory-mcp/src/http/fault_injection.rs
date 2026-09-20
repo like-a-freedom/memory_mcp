@@ -202,9 +202,108 @@ impl FailOnceAt {
     }
 }
 
+/// A test-only SQL fault seam (plan §5, "SQL fault hooks remain
+/// test-only").
+///
+/// When armed with a needle, the next local-admin statement whose SQL
+/// contains that needle fails *before* it reaches the engine. Production
+/// never calls [`SqlFaultHook::arm`], so `check` is a single relaxed
+/// atomic load on the common path and the hook cannot change production
+/// behaviour.
+///
+/// This is the SQL-level counterpart of [`FaultInjector`]: that seam fails
+/// a *worker transition*, this one fails a *statement*, which is what the
+/// "nonselected statement error / audit insert error" and "DB unavailable"
+/// experiments need in order to prove the adapter propagates the failure
+/// and leaves no partial credential, client, key or state change.
+#[derive(Debug, Default)]
+pub struct SqlFaultHook {
+    needle: std::sync::Mutex<Option<String>>,
+    fired: std::sync::atomic::AtomicBool,
+}
+
+impl SqlFaultHook {
+    /// Build an unarmed hook.
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Arm the hook so the next matching statement fails once. Test-only:
+    /// nothing in the production composition calls this.
+    #[cfg(test)]
+    pub fn arm(&self, needle: &str) {
+        let mut slot = self
+            .needle
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        *slot = Some(needle.to_string());
+        self.fired
+            .store(false, std::sync::atomic::Ordering::Release);
+    }
+
+    /// Fail closed when `sql` matches the armed needle, exactly once.
+    ///
+    /// The error is a plain storage error: every caller already maps
+    /// storage failure to a sanitized `503` and rolls the statement's
+    /// transaction back.
+    pub fn check(&self, sql: &str) -> Result<(), MemoryError> {
+        if self.fired.load(std::sync::atomic::Ordering::Acquire) {
+            return Ok(());
+        }
+        let slot = self
+            .needle
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        let Some(needle) = slot.as_deref() else {
+            return Ok(());
+        };
+        if !sql.contains(needle) {
+            return Ok(());
+        }
+        self.fired.store(true, std::sync::atomic::Ordering::Release);
+        Err(MemoryError::Storage(format!(
+            "simulated statement failure for {needle}"
+        )))
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn sql_fault_hook_fires_once_on_a_matching_statement() {
+        let hook = SqlFaultHook::new();
+        assert!(hook.check("SELECT 1").is_ok(), "unarmed hook passes");
+        hook.arm("local_admin_audit");
+        assert!(
+            hook.check("SELECT id FROM local_admin_audit WHERE id = $id")
+                .is_err(),
+            "armed needle fails the matching statement"
+        );
+        assert!(
+            hook.check("SELECT id FROM local_admin_audit WHERE id = $id")
+                .is_ok(),
+            "the fault fires exactly once"
+        );
+        assert!(
+            hook.check("SELECT 1 FROM local_admin").is_ok(),
+            "a different statement is never affected"
+        );
+    }
+
+    #[test]
+    fn sql_fault_hook_reports_the_matched_needle() {
+        let hook = SqlFaultHook::new();
+        hook.arm("local_admin_session");
+        let error = hook
+            .check("CREATE local_admin_session SET id = $id")
+            .expect_err("armed hook fails");
+        assert!(
+            error.to_string().contains("local_admin_session"),
+            "the operator can see which statement was failed: {error}"
+        );
+    }
 
     #[test]
     fn no_faults_always_passes() {

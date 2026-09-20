@@ -23,15 +23,15 @@ use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 
 use super::{
-    LocalAdminExtension, RECENT_AUTH_WINDOW_SECONDS, RequireAdmin, auth_context_from_parts, csrf,
+    LocalAdminExtension, RECENT_AUTH_WINDOW_SECONDS, REQUEST_ID_HEADER, RequireAdmin,
+    auth_context_from_parts, csrf,
 };
 use crate::http::HttpState;
 use crate::service::local_admin::auth::LocalAdminService;
-use crate::service::local_admin::client::{LocalClientService, key_request_fingerprint};
+use crate::service::local_admin::client::ClientAdminService;
 use crate::service::local_admin::contracts::{
-    AdminKeyInsert, AdminPrincipal, AuthAttemptContext, ChallengeKind, ClientCreate,
-    ClientStateAction, KeyExpiry, KeyInsertOutcome, LocalAdminError, LocalResult, PageRequest,
-    RequestContext,
+    AdminKeyCreate, AdminPrincipal, AuthAttemptContext, ChallengeKind, ClientCreate,
+    ClientStateAction, KeyExpiry, LocalAdminError, LocalResult, PageRequest, RequestContext,
 };
 
 const MAX_BODY_BYTES: usize = 16 * 1024; // 16KiB
@@ -57,11 +57,14 @@ struct ErrorDetail {
 }
 
 /// A local-admin rejection that renders the spec §8 error envelope.
+/// A rejection that has already been classified against the spec §8 table.
 ///
-/// Guards return this rather than a whole `Response` so the error arm
-/// stays small enough to pass by value (`clippy::result_large_err`)
-/// while still carrying everything the renderer needs.
-struct Rejection {
+/// Guards return this rather than a whole `Response` so the error arm stays
+/// small enough to pass by value (`clippy::result_large_err`) while still
+/// carrying everything the renderer needs. It is also the extractor
+/// (`RequireAdmin`) rejection type, so handler errors and extractor errors are
+/// rendered by exactly one table.
+pub struct Rejection {
     status: StatusCode,
     code: &'static str,
     message: String,
@@ -118,8 +121,16 @@ impl IntoResponse for Rejection {
     }
 }
 
+impl From<LocalAdminError> for Rejection {
+    fn from(error: LocalAdminError) -> Self {
+        map_error(error)
+    }
+}
+
 /// The single renderer of the spec §8 error envelope: every rejected
-/// local-admin request funnels through here.
+/// local-admin request funnels through here. Spec §8 also requires a
+/// server-generated request id, emitted both as the `x-request-id`
+/// response header and as `correlation_id` in the body.
 fn error_response_with_key(
     status: StatusCode,
     code: &'static str,
@@ -127,13 +138,14 @@ fn error_response_with_key(
     key_id: Option<String>,
     retry_after_seconds: Option<u32>,
 ) -> Response {
+    let request_id = uuid::Uuid::new_v4().to_string();
     let body = ErrorBody {
         error: ErrorDetail {
             code,
             message: message.to_string(),
             key_id,
         },
-        correlation_id: uuid::Uuid::new_v4().to_string(),
+        correlation_id: request_id.clone(),
     };
     let mut response = (
         status,
@@ -144,6 +156,9 @@ fn error_response_with_key(
         serde_json::to_string(&body).unwrap_or_default(),
     )
         .into_response();
+    if let Ok(value) = axum::http::HeaderValue::from_str(&request_id) {
+        response.headers_mut().insert(REQUEST_ID_HEADER, value);
+    }
     if let Some(seconds) = retry_after_seconds
         && let Ok(value) = axum::http::HeaderValue::from_str(&seconds.to_string())
     {
@@ -156,7 +171,7 @@ fn error_response_with_key(
 
 /// Map a domain error onto the spec §8 status/body table. Underlying
 /// storage errors are never rendered.
-fn map_error(e: LocalAdminError) -> Rejection {
+pub fn map_error(e: LocalAdminError) -> Rejection {
     match e {
         LocalAdminError::InvalidInput(msg) => {
             Rejection::new(StatusCode::BAD_REQUEST, "bad_request", &msg)
@@ -216,15 +231,10 @@ fn map_error(e: LocalAdminError) -> Rejection {
         LocalAdminError::Throttled {
             retry_after_seconds,
         } => Rejection::throttled(retry_after_seconds),
-        LocalAdminError::Unavailable => Rejection::new(
+        LocalAdminError::Unavailable | LocalAdminError::Infrastructure(_) => Rejection::new(
             StatusCode::SERVICE_UNAVAILABLE,
             "temporarily_unavailable",
             "temporarily unavailable",
-        ),
-        LocalAdminError::Infrastructure(_) => Rejection::new(
-            StatusCode::INTERNAL_SERVER_ERROR,
-            "internal_error",
-            "internal error",
         ),
     }
 }
@@ -239,15 +249,27 @@ fn no_store(mut response: Response) -> Response {
 }
 
 fn json_response<T: Serialize>(status: StatusCode, value: &T) -> Response {
-    (
-        status,
-        [
-            (axum::http::header::CONTENT_TYPE, "application/json"),
-            (axum::http::header::CACHE_CONTROL, "no-store"),
-        ],
-        serde_json::to_string(value).unwrap_or_default(),
-    )
-        .into_response()
+    match serde_json::to_string(value) {
+        Ok(body) => (
+            status,
+            [
+                (axum::http::header::CONTENT_TYPE, "application/json"),
+                (axum::http::header::CACHE_CONTROL, "no-store"),
+            ],
+            body,
+        )
+            .into_response(),
+        // No reachable value of these DTOs fails to serialize. If one ever
+        // did, fail closed with the sanitized outage answer instead of a
+        // success status carrying an empty body.
+        Err(_) => error_response_with_key(
+            StatusCode::SERVICE_UNAVAILABLE,
+            "temporarily_unavailable",
+            "temporarily unavailable",
+            None,
+            None,
+        ),
+    }
 }
 
 fn no_content() -> Response {
@@ -320,22 +342,27 @@ fn attempt_context(parts: &Parts) -> Result<AuthAttemptContext, Rejection> {
     })
 }
 
+/// Rejection used when no local-admin extension is installed at all, which
+/// the router prevents by mounting these routes only in local mode. Reported
+/// as an outage rather than an internal error (spec §8).
+pub fn not_configured() -> Rejection {
+    Rejection::new(
+        StatusCode::SERVICE_UNAVAILABLE,
+        "temporarily_unavailable",
+        "local administrator authentication is not configured",
+    )
+}
+
 fn get_ext(state: &Arc<HttpState>) -> Result<&LocalAdminExtension, Rejection> {
-    state.local_admin.as_ref().ok_or_else(|| {
-        Rejection::new(
-            StatusCode::SERVICE_UNAVAILABLE,
-            "temporarily_unavailable",
-            "local administrator authentication is not configured",
-        )
-    })
+    state.local_admin.as_ref().ok_or_else(not_configured)
 }
 
 fn make_auth_service(ext: &LocalAdminExtension) -> LocalAdminService {
     LocalAdminService::new(ext.authority.clone(), ext.hasher.clone())
 }
 
-fn make_client_service(ext: &LocalAdminExtension) -> LocalClientService {
-    LocalClientService::new(ext.authority.store().clone())
+fn make_client_service(ext: &LocalAdminExtension, pepper: &str) -> ClientAdminService {
+    ClientAdminService::new(ext.authority.clone(), ext.plan_version, pepper.to_owned())
 }
 
 /// Guard a public (pre-session) state-changing request.
@@ -719,7 +746,7 @@ pub async fn logout(
         // No session: 204 with no side effect beyond clearing a cookie
         // the caller may or may not hold.
         Ok(None) => return clear_session_response(),
-        Err(error) => return map_error(LocalAdminApiErrorToDomain::convert(error)).into_response(),
+        Err(error) => return map_error(error).into_response(),
     };
     let principal = match ext
         .authority
@@ -781,30 +808,6 @@ fn clear_preauth_cookie() -> String {
         "{}; Path=/; Secure; HttpOnly; SameSite=Strict; Max-Age=0",
         csrf::PREAUTH_COOKIE
     )
-}
-
-/// Small bridge so `logout` can reuse `map_error` for the cookie parse
-/// failure without duplicating the table.
-struct LocalAdminApiErrorToDomain;
-
-impl LocalAdminApiErrorToDomain {
-    fn convert(error: crate::control::local_admin::LocalAdminApiError) -> LocalAdminError {
-        use crate::control::local_admin::LocalAdminApiError;
-        match error {
-            LocalAdminApiError::BadRequest(_) => {
-                LocalAdminError::InvalidInput("bad request".into())
-            }
-            LocalAdminApiError::Unauthorized => LocalAdminError::Unauthenticated,
-            LocalAdminApiError::Forbidden => LocalAdminError::Forbidden,
-            LocalAdminApiError::NotFound => LocalAdminError::NotFound,
-            LocalAdminApiError::Conflict(_) => LocalAdminError::StateConflict,
-            LocalAdminApiError::Throttled(seconds) => LocalAdminError::Throttled {
-                retry_after_seconds: seconds,
-            },
-            LocalAdminApiError::ServiceUnavailable => LocalAdminError::Unavailable,
-            LocalAdminApiError::Internal(_) => LocalAdminError::Unavailable,
-        }
-    }
 }
 
 // ─── Client routes ────────────────────────────────────────
@@ -893,8 +896,8 @@ pub async fn list_clients(
         Ok(page) => page,
         Err(error) => return map_error(error).into_response(),
     };
-    let service = make_client_service(ext);
-    match service.list_clients(&principal.fence, page).await {
+    let service = make_client_service(ext, &state.config.api_key_pepper);
+    match service.list(&principal.fence, page).await {
         Ok(items) => no_store(json_response(StatusCode::OK, &items)),
         Err(error) => map_error(error).into_response(),
     }
@@ -939,39 +942,13 @@ pub async fn create_client(
         Err(error) => return map_error(error).into_response(),
     };
 
-    let now = chrono::Utc::now();
-    let account_id = crate::http::registry::models::new_account_id();
-    let tenant_id = crate::http::registry::models::new_tenant_id();
-    let account = crate::http::registry::models::Account {
-        id: account_id.clone(),
-        status: crate::http::registry::models::AccountStatus::Active,
-        tenant_id: tenant_id.clone(),
-        created_at: now,
-    };
-    let tenant = crate::http::registry::models::Tenant {
-        id: tenant_id.clone(),
-        status: crate::http::registry::models::TenantStatus::Reserved,
-        namespace_binding: crate::http::registry::models::NamespaceBinding {
-            namespace: crate::http::registry::models::new_namespace_name(),
-            database: "memory".into(),
-        },
-        plan_version: ext.plan_version,
-        schema_version: 0,
-        retry_stage: None,
-        provisioning_lease: None,
-        created_at: now,
-        version: 0,
-    };
-    let service = make_client_service(ext);
+    let service = make_client_service(ext, &state.config.api_key_pepper);
     let ctx = request_ctx(&parts);
     let command = ClientCreate {
         display_name,
         operation_id,
     };
-    match service
-        .create_client(&principal.fence, &ctx, command, account, tenant)
-        .await
-    {
+    match service.create(&principal.fence, &ctx, command).await {
         Ok(view) => {
             let mut response = no_store(json_response(StatusCode::ACCEPTED, &view));
             if let Ok(value) = axum::http::HeaderValue::from_str(&format!(
@@ -998,8 +975,8 @@ pub async fn get_client(
         Ok(ext) => ext,
         Err(rejection) => return rejection.into_response(),
     };
-    let service = make_client_service(ext);
-    match service.client(&principal.fence, &account_id).await {
+    let service = make_client_service(ext, &state.config.api_key_pepper);
+    match service.get(&principal.fence, &account_id).await {
         Ok(view) => no_store(json_response(StatusCode::OK, &view)),
         Err(error) => map_error(error).into_response(),
     }
@@ -1020,8 +997,8 @@ pub async fn list_keys(
         Ok(page) => page,
         Err(error) => return map_error(error).into_response(),
     };
-    let service = make_client_service(ext);
-    match service.list_keys(&principal.fence, &account_id, page).await {
+    let service = make_client_service(ext, &state.config.api_key_pepper);
+    match service.keys(&principal.fence, &account_id, page).await {
         Ok(items) => no_store(json_response(StatusCode::OK, &items)),
         Err(error) => map_error(error).into_response(),
     }
@@ -1084,43 +1061,27 @@ pub async fn issue_key(
         .into_response();
     }
 
-    // Generate the credential locally; only the verifier is persisted.
-    let secret = crate::control::secret::random_token();
-    let key_id = crate::http::registry::models::new_api_key_id();
-    let verifier = crate::http::registry::models::KeyedVerifier::compute(
-        state.config.api_key_pepper.as_bytes(),
-        secret.as_bytes(),
-    );
-    let command = AdminKeyInsert {
-        account_id: account_id.clone(),
-        key_id: key_id.clone(),
+    // The credential is generated and revealed exactly once by the service;
+    // only its verifier is persisted.
+    let command = AdminKeyCreate {
         name: name.clone(),
-        verifier,
         expiry: req.expiry.clone(),
         operation_id,
-        request_fingerprint: key_request_fingerprint(operation_id, &name, &req.expiry),
     };
-    let service = make_client_service(ext);
+    let service = make_client_service(ext, &state.config.api_key_pepper);
     match service
-        .insert_key(&principal.fence, &request_ctx(&parts), command)
+        .issue_key(&principal.fence, &request_ctx(&parts), &account_id, command)
         .await
     {
-        Ok(KeyInsertOutcome::Created(meta)) => {
-            // The full `mem_sk_...` credential is returned exactly once.
-            let credential = format!("mem_sk_{key_id}_{secret}");
-            no_store(json_response(
-                StatusCode::CREATED,
-                &IssuedKeyResponse {
-                    id: meta.id,
-                    name: meta.name,
-                    secret: credential,
-                    expires_at: meta.expires_at.map(|value| value.to_rfc3339()),
-                },
-            ))
-        }
-        Ok(KeyInsertOutcome::AlreadyIssued { key_id }) => {
-            map_error(LocalAdminError::SecretAlreadyIssued { key_id }).into_response()
-        }
+        Ok(issued) => no_store(json_response(
+            StatusCode::CREATED,
+            &IssuedKeyResponse {
+                id: issued.id,
+                name: issued.name,
+                secret: issued.secret,
+                expires_at: issued.expires_at.map(|value| value.to_rfc3339()),
+            },
+        )),
         Err(error) => map_error(error).into_response(),
     }
 }
@@ -1140,7 +1101,7 @@ pub async fn revoke_key(
     if let Err(rejection) = guard_session(ext, &state, &parts, &principal) {
         return rejection.into_response();
     }
-    let service = make_client_service(ext);
+    let service = make_client_service(ext, &state.config.api_key_pepper);
     match service
         .revoke_key(&principal.fence, &request_ctx(&parts), &account_id, &key_id)
         .await
@@ -1181,9 +1142,9 @@ async fn set_client_state(
         Ok(req) => req,
         Err(rejection) => return rejection.into_response(),
     };
-    let service = make_client_service(ext);
+    let service = make_client_service(ext, &state.config.api_key_pepper);
     match service
-        .set_client_state(
+        .set_state(
             &principal.fence,
             &request_ctx(&parts),
             &account_id,
@@ -1227,7 +1188,7 @@ pub async fn resume_client(
     set_client_state(
         state,
         principal,
-        body_parts(parts),
+        parts,
         account_id,
         body,
         ClientStateAction::Resume,
@@ -1235,6 +1196,197 @@ pub async fn resume_client(
     .await
 }
 
-fn body_parts(parts: Parts) -> Parts {
-    parts
+#[cfg(test)]
+mod tests {
+    //! The spec §8 error table, asserted at the single renderer.
+
+    use super::*;
+    use crate::error::MemoryError;
+
+    fn status_of(error: LocalAdminError) -> (StatusCode, &'static str) {
+        let rejection = map_error(error);
+        (rejection.status, rejection.code)
+    }
+
+    #[test]
+    fn spec_status_table_is_exhaustive() {
+        // Every arm of the domain error type maps to the documented status
+        // and stable code. A storage/adapter failure is a 503 outage, not a
+        // 500: spec §8 lists no 5xx other than `temporarily_unavailable`.
+        assert_eq!(
+            status_of(LocalAdminError::InvalidInput("x".into())),
+            (StatusCode::BAD_REQUEST, "bad_request")
+        );
+        assert_eq!(
+            status_of(LocalAdminError::InvalidChallenge),
+            (StatusCode::BAD_REQUEST, "invalid_challenge")
+        );
+        assert_eq!(
+            status_of(LocalAdminError::InvalidCredentials),
+            (StatusCode::UNAUTHORIZED, "invalid_credentials")
+        );
+        assert_eq!(
+            status_of(LocalAdminError::Unauthenticated),
+            (StatusCode::UNAUTHORIZED, "unauthorized")
+        );
+        assert_eq!(
+            status_of(LocalAdminError::Forbidden),
+            (StatusCode::FORBIDDEN, "forbidden")
+        );
+        assert_eq!(
+            status_of(LocalAdminError::ReauthRequired),
+            (StatusCode::FORBIDDEN, "reauth_required")
+        );
+        assert_eq!(
+            status_of(LocalAdminError::NotFound),
+            (StatusCode::NOT_FOUND, "not_found")
+        );
+        assert_eq!(
+            status_of(LocalAdminError::StateConflict),
+            (StatusCode::CONFLICT, "conflict")
+        );
+        assert_eq!(
+            status_of(LocalAdminError::VersionConflict),
+            (StatusCode::CONFLICT, "conflict")
+        );
+        assert_eq!(
+            status_of(LocalAdminError::IdempotencyConflict),
+            (StatusCode::CONFLICT, "idempotency_conflict")
+        );
+        assert_eq!(
+            status_of(LocalAdminError::KeyCap),
+            (StatusCode::CONFLICT, "key_cap_reached")
+        );
+        assert_eq!(
+            status_of(LocalAdminError::SecretAlreadyIssued {
+                key_id: "key:7".into()
+            }),
+            (StatusCode::CONFLICT, "secret_already_issued")
+        );
+        assert_eq!(
+            status_of(LocalAdminError::Throttled {
+                retry_after_seconds: 9
+            }),
+            (StatusCode::TOO_MANY_REQUESTS, "throttled")
+        );
+        assert_eq!(
+            status_of(LocalAdminError::Unavailable),
+            (StatusCode::SERVICE_UNAVAILABLE, "temporarily_unavailable")
+        );
+        assert_eq!(
+            status_of(LocalAdminError::Infrastructure(MemoryError::Storage(
+                "registry is down".into()
+            ))),
+            (StatusCode::SERVICE_UNAVAILABLE, "temporarily_unavailable")
+        );
+    }
+
+    #[test]
+    fn infrastructure_detail_is_never_rendered() {
+        let rejection = map_error(LocalAdminError::Infrastructure(MemoryError::Storage(
+            "connection refused to ws://db.internal:8000".into(),
+        )));
+        assert!(
+            !rejection.message.contains("db.internal"),
+            "a storage error must not reach the wire: {}",
+            rejection.message
+        );
+    }
+
+    #[tokio::test]
+    async fn every_error_carries_a_matching_request_id_header() {
+        let response = map_error(LocalAdminError::NotFound).into_response();
+        assert_eq!(response.status(), StatusCode::NOT_FOUND);
+        let header = response
+            .headers()
+            .get(REQUEST_ID_HEADER)
+            .expect("spec §8 requires a request-id header")
+            .to_str()
+            .expect("ascii request id")
+            .to_owned();
+        let body = axum::body::to_bytes(response.into_body(), 64 * 1024)
+            .await
+            .expect("error body");
+        let body: serde_json::Value = serde_json::from_slice(&body).expect("json envelope");
+        assert_eq!(
+            body["correlation_id"],
+            serde_json::json!(header),
+            "the header and the body must carry the same id"
+        );
+    }
+
+    #[tokio::test]
+    async fn throttling_sends_retry_after_and_never_a_second_id() {
+        let response = map_error(LocalAdminError::Throttled {
+            retry_after_seconds: 17,
+        })
+        .into_response();
+        assert_eq!(response.status(), StatusCode::TOO_MANY_REQUESTS);
+        assert_eq!(
+            response
+                .headers()
+                .get(axum::http::header::RETRY_AFTER)
+                .expect("spec §7 requires Retry-After on 429"),
+            "17"
+        );
+    }
+
+    #[test]
+    fn omitted_expiry_is_invalid_rather_than_non_expiring() {
+        // Spec §8: "missing/null expiry is invalid rather than accidental
+        // non-expiring issuance" — the strict DTO has no default.
+        assert!(serde_json::from_str::<KeyExpiry>(r#"{"kind":"days","days":30}"#).is_ok());
+        assert!(serde_json::from_str::<KeyExpiry>(r#"{"kind":"never"}"#).is_ok());
+        assert!(
+            serde_json::from_str::<KeyExpiry>(r#"{"kind":"unknown"}"#).is_err(),
+            "an unknown expiry kind must be rejected"
+        );
+        assert!(
+            serde_json::from_str::<KeyExpiry>(r#"{"kind":"days"}"#).is_err(),
+            "a day-count expiry without days must be rejected"
+        );
+        assert!(
+            serde_json::from_str::<KeyExpiry>(r#"{"kind":"never","bogus":30}"#).is_err(),
+            "a stray field must not be silently ignored"
+        );
+        assert!(
+            serde_json::from_str::<KeyExpiry>(r#"{"days":30}"#).is_err(),
+            "a missing kind must be rejected"
+        );
+        assert!(
+            serde_json::from_str::<IssueKeyRequest>(
+                r#"{"name":"k","expiry":{"kind":"never"},"extra":1}"#,
+            )
+            .is_err(),
+            "unknown request fields must be rejected"
+        );
+    }
+
+    #[test]
+    fn page_limits_match_the_documented_bounds() {
+        let too_small = PageQuery {
+            after: None,
+            limit: Some(0),
+        };
+        assert!(too_small.into_request().is_err());
+        let too_large = PageQuery {
+            after: None,
+            limit: Some(101),
+        };
+        assert!(too_large.into_request().is_err());
+        let default = PageQuery {
+            after: None,
+            limit: None,
+        }
+        .into_request()
+        .expect("default page");
+        assert_eq!(default.limit, 50);
+        let max = PageQuery {
+            after: None,
+            limit: Some(100),
+        }
+        .into_request()
+        .expect("maximum page");
+        assert_eq!(max.limit, 100);
+    }
 }

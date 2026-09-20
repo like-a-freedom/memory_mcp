@@ -54,6 +54,16 @@ pub fn build_router(
     #[cfg(feature = "prometheus")]
     let router = router.route("/metrics", get(super::metrics::prometheus));
 
+    // Mode disclosure is mounted in *both* browser-auth modes (spec §8:
+    // public `{mode:"local"|"oidc"}` when the control plane is enabled), so an
+    // OIDC deployment can tell the UI which flow to run. It lives on the base
+    // router, which already carries the host/origin and deadline layers.
+    #[cfg(feature = "control-plane")]
+    let router = router.route(
+        "/api/v1/auth/config",
+        get(crate::control::local_admin::handlers::auth_config),
+    );
+
     #[cfg(feature = "control-plane")]
     let control_extension: Option<axum::Extension<Arc<dyn FaultInjector>>> =
         control_plane_injector.map(axum::Extension);
@@ -184,7 +194,6 @@ pub fn build_router(
             // `/api/v1/account/*` and `/api/v1/operator/*` are absent
             // rather than merely unauthenticated.
             let local_admin = Router::new()
-                .route("/api/v1/auth/config", get(handlers::auth_config))
                 .route("/api/v1/auth/local/csrf", get(handlers::preauth_csrf))
                 .route(
                     "/api/v1/auth/local/challenge",

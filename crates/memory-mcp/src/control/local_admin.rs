@@ -1,9 +1,5 @@
-#![allow(dead_code)]
-
 use axum::extract::FromRequestParts;
-use axum::http::StatusCode;
 use axum::http::request::Parts;
-use axum::response::{IntoResponse, Response};
 use std::sync::Arc;
 
 use crate::http::HttpState;
@@ -11,80 +7,10 @@ use crate::service::local_admin::contracts::{
     AdminFence, AdminPrincipal, AuthAttemptContext, LocalAdminError, RequestContext,
 };
 
-/// HTTP error mapping for local admin operations.
-pub enum LocalAdminApiError {
-    BadRequest(String),
-    Unauthorized,
-    Forbidden,
-    NotFound,
-    Conflict(String),
-    Throttled(u32),
-    ServiceUnavailable,
-    Internal(String),
-}
-
-impl IntoResponse for LocalAdminApiError {
-    fn into_response(self) -> Response {
-        let (status, code, message) = match self {
-            Self::BadRequest(msg) => (StatusCode::BAD_REQUEST, "bad_request", msg),
-            Self::Unauthorized => (
-                StatusCode::UNAUTHORIZED,
-                "unauthorized",
-                "unauthorized".into(),
-            ),
-            Self::Forbidden => (StatusCode::FORBIDDEN, "forbidden", "forbidden".into()),
-            Self::NotFound => (StatusCode::NOT_FOUND, "not_found", "not found".into()),
-            Self::Conflict(msg) => (StatusCode::CONFLICT, "conflict", msg),
-            Self::Throttled(secs) => (
-                StatusCode::TOO_MANY_REQUESTS,
-                "throttled",
-                format!("retry after {secs}s"),
-            ),
-            Self::ServiceUnavailable => (
-                StatusCode::SERVICE_UNAVAILABLE,
-                "temporarily_unavailable",
-                "temporarily unavailable".into(),
-            ),
-            Self::Internal(msg) => (StatusCode::INTERNAL_SERVER_ERROR, "internal_error", msg),
-        };
-        let body = serde_json::json!({
-            "error": {"code": code, "message": message},
-            "correlation_id": uuid::Uuid::new_v4().to_string(),
-        });
-        (
-            status,
-            [(axum::http::header::CONTENT_TYPE, "application/json")],
-            body.to_string(),
-        )
-            .into_response()
-    }
-}
-
-impl From<LocalAdminError> for LocalAdminApiError {
-    fn from(e: LocalAdminError) -> Self {
-        match e {
-            LocalAdminError::InvalidInput(msg) => Self::BadRequest(msg),
-            LocalAdminError::InvalidCredentials => Self::Unauthorized,
-            LocalAdminError::InvalidChallenge => Self::BadRequest("invalid challenge".into()),
-            LocalAdminError::Unauthenticated => Self::Unauthorized,
-            LocalAdminError::Forbidden => Self::Forbidden,
-            LocalAdminError::ReauthRequired => Self::Unauthorized,
-            LocalAdminError::NotFound => Self::NotFound,
-            LocalAdminError::StateConflict => Self::Conflict("state conflict".into()),
-            LocalAdminError::VersionConflict => Self::Conflict("version conflict".into()),
-            LocalAdminError::IdempotencyConflict => Self::Conflict("idempotency conflict".into()),
-            LocalAdminError::KeyCap => Self::Conflict("key cap reached".into()),
-            LocalAdminError::SecretAlreadyIssued { key_id } => {
-                Self::Conflict(format!("secret already issued for key {key_id}"))
-            }
-            LocalAdminError::Throttled {
-                retry_after_seconds,
-            } => Self::Throttled(retry_after_seconds),
-            LocalAdminError::Unavailable => Self::ServiceUnavailable,
-            LocalAdminError::Infrastructure(_) => Self::Internal("internal error".into()),
-        }
-    }
-}
+/// The response request-id header name. Spec §8 requires the server to
+/// generate a request id for every local error response; the same id is
+/// also rendered into the body as `correlation_id`.
+pub const REQUEST_ID_HEADER: &str = "x-request-id";
 
 /// Extension that carries the local admin service, available when mode=local.
 #[derive(Clone)]
@@ -150,11 +76,14 @@ pub mod handlers;
 pub const RECENT_AUTH_WINDOW_SECONDS: i64 = 600;
 
 /// Extractor that resolves the admin principal from the session cookie.
-/// Returns 401 if no valid session exists.
+///
+/// Rejections are rendered by the *single* spec §8 error renderer in
+/// [`handlers`], so an extractor failure and a handler failure cannot
+/// disagree about a status or a stable code.
 pub struct RequireAdmin(pub AdminPrincipal);
 
 impl FromRequestParts<Arc<HttpState>> for RequireAdmin {
-    type Rejection = LocalAdminApiError;
+    type Rejection = handlers::Rejection;
 
     async fn from_request_parts(
         parts: &mut Parts,
@@ -163,24 +92,22 @@ impl FromRequestParts<Arc<HttpState>> for RequireAdmin {
         let ext = state
             .local_admin
             .as_ref()
-            .ok_or(LocalAdminApiError::Internal(
-                "local admin not configured".into(),
-            ))?;
+            .ok_or_else(handlers::not_configured)?;
 
         let cookie_header = parts
             .headers
             .get("cookie")
             .and_then(|v| v.to_str().ok())
             .unwrap_or("");
-        let cookie_verifier =
-            parse_admin_cookie(cookie_header)?.ok_or(LocalAdminApiError::Unauthorized)?;
+        let cookie_verifier = parse_admin_cookie(cookie_header)?
+            .ok_or_else(|| handlers::map_error(LocalAdminError::Unauthenticated))?;
 
         let principal = ext
             .authority
             .store()
             .resolve_session(&cookie_verifier, ext.authority.policy())
             .await
-            .map_err(LocalAdminApiError::from)?;
+            .map_err(handlers::map_error)?;
 
         Ok(RequireAdmin(principal))
     }
@@ -188,17 +115,19 @@ impl FromRequestParts<Arc<HttpState>> for RequireAdmin {
 
 /// Parse the `__Host-memory_mcp_admin=<hex>` cookie from the Cookie
 /// header. Duplicate values are rejected rather than resolved by
-/// "first wins".
-pub fn parse_admin_cookie(cookie_header: &str) -> Result<Option<[u8; 32]>, LocalAdminApiError> {
+/// "first wins"; every malformed shape collapses to
+/// [`LocalAdminError::Unauthenticated`] so the caller cannot distinguish
+/// "absent" from "malformed".
+pub fn parse_admin_cookie(cookie_header: &str) -> Result<Option<[u8; 32]>, LocalAdminError> {
     let Some(value) = csrf::parse_cookie(cookie_header, csrf::SESSION_COOKIE)
-        .map_err(|_| LocalAdminApiError::Unauthorized)?
+        .map_err(|_| LocalAdminError::Unauthenticated)?
     else {
         return Ok(None);
     };
-    let bytes = hex::decode(value).map_err(|_| LocalAdminApiError::Unauthorized)?;
+    let bytes = hex::decode(value).map_err(|_| LocalAdminError::Unauthenticated)?;
     let arr: [u8; 32] = bytes
         .try_into()
-        .map_err(|_| LocalAdminApiError::Unauthorized)?;
+        .map_err(|_| LocalAdminError::Unauthenticated)?;
     Ok(Some(arr))
 }
 
@@ -226,13 +155,7 @@ pub fn direct_peer(parts: &Parts) -> Option<std::net::IpAddr> {
         .get::<axum::extract::connect_info::ConnectInfo<std::net::SocketAddr>>()?
         .0
         .ip();
-    Some(match peer {
-        std::net::IpAddr::V6(v6) => match v6.to_ipv4_mapped() {
-            Some(v4) => std::net::IpAddr::V4(v4),
-            None => std::net::IpAddr::V6(v6),
-        },
-        ip => ip,
-    })
+    Some(crate::service::local_admin::policy::normalize_peer_ip(peer))
 }
 
 /// Build an `AuthAttemptContext` from axum request parts.

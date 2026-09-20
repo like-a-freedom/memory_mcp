@@ -7,7 +7,7 @@
 
 use dioxus::prelude::*;
 
-use crate::admin_api::{AdminApi, AuthConfig};
+use crate::admin_api::{AdminApi, AuthConfig, PATH_OIDC_AUTHORIZE};
 use crate::pages::admin_auth::AdminLoginForm;
 
 #[component]
@@ -35,7 +35,7 @@ pub fn LoginPage() -> Element {
                 } else if mode.is_oidc() {
                     h1 { "Login" }
                     p { "You will be redirected to your identity provider." }
-                    a { href: "/api/v1/auth/authorize", button { "Login with OIDC" } }
+                    a { href: PATH_OIDC_AUTHORIZE, button { "Login with OIDC" } }
                 } else {
                     h1 { "Sign in" }
                     p { class: "error", role: "alert",
@@ -68,4 +68,21 @@ fn load_mode(
             }
         }
     });
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// The OIDC button must point at the route the server actually mounts.
+    /// Guessing the `/api/v1` prefix (as an earlier revision did) produces a
+    /// link that 404s for every OIDC deployment.
+    #[test]
+    fn the_oidc_button_targets_the_mounted_authorize_route() {
+        assert_eq!(PATH_OIDC_AUTHORIZE, "/auth/oidc/authorize");
+        assert!(
+            !PATH_OIDC_AUTHORIZE.starts_with("/api/v1"),
+            "the OIDC flow is mounted outside the API prefix"
+        );
+    }
 }

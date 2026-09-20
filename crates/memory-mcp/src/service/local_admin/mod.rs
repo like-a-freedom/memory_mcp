@@ -21,15 +21,16 @@ mod tests;
 // exposed.
 
 pub use auth::{AdminManagementService, LocalAdminAuthority, LocalAdminService};
-pub use client::LocalClientService;
+pub use client::ClientAdminService;
 pub use contracts::{
-    AdminFence, AdminLogin, AdminPrincipal, AttemptDecision, AttemptDomain, AttemptInput,
-    AuthAttemptContext, BrowserPolicyFence, ChallengeFinish, ChallengeIssue, ChallengeKind,
-    ChallengeView, ClientBundle, ClientCreate, ClientStateAction, ClientView, CredentialSnapshot,
-    FailureAction, FailureAudit, FailureReason, IssuedChallenge, KeyExpiry, KeyInsertOutcome,
-    LocalAdminError, LocalAdminStore, LocalKeyFingerprints, LocalResult, OneTimeChallenge, Page,
-    PageRequest, RequestContext, SessionOpen, SessionRotate,
+    AdminFence, AdminKeyCreate, AdminLogin, AdminPrincipal, AttemptDecision, AttemptDomain,
+    AttemptInput, AuthAttemptContext, BrowserPolicyFence, ChallengeFinish, ChallengeIssue,
+    ChallengeKind, ChallengeView, ClientBundle, ClientCreate, ClientStateAction, ClientView,
+    CredentialSnapshot, FailureAction, FailureAudit, FailureReason, IssuedChallenge,
+    IssuedClientKey, KeyExpiry, KeyInsertOutcome, LocalAdminError, LocalAdminStore,
+    LocalKeyFingerprints, LocalResult, OneTimeChallenge, Page, PageRequest, RequestContext,
+    SessionOpen, SessionRotate,
 };
 #[cfg(feature = "control-plane")]
 pub use password::PasswordHasher;
-pub use policy::{normalize_username, validate_password};
+pub use policy::{normalize_peer_ip, normalize_username, validate_password};

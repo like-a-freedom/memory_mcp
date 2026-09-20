@@ -45,14 +45,19 @@ All of the following were executed in this repository and passed:
 | Static assets + CSP | `MEMORY_MCP_CONTROL_PLANE_UI_DIST=<abs dist> cargo test -p memory_mcp --lib --features control-plane-ui,test-fixtures --locked control::static_assets` — 6 passed |
 | Format, lint, non-default builds | `cargo fmt --all --check`; `cargo clippy --workspace --all-targets --features … --locked -- -D warnings` for all four documented feature combinations; `cargo check -p memory_mcp --no-default-features --locked` and `--features streamable-http` |
 | End-to-end against the real binaries | `sh scripts/ci/local_admin_local_check.sh` — local mode starts from env, activation/login/session, client create/list/get, provisioning reaches `ready` in one poll, restart persistence, plan-mismatch startup rejection, recovery invalidates the session, negative route/CSRF/Origin checks |
-| Packaged image over real TLS in a real browser | `docker build --tag memory-mcp-local-admin:test .` then `python3 scripts/ci/local_admin_image.py --image memory-mcp-local-admin:test --scenario all` — 4 scenarios, 54 checks, exit 0 (`auth` 9, `clients` 32, `regression` 6, `ui` 7) |
+| Packaged image over real TLS in a real browser | `docker build --tag memory-mcp-local-admin:test .` then `python3 scripts/ci/local_admin_image.py --image memory-mcp-local-admin:test --scenario all` — 4 scenarios, 54 checks, exit 0 (`auth` 9, `clients` 29, `regression` 6, `ui` 10) |
 | Compose modes resolve | `docker compose --env-file <operator env> -f docker-compose.yml -f docker-compose.{off,local,oidc}.yml config --quiet` — all three resolve |
 
 ### What is NOT verified
 
-1. **The remote replica race tests.** Both `local_admin_durable.rs` tests are
-   `#[ignore]`d and require an isolated remote SurrealDB 3.2.4 plus the three
-   `LOCAL_ADMIN_TEST_CONTROL_*` variables (§2.2, §13.2).
+1. **The remote replica race tests.** Both `local_admin_remote.rs` tests
+   (`local_admin_remote_replica_races`, `local_admin_session_revocation_race`)
+   are `#[ignore]`d and require an isolated remote SurrealDB 3.2.4 plus the
+   three `LOCAL_ADMIN_TEST_CONTROL_*` variables (§2.2, §13.2). They now live
+   inside the crate as inline adapter tests, so the documented
+   `cargo test -p memory_mcp --lib … -- --ignored` command selects them, and
+   explicitly selecting them without the environment **fails** rather than
+   skipping.
 2. **A real identity provider.** OIDC mode is exercised at store and router
    level, but no OIDC login was performed against a live IdP in this
    environment.
@@ -67,13 +72,17 @@ All of the following were executed in this repository and passed:
    covered as *outcomes*, not as interleavings: there are no barrier-driven
    tests that order two in-flight transactions (§13.3).
 6. **Database unavailability mid-transaction.** Storage-outage behaviour
-   (503 with no fallback) is asserted by unit-level mapping, not by taking the
-   database down under load.
+   (sanitized `503` with no fallback) is proven with the test-only SQL fault
+   hook (`sql_fault_tests` in the durable store), which fails a *named*
+   statement before it reaches the engine. A real database process is not
+   killed mid-request.
 7. **Sub-second rate-window boundaries across replicas.** The durable cap and
    its saturation are tested; two independent replicas sharing live counters
    were not (no second server process against a shared registry).
-8. **Second-administrator scoping.** Client visibility is per-creating-admin
-   and no test exercises two administrators against one registry (§6.3).
+8. **Second-administrator scoping.** ✅ now implemented and covered:
+   `http_local_admin.rs::a_second_administrator_sees_and_can_administer_the_same_clients`
+   (§6.3). The remaining remote-replica *interleavings* are still unverified
+   (§13.2).
 
 ### Relationship to other documents
 
@@ -123,14 +132,14 @@ Run from the repository root.
 | `cargo test -p memory_mcp --features control-plane,test-fixtures --locked --test http_control_plane` | ✅ executed, 10 passed |
 | `cargo test -p memory_mcp --features control-plane,test-fixtures --locked --test http_local_admin` | ✅ executed, 37 passed |
 | `cargo test -p memory_mcp --features control-plane,test-fixtures --locked --test local_admin_cli` | ✅ executed, 6 passed |
-| `cargo test -p memory_mcp --features control-plane,test-fixtures --locked --test local_admin_durable` | ✅ compiled and run; **0 passed, 2 ignored** (both require an isolated remote SurrealDB) |
+| `cargo test -p memory_mcp --features control-plane,test-fixtures --locked` | ✅ executed, all targets green |
 | `cargo test -p memory_mcp --features control-plane,test-fixtures --locked` | ✅ executed, every target green |
 | `cargo test -p control-plane-ui --locked` | ✅ executed, 51 passed |
 | `cargo check -p control-plane-ui --locked` | ✅ executed, clean (native check only; proves nothing about WASM) |
 | `cargo clippy --workspace --all-targets --features fs-watch,mcp-apps,streamable-http,control-plane --locked -- -D warnings` | ✅ executed, clean |
 | `cargo clippy --workspace --all-targets --features fs-watch,mcp-apps,streamable-http,control-plane,test-fixtures --locked -- -D warnings` | ✅ executed, clean |
 | `cargo clippy ... --features ...,control-plane-ui,test-fixtures ...` | ✅ executed, clean (with `MEMORY_MCP_CONTROL_PLANE_UI_DIST` set) |
-| `cargo test -p memory_mcp --lib --features control-plane,test-fixtures --locked local_admin_remote_replica_races -- --ignored` | ⚠️ not executed (needs an isolated remote SurrealDB 3.2.4 and the three `LOCAL_ADMIN_TEST_CONTROL_*` variables) |
+| `cargo test -p memory_mcp --lib --features control-plane,test-fixtures --locked local_admin_remote_replica_races -- --ignored` | ⚠️ not executed (needs an isolated remote SurrealDB 3.2.4 and the three `LOCAL_ADMIN_TEST_CONTROL_*` variables); the test is now an inline adapter test, so the command selects it, and running it without the variables **fails** rather than skipping |
 | `MEMORY_MCP_CONTROL_PLANE_UI_DIST=<abs dist> cargo test -p memory_mcp --lib --features control-plane-ui,test-fixtures --locked control::static_assets` | ✅ executed, 6 passed — the build script requires an absolute, non-symlink dist directory containing a non-empty `index.html` |
 | `MEMORY_MCP_CONTROL_PLANE_UI_DIST=<abs dist> cargo test -p memory_mcp --features control-plane-ui,test-fixtures --locked --test http_local_admin` | ✅ executed, 37 passed |
 | `docker compose --env-file <operator env> -f docker-compose.yml -f docker-compose.{off,local,oidc}.yml config --quiet` | ✅ executed, all three overlays resolve. The base file alone still fails by design: it refuses to default any secret |
@@ -173,7 +182,7 @@ were executed; neither can pass without testing something.
   not sufficient because the runner must mint its own codes. Secrets are
   registered in memory and redacted from every diagnostic.
 
-Executed result: `auth` 9, `clients` 32, `regression` 6, `ui` 7 — 54 checks,
+Executed result: `auth` 9, `clients` 29, `regression` 6, `ui` 10 — 54 checks,
 exit 0. The `ui` scenario loads the real bundle in a page and asserts it mounts.
 
 ### 2.4 Feature/runtime matrix
@@ -279,14 +288,14 @@ Always required by the HTTP profile (all modes; `require_env` / `parse_hex_32_en
 
 | Variable | Notes |
 |---|---|
-| `MEMORY_MCP_HTTP_PUBLIC_BASE_URL` | Must start with `https://` in local mode, **or** contain `localhost` (development escape hatch) |
+| `MEMORY_MCP_HTTP_PUBLIC_BASE_URL` | Must start with `https://` in local mode, **or** be loopback (`localhost`, `127.0.0.1`, `[::1]`) as a development escape hatch. The exception keys off the URL *host*, so `http://evil.example/?localhost` is rejected |
 | `ALLOWED_HOSTS` | Comma-separated; empty is rejected |
 | `ALLOWED_ORIGINS` | Comma-separated; empty is rejected, `*` rejected. Every local POST/DELETE requires a present, single, exactly-matching `Origin` |
 | `MEMORY_MCP_API_KEY_PEPPER` | ≥ 32 bytes; used to verify client keys |
-| `MEMORY_MCP_HTTP_IDENTITY_INDEX_KEY` | 64-char hex. **In local mode it is derived** from the session key under a purpose label; a supplied value is ignored rather than rejected. OIDC mode requires it |
+| `MEMORY_MCP_HTTP_IDENTITY_INDEX_KEY` | 64-char hex. **In local mode it is derived** from the session key under a purpose label, and supplying one **fails startup** (OIDC-only configuration must not be silently ignored). OIDC mode requires it |
 | `MEMORY_MCP_HTTP_SESSION_KEY` | 64-char hex; local session/policy key (see §9.1 for its limited role) |
-| `MEMORY_MCP_HTTP_OIDC_STATE_KEY` | 64-char hex. **In local mode it is derived** from the session key (supplied value ignored); OIDC mode requires it |
-| `MEMORY_MCP_HTTP_OIDC_NONCE_KEY` | 64-char hex. **In local mode it is derived** from the session key (supplied value ignored); OIDC mode requires it |
+| `MEMORY_MCP_HTTP_OIDC_STATE_KEY` | 64-char hex, same rule as the identity-index key: derived in local mode, supplying one fails startup; OIDC mode requires it |
+| `MEMORY_MCP_HTTP_OIDC_NONCE_KEY` | 64-char hex, same rule as the identity-index key: derived in local mode, supplying one fails startup; OIDC mode requires it |
 | `MEMORY_MCP_HTTP_CSRF_KEY` | 64-char hex; local CSRF key |
 | `MEMORY_MCP_HTTP_SIGNUP_MODE` | `invite_only` or `open`. In local mode it defaults to `invite_only` and an explicit `open` is **rejected at startup**, because local mode has no identity provider |
 | `SURREALDB_CONTROL_{URL,USERNAME,PASSWORD,DB,NAMESPACE}` | Control registry (all local-admin records live here) |
@@ -429,6 +438,7 @@ Environment read by `AdminCliConfig::from_env` — and nothing else:
 
 | Variable | Required |
 |---|---|
+| `MEMORY_MCP_HTTP_AUTH_MODE` | yes, and it must be exactly `local` (spec §6) |
 | `MEMORY_MCP_HTTP_SESSION_KEY` (64-hex) | yes |
 | `MEMORY_MCP_HTTP_CSRF_KEY` (64-hex) | yes |
 | `SURREALDB_CONTROL_URL` | yes |
@@ -438,7 +448,14 @@ Environment read by `AdminCliConfig::from_env` — and nothing else:
 | `SURREALDB_CONTROL_NAMESPACE` | yes |
 | `MEMORY_MCP_HTTP_PUBLIC_BASE_URL` | no (defaults to `https://localhost`) |
 
-The CLI does not read `MEMORY_MCP_HTTP_AUTH_MODE`, the plan limits, the tenant
+The CLI **requires local mode**: a missing or non-`local`
+`MEMORY_MCP_HTTP_AUTH_MODE` fails before any connection is opened, because
+creating a local administrator in a deployment that authenticates browsers
+through an identity provider would write records nothing can use
+(`tests/local_admin_cli.rs::admin_commands_require_local_mode` asserts the
+refusal for absent, `oidc` and `off`).
+
+Beyond that the CLI does not read the plan limits, the tenant
 DB, or any model/OIDC setting; it connects only to the control registry. It also
 does not start tenant provisioning, a runtime pool, embeddings, or OIDC
 discovery — `tests/local_admin_cli.rs` runs the real binary with `env_clear()`
@@ -626,7 +643,7 @@ wrapped in the host-allowlist middleware and the local deadline middleware.
 
 | Method | Path | Auth | Success | Failure codes observed in code |
 |---|---|---|---|---|
-| GET | `/api/v1/auth/config` | none | `200 {"mode":"local"}` | — (mounted only in local mode; absent in OIDC mode) |
+| GET | `/api/v1/auth/config` | none | `200 {"mode":"local"}` | mounted in local **and** OIDC mode, so the UI can discover which flow to run; a `503` if the control plane is disabled (spec §8) |
 | GET | `/api/v1/auth/local/csrf` | none | `200 {"csrf_token": ...}` + pre-auth cookie | `503` if local auth is not configured |
 | POST | `/api/v1/auth/local/challenge` | pre-auth | `200 {username, expires_at}` | `400 invalid_challenge`, `400 bad_request`, `403`, `413`, `415`, `429`, `503` |
 | POST | `/api/v1/auth/local/activate` | pre-auth | `204` | as above + `409` on state conflict |
@@ -657,24 +674,27 @@ Stable codes: `bad_request` (400), `invalid_challenge` (400), `payload_too_large
 (413), `unsupported_media_type` (415), `invalid_credentials` (401), `unauthorized`
 (401), `forbidden` (403), `reauth_required` (403), `not_found` (404), `conflict`
 (409), `idempotency_conflict` (409), `key_cap_reached` (409),
-`secret_already_issued` (409), `throttled` (429), `temporarily_unavailable` (503),
-`internal_error` (500). Storage error detail is never rendered.
+`secret_already_issued` (409), `throttled` (429), `temporarily_unavailable`
+(503). Storage error detail is never rendered.
 
-Three deviations from the design worth knowing as an operator or client author:
+Two details worth knowing as an operator or client author:
 
-- A `429` carries the retry delay **only in the message text**
-  (`"retry after <n>s"`). No `Retry-After` header is emitted on throttling. The
-  only `Retry-After` in the local surface is `Retry-After: 1` on the `503`
-  deadline response.
-- The response body carries `correlation_id`; there is no request-id response
-  header.
-- A storage/adapter failure is rendered as `500 internal_error`, not `503`:
-  `LocalAdminError::Infrastructure` (what the durable store's `infra()` helper
-  produces for every storage error) maps to `500`, while `503
-  temporarily_unavailable` is reserved for the explicit `Unavailable` variant
-  (KDF admission exhaustion, missing peer metadata, unconfigured local auth) and
-  for the deadline middleware. Authentication still fails closed either way, but
-  an operator alerting on `503` will not see a registry outage.
+- A `429` carries `Retry-After: <seconds>` **and** the retry delay in the message
+  text (`"retry after <n>s"`), as spec §7 requires. The `503` deadline response
+  also carries `Retry-After: 1`.
+- Every error response carries a server-generated request id twice: as the
+  `x-request-id` response header and as `correlation_id` in the body. Both are
+  the same UUID v4.
+
+There is deliberately **no `500`** on the local surface. A storage or adapter
+failure (`LocalAdminError::Infrastructure`, what the durable store's `infra()`
+helper produces for every storage error) is rendered as `503
+temporarily_unavailable`, exactly like the explicit `Unavailable` variant (KDF
+admission exhaustion, missing peer metadata, unconfigured local auth) and the
+deadline middleware. This is what spec §7 ("storage outage fails auth closed
+with sanitized `503`, never process-local fallback") and spec §8 ("store/admission
+outage `503`") require. An operator alerting on `503` therefore *does* see a
+registry outage.
 
 **Unmatched API paths** return a JSON `404`, not SPA HTML
 (`{"error":{"code":"not_found","message":"not found"}}`). This is verified with
@@ -725,13 +745,15 @@ advances it to `ready`, normally within one scheduler tick (1 s). Poll
 `tenant_status == "ready"` before issuing keys — issuance requires exactly that
 pair (§6.4).
 
-**Client visibility is scoped to the creating administrator.** Every client read
-and mutation in the durable store filters on `creating_admin_id = <this admin>`
-(`list_clients`, `client`, `list_client_keys`, `insert_client_key`'s ownership
-check, `set_client_state`). A second local administrator therefore cannot see,
-read, or mutate a client created by the first, and receives `404` rather than
-`403`. This is narrower than the design's "all local clients accessible to
-either administrator" and is flagged in §13.
+**Client visibility is shared between local administrators.** No client read or
+mutation filters on `creating_admin_id`: plan R2 requires equal administrators to
+see the same clients, and the sidecar keeps `creating_admin_id` as an audit
+attribute rather than an access boundary. A second local administrator lists,
+reads, renames (key names), suspends and resumes a client created by the first;
+`http_local_admin.rs::a_second_administrator_sees_and_can_administer_the_same_clients`
+asserts the list, read, suspend and resume paths. What remains per-administrator
+is the *operation/idempotency* scope (§6.4) and the audit trail, so a replay of
+another administrator's operation id does not resolve to their resource.
 
 ### 6.4 Idempotency contract
 
@@ -772,7 +794,11 @@ Response `201`:
 
 `secret` is the full bearer credential and is shown **exactly once**. Only
 the keyed verifier (HMAC over the pepper, `KeyedVerifier`) is persisted, in
-`local_admin_client_key`. Retrying the same idempotency key can never produce the
+`local_admin_client_key`. The material is produced by one shared helper
+(`service/credential_material.rs::generate_api_key_material`), which the
+`credential_material` unit tests pin to the data-plane parser
+(`principal::api_keys::ApiKeyCredential`) so the issued shape cannot drift from
+the accepted shape. Retrying the same idempotency key can never produce the
 secret a second time; it returns `409 secret_already_issued` with `key_id`. The
 repair path is therefore **revoke + reissue**: `DELETE .../keys/{key_id}` then a
 new `POST .../keys` with a new idempotency key. Deliver the secret to the client
@@ -921,10 +947,37 @@ credential attempts. Two consequences the operator must accept:
 
 Because the table is keyed by `(domain, dimension, slot)` with a unique index,
 cardinality is bounded by construction to roughly 12,288 rows (three slot spaces
-of 4096) regardless of offered input. A bounded cleanup helper
-(`SurrealRegistryStore::cleanup_rate_buckets`, batches of 512, database-time
-based) exists and is unit-tested, but is **not** wired into the runtime
-scheduler; the bound is what keeps that acceptable.
+of 4096) regardless of offered input. A bounded cleanup pass
+(`LocalAdminStore::cleanup_rate_buckets` → `SurrealRegistryStore::cleanup_expired_rate_buckets`,
+batches of 512, database-time based) is registered as a scheduler job
+(`local_admin_rate::rate_bucket_cleanup_scheduler_job`, at most one pass every
+300 seconds per process). Because expiry is enforced by database time on every
+reservation, a missed or delayed pass can never admit an extra attempt; the job
+therefore reclaims rows rather than enforcing the policy.
+
+### 8.4 Failure auditing
+
+The audit table records two kinds of event:
+
+- **Admitted authentication failures** append at most one deduplicated row per
+  `(request id, action)` pair. The service reserves the attempt first and only
+  then records the rejection, so a throttled or never-admitted request leaves no
+  audit row at all — it only moves the saturating counter in
+  `local_admin_rate_bucket`. Actions are `login`, `reauth` and `challenge`;
+  reasons are `invalid_credentials` and `invalid_challenge`; the actor is
+  `anonymous` unless the username resolved to an admin.
+- **Everything else** (invalid cookie, stale mutation, pre-admission denial) is
+  counted by the fixed action/reason aggregate slots in the same rate table.
+  There is deliberately no append-per-invalid-cookie path.
+
+If the failure-audit write fails, the request fails closed with `503
+temporarily_unavailable` rather than the caller's `401`/`400`: spec §10 requires
+that a failed-login audit failure is never silently dropped, and it never permits
+the login. The audit row carries `event_time`, `actor_kind`/`actor_id`, `action`,
+`outcome`, the safe `reason` enum, the request id, and — for key issuance —
+`grants_client_data_access`. Bounded bucket identifiers are **not** projected
+into the audit row: the approved migration `047` has no such columns, and the
+bucket dimensions are already aggregated in `local_admin_rate_bucket` (§13.4).
 
 ## 9. Secrets and rotation
 
@@ -1080,7 +1133,7 @@ regardless.
 | Claim | Evidence |
 |---|---|
 | Local routes are mounted only in local mode; OIDC routes are absent | `http_local_admin.rs::local_mode_does_not_mount_oidc_routes` |
-| `GET /api/v1/auth/config` returns `{"mode":"local"}` only | `http_local_admin.rs::auth_config_reports_local_mode_only` |
+| `GET /api/v1/auth/config` reports the mode in both browser-auth modes | `http_local_admin.rs::auth_config_reports_local_mode_only` (local), `http_control_plane.rs::auth_config_reports_oidc_mode_without_disclosing_more` (OIDC) |
 | Pre-auth cookie is `__Host-`, `Secure`, `HttpOnly`, `SameSite=Strict`, `Path=/` | `http_local_admin.rs::preauth_cookie_is_host_scoped_and_httponly` |
 | Activation → login → session round trip, no session from activation | `http_local_admin.rs::activation_login_session_roundtrip` |
 | Unknown user / wrong password are indistinguishable (`401 invalid_credentials`) | `http_local_admin.rs::wrong_password_is_uniformly_unauthorized`; service `login_unknown_user_fails_with_dummy_hash`, `login_wrong_password_fails` |
@@ -1100,9 +1153,9 @@ regardless.
 | Unmatched `/api/*` and `/auth/*` return JSON `404` (UI disabled) | `http_local_admin.rs::unmatched_api_and_auth_paths_are_json_404_not_html` |
 | A forged/unknown admin cookie is `401`, not a bearer privilege | `http_local_admin.rs::bearer_keys_cannot_authenticate_local_admin_routes` |
 | Auth config / pre-auth / session CSRF token binding to epoch and session | `csrf.rs` unit tests (`preauth_roundtrip`, `preauth_rejects_expired`, `preauth_rejects_future_timestamp`, `preauth_rejects_wrong_epoch`, `preauth_rejects_wrong_token`, `origin_must_be_present_and_exact`, `session_token_binds_epoch_and_session`) |
-| Argon2id parameters, per-hash salting, corrupt/foreign PHC rejection | `password.rs` unit tests |
+| Argon2id parameters, per-hash salting, corrupt/foreign PHC rejection, bounded KDF admission | `password.rs` unit tests, including `a_saturated_admission_queue_fails_closed` |
 | Username and password policy | `policy.rs` unit tests |
-| CLI surface, `--username` only, no password/code flags, stable mode label, not a one-shot | `local_admin_cli.rs` (5 parser tests) |
+| CLI surface, `--username` only, no password/code flags, stable mode label, not a one-shot | `local_admin_cli.rs` parser tests |
 | CLI persists across processes against file-backed RocksDB, no OIDC/model init | `local_admin_cli.rs::admin_create_then_recover_persists_across_processes` |
 | `admin` absent from a `--no-default-features` build | `cargo run -p memory_mcp --no-default-features --locked --bin memory_mcp -- --help` |
 | Local mode starts from environment variables against the real binary | `scripts/ci/local_admin_local_check.sh` §2–§12 (§2.5) |
@@ -1114,8 +1167,8 @@ regardless.
 | Pre-auth code, activation, login, session and recovery survive a real restart | Same script §9, §11 |
 | `control-plane-ui` requires an absolute, non-symlink bundle directory containing `index.html` | `crates/memory-mcp/build.rs`; the suite only builds with `MEMORY_MCP_CONTROL_PLANE_UI_DIST` pointing at one |
 | The image builds both binaries and a real UI bundle | `docker build` → `25/25 FINISHED`; `memory_mcp --help` lists `admin`; `control-plane-ui-dist/public` contains `index.html`, a 46 KB JS and a 775 KB WASM |
-| The UI boots in a real browser under the shipped CSP | `local_admin_image.py --scenario ui` → 7/7 checks, including `wasm app boots under the shipped csp` and no console/page errors |
-| The CLI in the image issues a code and the browser completes activation, login, client, key, suspend/resume | `--scenario all` → 54 checks (auth 9, clients 32, regression 6, ui 7) |
+| The UI boots in a real browser under the shipped CSP | `local_admin_image.py --scenario ui` → 10/10 checks, including `wasm app boots under the shipped csp` and no console/page errors |
+| The CLI in the image issues a code and the browser completes activation, login, client, key, suspend/resume | `--scenario all` → 54 checks (auth 9, clients 29, regression 6, ui 10) |
 | All three Compose modes resolve with operator-generated secrets | `docker compose --env-file … -f docker-compose.yml -f docker-compose.{off,local,oidc}.yml config --quiet` |
 | Issued key is a real data-plane credential | `scripts/ci/local_admin_local_check.sh` §7c — live key `200` on `POST /mcp`, revoked key `401`, no credential `401`; `http_local_admin.rs::issued_key_authenticates_on_the_data_plane` |
 | A tenant stranded in `NamespaceCreating` is resumable | `http_crash_recovery.rs::provisioning_resumes_a_tenant_stranded_in_namespace_creating` |
@@ -1126,18 +1179,18 @@ regardless.
 
 | Claim | Status |
 |---|---|
-| Remote replica races (`local_admin_remote_replica_races`, `local_admin_session_revocation_race`) | ❌ both `#[ignore]`d; they need an isolated remote SurrealDB 3.2.4 and the three `LOCAL_ADMIN_TEST_CONTROL_*` variables |
+| Remote replica races (`local_admin_remote_replica_races`, `local_admin_session_revocation_race`) | ❌ both `#[ignore]`d and moved inline into `surreal_store/local_admin_remote.rs` so `--lib … -- --ignored` selects them; they need an isolated remote SurrealDB 3.2.4 and the three `LOCAL_ADMIN_TEST_CONTROL_*` variables, and fail rather than skip when selected without them |
 | Two local replicas sharing live throttle/auth/idempotency state | ❌ no multi-process test: the durable rows are the mechanism, but two servers were never run against one registry |
 | OIDC login against a live identity provider | ❌ no IdP in this environment; OIDC is exercised at store and router level |
 | Host-side `dx bundle` | ❌ `dx` is absent on the host; only the pinned `dioxus-cli 0.7.10` inside the image builds the bundle |
 | The `linux/amd64` image | ❌ the verification host is `arm64`; CI pins amd64 but that path was not reproduced locally |
 | Forced ordering / barriers between two in-flight transactions (KDF-pause + recovery; prepare-reset + newer recovery; both resolve/logout orders; two rotations racing) | ❌ outcomes are covered, interleavings are not (§13.3) |
-| Database unavailable during reserve/auth/success-audit/failure-audit | ❌ asserted only through error mapping, not by taking the database down mid-flight |
+| Database unavailable during reserve/auth/success-audit/failure-audit | ✅ `surreal_store/local_admin.rs::sql_fault_tests` — the SQL fault hook fails the reservation, the session insert, the success-audit insert and the failure-audit insert in turn; each case asserts a sanitized failure, no session/key, and no partial credential/state change |
 | Rate-window boundary across replicas and after a restart | ❌ the fixed window and its saturation are tested in one process; a restart in the middle of a window is not |
-| Client visibility across two administrators | ❌ implemented as per-creating-admin scoping; the design's "accessible to either administrator" is not implemented and no test exercises a second administrator (§6.3) |
-| `surrealdb` SQL fault injection in the local-admin store (nonselected statement error, audit insert error) | ⚠️ covered generically by `query_json_at` tests, not by a fault hook on a local-admin transaction |
+| Client visibility across two administrators | ✅ `http_local_admin.rs::a_second_administrator_sees_and_can_administer_the_same_clients` (list, read, suspend, resume) |
+| `surrealdb` SQL fault injection in the local-admin store (nonselected statement error, audit insert error) | ✅ `sql_fault_tests` — a test-only SQL fault hook fails a named local-admin statement; the aborted transaction leaves no session, no success audit row and no half-applied credential change |
 | CLI versus a live holder of the same embedded RocksDB path | ❌ only standalone CLI use is proven; the script stops the server first by design |
-| Unscheduled rate-bucket cleanup | ⚠️ the helper is unit-tested but not invoked by the runtime; the bounded row count is what makes this safe |
+| Unscheduled rate-bucket cleanup | ✅ scheduled: `local_admin_rate::rate_bucket_cleanup_scheduler_job` is registered by `memory_mcp_http`, at most one bounded pass every 300 s per process |
 
 ### 13.3 Where each plan §5 security case is proven
 
@@ -1159,16 +1212,16 @@ suite that covers them instead of asserting against a test double.
 | OIDC transition; legacy session lacks an epoch | `surreal_store.rs::find_session_rejects_legacy_and_stale_epoch_rows` |
 | Rate: two handles, collision, window boundary | `exp9_rate_buckets_enforce_the_cap`, `exp9b_challenge_budget_is_shared_and_source_scoped`, `exp15_concurrent_logins_same_user` |
 | Spoofed `X-Forwarded-*`, missing peer, mapped IPv6 | `missing_peer_fails_closed`; `control::local_admin` peer-normalization tests |
-| KDF timeout/queue/cancellation/corrupt PHC | `password.rs` unit tests |
-| Nonselected SQL statement error / audit insert error | `surreal_store.rs::query_json_at_*` |
-| DB unavailable during reserve/auth/audit | unproven (§13.2) |
+| KDF timeout/queue/cancellation/corrupt PHC | `password.rs` unit tests, including `a_saturated_admission_queue_fails_closed` (a held slot fails the bounded deadline for a real *and* a dummy verification) |
+| Nonselected SQL statement error / audit insert error | `surreal_store/local_admin.rs::sql_fault_tests` — `session_insert_statement_error_leaves_no_session_and_rolls_back`, `success_audit_error_rolls_back_the_credential_change`, `failure_audit_storage_error_is_sanitized_unavailable_not_a_rejection` |
+| DB unavailable during reserve/auth/audit | `sql_fault_tests::reservation_storage_error_fails_closed_without_admitting_the_attempt`, `failure_audit_storage_error_is_sanitized_unavailable_not_a_rejection`; `control::local_admin::handlers::tests::spec_status_table_is_exhaustive` pins `Infrastructure → 503` |
 | Two admins issue at `cap − 1` | `active_key_cap_counts_only_live_keys`; issuance serializes on the client guard row |
 | Create same operation/body; different body; lost response | `client_lifecycle_uses_the_durable_store`, `missing_idempotency_key_is_rejected` |
-| Key issue response lost and repeated | `insert_client_key` → `AlreadyIssued`; UI `secret_already_issued` tests |
+| Key issue response lost and repeated | `insert_client_key` → `AlreadyIssued`; `http_local_admin.rs::a_repeated_key_issue_never_returns_a_second_secret` (409 + public key id, one key row, no second verifier); UI `secret_already_issued` tests |
 | Provisioner restart in `Reserved`/`NamespaceCreating`/`schema 0`/`Migrating` | `http_crash_recovery.rs` (11 tests, including `provisioning_resumes_a_tenant_stranded_in_namespace_creating`) |
 | Coherent suspend/resume, stale CAS, no false `Ready` | `suspend_and_resume_follow_the_coherent_state_contract`, `a_provisioning_client_cannot_be_suspended` |
 | Warm cache; revoke or expire; resume | `revoking_an_issued_key_denies_with_and_without_a_warm_cache`, `expiry_at_the_boundary_is_rejected`, `cache_hit_with_a_mismatched_owner_is_denied` |
-| Public auth and every admin route: Origin/CSRF/content type/body/duplicate cookie/unknown fields | 37 tests in `http_local_admin.rs` |
+| Public auth and every admin route: Origin/CSRF/content type/body/duplicate cookie/unknown fields | 41 tests in `http_local_admin.rs` |
 | Cookie/bearer privilege separation, unmounted APIs | `bearer_keys_cannot_authenticate_local_admin_routes`, `unmatched_api_and_auth_paths_are_json_404_not_html`, `a_key_for_one_client_cannot_reach_another` |
 | Packaged UI/CLI over trusted TLS | `local_admin_image.py --scenario all` — 54 checks in a real browser |
 
@@ -1178,11 +1231,14 @@ Stated rather than smoothed over:
 
 | Plan §3.4 entry | What shipped |
 |---|---|
-| `AdminKeyCreate` | Not implemented. Key issuance needs the pepper to derive the verifier, which lives in the HTTP composition, so the handler builds `AdminKeyInsert` (the store command) directly. A service-level `AdminKeyCreate` would have had to carry the secret material it exists to avoid. |
-| `IssuedClientKey { expires_at: Option<DateTime<Utc>> }` | Not implemented as a service type. The credential is revealed once by the HTTP layer and rendered with an RFC 3339 string, so the wire DTO is `IssuedKeyResponse` in `control/local_admin/handlers.rs`. |
 | Eight new tables | Nine shipped: `local_admin_client_key` is a ninth. It is the sidecar that scopes key *ownership* to the creating administrator (the `api_key` row alone cannot express which administrator issued a key), and it is written in the same transaction as the authoritative row. |
 | "never ensure hardcoded `free` for local/off" | Diverges for `off`: the `free` v1 plan is still ensured except in local browser mode. Off-mode tenants carry `plan_version 1` (the data plane resolves that row on every ingest, and tenants that predate this change keep that version), so removing the row strands their quota resolution. Local browser mode no longer publishes it at all — its plan is the deployment's `local_plan_v{version}`. |
 | The in-memory `LocalAdminStore` fixture | Removed. Every plan §5 experiment now runs against the real durable store; the test double had no callers and asserted behaviour the production store does not have. |
 | Off mode needing no browser keys | Diverges: `HmacKeys` is a single non-optional struct, so `off` still requires the five key variables (the compose `off` overlay refuses to default them). Zero-filling them is forbidden by the same plan, so the implementation chose "fail closed and require operator keys" over "start with forgeable keys". |
-| "Every local client accessible to either administrator" | Diverges: reads and mutations filter on `creating_admin_id`, so a second administrator gets `404`, not a shared view (§6.3). |
+| "Every local client accessible to either administrator" | Implemented: reads and mutations no longer filter on `creating_admin_id` (§6.3). The column remains as an audit attribute. |
 | Explicit `account_id` in the key-issue idempotency fingerprint | Diverges: the fingerprint covers `name` and the expiry choice only, so one idempotency key replayed against a different client with an identical body resolves to the first key (§6.4). |
+| The `LocalAdminStore` method surface | One method beyond the ledger: `cleanup_rate_buckets`, the bounded maintenance pass for `local_admin_rate_bucket`. The ledger's T4 surface was reservation + failure audit only, and the runtime scheduler needed a way to reach the store's maintenance pass through the same handle the routes use. |
+| `LocalAdminService::resolve(request, cookie: &str)` | Takes the decoded `cookie_verifier: &[u8; 32]` instead. The cookie *format* (`__Host-` prefix, hex, duplicate-value rejection) is parsed once in the control layer by `control::local_admin::parse_admin_cookie`, so the service never depends on `control::csrf` — which the plan forbids. The extractor calls the service for the policy/epoch check, so the method is on the production path. |
+| NEW-file names | The plan's inventory proposed `service/local_admin/clients.rs`, `control/local_admin/{mod,auth,clients}.rs` and `surreal_store/local_admin_clients.rs`. Shipped as `service/local_admin/client.rs`, `control/local_admin/{csrf,handlers}.rs` (the module itself is `control/local_admin.rs`, matching how every sibling control module is declared) and `surreal_store/local_admin{,_rate,_remote}.rs`. The split follows the code's seams (auth vs client, CSRF vs handlers, reservation vs maintenance) rather than the inventory's placeholder names. |
+| "Require HTTPS public base URL for local browser auth" | Diverges for loopback only: `http://localhost`, `http://127.0.0.1` and `http://[::1]` are accepted so the documented local development flow and the in-repo end-to-end script can run without a proxy. Any other host must be `https://` (the check keys off the URL host, not a substring), so the `Secure` cookies cannot be served over public plain HTTP. |
+| `FailureAudit.username_bucket` / `source_bucket` | Not projected into the audit row. Migration `047` (approved) gives `local_admin_audit` no bucket columns, and the buckets are already aggregated in `local_admin_rate_bucket`; the fields remain part of the event so the service describes a rejection fully. `policy` is likewise carried as a stale-epoch *attribute* and never re-validated, which is what keeps a stale-fence rejection from turning into an audit failure (§8.4). |

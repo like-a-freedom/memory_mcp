@@ -217,10 +217,7 @@ pub fn parse_cookie(header: &str, name: &str) -> LocalResult<Option<String>> {
 }
 
 fn random_32() -> [u8; 32] {
-    use rand_core::RngCore;
-    let mut buf = [0u8; 32];
-    rand_core::OsRng.fill_bytes(&mut buf);
-    buf
+    crate::service::credential_material::random_32()
 }
 
 fn constant_time_eq(a: &[u8], b: &[u8]) -> bool {

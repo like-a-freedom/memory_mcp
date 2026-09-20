@@ -3,8 +3,9 @@ use std::sync::Arc;
 use crate::service::local_admin::contracts::{
     AdminLogin, AdminPrincipal, AttemptDecision, AttemptDomain, AttemptInput, AuthAttemptContext,
     BrowserPolicyFence, ChallengeFinish, ChallengeIssue, ChallengeKind, ChallengeView,
-    LocalAdminError, LocalAdminStore, LocalKeyFingerprints, LocalResult, OneTimeChallenge,
-    RequestContext, SessionOpen, SessionRotate,
+    FailureAction, FailureAudit, FailureReason, LocalAdminError, LocalAdminStore,
+    LocalKeyFingerprints, LocalResult, OneTimeChallenge, RequestContext, SessionOpen,
+    SessionRotate,
 };
 use crate::service::local_admin::password::PasswordHasher;
 
@@ -53,7 +54,6 @@ impl LocalAdminAuthority {
 
 /// CLI-facing management service. No PasswordHasher needed —
 /// the CLI only issues activation/reset codes.
-#[allow(dead_code)]
 pub struct AdminManagementService {
     authority: Arc<LocalAdminAuthority>,
 }
@@ -188,18 +188,57 @@ impl LocalAdminService {
     /// normalized to their IPv4 form so one client cannot appear as two
     /// independent buckets.
     fn source_bucket(&self, source: std::net::IpAddr) -> LocalResult<u16> {
-        let normalized = match source {
-            std::net::IpAddr::V6(v6) => match v6.to_ipv4_mapped() {
-                Some(v4) => std::net::IpAddr::V4(v4),
-                None => std::net::IpAddr::V6(v6),
-            },
-            other => other,
-        };
+        let normalized = crate::service::local_admin::policy::normalize_peer_ip(source);
         bucket(
             &self.attempt_key,
             b"source\0",
             normalized.to_string().as_bytes(),
         )
+    }
+
+    /// Record the single admitted-failure audit event for an attempt this
+    /// service already reserved.
+    ///
+    /// Only a *reserved* authentication attempt appends an event (plan
+    /// §3.1). Pre-admission, session and client-mutation denials are
+    /// counted by the rate buckets instead, so there is deliberately no
+    /// append-per-denial path.
+    ///
+    /// A storage failure while writing the event is reported as
+    /// `Unavailable` (503) rather than the caller's rejection: spec §10
+    /// requires that a failed-login audit write is never silently
+    /// dropped, and a sanitized 503 is the only answer that is both
+    /// fail-closed and honest about the lost security event.
+    async fn record_admitted_failure(
+        &self,
+        context: &AuthAttemptContext,
+        action: FailureAction,
+        reason: FailureReason,
+        admin_id: Option<String>,
+        username: Option<&str>,
+    ) -> LocalResult<()> {
+        let username_bucket = match username {
+            Some(raw) => Some(self.username_bucket(raw)?),
+            None => None,
+        };
+        let event = FailureAudit {
+            request: context.request.clone(),
+            policy: self.authority.policy().clone(),
+            action,
+            reason,
+            admin_id,
+            username_bucket,
+            source_bucket: Some(self.source_bucket(context.source)?),
+            admitted_auth_attempt: true,
+        };
+        self.authority
+            .store()
+            .record_failure(event)
+            .await
+            .map_err(|error| match error {
+                LocalAdminError::Infrastructure(_) => LocalAdminError::Unavailable,
+                other => other,
+            })
     }
 
     /// Inspect a challenge code without consuming it.
@@ -210,11 +249,52 @@ impl LocalAdminService {
         kind: ChallengeKind,
     ) -> LocalResult<ChallengeView> {
         self.admit(context, AttemptDomain::Challenge, None).await?;
-        let verifier = parse_challenge_code(code)?;
-        self.authority
+        let verifier = match parse_challenge_code(code) {
+            Ok(verifier) => verifier,
+            Err(error) => {
+                self.record_admitted_failure(
+                    context,
+                    FailureAction::Challenge,
+                    FailureReason::InvalidChallenge,
+                    None,
+                    None,
+                )
+                .await?;
+                return Err(error);
+            }
+        };
+        match self
+            .authority
             .store()
             .inspect_challenge(&verifier, kind, self.authority.policy())
             .await
+        {
+            Ok(view) => Ok(view),
+            Err(error) => self.reject_challenge(context, error).await,
+        }
+    }
+
+    /// Record the admitted failure when a challenge operation is refused
+    /// for a reason that is about the presented code, then hand the
+    /// original rejection back. Storage and availability errors are not
+    /// credential rejections and carry no closed-enum reason, so they are
+    /// propagated unchanged.
+    async fn reject_challenge<T>(
+        &self,
+        context: &AuthAttemptContext,
+        error: LocalAdminError,
+    ) -> LocalResult<T> {
+        if matches!(error, LocalAdminError::InvalidChallenge) {
+            self.record_admitted_failure(
+                context,
+                FailureAction::Challenge,
+                FailureReason::InvalidChallenge,
+                None,
+                None,
+            )
+            .await?;
+        }
+        Err(error)
     }
 
     /// Finish a challenge (activate or reset password).
@@ -227,7 +307,20 @@ impl LocalAdminService {
     ) -> LocalResult<()> {
         self.admit(context, AttemptDomain::Challenge, None).await?;
         crate::service::local_admin::policy::validate_password(&password)?;
-        let verifier = parse_challenge_code(code)?;
+        let verifier = match parse_challenge_code(code) {
+            Ok(verifier) => verifier,
+            Err(error) => {
+                self.record_admitted_failure(
+                    context,
+                    FailureAction::Challenge,
+                    FailureReason::InvalidChallenge,
+                    None,
+                    None,
+                )
+                .await?;
+                return Err(error);
+            }
+        };
         let password_phc = self.hasher.hash(password).await?;
         let command = ChallengeFinish {
             verifier,
@@ -236,7 +329,10 @@ impl LocalAdminService {
             policy: self.authority.policy().clone(),
             request: context.request.clone(),
         };
-        self.authority.store().finish_challenge(command).await
+        match self.authority.store().finish_challenge(command).await {
+            Ok(()) => Ok(()),
+            Err(error) => self.reject_challenge(context, error).await,
+        }
     }
 
     /// Login with username/password.
@@ -257,6 +353,14 @@ impl LocalAdminService {
             Some(c) => c,
             None => {
                 let _ = self.hasher.verify(password, None).await?;
+                self.record_admitted_failure(
+                    context,
+                    FailureAction::Login,
+                    FailureReason::InvalidCredentials,
+                    None,
+                    Some(username),
+                )
+                .await?;
                 return Err(LocalAdminError::InvalidCredentials);
             }
         };
@@ -265,6 +369,14 @@ impl LocalAdminService {
             .verify(password, credential.password_phc.clone())
             .await?;
         if !ok {
+            self.record_admitted_failure(
+                context,
+                FailureAction::Login,
+                FailureReason::InvalidCredentials,
+                Some(credential.admin_id.clone()),
+                Some(username),
+            )
+            .await?;
             return Err(LocalAdminError::InvalidCredentials);
         }
         let cookie_verifier = generate_random_32();
@@ -280,6 +392,11 @@ impl LocalAdminService {
     }
 
     /// Resolve a session from a cookie verifier.
+    ///
+    /// The ledger's signature carries the request context so a rejection can be
+    /// attributed to a request even though resolution reads no
+    /// request-scoped state; the store's transaction uses the cookie verifier
+    /// and the current policy fence only.
     pub async fn resolve(
         &self,
         _request: &RequestContext,
@@ -309,12 +426,33 @@ impl LocalAdminService {
             .store()
             .credential(&principal.username, self.authority.policy())
             .await?;
-        let credential = credential.ok_or(LocalAdminError::InvalidCredentials)?;
+        let credential = match credential {
+            Some(credential) => credential,
+            None => {
+                self.record_admitted_failure(
+                    context,
+                    FailureAction::Reauth,
+                    FailureReason::InvalidCredentials,
+                    Some(principal.fence.admin_id.clone()),
+                    Some(&principal.username),
+                )
+                .await?;
+                return Err(LocalAdminError::InvalidCredentials);
+            }
+        };
         let ok = self
             .hasher
             .verify(password, credential.password_phc.clone())
             .await?;
         if !ok {
+            self.record_admitted_failure(
+                context,
+                FailureAction::Reauth,
+                FailureReason::InvalidCredentials,
+                Some(principal.fence.admin_id.clone()),
+                Some(&principal.username),
+            )
+            .await?;
             return Err(LocalAdminError::InvalidCredentials);
         }
         // Rotate session.
@@ -382,13 +520,7 @@ fn compute_fingerprints(
 
 /// Map keyed input into the fixed throttle slot range.
 fn bucket(key: &[u8; 32], label: &[u8], data: &[u8]) -> LocalResult<u16> {
-    use hmac::{Hmac, KeyInit, Mac};
-    use sha2::Sha256;
-    let mut mac = Hmac::<Sha256>::new_from_slice(key)
-        .map_err(|e| LocalAdminError::InvalidInput(format!("throttle key rejected: {e}")))?;
-    mac.update(label);
-    mac.update(data);
-    let digest = mac.finalize().into_bytes();
+    let digest = crate::service::credential_material::hmac_fingerprint(key, label, data);
     Ok(u16::from_be_bytes([digest[0], digest[1]]) % ATTEMPT_BUCKET_SLOTS)
 }
 
@@ -409,20 +541,8 @@ fn bounded_raw(raw: &str) -> String {
     String::from_utf8_lossy(&bytes[..end]).into_owned()
 }
 
-#[allow(dead_code)]
 fn generate_random_32() -> [u8; 32] {
-    let mut buf = [0u8; 32];
-    rand_core::OsRng.fill_bytes(&mut buf);
-    buf
-}
-
-#[allow(dead_code)]
-fn parse_hex_32(hex_str: &str) -> LocalResult<[u8; 32]> {
-    let bytes = hex::decode(hex_str)
-        .map_err(|e| LocalAdminError::InvalidInput(format!("invalid hex: {e}")))?;
-    bytes
-        .try_into()
-        .map_err(|_| LocalAdminError::InvalidInput("hex must be 32 bytes".into()))
+    crate::service::credential_material::random_32()
 }
 
 /// Parse a challenge code.
@@ -437,5 +557,3 @@ fn parse_challenge_code(hex_str: &str) -> LocalResult<[u8; 32]> {
         .try_into()
         .map_err(|_| LocalAdminError::InvalidChallenge)
 }
-
-use rand_core::RngCore;

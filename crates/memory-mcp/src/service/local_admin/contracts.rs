@@ -49,11 +49,12 @@ pub type LocalResult<T> = Result<T, LocalAdminError>;
 // ─── Common types ─────────────────────────────────────────
 
 /// Policy fence binding mode and epoch for browser sessions/challenges.
-#[derive(Debug, Clone)]
-pub struct BrowserPolicyFence {
-    pub mode: BrowserAuthMode,
-    pub epoch: u64,
-}
+///
+/// Defined by the storage layer (plan §3.1) so OIDC persistence can reference
+/// it without importing local-admin business logic; re-exported here so the
+/// service contracts and the store share one nominal type rather than two
+/// structurally identical ones.
+pub use crate::http::registry::models::BrowserPolicyFence;
 
 /// HMAC fingerprints for session and CSRF keys, used to join the
 /// durable policy.
@@ -172,9 +173,32 @@ pub struct SessionRotate {
     pub request: RequestContext,
 }
 
+/// Admin key-issue command (plan §3.4).
+///
+/// Carries only what the caller chooses: the service generates the credential
+/// material, the fingerprint and the persisted metadata from it.
+#[derive(Debug, Clone)]
+pub struct AdminKeyCreate {
+    pub name: String,
+    pub expiry: KeyExpiry,
+    pub operation_id: uuid::Uuid,
+}
+
+/// A revealed-once client key (plan §3.4).
+///
+/// `secret` is the full `mem_sk_<key_id>_<secret>` credential — the only time
+/// the raw credential exists outside the operator's clipboard. Only its
+/// verifier is durable.
+#[derive(Debug, Clone)]
+pub struct IssuedClientKey {
+    pub id: String,
+    pub name: String,
+    pub secret: String,
+    pub expires_at: Option<DateTime<Utc>>,
+}
+
 /// One-time challenge code with the issued material.
 #[derive(Debug)]
-#[allow(dead_code)]
 pub struct OneTimeChallenge {
     pub issued: IssuedChallenge,
     pub code: String,
@@ -214,7 +238,21 @@ pub enum AttemptDecision {
 }
 
 /// Failure audit event.
-#[derive(Debug)]
+///
+/// Only a service-reserved authentication attempt produces one of these
+/// (plan §3.1): pre-admission, session and client-mutation denials are
+/// aggregated by the rate buckets instead, so there is no
+/// append-per-denial path and no caller-controlled audit cardinality.
+///
+/// The durable projection of an event is the allowlisted audit row —
+/// actor, action, outcome, reason, request id and the target ids. The
+/// remaining fields are service-set attributes that describe the
+/// rejection without granting it authority: `policy` carries the epoch
+/// the request was presented under, so a request still failing on a stale
+/// fence records an event instead of an unrelated audit failure; the
+/// bounded buckets are aggregated in `local_admin_rate_bucket`; and
+/// `admitted_auth_attempt` separates these events from the aggregate
+/// slots.
 pub struct FailureAudit {
     pub request: RequestContext,
     pub policy: BrowserPolicyFence,
@@ -226,6 +264,12 @@ pub struct FailureAudit {
     pub admitted_auth_attempt: bool,
 }
 
+/// The closed vocabulary of rejected actions.
+///
+/// `Session` and `ClientMutation` are part of the ledger's closed enum but
+/// are deliberately never appended: those denials are counted by the fixed
+/// action/reason aggregate slots in `local_admin_rate_bucket`, so no
+/// invalid-cookie or stale-mutation stream reaches the audit table.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum FailureAction {
     Login,
@@ -235,6 +279,9 @@ pub enum FailureAction {
     ClientMutation,
 }
 
+/// The closed vocabulary of rejection reasons. `InvalidSession`,
+/// `StaleFence` and `Forbidden` describe aggregate-slot denials (see
+/// [`FailureAction`]) rather than appended events.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum FailureReason {
     InvalidCredentials,
@@ -288,11 +335,47 @@ pub struct ClientBundle {
     pub request_fingerprint: [u8; 32],
 }
 
-#[derive(Debug, Clone, serde::Deserialize)]
-#[serde(tag = "kind", rename_all = "snake_case")]
+/// The expiry choice for an issued key.
+///
+/// The wire form is internally tagged by `kind` and **strict**: exactly
+/// `{"kind":"never"}` or `{"kind":"days","days":<n>}`. `serde`'s
+/// internally tagged enums silently ignore unknown and cross-variant fields,
+/// which would let a typo like `"dayz":30` become an accidental
+/// non-expiring key — the exact outcome spec §8 forbids. The strictness is
+/// therefore implemented over a `deny_unknown_fields` struct, and the wire
+/// shape is unchanged.
+#[derive(Debug, Clone)]
 pub enum KeyExpiry {
     Never,
     Days { days: u32 },
+}
+
+impl<'de> serde::Deserialize<'de> for KeyExpiry {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        #[derive(serde::Deserialize)]
+        #[serde(deny_unknown_fields)]
+        struct Wire {
+            kind: String,
+            #[serde(default)]
+            days: Option<u32>,
+        }
+
+        let wire = Wire::deserialize(deserializer)?;
+        match (wire.kind.as_str(), wire.days) {
+            ("never", None) => Ok(KeyExpiry::Never),
+            ("days", Some(days)) => Ok(KeyExpiry::Days { days }),
+            ("never", Some(_)) => Err(serde::de::Error::custom(
+                "`days` is not valid for a never-expiring key",
+            )),
+            ("days", None) => Err(serde::de::Error::custom(
+                "a day-count expiry requires `days`",
+            )),
+            (other, _) => Err(serde::de::Error::unknown_variant(other, &["never", "days"])),
+        }
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -321,7 +404,7 @@ pub enum ClientStateAction {
 // ─── Store trait ──────────────────────────────────────────
 
 /// Durable local admin store. Implemented by `SurrealRegistryStore`
-/// in a child module; `InMemoryStore` for tests.
+/// in a child module.
 #[async_trait]
 pub trait LocalAdminStore: Send + Sync + 'static {
     /// Join or verify the local policy singleton. Compares
@@ -372,6 +455,13 @@ pub trait LocalAdminStore: Send + Sync + 'static {
 
     /// Reserve throttle attempt atomically.
     async fn reserve_attempt(&self, input: AttemptInput) -> LocalResult<AttemptDecision>;
+
+    /// Reclaim expired throttle buckets.
+    ///
+    /// Bounded maintenance only: expiry is enforced by database time on
+    /// every reservation, so a delayed or skipped pass can never admit an
+    /// extra attempt — it only keeps the table small.
+    async fn cleanup_rate_buckets(&self) -> LocalResult<u64>;
 
     /// Record a failure audit event (called after rollback or rejection).
     async fn record_failure(&self, event: FailureAudit) -> LocalResult<()>;

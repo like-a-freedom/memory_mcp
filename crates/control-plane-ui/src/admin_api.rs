@@ -31,6 +31,10 @@ use serde::{Deserialize, Serialize};
 
 /// `GET` — public auth mode, `{"mode":"local"|"oidc"}`.
 pub const PATH_AUTH_CONFIG: &str = "/api/v1/auth/config";
+/// `GET` — start the OIDC authorization-code flow. The server mounts it at
+/// `/auth/oidc/authorize` (`http/router.rs`), **not** under `/api/v1`; a link
+/// that guessed the API prefix would 404.
+pub const PATH_OIDC_AUTHORIZE: &str = "/auth/oidc/authorize";
 /// `GET` — short-lived pre-auth CSRF token.
 pub const PATH_PREAUTH_CSRF: &str = "/api/v1/auth/local/csrf";
 /// `POST` — validate a challenge code without consuming it.
@@ -97,13 +101,16 @@ pub struct AdminApiError {
     pub message: String,
     /// Present only for `secret_already_issued`.
     pub key_id: Option<String>,
+    /// Backend request correlation id. Never displayed; kept so an operator can
+    /// quote it to support when reporting a failure.
+    #[serde(default)]
+    pub correlation_id: Option<String>,
 }
 
 #[derive(Deserialize)]
 struct ErrorEnvelope {
     error: ErrorDetail,
     #[serde(default)]
-    #[allow(dead_code)]
     correlation_id: Option<String>,
 }
 
@@ -129,12 +136,14 @@ impl AdminApiError {
                 code: envelope.error.code,
                 message: envelope.error.message,
                 key_id: envelope.error.key_id,
+                correlation_id: envelope.correlation_id,
             },
             Err(_) => Self {
                 status,
                 code: "unknown_error".to_owned(),
                 message: "unparseable error response".to_owned(),
                 key_id: None,
+                correlation_id: None,
             },
         }
     }
@@ -146,6 +155,7 @@ impl AdminApiError {
             code: "transport_error".to_owned(),
             message: detail.to_owned(),
             key_id: None,
+            correlation_id: None,
         }
     }
 
@@ -161,6 +171,7 @@ impl AdminApiError {
             code: "empty_response".to_owned(),
             message: "expected a JSON body but the response was empty".to_owned(),
             key_id: None,
+            correlation_id: None,
         }
     }
 
@@ -171,6 +182,7 @@ impl AdminApiError {
             code: "malformed_response".to_owned(),
             message: "response body did not match the expected shape".to_owned(),
             key_id: None,
+            correlation_id: None,
         }
     }
 
@@ -181,6 +193,7 @@ impl AdminApiError {
             code: "unexpected_status".to_owned(),
             message: "unexpected success status for this endpoint".to_owned(),
             key_id: None,
+            correlation_id: None,
         }
     }
 
@@ -192,6 +205,7 @@ impl AdminApiError {
             code: "session_missing".to_owned(),
             message: "no session CSRF token is held by this client".to_owned(),
             key_id: None,
+            correlation_id: None,
         }
     }
 
@@ -202,6 +216,7 @@ impl AdminApiError {
             code: "no_crypto".to_owned(),
             message: "the browser exposed no cryptography API".to_owned(),
             key_id: None,
+            correlation_id: None,
         }
     }
 
@@ -212,6 +227,7 @@ impl AdminApiError {
             code: "no_timer".to_owned(),
             message: "the renderer exposes no event loop timer".to_owned(),
             key_id: None,
+            correlation_id: None,
         }
     }
 
@@ -222,6 +238,7 @@ impl AdminApiError {
             code: "clipboard_unavailable".to_owned(),
             message: "the clipboard API is unavailable or refused the write".to_owned(),
             key_id: None,
+            correlation_id: None,
         }
     }
 
@@ -1697,10 +1714,24 @@ mod tests {
             code: "reauth_required".to_owned(),
             message: "recent authentication required".to_owned(),
             key_id: None,
+            correlation_id: Some("8a1b".to_owned()),
         };
         let encoded = serde_json::to_string(&error).expect("serialize");
         let decoded: AdminApiError = serde_json::from_str(&encoded).expect("deserialize");
         assert_eq!(decoded, error);
+    }
+
+    #[test]
+    fn backend_correlation_id_is_retained_but_never_displayed() {
+        let envelope =
+            r#"{"error":{"code":"conflict","message":"version conflict"},"correlation_id":"8a1b"}"#;
+        let error = AdminApiError::from_response(409, envelope);
+        assert_eq!(error.correlation_id.as_deref(), Some("8a1b"));
+        assert!(!error.user_message().contains("8a1b"));
+
+        let without =
+            AdminApiError::from_response(409, r#"{"error":{"code":"conflict","message":"x"}}"#);
+        assert_eq!(without.correlation_id, None);
     }
 
     #[test]

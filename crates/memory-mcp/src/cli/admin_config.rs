@@ -15,7 +15,26 @@ pub struct AdminCliConfig {
 
 impl AdminCliConfig {
     /// Load configuration from environment variables.
+    ///
+    /// Spec §6: the admin commands **require local mode**. Creating or
+    /// recovering a local administrator in a deployment that authenticates
+    /// browsers through an identity provider would write records nothing can
+    /// use, so a missing or non-local `MEMORY_MCP_HTTP_AUTH_MODE` fails before
+    /// any connection is opened.
     pub fn from_env() -> Result<Self, MemoryError> {
+        match std::env::var("MEMORY_MCP_HTTP_AUTH_MODE").ok() {
+            Some(mode) if mode == "local" => {}
+            Some(other) => {
+                return Err(MemoryError::ConfigInvalid(format!(
+                    "admin commands require local mode, got '{other}'"
+                )));
+            }
+            None => {
+                return Err(MemoryError::ConfigInvalid(
+                    "admin commands require local mode (MEMORY_MCP_HTTP_AUTH_MODE=local)".into(),
+                ));
+            }
+        }
         let session_key = parse_hex_32_env("MEMORY_MCP_HTTP_SESSION_KEY")?;
         let csrf_key = parse_hex_32_env("MEMORY_MCP_HTTP_CSRF_KEY")?;
         let public_base_url = std::env::var("MEMORY_MCP_HTTP_PUBLIC_BASE_URL")
