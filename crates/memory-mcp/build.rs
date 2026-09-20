@@ -1,4 +1,5 @@
 use std::env;
+use std::ffi::OsStr;
 use std::fs;
 use std::path::{Component, Path, PathBuf};
 
@@ -12,6 +13,7 @@ struct Asset {
     relative: PathBuf,
     url_path: String,
     content_type: &'static str,
+    immutable: bool,
 }
 
 fn main() {
@@ -169,6 +171,7 @@ fn collect_assets(root: &Path, current: &Path, assets: &mut Vec<Asset>) -> Resul
             source: path,
             relative,
             content_type: content_type(&url_path),
+            immutable: is_content_addressed(&url_path),
             url_path,
         });
     }
@@ -201,6 +204,34 @@ fn url_path(relative: &Path) -> Result<String, String> {
         url.push_str(component);
     }
     Ok(url)
+}
+
+/// Return whether a bundle path carries a stable content hash.
+///
+/// Dioxus emits names such as `main-dxh1234567890.css`. Only filenames with a
+/// lowercase alphanumeric suffix of at least eight characters after the final
+/// hyphen are treated as content-addressed. Stable names such as `index.html`
+/// and `favicon.svg` therefore remain revalidated, and short or unusual names
+/// are conservatively treated as mutable.
+fn is_content_addressed(url_path: &str) -> bool {
+    let path = Path::new(url_path);
+    if path.file_name() == Some(OsStr::new("index.html"))
+        || path.file_name() == Some(OsStr::new("favicon.svg"))
+    {
+        return false;
+    }
+
+    let Some(stem) = path.file_stem().and_then(|value| value.to_str()) else {
+        return false;
+    };
+    let Some((_, suffix)) = stem.rsplit_once('-') else {
+        return false;
+    };
+
+    suffix.len() >= 8
+        && suffix
+            .bytes()
+            .all(|byte| byte.is_ascii_lowercase() || byte.is_ascii_digit())
 }
 
 fn content_type(path: &str) -> &'static str {
@@ -247,7 +278,8 @@ fn generate_manifest(assets: &[Asset]) -> String {
         let url_path = rust_string_literal(&asset.url_path);
         let content_type = rust_string_literal(asset.content_type);
         manifest.push_str(&format!(
-            "    Asset {{ path: {url_path}, content_type: {content_type}, body: include_bytes!(concat!(env!(\"OUT_DIR\"), \"/{STAGED_DIR}/\", {relative})) }},\n"
+            "    Asset {{ path: {url_path}, content_type: {content_type}, immutable: {}, body: include_bytes!(concat!(env!(\"OUT_DIR\"), \"/{STAGED_DIR}/\", {relative})) }},\n",
+            asset.immutable
         ));
     }
     manifest.push_str("];\n");
@@ -272,4 +304,30 @@ fn rust_string_literal(value: &str) -> String {
     }
     literal.push('"');
     literal
+}
+
+#[cfg(test)]
+mod tests {
+    use super::is_content_addressed;
+
+    #[test]
+    fn recognizes_dioxus_hashed_assets() {
+        assert!(is_content_addressed(
+            "/assets/control-plane-ui-dxh395eca31249da547.js"
+        ));
+        assert!(is_content_addressed("/assets/main-dxh8aea88cdab71b47.css"));
+    }
+
+    #[test]
+    fn keeps_stable_and_ambiguous_names_revalidating() {
+        for path in [
+            "/index.html",
+            "/assets/favicon.svg",
+            "/assets/main.css",
+            "/assets/main-short.css",
+            "/assets/main-dxH395eca31249da547.js",
+        ] {
+            assert!(!is_content_addressed(path), "path: {path}");
+        }
+    }
 }

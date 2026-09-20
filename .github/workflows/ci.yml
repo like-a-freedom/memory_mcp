@@ -213,6 +213,21 @@ jobs:
             echo 'the final image unexpectedly contains a shell' >&2
             exit 1
           fi
+      - name: Assert the final image has no UI sidecar
+        shell: bash
+        run: |
+          set -euo pipefail
+          container_id="$(docker create memory-mcp-http:local)"
+          trap 'docker rm "${container_id}" >/dev/null' EXIT
+          docker export "${container_id}" | python3 -c '
+          import sys
+          import tarfile
+
+          for member in tarfile.open(fileobj=sys.stdin.buffer, mode="r|"):
+              name = member.name.removeprefix("./")
+              if name == "src/control-plane-ui-dist" or name.startswith("src/control-plane-ui-dist/"):
+                  raise SystemExit(f"UI sidecar found in final image: {name}")
+          '
       - name: Start the HTTP service and probe liveness
         shell: bash
         run: |

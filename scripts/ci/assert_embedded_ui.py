@@ -75,6 +75,25 @@ SCRIPT_ASSET_REFERENCE = re.compile(r"""["'](/[^"'\s]*\.(?:wasm|js|mjs))["']""")
 # A bound on how much of the bundle one run will fetch.
 MAX_ASSETS = 64
 
+IMMUTABLE_CACHE_CONTROL = "public, max-age=31536000, immutable"
+REVALIDATE_CACHE_CONTROL = "no-cache"
+
+
+def header_value(headers: dict[str, str], name: str) -> str:
+    """Read an HTTP header without depending on the server's casing."""
+    name = name.lower()
+    return next((value for key, value in headers.items() if key.lower() == name), "")
+
+
+def is_content_addressed(path: str) -> bool:
+    """Match the conservative filename rule used by the Rust build script."""
+    filename = posixpath.basename(path)
+    if filename in {"index.html", "favicon.svg"}:
+        return False
+    stem, _ = posixpath.splitext(filename)
+    _, separator, suffix = stem.rpartition("-")
+    return bool(separator and len(suffix) >= 8 and re.fullmatch(r"[a-z0-9]+", suffix))
+
 
 def asset_references_in_script(source: str) -> list[str]:
     """Same-origin bundle paths a served script fetches at runtime."""
@@ -266,8 +285,27 @@ def main() -> int:
             "(see --host-header)"
         ),
     )
-    content_type = headers.get("content-type", headers.get("Content-Type", ""))
+    content_type = header_value(headers, "content-type")
     probe.check("document is html", "text/html" in content_type, content_type)
+    probe.check(
+        "document is revalidated on deploy",
+        header_value(headers, "cache-control") == REVALIDATE_CACHE_CONTROL,
+        header_value(headers, "cache-control"),
+    )
+
+    fallback_url = urllib.parse.urljoin(base_url, "admin/login")
+    fallback_status, fallback_headers, _ = probe.get(fallback_url)
+    probe.check("SPA route returns the embedded document", fallback_status == 200, fallback_status)
+    probe.check(
+        "SPA route returns html",
+        "text/html" in header_value(fallback_headers, "content-type"),
+        header_value(fallback_headers, "content-type"),
+    )
+    probe.check(
+        "SPA route is revalidated on deploy",
+        header_value(fallback_headers, "cache-control") == REVALIDATE_CACHE_CONTROL,
+        header_value(fallback_headers, "cache-control"),
+    )
 
     # The serving policy travels with every response; re-assert it here because
     # the crate's unit test runs against a fixture, not the shipped image.
@@ -342,7 +380,7 @@ def main() -> int:
 
     probe.check("document references assets", bool(document.references), len(document.references))
 
-    served: dict[str, tuple[int, str]] = {}
+    served: dict[str, tuple[int, str, str]] = {}
     external: list[str] = []
     unresolved: list[str] = []
     pending = list(document.references)
@@ -360,8 +398,9 @@ def main() -> int:
             unresolved.append(f"more than {MAX_ASSETS} assets referenced")
             break
         asset_status, asset_headers, asset_body = probe.get(resolved)
-        asset_type = asset_headers.get("content-type", asset_headers.get("Content-Type", ""))
-        served[path] = (asset_status, asset_type)
+        asset_type = header_value(asset_headers, "content-type")
+        cache_control = header_value(asset_headers, "cache-control")
+        served[path] = (asset_status, asset_type, cache_control)
         if asset_status != 200:
             unresolved.append(f"{path} -> {asset_status}")
             continue
@@ -372,6 +411,19 @@ def main() -> int:
         if wanted and not any(candidate in asset_type for candidate in wanted):
             unresolved.append(f"{path} -> content-type {asset_type!r}")
             continue
+        probe.check(f"{path} has a cache policy", bool(cache_control), cache_control)
+        if is_content_addressed(path):
+            probe.check(
+                f"{path} is immutable",
+                cache_control == IMMUTABLE_CACHE_CONTROL,
+                cache_control,
+            )
+        if posixpath.basename(path) == "favicon.svg":
+            probe.check(
+                "favicon is revalidated on deploy",
+                cache_control == REVALIDATE_CACHE_CONTROL,
+                cache_control,
+            )
         if path.endswith((".js", ".mjs")):
             pending.extend(
                 asset_references_in_script(asset_body.decode("utf-8", errors="replace"))

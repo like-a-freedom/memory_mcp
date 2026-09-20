@@ -272,7 +272,9 @@ control-plane-ui --out-dir /src/control-plane-ui-dist` (pinned `dioxus-cli
 0.7.10`), then both binaries with
 `streamable-http,control-plane,control-plane-ui` and
 `MEMORY_MCP_CONTROL_PLANE_UI_DIST=/src/control-plane-ui-dist/public`, then a
-`distroless/cc-debian13:nonroot` runtime.
+`distroless/cc-debian13:nonroot` runtime. The final runtime contains the two
+binaries, native libraries, and migrations only; it does not copy the UI bundle
+or require a runtime asset directory.
 
 The bundle is deliberately exactly five files — `index.html`, one `.js`, one
 `.wasm`, one `.css` and the unhashed `assets/favicon.svg` the shell names — and

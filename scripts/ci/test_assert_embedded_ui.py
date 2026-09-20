@@ -128,6 +128,23 @@ class ContentTypeTests(unittest.TestCase):
         self.assertEqual(ui.expected_content_types("/assets/data.bin"), ())
 
 
+class CachePolicyTests(unittest.TestCase):
+    def test_matches_the_rust_content_addressing_rule(self):
+        self.assertTrue(ui.is_content_addressed("/assets/main-dxh8aea88cdab71b47.css"))
+        self.assertTrue(ui.is_content_addressed("/assets/app-dxh395eca31249da547.js"))
+        self.assertFalse(ui.is_content_addressed("/index.html"))
+        self.assertFalse(ui.is_content_addressed("/assets/favicon.svg"))
+        self.assertFalse(ui.is_content_addressed("/assets/app.js"))
+        self.assertFalse(ui.is_content_addressed("/assets/app-short.js"))
+
+    def test_reads_cache_control_case_insensitively(self):
+        self.assertEqual(
+            ui.header_value({"Cache-Control": "no-cache"}, "cache-control"),
+            "no-cache",
+        )
+        self.assertEqual(ui.header_value({}, "cache-control"), "")
+
+
 class TitleTests(unittest.TestCase):
     def test_a_real_title_is_acceptable(self):
         self.assertTrue(ui.title_is_acceptable("Memory MCP control plane"))

@@ -134,15 +134,10 @@ COPY --from=builder /out/runtime/ /usr/local/lib/
 # are not world-readable in the working tree (e.g. a newly added file created
 # with a 002 umask lands as 0660 and would fail startup with `Permission denied`).
 COPY --chmod=0755 --from=builder /src/crates/memory-mcp/migrations/ /src/crates/memory-mcp/migrations/
-# The UI is embedded at compile time; the bundle is also carried at the literal
-# absolute dist path the build contract uses so the image and a source build
-# expose the same layout.
-COPY --from=builder /src/control-plane-ui-dist /src/control-plane-ui-dist
 
 ENV HOME=/tmp \
     XDG_DATA_HOME=/tmp/memory-mcp \
     LD_LIBRARY_PATH=/usr/local/lib \
-    MEMORY_MCP_CONTROL_PLANE_UI_DIST=/src/control-plane-ui-dist/public \
     RUST_LOG=info \
     NER_EXTRACTOR=anno \
     EMBEDDINGS_ENABLED=false \

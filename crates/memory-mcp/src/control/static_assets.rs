@@ -1,17 +1,20 @@
 //! Static asset serving for the optional Dioxus SPA.
 //!
-//! When `control-plane-ui` is enabled, built assets are embedded
-//! via `include_bytes!` and served under `/` with a fallback to
-//! `index.html`. API routes take priority via axum's `nest`.
+//! When `control-plane-ui` is enabled, built assets are embedded via
+//! `include_bytes!` and served under `/` with a fallback to `index.html`.
+//! API routes take priority via axum's `nest`.
 
 use axum::body::Body;
-use axum::http::{HeaderValue, StatusCode, header::CONTENT_TYPE};
+use axum::http::{HeaderValue, StatusCode, header::CACHE_CONTROL, header::CONTENT_TYPE};
 use axum::response::Response;
 
 #[derive(Debug, Clone, Copy)]
 struct Asset {
     path: &'static str,
     content_type: &'static str,
+    /// Whether this asset is content-addressed and safe to cache immutably.
+    /// Computed by `build.rs`; the served binary never guesses at a hash format.
+    immutable: bool,
     body: &'static [u8],
 }
 
@@ -30,8 +33,8 @@ const INDEX_PATH: &str = "/index.html";
 /// compiled to WebAssembly: Chromium classifies WASM compilation as an
 /// eval-like sink, so `script-src 'self'` alone blocks
 /// `WebAssembly.instantiateStreaming` and the SPA never mounts. The token
-/// permits WebAssembly compilation only — it does **not** enable JavaScript
-/// `eval` or `new Function`, which stay blocked. Verified by the
+/// permits WebAssembly compilation only; it does not enable JavaScript `eval`
+/// or `new Function`, which stay blocked. Verified by the
 /// `scripts/ci/local_admin_browser.mjs` `ui` scenario, which loads the real
 /// bundle in a browser under this header.
 const CONTENT_SECURITY_POLICY: &str = "default-src 'self'; \
@@ -110,6 +113,17 @@ fn asset_response(asset: &Asset) -> Response {
     let mut resp = Response::new(Body::from(asset.body));
     resp.headers_mut()
         .insert(CONTENT_TYPE, HeaderValue::from_static(asset.content_type));
+    // Content-addressed bundle assets never change once published, so they can
+    // be cached immutably. The index document and any stable-path asset (the
+    // favicon) are revalidated, so a new deploy is picked up promptly.
+    resp.headers_mut().insert(
+        CACHE_CONTROL,
+        HeaderValue::from_static(if asset.immutable {
+            "public, max-age=31536000, immutable"
+        } else {
+            "no-cache"
+        }),
+    );
     attach_security_headers(resp)
 }
 
@@ -125,19 +139,22 @@ mod tests {
 
     const FIXTURE_ASSETS: &[Asset] = &[
         Asset {
-            path: "/assets/app.js",
+            path: "/assets/app-dxh395eca31249da547.js",
             content_type: "text/javascript; charset=utf-8",
+            immutable: true,
             body: b"compiled-js-fixture",
+        },
+        Asset {
+            path: "/assets/favicon.svg",
+            content_type: "image/svg+xml",
+            immutable: false,
+            body: b"<svg></svg>",
         },
         Asset {
             path: "/index.html",
             content_type: "text/html; charset=utf-8",
+            immutable: false,
             body: b"compiled-index-fixture",
-        },
-        Asset {
-            path: "/styles.css",
-            content_type: "text/css; charset=utf-8",
-            body: b"compiled-css-fixture",
         },
     ];
 
@@ -156,7 +173,7 @@ mod tests {
             .expect("csp header");
         assert_eq!(csp, CONTENT_SECURITY_POLICY);
         // The bundle is WebAssembly, so the policy must permit WASM
-        // compilation — and nothing broader than that.
+        // compilation; and nothing broader than that.
         assert!(
             csp.contains("'wasm-unsafe-eval'"),
             "the shipped bundle cannot boot without a WASM-compilation allowance: {csp}"
@@ -187,7 +204,8 @@ mod tests {
 
     #[tokio::test]
     async fn fixture_asset_returns_compiled_bytes_and_content_type() {
-        let response = serve_asset_from("/assets/app.js?cache=1", FIXTURE_ASSETS);
+        let response =
+            serve_asset_from("/assets/app-dxh395eca31249da547.js?cache=1", FIXTURE_ASSETS);
 
         assert_eq!(response.status(), StatusCode::OK);
         assert_eq!(
@@ -198,11 +216,18 @@ mod tests {
             Some("text/javascript; charset=utf-8")
         );
         assert_security_headers(&response);
+        assert_eq!(
+            response
+                .headers()
+                .get(CACHE_CONTROL)
+                .and_then(|value| value.to_str().ok()),
+            Some("public, max-age=31536000, immutable")
+        );
         assert_eq!(response_body(response).await, b"compiled-js-fixture");
     }
 
     #[tokio::test]
-    async fn root_and_extensionless_routes_return_compiled_index() {
+    async fn root_and_extensionless_routes_return_revalidated_compiled_index() {
         for path in ["/", "/index.html", "/operator/settings"] {
             let response = serve_asset_from(path, FIXTURE_ASSETS);
 
@@ -216,11 +241,31 @@ mod tests {
                 "path: {path}"
             );
             assert_eq!(
+                response
+                    .headers()
+                    .get(CACHE_CONTROL)
+                    .and_then(|value| value.to_str().ok()),
+                Some("no-cache"),
+                "path: {path}"
+            );
+            assert_eq!(
                 response_body(response).await,
                 b"compiled-index-fixture",
                 "path: {path}"
             );
         }
+    }
+
+    #[test]
+    fn stable_unhashed_assets_are_revalidated() {
+        let response = serve_asset_from("/assets/favicon.svg", FIXTURE_ASSETS);
+        assert_eq!(
+            response
+                .headers()
+                .get(CACHE_CONTROL)
+                .and_then(|value| value.to_str().ok()),
+            Some("no-cache")
+        );
     }
 
     #[test]
@@ -269,6 +314,7 @@ mod tests {
             .find(|asset| asset.path == INDEX_PATH)
             .expect("asset build script should generate index.html");
         assert!(!index.body.is_empty());
+        assert!(!index.immutable);
     }
 
     #[test]
