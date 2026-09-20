@@ -251,17 +251,7 @@ impl LocalAdminService {
         self.admit(context, AttemptDomain::Challenge, None).await?;
         let verifier = match parse_challenge_code(code) {
             Ok(verifier) => verifier,
-            Err(error) => {
-                self.record_admitted_failure(
-                    context,
-                    FailureAction::Challenge,
-                    FailureReason::InvalidChallenge,
-                    None,
-                    None,
-                )
-                .await?;
-                return Err(error);
-            }
+            Err(error) => return self.reject_invalid_challenge(context, error).await,
         };
         match self
             .authority
@@ -272,6 +262,25 @@ impl LocalAdminService {
             Ok(view) => Ok(view),
             Err(error) => self.reject_challenge(context, error).await,
         }
+    }
+
+    /// Record the admitted failure for a rejected challenge code, then hand the
+    /// original rejection back. Used by both the inspect and finish paths so
+    /// the event they append cannot drift apart.
+    async fn reject_invalid_challenge<T>(
+        &self,
+        context: &AuthAttemptContext,
+        error: LocalAdminError,
+    ) -> LocalResult<T> {
+        self.record_admitted_failure(
+            context,
+            FailureAction::Challenge,
+            FailureReason::InvalidChallenge,
+            None,
+            None,
+        )
+        .await?;
+        Err(error)
     }
 
     /// Record the admitted failure when a challenge operation is refused
@@ -285,14 +294,7 @@ impl LocalAdminService {
         error: LocalAdminError,
     ) -> LocalResult<T> {
         if matches!(error, LocalAdminError::InvalidChallenge) {
-            self.record_admitted_failure(
-                context,
-                FailureAction::Challenge,
-                FailureReason::InvalidChallenge,
-                None,
-                None,
-            )
-            .await?;
+            return self.reject_invalid_challenge(context, error).await;
         }
         Err(error)
     }
@@ -309,17 +311,7 @@ impl LocalAdminService {
         crate::service::local_admin::policy::validate_password(&password)?;
         let verifier = match parse_challenge_code(code) {
             Ok(verifier) => verifier,
-            Err(error) => {
-                self.record_admitted_failure(
-                    context,
-                    FailureAction::Challenge,
-                    FailureReason::InvalidChallenge,
-                    None,
-                    None,
-                )
-                .await?;
-                return Err(error);
-            }
+            Err(error) => return self.reject_invalid_challenge(context, error).await,
         };
         let password_phc = self.hasher.hash(password).await?;
         let command = ChallengeFinish {

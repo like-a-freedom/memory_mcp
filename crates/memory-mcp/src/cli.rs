@@ -1,6 +1,10 @@
 //! CLI module — clap-based command surface shared between runtime modes
 //! (serve / watch / reembed) and one-shot memory tool subcommands.
 
+// Only the administrator commands use this, so it is compiled exactly when
+// they are: the module reads the HTTP profile's mode constant and must not pull
+// `crate::http` into a build that does not have `streamable-http`.
+#[cfg(all(feature = "streamable-http", feature = "control-plane"))]
 pub mod admin_config;
 pub mod args;
 pub mod commands;

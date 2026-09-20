@@ -2868,6 +2868,8 @@ pub use super::storage::ensure_namespace as ensure_registry_namespace;
 mod local_admin;
 #[cfg(feature = "control-plane")]
 pub mod local_admin_rate;
+#[cfg(feature = "control-plane")]
+pub use local_admin_rate::rate_bucket_cleanup_scheduler_job;
 #[cfg(all(test, feature = "control-plane"))]
 mod local_admin_remote;
 

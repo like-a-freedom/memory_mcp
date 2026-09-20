@@ -86,8 +86,7 @@ async fn main() -> ExitCode {
             // data-plane-only HTTP build does not carry it.
             #[cfg(feature = "control-plane")]
             let hooks = hooks.with_additional_job(
-                memory_mcp::http::registry::surreal_store::local_admin_rate::
-                    rate_bucket_cleanup_scheduler_job(),
+                memory_mcp::http::registry::surreal_store::rate_bucket_cleanup_scheduler_job(),
             );
             hooks
         })

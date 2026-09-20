@@ -207,9 +207,8 @@ impl FailOnceAt {
 ///
 /// When armed with a needle, the next local-admin statement whose SQL
 /// contains that needle fails *before* it reaches the engine. Production
-/// never calls [`SqlFaultHook::arm`], so `check` is a single relaxed
-/// atomic load on the common path and the hook cannot change production
-/// behaviour.
+/// never calls [`SqlFaultHook::arm`], so an unarmed `check` is a single atomic
+/// load and the hook cannot change production behaviour.
 ///
 /// This is the SQL-level counterpart of [`FaultInjector`]: that seam fails
 /// a *worker transition*, this one fails a *statement*, which is what the
@@ -219,6 +218,8 @@ impl FailOnceAt {
 #[derive(Debug, Default)]
 pub struct SqlFaultHook {
     needle: std::sync::Mutex<Option<String>>,
+    /// Whether a needle is armed at all, so the common path never locks.
+    armed: std::sync::atomic::AtomicBool,
     fired: std::sync::atomic::AtomicBool,
 }
 
@@ -239,6 +240,7 @@ impl SqlFaultHook {
         *slot = Some(needle.to_string());
         self.fired
             .store(false, std::sync::atomic::Ordering::Release);
+        self.armed.store(true, std::sync::atomic::Ordering::Release);
     }
 
     /// Fail closed when `sql` matches the armed needle, exactly once.
@@ -248,6 +250,10 @@ impl SqlFaultHook {
     /// transaction back.
     pub fn check(&self, sql: &str) -> Result<(), MemoryError> {
         if self.fired.load(std::sync::atomic::Ordering::Acquire) {
+            return Ok(());
+        }
+        if !self.armed.load(std::sync::atomic::Ordering::Acquire) {
+            // The unarmed fast path: one atomic load, no lock.
             return Ok(());
         }
         let slot = self

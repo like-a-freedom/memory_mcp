@@ -266,6 +266,37 @@ pub fn new_namespace_name() -> String {
     format!("tns_{}", uuid::Uuid::new_v4().simple())
 }
 
+/// A fresh `Account` + `Tenant` pair in the state every browser-auth workflow
+/// starts from: an `Active` account whose tenant is `Reserved` at
+/// `plan_version` and has not been provisioned yet.
+///
+/// Every caller that enrols a new client needs the same shape, and the
+/// provisioning worker keys off exactly these fields, so it is built in one
+/// place rather than re-typed per workflow.
+pub fn new_reserved_bundle(plan_version: u32, now: DateTime<Utc>) -> (Account, Tenant) {
+    let account = Account {
+        id: new_account_id(),
+        status: AccountStatus::Active,
+        tenant_id: new_tenant_id(),
+        created_at: now,
+    };
+    let tenant = Tenant {
+        id: account.tenant_id.clone(),
+        status: TenantStatus::Reserved,
+        namespace_binding: NamespaceBinding {
+            namespace: new_namespace_name(),
+            database: "memory".into(),
+        },
+        plan_version,
+        schema_version: 0,
+        retry_stage: None,
+        provisioning_lease: None,
+        created_at: now,
+        version: 0,
+    };
+    (account, tenant)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

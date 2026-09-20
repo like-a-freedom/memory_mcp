@@ -63,10 +63,9 @@ impl PasswordHasher {
     /// Hash a password with Argon2id. Bounded admission.
     pub async fn hash(&self, password: String) -> LocalResult<String> {
         let _permit = self.admit().await?;
-        let running = self.running.clone();
         let params = self.params.clone();
 
-        self.run_with_running_permit(running, move |_permit| {
+        self.run_with_running_permit(move |_permit| {
             let mut salt_bytes = [0u8; 16];
             OsRng.fill_bytes(&mut salt_bytes);
             let salt = SaltString::encode_b64(&salt_bytes)
@@ -90,14 +89,13 @@ impl PasswordHasher {
     /// it imitates.
     pub async fn verify(&self, password: String, phc: Option<String>) -> LocalResult<bool> {
         let _permit = self.admit().await?;
-        let running = self.running.clone();
 
         match phc {
             // Dummy verification for unknown/pending users.
             None => {
                 let params = self.params.clone();
                 let dummy = self.dummy_phc.clone();
-                self.run_with_running_permit(running, move |_permit| {
+                self.run_with_running_permit(move |_permit| {
                     let parsed = PasswordHash::new(&dummy)
                         .map_err(|e| LocalAdminError::InvalidInput(format!("dummy PHC: {e}")))?;
                     let argon2 = Argon2::new(Algorithm::Argon2id, Version::V0x13, params);
@@ -109,7 +107,7 @@ impl PasswordHasher {
             Some(phc_str) => {
                 // Validate PHC parameters before expensive KDF work.
                 validate_phc(&phc_str)?;
-                self.run_with_running_permit(running, move |_permit| {
+                self.run_with_running_permit(move |_permit| {
                     let parsed = PasswordHash::new(&phc_str)
                         .map_err(|e| LocalAdminError::InvalidInput(format!("PHC parse: {e}")))?;
                     let argon2 = Argon2::new(Algorithm::Argon2id, Version::V0x13, self_params()?);
@@ -144,20 +142,18 @@ impl PasswordHasher {
     /// the KDF work actually stops rather than when the awaiting future is
     /// dropped. Cancelling a request therefore cannot free capacity for work
     /// that is still executing on the pool.
-    async fn run_with_running_permit<T, F>(
-        &self,
-        running: Arc<tokio::sync::Semaphore>,
-        job: F,
-    ) -> LocalResult<T>
+    async fn run_with_running_permit<T, F>(&self, job: F) -> LocalResult<T>
     where
         F: FnOnce(tokio::sync::OwnedSemaphorePermit) -> LocalResult<T> + Send + 'static,
         T: Send + 'static,
     {
-        let running_permit =
-            tokio::time::timeout(std::time::Duration::from_secs(2), running.acquire_owned())
-                .await
-                .map_err(|_| LocalAdminError::Unavailable)?
-                .map_err(|_| LocalAdminError::Unavailable)?;
+        let running_permit = tokio::time::timeout(
+            std::time::Duration::from_secs(2),
+            self.running.clone().acquire_owned(),
+        )
+        .await
+        .map_err(|_| LocalAdminError::Unavailable)?
+        .map_err(|_| LocalAdminError::Unavailable)?;
 
         tokio::task::spawn_blocking(move || job(running_permit))
             .await

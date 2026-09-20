@@ -102,12 +102,13 @@ impl FromRequestParts<Arc<HttpState>> for RequireAdmin {
         let cookie_verifier = parse_admin_cookie(cookie_header)?
             .ok_or_else(|| handlers::map_error(LocalAdminError::Unauthenticated))?;
 
-        let principal = ext
-            .authority
-            .store()
-            .resolve_session(&cookie_verifier, ext.authority.policy())
-            .await
-            .map_err(handlers::map_error)?;
+        let principal = crate::service::local_admin::auth::LocalAdminService::new(
+            ext.authority.clone(),
+            ext.hasher.clone(),
+        )
+        .resolve(&request_context_from_parts(parts), &cookie_verifier)
+        .await
+        .map_err(handlers::map_error)?;
 
         Ok(RequireAdmin(principal))
     }

@@ -35,6 +35,6 @@ pub use parse::{
     DEFAULT_TASK_SYNC_MAX_BYTES, TrustedCidr,
 };
 pub use types::{
-    BrowserAuthConfig, BrowserAuthMode, HmacKeys, HttpConfig, LocalBrowserConfig,
-    OidcBrowserConfig, SignupMode,
+    AUTH_MODE_LOCAL, AUTH_MODE_OIDC, BrowserAuthConfig, BrowserAuthMode, HmacKeys, HttpConfig,
+    LocalBrowserConfig, OidcBrowserConfig, SignupMode,
 };

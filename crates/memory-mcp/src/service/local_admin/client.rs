@@ -12,10 +12,10 @@ use crate::service::local_admin::contracts::{
 
 /// Service for managing local clients and their API keys.
 ///
-/// Owns the deployment's default plan version and API-key pepper, so the HTTP
-/// adapter only parses, authorizes and serializes: the account/tenant bundle,
-/// the credential material and the request fingerprints are all produced here
-/// (plan §3.2, §3.4).
+/// Holds the deployment's default plan version and API-key pepper (both handed
+/// in at composition), so the HTTP adapter only parses, authorizes and
+/// serializes: the account/tenant bundle, the credential material and the
+/// request fingerprints are all produced here (plan §3.2, §3.4).
 pub struct ClientAdminService {
     authority: Arc<LocalAdminAuthority>,
     plan_version: u32,
@@ -52,31 +52,12 @@ impl ClientAdminService {
     ) -> LocalResult<ClientView> {
         use crate::http::registry::models as registry;
 
-        let account_id = registry::new_account_id();
-        let tenant_id = registry::new_tenant_id();
         let now = chrono::Utc::now();
         let fingerprint = client_request_fingerprint(command.operation_id, &command.display_name);
+        let (account, tenant) = registry::new_reserved_bundle(self.plan_version, now);
         let bundle = ClientBundle {
-            account: registry::Account {
-                id: account_id,
-                status: registry::AccountStatus::Active,
-                tenant_id: tenant_id.clone(),
-                created_at: now,
-            },
-            tenant: registry::Tenant {
-                id: tenant_id,
-                status: registry::TenantStatus::Reserved,
-                namespace_binding: registry::NamespaceBinding {
-                    namespace: registry::new_namespace_name(),
-                    database: "memory".into(),
-                },
-                plan_version: self.plan_version,
-                schema_version: 0,
-                retry_stage: None,
-                provisioning_lease: None,
-                created_at: now,
-                version: 0,
-            },
+            account,
+            tenant,
             display_name: command.display_name,
             operation_id: command.operation_id,
             request_fingerprint: fingerprint,

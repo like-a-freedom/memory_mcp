@@ -144,6 +144,11 @@ pub enum SignupMode {
     Open,
 }
 
+/// The two values `MEMORY_MCP_HTTP_AUTH_MODE` accepts, shared by the parser, the
+/// validator and the administrator CLI so no caller re-types the literal.
+pub const AUTH_MODE_LOCAL: &str = "local";
+pub const AUTH_MODE_OIDC: &str = "oidc";
+
 impl HttpConfig {
     /// Loads the HTTP config from process environment variables.
     pub fn from_env() -> Result<Self, MemoryError> {
@@ -221,7 +226,7 @@ impl HttpConfig {
         let enable_control_plane = parse_bool("MEMORY_MCP_HTTP_ENABLE_CONTROL_PLANE", false)?;
         let enable_control_plane_ui = parse_bool("MEMORY_MCP_HTTP_ENABLE_CONTROL_PLANE_UI", false)?;
         let auth_mode = optional_env("MEMORY_MCP_HTTP_AUTH_MODE");
-        let is_local_mode = enable_control_plane && auth_mode.as_deref() == Some("local");
+        let is_local_mode = enable_control_plane && auth_mode.as_deref() == Some(AUTH_MODE_LOCAL);
 
         let identity_index = if is_local_mode {
             // Local mode has no external identity to index, but the field
@@ -287,7 +292,7 @@ impl HttpConfig {
         // Mode-specific browser auth configuration.
         let browser_auth = if enable_control_plane {
             match auth_mode.as_deref() {
-                Some("local") => {
+                Some(AUTH_MODE_LOCAL) => {
                     // Local mode must not have OIDC-only settings. The three
                     // key variables are checked here rather than in
                     // `validate` because only the parser can tell a supplied
@@ -335,7 +340,7 @@ impl HttpConfig {
                         default_plan_limits,
                     }))
                 }
-                Some("oidc") | None => {
+                Some(AUTH_MODE_OIDC) | None => {
                     // OIDC mode (default for backward compatibility).
                     Some(BrowserAuthConfig::Oidc(OidcBrowserConfig {
                         issuer: oidc_issuer.clone(),

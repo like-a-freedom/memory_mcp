@@ -150,30 +150,8 @@ fn build_bundle(
     crate::http::registry::models::Tenant,
     crate::http::registry::models::ExternalIdentity,
 ) {
-    use crate::http::registry::models::{
-        Account, AccountStatus, ExternalIdentity, NamespaceBinding, Tenant, TenantStatus,
-        new_account_id, new_namespace_name, new_tenant_id,
-    };
-    let account = Account {
-        id: new_account_id(),
-        status: AccountStatus::Active,
-        tenant_id: new_tenant_id(),
-        created_at: now,
-    };
-    let tenant = Tenant {
-        id: account.tenant_id.clone(),
-        status: TenantStatus::Reserved,
-        namespace_binding: NamespaceBinding {
-            namespace: new_namespace_name(),
-            database: "memory".into(),
-        },
-        plan_version: 1,
-        schema_version: 0,
-        retry_stage: None,
-        provisioning_lease: None,
-        created_at: now,
-        version: 0,
-    };
+    use crate::http::registry::models::{ExternalIdentity, new_reserved_bundle};
+    let (account, tenant) = new_reserved_bundle(1, now);
     let identity_record = ExternalIdentity {
         id: format!("id_{}", uuid::Uuid::new_v4()),
         account_id: account.id.clone(),

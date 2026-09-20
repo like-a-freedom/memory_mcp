@@ -748,14 +748,12 @@ pub async fn logout(
         Ok(None) => return clear_session_response(),
         Err(error) => return map_error(error).into_response(),
     };
-    let principal = match ext
-        .authority
-        .store()
-        .resolve_session(&verifier, ext.authority.policy())
-        .await
-    {
+    let service = make_auth_service(ext);
+    let principal = match service.resolve(&request_ctx(&parts), &verifier).await {
         Ok(principal) => principal,
-        // An expired or revoked cookie is not a session to revoke.
+        // An expired, revoked or unverifiable cookie is not a session to
+        // revoke, so logout stays a no-op for it. Every session read in this
+        // module goes through the service ([`LocalAdminService::resolve`]).
         Err(_) => return clear_session_response(),
     };
     if let Err(rejection) = ext
@@ -764,7 +762,6 @@ pub async fn logout(
     {
         return rejection.into_response();
     }
-    let service = make_auth_service(ext);
     match service.logout(&request_ctx(&parts), &principal).await {
         Ok(()) => clear_session_response(),
         Err(error) => map_error(error).into_response(),
