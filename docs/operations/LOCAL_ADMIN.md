@@ -148,7 +148,7 @@ Run from the repository root.
 | `MEMORY_MCP_CONTROL_PLANE_UI_DIST=<abs dist> cargo test -p memory_mcp --lib --features control-plane-ui,test-fixtures --locked control::static_assets` | ✅ executed, 6 passed — the build script requires an absolute, non-symlink dist directory containing a non-empty `index.html` |
 | `MEMORY_MCP_CONTROL_PLANE_UI_DIST=<abs dist> cargo test -p memory_mcp --features control-plane-ui,test-fixtures --locked --test http_local_admin` | ✅ executed, 42 passed |
 | `docker compose --env-file <operator env> -f docker-compose.yml -f docker-compose.{off,local,oidc}.yml config --quiet` | ✅ executed, all three overlays resolve. The base file alone still fails by design: it refuses to default any secret |
-| `docker build --tag memory-mcp-local-admin:test .` | ✅ executed, `25/25 FINISHED` in ~338 s cold / ~321 s warm |
+| `docker build --tag memory-mcp-local-admin:test .` | ✅ executed, `25/25 FINISHED`. A cold build is dominated by the `ui-builder` WASM cargo layer — one observed cold run was still at `17/24` after 30 minutes, with that layer alone at ~1596 s — while a warm-cache rebuild finished in ~193 s. Give the build a generous timeout; do not read a slow cold build as a failure |
 | `python3 scripts/ci/local_admin_image.py --image memory-mcp-local-admin:test --scenario all` | ✅ executed, 4 scenarios / 54 checks, exit 0 |
 | `node scripts/ci/local_admin_browser.mjs --base-url https://localhost:8443 --scenario auth` | ✅ executed through the harness. Direct invocation requires `LOCAL_ADMIN_BROWSER_FIXTURE`; a bare URL is refused |
 | `sh scripts/ci/local_admin_local_check.sh` (authorisation-code end-to-end against the real binaries and a real RocksDB registry) | ✅ executed, all sections pass (§2.5) |
