@@ -1,8 +1,10 @@
 //! Account deletion page.
 
 use dioxus::prelude::*;
+use dioxus_router::Link;
 
 use crate::api::{ApiClient, DeleteChallenge};
+use crate::router::Route;
 
 #[component]
 pub fn DeletePage() -> Element {
@@ -85,7 +87,7 @@ pub fn DeletePage() -> Element {
                 }
             }
             nav { class: "actions", "aria-label": "Account",
-                a { class: "button", href: "/", "Back to status" }
+                Link { class: "button", to: Route::Status {}, "Back to status" }
             }
         }
     }

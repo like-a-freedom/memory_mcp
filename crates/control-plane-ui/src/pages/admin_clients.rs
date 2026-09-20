@@ -1,6 +1,7 @@
 //! Local admin client list.
 
 use dioxus::prelude::*;
+use dioxus_router::Link;
 
 use crate::admin_api::{
     AdminApi, ClientView, OperationId, fresh_operation_id, keeps_operation_id, sleep_ms,
@@ -46,7 +47,6 @@ pub fn AdminClientListPage() -> Element {
     // One operation id per deliberate create action, kept for manual retries of
     // that same request so a lost response cannot create a second client.
     let mut operation = use_signal(|| None::<OperationId>);
-    let login_route = Route::Login {}.to_string();
 
     use_effect(move || fetch_clients(session, state, None, PageDirection::Replace));
 
@@ -60,10 +60,7 @@ pub fn AdminClientListPage() -> Element {
             } else {
                 backoff
             };
-            if sleep_ms(delay).await.is_err() {
-                // No event loop on this renderer: stop instead of spinning.
-                return;
-            }
+            sleep_ms(delay).await;
             let (cursor, poll_now) = {
                 let current = state.peek();
                 (
@@ -113,7 +110,7 @@ pub fn AdminClientListPage() -> Element {
             let existing = operation.peek().clone();
             let id = match existing {
                 Some(id) => id,
-                None => match fresh_operation_id().await {
+                None => match fresh_operation_id() {
                     Ok(id) => {
                         operation.set(Some(id.clone()));
                         id
@@ -172,7 +169,7 @@ pub fn AdminClientListPage() -> Element {
             if session.read().has_ended() {
                 div { class: "error", role: "alert",
                     p { "Your session ended. Sign in again to manage clients." }
-                    a { href: "{login_route}", "Go to sign-in" }
+                    Link { to: Route::Login {}, "Go to sign-in" }
                 }
             } else {
                 if let Some(message) = session.read().error() {
@@ -258,7 +255,14 @@ pub fn AdminClientListPage() -> Element {
                             tbody {
                                 for client in state.read().items() {
                                     tr { key: "{client.account_id}",
-                                        td { a { href: "{client_href(&client.account_id)}", "{client.display_name}" } }
+                                        td {
+                                            Link {
+                                                to: Route::AdminClientDetail {
+                                                    account_id: client.account_id.clone(),
+                                                },
+                                                "{client.display_name}"
+                                            }
+                                        }
                                         td { code { "{client.account_id}" } }
                                         td { "{client.account_status}" }
                                         td { "{client.tenant_status}" }
@@ -297,14 +301,6 @@ fn provisioning_label(client: &ClientView) -> String {
     } else {
         client.state_label().to_owned()
     }
-}
-
-/// Link to one client's detail page, encoded by the router itself.
-fn client_href(account_id: &str) -> String {
-    Route::AdminClientDetail {
-        account_id: account_id.to_owned(),
-    }
-    .to_string()
 }
 
 /// Fetch one page of clients into the list state.
@@ -348,14 +344,5 @@ mod tests {
         assert_eq!(next_backoff(POLL_MAX_BACKOFF_MS), POLL_MAX_BACKOFF_MS);
         // Absurd input cannot overflow or exceed the ceiling.
         assert_eq!(next_backoff(u32::MAX), POLL_MAX_BACKOFF_MS);
-    }
-
-    #[test]
-    fn client_links_use_the_router_encoding() {
-        assert_eq!(
-            client_href("account:1"),
-            "/admin/clients/account:1",
-            "the router encodes dynamic segments itself; nothing else may"
-        );
     }
 }

@@ -1281,8 +1281,12 @@ dependencies = [
  "dioxus-router",
  "gloo-net 0.7.0",
  "gloo-storage",
+ "gloo-timers",
+ "js-sys",
  "serde",
  "serde_json",
+ "wasm-bindgen-futures",
+ "web-sys",
 ]
 
 [[package]]

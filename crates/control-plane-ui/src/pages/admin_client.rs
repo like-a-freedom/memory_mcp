@@ -1,6 +1,7 @@
 //! Local admin client detail: metadata, readiness, keys and state changes.
 
 use dioxus::prelude::*;
+use dioxus_router::Link;
 use dioxus_router::hooks::use_navigator;
 
 use crate::admin_api::{
@@ -65,7 +66,6 @@ pub fn AdminClientDetailPage(account_id: String) -> Element {
     let mut confirm_action = use_signal(|| None::<ClientStateAction>);
     let mut revoke_target = use_signal(|| None::<ApiKeyMeta>);
     let mut refused = use_signal(|| None::<RefusedMutation>);
-    let login_route = Route::Login {}.to_string();
 
     use_effect({
         let account_id = account_id.clone();
@@ -74,7 +74,7 @@ pub fn AdminClientDetailPage(account_id: String) -> Element {
             spawn(async move {
                 // The browser clock is read once, to label expired keys; it
                 // never influences an authorization decision.
-                now_millis.set(browser_now_millis().await);
+                now_millis.set(browser_now_millis());
             });
             load_client(session, client, error, account_id.clone());
             load_keys(session, keys, id, None, PageDirection::Replace);
@@ -95,9 +95,7 @@ pub fn AdminClientDetailPage(account_id: String) -> Element {
                     } else {
                         backoff
                     };
-                    if crate::admin_api::sleep_ms(delay).await.is_err() {
-                        return;
-                    }
+                    crate::admin_api::sleep_ms(delay).await;
                     if !client
                         .peek()
                         .as_ref()
@@ -207,7 +205,7 @@ pub fn AdminClientDetailPage(account_id: String) -> Element {
                 let existing = operation.peek().clone();
                 let operation_id = match existing {
                     Some(existing) => existing,
-                    None => match fresh_operation_id().await {
+                    None => match fresh_operation_id() {
                         Ok(fresh) => {
                             operation.set(Some(fresh.clone()));
                             fresh
@@ -480,7 +478,7 @@ pub fn AdminClientDetailPage(account_id: String) -> Element {
             if session.read().has_ended() {
                 div { class: "error", role: "alert",
                     p { "Your session ended. Sign in again to continue." }
-                    a { href: "{login_route}", "Go to sign-in" }
+                    Link { to: Route::Login {}, "Go to sign-in" }
                 }
             } else if let Some(message) = session.read().error() {
                 p { class: "error", role: "alert", "{message}" }

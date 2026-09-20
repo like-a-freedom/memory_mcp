@@ -1,6 +1,7 @@
 //! Account status page.
 
 use dioxus::prelude::*;
+use dioxus_router::Link;
 use dioxus_router::hooks::use_navigator;
 
 use crate::api::ApiClient;
@@ -54,8 +55,8 @@ pub fn StatusPage() -> Element {
                 p { class: "status", role: "status", "aria-live": "polite", "Loading account…" }
             }
             nav { class: "actions", "aria-label": "Account",
-                a { class: "button", href: "/keys", "API keys" }
-                a { class: "button", href: "/delete", "Delete account" }
+                Link { class: "button", to: Route::Keys {}, "API keys" }
+                Link { class: "button", to: Route::Delete {}, "Delete account" }
                 button { r#type: "button", onclick: sign_out, "Sign out" }
             }
         }

@@ -1,6 +1,7 @@
 //! API key management page.
 
 use dioxus::prelude::*;
+use dioxus_router::Link;
 use dioxus_router::hooks::use_navigator;
 
 use crate::api::ApiClient;
@@ -13,7 +14,6 @@ pub fn KeysPage() -> Element {
     let mut new_key_secret = use_signal(|| None::<String>);
     let mut new_key_name = use_signal(String::new);
     let mut error = use_signal(|| None::<String>);
-    let status_route = Route::Status {}.to_string();
 
     use_effect(move || load_keys(keys, error));
 
@@ -123,7 +123,7 @@ pub fn KeysPage() -> Element {
                 }
             }
             nav { class: "actions", "aria-label": "Account",
-                a { class: "button", href: "{status_route}", "Back to status" }
+                Link { class: "button", to: Route::Status {}, "Back to status" }
                 button { r#type: "button", onclick: sign_out, "Sign out" }
             }
         }

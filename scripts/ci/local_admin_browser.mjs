@@ -15,6 +15,10 @@
  *                asserts it boots under the shipped Content-Security-Policy
  *                (index.html bytes alone are not evidence that WebAssembly
  *                executed).
+ *   flow       — drives the packaged bundle's interactive paths through the
+ *                real DOM: sign in, create a client, wait out asynchronous
+ *                provisioning, issue a key, and copy its one-time secret.
+ *                Both the DOM and the network must react to every click.
  *
  * All runs require a protected fixture file:
  *   LOCAL_ADMIN_BROWSER_FIXTURE=/path/to/fixture.json
@@ -38,7 +42,7 @@ import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
-const SCENARIOS = ['auth', 'clients', 'regression', 'ui'];
+const SCENARIOS = ['auth', 'clients', 'regression', 'ui', 'flow'];
 
 function fail(message) {
   console.error(`local_admin_browser: ERROR: ${message}`);
@@ -198,6 +202,18 @@ function freshCode() {
 function disposablePassword() {
   // Never logged, never persisted; discarded when this process exits.
   return registerSecret(`disp-${randomBytes(24).toString('hex')}`);
+}
+
+/** Set the password for a freshly created administrator, without signing in. */
+async function activate(context, code, password) {
+  const csrfResponse = await context.request.get(`${BASE_URL}/api/v1/auth/local/csrf`);
+  const { csrf_token: csrfToken } = await csrfResponse.json();
+  registerSecret(csrfToken);
+  const activated = await context.request.post(`${BASE_URL}/api/v1/auth/local/activate`, {
+    headers: { 'X-CSRF-Token': csrfToken, Origin: BASE_URL },
+    data: { code, password },
+  });
+  check('activation returns 204', activated.status() === 204, activated.status());
 }
 
 async function activateAndLogin(context, username, code, password) {
@@ -562,6 +578,208 @@ async function scenarioUi(context) {
   await page.close();
 }
 
+// ── Interactive flow ───────────────────────────────────────────────────────
+//
+// Every interactive path in this console used to be inert. The app reached the
+// browser through `dioxus::document::eval`, which the web renderer implements
+// with `new Function`; the shipped CSP refuses that, and a refused call is a
+// WebAssembly trap rather than a recoverable error, so it aborted the scheduler
+// tick that raised it. Pages mounted and rendered while no application request
+// ever followed a click.
+//
+// `context.request` cannot observe that — it never executes script — so this
+// scenario performs the operator's actions through the real DOM and requires
+// both the network and the DOM to react. "Nothing happened" is the regression,
+// so an absence of evidence has to be a failure here.
+async function scenarioFlow(context) {
+  const page = await context.newPage();
+  const consoleErrors = [];
+  const pageErrors = [];
+  page.on('console', (message) => {
+    if (message.type() === 'error') consoleErrors.push(message.text());
+  });
+  page.on('pageerror', (error) => pageErrors.push(error.message));
+
+  const calls = [];
+  page.on('response', (response) => {
+    const path = new URL(response.url()).pathname;
+    if (path.startsWith('/api/v1/')) {
+      calls.push(`${response.request().method()} ${path} ${response.status()}`);
+    }
+  });
+
+  // Document-level navigation and non-API responses. Without these, a click that
+  // triggers a full page load looks identical to a click that did nothing, and
+  // the difference is the whole point of this scenario.
+  const navigations = [];
+  page.on('framenavigated', (frame) => {
+    if (frame === page.mainFrame()) navigations.push(frame.url());
+  });
+  const documents = [];
+  page.on('response', (response) => {
+    const status = response.status();
+    if (response.request().resourceType() === 'document' || status >= 400) {
+      documents.push(`${status} ${new URL(response.url()).pathname}`);
+    }
+  });
+
+  // Everything a failure needs to be diagnosable without a second run. It
+  // returns the object rather than a stringified copy so `check` can redact the
+  // whole structure: stringifying here would exceed its per-string length cap
+  // and hide the tail of the evidence.
+  const probe = async (extra = {}) => {
+    let body = '';
+    try {
+      body = (await page.locator('body').innerText({ timeout: 2_000 })).slice(0, 240);
+    } catch {
+      body = '<unreadable>';
+    }
+    return {
+      url: page.url(),
+      documents,
+      navigations,
+      calls: calls.slice(-8),
+      pageErrors: pageErrors.slice(0, 3),
+      consoleErrors: consoleErrors.slice(0, 3),
+      body,
+      ...extra,
+    };
+  };
+
+  // `clipboard.writeText` needs the permission and a secure context. The harness
+  // endpoint is https on localhost, so it is one; a production deployment is
+  // https by construction.
+  await context.grantPermissions(['clipboard-read', 'clipboard-write'], { origin: BASE_URL });
+
+  const { username, code } = freshCode();
+  const password = disposablePassword();
+  await activate(context, code, password);
+
+  // 1. Sign in through the form.
+  await page.goto(`${BASE_URL}/admin/login`, { waitUntil: 'load' });
+  await page.waitForSelector('#admin-username', { state: 'visible', timeout: 30_000 });
+  await page.fill('#admin-username', username);
+  await page.fill('#admin-password', password);
+  await page.click('form.admin-login button[type="submit"]');
+
+  // The list page renders its create form only once the session load has
+  // succeeded, so seeing it proves the app completed its session round trip and
+  // routed. A trapped scheduler tick leaves the sign-in form in place.
+  let signedIn = true;
+  try {
+    await page.waitForSelector('#client-display-name', { state: 'visible', timeout: 30_000 });
+  } catch {
+    signedIn = false;
+  }
+  check(
+    'signing in through the form reaches the clients page',
+    signedIn,
+    signedIn ? page.url() : await probe(),
+  );
+  check(
+    'the app loaded its session through the browser',
+    calls.includes('GET /api/v1/admin/session 200'),
+    calls,
+  );
+
+  // 2. Create a client. This click needs a fresh operation id from the browser
+  //    CSPRNG, which is exactly the primitive the policy was blocking.
+  const displayName = `flow-${randomBytes(3).toString('hex')}`;
+  await page.fill('#client-display-name', displayName);
+  await page.click('form.create-client button[type="submit"]');
+
+  let listed = true;
+  try {
+    await page
+      .locator('table.client-list tbody td a', { hasText: displayName })
+      .first()
+      .waitFor({ state: 'visible', timeout: 30_000 });
+  } catch {
+    listed = false;
+  }
+  check(
+    'creating a client through the form lists the new row',
+    listed,
+    listed ? 'ok' : await probe(),
+  );
+  check(
+    'the create request reached the backend',
+    calls.includes('POST /api/v1/admin/clients 202'),
+    calls,
+  );
+
+  // 3. Open the client. The detail page offers key issuance only once the tenant
+  //    is ready, and provisioning is asynchronous, so waiting for the form also
+  //    proves the two-second poll loop runs — the poll is what needed a working
+  //    timer.
+  //
+  //    Opening the row must be a client-side route change. `framenavigated` also
+  //    fires for `history.pushState`, so the signal that the app reloaded is a
+  //    fresh HTML *document*: only then did the browser re-download and re-boot
+  //    the whole WebAssembly bundle.
+  const beforeDocs = documents.length;
+  await page.locator('table.client-list tbody td a', { hasText: displayName }).first().click();
+  let issuable = true;
+  try {
+    await page.waitForSelector('#key-name', { state: 'visible', timeout: 60_000 });
+  } catch {
+    issuable = false;
+  }
+  check(
+    'the client detail page becomes issuable while its poll loop runs',
+    issuable,
+    issuable ? 'ok' : await probe(),
+  );
+  check(
+    'opening a client keeps the app mounted instead of reloading it',
+    documents.length === beforeDocs,
+    documents.slice(beforeDocs),
+  );
+
+  // 4. Issue a key and copy its one-time secret. The secret is registered for
+  //    redaction before it can reach any diagnostic, and is never logged.
+  await page.fill('#key-name', 'flow-key');
+  await page.check('#key-expiry-never');
+  await page.click('form.issue-key button[type="submit"]');
+
+  let revealed = true;
+  try {
+    await page.waitForSelector('#new-key-secret-title', { state: 'visible', timeout: 30_000 });
+  } catch {
+    revealed = false;
+  }
+  check(
+    'issuing a key reveals the one-time secret',
+    revealed,
+    revealed ? 'ok' : await probe(),
+  );
+  check(
+    'the key request reached the backend',
+    calls.some((call) => call.startsWith('POST /api/v1/admin/clients/') && call.endsWith('/keys 201')),
+    calls,
+  );
+
+  const secret = registerSecret((await page.textContent('code.secret-value'))?.trim() ?? '');
+  check('the revealed secret is non-empty', secret.length > 0, secret.length);
+
+  await page.click('button:has-text("Copy secret")');
+  let notified = true;
+  try {
+    await page.waitForSelector('text=Secret copied to the clipboard', { timeout: 15_000 });
+  } catch {
+    notified = false;
+  }
+  check('copying the secret reports success in the page', notified, notified ? 'ok' : 'no notice');
+
+  const clipboard = await page.evaluate(() => navigator.clipboard.readText());
+  check('the clipboard holds the secret', clipboard === secret, clipboard.length);
+
+  check('no uncaught errors were raised', pageErrors.length === 0, pageErrors.slice(0, 3));
+  check('no csp violations were logged', consoleErrors.length === 0, consoleErrors.slice(0, 3));
+
+  await page.close();
+}
+
 // ── Driver ─────────────────────────────────────────────────────────────────
 console.log(`local_admin_browser: base=${BASE_URL} scenario=${SCENARIO} tls=${tlsMode}`);
 
@@ -580,6 +798,7 @@ try {
     if (SCENARIO === 'auth') await scenarioAuth(context);
     else if (SCENARIO === 'clients') await scenarioClients(context);
     else if (SCENARIO === 'ui') await scenarioUi(context);
+    else if (SCENARIO === 'flow') await scenarioFlow(context);
     else await scenarioRegression(context);
     console.log(`local_admin_browser: ${checks} checks passed`);
   } finally {

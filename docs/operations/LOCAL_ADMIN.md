@@ -41,11 +41,11 @@ All of the following were executed in this repository and passed:
 | Durable query-shape regression | `... --test registry_query_shape` — 4 passed |
 | Provisioning crash recovery | `... --test http_crash_recovery` — 11 passed |
 | Whole conformance suite | `cargo test -p memory_mcp --features control-plane,test-fixtures --locked` and `cargo test -p memory_mcp --locked` — every target green |
-| UI crate | `cargo test -p control-plane-ui --locked` — 55 passed; `cargo check -p control-plane-ui --target wasm32-unknown-unknown` and the matching `cargo clippy … -D warnings` clean |
+| UI crate | `cargo test -p control-plane-ui --locked` — 67 passed; `cargo check -p control-plane-ui --target wasm32-unknown-unknown` and the matching `cargo clippy … -D warnings` clean |
 | Static assets + CSP | `MEMORY_MCP_CONTROL_PLANE_UI_DIST=<abs dist> cargo test -p memory_mcp --lib --features control-plane-ui,test-fixtures --locked control::static_assets` — 6 passed |
 | Format, lint, non-default builds | `cargo fmt --all --check`; `cargo clippy --workspace --all-targets --features … --locked -- -D warnings` for all four documented feature combinations; `cargo check -p memory_mcp --no-default-features --locked` and `--features streamable-http` |
 | End-to-end against the real binaries | `sh scripts/ci/local_admin_local_check.sh` — local mode starts from env, activation/login/session, client create/list/get, provisioning reaches `ready` in one poll, restart persistence, plan-mismatch startup rejection, recovery invalidates the session, negative route/CSRF/Origin checks |
-| Packaged image over real TLS in a real browser | `docker build --tag memory-mcp-local-admin:test .` then `python3 scripts/ci/local_admin_image.py --image memory-mcp-local-admin:test --scenario all` — 4 scenarios, 64 checks, exit 0 (`auth` 9, `clients` 29, `regression` 6, `ui` 20). The `ui` scenario proves the bundle boots, is styled and ships a correct document shell; the interactive flows are not covered (see below) |
+| Packaged image over real TLS in a real browser | `docker build --tag memory-mcp-local-admin:test .` then `python3 scripts/ci/local_admin_image.py --image memory-mcp-local-admin:test --scenario all` — 5 scenarios, 78 checks, exit 0 (`auth` 9, `clients` 29, `regression` 6, `ui` 20, `flow` 14). The `ui` scenario proves the bundle boots, is styled and ships a correct document shell; the `flow` scenario drives the console's own interactive paths through the real DOM and is the guard for the defect recorded in §2.6.1 |
 | Compose modes resolve | `docker compose --env-file <operator env> -f docker-compose.yml -f docker-compose.{off,local,oidc}.yml config --quiet` — all three resolve |
 
 ### What is NOT verified
@@ -83,13 +83,19 @@ All of the following were executed in this repository and passed:
    `http_local_admin.rs::a_second_administrator_sees_and_can_administer_the_same_clients`
    (§6.3). The remaining remote-replica *interleavings* are still unverified
    (§13.2).
-9. **The console's interactive flows.** Nothing automated drives the packaged
-   UI: the `ui` scenario asserts that it boots, is styled and carries a correct
-   document shell, and every other scenario drives the HTTP API directly. The
-   shipped CSP currently blocks the four `dioxus::document::eval` call sites, so
-   data loading, polling, client creation, key issuance and the clipboard are
-   inert, and the assertion that would have caught it is still to be added
-   (§2.6.1).
+9. **Every interactive flow of the console.** The `flow` scenario (§2.6.1)
+   drives the packaged bundle through sign-in, client creation, asynchronous
+   provisioning, key issuance and the clipboard copy, and it is the regression
+   guard for the class of defect that made those paths inert. What it still does
+   not reach: the OIDC and account surfaces (`/login`, `/keys`, `/delete`, the
+   OIDC sign-in redirect), which local mode does not mount, and the
+   activate/reset success redirect, which is driven at the HTTP layer only.
+10. **The OIDC account surface in a browser.** `/`, `/login`, `/keys` and
+    `/delete` are exercised only by unit tests. Local mode mounts no
+    `/api/v1/account/*` route, so they cannot be driven end to end here; two
+    transport and error-copy defects in that client were found and fixed by
+    inspection and a browser probe rather than by a scenario (§2.6.1), and the
+    root path remains a dead end in local mode (§2.6.1).
 
 ### Relationship to other documents
 
@@ -146,7 +152,7 @@ Run from the repository root.
 | `cargo test -p memory_mcp --features control-plane,test-fixtures --locked --test local_admin_cli` | ✅ executed, 7 passed |
 | `cargo test -p memory_mcp --features control-plane,test-fixtures --locked --test local_admin_durable` | ❌ superseded: the target was not created (§13.4). Its two remote-race cases moved inline into `surreal_store/local_admin_remote.rs`, so the `-- --ignored` row below replaces it. This row is the only plan §6 command that no longer exists verbatim |
 | `cargo test -p memory_mcp --features control-plane,test-fixtures --locked` | ✅ executed, every target green |
-| `cargo test -p control-plane-ui --locked` | ✅ executed, 53 passed |
+| `cargo test -p control-plane-ui --locked` | ✅ executed, 67 passed |
 | `cargo check -p control-plane-ui --locked` | ✅ executed, clean (native check only; proves nothing about WASM) |
 | `cargo clippy --workspace --all-targets --features fs-watch,mcp-apps,streamable-http,control-plane --locked -- -D warnings` | ✅ executed, clean |
 | `cargo clippy --workspace --all-targets --features fs-watch,mcp-apps,streamable-http,control-plane,test-fixtures --locked -- -D warnings` | ✅ executed, clean |
@@ -156,7 +162,7 @@ Run from the repository root.
 | `MEMORY_MCP_CONTROL_PLANE_UI_DIST=<abs dist> cargo test -p memory_mcp --features control-plane-ui,test-fixtures --locked --test http_local_admin` | ✅ executed, 42 passed |
 | `docker compose --env-file <operator env> -f docker-compose.yml -f docker-compose.{off,local,oidc}.yml config --quiet` | ✅ executed, all three overlays resolve. The base file alone still fails by design: it refuses to default any secret |
 | `docker build --tag memory-mcp-local-admin:test .` | ✅ executed, `25/25 FINISHED`. A cold build is dominated by the `ui-builder` WASM cargo layer — one observed cold run was still at `17/24` after 30 minutes, with that layer alone at ~1596 s — while a warm-cache rebuild finished in ~193 s. Give the build a generous timeout; do not read a slow cold build as a failure |
-| `python3 scripts/ci/local_admin_image.py --image memory-mcp-local-admin:test --scenario all` | ✅ executed, 4 scenarios / 54 checks, exit 0 |
+| `python3 scripts/ci/local_admin_image.py --image memory-mcp-local-admin:test --scenario all` | ✅ executed, 5 scenarios / 78 checks, exit 0 |
 | `node scripts/ci/local_admin_browser.mjs --base-url https://localhost:8443 --scenario auth` | ✅ executed through the harness. Direct invocation requires `LOCAL_ADMIN_BROWSER_FIXTURE`; a bare URL is refused |
 | `sh scripts/ci/local_admin_local_check.sh` (authorisation-code end-to-end against the real binaries and a real RocksDB registry) | ✅ executed, all sections pass (§2.5) |
 
@@ -327,7 +333,32 @@ the operator gets raw user-agent HTML — that a same-origin stylesheet is linke
 parses into rules and is applied, and that the document declares `lang`, its own
 title, a description, a `<noscript>` explanation, a same-origin favicon and one
 `<main>` landmark.
-Scenario totals: `auth` 9, `clients` 29, `regression` 6, `ui` 20.
+
+**The `flow` scenario drives the console itself.** `ui` proves the bundle boots;
+it cannot prove the app *works*, because a page that mounts and then does nothing
+is indistinguishable from a healthy one at that level. `flow` therefore performs
+the operator's actions through the real DOM — sign in through the form, create a
+client, open its detail page, wait for asynchronous provisioning, issue a key,
+copy its one-time secret — and requires **both** the DOM and the network to react
+to every step, so "nothing happened" is the failure rather than the absence of
+one. Three properties make it more than a smoke test:
+
+* Every assertion is paired with the request it implies. Seeing `#key-name` is
+  not enough; the scenario also requires the `GET /api/v1/admin/session 200` that
+  only a mounted page sends, the `POST /api/v1/admin/clients 202`, and
+  a `POST …/keys 201`. A dead scheduler tick leaves the sign-in form in place and
+  the request list empty.
+* It asserts `navigator.clipboard.readText()` equals the secret that was just
+  revealed, so a clipboard call that silently targets nothing fails. The runner
+  registers the secret for redaction *before* any diagnostic can observe it, and
+  every other diagnostic value passes through the redactor.
+* It asserts the page raised no uncaught error and logged no CSP violation, and
+  that opening a client did not fetch a fresh HTML *document* — an SPA that
+  reloads itself to show a detail page re-downloads and re-boots the whole
+  bundle. (`framenavigated` is not the signal here: it also fires for
+  `history.pushState`, so the check keys on a document-type response.)
+
+Scenario totals: `auth` 9, `clients` 29, `regression` 6, `ui` 20, `flow` 14.
 
 **CI proves the embedding property without a browser.** The `docker` job builds
 this same image, enables the UI in its smoke configuration and runs
@@ -351,62 +382,138 @@ loopback socket. The host middleware compares the raw `Host` header against
 the flag every check fails, which is the intended signal rather than a bug in the
 checker.
 
-#### 2.6.1 Known defect: the console's own `new Function` calls are blocked
+#### 2.6.1 Resolved defects: four reasons parts of the console were broken
 
-This is the one open defect in the shipped UI, and it is **not** fixed in this
-revision: the direct-dependency route has been declined, and the remaining route
-is a policy change that has to be agreed before it is made (both below).
+These were the open defects in the shipped UI, and they are **fixed**. They are
+recorded in full because each was invisible to every check the repository had at
+the time, and the checks that now catch them are the point.
 
+**Symptom.** The console mounted, rendered and was correctly styled, but every
+interactive path died silently. No request followed a click, and no error was
+shown to the operator.
+
+| Page / action | Observed behaviour before the fix |
+|---|---|
+| `/admin/clients`, `/admin/clients/:id` | Mounted, rendered, then never loaded or polled data. The banner read "No administrator session" and the list stayed empty. |
+| Create client | No request was sent at all. No error, no spinner, no row. |
+| Issue key | Same: the click was inert. |
+| Activate / reset success path | The request succeeded (204) but the page stayed on "Saving…" forever. |
+| Copy secret | Reported the clipboard as unavailable. |
+
+**Cause 1: `new Function` under a policy that refuses it.**
 `dioxus::document::eval` is implemented on the web target with `new Function`.
 The shipped policy blocks it, and the block is a WebAssembly trap rather than a
-recoverable error, so it aborts the Dioxus scheduler tick that raised it. The
-console calls `document::eval` in four places, for a CSPRNG operation id, a
-`setTimeout`-based sleep, the clipboard write and the browser clock. Every flow
-that reaches one dies silently:
+recoverable error, so it aborted the Dioxus scheduler tick that raised it. The
+console called `document::eval` in four places — a CSPRNG operation id, a
+`setTimeout` sleep, the clipboard write and the browser clock. Reproduced with
+`agent-browser` against the packaged image, the console log carried
+`wasm-bindgen: imported JS function that was not marked as catch threw an error:
+Evaluating a string as JavaScript violates the following Content Security Policy
+directive … 'unsafe-eval' is not an allowed source of script`, and the network
+log showed no application request after page load.
 
-| Page / action | Observed behaviour |
-|---|---|
-| `/admin/clients`, `/admin/clients/:id` | Mount, render, then never load or poll data. The banner reads "No administrator session" and the list stays empty. |
-| Create client | No request is sent at all. No error, no spinner, no row. |
-| Issue key | Same: the click is inert. |
-| Activate / reset success path | The request succeeds (204) but the page stays on "Saving…" forever. |
-| Copy secret | Reports the clipboard as unavailable. |
+**Cause 2: a `std::time` API that panics on `wasm32-unknown-unknown`.** With the
+trap removed, one path still died. `browser_now_millis` read
+`std::time::SystemTime::now()`. The standard library implements that clock only
+for targets with an OS underneath: `wasm32-unknown-unknown` selects
+`std/src/sys/time/unsupported.rs`, whose `SystemTime::now()` is
+`panic!("time not implemented on this platform")`. It compiles cleanly and
+panics the first time it runs, and because the panic aborts the WebAssembly
+module it kills the page — the session request that had already been issued
+succeeded, and the client and key requests scheduled in the same tick never ran.
+The detail page was the only caller, which is why the list page worked and
+opening a client did not. No `std::time`, `std::thread`, `std::fs` or `std::net`
+API is available to this crate.
 
-Reproduced with `agent-browser` against the packaged image: the console log
-carries `wasm-bindgen: imported JS function that was not marked as catch threw
-an error: Evaluating a string as JavaScript violates the following Content
-Security Policy directive … 'unsafe-eval' is not an allowed source of script`,
-and the network log shows no application request after page load.
+**Cause 3: internal links reloaded the whole app.** `dioxus-router` intercepts a
+click only in its own `Link` component; a hand-written `<a href="/admin/…">`
+performs a full document navigation. Every internal link in the console was a raw
+anchor, so selecting a client re-downloaded and re-booted the entire
+WebAssembly bundle. All internal links now use `Link { to: Route::… }`. Two
+anchors stay deliberately raw: the `#main-content` skip link, which is an in-page
+fragment, and the OIDC sign-in anchor, which is meant to leave the SPA for the
+identity provider.
 
-The `all` scenario does not catch this: it drives the HTTP API directly, and the
-`ui` scenario only asserts that the bundle *boots*. Loading `/admin/login` — the
-one page with no `document::eval` on mount — is what makes it pass.
+**The fix took the direct-dependency route, and the constraint still holds.**
+An earlier revision of this section declined route 1 below on the grounds that it
+added direct dependencies. That reading was wrong: the constraint that matters is
+that the image stays one all-in-one binary with no extra crates, and every crate
+named is already in `Cargo.lock` and already compiled into this crate's
+WebAssembly through `dioxus-web` and `gloo-net`. Naming them adds dependency
+*edges* and not one package or version — `git diff Cargo.lock` for the whole
+change is five added edges under `control-plane-ui` and no other line. The
+alternative (a first-party inline script) was rejected because it would have
+required a CSP change, and the CSP is deliberately byte-identical: no
+`'unsafe-eval'`, no `'unsafe-inline'`, no script hash.
 
-**The fix direction is to remove the four `document::eval` call sites**, not to
-relax the policy: `'unsafe-eval'` is refused by the unit test, by the browser
-scenario and by the approved specification. Two routes reach that, and neither is
-taken here because each needs a decision the code cannot make on its own:
+* `fresh_operation_id()` uses `window.crypto.getRandomValues`. It is now
+  synchronous, with no `Math.random` fallback: an insecure origin must fail loudly
+  rather than mint a weak idempotency key.
+* `sleep_ms()` uses `gloo_timers::future::TimeoutFuture`. It is infallible, so
+  the "no event loop" escape hatches at the call sites are gone — in a browser
+  there is always an event loop.
+* `copy_to_clipboard()` checks `window.is_secure_context()` *before* touching
+  `navigator.clipboard`, which would otherwise trap instead of reporting an
+  unavailable clipboard.
+* `browser_now_millis()` uses `js_sys::Date::now()`. It is display-only: it
+  labels key expiry and never influences an authorization decision, and an
+  unusable reading degrades to the server-reported status.
 
-1. *Call the browser APIs directly.* The four sites need a CSPRNG UUID, a
-   `setTimeout` sleep, a clipboard write and a clock. That means `web-sys`,
-   `js-sys`, `wasm-bindgen-futures` and `gloo-timers` as direct dependencies of
-   `control-plane-ui`. All four are already in `Cargo.lock` and already compiled
-   into this crate's WASM through `dioxus-web` and `gloo-net`, so no new crate
-   and no new version would enter the graph — but they are still four new direct
-   dependencies, and the project constraint is that the image stays one
-   all-in-one binary with no extra dependencies. Declined on that basis.
-2. *Move the primitives into a first-party inline script.* Declare a small
-   `AssetOptions::js()` asset, load it from `index.html` ahead of the module, and
-   expose the four primitives on a global (CSPRNG UUID, `setTimeout` sleep,
-   clipboard write, `Date.now()`); the WASM then calls into it, and no call site
-   evaluates a string. This preserves the embedding property and adds no
-   dependency, but it is a CSP change: the policy has to name the script
-   (`'sha256-…'`), `control/static_assets.rs` has to carry that hash, and the
-   policy's unit test and `scripts/ci/local_admin_browser.mjs` move with it. A
-   CSP change is a security change, so it needs to be agreed before it is made.
+**Cause 4: the account client built scheme-relative URLs.** Every account-page
+request went through `ApiClient::new("/")`, and the client joined that base to a
+path with `format!("{}/api/v1/account", self.base)`. `"/"` plus `"/api/v1/…"`
+is `//api/v1/…`, and a leading `//` is not an absolute path: the URL spec reads
+it as a *scheme-relative* reference, so the browser resolved it to
+`scheme://api/v1/account`, looked up a host literally named `api`, and rejected
+the request with `TypeError: Failed to fetch`. No byte ever reached the server,
+which is why no server-side test could observe it, and why the console showed a
+raw browser exception instead of an error. `/`, `/login`, `/keys` and `/delete`
+were all affected in every deployment mode.
 
-The `ui` scenario should also gain an assertion that a flow completes, which is
-what would have caught this.
+Found with `agent-browser` against the packaged image, because it is a
+client-side failure. The evidence is one line of transport plus one probe:
+
+```
+GET http://localhost:8080/api/v1/account (Fetch) 404      # after the fix
+                                                          # before it: no request at all
+> fetch("//api/v1/account").then(r => r.status).catch(e => "REJECTED: " + e.message)
+  "REJECTED: Failed to fetch"
+> fetch("/api/v1/account").then(r => r.status)
+  404
+```
+
+The join now lives in `ApiClient::endpoint`, which trims both sides to exactly
+one slash, and `mod tests` pins it from both directions: a root base and an empty
+base agree, an absolute base survives with one separator, and no request path is
+scheme-relative or contains a doubled slash.
+
+**The same review fixed the account client's error copy.** `ApiError.message`
+held `e.to_string()` — the raw `fetch` rejection, or a serde decode error such as
+``missing field `account` at line 1 column 52`` — and the account pages render that
+string verbatim. The client now decodes the backend's documented envelope,
+`{"error":{"code":"…","message":"…"}}`, and otherwise falls back to copy
+chosen by status class, so an operator never reads a browser exception or a Rust
+error. A rejected `fetch` is reported as an unreachable server, and `status: 0`
+is the marker for "no HTTP status exists".
+
+**The guard.** The `flow` scenario (§2.6) exists for causes 1–3. It is the only
+check in the repository that would have caught any of them: the `all` scenario
+drives the HTTP API directly, and the `ui` scenario loads `/admin/login` — the
+one page with no blocked call on mount — so both passed while the console was
+entirely inert. Cause 4 is guarded from the other direction: it is a client-side
+URL defect that no server-side test can see, so it is pinned by unit tests on the
+join and confirmed end to end with `agent-browser` against the packaged image.
+
+**Found in the same review, recorded and not changed: the account surface has no
+local-mode root.** `/` resolves to `StatusPage`, and `/login`, `/keys` and
+`/delete` are the OIDC account pages. Local mode mounts no `/api/v1/account/*`
+route at all (§4.2, and by design: mode disclosure reports `{"mode":"local"}`),
+so in a local deployment the bare origin loads the bundle and then reports a
+missing endpoint. The documented local entry point is `/admin/login` — the routes
+in §4.2 are exactly the `/admin/*` set — and nothing in the local console links to
+`/`, so this is a cosmetic dead end rather than a broken flow. Redirecting `/` to
+`/admin/login` when the deployment reports local mode is a product decision, not a
+defect fix, so it is left to the operator to request.
 
 ## 3. Deployment configuration
 

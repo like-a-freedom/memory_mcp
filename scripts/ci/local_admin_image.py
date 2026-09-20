@@ -48,7 +48,7 @@ TLS_PORT = 8443
 PUBLIC_BASE_URL = f"https://localhost:{TLS_PORT}"
 SURREALDB_IMAGE = "surrealdb/surrealdb:v3.2.4"
 CADDY_IMAGE = "caddy:2"
-SCENARIOS = ("auth", "clients", "regression", "ui")
+SCENARIOS = ("auth", "clients", "regression", "ui", "flow")
 
 
 class HarnessError(RuntimeError):

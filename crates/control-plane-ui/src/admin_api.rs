@@ -22,7 +22,6 @@
 
 use std::fmt;
 
-use dioxus::prelude::document;
 use gloo_net::http::{Request, RequestBuilder};
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
@@ -215,17 +214,6 @@ impl AdminApiError {
             status: 0,
             code: "no_crypto".to_owned(),
             message: "the browser exposed no cryptography API".to_owned(),
-            key_id: None,
-            correlation_id: None,
-        }
-    }
-
-    /// The renderer has no JavaScript bridge, so timers are unavailable.
-    fn no_timer() -> Self {
-        Self {
-            status: 0,
-            code: "no_timer".to_owned(),
-            message: "the renderer exposes no event loop timer".to_owned(),
             key_id: None,
             correlation_id: None,
         }
@@ -960,86 +948,116 @@ impl OperationId {
     }
 }
 
-/// Script that returns one CSPRNG-backed v4 UUID.
-///
-/// `crypto.randomUUID` is used when available, otherwise 16 bytes come from
-/// `crypto.getRandomValues` and are formatted as a v4 UUID. Both are
-/// secure-context APIs, which this deployment provides (TLS is required).
-/// There is deliberately no `Math.random` fallback.
-const OPERATION_ID_SCRIPT: &str = r#"
-const cryptoApi = globalThis.crypto;
-const formatV4 = (bytes) => {
-    bytes[6] = (bytes[6] & 0x0f) | 0x40;
-    bytes[8] = (bytes[8] & 0x3f) | 0x80;
-    let hex = "";
-    for (const byte of bytes) { hex += byte.toString(16).padStart(2, "0"); }
-    return hex.slice(0, 8) + "-" + hex.slice(8, 12) + "-" + hex.slice(12, 16) + "-" + hex.slice(16, 20) + "-" + hex.slice(20);
-};
-if (cryptoApi && typeof cryptoApi.randomUUID === "function") { return cryptoApi.randomUUID(); }
-if (cryptoApi && typeof cryptoApi.getRandomValues === "function") {
-    return formatV4(cryptoApi.getRandomValues(new Uint8Array(16)));
-}
-throw new Error("no secure random source");
-"#;
+// ─── Browser host primitives ──────────────────────────────
+//
+// The four functions below are the only place this crate calls into the browser
+// directly. They used to go through `dioxus::document::eval`, which the web
+// renderer implements with `new Function`. The shipped CSP allows WebAssembly
+// compilation only, so all four were blocked, and a blocked call is a
+// WebAssembly trap rather than a recoverable error: it aborted the scheduler
+// tick that raised it, which is why every interactive flow died silently.
+//
+// Calling the platform APIs directly removes the dynamic code entirely.
+// `gloo-timers`, `js-sys`, `wasm-bindgen-futures` and `web-sys` are already
+// compiled into this crate's WebAssembly through `dioxus-web` and `gloo-net`,
+// so naming them adds no crate to the lock file and no byte to the bundle.
+//
+// One trap is worth naming because it is invisible at compile time: the standard
+// library's clock has no `wasm32-unknown-unknown` implementation, so
+// `std::time::SystemTime::now()` compiles and then panics with "time not
+// implemented on this platform" the first time it runs. Nothing in this crate
+// may use `std::time`, `std::thread`, `std::fs` or `std::net` for the same
+// reason; the browser APIs are the only available source.
 
 /// Generate one operation id for a single deliberate user action.
 ///
 /// Call this once per action the operator takes and reuse the value for every
 /// manual retry of that action: a fresh id per retry would defeat the backend
 /// idempotency record.
-pub async fn fresh_operation_id() -> Result<OperationId, AdminApiError> {
-    match document::eval(OPERATION_ID_SCRIPT).join::<String>().await {
-        Ok(value) => OperationId::parse(&value).ok_or_else(AdminApiError::no_crypto),
-        Err(_) => Err(AdminApiError::no_crypto()),
-    }
+///
+/// The 16 bytes come from the window's `crypto.getRandomValues`, a
+/// secure-context API this deployment always provides (TLS is required, and
+/// loopback counts as secure). There is deliberately no `Math.random` fallback.
+pub fn fresh_operation_id() -> Result<OperationId, AdminApiError> {
+    let window = web_sys::window().ok_or_else(AdminApiError::no_crypto)?;
+    let crypto = window.crypto().map_err(|_| AdminApiError::no_crypto())?;
+    let mut bytes = [0u8; 16];
+    crypto
+        .get_random_values_with_u8_array(&mut bytes)
+        .map_err(|_| AdminApiError::no_crypto())?;
+    OperationId::parse(&format_v4(bytes)).ok_or_else(AdminApiError::no_crypto)
 }
 
-/// Yield to the browser event loop.
+/// Render 16 random bytes as a canonical lowercase v4 UUID.
 ///
-/// Returns an error on a renderer without a JavaScript bridge so polling loops
-/// stop instead of spinning.
-pub async fn sleep_ms(millis: u32) -> Result<(), AdminApiError> {
-    let script =
-        format!("await new Promise((resolve) => setTimeout(resolve, {millis})); return true;");
-    document::eval(&script)
-        .join::<bool>()
-        .await
-        .map(|_| ())
-        .map_err(|_| AdminApiError::no_timer())
+/// The version and variant bits are set here rather than trusted from the
+/// source, so the result always satisfies [`OperationId::parse`].
+fn format_v4(mut bytes: [u8; 16]) -> String {
+    bytes[6] = (bytes[6] & 0x0f) | 0x40;
+    bytes[8] = (bytes[8] & 0x3f) | 0x80;
+    let hex: String = bytes.iter().map(|byte| format!("{byte:02x}")).collect();
+    format!(
+        "{}-{}-{}-{}-{}",
+        &hex[0..8],
+        &hex[8..12],
+        &hex[12..16],
+        &hex[16..20],
+        &hex[20..32]
+    )
+}
+
+/// Yield to the browser event loop for `millis`.
+///
+/// Infallible by design: `setTimeout` is part of the environment, so a polling
+/// loop no longer needs a "no event loop" escape hatch that cannot fire.
+pub async fn sleep_ms(millis: u32) {
+    gloo_timers::future::TimeoutFuture::new(millis).await;
 }
 
 /// Copy a value to the clipboard through the browser, without persisting it.
 ///
-/// The value travels over the Dioxus JavaScript channel — it is never
-/// interpolated into the script source — and lives only for the duration of
-/// the call: nothing is written to `localStorage`, `sessionStorage` or
-/// `IndexedDB` on the way.
+/// The value goes straight to `navigator.clipboard.writeText`: it is never
+/// interpolated into executable source, and nothing is written to
+/// `localStorage`, `sessionStorage` or `IndexedDB` on the way.
+///
+/// `navigator.clipboard` exists only in a secure context, which is checked
+/// first. Without that check an insecure origin would trap the task instead of
+/// reporting an unavailable clipboard.
 pub async fn copy_to_clipboard(value: &str) -> Result<(), AdminApiError> {
-    const COPY_SCRIPT: &str = r#"
-const value = await dioxus.recv();
-if (typeof value !== "string") { dioxus.send(false); }
-else if (!navigator.clipboard || typeof navigator.clipboard.writeText !== "function") { dioxus.send(false); }
-else { await navigator.clipboard.writeText(value); dioxus.send(true); }
-"#;
-    let mut eval = document::eval(COPY_SCRIPT);
-    eval.send(value)
-        .map_err(|_| AdminApiError::clipboard_unavailable())?;
-    match eval.recv::<bool>().await {
-        Ok(true) => Ok(()),
-        _ => Err(AdminApiError::clipboard_unavailable()),
+    let window = web_sys::window().ok_or_else(AdminApiError::clipboard_unavailable)?;
+    if !window.is_secure_context() {
+        return Err(AdminApiError::clipboard_unavailable());
     }
+    let promise = window.navigator().clipboard().write_text(value);
+    wasm_bindgen_futures::JsFuture::from(promise)
+        .await
+        .map(|_| ())
+        .map_err(|_| AdminApiError::clipboard_unavailable())
 }
 
-/// Current browser wall clock in milliseconds since the Unix epoch.
+/// Current wall clock in milliseconds since the Unix epoch.
 ///
-/// `None` when the renderer has no JavaScript bridge; callers then fall back to
-/// server-reported statuses.
-pub async fn browser_now_millis() -> Option<i64> {
-    let value = document::eval("return Date.now();")
-        .join::<f64>()
-        .await
-        .ok()?;
-    value.is_finite().then_some(value as i64)
+/// Read from the browser's `Date.now()`. The standard library's clock is not
+/// implemented on `wasm32-unknown-unknown` — `SystemTime::now()` panics there —
+/// so the browser is the only source of wall clock this crate has.
+///
+/// `Date.now()` is an integer-valued `f64` milliseconds since the epoch. A
+/// non-finite reading, or one outside the representable range, is reported as
+/// unknown rather than truncated into a wrong instant, and callers then fall
+/// back to the server-reported status.
+///
+/// This is display only: it labels key expiry and never influences an
+/// authorization decision.
+pub fn browser_now_millis() -> Option<i64> {
+    millis_to_i64(js_sys::Date::now())
+}
+
+/// Accept a browser millisecond reading only when it names a real instant.
+fn millis_to_i64(millis: f64) -> Option<i64> {
+    if !millis.is_finite() || millis < 0.0 || millis > i64::MAX as f64 {
+        return None;
+    }
+    Some(millis as i64)
 }
 
 // ─── Session CSRF ─────────────────────────────────────────
@@ -1439,6 +1457,81 @@ struct SetStateBody {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    // ── Operation ids ─────────────────────────────────────
+
+    /// The formatter is the only part of id generation that is portable, so it
+    /// is the part worth pinning: the version and variant bits are set here, not
+    /// trusted from the source.
+    #[test]
+    fn formatting_sets_the_v4_version_and_variant_bits() {
+        let id = format_v4([0x00; 16]);
+        assert_eq!(id.len(), 36);
+        assert_eq!(id.matches('-').count(), 4);
+        assert_eq!(&id[14..15], "4", "version nibble");
+        assert!(
+            matches!(&id[19..20], "8" | "9" | "a" | "b"),
+            "variant nibble must be RFC 4122, got {}",
+            &id[19..20]
+        );
+        assert!(OperationId::parse(&id).is_some());
+    }
+
+    #[test]
+    fn formatting_is_lowercase_hex_in_canonical_positions() {
+        assert_eq!(
+            format_v4([
+                0x00, 0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77, 0x88, 0x99, 0xaa, 0xbb, 0xcc, 0xdd,
+                0xee, 0xff,
+            ]),
+            "00112233-4455-4677-8899-aabbccddeeff"
+        );
+    }
+
+    #[test]
+    fn every_formatted_id_passes_the_parser() {
+        for seed in 0u8..=255 {
+            let id = format_v4([seed; 16]);
+            assert!(OperationId::parse(&id).is_some(), "{id} was rejected");
+        }
+    }
+
+    // ── Browser clock ─────────────────────────────────────
+
+    /// `browser_now_millis` cannot be called from a host test: `Date::now()` is a
+    /// `wasm-bindgen` import that has no host implementation. The range check is
+    /// the part that can be pinned here, and it is the part that decides whether
+    /// an unusable reading reaches `ApiKeyMeta::display_status`.
+    #[test]
+    fn a_clock_reading_is_accepted_only_when_it_names_a_real_instant() {
+        assert_eq!(millis_to_i64(0.0), Some(0));
+        assert_eq!(millis_to_i64(1_756_000_000_000.0), Some(1_756_000_000_000));
+        // Sub-millisecond precision is truncated, never rounded up into a
+        // different instant.
+        assert_eq!(millis_to_i64(1_756_000_000_000.75), Some(1_756_000_000_000));
+
+        // Before the epoch, non-finite, and out of range are all "unknown"
+        // rather than a silently wrong instant.
+        assert_eq!(millis_to_i64(-1.0), None);
+        assert_eq!(millis_to_i64(f64::NAN), None);
+        assert_eq!(millis_to_i64(f64::INFINITY), None);
+        assert_eq!(millis_to_i64(f64::NEG_INFINITY), None);
+        assert_eq!(millis_to_i64(f64::MAX), None);
+    }
+
+    /// An unknown clock must degrade to the server-reported status, not to a
+    /// guess that a key has expired.
+    #[test]
+    fn an_unknown_clock_leaves_the_server_reported_status_alone() {
+        let key: ApiKeyMeta = serde_json::from_str(
+            r#"{"id":"key:4","name":"ci","status":"active","created_at":"2026-09-19T09:00:00+00:00","expires_at":"2026-09-19T10:00:00+00:00","last_used_at":null}"#,
+        )
+        .expect("key meta");
+
+        let now = parse_rfc3339_millis("2026-09-20T10:00:00+00:00").expect("now");
+        assert_eq!(key.display_status(Some(now)), KeyDisplayStatus::Expired);
+        assert_eq!(key.display_status(None), KeyDisplayStatus::Active);
+    }
 
     // ── Wire format ───────────────────────────────────────
 

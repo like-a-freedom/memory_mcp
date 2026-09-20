@@ -10,6 +10,7 @@
 //! `message` text is never rendered, so the forms cannot leak internals.
 
 use dioxus::prelude::*;
+use dioxus_router::Link;
 use dioxus_router::hooks::use_navigator;
 
 use crate::admin_api::{AdminApi, ChallengeKind, ChallengeResponse, SessionCsrf, sleep_ms};
@@ -155,7 +156,6 @@ fn ChallengeFinishFlow(kind: ChallengeKind) -> Element {
     let mut pending = use_signal(|| false);
     let mut error = use_signal(|| None::<String>);
     let mut done = use_signal(|| false);
-    let login_route = Route::Login {}.to_string();
 
     let inspect = move |event: FormEvent| {
         event.prevent_default();
@@ -220,7 +220,7 @@ fn ChallengeFinishFlow(kind: ChallengeKind) -> Element {
                     challenge.set(None);
                     done.set(true);
                     spawn(async move {
-                        let _ = sleep_ms(SUCCESS_REDIRECT_MS).await;
+                        sleep_ms(SUCCESS_REDIRECT_MS).await;
                         navigator.replace(Route::Login {});
                     });
                 }
@@ -233,7 +233,7 @@ fn ChallengeFinishFlow(kind: ChallengeKind) -> Element {
         if *done.read() {
             div { class: "success", role: "status", "aria-live": "polite",
                 p { "Password saved. Redirecting to sign-in…" }
-                a { href: "{login_route}", "Go to sign-in" }
+                Link { to: Route::Login {}, "Go to sign-in" }
             }
         } else if let Some(view) = challenge.read().as_ref() {
             form { class: "challenge-finish", onsubmit: finish,
@@ -427,7 +427,6 @@ pub fn AdminReauthPage() -> Element {
     let navigator = use_navigator();
     let session = use_admin_session();
     let csrf = session.read().csrf();
-    let login_route = Route::Login {}.to_string();
 
     rsx! {
         div { class: "container",
@@ -444,7 +443,7 @@ pub fn AdminReauthPage() -> Element {
             } else {
                 div { class: "error", role: "alert",
                     p { "Your session ended. Sign in again." }
-                    a { href: "{login_route}", "Go to sign-in" }
+                    Link { to: Route::Login {}, "Go to sign-in" }
                 }
             }
         }

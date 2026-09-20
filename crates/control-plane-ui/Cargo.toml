@@ -17,6 +17,20 @@ serde = { workspace = true }
 serde_json = { workspace = true }
 gloo-net = { version = "0.7", features = ["http"] }
 gloo-storage = { version = "0.4" }
+# Direct use of the browser platform. Every one is already in the lock file and
+# already compiled into this crate's WebAssembly through `dioxus-web` and
+# `gloo-net`: naming them here adds no crate to the graph and no byte to the
+# bundle, and it replaces the `new Function` bridge the CSP refuses.
+#
+# Every version here must keep matching what `dioxus-web` already resolves to.
+# `gloo-timers` is the live example: 0.4 exists, and raising the requirement to
+# it would link a second copy of the crate into the bundle, which is the one
+# thing this list exists to avoid. `cargo update` reports these as "available"
+# for exactly that reason.
+gloo-timers = { version = "0.3", features = ["futures"] }
+js-sys = "0.3"
+wasm-bindgen-futures = "0.4"
+web-sys = { version = "0.3", features = ["Clipboard", "Crypto", "Navigator", "Window"] }
 
 [lints]
 workspace = true
