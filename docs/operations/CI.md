@@ -23,6 +23,16 @@ select the existing release tag under **Run workflow** and supply the same tag
 as input. Old tags retain their old workflows: re-running `v1.9.10` does not
 retroactively use a newer workflow. Create a new version/tag after merging.
 
+## Dependency audit
+
+The **Dependency audit** job runs `rustsec/audit-check` against
+`Cargo.lock` on every pull request and on `master`. It exists because this
+workspace takes a large transitive graph (SurrealDB, RocksDB, ONNX Runtime,
+Dioxus) and a published advisory in it is a shipping decision, not a surprise to
+find at release time. It is a separate job from the quality gate on purpose: it
+needs no build cache, it finishes in minutes, and a failure should read as "the
+lock file needs attention" rather than "the tests are broken".
+
 ## Platforms
 
 | OS | x64 | ARM64 |
@@ -88,3 +98,10 @@ actionlint
 The shared setup is `.github/actions/setup/action.yml`; packaging and smoke
 checks are in `scripts/ci/package.py`. No generated workflow files or custom
 CI framework are involved.
+
+The `unittest` line above also pins two contracts that CI would otherwise leave
+to a comment: the image harness's scenario registry and the browser runner's
+(`test_local_admin_image.py`), and the Dioxus CLI version the console's bundle is
+built with against the `dioxus` requirement in the UI crate's manifest
+(`test_ui_bundle_pin.py`). Both are stdlib-only, so they run in the quality job
+without Docker, Node or a browser.

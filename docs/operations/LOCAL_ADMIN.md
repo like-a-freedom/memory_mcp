@@ -41,13 +41,13 @@ All of the following were executed in this repository and passed:
 | Durable query-shape regression | `... --test registry_query_shape` — 4 passed |
 | Provisioning crash recovery | `... --test http_crash_recovery` — 11 passed |
 | Whole conformance suite | `cargo test -p memory_mcp --features control-plane,test-fixtures --locked` and `cargo test -p memory_mcp --locked` — every target green |
-| UI crate | `cargo test -p control-plane-ui --locked` — 67 passed; `cargo check -p control-plane-ui --target wasm32-unknown-unknown` and the matching `cargo clippy … -D warnings` clean |
+| UI crate | `cargo test -p control-plane-ui --locked` — 87 passed; `cargo check -p control-plane-ui --target wasm32-unknown-unknown` and the matching `cargo clippy … -D warnings` clean |
 | Static assets + CSP | `MEMORY_MCP_CONTROL_PLANE_UI_DIST=<abs dist> cargo test -p memory_mcp --lib --features control-plane-ui,test-fixtures --locked control::static_assets` — 6 passed |
 | Format, lint, non-default builds | `cargo fmt --all --check`; `cargo clippy --workspace --all-targets --features … --locked -- -D warnings` for all four documented feature combinations; `cargo check -p memory_mcp --no-default-features --locked` and `--features streamable-http` |
 | End-to-end against the real binaries | `sh scripts/ci/local_admin_local_check.sh` — local mode starts from env, activation/login/session, client create/list/get, provisioning reaches `ready` in one poll, restart persistence, plan-mismatch startup rejection, recovery invalidates the session, negative route/CSRF/Origin checks |
 | Packaged image over real TLS in a real browser | `docker build --tag memory-mcp-local-admin:test .` then `python3 scripts/ci/local_admin_image.py --image memory-mcp-local-admin:test --scenario all` — 5 scenarios, 78 checks, exit 0 (`auth` 9, `clients` 29, `regression` 6, `ui` 20, `flow` 14). The `ui` scenario proves the bundle boots, is styled and ships a correct document shell; the `flow` scenario drives the console's own interactive paths through the real DOM and is the guard for the defect recorded in §2.6.1 |
 | Compose modes resolve | `docker compose --env-file <operator env> -f docker-compose.yml -f docker-compose.{off,local,oidc}.yml config --quiet` — all three resolve |
-| CI checker unit tests (stdlib only: no Docker, Node or browser) | `python3 -m unittest discover -s scripts/ci -p 'test_*.py'` — 39 passed. Covers `assert_embedded_ui.py`, the packaging helper, and the test that pins `local_admin_image.py`'s scenario registry to `local_admin_browser.mjs`'s — two lists in two languages with no other shared source of truth (§2.6) |
+| CI checker unit tests (stdlib only: no Docker, Node or browser) | `python3 -m unittest discover -s scripts/ci -p 'test_*.py'` — 46 passed. Covers `assert_embedded_ui.py`, the packaging helper, the test that pins `local_admin_image.py`'s scenario registry to `local_admin_browser.mjs`'s — two lists in two languages with no other shared source of truth (§2.6) — and `test_ui_bundle_pin.py`, which pins the Dioxus CLI version in `Dockerfile` to the `dioxus` requirement in the UI crate's manifest and the bundle's output layout to the assertions the build stage makes (§2.6) |
 
 ### What is NOT verified
 
@@ -127,7 +127,7 @@ the part worth keeping, so nobody reintroduces those claims.
 | Node.js | `v22.22.3` | Runs the browser harness with the pinned runner package |
 | Python | `3.14.7` | Runs the image harness |
 | `playwright` (npm) | `1.63.0` | Pinned in `scripts/ci/package.json` + `package-lock.json`; installed under `scripts/ci/node_modules` |
-| `dx` (Dioxus CLI) | **absent on the host** | Only the image builds the bundle, via `dioxus-cli 0.7.10` pinned as `DIOXUS_CLI_VERSION` in `Dockerfile` |
+| `dx` (Dioxus CLI) | `0.7.10`, present at review time | The bundle reviewed in §2.6 was built with it; the image pins the same version as `DIOXUS_CLI_VERSION` in `Dockerfile`, and `scripts/ci/test_ui_bundle_pin.py` keeps that pin equal to the UI crate's `dioxus = "=0.7.10"` requirement (§2.6) |
 | `surreal` CLI | **absent** | Not needed: the harness runs the `surrealdb/surrealdb:v3.2.4` container |
 
 Key material is operator-generated. Placeholders below are obviously fake and
@@ -153,7 +153,7 @@ Run from the repository root.
 | `cargo test -p memory_mcp --features control-plane,test-fixtures --locked --test local_admin_cli` | ✅ executed, 7 passed |
 | `cargo test -p memory_mcp --features control-plane,test-fixtures --locked --test local_admin_durable` | ❌ superseded: the target was not created (§13.4). Its two remote-race cases moved inline into `surreal_store/local_admin_remote.rs`, so the `-- --ignored` row below replaces it. This row is the only plan §6 command that no longer exists verbatim |
 | `cargo test -p memory_mcp --features control-plane,test-fixtures --locked` | ✅ executed, every target green |
-| `cargo test -p control-plane-ui --locked` | ✅ executed, 67 passed |
+| `cargo test -p control-plane-ui --locked` | ✅ executed, 87 passed |
 | `cargo check -p control-plane-ui --locked` | ✅ executed, clean (native check only; proves nothing about WASM) |
 | `cargo clippy --workspace --all-targets --features fs-watch,mcp-apps,streamable-http,control-plane --locked -- -D warnings` | ✅ executed, clean |
 | `cargo clippy --workspace --all-targets --features fs-watch,mcp-apps,streamable-http,control-plane,test-fixtures --locked -- -D warnings` | ✅ executed, clean |
@@ -312,6 +312,84 @@ error/success/warning, a platform UI font stack (no webfont request, no layout
 shift), touch targets of at least 44px below 768px, and motion confined to
 focus/hover/press feedback and disabled under `prefers-reduced-motion`.
 
+Three rules in that file are what keep the pages looking like one application:
+
+* every message — error, warning, success and progress — is one panel with one
+  padding and one radius, and only the tone differs. A loading line that floats
+  as bare text beside error panels that do not is how an operator learns to
+  ignore both;
+* a row highlight is reserved for tables with actions in them (`.data-table`).
+  Highlighting a row of account metadata offers an interaction that does not
+  exist;
+* destructive controls have two shapes and no third one: a solid `button.danger`
+  starts or confirms an irreversible action, and an outlined
+  `a.button--danger` leads to one without committing to it. Colour is the only
+  warning an operator gets before the page that asks them to type a confirmation
+  phrase.
+
+**The console is split along the seams its routes create.**
+`crates/control-plane-ui/src/` keeps `main.rs` (launch only), `assets.rs` (the
+bundle assets and their bundler options), `routes.rs` (the single `Routable`
+enum, with the two client routes nested under `#[layout(ConsoleLayout)]` and a
+trailing `/:..route` catch-all that renders a page-not-found screen), `pages/` (one directory per route, plus the sections of a single page
+beside the page itself), `components/` (only what two or more pages render: the
+modal frame, the one-time-secret panel, the session bar, badges, timestamps and
+alerts), `layouts/` (the console chrome, which loads the administrator session
+once and publishes it through context), `state/` (cursor paging, request
+generations, the paged-read hook, polling policy and the two session models — no
+markup), and `presentation.rs` (state words, status tones and timestamps). The
+split follows reuse rather than symmetry: a section with one consumer stays
+beside the page that renders it.
+
+The two pages that outgrew one file are split by reason to change, not by size:
+`pages/admin_client/` is `state.rs` (load, poll and page), `mutations.rs` (the
+four mutations, which share one in-flight slot, one compare-and-set version and
+one re-authentication refusal), `keys_panel.rs` (the keys section and its form),
+`keys_table.rs`, `metadata.rs`, `state_controls.rs` and `mod.rs` (composition);
+`pages/admin_clients/` is `mod.rs` plus `clients_table.rs`; `pages/admin_auth/`
+is `mod.rs` (the four routes) plus `challenge.rs` and `reauth_page.rs`. The
+plumbing the two console pages shared verbatim — a resource whose answer is
+applied only if the generation still matches, and a poll that re-reads the page
+on screen without moving the pager — is one hook, `state/paged_query.rs`; its
+tests are what keep the two pages from drifting apart.
+
+**Three interface decisions are worth stating, because each replaced one that
+looked reasonable.**
+
+*The revoke confirmation is a full-width row inside the table*, directly under
+the row it asks about. A panel rendered after a fifty-row table is off screen
+for every row above the fold: the operator presses "Revoke…" and nothing appears
+to happen. A modal would also work, and does not, because a `<dialog>` opened
+with the `open` attribute is not focused by the browser, so Escape has no
+focused element inside the frame to bubble from.
+
+*There is no "are you sure you want to leave" guard on the client detail page.*
+While a secret is on screen the page content is `inert` behind the secret's own
+modal, so the way out of the page cannot be reached: the guard could never fire.
+The modal's own two-stage close — first Escape or Close arms the question, then
+"Discard the secret" or "Keep it" answers it — is the guard, and it is the one
+place the warning is stated.
+
+*`autofocus` inside a modal is honoured only sometimes.* It is honoured when the
+frame is inserted into a document that keeps its focus, and ignored when the
+element the operator was using is replaced in the same update — which is what
+the re-authentication frame does. So a frame's own controls, not Escape, are the
+guaranteed way out, and every frame here renders a visible one. Focusing the
+frame explicitly would need `HTMLElement.focus()`, which means naming `Document`
+and `HtmlElement` as `web-sys` features in `crates/control-plane-ui/Cargo.toml`.
+
+**`inert` is set through one helper, because the obvious spelling is wrong.**
+`inert` is an ordinary attribute rather than a boolean one, so a Rust `bool`
+renders as `inert="true"` or `inert="false"` — and the attribute's *presence*
+is what the browser acts on. `inert="false"` therefore makes the page's own
+content unfocusable and removes it from the accessibility tree while no dialog
+is open, which is the opposite of the intent. `src/inert.rs::attr(bool)` maps the
+flag to an `Option`, so the attribute is rendered only while a dialog is
+actually open. The defect was invisible to every check the console had — an
+inert element is still rendered, still visible, and still reports its text — and
+surfaced as the page's own `<h1>` disappearing from the accessibility tree (axe
+`page-has-heading-one`).
+
 **The shipped CSP needs `'wasm-unsafe-eval'`.** `script-src 'self'` alone makes
 Chromium refuse `WebAssembly.instantiateStreaming`, so the SPA never mounted:
 
@@ -392,15 +470,17 @@ loopback socket. The host middleware compares the raw `Host` header against
 the flag every check fails, which is the intended signal rather than a bug in the
 checker.
 
-#### 2.6.1 Resolved defects: four reasons parts of the console were broken
+#### 2.6.1 Resolved defects: five reasons parts of the console were broken
 
 These were the open defects in the shipped UI, and they are **fixed**. They are
 recorded in full because each was invisible to every check the repository had at
 the time, and the checks that now catch them are the point.
 
-**Symptom.** The console mounted, rendered and was correctly styled, but every
-interactive path died silently. No request followed a click, and no error was
-shown to the operator.
+**Symptom (causes 1–4).** The console mounted, rendered and was correctly
+styled, but every interactive path died silently. No request followed a click,
+and no error was shown to the operator. Cause 5 below is the exception: it broke
+the accessibility tree rather than the request path, and it is described with its
+own symptom.
 
 | Page / action | Observed behaviour before the fix |
 |---|---|
@@ -506,6 +586,18 @@ chosen by status class, so an operator never reads a browser exception or a Rust
 error. A rejected `fetch` is reported as an unreachable server, and `status: 0`
 is the marker for "no HTTP status exists".
 
+**Cause 5: `inert` written as a boolean.** The console marks the page content
+`inert` while a dialog is open, so focus stays inside the dialog. `inert` is not
+a boolean attribute in the element registry, so `inert: modal_open` rendered
+`inert="true"` *and* `inert="false"` — and the browser acts on the attribute's
+presence. Every page carrying the marker was therefore inert at all times: its
+own heading vanished from the accessibility tree and nothing inside it could be
+focused by keyboard. The heading was still in the DOM, which is why every
+`textContent` assertion passed; the accessibility audit reported
+`page-has-heading-one` on exactly the routes that render the marker.
+`src/inert.rs::attr` maps the flag to an `Option`, so the attribute is rendered
+only while a dialog is actually open.
+
 **The guard.** The `flow` scenario (§2.6) exists for causes 1–3. It is the only
 check in the repository that would have caught any of them: the `all` scenario
 drives the HTTP API directly, and the `ui` scenario loads `/admin/login` — the
@@ -513,6 +605,9 @@ one page with no blocked call on mount — so both passed while the console was
 entirely inert. Cause 4 is guarded from the other direction: it is a client-side
 URL defect that no server-side test can see, so it is pinned by unit tests on the
 join and confirmed end to end with `agent-browser` against the packaged image.
+Cause 5 is guarded by `src/inert.rs`'s unit test and by an axe audit of every
+route; the `flow` scenario cannot see it, because an inert page still renders,
+still passes `textContent` checks, and still accepts a synthesised `fill`.
 
 **Found in the same review, recorded and not changed: the account surface has no
 local-mode root.** `/` resolves to `StatusPage`, and `/login`, `/keys` and
@@ -1510,4 +1605,5 @@ Stated rather than smoothed over:
 | `crates/memory-mcp/tests/local_admin_durable.rs` | Not created. The plan §2 inventory and the plan §6 `--test local_admin_durable` command predate the decision to keep the two remote-race cases inline. They assert "both replicas observe the same persisted row" through `SurrealRegistryStore::admin_query`, which is `pub(super)` — an external `tests/` target is a separate crate and cannot reach that statement seam. Both cases now live in `http/registry/surreal_store/local_admin_remote.rs`, where `cargo test -p memory_mcp --lib … -- --ignored` selects them (§2.2, §13.2). Everything else the plan's `tests/` inventory named exists: `tests/http_local_admin.rs`, `tests/local_admin_cli.rs` and `tests/http_control_plane.rs`. |
 | "Require HTTPS public base URL for local browser auth" | Diverges for loopback only: `http://localhost`, `http://127.0.0.1` and `http://[::1]` are accepted so the documented local development flow and the in-repo end-to-end script can run without a proxy. Any other host must be `https://` (the check keys off the URL host, not a substring), so the `Secure` cookies cannot be served over public plain HTTP. |
 | `FailureAudit.username_bucket` / `source_bucket` | Not projected into the audit row. Migration `047` (approved) gives `local_admin_audit` no bucket columns, and the buckets are already aggregated in `local_admin_rate_bucket`; the fields remain part of the event so the service describes a rejection fully. `policy` is likewise carried as a stale-epoch *attribute* and never re-validated, which is what keeps a stale-fence rejection from turning into an audit failure (§8.4). |
-| UI routes | The bundle serves `/admin/login`, `/admin/activate`, `/admin/reset`, `/admin/reauth`, `/admin/clients` and `/admin/clients/:account_id` (§2.6, §4.2, §5). The spec's §9 lists the *flows* rather than fixed paths, and the two extra routes exist because the activation/reset and re-authentication flows need their own page: a code has to be entered somewhere, and a stale session must be able to re-enter its password without a full login. |
+| UI routes | The bundle serves `/admin/login`, `/admin/activate`, `/admin/reset`, `/admin/reauth`, `/admin/clients` and `/admin/clients/:account_id` (§2.6, §4.2, §5). The spec's §9 lists the *flows* rather than fixed paths, and the two extra routes exist because the activation/reset and re-authentication flows need their own page: a code has to be entered somewhere, and a stale session must be able to re-enter its password without a full login. One further route, the trailing `/:..route` catch-all, is not a flow at all and so has no counterpart in the spec: the bundle is a single-page app served from one document, and without it an unlisted path renders an empty shell instead of a page with a way back. |
+| UI module layout | Shipped as `main.rs` / `assets.rs` / `routes.rs` / `inert.rs` + `pages/`, `components/`, `layouts/`, `state/` and `presentation.rs`. The earlier revision had `src/router.rs`, a flat `src/pages/` that also held paging and session *state*, and a single 845-line `AdminClientDetailPage`; the route enum also had no catch-all, so an unlisted path rendered nothing at all. The split is by reuse — a block moves to `components/` when a second page needs it — which is why `AdminLoginForm` and `AdminReauthDialog` were hoisted out of the page modules they started in (both now live in `components/admin_auth.rs`, each with two consumers). A later pass split the three largest page modules by reason to change and extracted the paged-read plumbing those pages duplicated into `state/paged_query.rs`; see §2.6 |

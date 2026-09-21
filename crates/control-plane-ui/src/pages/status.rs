@@ -1,59 +1,54 @@
-//! Account status page.
+//! The account status page.
+//!
+//! This is the OIDC/account surface: it authenticates with a browser cookie and
+//! holds no administrator session, so it neither loads the console session nor
+//! shares the console layout.
 
 use dioxus::prelude::*;
 use dioxus_router::Link;
 use dioxus_router::hooks::use_navigator;
 
 use crate::api::ApiClient;
-use crate::presentation::{compact_timestamp, status_badge_class, status_label};
-use crate::router::Route;
+use crate::components::alert::{Alert, AlertTone};
+use crate::components::status_badge::StatusBadge;
+use crate::components::timestamp::Timestamp;
+use crate::routes::Route;
+use crate::state::account_session::end_account_session;
 
+/// `/` — who the account is, and where else it can go.
 #[component]
 pub fn StatusPage() -> Element {
     let navigator = use_navigator();
-    let account = use_resource(|| async { ApiClient::new("/".to_string()).me().await });
-    let mut signing_out = use_signal(|| false);
-    let mut logout_error = use_signal(|| None::<String>);
-
-    let sign_out = move |_| {
-        // Hide the cached account before the navigation completes. The
-        // server-side `/auth/oidc/logout` clears the cookie and invalidates the
-        // session; the resource itself remains read-only.
-        signing_out.set(true);
-        logout_error.set(None);
-        spawn(async move {
-            let api = ApiClient::new("/".to_owned());
-            match api.logout().await {
-                Ok(()) => {
-                    navigator.replace(Route::Login {});
-                }
-                Err(_value) => {
-                    signing_out.set(false);
-                    logout_error.set(Some(
-                        "The console could not confirm sign-out. Close this tab or try again."
-                            .to_owned(),
-                    ));
-                }
-            }
-        });
-    };
+    // `use_resource` owns loading, cancellation and the latest result, and
+    // `restart` gives the operator an explicit retry.
+    let mut account = use_resource(|| async { ApiClient::new("/".to_owned()).me().await });
+    let signing_out = use_signal(|| false);
+    let logout_error = use_signal(|| None::<String>);
+    let sign_out = move |_| end_account_session(navigator, signing_out, logout_error);
+    let signing_out_now = *signing_out.read();
 
     rsx! {
         div { class: "container",
             h1 { "Account status" }
-            if *signing_out.read() {
-                p { class: "status", role: "status", "aria-live": "polite", "Signing out…" }
+            if signing_out_now {
+                Alert { tone: AlertTone::Status, message: Some("Signing out…".to_owned()) }
             }
-            if let Some(message) = logout_error.read().as_ref() {
-                p { class: "warning", role: "alert", "aria-live": "assertive", "{message}" }
-            }
-            if !*signing_out.read() {
+            Alert { tone: AlertTone::Warning, message: logout_error.read().clone() }
+            // The signed-out state hides the cached account rather than leaving
+            // a stale copy on screen behind the navigation.
+            if !signing_out_now {
                 match account.read().as_ref() {
                     None => rsx! {
-                        p { class: "status", role: "status", "aria-live": "polite", "Loading account…" }
+                        Alert {
+                            tone: AlertTone::Status,
+                            message: Some("Loading account…".to_owned()),
+                        }
                     },
                     Some(Err(err)) => rsx! {
-                        p { class: "error", role: "alert", "aria-live": "assertive", "{err.message}" }
+                        Alert { tone: AlertTone::Error, message: Some(err.message.clone()) }
+                        div { class: "actions",
+                            button { r#type: "button", onclick: move |_| account.restart(), "Try again" }
+                        }
                     },
                     Some(Ok(meta)) => rsx! {
                         table {
@@ -62,24 +57,12 @@ pub fn StatusPage() -> Element {
                                 tr { th { scope: "row", "ID" } td { code { "{meta.id}" } } }
                                 tr {
                                     th { scope: "row", "Status" }
-                                    td {
-                                        span {
-                                            class: "{status_badge_class(&meta.status)}",
-                                            "{status_label(&meta.status)}"
-                                        }
-                                    }
+                                    td { StatusBadge { value: meta.status.clone() } }
                                 }
                                 tr { th { scope: "row", "Tenant" } td { code { "{meta.tenant_id}" } } }
                                 tr {
                                     th { scope: "row", "Created" }
-                                    td {
-                                        time {
-                                            class: "timestamp",
-                                            datetime: "{meta.created_at}",
-                                            title: "{meta.created_at}",
-                                            "{compact_timestamp(&meta.created_at)}"
-                                        }
-                                    }
+                                    td { Timestamp { value: meta.created_at.clone() } }
                                 }
                             }
                         }
@@ -88,7 +71,14 @@ pub fn StatusPage() -> Element {
             }
             nav { class: "actions", "aria-label": "Account",
                 Link { class: "button", to: Route::Keys {}, "API keys" }
-                Link { class: "button", to: Route::Delete {}, "Delete account" }
+                // Destructive, so it must not look like its neighbour: the
+                // colour is the only warning an operator gets before the page
+                // that asks them to type a confirmation phrase.
+                Link {
+                    class: "button button--danger",
+                    to: Route::Delete {},
+                    "Delete account"
+                }
                 button { r#type: "button", onclick: sign_out, "Sign out" }
             }
         }

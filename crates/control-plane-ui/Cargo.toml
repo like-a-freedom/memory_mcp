@@ -23,10 +23,11 @@ gloo-storage = { version = "=0.4.0" }
 # bundle, and it replaces the `new Function` bridge the CSP refuses.
 #
 # Every version here must keep matching what `dioxus-web` already resolves to.
-# `gloo-timers` is the live example: 0.4 exists, and raising the requirement to
-# it would link a second copy of the crate into the bundle, which is the one
-# thing this list exists to avoid. `cargo update` reports these as "available"
-# for exactly that reason.
+# `gloo-timers` is the live example: this graph resolves 0.3.0, and a 0.4
+# requirement would link a second copy of the crate into the bundle, which is the
+# one thing this list exists to avoid. Each pin is exact (`=`), so `cargo update`
+# cannot move one out of step; raising a pin is a deliberate change, made after
+# re-reading what `dioxus-web` resolves to in `Cargo.lock`.
 gloo-timers = { version = "=0.3.0", features = ["futures"] }
 js-sys = "=0.3.105"
 wasm-bindgen-futures = "=0.4.78"

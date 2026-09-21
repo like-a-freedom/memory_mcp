@@ -1,15 +1,17 @@
-//! Login page — the flow this deployment serves.
+//! The sign-in route, which serves whichever flow this deployment offers.
 //!
 //! `GET /api/v1/auth/config` decides: local mode renders the administrator
-//! username/password form, OIDC mode keeps the existing provider redirect. An
-//! unknown mode renders neither, so a misconfigured server cannot fall back to
-//! a flow it does not actually offer.
+//! username/password form, OIDC mode keeps the provider redirect. An unknown
+//! mode renders neither, so a misconfigured server cannot fall back to a flow it
+//! does not actually offer.
 
 use dioxus::prelude::*;
 
 use crate::admin_api::{AdminApi, PATH_OIDC_AUTHORIZE};
-use crate::pages::admin_auth::AdminLoginForm;
+use crate::components::admin_auth::AdminLoginForm;
+use crate::components::alert::{Alert, AlertTone};
 
+/// `/login`
 #[component]
 pub fn LoginPage() -> Element {
     // This is a client-side read with an explicit retry action, so the resource
@@ -20,21 +22,28 @@ pub fn LoginPage() -> Element {
 
     rsx! {
         div { class: "container",
+            // The heading is outside the match: a page that is still deciding
+            // which flow to show still has a name, and an accessibility check
+            // reads a page with no heading as a page with no content.
+            h1 { "Sign in" }
             match config.read().as_ref() {
                 None => rsx! {
-                    p { class: "status", role: "status", "aria-live": "polite", "Checking how to sign in…" }
+                    Alert {
+                        tone: AlertTone::Status,
+                        message: Some("Checking how to sign in…".to_owned()),
+                    }
                 },
                 Some(Err(failure)) => rsx! {
-                    h1 { "Sign in" }
-                    p { class: "error", role: "alert", "aria-live": "assertive", "{failure.user_message()}" }
+                    Alert {
+                        tone: AlertTone::Error,
+                        message: Some(failure.user_message().to_owned()),
+                    }
                     button { r#type: "button", onclick: retry, "Try again" }
                 },
                 Some(Ok(mode)) if mode.is_local() => rsx! {
-                    h1 { "Sign in" }
                     AdminLoginForm {}
                 },
                 Some(Ok(mode)) if mode.is_oidc() => rsx! {
-                    h1 { "Sign in" }
                     p { "You will be redirected to your identity provider." }
                     // An anchor, not a button nested inside one: this leaves the
                     // SPA for the provider, and nesting interactive content is
@@ -42,9 +51,12 @@ pub fn LoginPage() -> Element {
                     a { class: "button", href: PATH_OIDC_AUTHORIZE, "Sign in with OIDC" }
                 },
                 Some(Ok(_)) => rsx! {
-                    h1 { "Sign in" }
-                    p { class: "error", role: "alert",
-                        "This deployment reported a sign-in mode this page does not recognise. Ask an operator to check the server configuration."
+                    Alert {
+                        tone: AlertTone::Error,
+                        message: Some(
+                            "This deployment reported a sign-in mode this page does not recognise. Ask an operator to check the server configuration."
+                                .to_owned(),
+                        ),
                     }
                 },
             }

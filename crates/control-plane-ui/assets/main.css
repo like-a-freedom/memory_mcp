@@ -44,6 +44,7 @@
     --danger-bg: #241316;
     --danger-hover: #331a1e;
     --danger-border: #7a3038;
+    --danger-text: #2b0d10;
 
     --success: #56d364;
     --success-bg: #0f1f14;
@@ -225,6 +226,37 @@ main:focus {
     padding: 2rem 1.5rem 4rem;
 }
 
+/* A page's title with the one control that belongs to the whole page — back,
+   refresh — on the same line. The title stays first in the document, so the
+   heading an operator hears is still the heading they see. */
+.page-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+}
+
+.page-header > button,
+.page-header > a.button {
+    flex: 0 0 auto;
+}
+
+/* `page-surface` marks the region a modal takes out of the tab order and
+   pointer access with `inert`. The browser does that itself for `showModal()`,
+   and a script-free console opens dialogs with the `open` attribute instead, so
+   the attribute has to come from the page.
+
+   It also repeats the container's stacking, because it sits between the
+   container and the page content: without this, every panel a page renders — the
+   session bar, the privilege note, each `section` — would touch the next one,
+   while the same panels a level higher would be separated. */
+.page-surface {
+    display: flex;
+    flex-direction: column;
+    gap: 1.25rem;
+}
+
 /* ═══ session bar ══════════════════════════════════════════════════════ */
 
 .session-bar {
@@ -263,6 +295,14 @@ form {
     flex-direction: column;
     gap: 1rem;
     max-width: 34rem;
+}
+
+/* A form's submit control is as wide as its label, not as wide as the form: a
+   full-width primary button in a 34rem column reads as a banner rather than as
+   the one thing to press. Below the tablet breakpoint it takes the full width,
+   where a thumb needs the target. */
+form > button[type="submit"] {
+    align-self: flex-start;
 }
 
 .field {
@@ -431,6 +471,34 @@ button[type="submit"]:hover:not(:disabled) {
     color: var(--accent-text);
 }
 
+/* Destructive controls. `button.danger` is a solid button that starts or
+   confirms an irreversible action; `.button--danger` is an outlined link that
+   leads to one without committing to it. */
+button.danger {
+    background-color: var(--danger);
+    color: var(--danger-text);
+    font-weight: 600;
+    border-color: var(--danger);
+}
+
+button.danger:hover:not(:disabled) {
+    background-color: #ffa3a8;
+    border-color: #ffa3a8;
+    color: var(--danger-text);
+}
+
+a.button.button--danger {
+    background-color: var(--danger-bg);
+    color: var(--danger);
+    border-color: var(--danger-border);
+}
+
+a.button.button--danger:hover {
+    background-color: var(--danger-hover);
+    border-color: var(--danger);
+    color: var(--danger);
+}
+
 /* Destructive confirmation: the confirming control inside a `.confirm` block. */
 .confirm > button:first-of-type {
     background-color: var(--danger-bg);
@@ -469,13 +537,22 @@ button[type="submit"]:hover:not(:disabled) {
     display: none;
 }
 
+/* Every message is one panel with one padding and one radius; the tone is the
+   only thing that differs. A loading line that floats as bare text beside
+   error panels that do not is how an operator learns to ignore both. */
+.error,
+.success,
+.warning,
+.status {
+    border-radius: var(--radius-panel);
+    padding: 0.625rem 0.875rem;
+    font-size: 0.875rem;
+}
+
 .error {
     background-color: var(--danger-bg);
     color: var(--danger);
     border: 1px solid var(--danger-border);
-    border-radius: var(--radius-panel);
-    padding: 0.625rem 0.875rem;
-    font-size: 0.875rem;
 }
 
 /* Standalone message paragraphs keep the same panel rhythm as other errors. */
@@ -487,20 +564,10 @@ p.error {
     margin: 0;
 }
 
-.error > a:not(.button) {
-    display: inline-block;
-    margin-top: 0.25rem;
-    color: var(--danger);
-    text-underline-offset: 3px;
-}
-
 .success {
     background-color: var(--success-bg);
     color: var(--success);
     border: 1px solid var(--success-border);
-    border-radius: var(--radius-panel);
-    padding: 0.625rem 0.875rem;
-    font-size: 0.875rem;
 }
 
 .success > p {
@@ -511,14 +578,12 @@ p.error {
     background-color: var(--warning-bg);
     color: var(--warning);
     border: 1px solid var(--warning-border);
-    border-radius: var(--radius-panel);
-    padding: 0.625rem 0.875rem;
-    font-size: 0.875rem;
 }
 
 .status {
+    background-color: var(--surface);
     color: var(--fg-muted);
-    font-size: 0.875rem;
+    border: 1px solid var(--border);
 }
 
 .hint {
@@ -696,8 +761,41 @@ tbody td {
     font-variant-numeric: tabular-nums;
 }
 
-tbody tr:hover {
+/* A highlight on a row that cannot be acted on is a promise the page does not
+   keep, so only the tables with actions in them react to the pointer. A row
+   holding a confirmation is not itself an action. */
+.data-table tbody tr:hover {
     background-color: var(--surface-raised);
+}
+
+.data-table tbody tr.confirm-row:hover {
+    background-color: transparent;
+}
+
+/* The confirmation panel fills the cell it is placed in, so the row reads as one
+   block rather than a panel floating in a padded cell. */
+.confirm-row > td {
+    padding: 0;
+}
+
+.confirm-row .confirm {
+    border: 0;
+    border-top: 1px solid var(--warning-border);
+    border-radius: 0;
+}
+
+/* The position summary and the pager that sits with it, below the rows it walks
+   rather than above the table they belong to. */
+.table-footer {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem 1rem;
+}
+
+.table-footer > p {
+    flex: 1 1 18rem;
 }
 
 tbody th[scope="row"] {
@@ -731,6 +829,13 @@ tbody th[scope="row"] {
 .client-list td:first-child {
     font-weight: 500;
     box-shadow: 1px 0 0 var(--border);
+}
+
+/* The pinned first column paints its own background, so it has to follow the
+   row's hover too: a sticky cell that stays dark on a highlighted row looks
+   like a rendering fault. */
+.client-list tbody tr:hover td:first-child {
+    background-color: var(--surface-raised);
 }
 
 .client-list td:first-child a {
@@ -809,7 +914,8 @@ dialog.modal-layer {
 
 /* The one-time secret is the highest-risk value this console ever renders: it
    is visually quarantined and set in mono so it can be read aloud or retyped
-   without ambiguity. */
+   without ambiguity. The deletion confirmation phrase is set the same way for
+   the same reason: it has to be copied or retyped exactly. */
 .secret {
     border-color: var(--warning-border);
 }
@@ -819,7 +925,8 @@ dialog.modal-layer {
     color: var(--warning);
 }
 
-.secret-value {
+.secret-value,
+.confirm-phrase {
     display: block;
     font-family: var(--font-mono);
     font-size: 0.8125rem;
@@ -833,36 +940,31 @@ dialog.modal-layer {
     user-select: all;
 }
 
+/* The confirmation phrase wraps an element, so the inner `code` drops the frame
+   the shared `code` rule gives it and the block keeps the value in one piece. */
+.confirm-phrase > code {
+    border: 0;
+    background-color: transparent;
+    padding: 0;
+    font-size: inherit;
+}
+
 .secret > p[role="alert"] {
     color: var(--danger);
 }
 
-/* A one-time secret shown outside the admin pages (the OIDC key page). */
-.alert {
-    display: flex;
-    flex-direction: column;
-    gap: 0.5rem;
-    background-color: var(--warning-bg);
-    border: 1px solid var(--warning-border);
-    border-radius: var(--radius-panel);
-    padding: 1rem;
-}
-
-.alert > p {
+/* The sentence explaining why a modal is open. Every modal renders one, so it
+   is styled here rather than per panel; in the secret panel it carries the
+   warning colour, because that is the only place the operator is told the value
+   will never be shown again. */
+.modal-description {
     margin: 0;
-    color: var(--warning);
     font-size: 0.875rem;
+    color: var(--fg-muted);
 }
 
-.alert > code {
-    display: block;
-    font-size: 0.8125rem;
-    line-height: 1.6;
-    background-color: var(--surface-sunken);
-    border-color: var(--border-strong);
-    padding: 0.75rem;
-    overflow-wrap: anywhere;
-    user-select: all;
+.secret > .modal-description {
+    color: var(--warning);
 }
 
 /* ═══ auth forms ═══════════════════════════════════════════════════════ */
@@ -931,6 +1033,11 @@ dialog.modal-layer {
         width: 100%;
     }
 
+    /* A thumb needs the whole width; a pointer does not. */
+    form > button[type="submit"] {
+        align-self: stretch;
+    }
+
     /* Touch targets: the desktop padding produces ~35px, which is above the
        24px minimum but short of the 44px comfortably tappable size. */
     button,
@@ -944,6 +1051,13 @@ dialog.modal-layer {
     input[type="number"],
     input[type="email"] {
         min-height: 2.75rem;
+    }
+
+    /* A checkbox is its own target: the label beside it is clickable too, but at
+       this size the box itself has to meet the 24px minimum on its own. */
+    input[type="checkbox"] {
+        width: 1.5rem;
+        height: 1.5rem;
     }
 
     section.client-metadata,
