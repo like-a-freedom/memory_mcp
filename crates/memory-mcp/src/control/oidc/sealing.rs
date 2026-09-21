@@ -13,7 +13,9 @@ use sha2::Sha256;
 
 use crate::error::MemoryError;
 
-use super::flow_material::{AuthError, OidcNonce, OidcState, PkceCode, StoredOidcRequest};
+use super::flow_material::{
+    AuthError, OidcFlowIntent, OidcNonce, OidcState, PkceCode, StoredOidcRequest,
+};
 
 /// Compute a keyed HMAC of (issuer, subject) to create a blind
 /// index for the OIDC identity. Raw OIDC subjects remain transient
@@ -31,19 +33,30 @@ pub fn identity_subject_verifier(
     Ok(mac.finalize().into_bytes().into())
 }
 
-/// Seal the OIDC flow material using AEAD encryption.
+/// Seal the OIDC flow material, including what the flow is for, using AEAD
+/// encryption.
 pub fn seal_oidc_payload(
     key: &[u8; 32],
     state: &OidcState,
     nonce: &OidcNonce,
     pkce: &PkceCode,
+    intent: &OidcFlowIntent,
 ) -> Result<(Vec<u8>, [u8; 12]), MemoryError> {
     use chacha20poly1305::{ChaCha20Poly1305, KeyInit, Nonce, aead::Aead};
 
+    // The intent is inside the sealed plaintext, so a callback cannot be told
+    // which flow it is completing by anything the browser controls.
+    let intent = match intent {
+        OidcFlowIntent::SignIn => serde_json::json!({ "kind": "sign_in" }),
+        OidcFlowIntent::Link { account_id } => {
+            serde_json::json!({ "kind": "link", "account_id": account_id })
+        }
+    };
     let plaintext = serde_json::json!({
         "state": state.as_str(),
         "nonce": nonce.as_str(),
         "pkce_verifier": pkce.verifier,
+        "intent": intent,
     });
     let plaintext_bytes = serde_json::to_vec(&plaintext)
         .map_err(|_| MemoryError::ConfigInvalid("seal serialization".into()))?;
@@ -80,14 +93,30 @@ pub fn unseal_oidc_payload(
         .map_err(|e: AuthError| MemoryError::ConfigInvalid(e.to_string()))?;
 
     #[derive(serde::Deserialize)]
+    #[serde(tag = "kind", rename_all = "snake_case")]
+    enum SealedIntent {
+        SignIn,
+        Link { account_id: String },
+    }
+
+    #[derive(serde::Deserialize)]
     struct SealedPayload {
         state: String,
         nonce: String,
         pkce_verifier: String,
+        /// Absent in a payload sealed before the intent existed; those flows
+        /// are logins, so that is what they decode as.
+        #[serde(default)]
+        intent: Option<SealedIntent>,
     }
 
     let payload: SealedPayload = serde_json::from_slice(&plaintext)
         .map_err(|e| MemoryError::ConfigInvalid(format!("unseal parse: {e}")))?;
+
+    let intent = match payload.intent {
+        None | Some(SealedIntent::SignIn) => OidcFlowIntent::SignIn,
+        Some(SealedIntent::Link { account_id }) => OidcFlowIntent::Link { account_id },
+    };
 
     Ok(StoredOidcRequest {
         state: OidcState(payload.state),
@@ -96,6 +125,7 @@ pub fn unseal_oidc_payload(
             verifier: payload.pkce_verifier,
             challenge: String::new(),
         },
+        intent,
         // The registry enforces the authoritative expiry at consume time;
         // this value is only the decrypted projection used by callers.
         expires_at: chrono::Utc::now() + chrono::Duration::minutes(10),

@@ -484,6 +484,73 @@ async fn identity_links_endpoint_is_reachable_and_well_formed() {
     );
 }
 
+/// ADR-0057: attaching an identity starts a provider round trip. The response
+/// names no identity, and nothing is linked until the provider attests to one —
+/// which is what stops an account holder from pre-attaching somebody else's
+/// identity by guessing its subject.
+#[tokio::test]
+async fn identity_link_starts_a_provider_round_trip_and_links_nothing() {
+    let (fixture, _mock, cookie) = spawn_with_env(Vec::new()).await;
+    let client = reqwest::Client::builder()
+        .timeout(Duration::from_secs(5))
+        .build()
+        .expect("client");
+
+    let (status, csrf_body) = fetch_csrf(&client, &fixture.base_url, &cookie).await;
+    assert_eq!(status, reqwest::StatusCode::OK);
+    let csrf = csrf_body["csrf_token"]
+        .as_str()
+        .expect("csrf token")
+        .to_owned();
+
+    // The body is the shape the removed route accepted. It must be ignored
+    // rather than honoured.
+    let resp = client
+        .post(format!(
+            "{}/api/v1/account/identity_links",
+            fixture.base_url
+        ))
+        .header("host", "localhost")
+        .header(cookie_header(&cookie).0, cookie_header(&cookie).1)
+        .header("x-csrf-token", csrf)
+        .json(&json!({
+            "issuer": "https://idp.example.com",
+            "subject": "claimed-without-proof",
+        }))
+        .send()
+        .await
+        .expect("start identity link");
+    assert_eq!(resp.status(), reqwest::StatusCode::OK);
+    let body: serde_json::Value = resp.json().await.expect("link json");
+    let url = body["authorize_url"].as_str().expect("authorize url");
+    assert!(
+        url.contains("/auth"),
+        "the flow must be sent to the provider: {url}"
+    );
+    assert!(
+        !url.contains("claimed-without-proof"),
+        "no identity may be carried into the provider flow: {url}"
+    );
+
+    // Nothing was linked: the provider has not attested to anything yet.
+    let listing = client
+        .get(format!(
+            "{}/api/v1/account/identity_links",
+            fixture.base_url
+        ))
+        .header("host", "localhost")
+        .header(cookie_header(&cookie).0, cookie_header(&cookie).1)
+        .send()
+        .await
+        .expect("identity links");
+    assert_eq!(listing.status(), reqwest::StatusCode::OK);
+    let body: serde_json::Value = listing.json().await.expect("identity links json");
+    assert!(
+        body.as_array().expect("array of identities").is_empty(),
+        "a started flow must not link anything: {body}"
+    );
+}
+
 #[tokio::test]
 async fn start_account_deletion_returns_one_time_token() {
     let (fixture, _mock, cookie) = spawn_with_env(Vec::new()).await;

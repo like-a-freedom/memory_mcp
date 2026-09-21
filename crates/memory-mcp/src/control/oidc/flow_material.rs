@@ -78,12 +78,34 @@ impl Default for PkceCode {
     }
 }
 
+/// What a sealed OIDC flow is for (ADR-0057).
+///
+/// The intent travels inside the AEAD-sealed state payload, so it is bound to
+/// the flow by the same key that protects the nonce and the PKCE verifier, and
+/// the callback can never be talked into attaching an identity by a request
+/// body.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub enum OidcFlowIntent {
+    /// Resolve or create the Account behind the verified identity, and open a
+    /// browser session for it.
+    #[default]
+    SignIn,
+    /// Attach the provider-verified identity to this Account. The Account is
+    /// named here because the flow began inside that Account's session, not
+    /// because a client asserted it at the callback.
+    Link { account_id: String },
+}
+
 /// Stored OIDC request — decrypted projection from the registry.
 #[derive(Debug, Clone)]
 pub struct StoredOidcRequest {
     pub state: OidcState,
     pub nonce: OidcNonce,
     pub pkce: PkceCode,
+    /// What the flow is for. A payload sealed before this field existed
+    /// decodes as [`OidcFlowIntent::SignIn`], so an upgrade does not strand an
+    /// in-flight login.
+    pub intent: OidcFlowIntent,
     /// Authoritative expiry enforced by the registry at consume
     /// time; this value is only the decrypted projection used by
     /// callers.

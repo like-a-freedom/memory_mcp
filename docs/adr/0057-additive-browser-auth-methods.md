@@ -13,11 +13,15 @@ provisioning, key issuance, audit and isolation requirements — remains in forc
 Implementation status. The set-of-methods half is implemented and verified: the
 configuration contract, independent route mounting, the single policy writer,
 the method disclosure, the login page, the admin CLI, and the single-file
-deployment. The **identity linking for Accounts** half is specified here but not
-yet built; the current `POST /api/v1/account/identity_links` still accepts the
-identity from the request body rather than from a provider round-trip, and
-`unlink` is still unconditional. Treat that section as the requirement it must
-meet, not as a description of the shipped code.
+deployment.
+
+Of the identity-linking half, two of the three requirements are implemented:
+the link is created only from a provider round trip that carries the link intent
+inside the sealed flow material, and an Account's last identity cannot be
+unlinked. The third — `identity_linked` / `identity_unlinked` audit events — is
+**not** implemented, because it needs a durable audit table that does not exist
+yet, and introducing one is a schema decision of its own rather than part of
+this change. Until it lands, an identity link is durable but not audited.
 
 ## Context
 

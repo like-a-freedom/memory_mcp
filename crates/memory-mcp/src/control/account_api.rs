@@ -22,10 +22,14 @@
 //!   an API key by id.
 //! - `GET    /api/v1/account/identity_links`   — list
 //!   linked external identities.
-//! - `POST   /api/v1/account/identity_links`   — link a
-//!   new external identity.
+//! - `POST   /api/v1/account/identity_links`   — begin
+//!   attaching a new external identity, by sending
+//!   the browser to the provider. The response names
+//!   no identity: the identity is the one the provider
+//!   later attests to (ADR-0057).
 //! - `DELETE /api/v1/account/identity_links/:id` —
-//!   unlink a previously linked identity.
+//!   unlink a previously linked identity, never the
+//!   last one.
 //! - `POST   /api/v1/account/delete`           — start
 //!   account deletion; the response carries the
 //!   one-time confirmation token.
@@ -292,53 +296,40 @@ pub async fn list_identity_links(
     json_response(StatusCode::OK, &identities)
 }
 
-#[derive(serde::Deserialize)]
-pub struct LinkIdentityRequest {
-    pub issuer: String,
-    pub subject: String,
+#[derive(serde::Serialize)]
+pub struct LinkIdentityResponse {
+    /// Where to send the browser to prove the identity it is about to attach.
+    pub authorize_url: String,
 }
 
-/// POST /api/v1/account/identity_links — link an external identity after
-/// recent authentication. The raw subject is immediately converted to a keyed
-/// blind index and is never sent to the registry store.
-pub async fn link_identity(
+/// POST /api/v1/account/identity_links — begin attaching an external identity
+/// to this Account (ADR-0057).
+///
+/// The identity is *not* named here. The response sends the browser to the
+/// identity provider, and the callback attaches whatever identity the provider
+/// then attests to — so an account holder can only attach an identity they can
+/// actually authenticate as. Naming the identity in this request, as an earlier
+/// revision did, let anyone who could guess another person's `sub` claim attach
+/// that identity to their own Account first.
+///
+/// Requires recent authentication, because the effect outlives the session.
+pub async fn start_identity_link(
     State(state): State<Arc<HttpState>>,
     axum::extract::Extension(session): axum::extract::Extension<
         super::session::ControlPlaneSession,
     >,
-    body: Body,
-) -> Result<StatusCode, ApiError> {
+) -> Result<Response, ApiError> {
     super::recent_auth::require_recent_auth(&session, super::recent_auth::DEFAULT_REAUTH_MAX_AGE)?;
-    let bytes = http_body_util::BodyExt::collect(body)
-        .await
-        .map_err(|error| ApiError::Internal(crate::error::MemoryError::Storage(error.to_string())))?
-        .to_bytes();
-    let request: LinkIdentityRequest = serde_json::from_slice(&bytes).map_err(|error| {
-        ApiError::Internal(crate::error::MemoryError::Validation(format!(
-            "link identity body: {error}"
-        )))
-    })?;
-    let subject_verifier = super::oidc::identity_subject_verifier(
-        &state.config.keys.identity_index,
-        &request.issuer,
-        &request.subject,
-    )?;
-    let identity = ExternalIdentity {
-        id: new_external_identity_id(),
-        issuer: request.issuer,
-        subject_verifier: SubjectVerifier(subject_verifier),
-        account_id: session.account_id,
-        created_at: chrono::Utc::now(),
-    };
-    state
-        .registry
-        .store_clone()
-        .link_external_identity(&identity)
-        .await?;
-    Ok(StatusCode::CREATED)
+    let authorize_url = super::oidc::start_link_flow(&state, &session.account_id).await?;
+    json_response(StatusCode::OK, &LinkIdentityResponse { authorize_url })
 }
 
 /// DELETE /api/v1/account/identity_links/:id — unlink an External Identity.
+///
+/// Refuses to remove the Account's last remaining identity (ADR-0057): an
+/// Account with no identity left has no way back in through the console, and
+/// the refusal is cheaper than a support process for undoing it. Recent
+/// authentication is required because the effect outlives the session.
 pub async fn unlink_identity(
     State(state): State<Arc<HttpState>>,
     axum::extract::Extension(session): axum::extract::Extension<
@@ -346,12 +337,36 @@ pub async fn unlink_identity(
     >,
     axum::extract::Path(identity_id): axum::extract::Path<String>,
 ) -> Result<StatusCode, ApiError> {
-    state
-        .registry
-        .store_clone()
-        .unlink_external_identity(&session.account_id, &identity_id)
-        .await?;
+    super::recent_auth::require_recent_auth(&session, super::recent_auth::DEFAULT_REAUTH_MAX_AGE)?;
+    guarded_unlink(
+        &state.registry.store_clone(),
+        &session.account_id,
+        &identity_id,
+    )
+    .await?;
     Ok(StatusCode::NO_CONTENT)
+}
+
+/// Remove one of an Account's identities, refusing to remove the last.
+///
+/// Split out from the handler so the rule can be exercised against a real store
+/// without a live identity provider: an Account must never be left with no
+/// identity it can sign in with.
+async fn guarded_unlink(
+    store: &Arc<dyn crate::http::registry::storage::RegistryStore>,
+    account_id: &str,
+    identity_id: &str,
+) -> Result<(), crate::error::MemoryError> {
+    let identities = store.find_external_identities(account_id).await?;
+    if identities.len() < 2 {
+        return Err(crate::error::MemoryError::Conflict(
+            "the account's last identity cannot be unlinked".into(),
+        ));
+    }
+    store
+        .unlink_external_identity(account_id, identity_id)
+        .await?;
+    Ok(())
 }
 
 /// POST /api/v1/account/delete — start deletion flow and return a short-lived
@@ -507,12 +522,89 @@ pub async fn create_account(
 mod tests {
     use super::*;
     use crate::control::operator;
-    use crate::http::registry::storage::InMemoryStore;
+    use crate::http::registry::models::{
+        Account, AccountStatus, ExternalIdentity, SubjectVerifier,
+    };
+    use crate::http::registry::storage::{InMemoryStore, RegistryStore};
     use axum::Router;
     use axum::body::Body;
     use axum::http::{Request, StatusCode};
     use axum::routing::post;
     use tower_service::Service;
+
+    /// Write an Account and `count` linked identities, returning the identity
+    /// ids in insertion order.
+    async fn account_with_identities(store: &Arc<InMemoryStore>, count: u8) -> Vec<String> {
+        let account_id = "acct_links";
+        store
+            .write_account(&Account {
+                id: account_id.to_owned(),
+                status: AccountStatus::Active,
+                tenant_id: "ten_links".to_owned(),
+                created_at: chrono::Utc::now(),
+            })
+            .await
+            .expect("write account");
+        let mut ids = Vec::new();
+        for index in 0..count {
+            let id = format!("idn_{index}");
+            store
+                .link_external_identity(&ExternalIdentity {
+                    id: id.clone(),
+                    issuer: "https://idp.example.com".to_owned(),
+                    subject_verifier: SubjectVerifier([index; 32]),
+                    account_id: account_id.to_owned(),
+                    created_at: chrono::Utc::now(),
+                })
+                .await
+                .expect("link identity");
+            ids.push(id);
+        }
+        ids
+    }
+
+    /// ADR-0057: an Account must never be left with no identity it can sign in
+    /// with, so the last one cannot be removed.
+    #[tokio::test]
+    async fn the_last_identity_cannot_be_unlinked() {
+        let store: Arc<InMemoryStore> = Arc::new(InMemoryStore::default());
+        let ids = account_with_identities(&store, 1).await;
+        let registry: Arc<dyn RegistryStore> = store.clone();
+
+        let refused = guarded_unlink(&registry, "acct_links", &ids[0]).await;
+        assert!(
+            matches!(refused, Err(crate::error::MemoryError::Conflict(_))),
+            "the only identity must not be removable"
+        );
+        assert_eq!(
+            store
+                .find_external_identities("acct_links")
+                .await
+                .expect("list")
+                .len(),
+            1,
+            "the refusal must not have removed anything"
+        );
+    }
+
+    /// With a second identity present the removal proceeds, so the guard above
+    /// cannot pass for the wrong reason.
+    #[tokio::test]
+    async fn an_identity_is_removable_while_another_remains() {
+        let store: Arc<InMemoryStore> = Arc::new(InMemoryStore::default());
+        let ids = account_with_identities(&store, 2).await;
+        let registry: Arc<dyn RegistryStore> = store.clone();
+
+        guarded_unlink(&registry, "acct_links", &ids[0])
+            .await
+            .expect("unlink one of two");
+        let remaining = store
+            .find_external_identities("acct_links")
+            .await
+            .expect("list");
+        assert_eq!(remaining.len(), 1);
+        assert_eq!(remaining[0].id, ids[1]);
+    }
 
     /// Build a router with the operator stub middleware and an
     /// in-memory registry store. The test passes because the

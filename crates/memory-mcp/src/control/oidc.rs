@@ -36,10 +36,10 @@ mod sealing;
 
 pub use client::OidcClient;
 pub use flow_material::{
-    AccessClaims, Audience, AuthError, OidcCallback, OidcNonce, OidcState, OidcTokens, PkceCode,
-    StoredOidcRequest,
+    AccessClaims, Audience, AuthError, OidcCallback, OidcFlowIntent, OidcNonce, OidcState,
+    OidcTokens, PkceCode, StoredOidcRequest,
 };
-pub use handlers::{authorize, callback, logout};
+pub use handlers::{authorize, callback, logout, start_link_flow};
 pub use jwks::JwksCache;
 pub use sealing::{identity_subject_verifier, seal_oidc_payload, unseal_oidc_payload};
 
@@ -204,7 +204,8 @@ mod tests {
         let nonce = OidcNonce::new();
         let pkce = PkceCode::new();
 
-        let (ciphertext, nonce_bytes) = seal_oidc_payload(&key, &state, &nonce, &pkce).unwrap();
+        let (ciphertext, nonce_bytes) =
+            seal_oidc_payload(&key, &state, &nonce, &pkce, &OidcFlowIntent::SignIn).unwrap();
 
         let mut stored = unseal_oidc_payload(&key, &ciphertext, &nonce_bytes).unwrap();
         stored.pkce.challenge = String::new();
@@ -212,6 +213,32 @@ mod tests {
         assert_eq!(stored.state.as_str(), state.as_str());
         assert_eq!(stored.nonce.as_str(), nonce.as_str());
         assert_eq!(stored.pkce.verifier, pkce.verifier);
+        assert_eq!(stored.intent, OidcFlowIntent::SignIn);
+    }
+
+    /// The link intent survives a seal/unseal round trip, so the callback can
+    /// trust the Account it names (ADR-0057).
+    #[test]
+    fn seal_unseal_roundtrip_carries_a_link_intent() {
+        let key = [0x42u8; 32];
+        let state = OidcState::new();
+        let nonce = OidcNonce::new();
+        let pkce = PkceCode::new();
+        let intent = OidcFlowIntent::Link {
+            account_id: "acct_link".to_owned(),
+        };
+
+        let (ciphertext, nonce_bytes) =
+            seal_oidc_payload(&key, &state, &nonce, &pkce, &intent).unwrap();
+        let stored = unseal_oidc_payload(&key, &ciphertext, &nonce_bytes).unwrap();
+
+        assert_eq!(stored.intent, intent);
+        assert!(
+            !ciphertext
+                .windows("acct_link".len())
+                .any(|window| window == b"acct_link"),
+            "the Account id must be sealed, not merely serialized"
+        );
     }
 
     #[test]
@@ -222,7 +249,8 @@ mod tests {
         let nonce = OidcNonce::new();
         let pkce = PkceCode::new();
 
-        let (ciphertext, nonce_bytes) = seal_oidc_payload(&key, &state, &nonce, &pkce).unwrap();
+        let (ciphertext, nonce_bytes) =
+            seal_oidc_payload(&key, &state, &nonce, &pkce, &OidcFlowIntent::SignIn).unwrap();
 
         let result = unseal_oidc_payload(&wrong_key, &ciphertext, &nonce_bytes);
         assert!(result.is_err());

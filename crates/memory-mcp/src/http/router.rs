@@ -109,7 +109,7 @@ pub fn build_router(
             .route(
                 "/api/v1/account/identity_links",
                 get(crate::control::account_api::list_identity_links)
-                    .post(crate::control::account_api::link_identity),
+                    .post(crate::control::account_api::start_identity_link),
             )
             .route(
                 "/api/v1/account/identity_links/{id}",
