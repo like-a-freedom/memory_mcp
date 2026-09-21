@@ -307,12 +307,20 @@ mod tests {
 
     #[cfg(feature = "control-plane-ui")]
     #[test]
-    fn generated_catalog_has_sorted_non_empty_index() {
+    fn generated_catalog_is_sorted_and_matches_the_embedded_bundle() {
+        // `build.rs` emits an empty catalog when `MEMORY_MCP_CONTROL_PLANE_UI_DIST`
+        // was absent (ADR-0056 makes the bundle optional), so sorting is the
+        // only invariant that holds for every build. The index assertions apply
+        // to a build that embedded a real bundle, where `build.rs` has already
+        // refused a bundle without a non-empty `index.html`.
         assert!(ASSETS.windows(2).all(|pair| pair[0].path < pair[1].path));
+        if ASSETS.is_empty() {
+            return;
+        }
         let index = ASSETS
             .iter()
             .find(|asset| asset.path == INDEX_PATH)
-            .expect("asset build script should generate index.html");
+            .expect("an embedded bundle must contain index.html");
         assert!(!index.body.is_empty());
         assert!(!index.immutable);
     }
