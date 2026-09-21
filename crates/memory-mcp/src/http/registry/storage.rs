@@ -492,6 +492,30 @@ pub trait RegistryStore: Send + Sync + 'static {
         local: Option<LocalKeyFingerprints>,
     ) -> Result<BrowserPolicyFence, MemoryError>;
 
+    /// Remove one method from the durable browser-auth policy and return the
+    /// resulting fence (ADR-0057).
+    ///
+    /// This is the guarded removal operation, and the only path that can narrow
+    /// the durable set: [`RegistryStore::reconcile_browser_policy`] adds methods
+    /// and refuses to drop one, so a deployment reaches "SSO only" by calling
+    /// this explicitly, never by editing the environment.
+    ///
+    /// The set left behind is the stored set minus `method`, computed here so a
+    /// caller cannot name a result that disagrees with the row. It is refused
+    /// when `method` is not enabled, and when removing it would leave no browser
+    /// method at all — a control plane that authenticates nobody is not a
+    /// deployment anyone can administer.
+    ///
+    /// The epoch advances, so every browser session of either method stops
+    /// resolving: a change to the deployment's authentication surface is not
+    /// something a session is kept across. An operator-action audit row naming
+    /// the method is written in the same transaction.
+    #[cfg(feature = "control-plane")]
+    async fn remove_browser_auth_method(
+        &self,
+        method: BrowserAuthMethod,
+    ) -> Result<BrowserPolicyFence, MemoryError>;
+
     /// Atomically create the account, tenant, and external identity under a
     /// matching browser auth policy fence. The policy mode/epoch are checked
     /// before any record is written.
@@ -1920,6 +1944,43 @@ impl RegistryStore for InMemoryStore {
     }
 
     #[cfg(feature = "control-plane")]
+    async fn remove_browser_auth_method(
+        &self,
+        method: crate::http::config::BrowserAuthMethod,
+    ) -> Result<super::models::BrowserPolicyFence, MemoryError> {
+        use crate::http::config::BrowserAuthMethod;
+        let mut policy = self.lock_browser_policy();
+        let Some(existing) = policy.as_mut() else {
+            return Err(MemoryError::Conflict(
+                "no durable browser-auth policy exists yet".into(),
+            ));
+        };
+        if !existing.methods.contains(&method) {
+            return Err(MemoryError::Conflict(format!(
+                "browser authentication method '{}' is not enabled",
+                method.as_str()
+            )));
+        }
+        let remaining: Vec<BrowserAuthMethod> = existing
+            .methods
+            .iter()
+            .copied()
+            .filter(|held| *held != method)
+            .collect();
+        if remaining.is_empty() {
+            return Err(MemoryError::Conflict(
+                "removing this method would leave no browser authentication method".into(),
+            ));
+        }
+        // The durable backend appends an operator-action audit row in
+        // `local_admin_audit`, which the in-memory double does not model at all
+        // (it holds no local-admin table), so only the policy change is mirrored.
+        existing.methods = remaining;
+        existing.epoch += 1;
+        Ok(existing.clone())
+    }
+
+    #[cfg(feature = "control-plane")]
     async fn create_oidc_account_bundle(
         &self,
         policy: &super::models::BrowserPolicyFence,
@@ -2114,6 +2175,42 @@ mod tests {
             )
             .await;
         assert!(matches!(res, Err(MemoryError::Conflict(_))));
+    }
+
+    /// ADR-0057: the in-memory double mirrors the guarded removal — the set
+    /// narrows, the epoch advances, and the last method stays.
+    #[tokio::test]
+    #[cfg(feature = "control-plane")]
+    async fn in_memory_removal_narrows_the_policy_and_advances_the_epoch() {
+        use crate::http::config::BrowserAuthMethod;
+        let s = InMemoryStore::default();
+        s.reconcile_browser_policy(&[BrowserAuthMethod::Local, BrowserAuthMethod::Oidc], None)
+            .await
+            .expect("reconcile a dual-method policy");
+
+        let fence = s
+            .remove_browser_auth_method(BrowserAuthMethod::Local)
+            .await
+            .expect("remove the local method");
+        assert_eq!(fence.methods, vec![BrowserAuthMethod::Oidc]);
+        assert_eq!(fence.epoch, 2, "a policy change advances the epoch");
+
+        // The whole point of the removal: the narrowed configuration now
+        // reconciles instead of being refused.
+        s.reconcile_browser_policy(&[BrowserAuthMethod::Oidc], None)
+            .await
+            .expect("an SSO-only configuration must be accepted after the removal");
+
+        let refused = s.remove_browser_auth_method(BrowserAuthMethod::Oidc).await;
+        assert!(
+            matches!(refused, Err(MemoryError::Conflict(_))),
+            "the last method must not be removable, got {refused:?}"
+        );
+        let absent = s.remove_browser_auth_method(BrowserAuthMethod::Local).await;
+        assert!(
+            matches!(absent, Err(MemoryError::Conflict(_))),
+            "an absent method must be refused, got {absent:?}"
+        );
     }
 
     #[tokio::test]

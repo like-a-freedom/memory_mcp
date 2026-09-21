@@ -370,8 +370,9 @@ enabled they are real key material and must be supplied.
 
 Material for a method the set omits is refused, and so is a set that drops a
 method the deployment has already enabled: turning a method off is an explicit
-guarded operation, not a startup reconciliation. The server names the offending
-variable and how to fix the set.
+guarded operation (`memory_mcp admin auth-methods remove --method local`), not a
+startup reconciliation. The server names the offending variable and how to fix
+the set.
 
 `MEMORY_MCP_HTTP_ENABLE_CONTROL_PLANE_UI=true` (the default) is valid only for an
 image built with the `streamable-http` profile (see
@@ -694,7 +695,29 @@ keys (`MEMORY_MCP_HTTP_IDENTITY_INDEX_KEY`, `..._OIDC_STATE_KEY`,
 A set that omits a method the deployment has already enabled fails startup.
 Removing a method is an explicit guarded operation rather than a reconciliation,
 because dropping the last route to administration is how a deployment locks
-itself out.
+itself out. It is the only path to "SSO only":
+
+```bash
+# 1. Declare the target set, and the operator who will administer it.
+export MEMORY_MCP_HTTP_AUTH_METHODS=oidc
+export MEMORY_MCP_HTTP_OPERATOR_IDENTITIES='<issuer>|<hex(subject_verifier)>'
+
+# 2. Drop the local method from the durable policy: one audited operation.
+memory_mcp admin auth-methods remove --method local
+
+# 3. Restart with the set the command printed.
+docker compose up -d
+```
+
+The command refuses a method the configuration still enables, because startup
+reconciliation is additive and would add it straight back; and it refuses to
+remove `local` while no operator identity is configured, because that would
+leave nobody able to administer the deployment — the rule that SSO cannot be
+required before a break-glass administrator exists. It is a CLI operation rather
+than a console toggle because the configuration is what declares the set, so a
+browser action would be undone by the next restart. The removal advances the
+deployment's policy epoch, invalidating every browser session, and records the
+operator's action in the audit log.
 
 Local-only deployments additionally require all seven `MEMORY_MCP_HTTP_*`
 plan-limit variables and a public base URL that is HTTPS (or loopback for

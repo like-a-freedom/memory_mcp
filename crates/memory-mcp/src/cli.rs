@@ -80,10 +80,11 @@ pub enum Command {
     /// Consumed by hook scripts, not a public tool. Legacy scope/project event fields are rejected.
     #[command(hide = true)]
     LifecycleCapture(args::LifecycleCaptureArgs),
-    /// Admin create/recover commands.
+    /// Administrator commands: create/recover, and the deployment's browser
+    /// authentication methods.
     ///
     /// Runs before MemoryService/NER construction. Connects directly
-    /// to the control registry to manage admin accounts.
+    /// to the control registry.
     #[cfg(all(feature = "streamable-http", feature = "control-plane"))]
     Admin(args::AdminArgs),
     /// Internal: recall scope-free lifecycle context (hidden from --help).

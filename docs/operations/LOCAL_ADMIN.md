@@ -830,7 +830,7 @@ Environment read by `AdminCliConfig::from_env` — and nothing else:
 
 | Variable | Required |
 |---|---|
-| `MEMORY_MCP_HTTP_AUTH_METHODS` | yes, and the set must contain `local`. A set that also enables `oidc` is accepted: the command reconciles the same row the server does, while a set without `local` would write records nothing can use |
+| `MEMORY_MCP_HTTP_AUTH_METHODS` | yes; the set must contain `local` for `create`/`recover`. A set that also enables `oidc` is accepted: the command reconciles the same row the server does, while a set without `local` would write records nothing can use. The *removal* command inverts this: `local` must already be absent |
 | `MEMORY_MCP_HTTP_AUTH_MODE` | the one-release alias for `MEMORY_MCP_HTTP_AUTH_METHODS=local`; still accepted on its own |
 | `MEMORY_MCP_HTTP_SESSION_KEY` (64-hex) | yes |
 | `MEMORY_MCP_HTTP_CSRF_KEY` (64-hex) | yes |
@@ -840,10 +840,11 @@ Environment read by `AdminCliConfig::from_env` — and nothing else:
 | `SURREALDB_CONTROL_DB` | yes |
 | `SURREALDB_CONTROL_NAMESPACE` | yes |
 | `MEMORY_MCP_HTTP_PUBLIC_BASE_URL` | no (defaults to `https://localhost`) |
+| `MEMORY_MCP_HTTP_OPERATOR_IDENTITIES` | no; read only by `auth-methods remove`, where an empty value refuses the removal of `local` |
 
-The CLI **requires the `local` method**: a configured set that omits it fails
-before any connection is opened, because creating a local administrator in a
-deployment that authenticates browsers through an identity provider alone would
+`create`/`recover` **require the `local` method**: a configured set that omits it
+fails before any connection is opened, because creating a local administrator in
+a deployment that authenticates browsers through an identity provider alone would
 write records nothing can use.
 
 > ADR-0057: the requirement is set membership, not equality. A set that also
@@ -853,6 +854,10 @@ write records nothing can use.
 > `tests/local_admin_cli.rs::admin_commands_require_the_local_method`, and it
 > asserts the refusal for an absent set, for `oidc` alone, and for an
 > unrecognised token — `off` is no longer a value any deployment names.
+>
+> The requirement moved out of `AdminCliConfig::from_env` and onto the two
+> commands that need it: the loader is a snapshot of the deployment's
+> environment, and `auth-methods remove` needs the opposite condition.
 
 Beyond that the CLI does not read the plan limits, the tenant
 DB, or any model/OIDC setting; it connects only to the control registry. It also
@@ -1037,6 +1042,44 @@ recovery may also finish. Recovery is a fence on future work, not a cancellation
 of in-flight work, and it is not a rollback. (`resolve_session`, the mutation
 guard, and the transaction ordering are the mechanism; the tests cover the
 invalidation outcome, not the interleaving guarantee — see §13.)
+
+### Removing the local method ("SSO only")
+
+`memory_mcp admin auth-methods remove --method local` is the only path that drops
+a method from the durable browser-auth policy, and therefore the only path to a
+deployment that authenticates browsers through the identity provider alone
+(ADR-0057). Startup reconciliation is additive and refuses to narrow the row, so
+editing `MEMORY_MCP_HTTP_AUTH_METHODS` alone fails startup rather than turning the
+method off.
+
+The command is run with the **target** set already exported, and refuses two
+things before it opens the registry:
+
+- a method the configuration still enables, because the next start would add it
+  straight back; and
+- removing `local` while `MEMORY_MCP_HTTP_OPERATOR_IDENTITIES` is empty, because
+  that would leave nobody able to administer the deployment.
+
+```bash
+export MEMORY_MCP_HTTP_AUTH_METHODS=oidc
+export MEMORY_MCP_HTTP_OPERATOR_IDENTITIES='<issuer>|<hex(subject_verifier)>'
+memory_mcp admin auth-methods remove --method local
+```
+
+It prints one JSON object: `removed_method`, `enabled_methods`, the advanced
+`epoch`, and `guidance` naming the `MEMORY_MCP_HTTP_AUTH_METHODS` value to
+restart with. In one transaction it narrows the row, advances the epoch — which
+invalidates every browser session of either method, so administrators sign in
+again after the restart — and appends an operator-action row to
+`local_admin_audit` (`action = 'auth_method_removed'`, `actor_kind = 'cli'`,
+`target_method`). `tests/local_admin_cli.rs::admin_auth_methods_remove_reaches_sso_only`
+runs the whole path against the real binary and a file-backed registry.
+
+It is deliberately not exposed as a console action: `MEMORY_MCP_HTTP_AUTH_METHODS`
+is what declares the enabled set, so a browser toggle would be undone by the next
+restart. Losing the administrator password afterwards is still recoverable with
+`admin recover` — but only while `local` is in the set, which is why the operator
+identity above is the precondition for leaving it.
 
 ## 6. Client and key administration
 
@@ -1458,7 +1501,13 @@ All local-admin records live in the control registry
 `browser_auth_policy`, `local_admin`, `local_admin_challenge`,
 `local_admin_session`, `local_admin_rate_bucket`, `local_admin_client`,
 `local_admin_client_key`, `local_admin_operation`, `local_admin_audit`. All are
-`SCHEMAFULL` with unique indices where required.
+`SCHEMAFULL` with unique indices where required. Three later registry migrations
+are additive and matter to a restore: `048_browser_auth_policy_methods` (the
+enabled-method set), `049_identity_change_audit` (`audit_event.target_identity_id`)
+and `050_browser_auth_method_removal` (`local_admin_audit.target_method`). A
+snapshot taken before them restores without error — every added column is
+optional — but it also restores the older enabled-method set, so re-check the
+browser-auth policy after any rewind.
 
 **Treat the registry backup as a credential database.** It contains Argon2id
 password hashes, session cookie verifiers, challenge verifiers, and client key

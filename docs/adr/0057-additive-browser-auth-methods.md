@@ -12,8 +12,8 @@ provisioning, key issuance, audit and isolation requirements — remains in forc
 
 Implementation status. The set-of-methods half is implemented and verified: the
 configuration contract, independent route mounting, the single policy writer,
-the method disclosure, the login page, the admin CLI, and the single-file
-deployment.
+the method disclosure, the login page, the admin CLI, the guarded removal that
+reaches "SSO only", and the single-file deployment.
 
 The identity-linking half is complete as of the audit change that followed it. A
 link is created only from a provider round trip that carries the link intent
@@ -125,6 +125,16 @@ deployment. This is the analogue of the industry rule that SSO cannot be require
 before a break-glass administrator exists. The existing "no administrator
 removal" non-goal already prevents deleting the last Local Administrator.
 
+The operation is `memory_mcp admin auth-methods remove --method <local|oidc>`,
+run with the target set already declared in the environment. It is deliberately
+not a console action: the configuration is what declares the enabled set, so a
+browser toggle would be undone by the next restart and would teach the operator
+to distrust it. The command likewise refuses a method the configuration still
+enables. In one transaction it narrows the durable row, advances its epoch so
+that every browser session stops resolving, and appends an operator-action audit
+row naming the method; afterwards it prints the `MEMORY_MCP_HTTP_AUTH_METHODS`
+value the deployment must be restarted with.
+
 ### The local method is the break-glass door
 
 `local` is the only method that does not depend on an external service, so it
@@ -191,6 +201,30 @@ notes were added with the audit change that followed.
   records the Account, the actor, the action and the instant. Migration 049 adds
   the single column it lacked — the identity the action touched, which an unlink
   deletes, so the row would otherwise stop naming its own subject.
+- **The removal is the only narrowing writer.** `reconcile_browser_policy`
+  computes the *union* of the stored set and the configured one and refuses a row
+  that holds a method the configuration omits; `remove_browser_auth_method`
+  computes the stored set minus one method, refuses if that would leave nothing,
+  and refuses a method that is not enabled. The narrowed set is derived in the
+  store rather than passed in, so a caller cannot name a result that disagrees
+  with the row. The `array::filter`/`array::difference` helpers this would
+  otherwise use are not in this build's function registry, so the complement of a
+  two-method universe is expressed as "the stored set contains both the removed
+  method and the other one".
+- **Removing `local` needs an operator identity, and the check runs first.** The
+  guard is evaluated before the registry is opened, so a refused removal neither
+  creates nor writes one; the same ordering preserves the older rule that
+  `create`/`recover` require `local`. The requirement moved out of
+  `AdminCliConfig::from_env` and onto the commands, because the loader was
+  requiring the local method for every command in order to enforce it for two.
+- **The removal is audited as an operator action, not as an Account action.**
+  `audit_event` is Account-scoped (`account_id` is asserted non-empty) and a
+  deployment-wide policy change has no Account to name, so the row goes to the
+  operator log `local_admin_audit` with `actor_kind = 'cli'` and a fresh
+  operation id as both row id and `request_id`. Migration 050 adds the one column
+  it lacked, `target_method`. The row id is generated, not derived from the
+  method: a derived id would collide when a method is removed, restored by
+  configuration, and removed again.
 - **The two methods that change an Account's identities audit the change.**
   `link_external_identity` and `unlink_external_identity` take the actor and the
   instant, and append the audit row inside the same guarded transaction as the

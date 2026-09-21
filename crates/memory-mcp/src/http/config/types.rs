@@ -41,6 +41,11 @@ pub enum BrowserAuthMethod {
 }
 
 impl BrowserAuthMethod {
+    /// Every method a deployment can serve. The set is closed: adding one
+    /// touches the durable schema, the router, the login page and the removal
+    /// guard, which is why the guard may name the tokens individually.
+    pub const ALL: [Self; 2] = [Self::Local, Self::Oidc];
+
     /// The durable token for this method, as stored in `browser_auth_policy`.
     pub const fn as_str(self) -> &'static str {
         match self {
@@ -66,7 +71,7 @@ impl BrowserAuthMethod {
     /// lets the durable row, the configuration and the login page be compared
     /// as values instead of as sets.
     pub fn canonical_set(desired: &[Self]) -> Vec<Self> {
-        [Self::Local, Self::Oidc]
+        Self::ALL
             .into_iter()
             .filter(|method| desired.contains(method))
             .collect()

@@ -218,11 +218,11 @@ A short-lived server-side browser session created after successful login — OID
 _Avoid_: App Session, MCP session, API key, browser token
 
 **Browser Authentication Method**:
-One way a browser signs in, currently either an External Identity at an OIDC provider or a Local Administrator password. An enabled control plane serves a *set* of methods and mounts each enabled method's routes; that set is durable deployment state, and a replica joining with a drifted set or drifted local key material fails closed instead of adopting it. A disabled control plane mounts no browser-auth route at all. Removing a method is explicit and guarded by the Last-Administrator Rule, and a method is never implied by another method's absence.
+One way a browser signs in, currently either an External Identity at an OIDC provider or a Local Administrator password. An enabled control plane serves a *set* of methods and mounts each enabled method's routes; that set is durable deployment state, and a replica joining with a drifted set or drifted local key material fails closed instead of adopting it. A disabled control plane mounts no browser-auth route at all. Adding a method is configuration reconciled at startup, while removing one is an explicit, audited operator command guarded by the Last-Administrator Rule — never a console action, because the configuration is what declares the set. A method is never implied by another method's absence.
 _Avoid_: single mode, either/or login, provider list, per-request mode, automatic fallback
 
 **Last-Administrator Rule**:
-The constraint that no operation may leave a deployment without a reachable way to administer it. It refuses to remove the local password method while no operator identity is configured, and it refuses to remove the final Local Administrator.
+The constraint that no operation may leave a deployment without a reachable way to administer it. It refuses to remove the local password method while no operator identity is configured, it refuses to remove the last remaining browser authentication method, and it refuses to remove the final Local Administrator.
 _Avoid_: lockout warning, best-effort check
 
 **Identity Link**:

@@ -215,6 +215,33 @@ pub enum AdminOperation {
         #[arg(long)]
         username: String,
     },
+    /// Change the deployment's browser authentication methods (ADR-0057).
+    ///
+    /// Turning a method off is the deployment's only "switch". Startup
+    /// reconciliation adds methods and refuses to drop one, so this is the only
+    /// path to "SSO only".
+    AuthMethods(AuthMethodsArgs),
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Args)]
+pub struct AuthMethodsArgs {
+    #[command(subcommand)]
+    pub operation: AuthMethodsOperation,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Subcommand)]
+pub enum AuthMethodsOperation {
+    /// Remove one method from the durable policy, then restart with the
+    /// method left out of `MEMORY_MCP_HTTP_AUTH_METHODS`.
+    ///
+    /// Refuses a method the configuration still enables, because the next start
+    /// would add it straight back, and refuses to remove the local method while
+    /// no operator identity is configured (ADR-0057).
+    Remove {
+        /// The method to remove: `local` or `oidc`.
+        #[arg(long)]
+        method: String,
+    },
 }
 
 /// Internal lifecycle-recall args — consumed by hook scripts, not a public tool.

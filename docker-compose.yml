@@ -19,6 +19,14 @@
 # the four `MEMORY_MCP_HTTP_OIDC_*` values plus the three provider keys; the
 # server keeps serving the local door and adds the redirect beside it.
 #
+# To go the other way and drop the local door, the set alone is not enough:
+# startup reconciliation is additive and refuses to narrow the stored set. Run
+# `memory_mcp admin auth-methods remove --method local` once, with the target set
+# and `MEMORY_MCP_HTTP_OPERATOR_IDENTITIES` already exported, then set
+# `MEMORY_MCP_HTTP_AUTH_METHODS=oidc` and restart. The command refuses to remove
+# `local` while no operator identity is configured, because that is how a
+# deployment locks itself out of its own administration.
+#
 # Values the enabled methods need are validated by the server, which names the
 # missing or forbidden variable and how to fix its set. `MEMORY_MCP_HTTP_
 # AUTH_METHODS` replaces the removed `MEMORY_MCP_HTTP_AUTH_MODE`, which is still

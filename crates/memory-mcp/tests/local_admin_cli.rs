@@ -16,7 +16,7 @@ use std::collections::BTreeSet;
 use std::process::Command as ProcessCommand;
 
 use clap::Parser;
-use memory_mcp::cli::args::AdminOperation;
+use memory_mcp::cli::args::{AdminOperation, AuthMethodsArgs, AuthMethodsOperation};
 use memory_mcp::cli::{Cli, Command};
 
 const SESSION_KEY_HEX: &str = "1111111111111111111111111111111111111111111111111111111111111111";
@@ -125,6 +125,17 @@ fn run_admin_with_mode(
     args: &[&str],
     methods: Option<&str>,
 ) -> std::process::Output {
+    run_admin_with_operators(dir, args, methods, None)
+}
+
+/// Spawn the admin CLI against an isolated control registry, optionally with a
+/// method set and an operator allowlist in the child environment.
+fn run_admin_with_operators(
+    dir: &tempfile::TempDir,
+    args: &[&str],
+    methods: Option<&str>,
+    operator_identities: Option<&str>,
+) -> std::process::Output {
     let url = format!("rocksdb://{}/db", dir.path().display());
     let mut command = ProcessCommand::new(env!("CARGO_BIN_EXE_memory_mcp"));
     command
@@ -140,6 +151,9 @@ fn run_admin_with_mode(
         .env("MEMORY_MCP_HTTP_PUBLIC_BASE_URL", PUBLIC_BASE_URL);
     if let Some(methods) = methods {
         command.env("MEMORY_MCP_HTTP_AUTH_METHODS", methods);
+    }
+    if let Some(operators) = operator_identities {
+        command.env("MEMORY_MCP_HTTP_OPERATOR_IDENTITIES", operators);
     }
     command
         .args(args)
@@ -316,4 +330,130 @@ fn admin_commands_require_the_local_method() {
             "no activation code may be issued with methods {methods:?}: {stdout}"
         );
     }
+}
+
+#[test]
+fn admin_auth_methods_remove_parses_typed_operation() {
+    let command = admin_command(&["auth-methods", "remove", "--method", "local"]);
+    let Command::Admin(args) = command else {
+        panic!("expected admin command");
+    };
+    assert_eq!(
+        args.operation,
+        AdminOperation::AuthMethods(AuthMethodsArgs {
+            operation: AuthMethodsOperation::Remove {
+                method: "local".to_string(),
+            },
+        })
+    );
+}
+
+#[test]
+fn admin_auth_methods_remove_requires_a_method_argument() {
+    assert!(
+        Cli::try_parse_from(["memory_mcp", "admin", "auth-methods", "remove"]).is_err(),
+        "--method is required"
+    );
+    assert!(
+        Cli::try_parse_from(["memory_mcp", "admin", "auth-methods", "remove", "--method"]).is_err(),
+        "a missing --method value must not parse"
+    );
+}
+
+/// ADR-0057: the removal is guarded, and every refusal happens before the
+/// registry is opened — so a refused command neither creates nor writes one.
+#[test]
+fn admin_auth_method_removal_is_guarded_before_the_registry_opens() {
+    for (methods, operators, expected) in [
+        (
+            Some("local"),
+            None,
+            "still enabled by MEMORY_MCP_HTTP_AUTH_METHODS",
+        ),
+        (
+            Some("local,oidc"),
+            Some("https://idp.example|ab"),
+            "still enabled by MEMORY_MCP_HTTP_AUTH_METHODS",
+        ),
+        (Some("oidc"), None, "MEMORY_MCP_HTTP_OPERATOR_IDENTITIES"),
+    ] {
+        let dir = tempfile::tempdir().expect("temp dir");
+        let output = run_admin_with_operators(
+            &dir,
+            &["admin", "auth-methods", "remove", "--method", "local"],
+            methods,
+            operators,
+        );
+        assert!(
+            !output.status.success(),
+            "methods {methods:?} / operators {operators:?} must be refused, got {:?}",
+            output.status
+        );
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        assert!(
+            stderr.contains(expected),
+            "methods {methods:?} / operators {operators:?} must name the refusal reason, \
+             got: {stderr}"
+        );
+        assert!(
+            !dir.path().join("db").exists(),
+            "a refused removal must not create a registry"
+        );
+    }
+}
+
+/// The end-to-end path to "SSO only": an administrator is created (which
+/// reconciles a `local,oidc` policy), then the local method is removed, and the
+/// configuration the command reports is the one a restart would need.
+#[test]
+fn admin_auth_methods_remove_reaches_sso_only() {
+    let dir = tempfile::tempdir().expect("temp dir");
+
+    let created = run_admin_with_mode(
+        &dir,
+        &["admin", "create", "--username", "ops.one"],
+        Some("local,oidc"),
+    );
+    assert!(
+        created.status.success(),
+        "admin create must reconcile a local,oidc policy: {}",
+        String::from_utf8_lossy(&created.stderr)
+    );
+
+    let removed = run_admin_with_operators(
+        &dir,
+        &["admin", "auth-methods", "remove", "--method", "local"],
+        Some("oidc"),
+        Some("https://idp.example|ab"),
+    );
+    assert!(
+        removed.status.success(),
+        "removing the local method must succeed: {}",
+        String::from_utf8_lossy(&removed.stderr)
+    );
+    let stdout = String::from_utf8_lossy(&removed.stdout);
+    let report = single_json_object(&stdout);
+    assert_eq!(report["removed_method"], "local");
+    assert_eq!(report["enabled_methods"], "oidc");
+    assert_eq!(report["epoch"], "2", "the removal advances the epoch");
+    let guidance = report["guidance"].as_str().expect("guidance");
+    assert!(
+        guidance.contains("MEMORY_MCP_HTTP_AUTH_METHODS=oidc"),
+        "the command must hand the operator the configuration to deploy: {guidance}"
+    );
+
+    // The method is gone: a second removal is refused by the store, not by the
+    // guard, because the configuration no longer names it either.
+    let again = run_admin_with_operators(
+        &dir,
+        &["admin", "auth-methods", "remove", "--method", "local"],
+        Some("oidc"),
+        Some("https://idp.example|ab"),
+    );
+    assert!(!again.status.success(), "a method cannot be removed twice");
+    let stderr = String::from_utf8_lossy(&again.stderr);
+    assert!(
+        stderr.contains("is not enabled by the durable policy"),
+        "the store must report the absent method, got: {stderr}"
+    );
 }

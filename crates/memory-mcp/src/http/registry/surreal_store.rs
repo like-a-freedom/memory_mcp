@@ -2447,6 +2447,108 @@ impl RegistryStore for SurrealRegistryStore {
         Ok(BrowserPolicyFence { methods, epoch })
     }
 
+    /// ADR-0057 removal, as one transaction: the narrowed set, the advanced
+    /// epoch and the operator-action audit row commit together or not at all.
+    ///
+    /// Statement order: `BEGIN`(0) `LET`(1) `IF`(2) `IF`(3) `LET`(4) `IF`(5)
+    /// `IF`(6) `UPDATE`(7) `CREATE`(8) `SELECT`(9) `COMMIT`(10). Result index 9
+    /// is the policy readback.
+    ///
+    /// The set left behind is derived in Rust and passed in as `$remaining`,
+    /// with the statement asserting that the same method is present in
+    /// `$methods`. For a two-method universe the two conditions together are
+    /// exactly "the stored set minus `$method`": the stored set holds `$method`
+    /// and the other method, so what remains is the other method. Expressing it
+    /// this way avoids `array::filter`/`array::difference`, which are not in this
+    /// build's function registry.
+    #[cfg(feature = "control-plane")]
+    async fn remove_browser_auth_method(
+        &self,
+        method: BrowserAuthMethod,
+    ) -> Result<BrowserPolicyFence, MemoryError> {
+        let remaining = match method {
+            BrowserAuthMethod::Local => BrowserAuthMethod::Oidc,
+            BrowserAuthMethod::Oidc => BrowserAuthMethod::Local,
+        };
+        // One id names the operation, and it is the audit row's durable id: a
+        // derived id would collide when a method is removed, restored by
+        // configuration, and removed again.
+        let operation_id = uuid::Uuid::new_v4().to_string();
+        let sql = "
+            BEGIN TRANSACTION;
+            LET $existing = (SELECT mode, epoch, methods FROM browser_auth_policy LIMIT 2);
+            IF array::len($existing) = 0 { THROW 'policy_absent'; };
+            IF array::len($existing) > 1 { THROW 'policy_ambiguous'; };
+            LET $methods = $existing[0].methods ?? [$existing[0].mode];
+            IF NOT ($method IN $methods) { THROW 'method_not_enabled'; };
+            IF NOT ($remaining[0] IN $methods) { THROW 'policy_would_be_empty'; };
+            UPDATE browser_auth_policy SET methods = $remaining, epoch = epoch + 1, updated_at = time::now();
+            CREATE type::record('local_admin_audit', $operation_id) SET
+                id = $operation_id,
+                event_time = time::now(),
+                actor_kind = 'cli',
+                actor_id = 'local_admin_cli',
+                action = 'auth_method_removed',
+                target_admin_id = NONE,
+                target_account_id = NONE,
+                target_tenant_id = NONE,
+                target_key_id = NONE,
+                target_method = $method,
+                outcome = 'success',
+                request_id = $operation_id;
+            SELECT mode, epoch, methods FROM browser_auth_policy LIMIT 1;
+            COMMIT TRANSACTION;";
+        let rows = self
+            .handle()
+            .query_json_at(
+                sql,
+                Some(json!({
+                    "method": method.as_str(),
+                    "remaining": [remaining.as_str()],
+                    "operation_id": operation_id,
+                })),
+                9,
+            )
+            .await
+            .map_err(|error| {
+                match thrown_token(
+                    &error,
+                    &[
+                        "policy_absent",
+                        "policy_ambiguous",
+                        "method_not_enabled",
+                        "policy_would_be_empty",
+                    ],
+                ) {
+                    Some("method_not_enabled") => MemoryError::Conflict(format!(
+                        "browser authentication method '{}' is not enabled by the durable policy",
+                        method.as_str()
+                    )),
+                    Some("policy_would_be_empty") => MemoryError::Conflict(
+                        "removing this method would leave no browser authentication method".into(),
+                    ),
+                    Some(_) => MemoryError::Storage(
+                        "the durable browser-auth policy is absent or ambiguous; refusing to \
+                         remove a method from a row that is not exactly one policy"
+                            .into(),
+                    ),
+                    None => map_storage_error("remove browser auth method", error),
+                }
+            })?;
+        let Some(row) = rows.into_iter().next() else {
+            return Err(MemoryError::Storage(
+                "remove_browser_auth_method returned no rows".into(),
+            ));
+        };
+        let methods = policy_methods_from_row(&row).ok_or_else(|| {
+            MemoryError::Storage(
+                "policy row carries neither an enabled-method set nor a recognized mode".into(),
+            )
+        })?;
+        let epoch = required_u64(&row, "epoch")?;
+        Ok(BrowserPolicyFence { methods, epoch })
+    }
+
     #[cfg(feature = "control-plane")]
     async fn create_oidc_account_bundle(
         &self,
@@ -3317,6 +3419,122 @@ mod tests {
         assert!(
             matches!(refused, Err(MemoryError::Conflict(_))),
             "an OIDC-only configuration over a local policy must fail, got {refused:?}"
+        );
+    }
+
+    /// A migrated registry whose durable policy already enables `methods`.
+    async fn policy_store(
+        methods: &[crate::http::config::BrowserAuthMethod],
+    ) -> SurrealRegistryStore {
+        let namespace = format!("auth_policy_{}", uuid::Uuid::new_v4().simple());
+        let store = SurrealRegistryStore::connect_in_memory(&namespace, "registry")
+            .await
+            .expect("migrated in-memory registry");
+        let local = methods
+            .contains(&crate::http::config::BrowserAuthMethod::Local)
+            .then_some(LocalKeyFingerprints {
+                session: [0x11; 32],
+                csrf: [0x22; 32],
+            });
+        store
+            .reconcile_browser_policy(methods, local)
+            .await
+            .expect("reconcile browser policy");
+        store
+    }
+
+    /// An operator-action audit row, read through the same handle the production
+    /// statements use.
+    async fn removal_audit_rows(store: &SurrealRegistryStore) -> Vec<Value> {
+        store
+            .handle()
+            .query_json(
+                "SELECT actor_kind, actor_id, action, outcome, target_method FROM local_admin_audit \
+                 WHERE action = 'auth_method_removed'",
+                None,
+            )
+            .await
+            .expect("read removal audit rows")
+    }
+
+    /// ADR-0057: the guarded removal narrows the durable set, advances the epoch
+    /// and records the operator action, all as one write — and afterwards the
+    /// configuration the operator was told to deploy is accepted at startup.
+    #[cfg(feature = "control-plane")]
+    #[tokio::test]
+    async fn removing_a_method_narrows_the_policy_and_audits_it() {
+        use crate::http::config::BrowserAuthMethod;
+        let store = policy_store(&[BrowserAuthMethod::Local, BrowserAuthMethod::Oidc]).await;
+
+        let fence = store
+            .remove_browser_auth_method(BrowserAuthMethod::Local)
+            .await
+            .expect("remove the local method");
+        assert_eq!(fence.methods, vec![BrowserAuthMethod::Oidc]);
+        assert_eq!(fence.epoch, 2, "a policy change advances the epoch");
+
+        let rows = removal_audit_rows(&store).await;
+        assert_eq!(rows.len(), 1);
+        assert_eq!(rows[0]["actor_kind"], "cli");
+        assert_eq!(rows[0]["actor_id"], "local_admin_cli");
+        assert_eq!(rows[0]["outcome"], "success");
+        assert_eq!(rows[0]["target_method"], "local");
+
+        // This is the whole point of the operation: the narrowed configuration
+        // now reconciles instead of failing startup.
+        let after_restart = store
+            .reconcile_browser_policy(&[BrowserAuthMethod::Oidc], None)
+            .await
+            .expect("an SSO-only configuration must be accepted once local is removed");
+        assert_eq!(after_restart.methods, vec![BrowserAuthMethod::Oidc]);
+        assert_eq!(
+            after_restart.epoch, fence.epoch,
+            "reconciling an unchanged set keeps the epoch"
+        );
+    }
+
+    /// Removing the only enabled method would leave a control plane that
+    /// authenticates nobody, and removing one that is not enabled is not the
+    /// operator's intent. Neither may write anything.
+    #[cfg(feature = "control-plane")]
+    #[tokio::test]
+    async fn removal_refuses_to_empty_the_policy_or_remove_an_absent_method() {
+        use crate::http::config::BrowserAuthMethod;
+        let store = policy_store(&[BrowserAuthMethod::Local]).await;
+
+        let refusal = store
+            .remove_browser_auth_method(BrowserAuthMethod::Local)
+            .await;
+        assert!(
+            matches!(refusal, Err(MemoryError::Conflict(_))),
+            "the last method must not be removable, got {refusal:?}"
+        );
+        let refusal = store
+            .remove_browser_auth_method(BrowserAuthMethod::Oidc)
+            .await;
+        assert!(
+            matches!(refusal, Err(MemoryError::Conflict(_))),
+            "an absent method must be refused, got {refusal:?}"
+        );
+        assert!(
+            removal_audit_rows(&store).await.is_empty(),
+            "a refusal must not be audited as a removal"
+        );
+
+        let policy = store
+            .reconcile_browser_policy(
+                &[BrowserAuthMethod::Local],
+                Some(LocalKeyFingerprints {
+                    session: [0x11; 32],
+                    csrf: [0x22; 32],
+                }),
+            )
+            .await
+            .expect("the policy is unchanged");
+        assert_eq!(policy.methods, vec![BrowserAuthMethod::Local]);
+        assert_eq!(
+            policy.epoch, 1,
+            "a refused removal must not advance the epoch"
         );
     }
 

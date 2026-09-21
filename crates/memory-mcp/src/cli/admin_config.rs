@@ -1,6 +1,11 @@
 //! Admin CLI configuration, separate from HttpConfig.
 //!
-//! Reads only the env vars needed for admin create/recover commands.
+//! Reads only the env vars the admin commands share: the privileged control
+//! registry, the browser keys, the public base URL and the enabled method set.
+//! What a *command* additionally requires is enforced by the command —
+//! `create`/`recover` need the local method, while removing it needs the
+//! opposite — so the loader stays a snapshot of the deployment's environment
+//! rather than a per-command policy.
 
 use crate::config::SurrealTargetConfig;
 use crate::error::MemoryError;
@@ -15,30 +20,29 @@ pub struct AdminCliConfig {
     /// The browser authentication methods this deployment enables, resolved
     /// through the same contract the server reads (ADR-0057).
     pub auth_methods: Vec<BrowserAuthMethod>,
+    /// The operator allowlist, read for the one guard that depends on it: a
+    /// deployment must not lose its local method while no operator identity is
+    /// configured, because that is the lockout the guard exists to prevent.
+    /// Empty when the variable is unset, which is the state the guard refuses.
+    pub operator_identities: Vec<String>,
 }
 
 impl AdminCliConfig {
     /// Load configuration from environment variables.
     ///
-    /// Spec §6: the admin commands **require the local method**. Creating or
-    /// recovering a local administrator in a deployment that authenticates
-    /// browsers through an identity provider alone would write records nothing
-    /// can use, so a method set without `local` fails before any connection is
-    /// opened. A set that also enables `oidc` is fine — the command writes to
-    /// the same durable policy the server reconciles, and refuses to narrow it.
+    /// The requirement that the local method be enabled belongs to
+    /// `create`/`recover` rather than to the loader: creating or recovering a
+    /// local administrator in a deployment that authenticates browsers through
+    /// an identity provider alone would write records nothing can use, and
+    /// removing that method is the opposite case. A set that also enables `oidc`
+    /// is fine for every command.
     pub fn from_env() -> Result<Self, MemoryError> {
         let auth_methods = resolve_auth_methods()?;
-        if !auth_methods.contains(&BrowserAuthMethod::Local) {
-            return Err(MemoryError::ConfigInvalid(
-                "admin commands require the 'local' browser authentication method \
-                 (MEMORY_MCP_HTTP_AUTH_METHODS=local)"
-                    .into(),
-            ));
-        }
         let session_key = parse_hex_32_env("MEMORY_MCP_HTTP_SESSION_KEY")?;
         let csrf_key = parse_hex_32_env("MEMORY_MCP_HTTP_CSRF_KEY")?;
         let public_base_url = std::env::var("MEMORY_MCP_HTTP_PUBLIC_BASE_URL")
             .unwrap_or_else(|_| "https://localhost".into());
+        let operator_identities = parse_csv_env("MEMORY_MCP_HTTP_OPERATOR_IDENTITIES");
 
         let control_db = SurrealTargetConfig {
             url: require_env("SURREALDB_CONTROL_URL")?,
@@ -54,12 +58,27 @@ impl AdminCliConfig {
             csrf_key,
             public_base_url,
             auth_methods,
+            operator_identities,
         })
     }
 }
 
 fn require_env(key: &str) -> Result<String, MemoryError> {
     std::env::var(key).map_err(|_| MemoryError::ConfigInvalid(format!("{key} is required")))
+}
+
+/// A comma-separated list, empty when unset. Mirrors the server's own reader so
+/// the CLI and the server agree on what "configured" means.
+fn parse_csv_env(key: &str) -> Vec<String> {
+    std::env::var(key)
+        .map(|raw| {
+            raw.split(',')
+                .map(str::trim)
+                .filter(|entry| !entry.is_empty())
+                .map(str::to_string)
+                .collect()
+        })
+        .unwrap_or_default()
 }
 
 fn parse_hex_32_env(key: &str) -> Result<[u8; 32], MemoryError> {
