@@ -251,9 +251,15 @@ async function activateAndLogin(context, username, code, password) {
 
 // ── Scenarios ──────────────────────────────────────────────────────────────
 async function scenarioAuth(context) {
+  // ADR-0057: the disclosure is the enabled *set*, not one mode, because a
+  // deployment may serve several methods at once. This run serves `local` alone.
   const config = await context.request.get(`${BASE_URL}/api/v1/auth/config`);
   const body = await config.json();
-  check('auth config reports local mode', body.mode === 'local', body);
+  check(
+    'auth config discloses local and only local',
+    Array.isArray(body.methods) && body.methods.length === 1 && body.methods[0] === 'local',
+    body,
+  );
 
   const { username, code } = freshCode();
   const password = disposablePassword();

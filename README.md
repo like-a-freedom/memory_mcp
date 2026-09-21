@@ -698,11 +698,17 @@ Removing a method is an explicit operation, not a startup reconciliation, and it
 is the only path to "SSO only":
 
 ```bash
-# 1. Declare the target set, and the operator who will administer it.
-export MEMORY_MCP_HTTP_AUTH_METHODS=oidc
+# 1. Add the provider beside the door, and declare the operator who will
+#    administer the narrowed deployment.
+export MEMORY_MCP_HTTP_AUTH_METHODS=local,oidc
 export MEMORY_MCP_HTTP_OPERATOR_IDENTITIES='<issuer>|<hex(subject_verifier)>'
+export MEMORY_MCP_HTTP_OIDC_ISSUER=... MEMORY_MCP_HTTP_OIDC_CLIENT_ID=...
+export MEMORY_MCP_HTTP_OIDC_AUDIENCE=... MEMORY_MCP_HTTP_OIDC_REDIRECT_URI=...
+export MEMORY_MCP_HTTP_IDENTITY_INDEX_KEY=... MEMORY_MCP_HTTP_OIDC_STATE_KEY=... MEMORY_MCP_HTTP_OIDC_NONCE_KEY=...
+docker compose up -d
 
-# 2. Drop the local method from the durable policy: one audited operation.
+# 2. Narrow the durable policy to the target set: one audited operation.
+export MEMORY_MCP_HTTP_AUTH_METHODS=oidc
 memory_mcp admin auth-methods remove --method local
 
 # 3. Restart with the set the command printed.
@@ -712,10 +718,12 @@ docker compose up -d
 The command refuses a method the configuration still enables, because startup
 reconciliation would add it straight back. It also refuses to remove `local`
 while no operator identity is configured, because that would leave the
-deployment with no route to its own administration. Configuration is what
-declares the set, which is why removal is a command and not a console control; a
-browser action would be undone by the next restart. Removal advances the policy
-epoch, which invalidates every browser session of either method, and writes the
+deployment with no route to its own administration. The store applies a third
+rule: a policy may not be narrowed to nothing, so the provider has to be serving
+beside the door before the door can be removed. Configuration is what declares
+the set, which is why removal is a command and not a console control; a browser
+action would be undone by the next restart. Removal advances the policy epoch,
+which invalidates every browser session of either method, and writes the
 operator's action to the audit log.
 
 Local-only deployments additionally require all seven `MEMORY_MCP_HTTP_*`
@@ -819,6 +827,12 @@ uses Authorization Code with PKCE, exact issuer and audience validation,
 encrypted state and nonce, and an algorithm allowlist. The browser session and
 MCP API keys are independent: a browser session never authenticates `POST /mcp`,
 and an API key never authenticates the control plane.
+
+The issuer is contacted at startup for its discovery document, so an
+`oidc`-enabled deployment needs the provider reachable to boot at all: an
+unreachable issuer is a startup failure, not a degraded login. A set without
+`oidc` makes no outbound request, which is what makes a local-only deployment
+independent of any external service.
 
 An Account can hold several external identities. `POST
 /api/v1/account/identity_links` starts a provider round trip and attaches
@@ -1035,7 +1049,7 @@ Read only by the `memory_mcp_http` binary built with the `streamable-http` featu
 | `MEMORY_MCP_HTTP_SIGNUP_MODE` | enum: `invite_only` \| `open` | unset | Required when `oidc` is enabled. `invite_only` rejects self-service sign-up; `open` requires the seven plan seed variables below and is rejected without the `oidc` method |
 | `MEMORY_MCP_HTTP_ENABLE_CONTROL_PLANE` | boolean | `false` | Enable browser sign-in, sessions, and control-plane `/api/v1` endpoints. The `POST /mcp` endpoint remains available when this is `false` |
 | `MEMORY_MCP_HTTP_ENABLE_CONTROL_PLANE_UI` | boolean | `false` | Serve the embedded web UI from `/`. Requires the control plane and the `streamable-http` build profile |
-| `MEMORY_MCP_HTTP_OIDC_ISSUER` | URL | unset | Required when `oidc` is enabled, refused when it is not. Exact issuer match is enforced on every login |
+| `MEMORY_MCP_HTTP_OIDC_ISSUER` | URL | unset | Required when `oidc` is enabled, refused when it is not. Exact issuer match is enforced on every login, and its discovery document is fetched at startup, so an unreachable issuer is a startup failure |
 | `MEMORY_MCP_HTTP_OIDC_CLIENT_ID` | string | unset | Required when `oidc` is enabled, refused when it is not |
 | `MEMORY_MCP_HTTP_OIDC_AUDIENCE` | URL string | unset | Required when `oidc` is enabled, refused when it is not. Exact audience match is enforced against the ID token's `aud` claim; supply a single audience identifier (the server does not currently parse a list) |
 | `MEMORY_MCP_HTTP_OIDC_REDIRECT_URI` | URL | unset | Required when `oidc` is enabled, refused when it is not. Must match the registered redirect URI exactly |

@@ -22,6 +22,12 @@ and both halves of an identity's lifetime are audited. That audit required no ne
 table — see the implementation notes below — so the earlier reading of this gap,
 that it was a schema decision of its own, did not hold.
 
+Annotation, 2026-09-21, from the container acceptance run. One consequence below
+claimed more than the implementation does, and it is corrected in place rather
+than rewritten: an unreachable provider is fatal at *startup*, because discovery
+runs while the composition is built. See the annotation under
+§Consequences.
+
 ## Context
 
 ### The deployment story that does not work today
@@ -225,6 +231,19 @@ notes were added with the audit change that followed.
   it lacked, `target_method`. The row id is generated, not derived from the
   method: a derived id would collide when a method is removed, restored by
   configuration, and removed again.
+- **Discovery runs at startup, and the container run is what shows it.** The
+  acceptance harness added with this annotation
+  (`scripts/ci/local_admin_image.py --scenario removal`) has to run a stub
+  identity provider, because bringing up a provider-enabled server without a
+  reachable issuer fails as described under §Consequences: `docker logs` shows
+  `tenant runtime init error: config invalid: OIDC discovery failed…` and the
+  container exits `2`. The same run is the first container-level evidence for the
+  additive half of this decision: it starts on `local` alone, adds `oidc` beside
+  the door on one restart, removes `local` through the CLI, and asserts on a
+  second restart that the local routes answer `404` while the provider routes are
+  mounted. It also pins the third refusal the decision does not name: the store
+  refuses a removal that would leave the policy with no method at all, so the
+  provider has to be serving beside the door before the door can be removed.
 - **The two methods that change an Account's identities audit the change.**
   `link_external_identity` and `unlink_external_identity` take the actor and the
   instant, and append the audit row inside the same guarded transaction as the
@@ -252,6 +271,18 @@ notes were added with the audit change that followed.
   login page becomes the place where a deployment's authentication shape is
   visible. A misconfigured deployment is now visible rather than fatal: an
   unreachable provider no longer prevents the operator from reaching the console.
+  **Amended 2026-09-21, after checking it against the built image:** that holds
+  for a provider that fails *while the process runs*, and not for one that is
+  unreachable at *startup*. `OidcClient::new` performs discovery against the
+  issuer while the composition is built
+  (`crates/memory-mcp/src/http.rs`), so a deployment whose set enables `oidc` and
+  whose issuer does not answer exits `2` with `tenant runtime init error: config
+  invalid: OIDC discovery failed` and mounts nothing at all — including the local
+  door, which is therefore not an escape hatch for this case, contrary to
+  §The local method is the break-glass door. A set without `oidc` makes no
+  outbound request. The verified asymmetry is recorded in the implementation
+  notes; making discovery lazy, or degrading to a provider-unavailable state that
+  still serves the local method, would be a new decision.
 - The privileged door does not move. Local Administrators remain a separate
   principal, are still not Accounts, and still gain nothing from an identity
   provider — so a provider compromise cannot escalate to deployment

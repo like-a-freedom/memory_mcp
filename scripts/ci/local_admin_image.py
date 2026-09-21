@@ -8,13 +8,15 @@ The harness is black-box: it never imports the crate. It
   * validates the Docker daemon, the image, Node, the pinned browser runner and
     OpenSSL, failing loudly when anything is missing (it never skips and never
     exits 0 without running the requested scenarios);
-  * creates a disposable Docker network, a disposable SurrealDB, protected
-    (0600) temp env files, and a TLS endpoint at https://localhost:8443 that
-    presents a harness-generated CA;
+  * creates a disposable Docker network, a disposable SurrealDB, a stub identity
+    provider, protected (0600) temp env files, and a TLS endpoint at
+    https://localhost:8443 that presents a harness-generated CA;
   * invokes both binaries from the image -- the HTTP server as the container
     entrypoint and the CLI through an entrypoint override (the image is
     shell-free, so `docker exec ... sh` is never used);
   * runs the browser scenarios from scripts/ci/local_admin_browser.mjs;
+  * runs the harness-owned `removal` scenario, which is a CLI and route assertion
+    rather than a browser flow;
   * tears everything down in a `finally` block.
 
 Secrets are generated per run, live only in the protected temp directory and in
@@ -25,6 +27,7 @@ codes) is captured in memory only; only redacted status lines reach the console.
 from __future__ import annotations
 
 import argparse
+import http.client
 import json
 import os
 import secrets
@@ -45,10 +48,22 @@ BROWSER_MODULE = REPO_ROOT / "scripts" / "ci" / "node_modules" / "playwright"
 CLI_IN_IMAGE = "/usr/local/bin/memory_mcp"
 HTTP_ENTRYPOINT = "/usr/local/bin/memory_mcp_http"
 TLS_PORT = 8443
+# A stub identity provider serves the discovery document an `oidc`-enabled
+# deployment fetches at startup. Published on loopback only, so the harness can
+# wait for it without running a second container per probe.
+OIDC_PORT = 8444
 PUBLIC_BASE_URL = f"https://localhost:{TLS_PORT}"
 SURREALDB_IMAGE = "surrealdb/surrealdb:v3.2.4"
 CADDY_IMAGE = "caddy:2"
 SCENARIOS = ("auth", "clients", "regression", "ui", "flow")
+# Scenarios this harness runs itself, because the operation under test is not a
+# browser flow. `removal` drives `memory_mcp admin auth-methods remove` -- which
+# ADR-0057 deliberately keeps out of the console -- against the same disposable
+# registry, and then restarts the server to look at the routes it left behind.
+# Kept separate from `SCENARIOS` so the pin to the browser runner's allowlist
+# (`test_local_admin_image.py`) stays a comparison of like with like.
+HARNESS_SCENARIOS = ("removal",)
+ALL_SCENARIOS = SCENARIOS + HARNESS_SCENARIOS
 
 
 class HarnessError(RuntimeError):
@@ -77,11 +92,14 @@ class Harness:
         self.image = image
         self.scenarios = scenarios
         self.keep = keep
+        self.server_env: dict[str, str] = {}
+        self.ca_cert: Path | None = None
         self.suffix = secrets.token_hex(4)
         self.network = f"lmcp-net-{self.suffix}"
         self.db_name = f"lmcp-db-{self.suffix}"
         self.http_name = f"lmcp-http-{self.suffix}"
         self.tls_name = f"lmcp-tls-{self.suffix}"
+        self.provider_name = f"lmcp-idp-{self.suffix}"
         self.work = Path(tempfile.mkdtemp(prefix="lmcp-local-admin-"))
         self.containers: list[str] = []
         self.ready = False
@@ -216,6 +234,7 @@ class Harness:
             "NER_EXTRACTOR": "anno",
             "EMBEDDINGS_ENABLED": "false",
         }
+        self.server_env = server_env
         env_file = self._write_protected(
             "server.env", "".join(f"{k}={v}\n" for k, v in server_env.items())
         )
@@ -239,6 +258,8 @@ class Harness:
         )
         self.containers.append(self.db_name)
         self._wait_db()
+
+        self._start_oidc_stub()
 
         # HTTP server: the image entrypoint, unchanged.
         run(
@@ -349,13 +370,82 @@ class Harness:
             f"last error: {last}\nhttp server logs (tail):\n{logs}"
         )
 
+    # ── stub identity provider ─────────────────────────────────────────
+    def oidc_issuer(self) -> str:
+        """The issuer of the stub provider, as the server must configure it.
+
+        The container's network name, not the loopback port the harness probes:
+        the running server resolves it inside the deployment network, and the
+        discovery document echoes this URL, which the client checks.
+        """
+        return f"http://{self.provider_name}"
+
+    def _start_oidc_stub(self) -> None:
+        """Serve `/.well-known/openid-configuration` for the scenarios that need it.
+
+        `OidcClient::new` runs discovery against the configured issuer at startup
+        and a failure there is fatal (`crates/memory-mcp/src/http.rs`), so an
+        `oidc`-enabled deployment cannot boot without a reachable issuer even for
+        a run that never completes a login. The document is served by the Caddy
+        image the harness already requires; the issuer is the container's own
+        network name, so no published port is needed for the server to reach it.
+        """
+        issuer = self.oidc_issuer()
+        document = {
+            "issuer": issuer,
+            "authorization_endpoint": f"{issuer}/authorize",
+            "token_endpoint": f"{issuer}/token",
+            "jwks_uri": f"{issuer}/jwks",
+            "id_token_signing_alg_values_supported": ["RS256"],
+        }
+        root = self.work / "oidc" / ".well-known"
+        root.mkdir(parents=True)
+        (root / "openid-configuration").write_text(json.dumps(document) + "\n")
+        run(
+            [
+                "docker", "run", "-d", "--name", self.provider_name,
+                "--network", self.network,
+                "-p", f"127.0.0.1:{OIDC_PORT}:80",
+                "-v", f"{self.work / 'oidc'}:/srv:ro",
+                CADDY_IMAGE,
+                "caddy", "file-server", "--root", "/srv", "--listen", ":80",
+            ],
+            timeout=300,
+        )
+        self.containers.append(self.provider_name)
+        self._wait_oidc_stub()
+
+    def _wait_oidc_stub(self) -> None:
+        url = f"http://127.0.0.1:{OIDC_PORT}/.well-known/openid-configuration"
+        deadline = time.time() + 60
+        while time.time() < deadline:
+            try:
+                with urllib.request.urlopen(url, timeout=5) as response:
+                    if response.status == 200:
+                        return
+            except Exception:  # noqa: BLE001 - the retry loop owns the diagnosis
+                time.sleep(2)
+        raise HarnessError("the stub identity provider did not serve its discovery document")
+
     # ── execution ──────────────────────────────────────────────────────
-    def _cli(self, args: list[str], *, timeout: int = 120):
-        """Run the CLI from the image. Secret stdout is returned, never printed."""
+    def _cli(self, args: list[str], *, timeout: int = 120, env: dict[str, str] | None = None):
+        """Run the CLI from the image. Secret stdout is returned, never printed.
+
+        `env` entries are passed as `-e` overrides, which Docker applies after the
+        `--env-file` snapshot of the running deployment. That is how a scenario
+        presents the *target* configuration to a command without restarting the
+        server first, which is the order ADR-0057 documents.
+        """
+        overrides = [
+            item
+            for key, value in (env or {}).items()
+            for item in ("-e", f"{key}={value}")
+        ]
         return run(
             [
                 "docker", "run", "--rm", "--network", self.network,
                 "--env-file", str(self.env_file),
+                *overrides,
                 "--entrypoint", CLI_IN_IMAGE, self.image,
                 *args,
             ],
@@ -363,13 +453,217 @@ class Harness:
             check=False,
         )
 
+    # ── harness-owned scenarios ───────────────────────────────────────
+    def _https_request(self, path: str) -> tuple[int, str]:
+        """One HTTPS request against the deployment boundary.
+
+        Redirects are not followed: a disabled method answers `404` while an
+        enabled one may answer `3xx`, and a followed redirect would turn the
+        second case into a network error against an unreachable provider.
+        """
+        context = ssl.create_default_context(cafile=str(self.ca_cert))
+        connection = http.client.HTTPSConnection(
+            "localhost", TLS_PORT, context=context, timeout=15
+        )
+        try:
+            connection.request("GET", path)
+            response = connection.getresponse()
+            return response.status, response.read().decode("utf-8", "replace")
+        finally:
+            connection.close()
+
+    def _expect(self, condition: bool, message: str) -> None:
+        if not condition:
+            raise HarnessError(message)
+
+    def _restart_server(self, overrides: dict[str, str]) -> None:
+        """Replace the HTTP container, keeping the registry and the network.
+
+        The base environment is the one the deployment started with, so a
+        scenario can change exactly the variables it is about. The container keeps
+        its name, which is what the TLS proxy resolves.
+        """
+        merged = dict(self.server_env)
+        merged.update(overrides)
+        env_file = self._write_protected(
+            "server-restart.env", "".join(f"{k}={v}\n" for k, v in merged.items())
+        )
+        run(["docker", "rm", "-f", self.http_name], check=False, timeout=120)
+        run(
+            [
+                "docker", "run", "-d", "--name", self.http_name,
+                "--network", self.network,
+                "--env-file", str(env_file),
+                self.image,
+            ],
+            timeout=180,
+        )
+        self._wait_https(self.ca_cert)
+
+    def _provider_overlay(self, operator_subject: str = "ab12") -> dict[str, str]:
+        """The material the `oidc` method needs, pointing at the stub provider.
+
+        Present whenever `oidc` is in the set, including beside `local`: the three
+        keys are derived from the session key *only* while `local` is the whole
+        set, so enabling a second method is what makes them real key material.
+        """
+        issuer = self.oidc_issuer()
+        return {
+            "MEMORY_MCP_HTTP_SIGNUP_MODE": "invite_only",
+            "MEMORY_MCP_HTTP_OPERATOR_IDENTITIES": f"{issuer}|{operator_subject}",
+            "MEMORY_MCP_HTTP_OIDC_ISSUER": issuer,
+            "MEMORY_MCP_HTTP_OIDC_CLIENT_ID": "harness-client",
+            "MEMORY_MCP_HTTP_OIDC_AUDIENCE": PUBLIC_BASE_URL,
+            "MEMORY_MCP_HTTP_OIDC_REDIRECT_URI": f"{PUBLIC_BASE_URL}/auth/oidc/callback",
+            "MEMORY_MCP_HTTP_IDENTITY_INDEX_KEY": secrets.token_hex(32),
+            "MEMORY_MCP_HTTP_OIDC_STATE_KEY": secrets.token_hex(32),
+            "MEMORY_MCP_HTTP_OIDC_NONCE_KEY": secrets.token_hex(32),
+        }
+
+    def scenario_removal(self) -> None:
+        """Reach "SSO only" end to end: add the provider, then drop the door.
+
+        The removal is a CLI operation by design, so this scenario runs the shipped
+        binary against the deployment's own durable registry and restarts the
+        server around it. It walks the whole ADR-0057 story in order, because the
+        store only narrows a set that has something to narrow to: `local` alone
+        cannot be removed, so the provider has to be added beside it first. That
+        precondition is asserted here rather than assumed.
+
+        The in-crate `tests/local_admin_cli.rs` covers the same sequence against a
+        file-backed registry without a running deployment; this is the container
+        and route-level counterpart.
+        """
+        operator = self._provider_overlay()["MEMORY_MCP_HTTP_OPERATOR_IDENTITIES"]
+        target = {"MEMORY_MCP_HTTP_AUTH_METHODS": "oidc"}
+        removal = ["admin", "auth-methods", "remove", "--method", "local"]
+        authorised = {**target, "MEMORY_MCP_HTTP_OPERATOR_IDENTITIES": operator}
+
+        def policy() -> str:
+            status, body = self._https_request("/api/v1/auth/config")
+            self._expect(status == 200, f"/api/v1/auth/config returned {status}")
+            return body
+
+        def expect_mounted(paths, mounted: bool) -> None:
+            for path in paths:
+                status, _ = self._https_request(path)
+                self._expect(
+                    (status != 404) == mounted,
+                    f"{path} must be {'mounted' if mounted else 'absent'}, got {status}",
+                )
+
+        local_routes = ("/api/v1/auth/local/csrf", "/api/v1/admin/session")
+        provider_routes = ("/auth/oidc/authorize", "/api/v1/account")
+
+        # 1. The deployment starts on the local door alone.
+        body = policy()
+        self._expect('"local"' in body, f"the disclosure must name local: {body}")
+        self._expect('"oidc"' not in body, f"oidc is not enabled in this run: {body}")
+        expect_mounted(local_routes, mounted=True)
+        expect_mounted(provider_routes, mounted=False)
+
+        # 2. Guard one: the configuration still enables the method, and startup
+        # reconciliation is additive, so removing it now would be undone.
+        refused = self._cli(
+            removal,
+            env={
+                "MEMORY_MCP_HTTP_AUTH_METHODS": "local",
+                "MEMORY_MCP_HTTP_OPERATOR_IDENTITIES": operator,
+            },
+        )
+        self._expect(
+            refused.returncode != 0, "a method the configuration still enables must be refused"
+        )
+        self._expect(
+            "still enabled" in refused.stderr,
+            f"the refusal must say the method is still enabled: {refused.stderr[-500:]}",
+        )
+
+        # 3. Guard two: the last-administrator rule. Without an operator identity, a
+        # local-free deployment would have nobody able to administer it.
+        refused = self._cli(removal, env=target)
+        self._expect(refused.returncode != 0, "removing local without an operator must be refused")
+        self._expect(
+            "MEMORY_MCP_HTTP_OPERATOR_IDENTITIES" in refused.stderr,
+            f"the refusal must name the variable that fixes it: {refused.stderr[-500:]}",
+        )
+
+        # 4. The store's own rule, which the two guards cannot express: the policy
+        # may not be narrowed to nothing. This is the precondition of the whole
+        # flow, and it is why the provider is added before the door is removed.
+        premature = self._cli(removal, env=authorised)
+        self._expect(
+            premature.returncode != 0,
+            "the last remaining method must not be removable",
+        )
+        self._expect(
+            "would leave no browser authentication method" in premature.stderr,
+            f"the store must refuse to empty the policy: {premature.stderr[-500:]}",
+        )
+
+        # 5. Add the provider beside the door: one environment change, one restart,
+        # and the local method keeps working through it.
+        self._restart_server(
+            {
+                "MEMORY_MCP_HTTP_AUTH_METHODS": "local,oidc",
+                **self._provider_overlay(),
+            }
+        )
+        body = policy()
+        self._expect('"local"' in body and '"oidc"' in body, f"both methods now: {body}")
+        expect_mounted(local_routes, mounted=True)
+        expect_mounted(provider_routes, mounted=True)
+        print("harness: the local door and the provider are served side by side")
+
+        # 6. The removal itself.
+        removed = self._cli(removal, env=authorised)
+        self._expect(
+            removed.returncode == 0,
+            f"removing local beside an enabled provider must succeed: {removed.stderr[-500:]}",
+        )
+        try:
+            report = json.loads(removed.stdout)
+        except json.JSONDecodeError as error:
+            raise HarnessError(f"the removal did not return JSON: {error}") from error
+        self._expect(report.get("removed_method") == "local", f"unexpected report: {report}")
+        self._expect(report.get("enabled_methods") == "oidc", f"unexpected report: {report}")
+        self._expect(
+            str(report.get("epoch", "")).isdigit(),
+            f"the removal must report the advanced epoch: {report}",
+        )
+        guidance = str(report.get("guidance", ""))
+        self._expect(
+            "MEMORY_MCP_HTTP_AUTH_METHODS=oidc" in guidance,
+            f"the command must print the configuration to deploy: {guidance}",
+        )
+        print(f"harness: the removal advanced the policy epoch to {report['epoch']}")
+
+        # Its success is also the evidence that none of the four refusals above
+        # wrote anything: the store refuses a second removal by name.
+        again = self._cli(removal, env=authorised)
+        self._expect(again.returncode != 0, "a method cannot be removed twice")
+        self._expect(
+            "not enabled by the durable policy" in again.stderr,
+            f"the store must report the absent method: {again.stderr[-500:]}",
+        )
+
+        # 7. The durable change decides what the deployment serves: restart with the
+        # narrowed set and the surfaces have swapped.
+        self._restart_server({**target, **self._provider_overlay()})
+        body = policy()
+        self._expect('"oidc"' in body, f"the disclosure must name oidc: {body}")
+        self._expect('"local"' not in body, f"the local method is gone: {body}")
+        expect_mounted(local_routes, mounted=False)
+        expect_mounted(provider_routes, mounted=True)
+        print("harness: the restarted deployment serves oidc only")
+
     def verify_cli(self) -> None:
         print("harness: invoking the source-built CLI in the image (output captured in memory)")
         probe = self._cli(["admin", "create", "--username", f"harness.probe.{self.suffix}"])
         if probe.returncode != 0:
             raise HarnessError(
                 f"the CLI `admin create` failed; the image must ship memory_mcp built with "
-                "streamable-http (stderr: {probe.stderr[-500:]})"
+                f"streamable-http (stderr: {probe.stderr[-500:]})"
             )
         try:
             issued = json.loads(probe.stdout)
@@ -404,6 +698,10 @@ class Harness:
         fixture = self.write_fixture()
         env = dict(os.environ, LOCAL_ADMIN_BROWSER_FIXTURE=str(fixture))
         for scenario in self.scenarios:
+            if scenario in HARNESS_SCENARIOS:
+                print(f"harness: scenario {scenario}")
+                getattr(self, f"scenario_{scenario}")()
+                continue
             print(f"harness: browser scenario {scenario}")
             result = run(
                 ["node", str(BROWSER_RUNNER), "--base-url", PUBLIC_BASE_URL, "--scenario", scenario],
@@ -435,12 +733,12 @@ class Harness:
 
 def parse_scenarios(value: str) -> list[str]:
     if value == "all":
-        return list(SCENARIOS)
+        return list(ALL_SCENARIOS)
     selected = [part.strip() for part in value.split(",") if part.strip()]
-    unknown = [part for part in selected if part not in SCENARIOS]
+    unknown = [part for part in selected if part not in ALL_SCENARIOS]
     if not selected or unknown:
         raise argparse.ArgumentTypeError(
-            f"--scenario must be 'all' or a comma-separated subset of {', '.join(SCENARIOS)}"
+            f"--scenario must be 'all' or a comma-separated subset of {', '.join(ALL_SCENARIOS)}"
         )
     return selected
 

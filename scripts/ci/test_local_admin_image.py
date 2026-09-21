@@ -13,6 +13,11 @@ That is not hypothetical: adding the `flow` scenario to the harness first made
 
 after the stack was already up. These tests make that mismatch a unit-test
 failure instead, and they run in CI without Docker, Node or a browser.
+
+The harness also owns a second registry, `HARNESS_SCENARIOS`, for scenarios whose
+subject is not a browser flow (`removal` drives the CLI and then the routes). That
+registry has no JavaScript counterpart, so it is pinned here instead to an
+implementation the dispatcher can actually find.
 """
 
 import re
@@ -41,11 +46,42 @@ class ScenarioRegistryTest(unittest.TestCase):
         return [name for name in re.findall(r"'([^']*)'", match.group(1))]
 
     def test_both_files_declare_the_same_scenarios(self):
+        # The browser registry only: `HARNESS_SCENARIOS` names no JavaScript
+        # scenario, so comparing it here would pin the runner to a name it must
+        # reject.
         self.assertEqual(
             self.runner_registry(),
             list(harness.SCENARIOS),
-            "the harness and the browser runner must accept exactly the same names",
+            "the harness and the browser runner must accept exactly the same browser names",
         )
+
+    def test_the_two_registries_do_not_overlap(self):
+        # A name in both would be dispatched twice, once by each path, and the
+        # second run would repeat mutations the first one made.
+        self.assertEqual(
+            set(harness.SCENARIOS) & set(harness.HARNESS_SCENARIOS),
+            set(),
+            "a scenario belongs to exactly one registry",
+        )
+
+    def test_every_harness_scenario_has_an_implementation(self):
+        # `run_scenarios` resolves these through `getattr`, so a name without a
+        # method is an AttributeError after the stack is already up.
+        for name in harness.HARNESS_SCENARIOS:
+            with self.subTest(name=name):
+                self.assertTrue(
+                    hasattr(harness.Harness, f"scenario_{name}"),
+                    f"HARNESS_SCENARIOS names {name!r} but Harness has no scenario_{name}",
+                )
+
+    def test_no_harness_scenario_is_dispatched_by_the_browser_runner(self):
+        for name in harness.HARNESS_SCENARIOS:
+            with self.subTest(name=name):
+                self.assertNotIn(
+                    name,
+                    self.runner_registry(),
+                    "a harness-owned scenario must not also be a runner scenario",
+                )
 
     def test_every_scenario_is_dispatched(self):
         # The runner accepts a name and then has to route it. One scenario is the
@@ -81,8 +117,13 @@ class ScenarioRegistryTest(unittest.TestCase):
 
 
 class ParseScenariosTest(unittest.TestCase):
-    def test_all_expands_to_the_full_registry_in_order(self):
-        self.assertEqual(harness.parse_scenarios("all"), list(harness.SCENARIOS))
+    def test_all_expands_to_both_registries_in_order(self):
+        self.assertEqual(harness.parse_scenarios("all"), list(harness.ALL_SCENARIOS))
+        self.assertEqual(
+            harness.ALL_SCENARIOS,
+            harness.SCENARIOS + harness.HARNESS_SCENARIOS,
+            "`all` runs the browser scenarios first and the harness-owned ones after",
+        )
 
     def test_a_subset_is_accepted_in_the_order_given(self):
         self.assertEqual(harness.parse_scenarios("flow,auth"), ["flow", "auth"])
@@ -96,7 +137,7 @@ class ParseScenariosTest(unittest.TestCase):
                     harness.parse_scenarios(value)
 
     def test_every_registered_scenario_parses(self):
-        for name in harness.SCENARIOS:
+        for name in harness.ALL_SCENARIOS:
             with self.subTest(name=name):
                 self.assertEqual(harness.parse_scenarios(name), [name])
 
