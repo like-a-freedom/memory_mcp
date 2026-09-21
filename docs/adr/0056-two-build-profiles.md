@@ -58,6 +58,12 @@ code in the **stdio/local** path too: `MemoryMcp` carries an in-memory
 silently removed the local app-session surface. It is a genuine independent
 axis, usable in both profiles.
 
+Orthogonality is a property of the feature graph, not of the artifacts: because
+`streamable-http` does not imply `mcp-apps`, every build that wants the surface
+must name it. Both the `Dockerfile` and the release build do, so the SaaS
+container and the released binaries expose the same app-session surface instead
+of differing by whichever build happened to remember the flag.
+
 ### Why the Compose deployments were reduced to two modes
 
 Compose merged the shared `docker-compose.yml` with exactly one of three
@@ -98,6 +104,9 @@ tests set the variable explicitly.
   and `prometheus` are no longer documented as independent user features.
 - All existing test/operator commands that name `control-plane` (with or
   without `streamable-http`) keep compiling via the cycle.
+- The `Dockerfile` and the release build both name `mcp-apps` alongside
+  `streamable-http`, so the published image and the released binaries agree on
+  the app-session surface.
 - Every HTTP build and test now compiles without a Dioxus WASM bundle; UI
   embedding is opt-in at build time via the environment variable.
 - Dockerfile, `ci.yml`, `Makefile`, `AGENTS.md`, `README.md` and the Compose

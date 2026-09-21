@@ -104,12 +104,17 @@ COPY . .
 COPY --from=ui-builder /src/control-plane-ui-dist /src/control-plane-ui-dist
 ENV MEMORY_MCP_CONTROL_PLANE_UI_DIST=/src/control-plane-ui-dist/public
 
+# `streamable-http` is the profile switch; `mcp-apps` is the orthogonal
+# app-session axis that nothing implies, so the image has to name it explicitly.
+# This container is the documented way to run the SaaS, so it ships the same
+# app-session surface as the release binaries rather than being a different
+# product from them.
 RUN --mount=type=cache,id=memory-mcp-cargo-registry,target=/usr/local/cargo/registry \
     --mount=type=cache,id=memory-mcp-cargo-git,target=/usr/local/cargo/git \
     --mount=type=cache,id=memory-mcp-target-trixie,target=/src/target \
     set -eux; \
     cargo build --locked --release -p memory_mcp --bins \
-        --features streamable-http; \
+        --features streamable-http,mcp-apps; \
     mkdir -p /out/runtime; \
     install -Dm755 target/release/memory_mcp /out/memory_mcp; \
     install -Dm755 target/release/memory_mcp_http /out/memory_mcp_http; \

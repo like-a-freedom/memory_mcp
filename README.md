@@ -319,7 +319,9 @@ The binary uses stdio transport, which makes it suitable for local MCP client in
 The repository includes a Linux/amd64 Compose setup with a persistent SurrealDB
 and a shell-free distroless `memory_mcp_http` image. It starts the Streamable HTTP
 endpoint on `http://localhost:8080` and keeps separate control and tenant
-namespace/database bindings in the same SurrealDB instance.
+namespace/database bindings in the same SurrealDB instance. The image is built
+with the `streamable-http` profile **and** the `mcp-apps` axis, so the app-session
+surface is available in the container.
 
 Compose merges `docker-compose.yml` with exactly one browser-mode overlay:
 
@@ -680,7 +682,7 @@ forced-order transaction interleavings).
 Build with the single `streamable-http` feature — the one coarse switch for
 the whole SaaS server. It implies the control plane (OIDC/local-admin auth +
 account API) and the embedded web UI. Add `mcp-apps` only if you want the
-durable app-session surface.
+durable app-session surface; the published image already includes it.
 
 ```bash
 cargo build --release --locked --features streamable-http
@@ -1036,7 +1038,7 @@ The package ships two coarse build profiles plus a few orthogonal opt-in axes.
 | --- | --- |
 | `default = ["fs-watch"]` | **Local personal profile**: the stdio MCP server + CLI, embedded SurrealDB, and filesystem ingestion (`fs-watch`). This is the default build; run `cargo build --release` with no flags.
 | `streamable-http` | **SaaS profile**: the single coarse switch for the whole Streamable HTTP server. It implies the control plane (OIDC + local-admin auth + account API), the embedded web UI, and Prometheus. See [Build and run](#build-and-run) below.
-| `mcp-apps` | Enable the optional interactive MCP app-session surface (inspector / diff / graph / lifecycle resources and tools). It is an orthogonal axis usable in **both** profiles: in-memory sessions in local/stdio, durable sessions in HTTP. It is not required for the eight core tools or the zero-config first-value path. Build: `cargo build --release --features mcp-apps` or `cargo build --release --features mcp-apps,streamable-http`.
+| `mcp-apps` | Enable the optional interactive MCP app-session surface (inspector / diff / graph / lifecycle resources and tools). It is an orthogonal axis usable in **both** profiles: in-memory sessions in local/stdio, durable sessions in HTTP. It is not required for the eight core tools or the zero-config first-value path. Build: `cargo build --release --features mcp-apps` or `cargo build --release --features mcp-apps,streamable-http`. The published image and the released binaries are built with it. |
 | `mimalloc` | Use the mimalloc global allocator instead of the system allocator. This remains an explicit experiment: the fresh macOS matrix reduced physical footprint after GLiNER unload but increased observed RSS to about 2.56 GB, so it is not the server default. Build: `cargo build --release --features mimalloc`. |
 | `accelerate` | Enable Candle's Apple Accelerate CPU backend. This is an explicit Apple-specific feature, not a portable package default; the current A/B did not pass the no-degradation gate, so do not present it as a production speedup. Build: `cargo build --release --features accelerate`. |
 | `metal` | Enable Candle's Metal backend for explicit macOS GPU experiments. It is not a production default. Build: `cargo build --release --features metal`. |
