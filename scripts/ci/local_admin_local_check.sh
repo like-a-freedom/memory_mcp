@@ -22,8 +22,8 @@ RESET=${LMCP_CHECK_RESET:-1}
 # feature set. `test-fixtures` is deliberately excluded: it switches the HTTP
 # binary into a bootstrap mode that extra environment variables must unlock.
 echo "=== 0. build the binaries under test ==="
-( cd "$REPO" && cargo build --locked \
-    --features fs-watch,mcp-apps,streamable-http,control-plane )
+(cd "$REPO" && cargo build --locked \
+    --features fs-watch,mcp-apps,streamable-http)
 
 . "$ROOT/env"
 

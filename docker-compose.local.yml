@@ -15,9 +15,9 @@ services:
   memory_mcp:
     environment:
       MEMORY_MCP_HTTP_ENABLE_CONTROL_PLANE: "true"
-      # Must be set explicitly: only an image built with `control-plane-ui` and
-      # a real bundle can serve the browser UI.
-      MEMORY_MCP_HTTP_ENABLE_CONTROL_PLANE_UI: "${MEMORY_MCP_HTTP_ENABLE_CONTROL_PLANE_UI:?set to true only with an image built with control-plane-ui}"
+      # Must be set explicitly: only an image built with the `streamable-http`
+      # profile and a real bundle can serve the browser UI.
+      MEMORY_MCP_HTTP_ENABLE_CONTROL_PLANE_UI: "${MEMORY_MCP_HTTP_ENABLE_CONTROL_PLANE_UI:?set to true only with an image built with the streamable-http profile}"
       MEMORY_MCP_HTTP_AUTH_MODE: "local"
       MEMORY_MCP_HTTP_SIGNUP_MODE: "invite_only"
       MEMORY_MCP_HTTP_LOCAL_DEFAULT_PLAN_VERSION: "${MEMORY_MCP_HTTP_LOCAL_DEFAULT_PLAN_VERSION:?MEMORY_MCP_HTTP_LOCAL_DEFAULT_PLAN_VERSION is required in local mode}"

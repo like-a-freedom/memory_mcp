@@ -10,7 +10,7 @@ services:
   memory_mcp:
     environment:
       MEMORY_MCP_HTTP_ENABLE_CONTROL_PLANE: "true"
-      MEMORY_MCP_HTTP_ENABLE_CONTROL_PLANE_UI: "${MEMORY_MCP_HTTP_ENABLE_CONTROL_PLANE_UI:?set to true only with an image built with control-plane-ui}"
+      MEMORY_MCP_HTTP_ENABLE_CONTROL_PLANE_UI: "${MEMORY_MCP_HTTP_ENABLE_CONTROL_PLANE_UI:?set to true only with an image built with the streamable-http profile}"
       MEMORY_MCP_HTTP_AUTH_MODE: "oidc"
       MEMORY_MCP_HTTP_SIGNUP_MODE: "${MEMORY_MCP_HTTP_SIGNUP_MODE:-invite_only}"
       MEMORY_MCP_HTTP_OIDC_ISSUER: "${MEMORY_MCP_HTTP_OIDC_ISSUER:?MEMORY_MCP_HTTP_OIDC_ISSUER is required in OIDC mode}"

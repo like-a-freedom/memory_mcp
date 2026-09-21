@@ -135,7 +135,7 @@ class Harness:
         if cli_probe.returncode != 0 or "memory_mcp" not in cli_probe.stdout:
             raise HarnessError(
                 f"image {self.image!r} does not run {CLI_IN_IMAGE} --version; the image must ship "
-                "`memory_mcp` built with streamable-http,control-plane"
+                "`memory_mcp` built with streamable-http"
             )
         # The HTTP binary has no argument parser: it starts, loads configuration,
         # and exits non-zero when required variables are absent. Reaching the
@@ -368,8 +368,8 @@ class Harness:
         probe = self._cli(["admin", "create", "--username", f"harness.probe.{self.suffix}"])
         if probe.returncode != 0:
             raise HarnessError(
-                "the CLI `admin create` failed; the image must ship memory_mcp built with "
-                f"streamable-http,control-plane (stderr: {probe.stderr[-500:]})"
+                f"the CLI `admin create` failed; the image must ship memory_mcp built with "
+                "streamable-http (stderr: {probe.stderr[-500:]})"
             )
         try:
             issued = json.loads(probe.stdout)
