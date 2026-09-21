@@ -148,6 +148,21 @@ fn cookie_header(cookie: &str) -> (&'static str, String) {
     ("cookie", format!("__Host-memory_mcp_session={cookie}"))
 }
 
+/// The seven plan-limit variables the `local` method requires. Values are the
+/// same as `PlanLimits::default()`; the method demands them explicitly rather
+/// than inventing them.
+fn plan_limit_env() -> Vec<(&'static str, String)> {
+    vec![
+        ("MEMORY_MCP_HTTP_MAX_INGESTED_BYTES", "1073741824".into()),
+        ("MEMORY_MCP_HTTP_MAX_EPISODE_COUNT", "100000".into()),
+        ("MEMORY_MCP_HTTP_INGEST_PER_MINUTE", "60".into()),
+        ("MEMORY_MCP_HTTP_MAX_OPEN_APP_SESSIONS", "32".into()),
+        ("MEMORY_MCP_HTTP_MAX_ACTIVE_API_KEYS", "5".into()),
+        ("MEMORY_MCP_HTTP_PER_TENANT_REQUEST_CONCURRENCY", "4".into()),
+        ("MEMORY_MCP_HTTP_EXTRACTION_CONCURRENCY", "2".into()),
+    ]
+}
+
 async fn fetch_csrf(
     client: &reqwest::Client,
     base_url: &str,
@@ -630,4 +645,49 @@ async fn auth_config_reports_the_oidc_method_without_disclosing_more() {
         .await
         .expect("local csrf probe");
     assert_eq!(local.status(), reqwest::StatusCode::NOT_FOUND);
+}
+
+/// ADR-0057: a deployment may serve both methods at once, which is what makes
+/// adding a provider to a running deployment an environment change rather than
+/// a migration. Each enabled method mounts its own surface, and enabling one
+/// never disturbs the other.
+#[tokio::test]
+async fn both_methods_are_served_side_by_side() {
+    let mut extra: Vec<(&'static str, String)> = vec![
+        ("MEMORY_MCP_HTTP_AUTH_METHODS", "local,oidc".to_string()),
+        (
+            "MEMORY_MCP_HTTP_LOCAL_DEFAULT_PLAN_VERSION",
+            "1".to_string(),
+        ),
+    ];
+    extra.extend(plan_limit_env());
+    let (fixture, _mock, cookie) = spawn_with_env(extra).await;
+
+    let client = reqwest::Client::builder()
+        .timeout(Duration::from_secs(5))
+        .build()
+        .expect("client");
+
+    // The disclosure names the whole set, in canonical order.
+    let response = client
+        .get(format!("{}/api/v1/auth/config", fixture.base_url))
+        .header("host", "localhost")
+        .send()
+        .await
+        .expect("auth config request");
+    assert_eq!(response.status(), reqwest::StatusCode::OK);
+    let body: serde_json::Value = response.json().await.expect("auth config json");
+    assert_eq!(body["methods"], json!(["local", "oidc"]));
+
+    // Both surfaces answer: the provider's CSRF endpoint and the
+    // administrator's pre-auth CSRF endpoint.
+    let (oidc_status, _) = fetch_csrf(&client, &fixture.base_url, &cookie).await;
+    assert_eq!(oidc_status, reqwest::StatusCode::OK);
+    let local = client
+        .get(format!("{}/api/v1/auth/local/csrf", fixture.base_url))
+        .header("host", "localhost")
+        .send()
+        .await
+        .expect("local csrf request");
+    assert_eq!(local.status(), reqwest::StatusCode::OK);
 }

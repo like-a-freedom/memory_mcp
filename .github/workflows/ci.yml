@@ -152,9 +152,12 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          # No secret is defaulted in any Compose file, so the job supplies
+          # No secret is defaulted in the Compose file, so the job supplies
           # operator-generated values. The file is written outside the
-          # workspace and is never uploaded as an artifact.
+          # workspace and is never uploaded as an artifact. It carries only what
+          # the Compose file marks required: every method-specific value is an
+          # empty default there, and the server reads an empty value as "not
+          # set".
           ENV_FILE="${RUNNER_TEMP}/memory-mcp-smoke.env"
           hex64() { head -c 32 /dev/urandom | od -An -tx1 | tr -d ' \n'; }
           {
@@ -163,57 +166,30 @@ jobs:
             echo "MEMORY_MCP_API_KEY_PEPPER=$(hex64)"
             echo "MEMORY_MCP_HTTP_SESSION_KEY=$(hex64)"
             echo "MEMORY_MCP_HTTP_CSRF_KEY=$(hex64)"
-            # The `oidc` overlay requires these three and never defaults them.
-            # They exist here only so the validation step can resolve that
-            # overlay; the smoke run itself is local mode. Local mode derives
-            # them from the session key and *fails startup* when they are
-            # supplied, so they must stay out of the local overlay's
-            # `environment:` block: an `--env-file` entry is only interpolated
-            # into the Compose file, never injected into the container.
-            echo "MEMORY_MCP_HTTP_IDENTITY_INDEX_KEY=$(hex64)"
-            echo "MEMORY_MCP_HTTP_OIDC_STATE_KEY=$(hex64)"
-            echo "MEMORY_MCP_HTTP_OIDC_NONCE_KEY=$(hex64)"
-            # Same purpose, and placeholder on purpose: `docker compose config`
-            # resolves the OIDC overlay's `${VAR:?}` references without ever
-            # contacting the identity provider named by them.
-            echo "MEMORY_MCP_HTTP_OIDC_ISSUER=https://idp.invalid/"
-            echo "MEMORY_MCP_HTTP_OIDC_CLIENT_ID=ci-smoke-client"
-            echo "MEMORY_MCP_HTTP_OIDC_AUDIENCE=ci-smoke-audience"
-            echo "MEMORY_MCP_HTTP_OIDC_REDIRECT_URI=https://localhost:8080/auth/oidc/callback"
             echo "MEMORY_MCP_HTTP_PUBLIC_BASE_URL=https://localhost:8080"
             echo "ALLOWED_HOSTS=localhost,127.0.0.1"
             echo "ALLOWED_ORIGINS=https://localhost:8080"
-            echo "MEMORY_MCP_HTTP_LOCAL_DEFAULT_PLAN_VERSION=1"
-            echo "MEMORY_MCP_HTTP_MAX_INGESTED_BYTES=1073741824"
-            echo "MEMORY_MCP_HTTP_MAX_EPISODE_COUNT=100000"
-            echo "MEMORY_MCP_HTTP_INGEST_PER_MINUTE=60"
-            echo "MEMORY_MCP_HTTP_MAX_OPEN_APP_SESSIONS=32"
-            echo "MEMORY_MCP_HTTP_MAX_ACTIVE_API_KEYS=5"
-            echo "MEMORY_MCP_HTTP_PER_TENANT_REQUEST_CONCURRENCY=4"
-            echo "MEMORY_MCP_HTTP_EXTRACTION_CONCURRENCY=2"
-            # Enabled on purpose: the image is built with `control-plane-ui`, and
-            # the step below asserts that the whole console is served out of the
-            # binary. Leaving it false would make that check unrunnable while
-            # testing nothing the unit and integration suites do not already
-            # cover.
-            echo "MEMORY_MCP_HTTP_ENABLE_CONTROL_PLANE_UI=true"
           } > "${ENV_FILE}"
           chmod 600 "${ENV_FILE}"
           echo "SMOKE_ENV_FILE=${ENV_FILE}" >> "${GITHUB_ENV}"
-      - name: Validate every Compose mode resolves
+      - name: Validate the Compose configuration resolves
         shell: bash
         run: |
           set -euo pipefail
-          # Every browser overlay is validated from the same operator
-          # environment, so a missing `${VAR:?}` reference in either one fails
-          # the build. An overlay that leaked the other mode's secrets would
-          # still resolve here; that invariant is enforced at startup and by the
-          # local-mode smoke run below.
-          for overlay in local oidc; do
-            echo "validating ${overlay}"
-            docker compose --env-file "${SMOKE_ENV_FILE}" \
-              -f docker-compose.yml -f "docker-compose.${overlay}.yml" config --quiet
-          done
+          docker compose --env-file "${SMOKE_ENV_FILE}" config --quiet
+          # The browser method set is a runtime value, so the provider half has
+          # to resolve from the same file rather than from a second overlay.
+          hex64() { head -c 32 /dev/urandom | od -An -tx1 | tr -d ' \n'; }
+          env \
+            MEMORY_MCP_HTTP_AUTH_METHODS=local,oidc \
+            MEMORY_MCP_HTTP_OIDC_ISSUER=https://idp.invalid/ \
+            MEMORY_MCP_HTTP_OIDC_CLIENT_ID=ci-smoke-client \
+            MEMORY_MCP_HTTP_OIDC_AUDIENCE=ci-smoke-audience \
+            MEMORY_MCP_HTTP_OIDC_REDIRECT_URI=https://localhost:8080/auth/oidc/callback \
+            "MEMORY_MCP_HTTP_IDENTITY_INDEX_KEY=$(hex64)" \
+            "MEMORY_MCP_HTTP_OIDC_STATE_KEY=$(hex64)" \
+            "MEMORY_MCP_HTTP_OIDC_NONCE_KEY=$(hex64)" \
+            docker compose --env-file "${SMOKE_ENV_FILE}" config --quiet
       - name: Extract image metadata
         id: meta
         uses: docker/metadata-action@v5
@@ -263,8 +239,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          docker compose --env-file "${SMOKE_ENV_FILE}" \
-            -f docker-compose.yml -f docker-compose.local.yml up -d --no-build
+          docker compose --env-file "${SMOKE_ENV_FILE}" up -d --no-build
           curl --fail --silent --show-error \
             --retry 60 --retry-all-errors --retry-delay 2 \
             --connect-timeout 2 --max-time 10 \
@@ -279,9 +254,14 @@ jobs:
           # Host must be refused rather than served.
           test "$(curl --silent --output /dev/null --write-out '%{http_code}' \
             -H 'Host: evil.example' http://127.0.0.1:8080/health/live)" = "403"
-          # The local surface must be the only browser surface mounted.
+          # The disclosure names the set this run enabled, and the surfaces of
+          # the methods it did not enable are absent rather than merely
+          # unauthenticated. This run leaves AUTH_METHODS at the Compose default,
+          # which is `local` alone.
           test "$(curl --silent --output /dev/null --write-out '%{http_code}' \
             -H 'Host: localhost' http://127.0.0.1:8080/api/v1/auth/config)" = "200"
+          test "$(curl --silent -H 'Host: localhost' \
+            http://127.0.0.1:8080/api/v1/auth/config | grep -c '"local"')" -ge 1
           test "$(curl --silent --output /dev/null --write-out '%{http_code}' \
             -H 'Host: localhost' http://127.0.0.1:8080/auth/oidc/authorize)" = "404"
           test "$(curl --silent --output /dev/null --write-out '%{http_code}' \
@@ -329,18 +309,14 @@ jobs:
         if: failure()
         shell: bash
         run: |
-          # The base file interpolates `${VAR:?}` references for the whole
-          # operator surface, so naming the overlay and its env file is what
-          # makes these diagnostics resolvable at all.
-          docker compose --env-file "${SMOKE_ENV_FILE}" \
-            -f docker-compose.yml -f docker-compose.local.yml ps
-          docker compose --env-file "${SMOKE_ENV_FILE}" \
-            -f docker-compose.yml -f docker-compose.local.yml logs --no-color
+          # The file interpolates `${VAR:?}` references for the whole operator
+          # surface, so naming its env file is what makes these diagnostics
+          # resolvable at all.
+          docker compose --env-file "${SMOKE_ENV_FILE}" ps
+          docker compose --env-file "${SMOKE_ENV_FILE}" logs --no-color
       - name: Stop Compose services
         if: always()
-        run: |
-          docker compose --env-file "${SMOKE_ENV_FILE}" \
-            -f docker-compose.yml -f docker-compose.local.yml down -v
+        run: docker compose --env-file "${SMOKE_ENV_FILE}" down -v
 
   passed:
     name: CI passed

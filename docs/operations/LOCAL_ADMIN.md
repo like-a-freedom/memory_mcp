@@ -1,5 +1,21 @@
 # Local Administrator Authentication — Operations Runbook
 
+> **Amended by [ADR-0057](../adr/0057-additive-browser-auth-methods.md).**
+> This runbook describes the `local` browser authentication method. It was
+> written when `local` and `oidc` were mutually exclusive modes selected by
+> `MEMORY_MCP_HTTP_AUTH_MODE`; they are now a **set** selected by
+> `MEMORY_MCP_HTTP_AUTH_METHODS`, and a deployment may serve both at once.
+> Read every occurrence of "local mode" below as "a method set that enables
+> `local`", and every `MEMORY_MCP_HTTP_AUTH_MODE=local` as
+> `MEMORY_MCP_HTTP_AUTH_METHODS=local` (the old variable still works for one
+> release as a one-element set). The `local` surface, the CLI, the durable
+> records, the fence, and the operational procedures are unchanged; what
+> changed is that enabling `oidc` beside them is configuration rather than a
+> migration, and that the checks which used to *forbid* OIDC configuration in a
+> local deployment now *require* it when `oidc` is enabled. Sections that
+> describe mutual exclusion are annotated in place rather than rewritten, so
+> the reasoning that produced them stays readable.
+
 Covers the local (non-OIDC) browser control plane: administrator accounts,
 password lifecycle, durable sessions, client provisioning, client API keys, and
 the deployment configuration that selects it.
@@ -19,7 +35,7 @@ the built image over trusted TLS in a real browser
 
 ### What this document covers
 
-- Local mode selection and the environment contract (`MEMORY_MCP_HTTP_AUTH_MODE=local`).
+- Local method selection and the environment contract (`MEMORY_MCP_HTTP_AUTH_METHODS=local`; `MEMORY_MCP_HTTP_AUTH_MODE=local` is the one-release alias for the same one-element set).
 - The CLI `admin` subcommand (`create`, `recover`) and its environment.
 - The local browser/API surface mounted at `/api/v1/auth/local/*` and `/api/v1/admin/*`.
 - Durable records, sessions, challenges, throttling, audit, and the
@@ -215,7 +231,7 @@ exit 0. The `ui` scenario loads the real bundle in a page and asserts it mounts.
 | Default stdio build unchanged / no `admin` | ✅ verified via `--help` |
 | Local mode from environment variables | ✅ verified end-to-end against the real binary (§2.5) |
 | Two local replicas sharing durable auth/throttle/caps | ❌ not demonstrated (no multi-process test against a remote registry) |
-| Mixed local/OIDC replicas rejected | ✅ both directions: `join_local_policy` refuses a non-local policy and `join_oidc_policy` refuses an existing local policy at startup; a session row from another epoch never resolves |
+| Mixed local/OIDC replicas rejected | ✅ both directions: `join_local_policy` refuses a non-local policy and `join_oidc_policy` refuses an existing local policy at startup; a session row from another epoch never resolves. **Amended by ADR-0057:** the case is now "a replica whose configured set omits a method the row enables", refused by `reconcile_browser_policy`; the evidence for "wrong key fingerprints" is unchanged (`exp16_wrong_mode_policy_fingerprint_mismatch`). Two replicas that both enable `local,oidc` are now *correct*, not mixed |
 
 ### 2.5 End-to-end evidence against the real binaries
 
@@ -666,20 +682,31 @@ Local-mode-specific:
 | Variable | Notes |
 |---|---|
 | `MEMORY_MCP_HTTP_ENABLE_CONTROL_PLANE=true` | Required; without it no browser auth is configured at all |
-| `MEMORY_MCP_HTTP_AUTH_MODE=local` | Explicitly set it; the default is `oidc`. Any other value fails startup |
+| `MEMORY_MCP_HTTP_AUTH_METHODS=local` | Explicitly set it; the default is `oidc`. Any unrecognised token fails startup, and so does a set that omits `local` if you then want to run the `admin` CLI |
+| `MEMORY_MCP_HTTP_AUTH_MODE=local` | The one-release alias for the above, still accepted on its own. Supplying both with disagreeing values fails startup |
 | `MEMORY_MCP_HTTP_LOCAL_DEFAULT_PLAN_VERSION` | Required positive `u32`; never taken from browser input |
 | See §3.3 | All seven plan-limit variables are required |
 
-OIDC-only values must be **empty** in local mode. The loader fails with
-`local mode must not have OIDC configuration` when any of these is set:
+OIDC-only values must be **empty** while `oidc` is not in the set. The loader
+fails with `<VARIABLE> is set but the 'oidc' browser authentication method is not
+enabled; add 'oidc' to MEMORY_MCP_HTTP_AUTH_METHODS` when any of these is set:
 `MEMORY_MCP_HTTP_OIDC_ISSUER`, `MEMORY_MCP_HTTP_OIDC_CLIENT_ID`,
 `MEMORY_MCP_HTTP_OIDC_AUDIENCE`, `MEMORY_MCP_HTTP_OIDC_REDIRECT_URI`,
 `MEMORY_MCP_HTTP_OIDC_ALLOWED_ALG` (non-default), `MEMORY_MCP_HTTP_OPERATOR_IDENTITIES`.
 
+> ADR-0057: this is now conditioned on the *set*, not on "local mode". With
+> `MEMORY_MCP_HTTP_AUTH_METHODS=local,oidc` all of the above are **required**
+> instead of forbidden, and the message that used to read
+> `local mode must not have OIDC configuration` is gone.
+
 Note the asymmetry: the OIDC *values* are rejected, but the three OIDC-only HMAC
-keys and `MEMORY_MCP_HTTP_SIGNUP_MODE` are still unconditionally required. Do not
-"clean up" a local Compose profile by deleting those four variables — startup
-fails with `config missing: MEMORY_MCP_HTTP_IDENTITY_INDEX_KEY` (verified).
+keys are still required whenever `oidc` is not the only method — they are derived
+from `MEMORY_MCP_HTTP_SESSION_KEY` **only** while `local` is the whole set, and
+supplying one there is itself the refusal case. `MEMORY_MCP_HTTP_SIGNUP_MODE` is
+required while `oidc` is enabled and optional (defaulting to `invite_only`)
+otherwise. Do not "clean up" a local-only Compose profile by deleting those
+three variables — startup fails with
+`config missing: MEMORY_MCP_HTTP_IDENTITY_INDEX_KEY` (verified).
 
 Optional in local mode: `MEMORY_MCP_HTTP_BIND`, `MEMORY_MCP_HTTP_BODY_LIMIT`,
 `MEMORY_MCP_HTTP_REQUEST_DEADLINE_SECS` (the local deadline; exhaustion returns
@@ -724,19 +751,21 @@ At startup (`HttpState::assemble`, `crates/memory-mcp/src/http.rs`) the server
 ensures a plan with version `MEMORY_MCP_HTTP_LOCAL_DEFAULT_PLAN_VERSION` and
 exactly these limits (`ensure_local_plan`). Lookup is by globally unique version:
 a stored plan at that version with a different limit set fails startup with
-`plan_limit_mismatch`. Because the same allocation also always ensures the
-version-1 `free` plan, a deployment using `MEMORY_MCP_HTTP_LOCAL_DEFAULT_PLAN_VERSION=1`
-must keep the two limit sets identical (they come from the same variables, so
-this holds unless the registry already contains a divergent `free` row).
-`MEMORY_MCP_HTTP_MAX_ACTIVE_API_KEYS` is the per-client key cap enforced at
-issuance (§6).
+`plan_limit_mismatch`. The version-1 `free` plan is ensured **only** when `oidc`
+is in the method set — a `local`-only deployment publishes no `free` plan at all,
+so it no longer has to keep the two limit sets identical. `MEMORY_MCP_HTTP_MAX_ACTIVE_API_KEYS`
+is the per-client key cap enforced at issuance (§6).
 
 ### 3.4 Local mode starts from environment variables (previously blocked)
 
 This was a real, reproduced startup failure and it is now fixed. The validator
 no longer demands OIDC completeness whenever the control plane is enabled: OIDC
-validation is gated on `browser_auth_is_oidc()`, so local and off modes mount
-neither OIDC routes nor OIDC configuration requirements.
+validation is gated on `oidc` being in the method set, so a set that omits it
+mounts neither the OIDC routes nor the OIDC configuration requirements.
+
+> ADR-0057: the gate is `HttpConfig::has_method(Oidc)`. The old name
+> `browser_auth_is_oidc()` no longer exists, because "is this deployment OIDC?"
+> stopped being a well-formed question once a deployment could be both.
 
 Verified end to end with the real binary and a real RocksDB-backed registry:
 
@@ -765,20 +794,23 @@ Two related behaviours are enforced in the same path:
 `default_plan_limits`. The two keys must be 32 bytes of operator-generated hex;
 there is no zero-key fallback.
 
-On startup a local replica joins the singleton `browser_auth_policy` row. The
-first joiner creates it with `mode='local'`, `epoch=1`, and hex fingerprints
-derived from both keys (domain-separated HMACs, not the keys themselves). A
-replica whose mode or key fingerprints differ is rejected at startup.
+On startup a replica reconciles the singleton `browser_auth_policy` row. The
+first one creates it with `mode` set to the first enabled method, `epoch=1`, and
+hex fingerprints derived from both keys (domain-separated HMACs, not the keys
+themselves). A replica whose keys' fingerprints differ, or whose configured set
+omits a method the row already enables, is rejected at startup.
 
-The fence is now wired in **both** directions:
+The fence is now reconciled in **one** place.
 
-- Local mode joins with `join_local_policy`, which refuses an existing
-  OIDC-owned row.
-- OIDC mode joins with `join_oidc_policy` at startup
-  (`HttpState::assemble_with_browser_policy`), which refuses an existing
-  local-owned row. `create_oidc_account_bundle` checks the same fence before
-  writing, and the six OIDC-only store operations take the policy as a
-  parameter.
+> ADR-0057: `join_local_policy` and `join_oidc_policy` are replaced by
+> `RegistryStore::reconcile_browser_policy(desired, local)`, which writes the
+> whole configured set in a single transaction. Two methods are no longer two
+> competing claims on the row: with `local,oidc` enabled the row holds both, and
+> the refusal rule is one-directional — a method the row enables and the
+> configuration omits is a *removal*, which is refused here because it is how a
+> deployment closes its last route to administration. `create_oidc_account_bundle`
+> still checks the same fence before writing, and the six OIDC-only store
+> operations still take the policy as a parameter.
 
 migration 047 adds the `browser_policy_epoch` column to
 `control_plane_session`, and `resolve_session_record` rejects any session whose
@@ -798,7 +830,8 @@ Environment read by `AdminCliConfig::from_env` — and nothing else:
 
 | Variable | Required |
 |---|---|
-| `MEMORY_MCP_HTTP_AUTH_MODE` | yes, and it must be exactly `local` (spec §6) |
+| `MEMORY_MCP_HTTP_AUTH_METHODS` | yes, and the set must contain `local`. A set that also enables `oidc` is accepted: the command reconciles the same row the server does, while a set without `local` would write records nothing can use |
+| `MEMORY_MCP_HTTP_AUTH_MODE` | the one-release alias for `MEMORY_MCP_HTTP_AUTH_METHODS=local`; still accepted on its own |
 | `MEMORY_MCP_HTTP_SESSION_KEY` (64-hex) | yes |
 | `MEMORY_MCP_HTTP_CSRF_KEY` (64-hex) | yes |
 | `SURREALDB_CONTROL_URL` | yes |
@@ -808,12 +841,18 @@ Environment read by `AdminCliConfig::from_env` — and nothing else:
 | `SURREALDB_CONTROL_NAMESPACE` | yes |
 | `MEMORY_MCP_HTTP_PUBLIC_BASE_URL` | no (defaults to `https://localhost`) |
 
-The CLI **requires local mode**: a missing or non-`local`
-`MEMORY_MCP_HTTP_AUTH_MODE` fails before any connection is opened, because
-creating a local administrator in a deployment that authenticates browsers
-through an identity provider would write records nothing can use
-(`tests/local_admin_cli.rs::admin_commands_require_local_mode` asserts the
-refusal for absent, `oidc` and `off`).
+The CLI **requires the `local` method**: a configured set that omits it fails
+before any connection is opened, because creating a local administrator in a
+deployment that authenticates browsers through an identity provider alone would
+write records nothing can use.
+
+> ADR-0057: the requirement is set membership, not equality. A set that also
+> enables `oidc` is accepted, and the command reconciles the same durable policy
+> the server does (so it can no longer be used to narrow a row the server would
+> then refuse). The test is now
+> `tests/local_admin_cli.rs::admin_commands_require_the_local_method`, and it
+> asserts the refusal for an absent set, for `oidc` alone, and for an
+> unrecognised token — `off` is no longer a value any deployment names.
 
 Beyond that the CLI does not read the plan limits, the tenant
 DB, or any model/OIDC setting; it connects only to the control registry. It also
@@ -1507,8 +1546,8 @@ regardless.
 
 | Claim | Evidence |
 |---|---|
-| Local routes are mounted only in local mode; OIDC routes are absent | `http_local_admin.rs::local_mode_does_not_mount_oidc_routes` |
-| `GET /api/v1/auth/config` reports the mode in both browser-auth modes | `http_local_admin.rs::auth_config_reports_local_mode_only` (local), `http_control_plane.rs::auth_config_reports_oidc_mode_without_disclosing_more` (OIDC) |
+| Local routes are mounted only when the set enables `local`; OIDC routes are absent otherwise | `http_local_admin.rs::local_routes_are_mounted_and_oidc_routes_are_not` (ADR-0057) |
+| `GET /api/v1/auth/config` reports the enabled method set | `http_local_admin.rs::auth_config_reports_only_the_local_method` (local), `http_control_plane.rs::auth_config_reports_the_oidc_method_without_disclosing_more` (OIDC); both enable the other method's absence is asserted by the router tests |
 | Pre-auth cookie is `__Host-`, `Secure`, `HttpOnly`, `SameSite=Strict`, `Path=/` | `http_local_admin.rs::preauth_cookie_is_host_scoped_and_httponly` |
 | Activation → login → session round trip, no session from activation | `http_local_admin.rs::activation_login_session_roundtrip` |
 | Unknown user / wrong password are indistinguishable (`401 invalid_credentials`) | `http_local_admin.rs::wrong_password_is_uniformly_unauthorized`; service `login_unknown_user_fails_with_dummy_hash`, `login_wrong_password_fails` |
@@ -1587,7 +1626,7 @@ suite that covers them instead of asserting against a test double.
 | Resolve/touch and recovery/logout, both commit orders | `exp4_revoke_after_login`; interleavings unproven |
 | Client mutation paused after middleware, logout commits | `client_mutation_follows_the_session_fence` |
 | Two rotations | `exp6_reauth_rotates_session`; interleavings unproven |
-| Replica joins wrong mode or wrong key fingerprints | `exp16_wrong_mode_policy_fingerprint_mismatch`, `surreal_store.rs::join_oidc_policy_rejects_an_existing_local_policy` |
+| Replica joins wrong key fingerprints, or a set that omits a durably enabled method | `exp16_wrong_mode_policy_fingerprint_mismatch`, `surreal_store.rs::reconcile_refuses_to_remove_a_durably_enabled_method` (ADR-0057) |
 | OIDC transition; legacy session lacks an epoch | `surreal_store.rs::find_session_rejects_legacy_and_stale_epoch_rows` |
 | Rate: two handles, collision, window boundary | `exp9_rate_buckets_enforce_the_cap`, `exp9b_challenge_budget_is_shared_and_source_scoped`, `exp15_concurrent_logins_same_user` |
 | Spoofed `X-Forwarded-*`, missing peer, mapped IPv6 | `missing_peer_fails_closed`; `control::local_admin` peer-normalization tests |

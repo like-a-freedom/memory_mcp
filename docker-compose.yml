@@ -1,18 +1,36 @@
-# Shared service definitions for the two runtime modes. Compose merges this
-# file with exactly one mode overlay:
+# memory_mcp — one runtime, one file.
 #
-#   local : docker compose -f docker-compose.yml -f docker-compose.local.yml up -d
-#   oidc  : docker compose -f docker-compose.yml -f docker-compose.oidc.yml  up -d
+#   docker compose up -d
 #
-# Validate a mode without printing secrets:
+# The browser authentication methods are a **runtime** choice, not a build or
+# file choice (ADR-0057). `MEMORY_MCP_HTTP_AUTH_METHODS` is a comma-separated
+# set drawn from `local` and `oidc`:
 #
-#   docker compose -f docker-compose.yml -f docker-compose.local.yml config --quiet
+#   local        the administrator's password door, provisioned with
+#                `memory_mcp admin create`. No external dependency, so it works
+#                out of the box and stays available when a provider does not.
+#   oidc         the identity-provider redirect for Accounts and operators.
+#   local,oidc   both at once. This is the whole point: start with the local
+#                administrator, add the provider later, and never re-provision
+#                clients, rotate API keys or rebuild the image.
 #
-# SECURITY: no secret is defaulted anywhere. Every `${VAR:?message}` must be
+# The default is `local` because it is the only set that needs no external
+# input. To add a provider, set `MEMORY_MCP_HTTP_AUTH_METHODS=local,oidc` and
+# the four `MEMORY_MCP_HTTP_OIDC_*` values plus the three provider keys; the
+# server keeps serving the local door and adds the redirect beside it.
+#
+# Values the enabled methods need are validated by the server, which names the
+# missing or forbidden variable and how to fix its set. `MEMORY_MCP_HTTP_
+# AUTH_METHODS` replaces the removed `MEMORY_MCP_HTTP_AUTH_MODE`, which is still
+# accepted for one release as a one-element set.
+#
+# Every `${VAR:-}` below is an empty default on purpose: an empty value is read
+# as "not set", so a method's material must be supplied by the operator's
+# environment rather than invented here.
+#
+# SECURITY: no secret is defaulted anywhere. Every `${VAR:?...}` must be
 # supplied by the operator from a protected environment file; there are no
-# example browser keys, no `root/root` database credentials, and no OIDC-only
-# value is injected into the local configuration. This file does not
-# configure the browser surface at all — the overlays do.
+# example browser keys and no `root/root` database credentials.
 
 services:
   surrealdb:
@@ -55,7 +73,7 @@ services:
     environment:
       # ── Non-secret shared settings ────────────────────────────────────
       MEMORY_MCP_HTTP_BIND: "0.0.0.0:8080"
-      MEMORY_MCP_HTTP_PUBLIC_BASE_URL: "${MEMORY_MCP_HTTP_PUBLIC_BASE_URL:?MEMORY_MCP_HTTP_PUBLIC_BASE_URL is required (https://... in local mode)}"
+      MEMORY_MCP_HTTP_PUBLIC_BASE_URL: "${MEMORY_MCP_HTTP_PUBLIC_BASE_URL:?MEMORY_MCP_HTTP_PUBLIC_BASE_URL is required (https://…, or a localhost development URL with an enabled local method)}"
       ALLOWED_HOSTS: "${ALLOWED_HOSTS:?ALLOWED_HOSTS is required (comma-separated)}"
       ALLOWED_ORIGINS: "${ALLOWED_ORIGINS:?ALLOWED_ORIGINS is required (comma-separated, no wildcard)}"
       MEMORY_MCP_HTTP_REPLICA_ID: "${MEMORY_MCP_HTTP_REPLICA_ID:-memory-http-1}"
@@ -80,20 +98,43 @@ services:
       SURREALDB_TENANT_NAMESPACE: "${SURREALDB_TENANT_NAMESPACE:-tenant}"
       SURREALDB_TENANT_DB: "${SURREALDB_TENANT_DB:-tenant}"
 
-      # ── Browser surface: disabled in the base file ────────────────────
-      # Exactly one overlay turns this on. Leaving it false here means this
-      # file never mounts a browser surface and references no OIDC or local
-      # browser variable.
-      #
-      # A deployment that keeps the control plane disabled is not the same as
-      # an unconfigured one: the server still requires
-      # `MEMORY_MCP_HTTP_SIGNUP_MODE` and the three 32-byte
-      # `MEMORY_MCP_HTTP_IDENTITY_INDEX_KEY` / `..._OIDC_STATE_KEY` /
-      # `..._OIDC_NONCE_KEY` values, and refuses to start without them. Supply
-      # all four to run a data-plane-only deployment; no overlay does it for
-      # you.
-      MEMORY_MCP_HTTP_ENABLE_CONTROL_PLANE: "false"
-      MEMORY_MCP_HTTP_ENABLE_CONTROL_PLANE_UI: "false"
+      # ── Browser surface ───────────────────────────────────────────────
+      # Set the control plane to `false` for a data-plane-only deployment, in
+      # which case `MEMORY_MCP_HTTP_SIGNUP_MODE` and the three provider keys are
+      # still required by the server.
+      MEMORY_MCP_HTTP_ENABLE_CONTROL_PLANE: "${MEMORY_MCP_HTTP_ENABLE_CONTROL_PLANE:-true}"
+      MEMORY_MCP_HTTP_ENABLE_CONTROL_PLANE_UI: "${MEMORY_MCP_HTTP_ENABLE_CONTROL_PLANE_UI:-true}"
+      MEMORY_MCP_HTTP_AUTH_METHODS: "${MEMORY_MCP_HTTP_AUTH_METHODS:-local}"
+      MEMORY_MCP_HTTP_SIGNUP_MODE: "${MEMORY_MCP_HTTP_SIGNUP_MODE:-invite_only}"
+
+      # ── `local`: the administrator door ───────────────────────────────
+      # The plan this deployment publishes for the clients the administrator
+      # provisions. They match `PlanLimits::default()`; set your own before
+      # provisioning anything, because the server refuses a stored plan whose
+      # limits have since drifted.
+      MEMORY_MCP_HTTP_LOCAL_DEFAULT_PLAN_VERSION: "${MEMORY_MCP_HTTP_LOCAL_DEFAULT_PLAN_VERSION:-1}"
+      MEMORY_MCP_HTTP_MAX_INGESTED_BYTES: "${MEMORY_MCP_HTTP_MAX_INGESTED_BYTES:-1073741824}"
+      MEMORY_MCP_HTTP_MAX_EPISODE_COUNT: "${MEMORY_MCP_HTTP_MAX_EPISODE_COUNT:-100000}"
+      MEMORY_MCP_HTTP_INGEST_PER_MINUTE: "${MEMORY_MCP_HTTP_INGEST_PER_MINUTE:-60}"
+      MEMORY_MCP_HTTP_MAX_OPEN_APP_SESSIONS: "${MEMORY_MCP_HTTP_MAX_OPEN_APP_SESSIONS:-32}"
+      MEMORY_MCP_HTTP_MAX_ACTIVE_API_KEYS: "${MEMORY_MCP_HTTP_MAX_ACTIVE_API_KEYS:-5}"
+      MEMORY_MCP_HTTP_PER_TENANT_REQUEST_CONCURRENCY: "${MEMORY_MCP_HTTP_PER_TENANT_REQUEST_CONCURRENCY:-4}"
+      MEMORY_MCP_HTTP_EXTRACTION_CONCURRENCY: "${MEMORY_MCP_HTTP_EXTRACTION_CONCURRENCY:-2}"
+
+      # ── `oidc`: the identity provider ─────────────────────────────────
+      # Unused unless `oidc` is in the set, and refused if it is not: a
+      # provider that is configured but not enabled is a deployment that
+      # believes it has SSO when it does not. The three keys below are
+      # derived from the session key while `local` is the whole set.
+      MEMORY_MCP_HTTP_OIDC_ISSUER: "${MEMORY_MCP_HTTP_OIDC_ISSUER:-}"
+      MEMORY_MCP_HTTP_OIDC_CLIENT_ID: "${MEMORY_MCP_HTTP_OIDC_CLIENT_ID:-}"
+      MEMORY_MCP_HTTP_OIDC_AUDIENCE: "${MEMORY_MCP_HTTP_OIDC_AUDIENCE:-}"
+      MEMORY_MCP_HTTP_OIDC_REDIRECT_URI: "${MEMORY_MCP_HTTP_OIDC_REDIRECT_URI:-}"
+      MEMORY_MCP_HTTP_OIDC_ALLOWED_ALG: "${MEMORY_MCP_HTTP_OIDC_ALLOWED_ALG:-RS256}"
+      MEMORY_MCP_HTTP_OPERATOR_IDENTITIES: "${MEMORY_MCP_HTTP_OPERATOR_IDENTITIES:-}"
+      MEMORY_MCP_HTTP_IDENTITY_INDEX_KEY: "${MEMORY_MCP_HTTP_IDENTITY_INDEX_KEY:-}"
+      MEMORY_MCP_HTTP_OIDC_STATE_KEY: "${MEMORY_MCP_HTTP_OIDC_STATE_KEY:-}"
+      MEMORY_MCP_HTTP_OIDC_NONCE_KEY: "${MEMORY_MCP_HTTP_OIDC_NONCE_KEY:-}"
 
 volumes:
   surrealdb-data:

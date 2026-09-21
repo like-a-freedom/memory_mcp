@@ -10,6 +10,15 @@ authentication vocabulary in [`CONTEXT.md`](../../CONTEXT.md). The rest of
 ADR-0055 — local administrator identity, CLI bootstrap and recovery, client
 provisioning, key issuance, audit and isolation requirements — remains in force.
 
+Implementation status. The set-of-methods half is implemented and verified: the
+configuration contract, independent route mounting, the single policy writer,
+the method disclosure, the login page, the admin CLI, and the single-file
+deployment. The **identity linking for Accounts** half is specified here but not
+yet built; the current `POST /api/v1/account/identity_links` still accepts the
+identity from the request body rather than from a provider round-trip, and
+`unlink` is still unconditional. Treat that section as the requirement it must
+meet, not as a description of the shipped code.
+
 ## Context
 
 ### The deployment story that does not work today
@@ -143,6 +152,30 @@ link intent, so the identity presented is verified by the provider rather than
 accepted from a request body as the current route does. The last identity of an
 Account cannot be unlinked, and link and unlink are audited with both identities,
 the actor and the timestamp.
+
+## Implementation notes
+
+Recorded the day this decision landed, because three details are checkable and
+one of them is a behaviour a reader would otherwise have to infer.
+
+- **One writer, not two.** The two joins this decision replaced
+  (`join_oidc_policy`, `join_local_policy`) became
+  `RegistryStore::reconcile_browser_policy(desired, local)`. The row holds the
+  whole configured set after a single transaction, so two methods cannot race
+  for the singleton and the local method's fingerprints are written by the same
+  statement that writes the set. The stored set is written in canonical order
+  (`local` before `oidc`), so it is one value however the caller enumerated the
+  methods.
+- **Material for a disabled method is refused, not ignored.** A provider that is
+  configured but not enabled is a deployment that believes it has SSO when it
+  does not, so the server names the offending variable and tells the operator to
+  add `oidc` to `MEMORY_MCP_HTTP_AUTH_METHODS`. This is the rule the deleted
+  `local mode must not have OIDC configuration` check was replaced by, and it is
+  conditioned on the set rather than on `local`.
+- **The `free` plan follows `oidc`.** A `local`-only deployment publishes no
+  version-1 `free` plan at all, because that plan backs the tenants `oidc`
+  signup creates. A deployment that enables `oidc` beside `local` publishes it
+  again on the same restart.
 
 ## Consequences
 

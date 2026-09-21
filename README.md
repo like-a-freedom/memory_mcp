@@ -323,51 +323,69 @@ namespace/database bindings in the same SurrealDB instance. The image is built
 with the `streamable-http` profile **and** the `mcp-apps` axis, so the app-session
 surface is available in the container.
 
-Compose merges `docker-compose.yml` with exactly one browser-mode overlay:
+One file, one runtime: `docker-compose.yml`. The browser authentication methods
+are a runtime value, so nothing is chosen at build time and no overlay has to be
+merged ([ADR-0057](docs/adr/0057-additive-browser-auth-methods.md)).
+`MEMORY_MCP_HTTP_AUTH_METHODS` is a comma-separated set:
 
-| Overlay | Control-plane auth | Use for |
-|---------|--------------------|---------|
-| `docker-compose.local.yml` | local administrators (Argon2id passwords, `admin` CLI provisioning) | single-tenant / air-gapped / no identity provider |
-| `docker-compose.oidc.yml`  | OIDC sign-in | deployments with an identity provider |
+| Set | Surfaces | Use for |
+|-----|----------|---------|
+| `local` (default) | local administrators (Argon2id passwords, `memory_mcp admin` provisioning) | single-tenant, air-gapped, or a deployment that has no identity provider yet |
+| `oidc` | OIDC sign-in | deployments with an identity provider and no need for a local door |
+| `local,oidc` | both, side by side | start with the administrator, add the provider later — **no re-provisioning, no key rotation, no image rebuild** |
 
-Each overlay demands its own secrets from the environment and fails startup if
-it receives values for the other mode. No value is defaulted anywhere, so export
-the shared set plus the mode's own variables before starting Compose:
+A deployment can therefore begin with `local`, then add `oidc` when a provider
+appears, and keep the administrator's door as the break-glass route. The login
+page lists every enabled method.
+
+The file defaults the *non-secret* method material so `docker compose up -d`
+works without an identity provider; secrets are never defaulted. Export the
+required set before starting Compose:
 
 ```bash
-# Shared by both overlays.
+# Required in every configuration.
 export SURREALDB_USERNAME=... SURREALDB_PASSWORD=...
 export MEMORY_MCP_API_KEY_PEPPER=... MEMORY_MCP_HTTP_SESSION_KEY=... MEMORY_MCP_HTTP_CSRF_KEY=...
 export MEMORY_MCP_HTTP_PUBLIC_BASE_URL=https://localhost:8080
 export ALLOWED_HOSTS=localhost,127.0.0.1 ALLOWED_ORIGINS=https://localhost:8080
-export MEMORY_MCP_HTTP_ENABLE_CONTROL_PLANE_UI=true
 
-# Local mode only: the deployment's plan.
-export MEMORY_MCP_HTTP_LOCAL_DEFAULT_PLAN_VERSION=1
-export MEMORY_MCP_HTTP_MAX_INGESTED_BYTES=... MEMORY_MCP_HTTP_MAX_EPISODE_COUNT=...
-export MEMORY_MCP_HTTP_INGEST_PER_MINUTE=... MEMORY_MCP_HTTP_MAX_OPEN_APP_SESSIONS=...
-export MEMORY_MCP_HTTP_MAX_ACTIVE_API_KEYS=... MEMORY_MCP_HTTP_PER_TENANT_REQUEST_CONCURRENCY=...
-export MEMORY_MCP_HTTP_EXTRACTION_CONCURRENCY=...
-
-docker compose -f docker-compose.yml -f docker-compose.local.yml up -d --build
+docker compose up -d --build
 ```
 
-`MEMORY_MCP_HTTP_ENABLE_CONTROL_PLANE_UI=true` is valid only for an image built
-with the `streamable-http` profile (see [Build features](#build-features));
-[`docs/operations/LOCAL_ADMIN.md`](docs/operations/LOCAL_ADMIN.md) provisions the
-first local administrator and issues API keys.
-
-For OIDC, pass `-f docker-compose.oidc.yml` instead and replace the local-only
-plan variables with `MEMORY_MCP_HTTP_OIDC_ISSUER`, `MEMORY_MCP_HTTP_OIDC_CLIENT_ID`,
-`MEMORY_MCP_HTTP_OIDC_AUDIENCE`, `MEMORY_MCP_HTTP_OIDC_REDIRECT_URI`, plus
-`MEMORY_MCP_HTTP_IDENTITY_INDEX_KEY`, `MEMORY_MCP_HTTP_OIDC_STATE_KEY` and
-`MEMORY_MCP_HTTP_OIDC_NONCE_KEY` (64 hex characters each). OIDC mode sets no plan
-limits, so the server's built-in defaults apply.
-
-Validate an overlay without starting it and without printing secrets:
+To add an identity provider to a running deployment, export the provider values
+and restart — the local method keeps working through the same restart:
 
 ```bash
-docker compose --env-file <env> -f docker-compose.yml -f docker-compose.local.yml config --quiet
+export MEMORY_MCP_HTTP_AUTH_METHODS=local,oidc
+export MEMORY_MCP_HTTP_OIDC_ISSUER=... MEMORY_MCP_HTTP_OIDC_CLIENT_ID=...
+export MEMORY_MCP_HTTP_OIDC_AUDIENCE=... MEMORY_MCP_HTTP_OIDC_REDIRECT_URI=...
+export MEMORY_MCP_HTTP_IDENTITY_INDEX_KEY=... MEMORY_MCP_HTTP_OIDC_STATE_KEY=... MEMORY_MCP_HTTP_OIDC_NONCE_KEY=...
+
+ docker compose up -d
+```
+
+The three provider keys are 64 hex characters each and are derived from
+`MEMORY_MCP_HTTP_SESSION_KEY` only while `local` is the *whole* set — with `oidc`
+enabled they are real key material and must be supplied.
+
+Material for a method the set omits is refused, and so is a set that drops a
+method the deployment has already enabled: turning a method off is an explicit
+guarded operation, not a startup reconciliation. The server names the offending
+variable and how to fix the set.
+
+`MEMORY_MCP_HTTP_ENABLE_CONTROL_PLANE_UI=true` (the default) is valid only for an
+image built with the `streamable-http` profile (see
+[Build features](#build-features));
+[`docs/operations/LOCAL_ADMIN.md`](docs/operations/LOCAL_ADMIN.md) provisions the
+first local administrator and issues API keys. Setting
+`MEMORY_MCP_HTTP_ENABLE_CONTROL_PLANE=false` gives a data-plane-only deployment;
+the server then still requires `MEMORY_MCP_HTTP_SIGNUP_MODE` and the three
+provider keys.
+
+Validate the configuration without starting it and without printing secrets:
+
+```bash
+docker compose --env-file <env> config --quiet
 ```
 
 `/health/live` and `/health/ready` are public health endpoints. MCP requests at
@@ -385,7 +403,7 @@ building locally, log in to GHCR and pull it before starting Compose:
 export MEMORY_MCP_IMAGE=ghcr.io/like-a-freedom/memory_mcp:latest
 docker login ghcr.io
 docker compose pull memory_mcp
-docker compose -f docker-compose.yml -f docker-compose.local.yml up -d
+ docker compose up -d
 ```
 
 ### Run with environment
@@ -632,46 +650,56 @@ request validation, and release gates live in the
 
 The Streamable HTTP transport and the control plane are separate. The `POST /mcp`
 route remains enabled when `MEMORY_MCP_HTTP_ENABLE_CONTROL_PLANE=false`.
-That flag controls OIDC login, browser sessions, account management, API-key
+That flag controls browser sign-in, sessions, account management, API-key
 management, and operator routes.
 
-The optional web UI is the browser client for the account control-plane API. It
-lets users sign in through OIDC and create, list, and revoke API keys. To use
-it, enable both runtime flags:
+The optional web UI is the browser client for the control-plane API. It lets
+users sign in through the enabled browser authentication methods and create,
+list, and revoke API keys. To use it, enable both runtime flags:
 
 `MEMORY_MCP_HTTP_ENABLE_CONTROL_PLANE=true` and
 `MEMORY_MCP_HTTP_ENABLE_CONTROL_PLANE_UI=true`
 
 The binary must be built with the `streamable-http` profile (which embeds the
 UI assets). If the image was not built with that profile, enabling the UI
-flag causes a startup error. The control plane must be enabled first, and its
-OIDC settings must contain real provider values. The UI is served from `/`.
+flag causes a startup error. The control plane must be enabled first, and any
+`oidc` method it enables must contain real provider values. The UI is served
+from `/`.
 
 The browser session and the MCP API key are separate credentials. A user signs
 in through the UI, creates an API key, and configures that key in the MCP
 client for `POST /mcp`. `MEMORY_MCP_HTTP_OPERATOR_IDENTITIES` is required only
 for operator routes, not for normal account or API-key management.
 
-### Local administrator mode (alternative to OIDC)
+### Browser authentication methods
 
-`MEMORY_MCP_HTTP_AUTH_MODE=local` selects an alternative control plane for
-single-tenant and air-gapped deployments that have no identity provider:
-locally created administrators sign in with Argon2id passwords and durable
-database-backed sessions, then provision clients and issue client API keys. OIDC
-settings must be absent in this mode, and the `memory_mcp admin create` /
-`admin recover` CLI is the only path that creates an administrator or resets a
-password.
+`MEMORY_MCP_HTTP_AUTH_METHODS` is a comma-separated **set** drawn from `local`
+and `oidc`; an enabled control plane mounts one surface per enabled method
+([ADR-0057](docs/adr/0057-additive-browser-auth-methods.md)). Supplying neither
+`MEMORY_MCP_HTTP_AUTH_METHODS` nor the deprecated one-release alias
+`MEMORY_MCP_HTTP_AUTH_MODE` keeps the historical default of `oidc` alone.
 
-Local mode starts from environment variables. It requires
-`MEMORY_MCP_HTTP_ENABLE_CONTROL_PLANE=true`, an explicit
-`MEMORY_MCP_HTTP_AUTH_MODE=local`, all seven `MEMORY_MCP_HTTP_*` plan-limit
-variables, and a public base URL that is HTTPS (or loopback for development).
-OIDC provider values must be empty: setting any of `MEMORY_MCP_HTTP_OIDC_ISSUER`,
-`..._CLIENT_ID`, `..._AUDIENCE`, `..._REDIRECT_URI`, `..._ALLOWED_ALG` or
-`MEMORY_MCP_HTTP_OPERATOR_IDENTITIES` fails startup with `local mode must not
-have OIDC configuration`. Note the asymmetry — the three OIDC-only HMAC keys
-and `MEMORY_MCP_HTTP_SIGNUP_MODE` are still required even though the provider
-values are not. See the
+| Set | What it mounts |
+|-----|----------------|
+| `local` | `/api/v1/auth/local/*` and `/api/v1/admin/*`: locally created administrators sign in with Argon2id passwords and durable database-backed sessions, then provision clients and issue client API keys. |
+| `oidc` | `/auth/oidc/*`, `/api/v1/account/*` and `/api/v1/operator/*`: browser sign-in through the identity provider. |
+| `local,oidc` | both, and each stays available while the other is used. Adding the provider is one environment change and a restart. |
+
+A method that is not enabled mounts **nothing** — not an unauthenticated route.
+Material for a method the set omits is refused, and the three OIDC-typed HMAC
+keys (`MEMORY_MCP_HTTP_IDENTITY_INDEX_KEY`, `..._OIDC_STATE_KEY`,
+`..._OIDC_NONCE_KEY`) are derived from `MEMORY_MCP_HTTP_SESSION_KEY` only while
+`local` is the whole set; supplying one there is an error.
+
+A set that omits a method the deployment has already enabled fails startup.
+Removing a method is an explicit guarded operation rather than a reconciliation,
+because dropping the last route to administration is how a deployment locks
+itself out.
+
+Local-only deployments additionally require all seven `MEMORY_MCP_HTTP_*`
+plan-limit variables and a public base URL that is HTTPS (or loopback for
+development), and the `memory_mcp admin create` / `admin recover` CLI is the only
+path that creates an administrator or resets a password. See the
 [local administrator authentication runbook](docs/operations/LOCAL_ADMIN.md)
 for the complete environment contract, the end-to-end evidence, and the
 remaining unverified areas (a live identity provider, the amd64 image, and
@@ -951,27 +979,30 @@ Read only by the `memory_mcp_http` binary built with the `streamable-http` featu
 | Variable | Description |
 | --- | --- |
 | `MEMORY_MCP_API_KEY_PEPPER` | Pepper for the keyed HMAC verifier of Account API keys; rotating it invalidates every existing key. Must be **≥ 32 bytes** of secret material; the server does not require hex encoding for this field |
-| `MEMORY_MCP_HTTP_IDENTITY_INDEX_KEY` | Blind index key for OIDC subject verifiers; rotating it requires every OIDC identity to relink |
+| `MEMORY_MCP_HTTP_IDENTITY_INDEX_KEY` | Blind index key for OIDC subject verifiers; rotating it requires every OIDC identity to relink. Required when `oidc` is enabled, and derived from `MEMORY_MCP_HTTP_SESSION_KEY` when `local` is the whole method set (supplying it there is an error) |
 | `MEMORY_MCP_HTTP_SESSION_KEY` | HMAC key for browser-session cookie verifiers; rotating it invalidates every browser session |
-| `MEMORY_MCP_HTTP_OIDC_STATE_KEY` | AEAD key for OIDC state nonces; rotating it invalidates in-flight login flows |
-| `MEMORY_MCP_HTTP_OIDC_NONCE_KEY` | AEAD key for OIDC ID-token nonces; rotating it invalidates in-flight login flows |
+| `MEMORY_MCP_HTTP_OIDC_STATE_KEY` | AEAD key for OIDC state nonces; rotating it invalidates in-flight login flows. Same requirement rule as `MEMORY_MCP_HTTP_IDENTITY_INDEX_KEY` |
+| `MEMORY_MCP_HTTP_OIDC_NONCE_KEY` | AEAD key for OIDC ID-token nonces; rotating it invalidates in-flight login flows. Same requirement rule as `MEMORY_MCP_HTTP_IDENTITY_INDEX_KEY` |
 | `MEMORY_MCP_HTTP_CSRF_KEY` | HMAC key for CSRF tokens; rotating it invalidates every active browser session |
 
-**Signup policy, control plane, and OIDC**
+**Browser authentication methods, signup policy, control plane, and OIDC**
 
 | Variable | Type | Default | Description |
 | --- | --- | --- | --- |
-| `MEMORY_MCP_HTTP_SIGNUP_MODE` | enum: `invite_only` \| `open` | unset | Required. `invite_only` rejects self-service sign-up; `open` requires the seven plan seed variables below |
-| `MEMORY_MCP_HTTP_ENABLE_CONTROL_PLANE` | boolean | `false` | Enable OIDC, browser sessions, and control-plane `/api/v1` endpoints. The `POST /mcp` endpoint remains available when this is `false` |
+| `MEMORY_MCP_HTTP_AUTH_METHODS` | comma-separated set of `local` \| `oidc` | `oidc` | The browser authentication methods this deployment serves. Each enabled method mounts its own surface and each disabled method mounts nothing. A set that omits a method the deployment has already enabled fails startup: removing a method is an explicit guarded operation |
+| `MEMORY_MCP_HTTP_AUTH_MODE` | one of `local` \| `oidc` | unset | Deprecated alias for a one-element `MEMORY_MCP_HTTP_AUTH_METHODS`, accepted for one release. Supplying both is an error unless they agree |
+| `MEMORY_MCP_HTTP_SIGNUP_MODE` | enum: `invite_only` \| `open` | unset | Required when `oidc` is enabled. `invite_only` rejects self-service sign-up; `open` requires the seven plan seed variables below and is rejected without the `oidc` method |
+| `MEMORY_MCP_HTTP_ENABLE_CONTROL_PLANE` | boolean | `false` | Enable browser sign-in, sessions, and control-plane `/api/v1` endpoints. The `POST /mcp` endpoint remains available when this is `false` |
 | `MEMORY_MCP_HTTP_ENABLE_CONTROL_PLANE_UI` | boolean | `false` | Serve the embedded web UI from `/`. Requires the control plane and the `streamable-http` build profile |
-| `MEMORY_MCP_HTTP_OIDC_ISSUER` | URL | unset | Required when the control plane is enabled. Exact issuer match is enforced on every login |
-| `MEMORY_MCP_HTTP_OIDC_CLIENT_ID` | string | unset | Required when the control plane is enabled |
-| `MEMORY_MCP_HTTP_OIDC_AUDIENCE` | URL string | unset | Required when the control plane is enabled. Exact audience match is enforced against the ID token's `aud` claim; supply a single audience identifier (the server does not currently parse a list) |
-| `MEMORY_MCP_HTTP_OIDC_REDIRECT_URI` | URL | unset | Required when the control plane is enabled. Must match the registered redirect URI exactly |
+| `MEMORY_MCP_HTTP_OIDC_ISSUER` | URL | unset | Required when `oidc` is enabled, refused when it is not. Exact issuer match is enforced on every login |
+| `MEMORY_MCP_HTTP_OIDC_CLIENT_ID` | string | unset | Required when `oidc` is enabled, refused when it is not |
+| `MEMORY_MCP_HTTP_OIDC_AUDIENCE` | URL string | unset | Required when `oidc` is enabled, refused when it is not. Exact audience match is enforced against the ID token's `aud` claim; supply a single audience identifier (the server does not currently parse a list) |
+| `MEMORY_MCP_HTTP_OIDC_REDIRECT_URI` | URL | unset | Required when `oidc` is enabled, refused when it is not. Must match the registered redirect URI exactly |
 | `MEMORY_MCP_HTTP_OIDC_ALLOWED_ALG` | enum | `RS256` | JWT algorithm allowlist; accepted values are `RS256`, `ES256`, and `EdDSA`. Tokens signed with any other algorithm are rejected. Mismatched values fail startup with `ConfigInvalid` |
-| `MEMORY_MCP_HTTP_OPERATOR_IDENTITIES` | comma-separated `issuer\|hex(subject_verifier)` list | unset | Immutable operator allowlist. Account APIs cannot grant operator status |
+| `MEMORY_MCP_HTTP_OPERATOR_IDENTITIES` | comma-separated `issuer\|hex(subject_verifier)` list | unset | Immutable operator allowlist; requires the `oidc` method. Account APIs cannot grant operator status |
+| `MEMORY_MCP_HTTP_LOCAL_DEFAULT_PLAN_VERSION` | positive `u32` | unset | Required when `local` is enabled: the version of the plan this deployment publishes for the clients the administrator provisions |
 
-**Plan seed (required for `signup_mode=open`)** — if any one of these is set, all seven must parse as `u64`/`usize`. The values seed Registry plan version 1 only when no plan exists; an existing durable plan is never overwritten.
+**Plan seed (required for `signup_mode=open` or the `local` method)** — if any one of these is set, all seven must parse as `u64`/`usize`. The values seed Registry plan version 1 only when no plan exists; an existing durable plan is never overwritten, and a stored plan whose limits have since drifted fails startup.
 
 | Variable | Type | Description |
 | --- | --- | --- |

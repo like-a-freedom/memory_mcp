@@ -192,7 +192,7 @@ class Harness:
             "MEMORY_MCP_HTTP_CSRF_KEY": secrets_map["csrf_key"],
             "MEMORY_MCP_HTTP_ENABLE_CONTROL_PLANE": "true",
             "MEMORY_MCP_HTTP_ENABLE_CONTROL_PLANE_UI": "true",
-            "MEMORY_MCP_HTTP_AUTH_MODE": "local",
+            "MEMORY_MCP_HTTP_AUTH_METHODS": "local",
             "MEMORY_MCP_HTTP_SIGNUP_MODE": "invite_only",
             "MEMORY_MCP_HTTP_LOCAL_DEFAULT_PLAN_VERSION": "1",
             "MEMORY_MCP_HTTP_MAX_INGESTED_BYTES": "1073741824",
