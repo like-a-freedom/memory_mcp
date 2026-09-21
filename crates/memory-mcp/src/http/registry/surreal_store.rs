@@ -245,11 +245,27 @@ impl SurrealHandle for Surreal<Db> {
     }
 }
 
+/// Whether a storage message says that a uniqueness constraint was violated.
+///
+/// SurrealDB spells the same condition two ways: inserting a record that exists
+/// says "already exists", while a unique index says "Database index `x` already
+/// *contains* …". Both have to be recognized **here**, in one place, because
+/// [`map_storage_error`] classifies with this predicate and [`is_conflict_error`]
+/// re-detects the result: a message one of them recognizes and the other does not
+/// would be classified as a conflict and then treated as something else.
+fn is_unique_violation_message(message: &str) -> bool {
+    let lower = message.to_ascii_lowercase();
+    lower.contains("already exists")
+        || lower.contains("already contains")
+        || lower.contains("duplicate")
+        || lower.contains("unique")
+}
+
 /// Convert a SurrealDB error string into a typed MemoryError.
 fn map_storage_error(context: &str, err: impl std::fmt::Display) -> MemoryError {
     let msg = err.to_string();
     let lower = msg.to_ascii_lowercase();
-    if lower.contains("already exists") || lower.contains("duplicate") || lower.contains("unique") {
+    if is_unique_violation_message(&lower) {
         MemoryError::Conflict(format!("{context}: {msg}"))
     } else if lower.contains("not found") || lower.contains("no record") {
         MemoryError::NotFound(format!("{context}: {msg}"))
@@ -258,11 +274,10 @@ fn map_storage_error(context: &str, err: impl std::fmt::Display) -> MemoryError 
     }
 }
 
+/// Whether an error [`map_storage_error`] produced came from a uniqueness
+/// violation, so a caller that lost the original message can retry or continue.
 fn is_conflict_error(error: &MemoryError) -> bool {
-    matches!(error, MemoryError::Conflict(message) if {
-        let lower = message.to_ascii_lowercase();
-        lower.contains("already exists") || lower.contains("duplicate") || lower.contains("unique")
-    })
+    matches!(error, MemoryError::Conflict(message) if is_unique_violation_message(message))
 }
 
 /// The first of `sentinels` that a `THROW`-ed statement surfaced in the
@@ -336,21 +351,13 @@ fn identity_audit_vars(event: &ControlAuditEvent) -> Value {
     })
 }
 
-/// Classify the failure of a guarded identity-change transaction.
-///
-/// The guard's own sentinel is the refusal. Everything else keeps the adapter's
-/// mapping, so a missing Account or identity still reads as `NotFound` — with one
-/// addition: SurrealDB reports a unique-index violation as "Database index `x`
-/// already *contains* …", which [`map_storage_error`] does not recognize, and the
-/// caller of a link needs that case to read as a `Conflict` rather than as an
-/// infrastructure failure.
+/// Classify the failure of a guarded identity-change transaction. The guard's
+/// own sentinel is the refusal; everything else keeps the adapter's mapping, so a
+/// unique-tuple violation still reads as a `Conflict` and a missing Account or
+/// identity still reads as `NotFound`.
 fn classify_identity_change_error(context: &str, error: MemoryError) -> MemoryError {
-    let text = error.to_string();
-    if text.contains(LAST_IDENTITY_SENTINEL) {
+    if error.to_string().contains(LAST_IDENTITY_SENTINEL) {
         return MemoryError::Conflict("the account's last identity cannot be unlinked".into());
-    }
-    if text.contains("already contains") || text.contains("already exists") {
-        return MemoryError::Conflict(format!("{context}: {error}"));
     }
     map_storage_error(context, error)
 }
@@ -3420,6 +3427,52 @@ mod tests {
             matches!(refused, Err(MemoryError::Conflict(_))),
             "an OIDC-only configuration over a local policy must fail, got {refused:?}"
         );
+    }
+
+    #[cfg(test)]
+    mod storage_error_classification {
+        use super::*;
+
+        /// SurrealDB spells a uniqueness violation two ways, and the adapter has
+        /// to read both as a `Conflict`: a record insert says "already exists",
+        /// while a unique index says "Database index `x` already contains …".
+        /// Missing the second spelling reported a lost race to the caller as an
+        /// infrastructure failure.
+        #[test]
+        fn both_unique_violation_spellings_are_conflicts() {
+            let messages = [
+                "Database index `idx_external_identity_issuer_subject` already contains \
+                 ['https://issuer.example', 'aa'], with record `external_identity:idn_one`",
+                "Database record `external_identity:idn_one` already exists",
+            ];
+            for message in messages {
+                let mapped = map_storage_error("link external identity", message);
+                assert!(
+                    matches!(mapped, MemoryError::Conflict(_)),
+                    "{message:?} must classify as a conflict, got {mapped:?}"
+                );
+                assert!(
+                    is_conflict_error(&mapped),
+                    "the classifier and the detector must agree on {message:?}"
+                );
+            }
+        }
+
+        /// The agreement above must not come from classifying everything as a
+        /// conflict: a genuine transport failure keeps its own category.
+        #[test]
+        fn other_failures_keep_their_category() {
+            let mapped = map_storage_error("read policy", "connection reset by peer");
+            assert!(matches!(mapped, MemoryError::Storage(_)), "got {mapped:?}");
+            assert!(!is_conflict_error(&mapped));
+
+            let missing = map_storage_error("read policy", "no record found");
+            assert!(
+                matches!(missing, MemoryError::NotFound(_)),
+                "got {missing:?}"
+            );
+            assert!(!is_conflict_error(&missing));
+        }
     }
 
     /// A migrated registry whose durable policy already enables `methods`.
