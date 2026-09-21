@@ -1,9 +1,8 @@
-# Shared service definitions for the three runtime modes. Compose merges this
+# Shared service definitions for the two runtime modes. Compose merges this
 # file with exactly one mode overlay:
 #
 #   local : docker compose -f docker-compose.yml -f docker-compose.local.yml up -d
 #   oidc  : docker compose -f docker-compose.yml -f docker-compose.oidc.yml  up -d
-#   off   : docker compose -f docker-compose.yml -f docker-compose.off.yml   up -d
 #
 # Validate a mode without printing secrets:
 #
@@ -12,7 +11,7 @@
 # SECURITY: no secret is defaulted anywhere. Every `${VAR:?message}` must be
 # supplied by the operator from a protected environment file; there are no
 # example browser keys, no `root/root` database credentials, and no OIDC-only
-# value is injected into the local or off configurations. This file does not
+# value is injected into the local configuration. This file does not
 # configure the browser surface at all — the overlays do.
 
 services:

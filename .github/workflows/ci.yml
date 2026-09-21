@@ -47,8 +47,18 @@ jobs:
         run: cargo test --workspace --lib --bins --tests --locked
       - name: Optional feature tests
         run: cargo test -p memory_mcp --lib --bins --tests --features fs-watch,mcp-apps,streamable-http,test-fixtures --locked
-      - name: Check additive HTTP features
-        run: cargo check -p memory_mcp --all-targets --no-default-features --features streamable-http,test-fixtures --locked
+      - name: Check the HTTP profile and its internal back-compat name
+        run: |
+          set -euo pipefail
+          # `streamable-http` is the documented profile switch. `control-plane` is
+          # an internal name that pre-existing test and operator invocations still
+          # pass on its own (the feature cycle keeps that compiling), so both
+          # entry points must build without default features.
+          for features in streamable-http control-plane; do
+            echo "checking ${features} without default features"
+            cargo check -p memory_mcp --all-targets --no-default-features \
+              --features "${features},test-fixtures" --locked
+          done
       - name: Evaluation gate
         env:
           EVAL_PROFILE: ${{ inputs.release && 'release' || 'pr' }}
@@ -153,16 +163,23 @@ jobs:
             echo "MEMORY_MCP_API_KEY_PEPPER=$(hex64)"
             echo "MEMORY_MCP_HTTP_SESSION_KEY=$(hex64)"
             echo "MEMORY_MCP_HTTP_CSRF_KEY=$(hex64)"
-            # The `off` overlay requires these three and never defaults them, so
-            # the mode-validation step below needs them present even though the
-            # smoke run itself is local mode. Local mode derives them from the
-            # session key and *fails startup* when they are supplied, so they must
-            # stay out of the local overlay's `environment:` block: an `--env-file`
-            # entry is only interpolated into the Compose file, never injected
-            # into the container.
+            # The `oidc` overlay requires these three and never defaults them.
+            # They exist here only so the validation step can resolve that
+            # overlay; the smoke run itself is local mode. Local mode derives
+            # them from the session key and *fails startup* when they are
+            # supplied, so they must stay out of the local overlay's
+            # `environment:` block: an `--env-file` entry is only interpolated
+            # into the Compose file, never injected into the container.
             echo "MEMORY_MCP_HTTP_IDENTITY_INDEX_KEY=$(hex64)"
             echo "MEMORY_MCP_HTTP_OIDC_STATE_KEY=$(hex64)"
             echo "MEMORY_MCP_HTTP_OIDC_NONCE_KEY=$(hex64)"
+            # Same purpose, and placeholder on purpose: `docker compose config`
+            # resolves the OIDC overlay's `${VAR:?}` references without ever
+            # contacting the identity provider named by them.
+            echo "MEMORY_MCP_HTTP_OIDC_ISSUER=https://idp.invalid/"
+            echo "MEMORY_MCP_HTTP_OIDC_CLIENT_ID=ci-smoke-client"
+            echo "MEMORY_MCP_HTTP_OIDC_AUDIENCE=ci-smoke-audience"
+            echo "MEMORY_MCP_HTTP_OIDC_REDIRECT_URI=https://localhost:8080/auth/oidc/callback"
             echo "MEMORY_MCP_HTTP_PUBLIC_BASE_URL=https://localhost:8080"
             echo "ALLOWED_HOSTS=localhost,127.0.0.1"
             echo "ALLOWED_ORIGINS=https://localhost:8080"
@@ -187,13 +204,13 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          for overlay in off local oidc; do
+          # Every browser overlay is validated from the same operator
+          # environment, so a missing `${VAR:?}` reference in either one fails
+          # the build. An overlay that leaked the other mode's secrets would
+          # still resolve here; that invariant is enforced at startup and by the
+          # local-mode smoke run below.
+          for overlay in local oidc; do
             echo "validating ${overlay}"
-            if [ "${overlay}" = oidc ]; then
-              # The OIDC overlay additionally requires an identity provider
-              # configuration, which the smoke test does not exercise.
-              continue
-            fi
             docker compose --env-file "${SMOKE_ENV_FILE}" \
               -f docker-compose.yml -f "docker-compose.${overlay}.yml" config --quiet
           done
@@ -310,12 +327,20 @@ jobs:
           done <<< "$IMAGE_TAGS"
       - name: Show Compose logs on failure
         if: failure()
+        shell: bash
         run: |
-          docker compose -f docker-compose.yml ps
-          docker compose -f docker-compose.yml logs --no-color
+          # The base file interpolates `${VAR:?}` references for the whole
+          # operator surface, so naming the overlay and its env file is what
+          # makes these diagnostics resolvable at all.
+          docker compose --env-file "${SMOKE_ENV_FILE}" \
+            -f docker-compose.yml -f docker-compose.local.yml ps
+          docker compose --env-file "${SMOKE_ENV_FILE}" \
+            -f docker-compose.yml -f docker-compose.local.yml logs --no-color
       - name: Stop Compose services
         if: always()
-        run: docker compose -f docker-compose.yml down -v
+        run: |
+          docker compose --env-file "${SMOKE_ENV_FILE}" \
+            -f docker-compose.yml -f docker-compose.local.yml down -v
 
   passed:
     name: CI passed

@@ -319,24 +319,60 @@ The binary uses stdio transport, which makes it suitable for local MCP client in
 The repository includes a Linux/amd64 Compose setup with a persistent SurrealDB
 and a shell-free distroless `memory_mcp_http` image. It starts the Streamable HTTP
 endpoint on `http://localhost:8080` and keeps separate control and tenant
-namespace/database bindings in the same SurrealDB instance:
+namespace/database bindings in the same SurrealDB instance.
+
+Compose merges `docker-compose.yml` with exactly one browser-mode overlay:
+
+| Overlay | Control-plane auth | Use for |
+|---------|--------------------|---------|
+| `docker-compose.local.yml` | local administrators (Argon2id passwords, `admin` CLI provisioning) | single-tenant / air-gapped / no identity provider |
+| `docker-compose.oidc.yml`  | OIDC sign-in | deployments with an identity provider |
+
+Each overlay demands its own secrets from the environment and fails startup if
+it receives values for the other mode. No value is defaulted anywhere, so export
+the shared set plus the mode's own variables before starting Compose:
 
 ```bash
-docker compose up --build
+# Shared by both overlays.
+export SURREALDB_USERNAME=... SURREALDB_PASSWORD=...
+export MEMORY_MCP_API_KEY_PEPPER=... MEMORY_MCP_HTTP_SESSION_KEY=... MEMORY_MCP_HTTP_CSRF_KEY=...
+export MEMORY_MCP_HTTP_PUBLIC_BASE_URL=https://localhost:8080
+export ALLOWED_HOSTS=localhost,127.0.0.1 ALLOWED_ORIGINS=https://localhost:8080
+export MEMORY_MCP_HTTP_ENABLE_CONTROL_PLANE_UI=true
+
+# Local mode only: the deployment's plan.
+export MEMORY_MCP_HTTP_LOCAL_DEFAULT_PLAN_VERSION=1
+export MEMORY_MCP_HTTP_MAX_INGESTED_BYTES=... MEMORY_MCP_HTTP_MAX_EPISODE_COUNT=...
+export MEMORY_MCP_HTTP_INGEST_PER_MINUTE=... MEMORY_MCP_HTTP_MAX_OPEN_APP_SESSIONS=...
+export MEMORY_MCP_HTTP_MAX_ACTIVE_API_KEYS=... MEMORY_MCP_HTTP_PER_TENANT_REQUEST_CONCURRENCY=...
+export MEMORY_MCP_HTTP_EXTRACTION_CONCURRENCY=...
+
+docker compose -f docker-compose.yml -f docker-compose.local.yml up -d --build
+```
+
+`MEMORY_MCP_HTTP_ENABLE_CONTROL_PLANE_UI=true` is valid only for an image built
+with the `streamable-http` profile (see [Build features](#build-features));
+[`docs/operations/LOCAL_ADMIN.md`](docs/operations/LOCAL_ADMIN.md) provisions the
+first local administrator and issues API keys.
+
+For OIDC, pass `-f docker-compose.oidc.yml` instead and replace the local-only
+plan variables with `MEMORY_MCP_HTTP_OIDC_ISSUER`, `MEMORY_MCP_HTTP_OIDC_CLIENT_ID`,
+`MEMORY_MCP_HTTP_OIDC_AUDIENCE`, `MEMORY_MCP_HTTP_OIDC_REDIRECT_URI`, plus
+`MEMORY_MCP_HTTP_IDENTITY_INDEX_KEY`, `MEMORY_MCP_HTTP_OIDC_STATE_KEY` and
+`MEMORY_MCP_HTTP_OIDC_NONCE_KEY` (64 hex characters each). OIDC mode sets no plan
+limits, so the server's built-in defaults apply.
+
+Validate an overlay without starting it and without printing secrets:
+
+```bash
+docker compose --env-file <env> -f docker-compose.yml -f docker-compose.local.yml config --quiet
 ```
 
 `/health/live` and `/health/ready` are public health endpoints. MCP requests at
-`POST /mcp` require a provisioned Bearer API key; this local profile keeps the
-control plane disabled by default, so production deployments must replace the
-development HMAC defaults and provision accounts/keys through the documented
-control-plane workflow. Set `MEMORY_MCP_HTTP_ENABLE_CONTROL_PLANE=true` together
-with the OIDC variables when enabling that workflow.
-
-The database is exposed on `localhost:8000` for local inspection and its data is
-stored in the `surrealdb-data` volume. Set `SURREALDB_USERNAME` and
-`SURREALDB_PASSWORD` before the first start to use different local credentials.
-The image is built from source with Cargo and its final stage is
-`gcr.io/distroless/cc-debian13:nonroot`.
+`POST /mcp` require a provisioned Bearer API key. The database is exposed on
+`localhost:8000` for local inspection and its data is stored in the
+`surrealdb-data` volume. The image is built from source with Cargo and its final
+stage is `gcr.io/distroless/cc-debian13:nonroot`.
 
 Pushes to `master` publish the same image to GitHub Container Registry as
 `ghcr.io/like-a-freedom/memory_mcp:latest` and a commit tag. Published release
@@ -347,7 +383,7 @@ building locally, log in to GHCR and pull it before starting Compose:
 export MEMORY_MCP_IMAGE=ghcr.io/like-a-freedom/memory_mcp:latest
 docker login ghcr.io
 docker compose pull memory_mcp
-docker compose up -d
+docker compose -f docker-compose.yml -f docker-compose.local.yml up -d
 ```
 
 ### Run with environment
@@ -1559,7 +1595,7 @@ and the supporting ADRs under `docs/adr/`.
 - [`docs/superpowers/specs/2026-08-27-streamable-http-saas.md`](docs/superpowers/specs/2026-08-27-streamable-http-saas.md) — Streamable HTTP SaaS design specification
 - [`docs/superpowers/specs/2026-07-28-truthful-evaluation-system-design.md`](docs/superpowers/specs/2026-07-28-truthful-evaluation-system-design.md) — evaluation architecture and design
 - [`docs/superpowers/specs/2026-07-30-token-efficient-responses-design.md`](docs/superpowers/specs/2026-07-30-token-efficient-responses-design.md) — compact tool responses design
-- [`docs/adr/`](docs/adr/) — Architecture Decision Records (52 ADRs, including ADR-0038 one Active Namespace and ADR-0052 Streamable HTTP SaaS profile)
+- [`docs/adr/`](docs/adr/) — Architecture Decision Records (56 ADRs, including ADR-0038 one Active Namespace, ADR-0052 Streamable HTTP SaaS profile, and ADR-0056 two build profiles)
 - [`docs/compatibility/one-active-namespace-identities.md`](docs/compatibility/one-active-namespace-identities.md) — scope/namespace compatibility contract
 - [`docs/operations/`](docs/operations/) — operator runbooks (protocol conformance, credential rotation, known limitations, SurrealDB restore drill)
 - [`docs/performance/`](docs/performance/) — memory profile and NER performance measurements
