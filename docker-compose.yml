@@ -81,9 +81,17 @@ services:
       SURREALDB_TENANT_DB: "${SURREALDB_TENANT_DB:-tenant}"
 
       # ── Browser surface: disabled in the base file ────────────────────
-      # Exactly one overlay turns this on. Leaving it false here means the
-      # base configuration alone never mounts a browser surface and never
-      # demands OIDC or local browser material.
+      # Exactly one overlay turns this on. Leaving it false here means this
+      # file never mounts a browser surface and references no OIDC or local
+      # browser variable.
+      #
+      # A deployment that keeps the control plane disabled is not the same as
+      # an unconfigured one: the server still requires
+      # `MEMORY_MCP_HTTP_SIGNUP_MODE` and the three 32-byte
+      # `MEMORY_MCP_HTTP_IDENTITY_INDEX_KEY` / `..._OIDC_STATE_KEY` /
+      # `..._OIDC_NONCE_KEY` values, and refuses to start without them. Supply
+      # all four to run a data-plane-only deployment; no overlay does it for
+      # you.
       MEMORY_MCP_HTTP_ENABLE_CONTROL_PLANE: "false"
       MEMORY_MCP_HTTP_ENABLE_CONTROL_PLANE_UI: "false"
 
