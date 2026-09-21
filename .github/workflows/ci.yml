@@ -38,7 +38,7 @@ jobs:
       - run: cargo fmt --all --check
       - name: Packaging regressions
         run: python3 -m unittest discover -s scripts/ci -p 'test_*.py'
-      - run: cargo clippy --workspace --all-targets --features fs-watch,mcp-apps,streamable-http,control-plane --locked -- -D warnings
+      - run: cargo clippy --workspace --all-targets --features fs-watch,mcp-apps,streamable-http --locked -- -D warnings
       - name: Control-plane UI WASM lint
         run: |
           rustup target add wasm32-unknown-unknown
@@ -46,9 +46,9 @@ jobs:
       - name: Default workspace tests
         run: cargo test --workspace --lib --bins --tests --locked
       - name: Optional feature tests
-        run: cargo test -p memory_mcp --lib --bins --tests --features fs-watch,mcp-apps,streamable-http,control-plane,test-fixtures --locked
+        run: cargo test -p memory_mcp --lib --bins --tests --features fs-watch,mcp-apps,streamable-http,test-fixtures --locked
       - name: Check additive HTTP features
-        run: cargo check -p memory_mcp --all-targets --no-default-features --features streamable-http,prometheus,control-plane,test-fixtures --locked
+        run: cargo check -p memory_mcp --all-targets --no-default-features --features streamable-http,test-fixtures --locked
       - name: Evaluation gate
         env:
           EVAL_PROFILE: ${{ inputs.release && 'release' || 'pr' }}
@@ -102,7 +102,7 @@ jobs:
           cache-key: ${{ inputs.release && 'release' || 'dev' }}
       - name: macOS feature lint
         if: matrix.target == 'aarch64-apple-darwin'
-        run: cargo clippy --workspace --all-targets --features fs-watch,mcp-apps,streamable-http,control-plane,metal --locked -- -D warnings
+        run: cargo clippy --workspace --all-targets --features fs-watch,mcp-apps,streamable-http,metal --locked -- -D warnings
       - name: Native unit and filesystem tests (Unix)
         # Hosted Windows runners consistently terminate the Rust test harness
         # with exit 101 after a long native dependency setup. Windows still
@@ -115,7 +115,7 @@ jobs:
       - name: Build CLI and HTTP server
         env:
           BUILD_PROFILE: ${{ inputs.release && 'release' || 'dev' }}
-        run: cargo build -p memory_mcp --bins --profile "$BUILD_PROFILE" --features fs-watch,mcp-apps,streamable-http,control-plane --locked
+        run: cargo build -p memory_mcp --bins --profile "$BUILD_PROFILE" --features fs-watch,mcp-apps,streamable-http --locked
       - name: Package and test the actual binaries
         env:
           BUILD_DIR: target/${{ matrix.target }}/${{ inputs.release && 'release' || 'debug' }}

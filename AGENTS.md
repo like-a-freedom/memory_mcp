@@ -33,13 +33,13 @@ cargo build                              # Build everything
 cargo test -p memory_mcp                 # Test production crate
 cargo check                              # Fast compile check
 cargo clippy --workspace --all-targets \ # Lint (zero warnings required)
-  --features fs-watch,mcp-apps,streamable-http,control-plane --locked -- -D warnings
+  --features fs-watch,mcp-apps,streamable-http --locked -- -D warnings
 cargo fmt --all --check                  # Format check (zero diff)
 cargo fmt --all                          # Auto-format
 cargo run -- serve                       # Start MCP server (stdio)
-MEMORY_INGESTION_INBOX=/absolute/path cargo run --features fs-watch -- serve  # Serve with filesystem ingestion
+MEMORY_INGESTION_INBOX=/absolute/path cargo run -- serve  # Serve with filesystem ingestion (fs-watch is default)
 cargo run -- reembed                     # Rebuild embeddings
-cargo run --features streamable-http,control-plane --bin memory_mcp_http  # Start SaaS HTTP server
+cargo run --features streamable-http --bin memory_mcp_http  # Start SaaS HTTP server
 ```
 
 ## Boundaries
@@ -57,7 +57,7 @@ cargo run --features streamable-http,control-plane --bin memory_mcp_http  # Star
 - Changing dependencies in `Cargo.toml`
 
 **Always:**
-- Run `cargo clippy --workspace --all-targets --features fs-watch,mcp-apps,streamable-http,control-plane --locked -- -D warnings` before shipping
+- Run `cargo clippy --workspace --all-targets --features fs-watch,mcp-apps,streamable-http --locked -- -D warnings` before shipping
 - Add tests for new functionality
 - Follow the design principles below
 
@@ -100,7 +100,7 @@ See [ADR-0016](docs/adr/0016-agent-memory-lifecycle-integration.md) and the oper
 | `SURREALDB_USERNAME` | Auth username |
 | `SURREALDB_PASSWORD` | Auth password |
 
-**Feature flags (additive):** `fs-watch` (filesystem ingestion), `mcp-apps` (app sessions), `prometheus` (metrics), `metal` (explicit Metal GPU backend), `eval-support` (eval harness), `mimalloc` (optional server allocator), `accelerate` (explicit Apple Accelerate CPU backend), `streamable-http` (modern MCP Streamable HTTP SaaS binary), `control-plane` (OIDC + browser sessions + control-plane API), `control-plane-ui` (Dioxus SPA), and `test-fixtures` (test-only bootstrap helpers). The package default remains `[]`; neither allocator nor Apple backend is enabled implicitly. See [ADR-0034](docs/adr/0034-allocator-and-accelerator-default-policy.md), [the memory profile](docs/performance/MEMORY_PROFILE.md), and [ADR-0052](docs/adr/0052-streamable-http-saas-profile.md) for the SaaS profile.
+**Feature flags:** `default = ["fs-watch"]` is the local personal profile (stdio MCP + embedded SurrealDB + filesystem ingestion). `streamable-http` is the single coarse switch for the whole SaaS product (Streamable HTTP MCP data plane + control plane with OIDC/local-admin auth + embedded web UI + Prometheus; it implies the internal `control-plane`, `control-plane-ui` and `prometheus` names, which are never written by users). Orthogonal axes that can be added to either profile: `mcp-apps` (app-session surface: in-memory in local, durable in HTTP), `metal` (explicit Metal GPU backend), `accelerate` (explicit Apple Accelerate CPU backend), `mimalloc` (optional server allocator), `eval-support` (eval harness), `prometheus` (metrics), and `test-fixtures` (test-only bootstrap helpers). The default build enables neither allocator nor Apple backend implicitly. See [ADR-0034](docs/adr/0034-allocator-and-accelerator-default-policy.md), [the memory profile](docs/performance/MEMORY_PROFILE.md), and [ADR-0052](docs/adr/0052-streamable-http-saas-profile.md) for the SaaS profile.
 
 ## Hooks
 

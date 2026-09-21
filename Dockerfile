@@ -7,8 +7,9 @@
 #                       subcommands (invoked with an entrypoint override, never
 #                       through a shell: the runtime is shell-free)
 #
-# Both are compiled with `streamable-http,control-plane,control-plane-ui` so the
-# local-admin CLI and the bundled browser UI are present in the same image.
+# Both are compiled with `streamable-http` — the single coarse switch that
+# implies the control plane (OIDC/local-admin), the embedded browser UI, and
+# Prometheus — so the local-admin CLI and the bundled UI are present together.
 #
 # The runtime keeps the pre-existing contract for the non-local modes: the
 # distroless nonroot user, no shell, the HTTP entrypoint, the native shared
@@ -108,7 +109,7 @@ RUN --mount=type=cache,id=memory-mcp-cargo-registry,target=/usr/local/cargo/regi
     --mount=type=cache,id=memory-mcp-target-trixie,target=/src/target \
     set -eux; \
     cargo build --locked --release -p memory_mcp --bins \
-        --features streamable-http,control-plane,control-plane-ui; \
+        --features streamable-http; \
     mkdir -p /out/runtime; \
     install -Dm755 target/release/memory_mcp /out/memory_mcp; \
     install -Dm755 target/release/memory_mcp_http /out/memory_mcp_http; \

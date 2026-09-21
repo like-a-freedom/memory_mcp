@@ -37,7 +37,7 @@ cargo test -p memory_mcp --features streamable-http,test-fixtures \
 
 ## Control-plane UI asset packaging
 
-The optional `control-plane-ui` feature serves the compiled Dioxus 0.7 SPA from
+The `streamable-http` profile embeds the compiled Dioxus 0.7 SPA from
 inside the backend binary. Build the bundle with the matching Dioxus CLI and
 provide its absolute output directory when compiling `memory_mcp`:
 
@@ -46,13 +46,16 @@ cd crates/control-plane-ui
 dx bundle --platform web --release --out-dir "$PWD/../../target/control-plane-ui-dist"
 cd ../..
 MEMORY_MCP_CONTROL_PLANE_UI_DIST="$PWD/target/control-plane-ui-dist" \
-  cargo build --release --features control-plane-ui
+  cargo build --release --features streamable-http
 ```
 
 The directory must contain a non-empty `index.html`. Asset paths are sorted and
 embedded at compile time; the backend does not read the directory at runtime or
-fetch missing assets. Enabling `control-plane-ui` without this complete bundle
-is a build error, not a fallback to placeholder HTML. The Dioxus CLI is not part
+fetch missing assets. Providing the bundle is optional: when
+`MEMORY_MCP_CONTROL_PLANE_UI_DIST` is absent the binary still compiles with an
+empty UI catalog and does not serve a UI. If the variable is set but the bundle
+is malformed (no `index.html`, a symlink, an invalid entry), the build fails
+fast rather than silently shipping a UI-less image. The Dioxus CLI is not part
 of the Rust workspace dependencies and must be installed separately.
 
 ## Notes

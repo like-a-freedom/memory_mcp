@@ -1,7 +1,7 @@
 .PHONY: eval-pr eval-release eval-nightly eval-response-size eval-ner-quality eval-external-longmemeval eval-external-locomo eval-external-personamem eval-external-prefeval prepare-eval-corpora bench-check bench-cpu bench-cpu-core bench-metal serve-release
 
 serve-release:
-	cargo run --release --features fs-watch -- serve
+	cargo run --release -- serve
 
 eval-pr:
 	@mkdir -p target/evals

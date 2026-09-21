@@ -23,17 +23,26 @@ fn main() {
         return;
     }
 
-    if let Err(error) = build_assets() {
-        panic!("control-plane-ui asset packaging failed: {error}");
-    }
+    let out_dir = PathBuf::from(env::var_os("OUT_DIR").expect("OUT_DIR is not set by Cargo"));
+    let assets = match env::var_os(DIST_ENV) {
+        Some(raw) => {
+            let dist = PathBuf::from(raw);
+            match build_assets(&dist, &out_dir) {
+                Ok(assets) => assets,
+                // A bundle was provided but is malformed; fail fast rather than
+                // silently shipping a UI-less build.
+                Err(error) => panic!("control-plane-ui asset packaging failed: {error}"),
+            }
+        }
+        // No bundle was provided. Emit an empty asset catalog so the binary
+        // still compiles and simply does not serve a UI. Only the UI-serving
+        // tests set DIST_ENV to a real bundle.
+        None => Vec::new(),
+    };
+    write_manifest(&out_dir, &assets);
 }
 
-fn build_assets() -> Result<(), String> {
-    let raw_dist = env::var_os(DIST_ENV).ok_or_else(|| {
-        format!("{DIST_ENV} must point to an absolute Dioxus 0.7 web bundle directory")
-    })?;
-    let dist = PathBuf::from(raw_dist);
-
+fn build_assets(dist: &Path, out_dir: &Path) -> Result<Vec<Asset>, String> {
     if !dist.is_absolute() {
         return Err(format!(
             "{DIST_ENV} must be absolute; received {}",
@@ -41,7 +50,7 @@ fn build_assets() -> Result<(), String> {
         ));
     }
 
-    let dist_metadata = fs::symlink_metadata(&dist).map_err(|error| {
+    let dist_metadata = fs::symlink_metadata(dist).map_err(|error| {
         format!(
             "cannot read {DIST_ENV} directory {}: {error}",
             dist.display()
@@ -62,7 +71,7 @@ fn build_assets() -> Result<(), String> {
 
     println!("cargo:rerun-if-changed={}", dist.display());
     let mut assets = Vec::new();
-    collect_assets(&dist, &dist, &mut assets)?;
+    collect_assets(dist, dist, &mut assets)?;
     assets.sort_by(|left, right| left.url_path.cmp(&right.url_path));
 
     let index = assets
@@ -80,9 +89,6 @@ fn build_assets() -> Result<(), String> {
         ));
     }
 
-    let out_dir = PathBuf::from(
-        env::var_os("OUT_DIR").ok_or_else(|| "OUT_DIR is not set by Cargo".to_owned())?,
-    );
     let staged_dir = out_dir.join(STAGED_DIR);
     if staged_dir.exists() {
         fs::remove_dir_all(&staged_dir).map_err(|error| {
@@ -119,15 +125,16 @@ fn build_assets() -> Result<(), String> {
         println!("cargo:rerun-if-changed={}", asset.source.display());
     }
 
-    let manifest = generate_manifest(&assets);
-    fs::write(out_dir.join(MANIFEST_FILE), manifest).map_err(|error| {
-        format!(
-            "cannot write generated asset manifest {}: {error}",
-            out_dir.join(MANIFEST_FILE).display()
-        )
-    })?;
+    Ok(assets)
+}
 
-    Ok(())
+/// Writes the `control_plane_assets.rs` manifest that `static_assets.rs`
+/// `include!`s. When no bundle was provided the asset list is empty, so the
+/// binary compiles with a catalog that simply serves no UI.
+fn write_manifest(out_dir: &Path, assets: &[Asset]) {
+    let manifest = generate_manifest(assets);
+    fs::write(out_dir.join(MANIFEST_FILE), manifest)
+        .expect("cannot write generated control-plane asset manifest")
 }
 
 fn collect_assets(root: &Path, current: &Path, assets: &mut Vec<Asset>) -> Result<(), String> {

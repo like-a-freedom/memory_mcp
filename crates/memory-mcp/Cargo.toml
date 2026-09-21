@@ -56,19 +56,29 @@ uuid = { workspace = true, optional = true }
 zip.workspace = true
 
 [features]
-default = []
+default = ["fs-watch"]
 # Optional Apple-specific CPU backend. Keep this out of `default`: Cargo package
 # defaults are not target-aware, so portable consumers must opt in explicitly.
 accelerate = ["candle-core/accelerate"]
 fs-watch = ["dep:notify"]
+# App-session surface (inspector / diff / graph / lifecycle MCP resources and
+# tools). Orthogonal axis, usable in BOTH profiles: in-memory sessions in
+# local/stdio, durable sessions persisted to the tenant namespace in HTTP.
 mcp-apps = []
 prometheus = ["dep:metrics-exporter-prometheus"]
 metal = ["candle-core/metal", "candle-nn/metal", "candle-transformers/metal"]
 mimalloc = ["dep:mimalloc"]
 eval-support = []
-# HTTP SaaS profile (ADR-0052). Off by default: existing stdio behavior and
-# default build remain unchanged.
+# One coarse switch = the whole SaaS product (Streamable HTTP MCP data plane +
+# control plane with OIDC/local-admin auth + embedded web UI + Prometheus).
+# `control-plane`, `control-plane-ui` and `prometheus` are internal names implied
+# by `streamable-http`; they exist only so the cfg sites in `http/` and `control/`
+# keep compiling and are never written by users. App sessions stay a separate
+# orthogonal axis (`mcp-apps`): in-memory in local/stdio, durable in HTTP.
 streamable-http = [
+    "control-plane",
+    "control-plane-ui",
+    "prometheus",
     "rmcp/transport-streamable-http-server",
     "dep:axum",
     "dep:http",
@@ -82,6 +92,11 @@ streamable-http = [
     "dep:subtle",
     "dep:base64",
 ]
+# Internal: control-plane auth (OIDC + local admin). Mutually implies
+# `streamable-http` (a benign feature cycle): `streamable-http` pulls in
+# `control-plane` for the full SaaS product, and `control-plane` keeps a
+# back-link so pre-existing test/operator invocations that name it without
+# `streamable-http` still compile the `http` module they need.
 control-plane = [
     "streamable-http",
     "dep:oauth2",
@@ -93,6 +108,7 @@ control-plane = [
     "dep:base64",
     "dep:argon2",
 ]
+# Internal: embedded control-plane web UI bundle. Implied by `streamable-http`.
 control-plane-ui = ["control-plane"]
 # Test-only: exposes #[cfg(any(test, feature = "test-fixtures"))] fixtures to
 # integration tests in tests/. Declared so cfg references pass unexpected_cfgs.

@@ -604,8 +604,8 @@ it, enable both runtime flags:
 `MEMORY_MCP_HTTP_ENABLE_CONTROL_PLANE=true` and
 `MEMORY_MCP_HTTP_ENABLE_CONTROL_PLANE_UI=true`
 
-The binary must also be built with the `control-plane-ui` feature and include
-the UI assets. If the image was not built with that feature, enabling the UI
+The binary must be built with the `streamable-http` profile (which embeds the
+UI assets). If the image was not built with that profile, enabling the UI
 flag causes a startup error. The control plane must be enabled first, and its
 OIDC settings must contain real provider values. The UI is served from `/`.
 
@@ -641,12 +641,13 @@ forced-order transaction interleavings).
 
 ### Build and run
 
-Build with the `streamable-http` feature. Add `control-plane` for the OIDC
-and account-management backend. Add `control-plane-ui` to include the optional
-web UI.
+Build with the single `streamable-http` feature — the one coarse switch for
+the whole SaaS server. It implies the control plane (OIDC/local-admin auth +
+account API) and the embedded web UI. Add `mcp-apps` only if you want the
+durable app-session surface.
 
 ```bash
-cargo build --release --locked --features streamable-http,control-plane
+cargo build --release --locked --features streamable-http
 
 MEMORY_MCP_HTTP_PUBLIC_BASE_URL=https://mcp.example.com \
 ALLOWED_HOSTS=mcp.example.com \
@@ -687,8 +688,8 @@ MEMORY_MCP_HTTP_REPLICA_ID=node-a \
 | `/api/v1/operator/*` | OIDC operator + CSRF + recent-auth | Operator-only: provisioning retry, suspend, purge, recovery |
 | `/auth/oidc/*` | OIDC flow | Login, callback, logout (only when the control plane is enabled) |
 | `/health/live`, `/health/ready` | Public | Process liveness and admission readiness |
-| `/metrics` | Public (no app auth) | Prometheus scrape when built with the `prometheus` feature. Restrict at the reverse proxy or network layer. |
-| `/` and SPA fallback | Public | Control-plane web UI, when the `control-plane-ui` build feature and `MEMORY_MCP_HTTP_ENABLE_CONTROL_PLANE_UI=true` are both enabled |
+| `/metrics` | Public (no app auth) | Prometheus scrape (enabled by the `streamable-http` profile). Restrict at the reverse proxy or network layer. |
+| `/` and SPA fallback | Public | Control-plane web UI, when `MEMORY_MCP_HTTP_ENABLE_CONTROL_PLANE_UI=true` (the UI is embedded by the `streamable-http` build) |
 
 "Public" is about application auth only. The `Host`/`Origin` allowlist is
 enforced on every row above, including `/` and the SPA fallback: it is a property
@@ -838,7 +839,7 @@ The following settings are optional for power users. They are read by the same e
 | --- | --- | --- | --- |
 | `RUST_LOG` | string | `info` | Logging level; canonical values are `trace`, `debug`, `info`, `warn`, and `error`; `warning` aliases `warn`, and unknown values fall back to `info` |
 | `MEMORY_LOG_FILE` | path | unset | Write structured log events to this file instead of stderr; the file is created if missing (parent directory must exist), opened in append mode, and flushed after every line; on open failure the process falls back to stderr with a warning |
-| `MEMORY_PROMETHEUS_LISTEN_ADDR` | socket address (`IP:port`) | unset | Prometheus HTTP listener address; active only when the `prometheus` feature is compiled and this variable is set |
+| `MEMORY_PROMETHEUS_LISTEN_ADDR` | socket address (`IP:port`) | unset | Prometheus HTTP listener address; active only when the `streamable-http` profile is compiled and this variable is set |
 | `QUERY_LOGGING_ENABLED` | boolean | `false` | Persist `assemble_context` analytics rows into `query_log` when `true` |
 | `QUERY_LOG_RETENTION_DAYS` | unsigned integer | `90` | Days to retain persisted `query_log` analytics before best-effort pruning |
 | `LIFECYCLE_ENABLED` | boolean | `false` | Enable background lifecycle jobs |
@@ -924,7 +925,7 @@ Read only by the `memory_mcp_http` binary built with the `streamable-http` featu
 | --- | --- | --- | --- |
 | `MEMORY_MCP_HTTP_SIGNUP_MODE` | enum: `invite_only` \| `open` | unset | Required. `invite_only` rejects self-service sign-up; `open` requires the seven plan seed variables below |
 | `MEMORY_MCP_HTTP_ENABLE_CONTROL_PLANE` | boolean | `false` | Enable OIDC, browser sessions, and control-plane `/api/v1` endpoints. The `POST /mcp` endpoint remains available when this is `false` |
-| `MEMORY_MCP_HTTP_ENABLE_CONTROL_PLANE_UI` | boolean | `false` | Serve the embedded web UI from `/`. Requires the control plane and the `control-plane-ui` build feature |
+| `MEMORY_MCP_HTTP_ENABLE_CONTROL_PLANE_UI` | boolean | `false` | Serve the embedded web UI from `/`. Requires the control plane and the `streamable-http` build profile |
 | `MEMORY_MCP_HTTP_OIDC_ISSUER` | URL | unset | Required when the control plane is enabled. Exact issuer match is enforced on every login |
 | `MEMORY_MCP_HTTP_OIDC_CLIENT_ID` | string | unset | Required when the control plane is enabled |
 | `MEMORY_MCP_HTTP_OIDC_AUDIENCE` | URL string | unset | Required when the control plane is enabled. Exact audience match is enforced against the ID token's `aud` claim; supply a single audience identifier (the server does not currently parse a list) |
@@ -991,25 +992,27 @@ retrieval quality, gates, and case outcomes. Individual record identifiers are
 never metric labels; use structured logs for per-request diagnosis. See
 [ADR-0048](docs/adr/0048-bounded-runtime-observability.md).
 
-### Optional build features
+### Build features
 
-The binary supports a few opt-in Cargo features:
+The package ships two coarse build profiles plus a few orthogonal opt-in axes.
 
 | Feature | Effect |
 | --- | --- |
+| `default = ["fs-watch"]` | **Local personal profile**: the stdio MCP server + CLI, embedded SurrealDB, and filesystem ingestion (`fs-watch`). This is the default build; run `cargo build --release` with no flags.
+| `streamable-http` | **SaaS profile**: the single coarse switch for the whole Streamable HTTP server. It implies the control plane (OIDC + local-admin auth + account API), the embedded web UI, and Prometheus. See [Build and run](#build-and-run) below.
+| `mcp-apps` | Enable the optional interactive MCP app-session surface (inspector / diff / graph / lifecycle resources and tools). It is an orthogonal axis usable in **both** profiles: in-memory sessions in local/stdio, durable sessions in HTTP. It is not required for the eight core tools or the zero-config first-value path. Build: `cargo build --release --features mcp-apps` or `cargo build --release --features mcp-apps,streamable-http`.
 | `mimalloc` | Use the mimalloc global allocator instead of the system allocator. This remains an explicit experiment: the fresh macOS matrix reduced physical footprint after GLiNER unload but increased observed RSS to about 2.56 GB, so it is not the server default. Build: `cargo build --release --features mimalloc`. |
 | `accelerate` | Enable Candle's Apple Accelerate CPU backend. This is an explicit Apple-specific feature, not a portable package default; the current A/B did not pass the no-degradation gate, so do not present it as a production speedup. Build: `cargo build --release --features accelerate`. |
 | `metal` | Enable Candle's Metal backend for explicit macOS GPU experiments. It is not a production default. Build: `cargo build --release --features metal`. |
-| `mcp-apps` | Enable the optional interactive MCP app-session surface. It is not required for the eight core tools or the zero-config first-value path. Build: `cargo build --release --features mcp-apps`. |
-| `control-plane-ui` | Compile the optional Dioxus control-plane SPA. It requires a prebuilt web bundle; see [Control-plane UI asset packaging](#control-plane-ui-asset-packaging). |
-| `prometheus` | Compile the optional Prometheus recorder/listener. Set `MEMORY_PROMETHEUS_LISTEN_ADDR` at runtime to expose `/metrics`. |
+| `eval-support` | Enable the evaluation harness support surface (used by `eval-harness`). Not a runtime profile. |
+| `test-fixtures` | Test-only bootstrap helpers; not used in normal builds. |
 
 The allocator evidence is recorded in [`docs/performance/MEMORY_PROFILE.md`](docs/performance/MEMORY_PROFILE.md), the CPU-backend result in [`docs/performance/NER_PERFORMANCE.md`](docs/performance/NER_PERFORMANCE.md), and the policy in [ADR-0034](docs/adr/0034-allocator-and-accelerator-default-policy.md). For infrequent local GLiNER extraction, `NER_IDLE_UNLOAD_SECS=30` is the measured workload-specific memory recommendation; the runtime compatibility default remains `0`.
 
 ### Control-plane UI asset packaging
 
-The `control-plane-ui` feature embeds the separately built Dioxus 0.7 web bundle
-into the `memory_mcp` binary at compile time. The runtime does not read a
+The `streamable-http` profile embeds the separately built Dioxus 0.7 web bundle
+into the `memory_mcp_http` binary at compile time. The runtime does not read a
 filesystem asset directory, and the build never fetches UI assets from the
 network.
 
@@ -1021,16 +1024,22 @@ cd crates/control-plane-ui
 dx bundle --platform web --release --out-dir "$PWD/../../target/control-plane-ui-dist"
 cd ../..
 MEMORY_MCP_CONTROL_PLANE_UI_DIST="$PWD/target/control-plane-ui-dist" \
-  cargo build --release --features control-plane-ui
+  cargo build --release --features streamable-http
 ```
 
 The bundle must contain a non-empty `index.html`. All regular files are copied
 in deterministic path order into Cargo's `OUT_DIR` and embedded with
 `include_bytes!`; symlinks, non-UTF-8 paths, and invalid bundle entries are
-rejected. If `control-plane-ui` is enabled without the environment variable or
-without a complete bundle, compilation fails with an actionable error instead
-of producing a placeholder page. Builds without that feature do not require UI
-assets.
+rejected.
+
+Providing the bundle is **optional**: if `MEMORY_MCP_CONTROL_PLANE_UI_DIST` is
+absent, the `streamable-http` binary still compiles with an empty UI catalog
+and simply does not serve a UI. This keeps every HTTP build and test
+executable without a Dioxus WASM build; set the variable only when you actually
+want the browser UI. If the variable **is** set but the bundle is malformed
+(no `index.html`, a symlink, an invalid entry), the build fails fast rather than
+silently shipping a UI-less image. Builds without the `streamable-http` profile
+do not compile the UI at all.
 
 ### One active namespace
 
@@ -1459,7 +1468,7 @@ GLINER_DEVICE=auto cargo run --release --features metal -- serve
 - `crates/memory-mcp/src/main.rs` — main MCP server binary (`memory_mcp`); stdio profile, CLI, and lifecycle hooks
 - `crates/memory-mcp/src/bin/memory_mcp_http.rs` — Streamable HTTP SaaS binary (`memory_mcp_http`); built when the `streamable-http` feature is enabled
 - `crates/eval-harness/src/main.rs` — evaluation harness binary (`memory-eval`); never linked into the production binary
-- `crates/control-plane-ui/src/main.rs` — Dioxus web SPA build target (`control-plane-ui`); built with the Dioxus CLI and embedded by the backend when the `control-plane-ui` feature is enabled
+- `crates/control-plane-ui/src/main.rs` — Dioxus web SPA build target; built with the Dioxus CLI and embedded by the backend when the `streamable-http` profile is enabled
 
 MCP input/output schemas are exposed by the server itself through the protocol's
 tool metadata and remain regression-covered by the schema tests under
@@ -1501,7 +1510,7 @@ Coverage output is stored under `coverage/` when generated with Tarpaulin.
 │   │   ├── migrations/
 │   │   ├── src/            # library, two binary entry points, MCP/HTTP, control plane, and domain services
 │   │   └── tests/          # production integration and release-gate tests
-│   ├── control-plane-ui/   # Dioxus 0.7 web SPA (control-plane-ui feature)
+│   ├── control-plane-ui/   # Dioxus 0.7 web SPA (embedded by the streamable-http profile)
 │   │   └── src/            # router, API client, login/keys/delete/status pages
 │   └── eval-harness/       # private evaluation package
 │       ├── benches/        # Criterion benchmark families

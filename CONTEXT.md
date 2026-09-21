@@ -249,6 +249,10 @@ _Avoid_: Fact invalidation, backup erasure, recovery window
 The single immutable SurrealDB namespace selected at startup by a local stdio server process. It remains a local deployment concept and is not the SaaS Tenant Namespace selected for an authenticated HTTP request.
 _Avoid_: Tenant Namespace, dynamic namespace, request namespace
 
+**Build Profile**:
+The coarse build-time posture of the `memory_mcp` package: the **local profile** (`default = ["fs-watch"]`, stdio MCP + embedded SurrealDB + filesystem ingestion) or the **SaaS profile** (`streamable-http`, the single switch for the Streamable HTTP data plane plus control plane, embedded web UI, and Prometheus). `mcp-apps` is an orthogonal axis usable in either profile, not a profile of its own.
+_Avoid_: feature flag, module, deployment mode
+
 ## Constraints
 
 - Production code uses `MemoryError` and `Result`; no production `unwrap`,
