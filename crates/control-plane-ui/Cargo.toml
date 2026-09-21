@@ -28,10 +28,26 @@ gloo-storage = { version = "=0.4.0" }
 # one thing this list exists to avoid. Each pin is exact (`=`), so `cargo update`
 # cannot move one out of step; raising a pin is a deliberate change, made after
 # re-reading what `dioxus-web` resolves to in `Cargo.lock`.
+#
+# `Document`, `Element` and `Node` exist for one question asked in
+# `components/modal.rs`: whether focus already sits inside a modal frame that has
+# just mounted. The answer is what lets a panel's own control claim focus first
+# without the frame pulling it back. `Element` and `Node` arrive with `Document`
+# and with `dioxus-web`'s own `mounted` feature; `HtmlElement` is deliberately
+# absent because the focus itself goes through Dioxus's `MountedData::set_focus`,
+# which calls it inside `dioxus-web`.
 gloo-timers = { version = "=0.3.0", features = ["futures"] }
 js-sys = "=0.3.105"
 wasm-bindgen-futures = "=0.4.78"
-web-sys = { version = "=0.3.105", features = ["Clipboard", "Crypto", "Navigator", "Window"] }
+web-sys = { version = "=0.3.105", features = [
+  "Clipboard",
+  "Crypto",
+  "Document",
+  "Element",
+  "Navigator",
+  "Node",
+  "Window",
+] }
 
 [lints]
 workspace = true

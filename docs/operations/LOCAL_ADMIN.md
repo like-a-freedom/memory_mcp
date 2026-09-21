@@ -45,7 +45,7 @@ All of the following were executed in this repository and passed:
 | Static assets + CSP | `MEMORY_MCP_CONTROL_PLANE_UI_DIST=<abs dist> cargo test -p memory_mcp --lib --features control-plane-ui,test-fixtures --locked control::static_assets` — 6 passed |
 | Format, lint, non-default builds | `cargo fmt --all --check`; `cargo clippy --workspace --all-targets --features … --locked -- -D warnings` for all four documented feature combinations; `cargo check -p memory_mcp --no-default-features --locked` and `--features streamable-http` |
 | End-to-end against the real binaries | `sh scripts/ci/local_admin_local_check.sh` — local mode starts from env, activation/login/session, client create/list/get, provisioning reaches `ready` in one poll, restart persistence, plan-mismatch startup rejection, recovery invalidates the session, negative route/CSRF/Origin checks |
-| Packaged image over real TLS in a real browser | `docker build --tag memory-mcp-local-admin:test .` then `python3 scripts/ci/local_admin_image.py --image memory-mcp-local-admin:test --scenario all` — 5 scenarios, 78 checks, exit 0 (`auth` 9, `clients` 29, `regression` 6, `ui` 20, `flow` 14). The `ui` scenario proves the bundle boots, is styled and ships a correct document shell; the `flow` scenario drives the console's own interactive paths through the real DOM and is the guard for the defect recorded in §2.6.1 |
+| Packaged image over real TLS in a real browser | `docker build --tag memory-mcp-local-admin:test .` then `python3 scripts/ci/local_admin_image.py --image memory-mcp-local-admin:test --scenario all` — 5 scenarios, 81 checks, exit 0 (`auth` 9, `clients` 29, `regression` 6, `ui` 20, `flow` 17). The `ui` scenario proves the bundle boots, is styled and ships a correct document shell; the `flow` scenario drives the console's own interactive paths through the real DOM and is the guard for the defects recorded in §2.6.1 |
 | Compose modes resolve | `docker compose --env-file <operator env> -f docker-compose.yml -f docker-compose.{off,local,oidc}.yml config --quiet` — all three resolve |
 | CI checker unit tests (stdlib only: no Docker, Node or browser) | `python3 -m unittest discover -s scripts/ci -p 'test_*.py'` — 46 passed. Covers `assert_embedded_ui.py`, the packaging helper, the test that pins `local_admin_image.py`'s scenario registry to `local_admin_browser.mjs`'s — two lists in two languages with no other shared source of truth (§2.6) — and `test_ui_bundle_pin.py`, which pins the Dioxus CLI version in `Dockerfile` to the `dioxus` requirement in the UI crate's manifest and the bundle's output layout to the assertions the build stage makes (§2.6) |
 
@@ -359,9 +359,10 @@ looked reasonable.**
 *The revoke confirmation is a full-width row inside the table*, directly under
 the row it asks about. A panel rendered after a fifty-row table is off screen
 for every row above the fold: the operator presses "Revoke…" and nothing appears
-to happen. A modal would also work, and does not, because a `<dialog>` opened
-with the `open` attribute is not focused by the browser, so Escape has no
-focused element inside the frame to bubble from.
+to happen. It is a row rather than a modal because the question is *which* key is
+being revoked, and the row that answers it has to stay on screen beside the
+question; a modal also costs the operator their place in a table they are
+working through.
 
 *There is no "are you sure you want to leave" guard on the client detail page.*
 While a secret is on screen the page content is `inert` behind the secret's own
@@ -370,13 +371,20 @@ The modal's own two-stage close — first Escape or Close arms the question, the
 "Discard the secret" or "Keep it" answers it — is the guard, and it is the one
 place the warning is stated.
 
-*`autofocus` inside a modal is honoured only sometimes.* It is honoured when the
-frame is inserted into a document that keeps its focus, and ignored when the
-element the operator was using is replaced in the same update — which is what
-the re-authentication frame does. So a frame's own controls, not Escape, are the
-guaranteed way out, and every frame here renders a visible one. Focusing the
-frame explicitly would need `HTMLElement.focus()`, which means naming `Document`
-and `HtmlElement` as `web-sys` features in `crates/control-plane-ui/Cargo.toml`.
+*Every modal frame takes focus as it opens, and no modal panel relies on
+`autofocus`.*
+Escape reaches a `<dialog>` only while focus is inside it, and a frame opened with
+the `open` attribute focuses nothing, so `src/components/modal.rs` moves focus
+into the frame as it mounts. The `autofocus` attribute cannot carry that
+guarantee: the browser processes it in a task of its own and skips it altogether
+when the control the operator was using is removed in the same update — which is
+exactly what the re-authentication panel does, so its password field was never
+focused and Escape did nothing while that panel was open. A panel whose own
+control should start focused asks for it with `claim_initial_focus`, which the
+frame steps aside for. `Document`, `Element` and `Node` are the `web-sys`
+features the frame needs for its one question — whether focus is already inside
+it. Nothing is added to the image: all three are already compiled into the bundle
+through `dioxus-web`, and naming features leaves `Cargo.lock` untouched.
 
 **`inert` is set through one helper, because the obvious spelling is wrong.**
 `inert` is an ordinary attribute rather than a boolean one, so a Rust `bool`
@@ -429,6 +437,15 @@ one. Three properties make it more than a smoke test:
   only a mounted page sends, the `POST /api/v1/admin/clients 202`, and
   a `POST …/keys 201`. A dead scheduler tick leaves the sign-in form in place and
   the request list empty.
+* It asserts the one-time-secret panel **takes focus as it opens**, before
+  anything is clicked — because after a click focus would be there anyway and the
+  assertion would prove nothing. Escape reaches a `<dialog>` only while focus is
+  inside it, so this is the executable form of the guarantee in §2.6 that the
+  panel cannot strand the operator's focus on the document body.
+* It asserts the panel's **two-stage close**: the first Escape must leave the
+  panel open and asking, and only the second may discard the secret and leave the
+  page interactive again. That guard protects the one value the backend cannot
+  reissue, and until now it was described in prose with no scenario covering it.
 * It asserts `navigator.clipboard.readText()` equals the secret that was just
   revealed, so a clipboard call that silently targets nothing fails. The runner
   registers the secret for redaction *before* any diagnostic can observe it, and
@@ -439,7 +456,7 @@ one. Three properties make it more than a smoke test:
   bundle. (`framenavigated` is not the signal here: it also fires for
   `history.pushState`, so the check keys on a document-type response.)
 
-Scenario totals: `auth` 9, `clients` 29, `regression` 6, `ui` 20, `flow` 14.
+Scenario totals: `auth` 9, `clients` 29, `regression` 6, `ui` 20, `flow` 17.
 
 The harness and the runner keep separate scenario lists, in separate languages.
 `scripts/ci/test_local_admin_image.py` pins them to each other — the registry
@@ -1526,6 +1543,7 @@ regardless.
 | `control-plane-ui` requires an absolute, non-symlink bundle directory containing `index.html` | `crates/memory-mcp/build.rs`; the suite only builds with `MEMORY_MCP_CONTROL_PLANE_UI_DIST` pointing at one |
 | The image builds both binaries and a real UI bundle | `docker build` → `25/25 FINISHED`; `memory_mcp --help` lists `admin`; `control-plane-ui-dist/public` contains `index.html`, a 46 KB JS and a 775 KB WASM |
 | The UI boots in a real browser under the shipped CSP | `local_admin_image.py --scenario ui` → 10/10 checks, including `wasm app boots under the shipped csp` and no console/page errors |
+| A modal frame takes focus as it opens, so Escape reaches it | `--scenario flow` → `the one-time secret arrives in an alertdialog that has taken focus`, plus the two-stage close (`the first escape asks before discarding the secret`, `the second escape discards the secret and leaves the page interactive`). The re-authentication panel is the case that needed the frame to take focus, and the one the scenario cannot reach: `reauth_required` is driven by `control::recent_auth::DEFAULT_REAUTH_MAX_AGE`, a 600-second constant with no configuration knob, so a fresh session cannot provoke it. For that panel the evidence is a before/after in a real browser against the packaged bundle: before, the dialog open with `document.activeElement` on `BODY` and Escape leaving it open; after, focus on `#reauth-password` and Escape dismissing it (§2.6) |
 | The CLI in the image issues a code and the browser completes activation, login, client, key, suspend/resume | `--scenario all` → 54 checks (auth 9, clients 29, regression 6, ui 10) |
 | All three Compose modes resolve with operator-generated secrets | `docker compose --env-file … -f docker-compose.yml -f docker-compose.{off,local,oidc}.yml config --quiet` |
 | Issued key is a real data-plane credential | `scripts/ci/local_admin_local_check.sh` §7c — live key `200` on `POST /mcp`, revoked key `401`, no credential `401`; `http_local_admin.rs::issued_key_authenticates_on_the_data_plane` |

@@ -14,7 +14,7 @@ use dioxus::prelude::*;
 
 use crate::admin_api::copy_to_clipboard;
 use crate::components::alert::{Alert, AlertTone};
-use crate::components::modal::{Modal, ModalKind};
+use crate::components::modal::{Modal, ModalKind, claim_initial_focus};
 
 /// The one sentence that must accompany every one-time secret.
 const WARNING: &str = "Save this now; it cannot be shown again. Deliver it outside this service.";
@@ -83,7 +83,14 @@ pub fn OneTimeSecret(
             if let Some(detail) = detail {
                 p { "{detail}" }
             }
-            button { r#type: "button", autofocus: true, onclick: copy, "Copy secret" }
+            // The panel's primary action, not the frame: this is the control the
+            // operator opened the panel for.
+            button {
+                r#type: "button",
+                onmounted: move |event: MountedEvent| claim_initial_focus(&event),
+                onclick: copy,
+                "Copy secret"
+            }
             Alert { tone: AlertTone::Status, message: notice.read().clone() }
             if *armed.read() {
                 p { role: "alert", "{CLOSING_WARNING}" }

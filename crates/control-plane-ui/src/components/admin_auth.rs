@@ -16,7 +16,7 @@ use dioxus_router::hooks::use_navigator;
 
 use crate::admin_api::{AdminApi, SessionCsrf};
 use crate::components::alert::{Alert, AlertTone};
-use crate::components::modal::{Modal, ModalKind};
+use crate::components::modal::{Modal, ModalKind, claim_initial_focus};
 use crate::routes::Route;
 
 /// Local username/password sign-in form.
@@ -171,7 +171,11 @@ pub fn AdminReauthDialog(
                         name: "password",
                         r#type: "password",
                         autocomplete: "current-password",
-                        autofocus: true,
+                        // The panel exists to collect this one value, so the field
+                        // takes initial focus from the frame. `autofocus` would not:
+                        // the browser skips it because the control the operator was
+                        // using is removed in the same update.
+                        onmounted: move |event: MountedEvent| claim_initial_focus(&event),
                         required: true,
                         value: "{password}",
                         oninput: move |event| password.set(event.value()),

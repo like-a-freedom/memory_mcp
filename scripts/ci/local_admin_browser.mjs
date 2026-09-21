@@ -18,7 +18,9 @@
  *   flow       — drives the packaged bundle's interactive paths through the
  *                real DOM: sign in, create a client, wait out asynchronous
  *                provisioning, issue a key, and copy its one-time secret.
- *                Both the DOM and the network must react to every click.
+ *                Both the DOM and the network must react to every click. It also
+ *                asserts that the panel takes focus as it opens, so Escape
+ *                reaches it, and that Escape asks before discarding the secret.
  *
  * All runs require a protected fixture file:
  *   LOCAL_ADMIN_BROWSER_FIXTURE=/path/to/fixture.json
@@ -759,6 +761,29 @@ async function scenarioFlow(context) {
     calls,
   );
 
+  // The panel's Escape handling only works while focus is inside its frame, and
+  // the frame is opened with the `open` attribute, which does not focus anything.
+  // So the frame has to put focus inside itself as it mounts, and this is the
+  // assertion that it does: without it the operator's focus stays on the document
+  // body, where a keypress never reaches the panel. `autofocus` cannot carry the
+  // guarantee — the browser processes it in a task of its own and skips it when
+  // the control the operator was using was removed in the same update, which is
+  // what opening this panel does. Asserted before anything is clicked, because a
+  // click would put focus here by itself and prove nothing.
+  const opened = await page.evaluate(() => {
+    const frame = document.querySelector('dialog.modal-layer');
+    return {
+      role: frame?.getAttribute('role') ?? null,
+      insideFrame: !!frame && frame.contains(document.activeElement),
+      activeElement: document.activeElement?.tagName ?? null,
+    };
+  });
+  check(
+    'the one-time secret arrives in an alertdialog that has taken focus',
+    opened.role === 'alertdialog' && opened.insideFrame,
+    opened,
+  );
+
   const secret = registerSecret((await page.textContent('code.secret-value'))?.trim() ?? '');
   check('the revealed secret is non-empty', secret.length > 0, secret.length);
 
@@ -773,6 +798,43 @@ async function scenarioFlow(context) {
 
   const clipboard = await page.evaluate(() => navigator.clipboard.readText());
   check('the clipboard holds the secret', clipboard === secret, clipboard.length);
+
+  // Leaving the panel is a two-stage act. The first Escape arms the question and
+  // the secret survives it, so a stray keypress cannot lose a credential the
+  // operator has not saved; only the second one discards it. This is the only
+  // behaviour here that protects a value the backend cannot reissue, and it is
+  // asserted rather than described because the guard is one line of state that a
+  // refactor can quietly drop.
+  await page.keyboard.press('Escape');
+  const armed = await page.evaluate(() => {
+    const frame = document.querySelector('dialog.modal-layer');
+    return {
+      open: !!frame,
+      question: [...(frame?.querySelectorAll('[role="alert"]') ?? [])].map((node) =>
+        node.innerText.trim(),
+      ),
+      buttons: [...(frame?.querySelectorAll('button') ?? [])].map((node) => node.innerText.trim()),
+    };
+  });
+  check(
+    'the first escape asks before discarding the secret',
+    armed.open &&
+      armed.question.length === 1 &&
+      armed.buttons.includes('Discard the secret') &&
+      armed.buttons.includes('Keep it'),
+    armed,
+  );
+
+  await page.keyboard.press('Escape');
+  const discarded = await page.evaluate(() => ({
+    open: !!document.querySelector('dialog.modal-layer'),
+    inert: !!document.querySelector('[inert]'),
+  }));
+  check(
+    'the second escape discards the secret and leaves the page interactive',
+    !discarded.open && !discarded.inert,
+    discarded,
+  );
 
   check('no uncaught errors were raised', pageErrors.length === 0, pageErrors.slice(0, 3));
   check('no csp violations were logged', consoleErrors.length === 0, consoleErrors.slice(0, 3));
