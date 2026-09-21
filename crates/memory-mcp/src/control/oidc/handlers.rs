@@ -19,7 +19,9 @@ use crate::control::session::ControlPlaneSession;
 use crate::error::MemoryError;
 use crate::http::HttpState;
 use crate::http::config::SignupMode;
-use crate::http::registry::models::{ExternalIdentity, SubjectVerifier, new_external_identity_id};
+use crate::http::registry::models::{
+    ExternalIdentity, IdentityAudit, SubjectVerifier, new_external_identity_id,
+};
 
 use super::flow_material::{OidcCallback, OidcFlowIntent, OidcNonce, OidcState, PkceCode};
 use super::sealing::{identity_subject_verifier, seal_oidc_payload, unseal_oidc_payload};
@@ -299,7 +301,14 @@ async fn link_verified_identity(
         account_id: account_id.to_owned(),
         created_at: Utc::now(),
     };
-    store.link_external_identity(&identity).await?;
+    // The Account holder is the actor: the browser is already signed in, and the
+    // identity being attached is the one the provider just attested to.
+    store
+        .link_external_identity(
+            &identity,
+            &IdentityAudit::by_account(account_id, Utc::now()),
+        )
+        .await?;
     Ok(())
 }
 

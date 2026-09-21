@@ -326,10 +326,12 @@ pub async fn start_identity_link(
 
 /// DELETE /api/v1/account/identity_links/:id — unlink an External Identity.
 ///
-/// Refuses to remove the Account's last remaining identity (ADR-0057): an
-/// Account with no identity left has no way back in through the console, and
-/// the refusal is cheaper than a support process for undoing it. Recent
-/// authentication is required because the effect outlives the session.
+/// The store refuses to remove the Account's last remaining identity
+/// (ADR-0057): an Account with no identity left has no way back in through the
+/// console, and the refusal is cheaper than a support process for undoing it.
+/// The rule lives in the store rather than here so that the count and the delete
+/// share one transaction. Recent authentication is required because the effect
+/// outlives the session.
 pub async fn unlink_identity(
     State(state): State<Arc<HttpState>>,
     axum::extract::Extension(session): axum::extract::Extension<
@@ -338,35 +340,16 @@ pub async fn unlink_identity(
     axum::extract::Path(identity_id): axum::extract::Path<String>,
 ) -> Result<StatusCode, ApiError> {
     super::recent_auth::require_recent_auth(&session, super::recent_auth::DEFAULT_REAUTH_MAX_AGE)?;
-    guarded_unlink(
-        &state.registry.store_clone(),
-        &session.account_id,
-        &identity_id,
-    )
-    .await?;
-    Ok(StatusCode::NO_CONTENT)
-}
-
-/// Remove one of an Account's identities, refusing to remove the last.
-///
-/// Split out from the handler so the rule can be exercised against a real store
-/// without a live identity provider: an Account must never be left with no
-/// identity it can sign in with.
-async fn guarded_unlink(
-    store: &Arc<dyn crate::http::registry::storage::RegistryStore>,
-    account_id: &str,
-    identity_id: &str,
-) -> Result<(), crate::error::MemoryError> {
-    let identities = store.find_external_identities(account_id).await?;
-    if identities.len() < 2 {
-        return Err(crate::error::MemoryError::Conflict(
-            "the account's last identity cannot be unlinked".into(),
-        ));
-    }
-    store
-        .unlink_external_identity(account_id, identity_id)
+    state
+        .registry
+        .store_clone()
+        .unlink_external_identity(
+            &session.account_id,
+            &identity_id,
+            &IdentityAudit::by_account(&session.account_id, chrono::Utc::now()),
+        )
         .await?;
-    Ok(())
+    Ok(StatusCode::NO_CONTENT)
 }
 
 /// POST /api/v1/account/delete — start deletion flow and return a short-lived
@@ -549,18 +532,29 @@ mod tests {
         for index in 0..count {
             let id = format!("idn_{index}");
             store
-                .link_external_identity(&ExternalIdentity {
-                    id: id.clone(),
-                    issuer: "https://idp.example.com".to_owned(),
-                    subject_verifier: SubjectVerifier([index; 32]),
-                    account_id: account_id.to_owned(),
-                    created_at: chrono::Utc::now(),
-                })
+                .link_external_identity(
+                    &ExternalIdentity {
+                        id: id.clone(),
+                        issuer: "https://idp.example.com".to_owned(),
+                        subject_verifier: SubjectVerifier([index; 32]),
+                        account_id: account_id.to_owned(),
+                        created_at: chrono::Utc::now(),
+                    },
+                    &IdentityAudit::by_account(account_id, chrono::Utc::now()),
+                )
                 .await
                 .expect("link identity");
             ids.push(id);
         }
         ids
+    }
+
+    /// The `identity_unlinked` audit row for `identity_id`, if one was written.
+    fn unlink_audit(store: &InMemoryStore, identity_id: &str) -> Option<ControlAuditEvent> {
+        store.audit_events().into_iter().find(|event| {
+            event.action == "identity_unlinked"
+                && event.target_identity_id.as_deref() == Some(identity_id)
+        })
     }
 
     /// ADR-0057: an Account must never be left with no identity it can sign in
@@ -569,9 +563,14 @@ mod tests {
     async fn the_last_identity_cannot_be_unlinked() {
         let store: Arc<InMemoryStore> = Arc::new(InMemoryStore::default());
         let ids = account_with_identities(&store, 1).await;
-        let registry: Arc<dyn RegistryStore> = store.clone();
 
-        let refused = guarded_unlink(&registry, "acct_links", &ids[0]).await;
+        let refused = store
+            .unlink_external_identity(
+                "acct_links",
+                &ids[0],
+                &IdentityAudit::by_account("acct_links", chrono::Utc::now()),
+            )
+            .await;
         assert!(
             matches!(refused, Err(crate::error::MemoryError::Conflict(_))),
             "the only identity must not be removable"
@@ -585,6 +584,10 @@ mod tests {
             1,
             "the refusal must not have removed anything"
         );
+        assert!(
+            unlink_audit(&store, &ids[0]).is_none(),
+            "a refused removal must not be audited as one"
+        );
     }
 
     /// With a second identity present the removal proceeds, so the guard above
@@ -593,9 +596,13 @@ mod tests {
     async fn an_identity_is_removable_while_another_remains() {
         let store: Arc<InMemoryStore> = Arc::new(InMemoryStore::default());
         let ids = account_with_identities(&store, 2).await;
-        let registry: Arc<dyn RegistryStore> = store.clone();
 
-        guarded_unlink(&registry, "acct_links", &ids[0])
+        store
+            .unlink_external_identity(
+                "acct_links",
+                &ids[0],
+                &IdentityAudit::by_account("acct_links", chrono::Utc::now()),
+            )
             .await
             .expect("unlink one of two");
         let remaining = store
@@ -604,6 +611,44 @@ mod tests {
             .expect("list");
         assert_eq!(remaining.len(), 1);
         assert_eq!(remaining[0].id, ids[1]);
+    }
+
+    /// The two halves of an identity's lifetime are audited, each naming the
+    /// identity it acted on (ADR-0057).
+    #[tokio::test]
+    async fn linking_and_unlinking_are_audited_with_the_identity() {
+        let store: Arc<InMemoryStore> = Arc::new(InMemoryStore::default());
+        let ids = account_with_identities(&store, 2).await;
+        store
+            .unlink_external_identity(
+                "acct_links",
+                &ids[0],
+                &IdentityAudit::by_account("acct_links", chrono::Utc::now()),
+            )
+            .await
+            .expect("unlink one of two");
+
+        let linked: Vec<_> = store
+            .audit_events()
+            .into_iter()
+            .filter(|event| event.action == "identity_linked")
+            .collect();
+        assert_eq!(linked.len(), 2, "one row per link");
+        assert_eq!(
+            linked[0].target_identity_id.as_deref(),
+            Some(ids[0].as_str())
+        );
+        assert_eq!(linked[0].account_id, "acct_links");
+        assert_eq!(linked[0].actor_kind, AuditActorKind::Account);
+        assert_eq!(linked[0].actor_principal, "acct_links");
+        assert!(
+            linked[0].correlation_id != linked[1].correlation_id,
+            "each row needs its own durable id"
+        );
+
+        let unlinked = unlink_audit(&store, &ids[0]).expect("unlink is audited");
+        assert_eq!(unlinked.account_id, "acct_links");
+        assert_eq!(unlinked.actor_kind, AuditActorKind::Account);
     }
 
     /// Build a router with the operator stub middleware and an

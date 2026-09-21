@@ -151,14 +151,27 @@ pub trait RegistryStore: Send + Sync + 'static {
 
     /// Add an external identity to an account. Implementations
     /// must enforce that the (issuer, subject_verifier) tuple
-    /// is unique and that the account exists.
-    async fn link_external_identity(&self, identity: &ExternalIdentity) -> Result<(), MemoryError>;
+    /// is unique and that the account exists, and must append the
+    /// `identity_linked` audit row in the same transaction (ADR-0057),
+    /// which is why `audit` is required rather than optional.
+    async fn link_external_identity(
+        &self,
+        identity: &ExternalIdentity,
+        audit: &IdentityAudit,
+    ) -> Result<(), MemoryError>;
 
-    /// Remove a linked identity by id.
+    /// Remove a linked identity by id, appending the `identity_unlinked`
+    /// audit row in the same transaction.
+    ///
+    /// Refuses to remove an Account's last remaining identity (ADR-0057). The
+    /// rule is enforced by the store rather than by the caller so that two
+    /// concurrent removals cannot both observe two identities and both delete
+    /// one.
     async fn unlink_external_identity(
         &self,
         account_id: &str,
         identity_id: &str,
+        audit: &IdentityAudit,
     ) -> Result<(), MemoryError>;
 
     async fn find_api_key(&self, key_id: &str) -> Result<Option<ApiKey>, MemoryError>;
@@ -521,7 +534,7 @@ pub struct InMemoryStore {
     api_keys: std::sync::Mutex<Vec<ApiKey>>,
     identities: std::sync::Mutex<Vec<ExternalIdentity>>,
     events: std::sync::Mutex<Vec<(String, String)>>,
-    audit_events: std::sync::Mutex<Vec<(String, String)>>,
+    audit_events: std::sync::Mutex<Vec<ControlAuditEvent>>,
     usage: std::sync::Mutex<
         std::collections::HashMap<String, crate::http::registry::plan::UsageCounter>,
     >,
@@ -594,7 +607,7 @@ impl InMemoryStore {
     fn lock_identities(&self) -> std::sync::MutexGuard<'_, Vec<ExternalIdentity>> {
         self.identities.lock().expect("poisoned")
     }
-    fn lock_audit_events(&self) -> std::sync::MutexGuard<'_, Vec<(String, String)>> {
+    fn lock_audit_events(&self) -> std::sync::MutexGuard<'_, Vec<ControlAuditEvent>> {
         self.audit_events.lock().expect("poisoned")
     }
     fn lock_usage(
@@ -778,7 +791,11 @@ impl RegistryStore for InMemoryStore {
             .collect())
     }
 
-    async fn link_external_identity(&self, identity: &ExternalIdentity) -> Result<(), MemoryError> {
+    async fn link_external_identity(
+        &self,
+        identity: &ExternalIdentity,
+        audit: &IdentityAudit,
+    ) -> Result<(), MemoryError> {
         let account_exists = self
             .accounts
             .lock()
@@ -807,6 +824,14 @@ impl RegistryStore for InMemoryStore {
             )));
         }
         identities.push(identity.clone());
+        drop(identities);
+        self.lock_audit_events()
+            .push(ControlAuditEvent::identity_change(
+                IdentityAuditAction::Linked,
+                &identity.id,
+                &identity.account_id,
+                audit,
+            ));
         Ok(())
     }
 
@@ -814,13 +839,31 @@ impl RegistryStore for InMemoryStore {
         &self,
         account_id: &str,
         identity_id: &str,
+        audit: &IdentityAudit,
     ) -> Result<(), MemoryError> {
         let mut identities = self.lock_identities();
+        let held = identities
+            .iter()
+            .filter(|i| i.account_id == account_id)
+            .count();
+        if held < 2 {
+            return Err(MemoryError::Conflict(
+                "the account's last identity cannot be unlinked".into(),
+            ));
+        }
         let before = identities.len();
         identities.retain(|i| !(i.account_id == account_id && i.id == identity_id));
         if identities.len() == before {
             return Err(MemoryError::NotFound(format!("identity {identity_id}")));
         }
+        drop(identities);
+        self.lock_audit_events()
+            .push(ControlAuditEvent::identity_change(
+                IdentityAuditAction::Unlinked,
+                identity_id,
+                account_id,
+                audit,
+            ));
         Ok(())
     }
 
@@ -959,7 +1002,13 @@ impl RegistryStore for InMemoryStore {
             .expect("poisoned")
             .retain(|_, session| session.account_id != account_id);
         challenges[challenge_index].consumed_at = Some(now);
-        audit_events.push((account_id.to_owned(), "account_deletion_started".to_owned()));
+        audit_events.push(ControlAuditEvent::for_account(
+            account_id,
+            AuditActorKind::Account,
+            account_id,
+            "account_deletion_started",
+            now,
+        ));
         Ok(())
     }
 
@@ -1010,12 +1059,16 @@ impl RegistryStore for InMemoryStore {
             .expect("poisoned")
             .retain(|_, session| session.account_id != account_id);
         let mut audit_events = self.lock_audit_events();
-        if !audit_events
-            .iter()
-            .any(|(id, action)| id == &account_id && action == "account_deletion_started_operator")
-        {
-            let _ = (actor, now);
-            audit_events.push((account_id, "account_deletion_started_operator".to_owned()));
+        if !audit_events.iter().any(|event| {
+            event.account_id == account_id && event.action == "account_deletion_started_operator"
+        }) {
+            audit_events.push(ControlAuditEvent::for_account(
+                &account_id,
+                AuditActorKind::Operator,
+                actor,
+                "account_deletion_started_operator",
+                now,
+            ));
         }
         Ok(())
     }
@@ -1027,7 +1080,7 @@ impl RegistryStore for InMemoryStore {
         lease_owner_id: &str,
         lease_id: &str,
         fencing_generation: u64,
-        _completed_at: DateTime<Utc>,
+        completed_at: DateTime<Utc>,
     ) -> Result<(), MemoryError> {
         let mut tenants = self.lock_tenants();
         let tenant_index = tenants
@@ -1078,7 +1131,13 @@ impl RegistryStore for InMemoryStore {
             .checked_add(1)
             .ok_or_else(|| MemoryError::Conflict("tenant version overflow".into()))?;
         let mut audit_events = self.lock_audit_events();
-        audit_events.push((account_id, "account_deletion_completed".to_owned()));
+        audit_events.push(ControlAuditEvent::for_account(
+            &account_id,
+            AuditActorKind::System,
+            lease_owner_id,
+            "account_deletion_completed",
+            completed_at,
+        ));
         Ok(())
     }
 
@@ -1890,7 +1949,7 @@ impl InMemoryStore {
             .clone()
     }
 
-    pub fn audit_events(&self) -> Vec<(String, String)> {
+    pub fn audit_events(&self) -> Vec<ControlAuditEvent> {
         self.audit_events
             .lock()
             .expect("in-memory store poisoned")
@@ -2042,8 +2101,18 @@ mod tests {
             account_id: "acct_b".into(),
             created_at: chrono::Utc::now(),
         };
-        s.link_external_identity(&i1).await.unwrap();
-        let res = s.link_external_identity(&i2).await;
+        s.link_external_identity(
+            &i1,
+            &IdentityAudit::by_account("acct_a", chrono::Utc::now()),
+        )
+        .await
+        .unwrap();
+        let res = s
+            .link_external_identity(
+                &i2,
+                &IdentityAudit::by_account("acct_b", chrono::Utc::now()),
+            )
+            .await;
         assert!(matches!(res, Err(MemoryError::Conflict(_))));
     }
 
@@ -2307,13 +2376,16 @@ mod tests {
         })
         .await
         .unwrap();
-        s.link_external_identity(&ExternalIdentity {
-            id: "idn_delete".into(),
-            issuer: "https://issuer".into(),
-            subject_verifier: SubjectVerifier([2; 32]),
-            account_id: account.id.clone(),
-            created_at: now,
-        })
+        s.link_external_identity(
+            &ExternalIdentity {
+                id: "idn_delete".into(),
+                issuer: "https://issuer".into(),
+                subject_verifier: SubjectVerifier([2; 32]),
+                account_id: account.id.clone(),
+                created_at: now,
+            },
+            &IdentityAudit::by_account(&account.id, now),
+        )
         .await
         .unwrap();
         s.store_session(
@@ -2400,7 +2472,16 @@ mod tests {
             s.find_external_identities(&account.id).await.unwrap().len(),
             1
         );
-        assert_eq!(s.audit_events().len(), 1);
+        let events = s.audit_events();
+        assert_eq!(
+            events
+                .iter()
+                .filter(|event| event.action == "account_deletion_started")
+                .count(),
+            1,
+            "the deletion start must append exactly one row"
+        );
+        assert_eq!(events.len(), 2, "the earlier link keeps its own row");
 
         let replay = s
             .begin_account_deletion("verifier_atomic", &account.id, "ses_delete", now)

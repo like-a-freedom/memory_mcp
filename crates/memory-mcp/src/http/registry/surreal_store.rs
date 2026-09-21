@@ -313,6 +313,48 @@ fn classify_deletion_error(error: MemoryError) -> MemoryError {
     }
 }
 
+/// Sentinel the unlink transaction throws when the removal would leave an
+/// Account with no identity at all. A refused removal has to be told apart from
+/// an infrastructure failure, and a `THROW` reaches the adapter as storage text.
+const LAST_IDENTITY_SENTINEL: &str = "last identity cannot be unlinked";
+
+/// Query variables shared by both identity-change transactions, so the two call
+/// sites cannot drift in which columns they write.
+///
+/// The identity id is bound once and used both as the `external_identity` record
+/// id and as the `target_identity_id` column: an unbound id would silently write
+/// a single `external_identity:NONE` row that the next link then collides with.
+fn identity_audit_vars(event: &ControlAuditEvent) -> Value {
+    json!({
+        "account_id": event.account_id,
+        "actor_kind": event.actor_kind.as_str(),
+        "actor_principal": event.actor_principal,
+        "action": event.action,
+        "identity_id": event.target_identity_id.as_deref().unwrap_or_default(),
+        "correlation_id": event.correlation_id,
+        "occurred_at": event.occurred_at.to_rfc3339(),
+    })
+}
+
+/// Classify the failure of a guarded identity-change transaction.
+///
+/// The guard's own sentinel is the refusal. Everything else keeps the adapter's
+/// mapping, so a missing Account or identity still reads as `NotFound` — with one
+/// addition: SurrealDB reports a unique-index violation as "Database index `x`
+/// already *contains* …", which [`map_storage_error`] does not recognize, and the
+/// caller of a link needs that case to read as a `Conflict` rather than as an
+/// infrastructure failure.
+fn classify_identity_change_error(context: &str, error: MemoryError) -> MemoryError {
+    let text = error.to_string();
+    if text.contains(LAST_IDENTITY_SENTINEL) {
+        return MemoryError::Conflict("the account's last identity cannot be unlinked".into());
+    }
+    if text.contains("already contains") || text.contains("already exists") {
+        return MemoryError::Conflict(format!("{context}: {error}"));
+    }
+    map_storage_error(context, error)
+}
+
 fn migration_checksum(sql: &str) -> String {
     let mut hasher = Sha256::new();
     hasher.update(sql.as_bytes());
@@ -1309,31 +1351,44 @@ impl RegistryStore for SurrealRegistryStore {
         rows.iter().map(decode_identity).collect()
     }
 
-    async fn link_external_identity(&self, identity: &ExternalIdentity) -> Result<(), MemoryError> {
-        if self
-            .find_account_by_id(&identity.account_id)
-            .await?
-            .is_none()
-        {
-            return Err(MemoryError::NotFound(format!(
-                "account {}",
-                identity.account_id
-            )));
-        }
+    async fn link_external_identity(
+        &self,
+        identity: &ExternalIdentity,
+        audit: &IdentityAudit,
+    ) -> Result<(), MemoryError> {
+        // One transaction: the identity and the `identity_linked` row describing
+        // it are written together, or neither is (ADR-0057). The row cannot be
+        // derived later, because the identity it names is deletable.
+        let event = ControlAuditEvent::identity_change(
+            IdentityAuditAction::Linked,
+            &identity.id,
+            &identity.account_id,
+            audit,
+        );
+        let mut vars = identity_audit_vars(&event);
+        vars["issuer"] = json!(identity.issuer);
+        vars["verifier"] = json!(hex::encode(identity.subject_verifier.0));
+        vars["created_at"] = json!(identity.created_at.to_rfc3339());
+        let script = "BEGIN TRANSACTION; \
+            LET $account = SELECT id FROM type::record('account', $account_id) LIMIT 1; \
+            IF array::len($account) = 0 { THROW 'account not found'; }; \
+            CREATE type::record('external_identity', $identity_id) SET \
+                id = $identity_id, issuer = $issuer, \
+                subject_verifier = $verifier, account_id = $account_id, \
+                created_at = type::datetime($created_at); \
+            CREATE type::record('audit_event', $correlation_id) SET \
+                account_id = $account_id, \
+                actor_kind = $actor_kind, \
+                actor_principal = $actor_principal, \
+                action = $action, \
+                target_identity_id = IF $identity_id = '' { NONE } ELSE { $identity_id }, \
+                occurred_at = type::datetime($occurred_at), \
+                correlation_id = $correlation_id; \
+            COMMIT TRANSACTION;";
         self.handle()
-            .query_json(
-                "CREATE type::record($table, $id) SET id = $id, issuer = $issuer, subject_verifier = $verifier, account_id = $account_id, created_at = type::datetime($created_at)",
-                Some(json!({
-                    "table": "external_identity",
-                    "id": identity.id,
-                    "issuer": identity.issuer,
-                    "verifier": hex::encode(identity.subject_verifier.0),
-                    "account_id": identity.account_id,
-                    "created_at": identity.created_at.to_rfc3339(),
-                })),
-            )
+            .query_json(script, Some(vars))
             .await
-            .map_err(|error| map_storage_error("link external identity", error))?;
+            .map_err(|error| classify_identity_change_error("link external identity", error))?;
         Ok(())
     }
 
@@ -1341,18 +1396,37 @@ impl RegistryStore for SurrealRegistryStore {
         &self,
         account_id: &str,
         identity_id: &str,
+        audit: &IdentityAudit,
     ) -> Result<(), MemoryError> {
-        let rows = self
-            .handle()
-            .query_json(
-                "DELETE type::record($table, $id) WHERE account_id = $account_id RETURN BEFORE",
-                Some(json!({"table": "external_identity", "id": identity_id, "account_id": account_id})),
-            )
+        // The last-identity rule is enforced here rather than by the caller so
+        // that the count and the delete share one transaction: two concurrent
+        // removals can no longer both read two identities and both delete one
+        // (ADR-0057).
+        let event = ControlAuditEvent::identity_change(
+            IdentityAuditAction::Unlinked,
+            identity_id,
+            account_id,
+            audit,
+        );
+        let script = "BEGIN TRANSACTION; \
+            LET $held = SELECT id FROM external_identity WHERE account_id = $account_id; \
+            IF array::len($held) < 2 { THROW 'last identity cannot be unlinked'; }; \
+            LET $removed = DELETE type::record('external_identity', $identity_id) \
+                WHERE account_id = $account_id RETURN BEFORE; \
+            IF array::len($removed) = 0 { THROW 'identity not found'; }; \
+            CREATE type::record('audit_event', $correlation_id) SET \
+                account_id = $account_id, \
+                actor_kind = $actor_kind, \
+                actor_principal = $actor_principal, \
+                action = $action, \
+                target_identity_id = IF $identity_id = '' { NONE } ELSE { $identity_id }, \
+                occurred_at = type::datetime($occurred_at), \
+                correlation_id = $correlation_id; \
+            COMMIT TRANSACTION;";
+        self.handle()
+            .query_json(script, Some(identity_audit_vars(&event)))
             .await
-            .map_err(|error| map_storage_error("unlink external identity", error))?;
-        if rows.is_empty() {
-            return Err(MemoryError::NotFound("external identity not found".into()));
-        }
+            .map_err(|error| classify_identity_change_error("unlink external identity", error))?;
         Ok(())
     }
 
@@ -3393,6 +3467,131 @@ mod tests {
                 .expect("stale lookup")
                 .is_none(),
             "a session with a stale epoch must not resolve"
+        );
+    }
+
+    /// A migrated control namespace with one Active Account, which is all an
+    /// identity change needs.
+    async fn identity_change_store() -> SurrealRegistryStore {
+        let namespace = format!("identity_audit_{}", uuid::Uuid::new_v4().simple());
+        let store = SurrealRegistryStore::connect_in_memory(&namespace, "registry")
+            .await
+            .expect("migrated Mem registry");
+        store
+            .ensure_plan(&crate::http::registry::models::Plan::default())
+            .await
+            .expect("ensure default plan");
+        store
+            .create_account_bundle(&account(), &tenant(), None)
+            .await
+            .expect("create account bundle");
+        store
+    }
+
+    fn linked_identity(id: &str, tag: u8) -> ExternalIdentity {
+        ExternalIdentity {
+            id: id.into(),
+            issuer: "https://issuer.example".into(),
+            subject_verifier: SubjectVerifier([tag; 32]),
+            account_id: "acct_shared".into(),
+            created_at: Utc::now(),
+        }
+    }
+
+    /// Durable audit rows carrying `action`, read through the same handle the
+    /// production statements use.
+    async fn audit_rows(store: &SurrealRegistryStore, action: &str) -> Vec<Value> {
+        store
+            .handle()
+            .query_json(
+                "SELECT account_id, actor_kind, actor_principal, action, target_identity_id, correlation_id FROM audit_event WHERE action = $action",
+                Some(json!({"action": action})),
+            )
+            .await
+            .expect("read audit rows")
+    }
+
+    /// ADR-0057: an identity change and its audit row are one durable write, and
+    /// the row names the Account, the actor and the identity — which is what
+    /// keeps the change readable once the identity itself has been deleted.
+    #[tokio::test]
+    async fn identity_changes_append_audit_rows_durably() {
+        let store = identity_change_store().await;
+        let audit = IdentityAudit::by_account("acct_shared", Utc::now());
+
+        store
+            .link_external_identity(&linked_identity("idn_one", 0x11), &audit)
+            .await
+            .expect("link first identity");
+        let rows = audit_rows(&store, "identity_linked").await;
+        assert_eq!(rows.len(), 1);
+        assert_eq!(rows[0]["account_id"], "acct_shared");
+        assert_eq!(rows[0]["actor_kind"], "account");
+        assert_eq!(rows[0]["actor_principal"], "acct_shared");
+        assert_eq!(rows[0]["target_identity_id"], "idn_one");
+        assert_eq!(rows[0]["correlation_id"], "identity_linked_idn_one");
+
+        store
+            .link_external_identity(&linked_identity("idn_two", 0x22), &audit)
+            .await
+            .expect("link second identity");
+        store
+            .unlink_external_identity("acct_shared", "idn_one", &audit)
+            .await
+            .expect("unlink one of two");
+
+        let remaining = store
+            .find_external_identities("acct_shared")
+            .await
+            .expect("list identities");
+        assert_eq!(remaining.len(), 1);
+        assert_eq!(remaining[0].id, "idn_two");
+        let rows = audit_rows(&store, "identity_unlinked").await;
+        assert_eq!(rows.len(), 1);
+        assert_eq!(rows[0]["target_identity_id"], "idn_one");
+        assert_eq!(rows[0]["account_id"], "acct_shared");
+    }
+
+    /// A refused identity change leaves nothing behind: the transaction that
+    /// would have appended the row is the one that was rolled back, so neither a
+    /// duplicate link nor a refused removal can produce a row that describes a
+    /// change that did not happen.
+    #[tokio::test]
+    async fn a_refused_identity_change_appends_no_audit_row() {
+        let store = identity_change_store().await;
+        let audit = IdentityAudit::by_account("acct_shared", Utc::now());
+        let first = linked_identity("idn_one", 0x11);
+        store
+            .link_external_identity(&first, &audit)
+            .await
+            .expect("link first identity");
+
+        // Same (issuer, subject_verifier) under a different row id: the durable
+        // unique index is what refuses it.
+        let duplicate = linked_identity("idn_duplicate", 0x11);
+        let refused = store.link_external_identity(&duplicate, &audit).await;
+        assert!(
+            matches!(refused, Err(MemoryError::Conflict(_))),
+            "a duplicate identity tuple must be refused, got {refused:?}"
+        );
+        assert_eq!(audit_rows(&store, "identity_linked").await.len(), 1);
+
+        let refused = store
+            .unlink_external_identity("acct_shared", "idn_one", &audit)
+            .await;
+        assert!(
+            matches!(refused, Err(MemoryError::Conflict(_))),
+            "the last identity must not be removable, got {refused:?}"
+        );
+        assert!(audit_rows(&store, "identity_unlinked").await.is_empty());
+        assert_eq!(
+            store
+                .find_external_identities("acct_shared")
+                .await
+                .expect("list identities")
+                .len(),
+            1,
+            "the refusal must not have removed anything"
         );
     }
 }

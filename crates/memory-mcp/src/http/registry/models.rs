@@ -248,6 +248,141 @@ pub struct DeletionChallengeRecord {
     pub consumed_at: Option<DateTime<Utc>>,
 }
 
+/// Who or what performed a control action.
+///
+/// Mirrors the `actor_kind` allowlist on the durable `audit_event` table, so an
+/// unrecognized kind is a compile error here rather than a row the database
+/// rejects at runtime.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum AuditActorKind {
+    /// The Account holder, acting in their own browser session.
+    Account,
+    /// An operator, acting through the operator surface.
+    Operator,
+    /// The server, acting on its own schedule.
+    System,
+}
+
+impl AuditActorKind {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Account => "account",
+            Self::Operator => "operator",
+            Self::System => "system",
+        }
+    }
+}
+
+/// The actor behind an identity change and the instant it happened.
+///
+/// The store methods that change an Account's identities take one of these and
+/// write the audit row in the same transaction, so a change cannot be performed
+/// without recording who performed it.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct IdentityAudit {
+    pub actor_kind: AuditActorKind,
+    pub actor_principal: String,
+    pub occurred_at: DateTime<Utc>,
+}
+
+impl IdentityAudit {
+    /// An identity change performed by the Account holder themselves.
+    pub fn by_account(account_id: &str, occurred_at: DateTime<Utc>) -> Self {
+        Self {
+            actor_kind: AuditActorKind::Account,
+            actor_principal: account_id.to_owned(),
+            occurred_at,
+        }
+    }
+}
+
+/// Which identity change an audit row records.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum IdentityAuditAction {
+    Linked,
+    Unlinked,
+}
+
+impl IdentityAuditAction {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Linked => "identity_linked",
+            Self::Unlinked => "identity_unlinked",
+        }
+    }
+}
+
+/// One row of the control audit log (`audit_event`, migration 045).
+///
+/// The log is append-only: the durable table grants no select, update or delete
+/// permission to an unprivileged caller, and nothing rewrites a row once it is
+/// written. Deletion events are appended inside the transaction that performs
+/// the deletion; identity changes use [`ControlAuditEvent::identity_change`] and
+/// are appended by the store method that performs the change.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ControlAuditEvent {
+    pub account_id: String,
+    pub actor_kind: AuditActorKind,
+    /// The concrete principal behind `actor_kind`: the Account id for
+    /// [`AuditActorKind::Account`], the operator id for
+    /// [`AuditActorKind::Operator`].
+    pub actor_principal: String,
+    /// The durable action token, e.g. `account_deletion_started`.
+    pub action: String,
+    /// The resource inside the Account that the action touched. Only identity
+    /// changes set it today; the Account itself is `account_id`.
+    pub target_identity_id: Option<String>,
+    /// The durable row id, unique per action. Deterministic, so appending the
+    /// same event twice conflicts instead of appending a second row.
+    pub correlation_id: String,
+    pub occurred_at: DateTime<Utc>,
+}
+
+impl ControlAuditEvent {
+    /// A control action whose only subject is the Account.
+    pub fn for_account(
+        account_id: &str,
+        actor_kind: AuditActorKind,
+        actor_principal: &str,
+        action: &str,
+        occurred_at: DateTime<Utc>,
+    ) -> Self {
+        Self {
+            account_id: account_id.to_owned(),
+            actor_kind,
+            actor_principal: actor_principal.to_owned(),
+            action: action.to_owned(),
+            target_identity_id: None,
+            correlation_id: format!("{action}_{account_id}"),
+            occurred_at,
+        }
+    }
+
+    /// The row for attaching or detaching one External Identity (ADR-0057).
+    ///
+    /// The identity id is both the named target and the basis of the row id, so
+    /// the two events of one identity's lifetime stay distinguishable and a
+    /// repeated append cannot duplicate the row.
+    pub fn identity_change(
+        action: IdentityAuditAction,
+        identity_id: &str,
+        account_id: &str,
+        audit: &IdentityAudit,
+    ) -> Self {
+        let action = action.as_str();
+        Self {
+            account_id: account_id.to_owned(),
+            actor_kind: audit.actor_kind,
+            actor_principal: audit.actor_principal.clone(),
+            action: action.to_owned(),
+            target_identity_id: Some(identity_id.to_owned()),
+            correlation_id: format!("{action}_{identity_id}"),
+            occurred_at: audit.occurred_at,
+        }
+    }
+}
+
 impl KeyedVerifier {
     /// Compute HMAC-SHA256(pepper, secret) into a fixed-size
     /// verifier. Used when issuing new API keys.

@@ -15,13 +15,12 @@ configuration contract, independent route mounting, the single policy writer,
 the method disclosure, the login page, the admin CLI, and the single-file
 deployment.
 
-Of the identity-linking half, two of the three requirements are implemented:
-the link is created only from a provider round trip that carries the link intent
-inside the sealed flow material, and an Account's last identity cannot be
-unlinked. The third — `identity_linked` / `identity_unlinked` audit events — is
-**not** implemented, because it needs a durable audit table that does not exist
-yet, and introducing one is a schema decision of its own rather than part of
-this change. Until it lands, an identity link is durable but not audited.
+The identity-linking half is complete as of the audit change that followed it. A
+link is created only from a provider round trip that carries the link intent
+inside the sealed flow material; an Account's last identity cannot be unlinked;
+and both halves of an identity's lifetime are audited. That audit required no new
+table — see the implementation notes below — so the earlier reading of this gap,
+that it was a schema decision of its own, did not hold.
 
 ## Context
 
@@ -157,10 +156,16 @@ accepted from a request body as the current route does. The last identity of an
 Account cannot be unlinked, and link and unlink are audited with both identities,
 the actor and the timestamp.
 
+Both properties are enforced where the write happens rather than by the caller:
+the store methods that change an Account's identities take the actor and the
+instant, and the mutation, the audit row and the last-identity check share one
+guarded transaction.
+
 ## Implementation notes
 
 Recorded the day this decision landed, because three details are checkable and
-one of them is a behaviour a reader would otherwise have to infer.
+one of them is a behaviour a reader would otherwise have to infer. The identity
+notes were added with the audit change that followed.
 
 - **One writer, not two.** The two joins this decision replaced
   (`join_oidc_policy`, `join_local_policy`) became
@@ -180,6 +185,24 @@ one of them is a behaviour a reader would otherwise have to infer.
   version-1 `free` plan at all, because that plan backs the tenants `oidc`
   signup creates. A deployment that enables `oidc` beside `local` publishes it
   again on the same restart.
+- **The identity audit reused a table that already existed.** An earlier status
+  note claimed `identity_linked` / `identity_unlinked` needed a durable audit
+  table that did not exist. That was wrong: `audit_event` (migration 045) already
+  records the Account, the actor, the action and the instant. Migration 049 adds
+  the single column it lacked — the identity the action touched, which an unlink
+  deletes, so the row would otherwise stop naming its own subject.
+- **The two methods that change an Account's identities audit the change.**
+  `link_external_identity` and `unlink_external_identity` take the actor and the
+  instant, and append the audit row inside the same guarded transaction as the
+  mutation; `InMemoryStore` mirrors both. Making the parameter required is what
+  keeps a caller from attaching or detaching an identity without recording it,
+  and the shared transaction is what keeps a refused link or removal from
+  leaving a row behind. The last-identity rule moved into that transaction too,
+  so it holds under two concurrent removals rather than only under a pre-check.
+  Creating an Account with its first identity is *not* one of these events: that
+  is `create_account_bundle`, which provisions the Account and Tenant pair and
+  belongs to provisioning rather than to linking, so it is outside this
+  decision.
 
 ## Consequences
 

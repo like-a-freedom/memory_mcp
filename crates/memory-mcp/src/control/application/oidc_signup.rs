@@ -268,7 +268,9 @@ mod tests {
     /// reread returns the seeded account.
     #[tokio::test]
     async fn conflict_is_resolved_by_reread() {
-        use crate::http::registry::models::{Account, AccountStatus, ExternalIdentity};
+        use crate::http::registry::models::{
+            Account, AccountStatus, ExternalIdentity, IdentityAudit,
+        };
         let store = Arc::new(InMemoryStore::default());
         let now = chrono::Utc::now();
 
@@ -288,7 +290,10 @@ mod tests {
         };
         store.write_account(&existing_account).await.unwrap();
         store
-            .link_external_identity(&existing_identity)
+            .link_external_identity(
+                &existing_identity,
+                &IdentityAudit::by_account(&existing_account.id, now),
+            )
             .await
             .expect("seed identity");
 
