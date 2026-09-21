@@ -345,7 +345,7 @@ mod tests {
 
     #[test]
     fn session_token_binds_epoch_and_session() {
-        use crate::http::config::BrowserAuthMode;
+        use crate::http::config::BrowserAuthMethod;
         use crate::service::local_admin::contracts::BrowserPolicyFence;
 
         let fence = AdminFence {
@@ -353,7 +353,7 @@ mod tests {
             session_id: "ses1".into(),
             credential_generation: 1,
             policy: BrowserPolicyFence {
-                mode: BrowserAuthMode::Local,
+                methods: vec![BrowserAuthMethod::Local],
                 epoch: 2,
             },
         };

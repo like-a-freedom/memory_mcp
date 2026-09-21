@@ -618,17 +618,14 @@ impl InMemoryStore {
         &self,
         policy: &super::models::BrowserPolicyFence,
     ) -> Result<(), MemoryError> {
-        use crate::http::config::BrowserAuthMode;
         let stored = self.lock_browser_policy();
         match stored.as_ref() {
             Some(existing)
-                if existing.mode == BrowserAuthMode::Oidc
-                    && existing.mode == policy.mode
-                    && existing.epoch == policy.epoch =>
+                if existing.methods == policy.methods && existing.epoch == policy.epoch =>
             {
                 Ok(())
             }
-            _ => Err(MemoryError::Conflict("policy mode/epoch mismatch".into())),
+            _ => Err(MemoryError::Conflict("policy method/epoch mismatch".into())),
         }
     }
 
@@ -1801,16 +1798,18 @@ impl RegistryStore for InMemoryStore {
 
     #[cfg(feature = "control-plane")]
     async fn join_oidc_policy(&self) -> Result<super::models::BrowserPolicyFence, MemoryError> {
-        use crate::http::config::BrowserAuthMode;
+        use crate::http::config::BrowserAuthMethod;
         let mut policy = self.lock_browser_policy();
         if let Some(existing) = policy.as_ref() {
-            if existing.mode != BrowserAuthMode::Oidc {
-                return Err(MemoryError::Conflict("mode mismatch: expected oidc".into()));
+            if !existing.has(BrowserAuthMethod::Oidc) {
+                return Err(MemoryError::Conflict(
+                    "method not enabled: expected oidc".into(),
+                ));
             }
             Ok(existing.clone())
         } else {
             let fence = super::models::BrowserPolicyFence {
-                mode: BrowserAuthMode::Oidc,
+                methods: vec![BrowserAuthMethod::Oidc],
                 epoch: 1,
             };
             *policy = Some(fence.clone());
@@ -1830,8 +1829,8 @@ impl RegistryStore for InMemoryStore {
             let stored = self.lock_browser_policy();
             match stored.as_ref() {
                 Some(existing)
-                    if existing.mode == policy.mode && existing.epoch == policy.epoch => {}
-                _ => return Err(MemoryError::Conflict("policy mode/epoch mismatch".into())),
+                    if existing.methods == policy.methods && existing.epoch == policy.epoch => {}
+                _ => return Err(MemoryError::Conflict("policy method/epoch mismatch".into())),
             }
         }
         self.create_account_bundle(account, tenant, Some(identity))

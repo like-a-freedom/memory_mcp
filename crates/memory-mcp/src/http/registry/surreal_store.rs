@@ -1133,13 +1133,20 @@ impl SurrealRegistryStore {
 /// `BEGIN TRANSACTION`) and the method-specific statement is index 5.
 /// A `THROW` aborts the transaction and is surfaced by `query_json_at`
 /// before any result is decoded. The caller binds `$expected_epoch` to
-/// the fence joined at startup; a missing singleton, a non-OIDC mode, or
-/// a stale epoch all fail the transaction.
+/// the fence joined at startup; a missing or ambiguous singleton, a
+/// deployment that does not enable `oidc`, or a stale epoch all fail the
+/// transaction.
+///
+/// The row is read with `LIMIT 2` so "exactly one row" is a checked
+/// precondition rather than an assumption about which row the engine
+/// returns: a second row now fails loudly instead of being silently
+/// ignored. `methods` is authoritative and `mode` only supplies the value
+/// for a row created before migration 048.
 #[cfg(feature = "control-plane")]
 const OIDC_POLICY_GUARD: &str = r#"
-LET $policy = (SELECT mode, epoch FROM browser_auth_policy LIMIT 1);
-IF array::len($policy) = 0 { THROW 'no_policy'; };
-IF $policy[0].mode != 'oidc' { THROW 'mode_mismatch'; };
+LET $policy = (SELECT mode, epoch, methods FROM browser_auth_policy LIMIT 2);
+IF array::len($policy) != 1 { THROW 'no_policy'; };
+IF NOT ('oidc' IN $policy[0].methods ?? [$policy[0].mode]) { THROW 'mode_mismatch'; };
 IF $policy[0].epoch != $expected_epoch { THROW 'epoch_mismatch'; };
 "#;
 
@@ -2256,19 +2263,20 @@ impl RegistryStore for SurrealRegistryStore {
         // pre-existing policy for another mode aborts startup.
         let sql = "
             BEGIN TRANSACTION;
-            LET $existing = (SELECT mode, epoch FROM browser_auth_policy LIMIT 1);
+            LET $existing = (SELECT mode, epoch, methods FROM browser_auth_policy LIMIT 2);
             IF array::len($existing) = 0 {
                 CREATE browser_auth_policy SET
                     mode = 'oidc',
+                    methods = ['oidc'],
                     epoch = 1,
                     version = 1,
                     created_at = time::now(),
                     updated_at = time::now();
             };
-            IF array::len($existing) > 0 AND $existing[0].mode != 'oidc' {
+            IF array::len($existing) > 0 AND (array::len($existing) != 1 OR NOT ('oidc' IN $existing[0].methods ?? [$existing[0].mode])) {
                 THROW 'mode_mismatch';
             };
-            SELECT mode, epoch FROM browser_auth_policy LIMIT 1;
+            SELECT mode, epoch, methods FROM browser_auth_policy LIMIT 2;
             COMMIT TRANSACTION;";
         let rows = self
             .handle()
@@ -2280,20 +2288,19 @@ impl RegistryStore for SurrealRegistryStore {
                 "join_oidc_policy returned no rows".into(),
             ));
         };
-        let mode_str = row
-            .get("mode")
-            .and_then(|v| v.as_str())
-            .ok_or_else(|| MemoryError::Storage("policy row has no mode".into()))?;
-        let mode = match mode_str {
-            "oidc" => crate::http::config::BrowserAuthMode::Oidc,
-            other => {
-                return Err(MemoryError::Storage(format!(
-                    "unexpected policy mode: {other}"
-                )));
-            }
-        };
+        let methods =
+            crate::http::registry::models::policy_methods_from_row(&row).ok_or_else(|| {
+                MemoryError::Storage(
+                    "policy row carries neither an enabled-method set nor a recognized mode".into(),
+                )
+            })?;
+        if !methods.contains(&crate::http::config::BrowserAuthMethod::Oidc) {
+            return Err(MemoryError::Storage(
+                "policy row does not enable oidc".into(),
+            ));
+        }
         let epoch = required_u64(&row, "epoch")?;
-        Ok(BrowserPolicyFence { mode, epoch })
+        Ok(BrowserPolicyFence { methods, epoch })
     }
 
     #[cfg(feature = "control-plane")]
@@ -2304,10 +2311,6 @@ impl RegistryStore for SurrealRegistryStore {
         tenant: &Tenant,
         identity: &ExternalIdentity,
     ) -> Result<(), MemoryError> {
-        let expected_mode = match policy.mode {
-            crate::http::config::BrowserAuthMode::Oidc => "oidc",
-            crate::http::config::BrowserAuthMode::Local => "local",
-        };
         let account_status = serde_json::to_value(account.status)
             .map_err(|error| MemoryError::Storage(format!("encode account status: {error}")))?;
         let tenant_status = serde_json::to_value(tenant.status)
@@ -2321,9 +2324,9 @@ impl RegistryStore for SurrealRegistryStore {
         };
         let script = format!(
             "BEGIN TRANSACTION;
-            LET $policy = (SELECT mode, epoch FROM browser_auth_policy LIMIT 1);
-            IF array::len($policy) = 0 {{ THROW 'no_policy'; }};
-            IF $policy[0].mode != $expected_mode {{ THROW 'mode_mismatch'; }};
+            LET $policy = (SELECT mode, epoch, methods FROM browser_auth_policy LIMIT 2);
+            IF array::len($policy) != 1 {{ THROW 'no_policy'; }};
+            IF NOT ('oidc' IN $policy[0].methods ?? [$policy[0].mode]) {{ THROW 'mode_mismatch'; }};
             IF $policy[0].epoch != $expected_epoch {{ THROW 'epoch_mismatch'; }};
             CREATE type::record('account', $account_id) SET id = $account_id, status = $account_status, tenant_id = $tenant_id, created_at = type::datetime($account_created_at);
             CREATE type::record('tenant', $tenant_record_id) SET id = $tenant_record_id, status = $tenant_status, namespace_binding = $binding, plan_version = $plan_version, schema_version = $schema_version, {retry_stage_assignment}, {lease_assignment}, created_at = type::datetime($tenant_created_at), version = $version;
@@ -2331,7 +2334,6 @@ impl RegistryStore for SurrealRegistryStore {
             COMMIT TRANSACTION;",
         );
         let mut vars = json!({
-            "expected_mode": expected_mode,
             "expected_epoch": policy.epoch,
             "account_id": account.id,
             "account_status": account_status,
@@ -3107,16 +3109,16 @@ mod tests {
     #[cfg(feature = "control-plane")]
     #[tokio::test]
     async fn join_oidc_policy_creates_singleton_and_is_idempotent() {
-        use crate::http::config::BrowserAuthMode;
+        use crate::http::config::BrowserAuthMethod;
         let namespace = format!("join_oidc_{}", uuid::Uuid::new_v4().simple());
         let store = SurrealRegistryStore::connect_in_memory(&namespace, "registry")
             .await
             .expect("migrated in-memory registry");
         let first = store.join_oidc_policy().await.expect("join OIDC policy");
-        assert_eq!(first.mode, BrowserAuthMode::Oidc);
+        assert!(first.has(BrowserAuthMethod::Oidc));
         assert_eq!(first.epoch, 1);
         let second = store.join_oidc_policy().await.expect("idempotent join");
-        assert_eq!(second.mode, first.mode);
+        assert_eq!(second.methods, first.methods);
         assert_eq!(second.epoch, first.epoch);
     }
 
@@ -3153,7 +3155,7 @@ mod tests {
     #[cfg(feature = "control-plane")]
     #[tokio::test]
     async fn oidc_flow_operations_are_policy_guarded() {
-        use crate::http::config::BrowserAuthMode;
+        use crate::http::config::BrowserAuthMethod;
         use crate::http::registry::models::BrowserPolicyFence;
 
         let namespace = format!("oidc_flow_{}", uuid::Uuid::new_v4().simple());
@@ -3185,7 +3187,7 @@ mod tests {
 
         // A stale or non-OIDC fence aborts the transaction.
         let stale = BrowserPolicyFence {
-            mode: BrowserAuthMode::Oidc,
+            methods: vec![BrowserAuthMethod::Oidc],
             epoch: policy.epoch + 1,
         };
         assert!(

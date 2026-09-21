@@ -30,7 +30,7 @@ use crate::error::MemoryError;
 use crate::http::registry::models::{AccountStatus, ApiKeyMeta, TenantStatus};
 use crate::service::local_admin::contracts::{
     AdminFence, AdminKeyInsert, AdminPrincipal, AdminState, AttemptDecision, AttemptDomain,
-    AttemptInput, BrowserAuthMode, BrowserPolicyFence, ChallengeFinish, ChallengeIssue,
+    AttemptInput, BrowserAuthMethod, BrowserPolicyFence, ChallengeFinish, ChallengeIssue,
     ChallengeKind, ChallengeView, ClientBundle, ClientStateAction, ClientView, CredentialSnapshot,
     FailureAction, FailureAudit, FailureReason, IssuedChallenge, KeyExpiry, KeyInsertOutcome,
     LocalAdminError, LocalAdminStore, LocalKeyFingerprints, LocalResult, Page, PageRequest,
@@ -304,8 +304,8 @@ fn failure_reason_token(reason: FailureReason) -> &'static str {
 /// The two `UPDATE`s touch the admin `version` and the session row so a
 /// concurrent recovery, logout or rotation aborts the transaction.
 const MUTATION_GUARD: &str = r#"
-LET $guard_policy = (SELECT epoch FROM browser_auth_policy LIMIT 1);
-IF array::len($guard_policy) = 0 OR $guard_policy[0].epoch != $epoch { THROW 'policy_stale'; };
+LET $guard_policy = (SELECT epoch, mode, methods FROM browser_auth_policy LIMIT 2);
+IF array::len($guard_policy) != 1 OR NOT ('local' IN $guard_policy[0].methods ?? [$guard_policy[0].mode]) OR $guard_policy[0].epoch != $epoch { THROW 'policy_stale'; };
 LET $guard_admin = (SELECT state, credential_generation FROM local_admin WHERE id = type::record('local_admin', $admin_id) LIMIT 1);
 IF array::len($guard_admin) = 0 OR $guard_admin[0].state != 'active' OR $guard_admin[0].credential_generation != $generation { THROW 'admin_stale'; };
 LET $guard_session = (SELECT id FROM local_admin_session WHERE cookie_verifier = $session_verifier AND admin_id = $admin_id AND credential_generation = $generation AND mode_epoch = $epoch AND revoked_at IS NONE AND idle_expiry > time::now() AND absolute_expiry > time::now() AND auth_time > time::now() - 600s LIMIT 1);
@@ -434,10 +434,11 @@ impl LocalAdminStore for SurrealRegistryStore {
 
         let sql = "
             BEGIN TRANSACTION;
-            LET $existing = (SELECT mode, epoch, local_session_fingerprint, local_csrf_fingerprint FROM browser_auth_policy LIMIT 1);
+            LET $existing = (SELECT mode, epoch, methods, local_session_fingerprint, local_csrf_fingerprint FROM browser_auth_policy LIMIT 2);
             IF array::len($existing) = 0 {
                 CREATE browser_auth_policy SET
                     mode = 'local',
+                    methods = ['local'],
                     epoch = 1,
                     version = 1,
                     local_session_fingerprint = $session_fingerprint,
@@ -445,10 +446,10 @@ impl LocalAdminStore for SurrealRegistryStore {
                     created_at = time::now(),
                     updated_at = time::now();
             };
-            IF array::len($existing) > 0 AND ($existing[0].mode != 'local' OR $existing[0].local_session_fingerprint != $session_fingerprint OR $existing[0].local_csrf_fingerprint != $csrf_fingerprint) {
+            IF array::len($existing) > 0 AND (array::len($existing) != 1 OR NOT ('local' IN $existing[0].methods ?? [$existing[0].mode]) OR $existing[0].local_session_fingerprint != $session_fingerprint OR $existing[0].local_csrf_fingerprint != $csrf_fingerprint) {
                 THROW 'policy_mismatch';
             };
-            SELECT mode, epoch FROM browser_auth_policy LIMIT 1;
+            SELECT mode, epoch, methods FROM browser_auth_policy LIMIT 2;
             COMMIT TRANSACTION;
         ";
 
@@ -472,15 +473,20 @@ impl LocalAdminStore for SurrealRegistryStore {
                 "join_local_policy returned no row".into(),
             ))
         })?;
-        let mode = require_str(&row, "mode")?;
-        if mode != "local" {
-            return Err(infra(MemoryError::Storage(format!(
-                "browser_auth_policy mode is {mode}, expected local"
-            ))));
+        let methods =
+            crate::http::registry::models::policy_methods_from_row(&row).ok_or_else(|| {
+                infra(MemoryError::Storage(
+                    "policy row carries neither an enabled-method set nor a recognized mode".into(),
+                ))
+            })?;
+        if !methods.contains(&BrowserAuthMethod::Local) {
+            return Err(infra(MemoryError::Storage(
+                "browser_auth_policy does not enable local".into(),
+            )));
         }
 
         Ok(BrowserPolicyFence {
-            mode: BrowserAuthMode::Local,
+            methods,
             epoch: require_u64(&row, "epoch")?,
         })
     }
@@ -2309,7 +2315,7 @@ mod sql_fault_tests {
         // rejection would turn into an unrelated audit failure.
         let (store, authority, _service, _management) = fixture().await;
         let stale = BrowserPolicyFence {
-            mode: BrowserAuthMode::Local,
+            methods: vec![BrowserAuthMethod::Local],
             epoch: authority.policy().epoch.wrapping_add(41),
         };
         store

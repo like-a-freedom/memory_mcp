@@ -7,6 +7,8 @@
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 
+use crate::http::config::BrowserAuthMethod;
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ExternalIdentity {
     pub id: String,
@@ -200,8 +202,37 @@ pub struct IdentityRef {
 /// reference it without importing the local_admin service contracts.
 #[derive(Debug, Clone)]
 pub struct BrowserPolicyFence {
-    pub mode: crate::http::config::BrowserAuthMode,
+    /// The methods this deployment enables (ADR-0057). A row created before
+    /// migration 048 carries no set and is read as the single method named by
+    /// its `mode`.
+    pub methods: Vec<crate::http::config::BrowserAuthMethod>,
     pub epoch: u64,
+}
+
+impl BrowserPolicyFence {
+    /// Whether `method` is enabled on this deployment.
+    pub fn has(&self, method: crate::http::config::BrowserAuthMethod) -> bool {
+        self.methods.contains(&method)
+    }
+}
+
+/// Read the enabled browser authentication methods from a `browser_auth_policy`
+/// row.
+///
+/// A row created before migration 048 carries no `methods` array and reads as
+/// the single method named by its `mode`, which is what makes the change
+/// additive for a deployment that already holds a single-mode row. Returns
+/// `None` when neither source is present or a token is unrecognized, so the
+/// caller fails closed with its own storage error.
+pub fn policy_methods_from_row(row: &serde_json::Value) -> Option<Vec<BrowserAuthMethod>> {
+    let tokens: Vec<&str> = match row.get("methods").and_then(|value| value.as_array()) {
+        Some(values) => values.iter().filter_map(|value| value.as_str()).collect(),
+        None => vec![row.get("mode")?.as_str()?],
+    };
+    if tokens.is_empty() {
+        return None;
+    }
+    tokens.into_iter().map(BrowserAuthMethod::parse).collect()
 }
 
 /// One-use deletion challenge keyed by an HMAC verifier.

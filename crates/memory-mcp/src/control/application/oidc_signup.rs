@@ -336,7 +336,7 @@ mod tests {
     /// relies on; `create_account_bundle` alone is mode-neutral.
     #[tokio::test]
     async fn stale_or_non_oidc_fence_is_rejected() {
-        use crate::http::config::BrowserAuthMode;
+        use crate::http::config::BrowserAuthMethod;
         use crate::http::registry::models::BrowserPolicyFence;
 
         let store = Arc::new(InMemoryStore::default());
@@ -345,7 +345,7 @@ mod tests {
         assert_eq!(durable.epoch, 1);
 
         let stale = BrowserPolicyFence {
-            mode: BrowserAuthMode::Oidc,
+            methods: vec![BrowserAuthMethod::Oidc],
             epoch: durable.epoch + 1,
         };
         let workflow = OidcSignup::new(store.clone());
@@ -366,7 +366,7 @@ mod tests {
         );
 
         let non_oidc = BrowserPolicyFence {
-            mode: BrowserAuthMode::Local,
+            methods: vec![BrowserAuthMethod::Local],
             epoch: durable.epoch,
         };
         let non_oidc_result = workflow

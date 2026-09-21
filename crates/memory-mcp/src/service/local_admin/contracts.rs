@@ -4,7 +4,7 @@ use serde::Serialize;
 use std::fmt;
 
 use crate::error::MemoryError;
-pub use crate::http::config::BrowserAuthMode;
+pub use crate::http::config::BrowserAuthMethod;
 use crate::http::registry::models::{AccountStatus, TenantStatus};
 
 /// Substituted for a secret field by a hand-written `Debug`.

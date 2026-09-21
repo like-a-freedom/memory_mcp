@@ -23,7 +23,7 @@ impl AdminCliConfig {
     /// any connection is opened.
     pub fn from_env() -> Result<Self, MemoryError> {
         match std::env::var("MEMORY_MCP_HTTP_AUTH_MODE").ok() {
-            Some(mode) if mode == crate::http::config::AUTH_MODE_LOCAL => {}
+            Some(mode) if mode == crate::http::config::AUTH_METHOD_LOCAL => {}
             Some(other) => {
                 return Err(MemoryError::ConfigInvalid(format!(
                     "admin commands require local mode, got '{other}'"

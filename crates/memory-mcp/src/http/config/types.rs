@@ -30,12 +30,34 @@ pub use crate::config::SurrealTargetConfig;
 /// "Redact Debug of config and keys").
 const REDACTED: &str = "<redacted>";
 
-/// The browser authentication mode selected for this deployment.
+/// One browser authentication method (ADR-0057). A deployment enables a **set**
+/// of these rather than choosing one, and each enabled method mounts its own
+/// routes.
 #[derive(Debug, Clone, Copy, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
-pub enum BrowserAuthMode {
+pub enum BrowserAuthMethod {
     Local,
     Oidc,
+}
+
+impl BrowserAuthMethod {
+    /// The durable token for this method, as stored in `browser_auth_policy`.
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::Local => AUTH_METHOD_LOCAL,
+            Self::Oidc => AUTH_METHOD_OIDC,
+        }
+    }
+
+    /// Parse a durable token, or `None` for an unknown method so the caller can
+    /// fail closed with its own error type.
+    pub fn parse(token: &str) -> Option<Self> {
+        match token {
+            AUTH_METHOD_LOCAL => Some(Self::Local),
+            AUTH_METHOD_OIDC => Some(Self::Oidc),
+            _ => None,
+        }
+    }
 }
 
 /// Mode-specific browser configuration. `None` when the control plane
@@ -250,10 +272,11 @@ pub enum SignupMode {
     Open,
 }
 
-/// The two values `MEMORY_MCP_HTTP_AUTH_MODE` accepts, shared by the parser, the
-/// validator and the administrator CLI so no caller re-types the literal.
-pub const AUTH_MODE_LOCAL: &str = "local";
-pub const AUTH_MODE_OIDC: &str = "oidc";
+/// The two method tokens `MEMORY_MCP_HTTP_AUTH_METHODS` accepts, shared by the
+/// parser, the validator and the durable policy so no caller re-types the
+/// literal.
+pub const AUTH_METHOD_LOCAL: &str = "local";
+pub const AUTH_METHOD_OIDC: &str = "oidc";
 
 impl HttpConfig {
     /// Loads the HTTP config from process environment variables.
@@ -332,7 +355,7 @@ impl HttpConfig {
         let enable_control_plane = parse_bool("MEMORY_MCP_HTTP_ENABLE_CONTROL_PLANE", false)?;
         let enable_control_plane_ui = parse_bool("MEMORY_MCP_HTTP_ENABLE_CONTROL_PLANE_UI", false)?;
         let auth_mode = optional_env("MEMORY_MCP_HTTP_AUTH_MODE");
-        let is_local_mode = enable_control_plane && auth_mode.as_deref() == Some(AUTH_MODE_LOCAL);
+        let is_local_mode = enable_control_plane && auth_mode.as_deref() == Some(AUTH_METHOD_LOCAL);
 
         let identity_index = if is_local_mode {
             // Local mode has no external identity to index, but the field
@@ -398,7 +421,7 @@ impl HttpConfig {
         // Mode-specific browser auth configuration.
         let browser_auth = if enable_control_plane {
             match auth_mode.as_deref() {
-                Some(AUTH_MODE_LOCAL) => {
+                Some(AUTH_METHOD_LOCAL) => {
                     // Local mode must not have OIDC-only settings. The three
                     // key variables are checked here rather than in
                     // `validate` because only the parser can tell a supplied
@@ -446,7 +469,7 @@ impl HttpConfig {
                         default_plan_limits,
                     }))
                 }
-                Some(AUTH_MODE_OIDC) | None => {
+                Some(AUTH_METHOD_OIDC) | None => {
                     // OIDC mode (default for backward compatibility).
                     Some(BrowserAuthConfig::Oidc(OidcBrowserConfig {
                         issuer: oidc_issuer.clone(),
