@@ -28,11 +28,13 @@ It is designed for workflows where agents need more than short-lived chat contex
 - [Project layout](#project-layout)
 - [Documentation](#documentation)
 - [Contributing](#contributing)
+- [CLI mode](#cli-mode)
 - [License](#license)
+- [Agent memory lifecycle integration](#agent-memory-lifecycle-integration)
 
 ## Overview
 
-Memory MCP implements a memory system for AI agents with core goals:
+Memory MCP is a memory system for AI agents with these goals:
 
 - preserve important source material as episodes
 - extract entities, facts, and links in a deterministic way
@@ -53,9 +55,9 @@ In practice, an agent can ingest emails, notes, or working documents, resolve en
 - **Optional semantic retrieval providers** including in-process `local-candle`
 - **Pluggable NER backends** for entity extraction: `anno`, `regex`, explicit Anno NuNER ONNX, and two native Candle zero-shot GLiNER backends (selectable via `NER_EXTRACTOR`)
 - **SurrealDB support** for embedded and remote deployments
-- **Optional filesystem ingestion inside `serve`** for filesystem-backed auto-ingest workflows (activated by `MEMORY_INGESTION_INBOX`)
-- **MCP-native interface** for tool-driven agent workflows
-- **Structured logging** with predictable operational behavior
+- **Optional filesystem ingestion inside `serve`** for auto-ingest from a watched directory (activated by `MEMORY_INGESTION_INBOX`)
+- **Eight MCP tools** for tool-driven agent workflows
+- **Structured logging** at documented levels
 
 ## Architecture
 
@@ -90,7 +92,7 @@ flowchart TD
 
 **Important boundaries**
 
-- `main.rs` is intentionally thin: argument parsing and dispatch only.
+- `main.rs` is thin: argument parsing and dispatch only.
 - `mcp/` is a protocol adapter; business logic stays in `service/`.
 - `tools/` and `service/capabilities/` are reusable from both MCP and CLI.
 - Storage is selected once at startup. Requests do not choose a namespace.
@@ -176,8 +178,7 @@ rationale and provenance for an agent to decide whether to use it.
 ### Bi-temporal data model
 
 Memory distinguishes **when something was true** from **when the system learned
-it**. This is essential for correcting stale knowledge without erasing the
-historical record.
+it**. It can then correct stale knowledge without erasing the historical record.
 
 ```mermaid
 erDiagram
@@ -245,7 +246,7 @@ erDiagram
 | `tools` | Protocol-agnostic tool implementations shared by MCP and CLI |
 | `cli` | CLI subcommand adapters and lifecycle hooks |
 | `http` | Streamable HTTP composition root (SaaS profile, feature-gated) |
-| `control` | OIDC, browser sessions, account/operator API, CSRF, and deletion flow (feature-gated) |
+| `control` | Browser authentication (OIDC and local administrator), sessions, account/operator API, CSRF, and deletion flow (feature-gated) |
 
 ## Quick start
 
@@ -290,8 +291,8 @@ scripts/measure_ttv.sh --cargo-install --source . --persona rust-user --repeat 5
 The fixture is a summary-like `requirement` episode because the existing extractor
 intentionally limits note fallback facts to summary-capable source types. The
 validator rejects malformed responses, empty fact arrays, and episode-only fallback
-items, so a run is successful only when a persisted fact—not an episode fallback—is
-recalled. Installation, host-snippet preparation, storage initialization, episode
+items, so a run counts as successful only when it recalls a persisted fact, not an
+episode fallback. Installation, host-snippet preparation, storage initialization, episode
 write, extraction, and fact recall are reported separately. A median total of
 `<= 300` seconds is the measured target, not a guarantee; the first clean rust-user
 run on this macOS workspace took `544.098` seconds, with `542.634` seconds spent in
@@ -320,7 +321,7 @@ The repository includes a Linux/amd64 Compose setup with a persistent SurrealDB
 and a shell-free distroless `memory_mcp_http` image. It starts the Streamable HTTP
 endpoint on `http://localhost:8080` and keeps separate control and tenant
 namespace/database bindings in the same SurrealDB instance. The image is built
-with the `streamable-http` profile **and** the `mcp-apps` axis, so the app-session
+with the `streamable-http` profile and the `mcp-apps` axis, so the app-session
 surface is available in the container.
 
 One file, one runtime: `docker-compose.yml`. The browser authentication methods
@@ -332,15 +333,15 @@ merged ([ADR-0057](docs/adr/0057-additive-browser-auth-methods.md)).
 |-----|----------|---------|
 | `local` (default) | local administrators (Argon2id passwords, `memory_mcp admin` provisioning) | single-tenant, air-gapped, or a deployment that has no identity provider yet |
 | `oidc` | OIDC sign-in | deployments with an identity provider and no need for a local door |
-| `local,oidc` | both, side by side | start with the administrator, add the provider later — **no re-provisioning, no key rotation, no image rebuild** |
+| `local,oidc` | both, side by side | start with the administrator, add the provider later: no re-provisioning, no key rotation, no image rebuild |
 
 A deployment can therefore begin with `local`, then add `oidc` when a provider
 appears, and keep the administrator's door as the break-glass route. The login
 page lists every enabled method.
 
-The file defaults the *non-secret* method material so `docker compose up -d`
-works without an identity provider; secrets are never defaulted. Export the
-required set before starting Compose:
+The file defaults the non-secret method material, so a deployment with no
+identity provider starts from the file alone. Secrets are never defaulted, so
+export the required values before starting Compose:
 
 ```bash
 # Required in every configuration.
@@ -353,7 +354,7 @@ docker compose up -d --build
 ```
 
 To add an identity provider to a running deployment, export the provider values
-and restart — the local method keeps working through the same restart:
+and restart. The local method keeps working through the same restart:
 
 ```bash
 export MEMORY_MCP_HTTP_AUTH_METHODS=local,oidc
@@ -361,11 +362,11 @@ export MEMORY_MCP_HTTP_OIDC_ISSUER=... MEMORY_MCP_HTTP_OIDC_CLIENT_ID=...
 export MEMORY_MCP_HTTP_OIDC_AUDIENCE=... MEMORY_MCP_HTTP_OIDC_REDIRECT_URI=...
 export MEMORY_MCP_HTTP_IDENTITY_INDEX_KEY=... MEMORY_MCP_HTTP_OIDC_STATE_KEY=... MEMORY_MCP_HTTP_OIDC_NONCE_KEY=...
 
- docker compose up -d
+docker compose up -d
 ```
 
 The three provider keys are 64 hex characters each and are derived from
-`MEMORY_MCP_HTTP_SESSION_KEY` only while `local` is the *whole* set — with `oidc`
+`MEMORY_MCP_HTTP_SESSION_KEY` only while `local` is the whole set. With `oidc`
 enabled they are real key material and must be supplied.
 
 Material for a method the set omits is refused, and so is a set that drops a
@@ -379,8 +380,9 @@ image built with the `streamable-http` profile (see
 [Build features](#build-features));
 [`docs/operations/LOCAL_ADMIN.md`](docs/operations/LOCAL_ADMIN.md) provisions the
 first local administrator and issues API keys. Setting
-`MEMORY_MCP_HTTP_ENABLE_CONTROL_PLANE=false` gives a data-plane-only deployment;
-the server then still requires `MEMORY_MCP_HTTP_SIGNUP_MODE` and the three
+`MEMORY_MCP_HTTP_ENABLE_CONTROL_PLANE=false` gives a data-plane-only deployment,
+but the method set still decides which material is required: with the default
+`oidc` set the server still demands `MEMORY_MCP_HTTP_SIGNUP_MODE` and the three
 provider keys.
 
 Validate the configuration without starting it and without printing secrets:
@@ -396,7 +398,7 @@ docker compose --env-file <env> config --quiet
 stage is `gcr.io/distroless/cc-debian13:nonroot`.
 
 Pushes to `master` publish the same image to GitHub Container Registry as
-`ghcr.io/like-a-freedom/memory_mcp:latest` and a commit tag. Published release
+`ghcr.io/like-a-freedom/memory_mcp:latest` and `sha-<commit>`. Published release
 tags receive a matching image tag. To deploy a published image instead of
 building locally, log in to GHCR and pull it before starting Compose:
 
@@ -404,7 +406,7 @@ building locally, log in to GHCR and pull it before starting Compose:
 export MEMORY_MCP_IMAGE=ghcr.io/like-a-freedom/memory_mcp:latest
 docker login ghcr.io
 docker compose pull memory_mcp
- docker compose up -d
+docker compose up -d
 ```
 
 ### Run with environment
@@ -430,11 +432,11 @@ user-owned data directory by default.
 
 ### Filesystem ingestion (optional, inside `serve`)
 
-Filesystem ingestion turns a directory into a **passive memory intake pipe**:
-drop or save files into the configured inbox and the stdio MCP server ingests
-them through the full `ingest → extract` pipeline without manual tool calls.
+Filesystem ingestion watches a directory: save a file into the configured inbox
+and the stdio MCP server ingests it through the full `ingest → extract` pipeline
+without a manual tool call.
 
-**Activation**
+#### Activation
 
 Set `MEMORY_INGESTION_INBOX` to an existing absolute directory when starting
 `serve` (the variable is optional; when absent, startup behavior is unchanged).
@@ -450,11 +452,11 @@ RUST_LOG=info \
   memory_mcp serve
 ```
 
-**What it does**
+#### What it does
 
 - Startup validates the inbox, attaches the OS watcher, then scans existing
   supported files in the background (files cannot fall into a scan-to-watch gap)
-- Watches the inbox recursively for file **create** and **modify** events
+- Watches the inbox recursively for file creation and modification events
 - Processes files only after size and modification time stabilize
 - Skips symlinks and unsupported file types silently
 - Tracks durable revisions: each distinct set of bytes at a path is one
@@ -463,7 +465,7 @@ RUST_LOG=info \
 - One failed file never stops ingestion or MCP; the watcher backend is
   recreated with bounded backoff and then enters a logged degraded state
 
-**Supported file types**
+#### Supported file types
 
 | Extension | Format | Extracted content |
 |-----------|--------|-------------------|
@@ -475,9 +477,9 @@ RUST_LOG=info \
 | `.txt` | Plain text | Raw text content |
 | `.eml` | Email message | Subject, sender, recipients, body, date |
 
-Files with other extensions (`.json`, `.png`, `.zip`, etc.) are **silently skipped**.
+Files with other extensions (`.json`, `.png`, `.zip`, etc.) are silently skipped.
 
-**MCP host example (Zed)**
+#### MCP host example (Zed)
 
 ```json
 {
@@ -494,7 +496,7 @@ Files with other extensions (`.json`, `.png`, `.zip`, etc.) are **silently skipp
 }
 ```
 
-**MCP host example (Claude Desktop)**
+#### MCP host example (Claude Desktop)
 
 ```json
 {
@@ -514,27 +516,10 @@ Files with other extensions (`.json`, `.png`, `.zip`, etc.) are **silently skipp
 Each stdio client process needs its own `SURREALDB_DATA_DIR`; changing only the
 database name or namespace does not avoid the embedded directory lock.
 
-### Optional MCP apps surface
-
-The repository also contains an optional app-oriented MCP surface for reviewer and inspector workflows. It is intentionally feature-gated so the eight canonical memory tools stay available without exposing extra session/resource endpoints by default.
-
-Build or run with apps enabled:
-
-```bash
-cargo run --features mcp-apps -- serve
-```
-
-Recommended verification for this surface:
-
-```bash
-cargo check --all-targets --features mcp-apps
-cargo clippy --all-targets --features mcp-apps
-```
-
-**How it works internally**
+#### How it works internally
 
 <details>
-<summary><strong>Architecture flow</strong></summary>
+<summary>Architecture flow</summary>
 
 ```
 serve (stdio MCP) with MEMORY_INGESTION_INBOX set
@@ -565,24 +550,24 @@ FsWatchRuntime::start(service, config)
 
 </details>
 
-**Revision and deduplication behavior**
+#### Revision and deduplication behavior
 
 <details>
-<summary><strong>How rapid saves are handled</strong></summary>
+<summary>How rapid saves are handled</summary>
 
-When you save a file, editors often fire multiple filesystem events in quick succession (write + metadata + timestamp). Files are processed only after **size and modification time stabilize** (two consecutive matching samples), and each distinct set of raw bytes becomes exactly **one immutable inbox revision**:
+When you save a file, editors often fire multiple filesystem events in quick succession (write + metadata + timestamp). Files are processed only after size and modification time stabilize (two consecutive matching samples), and each distinct set of raw bytes becomes exactly one immutable inbox revision:
 
 - Revision identity is SHA-256 over the raw bytes plus the normalized lineage (path relative to the inbox)
-- Re-scanning or re-observing identical bytes returns the existing revision — no duplicate episode or facts
-- A file that changes creates a **new revision** (new episode, same `source_lineage`)
-- Renaming a file starts a **new lineage** (new episode source lineage); deleting a file never invalidates memory
+- Re-scanning or re-observing identical bytes returns the existing revision, with no duplicate episode or facts
+- A file that changes creates a new revision (new episode, same `source_lineage`)
+- Renaming a file starts a new lineage (new episode source lineage); deleting a file never invalidates memory
 
 </details>
 
-**Command-line reference**
+#### Command-line reference
 
 <details>
-<summary><strong>Activation</strong></summary>
+<summary>Activation</summary>
 
 ```
 MEMORY_INGESTION_INBOX=/absolute/path/to/inbox memory_mcp serve
@@ -603,10 +588,10 @@ Important notes:
 - One failed file or a degraded watcher backend never stops MCP or queued work.
 </details>
 
-**Logging during filesystem ingestion**
+#### Logging during filesystem ingestion
 
 <details>
-<summary><strong>What to expect at each log level</strong></summary>
+<summary>What to expect at each log level</summary>
 
 | Level | Events you'll see |
 |-------|-------------------|
@@ -618,6 +603,23 @@ Revision events contain relative paths and short revision prefixes only; file
 contents and absolute inbox roots never appear in logs except startup
 diagnostics.
 </details>
+
+### Optional MCP apps surface
+
+The repository also contains an optional app-oriented MCP surface for reviewer and inspector workflows. It is feature-gated so the eight canonical memory tools stay available without exposing extra session and resource endpoints by default.
+
+Build or run with apps enabled:
+
+```bash
+cargo run --features mcp-apps -- serve
+```
+
+Recommended verification for this surface:
+
+```bash
+cargo check --all-targets --features mcp-apps
+cargo clippy --all-targets --features mcp-apps
+```
 
 ### VS Code MCP host example
 
@@ -659,13 +661,12 @@ users sign in through the enabled browser authentication methods and create,
 list, and revoke API keys. To use it, enable both runtime flags:
 
 `MEMORY_MCP_HTTP_ENABLE_CONTROL_PLANE=true` and
-`MEMORY_MCP_HTTP_ENABLE_CONTROL_PLANE_UI=true`
+`MEMORY_MCP_HTTP_ENABLE_CONTROL_PLANE_UI=true`.
 
-The binary must be built with the `streamable-http` profile (which embeds the
-UI assets). If the image was not built with that profile, enabling the UI
-flag causes a startup error. The control plane must be enabled first, and any
-`oidc` method it enables must contain real provider values. The UI is served
-from `/`.
+The binary must be built with the `streamable-http` profile, which embeds the UI
+assets; enabling the UI flag on a build without them is a startup error. The
+control plane must be enabled first, and any `oidc` method it enables must
+contain real provider values. The UI is served from `/`.
 
 The browser session and the MCP API key are separate credentials. A user signs
 in through the UI, creates an API key, and configures that key in the MCP
@@ -674,7 +675,7 @@ for operator routes, not for normal account or API-key management.
 
 ### Browser authentication methods
 
-`MEMORY_MCP_HTTP_AUTH_METHODS` is a comma-separated **set** drawn from `local`
+`MEMORY_MCP_HTTP_AUTH_METHODS` is a comma-separated set drawn from `local`
 and `oidc`; an enabled control plane mounts one surface per enabled method
 ([ADR-0057](docs/adr/0057-additive-browser-auth-methods.md)). Supplying neither
 `MEMORY_MCP_HTTP_AUTH_METHODS` nor the deprecated one-release alias
@@ -686,16 +687,15 @@ and `oidc`; an enabled control plane mounts one surface per enabled method
 | `oidc` | `/auth/oidc/*`, `/api/v1/account/*` and `/api/v1/operator/*`: browser sign-in through the identity provider. |
 | `local,oidc` | both, and each stays available while the other is used. Adding the provider is one environment change and a restart. |
 
-A method that is not enabled mounts **nothing** — not an unauthenticated route.
+A method that is not enabled mounts nothing, not an unauthenticated route.
 Material for a method the set omits is refused, and the three OIDC-typed HMAC
 keys (`MEMORY_MCP_HTTP_IDENTITY_INDEX_KEY`, `..._OIDC_STATE_KEY`,
 `..._OIDC_NONCE_KEY`) are derived from `MEMORY_MCP_HTTP_SESSION_KEY` only while
 `local` is the whole set; supplying one there is an error.
 
 A set that omits a method the deployment has already enabled fails startup.
-Removing a method is an explicit guarded operation rather than a reconciliation,
-because dropping the last route to administration is how a deployment locks
-itself out. It is the only path to "SSO only":
+Removing a method is an explicit operation, not a startup reconciliation, and it
+is the only path to "SSO only":
 
 ```bash
 # 1. Declare the target set, and the operator who will administer it.
@@ -710,14 +710,13 @@ docker compose up -d
 ```
 
 The command refuses a method the configuration still enables, because startup
-reconciliation is additive and would add it straight back; and it refuses to
-remove `local` while no operator identity is configured, because that would
-leave nobody able to administer the deployment — the rule that SSO cannot be
-required before a break-glass administrator exists. It is a CLI operation rather
-than a console toggle because the configuration is what declares the set, so a
-browser action would be undone by the next restart. The removal advances the
-deployment's policy epoch, invalidating every browser session, and records the
-operator's action in the audit log.
+reconciliation would add it straight back. It also refuses to remove `local`
+while no operator identity is configured, because that would leave the
+deployment with no route to its own administration. Configuration is what
+declares the set, which is why removal is a command and not a console control; a
+browser action would be undone by the next restart. Removal advances the policy
+epoch, which invalidates every browser session of either method, and writes the
+operator's action to the audit log.
 
 Local-only deployments additionally require all seven `MEMORY_MCP_HTTP_*`
 plan-limit variables and a public base URL that is HTTPS (or loopback for
@@ -730,10 +729,10 @@ forced-order transaction interleavings).
 
 ### Build and run
 
-Build with the single `streamable-http` feature — the one coarse switch for
-the whole SaaS server. It implies the control plane (OIDC/local-admin auth +
-account API) and the embedded web UI. Add `mcp-apps` only if you want the
-durable app-session surface; the published image already includes it.
+Build with the single `streamable-http` feature, the one coarse switch for
+the whole SaaS server. It implies the control plane (OIDC and local-admin auth,
+plus the account API) and the embedded web UI. Add `mcp-apps` only if you want
+the durable app-session surface; the published image already includes it.
 
 ```bash
 cargo build --release --locked --features streamable-http
@@ -758,6 +757,7 @@ MEMORY_MCP_HTTP_SESSION_KEY=... \
 MEMORY_MCP_HTTP_OIDC_STATE_KEY=... \
 MEMORY_MCP_HTTP_OIDC_NONCE_KEY=... \
 MEMORY_MCP_HTTP_CSRF_KEY=... \
+MEMORY_MCP_HTTP_AUTH_METHODS=oidc \
 MEMORY_MCP_HTTP_SIGNUP_MODE=invite_only \
 MEMORY_MCP_HTTP_ENABLE_CONTROL_PLANE=true \
 MEMORY_MCP_HTTP_OIDC_ISSUER=https://issuer.example.com \
@@ -773,12 +773,21 @@ MEMORY_MCP_HTTP_REPLICA_ID=node-a \
 | Route | Auth | Use |
 |---|---|---|
 | `POST /mcp` | Bearer API key | Modern MCP Streamable HTTP (`2026-07-28`). Only `POST` is accepted; `GET`/`DELETE` return `405`. |
-| `/api/v1/account/*` | Browser session + CSRF | Self-service: API keys, profile, account deletion |
+| `/api/v1/account/*` | Browser session + CSRF | Self-service: API keys, linked identities, profile, account deletion |
 | `/api/v1/operator/*` | OIDC operator + CSRF + recent-auth | Operator-only: provisioning retry, suspend, purge, recovery |
-| `/auth/oidc/*` | OIDC flow | Login, callback, logout (only when the control plane is enabled) |
+| `/auth/oidc/*` | OIDC flow | Login, callback, logout |
+| `/api/v1/auth/local/*` | Local administrator password | Administrator login, activation, password reset |
+| `/api/v1/admin/*` | Local administrator session + CSRF | Client provisioning, key issuance and revocation, suspend and resume |
 | `/health/live`, `/health/ready` | Public | Process liveness and admission readiness |
 | `/metrics` | Public (no app auth) | Prometheus scrape (enabled by the `streamable-http` profile). Restrict at the reverse proxy or network layer. |
 | `/` and SPA fallback | Public | Control-plane web UI, when `MEMORY_MCP_HTTP_ENABLE_CONTROL_PLANE_UI=true` (the UI is embedded by the `streamable-http` build) |
+
+Which of these exist depends on the configured method set, and a disabled method
+mounts nothing. `/auth/oidc/*`, `/api/v1/account/*` and `/api/v1/operator/*`
+appear only while `oidc` is enabled; `/api/v1/auth/local/*` and `/api/v1/admin/*`
+only while `local` is. The paths of a disabled method return `404`, not an
+unauthenticated route, and all of them disappear when
+`MEMORY_MCP_HTTP_ENABLE_CONTROL_PLANE=false`.
 
 "Public" is about application auth only. The `Host`/`Origin` allowlist is
 enforced on every row above, including `/` and the SPA fallback: it is a property
@@ -802,13 +811,22 @@ session cookie (HttpOnly, SameSite). The session has both an idle and an
 absolute expiry and rotates after login. Destructive actions require recent
 authentication, typically within ten minutes.
 
-OIDC authenticates browser control-plane sessions. When the control plane is
-enabled, the binary requires `MEMORY_MCP_HTTP_OIDC_*` configuration. Enabling
-the control plane without it is a startup error. OIDC login uses Authorization
-Code with PKCE, exact issuer and audience validation, encrypted state and
-nonce, and an algorithm allowlist. The browser session and MCP API keys are
-independent: a browser session never authenticates `POST /mcp`, and an API key
-never authenticates the control plane.
+OIDC signs in browser control-plane sessions while `oidc` is enabled, and the
+binary requires the `MEMORY_MCP_HTTP_OIDC_*` values for it. It refuses those
+variables when the set omits `oidc`: a provider that is configured but not
+enabled is a deployment that believes it has SSO when it does not. OIDC login
+uses Authorization Code with PKCE, exact issuer and audience validation,
+encrypted state and nonce, and an algorithm allowlist. The browser session and
+MCP API keys are independent: a browser session never authenticates `POST /mcp`,
+and an API key never authenticates the control plane.
+
+An Account can hold several external identities. `POST
+/api/v1/account/identity_links` starts a provider round trip and attaches
+whatever identity the provider then attests to; `GET` on the same path lists the
+current ones, and `DELETE /api/v1/account/identity_links/{id}` removes one. Both
+need recent authentication, an Account's last identity cannot be removed, and
+every change is written to the audit log. The embedded console does not expose
+this, so it is an API-only surface.
 
 Operator access is granted only through `MEMORY_MCP_HTTP_OPERATOR_IDENTITIES`,
 an immutable allowlist of `issuer|hex(subject_verifier)` entries. Operators
@@ -982,7 +1000,7 @@ Read only by the `memory_mcp_http` binary built with the `streamable-http` featu
 | `MEMORY_MCP_HTTP_REQUEST_DEADLINE_SECS` | seconds | `120` | Ordinary request handler deadline; does not apply to `subscriptions/listen` |
 | `MEMORY_MCP_HTTP_SHUTDOWN_GRACE_SECS` | seconds | `30` | Time the server waits for in-flight requests and SSE streams during shutdown |
 
-**SurrealDB (control Registry and tenant engine)** — required
+**SurrealDB (control Registry and tenant engine)**: required
 
 | Variable | Type | Description |
 | --- | --- | --- |
@@ -997,7 +1015,7 @@ Read only by the `memory_mcp_http` binary built with the `streamable-http` featu
 | `SURREALDB_TENANT_NAMESPACE` | string | Tenant engine namespace |
 | `SURREALDB_TENANT_DB` | string | Tenant engine database name |
 
-**Keyed verifiers and secrets** — required, 32-byte hex each (raw secrets are never persisted or logged)
+**Keyed verifiers and secrets**: required, 32-byte hex each (raw secrets are never persisted or logged)
 
 | Variable | Description |
 | --- | --- |
@@ -1012,7 +1030,7 @@ Read only by the `memory_mcp_http` binary built with the `streamable-http` featu
 
 | Variable | Type | Default | Description |
 | --- | --- | --- | --- |
-| `MEMORY_MCP_HTTP_AUTH_METHODS` | comma-separated set of `local` \| `oidc` | `oidc` | The browser authentication methods this deployment serves. Each enabled method mounts its own surface and each disabled method mounts nothing. A set that omits a method the deployment has already enabled fails startup: removing a method is an explicit guarded operation |
+| `MEMORY_MCP_HTTP_AUTH_METHODS` | comma-separated set of `local` \| `oidc` | `oidc` | The browser authentication methods this deployment serves. Each enabled method mounts its own surface and each disabled method mounts nothing. A set that omits a method the deployment has already enabled fails startup: removing a method is an explicit guarded operation, `memory_mcp admin auth-methods remove --method local` |
 | `MEMORY_MCP_HTTP_AUTH_MODE` | one of `local` \| `oidc` | unset | Deprecated alias for a one-element `MEMORY_MCP_HTTP_AUTH_METHODS`, accepted for one release. Supplying both is an error unless they agree |
 | `MEMORY_MCP_HTTP_SIGNUP_MODE` | enum: `invite_only` \| `open` | unset | Required when `oidc` is enabled. `invite_only` rejects self-service sign-up; `open` requires the seven plan seed variables below and is rejected without the `oidc` method |
 | `MEMORY_MCP_HTTP_ENABLE_CONTROL_PLANE` | boolean | `false` | Enable browser sign-in, sessions, and control-plane `/api/v1` endpoints. The `POST /mcp` endpoint remains available when this is `false` |
@@ -1025,7 +1043,7 @@ Read only by the `memory_mcp_http` binary built with the `streamable-http` featu
 | `MEMORY_MCP_HTTP_OPERATOR_IDENTITIES` | comma-separated `issuer\|hex(subject_verifier)` list | unset | Immutable operator allowlist; requires the `oidc` method. Account APIs cannot grant operator status |
 | `MEMORY_MCP_HTTP_LOCAL_DEFAULT_PLAN_VERSION` | positive `u32` | unset | Required when `local` is enabled: the version of the plan this deployment publishes for the clients the administrator provisions |
 
-**Plan seed (required for `signup_mode=open` or the `local` method)** — if any one of these is set, all seven must parse as `u64`/`usize`. The values seed Registry plan version 1 only when no plan exists; an existing durable plan is never overwritten, and a stored plan whose limits have since drifted fails startup.
+**Plan seed (required for `signup_mode=open` or the `local` method)**: if any one of these is set, all seven must parse as `u64`/`usize`. The values seed Registry plan version 1 only when no plan exists; an existing durable plan is never overwritten, and a stored plan whose limits have since drifted fails startup.
 
 | Variable | Type | Description |
 | --- | --- | --- |
@@ -1057,7 +1075,7 @@ Read only by the `memory_mcp_http` binary built with the `streamable-http` featu
 
 `MEMORY_INGESTION_INBOX` and any other stdio-only filesystem variable are rejected as a fatal startup error in the HTTP profile.
 
-**Additional startup-failure rules** (not optional):
+**Additional startup-failure rules**:
 
 - `ALLOWED_HOSTS` and `ALLOWED_ORIGINS` are required and must be non-empty in any HTTP build. Missing or wildcard origins are rejected at startup (`ConfigInvalid`), and the server does not fall back to permissive defaults.
 - The control and tenant SurrealDB targets (`SURREALDB_CONTROL_*` vs `SURREALDB_TENANT_*`) must differ in at least one of `url`, `namespace`, or `database`. The server rejects identical bindings at startup to prevent the control Registry from writing into a tenant namespace.
@@ -1090,9 +1108,9 @@ The package ships two coarse build profiles plus a few orthogonal opt-in axes.
 
 | Feature | Effect |
 | --- | --- |
-| `default = ["fs-watch"]` | **Local personal profile**: the stdio MCP server + CLI, embedded SurrealDB, and filesystem ingestion (`fs-watch`). This is the default build; run `cargo build --release` with no flags.
-| `streamable-http` | **SaaS profile**: the single coarse switch for the whole Streamable HTTP server. It implies the control plane (OIDC + local-admin auth + account API), the embedded web UI, and Prometheus. See [Build and run](#build-and-run) below.
-| `mcp-apps` | Enable the optional interactive MCP app-session surface (inspector / diff / graph / lifecycle resources and tools). It is an orthogonal axis usable in **both** profiles: in-memory sessions in local/stdio, durable sessions in HTTP. It is not required for the eight core tools or the zero-config first-value path. Build: `cargo build --release --features mcp-apps` or `cargo build --release --features mcp-apps,streamable-http`. The published image and the released binaries are built with it. |
+| `default = ["fs-watch"]` | **Local personal profile**: the stdio MCP server + CLI, embedded SurrealDB, and filesystem ingestion (`fs-watch`). This is the default build; run `cargo build --release` with no flags. |
+| `streamable-http` | **SaaS profile**: the single coarse switch for the whole Streamable HTTP server. It implies the control plane (OIDC + local-admin auth + account API), the embedded web UI, and Prometheus. See [Build and run](#build-and-run) below. |
+| `mcp-apps` | Enable the optional interactive MCP app-session surface (inspector / diff / graph / lifecycle resources and tools). It is an orthogonal axis usable in both profiles: in-memory sessions in local/stdio, durable sessions in HTTP. It is not required for the eight core tools or the zero-config first-value path. Build: `cargo build --release --features mcp-apps` or `cargo build --release --features mcp-apps,streamable-http`. The published image and the released binaries are built with it. |
 | `mimalloc` | Use the mimalloc global allocator instead of the system allocator. This remains an explicit experiment: the fresh macOS matrix reduced physical footprint after GLiNER unload but increased observed RSS to about 2.56 GB, so it is not the server default. Build: `cargo build --release --features mimalloc`. |
 | `accelerate` | Enable Candle's Apple Accelerate CPU backend. This is an explicit Apple-specific feature, not a portable package default; the current A/B did not pass the no-degradation gate, so do not present it as a production speedup. Build: `cargo build --release --features accelerate`. |
 | `metal` | Enable Candle's Metal backend for explicit macOS GPU experiments. It is not a production default. Build: `cargo build --release --features metal`. |
@@ -1138,7 +1156,7 @@ do not compile the UI at all.
 Each server process selects exactly one SurrealDB **namespace** at startup. The
 default is `main`; `SURREALDB_NAMESPACE` may select one other namespace. All
 ordinary MCP, CLI, lifecycle, app, and worker operations use that namespace
-implicitly — tool calls do not carry `scope`, `project`, or a request-level
+implicitly. Tool calls do not carry `scope`, `project`, or a request-level
 namespace.
 
 **`SURREALDB_NAMESPACE`** accepts exactly one name. The removed plural variable
@@ -1206,7 +1224,7 @@ follows these rules so MCP readiness never waits on the network:
   `ner.artifact_refresh.candidate_ready` (with `activation=next_restart`)
   on stderr/logs means a new revision was staged locally. Restart Memory
   MCP (and therefore Zed) to activate it. Retrying `extract` in the
-  same process cannot activate the model — the active extractor and
+  same process cannot activate the model: the active extractor and
   fingerprint are immutable for the process lifetime.
 - **Download-free alternatives**: `NER_EXTRACTOR=anno` (the default),
   `NER_EXTRACTOR=regex`, and `NER_EXTRACTOR=anno-onnx` (CPU only, manual
@@ -1216,8 +1234,8 @@ follows these rules so MCP readiness never waits on the network:
   permissions) remain explicit startup errors and never silently
   downgrade extraction.
 
-See ADR-0051 for the state machine, cancellation guarantees, and
-rejected alternatives.
+See [ADR-0051](docs/adr/0051-background-classic-gliner-refresh.md) for the state
+machine, cancellation guarantees, and rejected alternatives.
 
 ### Embedding providers and switching
 
@@ -1235,7 +1253,7 @@ At startup the server resolves a **target embedding identity** from the configur
 For remote providers (`openai-compatible`, `ollama`) the effective dimension is normally detected with a single short **dimension probe** request to the provider.
 Two startup behaviors keep this from blocking `serve`:
 
-- If `SURREALDB_EMBEDDING_DIMENSION` is set, the probe is **skipped entirely** — the override is authoritative at startup, so the server resolves its embedding identity without any network access. A wrong override then surfaces as a dimension-validation error on embed; use `reembed` as the recovery path.
+- If `SURREALDB_EMBEDDING_DIMENSION` is set, the probe is skipped entirely: the override is authoritative at startup, so the server resolves its embedding identity without any network access. A wrong override then surfaces as a dimension-validation error on embed; use `reembed` as the recovery path.
 - If no override is set and the provider is unreachable, the probe fails fast (single attempt, bounded by a short probe timeout) and the server degrades to lexical/graph-only retrieval instead of stalling startup.
 
 That identity is persisted per namespace in `embedding_state:fact` as an `active_signature` once the namespace is known to be compatible.
@@ -1244,16 +1262,17 @@ If it is already marked `ready` for the same signature and has no missing vector
 If its state is missing but it is clearly compatible (empty namespace or sampled legacy vectors all match the current dimension), the service bootstraps a `ready` state automatically.
 If it is marked `rebuilding`, `failed`, or has embeddings that do not match the configured target, the service **degrades to lexical/graph-only retrieval** instead of mixing incompatible vectors. When a signature differs but missing vectors exist, the service starts degraded and schedules safe backfill of only those missing vectors; the old persisted signature remains until `reembed` completes.
 
-That is the safety rail: after a provider switch, normal MCP traffic keeps working, but semantic retrieval is intentionally disabled until embeddings are rebuilt.
+After a provider switch, normal MCP traffic keeps working, but semantic retrieval
+stays disabled until embeddings are rebuilt.
 
 #### What happens when you switch providers
 
 To switch, change the environment variables and restart. The server does **not** silently rewrite old vectors during normal startup.
 
-The runtime now separates two modes:
+The runtime separates two modes:
 
-**Normal mode** (`memory_mcp` or `memory_mcp serve`) — safe startup checks run first. If stored embeddings are incompatible with the configured target, semantic retrieval is disabled and the process logs `embedding.rebuild_required`.
-**Maintenance mode** (`memory_mcp reembed`) — a dedicated one-shot command that forces the configured embedding provider on, rewrites every fact embedding, persists progress, and exits when complete.
+**Normal mode** (`memory_mcp` or `memory_mcp serve`): safe startup checks run first. If stored embeddings are incompatible with the configured target, semantic retrieval is disabled and the process logs `embedding.rebuild_required`.
+**Maintenance mode** (`memory_mcp reembed`): a dedicated one-shot command that forces the configured embedding provider on, rewrites every fact embedding, persists progress, and exits when complete.
 
 This keeps the public MCP tool surface unchanged while giving operators a deterministic recovery path after provider changes.
 
@@ -1345,15 +1364,15 @@ After completion, a compact summary is printed to stdout:
 
 **Non-TTY mode (pipes, CI, scripts):** When stderr is not a TTY, the command falls back to structured log events:
 
-- `reembed.init_completed` — service initialized, ready to process
+- `reembed.init_completed`: service initialized, ready to process
 - `reembed.namespace_started` / `reembed.namespace_completed`
 - `reembed.index_recreating` / `reembed.index_recreated`
-- `reembed.progress` — batch-level progress (every 100 facts)
-- `reembed.fact_failed` — a fact failed to re-embed (with error reason)
-- `reembed.job_interrupted` — Ctrl+C received
-- `reembed.job_completed` — final outcome with `outcome` field
-- `reembed.job_failed` — quota exceeded or unrecoverable error
-- `main.reembed_completed` — compact summary with totals and elapsed time
+- `reembed.progress`: batch-level progress (every 100 facts)
+- `reembed.fact_failed`: a fact failed to re-embed (with error reason)
+- `reembed.job_interrupted`: Ctrl+C received
+- `reembed.job_completed`: final outcome with `outcome` field
+- `reembed.job_failed`: quota exceeded or unrecoverable error
+- `main.reembed_completed`: compact summary with totals and elapsed time
 
 Job statuses persisted in the control-plane record: `running`, `completed`, `completed_with_errors`, `failed`, `interrupted`.
 
@@ -1390,7 +1409,7 @@ Important limitation: the deferred background path is intentionally **in-memory 
 
 The `EMBEDDINGS_SIMILARITY_THRESHOLD` (default `0.7`) filters semantic search results: only facts with cosine similarity ≥ threshold are returned. After a provider switch, this threshold effectively filters out **all** old facts because cross-provider similarity scores are meaningless.
 
-If you only use **lexical** (BM25/FTS) retrieval and **graph-expanded** context assembly, the provider switch has **no impact** on those retrieval tiers — they do not use embeddings.
+If you only use lexical (BM25/FTS) retrieval and graph-expanded context assembly, the provider switch has no impact on those retrieval tiers, because they do not use embeddings.
 
 ### Retrieval behavior
 
@@ -1423,13 +1442,13 @@ This switch only controls database-backed query analytics. Regular runtime logs 
 
 ### Logging levels and what they cover
 
-`memory_mcp` emits structured logs across the plan-added functionality using the standard levels below:
+`memory_mcp` emits structured logs at the standard levels:
 
-- `info` — lifecycle milestones and successful high-level operations such as `ingest`, `extract`, `assemble_context`, filesystem-ingestion readiness and per-revision outcomes, and community rebuild passes
-- `debug` — feature-path decisions such as document ingest transport detection (`file`/`directory`/`url`/`inline`), view-mode selection, graph insight assembly, hub/community map building, and successful `query_log` writes when enabled
-- `trace` — fine-grained diagnostics such as cache misses/sets, `query_log` skips when disabled, retrieval-tier summaries, appended `experience` facts, and Active-Namespace community rebuild details
-- `warn` — recoverable issues such as unknown `view_mode` fallback, access-heat tracking failures, query analytics write failures, degraded worker passes, and `fs_watch.degraded`
-- `error` — terminal failures such as process-level startup/serve failures
+- `info`: lifecycle milestones and successful high-level operations such as `ingest`, `extract`, `assemble_context`, filesystem-ingestion readiness and per-revision outcomes, and community rebuild passes
+- `debug`: feature-path decisions such as document ingest transport detection (`file`/`directory`/`url`/`inline`), view-mode selection, graph insight assembly, hub/community map building, and successful `query_log` writes when enabled
+- `trace`: fine-grained diagnostics such as cache misses and sets, `query_log` skips when disabled, retrieval-tier summaries, appended `experience` facts, and Active-Namespace community rebuild details
+- `warn`: recoverable issues such as unknown `view_mode` fallback, access-heat tracking failures, query analytics write failures, degraded worker passes, and `fs_watch.degraded`
+- `error`: terminal failures such as process-level startup/serve failures
 
 Recommended presets:
 
@@ -1443,7 +1462,7 @@ When `MEMORY_LOG_FILE` is set to a non-empty path, all structured log events are
 
 ## MCP tools
 
-The public MCP surface is centered on a small set of high-value operations rather than endpoint-by-endpoint plumbing.
+The public MCP surface is eight tools.
 
 | Tool | Purpose |
 | --- | --- |
@@ -1458,12 +1477,12 @@ The public MCP surface is centered on a small set of high-value operations rathe
 
 When the MCP host supports resources, the server also exposes app discovery and session resources such as `ui://memory/apps` and `ui://memory/app/{app}/{session_id}` for inspector, diff, ingestion review, lifecycle, and graph views.
 
-### `explain` Multi-Source Provenance
+### `explain` multi-source provenance
 
 The `explain()` operation returns complete provenance lineage for each fact:
 
-- **Direct sources** — episodes that directly generated the fact
-- **Linked sources** — episodes connected via shared entities
+- **Direct sources**: episodes that directly generated the fact
+- **Linked sources**: episodes connected via shared entities
 
 **Returns:**
 - `all_sources`: Array of provenance sources including:
@@ -1473,13 +1492,15 @@ The `explain()` operation returns complete provenance lineage for each fact:
   - `relationship`: "direct" (created fact) or "linked" (via entity)
   - `entity_path`: Path from fact to episode via entity (if linked)
 
-This enables full audit trails, understanding of information propagation, and building trust through transparency.
+Every fact can therefore be traced back to the episodes it came from.
 
-This design lines up with the intent-driven MCP guidance reflected in the docs: fewer tools, clearer semantics, better outcomes.
+The design follows the intent-driven MCP guidance in the docs: fewer tools,
+clearer semantics.
 
-### Adaptive Memory Features
+### Adaptive memory features
 
-As of 2026-03-27, `memory_mcp` implements adaptive memory alignment with SOTA research:
+As of 2026-03-27, `memory_mcp` implements adaptive memory features drawn from
+recent memory research:
 
 - **Fact-augmented index keys**: Entity names, aliases, and temporal markers (month-year, ISO dates) indexed at ingest for enriched BM25 retrieval. FTS matches on both `content` and `index_keys`.
 
@@ -1497,8 +1518,8 @@ See the [Architecture Decision Records](docs/adr/) (ADR-0008 source continuity, 
 
 ```bash
 cargo check
-cargo fmt
-cargo clippy -- -D warnings
+cargo fmt --all
+cargo clippy --workspace --all-targets --features fs-watch,mcp-apps,streamable-http --locked -- -D warnings
 cargo doc --no-deps
 ```
 
@@ -1527,7 +1548,7 @@ cargo bench -p eval-harness --bench contention -- --noplot
 See `docs/performance/NER_PERFORMANCE.md` for raw samples, contention results,
 and the Criterion reproduction contract.
 
-### MCP Tasks (optional)
+### MCP tasks (optional)
 
 The server advertises the official `io.modelcontextprotocol/tasks` extension.
 `extract` is the only task-capable tool. A client that advertises the extension
@@ -1557,10 +1578,10 @@ GLINER_DEVICE=auto cargo run --release --features metal -- serve
 
 ### Binary entry points
 
-- `crates/memory-mcp/src/main.rs` — main MCP server binary (`memory_mcp`); stdio profile, CLI, and lifecycle hooks
-- `crates/memory-mcp/src/bin/memory_mcp_http.rs` — Streamable HTTP SaaS binary (`memory_mcp_http`); built when the `streamable-http` feature is enabled
-- `crates/eval-harness/src/main.rs` — evaluation harness binary (`memory-eval`); never linked into the production binary
-- `crates/control-plane-ui/src/main.rs` — Dioxus web SPA build target; built with the Dioxus CLI and embedded by the backend when the `streamable-http` profile is enabled
+- `crates/memory-mcp/src/main.rs`: main MCP server binary (`memory_mcp`); stdio profile, CLI, and lifecycle hooks
+- `crates/memory-mcp/src/bin/memory_mcp_http.rs`: Streamable HTTP SaaS binary (`memory_mcp_http`); built when the `streamable-http` feature is enabled
+- `crates/eval-harness/src/main.rs`: evaluation harness binary (`memory-eval`); never linked into the production binary
+- `crates/control-plane-ui/src/main.rs`: Dioxus web SPA build target; built with the Dioxus CLI and embedded by the backend when the `streamable-http` profile is enabled
 
 MCP input/output schemas are exposed by the server itself through the protocol's
 tool metadata and remain regression-covered by the schema tests under
@@ -1648,16 +1669,16 @@ and the supporting ADRs under `docs/adr/`.
 
 ## Documentation
 
-- [`docs/superpowers/specs/2026-08-27-streamable-http-saas.md`](docs/superpowers/specs/2026-08-27-streamable-http-saas.md) — Streamable HTTP SaaS design specification
-- [`docs/superpowers/specs/2026-07-28-truthful-evaluation-system-design.md`](docs/superpowers/specs/2026-07-28-truthful-evaluation-system-design.md) — evaluation architecture and design
-- [`docs/superpowers/specs/2026-07-30-token-efficient-responses-design.md`](docs/superpowers/specs/2026-07-30-token-efficient-responses-design.md) — compact tool responses design
-- [`docs/adr/`](docs/adr/) — Architecture Decision Records (57 ADRs, including ADR-0038 one Active Namespace, ADR-0052 Streamable HTTP SaaS profile, ADR-0056 two build profiles, and ADR-0057 additive browser authentication methods)
-- [`docs/compatibility/one-active-namespace-identities.md`](docs/compatibility/one-active-namespace-identities.md) — scope/namespace compatibility contract
-- [`docs/operations/`](docs/operations/) — operator runbooks (protocol conformance, credential rotation, known limitations, SurrealDB restore drill)
-- [`docs/performance/`](docs/performance/) — memory profile and NER performance measurements
-- [`docs/evals/`](docs/evals/) — evaluation results, benchmark reports, claim reconciliation baselines, and procedural memory evidence
-- [`docs/BACKLOG.md`](docs/BACKLOG.md) — open engineering backlog
-- [`hooks/README.md`](hooks/README.md) — lifecycle hooks contract and editor-by-editor configuration
+- [`docs/superpowers/specs/2026-08-27-streamable-http-saas.md`](docs/superpowers/specs/2026-08-27-streamable-http-saas.md): Streamable HTTP SaaS design specification
+- [`docs/superpowers/specs/2026-07-28-truthful-evaluation-system-design.md`](docs/superpowers/specs/2026-07-28-truthful-evaluation-system-design.md): evaluation architecture and design
+- [`docs/superpowers/specs/2026-07-30-token-efficient-responses-design.md`](docs/superpowers/specs/2026-07-30-token-efficient-responses-design.md): compact tool responses design
+- [`docs/adr/`](docs/adr/): Architecture Decision Records (57 ADRs, including ADR-0038 one Active Namespace, ADR-0052 Streamable HTTP SaaS profile, ADR-0056 two build profiles, and ADR-0057 additive browser authentication methods)
+- [`docs/compatibility/one-active-namespace-identities.md`](docs/compatibility/one-active-namespace-identities.md): scope/namespace compatibility contract
+- [`docs/operations/`](docs/operations/): operator runbooks, including the [local administrator runbook](docs/operations/LOCAL_ADMIN.md), protocol conformance, credential rotation, known limitations, and the SurrealDB restore drill
+- [`docs/performance/`](docs/performance/): memory profile and NER performance measurements
+- [`docs/evals/`](docs/evals/): evaluation results, benchmark reports, claim reconciliation baselines, and procedural memory evidence
+- [`docs/BACKLOG.md`](docs/BACKLOG.md): open engineering backlog
+- [`hooks/README.md`](hooks/README.md): lifecycle hooks contract and editor-by-editor configuration
 
 ## Contributing
 
@@ -1670,9 +1691,9 @@ In particular:
 - prefer typed errors and deterministic behavior
 - run formatting, clippy, and tests before considering work done
 
-## CLI Mode
+## CLI mode
 
-Every memory tool can be invoked directly from the command line. The CLI shares the same implementation as the MCP protocol — zero code duplication.
+Every memory tool can be invoked directly from the command line. The CLI and the MCP server share one implementation.
 
 ### Subcommands
 
@@ -1688,10 +1709,12 @@ Every memory tool can be invoked directly from the command line. The CLI shares 
 | `explain` | Get citation-ready source snippets |
 | `assemble-context` | Assemble ranked, relevant context for a query |
 | `init [--target TARGET]` | Print deterministic, output-only host setup for `vscode`, `claude-desktop`, `codex`, `zed`, or `env` |
+| `admin` | Administrator CLI, gated on the `streamable-http` and `control-plane` features: `create` and `recover` for administrators, `auth-methods remove` for the deployment's browser authentication methods. Connects to the control registry only, before service construction |
 
-`init` is the one authorized output-only onboarding exception to the ordinary
-CLI surface. It does not build a service, touch storage, edit files, or change
-environment variables.
+`init` is an output-only onboarding command: it does not build a service, touch
+storage, edit files, or change environment variables. `admin` is the other
+command that runs outside a service, and a default build does not have it. See
+[Remote deployment](#remote-deployment).
 
 ### Examples
 
@@ -1784,12 +1807,12 @@ failures and other error responses go to **stderr** as JSON:
 
 This project is licensed under the **MIT** license. See [`LICENSE`](LICENSE) for details.
 
-## Agent Memory Lifecycle Integration
+## Agent memory lifecycle integration
 
 `memory_mcp` supports agent-host lifecycle integration through an internal
 control plane that does not add new public tools. The eight-tool MCP surface
-remains exactly eight tools. The ordinary CLI surface has one separate,
-output-only onboarding exception: `memory_mcp init`.
+remains exactly eight tools. The ordinary CLI surface has one output-only
+onboarding exception, `memory_mcp init`, plus the feature-gated `admin` command.
 
 - **Architecture:** A versioned host lifecycle bridge invokes internal
   `LifecycleRecall` and `LifecycleCapture` capabilities, which reuse the
@@ -1822,6 +1845,6 @@ external content is treated as data rather than privileged instruction.
 
 See:
 - [ADR 0016](docs/adr/0016-agent-memory-lifecycle-integration.md)
-- [Hook scripts contract](hooks/README.md) — transport, environment variables, editor-by-editor configuration, and hidden lifecycle CLI subcommands
+- [Hook scripts contract](hooks/README.md): transport, environment variables, editor-by-editor configuration, and hidden lifecycle CLI subcommands
 - [Evaluation Results](docs/evals/AGENT_MEMORY_LIFECYCLE.md)
 - [Procedural Memory](docs/evals/PROCEDURAL_MEMORY.md)
