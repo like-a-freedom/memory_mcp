@@ -2,8 +2,8 @@ use std::sync::Arc;
 
 use crate::service::local_admin::contracts::{
     AdminLogin, AdminPrincipal, AttemptDecision, AttemptDomain, AttemptInput, AuthAttemptContext,
-    BrowserPolicyFence, ChallengeFinish, ChallengeIssue, ChallengeKind, ChallengeView,
-    FailureAction, FailureAudit, FailureReason, LocalAdminError, LocalAdminStore,
+    BrowserAuthMethod, BrowserPolicyFence, ChallengeFinish, ChallengeIssue, ChallengeKind,
+    ChallengeView, FailureAction, FailureAudit, FailureReason, LocalAdminError, LocalAdminStore,
     LocalKeyFingerprints, LocalResult, OneTimeChallenge, RequestContext, SessionOpen,
     SessionRotate,
 };
@@ -18,15 +18,26 @@ pub struct LocalAdminAuthority {
 }
 
 impl LocalAdminAuthority {
-    /// Join or verify the durable local policy. Computes fingerprints,
-    /// joins the policy, and privately owns store/keys/fence.
-    pub async fn join(
+    /// Bind the authority to the browser-auth policy fence its composition
+    /// reconciled at startup (ADR-0057).
+    ///
+    /// The fence is passed in rather than joined here because there is one
+    /// writer of `browser_auth_policy` — `RegistryStore::reconcile_browser_policy`
+    /// — and the composition already called it once with the full configured
+    /// method set. Joining again would be a second transaction against the same
+    /// singleton, and a fence that does not enable `local` would let the local
+    /// surface run without the durable policy it must be fenced by.
+    pub fn join(
         store: Arc<dyn LocalAdminStore>,
         session_key: [u8; 32],
         csrf_key: [u8; 32],
+        policy: BrowserPolicyFence,
     ) -> LocalResult<Arc<Self>> {
-        let fingerprints = compute_fingerprints(&session_key, &csrf_key)?;
-        let policy = store.join_local_policy(fingerprints).await?;
+        if !policy.has(BrowserAuthMethod::Local) {
+            return Err(LocalAdminError::InvalidInput(
+                "the local administrator authority requires a policy that enables local".into(),
+            ));
+        }
         Ok(Arc::new(Self {
             store,
             session_key,
@@ -37,6 +48,32 @@ impl LocalAdminAuthority {
 
     pub fn policy(&self) -> &BrowserPolicyFence {
         &self.policy
+    }
+
+    /// Reconcile a `local`-only durable policy on a concrete store and bind an
+    /// authority to it.
+    ///
+    /// Fixture helper. Production HTTP startup reconciles the policy once, with
+    /// the full configured method set, and hands the fence to [`Self::join`];
+    /// the fixtures that build a store directly need the same row written
+    /// before the authority will accept a session, and they run exactly one
+    /// method.
+    #[cfg(all(feature = "control-plane", any(test, feature = "test-fixtures")))]
+    pub async fn join_local_for_test(
+        store: Arc<crate::http::registry::SurrealRegistryStore>,
+        session_key: [u8; 32],
+        csrf_key: [u8; 32],
+    ) -> LocalResult<Arc<Self>> {
+        let fingerprints = compute_fingerprints(&session_key, &csrf_key)?;
+        let policy = crate::http::registry::RegistryStore::reconcile_browser_policy(
+            store.as_ref(),
+            &[BrowserAuthMethod::Local],
+            Some(fingerprints),
+        )
+        .await
+        .map_err(LocalAdminError::Infrastructure)?;
+        let local_store: Arc<dyn LocalAdminStore> = store;
+        Self::join(local_store, session_key, csrf_key, policy)
     }
 
     pub fn store(&self) -> &Arc<dyn LocalAdminStore> {
@@ -494,7 +531,13 @@ impl LocalAdminService {
 
 // ─── Helpers ──────────────────────────────────────────────
 
-fn compute_fingerprints(
+/// Derive the durable policy fingerprints for the local method's keys.
+///
+/// Keyed on fixed labels rather than on the keys themselves, so the stored
+/// values are a stable comparison token and not a key oracle. Public within the
+/// crate because every composition that writes the policy — the HTTP binary and
+/// the admin CLI — must derive the identical fingerprints.
+pub(crate) fn compute_fingerprints(
     session_key: &[u8; 32],
     csrf_key: &[u8; 32],
 ) -> LocalResult<LocalKeyFingerprints> {

@@ -58,15 +58,55 @@ impl BrowserAuthMethod {
             _ => None,
         }
     }
+
+    /// The enabled methods in the canonical order every representation uses:
+    /// `local` before `oidc`.
+    ///
+    /// A set has one representation however it was enumerated, which is what
+    /// lets the durable row, the configuration and the login page be compared
+    /// as values instead of as sets.
+    pub fn canonical_set(desired: &[Self]) -> Vec<Self> {
+        [Self::Local, Self::Oidc]
+            .into_iter()
+            .filter(|method| desired.contains(method))
+            .collect()
+    }
 }
 
-/// Mode-specific browser configuration. `None` when the control plane
-/// is disabled.
+/// The browser authentication methods this deployment enables, each with the
+/// configuration it needs (ADR-0057). `None` on `HttpConfig` when the control
+/// plane is disabled; otherwise at least one method is enabled.
 #[derive(Debug, Clone, Deserialize)]
-#[serde(tag = "mode", rename_all = "snake_case")]
-pub enum BrowserAuthConfig {
-    Local(LocalBrowserConfig),
-    Oidc(OidcBrowserConfig),
+pub struct BrowserAuthMethods {
+    /// Present when `local` is enabled.
+    pub local: Option<LocalBrowserConfig>,
+    /// Present when `oidc` is enabled.
+    pub oidc: Option<OidcBrowserConfig>,
+}
+
+impl BrowserAuthMethods {
+    /// Whether `method` is enabled.
+    ///
+    /// The two `Option`s are the source of truth and the enabled set is
+    /// derived from them, so the two can never disagree.
+    pub fn has(&self, method: BrowserAuthMethod) -> bool {
+        match method {
+            BrowserAuthMethod::Local => self.local.is_some(),
+            BrowserAuthMethod::Oidc => self.oidc.is_some(),
+        }
+    }
+
+    /// The enabled methods, in canonical order.
+    pub fn enabled(&self) -> Vec<BrowserAuthMethod> {
+        let mut methods = Vec::new();
+        if self.local.is_some() {
+            methods.push(BrowserAuthMethod::Local);
+        }
+        if self.oidc.is_some() {
+            methods.push(BrowserAuthMethod::Oidc);
+        }
+        methods
+    }
 }
 
 /// Configuration for local administrator browser authentication.
@@ -161,7 +201,7 @@ pub struct HttpConfig {
     /// the control plane is disabled. When `Some`, it owns the mode
     /// selection and all mode-specific secrets/limits.
     #[serde(skip)]
-    pub browser_auth: Option<BrowserAuthConfig>,
+    pub browser_auth: Option<BrowserAuthMethods>,
 }
 
 /// `HttpConfig` carries four independent secret classes — the API-key pepper,
@@ -272,6 +312,90 @@ pub enum SignupMode {
     Open,
 }
 
+/// Resolve the enabled browser authentication methods (ADR-0057).
+///
+/// `MEMORY_MCP_HTTP_AUTH_METHODS` is the contract: a comma-separated set. The
+/// deprecated `MEMORY_MCP_HTTP_AUTH_MODE` is still accepted for one release as
+/// a one-element set and must not contradict a set that is also supplied.
+/// Supplying neither keeps the historical default of `oidc` alone.
+///
+/// Public within the crate because the admin CLI reads the same contract: one
+/// resolver means the CLI and the server can never disagree about which methods
+/// a deployment enables.
+pub(crate) fn resolve_auth_methods() -> Result<Vec<BrowserAuthMethod>, MemoryError> {
+    let set = optional_env("MEMORY_MCP_HTTP_AUTH_METHODS");
+    let legacy = optional_env("MEMORY_MCP_HTTP_AUTH_MODE");
+    let Some(set) = set else {
+        return match legacy.as_deref() {
+            None => Ok(vec![BrowserAuthMethod::Oidc]),
+            Some(token) => BrowserAuthMethod::parse(token)
+                .map(|method| vec![method])
+                .ok_or_else(|| auth_method_error(token)),
+        };
+    };
+    let mut methods = Vec::new();
+    for token in set.split(',').map(str::trim).filter(|t| !t.is_empty()) {
+        let method = BrowserAuthMethod::parse(token).ok_or_else(|| auth_method_error(token))?;
+        if !methods.contains(&method) {
+            methods.push(method);
+        }
+    }
+    if methods.is_empty() {
+        return Err(MemoryError::ConfigInvalid(
+            "MEMORY_MCP_HTTP_AUTH_METHODS must name at least one method".into(),
+        ));
+    }
+    if let Some(token) = legacy.as_deref() {
+        match BrowserAuthMethod::parse(token) {
+            Some(method) if methods.contains(&method) => {}
+            Some(_) => {
+                return Err(MemoryError::ConfigInvalid(format!(
+                    "MEMORY_MCP_HTTP_AUTH_MODE={token} contradicts \
+                     MEMORY_MCP_HTTP_AUTH_METHODS={set}; set only one of them"
+                )));
+            }
+            None => return Err(auth_method_error(token)),
+        }
+    }
+    Ok(methods)
+}
+
+fn auth_method_error(token: &str) -> MemoryError {
+    MemoryError::ConfigInvalid(format!(
+        "browser authentication methods must be 'local' or 'oidc', got '{token}'"
+    ))
+}
+
+/// Build the `local` method's configuration, demanding the plan material that
+/// method uses and nothing else.
+fn build_local_browser_config() -> Result<LocalBrowserConfig, MemoryError> {
+    let default_plan_version: u32 = require_env("MEMORY_MCP_HTTP_LOCAL_DEFAULT_PLAN_VERSION")?
+        .parse()
+        .map_err(|_| {
+            MemoryError::ConfigInvalid(
+                "MEMORY_MCP_HTTP_LOCAL_DEFAULT_PLAN_VERSION must be a positive u32".into(),
+            )
+        })?;
+    if default_plan_version == 0 {
+        return Err(MemoryError::ConfigInvalid(
+            "default plan version must be positive".into(),
+        ));
+    }
+    let default_plan_limits = load_signup_plan_limits()?.ok_or_else(|| {
+        MemoryError::ConfigInvalid(
+            "the 'local' browser authentication method requires all seven plan limit \
+             environment variables"
+                .into(),
+        )
+    })?;
+    Ok(LocalBrowserConfig {
+        session_key: parse_hex_32_env("MEMORY_MCP_HTTP_SESSION_KEY")?,
+        csrf_key: parse_hex_32_env("MEMORY_MCP_HTTP_CSRF_KEY")?,
+        default_plan_version,
+        default_plan_limits,
+    })
+}
+
 /// The two method tokens `MEMORY_MCP_HTTP_AUTH_METHODS` accepts, shared by the
 /// parser, the validator and the durable policy so no caller re-types the
 /// literal.
@@ -348,16 +472,23 @@ impl HttpConfig {
             .map(|s| TrustedCidr::parse(&s))
             .collect::<Result<Vec<_>, _>>()?;
         let api_key_pepper = require_env("MEMORY_MCP_API_KEY_PEPPER")?;
-        // Mode and enable flags are read before any secret so a local or
-        // disabled deployment is never forced to configure OIDC-only
-        // material, and so the KDF/OIDC keys are only demanded when the
-        // selected mode actually uses them.
+        // Enable flags and the method set are read before any secret so a
+        // deployment that does not enable `oidc` is never forced to configure
+        // OIDC-only material, and so each method's keys are demanded only when
+        // that method is enabled.
         let enable_control_plane = parse_bool("MEMORY_MCP_HTTP_ENABLE_CONTROL_PLANE", false)?;
         let enable_control_plane_ui = parse_bool("MEMORY_MCP_HTTP_ENABLE_CONTROL_PLANE_UI", false)?;
-        let auth_mode = optional_env("MEMORY_MCP_HTTP_AUTH_MODE");
-        let is_local_mode = enable_control_plane && auth_mode.as_deref() == Some(AUTH_METHOD_LOCAL);
+        let configured_methods = if enable_control_plane {
+            resolve_auth_methods()?
+        } else {
+            Vec::new()
+        };
+        // `local` derives the three key slots it cannot use from the session
+        // key, which is only coherent while it is the *whole* set: with `oidc`
+        // enabled those slots are real material for a real provider.
+        let derives_local_keys = configured_methods == [BrowserAuthMethod::Local];
 
-        let identity_index = if is_local_mode {
+        let identity_index = if derives_local_keys {
             // Local mode has no external identity to index, but the field
             // is not optional. Rather than zero-fill it (which would make
             // an accidental use trivially forgeable) derive it from the
@@ -366,12 +497,12 @@ impl HttpConfig {
         } else {
             parse_hex_32_env("MEMORY_MCP_HTTP_IDENTITY_INDEX_KEY")
         }?;
-        let oidc_state = if is_local_mode {
+        let oidc_state = if derives_local_keys {
             Ok(derive_local_key("MEMORY_MCP_HTTP_OIDC_STATE_KEY")?)
         } else {
             parse_hex_32_env("MEMORY_MCP_HTTP_OIDC_STATE_KEY")
         }?;
-        let oidc_nonce = if is_local_mode {
+        let oidc_nonce = if derives_local_keys {
             Ok(derive_local_key("MEMORY_MCP_HTTP_OIDC_NONCE_KEY")?)
         } else {
             parse_hex_32_env("MEMORY_MCP_HTTP_OIDC_NONCE_KEY")
@@ -383,27 +514,27 @@ impl HttpConfig {
             oidc_nonce,
             csrf: parse_hex_32_env("MEMORY_MCP_HTTP_CSRF_KEY")?,
         };
-        // Signup policy: local mode has no identity provider, so the only
-        // coherent setting is invite-only. Defaulting it keeps the local
-        // environment from carrying an OIDC-only variable, and an
-        // explicit `open` is rejected rather than silently ignored.
-        let signup_mode = if is_local_mode {
-            match optional_env("MEMORY_MCP_HTTP_SIGNUP_MODE").as_deref() {
-                None | Some("invite_only") => SignupMode::InviteOnly,
-                Some("open") => {
-                    return Err(MemoryError::ConfigInvalid(
-                        "local mode requires signup mode 'invite_only'".into(),
-                    ));
-                }
-                Some(other) => {
-                    return Err(MemoryError::ConfigInvalid(format!("signup mode: {other}")));
-                }
-            }
-        } else {
+        // Signup policy: only the `oidc` method has an identity provider to
+        // sign up with, so a set without it is invite-only and rejects an
+        // explicit `open` rather than silently ignoring it. Defaulting the
+        // variable keeps a local environment from carrying an OIDC-only key.
+        let signup_mode = if configured_methods.contains(&BrowserAuthMethod::Oidc) {
             match require_env("MEMORY_MCP_HTTP_SIGNUP_MODE")?.as_str() {
                 "invite_only" => SignupMode::InviteOnly,
                 "open" => SignupMode::Open,
                 other => {
+                    return Err(MemoryError::ConfigInvalid(format!("signup mode: {other}")));
+                }
+            }
+        } else {
+            match optional_env("MEMORY_MCP_HTTP_SIGNUP_MODE").as_deref() {
+                None | Some("invite_only") => SignupMode::InviteOnly,
+                Some("open") => {
+                    return Err(MemoryError::ConfigInvalid(
+                        "signup mode 'open' requires the 'oidc' authentication method".into(),
+                    ));
+                }
+                Some(other) => {
                     return Err(MemoryError::ConfigInvalid(format!("signup mode: {other}")));
                 }
             }
@@ -418,60 +549,65 @@ impl HttpConfig {
             .unwrap_or_else(|| DEFAULT_OIDC_ALG.into());
         let operator_identity_allowlist = parse_csv("MEMORY_MCP_HTTP_OPERATOR_IDENTITIES")?;
 
-        // Mode-specific browser auth configuration.
+        // Material for a method this deployment does not enable is a
+        // configuration error rather than something to ignore: a provider that
+        // is configured but not enabled is a deployment that believes it has
+        // SSO when it does not.
+        if !configured_methods.contains(&BrowserAuthMethod::Oidc) {
+            let stray = [
+                ("MEMORY_MCP_HTTP_OIDC_ISSUER", &oidc_issuer),
+                ("MEMORY_MCP_HTTP_OIDC_CLIENT_ID", &oidc_client_id),
+                ("MEMORY_MCP_HTTP_OIDC_AUDIENCE", &oidc_audience),
+                ("MEMORY_MCP_HTTP_OIDC_REDIRECT_URI", &oidc_redirect_uri),
+            ]
+            .into_iter()
+            .find_map(|(name, value)| (!value.is_empty()).then_some(name))
+            .or_else(|| {
+                (oidc_allowed_alg != DEFAULT_OIDC_ALG).then_some("MEMORY_MCP_HTTP_OIDC_ALLOWED_ALG")
+            })
+            .or_else(|| {
+                (!operator_identity_allowlist.is_empty())
+                    .then_some("MEMORY_MCP_HTTP_OPERATOR_IDENTITIES")
+            });
+            if let Some(name) = stray {
+                return Err(MemoryError::ConfigInvalid(format!(
+                    "{name} is set but the 'oidc' browser authentication method is not enabled; \
+                     add 'oidc' to MEMORY_MCP_HTTP_AUTH_METHODS"
+                )));
+            }
+        }
+        // The three OIDC-typed HMAC slots are real key material in every set
+        // that enables `oidc`, and are derived from the session key only while
+        // `local` is the *whole* set. A deployment that supplies one there is
+        // ambiguous about which key it means, so it is refused rather than
+        // silently overridden. Only the parser can tell a supplied value from
+        // the derived one.
+        if derives_local_keys
+            && let Some(name) = [
+                "MEMORY_MCP_HTTP_IDENTITY_INDEX_KEY",
+                "MEMORY_MCP_HTTP_OIDC_STATE_KEY",
+                "MEMORY_MCP_HTTP_OIDC_NONCE_KEY",
+            ]
+            .into_iter()
+            .find(|name| optional_env(name).is_some())
+        {
+            return Err(MemoryError::ConfigInvalid(format!(
+                "{name} is set but the 'oidc' browser authentication method is not enabled; \
+                 add 'oidc' to MEMORY_MCP_HTTP_AUTH_METHODS"
+            )));
+        }
+
+        // One configuration per enabled method, so each method demands exactly
+        // the material it uses (ADR-0057).
         let browser_auth = if enable_control_plane {
-            match auth_mode.as_deref() {
-                Some(AUTH_METHOD_LOCAL) => {
-                    // Local mode must not have OIDC-only settings. The three
-                    // key variables are checked here rather than in
-                    // `validate` because only the parser can tell a supplied
-                    // value from the derived one; the rest are re-checked on
-                    // the built struct by the validator.
-                    if !oidc_issuer.is_empty()
-                        || !oidc_client_id.is_empty()
-                        || !oidc_audience.is_empty()
-                        || !oidc_redirect_uri.is_empty()
-                        || oidc_allowed_alg != DEFAULT_OIDC_ALG
-                        || !operator_identity_allowlist.is_empty()
-                        || optional_env("MEMORY_MCP_HTTP_IDENTITY_INDEX_KEY").is_some()
-                        || optional_env("MEMORY_MCP_HTTP_OIDC_STATE_KEY").is_some()
-                        || optional_env("MEMORY_MCP_HTTP_OIDC_NONCE_KEY").is_some()
-                    {
-                        return Err(MemoryError::ConfigInvalid(
-                            "local mode must not have OIDC configuration".into(),
-                        ));
-                    }
-                    let session_key = parse_hex_32_env("MEMORY_MCP_HTTP_SESSION_KEY")?;
-                    let csrf_key = parse_hex_32_env("MEMORY_MCP_HTTP_CSRF_KEY")?;
-                    let default_plan_version: u32 =
-                        require_env("MEMORY_MCP_HTTP_LOCAL_DEFAULT_PLAN_VERSION")?
-                            .parse()
-                            .map_err(|_| {
-                                MemoryError::ConfigInvalid(
-                            "MEMORY_MCP_HTTP_LOCAL_DEFAULT_PLAN_VERSION must be a positive u32"
-                                .into(),
-                        )
-                            })?;
-                    if default_plan_version == 0 {
-                        return Err(MemoryError::ConfigInvalid(
-                            "default plan version must be positive".into(),
-                        ));
-                    }
-                    let default_plan_limits = load_signup_plan_limits()?.ok_or_else(|| {
-                        MemoryError::ConfigInvalid(
-                            "local mode requires all seven plan limit environment variables".into(),
-                        )
-                    })?;
-                    Some(BrowserAuthConfig::Local(LocalBrowserConfig {
-                        session_key,
-                        csrf_key,
-                        default_plan_version,
-                        default_plan_limits,
-                    }))
-                }
-                Some(AUTH_METHOD_OIDC) | None => {
-                    // OIDC mode (default for backward compatibility).
-                    Some(BrowserAuthConfig::Oidc(OidcBrowserConfig {
+            Some(BrowserAuthMethods {
+                local: configured_methods
+                    .contains(&BrowserAuthMethod::Local)
+                    .then(build_local_browser_config)
+                    .transpose()?,
+                oidc: configured_methods
+                    .contains(&BrowserAuthMethod::Oidc)
+                    .then(|| OidcBrowserConfig {
                         issuer: oidc_issuer.clone(),
                         client_id: oidc_client_id.clone(),
                         audience: oidc_audience.clone(),
@@ -480,14 +616,8 @@ impl HttpConfig {
                         operator_identity_allowlist: operator_identity_allowlist.clone(),
                         signup_mode,
                         keys,
-                    }))
-                }
-                Some(other) => {
-                    return Err(MemoryError::ConfigInvalid(format!(
-                        "MEMORY_MCP_HTTP_AUTH_MODE must be 'local' or 'oidc', got '{other}'"
-                    )));
-                }
-            }
+                    }),
+            })
         } else {
             None
         };
@@ -551,22 +681,24 @@ impl HttpConfig {
         validate(self)
     }
 
-    /// Whether this deployment uses OIDC browser authentication.
+    /// Whether `method` is enabled on this deployment.
     ///
-    /// `true` when the control plane is enabled and the configured
-    /// browser policy is OIDC, or when the control plane is enabled and
-    /// no explicit policy was supplied (OIDC is the historical
-    /// default). Local mode returns `false`, which suppresses OIDC
-    /// discovery at startup.
-    pub fn browser_auth_is_oidc(&self) -> bool {
-        if !self.enable_control_plane {
-            return false;
-        }
-        match &self.browser_auth {
-            Some(BrowserAuthConfig::Oidc(_)) => true,
-            Some(BrowserAuthConfig::Local(_)) => false,
-            None => true,
-        }
+    /// Every consumer that used to ask "is this deployment OIDC?" now asks
+    /// about one method, so enabling a second method never changes the answer
+    /// for the first.
+    pub fn has_method(&self, method: BrowserAuthMethod) -> bool {
+        self.browser_auth
+            .as_ref()
+            .is_some_and(|methods| methods.has(method))
+    }
+
+    /// The enabled browser authentication methods, empty when the control plane
+    /// is disabled.
+    pub fn browser_auth_methods(&self) -> Vec<BrowserAuthMethod> {
+        self.browser_auth
+            .as_ref()
+            .map(BrowserAuthMethods::enabled)
+            .unwrap_or_default()
     }
 }
 
@@ -618,22 +750,25 @@ impl HttpConfig {
             enable_control_plane: false,
             enable_control_plane_ui: false,
             signup_plan_limits: None,
-            browser_auth: Some(BrowserAuthConfig::Oidc(OidcBrowserConfig {
-                issuer: "https://issuer.invalid".into(),
-                client_id: "test-client".into(),
-                audience: "memory-mcp".into(),
-                redirect_uri: "http://localhost/auth/oidc/callback".into(),
-                allowed_alg: DEFAULT_OIDC_ALG.into(),
-                operator_identity_allowlist: Vec::new(),
-                signup_mode: SignupMode::InviteOnly,
-                keys: HmacKeys {
-                    identity_index: [0; 32],
-                    control_plane_session: [0; 32],
-                    oidc_state: [0; 32],
-                    oidc_nonce: [0; 32],
-                    csrf: [0; 32],
-                },
-            })),
+            browser_auth: Some(BrowserAuthMethods {
+                local: None,
+                oidc: Some(OidcBrowserConfig {
+                    issuer: "https://issuer.invalid".into(),
+                    client_id: "test-client".into(),
+                    audience: "memory-mcp".into(),
+                    redirect_uri: "http://localhost/auth/oidc/callback".into(),
+                    allowed_alg: DEFAULT_OIDC_ALG.into(),
+                    operator_identity_allowlist: Vec::new(),
+                    signup_mode: SignupMode::InviteOnly,
+                    keys: HmacKeys {
+                        identity_index: [0; 32],
+                        control_plane_session: [0; 32],
+                        oidc_state: [0; 32],
+                        oidc_nonce: [0; 32],
+                        csrf: [0; 32],
+                    },
+                }),
+            }),
         }
     }
 }
@@ -801,17 +936,9 @@ mod tests {
             })
             .collect();
         vars.push(("MEMORY_MCP_HTTP_ENABLE_CONTROL_PLANE", "true".into()));
-        vars.push(("MEMORY_MCP_HTTP_AUTH_MODE", "local".into()));
+        vars.push(("MEMORY_MCP_HTTP_AUTH_METHODS", "local".into()));
         vars.push(("MEMORY_MCP_HTTP_LOCAL_DEFAULT_PLAN_VERSION", "1".into()));
-        vars.extend([
-            ("MEMORY_MCP_HTTP_MAX_INGESTED_BYTES", "1000".into()),
-            ("MEMORY_MCP_HTTP_MAX_EPISODE_COUNT", "10".into()),
-            ("MEMORY_MCP_HTTP_INGEST_PER_MINUTE", "3".into()),
-            ("MEMORY_MCP_HTTP_MAX_OPEN_APP_SESSIONS", "8".into()),
-            ("MEMORY_MCP_HTTP_MAX_ACTIVE_API_KEYS", "2".into()),
-            ("MEMORY_MCP_HTTP_PER_TENANT_REQUEST_CONCURRENCY", "6".into()),
-            ("MEMORY_MCP_HTTP_EXTRACTION_CONCURRENCY", "4".into()),
-        ]);
+        vars.extend(plan_limit_env());
         vars
     }
 
@@ -821,9 +948,73 @@ mod tests {
         let refs: Vec<(&str, &str)> = vars.iter().map(|(k, v)| (*k, v.as_str())).collect();
         with_env(&refs, || {
             let cfg = HttpConfig::from_env().expect("a local-mode deployment loads");
-            assert!(!cfg.browser_auth_is_oidc());
+            assert!(cfg.has_method(BrowserAuthMethod::Local));
+            assert!(!cfg.has_method(BrowserAuthMethod::Oidc));
             assert!(cfg.oidc_issuer.is_empty(), "local mode carries no issuer");
             assert!(cfg.oidc_client_id.is_empty());
+        });
+    }
+
+    /// `MEMORY_MCP_HTTP_AUTH_MODE` is a one-release alias for a one-element
+    /// `MEMORY_MCP_HTTP_AUTH_METHODS`. Supplying only the alias still works,
+    /// and a set that contradicts it is refused rather than silently winning.
+    #[test]
+    fn auth_mode_is_a_one_element_alias_for_the_method_set() {
+        let mut vars = local_mode_env();
+        vars.retain(|(k, _)| *k != "MEMORY_MCP_HTTP_AUTH_METHODS");
+        vars.push(("MEMORY_MCP_HTTP_AUTH_MODE", "local".into()));
+        let refs: Vec<(&str, &str)> = vars.iter().map(|(k, v)| (*k, v.as_str())).collect();
+        with_env(&refs, || {
+            let cfg = HttpConfig::from_env().expect("the alias alone still resolves");
+            assert_eq!(cfg.browser_auth_methods(), vec![BrowserAuthMethod::Local]);
+        });
+
+        let mut vars = local_mode_env();
+        vars.push(("MEMORY_MCP_HTTP_AUTH_MODE", "oidc".into()));
+        let refs: Vec<(&str, &str)> = vars.iter().map(|(k, v)| (*k, v.as_str())).collect();
+        with_env(&refs, || {
+            assert!(
+                matches!(
+                    HttpConfig::from_env(),
+                    Err(MemoryError::ConfigInvalid(ref message)) if message.contains("contradicts")
+                ),
+                "an alias that disagrees with the set must fail startup"
+            );
+        });
+    }
+
+    /// Both methods enabled is configuration, not a migration: the OIDC
+    /// material is required rather than forbidden, and the local material is
+    /// required as well (ADR-0057).
+    #[test]
+    fn both_methods_load_and_validate_together() {
+        let mut vars = base_required_env();
+        vars.push(("MEMORY_MCP_HTTP_ENABLE_CONTROL_PLANE", "true".into()));
+        vars.push(("MEMORY_MCP_HTTP_AUTH_METHODS", "oidc,local".into()));
+        vars.push(("MEMORY_MCP_HTTP_LOCAL_DEFAULT_PLAN_VERSION", "1".into()));
+        vars.push((
+            "MEMORY_MCP_HTTP_OIDC_ISSUER",
+            "https://issuer.example.com".into(),
+        ));
+        vars.push(("MEMORY_MCP_HTTP_OIDC_CLIENT_ID", "test-client".into()));
+        vars.push(("MEMORY_MCP_HTTP_OIDC_AUDIENCE", "memory-mcp".into()));
+        vars.push((
+            "MEMORY_MCP_HTTP_OIDC_REDIRECT_URI",
+            "https://memory.example.com/callback".into(),
+        ));
+        vars.push((
+            "MEMORY_MCP_HTTP_PUBLIC_BASE_URL",
+            "https://memory.example.com".into(),
+        ));
+        vars.extend(plan_limit_env());
+        let refs: Vec<(&str, &str)> = vars.iter().map(|(k, v)| (*k, v.as_str())).collect();
+        with_env(&refs, || {
+            let cfg = HttpConfig::from_env().expect("both methods load");
+            assert_eq!(
+                cfg.browser_auth_methods(),
+                vec![BrowserAuthMethod::Local, BrowserAuthMethod::Oidc]
+            );
+            cfg.validate().expect("both methods validate together");
         });
     }
 
@@ -845,7 +1036,7 @@ mod tests {
                     matches!(
                         HttpConfig::from_env(),
                         Err(MemoryError::ConfigInvalid(ref message))
-                            if message.contains("OIDC configuration")
+                            if message.contains("not enabled")
                     ),
                     "{name} must fail startup in local mode"
                 );
@@ -868,15 +1059,7 @@ mod tests {
             "MEMORY_MCP_HTTP_OIDC_REDIRECT_URI",
             "http://localhost/callback".into(),
         ));
-        vars.extend([
-            ("MEMORY_MCP_HTTP_MAX_INGESTED_BYTES", "1000".into()),
-            ("MEMORY_MCP_HTTP_MAX_EPISODE_COUNT", "10".into()),
-            ("MEMORY_MCP_HTTP_INGEST_PER_MINUTE", "3".into()),
-            ("MEMORY_MCP_HTTP_MAX_OPEN_APP_SESSIONS", "8".into()),
-            ("MEMORY_MCP_HTTP_MAX_ACTIVE_API_KEYS", "2".into()),
-            ("MEMORY_MCP_HTTP_PER_TENANT_REQUEST_CONCURRENCY", "6".into()),
-            ("MEMORY_MCP_HTTP_EXTRACTION_CONCURRENCY", "4".into()),
-        ]);
+        vars.extend(plan_limit_env());
         let refs: Vec<(&str, &str)> = vars.iter().map(|(k, v)| (*k, v.as_str())).collect();
         with_env(&refs, || {
             let cfg = HttpConfig::from_env().expect("config loads");
@@ -1052,6 +1235,20 @@ mod tests {
         }
     }
 
+    /// The seven plan limit variables the `local` method publishes for the
+    /// clients it provisions.
+    fn plan_limit_env() -> Vec<(&'static str, String)> {
+        vec![
+            ("MEMORY_MCP_HTTP_MAX_INGESTED_BYTES", "1000".into()),
+            ("MEMORY_MCP_HTTP_MAX_EPISODE_COUNT", "10".into()),
+            ("MEMORY_MCP_HTTP_INGEST_PER_MINUTE", "3".into()),
+            ("MEMORY_MCP_HTTP_MAX_OPEN_APP_SESSIONS", "8".into()),
+            ("MEMORY_MCP_HTTP_MAX_ACTIVE_API_KEYS", "2".into()),
+            ("MEMORY_MCP_HTTP_PER_TENANT_REQUEST_CONCURRENCY", "6".into()),
+            ("MEMORY_MCP_HTTP_EXTRACTION_CONCURRENCY", "4".into()),
+        ]
+    }
+
     /// A valid, complete local-mode configuration.
     ///
     /// The positive case comes first so each negative test below mutates
@@ -1060,11 +1257,14 @@ mod tests {
     fn valid_local_config() -> HttpConfig {
         let mut cfg = HttpConfig::default_for_test();
         cfg.enable_control_plane = true;
-        cfg.browser_auth = Some(BrowserAuthConfig::Local(local_browser_config()));
+        cfg.browser_auth = Some(BrowserAuthMethods {
+            local: Some(local_browser_config()),
+            oidc: None,
+        });
         cfg.public_base_url = "https://memory.example.com".into();
         cfg.signup_plan_limits = Some(PlanLimits::default());
         cfg.signup_mode = SignupMode::InviteOnly;
-        // Local mode must carry no OIDC-only setting at all.
+        // A set without `oidc` must carry no OIDC-only setting at all.
         cfg.oidc_issuer.clear();
         cfg.oidc_client_id.clear();
         cfg.oidc_audience.clear();
@@ -1081,7 +1281,8 @@ mod tests {
             "a complete local config must validate: {:?}",
             cfg.validate().err()
         );
-        assert!(!cfg.browser_auth_is_oidc());
+        assert!(cfg.has_method(BrowserAuthMethod::Local));
+        assert!(!cfg.has_method(BrowserAuthMethod::Oidc));
     }
 
     #[test]
@@ -1135,7 +1336,7 @@ mod tests {
         cfg.signup_mode = SignupMode::Open;
         assert!(matches!(
             cfg.validate(),
-            Err(MemoryError::ConfigInvalid(ref msg)) if msg.contains("invite_only")
+            Err(MemoryError::ConfigInvalid(ref msg)) if msg.contains("'oidc' authentication method")
         ));
     }
 
@@ -1218,7 +1419,7 @@ mod tests {
         cfg.oidc_issuer = "https://issuer.example.com".into();
         assert!(matches!(
             cfg.validate(),
-            Err(MemoryError::ConfigInvalid(msg)) if msg.contains("off mode")
+            Err(MemoryError::ConfigInvalid(msg)) if msg.contains("MEMORY_MCP_HTTP_OIDC_ISSUER")
         ));
     }
 }

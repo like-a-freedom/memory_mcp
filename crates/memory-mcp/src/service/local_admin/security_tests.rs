@@ -82,7 +82,7 @@ mod tests {
                 .await
                 .expect("migrated Mem registry"),
         );
-        let authority = LocalAdminAuthority::join(store, [1u8; 32], [2u8; 32])
+        let authority = LocalAdminAuthority::join_local_for_test(store, [1u8; 32], [2u8; 32])
             .await
             .expect("join durable local policy");
         let hasher = Arc::new(PasswordHasher::new().expect("supported KDF"));
@@ -528,12 +528,12 @@ mod tests {
                 .expect("migrated Mem registry"),
         );
         assert!(
-            LocalAdminAuthority::join(store.clone(), [1u8; 32], [2u8; 32])
+            LocalAdminAuthority::join_local_for_test(store.clone(), [1u8; 32], [2u8; 32])
                 .await
                 .is_ok()
         );
         assert!(
-            LocalAdminAuthority::join(store, [3u8; 32], [4u8; 32])
+            LocalAdminAuthority::join_local_for_test(store, [3u8; 32], [4u8; 32])
                 .await
                 .is_err(),
             "a differing local key fingerprint must fail the join"

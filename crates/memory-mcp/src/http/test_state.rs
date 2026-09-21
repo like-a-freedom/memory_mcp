@@ -47,7 +47,7 @@ impl HttpStateTestBuilder {
     /// durable policy) before exercising the HTTP routes.
     #[cfg(feature = "control-plane")]
     pub async fn local_admin() -> (Self, std::sync::Arc<super::registry::SurrealRegistryStore>) {
-        use crate::http::config::{BrowserAuthConfig, LocalBrowserConfig};
+        use crate::http::config::{BrowserAuthMethods, LocalBrowserConfig};
         use crate::service::local_admin::contracts::LocalAdminStore;
 
         let namespace = format!("http_local_admin_{}", uuid::Uuid::new_v4().simple());
@@ -66,12 +66,15 @@ impl HttpStateTestBuilder {
         );
         let mut config = super::config::HttpConfig::default_for_test();
         config.enable_control_plane = true;
-        config.browser_auth = Some(BrowserAuthConfig::Local(LocalBrowserConfig {
-            session_key: Self::LOCAL_TEST_SESSION_KEY,
-            csrf_key: Self::LOCAL_TEST_CSRF_KEY,
-            default_plan_version: 1,
-            default_plan_limits: super::registry::models::PlanLimits::default(),
-        }));
+        config.browser_auth = Some(BrowserAuthMethods {
+            local: Some(LocalBrowserConfig {
+                session_key: Self::LOCAL_TEST_SESSION_KEY,
+                csrf_key: Self::LOCAL_TEST_CSRF_KEY,
+                default_plan_version: 1,
+                default_plan_limits: super::registry::models::PlanLimits::default(),
+            }),
+            oidc: None,
+        });
         (
             Self {
                 config,

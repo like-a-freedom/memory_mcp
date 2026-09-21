@@ -82,23 +82,25 @@ async fn local_admin_remote_replica_races() {
     let target = remote_target();
     let (first, second) = two_replicas(&target).await;
 
-    // Both replicas join the singleton policy: the first creates it, the
-    // second must observe an identical mode/epoch rather than creating a
-    // second one.
-    let authority_one = crate::service::local_admin::auth::LocalAdminAuthority::join(
-        first.clone(),
-        [7u8; 32],
-        [8u8; 32],
-    )
-    .await
-    .expect("replica one joins the local policy");
-    let authority_two = crate::service::local_admin::auth::LocalAdminAuthority::join(
-        second.clone(),
-        [7u8; 32],
-        [8u8; 32],
-    )
-    .await
-    .expect("replica two joins the same local policy");
+    // Both replicas reconcile the singleton policy: the first creates it, the
+    // second must observe an identical epoch and the same method set rather
+    // than creating a second row.
+    let authority_one =
+        crate::service::local_admin::auth::LocalAdminAuthority::join_local_for_test(
+            first.clone(),
+            [7u8; 32],
+            [8u8; 32],
+        )
+        .await
+        .expect("replica one joins the local policy");
+    let authority_two =
+        crate::service::local_admin::auth::LocalAdminAuthority::join_local_for_test(
+            second.clone(),
+            [7u8; 32],
+            [8u8; 32],
+        )
+        .await
+        .expect("replica two joins the same local policy");
     assert_eq!(
         authority_one.policy().epoch,
         authority_two.policy().epoch,
@@ -158,20 +160,22 @@ async fn local_admin_session_revocation_race() {
     let target = remote_target();
     let (first, second) = two_replicas(&target).await;
 
-    let authority_one = crate::service::local_admin::auth::LocalAdminAuthority::join(
-        first.clone(),
-        [7u8; 32],
-        [8u8; 32],
-    )
-    .await
-    .expect("replica one joins the local policy");
-    let authority_two = crate::service::local_admin::auth::LocalAdminAuthority::join(
-        second.clone(),
-        [7u8; 32],
-        [8u8; 32],
-    )
-    .await
-    .expect("replica two joins the same local policy");
+    let authority_one =
+        crate::service::local_admin::auth::LocalAdminAuthority::join_local_for_test(
+            first.clone(),
+            [7u8; 32],
+            [8u8; 32],
+        )
+        .await
+        .expect("replica one joins the local policy");
+    let authority_two =
+        crate::service::local_admin::auth::LocalAdminAuthority::join_local_for_test(
+            second.clone(),
+            [7u8; 32],
+            [8u8; 32],
+        )
+        .await
+        .expect("replica two joins the same local policy");
 
     // Provision an activated administrator on replica one, then log in twice
     // so two independent sessions exist.

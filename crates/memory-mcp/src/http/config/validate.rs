@@ -156,10 +156,12 @@ pub(super) fn validate(cfg: &HttpConfig) -> Result<(), MemoryError> {
         }
     }
     // OIDC completeness and algorithm checks apply only when the
-    // deployment actually authenticates browsers through OIDC. Local
-    // mode has no identity provider and must not be forced to configure
-    // one; a disabled control plane mounts neither surface.
-    let uses_oidc = cfg.browser_auth_is_oidc();
+    // deployment actually authenticates browsers through OIDC. A set without
+    // `oidc` has no identity provider and must not be forced to configure
+    // one; a disabled control plane mounts neither surface. Material for a
+    // method the deployment does not enable is rejected in `from_env`, which
+    // alone can tell a supplied key from a derived one.
+    let uses_oidc = cfg.has_method(super::types::BrowserAuthMethod::Oidc);
     if uses_oidc
         && (cfg.oidc_issuer.is_empty()
             || cfg.oidc_client_id.is_empty()
@@ -189,62 +191,63 @@ pub(super) fn validate(cfg: &HttpConfig) -> Result<(), MemoryError> {
         ));
     }
 
-    // ─── Browser auth mode validation ─────────────────────
-    match &cfg.browser_auth {
-        Some(super::types::BrowserAuthConfig::Local(_local)) => {
-            // Local mode: every OIDC-only setting must be absent. Leaving
-            // one set is an ambiguous deployment, not a harmless extra.
-            for (name, value) in [
-                ("MEMORY_MCP_HTTP_OIDC_ISSUER", &cfg.oidc_issuer),
-                ("MEMORY_MCP_HTTP_OIDC_CLIENT_ID", &cfg.oidc_client_id),
-                ("MEMORY_MCP_HTTP_OIDC_AUDIENCE", &cfg.oidc_audience),
-                ("MEMORY_MCP_HTTP_OIDC_REDIRECT_URI", &cfg.oidc_redirect_uri),
-            ] {
-                if !value.is_empty() {
-                    return Err(MemoryError::ConfigInvalid(format!(
-                        "local mode must not set {name}"
-                    )));
-                }
-            }
-            if !cfg.operator_identity_allowlist.is_empty() {
-                return Err(MemoryError::ConfigInvalid(
-                    "local mode must not set the operator identity allowlist".into(),
-                ));
-            }
-            // Open signup is meaningless without an identity provider and
-            // would advertise accounts nobody can create. Invite-only is
-            // the only coherent local setting.
-            if cfg.signup_mode != SignupMode::InviteOnly {
-                return Err(MemoryError::ConfigInvalid(
-                    "local mode requires signup mode 'invite_only'".into(),
-                ));
-            }
-            // Local mode: require HTTPS in public_base_url
-            if !cfg.public_base_url.starts_with("https://")
-                && !is_loopback_public_url(&cfg.public_base_url)
-            {
-                return Err(MemoryError::ConfigInvalid(
-                    "local mode requires HTTPS public_base_url (or localhost for development)"
-                        .into(),
-                ));
-            }
-            // Local mode: require explicit plan limits
-            if cfg.signup_plan_limits.is_none() {
-                return Err(MemoryError::ConfigInvalid(
-                    "local mode requires explicit signup plan limits".into(),
-                ));
+    // ─── Browser auth method validation ────────────────────
+    if !cfg.has_method(super::types::BrowserAuthMethod::Oidc) {
+        // Material for a disabled method is an ambiguous deployment rather
+        // than a harmless extra: a provider that is configured but not enabled
+        // is a deployment that believes it has SSO when it does not. The three
+        // HMAC keys are absent from this list because only the env loader can
+        // tell a supplied key from the one local mode derives.
+        for (variable, value) in [
+            ("MEMORY_MCP_HTTP_OIDC_ISSUER", &cfg.oidc_issuer),
+            ("MEMORY_MCP_HTTP_OIDC_CLIENT_ID", &cfg.oidc_client_id),
+            ("MEMORY_MCP_HTTP_OIDC_AUDIENCE", &cfg.oidc_audience),
+            ("MEMORY_MCP_HTTP_OIDC_REDIRECT_URI", &cfg.oidc_redirect_uri),
+        ] {
+            if !value.is_empty() {
+                return Err(MemoryError::ConfigInvalid(format!(
+                    "{variable} is set but the 'oidc' browser authentication method is not \
+                     enabled; add 'oidc' to MEMORY_MCP_HTTP_AUTH_METHODS"
+                )));
             }
         }
-        Some(super::types::BrowserAuthConfig::Oidc(_)) => {
-            // OIDC mode: existing validation applies
+        if cfg.oidc_allowed_alg != super::parse::DEFAULT_OIDC_ALG {
+            return Err(MemoryError::ConfigInvalid(
+                "MEMORY_MCP_HTTP_OIDC_ALLOWED_ALG is set but the 'oidc' browser authentication \
+                 method is not enabled; add 'oidc' to MEMORY_MCP_HTTP_AUTH_METHODS"
+                    .into(),
+            ));
         }
-        None => {
-            // Off mode: no browser keys
-            if !cfg.oidc_issuer.is_empty() || !cfg.oidc_client_id.is_empty() {
-                return Err(MemoryError::ConfigInvalid(
-                    "off mode must not set OIDC credentials".into(),
-                ));
-            }
+        // Open signup is meaningless without an identity provider and would
+        // advertise accounts nobody can create. Invite-only is the only
+        // coherent setting for a deployment with no OIDC method.
+        if cfg.signup_mode != SignupMode::InviteOnly {
+            return Err(MemoryError::ConfigInvalid(
+                "signup mode 'open' requires the 'oidc' authentication method".into(),
+            ));
+        }
+        if !cfg.operator_identity_allowlist.is_empty() {
+            return Err(MemoryError::ConfigInvalid(
+                "the operator identity allowlist requires the 'oidc' authentication method".into(),
+            ));
+        }
+    }
+    if cfg.has_method(super::types::BrowserAuthMethod::Local) {
+        // The local method serves a single-tenant administrator console over a
+        // password, so it needs an HTTPS origin (or loopback) and the plan it
+        // publishes for the clients it provisions.
+        if !cfg.public_base_url.starts_with("https://")
+            && !is_loopback_public_url(&cfg.public_base_url)
+        {
+            return Err(MemoryError::ConfigInvalid(
+                "the 'local' authentication method requires HTTPS public_base_url (or localhost for development)"
+                    .into(),
+            ));
+        }
+        if cfg.signup_plan_limits.is_none() {
+            return Err(MemoryError::ConfigInvalid(
+                "the 'local' authentication method requires explicit signup plan limits".into(),
+            ));
         }
     }
     #[cfg(not(any(test, feature = "test-fixtures")))]

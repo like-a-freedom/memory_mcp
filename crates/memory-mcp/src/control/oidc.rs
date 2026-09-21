@@ -88,9 +88,15 @@ mod tests {
     async fn logout_revokes_session_and_clears_cookie() {
         let store: Arc<crate::http::registry::storage::InMemoryStore> =
             Arc::new(crate::http::registry::storage::InMemoryStore::default());
-        // Join the durable OIDC policy so the session write is guarded by
+        // Reconcile the durable policy so the session write is guarded by
         // a current epoch, mirroring startup composition.
-        let policy = store.join_oidc_policy().await.expect("join OIDC policy");
+        let policy = crate::http::registry::RegistryStore::reconcile_browser_policy(
+            store.as_ref(),
+            &[crate::http::config::BrowserAuthMethod::Oidc],
+            None,
+        )
+        .await
+        .expect("reconcile browser policy");
         let registry = RegistryHandle::in_memory().with_inner_store(store.clone());
         let state = crate::http::test_state::HttpStateTestBuilder::new()
             .await

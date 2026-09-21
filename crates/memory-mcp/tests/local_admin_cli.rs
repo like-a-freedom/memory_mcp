@@ -117,12 +117,13 @@ fn run_admin(dir: &tempfile::TempDir, args: &[&str]) -> std::process::Output {
     run_admin_with_mode(dir, args, Some("local"))
 }
 
-/// As [`run_admin`], but with an explicit `MEMORY_MCP_HTTP_AUTH_MODE` (or none
-/// at all) so the mode requirement can be exercised.
+/// As [`run_admin`], but with an explicit
+/// `MEMORY_MCP_HTTP_AUTH_METHODS` (or none at all) so the method requirement
+/// can be exercised.
 fn run_admin_with_mode(
     dir: &tempfile::TempDir,
     args: &[&str],
-    mode: Option<&str>,
+    methods: Option<&str>,
 ) -> std::process::Output {
     let url = format!("rocksdb://{}/db", dir.path().display());
     let mut command = ProcessCommand::new(env!("CARGO_BIN_EXE_memory_mcp"));
@@ -137,8 +138,8 @@ fn run_admin_with_mode(
         .env("MEMORY_MCP_HTTP_SESSION_KEY", SESSION_KEY_HEX)
         .env("MEMORY_MCP_HTTP_CSRF_KEY", CSRF_KEY_HEX)
         .env("MEMORY_MCP_HTTP_PUBLIC_BASE_URL", PUBLIC_BASE_URL);
-    if let Some(mode) = mode {
-        command.env("MEMORY_MCP_HTTP_AUTH_MODE", mode);
+    if let Some(methods) = methods {
+        command.env("MEMORY_MCP_HTTP_AUTH_METHODS", methods);
     }
     command
         .args(args)
@@ -282,32 +283,37 @@ fn admin_create_then_recover_persists_across_processes() {
     assert_no_oidc_or_model_markers(&recover_stderr);
 }
 
-/// Spec §6: the admin commands **require local mode**. Running one in an
-/// OIDC (or unconfigured) deployment must fail before any registry is opened
-/// or written.
+/// Spec §6: the admin commands **require the local method**. Running one in a
+/// deployment that authenticates browsers through an identity provider alone
+/// (or that names an unknown method) must fail before any registry is opened or
+/// written.
 #[test]
-fn admin_commands_require_local_mode() {
-    for (mode, expected) in [
-        (None, "require local mode"),
-        (Some("oidc"), "require local mode"),
-        (Some("off"), "require local mode"),
+fn admin_commands_require_the_local_method() {
+    for (methods, expected) in [
+        (None, "require the 'local' browser authentication method"),
+        (
+            Some("oidc"),
+            "require the 'local' browser authentication method",
+        ),
+        (Some("saml"), "must be 'local' or 'oidc'"),
     ] {
         let dir = tempfile::tempdir().expect("temp dir");
-        let output = run_admin_with_mode(&dir, &["admin", "create", "--username", "ops.one"], mode);
+        let output =
+            run_admin_with_mode(&dir, &["admin", "create", "--username", "ops.one"], methods);
         assert!(
             !output.status.success(),
-            "mode {mode:?} must be refused, got {:?}",
+            "methods {methods:?} must be refused, got {:?}",
             output.status
         );
         let stderr = String::from_utf8_lossy(&output.stderr);
         assert!(
             stderr.contains(expected),
-            "mode {mode:?} must name the requirement, got: {stderr}"
+            "methods {methods:?} must name the requirement, got: {stderr}"
         );
         let stdout = String::from_utf8_lossy(&output.stdout);
         assert!(
             !stdout.contains("\"code\""),
-            "no activation code may be issued in mode {mode:?}: {stdout}"
+            "no activation code may be issued with methods {methods:?}: {stdout}"
         );
     }
 }

@@ -9,7 +9,7 @@ mod service_cases {
     use crate::http::registry::SurrealRegistryStore;
     use crate::service::local_admin::{
         AdminManagementService, AuthAttemptContext, ChallengeKind, LocalAdminAuthority,
-        LocalAdminService, LocalAdminStore, PasswordHasher, RequestContext,
+        LocalAdminService, PasswordHasher, RequestContext,
     };
 
     async fn service() -> (AdminManagementService, LocalAdminService) {
@@ -19,8 +19,7 @@ mod service_cases {
                 .await
                 .expect("migrated Mem registry"),
         );
-        let store: Arc<dyn LocalAdminStore> = concrete;
-        let authority = LocalAdminAuthority::join(store, [1; 32], [2; 32])
+        let authority = LocalAdminAuthority::join_local_for_test(concrete, [1; 32], [2; 32])
             .await
             .expect("local policy");
         let management = AdminManagementService::new(authority.clone());

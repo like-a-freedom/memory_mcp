@@ -10,6 +10,8 @@ use axum::routing::delete;
 
 use super::HttpState;
 use super::fault_injection::FaultInjector;
+#[cfg(feature = "control-plane")]
+use crate::http::config::BrowserAuthMethod;
 
 pub fn build_router(
     state: Arc<HttpState>,
@@ -77,13 +79,15 @@ pub fn build_router(
     #[cfg(feature = "control-plane")]
     let control_extension: Option<axum::Extension<Arc<dyn FaultInjector>>> =
         control_plane_injector.map(axum::Extension);
-    // The OIDC/account/operator surface is mounted only when the
-    // deployment is in OIDC mode. Local mode must not expose
-    // `/auth/oidc/*`, `/api/v1/account/*` or `/api/v1/operator/*` at
-    // all — not merely leave them unauthenticated — and a disabled
-    // control plane mounts neither surface.
+    // Each enabled browser authentication method mounts its own surface, and a
+    // method that is not enabled mounts nothing at all — not even an
+    // unauthenticated route (ADR-0057). A deployment with no identity provider
+    // must not answer `/auth/oidc/*`, `/api/v1/account/*` or
+    // `/api/v1/operator/*`; one with no local administrator must not answer
+    // `/api/v1/auth/local/*` or `/api/v1/admin/*`. Both are mounted only by
+    // explicit configuration, and a disabled control plane mounts neither.
     #[cfg(feature = "control-plane")]
-    let router = if state.config.browser_auth_is_oidc() {
+    let router = if state.config.has_method(BrowserAuthMethod::Oidc) {
         let account = Router::new()
             .route(
                 "/api/v1/account",
@@ -192,70 +196,65 @@ pub fn build_router(
     };
 
     #[cfg(feature = "control-plane")]
-    let router = {
-        use crate::http::config::BrowserAuthConfig;
-        let is_local = matches!(state.config.browser_auth, Some(BrowserAuthConfig::Local(_)));
-        if is_local {
-            use crate::control::local_admin::handlers;
-            use axum::routing::{delete, get, post};
-            // The local surface deliberately mirrors spec §8 and mounts
-            // none of the OIDC control-plane routes. The OIDC branch is
-            // skipped entirely above, so `/auth/oidc/*`,
-            // `/api/v1/account/*` and `/api/v1/operator/*` are absent
-            // rather than merely unauthenticated.
-            let local_admin = Router::new()
-                .route("/api/v1/auth/local/csrf", get(handlers::preauth_csrf))
-                .route(
-                    "/api/v1/auth/local/challenge",
-                    post(handlers::inspect_challenge),
-                )
-                .route("/api/v1/auth/local/activate", post(handlers::activate))
-                .route("/api/v1/auth/local/reset", post(handlers::reset))
-                .route("/api/v1/auth/local/login", post(handlers::login))
-                .route("/api/v1/admin/session", get(handlers::session))
-                .route("/api/v1/admin/reauth", post(handlers::reauth))
-                .route("/api/v1/admin/logout", post(handlers::logout))
-                .route(
-                    "/api/v1/admin/clients",
-                    get(handlers::list_clients).post(handlers::create_client),
-                )
-                .route(
-                    "/api/v1/admin/clients/{account_id}",
-                    get(handlers::get_client),
-                )
-                .route(
-                    "/api/v1/admin/clients/{account_id}/keys",
-                    get(handlers::list_keys).post(handlers::issue_key),
-                )
-                .route(
-                    "/api/v1/admin/clients/{account_id}/keys/{key_id}",
-                    delete(handlers::revoke_key),
-                )
-                .route(
-                    "/api/v1/admin/clients/{account_id}/suspend",
-                    post(handlers::suspend_client),
-                )
-                .route(
-                    "/api/v1/admin/clients/{account_id}/resume",
-                    post(handlers::resume_client),
-                )
-                // Local routes are merged after the base router's route-scoped
-                // layers were applied, so they carry their own copy of the local
-                // deadline. Host/Origin is not repeated here: it is a property of
-                // the deployment boundary, applied once at the end of this
-                // function, and that single copy wraps merged routes too. Origin
-                // is enforced per-handler because only local routes require its
-                // *presence*.
-                .layer(axum::middleware::from_fn_with_state(
-                    state.clone(),
-                    super::middleware::local_admin_deadline,
-                ));
-            // The reserved-surface 404 is installed as the single outer
-            // fallback below so the static-asset router cannot shadow it.
-            router.merge(local_admin)
-        } else {
-            router
-        }
+    let router = if state.config.has_method(BrowserAuthMethod::Local) {
+        use crate::control::local_admin::handlers;
+        use axum::routing::{delete, get, post};
+        // The local surface mounts none of the OIDC control-plane routes: the
+        // OIDC branch above is skipped when that method is disabled, so
+        // `/auth/oidc/*`, `/api/v1/account/*` and `/api/v1/operator/*` are
+        // absent rather than merely unauthenticated.
+        let local_admin = Router::new()
+            .route("/api/v1/auth/local/csrf", get(handlers::preauth_csrf))
+            .route(
+                "/api/v1/auth/local/challenge",
+                post(handlers::inspect_challenge),
+            )
+            .route("/api/v1/auth/local/activate", post(handlers::activate))
+            .route("/api/v1/auth/local/reset", post(handlers::reset))
+            .route("/api/v1/auth/local/login", post(handlers::login))
+            .route("/api/v1/admin/session", get(handlers::session))
+            .route("/api/v1/admin/reauth", post(handlers::reauth))
+            .route("/api/v1/admin/logout", post(handlers::logout))
+            .route(
+                "/api/v1/admin/clients",
+                get(handlers::list_clients).post(handlers::create_client),
+            )
+            .route(
+                "/api/v1/admin/clients/{account_id}",
+                get(handlers::get_client),
+            )
+            .route(
+                "/api/v1/admin/clients/{account_id}/keys",
+                get(handlers::list_keys).post(handlers::issue_key),
+            )
+            .route(
+                "/api/v1/admin/clients/{account_id}/keys/{key_id}",
+                delete(handlers::revoke_key),
+            )
+            .route(
+                "/api/v1/admin/clients/{account_id}/suspend",
+                post(handlers::suspend_client),
+            )
+            .route(
+                "/api/v1/admin/clients/{account_id}/resume",
+                post(handlers::resume_client),
+            )
+            // Local routes are merged after the base router's route-scoped
+            // layers were applied, so they carry their own copy of the local
+            // deadline. Host/Origin is not repeated here: it is a property of
+            // the deployment boundary, applied once at the end of this
+            // function, and that single copy wraps merged routes too. Origin
+            // is enforced per-handler because only local routes require its
+            // *presence*.
+            .layer(axum::middleware::from_fn_with_state(
+                state.clone(),
+                super::middleware::local_admin_deadline,
+            ));
+        // The reserved-surface 404 is installed as the single outer
+        // fallback below so the static-asset router cannot shadow it.
+        router.merge(local_admin)
+    } else {
+        router
     };
 
     // ─── Reserved-surface 404 and the SPA fallback ────────

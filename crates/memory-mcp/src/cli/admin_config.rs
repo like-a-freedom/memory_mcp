@@ -4,6 +4,7 @@
 
 use crate::config::SurrealTargetConfig;
 use crate::error::MemoryError;
+use crate::http::config::{BrowserAuthMethod, resolve_auth_methods};
 
 /// Configuration for the admin CLI commands.
 pub struct AdminCliConfig {
@@ -11,29 +12,28 @@ pub struct AdminCliConfig {
     pub session_key: [u8; 32],
     pub csrf_key: [u8; 32],
     pub public_base_url: String,
+    /// The browser authentication methods this deployment enables, resolved
+    /// through the same contract the server reads (ADR-0057).
+    pub auth_methods: Vec<BrowserAuthMethod>,
 }
 
 impl AdminCliConfig {
     /// Load configuration from environment variables.
     ///
-    /// Spec §6: the admin commands **require local mode**. Creating or
+    /// Spec §6: the admin commands **require the local method**. Creating or
     /// recovering a local administrator in a deployment that authenticates
-    /// browsers through an identity provider would write records nothing can
-    /// use, so a missing or non-local `MEMORY_MCP_HTTP_AUTH_MODE` fails before
-    /// any connection is opened.
+    /// browsers through an identity provider alone would write records nothing
+    /// can use, so a method set without `local` fails before any connection is
+    /// opened. A set that also enables `oidc` is fine — the command writes to
+    /// the same durable policy the server reconciles, and refuses to narrow it.
     pub fn from_env() -> Result<Self, MemoryError> {
-        match std::env::var("MEMORY_MCP_HTTP_AUTH_MODE").ok() {
-            Some(mode) if mode == crate::http::config::AUTH_METHOD_LOCAL => {}
-            Some(other) => {
-                return Err(MemoryError::ConfigInvalid(format!(
-                    "admin commands require local mode, got '{other}'"
-                )));
-            }
-            None => {
-                return Err(MemoryError::ConfigInvalid(
-                    "admin commands require local mode (MEMORY_MCP_HTTP_AUTH_MODE=local)".into(),
-                ));
-            }
+        let auth_methods = resolve_auth_methods()?;
+        if !auth_methods.contains(&BrowserAuthMethod::Local) {
+            return Err(MemoryError::ConfigInvalid(
+                "admin commands require the 'local' browser authentication method \
+                 (MEMORY_MCP_HTTP_AUTH_METHODS=local)"
+                    .into(),
+            ));
         }
         let session_key = parse_hex_32_env("MEMORY_MCP_HTTP_SESSION_KEY")?;
         let csrf_key = parse_hex_32_env("MEMORY_MCP_HTTP_CSRF_KEY")?;
@@ -53,6 +53,7 @@ impl AdminCliConfig {
             session_key,
             csrf_key,
             public_base_url,
+            auth_methods,
         })
     }
 }

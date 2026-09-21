@@ -6,8 +6,10 @@
 use crate::cli::admin_config::AdminCliConfig;
 use crate::cli::args::AdminOperation;
 use crate::error::MemoryError;
-use crate::http::registry::SurrealRegistryStore;
-use crate::service::local_admin::auth::{AdminManagementService, LocalAdminAuthority};
+use crate::http::registry::{RegistryStore, SurrealRegistryStore};
+use crate::service::local_admin::auth::{
+    AdminManagementService, LocalAdminAuthority, compute_fingerprints,
+};
 use crate::service::local_admin::contracts::{LocalAdminError, RequestContext};
 use std::sync::Arc;
 
@@ -36,9 +38,23 @@ pub async fn run(operation: AdminOperation) -> Result<(), MemoryError> {
             .map_err(|e| MemoryError::Storage(format!("control registry connect: {e}")))?,
     );
 
-    let authority = LocalAdminAuthority::join(store, config.session_key, config.csrf_key)
-        .await
-        .map_err(|e| MemoryError::Storage(format!("join policy: {e}")))?;
+    // Reconcile the durable browser-auth policy exactly as the server does, so
+    // a command never writes against a policy the server would refuse to join
+    // (ADR-0057). A set that also enables `oidc` is accepted, and the same
+    // fingerprints bind this write to the running deployment's keys.
+    let fingerprints =
+        compute_fingerprints(&config.session_key, &config.csrf_key).map_err(admin_error)?;
+    let policy = RegistryStore::reconcile_browser_policy(
+        store.as_ref(),
+        &config.auth_methods,
+        Some(fingerprints),
+    )
+    .await
+    .map_err(|e| MemoryError::Storage(format!("reconcile browser policy: {e}")))?;
+
+    let authority =
+        LocalAdminAuthority::join(store.clone(), config.session_key, config.csrf_key, policy)
+            .map_err(|e| MemoryError::Storage(format!("join policy: {e}")))?;
 
     let service = AdminManagementService::new(authority);
     let request = RequestContext {

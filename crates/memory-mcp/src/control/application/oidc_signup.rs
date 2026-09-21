@@ -188,12 +188,18 @@ mod tests {
         }
     }
 
-    /// Join the durable policy so the signup workflow has a
+    /// Reconcile the durable policy so the signup workflow has a
     /// matching epoch-bearing fence, mirroring startup composition.
     async fn join_fence(
         store: &InMemoryStore,
     ) -> crate::http::registry::models::BrowserPolicyFence {
-        store.join_oidc_policy().await.expect("join OIDC policy")
+        crate::http::registry::RegistryStore::reconcile_browser_policy(
+            store,
+            &[crate::http::config::BrowserAuthMethod::Oidc],
+            None,
+        )
+        .await
+        .expect("reconcile browser policy")
     }
 
     /// A first call to `resolve_or_create` for a brand-new

@@ -25,6 +25,10 @@ use surrealdb::opt::auth as surrealdb_auth;
 use super::models::*;
 use super::storage::{LeaseFence, RegistryStore, is_safe_identifier};
 use crate::error::MemoryError;
+#[cfg(feature = "control-plane")]
+use crate::http::config::BrowserAuthMethod;
+#[cfg(feature = "control-plane")]
+use crate::service::local_admin::contracts::LocalKeyFingerprints;
 
 /// Backing connection variant. Both arms hold the already-connected
 /// `Surreal<C>` handle. The variant is selected at startup based on
@@ -259,6 +263,23 @@ fn is_conflict_error(error: &MemoryError) -> bool {
         let lower = message.to_ascii_lowercase();
         lower.contains("already exists") || lower.contains("duplicate") || lower.contains("unique")
     })
+}
+
+/// The first of `sentinels` that a `THROW`-ed statement surfaced in the
+/// storage error's text, or `None`.
+///
+/// A `THROW` inside a guarded transaction reaches the adapter as an opaque
+/// storage failure carrying only its own sentinel, so a caller that needs a
+/// typed error matches on the token it threw rather than on message prose.
+#[cfg(feature = "control-plane")]
+fn thrown_token<'a>(error: &MemoryError, sentinels: &[&'a str]) -> Option<&'a str> {
+    let MemoryError::Storage(message) = error else {
+        return None;
+    };
+    sentinels
+        .iter()
+        .copied()
+        .find(|token| message.contains(token))
 }
 
 /// Engine-level MVCC write conflicts are transient: the datastore
@@ -2256,48 +2277,97 @@ impl RegistryStore for SurrealRegistryStore {
     }
 
     #[cfg(feature = "control-plane")]
-    async fn join_oidc_policy(&self) -> Result<BrowserPolicyFence, MemoryError> {
-        // Statement order: `BEGIN`(0) `LET`(1) `IF`(2) `IF`(3) `SELECT`(4)
-        // `COMMIT`(5). Result index 4 is the policy readback. The
-        // compare/create is a singleton and never switches mode: a
-        // pre-existing policy for another mode aborts startup.
+    async fn reconcile_browser_policy(
+        &self,
+        desired: &[BrowserAuthMethod],
+        local: Option<LocalKeyFingerprints>,
+    ) -> Result<BrowserPolicyFence, MemoryError> {
+        if local.is_some() != desired.contains(&BrowserAuthMethod::Local) {
+            return Err(MemoryError::Storage(
+                "local fingerprints must be supplied exactly when the local method is enabled"
+                    .into(),
+            ));
+        }
+        // Statement order: `BEGIN`(0) `LET`(1) `IF`(2) `IF`(3) `LET`(4)
+        // `IF`(5) `IF`(6) `IF`(7) `UPDATE`(8) `SELECT`(9) `COMMIT`(10). Result
+        // index 9 is the policy readback. `array::includes` is not in this
+        // build's function registry, so membership is the `IN` operator; `??`
+        // reads a legacy row's `mode` as its one-method set.
+        //
+        // The fingerprint statements are guarded on `$writes_local` rather than
+        // written unconditionally: a `NULL` parameter does not coerce into the
+        // `option<string>` columns, and an absent method's parameters are never
+        // bound at all.
+        let canonical_desired = BrowserAuthMethod::canonical_set(desired);
         let sql = "
             BEGIN TRANSACTION;
-            LET $existing = (SELECT mode, epoch, methods FROM browser_auth_policy LIMIT 2);
+            LET $existing = (SELECT mode, epoch, methods, local_session_fingerprint, local_csrf_fingerprint FROM browser_auth_policy LIMIT 2);
             IF array::len($existing) = 0 {
                 CREATE browser_auth_policy SET
-                    mode = 'oidc',
-                    methods = ['oidc'],
+                    mode = $desired[0],
+                    methods = $desired,
                     epoch = 1,
                     version = 1,
                     created_at = time::now(),
                     updated_at = time::now();
             };
-            IF array::len($existing) > 0 AND (array::len($existing) != 1 OR NOT ('oidc' IN $existing[0].methods ?? [$existing[0].mode])) {
-                THROW 'mode_mismatch';
-            };
+            IF array::len($existing) > 1 { THROW 'policy_ambiguous'; };
+            LET $methods = $existing[0].methods ?? [$existing[0].mode];
+            IF ('local' IN $methods AND NOT ('local' IN $desired)) OR ('oidc' IN $methods AND NOT ('oidc' IN $desired)) { THROW 'policy_removal'; };
+            IF $writes_local AND 'local' IN $methods AND ($existing[0].local_session_fingerprint != $session_fingerprint OR $existing[0].local_csrf_fingerprint != $csrf_fingerprint) { THROW 'policy_key_mismatch'; };
+            IF $writes_local { UPDATE browser_auth_policy SET local_session_fingerprint = $session_fingerprint, local_csrf_fingerprint = $csrf_fingerprint; };
+            UPDATE browser_auth_policy SET methods = $desired, updated_at = time::now();
             SELECT mode, epoch, methods FROM browser_auth_policy LIMIT 2;
             COMMIT TRANSACTION;";
+        let mut params = json!({
+            "desired": canonical_desired
+                .iter()
+                .map(|method| method.as_str())
+                .collect::<Vec<_>>(),
+            "writes_local": local.is_some(),
+        });
+        if let Some(fingerprints) = local {
+            params["session_fingerprint"] = json!(hex::encode(fingerprints.session));
+            params["csrf_fingerprint"] = json!(hex::encode(fingerprints.csrf));
+        }
         let rows = self
             .handle()
-            .query_json_at(sql, None, 4)
+            .query_json_at(sql, Some(params), 9)
             .await
-            .map_err(|error| map_storage_error("join OIDC policy", error))?;
+            .map_err(|error| {
+                match thrown_token(&error, &["policy_removal", "policy_key_mismatch"]) {
+                Some("policy_removal") => MemoryError::Conflict(
+                    "this deployment's durable browser-auth policy enables a method that the \
+                     configuration omits; removing a method is an explicit operation, not a \
+                     startup reconciliation"
+                        .into(),
+                ),
+                Some(_) => MemoryError::Conflict(
+                    "the local administrator's key fingerprints do not match the durable policy; \
+                     MEMORY_MCP_HTTP_SESSION_KEY and MEMORY_MCP_HTTP_CSRF_KEY must be the keys \
+                     the policy was created with"
+                        .into(),
+                ),
+                None => map_storage_error("reconcile browser policy", error),
+            }
+            })?;
         let Some(row) = rows.into_iter().next() else {
             return Err(MemoryError::Storage(
-                "join_oidc_policy returned no rows".into(),
+                "reconcile_browser_policy returned no rows".into(),
             ));
         };
-        let methods =
-            crate::http::registry::models::policy_methods_from_row(&row).ok_or_else(|| {
-                MemoryError::Storage(
-                    "policy row carries neither an enabled-method set nor a recognized mode".into(),
-                )
-            })?;
-        if !methods.contains(&crate::http::config::BrowserAuthMethod::Oidc) {
-            return Err(MemoryError::Storage(
-                "policy row does not enable oidc".into(),
-            ));
+        let methods = policy_methods_from_row(&row).ok_or_else(|| {
+            MemoryError::Storage(
+                "policy row carries neither an enabled-method set nor a recognized mode".into(),
+            )
+        })?;
+        for method in canonical_desired {
+            if !methods.contains(&method) {
+                return Err(MemoryError::Storage(format!(
+                    "policy row does not enable '{}'",
+                    method.as_str()
+                )));
+            }
         }
         let epoch = required_u64(&row, "epoch")?;
         Ok(BrowserPolicyFence { methods, epoch })
@@ -3104,47 +3174,75 @@ mod tests {
         assert!(result.is_err());
     }
 
-    /// `join_oidc_policy` creates the singleton on first call and
-    /// returns the same fence on every later call (never switches).
+    /// `reconcile_browser_policy` creates the singleton on first call,
+    /// returns the same fence on every later call, and never narrows the set.
     #[cfg(feature = "control-plane")]
     #[tokio::test]
-    async fn join_oidc_policy_creates_singleton_and_is_idempotent() {
+    async fn reconcile_creates_singleton_extends_and_is_idempotent() {
         use crate::http::config::BrowserAuthMethod;
         let namespace = format!("join_oidc_{}", uuid::Uuid::new_v4().simple());
         let store = SurrealRegistryStore::connect_in_memory(&namespace, "registry")
             .await
             .expect("migrated in-memory registry");
-        let first = store.join_oidc_policy().await.expect("join OIDC policy");
-        assert!(first.has(BrowserAuthMethod::Oidc));
+        let oidc_only = [BrowserAuthMethod::Oidc];
+        let first = store
+            .reconcile_browser_policy(&oidc_only, None)
+            .await
+            .expect("reconcile browser policy");
+        assert_eq!(first.methods, vec![BrowserAuthMethod::Oidc]);
         assert_eq!(first.epoch, 1);
-        let second = store.join_oidc_policy().await.expect("idempotent join");
+        let second = store
+            .reconcile_browser_policy(&oidc_only, None)
+            .await
+            .expect("idempotent reconcile");
         assert_eq!(second.methods, first.methods);
         assert_eq!(second.epoch, first.epoch);
+        // Adding the local method extends the same row rather than replacing
+        // it, which is what makes adding a provider an environment change.
+        let extended = store
+            .reconcile_browser_policy(
+                &[BrowserAuthMethod::Oidc, BrowserAuthMethod::Local],
+                Some(LocalKeyFingerprints {
+                    session: [0x11; 32],
+                    csrf: [0x22; 32],
+                }),
+            )
+            .await
+            .expect("extend the policy with local");
+        assert_eq!(
+            extended.methods,
+            vec![BrowserAuthMethod::Local, BrowserAuthMethod::Oidc]
+        );
+        assert_eq!(extended.epoch, first.epoch, "extending keeps the epoch");
     }
 
-    /// An OIDC join over an existing local policy is a mode mismatch
-    /// and must fail (startup fails before serving browser requests).
+    /// Removing a method is an explicit guarded operation, not a
+    /// reconciliation: a configuration that omits a method the row enables
+    /// must fail startup rather than narrow the row.
     #[cfg(feature = "control-plane")]
     #[tokio::test]
-    async fn join_oidc_policy_rejects_an_existing_local_policy() {
-        use crate::service::local_admin::contracts::{LocalAdminStore, LocalKeyFingerprints};
+    async fn reconcile_refuses_to_remove_a_durably_enabled_method() {
+        use crate::http::config::BrowserAuthMethod;
         let namespace = format!("join_oidc_local_{}", uuid::Uuid::new_v4().simple());
         let store = SurrealRegistryStore::connect_in_memory(&namespace, "registry")
             .await
             .expect("migrated in-memory registry");
-        LocalAdminStore::join_local_policy(
-            &store,
-            LocalKeyFingerprints {
-                session: [0x11; 32],
-                csrf: [0x22; 32],
-            },
-        )
-        .await
-        .expect("join local policy");
-        let result = store.join_oidc_policy().await;
+        store
+            .reconcile_browser_policy(
+                &[BrowserAuthMethod::Local],
+                Some(LocalKeyFingerprints {
+                    session: [0x11; 32],
+                    csrf: [0x22; 32],
+                }),
+            )
+            .await
+            .expect("reconcile a local-only policy");
+        let refused = store
+            .reconcile_browser_policy(&[BrowserAuthMethod::Oidc], None)
+            .await;
         assert!(
-            result.is_err(),
-            "an OIDC join over a local policy must fail, got {result:?}"
+            matches!(refused, Err(MemoryError::Conflict(_))),
+            "an OIDC-only configuration over a local policy must fail, got {refused:?}"
         );
     }
 
@@ -3162,7 +3260,10 @@ mod tests {
         let store = SurrealRegistryStore::connect_in_memory(&namespace, "registry")
             .await
             .expect("migrated in-memory registry");
-        let policy = store.join_oidc_policy().await.expect("join OIDC policy");
+        let policy = store
+            .reconcile_browser_policy(&[BrowserAuthMethod::Oidc], None)
+            .await
+            .expect("reconcile browser policy");
 
         // store -> take is a one-use round-trip.
         store
@@ -3257,7 +3358,10 @@ mod tests {
         let store = SurrealRegistryStore::connect_in_memory(&namespace, "registry")
             .await
             .expect("migrated in-memory registry");
-        let policy = store.join_oidc_policy().await.expect("join OIDC policy");
+        let policy = store
+            .reconcile_browser_policy(&[crate::http::config::BrowserAuthMethod::Oidc], None)
+            .await
+            .expect("reconcile browser policy");
         store
             .handle()
             .query_json(

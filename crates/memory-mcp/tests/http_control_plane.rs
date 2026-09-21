@@ -598,11 +598,11 @@ async fn api_v1_routes_take_precedence_over_static_fallback() {
     );
 }
 
-/// Spec §8: `GET /api/v1/auth/config` is public and mounted in **both**
-/// browser-auth modes, so an OIDC deployment can tell the UI which flow to
-/// run. It discloses the mode and nothing else.
+/// Spec §8: `GET /api/v1/auth/config` is public and mounted **in both**
+/// browser-auth methods, so an OIDC deployment can tell the UI which flow to
+/// run. It discloses the enabled method set and nothing else.
 #[tokio::test]
-async fn auth_config_reports_oidc_mode_without_disclosing_more() {
+async fn auth_config_reports_the_oidc_method_without_disclosing_more() {
     let (fixture, _mock, _cookie) = spawn_with_env(Vec::new()).await;
     let client = reqwest::Client::builder()
         .timeout(Duration::from_secs(5))
@@ -617,11 +617,12 @@ async fn auth_config_reports_oidc_mode_without_disclosing_more() {
         .expect("auth config request");
     assert_eq!(response.status(), reqwest::StatusCode::OK);
     let body: serde_json::Value = response.json().await.expect("auth config json");
-    assert_eq!(body["mode"], "oidc");
+    assert_eq!(body["methods"], serde_json::json!(["oidc"]));
     assert!(body.get("issuer").is_none(), "no issuer disclosure");
     assert!(body.get("admin_count").is_none(), "no admin disclosure");
 
-    // Local-only routes stay unmounted in OIDC mode: a JSON 404, not HTML.
+    // Local-only routes stay unmounted without the local method: a JSON 404,
+    // not HTML.
     let local = client
         .get(format!("{}/api/v1/auth/local/csrf", fixture.base_url))
         .header("host", "localhost")

@@ -36,8 +36,8 @@ use memory_mcp::http::registry::storage::RegistryStore;
 use memory_mcp::http::router::build_router;
 use memory_mcp::http::test_state::HttpStateTestBuilder;
 use memory_mcp::service::local_admin::{
-    AdminFence, AdminManagementService, LocalAdminAuthority, LocalAdminService, LocalAdminStore,
-    PasswordHasher, RequestContext,
+    AdminFence, AdminManagementService, LocalAdminAuthority, LocalAdminService, PasswordHasher,
+    RequestContext,
 };
 use tower_service::Service;
 
@@ -164,8 +164,8 @@ impl Harness {
     ) -> std::pin::Pin<Box<dyn std::future::Future<Output = Arc<LocalAdminAuthority>> + Send + '_>>
     {
         Box::pin(async move {
-            LocalAdminAuthority::join(
-                self.store.clone() as Arc<dyn LocalAdminStore>,
+            LocalAdminAuthority::join_local_for_test(
+                self.store.clone(),
                 HttpStateTestBuilder::LOCAL_TEST_SESSION_KEY,
                 HttpStateTestBuilder::LOCAL_TEST_CSRF_KEY,
             )
@@ -336,15 +336,15 @@ async fn read_json(response: axum::response::Response) -> serde_json::Value {
     }
 }
 
-// ─── Mode disclosure ──────────────────────────────────────
+// ─── Method disclosure ────────────────────────────────────
 
 #[tokio::test]
-async fn auth_config_reports_local_mode_only() {
+async fn auth_config_reports_only_the_local_method() {
     let harness = Harness::new().await;
     let response = harness.get("/api/v1/auth/config", &[]).await;
     assert_eq!(response.status(), StatusCode::OK);
     let body = read_json(response).await;
-    assert_eq!(body["mode"], "local");
+    assert_eq!(body["methods"], serde_json::json!(["local"]));
     assert!(body.get("issuer").is_none());
     assert!(body.get("admin_count").is_none());
 }

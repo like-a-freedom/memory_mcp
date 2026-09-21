@@ -407,17 +407,24 @@ fn request_ctx(parts: &Parts) -> RequestContext {
 
 #[derive(Serialize)]
 struct AuthConfigResponse {
-    mode: &'static str,
+    methods: Vec<&'static str>,
 }
 
-/// `GET /api/v1/auth/config` — the only public mode disclosure.
+/// `GET /api/v1/auth/config` — the only public disclosure of how this deployment
+/// authenticates browsers.
+///
+/// It reports the enabled **set**, not a single mode (ADR-0057), and reads it
+/// from the configuration the router mounted, so what the login page offers and
+/// what the deployment serves can never disagree. The endpoint is internal to the
+/// embedded console, so the field was replaced rather than versioned.
 pub async fn auth_config(State(state): State<Arc<HttpState>>) -> Response {
-    let mode = if state.local_admin.is_some() {
-        "local"
-    } else {
-        "oidc"
-    };
-    json_response(StatusCode::OK, &AuthConfigResponse { mode })
+    let methods = state
+        .config
+        .browser_auth_methods()
+        .into_iter()
+        .map(crate::http::config::BrowserAuthMethod::as_str)
+        .collect();
+    json_response(StatusCode::OK, &AuthConfigResponse { methods })
 }
 
 // ─── Pre-auth CSRF ────────────────────────────────────────

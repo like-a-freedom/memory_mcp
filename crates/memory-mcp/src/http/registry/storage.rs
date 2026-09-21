@@ -30,6 +30,10 @@ use std::sync::Mutex;
 use super::models::BrowserPolicyFence;
 use super::models::*;
 use crate::error::MemoryError;
+#[cfg(feature = "control-plane")]
+use crate::http::config::BrowserAuthMethod;
+#[cfg(feature = "control-plane")]
+use crate::service::local_admin::contracts::LocalKeyFingerprints;
 
 /// Compact view of the lease fields the registry uses for
 /// fenced CAS predicates. The `&str` borrows let callers pass
@@ -451,8 +455,29 @@ pub trait RegistryStore: Send + Sync + 'static {
     /// Returns the durable plan.
     async fn ensure_local_plan(&self, plan: &Plan) -> Result<Plan, MemoryError>;
 
+    /// Reconcile the durable browser-auth policy with the configured method
+    /// set and return the resulting fence (ADR-0057).
+    ///
+    /// This is the single writer of `browser_auth_policy`. Creating the
+    /// singleton is the only write an empty registry needs; reconciling an
+    /// existing row is the *union* of what it holds and `desired`, because a
+    /// row holding a method that `desired` omits is refused with
+    /// [`MemoryError::Conflict`] rather than narrowed. Narrowing is the
+    /// guarded removal operation, not a startup reconciliation.
+    ///
+    /// `local` carries the `local` method's key fingerprints and is `Some`
+    /// exactly when `desired` enables `local`: a row that already enables it
+    /// has its fingerprints verified, and adding it writes them.
+    ///
+    /// The stored set is written in canonical order
+    /// ([`BrowserAuthMethod::canonical_set`]) so the row is one value however
+    /// the caller enumerated the methods.
     #[cfg(feature = "control-plane")]
-    async fn join_oidc_policy(&self) -> Result<BrowserPolicyFence, MemoryError>;
+    async fn reconcile_browser_policy(
+        &self,
+        desired: &[BrowserAuthMethod],
+        local: Option<LocalKeyFingerprints>,
+    ) -> Result<BrowserPolicyFence, MemoryError>;
 
     /// Atomically create the account, tenant, and external identity under a
     /// matching browser auth policy fence. The policy mode/epoch are checked
@@ -1797,24 +1822,42 @@ impl RegistryStore for InMemoryStore {
     }
 
     #[cfg(feature = "control-plane")]
-    async fn join_oidc_policy(&self) -> Result<super::models::BrowserPolicyFence, MemoryError> {
+    async fn reconcile_browser_policy(
+        &self,
+        desired: &[crate::http::config::BrowserAuthMethod],
+        local: Option<LocalKeyFingerprints>,
+    ) -> Result<super::models::BrowserPolicyFence, MemoryError> {
         use crate::http::config::BrowserAuthMethod;
-        let mut policy = self.lock_browser_policy();
-        if let Some(existing) = policy.as_ref() {
-            if !existing.has(BrowserAuthMethod::Oidc) {
-                return Err(MemoryError::Conflict(
-                    "method not enabled: expected oidc".into(),
-                ));
-            }
-            Ok(existing.clone())
-        } else {
-            let fence = super::models::BrowserPolicyFence {
-                methods: vec![BrowserAuthMethod::Oidc],
-                epoch: 1,
-            };
-            *policy = Some(fence.clone());
-            Ok(fence)
+        // The in-memory backend stores no fingerprints: it has no `local`
+        // surface, so `local` may only ever be absent here.
+        if local.is_some() {
+            return Err(MemoryError::Conflict(
+                "the in-memory registry does not implement local fingerprints".into(),
+            ));
         }
+        let mut policy = self.lock_browser_policy();
+        let desired = BrowserAuthMethod::canonical_set(desired);
+        let fence = match policy.as_ref() {
+            None => super::models::BrowserPolicyFence {
+                methods: desired.clone(),
+                epoch: 1,
+            },
+            Some(existing) => {
+                if let Some(held) = existing.methods.iter().find(|m| !desired.contains(m)) {
+                    return Err(MemoryError::Conflict(format!(
+                        "browser authentication method '{}' is enabled durably but not in this \
+                         configuration",
+                        held.as_str()
+                    )));
+                }
+                super::models::BrowserPolicyFence {
+                    methods: desired.clone(),
+                    epoch: existing.epoch,
+                }
+            }
+        };
+        *policy = Some(fence.clone());
+        Ok(fence)
     }
 
     #[cfg(feature = "control-plane")]
@@ -2225,7 +2268,10 @@ mod tests {
     async fn deletion_start_is_atomic_and_retains_control_records() {
         let s = InMemoryStore::default();
         let now = Utc::now();
-        let policy = s.join_oidc_policy().await.expect("join OIDC policy");
+        let policy = s
+            .reconcile_browser_policy(&[BrowserAuthMethod::Oidc], None)
+            .await
+            .expect("reconcile browser policy");
         let account = Account {
             id: "acct_delete".into(),
             status: AccountStatus::Active,

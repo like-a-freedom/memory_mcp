@@ -135,17 +135,16 @@ impl HttpState {
         _metrics_handle: AssembleMetrics,
         browser_policy_override: Option<crate::http::registry::models::BrowserPolicyFence>,
     ) -> Result<Arc<Self>, crate::error::MemoryError> {
-        // The `free` plan backs the OIDC/off data plane: tenants created by
-        // signup, and tenants that predate this change, carry
-        // `plan_version 1`, and the data plane resolves that row on every
-        // ingest. Local mode instead creates its own `local_plan_v{version}`
-        // row and compares the stored limits, so in local mode a hardcoded
-        // `free` plan must not be published at all.
-        let is_local_browser_auth = matches!(
-            config.browser_auth.as_ref(),
-            Some(crate::http::config::BrowserAuthConfig::Local(_))
-        );
-        if !is_local_browser_auth {
+        // The `free` plan backs the data plane: tenants created by signup, and
+        // tenants that predate this change, carry `plan_version 1`, and the data
+        // plane resolves that row on every ingest. A `local`-only deployment
+        // instead creates its own `local_plan_v{version}` row and compares the
+        // stored limits, so a hardcoded `free` plan must not be published at
+        // all. As soon as `oidc` is enabled the plan is needed again, because
+        // that is the method whose signup creates those tenants.
+        let local_only = config.has_method(crate::http::config::BrowserAuthMethod::Local)
+            && !config.has_method(crate::http::config::BrowserAuthMethod::Oidc);
+        if !local_only {
             let signup_plan = registry::models::Plan {
                 id: "free".into(),
                 version: 1,
@@ -158,16 +157,35 @@ impl HttpState {
             Arc::new(registry.clone()),
         ));
         let store = registry.store_clone();
-        // OIDC mode joins the durable browser-auth policy singleton at
-        // startup. The join is compare/create and never switches mode: a
-        // pre-existing policy for a different mode fails startup here, before
-        // any browser request is served. The local-admin surface joins its own
-        // policy through `LocalAdminAuthority` below.
+        // The configured method set is what the durable policy reconciles to.
+        // The join is reconcile-and-extend and never removes: a pre-existing
+        // policy that enables a method this configuration omits fails startup
+        // here, before any browser request is served (ADR-0057).
+        let desired_methods = config.browser_auth_methods();
+        // One reconciliation, from the full configured set. `local` and `oidc`
+        // are not two competing claims on the singleton row: whichever methods
+        // are enabled are written together, in one transaction, by one writer.
         #[cfg(feature = "control-plane")]
         let browser_policy = if let Some(policy) = browser_policy_override {
             Some(policy)
-        } else if config.enable_control_plane && config.browser_auth_is_oidc() {
-            Some(store.join_oidc_policy().await?)
+        } else if config.enable_control_plane && config.browser_auth.is_some() {
+            let local = config
+                .browser_auth
+                .as_ref()
+                .and_then(|methods| methods.local.as_ref())
+                .map(|local| {
+                    crate::service::local_admin::auth::compute_fingerprints(
+                        &local.session_key,
+                        &local.csrf_key,
+                    )
+                })
+                .transpose()
+                .map_err(|error| crate::error::MemoryError::Auth(error.to_string()))?;
+            Some(
+                store
+                    .reconcile_browser_policy(&desired_methods, local)
+                    .await?,
+            )
         } else {
             None
         };
@@ -185,12 +203,14 @@ impl HttpState {
         ));
         let account_resolver = Arc::new(registry::account::AccountResolver::new(store));
         // The OIDC client performs discovery against the configured
-        // issuer at startup. In local mode there is no issuer to reach
-        // and no OIDC route is mounted, so discovery must not run: a
-        // local deployment has no dependency on the identity provider
-        // being online.
+        // issuer at startup. Without the `oidc` method there is no issuer to
+        // reach and no OIDC route is mounted, so discovery must not run: such a
+        // deployment has no dependency on any identity provider being online.
+        // A disabled control plane mounts no browser surface at all.
         #[cfg(feature = "control-plane")]
-        let oidc_client = if config.enable_control_plane && config.browser_auth_is_oidc() {
+        let oidc_client = if config.enable_control_plane
+            && config.has_method(crate::http::config::BrowserAuthMethod::Oidc)
+        {
             Some(Arc::new(
                 crate::control::oidc::OidcClient::new(
                     &config.oidc_issuer,
@@ -205,48 +225,56 @@ impl HttpState {
             None
         };
         #[cfg(feature = "control-plane")]
-        let local_admin = if config.enable_control_plane {
-            use crate::http::config::BrowserAuthConfig;
-            match &config.browser_auth {
-                Some(BrowserAuthConfig::Local(local_config)) => {
-                    // Ensure the deployment's version-1 local plan exists
-                    // and has not drifted. `ensure_local_plan` returns
-                    // `plan_limit_mismatch` when an operator has already
-                    // stored a different limit set, so a silent downgrade
-                    // or upgrade of limits is impossible.
-                    registry
-                        .ensure_local_plan(&registry::models::Plan {
-                            id: format!("local_plan_v{}", local_config.default_plan_version),
-                            version: local_config.default_plan_version,
-                            limits: local_config.default_plan_limits.clone(),
-                        })
-                        .await?;
-                    let store = registry.local_admin_store_clone().ok_or_else(|| {
-                        crate::error::MemoryError::ConfigInvalid(
-                            "local browser auth requires the durable local admin store".into(),
-                        )
-                    })?;
-                    use crate::service::local_admin::auth::LocalAdminAuthority;
-                    use crate::service::local_admin::password::PasswordHasher;
-                    let authority = LocalAdminAuthority::join(
-                        store,
-                        local_config.session_key,
-                        local_config.csrf_key,
-                    )
-                    .await
-                    .map_err(|e| crate::error::MemoryError::Auth(e.to_string()))?;
-                    let hasher = Arc::new(
-                        PasswordHasher::new()
-                            .map_err(|e| crate::error::MemoryError::Auth(e.to_string()))?,
-                    );
-                    Some(crate::control::local_admin::LocalAdminExtension {
-                        authority,
-                        hasher,
-                        plan_version: local_config.default_plan_version,
-                    })
-                }
-                _ => None,
-            }
+        let local_admin = if !config.enable_control_plane {
+            None
+        } else if let Some(local_config) = config
+            .browser_auth
+            .as_ref()
+            .and_then(|methods| methods.local.as_ref())
+        {
+            // Ensure the deployment's version-1 local plan exists
+            // and has not drifted. `ensure_local_plan` returns
+            // `plan_limit_mismatch` when an operator has already
+            // stored a different limit set, so a silent downgrade
+            // or upgrade of limits is impossible.
+            registry
+                .ensure_local_plan(&registry::models::Plan {
+                    id: format!("local_plan_v{}", local_config.default_plan_version),
+                    version: local_config.default_plan_version,
+                    limits: local_config.default_plan_limits.clone(),
+                })
+                .await?;
+            let store = registry.local_admin_store_clone().ok_or_else(|| {
+                crate::error::MemoryError::ConfigInvalid(
+                    "local browser auth requires the durable local admin store".into(),
+                )
+            })?;
+            use crate::service::local_admin::auth::LocalAdminAuthority;
+            use crate::service::local_admin::password::PasswordHasher;
+            // The reconciled fence is handed to the authority rather than
+            // joined a second time: the singleton has one writer, and this is
+            // that writer's result.
+            let policy = browser_policy.clone().ok_or_else(|| {
+                crate::error::MemoryError::ConfigInvalid(
+                    "local browser auth requires the durable browser-auth policy".into(),
+                )
+            })?;
+            let authority = LocalAdminAuthority::join(
+                store,
+                local_config.session_key,
+                local_config.csrf_key,
+                policy,
+            )
+            .map_err(|e| crate::error::MemoryError::Auth(e.to_string()))?;
+            let hasher = Arc::new(
+                PasswordHasher::new()
+                    .map_err(|e| crate::error::MemoryError::Auth(e.to_string()))?,
+            );
+            Some(crate::control::local_admin::LocalAdminExtension {
+                authority,
+                hasher,
+                plan_version: local_config.default_plan_version,
+            })
         } else {
             None
         };

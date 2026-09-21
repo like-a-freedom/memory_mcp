@@ -558,13 +558,6 @@ pub enum ClientStateAction {
 /// in a child module.
 #[async_trait]
 pub trait LocalAdminStore: Send + Sync + 'static {
-    /// Join or verify the local policy singleton. Compares
-    /// mode/epoch/config fingerprints; fails on drift.
-    async fn join_local_policy(
-        &self,
-        fingerprints: LocalKeyFingerprints,
-    ) -> LocalResult<BrowserPolicyFence>;
-
     /// Issue a new challenge (activation or reset). Unique canonical
     /// admin, fixed 900-second DB TTL, verifier only.
     async fn issue_challenge(&self, command: ChallengeIssue) -> LocalResult<IssuedChallenge>;

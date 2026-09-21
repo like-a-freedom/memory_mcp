@@ -30,11 +30,10 @@ use crate::error::MemoryError;
 use crate::http::registry::models::{AccountStatus, ApiKeyMeta, TenantStatus};
 use crate::service::local_admin::contracts::{
     AdminFence, AdminKeyInsert, AdminPrincipal, AdminState, AttemptDecision, AttemptDomain,
-    AttemptInput, BrowserAuthMethod, BrowserPolicyFence, ChallengeFinish, ChallengeIssue,
-    ChallengeKind, ChallengeView, ClientBundle, ClientStateAction, ClientView, CredentialSnapshot,
-    FailureAction, FailureAudit, FailureReason, IssuedChallenge, KeyExpiry, KeyInsertOutcome,
-    LocalAdminError, LocalAdminStore, LocalKeyFingerprints, LocalResult, Page, PageRequest,
-    RequestContext, SessionOpen, SessionRotate,
+    AttemptInput, BrowserPolicyFence, ChallengeFinish, ChallengeIssue, ChallengeKind,
+    ChallengeView, ClientBundle, ClientStateAction, ClientView, CredentialSnapshot, FailureAction,
+    FailureAudit, FailureReason, IssuedChallenge, KeyExpiry, KeyInsertOutcome, LocalAdminError,
+    LocalAdminStore, LocalResult, Page, PageRequest, RequestContext, SessionOpen, SessionRotate,
 };
 
 use super::{SurrealRegistryStore, record_id_value, row_id as decode_record_id, status_from_row};
@@ -423,75 +422,7 @@ impl SurrealRegistryStore {
 #[async_trait]
 impl LocalAdminStore for SurrealRegistryStore {
     /// Statement order:
-    /// `BEGIN`(0) `LET`(1) `IF`(2) `IF`(3) `SELECT`(4) `COMMIT`(5).
-    /// Result index 4 is the policy readback.
-    async fn join_local_policy(
-        &self,
-        fingerprints: LocalKeyFingerprints,
-    ) -> LocalResult<BrowserPolicyFence> {
-        let session_fingerprint = hex::encode(fingerprints.session);
-        let csrf_fingerprint = hex::encode(fingerprints.csrf);
-
-        let sql = "
-            BEGIN TRANSACTION;
-            LET $existing = (SELECT mode, epoch, methods, local_session_fingerprint, local_csrf_fingerprint FROM browser_auth_policy LIMIT 2);
-            IF array::len($existing) = 0 {
-                CREATE browser_auth_policy SET
-                    mode = 'local',
-                    methods = ['local'],
-                    epoch = 1,
-                    version = 1,
-                    local_session_fingerprint = $session_fingerprint,
-                    local_csrf_fingerprint = $csrf_fingerprint,
-                    created_at = time::now(),
-                    updated_at = time::now();
-            };
-            IF array::len($existing) > 0 AND (array::len($existing) != 1 OR NOT ('local' IN $existing[0].methods ?? [$existing[0].mode]) OR $existing[0].local_session_fingerprint != $session_fingerprint OR $existing[0].local_csrf_fingerprint != $csrf_fingerprint) {
-                THROW 'policy_mismatch';
-            };
-            SELECT mode, epoch, methods FROM browser_auth_policy LIMIT 2;
-            COMMIT TRANSACTION;
-        ";
-
-        let rows = self
-            .admin_query_at(
-                sql,
-                Some(json!({
-                    "session_fingerprint": session_fingerprint,
-                    "csrf_fingerprint": csrf_fingerprint,
-                })),
-                4,
-            )
-            .await
-            .map_err(|error| match thrown(&error, &["policy_mismatch"]) {
-                Some(_) => LocalAdminError::StateConflict,
-                None => infra(error),
-            })?;
-
-        let row = rows.into_iter().next().ok_or_else(|| {
-            infra(MemoryError::Storage(
-                "join_local_policy returned no row".into(),
-            ))
-        })?;
-        let methods =
-            crate::http::registry::models::policy_methods_from_row(&row).ok_or_else(|| {
-                infra(MemoryError::Storage(
-                    "policy row carries neither an enabled-method set nor a recognized mode".into(),
-                ))
-            })?;
-        if !methods.contains(&BrowserAuthMethod::Local) {
-            return Err(infra(MemoryError::Storage(
-                "browser_auth_policy does not enable local".into(),
-            )));
-        }
-
-        Ok(BrowserPolicyFence {
-            methods,
-            epoch: require_u64(&row, "epoch")?,
-        })
-    }
-
-    /// Statement order: `BEGIN`(0) `LET`(1) `IF`(2) `IF`(3) `IF`(4)
+    /// `BEGIN`(0) `LET`(1) `IF`(2) `IF`(3) `IF`(4)
     /// `LET`(5) `LET`(6) `IF`(7) `IF`(8) `IF`(9) `UPDATE`(10) `LET`(11)
     /// `CREATE`(12) `CREATE`(13) `SELECT`(14) `COMMIT`(15).
     /// Result index 14 is the created challenge readback.
@@ -2017,9 +1948,10 @@ mod sql_fault_tests {
                 .await
                 .expect("migrated Mem registry"),
         );
-        let authority = LocalAdminAuthority::join(store.clone(), [1u8; 32], [2u8; 32])
-            .await
-            .expect("join durable local policy");
+        let authority =
+            LocalAdminAuthority::join_local_for_test(store.clone(), [1u8; 32], [2u8; 32])
+                .await
+                .expect("join durable local policy");
         let hasher = Arc::new(PasswordHasher::new().expect("supported KDF"));
         let service = Arc::new(LocalAdminService::new(authority.clone(), hasher));
         let management = AdminManagementService::new(authority.clone());
@@ -2315,7 +2247,7 @@ mod sql_fault_tests {
         // rejection would turn into an unrelated audit failure.
         let (store, authority, _service, _management) = fixture().await;
         let stale = BrowserPolicyFence {
-            methods: vec![BrowserAuthMethod::Local],
+            methods: vec![crate::http::config::BrowserAuthMethod::Local],
             epoch: authority.policy().epoch.wrapping_add(41),
         };
         store

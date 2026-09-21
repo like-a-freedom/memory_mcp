@@ -34,7 +34,8 @@ pub use parse::{
     DEFAULT_SUBSCRIPTION_QUEUE_CAPACITY, DEFAULT_TASK_QUEUE_CAPACITY, DEFAULT_TASK_RETENTION_SECS,
     DEFAULT_TASK_SYNC_MAX_BYTES, TrustedCidr,
 };
+pub(crate) use types::resolve_auth_methods;
 pub use types::{
-    AUTH_METHOD_LOCAL, AUTH_METHOD_OIDC, BrowserAuthConfig, BrowserAuthMethod, HmacKeys,
+    AUTH_METHOD_LOCAL, AUTH_METHOD_OIDC, BrowserAuthMethod, BrowserAuthMethods, HmacKeys,
     HttpConfig, LocalBrowserConfig, OidcBrowserConfig, SignupMode,
 };
