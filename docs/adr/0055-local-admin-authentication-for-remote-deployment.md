@@ -4,6 +4,8 @@
 
 Accepted product direction, 2026-09-19. Technical design approved and implemented; release verification is incomplete. The evidence-based [runbook](../operations/LOCAL_ADMIN.md) lists what is verified and what is not. This ADR records the approved requirements, not approval of dependencies, migrations, or implementation.
 
+Amended 2026-09-21 by [ADR-0057](0057-additive-browser-auth-methods.md): browser authentication methods are additive, so the exclusivity clause in §Deployment authentication modes no longer describes the shipped behaviour. Everything else below — local administrator identity, CLI bootstrap and recovery, client provisioning, key issuance, audit and isolation — remains in force.
+
 ## Context
 
 [ADR-0052](0052-streamable-http-saas-profile.md) describes an optional OIDC self-service control plane. MCP requests authenticate independently with Account API keys. A deployment without the control plane can serve existing keys, but does not provide a browser workflow for onboarding clients without an OIDC provider.
@@ -54,6 +56,8 @@ The [implementation plan](../superpowers/plans/2026-09-18-local-admin-auth.md) a
 ## Relationships
 
 This decision amends ADR-0052's OIDC-only browser control-plane choice for the planned local mode. Its External Identity and self-service rules continue to describe OIDC mode. In the shipped implementation, an enabled control plane requires exactly one browser authentication mode — `oidc` (the default) or `local`, selected by `MEMORY_MCP_HTTP_AUTH_MODE` — and neither mode exposes the other's authentication or administration routes.
+
+[ADR-0057](0057-additive-browser-auth-methods.md) amends that last sentence: an enabled control plane now serves a **set** of methods (`oidc`, `local`), selected by `MEMORY_MCP_HTTP_AUTH_METHODS`, and each method's routes are mounted when it is enabled rather than instead of the other. The Alternatives entry below that rejected enabling local and OIDC together is superseded for the same reason.
 
 ADR-0052's API-key transport, tenancy and HTTP boundaries remain in force. The reviewed proposal to revalidate key state on cache hits strengthens its authorization checks; exact invalidation guarantees require executed tests and documentation before release.
 

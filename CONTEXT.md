@@ -217,12 +217,20 @@ _Avoid_: Access token, transport session, namespace parameter
 A short-lived server-side browser session created after successful login — OIDC for an Account owner, or a local password for a Local Administrator — for credential and client administration. It is represented to the browser only by a secure opaque cookie and is distinct from an App Session, Account API Key, OAuth access token, and MCP transport state. The OIDC and local forms are separate records on separate routes; neither substitutes for the other.
 _Avoid_: App Session, MCP session, API key, browser token
 
-**Browser Authentication Mode**:
-The single browser-login mechanism an enabled control plane serves, `oidc` or `local`, selected at startup and recorded as one durable policy singleton with its epoch and local key fingerprints. A deployment serves exactly one mode and mounts only that mode's routes; a replica joining with a drifted mode or key configuration fails closed instead of adopting it, and a disabled control plane mounts no browser-auth route at all.
-_Avoid_: provider list, per-request mode, fallback login
+**Browser Authentication Method**:
+One way a browser signs in, currently either an External Identity at an OIDC provider or a Local Administrator password. An enabled control plane serves a *set* of methods and mounts each enabled method's routes; that set is durable deployment state, and a replica joining with a drifted set or drifted local key material fails closed instead of adopting it. A disabled control plane mounts no browser-auth route at all. Removing a method is explicit and guarded by the Last-Administrator Rule, and a method is never implied by another method's absence.
+_Avoid_: single mode, either/or login, provider list, per-request mode, automatic fallback
+
+**Last-Administrator Rule**:
+The constraint that no operation may leave a deployment without a reachable way to administer it. It refuses to remove the local password method while no operator identity is configured, and it refuses to remove the final Local Administrator.
+_Avoid_: lockout warning, best-effort check
+
+**Identity Link**:
+The binding of one External Identity to an Account, which is what lets a person reach the same Account through more than one provider. An Account may hold several links. A link is created only from an already-authenticated session, after the provider has verified the identity being attached — never from a matching email address and never from a caller's assertion — and the final link cannot be removed. The Account's identity anchor remains the issuer and subject pair; email is profile data.
+_Avoid_: email match, account merge, identity provider list
 
 **Local Administrator**:
-A deployment-scoped operator identity created by the administrator CLI rather than by an identity provider, and authenticated with a password against a stored PHC hash. Local Administrators have equal privileges, are not Accounts and own no Tenant, and their credentials stay separate from every Account API Key. Their shared privileges are why client data is reachable by any of them.
+A deployment-scoped operator identity created by the administrator CLI rather than by an identity provider, and authenticated with a password against a stored PHC hash. Local Administrators have equal privileges, are not Accounts and own no Tenant, and their credentials stay separate from every Account API Key. Their shared privileges are why client data is reachable by any of them. The password method is the deployment's break-glass door: it is the only login path that depends on no external service, so it remains available when a provider is unreachable, and it deliberately gains nothing from an identity provider.
 _Avoid_: admin Account, Tenant owner, OIDC operator identity
 
 **Challenge Code**:
