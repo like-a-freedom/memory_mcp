@@ -28,7 +28,8 @@ use serde::{Deserialize, Serialize};
 
 // ─── Routes ───────────────────────────────────────────────
 
-/// `GET` — public auth mode, `{"mode":"local"|"oidc"}`.
+/// `GET` — the enabled browser authentication methods,
+/// `{"methods":["local","oidc"]}`.
 pub const PATH_AUTH_CONFIG: &str = "/api/v1/auth/config";
 /// `GET` — start the OIDC authorization-code flow. The server mounts it at
 /// `/auth/oidc/authorize` (`http/router.rs`), **not** under `/api/v1`; a link
@@ -58,10 +59,10 @@ pub const HEADER_CSRF: &str = "X-CSRF-Token";
 /// Idempotency header required on client creation and key issuance.
 pub const HEADER_IDEMPOTENCY: &str = "Idempotency-Key";
 
-/// Auth mode reporting local username/password login.
-pub const MODE_LOCAL: &str = "local";
-/// Auth mode delegating to an external identity provider.
-pub const MODE_OIDC: &str = "oidc";
+/// Browser authentication method reporting local username/password login.
+pub const METHOD_LOCAL: &str = "local";
+/// Browser authentication method delegating to an external identity provider.
+pub const METHOD_OIDC: &str = "oidc";
 
 /// Default and maximum page size accepted by the backend.
 pub const MAX_PAGE_LIMIT: u16 = 100;
@@ -321,22 +322,28 @@ impl fmt::Display for AdminApiError {
 
 // ─── Wire DTOs ────────────────────────────────────────────
 
-/// `GET /api/v1/auth/config` response.
+/// `GET /api/v1/auth/config` response: the enabled browser authentication
+/// methods (ADR-0057).
+///
+/// A deployment serves a *set*, so this is a list rather than one value, and the
+/// login page renders one form per entry it recognises. An entry it does not
+/// recognise is ignored rather than fatal: a newer server may offer a method this
+/// build has no form for, and the ones it does know still work.
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
 pub struct AuthConfig {
-    pub mode: String,
+    #[serde(default)]
+    pub methods: Vec<String>,
 }
 
 impl AuthConfig {
-    /// Local username/password mode.
-    pub fn is_local(&self) -> bool {
-        self.mode == MODE_LOCAL
+    /// Whether the deployment offers the administrator's password door.
+    pub fn has_local(&self) -> bool {
+        self.methods.iter().any(|method| method == METHOD_LOCAL)
     }
 
-    /// OIDC mode. An unknown mode is neither, and the login page refuses to
-    /// render either form rather than guessing.
-    pub fn is_oidc(&self) -> bool {
-        self.mode == MODE_OIDC
+    /// Whether the deployment offers the identity-provider redirect.
+    pub fn has_oidc(&self) -> bool {
+        self.methods.iter().any(|method| method == METHOD_OIDC)
     }
 }
 
@@ -1188,8 +1195,9 @@ impl AdminApi {
         accept_no_content(status)
     }
 
-    /// `GET /api/v1/auth/config` — which login flow this deployment serves.
-    pub async fn mode(&self) -> Result<AuthConfig, AdminApiError> {
+    /// `GET /api/v1/auth/config` — which sign-in methods this deployment
+    /// serves.
+    pub async fn auth_config(&self) -> Result<AuthConfig, AdminApiError> {
         self.get_json(PATH_AUTH_CONFIG).await
     }
 
@@ -1536,22 +1544,38 @@ mod tests {
     // ── Wire format ───────────────────────────────────────
 
     #[test]
-    fn auth_config_deserializes() {
-        let config: AuthConfig = serde_json::from_str(r#"{"mode":"local"}"#).expect("auth config");
-        assert_eq!(config.mode, MODE_LOCAL);
-        assert!(config.is_local());
-        assert!(!config.is_oidc());
+    fn auth_config_deserializes_every_recognised_method() {
+        let local: AuthConfig =
+            serde_json::from_str(r#"{"methods":["local"]}"#).expect("auth config");
+        assert_eq!(local.methods, vec![METHOD_LOCAL.to_owned()]);
+        assert!(local.has_local());
+        assert!(!local.has_oidc());
 
-        let oidc: AuthConfig = serde_json::from_str(r#"{"mode":"oidc"}"#).expect("auth config");
-        assert!(oidc.is_oidc());
-        assert!(!oidc.is_local());
+        let oidc: AuthConfig =
+            serde_json::from_str(r#"{"methods":["oidc"]}"#).expect("auth config");
+        assert!(oidc.has_oidc());
+        assert!(!oidc.has_local());
+
+        // Both at once is the additive case ADR-0057 exists for, and the two
+        // answers are independent: enabling one never changes the other.
+        let both: AuthConfig =
+            serde_json::from_str(r#"{"methods":["local","oidc"]}"#).expect("auth config");
+        assert!(both.has_local());
+        assert!(both.has_oidc());
     }
 
     #[test]
-    fn unknown_mode_is_neither_local_nor_oidc() {
-        let other: AuthConfig = serde_json::from_str(r#"{"mode":"saml"}"#).expect("auth config");
-        assert!(!other.is_local());
-        assert!(!other.is_oidc());
+    fn unknown_methods_are_ignored_rather_than_fatal() {
+        let other: AuthConfig =
+            serde_json::from_str(r#"{"methods":["saml"]}"#).expect("auth config");
+        assert!(!other.has_local());
+        assert!(!other.has_oidc());
+
+        // A missing list is an empty set, not a deserialization failure: the
+        // page has to be able to say "no method I recognise" either way.
+        let missing: AuthConfig = serde_json::from_str(r#"{}"#).expect("auth config");
+        assert!(!missing.has_local());
+        assert!(!missing.has_oidc());
     }
 
     #[test]
