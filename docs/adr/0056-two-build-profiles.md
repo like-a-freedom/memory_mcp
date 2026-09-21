@@ -114,6 +114,15 @@ tests set the variable explicitly.
 - Compose ships two browser overlays, `docker-compose.local.yml` and
   `docker-compose.oidc.yml`. A data-plane-only deployment is an
   operator-composed environment rather than a third pre-baked overlay.
+  **Amended by [ADR-0057](0057-additive-browser-auth-methods.md):** the browser
+  authentication methods became a runtime *set*, so there is no method choice
+  left to make at file level. The two overlays are replaced by a single
+  `docker-compose.yml` whose `MEMORY_MCP_HTTP_AUTH_METHODS` selects `local`,
+  `oidc`, or both. This supersedes the "Collapse `local` and `oidc` into one
+  overlay selected by a `MODE` variable" rejection below: the reason it was
+  rejected is that a conditional overlay could not demand each mode's secrets
+  unconditionally, and the server now does that demanding itself, naming the
+  variable and the set to fix.
 - The trade-off of Q8b over Q8a: the internal feature names remain in
   `Cargo.toml` (marked internal) rather than being removed and having all
   ~80 `cfg` sites rewritten. This avoids a large, security-sensitive
@@ -138,4 +147,7 @@ tests set the variable explicitly.
   variable.** The mode-exclusive secret sets are what make a wrong-mode
   deployment fail before the container starts; a conditional overlay would have
   to give that up and could no longer demand each mode's secrets
-  unconditionally. Rejected.
+  unconditionally. Rejected. **Superseded by ADR-0057:** the server enforces the
+  same rule from the method set and reports which variable is missing or
+  forbidden, and the methods are additive rather than exclusive, so one file is
+  no longer a loss of validation.
