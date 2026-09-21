@@ -2468,6 +2468,10 @@ impl RegistryStore for SurrealRegistryStore {
     /// and the other method, so what remains is the other method. Expressing it
     /// this way avoids `array::filter`/`array::difference`, which are not in this
     /// build's function registry.
+    ///
+    /// `mode` — the pre-048 column — is left as it was, exactly as
+    /// `reconcile_browser_policy` leaves it: `methods` is authoritative and `mode`
+    /// is read only as the fallback for a row that predates it.
     #[cfg(feature = "control-plane")]
     async fn remove_browser_auth_method(
         &self,

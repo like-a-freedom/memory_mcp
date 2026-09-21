@@ -36,10 +36,11 @@ the built image over trusted TLS in a real browser
 ### What this document covers
 
 - Local method selection and the environment contract (`MEMORY_MCP_HTTP_AUTH_METHODS=local`; `MEMORY_MCP_HTTP_AUTH_MODE=local` is the one-release alias for the same one-element set).
-- The CLI `admin` subcommand (`create`, `recover`) and its environment.
+- The CLI `admin` subcommand (`create`, `recover`, and `auth-methods remove`) and its environment.
 - The local browser/API surface mounted at `/api/v1/auth/local/*` and `/api/v1/admin/*`.
 - Durable records, sessions, challenges, throttling, audit, and the
-  `browser_auth_policy` mode fence.
+  `browser_auth_policy` method fence — including the guarded removal that narrows
+  it and reaches "SSO only" (§5).
 - Client creation, key issuance/revocation, suspend/resume.
 - Backups, restore, rotation, rollback, and explicit non-goals.
 
@@ -1081,6 +1082,14 @@ restart. Losing the administrator password afterwards is still recoverable with
 `admin recover` — but only while `local` is in the set, which is why the operator
 identity above is the precondition for leaving it.
 
+**Rollout order with more than one replica.** The configuration, not the durable
+row, decides what a process serves, so the removal must not be the only change
+made: narrow `MEMORY_MCP_HTTP_AUTH_METHODS` first, then run the removal, then
+restart **every** replica with the narrowed set. A replica started from the old
+environment re-adds the removed method at its own reconciliation — the removal is
+additive-resistant but not a fence against a stale configuration, and the
+operator who only removes the method will see it come back at the next start.
+
 ## 6. Client and key administration
 
 ### 6.1 Route table
@@ -1578,6 +1587,10 @@ unless you deliberately recover or rotate them.
   email, no `open` signup route mounted in local mode.
 - **No purge UI.** No client deletion, quota editing, or purge route.
 - **No browser password reset.** Recovery is CLI-only (§5).
+- **No console action for the browser-auth method set.** Adding a method is
+  configuration and removing one is `memory_mcp admin auth-methods remove` (§5);
+  neither is a route or a UI control, because `MEMORY_MCP_HTTP_AUTH_METHODS` is
+  what declares the set and a browser action would be undone by the next restart.
 
 **Honest statement of administrator privilege:** an administrator can create a
 client, wait for its tenant to become ready, and issue API keys for it. Issuing a

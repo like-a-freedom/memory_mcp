@@ -1651,7 +1651,7 @@ and the supporting ADRs under `docs/adr/`.
 - [`docs/superpowers/specs/2026-08-27-streamable-http-saas.md`](docs/superpowers/specs/2026-08-27-streamable-http-saas.md) — Streamable HTTP SaaS design specification
 - [`docs/superpowers/specs/2026-07-28-truthful-evaluation-system-design.md`](docs/superpowers/specs/2026-07-28-truthful-evaluation-system-design.md) — evaluation architecture and design
 - [`docs/superpowers/specs/2026-07-30-token-efficient-responses-design.md`](docs/superpowers/specs/2026-07-30-token-efficient-responses-design.md) — compact tool responses design
-- [`docs/adr/`](docs/adr/) — Architecture Decision Records (56 ADRs, including ADR-0038 one Active Namespace, ADR-0052 Streamable HTTP SaaS profile, and ADR-0056 two build profiles)
+- [`docs/adr/`](docs/adr/) — Architecture Decision Records (57 ADRs, including ADR-0038 one Active Namespace, ADR-0052 Streamable HTTP SaaS profile, ADR-0056 two build profiles, and ADR-0057 additive browser authentication methods)
 - [`docs/compatibility/one-active-namespace-identities.md`](docs/compatibility/one-active-namespace-identities.md) — scope/namespace compatibility contract
 - [`docs/operations/`](docs/operations/) — operator runbooks (protocol conformance, credential rotation, known limitations, SurrealDB restore drill)
 - [`docs/performance/`](docs/performance/) — memory profile and NER performance measurements
