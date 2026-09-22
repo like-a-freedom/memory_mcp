@@ -20,6 +20,10 @@ pub fn App() -> Element {
             class: "app-header",
             div { class: "app-header-inner",
                 span { class: "app-brand", "Memory MCP" }
+                // A whitespace text node between the spans: flex ignores it
+                // visually, while text extraction and screen readers stop
+                // reading "Memory MCPcontrol plane".
+                " "
                 span { class: "app-brand-suffix", "control plane" }
             }
         }

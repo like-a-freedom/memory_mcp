@@ -132,6 +132,13 @@ a:hover {
     color: var(--accent-hover);
 }
 
+hr {
+    border: 0;
+    border-top: 1px solid var(--border);
+    width: 100%;
+    margin: 0.25rem 0;
+}
+
 code {
     font-family: var(--font-mono);
     font-size: 0.8125rem;
@@ -141,6 +148,12 @@ code {
     border-radius: var(--radius-control);
     padding: 0.0625rem 0.375rem;
     overflow-wrap: anywhere;
+}
+
+/* Table id chips are copied far more often than they are read: one click
+   selects the whole id. Inline `code` in prose keeps ordinary selection. */
+td > code {
+    user-select: all;
 }
 
 :focus-visible {
@@ -284,7 +297,6 @@ main:focus {
 
 .session-expiry {
     color: var(--fg-subtle);
-    font-family: var(--font-mono);
     font-size: 0.8125rem;
 }
 
@@ -398,6 +410,7 @@ input[type="checkbox"] {
 
 .expiry > div > label {
     font-size: 0.875rem;
+    white-space: nowrap;
 }
 
 .expiry > div > input[type="number"] {
@@ -457,7 +470,9 @@ button:disabled {
 
 /* Primary: every <form> has exactly one submit control, so `type="submit"` is
    the primary affordance and `type="button"` is always secondary. No page
-   carries two controls with the same intent. */
+   carries two controls with the same intent — the one exception is the
+   one-time secret panel, whose Copy action is the panel's whole purpose and
+   therefore takes the same accent (`.secret > button:first-of-type` below). */
 button[type="submit"] {
     background-color: var(--accent);
     color: var(--accent-text);
@@ -510,6 +525,22 @@ a.button.button--danger:hover {
     background-color: var(--danger-hover);
     border-color: var(--danger);
     color: var(--danger);
+}
+
+/* The one-time secret panel's primary act. `:first-of-type` is always the
+   Copy control — it is rendered before the close controls — so the safe action
+   keeps the accent while the lossy action stays secondary. */
+.secret > button:first-of-type {
+    background-color: var(--accent);
+    color: var(--accent-text);
+    font-weight: 600;
+    border-color: var(--accent);
+}
+
+.secret > button:first-of-type:hover:not(:disabled) {
+    background-color: var(--accent-hover);
+    border-color: var(--accent-hover);
+    color: var(--accent-text);
 }
 
 .actions {
@@ -699,6 +730,11 @@ section.client-state {
     gap: 0.75rem;
 }
 
+/* A column flex stretches its children; a decision button is not a banner. */
+section.client-state > button {
+    align-self: flex-start;
+}
+
 section > h2 {
     padding-bottom: 0.75rem;
     border-bottom: 1px solid var(--border);
@@ -772,6 +808,12 @@ tbody td {
     background-color: transparent;
 }
 
+/* A key name wraps at its hyphens into four ragged lines at phone widths; the
+   tables scroll, so the name column keeps its width instead. */
+.data-table tbody tr:not(.confirm-row) > td:first-child {
+    white-space: nowrap;
+}
+
 /* The confirmation panel fills the cell it is placed in, so the row reads as one
    block rather than a panel floating in a padded cell. */
 .confirm-row > td {
@@ -782,6 +824,13 @@ tbody td {
     border: 0;
     border-top: 1px solid var(--warning-border);
     border-radius: 0;
+    width: 100%;
+}
+
+/* The shared 34rem measure is for a floating dialog, not for a block that
+   continues a table row or answers a question inside a section. */
+section.client-state .confirm {
+    width: 100%;
 }
 
 /* The position summary and the pager that sits with it, below the rows it walks
@@ -969,12 +1018,13 @@ dialog.modal-layer {
 
 /* ═══ auth forms ═══════════════════════════════════════════════════════ */
 
+/* The issue-key form is deliberately absent: it lives inside the framed
+   `section.keys`, and a card inside a card is noise. */
 .admin-login,
 .challenge-inspect,
 .challenge-finish,
 .create-client,
-.create-key,
-.issue-key {
+.create-key {
     background-color: var(--surface);
     border: 1px solid var(--border);
     border-radius: var(--radius-panel);
@@ -1073,8 +1123,7 @@ dialog.modal-layer {
     .challenge-inspect,
     .challenge-finish,
     .create-client,
-    .create-key,
-    .issue-key {
+    .create-key {
         max-width: none;
         padding: 1rem;
     }

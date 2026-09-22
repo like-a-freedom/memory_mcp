@@ -12,6 +12,7 @@
 //! never rendered, so the forms cannot leak internals.
 
 use dioxus::prelude::*;
+use dioxus_router::Link;
 use dioxus_router::hooks::use_navigator;
 
 use crate::admin_api::{AdminApi, SessionCsrf};
@@ -94,6 +95,15 @@ pub fn AdminLoginForm() -> Element {
                 tone: AlertTone::Status,
                 message: pending.read().then(|| "Signing in…".to_owned()),
             }
+            // The two CLI-driven flows exist but used to be reachable only by
+            // typing their URL. A first-time administrator and a locked-out one
+            // both start here, so both routes are named here.
+            p { class: "hint",
+                Link { to: Route::AdminActivate {}, "First run: set the password" }
+                " or "
+                Link { to: Route::AdminReset {}, "lost access: reset it" }
+                " — both need a one-time code from the CLI."
+            }
         }
     }
 }
@@ -162,7 +172,6 @@ pub fn AdminReauthDialog(
             title: "Confirm your password",
             description,
             on_dismiss: move |_| on_cancel.call(()),
-            p { class: "hint", "Nothing is retried until you confirm." }
             form { onsubmit: confirm,
                 div { class: "field",
                     label { r#for: "reauth-password", "Password" }

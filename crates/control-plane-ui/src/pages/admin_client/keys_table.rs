@@ -17,6 +17,7 @@
 use dioxus::prelude::*;
 
 use crate::admin_api::{ApiKeyMeta, KeyDisplayStatus};
+use crate::components::modal::claim_initial_focus;
 use crate::components::status_badge::StatusBadge;
 use crate::components::timestamp::Timestamp;
 
@@ -109,7 +110,6 @@ pub fn KeysTable(
                                         }
                                         button {
                                             r#type: "button",
-                                            autofocus: true,
                                             disabled: pending,
                                             onclick: {
                                                 let id = key.id.clone();
@@ -117,8 +117,14 @@ pub fn KeysTable(
                                             },
                                             if pending { "Working…" } else { "Confirm revoke" }
                                         }
+                                        // Initial focus goes to the safe exit, not to the
+                                        // irreversible action: a stray Enter must not revoke a
+                                        // key before the question has been read.
                                         button {
                                             r#type: "button",
+                                            onmounted: move |event: MountedEvent| {
+                                                claim_initial_focus(&event)
+                                            },
                                             onclick: move |_| on_cancel.call(()),
                                             "Cancel"
                                         }

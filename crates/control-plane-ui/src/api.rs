@@ -56,7 +56,10 @@ fn fallback_message(status: u16) -> String {
         401 | 403 => {
             "You are not signed in, or your session has expired. Sign in again.".to_owned()
         }
-        404 => "That no longer exists. Reload the page.".to_owned(),
+        404 => {
+            "That no longer exists, or you are not signed in to an account. Sign in again, or reload the page."
+                .to_owned()
+        }
         409 => "That change conflicts with the current state. Reload and try again.".to_owned(),
         429 => "Too many requests. Wait a moment and try again.".to_owned(),
         500..=599 => "The server could not complete the request. Try again.".to_owned(),
@@ -64,16 +67,32 @@ fn fallback_message(status: u16) -> String {
     }
 }
 
+/// Choose the message for a failed response.
+///
+/// Session-shaped failures (401/403/404) always use this console's copy: the
+/// server answers those with a terse `not found` to keep the account surface
+/// opaque, and an operator can act on the copy below, not on that. Other
+/// statuses keep the server's documented envelope message — a validation
+/// reason is worth showing — and fall back to status copy when there is none.
+fn failure_message(status: u16, server: Option<String>) -> String {
+    if matches!(status, 401 | 403 | 404) {
+        return fallback_message(status);
+    }
+    server.unwrap_or_else(|| fallback_message(status))
+}
+
 /// Turn a non-success response into an [`ApiError`] the page can render.
 async fn read_failure(resp: gloo_net::http::Response) -> ApiError {
     let status = resp.status();
-    let message = resp
+    let server = resp
         .text()
         .await
         .ok()
-        .and_then(|body| server_message(&body))
-        .unwrap_or_else(|| fallback_message(status));
-    ApiError { message, status }
+        .and_then(|body| server_message(&body));
+    ApiError {
+        message: failure_message(status, server),
+        status,
+    }
 }
 
 /// Account metadata from GET /api/v1/account.
@@ -285,7 +304,7 @@ impl ApiClient {
 
 #[cfg(test)]
 mod tests {
-    use super::{ApiClient, fallback_message, server_message};
+    use super::{ApiClient, failure_message, fallback_message, server_message};
 
     /// The regression that motivated `endpoint`. `format!("{}/api/v1/account", "/")`
     /// is `//api/v1/account`, which is a scheme-relative URL, so the browser
@@ -375,6 +394,31 @@ mod tests {
         assert_eq!(server_message(r#"{"error":{"message":"   "}}"#), None);
         assert_eq!(server_message(r#"{"error":"a string"}"#), None);
         assert_eq!(server_message(""), None);
+    }
+
+    #[test]
+    fn session_failures_use_operator_copy_not_the_servers_terse_string() {
+        // `not found` is what the server says to a browser with no account
+        // session; it used to be rendered verbatim on `/`, `/keys` and
+        // `/delete`, leaving the destructive flow in a dead end.
+        assert_eq!(
+            failure_message(404, Some("not found".to_owned())),
+            fallback_message(404)
+        );
+        assert_eq!(
+            failure_message(401, Some("unauthorized".to_owned())),
+            fallback_message(401)
+        );
+        assert_eq!(
+            failure_message(403, Some("forbidden".to_owned())),
+            fallback_message(403)
+        );
+        // A validation reason on a normal status is worth keeping.
+        assert_eq!(
+            failure_message(400, Some("Confirmation phrase did not match.".to_owned())),
+            "Confirmation phrase did not match."
+        );
+        assert_eq!(failure_message(500, None), fallback_message(500));
     }
 
     #[test]

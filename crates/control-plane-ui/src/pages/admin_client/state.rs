@@ -39,6 +39,10 @@ pub(super) struct KeyIssueFields {
     pub(super) name: Signal<String>,
     pub(super) days: Signal<String>,
     pub(super) never: Signal<bool>,
+    /// A rejection of what the form holds, rendered inside the form. The
+    /// page-level error is for loads and mutations; telling an operator their
+    /// input is wrong 600px above the input is telling them nothing.
+    pub(super) error: Signal<Option<String>>,
 }
 
 impl KeyIssueFields {
@@ -47,7 +51,23 @@ impl KeyIssueFields {
             name: use_signal(String::new),
             days: use_signal(String::new),
             never: use_signal(|| false),
+            error: use_signal(|| None),
         }
+    }
+
+    /// A typed day count and "Never" are mutually exclusive choices, not a pair
+    /// to reconcile: typing a count takes the box off the table.
+    pub(super) fn enter_days(&mut self, value: String) {
+        let (days, never) = entered_days(value, *self.never.peek());
+        self.days.set(days);
+        self.never.set(never);
+    }
+
+    /// Checking "Never" clears the day count instead of contradicting it.
+    pub(super) fn toggle_never(&mut self, checked: bool) {
+        let (days, never) = toggled_never(checked, self.days.read().clone());
+        self.days.set(days);
+        self.never.set(never);
     }
 
     /// The name to send, validated by the rule the backend also applies.
@@ -69,7 +89,23 @@ impl KeyIssueFields {
         self.name.set(String::new());
         self.days.set(String::new());
         self.never.set(false);
+        self.error.set(None);
     }
+}
+
+/// The expiry interaction, as data: a day count implies "not never".
+///
+/// Empty days change nothing — there is no default, and the blank pair is
+/// still the operator's decision to make.
+pub(super) fn entered_days(days: String, never: bool) -> (String, bool) {
+    let never = if days.trim().is_empty() { never } else { false };
+    (days, never)
+}
+
+/// The other direction: "Never" empties the day count rather than
+/// contradicting it.
+pub(super) fn toggled_never(checked: bool, days: String) -> (String, bool) {
+    (if checked { String::new() } else { days }, checked)
 }
 
 /// Everything the client detail page renders or mutates.
@@ -203,5 +239,35 @@ pub(super) fn use_page_state(account_id: String) -> PageState {
         pending,
         confirm_action,
         refused,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{entered_days, toggled_never};
+
+    #[test]
+    fn typing_a_day_count_takes_never_off_the_table() {
+        let (days, never) = entered_days("30".to_owned(), true);
+        assert_eq!(days, "30");
+        assert!(!never);
+    }
+
+    #[test]
+    fn clearing_the_day_count_does_not_check_never_by_itself() {
+        // There is no default: a blank pair stays blank, and the submit-side
+        // validation is what says so.
+        let (_, never) = entered_days(String::new(), false);
+        assert!(!never);
+    }
+
+    #[test]
+    fn checking_never_clears_the_day_count_instead_of_contradicting_it() {
+        let (days, never) = toggled_never(true, "30".to_owned());
+        assert_eq!(days, "");
+        assert!(never);
+        let (days, never) = toggled_never(false, "30".to_owned());
+        assert_eq!(days, "30");
+        assert!(!never);
     }
 }

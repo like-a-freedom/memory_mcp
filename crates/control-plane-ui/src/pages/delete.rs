@@ -108,8 +108,11 @@ pub fn DeletePage() -> Element {
                             oninput: move |event| phrase.set(event.value()),
                         }
                     }
-                    button { r#type: "submit", class: "danger", disabled: pending_now,
-                        if pending_now { "Confirming…" } else { "Confirm deletion" }
+                    div { class: "actions",
+                        button { r#type: "submit", class: "danger", disabled: pending_now,
+                            if pending_now { "Confirming…" } else { "Confirm deletion" }
+                        }
+                        Link { class: "button", to: Route::Status {}, "Back to status" }
                     }
                     p { class: "hint",
                         "This confirmation expires at "
@@ -119,13 +122,13 @@ pub fn DeletePage() -> Element {
                 }
             } else {
                 form { onsubmit: start_delete,
-                    button { r#type: "submit", class: "danger", disabled: pending_now,
-                        if pending_now { "Starting…" } else { "Start deletion" }
+                    div { class: "actions",
+                        button { r#type: "submit", class: "danger", disabled: pending_now,
+                            if pending_now { "Starting…" } else { "Start deletion" }
+                        }
+                        Link { class: "button", to: Route::Status {}, "Back to status" }
                     }
                 }
-            }
-            nav { class: "actions", "aria-label": "Account",
-                Link { class: "button", to: Route::Status {}, "Back to status" }
             }
         }
     }

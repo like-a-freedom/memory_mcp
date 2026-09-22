@@ -21,7 +21,6 @@ use crate::admin_api::{
 };
 use crate::components::alert::{Alert, AlertTone};
 use crate::components::session_bar::AdminSessionBar;
-use crate::presentation::KEY_PRIVILEGE_NOTE;
 use crate::state::admin_session::{
     SESSION_ENDED, SESSION_ENDED_BEFORE_MUTATION, end_session, use_console_session,
 };
@@ -188,7 +187,6 @@ pub fn AdminClientListPage() -> Element {
             }
         }
         AdminSessionBar { session, on_sign_out: sign_out }
-        p { class: "privilege-note", "{KEY_PRIVILEGE_NOTE}" }
         // The form is offered only once the session is known to be usable, so a
         // signed-out operator is never invited to fill in something that cannot
         // be submitted.
@@ -207,7 +205,7 @@ pub fn AdminClientListPage() -> Element {
                         oninput: move |event| display_name.set(event.value()),
                     }
                     p { id: "client-display-name-hint", class: "hint",
-                        "Up to 100 characters. This is the name every console page shows."
+                        "Up to 100 characters. Shown on every console page."
                     }
                 }
                 Alert { tone: AlertTone::Error, message: create_error.read().clone() }
@@ -266,7 +264,7 @@ pub fn AdminClientListPage() -> Element {
             }
         }
         p { class: "hint",
-            "Client ids are stable. Failed clients are shown with the reason the backend reported, and are never retried from here."
+            "Client ids are stable. Failed clients keep the reason the backend reported."
         }
     }
 }

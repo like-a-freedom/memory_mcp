@@ -31,6 +31,7 @@ pub fn PageNotFound(route: Vec<String>) -> Element {
             }
             nav { class: "actions", "aria-label": "Ways back",
                 Link { class: "button", to: Route::Status {}, "Account status" }
+                Link { class: "button", to: Route::AdminClientList {}, "Clients" }
                 Link { class: "button", to: Route::Login {}, "Sign in" }
             }
         }

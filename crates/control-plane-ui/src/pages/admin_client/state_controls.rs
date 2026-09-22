@@ -7,6 +7,7 @@
 use dioxus::prelude::*;
 
 use crate::admin_api::{ClientStateAction, ClientView};
+use crate::components::modal::claim_initial_focus;
 
 /// The state controls for one ready or suspended client.
 #[component]
@@ -31,12 +32,18 @@ pub fn ClientStateControls(
                     p { id: "client-state-question", "{question(action)}" }
                     button {
                         r#type: "button",
-                        autofocus: true,
                         disabled: *pending.read(),
                         onclick: move |_| on_confirm.call(()),
                         "Confirm"
                     }
-                    button { r#type: "button", onclick: move |_| on_cancel.call(()), "Cancel" }
+                    // The safe exit takes initial focus: a stray Enter must not
+                    // suspend a client before the question has been read.
+                    button {
+                        r#type: "button",
+                        onmounted: move |event: MountedEvent| claim_initial_focus(&event),
+                        onclick: move |_| on_cancel.call(()),
+                        "Cancel"
+                    }
                 }
             } else if view.can_suspend() {
                 button {

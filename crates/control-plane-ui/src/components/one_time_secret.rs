@@ -94,7 +94,7 @@ pub fn OneTimeSecret(
             Alert { tone: AlertTone::Status, message: notice.read().clone() }
             if *armed.read() {
                 p { role: "alert", "{CLOSING_WARNING}" }
-                button { r#type: "button", onclick: dismiss_click, "Discard the secret" }
+                button { r#type: "button", class: "danger", onclick: dismiss_click, "Discard the secret" }
                 button { r#type: "button", onclick: keep, "Keep it" }
             } else {
                 button { r#type: "button", onclick: dismiss_click, "Close" }

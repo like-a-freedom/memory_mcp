@@ -119,7 +119,7 @@ pub(super) fn KeysPanel(
                                 max: "{MAX_EXPIRY_DAYS}",
                                 step: "1",
                                 value: "{fields.days}",
-                                oninput: move |event| fields.days.set(event.value()),
+                                oninput: move |event| fields.enter_days(event.value()),
                             }
                             span { "days ({MIN_EXPIRY_DAYS}–{MAX_EXPIRY_DAYS})" }
                         }
@@ -130,17 +130,19 @@ pub(super) fn KeysPanel(
                                 name: "expiry-never",
                                 r#type: "checkbox",
                                 checked: *fields.never.read(),
-                                onchange: move |event| fields.never.set(event.checked()),
+                                onchange: move |event| fields.toggle_never(event.checked()),
                             }
                         }
                         p { class: "hint", "Choose exactly one. There is no default." }
                     }
+                    // What the form rejected is said beside the form.
+                    Alert { tone: AlertTone::Error, message: fields.error.read().clone() }
                     button { r#type: "submit", disabled: pending,
                         if pending { "Issuing…" } else { "Issue key" }
                     }
                     if retrying {
                         p { class: "hint",
-                            "This request already has an operation id. Retrying reuses it, so a lost response cannot issue a second key."
+                            "Retrying this request cannot issue a second key."
                         }
                     }
                 }

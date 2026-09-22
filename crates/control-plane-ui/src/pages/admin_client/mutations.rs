@@ -103,14 +103,14 @@ impl PageState {
         let name = match self.fields.validated_name() {
             Ok(name) => name,
             Err(message) => {
-                self.error.set(Some(message.to_owned()));
+                self.fields.error.set(Some(message.to_owned()));
                 return;
             }
         };
         let expiry = match self.fields.validated_expiry() {
             Ok(expiry) => expiry,
             Err(message) => {
-                self.error.set(Some(message.to_owned()));
+                self.fields.error.set(Some(message.to_owned()));
                 return;
             }
         };
@@ -134,6 +134,7 @@ impl PageState {
         };
         self.pending.set(true);
         self.error.set(None);
+        self.fields.error.set(None);
         self.notice.set(None);
         let id = account_id.to_owned();
         let mut state = *self;
@@ -147,7 +148,10 @@ impl PageState {
                     state.fields.clear();
                     state.notice.set(None);
                     state.secret.set(Some(created));
-                    state.keys.first_page();
+                    // The key write moved the client's compare-and-set version:
+                    // re-read it now, or the next mutation on this page would be
+                    // refused as stale by the page's own action.
+                    state.reload();
                 }
                 Err(failure) if failure.is_reauth_required() => {
                     // Confirm the password first; issuance is retried by the
@@ -202,7 +206,10 @@ impl PageState {
             match api.revoke_key(&id, &key_id).await {
                 Ok(()) => {
                     state.notice.set(Some("Key revoked.".to_owned()));
-                    state.keys.first_page();
+                    // Same as issuance: the key write moved the client's
+                    // compare-and-set version, so re-read it before the next
+                    // mutation is attempted from this page.
+                    state.reload();
                 }
                 Err(failure) => {
                     if failure.ends_session() {

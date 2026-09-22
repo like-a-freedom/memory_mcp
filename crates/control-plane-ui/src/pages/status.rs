@@ -46,7 +46,10 @@ pub fn StatusPage() -> Element {
                     },
                     Some(Err(err)) => rsx! {
                         Alert { tone: AlertTone::Error, message: Some(err.message.clone()) }
+                        // Recovery first: an account page without a session is
+                        // one sign-in away from working, not one reload away.
                         div { class: "actions",
+                            Link { class: "button", to: Route::Login {}, "Sign in" }
                             button { r#type: "button", onclick: move |_| account.restart(), "Try again" }
                         }
                     },
@@ -66,20 +69,23 @@ pub fn StatusPage() -> Element {
                                 }
                             }
                         }
+                        // Account actions are shown only to a loaded account:
+                        // leading a sessionless visitor to `/delete` is how the
+                        // destructive flow used to dead-end on "not found".
+                        nav { class: "actions", "aria-label": "Account",
+                            Link { class: "button", to: Route::Keys {}, "API keys" }
+                            // Destructive, so it must not look like its neighbour: the
+                            // colour is the only warning an operator gets before the page
+                            // that asks them to type a confirmation phrase.
+                            Link {
+                                class: "button button--danger",
+                                to: Route::Delete {},
+                                "Delete account"
+                            }
+                            button { r#type: "button", onclick: sign_out, "Sign out" }
+                        }
                     },
                 }
-            }
-            nav { class: "actions", "aria-label": "Account",
-                Link { class: "button", to: Route::Keys {}, "API keys" }
-                // Destructive, so it must not look like its neighbour: the
-                // colour is the only warning an operator gets before the page
-                // that asks them to type a confirmation phrase.
-                Link {
-                    class: "button button--danger",
-                    to: Route::Delete {},
-                    "Delete account"
-                }
-                button { r#type: "button", onclick: sign_out, "Sign out" }
             }
         }
     }

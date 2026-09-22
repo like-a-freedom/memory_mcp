@@ -16,6 +16,7 @@ use dioxus_router::hooks::use_navigator;
 
 use crate::api::{ApiClient, ApiKeyMeta};
 use crate::components::alert::{Alert, AlertTone};
+use crate::components::modal::claim_initial_focus;
 use crate::components::one_time_secret::OneTimeSecret;
 use crate::components::status_badge::StatusBadge;
 use crate::components::timestamp::Timestamp;
@@ -103,6 +104,7 @@ pub fn KeysPage() -> Element {
                     if let Some(Err(value)) = keys.read().as_ref() {
                         Alert { tone: AlertTone::Error, message: Some(value.message.clone()) }
                         div { class: "actions",
+                            Link { class: "button", to: Route::Login {}, "Sign in" }
                             button {
                                 r#type: "button",
                                 onclick: move |_| {
@@ -113,6 +115,10 @@ pub fn KeysPage() -> Element {
                             }
                         }
                     }
+                    // The form is offered only while the account is known to be
+                    // reachable — the same rule the client list applies. A form
+                    // that cannot be submitted is not an invitation to type.
+                    if !matches!(keys.read().as_ref(), Some(Err(_))) {
                     form { class: "create-key", onsubmit: create_key,
                         div { class: "field",
                             label { r#for: "new-key-name", "Key name" }
@@ -133,6 +139,7 @@ pub fn KeysPage() -> Element {
                         button { r#type: "submit", disabled: pending_now,
                             if pending_now { "Creating…" } else { "Create key" }
                         }
+                    }
                     }
                     match keys.read().as_ref() {
                         None => rsx! {
@@ -203,7 +210,6 @@ pub fn KeysPage() -> Element {
                                                             }
                                                             button {
                                                                 r#type: "button",
-                                                                autofocus: true,
                                                                 disabled: pending_now,
                                                                 onclick: {
                                                                     let id = key.id.clone();
@@ -214,8 +220,14 @@ pub fn KeysPage() -> Element {
                                                                 },
                                                                 if pending_now { "Working…" } else { "Confirm revoke" }
                                                             }
+                                                            // The safe exit takes initial focus: a
+                                                            // stray Enter must not revoke a key
+                                                            // before the question has been read.
                                                             button {
                                                                 r#type: "button",
+                                                                onmounted: move |event: MountedEvent| {
+                                                                    claim_initial_focus(&event)
+                                                                },
                                                                 onclick: move |_| revoke_target.set(None),
                                                                 "Cancel"
                                                             }

@@ -81,7 +81,10 @@ impl Status {
         match self.raw() {
             "active" | "ready" => StatusTone::Success,
             "reserved" | "namespace_creating" | "migrating" => StatusTone::Warning,
-            "failed" | "revoked" | "expired" | "deleting" => StatusTone::Danger,
+            // `suspended` belongs here by this module's own definition of the
+            // tone: the object cannot be used. The state is deliberate — a
+            // kill switch reads as danger, not as an unrecognised state.
+            "failed" | "revoked" | "expired" | "deleting" | "suspended" => StatusTone::Danger,
             _ => StatusTone::Muted,
         }
     }
@@ -125,16 +128,31 @@ pub const KEY_PRIVILEGE_NOTE: &str =
 
 /// Make an RFC 3339 timestamp compact enough for a table cell while the exact
 /// value stays available in the element's `datetime` and `title` attributes.
+///
+/// Minutes are the precision an operator acts at: seconds, fractional seconds
+/// and offset seconds are noise that forces every value to be parsed by eye.
+/// A UTC instant (either `Z` or `+00:00`, with or without fractional seconds)
+/// reads as `2026-09-23 19:59 UTC`; another offset keeps itself.
 pub fn compact_timestamp(value: &str) -> String {
     let trimmed = value.trim();
-    let Some(separator) = trimmed.find('T') else {
+    let Some(separator) = trimmed.find(['T', ' ']) else {
         return trimmed.to_owned();
     };
     let date = &trimmed[..separator];
     let remainder = &trimmed[separator + 1..];
-    let time = remainder.get(..8).unwrap_or(remainder);
-    let zone = remainder.get(8..).unwrap_or_default();
-    let zone = if zone == "Z" { " UTC" } else { zone };
+    let time = remainder.get(..5).unwrap_or(remainder);
+    // The offset is the last `+` or `-` after the date; everything between the
+    // clock and the offset is the fractional second being dropped here.
+    let offset = trimmed
+        .rfind(['+', '-'])
+        .filter(|at| *at > separator)
+        .map(|at| &trimmed[at..]);
+    let zone = match offset {
+        Some("+00:00") => " UTC",
+        Some(offset) => return format!("{date} {time} {offset}"),
+        None if trimmed.ends_with('Z') => " UTC",
+        None => "",
+    };
     format!("{date} {time}{zone}")
 }
 
@@ -166,6 +184,9 @@ mod tests {
         assert_eq!(Status::new("migrating").tone(), StatusTone::Warning);
         assert_eq!(Status::new("failed").tone(), StatusTone::Danger);
         assert_eq!(Status::new("unknown").tone(), StatusTone::Muted);
+        // A suspended client cannot be used either, whatever produced the
+        // state: the tone answers that question, not whose idea it was.
+        assert_eq!(Status::new("suspended").tone(), StatusTone::Danger);
     }
 
     #[test]
@@ -203,12 +224,31 @@ mod tests {
     fn timestamps_are_readable_but_keep_the_original_precision_elsewhere() {
         assert_eq!(
             compact_timestamp("2026-09-19T10:15:00Z"),
-            "2026-09-19 10:15:00 UTC"
+            "2026-09-19 10:15 UTC"
         );
         assert_eq!(
             compact_timestamp("2026-09-19T10:15:00+00:00"),
-            "2026-09-19 10:15:00+00:00"
+            "2026-09-19 10:15 UTC"
+        );
+        assert_eq!(
+            compact_timestamp("2026-09-19T10:15:00+02:00"),
+            "2026-09-19 10:15 +02:00"
         );
         assert_eq!(compact_timestamp("not-a-date"), "not-a-date");
+    }
+
+    #[test]
+    fn fractional_seconds_never_reach_the_visible_zone() {
+        // The two shapes the backend actually sends. A `.707974+00:00` suffix
+        // used to pass through as the "zone", printing microseconds in every
+        // table cell and in the session bar.
+        assert_eq!(
+            compact_timestamp("2026-09-23T19:59:41.707974+00:00"),
+            "2026-09-23 19:59 UTC"
+        );
+        assert_eq!(
+            compact_timestamp("2026-09-22T20:08:03.877263Z"),
+            "2026-09-22 20:08 UTC"
+        );
     }
 }
