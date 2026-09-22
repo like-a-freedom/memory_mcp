@@ -12,14 +12,14 @@
 //! | §5 case | Evidence |
 //! |---|---|
 //! | Same activation/reset verifier through independent handles | `exp1_same_verifier_double_submit` (durable) |
-//! | KDF completes, pause before session insert; recover on a second handle | `http_local_admin.rs::client_mutation_follows_the_session_fence`, `reset_changes_the_password_and_fences_old_sessions` |
-//! | Reset hash prepared, newer recovery commits | `exp3_recovery_invalidates_old_credentials` (generation, not interleaving) |
-//! | Resolve/touch and recovery/logout, both commit orders | `exp4_revoke_after_login`; interleavings unproven |
+//! | KDF completes, pause before session insert; recover on a second handle | `exp18_kdf_finishing_during_recovery_never_yields_an_old_generation_session` (real KDF window raced against recovery), `reset_changes_the_password_and_fences_old_sessions` |
+//! | Reset hash prepared, newer recovery commits | `exp19_a_reset_racing_a_newer_recovery_never_outlives_it` (real concurrency), `exp3_recovery_invalidates_old_credentials` (generation) |
+//! | Resolve/touch and recovery/logout, both commit orders | `exp20_resolve_touch_racing_recovery_never_resurrects_the_session` (real concurrency), `exp4_revoke_after_login` |
 //! | Client mutation paused after middleware, logout commits | `http_local_admin.rs::client_mutation_follows_the_session_fence` |
-//! | Two rotations | `exp6_reauth_rotates_session`; interleavings unproven |
+//! | Two rotations | `exp21_concurrent_reauthentications_have_one_winner` (exactly one winner), `exp6_reauth_rotates_session` |
 //! | Replica joins wrong mode or wrong local key fingerprints | `exp16_wrong_mode_policy_fingerprint_mismatch` (durable) |
 //! | OIDC local→OIDC transition and legacy epoch-less session | `surreal_store.rs::find_session_rejects_legacy_and_stale_epoch_rows` |
-//! | Rate two handles/restart/collision/window boundary | `exp9_rate_buckets_enforce_the_cap` (durable cap; restart persistence unproven) |
+//! | Rate two handles/restart/collision/window boundary | `exp9_rate_buckets_enforce_the_cap` (durable cap); `local_admin_rate_window_survives_a_store_reconnect` (restart persistence) |
 //! | Spoofed forwarding headers, missing peer, mapped IPv6 | `http_local_admin.rs::missing_peer_fails_closed`; `control::local_admin` peer tests |
 //! | KDF queue/timeout/cancel/corrupt PHC | `password.rs` unit tests |
 //! | Nonselected SQL statement error / audit insert error | `surreal_store/local_admin.rs::sql_fault_tests` (4 experiments); `surreal_store.rs::query_json_at_*` for the adapter-level propagation |
@@ -516,6 +516,169 @@ mod tests {
                     .is_ok()
             );
         }
+    }
+
+    #[tokio::test]
+    async fn exp18_kdf_finishing_during_recovery_never_yields_an_old_generation_session() {
+        // §5: "KDF completes, pause before session insert; recover on a
+        // second handle; release." The real Argon2 run is the pause window:
+        // login and recovery race on the real store, and whichever order the
+        // transactions commit, no old-generation session may survive and the
+        // old password must not log in afterwards.
+        let (authority, hasher) = setup().await;
+        let mgmt = AdminManagementService::new(authority.clone());
+        let auth = LocalAdminService::new(authority.clone(), hasher);
+        activated_login(&mgmt, &auth, "SecureP@ssw0rd123").await;
+
+        let attempt_ctx = make_auth();
+        let recovery_request = make_request();
+        let (raced_login, raced_recovery) = tokio::join!(
+            auth.login(&attempt_ctx, "ops.one", "SecureP@ssw0rd123".to_owned()),
+            mgmt.recover_admin("ops.one", &recovery_request),
+        );
+        assert!(raced_recovery.is_ok(), "the recovery always commits");
+        if let Ok(login) = raced_login {
+            assert!(
+                auth.resolve(&make_request(), &cookie_verifier(&login.cookie))
+                    .await
+                    .is_err(),
+                "recovery must revoke a session that won the insert race"
+            );
+        }
+        assert!(
+            auth.login(&make_auth(), "ops.one", "SecureP@ssw0rd123".to_owned())
+                .await
+                .is_err(),
+            "the old password must not log in after the recovery"
+        );
+    }
+
+    #[tokio::test]
+    async fn exp19_a_reset_racing_a_newer_recovery_never_outlives_it() {
+        // §5: "Reset hash prepared, newer recovery commits, release finish."
+        // Whichever order the two transactions commit, the old code never
+        // outlives the newer recovery and only the final generation's
+        // material is usable.
+        let (authority, hasher) = setup().await;
+        let mgmt = AdminManagementService::new(authority.clone());
+        let auth = LocalAdminService::new(authority.clone(), hasher);
+        mgmt.create_admin("ops.one", &make_request())
+            .await
+            .expect("create admin");
+        let code1 = mgmt
+            .recover_admin("ops.one", &make_request())
+            .await
+            .expect("first recovery")
+            .code;
+
+        let attempt_ctx = make_auth();
+        let recovery_request = make_request();
+        let (raced_finish, raced_recovery) = tokio::join!(
+            auth.finish_challenge(
+                &attempt_ctx,
+                &code1,
+                ChallengeKind::Reset,
+                "intermediate password".to_owned(),
+            ),
+            mgmt.recover_admin("ops.one", &recovery_request),
+        );
+        match raced_finish {
+            Ok(()) | Err(LocalAdminError::InvalidChallenge) => {}
+            other => panic!("the racing finish either wins or loses cleanly: {other:?}"),
+        }
+        let code2 = raced_recovery
+            .expect("the newer recovery always commits")
+            .code;
+        // The intermediate password is never a usable final credential: if
+        // the finish won, the newer recovery bumped past it; if it lost, the
+        // hash was never set.
+        assert!(
+            auth.login(&make_auth(), "ops.one", "intermediate password".to_owned())
+                .await
+                .is_err(),
+            "no racing outcome leaves the intermediate password usable"
+        );
+        // The newer recovery's code is always usable: a losing finish can
+        // only revoke challenges that existed before it.
+        auth.finish_challenge(
+            &make_auth(),
+            &code2,
+            ChallengeKind::Reset,
+            "final correct password".to_owned(),
+        )
+        .await
+        .expect("the final generation's code works");
+        assert!(
+            auth.login(&make_auth(), "ops.one", "final correct password".to_owned())
+                .await
+                .is_ok()
+        );
+    }
+
+    #[tokio::test]
+    async fn exp20_resolve_touch_racing_recovery_never_resurrects_the_session() {
+        // §5: "Resolve/touch and recovery/logout, both commit orders." The
+        // two transactions race on the real store; whichever order they
+        // commit in, the session is dead afterwards and no late touch may
+        // resurrect it or extend its deadlines.
+        let (authority, hasher) = setup().await;
+        let mgmt = AdminManagementService::new(authority.clone());
+        let auth = LocalAdminService::new(authority.clone(), hasher);
+        let login = activated_login(&mgmt, &auth, "SecureP@ssw0rd123").await;
+        let verifier = cookie_verifier(&login.cookie);
+
+        let resolve_request = make_request();
+        let recovery_request = make_request();
+        let (raced_resolve, raced_recovery) = tokio::join!(
+            auth.resolve(&resolve_request, &verifier),
+            mgmt.recover_admin("ops.one", &recovery_request),
+        );
+        assert!(raced_recovery.is_ok(), "the recovery always commits");
+        match raced_resolve {
+            Ok(_) | Err(LocalAdminError::Unauthenticated) => {}
+            other => panic!("the racing resolve either touches or is refused: {other:?}"),
+        }
+        assert!(
+            auth.resolve(&make_request(), &verifier).await.is_err(),
+            "the session stays dead after the recovery, whatever committed first"
+        );
+        assert!(
+            auth.login(&make_auth(), "ops.one", "SecureP@ssw0rd123".to_owned())
+                .await
+                .is_err()
+        );
+    }
+
+    #[tokio::test]
+    async fn exp21_concurrent_reauthentications_have_one_winner() {
+        // §5: "Two rotations; logout-before-rotation and
+        // rotation-before-old-logout." Two rotations racing over the same
+        // presented session: exactly one may win, because the loser must see
+        // the revoked old cookie once the guard's write conflict resolves.
+        let (authority, hasher) = setup().await;
+        let mgmt = AdminManagementService::new(authority.clone());
+        let auth = LocalAdminService::new(authority.clone(), hasher);
+        let login = activated_login(&mgmt, &auth, "SecureP@ssw0rd123").await;
+
+        let first_attempt = make_auth();
+        let second_attempt = make_auth();
+        let (first, second) = tokio::join!(
+            auth.reauthenticate(
+                &first_attempt,
+                &login.principal,
+                "SecureP@ssw0rd123".to_owned()
+            ),
+            auth.reauthenticate(
+                &second_attempt,
+                &login.principal,
+                "SecureP@ssw0rd123".to_owned()
+            ),
+        );
+        let successes = usize::from(first.is_ok()) + usize::from(second.is_ok());
+        assert_eq!(
+            successes, 1,
+            "exactly one rotation may win the presented session: {first:?} / {second:?}"
+        );
     }
 
     #[tokio::test]

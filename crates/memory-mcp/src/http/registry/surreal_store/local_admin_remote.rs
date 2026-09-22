@@ -129,14 +129,14 @@ async fn local_admin_remote_replica_races() {
     // production query path.
     let rows = first
         .admin_query(
-            "SELECT VALUE id FROM local_admin WHERE username = $username;",
+            "SELECT VALUE record::id(id) FROM local_admin WHERE username = $username;",
             Some(serde_json::json!({ "username": "race.one" })),
         )
         .await
         .expect("replica one reads the admin");
     let rows_other = second
         .admin_query(
-            "SELECT VALUE id FROM local_admin WHERE username = $username;",
+            "SELECT VALUE record::id(id) FROM local_admin WHERE username = $username;",
             Some(serde_json::json!({ "username": "race.one" })),
         )
         .await
@@ -261,6 +261,65 @@ async fn local_admin_session_revocation_race() {
         survivor.fence.admin_id, first_login.principal.fence.admin_id,
         "the survivor belongs to the same administrator as the revoked session"
     );
+}
+
+/// A rate window is durable state, not process state: after a connection
+/// goes away (a restart), a fresh connection to the same registry still
+/// sees the spent budget instead of silently resetting it. Plan §5 lists
+/// "restart" alongside the two-handle rate cases.
+#[tokio::test]
+#[ignore = "requires isolated remote SurrealDB 3.2.4"]
+async fn local_admin_rate_window_survives_a_store_reconnect() {
+    use crate::service::local_admin::contracts::{
+        AttemptDecision, AttemptDomain, AttemptInput, LocalAdminStore,
+    };
+
+    let target = remote_target();
+    let before = Arc::new(
+        SurrealRegistryStore::connect(&target)
+            .await
+            .expect("connect before the restart"),
+    );
+    let authority = crate::service::local_admin::auth::LocalAdminAuthority::join_local_for_test(
+        before.clone(),
+        [7u8; 32],
+        [8u8; 32],
+    )
+    .await
+    .expect("join the local policy");
+    let attempt = || AttemptInput {
+        domain: AttemptDomain::Challenge,
+        username_bucket: None,
+        source_bucket: 0,
+        policy: authority.policy().clone(),
+        request: request(),
+    };
+
+    // Spend the challenge domain's whole per-source budget (10 per window).
+    for _ in 0..10 {
+        let decision = before.reserve_attempt(attempt()).await.expect("reserve");
+        assert!(
+            matches!(decision, AttemptDecision::Allowed),
+            "the budget admits exactly ten attempts: {decision:?}"
+        );
+    }
+
+    // "Restart": the old handle goes away mid-window, a fresh connection
+    // opens against the same registry.
+    drop(before);
+    let after = Arc::new(
+        SurrealRegistryStore::connect(&target)
+            .await
+            .expect("connect after the restart"),
+    );
+    match after.reserve_attempt(attempt()).await.expect("reserve") {
+        AttemptDecision::Limited {
+            retry_after_seconds,
+        } => {
+            assert!(retry_after_seconds > 0, "the window states when it reopens");
+        }
+        other => panic!("the spent budget must survive the restart: {other:?}"),
+    }
 }
 
 /// Decode the `__Host-memory_mcp_admin=<hex>` session cookie into the verifier
