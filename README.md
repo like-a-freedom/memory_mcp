@@ -26,6 +26,7 @@ It is designed for workflows where agents need more than short-lived chat contex
 - [Development](#development)
 - [Testing](#testing)
 - [Project layout](#project-layout)
+- [Evaluation](#evaluation)
 - [Documentation](#documentation)
 - [Contributing](#contributing)
 - [CLI mode](#cli-mode)
@@ -42,7 +43,7 @@ Memory MCP is a memory system for AI agents with these goals:
 - assemble compact, relevant context for downstream reasoning
 - support policy-tag-aware retrieval and access filtering within one Active Namespace
 
-In practice, an agent can ingest emails, notes, or working documents, resolve entities consistently, store facts with provenance, and later ask for ranked context instead of replaying entire histories.
+An agent can ingest emails, notes, or working documents, resolve entities consistently, store facts with provenance, and later ask for ranked context instead of replaying entire histories.
 
 ## What it provides
 
@@ -331,27 +332,33 @@ merged ([ADR-0057](docs/adr/0057-additive-browser-auth-methods.md)).
 
 | Set | Surfaces | Use for |
 |-----|----------|---------|
-| `local` (default) | local administrators (Argon2id passwords, `memory_mcp admin` provisioning) | single-tenant, air-gapped, or a deployment that has no identity provider yet |
+| `local` (Compose default) | local administrators (Argon2id passwords, `memory_mcp admin` provisioning) | single-tenant, air-gapped, or a deployment that has no identity provider yet |
 | `oidc` | OIDC sign-in | deployments with an identity provider and no need for a local door |
-| `local,oidc` | both, side by side | start with the administrator, add the provider later: no re-provisioning, no key rotation, no image rebuild |
+| `local,oidc` | both, side by side | start with the administrator, then add the provider later without re-provisioning clients, rotating keys, or rebuilding the image |
 
 A deployment can therefore begin with `local`, then add `oidc` when a provider
 appears, and keep the administrator's door as the break-glass route. The login
 page lists every enabled method.
 
-The file defaults the non-secret method material, so a deployment with no
-identity provider starts from the file alone. Secrets are never defaulted, so
+The Compose file defaults the non-secret method material, including
+`MEMORY_MCP_HTTP_AUTH_METHODS=local`, so a deployment with no identity provider
+starts from the file plus the exports below. Secrets are never defaulted, so
 export the required values before starting Compose:
 
 ```bash
 # Required in every configuration.
 export SURREALDB_USERNAME=... SURREALDB_PASSWORD=...
 export MEMORY_MCP_API_KEY_PEPPER=... MEMORY_MCP_HTTP_SESSION_KEY=... MEMORY_MCP_HTTP_CSRF_KEY=...
-export MEMORY_MCP_HTTP_PUBLIC_BASE_URL=https://localhost:8080
-export ALLOWED_HOSTS=localhost,127.0.0.1 ALLOWED_ORIGINS=https://localhost:8080
+export MEMORY_MCP_HTTP_PUBLIC_BASE_URL=http://localhost:8080
+export ALLOWED_HOSTS=localhost:8080,127.0.0.1:8080 ALLOWED_ORIGINS=http://localhost:8080
 
 docker compose up -d --build
 ```
+
+`Host` and `Origin` are matched verbatim against the raw headers, so the port
+belongs in each entry. The `http://localhost` values work only through the
+`local` method's loopback development escape hatch; a non-loopback deployment
+uses an `https://` base URL and matching origins.
 
 To add an identity provider to a running deployment, export the provider values
 and restart. The local method keeps working through the same restart:
@@ -373,16 +380,23 @@ Material for a method the set omits is refused, and so is a set that drops a
 method the deployment has already enabled: turning a method off is an explicit
 guarded operation (`memory_mcp admin auth-methods remove --method local`), not a
 startup reconciliation. The server names the offending variable and how to fix
-the set.
+the set. The CLI ships in the image and runs through an entrypoint override,
+since the runtime has no shell:
 
-`MEMORY_MCP_HTTP_ENABLE_CONTROL_PLANE_UI=true` (the default) is valid only for an
+```bash
+docker compose run --rm --entrypoint /usr/local/bin/memory_mcp memory_mcp \
+  admin create --username ops.one
+```
+
+`MEMORY_MCP_HTTP_ENABLE_CONTROL_PLANE_UI=true` (the Compose default) is valid only for an
 image built with the `streamable-http` profile (see
 [Build features](#build-features));
 [`docs/operations/LOCAL_ADMIN.md`](docs/operations/LOCAL_ADMIN.md) provisions the
 first local administrator and issues API keys. Setting
 `MEMORY_MCP_HTTP_ENABLE_CONTROL_PLANE=false` gives a data-plane-only deployment,
-but the method set still decides which material is required: with the default
-`oidc` set the server still demands `MEMORY_MCP_HTTP_SIGNUP_MODE` and the three
+but the method set still decides which material is required: an `oidc` set (the
+server's default when `MEMORY_MCP_HTTP_AUTH_METHODS` is unset) still demands
+`MEMORY_MCP_HTTP_SIGNUP_MODE` and the three
 provider keys.
 
 Validate the configuration without starting it and without printing secrets:
@@ -715,8 +729,9 @@ memory_mcp admin auth-methods remove --method local
 docker compose up -d
 ```
 
-The command refuses a method the configuration still enables, because startup
-reconciliation would add it straight back. It also refuses to remove `local`
+In container deployments run it through the image's entrypoint override shown
+above. The command refuses a method the configuration still enables, because
+startup reconciliation would add it straight back. It also refuses to remove `local`
 while no operator identity is configured, because that would leave the
 deployment with no route to its own administration. The store applies a third
 rule: a policy may not be narrowed to nothing, so the provider has to be serving
@@ -799,8 +814,8 @@ unauthenticated route, and all of them disappear when
 
 "Public" is about application auth only. The `Host`/`Origin` allowlist is
 enforced on every row above, including `/` and the SPA fallback: it is a property
-of the deployment boundary, so the middleware is applied after every route and
-the fallback exist rather than to the routes that happen to be mounted first.
+of the deployment boundary, so the middleware is layered after every route and
+the fallback, not onto whichever routes happen to mount first.
 `Origin` is checked when the header is present (a browser navigation does not
 send one). Both values are matched verbatim against the raw header, so a
 non-default port must be part of the allowlisted entry.
@@ -831,8 +846,8 @@ and an API key never authenticates the control plane.
 The issuer is contacted at startup for its discovery document, so an
 `oidc`-enabled deployment needs the provider reachable to boot at all: an
 unreachable issuer is a startup failure, not a degraded login. A set without
-`oidc` makes no outbound request, which is what makes a local-only deployment
-independent of any external service.
+`oidc` makes no outbound request, so a local-only deployment depends on no
+external service.
 
 An Account can hold several external identities. `POST
 /api/v1/account/identity_links` starts a provider round trip and attaches
@@ -880,7 +895,7 @@ MEMORY_MCP_HTTP_PER_TENANT_REQUEST_CONCURRENCY
 MEMORY_MCP_HTTP_EXTRACTION_CONCURRENCY
 ```
 
-These seed Registry plan version 1 only when no plan exists. An existing
+For open signup these seed the `free` plan at version 1 when no plan exists; the `local` method publishes `local_plan_v{version}` instead. An existing
 durable plan is never overwritten.
 
 ### Long-lived streams
@@ -1057,7 +1072,7 @@ Read only by the `memory_mcp_http` binary built with the `streamable-http` featu
 | `MEMORY_MCP_HTTP_OPERATOR_IDENTITIES` | comma-separated `issuer\|hex(subject_verifier)` list | unset | Immutable operator allowlist; requires the `oidc` method. Account APIs cannot grant operator status |
 | `MEMORY_MCP_HTTP_LOCAL_DEFAULT_PLAN_VERSION` | positive `u32` | unset | Required when `local` is enabled: the version of the plan this deployment publishes for the clients the administrator provisions |
 
-**Plan seed (required for `signup_mode=open` or the `local` method)**: if any one of these is set, all seven must parse as `u64`/`usize`. The values seed Registry plan version 1 only when no plan exists; an existing durable plan is never overwritten, and a stored plan whose limits have since drifted fails startup.
+**Plan seed (required for `signup_mode=open` or the `local` method)**: if any one of these is set, all seven must parse as `u64`/`usize`. For open signup the values seed the `free` plan at version 1 when no plan exists; the `local` method instead creates `local_plan_v{version}` at `MEMORY_MCP_HTTP_LOCAL_DEFAULT_PLAN_VERSION` and compares every limit. An existing durable plan is never overwritten, and a stored plan whose limits differ fails startup.
 
 | Variable | Type | Description |
 | --- | --- | --- |
@@ -1140,18 +1155,18 @@ into the `memory_mcp_http` binary at compile time. The runtime does not read a
 filesystem asset directory, and the build never fetches UI assets from the
 network.
 
-Build the UI with the Dioxus CLI matching the crate's 0.7 dependency, then pass
-an **absolute** bundle directory to the backend build:
+Build the UI with the Dioxus CLI 0.7; the Docker build pins the verified
+0.7.10. `dx bundle` writes the web assets to `<out-dir>/public/`, so the backend
+variable must name the absolute `public` directory:
 
 ```bash
-cd crates/control-plane-ui
-dx bundle --platform web --release --out-dir "$PWD/../../target/control-plane-ui-dist"
-cd ../..
-MEMORY_MCP_CONTROL_PLANE_UI_DIST="$PWD/target/control-plane-ui-dist" \
+dx bundle --platform web --release --package control-plane-ui \
+  --out-dir "$PWD/target/control-plane-ui-dist"
+MEMORY_MCP_CONTROL_PLANE_UI_DIST="$PWD/target/control-plane-ui-dist/public" \
   cargo build --release --features streamable-http
 ```
 
-The bundle must contain a non-empty `index.html`. All regular files are copied
+The named directory must contain a non-empty `index.html`. All regular files are copied
 in deterministic path order into Cargo's `OUT_DIR` and embedded with
 `include_bytes!`; symlinks, non-UTF-8 paths, and invalid bundle entries are
 rejected.
@@ -1506,8 +1521,6 @@ The `explain()` operation returns complete provenance lineage for each fact:
   - `relationship`: "direct" (created fact) or "linked" (via entity)
   - `entity_path`: Path from fact to episode via entity (if linked)
 
-Every fact can therefore be traced back to the episodes it came from.
-
 The design follows the intent-driven MCP guidance in the docs: fewer tools,
 clearer semantics.
 
@@ -1569,13 +1582,13 @@ The server advertises the official `io.modelcontextprotocol/tasks` extension.
 calls `extract` through ordinary `tools/call` and receives a task handle with
 `taskId`, `status`, timestamps, TTL, and a suggested polling interval at the
 result level. Poll `tasks/get` until the task is terminal; completed payloads are
-embedded in the detailed task’s `result` field and failed payloads in its `error`
+embedded in the detailed task's `result` field and failed payloads in its `error`
 field. `tasks/update` is available for input responses and `tasks/cancel` requests
 cooperative cancellation. Task listing and a separate terminal-result request are
 not part of this extension contract.
 
 Clients that do not advertise `io.modelcontextprotocol/tasks` continue to receive
-synchronous `extract` results. rmcp’s `TaskManager` supplies the default five-minute
+synchronous `extract` results. rmcp's `TaskManager` supplies the default five-minute
 TTL, polling metadata, lifecycle, and retention behavior.
 
 CPU is the production default. Metal remains an experimental, explicit opt-in until its
@@ -1638,7 +1651,7 @@ Coverage output is stored under `coverage/` when generated with Tarpaulin.
 │   │   ├── src/            # library, two binary entry points, MCP/HTTP, control plane, and domain services
 │   │   └── tests/          # production integration and release-gate tests
 │   ├── control-plane-ui/   # Dioxus 0.7 web SPA (embedded by the streamable-http profile)
-│   │   └── src/            # router, API client, login/keys/delete/status pages
+│   │   └── src/            # SPA routes, API client, OIDC and local-admin pages
 │   └── eval-harness/       # private evaluation package
 │       ├── benches/        # Criterion benchmark families
 │       ├── src/            # domain, artifact, metrics, gate, suites, runner, CLI
@@ -1723,7 +1736,7 @@ Every memory tool can be invoked directly from the command line. The CLI and the
 | `explain` | Get citation-ready source snippets |
 | `assemble-context` | Assemble ranked, relevant context for a query |
 | `init [--target TARGET]` | Print deterministic, output-only host setup for `vscode`, `claude-desktop`, `codex`, `zed`, or `env` |
-| `admin` | Administrator CLI, gated on the `streamable-http` and `control-plane` features: `create` and `recover` for administrators, `auth-methods remove` for the deployment's browser authentication methods. Connects to the control registry only, before service construction |
+| `admin` | Administrator CLI, gated on the `streamable-http` profile: `create` and `recover` for administrators, `auth-methods remove` for the deployment's browser authentication methods. Connects to the control registry only, before service construction; in the SaaS image it runs via entrypoint override (`/usr/local/bin/memory_mcp`) |
 
 `init` is an output-only onboarding command: it does not build a service, touch
 storage, edit files, or change environment variables. `admin` is the other
