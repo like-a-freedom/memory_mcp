@@ -249,6 +249,12 @@ pub fn build_router(
             .layer(axum::middleware::from_fn_with_state(
                 state.clone(),
                 super::middleware::local_admin_deadline,
+            ))
+            // Outermost: mint the one request id before any rejection can be
+            // rendered, so the error envelope, the response header and the
+            // audit trail share it.
+            .layer(axum::middleware::from_fn(
+                crate::control::local_admin::attach_request_id,
             ));
         // The reserved-surface 404 is installed as the single outer
         // fallback below so the static-asset router cannot shadow it.

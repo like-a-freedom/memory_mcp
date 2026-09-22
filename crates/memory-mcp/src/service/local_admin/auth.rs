@@ -443,13 +443,34 @@ impl LocalAdminService {
             return Err(LocalAdminError::InvalidCredentials);
         }
         let cookie_verifier = generate_random_32();
+        let admin_id = credential.admin_id.clone();
         let command = SessionOpen {
             credential,
             cookie_verifier,
             policy: self.authority.policy().clone(),
             request: context.request.clone(),
         };
-        let principal = self.authority.store().open_session(command).await?;
+        let principal = match self.authority.store().open_session(command).await {
+            Ok(principal) => principal,
+            Err(error @ LocalAdminError::InvalidCredentials) => {
+                // The verified password lost its generation race (a recovery
+                // committed between the KDF and the insert). The attempt was
+                // reserved and resolved to a credential, so this typed
+                // rejection is a login outcome and gets its one deduplicated
+                // failure event (spec §10); an audit write failure surfaces as
+                // a sanitized 503, never as the rejection.
+                self.record_admitted_failure(
+                    context,
+                    FailureAction::Login,
+                    FailureReason::StaleFence,
+                    Some(admin_id),
+                    Some(username),
+                )
+                .await?;
+                return Err(error);
+            }
+            Err(error) => return Err(error),
+        };
         let cookie = format!("__Host-memory_mcp_admin={}", hex::encode(cookie_verifier));
         Ok(AdminLogin { principal, cookie })
     }

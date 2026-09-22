@@ -71,6 +71,9 @@ pub struct Rejection {
     key_id: Option<String>,
     /// `Retry-After` in seconds, emitted only on `429`.
     retry_after_seconds: Option<u32>,
+    /// The request's id, so the envelope's `correlation_id`, the
+    /// `x-request-id` header and the audit `RequestContext` name one value.
+    request_id: Option<uuid::Uuid>,
 }
 
 impl Rejection {
@@ -82,6 +85,7 @@ impl Rejection {
             message: message.to_string(),
             key_id: None,
             retry_after_seconds: None,
+            request_id: None,
         }
     }
 
@@ -93,6 +97,7 @@ impl Rejection {
             message: message.to_string(),
             key_id: Some(key_id),
             retry_after_seconds: None,
+            request_id: None,
         }
     }
 
@@ -105,7 +110,15 @@ impl Rejection {
             message: format!("retry after {retry_after_seconds}s"),
             key_id: None,
             retry_after_seconds: Some(retry_after_seconds),
+            request_id: None,
         }
+    }
+
+    /// Stamp the request's id (minted once per request by
+    /// [`super::attach_request_id`]) before rendering.
+    pub(crate) fn at(mut self, parts: &Parts) -> Self {
+        self.request_id = parts.extensions.get::<uuid::Uuid>().copied();
+        self
     }
 }
 
@@ -117,6 +130,7 @@ impl IntoResponse for Rejection {
             &self.message,
             self.key_id,
             self.retry_after_seconds,
+            self.request_id,
         )
     }
 }
@@ -130,15 +144,18 @@ impl From<LocalAdminError> for Rejection {
 /// The single renderer of the spec §8 error envelope: every rejected
 /// local-admin request funnels through here. Spec §8 also requires a
 /// server-generated request id, emitted both as the `x-request-id`
-/// response header and as `correlation_id` in the body.
+/// response header and as `correlation_id` in the body; when the request
+/// already carries one (minted by `attach_request_id`), the same value is
+/// used in both places and in the audit trail.
 fn error_response_with_key(
     status: StatusCode,
     code: &'static str,
     message: &str,
     key_id: Option<String>,
     retry_after_seconds: Option<u32>,
+    request_id: Option<uuid::Uuid>,
 ) -> Response {
-    let request_id = uuid::Uuid::new_v4().to_string();
+    let request_id = request_id.unwrap_or_else(uuid::Uuid::new_v4).to_string();
     let body = ErrorBody {
         error: ErrorDetail {
             code,
@@ -266,6 +283,7 @@ fn json_response<T: Serialize>(status: StatusCode, value: &T) -> Response {
             StatusCode::SERVICE_UNAVAILABLE,
             "temporarily_unavailable",
             "temporarily unavailable",
+            None,
             None,
             None,
         ),
@@ -437,10 +455,14 @@ struct PreauthResponse {
 /// `GET /api/v1/auth/local/csrf` — establish the short-lived pre-auth
 /// cookie and return the token the client must echo in
 /// `X-CSRF-Token` on public POSTs.
-pub async fn preauth_csrf(State(state): State<Arc<HttpState>>) -> Response {
+pub async fn preauth_csrf(
+    State(state): State<Arc<HttpState>>,
+    request: axum::extract::Request,
+) -> Response {
+    let (parts, _body) = request.into_parts();
     let ext = match get_ext(&state) {
         Ok(ext) => ext,
-        Err(rejection) => return rejection.into_response(),
+        Err(rejection) => return rejection.at(&parts).into_response(),
     };
     let issued = match csrf::issue_preauth(
         ext.authority.csrf_key(),
@@ -448,7 +470,7 @@ pub async fn preauth_csrf(State(state): State<Arc<HttpState>>) -> Response {
         chrono::Utc::now().timestamp(),
     ) {
         Ok(issued) => issued,
-        Err(error) => return map_error(error).into_response(),
+        Err(error) => return map_error(error).at(&parts).into_response(),
     };
     let cookie = format!(
         "{}; Path=/; Secure; HttpOnly; SameSite=Strict; Max-Age={}",
@@ -500,25 +522,25 @@ pub async fn inspect_challenge(
     let (parts, body) = request.into_parts();
     let ext = match get_ext(&state) {
         Ok(ext) => ext,
-        Err(rejection) => return rejection.into_response(),
+        Err(rejection) => return rejection.at(&parts).into_response(),
     };
     if let Err(rejection) = guard_preauth(ext, &state, &parts) {
-        return rejection.into_response();
+        return rejection.at(&parts).into_response();
     }
     if let Err(rejection) = require_json_content_type(&parts) {
-        return rejection.into_response();
+        return rejection.at(&parts).into_response();
     }
     let context = match attempt_context(&parts) {
         Ok(context) => context,
-        Err(rejection) => return rejection.into_response(),
+        Err(rejection) => return rejection.at(&parts).into_response(),
     };
     let req: ChallengeRequest = match parse_body(body).await {
         Ok(req) => req,
-        Err(rejection) => return rejection.into_response(),
+        Err(rejection) => return rejection.at(&parts).into_response(),
     };
     let kind = match parse_kind(&req.kind) {
         Ok(kind) => kind,
-        Err(rejection) => return rejection.into_response(),
+        Err(rejection) => return rejection.at(&parts).into_response(),
     };
     let service = make_auth_service(ext);
     match service.inspect_challenge(&context, &req.code, kind).await {
@@ -529,7 +551,7 @@ pub async fn inspect_challenge(
                 expires_at: view.expires_at.to_rfc3339(),
             },
         ),
-        Err(error) => map_error(error).into_response(),
+        Err(error) => map_error(error).at(&parts).into_response(),
     }
 }
 
@@ -548,21 +570,21 @@ async fn finish_challenge(
     let (parts, body) = request.into_parts();
     let ext = match get_ext(&state) {
         Ok(ext) => ext,
-        Err(rejection) => return rejection.into_response(),
+        Err(rejection) => return rejection.at(&parts).into_response(),
     };
     if let Err(rejection) = guard_preauth(ext, &state, &parts) {
-        return rejection.into_response();
+        return rejection.at(&parts).into_response();
     }
     if let Err(rejection) = require_json_content_type(&parts) {
-        return rejection.into_response();
+        return rejection.at(&parts).into_response();
     }
     let context = match attempt_context(&parts) {
         Ok(context) => context,
-        Err(rejection) => return rejection.into_response(),
+        Err(rejection) => return rejection.at(&parts).into_response(),
     };
     let req: ChallengePasswordRequest = match parse_body(body).await {
         Ok(req) => req,
-        Err(rejection) => return rejection.into_response(),
+        Err(rejection) => return rejection.at(&parts).into_response(),
     };
     let service = make_auth_service(ext);
     match service
@@ -570,7 +592,7 @@ async fn finish_challenge(
         .await
     {
         Ok(()) => no_content(),
-        Err(error) => map_error(error).into_response(),
+        Err(error) => map_error(error).at(&parts).into_response(),
     }
 }
 
@@ -607,21 +629,21 @@ pub async fn login(
     let (parts, body) = request.into_parts();
     let ext = match get_ext(&state) {
         Ok(ext) => ext,
-        Err(rejection) => return rejection.into_response(),
+        Err(rejection) => return rejection.at(&parts).into_response(),
     };
     if let Err(rejection) = guard_preauth(ext, &state, &parts) {
-        return rejection.into_response();
+        return rejection.at(&parts).into_response();
     }
     if let Err(rejection) = require_json_content_type(&parts) {
-        return rejection.into_response();
+        return rejection.at(&parts).into_response();
     }
     let context = match attempt_context(&parts) {
         Ok(context) => context,
-        Err(rejection) => return rejection.into_response(),
+        Err(rejection) => return rejection.at(&parts).into_response(),
     };
     let req: LoginRequest = match parse_body(body).await {
         Ok(req) => req,
-        Err(rejection) => return rejection.into_response(),
+        Err(rejection) => return rejection.at(&parts).into_response(),
     };
     let service = make_auth_service(ext);
     match service.login(&context, &req.username, req.password).await {
@@ -633,7 +655,7 @@ pub async fn login(
             append_set_cookie(&mut response, &clear_preauth_cookie());
             response
         }
-        Err(error) => map_error(error).into_response(),
+        Err(error) => map_error(error).at(&parts).into_response(),
     }
 }
 
@@ -650,14 +672,16 @@ struct SessionResponse {
 pub async fn session(
     RequireAdmin(principal): RequireAdmin,
     State(state): State<Arc<HttpState>>,
+    request: axum::extract::Request,
 ) -> Response {
+    let (parts, _body) = request.into_parts();
     let ext = match get_ext(&state) {
         Ok(ext) => ext,
-        Err(rejection) => return rejection.into_response(),
+        Err(rejection) => return rejection.at(&parts).into_response(),
     };
     let csrf_token = match ext.session_token(&principal.fence) {
         Ok(token) => token,
-        Err(error) => return map_error(error).into_response(),
+        Err(error) => return map_error(error).at(&parts).into_response(),
     };
     no_store(json_response(
         StatusCode::OK,
@@ -686,21 +710,21 @@ pub async fn reauth(
     let (parts, body) = request.into_parts();
     let ext = match get_ext(&state) {
         Ok(ext) => ext,
-        Err(rejection) => return rejection.into_response(),
+        Err(rejection) => return rejection.at(&parts).into_response(),
     };
     if let Err(rejection) = guard_session(ext, &state, &parts, &principal) {
-        return rejection.into_response();
+        return rejection.at(&parts).into_response();
     }
     if let Err(rejection) = require_json_content_type(&parts) {
-        return rejection.into_response();
+        return rejection.at(&parts).into_response();
     }
     let context = match attempt_context(&parts) {
         Ok(context) => context,
-        Err(rejection) => return rejection.into_response(),
+        Err(rejection) => return rejection.at(&parts).into_response(),
     };
     let req: ReauthRequest = match parse_body(body).await {
         Ok(req) => req,
-        Err(rejection) => return rejection.into_response(),
+        Err(rejection) => return rejection.at(&parts).into_response(),
     };
     let service = make_auth_service(ext);
     match service
@@ -723,7 +747,7 @@ pub async fn reauth(
             );
             response
         }
-        Err(error) => map_error(error).into_response(),
+        Err(error) => map_error(error).at(&parts).into_response(),
     }
 }
 
@@ -738,10 +762,10 @@ pub async fn logout(
     let (parts, _body) = request.into_parts();
     let ext = match get_ext(&state) {
         Ok(ext) => ext,
-        Err(rejection) => return rejection.into_response(),
+        Err(rejection) => return rejection.at(&parts).into_response(),
     };
     if let Err(rejection) = require_origin(&state, &parts.headers) {
-        return rejection.into_response();
+        return rejection.at(&parts).into_response();
     }
     let cookie_header = parts
         .headers
@@ -753,7 +777,7 @@ pub async fn logout(
         // No session: 204 with no side effect beyond clearing a cookie
         // the caller may or may not hold.
         Ok(None) => return clear_session_response(),
-        Err(error) => return map_error(error).into_response(),
+        Err(error) => return map_error(error).at(&parts).into_response(),
     };
     let service = make_auth_service(ext);
     let principal = match service.resolve(&request_ctx(&parts), &verifier).await {
@@ -767,11 +791,11 @@ pub async fn logout(
         .verify_session_request(&parts.headers, &principal.fence)
         .map_err(|_| Rejection::new(StatusCode::FORBIDDEN, "forbidden", "request rejected"))
     {
-        return rejection.into_response();
+        return rejection.at(&parts).into_response();
     }
     match service.logout(&request_ctx(&parts), &principal).await {
         Ok(()) => clear_session_response(),
-        Err(error) => map_error(error).into_response(),
+        Err(error) => map_error(error).at(&parts).into_response(),
     }
 }
 
@@ -891,19 +915,21 @@ pub async fn list_clients(
     RequireAdmin(principal): RequireAdmin,
     State(state): State<Arc<HttpState>>,
     Query(query): Query<PageQuery>,
+    request: axum::extract::Request,
 ) -> Response {
+    let (parts, _body) = request.into_parts();
     let ext = match get_ext(&state) {
         Ok(ext) => ext,
-        Err(rejection) => return rejection.into_response(),
+        Err(rejection) => return rejection.at(&parts).into_response(),
     };
     let page = match query.into_request() {
         Ok(page) => page,
-        Err(error) => return map_error(error).into_response(),
+        Err(error) => return map_error(error).at(&parts).into_response(),
     };
     let service = make_client_service(ext, &state.config.api_key_pepper);
     match service.list(&principal.fence, page).await {
         Ok(items) => no_store(json_response(StatusCode::OK, &items)),
-        Err(error) => map_error(error).into_response(),
+        Err(error) => map_error(error).at(&parts).into_response(),
     }
 }
 
@@ -922,28 +948,28 @@ pub async fn create_client(
     let (parts, body) = request.into_parts();
     let ext = match get_ext(&state) {
         Ok(ext) => ext,
-        Err(rejection) => return rejection.into_response(),
+        Err(rejection) => return rejection.at(&parts).into_response(),
     };
     if let Err(rejection) = guard_session(ext, &state, &parts, &principal) {
-        return rejection.into_response();
+        return rejection.at(&parts).into_response();
     }
     if let Err(rejection) = require_recent_auth(&principal) {
-        return rejection.into_response();
+        return rejection.at(&parts).into_response();
     }
     if let Err(rejection) = require_json_content_type(&parts) {
-        return rejection.into_response();
+        return rejection.at(&parts).into_response();
     }
     let operation_id = match idempotency_key(&parts.headers) {
         Ok(id) => id,
-        Err(rejection) => return rejection.into_response(),
+        Err(rejection) => return rejection.at(&parts).into_response(),
     };
     let req: CreateClientRequest = match parse_body(body).await {
         Ok(req) => req,
-        Err(rejection) => return rejection.into_response(),
+        Err(rejection) => return rejection.at(&parts).into_response(),
     };
     let display_name = match validate_name(&req.display_name) {
         Ok(name) => name,
-        Err(error) => return map_error(error).into_response(),
+        Err(error) => return map_error(error).at(&parts).into_response(),
     };
 
     let service = make_client_service(ext, &state.config.api_key_pepper);
@@ -965,7 +991,7 @@ pub async fn create_client(
             }
             response
         }
-        Err(error) => map_error(error).into_response(),
+        Err(error) => map_error(error).at(&parts).into_response(),
     }
 }
 
@@ -974,15 +1000,17 @@ pub async fn get_client(
     RequireAdmin(principal): RequireAdmin,
     State(state): State<Arc<HttpState>>,
     Path(account_id): Path<String>,
+    request: axum::extract::Request,
 ) -> Response {
+    let (parts, _body) = request.into_parts();
     let ext = match get_ext(&state) {
         Ok(ext) => ext,
-        Err(rejection) => return rejection.into_response(),
+        Err(rejection) => return rejection.at(&parts).into_response(),
     };
     let service = make_client_service(ext, &state.config.api_key_pepper);
     match service.get(&principal.fence, &account_id).await {
         Ok(view) => no_store(json_response(StatusCode::OK, &view)),
-        Err(error) => map_error(error).into_response(),
+        Err(error) => map_error(error).at(&parts).into_response(),
     }
 }
 
@@ -992,19 +1020,21 @@ pub async fn list_keys(
     State(state): State<Arc<HttpState>>,
     Path(account_id): Path<String>,
     Query(query): Query<PageQuery>,
+    request: axum::extract::Request,
 ) -> Response {
+    let (parts, _body) = request.into_parts();
     let ext = match get_ext(&state) {
         Ok(ext) => ext,
-        Err(rejection) => return rejection.into_response(),
+        Err(rejection) => return rejection.at(&parts).into_response(),
     };
     let page = match query.into_request() {
         Ok(page) => page,
-        Err(error) => return map_error(error).into_response(),
+        Err(error) => return map_error(error).at(&parts).into_response(),
     };
     let service = make_client_service(ext, &state.config.api_key_pepper);
     match service.keys(&principal.fence, &account_id, page).await {
         Ok(items) => no_store(json_response(StatusCode::OK, &items)),
-        Err(error) => map_error(error).into_response(),
+        Err(error) => map_error(error).at(&parts).into_response(),
     }
 }
 
@@ -1033,28 +1063,28 @@ pub async fn issue_key(
     let (parts, body) = request.into_parts();
     let ext = match get_ext(&state) {
         Ok(ext) => ext,
-        Err(rejection) => return rejection.into_response(),
+        Err(rejection) => return rejection.at(&parts).into_response(),
     };
     if let Err(rejection) = guard_session(ext, &state, &parts, &principal) {
-        return rejection.into_response();
+        return rejection.at(&parts).into_response();
     }
     if let Err(rejection) = require_recent_auth(&principal) {
-        return rejection.into_response();
+        return rejection.at(&parts).into_response();
     }
     if let Err(rejection) = require_json_content_type(&parts) {
-        return rejection.into_response();
+        return rejection.at(&parts).into_response();
     }
     let operation_id = match idempotency_key(&parts.headers) {
         Ok(id) => id,
-        Err(rejection) => return rejection.into_response(),
+        Err(rejection) => return rejection.at(&parts).into_response(),
     };
     let req: IssueKeyRequest = match parse_body(body).await {
         Ok(req) => req,
-        Err(rejection) => return rejection.into_response(),
+        Err(rejection) => return rejection.at(&parts).into_response(),
     };
     let name = match validate_name(&req.name) {
         Ok(name) => name,
-        Err(error) => return map_error(error).into_response(),
+        Err(error) => return map_error(error).at(&parts).into_response(),
     };
     if let KeyExpiry::Days { days } = req.expiry
         && !(1..=3650).contains(&days)
@@ -1086,7 +1116,7 @@ pub async fn issue_key(
                 expires_at: issued.expires_at.map(|value| value.to_rfc3339()),
             },
         )),
-        Err(error) => map_error(error).into_response(),
+        Err(error) => map_error(error).at(&parts).into_response(),
     }
 }
 
@@ -1100,13 +1130,13 @@ pub async fn revoke_key(
     let (parts, _body) = request.into_parts();
     let ext = match get_ext(&state) {
         Ok(ext) => ext,
-        Err(rejection) => return rejection.into_response(),
+        Err(rejection) => return rejection.at(&parts).into_response(),
     };
     if let Err(rejection) = guard_session(ext, &state, &parts, &principal) {
-        return rejection.into_response();
+        return rejection.at(&parts).into_response();
     }
     if let Err(rejection) = require_recent_auth(&principal) {
-        return rejection.into_response();
+        return rejection.at(&parts).into_response();
     }
     let service = make_client_service(ext, &state.config.api_key_pepper);
     match service
@@ -1114,7 +1144,7 @@ pub async fn revoke_key(
         .await
     {
         Ok(()) => no_store(StatusCode::NO_CONTENT.into_response()),
-        Err(error) => map_error(error).into_response(),
+        Err(error) => map_error(error).at(&parts).into_response(),
     }
 }
 
@@ -1134,20 +1164,20 @@ async fn set_client_state(
 ) -> Response {
     let ext = match get_ext(&state) {
         Ok(ext) => ext,
-        Err(rejection) => return rejection.into_response(),
+        Err(rejection) => return rejection.at(&parts).into_response(),
     };
     if let Err(rejection) = guard_session(ext, &state, &parts, &principal) {
-        return rejection.into_response();
+        return rejection.at(&parts).into_response();
     }
     if let Err(rejection) = require_recent_auth(&principal) {
-        return rejection.into_response();
+        return rejection.at(&parts).into_response();
     }
     if let Err(rejection) = require_json_content_type(&parts) {
-        return rejection.into_response();
+        return rejection.at(&parts).into_response();
     }
     let req: SetStateRequest = match parse_body(body).await {
         Ok(req) => req,
-        Err(rejection) => return rejection.into_response(),
+        Err(rejection) => return rejection.at(&parts).into_response(),
     };
     let service = make_client_service(ext, &state.config.api_key_pepper);
     match service
@@ -1161,7 +1191,7 @@ async fn set_client_state(
         .await
     {
         Ok(()) => no_content(),
-        Err(error) => map_error(error).into_response(),
+        Err(error) => map_error(error).at(&parts).into_response(),
     }
 }
 

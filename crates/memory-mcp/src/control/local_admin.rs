@@ -92,15 +92,16 @@ impl FromRequestParts<Arc<HttpState>> for RequireAdmin {
         let ext = state
             .local_admin
             .as_ref()
-            .ok_or_else(handlers::not_configured)?;
+            .ok_or_else(|| handlers::not_configured().at(parts))?;
 
         let cookie_header = parts
             .headers
             .get("cookie")
             .and_then(|v| v.to_str().ok())
             .unwrap_or("");
-        let cookie_verifier = parse_admin_cookie(cookie_header)?
-            .ok_or_else(|| handlers::map_error(LocalAdminError::Unauthenticated))?;
+        let cookie_verifier = parse_admin_cookie(cookie_header)
+            .map_err(|error| handlers::map_error(error).at(parts))?
+            .ok_or_else(|| handlers::map_error(LocalAdminError::Unauthenticated).at(parts))?;
 
         let principal = crate::service::local_admin::auth::LocalAdminService::new(
             ext.authority.clone(),
@@ -108,7 +109,7 @@ impl FromRequestParts<Arc<HttpState>> for RequireAdmin {
         )
         .resolve(&request_context_from_parts(parts), &cookie_verifier)
         .await
-        .map_err(handlers::map_error)?;
+        .map_err(|error| handlers::map_error(error).at(parts))?;
 
         Ok(RequireAdmin(principal))
     }
@@ -130,6 +131,29 @@ pub fn parse_admin_cookie(cookie_header: &str) -> Result<Option<[u8; 32]>, Local
         .try_into()
         .map_err(|_| LocalAdminError::Unauthenticated)?;
     Ok(Some(arr))
+}
+
+/// Mint the one request id per local-admin request and stamp it on the
+/// response. The audit `RequestContext`, the `x-request-id` header and the
+/// error envelope's `correlation_id` all read this value, so one reported id
+/// identifies one request end to end (spec §10).
+pub async fn attach_request_id(
+    mut req: axum::extract::Request,
+    next: axum::middleware::Next,
+) -> axum::response::Response {
+    let request_id = req
+        .extensions()
+        .get::<uuid::Uuid>()
+        .copied()
+        .unwrap_or_else(uuid::Uuid::new_v4);
+    req.extensions_mut().insert(request_id);
+    let mut response = next.run(req).await;
+    if !response.headers().contains_key(REQUEST_ID_HEADER)
+        && let Ok(value) = axum::http::HeaderValue::from_str(&request_id.to_string())
+    {
+        response.headers_mut().insert(REQUEST_ID_HEADER, value);
+    }
+    response
 }
 
 /// Build a `RequestContext` from axum request parts.
@@ -170,4 +194,56 @@ pub fn auth_context_from_parts(parts: &Parts) -> Option<AuthAttemptContext> {
         request: request_context_from_parts(parts),
         source,
     })
+}
+
+#[cfg(test)]
+mod request_id_tests {
+    //! One request id per request: the error envelope's `correlation_id` and
+    //! the `x-request-id` header name the same value the audit trail records.
+
+    use super::attach_request_id;
+    use crate::control::local_admin::handlers;
+    use crate::service::local_admin::contracts::LocalAdminError;
+    use axum::response::IntoResponse;
+
+    async fn render_rejection(request: axum::extract::Request) -> axum::response::Response {
+        let (parts, _body) = request.into_parts();
+        handlers::map_error(LocalAdminError::Unauthenticated)
+            .at(&parts)
+            .into_response()
+    }
+
+    #[tokio::test]
+    async fn the_error_envelope_carries_the_requests_id() {
+        use tower_service::Service;
+
+        let mut app = axum::Router::new()
+            .route(
+                "/api/v1/admin/session",
+                axum::routing::get(render_rejection),
+            )
+            .layer(axum::middleware::from_fn(attach_request_id));
+        let request = axum::extract::Request::builder()
+            .uri("/api/v1/admin/session")
+            .body(axum::body::Body::empty())
+            .expect("request");
+        let response = app.call(request).await.expect("response");
+
+        let header = response
+            .headers()
+            .get(super::REQUEST_ID_HEADER)
+            .expect("x-request-id header")
+            .to_str()
+            .expect("ascii id")
+            .to_owned();
+        let body = axum::body::to_bytes(response.into_body(), usize::MAX)
+            .await
+            .expect("error body");
+        let envelope: serde_json::Value = serde_json::from_slice(&body).expect("json envelope");
+        assert_eq!(
+            envelope["correlation_id"],
+            header.as_str(),
+            "body and header must name one request id"
+        );
+    }
 }

@@ -21,15 +21,14 @@ pub struct PasswordHasher {
 impl PasswordHasher {
     /// Initialize with supported parameters and a dummy PHC hash.
     pub fn new() -> LocalResult<Self> {
-        let params = Params::new(19456, 2, 1, Some(32))
-            .map_err(|e| LocalAdminError::InvalidInput(format!("KDF params: {e}")))?;
+        let params = self_params()?;
         // Generate a dummy PHC once at startup for unknown/pending users. The
         // hasher draws the salt from the system RNG itself, so there is no salt
         // material to hold here.
         let argon2 = Argon2::new(Algorithm::Argon2id, Version::V0x13, params.clone());
         let dummy_phc = argon2
             .hash_password(b"dummy")
-            .map_err(|e| LocalAdminError::InvalidInput(format!("dummy KDF: {e}")))?
+            .map_err(|_| LocalAdminError::InvalidInput("KDF configuration error".to_owned()))?
             .to_string();
         Ok(Self {
             params,
@@ -56,16 +55,23 @@ impl PasswordHasher {
         self.admission.clone()
     }
 
+    /// The running semaphore, so a test can hold every slot and prove the
+    /// shared fail-closed deadline. Test-only.
+    #[cfg(test)]
+    pub(crate) fn running_semaphore(&self) -> Arc<tokio::sync::Semaphore> {
+        self.running.clone()
+    }
+
     /// Hash a password with Argon2id. Bounded admission.
     pub async fn hash(&self, password: String) -> LocalResult<String> {
-        let _permit = self.admit().await?;
+        let (_permit, deadline) = self.admit().await?;
         let params = self.params.clone();
 
-        self.run_with_running_permit(move |_permit| {
+        self.run_with_running_permit(deadline, move |_permit| {
             let argon2 = Argon2::new(Algorithm::Argon2id, Version::V0x13, params);
             let phc = argon2
                 .hash_password(password.as_bytes())
-                .map_err(|e| LocalAdminError::InvalidInput(format!("KDF hash: {e}")))?
+                .map_err(|_| LocalAdminError::InvalidInput("KDF hash error".to_owned()))?
                 .to_string();
             Ok::<String, LocalAdminError>(phc)
         })
@@ -80,16 +86,16 @@ impl PasswordHasher {
     /// blocking KDF work, so the work it does is bounded exactly like the work
     /// it imitates.
     pub async fn verify(&self, password: String, phc: Option<String>) -> LocalResult<bool> {
-        let _permit = self.admit().await?;
+        let (_permit, deadline) = self.admit().await?;
 
         match phc {
             // Dummy verification for unknown/pending users.
             None => {
                 let params = self.params.clone();
                 let dummy = self.dummy_phc.clone();
-                self.run_with_running_permit(move |_permit| {
+                self.run_with_running_permit(deadline, move |_permit| {
                     let parsed = PasswordHash::new(&dummy)
-                        .map_err(|e| LocalAdminError::InvalidInput(format!("dummy PHC: {e}")))?;
+                        .map_err(|_| LocalAdminError::InvalidInput("PHC parse error".to_owned()))?;
                     let argon2 = Argon2::new(Algorithm::Argon2id, Version::V0x13, params);
                     let _ = argon2.verify_password(password.as_bytes(), &parsed);
                     Ok::<bool, LocalAdminError>(false)
@@ -99,9 +105,9 @@ impl PasswordHasher {
             Some(phc_str) => {
                 // Validate PHC parameters before expensive KDF work.
                 validate_phc(&phc_str)?;
-                self.run_with_running_permit(move |_permit| {
+                self.run_with_running_permit(deadline, move |_permit| {
                     let parsed = PasswordHash::new(&phc_str)
-                        .map_err(|e| LocalAdminError::InvalidInput(format!("PHC parse: {e}")))?;
+                        .map_err(|_| LocalAdminError::InvalidInput("PHC parse error".to_owned()))?;
                     let argon2 = Argon2::new(Algorithm::Argon2id, Version::V0x13, self_params()?);
                     let ok = argon2.verify_password(password.as_bytes(), &parsed).is_ok();
                     Ok::<bool, LocalAdminError>(ok)
@@ -112,40 +118,46 @@ impl PasswordHasher {
     }
 
     /// Take one of the eight admission slots, or fail closed with a
-    /// sanitized `503` after the two-second deadline.
+    /// sanitized `503`, and return the shared admission deadline.
     ///
-    /// The wait is bounded rather than instant: a burst beyond the queue is
-    /// rejected after the same two-second deadline every admission obeys, and
+    /// One two-second budget covers the whole KDF job: the queue wait and the
+    /// wait for a running permit draw on the same deadline, so a request can
+    /// never spend four seconds in admission. The wait is bounded rather than
+    /// instant: a burst beyond the queue is rejected after that deadline, and
     /// a saturated queue can never grow without limit.
-    async fn admit(&self) -> LocalResult<tokio::sync::OwnedSemaphorePermit> {
-        tokio::time::timeout(
-            std::time::Duration::from_secs(2),
-            self.admission.clone().acquire_owned(),
-        )
-        .await
-        .map_err(|_| LocalAdminError::Unavailable)?
-        .map_err(|_| LocalAdminError::Unavailable)
+    async fn admit(&self) -> LocalResult<(tokio::sync::OwnedSemaphorePermit, std::time::Instant)> {
+        let deadline = std::time::Instant::now() + std::time::Duration::from_secs(2);
+        let permit =
+            tokio::time::timeout_at(deadline.into(), self.admission.clone().acquire_owned())
+                .await
+                .map_err(|_| LocalAdminError::Unavailable)?
+                .map_err(|_| LocalAdminError::Unavailable)?;
+        Ok((permit, deadline))
     }
 
     /// Run `job` on the blocking pool while holding one of the two *running*
     /// permits.
     ///
-    /// The permit travels **into** the blocking closure, so it is released when
-    /// the KDF work actually stops rather than when the awaiting future is
-    /// dropped. Cancelling a request therefore cannot free capacity for work
-    /// that is still executing on the pool.
-    async fn run_with_running_permit<T, F>(&self, job: F) -> LocalResult<T>
+    /// The running-permit wait draws on the same admission deadline the queue
+    /// wait used, so admission is one bounded budget, not one window per
+    /// semaphore. The permit travels **into** the blocking closure, so it is
+    /// released when the KDF work actually stops rather than when the
+    /// awaiting future is dropped. Cancelling a request therefore cannot free
+    /// capacity for work that is still executing on the pool.
+    async fn run_with_running_permit<T, F>(
+        &self,
+        deadline: std::time::Instant,
+        job: F,
+    ) -> LocalResult<T>
     where
         F: FnOnce(tokio::sync::OwnedSemaphorePermit) -> LocalResult<T> + Send + 'static,
         T: Send + 'static,
     {
-        let running_permit = tokio::time::timeout(
-            std::time::Duration::from_secs(2),
-            self.running.clone().acquire_owned(),
-        )
-        .await
-        .map_err(|_| LocalAdminError::Unavailable)?
-        .map_err(|_| LocalAdminError::Unavailable)?;
+        let running_permit =
+            tokio::time::timeout_at(deadline.into(), self.running.clone().acquire_owned())
+                .await
+                .map_err(|_| LocalAdminError::Unavailable)?
+                .map_err(|_| LocalAdminError::Unavailable)?;
 
         tokio::task::spawn_blocking(move || job(running_permit))
             .await
@@ -167,7 +179,7 @@ const P_COST: u32 = 1;
 /// never abort a request path.
 fn self_params() -> LocalResult<Params> {
     Params::new(M_COST, T_COST, P_COST, Some(32))
-        .map_err(|e| LocalAdminError::InvalidInput(format!("KDF params: {e}")))
+        .map_err(|_| LocalAdminError::InvalidInput("KDF configuration error".to_owned()))
 }
 
 /// Validate PHC parameters before expensive KDF work.
@@ -275,6 +287,26 @@ mod tests {
                 .verify("any password".into(), Some(other.to_owned()))
                 .await,
             Err(LocalAdminError::InvalidCredentials)
+        ));
+    }
+
+    #[tokio::test]
+    async fn a_spent_admission_deadline_fails_before_the_running_permit() {
+        // Plan §7: one bounded admission. The queue wait and the running
+        // permit draw on the same two-second budget, so a request whose
+        // budget is already spent must fail immediately instead of waiting a
+        // second window for a running permit.
+        let hasher = PasswordHasher::with_bounds(1, 2).expect("supported KDF");
+        let _held = hasher
+            .running_semaphore()
+            .try_acquire_owned()
+            .expect("hold the running slot");
+        let deadline = std::time::Instant::now();
+        assert!(matches!(
+            hasher
+                .run_with_running_permit(deadline, |_permit| Ok(()))
+                .await,
+            Err(LocalAdminError::Unavailable)
         ));
     }
 
