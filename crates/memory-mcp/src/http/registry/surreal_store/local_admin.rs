@@ -301,7 +301,9 @@ fn failure_reason_token(reason: FailureReason) -> &'static str {
 /// transaction it occupies result indices 1..=8 (index 0 is the opening
 /// `BEGIN TRANSACTION`) and the first method-specific statement is index 9.
 /// The two `UPDATE`s touch the admin `version` and the session row so a
-/// concurrent recovery, logout or rotation aborts the transaction.
+/// concurrent recovery, logout or rotation aborts the transaction. The
+/// session touch matches every live session, including the final 30 minutes
+/// of absolute lifetime, and caps the idle deadline at the absolute one.
 const MUTATION_GUARD: &str = r#"
 LET $guard_policy = (SELECT epoch, mode, methods FROM browser_auth_policy LIMIT 2);
 IF array::len($guard_policy) != 1 OR NOT ('local' IN $guard_policy[0].methods ?? [$guard_policy[0].mode]) OR $guard_policy[0].epoch != $epoch { THROW 'policy_stale'; };
@@ -310,7 +312,7 @@ IF array::len($guard_admin) = 0 OR $guard_admin[0].state != 'active' OR $guard_a
 LET $guard_session = (SELECT id FROM local_admin_session WHERE cookie_verifier = $session_verifier AND admin_id = $admin_id AND credential_generation = $generation AND mode_epoch = $epoch AND revoked_at IS NONE AND idle_expiry > time::now() AND absolute_expiry > time::now() AND auth_time > time::now() - 600s LIMIT 1);
 IF array::len($guard_session) = 0 { THROW 'session_invalid'; };
 UPDATE type::record('local_admin', $admin_id) SET version = version + 1, updated_at = time::now();
-UPDATE local_admin_session SET idle_expiry = time::now() + 1800s WHERE cookie_verifier = $session_verifier AND revoked_at IS NONE AND absolute_expiry > time::now() + 1800s;
+UPDATE local_admin_session SET idle_expiry = IF absolute_expiry > time::now() + 1800s { time::now() + 1800s } ELSE { absolute_expiry } WHERE cookie_verifier = $session_verifier AND revoked_at IS NONE;
 "#;
 
 /// Bind the guard parameters shared by every guarded mutation.
@@ -422,10 +424,11 @@ impl SurrealRegistryStore {
 #[async_trait]
 impl LocalAdminStore for SurrealRegistryStore {
     /// Statement order:
-    /// `BEGIN`(0) `LET`(1) `IF`(2) `IF`(3) `IF`(4)
-    /// `LET`(5) `LET`(6) `IF`(7) `IF`(8) `IF`(9) `UPDATE`(10) `LET`(11)
-    /// `CREATE`(12) `CREATE`(13) `SELECT`(14) `COMMIT`(15).
-    /// Result index 14 is the created challenge readback.
+    /// `BEGIN`(0) `LET`(1, policy) `IF`(2, policy) `LET`(3) `IF`(4)
+    /// `IF`(5) `IF`(6) `LET`(7) `LET`(8) `IF`(9) `IF`(10) `IF`(11)
+    /// `UPDATE`(12) `LET`(13) `CREATE`(14) `CREATE`(15) `SELECT`(16)
+    /// `COMMIT`(17).
+    /// Result index 16 is the created challenge readback.
     async fn issue_challenge(&self, command: ChallengeIssue) -> LocalResult<IssuedChallenge> {
         let kind = match command.kind {
             ChallengeKind::Activate => "activate",
@@ -438,6 +441,8 @@ impl LocalAdminStore for SurrealRegistryStore {
 
         let sql = "
             BEGIN TRANSACTION;
+            LET $guard_policy = (SELECT epoch, mode, methods FROM browser_auth_policy LIMIT 2);
+            IF array::len($guard_policy) != 1 OR NOT ('local' IN $guard_policy[0].methods ?? [$guard_policy[0].mode]) OR $guard_policy[0].epoch != $epoch { THROW 'policy_stale'; };
             LET $existing = (SELECT id, state, credential_generation FROM local_admin WHERE username = $username LIMIT 1);
             IF array::len($existing) = 0 AND $kind = 'reset' { THROW 'admin_not_found'; };
             IF array::len($existing) = 0 AND $kind = 'activate' {
@@ -451,7 +456,7 @@ impl LocalAdminStore for SurrealRegistryStore {
                     created_at = time::now(),
                     updated_at = time::now();
             };
-            IF array::len($existing) > 0 AND $kind = 'activate' AND $existing[0].state != 'pending_activation' {
+            IF array::len($existing) > 0 AND $kind = 'activate' {
                 THROW 'admin_already_exists';
             };
             LET $admin = (SELECT id, state, credential_generation FROM local_admin WHERE username = $username LIMIT 1);
@@ -516,11 +521,14 @@ impl LocalAdminStore for SurrealRegistryStore {
                     "audit_id": audit_id,
                     "request_id": command.request.request_id.to_string(),
                 })),
-                14,
+                16,
             )
             .await
             .map_err(|error| {
-                match thrown(&error, &["admin_not_found", "admin_already_exists"]) {
+                match thrown(
+                    &error,
+                    &["admin_not_found", "admin_already_exists", "policy_stale"],
+                ) {
                     Some("admin_not_found") => LocalAdminError::NotFound,
                     Some(_) => LocalAdminError::StateConflict,
                     None => infra(error),
@@ -554,6 +562,20 @@ impl LocalAdminStore for SurrealRegistryStore {
             ChallengeKind::Activate => "activate",
             ChallengeKind::Reset => "reset",
         };
+
+        // Re-read the durable policy fence first (spec §7: every local auth
+        // transaction checks the policy): a fence that has moved rejects the
+        // inspection with the same uniform answer as any other bad code.
+        self.admin_query(
+            "LET $guard_policy = (SELECT epoch, mode, methods FROM browser_auth_policy LIMIT 2);
+             IF array::len($guard_policy) != 1 OR NOT ('local' IN $guard_policy[0].methods ?? [$guard_policy[0].mode]) OR $guard_policy[0].epoch != $epoch { THROW 'policy_stale'; };",
+            Some(json!({"epoch": policy.epoch})),
+        )
+        .await
+        .map_err(|error| match thrown(&error, &["policy_stale"]) {
+            Some(_) => LocalAdminError::InvalidChallenge,
+            None => infra(error),
+        })?;
 
         let sql = "
             SELECT admin_id, expires_at FROM local_admin_challenge
@@ -612,6 +634,8 @@ impl LocalAdminStore for SurrealRegistryStore {
 
         let sql = "
             BEGIN TRANSACTION;
+            LET $guard_policy = (SELECT epoch, mode, methods FROM browser_auth_policy LIMIT 2);
+            IF array::len($guard_policy) != 1 OR NOT ('local' IN $guard_policy[0].methods ?? [$guard_policy[0].mode]) OR $guard_policy[0].epoch != $epoch { THROW 'policy_stale'; };
             LET $challenge = (SELECT id, admin_id, kind, credential_generation FROM local_admin_challenge WHERE verifier = $verifier AND kind = $kind AND consumed_at IS NONE AND revoked_at IS NONE AND expires_at > time::now() AND mode_epoch = $epoch LIMIT 1);
             IF array::len($challenge) = 0 { THROW 'challenge_invalid'; };
             LET $ch = $challenge[0];
@@ -660,10 +684,12 @@ impl LocalAdminStore for SurrealRegistryStore {
             })),
         )
         .await
-        .map_err(|error| match thrown(&error, &["challenge_invalid"]) {
-            Some(_) => LocalAdminError::InvalidChallenge,
-            None => infra(error),
-        })?;
+        .map_err(
+            |error| match thrown(&error, &["challenge_invalid", "policy_stale"]) {
+                Some(_) => LocalAdminError::InvalidChallenge,
+                None => infra(error),
+            },
+        )?;
 
         Ok(())
     }
@@ -710,15 +736,18 @@ impl LocalAdminStore for SurrealRegistryStore {
         }))
     }
 
-    /// Statement order: `BEGIN`(0) `LET`(1) `IF`(2) `CREATE`(3)
-    /// `CREATE`(4) `SELECT`(5) `COMMIT`(6). Result index 5 is the inserted
-    /// session readback, so the returned deadlines are database time.
+    /// Statement order: `BEGIN`(0) `LET`(1, policy) `IF`(2, policy)
+    /// `LET`(3) `IF`(4) `CREATE`(5) `CREATE`(6) `SELECT`(7) `COMMIT`(8).
+    /// Result index 7 is the inserted session readback, so the returned
+    /// deadlines are database time.
     async fn open_session(&self, command: SessionOpen) -> LocalResult<AdminPrincipal> {
         let cookie_verifier = hex::encode(command.cookie_verifier);
         let audit_id = row_id("aud");
 
         let sql = "
             BEGIN TRANSACTION;
+            LET $guard_policy = (SELECT epoch, mode, methods FROM browser_auth_policy LIMIT 2);
+            IF array::len($guard_policy) != 1 OR NOT ('local' IN $guard_policy[0].methods ?? [$guard_policy[0].mode]) OR $guard_policy[0].epoch != $epoch { THROW 'policy_stale'; };
             LET $admin = (SELECT state, credential_generation, password_phc FROM local_admin WHERE id = type::record('local_admin', $admin_id) LIMIT 1);
             IF array::len($admin) = 0 OR $admin[0].state != 'active' OR $admin[0].credential_generation != $generation OR $admin[0].password_phc != $password_phc {
                 THROW 'login_conflict';
@@ -764,13 +793,16 @@ impl LocalAdminStore for SurrealRegistryStore {
                     "audit_id": audit_id,
                     "request_id": command.request.request_id.to_string(),
                 })),
-                5,
+                7,
             )
             .await
-            .map_err(|error| match thrown(&error, &["login_conflict"]) {
-                Some(_) => LocalAdminError::InvalidCredentials,
-                None => infra(error),
-            })?;
+            .map_err(
+                |error| match thrown(&error, &["login_conflict", "policy_stale"]) {
+                    Some("policy_stale") => LocalAdminError::Unauthenticated,
+                    Some(_) => LocalAdminError::InvalidCredentials,
+                    None => infra(error),
+                },
+            )?;
 
         let row = rows.into_iter().next().ok_or_else(|| {
             infra(MemoryError::Storage(
@@ -791,9 +823,10 @@ impl LocalAdminStore for SurrealRegistryStore {
         })
     }
 
-    /// Statement order: `BEGIN`(0) `LET`(1) `IF`(2) `LET`(3) `IF`(4)
-    /// `IF`(5) `LET`(6) `IF`(7) `UPDATE`(8) `UPDATE`(9) `RETURN`(10)
-    /// `COMMIT`(11). Result index 10 is the principal projection.
+    /// Statement order: `BEGIN`(0) `LET`(1, policy) `IF`(2, policy)
+    /// `LET`(3) `IF`(4) `LET`(5) `IF`(6) `IF`(7) `LET`(8) `IF`(9)
+    /// `UPDATE`(10) `UPDATE`(11) `RETURN`(12) `COMMIT`(13). Result index 12
+    /// is the principal projection.
     async fn resolve_session(
         &self,
         cookie_verifier: &[u8; 32],
@@ -803,6 +836,8 @@ impl LocalAdminStore for SurrealRegistryStore {
 
         let sql = "
             BEGIN TRANSACTION;
+            LET $guard_policy = (SELECT epoch, mode, methods FROM browser_auth_policy LIMIT 2);
+            IF array::len($guard_policy) != 1 OR NOT ('local' IN $guard_policy[0].methods ?? [$guard_policy[0].mode]) OR $guard_policy[0].epoch != $epoch { THROW 'policy_stale'; };
             LET $session_row = (SELECT admin_id, credential_generation, mode_epoch, auth_time, idle_expiry, absolute_expiry FROM local_admin_session WHERE cookie_verifier = $cookie_verifier AND revoked_at IS NONE LIMIT 1);
             IF array::len($session_row) = 0 { THROW 'session_invalid'; };
             LET $s = $session_row[0];
@@ -820,13 +855,15 @@ impl LocalAdminStore for SurrealRegistryStore {
             .admin_query_at(
                 sql,
                 Some(json!({"cookie_verifier": cookie_verifier.clone(), "epoch": policy.epoch})),
-                10,
+                12,
             )
             .await
-            .map_err(|error| match thrown(&error, &["session_invalid"]) {
-                Some(_) => LocalAdminError::Unauthenticated,
-                None => infra(error),
-            })?;
+            .map_err(
+                |error| match thrown(&error, &["session_invalid", "policy_stale"]) {
+                    Some(_) => LocalAdminError::Unauthenticated,
+                    None => infra(error),
+                },
+            )?;
 
         let row = rows.into_iter().next().ok_or_else(|| {
             infra(MemoryError::Storage(
@@ -849,10 +886,11 @@ impl LocalAdminStore for SurrealRegistryStore {
         })
     }
 
-    /// Statement order: `BEGIN`(0) `LET`(1) `IF`(2) `LET`(3) `IF`(4)
-    /// `IF`(5) `LET`(6) `IF`(7) `UPDATE`(8) `CREATE`(9) `CREATE`(10)
-    /// `RETURN`(11) `COMMIT`(12). Result index 11 is the principal
-    /// projection carrying the preserved absolute deadline.
+    /// Statement order: `BEGIN`(0) `LET`(1, policy) `IF`(2, policy)
+    /// `LET`(3) `IF`(4) `LET`(5) `IF`(6) `IF`(7) `LET`(8) `IF`(9)
+    /// `UPDATE`(10) `CREATE`(11) `CREATE`(12) `RETURN`(13)
+    /// `COMMIT`(14). Result index 13 is the principal projection carrying
+    /// the preserved absolute deadline.
     async fn rotate_session(&self, command: SessionRotate) -> LocalResult<AdminPrincipal> {
         let old_cookie = command.fence.session_id.clone();
         let new_cookie = hex::encode(command.cookie_verifier);
@@ -860,6 +898,8 @@ impl LocalAdminStore for SurrealRegistryStore {
 
         let sql = "
             BEGIN TRANSACTION;
+            LET $guard_policy = (SELECT epoch, mode, methods FROM browser_auth_policy LIMIT 2);
+            IF array::len($guard_policy) != 1 OR NOT ('local' IN $guard_policy[0].methods ?? [$guard_policy[0].mode]) OR $guard_policy[0].epoch != $epoch { THROW 'policy_stale'; };
             LET $old = (SELECT admin_id, credential_generation, mode_epoch, idle_expiry, absolute_expiry FROM local_admin_session WHERE cookie_verifier = $old_cookie_verifier AND revoked_at IS NONE LIMIT 1);
             IF array::len($old) = 0 { THROW 'session_invalid'; };
             LET $o = $old[0];
@@ -910,13 +950,15 @@ impl LocalAdminStore for SurrealRegistryStore {
                     "audit_id": audit_id,
                     "request_id": command.request.request_id.to_string(),
                 })),
-                11,
+                13,
             )
             .await
-            .map_err(|error| match thrown(&error, &["session_invalid"]) {
-                Some(_) => LocalAdminError::Unauthenticated,
-                None => infra(error),
-            })?;
+            .map_err(
+                |error| match thrown(&error, &["session_invalid", "policy_stale"]) {
+                    Some(_) => LocalAdminError::Unauthenticated,
+                    None => infra(error),
+                },
+            )?;
 
         let row = rows.into_iter().next().ok_or_else(|| {
             infra(MemoryError::Storage(
@@ -950,6 +992,8 @@ impl LocalAdminStore for SurrealRegistryStore {
 
         let sql = "
             BEGIN TRANSACTION;
+            LET $guard_policy = (SELECT epoch, mode, methods FROM browser_auth_policy LIMIT 2);
+            IF array::len($guard_policy) != 1 OR NOT ('local' IN $guard_policy[0].methods ?? [$guard_policy[0].mode]) OR $guard_policy[0].epoch != $epoch { THROW 'policy_stale'; };
             LET $session_row = (SELECT id FROM local_admin_session WHERE cookie_verifier = $session_verifier AND admin_id = $admin_id AND credential_generation = $generation AND revoked_at IS NONE LIMIT 1);
             IF array::len($session_row) = 0 { THROW 'session_not_found'; };
             UPDATE $session_row[0].id SET revoked_at = time::now();
@@ -976,23 +1020,27 @@ impl LocalAdminStore for SurrealRegistryStore {
                 "session_verifier": fence.session_id.clone(),
                 "admin_id": fence.admin_id.clone(),
                 "generation": fence.credential_generation,
+                "epoch": fence.policy.epoch,
                 "audit_id": audit_id,
                 "request_id": request.request_id.to_string(),
             })),
         )
         .await
-        .map_err(|error| match thrown(&error, &["session_not_found"]) {
-            Some(_) => LocalAdminError::Unauthenticated,
-            None => infra(error),
-        })?;
+        .map_err(
+            |error| match thrown(&error, &["session_not_found", "policy_stale"]) {
+                Some(_) => LocalAdminError::Unauthenticated,
+                None => infra(error),
+            },
+        )?;
 
         Ok(())
     }
 
-    /// Statement order: `BEGIN`(0) `LET`(1) `IF`(2..5, four primaries)
-    /// `LET`(6) `IF`(7..10, four secondaries) `RETURN`(11) `COMMIT`(12).
-    /// Result index 11 returns both bucket rows as one object, so saturation
-    /// is decided from persisted counters rather than assumed.
+    /// Statement order: `BEGIN`(0) `LET`(1, policy) `IF`(2, policy)
+    /// `LET`(3) `IF`(4..7, four primaries) `LET`(8) `IF`(9..12, four
+    /// secondaries) `RETURN`(13) `COMMIT`(14). Result index 13 returns both
+    /// bucket rows as one object, so saturation is decided from persisted
+    /// counters rather than assumed.
     ///
     /// One bounded row per dimension slot and window; a saturated bucket
     /// increments its saturating counter instead of creating rows. Expired
@@ -1056,9 +1104,12 @@ impl LocalAdminStore for SurrealRegistryStore {
             cap: CHALLENGE_SOURCE_CAP,
         });
         let has_b = !secondary.id.is_empty();
+        let challenge_domain = primary.action == "challenge";
 
         let sql = "
             BEGIN TRANSACTION;
+            LET $guard_policy = (SELECT epoch, mode, methods FROM browser_auth_policy LIMIT 2);
+            IF array::len($guard_policy) != 1 OR NOT ('local' IN $guard_policy[0].methods ?? [$guard_policy[0].mode]) OR $guard_policy[0].epoch != $epoch { THROW 'policy_stale'; };
             LET $a = (SELECT denied_count, expires_at FROM local_admin_rate_bucket WHERE bucket_id = $a_id LIMIT 1);
             IF array::len($a) = 0 {
                 CREATE type::record('local_admin_rate_bucket', $a_id) SET
@@ -1115,6 +1166,7 @@ impl LocalAdminStore for SurrealRegistryStore {
         ";
 
         let vars = json!({
+            "epoch": input.policy.epoch,
             "a_id": primary.id,
             "a_source": primary.source,
             "a_username": primary.username.unwrap_or(0),
@@ -1135,9 +1187,17 @@ impl LocalAdminStore for SurrealRegistryStore {
         // client behind one proxy sharing the source bucket) can lose the
         // write race; the shared execution seam retries that boundedly.
         let rows = self
-            .admin_query_at(sql, Some(vars.clone()), 11)
+            .admin_query_at(sql, Some(vars.clone()), 13)
             .await
-            .map_err(infra)?;
+            .map_err(|error| match thrown(&error, &["policy_stale"]) {
+                // A stale fence refuses admission. Challenge flows keep their
+                // uniform `400 invalid_challenge` answer so the rejection
+                // cannot be told apart from a bad code; credential flows get
+                // the uniform 401.
+                Some(_) if challenge_domain => LocalAdminError::InvalidChallenge,
+                Some(_) => LocalAdminError::Unauthenticated,
+                None => infra(error),
+            })?;
 
         let row = rows.into_iter().next().ok_or_else(|| {
             infra(MemoryError::Storage(
@@ -2281,6 +2341,214 @@ mod sql_fault_tests {
             serde_json::json!("admin"),
             "a named actor is recorded as such"
         );
+    }
+}
+
+#[cfg(test)]
+mod guard_semantics_tests {
+    //! Review findings on the mutation guard and the durable policy fence.
+    //!
+    //! The guard case drives the production [`MUTATION_GUARD`] fragment
+    //! exactly as the four guarded client mutations do; the fence cases drive
+    //! the real service over the real durable store.
+
+    use super::sql_fault_tests::{attempt, command_request, fixture};
+    use super::*;
+    use crate::service::local_admin::contracts::ChallengeKind;
+
+    const PASSWORD: &str = "SecureP@ssw0rd123";
+
+    #[tokio::test]
+    async fn mutation_guard_touches_a_session_in_its_final_thirty_minutes() {
+        let (store, _authority, service, management) = fixture().await;
+        let challenge = management
+            .create_admin("ops.one", &command_request())
+            .await
+            .expect("create admin");
+        service
+            .finish_challenge(
+                &attempt(),
+                &challenge.code,
+                ChallengeKind::Activate,
+                PASSWORD.to_owned(),
+            )
+            .await
+            .expect("activate");
+        let login = service
+            .login(&attempt(), "ops.one", PASSWORD.to_owned())
+            .await
+            .expect("login");
+
+        // Test-only state surgery: put the session inside its final 30
+        // minutes of absolute lifetime with a stale idle deadline.
+        store
+            .admin_query(
+                "UPDATE local_admin_session SET absolute_expiry = time::now() + 600s, idle_expiry = time::now() + 60s;",
+                None,
+            )
+            .await
+            .expect("shrink the session lifetime");
+
+        // The guard fragment must write the presented session row even here:
+        // without a write intent there is no conflict with a concurrent
+        // logout or rotation, and a paused mutation could serialize after
+        // revocation (spec §7).
+        let sql = format!(
+            "BEGIN TRANSACTION;{MUTATION_GUARD}
+             SELECT id FROM local_admin_session WHERE cookie_verifier = $session_verifier LIMIT 1;
+             COMMIT TRANSACTION;"
+        );
+        store
+            .admin_query(&sql, Some(with_guard(&login.principal.fence, json!({}))))
+            .await
+            .expect("guarded transaction near the absolute deadline");
+
+        let rows = store
+            .admin_query(
+                "SELECT idle_expiry, absolute_expiry FROM local_admin_session;",
+                None,
+            )
+            .await
+            .expect("read deadlines");
+        let row = rows.first().expect("one session row");
+        let idle = parse_datetime(row, "idle_expiry").expect("idle expiry");
+        let absolute = parse_datetime(row, "absolute_expiry").expect("absolute expiry");
+        assert_eq!(
+            idle, absolute,
+            "the guard touches the row and caps the idle deadline at the absolute one"
+        );
+    }
+
+    #[tokio::test]
+    async fn a_policy_epoch_bump_stops_session_resolution_and_minting() {
+        let (store, _authority, service, management) = fixture().await;
+        let challenge = management
+            .create_admin("ops.one", &command_request())
+            .await
+            .expect("create admin");
+        service
+            .finish_challenge(
+                &attempt(),
+                &challenge.code,
+                ChallengeKind::Activate,
+                PASSWORD.to_owned(),
+            )
+            .await
+            .expect("activate");
+        let login = service
+            .login(&attempt(), "ops.one", PASSWORD.to_owned())
+            .await
+            .expect("login");
+        let raw = login
+            .cookie
+            .strip_prefix("__Host-memory_mcp_admin=")
+            .expect("session cookie prefix");
+        let verifier: [u8; 32] = hex::decode(raw)
+            .expect("hex cookie verifier")
+            .try_into()
+            .expect("32-byte cookie verifier");
+
+        // What `admin auth-methods remove` and offline key rotation do to the
+        // durable policy: advance the epoch.
+        store
+            .admin_query(
+                "UPDATE browser_auth_policy SET epoch = epoch + 1, version = version + 1;",
+                None,
+            )
+            .await
+            .expect("advance the policy epoch");
+
+        assert!(
+            matches!(
+                service.resolve(&command_request(), &verifier).await,
+                Err(LocalAdminError::Unauthenticated)
+            ),
+            "an old-epoch session must stop resolving the moment the epoch moves"
+        );
+        assert!(
+            matches!(
+                service
+                    .login(&attempt(), "ops.one", PASSWORD.to_owned())
+                    .await,
+                Err(LocalAdminError::Unauthenticated)
+            ),
+            "no session may be minted under the stale fence"
+        );
+    }
+
+    #[tokio::test]
+    async fn a_policy_epoch_bump_rejects_challenge_inspection_and_finish() {
+        let (store, _authority, service, management) = fixture().await;
+        let challenge = management
+            .create_admin("ops.one", &command_request())
+            .await
+            .expect("create admin");
+        store
+            .admin_query(
+                "UPDATE browser_auth_policy SET epoch = epoch + 1, version = version + 1;",
+                None,
+            )
+            .await
+            .expect("advance the policy epoch");
+        assert!(
+            matches!(
+                service
+                    .inspect_challenge(&attempt(), &challenge.code, ChallengeKind::Activate)
+                    .await,
+                Err(LocalAdminError::InvalidChallenge)
+            ),
+            "challenge inspection refuses the stale fence with the uniform answer"
+        );
+        assert!(
+            matches!(
+                service
+                    .finish_challenge(
+                        &attempt(),
+                        &challenge.code,
+                        ChallengeKind::Activate,
+                        PASSWORD.to_owned(),
+                    )
+                    .await,
+                Err(LocalAdminError::InvalidChallenge)
+            ),
+            "challenge completion refuses the stale fence too"
+        );
+    }
+
+    #[tokio::test]
+    async fn local_admin_tables_deny_unprivileged_access() {
+        // Migration 051 restores the 001 deny-everything permissions on the
+        // nine local-admin tables (047 shipped without them). Table-level
+        // permissions render in `INFO FOR DB`, not `INFO FOR TABLE`.
+        let (store, _authority, _service, _management) = fixture().await;
+        let rows = store
+            .admin_query("INFO FOR DB;", None)
+            .await
+            .expect("db info");
+        let row = rows.first().expect("one info envelope");
+        for table in [
+            "browser_auth_policy",
+            "local_admin",
+            "local_admin_challenge",
+            "local_admin_session",
+            "local_admin_rate_bucket",
+            "local_admin_client",
+            "local_admin_client_key",
+            "local_admin_operation",
+            "local_admin_audit",
+        ] {
+            let definition = row["tables"][table]
+                .as_str()
+                .unwrap_or_else(|| panic!("{table} has no table definition: {row}"));
+            assert!(
+                definition.contains("PERMISSIONS"),
+                "{table} must declare permissions: {definition}"
+            );
+            assert!(
+                definition.contains("WHERE false"),
+                "{table} must deny unprivileged access: {definition}"
+            );
+        }
     }
 }
 

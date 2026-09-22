@@ -3,7 +3,7 @@ use crate::service::local_admin::contracts::{LocalAdminError, LocalResult};
 /// Normalize a username: trim outer ASCII whitespace, lowercase ASCII.
 /// Valid: ASCII lowercase `[a-z0-9][a-z0-9._-]{2,63}`.
 pub fn normalize_username(raw: &str) -> LocalResult<String> {
-    let trimmed = raw.trim();
+    let trimmed = raw.trim_matches(|c: char| c.is_ascii_whitespace());
     let lowered: String = trimmed
         .chars()
         .map(|c| {
@@ -109,6 +109,9 @@ mod tests {
     #[test]
     fn local_admin_username_policy() {
         assert_eq!(normalize_username("  Ops.One  ").expect("valid"), "ops.one");
+        // Outer ASCII whitespace only (spec §6): a non-breaking space is
+        // content, and content outside the character set is rejected.
+        assert!(normalize_username("\u{a0}ops.one").is_err());
         for raw in ["ab", "a b", "аdmin", "a\nadmin", "-admin"] {
             assert!(normalize_username(raw).is_err());
         }

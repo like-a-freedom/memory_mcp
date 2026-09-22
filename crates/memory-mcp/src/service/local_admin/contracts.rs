@@ -418,9 +418,11 @@ pub struct FailureAudit {
 /// The closed vocabulary of rejected actions.
 ///
 /// `Session` and `ClientMutation` are part of the ledger's closed enum but
-/// are deliberately never appended: those denials are counted by the fixed
-/// action/reason aggregate slots in `local_admin_rate_bucket`, so no
-/// invalid-cookie or stale-mutation stream reaches the audit table.
+/// are deliberately never appended: this release implements no aggregate
+/// denial slots for them either (the spec's fixed action/reason slots are a
+/// documented divergence; see `docs/operations/LOCAL_ADMIN.md` §13.4), so no
+/// invalid-cookie or stale-mutation stream reaches the audit table and no
+/// caller controls audit cardinality.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum FailureAction {
     Login,
@@ -431,8 +433,9 @@ pub enum FailureAction {
 }
 
 /// The closed vocabulary of rejection reasons. `InvalidSession`,
-/// `StaleFence` and `Forbidden` describe aggregate-slot denials (see
-/// [`FailureAction`]) rather than appended events.
+/// `StaleFence` and `Forbidden` mostly describe pre-admission denials
+/// (see [`FailureAction`]), which are not appended; an appended event may
+/// still carry `StaleFence` as its reason.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum FailureReason {
     InvalidCredentials,

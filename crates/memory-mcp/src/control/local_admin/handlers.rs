@@ -1105,6 +1105,9 @@ pub async fn revoke_key(
     if let Err(rejection) = guard_session(ext, &state, &parts, &principal) {
         return rejection.into_response();
     }
+    if let Err(rejection) = require_recent_auth(&principal) {
+        return rejection.into_response();
+    }
     let service = make_client_service(ext, &state.config.api_key_pepper);
     match service
         .revoke_key(&principal.fence, &request_ctx(&parts), &account_id, &key_id)

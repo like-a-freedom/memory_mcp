@@ -386,6 +386,27 @@ impl LocalAdminService {
     ) -> LocalResult<AdminLogin> {
         self.admit(context, AttemptDomain::Credentials, Some(username))
             .await?;
+        // Spec §6: login canonicalizes the offered name exactly like the CLI
+        // (outer ASCII whitespace trimmed, ASCII case-folded) before lookup.
+        // A value that fails canonicalization takes the same dummy-KDF
+        // uniform-401 path as an unknown user, so validation never becomes an
+        // account-existence oracle.
+        let username = match crate::service::local_admin::policy::normalize_username(username) {
+            Ok(username) => username,
+            Err(_) => {
+                let _ = self.hasher.verify(password, None).await?;
+                self.record_admitted_failure(
+                    context,
+                    FailureAction::Login,
+                    FailureReason::InvalidCredentials,
+                    None,
+                    Some(username),
+                )
+                .await?;
+                return Err(LocalAdminError::InvalidCredentials);
+            }
+        };
+        let username = username.as_str();
         let credential = self
             .authority
             .store()

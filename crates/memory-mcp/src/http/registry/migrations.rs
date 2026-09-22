@@ -23,6 +23,7 @@ pub const REGISTRY_MIGRATIONS: &[&str] = &[
     "048_browser_auth_policy_methods",
     "049_identity_change_audit",
     "050_browser_auth_method_removal",
+    "051_local_admin_table_permissions",
 ];
 
 /// Apply the registry migration catalog through the durable store. The store
@@ -61,6 +62,7 @@ mod tests {
         assert!(m.contains(&"048_browser_auth_policy_methods".to_string()));
         assert!(m.contains(&"049_identity_change_audit".to_string()));
         assert!(m.contains(&"050_browser_auth_method_removal".to_string()));
+        assert!(m.contains(&"051_local_admin_table_permissions".to_string()));
     }
 
     #[test]

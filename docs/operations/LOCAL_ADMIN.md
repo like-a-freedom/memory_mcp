@@ -914,7 +914,7 @@ by `tests/local_admin_cli.rs`):
   inside its 15-minute window. The derivation and migration `047` shipped
   together, so no deployment holds a pre-derivation row.
 - Running `create` twice for the same username does not mint a second code: the
-  durable transaction rejects a repeated `activate` issue for a non-pending
+  durable transaction rejects a repeated `activate` issue for any existing
   administrator (`admin_already_exists` → conflict). To replace lost or expired
   material, use `recover`.
 - The record created is `state = pending_activation`,
@@ -932,7 +932,8 @@ The server stores only an Argon2id PHC hash: version 19, `m=19456 KiB, t=2, p=1`
 32-byte output, independent 16-byte random salt per hash. Hashing runs on
 `spawn_blocking` with a per-process semaphore of 2 running jobs, at most 8
 queued, and a 2-second admission timeout (exhaustion → `503`). Stored PHC
-parameters are validated against supported bounds before any expensive work;
+parameters must equal the production set (version 19, `m=19456`, `t=2`,
+`p=1`); anything else is refused before any expensive work;
 corrupt or foreign hashes fail closed as invalid credentials.
 
 ### 4.2 Activation over the browser
@@ -1739,6 +1740,8 @@ Stated rather than smoothed over:
 
 | Plan §3.4 entry | What shipped |
 |---|---|
+| Spec §10 aggregate denial slots | `FailureAction::Session` / `ClientMutation` denials are neither appended nor counted: this release implements no fixed action/reason aggregate slots in `local_admin_rate_bucket`. Reserved attempts are counted there; pre-admission, session and stale-mutation denials leave no durable trace. |
+| Spec §7 “every local auth transaction checks this policy” | All local auth transactions re-read `browser_auth_policy` and compare mode and epoch (`policy_stale`). The `credential()` lookup is a plain read feeding the dummy-KDF decision and is deliberately not fenced; `open_session` re-checks the durable policy at commit. |
 | Eight new tables | Nine shipped: `local_admin_client_key` is a ninth. It is the sidecar that scopes key *ownership* to the creating administrator (the `api_key` row alone cannot express which administrator issued a key), and it is written in the same transaction as the authoritative row. |
 | "never ensure hardcoded `free` for local/off" | Diverges for `off`: the `free` v1 plan is still ensured except in local browser mode. Off-mode tenants carry `plan_version 1` (the data plane resolves that row on every ingest, and tenants that predate this change keep that version), so removing the row strands their quota resolution. Local browser mode no longer publishes it at all — its plan is the deployment's `local_plan_v{version}`. |
 | The in-memory `LocalAdminStore` fixture | Removed. Every plan §5 experiment now runs against the real durable store; the test double had no callers and asserted behaviour the production store does not have. |

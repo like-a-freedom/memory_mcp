@@ -7,6 +7,7 @@ mod service_cases {
     use std::sync::Arc;
 
     use crate::http::registry::SurrealRegistryStore;
+    use crate::service::local_admin::contracts::LocalAdminError;
     use crate::service::local_admin::{
         AdminManagementService, AuthAttemptContext, ChallengeKind, LocalAdminAuthority,
         LocalAdminService, PasswordHasher, RequestContext,
@@ -52,6 +53,62 @@ mod service_cases {
             .expect("hex cookie verifier")
             .try_into()
             .expect("32-byte cookie verifier")
+    }
+
+    #[tokio::test]
+    async fn create_for_an_existing_administrator_conflicts_without_a_second_code() {
+        // Spec §6: "Duplicate usernames return conflict, not another
+        // activation code." Lost or expired material is replaced with
+        // `recover`, which works for pending administrators too.
+        let (management, auth) = service().await;
+        let first = management
+            .create_admin("ops.one", &request())
+            .await
+            .expect("create");
+        let second = management.create_admin("ops.one", &request()).await;
+        assert!(
+            matches!(second, Err(LocalAdminError::StateConflict)),
+            "a duplicate create must conflict, not mint a second code"
+        );
+        // Non-vacuous in the other direction: the first code still works, so
+        // the rejected duplicate revoked nothing.
+        auth.finish_challenge(
+            &attempt(),
+            &first.code,
+            ChallengeKind::Activate,
+            "first correct password".into(),
+        )
+        .await
+        .expect("the first code survives the rejected duplicate");
+    }
+
+    #[tokio::test]
+    async fn login_canonicalizes_the_offered_username() {
+        // Spec §6: login trims outer ASCII whitespace and case-folds exactly
+        // like the CLI, so one administrator has one canonical name.
+        let (management, auth) = service().await;
+        let invitation = management
+            .create_admin("ops.one", &request())
+            .await
+            .expect("create");
+        auth.finish_challenge(
+            &attempt(),
+            &invitation.code,
+            ChallengeKind::Activate,
+            "first correct password".into(),
+        )
+        .await
+        .expect("activate");
+        auth.login(&attempt(), "  OPS.ONE  ", "first correct password".into())
+            .await
+            .expect("login accepts the canonicalized form of the name");
+        // A non-ASCII padding is not canonicalizable and takes the uniform
+        // 401 dummy path, never an input-error oracle.
+        assert!(matches!(
+            auth.login(&attempt(), "\u{a0}ops.one", "first correct password".into())
+                .await,
+            Err(LocalAdminError::InvalidCredentials)
+        ));
     }
 
     #[tokio::test]

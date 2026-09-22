@@ -153,22 +153,31 @@ impl PasswordHasher {
     }
 }
 
+/// The production Argon2id v19 parameters: m=19456 KiB, t=2, p=1.
+///
+/// One source of truth: [`self_params`] builds from these and [`validate_phc`]
+/// refuses any stored hash built with anything else.
+const M_COST: u32 = 19456;
+const T_COST: u32 = 2;
+const P_COST: u32 = 1;
+
 /// Default Argon2id v19 parameters: m=19456, t=2, p=1.
 ///
 /// Returns an error rather than panicking so hostile stored parameters can
 /// never abort a request path.
 fn self_params() -> LocalResult<Params> {
-    Params::new(19456, 2, 1, Some(32))
+    Params::new(M_COST, T_COST, P_COST, Some(32))
         .map_err(|e| LocalAdminError::InvalidInput(format!("KDF params: {e}")))
 }
 
 /// Validate PHC parameters before expensive KDF work.
 ///
-/// Binds algorithm, version, memory, time and parallelism. The derived output
-/// length is deliberately not bound here: `argon2`'s verifier compares the full
-/// PHC string, so a foreign output length cannot verify against a stored hash
-/// that was produced with `Some(32)`. Corrupt or hostile hashes fail closed
-/// without raw error details.
+/// `argon2`'s verifier computes with the parameters stored in the hash, so a
+/// wide acceptance range would let one corrupt or hostile row choose the
+/// allocation (plan §6: "do not allocate according to arbitrary stored
+/// parameters"). The system only ever writes its own parameters, so anything
+/// else is corrupt or hostile and is refused before any computation. Corrupt
+/// or hostile hashes fail closed without raw error details.
 fn validate_phc(phc: &str) -> LocalResult<()> {
     // Must start with the expected Argon2id prefix
     if !phc.starts_with("$argon2id$v=19$m=") {
@@ -178,25 +187,9 @@ fn validate_phc(phc: &str) -> LocalResult<()> {
     // Parse the hash to validate structure
     let parsed = PasswordHash::new(phc).map_err(|_| LocalAdminError::InvalidCredentials)?;
 
-    // Verify parameters are within bounds using the argon2 crate
+    // The stored parameters must be exactly the production set
     let params = Params::try_from(&parsed).map_err(|_| LocalAdminError::InvalidCredentials)?;
-
-    let m_cost = params.m_cost();
-    let t_cost = params.t_cost();
-    let p_cost = params.p_cost();
-
-    // Bound memory: must be reasonable (1MB - 1GB in KiB)
-    if !(1024..=1048576).contains(&m_cost) {
-        return Err(LocalAdminError::InvalidCredentials);
-    }
-
-    // Bound time: must be reasonable (1 - 100)
-    if !(1..=100).contains(&t_cost) {
-        return Err(LocalAdminError::InvalidCredentials);
-    }
-
-    // Bound parallelism: must be reasonable (1 - 64)
-    if !(1..=64).contains(&p_cost) {
+    if params.m_cost() != M_COST || params.t_cost() != T_COST || params.p_cost() != P_COST {
         return Err(LocalAdminError::InvalidCredentials);
     }
 
@@ -251,6 +244,38 @@ mod tests {
             )
             .await;
         assert!(result.is_err());
+    }
+
+    #[tokio::test]
+    async fn hostile_phc_parameters_are_refused_before_any_computation() {
+        // Plan §5: "hostile parameters not executed". `argon2` computes with
+        // the parameters stored in the hash, so a row carrying m=1 GiB must be
+        // refused before any allocation. A completed test is the evidence:
+        // computing this PHC would stall for minutes and allocate 1 GiB.
+        let hasher = PasswordHasher::new().expect("supported KDF");
+        let hostile = concat!(
+            "$argon2id$v=19$m=1048576,t=2,p=1$",
+            "MTIzNDU2Nzg5MGFiY2RlZg==",
+            "$QUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUE="
+        );
+        assert!(matches!(
+            hasher
+                .verify("any password".into(), Some(hostile.to_owned()))
+                .await,
+            Err(LocalAdminError::InvalidCredentials)
+        ));
+        // A plausible but non-production cost set is refused the same way.
+        let other = concat!(
+            "$argon2id$v=19$m=8192,t=2,p=1$",
+            "MTIzNDU2Nzg5MGFiY2RlZg==",
+            "$QUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUE="
+        );
+        assert!(matches!(
+            hasher
+                .verify("any password".into(), Some(other.to_owned()))
+                .await,
+            Err(LocalAdminError::InvalidCredentials)
+        ));
     }
 
     #[tokio::test]
