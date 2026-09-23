@@ -4972,7 +4972,7 @@ dependencies = [
 
 [[package]]
 name = "memory_mcp"
-version = "1.10.0"
+version = "1.11.0"
 dependencies = [
  "anno",
  "argon2 0.6.0",
