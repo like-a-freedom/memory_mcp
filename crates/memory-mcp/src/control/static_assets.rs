@@ -47,7 +47,7 @@ const HEAD_TAG: &str = "<head>";
 /// `base` and guarantees the `DIOXUS_ASSET_ROOT` meta carries exactly `base`,
 /// so the WASM's runtime base resolution reads the deployed base. `base` is
 /// the validated mount base (`""` = origin root).
-pub fn stamp_index_html(raw: &[u8], base: &str) -> Result<Vec<u8>, MemoryError> {
+pub(crate) fn stamp_index_html(raw: &[u8], base: &str) -> Result<Vec<u8>, MemoryError> {
     let html = std::str::from_utf8(raw).map_err(|_| {
         MemoryError::ConfigInvalid(
             "the embedded control-plane index.html is not valid UTF-8".to_string(),
@@ -61,7 +61,7 @@ pub fn stamp_index_html(raw: &[u8], base: &str) -> Result<Vec<u8>, MemoryError> 
         )));
     }
     let stamped = stamp_text(html, base)?;
-    let stamped = with_meta(stamped, base);
+    let stamped = with_meta(stamped, base)?;
     debug_assert!(!stamped.contains(BASE_PATH_SENTINEL));
     Ok(stamped.into_bytes())
 }
@@ -80,17 +80,28 @@ fn stamp_text(text: &str, base: &str) -> Result<String, MemoryError> {
 /// Rewrites the `content` of the `DIOXUS_ASSET_ROOT` meta to `base`, or
 /// inserts the element at the start of `<head>` when the bundle has none
 /// (dioxus-cli 0.7.10 does not emit the meta, so insertion is the live path).
-fn with_meta(html: String, base: &str) -> String {
+/// Malformed documents are a config error, never a silent rewrite.
+fn with_meta(html: String, base: &str) -> Result<String, MemoryError> {
     if let Some(start) = html.find(META_PREFIX) {
         let value_start = start + META_PREFIX.len();
-        let width = html[value_start..].find('"').unwrap_or(0);
+        let Some(width) = html[value_start..].find('"') else {
+            return Err(MemoryError::ConfigInvalid(
+                "the embedded control-plane index.html has an unterminated DIOXUS_ASSET_ROOT meta"
+                    .to_string(),
+            ));
+        };
         let mut out = String::with_capacity(html.len() + base.len());
         out.push_str(&html[..value_start]);
         out.push_str(base);
         out.push_str(&html[value_start + width..]);
-        return out;
+        return Ok(out);
     }
-    let insert_at = html.find(HEAD_TAG).map_or(0, |pos| pos + HEAD_TAG.len());
+    let Some(head) = html.find(HEAD_TAG) else {
+        return Err(MemoryError::ConfigInvalid(
+            "the embedded control-plane index.html has no <head> element to stamp".to_string(),
+        ));
+    };
+    let insert_at = head + HEAD_TAG.len();
     let mut out = String::with_capacity(html.len() + base.len() + META_PREFIX.len() + 2);
     out.push_str(&html[..insert_at]);
     out.push_str(META_PREFIX);
@@ -98,7 +109,7 @@ fn with_meta(html: String, base: &str) -> String {
     out.push('"');
     out.push('>');
     out.push_str(&html[insert_at..]);
-    out
+    Ok(out)
 }
 
 /// The single source of truth for the SPA policy, shared by the header
@@ -528,6 +539,25 @@ mod tests {
         // loudly at router assembly instead.
         let err =
             stamp_index_html(PROBE_INDEX.as_bytes(), BASE_PATH_SENTINEL).expect_err("must reject");
+        assert!(matches!(err, MemoryError::ConfigInvalid(_)), "{err:?}");
+    }
+
+    #[test]
+    fn an_unterminated_meta_is_a_config_error() {
+        // A malformed meta must fail loudly at router assembly, not silently
+        // duplicate its broken tail after the stamped base.
+        let raw = "<html><head><meta name=\"DIOXUS_ASSET_ROOT\" content=\"oops></head></html>";
+        let err = stamp_index_html(raw.as_bytes(), "").expect_err("must reject");
+        assert!(matches!(err, MemoryError::ConfigInvalid(_)), "{err:?}");
+    }
+
+    #[test]
+    fn a_document_without_head_is_a_config_error() {
+        // Inserting the meta before `<!DOCTYPE html>` would put the document
+        // in quirks mode; a shell without `<head>` is not a valid bundle
+        // document and must be refused.
+        let raw = "<!DOCTYPE html><html><body>/__memory_mcp_base__</body></html>";
+        let err = stamp_index_html(raw.as_bytes(), "/memory").expect_err("must reject");
         assert!(matches!(err, MemoryError::ConfigInvalid(_)), "{err:?}");
     }
 
