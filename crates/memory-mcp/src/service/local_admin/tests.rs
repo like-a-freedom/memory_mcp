@@ -45,11 +45,8 @@ mod service_cases {
     }
 
     /// Decode the session cookie into the raw verifier `resolve` expects.
-    fn cookie_verifier(cookie: &str) -> [u8; 32] {
-        let value = cookie
-            .strip_prefix("__Host-memory_mcp_admin=")
-            .expect("session cookie prefix");
-        hex::decode(value)
+    fn cookie_verifier(cookie_value: &str) -> [u8; 32] {
+        hex::decode(cookie_value)
             .expect("hex cookie verifier")
             .try_into()
             .expect("32-byte cookie verifier")
@@ -139,7 +136,12 @@ mod service_cases {
             .await
             .expect("login");
         assert_eq!(login.principal.username, "ops.one");
-        assert!(login.cookie.starts_with("__Host-memory_mcp_admin="));
+        // The bare verifier: the HTTP layer owns the cookie name and attributes.
+        assert_eq!(login.cookie_value.len(), 64, "64 hex chars");
+        assert!(
+            login.cookie_value.chars().all(|c| c.is_ascii_hexdigit()),
+            "bare hex verifier"
+        );
     }
 
     #[tokio::test]
@@ -203,7 +205,7 @@ mod service_cases {
             .expect("login");
 
         // Resolve session
-        let verifier = cookie_verifier(&login.cookie);
+        let verifier = cookie_verifier(&login.cookie_value);
         let principal = auth
             .resolve(&request(), &verifier)
             .await
@@ -240,7 +242,7 @@ mod service_cases {
             .expect("logout");
 
         // Try to resolve session — should fail
-        let verifier = cookie_verifier(&login.cookie);
+        let verifier = cookie_verifier(&login.cookie_value);
         assert!(auth.resolve(&request(), &verifier).await.is_err());
     }
 
@@ -278,7 +280,7 @@ mod service_cases {
             .expect("reauthenticate");
         assert_eq!(reauth.principal.username, "ops.one");
         // New cookie should be different
-        assert_ne!(login.cookie, reauth.cookie);
+        assert_ne!(login.cookie_value, reauth.cookie_value);
     }
 
     #[tokio::test]
@@ -348,7 +350,7 @@ mod service_cases {
             .recover_admin("ops.one", &request())
             .await
             .expect("recover");
-        let old_cookie = cookie_verifier(&login.cookie);
+        let old_cookie = cookie_verifier(&login.cookie_value);
         assert!(auth.resolve(&request(), &old_cookie).await.is_err());
         assert!(
             auth.login(&attempt(), "ops.one", "first correct password".into())

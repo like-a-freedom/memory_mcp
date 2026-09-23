@@ -229,8 +229,8 @@ async fn local_admin_session_revocation_race() {
     // own, independent session.
     let logout_request = request();
     let resolve_request = request();
-    let second_verifier = cookie_verifier(&second_login.cookie);
-    let first_verifier = cookie_verifier(&first_login.cookie);
+    let second_verifier = cookie_verifier(&second_login.cookie_value);
+    let first_verifier = cookie_verifier(&first_login.cookie_value);
     let (logout, resolved) = tokio::join!(
         auth_one.logout(&logout_request, &first_login.principal),
         auth_two.resolve(&resolve_request, &second_verifier)
@@ -324,11 +324,8 @@ async fn local_admin_rate_window_survives_a_store_reconnect() {
 
 /// Decode the `__Host-memory_mcp_admin=<hex>` session cookie into the verifier
 /// the service resolves with (the same shape the HTTP layer parses).
-fn cookie_verifier(cookie: &str) -> [u8; 32] {
-    let raw = cookie
-        .strip_prefix("__Host-memory_mcp_admin=")
-        .expect("session cookie prefix");
-    hex::decode(raw)
+fn cookie_verifier(cookie_value: &str) -> [u8; 32] {
+    hex::decode(cookie_value)
         .expect("hex cookie verifier")
         .try_into()
         .expect("32-byte cookie verifier")

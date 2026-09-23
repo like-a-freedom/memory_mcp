@@ -28,13 +28,15 @@ impl LocalAdminExtension {
     pub fn verify_preauth_request(
         &self,
         headers: &axum::http::HeaderMap,
+        base_path: &str,
     ) -> Result<(), LocalAdminError> {
         let cookie_header = headers
             .get(axum::http::header::COOKIE)
             .and_then(|value| value.to_str().ok())
             .unwrap_or("");
-        let cookie_value = csrf::parse_cookie(cookie_header, csrf::PREAUTH_COOKIE)?
-            .ok_or(LocalAdminError::Forbidden)?;
+        let cookie_value =
+            csrf::parse_cookie_preferred(cookie_header, csrf::preauth_cookie_names(base_path))?
+                .ok_or(LocalAdminError::Forbidden)?;
         let token = headers
             .get("x-csrf-token")
             .and_then(|value| value.to_str().ok())
@@ -99,7 +101,7 @@ impl FromRequestParts<Arc<HttpState>> for RequireAdmin {
             .get("cookie")
             .and_then(|v| v.to_str().ok())
             .unwrap_or("");
-        let cookie_verifier = parse_admin_cookie(cookie_header)
+        let cookie_verifier = parse_admin_cookie(cookie_header, &state.config.base_path)
             .map_err(|error| handlers::map_error(error).at(parts))?
             .ok_or_else(|| handlers::map_error(LocalAdminError::Unauthenticated).at(parts))?;
 
@@ -115,14 +117,19 @@ impl FromRequestParts<Arc<HttpState>> for RequireAdmin {
     }
 }
 
-/// Parse the `__Host-memory_mcp_admin=<hex>` cookie from the Cookie
-/// header. Duplicate values are rejected rather than resolved by
-/// "first wins"; every malformed shape collapses to
+/// Parse the admin-session cookie (either mount name — see
+/// [`csrf::session_cookie_names`]) from the Cookie header, preferring the
+/// name for `base_path`. Duplicate values are rejected rather than resolved
+/// by "first wins"; every malformed shape collapses to
 /// [`LocalAdminError::Unauthenticated`] so the caller cannot distinguish
 /// "absent" from "malformed".
-pub fn parse_admin_cookie(cookie_header: &str) -> Result<Option<[u8; 32]>, LocalAdminError> {
-    let Some(value) = csrf::parse_cookie(cookie_header, csrf::SESSION_COOKIE)
-        .map_err(|_| LocalAdminError::Unauthenticated)?
+pub fn parse_admin_cookie(
+    cookie_header: &str,
+    base_path: &str,
+) -> Result<Option<[u8; 32]>, LocalAdminError> {
+    let Some(value) =
+        csrf::parse_cookie_preferred(cookie_header, csrf::session_cookie_names(base_path))
+            .map_err(|_| LocalAdminError::Unauthenticated)?
     else {
         return Ok(None);
     };

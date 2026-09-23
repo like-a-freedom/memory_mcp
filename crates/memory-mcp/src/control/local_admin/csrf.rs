@@ -18,10 +18,13 @@
 //! checked against server UTC with a bounded skew allowance; durable
 //! session deadlines continue to use database time.
 //!
-//! Cookies are `__Host-` prefixed, so they are `Secure`, `HttpOnly`,
-//! `SameSite=Strict`, `Path=/` and carry no `Domain` attribute. A
-//! request presenting the same cookie name twice is rejected outright:
-//! ambiguous values are never resolved by "first wins".
+//! Cookies are `Secure`, `HttpOnly`, `SameSite=Strict`, carry no `Domain`
+//! attribute, and switch shape with the deployment's mount base path (see
+//! [`session_cookie_names`]): `__Host-` with `Path=/` at the origin root,
+//! `__Secure-` with `Path={base}/` under a prefix — `__Host-` requires
+//! `Path=/`, which on a shared host would leak the credential to sibling
+//! services. A request presenting the same cookie name twice is rejected
+//! outright: ambiguous values are never resolved by "first wins".
 
 use hmac::{Hmac, KeyInit, Mac};
 use sha2::Sha256;
@@ -30,11 +33,54 @@ use crate::service::local_admin::contracts::{AdminFence, LocalAdminError, LocalR
 
 type HmacSha256 = Hmac<Sha256>;
 
-/// Cookie carrying the signed pre-auth nonce and issue timestamp.
-pub const PREAUTH_COOKIE: &str = "__Host-memory_mcp_admin_preauth";
+const SESSION_COOKIE_HOST: &str = "__Host-memory_mcp_admin";
+const SESSION_COOKIE_SECURE: &str = "__Secure-memory_mcp_admin";
+const PREAUTH_COOKIE_HOST: &str = "__Host-memory_mcp_admin_preauth";
+const PREAUTH_COOKIE_SECURE: &str = "__Secure-memory_mcp_admin_preauth";
 
-/// Cookie carrying the admin session verifier.
-pub const SESSION_COOKIE: &str = "__Host-memory_mcp_admin";
+/// `[preferred, other]` admin-session cookie names for a mount base path:
+/// `__Host-` + `Path=/` at the origin root, `__Secure-` + `Path={base}/`
+/// under a prefix. Parsing walks them in order — the configured name wins,
+/// the other still parses so a config change never wedges a live session.
+pub fn session_cookie_names(base_path: &str) -> [&'static str; 2] {
+    if base_path.is_empty() {
+        [SESSION_COOKIE_HOST, SESSION_COOKIE_SECURE]
+    } else {
+        [SESSION_COOKIE_SECURE, SESSION_COOKIE_HOST]
+    }
+}
+
+/// The name Set-Cookie uses for this base path (`session_cookie_names[0]`).
+pub fn session_cookie_name(base_path: &str) -> &'static str {
+    session_cookie_names(base_path)[0]
+}
+
+/// `[preferred, other]` pre-auth cookie names; see [`session_cookie_names`].
+pub fn preauth_cookie_names(base_path: &str) -> [&'static str; 2] {
+    if base_path.is_empty() {
+        [PREAUTH_COOKIE_HOST, PREAUTH_COOKIE_SECURE]
+    } else {
+        [PREAUTH_COOKIE_SECURE, PREAUTH_COOKIE_HOST]
+    }
+}
+
+/// The name Set-Cookie uses for this base path (`preauth_cookie_names[0]`).
+pub fn preauth_cookie_name(base_path: &str) -> &'static str {
+    preauth_cookie_names(base_path)[0]
+}
+
+/// Parse `name` from the Cookie header, preferring `names[0]` and falling
+/// back to `names[1]`. A duplicate of *either* name is still rejected
+/// outright — only the cross-name preference is tolerated.
+pub fn parse_cookie_preferred(
+    header: &str,
+    names: [&'static str; 2],
+) -> LocalResult<Option<String>> {
+    if let Some(value) = parse_cookie(header, names[0])? {
+        return Ok(Some(value));
+    }
+    parse_cookie(header, names[1])
+}
 
 /// Pre-auth material lifetime.
 pub const PREAUTH_TTL_SECONDS: i64 = 300;
@@ -78,12 +124,17 @@ fn hex_32(value: &[u8; 32]) -> String {
 ///
 /// `now_unix` is passed in so callers can inject a deterministic clock
 /// in tests; production passes `Utc::now().timestamp()`.
-pub fn issue_preauth(key: &[u8; 32], epoch: u64, now_unix: i64) -> LocalResult<PreauthIssue> {
+pub fn issue_preauth(
+    key: &[u8; 32],
+    epoch: u64,
+    now_unix: i64,
+    base_path: &str,
+) -> LocalResult<PreauthIssue> {
     let nonce = random_32();
     let cookie_value = sign_preauth(key, &nonce, epoch, now_unix)?;
     let token = preauth_token(key, &cookie_value)?;
     Ok(PreauthIssue {
-        cookie: format!("{PREAUTH_COOKIE}={cookie_value}"),
+        cookie: format!("{}={cookie_value}", preauth_cookie_name(base_path)),
         token,
     })
 }
@@ -269,7 +320,7 @@ mod tests {
 
     #[test]
     fn preauth_roundtrip() {
-        let issued = issue_preauth(&KEY, 3, 1_000).expect("issue");
+        let issued = issue_preauth(&KEY, 3, 1_000, "").expect("issue");
         let cookie_value = issued
             .cookie
             .strip_prefix("__Host-memory_mcp_admin_preauth=")
@@ -280,37 +331,38 @@ mod tests {
 
     #[test]
     fn preauth_rejects_expired() {
-        let issued = issue_preauth(&KEY, 3, 1_000).expect("issue");
+        let issued = issue_preauth(&KEY, 3, 1_000, "").expect("issue");
         let cookie_value = issued.cookie.split_once('=').expect("kv").1;
         assert!(verify_preauth(&KEY, cookie_value, &issued.token, 3, 9_999).is_err());
     }
 
     #[test]
     fn preauth_rejects_future_timestamp() {
-        let issued = issue_preauth(&KEY, 3, 10_000).expect("issue");
+        let issued = issue_preauth(&KEY, 3, 10_000, "").expect("issue");
         let cookie_value = issued.cookie.split_once('=').expect("kv").1;
         assert!(verify_preauth(&KEY, cookie_value, &issued.token, 3, 1_000).is_err());
     }
 
     #[test]
     fn preauth_rejects_wrong_epoch() {
-        let issued = issue_preauth(&KEY, 3, 1_000).expect("issue");
+        let issued = issue_preauth(&KEY, 3, 1_000, "").expect("issue");
         let cookie_value = issued.cookie.split_once('=').expect("kv").1;
         assert!(verify_preauth(&KEY, cookie_value, &issued.token, 4, 1_000).is_err());
     }
 
     #[test]
     fn preauth_rejects_wrong_token() {
-        let issued = issue_preauth(&KEY, 3, 1_000).expect("issue");
-        let other = issue_preauth(&KEY, 3, 1_000).expect("issue");
+        let issued = issue_preauth(&KEY, 3, 1_000, "").expect("issue");
+        let other = issue_preauth(&KEY, 3, 1_000, "").expect("issue");
         let cookie_value = issued.cookie.split_once('=').expect("kv").1;
         assert!(verify_preauth(&KEY, cookie_value, &other.token, 3, 1_000).is_err());
     }
 
     #[test]
     fn duplicate_cookie_is_rejected() {
-        let header = format!("{PREAUTH_COOKIE}=a; {PREAUTH_COOKIE}=b");
-        assert!(parse_cookie(&header, PREAUTH_COOKIE).is_err());
+        let name = preauth_cookie_name("");
+        let header = format!("{name}=a; {name}=b");
+        assert!(parse_cookie(&header, name).is_err());
     }
 
     #[test]

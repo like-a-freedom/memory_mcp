@@ -74,14 +74,57 @@ impl ControlPlaneSession {
     }
 }
 
+/// `__Host-` requires `Path=/` (cookie spec), which on a shared host sends
+/// the credential to every sibling service. Under a base path we scope the
+/// cookie instead and must downgrade to `__Secure-`.
+pub fn session_cookie_name(base_path: &str) -> &'static str {
+    if base_path.is_empty() {
+        "__Host-memory_mcp_session"
+    } else {
+        "__Secure-memory_mcp_session"
+    }
+}
+
+pub fn session_cookie_path(base_path: &str) -> String {
+    if base_path.is_empty() {
+        "/".to_owned()
+    } else {
+        format!("{base_path}/")
+    }
+}
+
 /// Build a Set-Cookie header value for the session.
-pub fn build_session_cookie(
-    cookie_value: String,
-    _cfg: &crate::http::config::HttpConfig,
-) -> String {
+pub fn build_session_cookie(cookie_value: String, cfg: &crate::http::config::HttpConfig) -> String {
     format!(
-        "__Host-memory_mcp_session={cookie_value}; Path=/; Secure; HttpOnly; SameSite=Lax; Max-Age=86400",
+        "{}={cookie_value}; Path={}; Secure; HttpOnly; SameSite=Lax; Max-Age=86400",
+        session_cookie_name(&cfg.base_path),
+        session_cookie_path(&cfg.base_path),
     )
+}
+
+/// Build the Set-Cookie header value that clears the session cookie —
+/// clearing must repeat the exact name and path used when setting.
+pub fn clear_session_cookie(cfg: &crate::http::config::HttpConfig) -> String {
+    format!(
+        "{}=; Path={}; Secure; HttpOnly; SameSite=Lax; Max-Age=0",
+        session_cookie_name(&cfg.base_path),
+        session_cookie_path(&cfg.base_path),
+    )
+}
+
+/// Accepts both names deliberately: the configured one is preferred, the
+/// other keeps a session readable across a config change. Preference must
+/// win over header order — a browser sends both during a migration.
+pub fn parse_session_cookie<'a>(header_value: &'a str, base_path: &str) -> Option<&'a str> {
+    let find = |name: &str| {
+        header_value.split(';').find_map(|cookie| {
+            let (cookie_name, value) = cookie.trim().split_once('=')?;
+            (cookie_name == name).then_some(value)
+        })
+    };
+    find(session_cookie_name(base_path))
+        .or_else(|| find("__Host-memory_mcp_session"))
+        .or_else(|| find("__Secure-memory_mcp_session"))
 }
 
 /// Resolve and refresh a server-side session from a raw cookie value.
@@ -180,5 +223,56 @@ mod tests {
         let b = generate_session_cookie_value();
         assert_ne!(a, b);
         assert_eq!(a.len(), 64);
+    }
+}
+
+#[cfg(test)]
+mod cookie_tests {
+    use super::*;
+
+    #[test]
+    fn root_deployments_keep_the_host_prefixed_cookie() {
+        let cfg = crate::http::config::HttpConfig::default_for_test();
+        assert_eq!(
+            build_session_cookie("v".into(), &cfg),
+            "__Host-memory_mcp_session=v; Path=/; Secure; HttpOnly; SameSite=Lax; Max-Age=86400"
+        );
+    }
+
+    #[test]
+    fn a_base_path_scopes_the_cookie_and_drops_the_host_prefix() {
+        let mut cfg = crate::http::config::HttpConfig::default_for_test();
+        cfg.base_path = "/memory".into();
+        let cookie = build_session_cookie("v".into(), &cfg);
+        assert!(
+            cookie.starts_with("__Secure-memory_mcp_session=v; Path=/memory/;"),
+            "got: {cookie}"
+        );
+        assert!(!cookie.contains("__Host-"), "got: {cookie}");
+    }
+
+    #[test]
+    fn clearing_uses_the_same_name_and_path_as_setting() {
+        let mut cfg = crate::http::config::HttpConfig::default_for_test();
+        cfg.base_path = "/memory".into();
+        let clear = clear_session_cookie(&cfg);
+        assert!(
+            clear.starts_with("__Secure-memory_mcp_session=; Path=/memory/;"),
+            "got: {clear}"
+        );
+        assert!(clear.contains("Max-Age=0"), "got: {clear}");
+    }
+
+    #[test]
+    fn parsing_prefers_the_configured_name_and_accepts_the_other() {
+        let hdr = "other=1; __Host-memory_mcp_session=abc; __Secure-memory_mcp_session=def";
+        // Preferred name wins even though the other one appears first.
+        assert_eq!(parse_session_cookie(hdr, ""), Some("abc"));
+        assert_eq!(parse_session_cookie(hdr, "/memory"), Some("def"));
+        // The non-configured name still parses (config changes never wedge).
+        assert_eq!(
+            parse_session_cookie("__Host-memory_mcp_session=abc", "/memory"),
+            Some("abc")
+        );
     }
 }

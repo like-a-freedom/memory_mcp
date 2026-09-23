@@ -149,12 +149,27 @@ pub struct AuthAttemptContext {
 }
 
 /// Admin fence for session/guard checks.
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct AdminFence {
     pub admin_id: String,
     pub session_id: String,
     pub credential_generation: u64,
     pub policy: BrowserPolicyFence,
+}
+
+/// `session_id` IS the session-cookie verifier — the store keys sessions by
+/// its hex (`WHERE cookie_verifier = …`) — so printing it in `Debug` would
+/// leak the session credential into any log line that renders a principal.
+/// Same redaction contract as `AdminLogin::cookie_value`.
+impl fmt::Debug for AdminFence {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("AdminFence")
+            .field("admin_id", &self.admin_id)
+            .field("session_id", &REDACTED)
+            .field("credential_generation", &self.credential_generation)
+            .field("policy", &self.policy)
+            .finish()
+    }
 }
 
 /// Admin principal after successful authentication.
@@ -349,15 +364,17 @@ impl fmt::Debug for OneTimeChallenge {
 /// Admin login result.
 pub struct AdminLogin {
     pub principal: AdminPrincipal,
-    pub cookie: String,
+    /// Bare hex session verifier (32 bytes → 64 chars). The HTTP layer
+    /// composes the cookie name and attributes around it.
+    pub cookie_value: String,
 }
 
-/// `cookie` is the session credential, cookie name included: redacted.
+/// `cookie_value` is the session credential: redacted.
 impl fmt::Debug for AdminLogin {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("AdminLogin")
             .field("principal", &self.principal)
-            .field("cookie", &REDACTED)
+            .field("cookie_value", &REDACTED)
             .finish()
     }
 }

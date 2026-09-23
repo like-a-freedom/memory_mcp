@@ -62,11 +62,8 @@ mod tests {
     }
 
     /// Decode a session cookie into the raw verifier `resolve` expects.
-    fn cookie_verifier(cookie: &str) -> [u8; 32] {
-        let value = cookie
-            .strip_prefix("__Host-memory_mcp_admin=")
-            .expect("session cookie prefix");
-        hex::decode(value)
+    fn cookie_verifier(cookie_value: &str) -> [u8; 32] {
+        hex::decode(cookie_value)
             .expect("hex cookie verifier")
             .try_into()
             .expect("32-byte cookie verifier")
@@ -202,7 +199,7 @@ mod tests {
 
         let login = activated_login(&mgmt, &auth, "FirstP@ss1234567").await;
         assert!(
-            auth.resolve(&make_request(), &cookie_verifier(&login.cookie))
+            auth.resolve(&make_request(), &cookie_verifier(&login.cookie_value))
                 .await
                 .is_ok(),
             "the fresh session must resolve"
@@ -214,7 +211,7 @@ mod tests {
             .expect("recover");
 
         assert!(
-            auth.resolve(&make_request(), &cookie_verifier(&login.cookie))
+            auth.resolve(&make_request(), &cookie_verifier(&login.cookie_value))
                 .await
                 .is_err(),
             "recovery must invalidate existing sessions"
@@ -250,7 +247,7 @@ mod tests {
         let auth = LocalAdminService::new(authority.clone(), hasher);
 
         let login = activated_login(&mgmt, &auth, "SecureP@ssw0rd123").await;
-        let verifier = cookie_verifier(&login.cookie);
+        let verifier = cookie_verifier(&login.cookie_value);
         auth.logout(&make_request(), &login.principal)
             .await
             .expect("logout");
@@ -309,7 +306,7 @@ mod tests {
         let auth = LocalAdminService::new(authority.clone(), hasher);
 
         let login = activated_login(&mgmt, &auth, "SecureP@ssw0rd123").await;
-        let old_verifier = cookie_verifier(&login.cookie);
+        let old_verifier = cookie_verifier(&login.cookie_value);
         let rotated = auth
             .reauthenticate(
                 &make_auth(),
@@ -320,7 +317,7 @@ mod tests {
             .expect("reauth");
 
         assert_ne!(
-            rotated.cookie, login.cookie,
+            rotated.cookie_value, login.cookie_value,
             "reauth must rotate the cookie"
         );
         assert_eq!(
@@ -328,7 +325,7 @@ mod tests {
             "rotation keeps the same administrator"
         );
         assert!(
-            auth.resolve(&make_request(), &cookie_verifier(&rotated.cookie))
+            auth.resolve(&make_request(), &cookie_verifier(&rotated.cookie_value))
                 .await
                 .is_ok(),
             "the rotated session must resolve"
@@ -500,7 +497,10 @@ mod tests {
             logins.push(handle.await.expect("join").expect("admitted login"));
         }
 
-        let cookies: Vec<_> = logins.iter().map(|login| login.cookie.clone()).collect();
+        let cookies: Vec<_> = logins
+            .iter()
+            .map(|login| login.cookie_value.clone())
+            .collect();
         let unique: std::collections::HashSet<_> = cookies.iter().collect();
         assert_eq!(
             unique.len(),
@@ -539,7 +539,7 @@ mod tests {
         assert!(raced_recovery.is_ok(), "the recovery always commits");
         if let Ok(login) = raced_login {
             assert!(
-                auth.resolve(&make_request(), &cookie_verifier(&login.cookie))
+                auth.resolve(&make_request(), &cookie_verifier(&login.cookie_value))
                     .await
                     .is_err(),
                 "recovery must revoke a session that won the insert race"
@@ -625,7 +625,7 @@ mod tests {
         let mgmt = AdminManagementService::new(authority.clone());
         let auth = LocalAdminService::new(authority.clone(), hasher);
         let login = activated_login(&mgmt, &auth, "SecureP@ssw0rd123").await;
-        let verifier = cookie_verifier(&login.cookie);
+        let verifier = cookie_verifier(&login.cookie_value);
 
         let resolve_request = make_request();
         let recovery_request = make_request();

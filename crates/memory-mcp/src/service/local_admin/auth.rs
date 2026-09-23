@@ -471,8 +471,11 @@ impl LocalAdminService {
             }
             Err(error) => return Err(error),
         };
-        let cookie = format!("__Host-memory_mcp_admin={}", hex::encode(cookie_verifier));
-        Ok(AdminLogin { principal, cookie })
+        let cookie_value = hex::encode(cookie_verifier);
+        Ok(AdminLogin {
+            principal,
+            cookie_value,
+        })
     }
 
     /// Resolve a session from a cookie verifier.
@@ -548,13 +551,10 @@ impl LocalAdminService {
             request: context.request.clone(),
         };
         let new_principal = self.authority.store().rotate_session(command).await?;
-        let cookie = format!(
-            "__Host-memory_mcp_admin={}",
-            hex::encode(new_cookie_verifier)
-        );
+        let cookie_value = hex::encode(new_cookie_verifier);
         Ok(AdminLogin {
             principal: new_principal,
-            cookie,
+            cookie_value,
         })
     }
 

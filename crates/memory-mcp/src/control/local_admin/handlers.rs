@@ -390,7 +390,7 @@ fn guard_preauth(
     parts: &Parts,
 ) -> Result<(), Rejection> {
     require_origin(state, &parts.headers)?;
-    ext.verify_preauth_request(&parts.headers)
+    ext.verify_preauth_request(&parts.headers, &state.config.base_path)
         .map_err(|_| Rejection::new(StatusCode::FORBIDDEN, "forbidden", "request rejected"))
 }
 
@@ -468,13 +468,16 @@ pub async fn preauth_csrf(
         ext.authority.csrf_key(),
         ext.authority.policy().epoch,
         chrono::Utc::now().timestamp(),
+        &state.config.base_path,
     ) {
         Ok(issued) => issued,
         Err(error) => return map_error(error).at(&parts).into_response(),
     };
     let cookie = format!(
-        "{}; Path=/; Secure; HttpOnly; SameSite=Strict; Max-Age={}",
-        issued.cookie, PREAUTH_COOKIE_MAX_AGE
+        "{}; Path={}; Secure; HttpOnly; SameSite=Strict; Max-Age={}",
+        issued.cookie,
+        crate::control::session::session_cookie_path(&state.config.base_path),
+        PREAUTH_COOKIE_MAX_AGE
     );
     let mut response = json_response(
         StatusCode::OK,
@@ -649,10 +652,13 @@ pub async fn login(
     match service.login(&context, &req.username, req.password).await {
         Ok(login) => {
             let mut response = no_content();
-            append_set_cookie(&mut response, &session_cookie(&login.cookie, None));
+            append_set_cookie(
+                &mut response,
+                &session_cookie(&state.config, &login.cookie_value, None),
+            );
             // Rotate the pre-auth cookie away on success: it has no
             // further purpose and must not be replayable.
-            append_set_cookie(&mut response, &clear_preauth_cookie());
+            append_set_cookie(&mut response, &clear_preauth_cookie(&state.config));
             response
         }
         Err(error) => map_error(error).at(&parts).into_response(),
@@ -743,7 +749,7 @@ pub async fn reauth(
                 .max(0);
             append_set_cookie(
                 &mut response,
-                &session_cookie(&login.cookie, Some(remaining)),
+                &session_cookie(&state.config, &login.cookie_value, Some(remaining)),
             );
             response
         }
@@ -772,11 +778,14 @@ pub async fn logout(
         .get(axum::http::header::COOKIE)
         .and_then(|value| value.to_str().ok())
         .unwrap_or("");
-    let verifier = match crate::control::local_admin::parse_admin_cookie(cookie_header) {
+    let verifier = match crate::control::local_admin::parse_admin_cookie(
+        cookie_header,
+        &state.config.base_path,
+    ) {
         Ok(Some(verifier)) => verifier,
         // No session: 204 with no side effect beyond clearing a cookie
         // the caller may or may not hold.
-        Ok(None) => return clear_session_response(),
+        Ok(None) => return clear_session_response(&state.config),
         Err(error) => return map_error(error).at(&parts).into_response(),
     };
     let service = make_auth_service(ext);
@@ -785,7 +794,7 @@ pub async fn logout(
         // An expired, revoked or unverifiable cookie is not a session to
         // revoke, so logout stays a no-op for it. Every session read in this
         // module goes through the service ([`LocalAdminService::resolve`]).
-        Err(_) => return clear_session_response(),
+        Err(_) => return clear_session_response(&state.config),
     };
     if let Err(rejection) = ext
         .verify_session_request(&parts.headers, &principal.fence)
@@ -794,14 +803,14 @@ pub async fn logout(
         return rejection.at(&parts).into_response();
     }
     match service.logout(&request_ctx(&parts), &principal).await {
-        Ok(()) => clear_session_response(),
+        Ok(()) => clear_session_response(&state.config),
         Err(error) => map_error(error).at(&parts).into_response(),
     }
 }
 
-fn clear_session_response() -> Response {
+fn clear_session_response(cfg: &crate::http::config::HttpConfig) -> Response {
     let mut response = no_content();
-    append_set_cookie(&mut response, &clear_session_cookie());
+    append_set_cookie(&mut response, &clear_session_cookie(cfg));
     response
 }
 
@@ -813,28 +822,40 @@ fn append_set_cookie(response: &mut Response, cookie: &str) {
     }
 }
 
-/// The admin session cookie. `Max-Age` is omitted for a session-scoped
+/// The admin session cookie, composed from the mount base path:
+/// `__Host-` with `Path=/` at the origin root, or `__Secure-` with
+/// `Path={base}/` under a prefix. `Max-Age` is omitted for a session-scoped
 /// cookie; the reauth path passes the remaining absolute lifetime.
-fn session_cookie(cookie: &str, max_age: Option<i64>) -> String {
+fn session_cookie(
+    cfg: &crate::http::config::HttpConfig,
+    cookie_value: &str,
+    max_age: Option<i64>,
+) -> String {
+    let name = csrf::session_cookie_name(&cfg.base_path);
+    let path = crate::control::session::session_cookie_path(&cfg.base_path);
     match max_age {
         Some(seconds) => {
-            format!("{cookie}; Path=/; Secure; HttpOnly; SameSite=Strict; Max-Age={seconds}")
+            format!(
+                "{name}={cookie_value}; Path={path}; Secure; HttpOnly; SameSite=Strict; Max-Age={seconds}"
+            )
         }
-        None => format!("{cookie}; Path=/; Secure; HttpOnly; SameSite=Strict"),
+        None => format!("{name}={cookie_value}; Path={path}; Secure; HttpOnly; SameSite=Strict"),
     }
 }
 
-fn clear_session_cookie() -> String {
+fn clear_session_cookie(cfg: &crate::http::config::HttpConfig) -> String {
     format!(
-        "{}; Path=/; Secure; HttpOnly; SameSite=Strict; Max-Age=0",
-        csrf::SESSION_COOKIE
+        "{}=; Path={}; Secure; HttpOnly; SameSite=Strict; Max-Age=0",
+        csrf::session_cookie_name(&cfg.base_path),
+        crate::control::session::session_cookie_path(&cfg.base_path)
     )
 }
 
-fn clear_preauth_cookie() -> String {
+fn clear_preauth_cookie(cfg: &crate::http::config::HttpConfig) -> String {
     format!(
-        "{}; Path=/; Secure; HttpOnly; SameSite=Strict; Max-Age=0",
-        csrf::PREAUTH_COOKIE
+        "{}=; Path={}; Secure; HttpOnly; SameSite=Strict; Max-Age=0",
+        csrf::preauth_cookie_name(&cfg.base_path),
+        crate::control::session::session_cookie_path(&cfg.base_path)
     )
 }
 

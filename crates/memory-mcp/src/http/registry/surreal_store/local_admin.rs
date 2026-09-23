@@ -2050,10 +2050,7 @@ mod sql_fault_tests {
             .login(&attempt(), "ops.one", PASSWORD.to_owned())
             .await
             .expect("login");
-        let raw = login
-            .cookie
-            .strip_prefix("__Host-memory_mcp_admin=")
-            .expect("session cookie prefix");
+        let raw = &login.cookie_value;
         hex::decode(raw)
             .expect("hex cookie verifier")
             .try_into()
@@ -2439,10 +2436,7 @@ mod guard_semantics_tests {
             .login(&attempt(), "ops.one", PASSWORD.to_owned())
             .await
             .expect("login");
-        let raw = login
-            .cookie
-            .strip_prefix("__Host-memory_mcp_admin=")
-            .expect("session cookie prefix");
+        let raw = &login.cookie_value;
         let verifier: [u8; 32] = hex::decode(raw)
             .expect("hex cookie verifier")
             .try_into()
@@ -2643,16 +2637,33 @@ mod secret_hygiene_tests {
             .expect("login");
 
         let rendered = format!("{login:?}");
+        // The verifier hex must not render anywhere: `cookie_value` and the
+        // fence's `session_id` (which IS the verifier) are both redacted.
         assert!(
-            !rendered.contains(&login.cookie),
+            !rendered.contains(&login.cookie_value),
             "Debug must redact the session cookie: {rendered}"
+        );
+        assert!(
+            rendered.contains("<redacted>"),
+            "the redaction marker renders: {rendered}"
         );
         assert!(
             !rendered.contains(PASSWORD),
             "Debug must not carry the password: {rendered}"
         );
 
-        assert_absent_from_every_table(&store, &login.cookie, "the session cookie").await;
+        // Durable rows: the *cookie as a header value* (name and verifier
+        // together) must appear nowhere. The bare verifier hex is deliberately
+        // stored — it is `local_admin_session`'s lookup key (`resolve_session`
+        // selects `WHERE cookie_verifier = $hex`) — so scanning for the hex
+        // alone would assert against the design; the composed cookie string is
+        // what must never be persisted.
+        let composed_cookie = format!(
+            "{}={}",
+            crate::control::local_admin::csrf::session_cookie_name(""),
+            login.cookie_value
+        );
+        assert_absent_from_every_table(&store, &composed_cookie, "the session cookie").await;
         assert_absent_from_every_table(&store, PASSWORD, "the administrator password").await;
         // A consumed code must not linger either.
         assert_absent_from_every_table(&store, &challenge.code, "the consumed activation code")

@@ -88,10 +88,8 @@ pub async fn authenticate_control_plane_session(
         .get(header::COOKIE)
         .and_then(|value| value.to_str().ok())
         .and_then(|cookies| {
-            cookies.split(';').find_map(|cookie| {
-                let (name, value) = cookie.trim().split_once('=')?;
-                (name == "__Host-memory_mcp_session").then_some(value.to_owned())
-            })
+            crate::control::session::parse_session_cookie(cookies, &state.config.base_path)
+                .map(str::to_owned)
         });
     let Some(cookie) = cookie else {
         return (StatusCode::UNAUTHORIZED, "control-plane session required").into_response();

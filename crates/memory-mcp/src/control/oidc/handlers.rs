@@ -109,7 +109,7 @@ pub async fn logout(
     let mut headers = axum::http::HeaderMap::new();
     headers.insert(
         axum::http::header::SET_COOKIE,
-        "__Host-memory_mcp_session=; Path=/; Secure; HttpOnly; SameSite=Lax; Max-Age=0"
+        crate::control::session::clear_session_cookie(&state.config)
             .parse()
             .map_err(|_| {
                 ApiError::Internal(MemoryError::ConfigInvalid(
