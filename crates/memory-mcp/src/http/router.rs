@@ -292,16 +292,16 @@ pub fn build_router(
     // bundle contract it does not serve; the `#[cfg]` mirrors the gate on
     // the `serve_asset` call inside the fallback.
     #[cfg(feature = "control-plane-ui")]
-    let ui_index = if ui_enabled {
-        crate::control::static_assets::build_stamped_index(&state.config.base_path)?
+    let stamped_assets = if ui_enabled {
+        crate::control::static_assets::build_stamped_assets(&state.config.base_path)?
     } else {
         None
     };
     #[cfg(not(feature = "control-plane-ui"))]
-    let ui_index: Option<std::sync::Arc<[u8]>> = None;
+    let stamped_assets: Option<std::sync::Arc<crate::control::static_assets::StampedAssets>> = None;
 
     let router = router.fallback(move |uri: axum::http::Uri| {
-        let ui_index = ui_index.clone();
+        let stamped_assets = stamped_assets.clone();
         async move {
             let path = uri.path();
             if path.starts_with("/api/") || path == "/api" {
@@ -320,9 +320,9 @@ pub fn build_router(
             }
             #[cfg(feature = "control-plane-ui")]
             if ui_enabled {
-                return crate::control::static_assets::serve_asset(path, ui_index.as_deref());
+                return crate::control::static_assets::serve_asset(path, stamped_assets.as_deref());
             }
-            let _ = (ui_enabled, &ui_index);
+            let _ = (ui_enabled, &stamped_assets);
             axum::response::IntoResponse::into_response((
                 axum::http::StatusCode::NOT_FOUND,
                 [(axum::http::header::CONTENT_TYPE, "application/json")],

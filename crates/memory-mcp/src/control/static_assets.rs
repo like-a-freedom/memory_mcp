@@ -48,11 +48,6 @@ const HEAD_TAG: &str = "<head>";
 /// so the WASM's runtime base resolution reads the deployed base. `base` is
 /// the validated mount base (`""` = origin root).
 pub fn stamp_index_html(raw: &[u8], base: &str) -> Result<Vec<u8>, MemoryError> {
-    if base.contains(BASE_PATH_SENTINEL) {
-        return Err(MemoryError::ConfigInvalid(
-            "the mount base itself must not contain the bundle sentinel".to_string(),
-        ));
-    }
     let html = std::str::from_utf8(raw).map_err(|_| {
         MemoryError::ConfigInvalid(
             "the embedded control-plane index.html is not valid UTF-8".to_string(),
@@ -65,10 +60,21 @@ pub fn stamp_index_html(raw: &[u8], base: &str) -> Result<Vec<u8>, MemoryError> 
              (see README \"Control-plane UI asset packaging\")"
         )));
     }
-    let stamped = html.replace(BASE_PATH_SENTINEL, base);
+    let stamped = stamp_text(html, base)?;
     let stamped = with_meta(stamped, base);
     debug_assert!(!stamped.contains(BASE_PATH_SENTINEL));
     Ok(stamped.into_bytes())
+}
+
+/// Sentinel replacement for one UTF-8 asset, with the mount-base guard shared
+/// by every stamping path.
+fn stamp_text(text: &str, base: &str) -> Result<String, MemoryError> {
+    if base.contains(BASE_PATH_SENTINEL) {
+        return Err(MemoryError::ConfigInvalid(
+            "the mount base itself must not contain the bundle sentinel".to_string(),
+        ));
+    }
+    Ok(text.replace(BASE_PATH_SENTINEL, base))
 }
 
 /// Rewrites the `content` of the `DIOXUS_ASSET_ROOT` meta to `base`, or
@@ -125,45 +131,77 @@ pub fn attach_security_headers(mut resp: Response) -> Response {
     resp
 }
 
-/// Stamps the compiled `index.html` with the deployed mount base once, at
-/// router assembly. `None` when no UI bundle is compiled into the binary.
-pub fn build_stamped_index(base: &str) -> Result<Option<Arc<[u8]>>, MemoryError> {
-    let Some(index) = ASSETS.iter().find(|asset| asset.path == INDEX_PATH) else {
-        return Ok(None);
-    };
-    Ok(Some(Arc::from(
-        stamp_index_html(index.body, base)?.into_boxed_slice(),
-    )))
+/// Prefix-dependent bundle bytes, stamped with the mount base at router
+/// assembly. `dx bundle --base-path` bakes the sentinel not only into
+/// `index.html` (asset URLs, the `DIOXUS_ASSET_ROOT` meta) but also into the
+/// JS loader's hashed WASM URL, so every UTF-8 asset carrying the sentinel is
+/// stamped. Binary assets (the WASM) pass through byte for byte: their baked
+/// `DIOXUS_ASSET_ROOT` constant is filtered client-side (`base.rs`).
+pub struct StampedAssets {
+    entries: Vec<(&'static str, Vec<u8>)>,
 }
 
-/// Serve a compiled Dioxus asset by path. `stamped_index` is the
-/// mount-base-stamped `index.html` from [`build_stamped_index`]; SPA routes
-/// and `/index.html` serve those bytes instead of the raw compiled document.
+impl StampedAssets {
+    /// The stamped bytes for `path`, when that asset carries the sentinel.
+    pub fn get(&self, path: &str) -> Option<&[u8]> {
+        self.entries
+            .iter()
+            .find(|(entry_path, _)| *entry_path == path)
+            .map(|(_, body)| body.as_slice())
+    }
+}
+
+/// Stamps every prefix-dependent asset once, at router assembly. `None` when
+/// no UI bundle is compiled into the binary.
+pub fn build_stamped_assets(base: &str) -> Result<Option<Arc<StampedAssets>>, MemoryError> {
+    Ok(stamped_entries(ASSETS, base)?.map(Arc::new))
+}
+
+fn stamped_entries(assets: &[Asset], base: &str) -> Result<Option<StampedAssets>, MemoryError> {
+    let mut entries = Vec::new();
+    for asset in assets {
+        if asset.path == INDEX_PATH {
+            entries.push((asset.path, stamp_index_html(asset.body, base)?));
+            continue;
+        }
+        let Ok(text) = std::str::from_utf8(asset.body) else {
+            continue;
+        };
+        if text.contains(BASE_PATH_SENTINEL) {
+            entries.push((asset.path, stamp_text(text, base)?.into_bytes()));
+        }
+    }
+    if entries.is_empty() {
+        return Ok(None);
+    }
+    Ok(Some(StampedAssets { entries }))
+}
+
+/// Serve a compiled Dioxus asset by path. `stamped` carries the
+/// mount-base-stamped bytes of every prefix-dependent asset from
+/// [`build_stamped_assets`]; they replace the compiled ones wherever present
+/// (SPA routes and `/index.html` included).
 ///
 /// Exact bundle paths win. Extensionless paths outside the asset directory use
 /// the compiled index for client-side SPA routes; missing files and malformed
 /// paths return 404.
-pub fn serve_asset(path: &str, stamped_index: Option<&[u8]>) -> Response {
-    serve_asset_from(path, ASSETS, stamped_index)
+pub fn serve_asset(path: &str, stamped: Option<&StampedAssets>) -> Response {
+    serve_asset_from(path, ASSETS, stamped)
 }
 
-fn serve_asset_from(path: &str, assets: &[Asset], stamped_index: Option<&[u8]>) -> Response {
+fn serve_asset_from(path: &str, assets: &[Asset], stamped: Option<&StampedAssets>) -> Response {
     let Some(path) = request_path(path) else {
         return not_found_response();
     };
 
     if let Some(asset) = assets.iter().find(|asset| asset.path == path) {
-        return if asset.path == INDEX_PATH {
-            index_response(asset, stamped_index)
-        } else {
-            asset_response(asset)
-        };
+        return asset_response(asset, stamped.and_then(|s| s.get(asset.path)));
     }
 
     if is_spa_route(path)
         && let Some(index) = assets.iter().find(|asset| asset.path == INDEX_PATH)
     {
-        return index_response(index, stamped_index);
+        return asset_response(index, stamped.and_then(|s| s.get(index.path)));
     }
 
     not_found_response()
@@ -195,21 +233,13 @@ fn is_spa_route(path: &str) -> bool {
         .is_some_and(|segment| !segment.contains('.'))
 }
 
-fn asset_response(asset: &Asset) -> Response {
-    asset_response_with_body(asset, Body::from(asset.body))
-}
-
-/// The index document is `no-cache` and served from the stamped buffer when
-/// one exists: the compiled bytes still carry the build sentinel and must
-/// never reach a client on a prefixed deployment.
-fn index_response(asset: &Asset, stamped_index: Option<&[u8]>) -> Response {
-    match stamped_index {
-        Some(stamped) => asset_response_with_body(asset, Body::from(stamped.to_vec())),
-        None => asset_response(asset),
-    }
-}
-
-fn asset_response_with_body(asset: &Asset, body: Body) -> Response {
+fn asset_response(asset: &Asset, stamped: Option<&[u8]>) -> Response {
+    // Stamped bytes win: the compiled asset still carries the build sentinel
+    // and must never reach a client on a prefixed deployment.
+    let body = match stamped {
+        Some(bytes) => Body::from(bytes.to_vec()),
+        None => Body::from(asset.body),
+    };
     let mut resp = Response::new(body);
     resp.headers_mut()
         .insert(CONTENT_TYPE, HeaderValue::from_static(asset.content_type));
@@ -501,23 +531,84 @@ mod tests {
         assert!(matches!(err, MemoryError::ConfigInvalid(_)), "{err:?}");
     }
 
+    const PREFIXED_ASSETS: &[Asset] = &[
+        Asset {
+            path: "/assets/app-dxh.js",
+            content_type: "text/javascript; charset=utf-8",
+            immutable: true,
+            body: b"init(\"/__memory_mcp_base__/assets/app_bg-dxh.wasm\");",
+        },
+        Asset {
+            path: "/index.html",
+            content_type: "text/html; charset=utf-8",
+            immutable: false,
+            body: b"<!DOCTYPE html><html><head></head><body><script src=\"/__memory_mcp_base__/assets/app-dxh.js\"></script></body></html>",
+        },
+    ];
+
+    const BINARY_ASSETS: &[Asset] = &[Asset {
+        path: "/assets/app_bg-dxh.wasm",
+        content_type: "application/wasm",
+        immutable: true,
+        body: b"/__memory_mcp_base__\xff\xfe",
+    }];
+
     #[tokio::test]
     async fn a_stamped_index_replaces_the_compiled_document_on_spa_routes() {
-        let response = serve_asset_from(
-            "/admin/clients",
-            FIXTURE_ASSETS,
-            Some(b"stamped-fixture".as_slice()),
+        let stamped = stamped_entries(PREFIXED_ASSETS, "/memory")
+            .expect("stamps")
+            .expect("entries");
+        let response = serve_asset_from("/admin/clients", PREFIXED_ASSETS, Some(&stamped));
+        let body = response_body(response).await;
+        let body = String::from_utf8(body).expect("utf-8");
+        assert!(
+            body.contains(r#"src="/memory/assets/app-dxh.js""#),
+            "{body}"
         );
-        assert_eq!(response_body(response).await, b"stamped-fixture");
+        assert!(!body.contains(BASE_PATH_SENTINEL));
     }
 
     #[tokio::test]
     async fn the_index_path_also_serves_the_stamped_document() {
-        let response = serve_asset_from(
-            "/index.html",
-            FIXTURE_ASSETS,
-            Some(b"stamped-fixture".as_slice()),
+        let stamped = stamped_entries(PREFIXED_ASSETS, "/memory")
+            .expect("stamps")
+            .expect("entries");
+        let response = serve_asset_from("/index.html", PREFIXED_ASSETS, Some(&stamped));
+        let body = response_body(response).await;
+        let body = String::from_utf8(body).expect("utf-8");
+        assert!(
+            body.contains(r#"src="/memory/assets/app-dxh.js""#),
+            "{body}"
         );
-        assert_eq!(response_body(response).await, b"stamped-fixture");
+    }
+
+    #[tokio::test]
+    async fn a_text_asset_carrying_the_sentinel_is_served_stamped() {
+        // `dx bundle` bakes the sentinel into the JS loader too (its hashed
+        // WASM URL), not just index.html. Any UTF-8 asset carrying the
+        // sentinel must be stamped, or the loader 404s on a prefixed
+        // deployment and the WASM never boots.
+        let stamped = stamped_entries(PREFIXED_ASSETS, "/memory")
+            .expect("stamps")
+            .expect("entries");
+        let response = serve_asset_from("/assets/app-dxh.js", PREFIXED_ASSETS, Some(&stamped));
+        assert_eq!(
+            response_body(response).await,
+            br#"init("/memory/assets/app_bg-dxh.wasm");"#
+        );
+    }
+
+    #[tokio::test]
+    async fn binary_assets_are_served_byte_for_byte() {
+        // The WASM is not UTF-8; its baked `DIOXUS_ASSET_ROOT` constant is
+        // filtered client-side (`base.rs`) and its bytes must never be
+        // rewritten here.
+        let stamped = stamped_entries(BINARY_ASSETS, "/memory").expect("walks the catalog");
+        assert!(stamped.is_none(), "binary assets are never stamped");
+        let response = serve_asset_from("/assets/app_bg-dxh.wasm", BINARY_ASSETS, stamped.as_ref());
+        assert_eq!(
+            response_body(response).await,
+            b"/__memory_mcp_base__\xff\xfe"
+        );
     }
 }
