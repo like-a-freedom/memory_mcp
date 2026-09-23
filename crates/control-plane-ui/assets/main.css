@@ -239,6 +239,16 @@ main:focus {
     padding: 2rem 1.5rem 4rem;
 }
 
+/* Form-centric pages — sign-in, activation, account self-service, the 404 —
+   read as one narrow column centered between the screen edges. Every block
+   shares one width and one left line (37rem outer = 34rem content plus the
+   container padding), so a full-width banner beside a 34rem form cannot
+   leave a ragged right edge, and the column is equidistant from the
+   viewport's edges at every width. */
+.container--narrow {
+    max-width: 37rem;
+}
+
 /* A page's title with the one control that belongs to the whole page — back,
    refresh — on the same line. The title stays first in the document, so the
    heading an operator hears is still the heading they see. */
@@ -340,6 +350,9 @@ input[type="password"],
 input[type="number"],
 input[type="email"] {
     width: 100%;
+    /* One control height across the console: fields, buttons and links in a
+       form row share the same box, so their tops and bottoms line up. */
+    min-height: 2.5rem;
     background-color: var(--surface-sunken);
     color: var(--fg);
     font-family: inherit;
@@ -430,6 +443,7 @@ a.button {
     align-items: center;
     justify-content: center;
     gap: 0.375rem;
+    min-height: 2.5rem;
     background-color: var(--surface-raised);
     color: var(--fg);
     font-family: inherit;

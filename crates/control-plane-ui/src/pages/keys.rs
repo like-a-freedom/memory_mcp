@@ -90,7 +90,7 @@ pub fn KeysPage() -> Element {
     let confirming = revoke_target.read().as_ref().map(|key| key.id.clone());
 
     rsx! {
-        div { class: "container",
+        div { class: "container container--narrow",
             div { class: "page-surface", inert: inert::attr(secret_open),
                 h1 { "API keys" }
                 if signing_out_now {

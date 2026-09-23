@@ -34,7 +34,7 @@ pub fn AdminReauthPage() -> Element {
     };
 
     rsx! {
-        div { class: "container",
+        div { class: "container container--narrow",
             div { class: "page-surface", inert: inert::attr(is_ready),
                 h1 { "Confirm your password" }
                 if is_loading {

@@ -24,7 +24,7 @@ pub fn LoginPage() -> Element {
     let retry = move |_| config.restart();
 
     rsx! {
-        div { class: "container",
+        div { class: "container container--narrow",
             // The heading is outside the match: a page that is still deciding
             // which flow to show still has a name, and an accessibility check
             // reads a page with no heading as a page with no content.

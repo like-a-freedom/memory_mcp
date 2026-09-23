@@ -32,7 +32,7 @@ pub use reauth_page::AdminReauthPage;
 #[component]
 pub fn AdminLoginPage() -> Element {
     rsx! {
-        div { class: "container",
+        div { class: "container container--narrow",
             h1 { "Administrator sign-in" }
             AdminLoginForm {}
         }
@@ -43,7 +43,7 @@ pub fn AdminLoginPage() -> Element {
 #[component]
 pub fn AdminActivationPage() -> Element {
     rsx! {
-        div { class: "container",
+        div { class: "container container--narrow",
             h1 { "Set administrator password" }
             ChallengeFinishFlow { kind: ChallengeKind::Activate }
         }
@@ -54,7 +54,7 @@ pub fn AdminActivationPage() -> Element {
 #[component]
 pub fn AdminResetPage() -> Element {
     rsx! {
-        div { class: "container",
+        div { class: "container container--narrow",
             h1 { "Reset administrator password" }
             ChallengeFinishFlow { kind: ChallengeKind::Reset }
         }

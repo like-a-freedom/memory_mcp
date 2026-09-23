@@ -22,7 +22,7 @@ pub fn PageNotFound(route: Vec<String>) -> Element {
     let path = route.join("/");
 
     rsx! {
-        div { class: "container",
+        div { class: "container container--narrow",
             h1 { "Page not found" }
             p {
                 "This console has no page at "

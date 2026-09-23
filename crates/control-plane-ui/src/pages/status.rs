@@ -28,7 +28,7 @@ pub fn StatusPage() -> Element {
     let signing_out_now = *signing_out.read();
 
     rsx! {
-        div { class: "container",
+        div { class: "container container--narrow",
             h1 { "Account status" }
             if signing_out_now {
                 Alert { tone: AlertTone::Status, message: Some("Signing out…".to_owned()) }

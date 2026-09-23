@@ -71,7 +71,7 @@ pub fn DeletePage() -> Element {
     let pending_now = *pending.read();
 
     rsx! {
-        div { class: "container",
+        div { class: "container container--narrow",
             h1 { "Delete account" }
             // A plain panel rather than a live region: nothing has happened yet,
             // and an alert that fires on load reports a problem the operator does
