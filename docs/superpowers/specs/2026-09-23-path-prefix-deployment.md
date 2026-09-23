@@ -2,6 +2,11 @@
 
 **Date:** 2026-09-23
 **Status:** Approved for planning
+**Amended:** 2026-09-23 — Decision 3 is replaced: the UI bundle no longer bakes
+the mount prefix at build time. It is built relocatable (sentinel base) and the
+server stamps the deployed base into the served shell at startup. The non-goal
+"Runtime-variable base for the UI bundle" is removed accordingly.
+Implementation: `docs/superpowers/plans/2026-09-23-relocatable-ui-bundle.md`.
 **Plan:** `docs/superpowers/plans/2026-09-23-path-prefix-deployment.md`
 
 ## Context
@@ -65,16 +70,21 @@ not match, so `{base}/` (e.g. `/memory/`) would 404 while `{base}` works. The
 outer fallback answers `{base}/` with a `308` redirect to `{base}`, and
 everything else with the standard `not_found` JSON envelope.
 
-**3. The UI bundle bakes the same prefix at build time** via
-`dx bundle --base-path /memory` (Docker build arg `MEMORY_MCP_UI_BASE_PATH`,
-default empty = root bundle). This is first-class Dioxus support: prefixed
-asset URLs, the `dioxus-asset-root` meta element, and a prefix-aware
-`dioxus_web::WebHistory` for `dioxus-router`. UI code derives its fetch base
-from the same native source (`dioxus_cli_config::base_path()`) through one
-`url(path)` join; API path constants stay root-absolute. The bundle's base and
-the public URL's path **must match** — a build/deploy contract documented in
-the README (the only place the base appears twice, because runtime and build
-are separate 12-factor stages).
+**3. The UI bundle is relocatable; the server stamps the base at startup.**
+`dx bundle --base-path /__memory_mcp_base__` bakes a *sentinel*, never a
+deployment prefix: every prefix-dependent URL in the bundle's `index.html` and
+its `DIOXUS_ASSET_ROOT` meta element carry `/__memory_mcp_base__`. At router
+assembly `memory_mcp_http` replaces the sentinel with the derived base
+(`""` or `/memory`, …) in the embedded `index.html` and serves those stamped
+bytes for the SPA shell; asset requests already work at any base because
+`Router::nest` strips the prefix before `serve_asset` sees the path. The WASM
+resolves its base at runtime from the `DIOXUS_ASSET_ROOT` meta (stamped by the
+server) with a sentinel-filtered fallback, and `dioxus_web::WebHistory` receives
+the same base explicitly. A bundle missing the sentinel is rejected at startup
+(`MemoryError::ConfigInvalid`) unless the deployment is at the origin root. The
+result: **one image serves any prefix**; changing the prefix is a runtime
+configuration change and needs no rebuild. The only build/deploy contract left
+is "the bundle was built with the sentinel", which startup enforces.
 
 **4. Cookies switch to `__Secure-` + `Path={base}/` when a base is set**; with
 an empty base the existing `__Host-` + `Path=/` contract is unchanged. On a
@@ -96,8 +106,9 @@ follow from the public URL automatically.
 | `MEMORY_MCP_HTTP_PUBLIC_BASE_URL` | semantics sharpened | Its **path** is now the mount base (`https://mcp.example/memory`). No path = origin root = unchanged behavior. |
 | `MEMORY_MCP_HTTP_OIDC_REDIRECT_URI` | none | Register `https://mcp.example/memory/auth/oidc/callback` at the IdP. |
 
-Build-time: `dx bundle --base-path /memory` (Docker: `--build-arg
-MEMORY_MCP_UI_BASE_PATH=/memory`, default empty). **Zero new env vars.**
+Build-time: `dx bundle --base-path /__memory_mcp_base__` — the relocatable-bundle
+sentinel, never a deployment prefix (Docker: hardcoded in the `Dockerfile`, no
+build arg). **Zero new env vars.**
 
 ## Pangolin contract
 
@@ -112,7 +123,6 @@ participates there and answers `404` on root paths itself.
 ## Non-goals
 
 - `/metrics` exposure (operator: proxy owns it).
-- Runtime-variable base for the UI bundle (Dioxus bakes it at build time).
 - More than one mount prefix per process.
 
 ## Compatibility
@@ -122,4 +132,8 @@ participates there and answers `404` on root paths itself.
   unmodified).
 - With a path: browser sessions are invalidated by the cookie name/Path
   change (one-time re-login, same class as the documented
-  `browser_policy_epoch` break). `{base}/` answers `308 → {base}`.
+  `browser_policy_epoch` break). `{base}/` answers `308 → {base}`. The UI
+  bundle is prefix-free from this amendment on: the same image serves the
+  origin root and any prefix, stamped at startup. Prefix changes no longer
+  invalidate browser caches of hashed assets for a rebuilt bundle, because no
+  rebuild happens.
