@@ -583,6 +583,25 @@ async function scenarioUi(context) {
   );
   check('no external assets are loaded', external.length === 0, external.slice(0, 3));
 
+  // Every asset URL in the served shell must live under the mount base. This
+  // is the exact failure class of image 1.11.0: a bundle whose prefix was
+  // rebuilt at root while the server ran under /memory — the page shell
+  // returns 200 and every asset request escapes into the host root.
+  const assetRefs = await page.evaluate(() => [
+    ...[...document.querySelectorAll('link[href]')].map((el) => el.getAttribute('href')),
+    ...[...document.querySelectorAll('script[src]')].map((el) => el.getAttribute('src')),
+  ]);
+  const basePath = new URL(BASE_URL).pathname.replace(/\/+$/, '');
+  const escaped = assetRefs.filter(
+    (ref) => ref && !ref.startsWith('data:') && !ref.startsWith(`${basePath}/`),
+  );
+  check('every asset url stays under the mount base', escaped.length === 0, escaped);
+  check(
+    'no unstamped base sentinel is served',
+    assetRefs.every((ref) => !(ref ?? '').includes('__memory_mcp_base__')),
+    assetRefs,
+  );
+
   await page.close();
 }
 
