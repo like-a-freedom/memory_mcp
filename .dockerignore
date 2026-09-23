@@ -3,6 +3,9 @@
 .agents
 .codex
 .venv
+.commandcode
+.impeccable
+.zed
 target
 dist
 data
