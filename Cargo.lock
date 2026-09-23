@@ -1280,6 +1280,7 @@ dependencies = [
  "dioxus",
  "dioxus-cli-config",
  "dioxus-router",
+ "dioxus-web",
  "gloo-net 0.7.0",
  "gloo-storage",
  "gloo-timers",

@@ -13,6 +13,12 @@ path = "src/main.rs"
 [dependencies]
 dioxus = { version = "=0.7.10", features = ["web"] }
 dioxus-router = "=0.7.10"
+# The renderer `dioxus` already resolves to; named here only so `main` can
+# hand `WebHistory` an explicit runtime prefix via `Config::history` — the
+# one native seam that keeps the router's URL space in step with the
+# server-stamped base. Pin is exact and must keep matching what `dioxus`
+# resolves to in `Cargo.lock` (same policy as the list below).
+dioxus-web = "=0.7.10"
 # Native Dioxus base-path source — the exact value `dioxus_web::WebHistory`
 # prefixes router navigation with. Already in the lock file through
 # `dioxus-web`; naming it here adds no crate to the graph (see the pin policy
