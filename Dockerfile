@@ -49,9 +49,6 @@ RUN apt-get update \
 
 ARG DIOXUS_CLI_VERSION=0.7.10
 ARG WASM_TARGET=wasm32-unknown-unknown
-# Mount prefix for the control-plane bundle (empty = origin root). Must
-# equal the path of the deployed MEMORY_MCP_HTTP_PUBLIC_BASE_URL.
-ARG MEMORY_MCP_UI_BASE_PATH=
 
 RUN rustup target add "${WASM_TARGET}" \
     && cargo install dioxus-cli --version "${DIOXUS_CLI_VERSION}" --locked
@@ -66,18 +63,22 @@ COPY . .
 # embeds it — grows by one stale JS/WASM pair (about 0.8 MB) on every build, and
 # ships assets nothing references. The counts are asserted so a regression fails
 # the build instead of silently bloating the image.
+# The bundle is relocatable: every prefix-dependent URL in its index.html and
+# its DIOXUS_ASSET_ROOT meta carry the sentinel /__memory_mcp_base__, which
+# memory_mcp_http replaces with the deployed MEMORY_MCP_HTTP_PUBLIC_BASE_URL
+# path at startup. Never pass a deployment prefix here. The literal must match
+# BASE_PATH_SENTINEL in crates/memory-mcp/src/control/static_assets.rs and
+# crates/control-plane-ui/src/base.rs, and the favicon href in
+# crates/control-plane-ui/index.html.
 RUN --mount=type=cache,id=memory-mcp-cargo-registry-ui,target=/usr/local/cargo/registry \
     --mount=type=cache,id=memory-mcp-cargo-git-ui,target=/usr/local/cargo/git \
     --mount=type=cache,id=memory-mcp-target-ui,target=/src/target \
     set -eux; \
     cd /src; \
     rm -rf /src/target/dx/control-plane-ui/release/web/public /src/control-plane-ui-dist; \
-    base_args=""; \
-    if [ -n "${MEMORY_MCP_UI_BASE_PATH}" ]; then \
-        base_args="--base-path ${MEMORY_MCP_UI_BASE_PATH}"; \
-    fi; \
-    dx bundle --platform web --release --package control-plane-ui --out-dir /src/control-plane-ui-dist ${base_args}; \
+    dx bundle --platform web --release --package control-plane-ui --out-dir /src/control-plane-ui-dist --base-path /__memory_mcp_base__; \
     test -s /src/control-plane-ui-dist/public/index.html; \
+    grep -q '__memory_mcp_base__' /src/control-plane-ui-dist/public/index.html; \
     test "$(find /src/control-plane-ui-dist/public -type f -name '*.js'   | wc -l)" = "1"; \
     test "$(find /src/control-plane-ui-dist/public -type f -name '*.wasm' | wc -l)" = "1"; \
     test "$(find /src/control-plane-ui-dist/public -type f -name '*.css'  | wc -l)" = "1"
