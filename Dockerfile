@@ -49,6 +49,9 @@ RUN apt-get update \
 
 ARG DIOXUS_CLI_VERSION=0.7.10
 ARG WASM_TARGET=wasm32-unknown-unknown
+# Mount prefix for the control-plane bundle (empty = origin root). Must
+# equal the path of the deployed MEMORY_MCP_HTTP_PUBLIC_BASE_URL.
+ARG MEMORY_MCP_UI_BASE_PATH=
 
 RUN rustup target add "${WASM_TARGET}" \
     && cargo install dioxus-cli --version "${DIOXUS_CLI_VERSION}" --locked
@@ -69,7 +72,11 @@ RUN --mount=type=cache,id=memory-mcp-cargo-registry-ui,target=/usr/local/cargo/r
     set -eux; \
     cd /src; \
     rm -rf /src/target/dx/control-plane-ui/release/web/public /src/control-plane-ui-dist; \
-    dx bundle --platform web --release --package control-plane-ui --out-dir /src/control-plane-ui-dist; \
+    base_args=""; \
+    if [ -n "${MEMORY_MCP_UI_BASE_PATH}" ]; then \
+        base_args="--base-path ${MEMORY_MCP_UI_BASE_PATH}"; \
+    fi; \
+    dx bundle --platform web --release --package control-plane-ui --out-dir /src/control-plane-ui-dist ${base_args}; \
     test -s /src/control-plane-ui-dist/public/index.html; \
     test "$(find /src/control-plane-ui-dist/public -type f -name '*.js'   | wc -l)" = "1"; \
     test "$(find /src/control-plane-ui-dist/public -type f -name '*.wasm' | wc -l)" = "1"; \

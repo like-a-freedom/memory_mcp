@@ -1161,10 +1161,15 @@ variable must name the absolute `public` directory:
 
 ```bash
 dx bundle --platform web --release --package control-plane-ui \
+  --base-path /memory \
   --out-dir "$PWD/target/control-plane-ui-dist"
 MEMORY_MCP_CONTROL_PLANE_UI_DIST="$PWD/target/control-plane-ui-dist/public" \
   cargo build --release --features streamable-http
 ```
+
+`--base-path` may be omitted for an origin-root deployment; when present its
+value must equal the path of `MEMORY_MCP_HTTP_PUBLIC_BASE_URL` (see
+*Deploying under a path prefix*).
 
 The named directory must contain a non-empty `index.html`. All regular files are copied
 in deterministic path order into Cargo's `OUT_DIR` and embedded with

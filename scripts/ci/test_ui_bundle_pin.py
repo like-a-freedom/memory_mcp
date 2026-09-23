@@ -75,6 +75,15 @@ class DioxusCliPinTests(unittest.TestCase):
                 self.text,
             )
 
+    def test_base_path_plumbing(self):
+        # The UI bundle bakes its mount prefix at build time; the runtime
+        # twin is the path of MEMORY_MCP_HTTP_PUBLIC_BASE_URL (see
+        # docs/superpowers/specs/2026-09-23-path-prefix-deployment.md).
+        # The arg must default to empty so root builds stay zero-config.
+        self.assertIn("ARG MEMORY_MCP_UI_BASE_PATH=", self.text)
+        self.assertIn("--base-path", self.text)
+        self.assertIn("${MEMORY_MCP_UI_BASE_PATH}", self.text)
+
     def test_the_staging_directory_is_cleared_before_bundling(self):
         # `dx` copies its staging directory wholesale, so without this the
         # embedded bundle grows by one stale JS/WASM pair per build.
