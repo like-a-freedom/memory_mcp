@@ -1384,7 +1384,7 @@ impl AdminApi {
     /// revoke. Explicit operator action only; never retried automatically.
     pub async fn revoke_key(&self, account_id: &str, key_id: &str) -> Result<(), AdminApiError> {
         let csrf = self.session_csrf()?;
-        let request = Request::delete(&key_path(account_id, key_id))
+        let request = Request::delete(&crate::base::url(&key_path(account_id, key_id)))
             .header(HEADER_CSRF, csrf)
             .build()
             .map_err(|error| AdminApiError::transport(&error.to_string()))?;
@@ -1468,6 +1468,36 @@ struct SetStateBody {
 
 #[cfg(test)]
 mod tests {
+    /// Regression: every request construction must go through
+    /// `crate::base::url(...)`. A single unwrapped site (the `revoke_key`
+    /// DELETE was exactly that) sends the request to origin-root under a
+    /// mount base — on a shared host it leaves the prefix entirely, and at
+    /// the origin root every test stays green, so the gap hides. This scan
+    /// makes the whole class unrepresentable.
+    #[test]
+    fn every_request_construction_is_wrapped_in_the_base_url() {
+        let src = include_str!("admin_api.rs");
+        // Scan production code only: the test module itself contains the
+        // constructor names as string literals (the `ctors` array below).
+        let production = src.split("#[cfg(test)]").next().unwrap_or(src);
+        let ctors = ["Request::get(", "Request::post(", "Request::delete("];
+        let mut offenders = Vec::new();
+        for (number, line) in production.lines().enumerate() {
+            let trimmed = line.trim_start();
+            if trimmed.starts_with("//") {
+                continue;
+            }
+            if ctors.iter().any(|ctor| line.contains(ctor)) && !line.contains("crate::base::url(") {
+                offenders.push(format!("{}:{}: {}", "admin_api.rs", number + 1, trimmed));
+            }
+        }
+        assert!(
+            offenders.is_empty(),
+            "request construction must be wrapped in crate::base::url(...):\n{}",
+            offenders.join("\n")
+        );
+    }
+
     use super::*;
 
     // ── Operation ids ─────────────────────────────────────

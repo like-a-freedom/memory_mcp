@@ -86,6 +86,18 @@ pub async fn start_link_flow(
     .await
 }
 
+/// Where the browser lands after an OIDC flow: the console root —
+/// origin root at an origin-root deployment, the mount base under a
+/// prefix (the SPA lives there; the trailing-slash form `308`-
+/// canonicalizes to it, so neither is a redirect chain).
+fn console_home(base_path: &str) -> String {
+    if base_path.is_empty() {
+        "/".to_owned()
+    } else {
+        base_path.to_owned()
+    }
+}
+
 /// GET /api/v1/auth/authorize — initiate OIDC login.
 pub async fn authorize(
     axum::extract::State(state): axum::extract::State<std::sync::Arc<HttpState>>,
@@ -121,7 +133,10 @@ pub async fn logout(
         axum::http::header::CACHE_CONTROL,
         axum::http::HeaderValue::from_static("no-store"),
     );
-    Ok((headers, axum::response::Redirect::to("/")))
+    Ok((
+        headers,
+        axum::response::Redirect::to(&console_home(&state.config.base_path)),
+    ))
 }
 
 /// GET /api/v1/auth/callback — OIDC provider redirects here.
@@ -209,7 +224,7 @@ pub async fn callback(
         .await?;
         return Ok((
             axum::http::header::HeaderMap::new(),
-            axum::response::Redirect::to("/"),
+            axum::response::Redirect::to(&console_home(&state.config.base_path)),
         ));
     }
 
@@ -263,7 +278,10 @@ pub async fn callback(
             ApiError::Internal(MemoryError::ConfigInvalid("invalid cookie header".into()))
         })?,
     );
-    Ok((headers, axum::response::Redirect::to("/")))
+    Ok((
+        headers,
+        axum::response::Redirect::to(&console_home(&state.config.base_path)),
+    ))
 }
 
 /// Attach a provider-verified identity to an Account (ADR-0057).
@@ -318,6 +336,15 @@ mod tests {
     use crate::http::registry::models::{Account, AccountStatus};
     use crate::http::registry::storage::{InMemoryStore, RegistryStore};
     use std::sync::Arc;
+
+    /// Every post-flow redirect lands on the console root *inside the
+    /// mount base* — dumping a signed-in browser at the origin root of a
+    /// shared host would hand it to a sibling service or a 404.
+    #[test]
+    fn console_home_lands_inside_the_mount_base() {
+        assert_eq!(console_home(""), "/");
+        assert_eq!(console_home("/memory"), "/memory");
+    }
 
     const ISSUER: &str = "https://idp.example.com";
 

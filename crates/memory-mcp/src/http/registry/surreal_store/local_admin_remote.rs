@@ -322,8 +322,9 @@ async fn local_admin_rate_window_survives_a_store_reconnect() {
     }
 }
 
-/// Decode the `__Host-memory_mcp_admin=<hex>` session cookie into the verifier
-/// the service resolves with (the same shape the HTTP layer parses).
+/// Decode the bare-hex session verifier (`AdminLogin::cookie_value`) into
+/// the 32-byte value the service resolves with (the same shape the HTTP
+/// layer parses out of either cookie name).
 fn cookie_verifier(cookie_value: &str) -> [u8; 32] {
     hex::decode(cookie_value)
         .expect("hex cookie verifier")

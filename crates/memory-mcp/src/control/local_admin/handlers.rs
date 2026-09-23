@@ -1002,9 +1002,11 @@ pub async fn create_client(
     match service.create(&principal.fence, &ctx, command).await {
         Ok(view) => {
             let mut response = no_store(json_response(StatusCode::ACCEPTED, &view));
+            // Root-absolute inside the mount base: a spec-following client
+            // follows `Location`, so it must stay under the prefix.
             if let Ok(value) = axum::http::HeaderValue::from_str(&format!(
-                "/api/v1/admin/clients/{}",
-                view.account_id
+                "{}/api/v1/admin/clients/{}",
+                state.config.base_path, view.account_id
             )) {
                 response
                     .headers_mut()
@@ -1260,6 +1262,38 @@ mod tests {
 
     use super::*;
     use crate::error::MemoryError;
+
+    /// Task 6 coverage for the admin-cookie `__Secure-` branch: the three
+    /// cookie builders are the only place name and path are composed, so
+    /// they are pinned for both mount shapes.
+    #[test]
+    fn admin_cookie_builders_follow_the_mount_base() {
+        let mut root = crate::http::config::HttpConfig::default_for_test();
+        root.base_path = String::new();
+        assert_eq!(
+            session_cookie(&root, "v", None),
+            "__Host-memory_mcp_admin=v; Path=/; Secure; HttpOnly; SameSite=Strict"
+        );
+        assert!(
+            clear_preauth_cookie(&root).starts_with("__Host-memory_mcp_admin_preauth=; Path=/;")
+        );
+
+        let mut base = crate::http::config::HttpConfig::default_for_test();
+        base.base_path = "/memory".into();
+        let set = session_cookie(&base, "v", Some(42));
+        assert!(
+            set.starts_with("__Secure-memory_mcp_admin=v; Path=/memory/;"),
+            "got: {set}"
+        );
+        assert!(set.ends_with("Max-Age=42"), "got: {set}");
+        assert!(!set.contains("__Host-"), "got: {set}");
+        let cleared = clear_session_cookie(&base);
+        assert!(
+            cleared.starts_with("__Secure-memory_mcp_admin=; Path=/memory/;"),
+            "got: {cleared}"
+        );
+        assert!(cleared.contains("Max-Age=0"), "got: {cleared}");
+    }
 
     fn status_of(error: LocalAdminError) -> (StatusCode, &'static str) {
         let rejection = map_error(error);

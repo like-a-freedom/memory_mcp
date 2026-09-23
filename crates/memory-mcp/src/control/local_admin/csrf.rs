@@ -329,6 +329,65 @@ mod tests {
         assert_eq!(verified.epoch, 3);
     }
 
+    /// Task 6: the `__Secure-` / `Path={base}/` branch of the local-admin
+    /// cookies gets the same coverage the OIDC session cookie has — a
+    /// wiring regression there must not keep the whole suite green.
+    #[test]
+    fn base_path_switches_both_local_admin_cookie_names() {
+        assert_eq!(
+            session_cookie_names("/memory"),
+            ["__Secure-memory_mcp_admin", "__Host-memory_mcp_admin"]
+        );
+        assert_eq!(
+            preauth_cookie_names("/memory"),
+            [
+                "__Secure-memory_mcp_admin_preauth",
+                "__Host-memory_mcp_admin_preauth"
+            ]
+        );
+        // Root keeps the host-prefixed contract.
+        assert_eq!(session_cookie_name(""), "__Host-memory_mcp_admin");
+        assert_eq!(preauth_cookie_name(""), "__Host-memory_mcp_admin_preauth");
+    }
+
+    #[test]
+    fn issue_preauth_under_a_base_uses_the_secure_name() {
+        let issued = issue_preauth(&KEY, 3, 1_000, "/memory").expect("issue");
+        assert!(
+            issued
+                .cookie
+                .starts_with("__Secure-memory_mcp_admin_preauth="),
+            "got: {}",
+            issued.cookie
+        );
+        let value = issued.cookie.split_once('=').expect("kv").1;
+        verify_preauth(&KEY, value, &issued.token, 3, 1_000).expect("verify");
+    }
+
+    #[test]
+    fn preferred_cookie_name_wins_regardless_of_header_order() {
+        let names = session_cookie_names("/memory");
+        // Both names present: the configured one wins even when listed second.
+        let header = format!("{}=from_host; {}=from_secure", names[1], names[0]);
+        assert_eq!(
+            parse_cookie_preferred(&header, names)
+                .expect("parse")
+                .as_deref(),
+            Some("from_secure")
+        );
+        // Only the non-configured name present: it still parses.
+        let header = format!("{}=legacy", names[1]);
+        assert_eq!(
+            parse_cookie_preferred(&header, names)
+                .expect("parse")
+                .as_deref(),
+            Some("legacy")
+        );
+        // Duplicate of the configured name is still rejected outright.
+        let header = format!("{0}=a; {0}=b", names[0]);
+        assert!(parse_cookie_preferred(&header, names).is_err());
+    }
+
     #[test]
     fn preauth_rejects_expired() {
         let issued = issue_preauth(&KEY, 3, 1_000, "").expect("issue");

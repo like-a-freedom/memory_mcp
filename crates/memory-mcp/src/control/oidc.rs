@@ -181,6 +181,85 @@ mod tests {
         );
     }
 
+    /// Regression for the post-flow redirect fix (Critical #2 in review):
+    /// under a mount base the logout must land on the base, not on the
+    /// origin root of the shared host.
+    #[tokio::test]
+    async fn logout_redirects_into_the_mount_base() {
+        let store: Arc<crate::http::registry::storage::InMemoryStore> =
+            Arc::new(crate::http::registry::storage::InMemoryStore::default());
+        let policy = crate::http::registry::RegistryStore::reconcile_browser_policy(
+            store.as_ref(),
+            &[crate::http::config::BrowserAuthMethod::Oidc],
+            None,
+        )
+        .await
+        .expect("reconcile browser policy");
+        let registry = RegistryHandle::in_memory().with_inner_store(store.clone());
+        let mut config = crate::http::config::HttpConfig::default_for_test();
+        config.base_path = "/memory".into();
+        let state = crate::http::test_state::HttpStateTestBuilder::new()
+            .await
+            .with_config(config)
+            .with_registry(registry)
+            .with_browser_policy(policy.clone())
+            .build()
+            .await
+            .expect("test HTTP state");
+        let now = chrono::Utc::now();
+        store
+            .store_session(
+                &policy,
+                &ControlPlaneSession {
+                    id: "ses_base".into(),
+                    cookie_hash: "cookie_base".into(),
+                    account_id: "acct_base".into(),
+                    browser_policy_epoch: Some(policy.epoch),
+                    auth_time: now,
+                    idle_expiry: now + chrono::Duration::minutes(30),
+                    absolute_expiry: now + chrono::Duration::hours(1),
+                },
+            )
+            .await
+            .expect("store session");
+
+        let (_headers, redirect) = logout(
+            axum::extract::State(state),
+            axum::extract::Extension(ControlPlaneSession {
+                id: "ses_base".into(),
+                cookie_hash: "cookie_base".into(),
+                account_id: "acct_base".into(),
+                browser_policy_epoch: Some(policy.epoch),
+                auth_time: now,
+                idle_expiry: now + chrono::Duration::minutes(30),
+                absolute_expiry: now + chrono::Duration::hours(1),
+            }),
+        )
+        .await
+        .map_err(|_| "logout returned ApiError".to_string())
+        .expect("logout ok");
+
+        let response = axum::response::IntoResponse::into_response(redirect);
+        assert_eq!(
+            response
+                .headers()
+                .get(axum::http::header::LOCATION)
+                .expect("Location header"),
+            "/memory",
+            "the post-logout redirect must land inside the mount base"
+        );
+        // The clearing cookie must be scoped with it.
+        let cookie = _headers
+            .get(axum::http::header::SET_COOKIE)
+            .expect("Set-Cookie present")
+            .to_str()
+            .expect("ascii cookie");
+        assert!(
+            cookie.starts_with("__Secure-memory_mcp_session=; Path=/memory/;"),
+            "got: {cookie}"
+        );
+    }
+
     #[test]
     fn identity_subject_verifier_is_deterministic() {
         let key = [0xABu8; 32];

@@ -227,7 +227,10 @@ pub(super) fn derive_base_path(public_base_url: &str) -> Result<String, MemoryEr
         .split_once('/')
         .map(|(_, path)| format!("/{path}"))
         .unwrap_or_default();
-    let base = path.trim_end_matches('/').to_owned();
+    // Strip at most ONE trailing slash: a single trailing slash is a
+    // tolerated spelling of the same URL, but a second one is an empty
+    // segment the grammar forbids (`https://host//`, `…/memory//`).
+    let base = path.strip_suffix('/').unwrap_or(&path).to_owned();
     if base.is_empty() {
         return Ok(String::new());
     }
@@ -276,6 +279,8 @@ mod tests {
             "https://mcp.example/mem ory",    // space
             "https://mcp.example/мемори",     // non-ASCII
             "https://mcp.example/memory?q=1", // query
+            "https://mcp.example//",          // empty segment from `//`
+            "https://mcp.example/memory//",   // double trailing slash
         ] {
             assert!(derive_base_path(url).is_err(), "{url}");
         }
