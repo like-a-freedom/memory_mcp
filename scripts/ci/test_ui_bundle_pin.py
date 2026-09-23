@@ -75,14 +75,18 @@ class DioxusCliPinTests(unittest.TestCase):
                 self.text,
             )
 
-    def test_base_path_plumbing(self):
-        # The UI bundle bakes its mount prefix at build time; the runtime
-        # twin is the path of MEMORY_MCP_HTTP_PUBLIC_BASE_URL (see
-        # docs/superpowers/specs/2026-09-23-path-prefix-deployment.md).
-        # The arg must default to empty so root builds stay zero-config.
-        self.assertIn("ARG MEMORY_MCP_UI_BASE_PATH=", self.text)
-        self.assertIn("--base-path", self.text)
-        self.assertIn("${MEMORY_MCP_UI_BASE_PATH}", self.text)
+    def test_bundle_relocatable_plumbing(self):
+        # The UI bundle is relocatable: `dx bundle` bakes the sentinel
+        # /__memory_mcp_base__ (never a deployment prefix) and `memory_mcp_http`
+        # stamps the path of MEMORY_MCP_HTTP_PUBLIC_BASE_URL over it at startup
+        # (docs/superpowers/specs/2026-09-23-path-prefix-deployment.md, amended).
+        # The MEMORY_MCP_UI_BASE_PATH build arg must stay deleted: one value,
+        # stamped at runtime, so one image serves any mount prefix. The build
+        # greps the sentinel into the produced document so a `dx` that stops
+        # writing it fails the build instead of the browser session.
+        self.assertIn("--base-path /__memory_mcp_base__", self.text)
+        self.assertIn("grep -q '__memory_mcp_base__'", self.text)
+        self.assertNotIn("MEMORY_MCP_UI_BASE_PATH", self.text)
 
     def test_the_staging_directory_is_cleared_before_bundling(self):
         # `dx` copies its staging directory wholesale, so without this the
