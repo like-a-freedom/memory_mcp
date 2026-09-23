@@ -7,6 +7,14 @@ inputs:
   cache-key:
     description: Separate check and release build caches
     required: true
+  cache-shared-key:
+    description: >-
+      Optional job-independent cache fragment. When set, rust-cache replaces
+      the automatic job-based key with it, so sibling jobs on the same
+      target and profile share one cache instead of rebuilding the same
+      dependency tree per job.
+    required: false
+    default: ""
 runs:
   using: composite
   steps:
@@ -48,5 +56,6 @@ runs:
         rustflags: ""
         cache: true
         cache-key: native-v3-${{ inputs.target }}-${{ inputs.cache-key }}
+        cache-shared-key: ${{ inputs.cache-shared-key != '' && format('native-v3-{0}-{1}', inputs.target, inputs.cache-shared-key) || '' }}
         cache-on-failure: false
         cache-save-if: ${{ github.event_name != 'pull_request' }}

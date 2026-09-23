@@ -35,6 +35,10 @@ jobs:
         with:
           target: x86_64-unknown-linux-gnu
           cache-key: quality
+          # Same target, same dev profile as the native Linux x64 job below:
+          # one shared cache instead of two isolated ones rebuilding the same
+          # dependency tree (rocksdb, ONNX, SurrealDB) per job.
+          cache-shared-key: dev
       - run: cargo fmt --all --check
       - name: Packaging regressions
         run: python3 -m unittest discover -s scripts/ci -p 'test_*.py'
@@ -100,6 +104,7 @@ jobs:
         with:
           target: ${{ matrix.target }}
           cache-key: ${{ inputs.release && 'release' || 'dev' }}
+          cache-shared-key: ${{ inputs.release && 'release' || 'dev' }}
       - name: macOS feature lint
         if: matrix.target == 'aarch64-apple-darwin'
         run: cargo clippy --workspace --all-targets --features fs-watch,mcp-apps,streamable-http,metal --locked -- -D warnings
