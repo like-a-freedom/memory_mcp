@@ -1180,3 +1180,27 @@ Summarize for the operator: the probe matrix, the stamped-shell output, and conf
 **Placeholder scan:** every code step carries the actual code or an exact old→new splice; the Task 2 outcome that selects Task 5's variant is resolved by a recorded probe (Variant A and Variant B are both written out); the two STOP conditions say exactly what to report, not "handle it".
 
 **Type consistency:** `stamp_index_html(raw: &[u8], base: &str) -> Result<Vec<u8>, MemoryError>` (Task 3 = Task 4 consume); `build_stamped_index(base: &str) -> Result<Option<Arc<[u8]>>, MemoryError>` and `serve_asset(path: &str, stamped_index: Option<&[u8]>)` (Task 4, `Arc<[u8]>::as_deref()` feeds `Option<&[u8]>`); `resolve_base(meta_content: Option<String>, baked: Option<String>) -> String` and `base_path() -> String` (Task 6 = Task 7 consume). `BASE_PATH_SENTINEL` is spelled `/__memory_mcp_base__` in all five code sites (server const, UI const, UI index.html, Dockerfile `dx` invocation + `grep`, browser-script check).
+
+---
+
+## As-implemented deviations (acceptance record)
+
+1. **Task 2 spike outcome (recorded):** `dx bundle` 0.7.10 accepts the sentinel
+   verbatim; favicon literals are **not** rewritten (Variant A applied in Task
+   5); `dx` does **not** emit the `DIOXUS_ASSET_ROOT` meta (Task 3's `with_meta`
+   insertion is the live path); the JS and WASM each bake the sentinel once
+   (`option_env!`).
+2. **Second sentinel leak found by acceptance (Task 11):** `dx` also bakes the
+   sentinel into the JS loader's hashed WASM URL. Stamping `index.html` alone
+   404'd the WASM on a prefixed deployment. The seam was generalized from
+   `build_stamped_index` to `StampedAssets`/`build_stamped_assets`: every UTF-8
+   asset carrying the sentinel is stamped at router assembly; binary assets
+   (the WASM) pass through byte for byte and the client-side `base.rs` filter
+   handles their baked constant. Spec and README were amended accordingly.
+3. `stamp_index_html` is `pub` (not `pub(crate)`): the intermediate commit
+   between Tasks 3 and 4 would otherwise fail the `clippy -D warnings` gate on
+   dead code.
+4. Task 9's scenario run happened in Task 11 against both mounts (the harness
+   requires `LOCAL_ADMIN_BROWSER_FIXTURE` + https; a throwaway self-signed TLS
+   proxy on `localhost:8443` stood in for the production terminator). Result:
+   22/22 checks at `/memory` and 22/22 at the origin root on the same image.
