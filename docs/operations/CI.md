@@ -5,13 +5,20 @@
 1. Open a pull request. **CI** runs Linux lint, workspace tests, optional-feature
    tests and the PR evaluation gate. Native build/test jobs start after the
    quality gate passes.
-2. Require **CI passed** in branch protection. This check fails if any required
-   job fails, is cancelled or is skipped. Windows failures are mandatory.
-3. Merge to `master`. CI checks the merged commit. Feature-branch pushes do not
+2. Require **CI passed** in branch protection. The required set follows the
+   event: pull requests, manual runs and releases must pass every job; a push
+   to `master` must pass the quality job (the build jobs do not start there
+   and must be skipped, never failed or cancelled). Windows failures are
+   mandatory.
+3. Merge to `master`. The quality job checks the merged commit; the native and
+   image jobs do not start on push — the pull request already ran them and the
+   release rebuilds with the release profile. Feature-branch pushes do not
    also trigger a duplicate push workflow.
-4. A successful `master` run publishes the Linux/amd64 Streamable HTTP image to
-   GitHub Container Registry as `ghcr.io/like-a-freedom/memory_mcp:latest` and
-   `sha-<commit>`. Pull requests build and test the image without publishing it.
+4. A release run publishes the Linux/amd64 Streamable HTTP image to GitHub
+   Container Registry as `ghcr.io/like-a-freedom/memory_mcp:latest`,
+   `sha-<commit>` and the release tag (a manual run started from `master`
+   refreshes `latest` and `sha-<commit>`). Pull requests build and test the
+   image without publishing it.
 5. Publish a GitHub Release on a tag containing these workflows. **Release**
    calls the same CI with optimized builds and the release evaluation gate,
    publishes the matching container tag, then uploads assets only after every

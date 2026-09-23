@@ -411,10 +411,13 @@ docker compose --env-file <env> config --quiet
 `surrealdb-data` volume. The image is built from source with Cargo and its final
 stage is `gcr.io/distroless/cc-debian13:nonroot`.
 
-Pushes to `master` publish the same image to GitHub Container Registry as
-`ghcr.io/like-a-freedom/memory_mcp:latest` and `sha-<commit>`. Published release
-tags receive a matching image tag. To deploy a published image instead of
-building locally, log in to GHCR and pull it before starting Compose:
+Release runs publish the image to GitHub Container Registry as
+`ghcr.io/like-a-freedom/memory_mcp:latest`, `sha-<commit>` and the release
+tag; a manual run started from `master` refreshes `latest` and `sha-<commit>`.
+Pushes to `master` run the quality gate only — platform builds and the image
+start on pull requests, manual runs and releases. To deploy a published image
+instead of building locally, log in to GHCR and pull it before starting
+Compose:
 
 ```bash
 export MEMORY_MCP_IMAGE=ghcr.io/like-a-freedom/memory_mcp:latest

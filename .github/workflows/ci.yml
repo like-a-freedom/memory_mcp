@@ -78,6 +78,11 @@ jobs:
 
   native:
     needs: quality
+    # The platform matrix starts for pull requests, manual runs and releases.
+    # A push to master runs the quality gate only: the pull request already
+    # exercised every platform, and the release rebuilds everything with the
+    # release profile anyway.
+    if: github.event_name != 'push'
     name: ${{ matrix.target }}
     runs-on: ${{ matrix.os }}
     timeout-minutes: 150
@@ -134,6 +139,9 @@ jobs:
 
   docker:
     needs: quality
+    # Same policy as `native`: no image build on push — releases publish,
+    # pull requests build and smoke-test without publishing.
+    if: github.event_name != 'push'
     name: Docker linux/amd64
     runs-on: ubuntu-24.04
     timeout-minutes: 150
@@ -319,9 +327,18 @@ jobs:
     needs: [quality, native, docker]
     runs-on: ubuntu-24.04
     steps:
-      - name: Require all checks and all five platforms
+      - name: Require every check this event is supposed to run
         env:
+          EVENT: ${{ github.event_name }}
           QUALITY: ${{ needs.quality.result }}
           NATIVE: ${{ needs.native.result }}
           DOCKER: ${{ needs.docker.result }}
-        run: test "$QUALITY" = success && test "$NATIVE" = success && test "$DOCKER" = success
+        run: |
+          test "$QUALITY" = success || exit 1
+          if test "$EVENT" = push; then
+            # Build jobs deliberately do not start on push: a skip is the
+            # designed outcome there, a failure or cancellation is not.
+            test "$NATIVE" = skipped && test "$DOCKER" = skipped
+          else
+            test "$NATIVE" = success && test "$DOCKER" = success
+          fi
