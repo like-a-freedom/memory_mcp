@@ -75,9 +75,12 @@ everything else with the standard `not_found` JSON envelope.
 deployment prefix: every prefix-dependent URL in the bundle's `index.html` and
 its `DIOXUS_ASSET_ROOT` meta element carry `/__memory_mcp_base__`. At router
 assembly `memory_mcp_http` replaces the sentinel with the derived base
-(`""` or `/memory`, …) in the embedded `index.html` and serves those stamped
-bytes for the SPA shell; asset requests already work at any base because
-`Router::nest` strips the prefix before `serve_asset` sees the path. The WASM
+(`""` or `/memory`, …) in every prefix-dependent asset of the embedded
+bundle — `index.html` (asset URLs and the `DIOXUS_ASSET_ROOT` meta) and the
+JS loader's hashed WASM URL — and serves those stamped bytes; binary assets
+(the WASM) pass through byte for byte and their baked `DIOXUS_ASSET_ROOT`
+constant is filtered client-side. Asset requests already work at any base
+because `Router::nest` strips the prefix before `serve_asset` sees the path. The WASM
 resolves its base at runtime from the `DIOXUS_ASSET_ROOT` meta (stamped by the
 server) with a sentinel-filtered fallback, and `dioxus_web::WebHistory` receives
 the same base explicitly. A bundle missing the sentinel is rejected at startup

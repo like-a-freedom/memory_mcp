@@ -889,13 +889,14 @@ One value configures the prefix:
 - runtime: `MEMORY_MCP_HTTP_PUBLIC_BASE_URL=https://mcp.example/memory`
   (the server answers only under `/memory`, `308`-canonicalizes
   `/memory/` → `/memory`, `404`s every root path, and stamps the mount base
-  into the served UI shell at startup).
+  into the served UI bundle at startup).
 
 The UI bundle is **relocatable**: it is always built with the placeholder
 `dx bundle --base-path /__memory_mcp_base__`, and `memory_mcp_http` replaces
-that sentinel with the path of `MEMORY_MCP_HTTP_PUBLIC_BASE_URL` in the
-embedded `index.html` (asset URLs and the `DIOXUS_ASSET_ROOT` meta) when the
-router is assembled. One image therefore serves the origin root and any
+that sentinel with the path of `MEMORY_MCP_HTTP_PUBLIC_BASE_URL` in every
+prefix-dependent asset of the embedded bundle when the router is assembled
+(`index.html` asset URLs, the `DIOXUS_ASSET_ROOT` meta, and the JS loader's
+hashed WASM URL). One image therefore serves the origin root and any
 prefix; changing the prefix is a configuration change and needs no rebuild. A
 bundle without the sentinel is rejected at startup unless the deployment is at
 the origin root.
@@ -1058,7 +1059,7 @@ Read only by the `memory_mcp_http` binary built with the `streamable-http` featu
 | Variable | Type | Default | Description |
 | --- | --- | --- | --- |
 | `MEMORY_MCP_HTTP_BIND` | socket address (`IP:port`) | `0.0.0.0:8080` | Listen address |
-| `MEMORY_MCP_HTTP_PUBLIC_BASE_URL` | URL | unset | Required. Public base URL used for OIDC redirects and absolute links. Its **path** is also the mount base of the server (e.g. `https://mcp.example/memory`); no path means the origin root. The path is stamped into the served UI shell at startup, so no UI rebuild is needed when it changes |
+| `MEMORY_MCP_HTTP_PUBLIC_BASE_URL` | URL | unset | Required. Public base URL used for OIDC redirects and absolute links. Its **path** is also the mount base of the server (e.g. `https://mcp.example/memory`); no path means the origin root. The path is stamped into the served UI bundle at startup, so no UI rebuild is needed when it changes |
 | `ALLOWED_HOSTS` | comma-separated list | unset | Required for production. Wildcard and unset values are rejected at startup; missing `Host` returns `403` |
 | `ALLOWED_ORIGINS` | comma-separated list | unset | Required for production. Wildcard values are rejected; missing `Origin` is allowed only for non-browser MCP clients, present `Origin` must match |
 | `MEMORY_MCP_HTTP_TRUSTED_PROXY_CIDRS` | comma-separated `CIDR` list | unset | Trusted reverse-proxy CIDRs for forwarded `Host`/`Origin`; if unset, the values are ignored entirely |
@@ -1206,7 +1207,8 @@ MEMORY_MCP_CONTROL_PLANE_UI_DIST="$PWD/target/control-plane-ui-dist/public" \
 
 `--base-path` must always be the sentinel `/__memory_mcp_base__` — never a
 deployment prefix. The bundle carries the sentinel in every prefix-dependent
-URL and in its `DIOXUS_ASSET_ROOT` meta; `memory_mcp_http` replaces it with
+URL (the `index.html` asset URLs, the JS loader's hashed WASM URL) and in its
+`DIOXUS_ASSET_ROOT` meta; `memory_mcp_http` replaces it with
 the path of `MEMORY_MCP_HTTP_PUBLIC_BASE_URL` at startup (see *Deploying under
 a path prefix*). The same literal lives in `crates/control-plane-ui/index.html`,
 `crates/control-plane-ui/src/base.rs` and `BASE_PATH_SENTINEL`
