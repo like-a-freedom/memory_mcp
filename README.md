@@ -884,16 +884,21 @@ stays free for other services (see
 `docs/superpowers/specs/2026-09-23-path-prefix-deployment.md`). There is no
 separate knob: the path of `MEMORY_MCP_HTTP_PUBLIC_BASE_URL` *is* the prefix.
 
-Two values must agree:
+One value configures the prefix:
 
 - runtime: `MEMORY_MCP_HTTP_PUBLIC_BASE_URL=https://mcp.example/memory`
   (the server answers only under `/memory`, `308`-canonicalizes
-  `/memory/` → `/memory`, and `404`s every root path);
-- build time: `dx bundle --base-path /memory` (Docker:
-  `--build-arg MEMORY_MCP_UI_BASE_PATH=/memory`) — bakes the same prefix
-  into the SPA bundle. **A mismatch between the two breaks the UI** (asset
-  requests land outside the prefix); rebuild the bundle when the prefix
-  changes.
+  `/memory/` → `/memory`, `404`s every root path, and stamps the mount base
+  into the served UI shell at startup).
+
+The UI bundle is **relocatable**: it is always built with the placeholder
+`dx bundle --base-path /__memory_mcp_base__`, and `memory_mcp_http` replaces
+that sentinel with the path of `MEMORY_MCP_HTTP_PUBLIC_BASE_URL` in the
+embedded `index.html` (asset URLs and the `DIOXUS_ASSET_ROOT` meta) when the
+router is assembled. One image therefore serves the origin root and any
+prefix; changing the prefix is a configuration change and needs no rebuild. A
+bundle without the sentinel is rejected at startup unless the deployment is at
+the origin root.
 
 The OIDC redirect URI keeps its canonical path under the prefix
 (`https://mcp.example/memory/auth/oidc/callback`) — register exactly that at
@@ -1053,7 +1058,7 @@ Read only by the `memory_mcp_http` binary built with the `streamable-http` featu
 | Variable | Type | Default | Description |
 | --- | --- | --- | --- |
 | `MEMORY_MCP_HTTP_BIND` | socket address (`IP:port`) | `0.0.0.0:8080` | Listen address |
-| `MEMORY_MCP_HTTP_PUBLIC_BASE_URL` | URL | unset | Required. Public base URL used for OIDC redirects and absolute links. Its **path** is also the mount base of the server (e.g. `https://mcp.example/memory`); no path means the origin root |
+| `MEMORY_MCP_HTTP_PUBLIC_BASE_URL` | URL | unset | Required. Public base URL used for OIDC redirects and absolute links. Its **path** is also the mount base of the server (e.g. `https://mcp.example/memory`); no path means the origin root. The path is stamped into the served UI shell at startup, so no UI rebuild is needed when it changes |
 | `ALLOWED_HOSTS` | comma-separated list | unset | Required for production. Wildcard and unset values are rejected at startup; missing `Host` returns `403` |
 | `ALLOWED_ORIGINS` | comma-separated list | unset | Required for production. Wildcard values are rejected; missing `Origin` is allowed only for non-browser MCP clients, present `Origin` must match |
 | `MEMORY_MCP_HTTP_TRUSTED_PROXY_CIDRS` | comma-separated `CIDR` list | unset | Trusted reverse-proxy CIDRs for forwarded `Host`/`Origin`; if unset, the values are ignored entirely |
@@ -1193,15 +1198,21 @@ variable must name the absolute `public` directory:
 
 ```bash
 dx bundle --platform web --release --package control-plane-ui \
-  --base-path /memory \
+  --base-path /__memory_mcp_base__ \
   --out-dir "$PWD/target/control-plane-ui-dist"
 MEMORY_MCP_CONTROL_PLANE_UI_DIST="$PWD/target/control-plane-ui-dist/public" \
   cargo build --release --features streamable-http
 ```
 
-`--base-path` may be omitted for an origin-root deployment; when present its
-value must equal the path of `MEMORY_MCP_HTTP_PUBLIC_BASE_URL` (see
-*Deploying under a path prefix*).
+`--base-path` must always be the sentinel `/__memory_mcp_base__` — never a
+deployment prefix. The bundle carries the sentinel in every prefix-dependent
+URL and in its `DIOXUS_ASSET_ROOT` meta; `memory_mcp_http` replaces it with
+the path of `MEMORY_MCP_HTTP_PUBLIC_BASE_URL` at startup (see *Deploying under
+a path prefix*). The same literal lives in `crates/control-plane-ui/index.html`,
+`crates/control-plane-ui/src/base.rs` and `BASE_PATH_SENTINEL`
+(`crates/memory-mcp/src/control/static_assets.rs`), the `Dockerfile`, and
+`scripts/ci/local_admin_browser.mjs`; changing it means changing all five
+sites together.
 
 The named directory must contain a non-empty `index.html`. All regular files are copied
 in deterministic path order into Cargo's `OUT_DIR` and embedded with
@@ -1594,19 +1605,19 @@ Criterion. They are not part of `cargo test`.
 
 ```bash
 # Pipeline stages (ingest, extraction, claims, retrieval, end-to-end)
-cargo bench -p eval-harness --bench pipeline -- --noplot
+cargo bench -p eval-harness --features eval-harness/bench --bench pipeline -- --noplot
 
 # NER on CPU
-cargo bench -p eval-harness --bench ner_cpu -- --noplot
+cargo bench -p eval-harness --features eval-harness/bench --bench ner_cpu -- --noplot
 
 # NER on Metal (macOS only; feature belongs to memory_mcp)
-cargo bench -p eval-harness --features memory_mcp/metal --bench ner_metal -- --noplot
+cargo bench -p eval-harness --features memory_mcp/metal,eval-harness/bench --bench ner_metal -- --noplot
 
 # NER CPU with Candle Accelerate (macOS only; currently experimental)
-cargo bench -p eval-harness --features memory_mcp/accelerate --bench ner_cpu -- --noplot
+cargo bench -p eval-harness --features memory_mcp/accelerate,eval-harness/bench --bench ner_cpu -- --noplot
 
 # Contention
-cargo bench -p eval-harness --bench contention -- --noplot
+cargo bench -p eval-harness --features eval-harness/bench --bench contention -- --noplot
 ```
 
 See `docs/performance/NER_PERFORMANCE.md` for raw samples, contention results,
