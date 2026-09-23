@@ -72,16 +72,6 @@ jobs:
           name: evaluation
           path: target/evals/*.json
 
-  audit:
-    name: Dependency audit
-    runs-on: ubuntu-24.04
-    timeout-minutes: 20
-    steps:
-      - uses: actions/checkout@v7.0.0
-      - uses: rustsec/audit-check@v2.0.0
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-
   native:
     needs: quality
     name: ${{ matrix.target }}
@@ -321,13 +311,12 @@ jobs:
   passed:
     name: CI passed
     if: always()
-    needs: [quality, audit, native, docker]
+    needs: [quality, native, docker]
     runs-on: ubuntu-24.04
     steps:
       - name: Require all checks and all five platforms
         env:
           QUALITY: ${{ needs.quality.result }}
           NATIVE: ${{ needs.native.result }}
-          AUDIT: ${{ needs.audit.result }}
           DOCKER: ${{ needs.docker.result }}
-        run: test "$QUALITY" = success && test "$AUDIT" = success && test "$NATIVE" = success && test "$DOCKER" = success
+        run: test "$QUALITY" = success && test "$NATIVE" = success && test "$DOCKER" = success

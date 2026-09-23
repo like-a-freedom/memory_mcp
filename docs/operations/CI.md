@@ -23,16 +23,6 @@ select the existing release tag under **Run workflow** and supply the same tag
 as input. Old tags retain their old workflows: re-running `v1.9.10` does not
 retroactively use a newer workflow. Create a new version/tag after merging.
 
-## Dependency audit
-
-The **Dependency audit** job runs `rustsec/audit-check` against
-`Cargo.lock` on every pull request and on `master`. It exists because this
-workspace takes a large transitive graph (SurrealDB, RocksDB, ONNX Runtime,
-Dioxus) and a published advisory in it is a shipping decision, not a surprise to
-find at release time. It is a separate job from the quality gate on purpose: it
-needs no build cache, it finishes in minutes, and a failure should read as "the
-lock file needs attention" rather than "the tests are broken".
-
 ## Platforms
 
 | OS | x64 | ARM64 |
