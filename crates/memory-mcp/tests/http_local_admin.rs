@@ -59,7 +59,7 @@ impl Harness {
     async fn new() -> Self {
         let (builder, store) = HttpStateTestBuilder::local_admin().await;
         let state = builder.build().await.expect("local admin HTTP state");
-        let router = build_router(state.clone(), None);
+        let router = build_router(state.clone(), None).expect("router builds in tests");
         Self {
             state,
             store,
