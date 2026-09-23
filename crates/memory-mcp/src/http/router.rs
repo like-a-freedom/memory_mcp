@@ -321,16 +321,50 @@ pub fn build_router(
     // this function, so no route that was already covered changes behaviour:
     // `request_log` stays outermost, which is why a request the allowlist refuses
     // is still logged.
-    router
-        .with_state(state.clone())
-        .layer(axum::middleware::from_fn_with_state(
-            state,
-            super::middleware::host_origin,
-        ))
-        .layer(axum::middleware::from_fn(
-            super::middleware::inject_sse_headers,
-        ))
-        .layer(axum::middleware::from_fn(super::logging::request_log))
+    let base_path = state.config.base_path.clone();
+    let app = router.with_state(state.clone());
+    // Under a mount base the whole router is nested: axum registers every
+    // route *and the fallback* under the prefix and strips it from the
+    // request URI (`StripPrefix`) before anything below inspects
+    // `uri().path()`, so `reject_non_post_mcp`, the reserved-surface
+    // checks and `serve_asset` keep seeing canonical paths. Requests
+    // outside the prefix match nothing. The boundary layers below wrap
+    // this whole shape, gap fallback included.
+    let app = if base_path.is_empty() {
+        app
+    } else {
+        let base_for_fallback = base_path.clone();
+        axum::Router::new()
+            .nest(&base_path, app)
+            .fallback(move |uri: axum::http::Uri| {
+                let base = base_for_fallback.clone();
+                async move {
+                    // matchit does not match an empty catch-all tail, so
+                    // `{base}/` lands here while `{base}` is the nested SPA
+                    // root. Canonicalize the one URL humans and proxies
+                    // produce routinely instead of 404-ing it; everything
+                    // else outside the nested surface is a plain 404.
+                    if uri.path() == format!("{base}/") {
+                        return axum::response::IntoResponse::into_response(
+                            axum::response::Redirect::permanent(&base),
+                        );
+                    }
+                    axum::response::IntoResponse::into_response((
+                        axum::http::StatusCode::NOT_FOUND,
+                        [(axum::http::header::CONTENT_TYPE, "application/json")],
+                        "{\"error\":{\"code\":\"not_found\",\"message\":\"not found\"}}",
+                    ))
+                }
+            })
+    };
+    app.layer(axum::middleware::from_fn_with_state(
+        state,
+        super::middleware::host_origin,
+    ))
+    .layer(axum::middleware::from_fn(
+        super::middleware::inject_sse_headers,
+    ))
+    .layer(axum::middleware::from_fn(super::logging::request_log))
 }
 
 #[cfg(test)]
@@ -480,6 +514,164 @@ mod tests {
             .await
             .expect("dispatch");
         assert_eq!(response.status(), StatusCode::NOT_FOUND);
+    }
+
+    async fn prefixed_state(base: &str) -> std::sync::Arc<crate::http::HttpState> {
+        let mut config = crate::http::config::HttpConfig::default_for_test();
+        config.base_path = base.to_owned();
+        config.enable_control_plane_ui = true;
+        HttpStateTestBuilder::new()
+            .await
+            .with_config(config)
+            .build()
+            .await
+            .expect("prefixed HTTP state")
+    }
+
+    async fn body_text(response: axum::response::Response) -> String {
+        let bytes = axum::body::to_bytes(response.into_body(), usize::MAX)
+            .await
+            .expect("body");
+        String::from_utf8_lossy(&bytes).into_owned()
+    }
+
+    /// The point of the whole feature: `memory_mcp` must not answer at the
+    /// origin root of a shared host. Without the base, `GET /mcp` is a 405
+    /// and `GET /health/live` is a 200 — both must become the 404 envelope.
+    #[tokio::test]
+    async fn with_a_base_path_root_paths_answer_the_404_envelope() {
+        let mut router = build_router(prefixed_state("/memory").await, None);
+        for (method, uri) in [
+            (Method::GET, "/health/live"),
+            (Method::GET, "/mcp"),
+            (Method::POST, "/mcp"),
+        ] {
+            let response = router.call(request(method, uri)).await.expect("dispatch");
+            assert_eq!(response.status(), StatusCode::NOT_FOUND, "{uri}");
+            assert!(body_text(response).await.contains("\"not_found\""), "{uri}");
+        }
+    }
+
+    #[tokio::test]
+    async fn with_a_base_path_routes_reach_their_handlers() {
+        let mut router = build_router(prefixed_state("/memory").await, None);
+
+        let response = router
+            .call(request(Method::GET, "/memory/health/live"))
+            .await
+            .expect("dispatch");
+        assert_eq!(response.status(), StatusCode::OK);
+
+        // 405 proves `reject_non_post_mcp` saw the *stripped* path: it
+        // guards on `path == "/mcp"`, and `/memory/mcp` carried in the URI
+        // would fall through to the fallback instead.
+        let response = router
+            .call(request(Method::GET, "/memory/mcp"))
+            .await
+            .expect("dispatch");
+        assert_eq!(response.status(), StatusCode::METHOD_NOT_ALLOWED);
+
+        // POST passes the method guard and dies at MCP prevalidation with
+        // the 400 JSON-RPC envelope — the whole route stack ran. The
+        // mirrored MCP headers must be present (content-type + accept), or
+        // prevalidation rejects the media type (415/406) before parsing
+        // the (absent) envelope.
+        let response = Request::builder()
+            .method(Method::POST)
+            .uri("/memory/mcp")
+            .header(axum::http::header::HOST, "localhost")
+            .header(axum::http::header::CONTENT_TYPE, "application/json")
+            .header(
+                axum::http::header::ACCEPT,
+                "application/json, text/event-stream",
+            )
+            .body(Body::empty())
+            .expect("request");
+        let response = router.call(response).await.expect("dispatch");
+        assert_eq!(response.status(), StatusCode::BAD_REQUEST);
+    }
+
+    #[tokio::test]
+    async fn a_query_string_survives_the_mount() {
+        let mut router = build_router(prefixed_state("/memory").await, None);
+        let response = router
+            .call(request(Method::GET, "/memory/health/live?probe=1"))
+            .await
+            .expect("dispatch");
+        assert_eq!(response.status(), StatusCode::OK);
+    }
+
+    #[tokio::test]
+    async fn the_trailing_slash_form_canonicalizes_to_the_bare_prefix() {
+        let mut router = build_router(prefixed_state("/memory").await, None);
+        let response = router
+            .call(request(Method::GET, "/memory/"))
+            .await
+            .expect("dispatch");
+        assert_eq!(response.status(), StatusCode::PERMANENT_REDIRECT);
+        assert_eq!(
+            response
+                .headers()
+                .get("location")
+                .and_then(|value| value.to_str().ok()),
+            Some("/memory")
+        );
+    }
+
+    /// `serve_asset`'s not-found is plain `not found` with security headers;
+    /// the gap fallback's is the JSON envelope. The body proves the bare
+    /// prefix routed to the *inner* SPA fallback (the bundle is absent in
+    /// tests, so the SPA route itself 404s — through `serve_asset`).
+    #[cfg(feature = "control-plane-ui")]
+    #[tokio::test]
+    async fn the_bare_prefix_reaches_the_inner_spa_fallback() {
+        let mut router = build_router(prefixed_state("/memory").await, None);
+        let response = router
+            .call(request(Method::GET, "/memory"))
+            .await
+            .expect("dispatch");
+        assert_eq!(response.status(), StatusCode::NOT_FOUND);
+        assert!(response.headers().contains_key("content-security-policy"));
+        assert_eq!(body_text(response).await, "not found");
+    }
+
+    #[cfg(feature = "control-plane-ui")]
+    #[tokio::test]
+    async fn deep_spa_paths_reach_the_inner_spa_fallback() {
+        let mut router = build_router(prefixed_state("/memory").await, None);
+        let response = router
+            .call(request(Method::GET, "/memory/admin/login"))
+            .await
+            .expect("dispatch");
+        assert_eq!(body_text(response).await, "not found");
+    }
+
+    /// The deployment boundary must cover the gap fallback too — it is the
+    /// one surface that does not sit inside the nested router.
+    #[tokio::test]
+    async fn the_host_allowlist_covers_the_gap_fallback() {
+        let mut router = build_router(prefixed_state("/memory").await, None);
+        let response = router
+            .call(request_with_host(Method::GET, "/memory/", "evil.example"))
+            .await
+            .expect("dispatch");
+        assert_eq!(response.status(), StatusCode::FORBIDDEN);
+    }
+
+    /// An empty base must keep the exact pre-feature surface.
+    #[tokio::test]
+    async fn an_empty_base_path_keeps_root_serving() {
+        let mut router = build_router(prefixed_state("").await, None);
+        let response = router
+            .call(request(Method::GET, "/health/live"))
+            .await
+            .expect("dispatch");
+        assert_eq!(response.status(), StatusCode::OK);
+        let response = router
+            .call(request(Method::GET, "/mcp"))
+            .await
+            .expect("dispatch");
+        assert_eq!(response.status(), StatusCode::METHOD_NOT_ALLOWED);
     }
 }
 
