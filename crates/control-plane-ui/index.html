@@ -10,8 +10,10 @@
         <!-- Served from the bundle at a stable, unhashed path (see the
              `favicon.svg` asset in `src/assets.rs`). A browser probes
              `/favicon.ico` before the module boots, so this cannot wait for
-             the app to inject it. -->
-        <link rel="icon" type="image/svg+xml" href="/assets/favicon.svg">
+             the app to inject it. The /__memory_mcp_base__ sentinel is
+             replaced with the deployed mount base by memory_mcp_http at
+             startup (README, "Deploying under a path prefix"). -->
+        <link rel="icon" type="image/svg+xml" href="/__memory_mcp_base__/assets/favicon.svg">
         <meta
             name="description"
             content="Operator console for the Memory MCP control plane: provision clients, issue and revoke API keys, and inspect administrator session state."

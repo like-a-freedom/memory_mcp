@@ -32,6 +32,20 @@ mod tests {
     use super::join;
 
     #[test]
+    fn the_document_shell_carries_the_base_sentinel_in_literal_asset_urls() {
+        // `dx bundle` prefixes only the tags it injects (css/js). Hand-written
+        // hrefs in index.html survive verbatim (verified against dioxus-cli
+        // 0.7.10), so they must carry the sentinel themselves or the favicon
+        // escapes the server-side stamp.
+        let shell = include_str!("../index.html");
+        assert!(
+            shell.contains(r#"href="/__memory_mcp_base__/assets/favicon.svg""#),
+            "index.html literal asset URLs must carry /__memory_mcp_base__ so \
+             memory_mcp_http can stamp them"
+        );
+    }
+
+    #[test]
     fn empty_base_and_root_base_agree() {
         assert_eq!(join("", "/api/v1/account"), "/api/v1/account");
         assert_eq!(join("/", "/api/v1/account"), "/api/v1/account");
