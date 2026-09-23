@@ -58,18 +58,18 @@ eval-external-prefeval:
 	cargo run -p eval-harness --bin memory-eval -- run --profile evals/profiles/external_prefeval.json --artifact target/evals/external-prefeval.json
 
 bench-check:
-	cargo bench -p eval-harness --no-run --locked
+	cargo bench -p eval-harness --no-run --locked --features eval-harness/bench
 
 bench-cpu:
 	$(MAKE) bench-cpu-core
-	MEMORY_MCP_BENCH_REQUIRE_FIXTURES=1 cargo bench -p eval-harness --bench ner_cpu --locked
+	MEMORY_MCP_BENCH_REQUIRE_FIXTURES=1 cargo bench -p eval-harness --bench ner_cpu --locked --features eval-harness/bench
 
 bench-cpu-core:
-	cargo bench -p eval-harness --bench pipeline --locked
-	cargo bench -p eval-harness --bench contention --locked
+	cargo bench -p eval-harness --bench pipeline --locked --features eval-harness/bench
+	cargo bench -p eval-harness --bench contention --locked --features eval-harness/bench
 
 bench-metal:
 	@if [ "$$(uname -s)" != "Darwin" ] || [ "$$(uname -m)" != "arm64" ]; then \
 		echo "bench-metal requires macOS arm64 and local Metal/model assets" >&2; exit 2; \
 	fi
-	MEMORY_MCP_BENCH_REQUIRE_FIXTURES=1 cargo bench -p eval-harness --features memory_mcp/metal --bench ner_metal --locked
+	MEMORY_MCP_BENCH_REQUIRE_FIXTURES=1 cargo bench -p eval-harness --features memory_mcp/metal,eval-harness/bench --bench ner_metal --locked

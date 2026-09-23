@@ -9,7 +9,7 @@ performance result is compared with a previous run.
 |---|---|---|---|
 | `pipeline` | ingest, extract, retrieval, metric overhead | embedded test DB | `make bench-cpu` |
 | `contention` | 1/2/4 concurrent clients | embedded test DB | `make bench-cpu` |
-| `ner_cpu` | regex, Anno, Anno-ONNX, GLiNER, VAGO | all local model fixtures | `MEMORY_MCP_BENCH_REQUIRE_FIXTURES=1 cargo bench -p eval-harness --bench ner_cpu` |
+| `ner_cpu` | regex, Anno, Anno-ONNX, GLiNER, VAGO | all local model fixtures | `MEMORY_MCP_BENCH_REQUIRE_FIXTURES=1 cargo bench -p eval-harness --features eval-harness/bench --bench ner_cpu` |
 | `ner_metal` | Apple Silicon production path | macOS arm64 and local Metal/model assets | `make bench-metal` |
 
 `make bench-check` only compiles targets. CI's scheduled `make bench-cpu`

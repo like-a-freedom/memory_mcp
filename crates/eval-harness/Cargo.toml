@@ -19,6 +19,14 @@ memory_mcp = { path = "../memory-mcp", features = ["eval-support"] }
 async-trait.workspace = true
 chrono.workspace = true
 clap.workspace = true
+# Criterion is an optional dependency behind the `bench` feature: the four
+# `[[bench]]` targets declare `required-features = ["bench"]`, so ordinary
+# lint and test runs (`cargo clippy --all-targets`, `cargo test --workspace`)
+# never compile the Criterion tree — it would otherwise build as an
+# unconditional dev-dependency of every test target of this package.
+# Weekly Extended evaluations compile, lint and run the benches with the
+# feature enabled (see .github/workflows/evaluations.yml).
+criterion = { workspace = true, optional = true }
 csv.workspace = true
 hex.workspace = true
 reqwest.workspace = true
@@ -29,8 +37,11 @@ thiserror.workspace = true
 tokio.workspace = true
 
 [dev-dependencies]
-criterion.workspace = true
 tempfile.workspace = true
+
+[features]
+# Compile the Criterion benchmark targets of this package.
+bench = ["dep:criterion"]
 
 [lints]
 workspace = true
@@ -38,15 +49,19 @@ workspace = true
 [[bench]]
 name = "pipeline"
 harness = false
+required-features = ["bench"]
 
 [[bench]]
 name = "ner_cpu"
 harness = false
+required-features = ["bench"]
 
 [[bench]]
 name = "ner_metal"
 harness = false
+required-features = ["bench"]
 
 [[bench]]
 name = "contention"
 harness = false
+required-features = ["bench"]

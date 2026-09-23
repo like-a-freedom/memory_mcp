@@ -75,8 +75,12 @@ smoke checks as well and skip compiling a second test profile.
 ## Extended evaluations
 
 **Extended evaluations** runs weekly or manually. It retains the nightly
-evaluation profile, response-size checks, benchmark compilation and CPU
-Criterion runs without blocking ordinary builds. NER model quality checks
+evaluation profile, response-size checks, benchmark compilation, benchmark
+linting and CPU Criterion runs without blocking ordinary builds. The Criterion
+targets live behind the `bench` feature of `eval-harness` (`required-features`
+on each `[[bench]]`), so the ordinary quality gate never compiles them; this
+workflow enables the feature for both the clippy pass over the bench targets
+and `make bench-check`. NER model quality checks
 still require provisioned fixtures; missing fixtures are reported explicitly.
 The lightweight PR/release evaluation baselines remain mandatory in CI.
 

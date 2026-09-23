@@ -66,19 +66,19 @@ The old `eval_ner_latency` and `eval_latency` integration tests have been remove
 
 ```bash
 # NER CPU benchmarks (one-window and multi-window)
-cargo bench -p eval-harness --bench ner_cpu -- --noplot
+cargo bench -p eval-harness --features eval-harness/bench --bench ner_cpu -- --noplot
 
 # NER Metal benchmarks (macOS only; feature belongs to memory_mcp)
-cargo bench -p eval-harness --features memory_mcp/metal --bench ner_metal -- --noplot
+cargo bench -p eval-harness --features memory_mcp/metal,eval-harness/bench --bench ner_metal -- --noplot
 
 # NER CPU with Candle Accelerate (macOS only; currently rejected for production adoption)
-cargo bench -p eval-harness --features memory_mcp/accelerate --bench ner_cpu -- --noplot
+cargo bench -p eval-harness --features memory_mcp/accelerate,eval-harness/bench --bench ner_cpu -- --noplot
 
 # Contention benchmarks (multi-client concurrency)
-cargo bench -p eval-harness --bench contention -- --noplot
+cargo bench -p eval-harness --features eval-harness/bench --bench contention -- --noplot
 
 # Full pipeline benchmarks (ingest, extraction, claims, retrieval, end-to-end)
-cargo bench -p eval-harness --bench pipeline -- --noplot
+cargo bench -p eval-harness --features eval-harness/bench --bench pipeline -- --noplot
 ```
 
 Run without another model workload and with stable machine power/thermal settings.

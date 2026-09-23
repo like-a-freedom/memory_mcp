@@ -59,13 +59,18 @@ jobs:
       with:
         target: x86_64-unknown-linux-gnu
         cache-key: benchmark-nightly
+    - name: Lint benchmark targets behind the bench feature
+      # The weekly job is where criterion benches are compiled and linted:
+      # ordinary quality runs skip them (required-features) to keep the gate
+      # free of the Criterion tree.
+      run: cargo clippy -p eval-harness --benches --features eval-harness/bench --locked -- -D warnings
     - name: Compile all benchmark targets
       run: make bench-check
     - name: Run CPU Criterion benchmarks
       run: |
         make bench-cpu-core
         if test -d crates/memory-mcp/tests/models/ner; then
-          MEMORY_MCP_BENCH_REQUIRE_FIXTURES=1 cargo bench -p eval-harness --bench ner_cpu --locked
+          MEMORY_MCP_BENCH_REQUIRE_FIXTURES=1 cargo bench -p eval-harness --bench ner_cpu --locked --features eval-harness/bench
         else
           echo "NER CPU benchmark not executed: model fixtures are not provisioned in CI"
           echo "Run MEMORY_MCP_BENCH_REQUIRE_FIXTURES=1 make bench-cpu on a fixture-equipped host"
