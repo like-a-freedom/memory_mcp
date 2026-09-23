@@ -877,6 +877,38 @@ a reverse proxy. The proxy must:
 Wildcard origins are rejected at startup. Missing `Origin` is accepted only
 for non-browser MCP clients.
 
+### Deploying under a path prefix
+
+`memory_mcp_http` can live entirely under one path prefix so the host root
+stays free for other services (see
+`docs/superpowers/specs/2026-09-23-path-prefix-deployment.md`). There is no
+separate knob: the path of `MEMORY_MCP_HTTP_PUBLIC_BASE_URL` *is* the prefix.
+
+Two values must agree:
+
+- runtime: `MEMORY_MCP_HTTP_PUBLIC_BASE_URL=https://mcp.example/memory`
+  (the server answers only under `/memory`, `308`-canonicalizes
+  `/memory/` → `/memory`, and `404`s every root path);
+- build time: `dx bundle --base-path /memory` (Docker:
+  `--build-arg MEMORY_MCP_UI_BASE_PATH=/memory`) — bakes the same prefix
+  into the SPA bundle. **A mismatch between the two breaks the UI** (asset
+  requests land outside the prefix); rebuild the bundle when the prefix
+  changes.
+
+The OIDC redirect URI keeps its canonical path under the prefix
+(`https://mcp.example/memory/auth/oidc/callback`) — register exactly that at
+the identity provider.
+
+Reverse-proxy contract (Pangolin): route the prefix **without rewriting** —
+`/memory` → `http://127.0.0.1:8080` forwards `/memory/mcp`,
+`/memory/api/v1/...` etc. unchanged. The MCP endpoint is
+`https://mcp.example/memory/mcp` (give clients the full URL; if a client
+appends `/mcp` itself, give it `https://mcp.example/memory`).
+
+With a prefix set, session cookies are `__Secure-` scoped to `Path={base}/`
+so sibling services on the same host never receive them; at the origin root
+the `__Host-` + `Path=/` contract is kept.
+
 ### Capacity and quotas
 
 The HTTP profile enforces admission limits at the edge (per-tenant and
@@ -1021,7 +1053,7 @@ Read only by the `memory_mcp_http` binary built with the `streamable-http` featu
 | Variable | Type | Default | Description |
 | --- | --- | --- | --- |
 | `MEMORY_MCP_HTTP_BIND` | socket address (`IP:port`) | `0.0.0.0:8080` | Listen address |
-| `MEMORY_MCP_HTTP_PUBLIC_BASE_URL` | URL | unset | Required. Public base URL used for OIDC redirects and absolute links |
+| `MEMORY_MCP_HTTP_PUBLIC_BASE_URL` | URL | unset | Required. Public base URL used for OIDC redirects and absolute links. Its **path** is also the mount base of the server (e.g. `https://mcp.example/memory`); no path means the origin root |
 | `ALLOWED_HOSTS` | comma-separated list | unset | Required for production. Wildcard and unset values are rejected at startup; missing `Host` returns `403` |
 | `ALLOWED_ORIGINS` | comma-separated list | unset | Required for production. Wildcard values are rejected; missing `Origin` is allowed only for non-browser MCP clients, present `Origin` must match |
 | `MEMORY_MCP_HTTP_TRUSTED_PROXY_CIDRS` | comma-separated `CIDR` list | unset | Trusted reverse-proxy CIDRs for forwarded `Host`/`Origin`; if unset, the values are ignored entirely |
