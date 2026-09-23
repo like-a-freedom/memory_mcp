@@ -201,10 +201,85 @@ impl<'de> Deserialize<'de> for TrustedCidr {
     }
 }
 
+/// Derive the mount base path from `MEMORY_MCP_HTTP_PUBLIC_BASE_URL`.
+///
+/// The public URL is the single source of truth for where this server is
+/// mounted (12-factor config): its path *is* the base path, so no second
+/// variable can drift from it. No path means the origin root — the
+/// pre-base-path behavior. The grammar is strict on purpose: `Router::nest`
+/// panics on malformed mount paths, so a bad public URL must fail config
+/// load instead.
+pub(super) fn derive_base_path(public_base_url: &str) -> Result<String, MemoryError> {
+    let invalid = |detail: &str| {
+        MemoryError::ConfigInvalid(format!(
+            "MEMORY_MCP_HTTP_PUBLIC_BASE_URL must be scheme://host[:port][/base] where the \
+             base is '/'-prefixed unreserved-character segments \
+             (e.g. https://mcp.example/memory): {detail}"
+        ))
+    };
+    let Some((_, rest)) = public_base_url.split_once("://") else {
+        return Err(invalid("no scheme"));
+    };
+    if rest.is_empty() || rest.starts_with('/') {
+        return Err(invalid("no host"));
+    }
+    let path = rest
+        .split_once('/')
+        .map(|(_, path)| format!("/{path}"))
+        .unwrap_or_default();
+    let base = path.trim_end_matches('/').to_owned();
+    if base.is_empty() {
+        return Ok(String::new());
+    }
+    for segment in base[1..].split('/') {
+        if segment.is_empty()
+            || segment == "."
+            || segment == ".."
+            || !segment
+                .chars()
+                .all(|c| c.is_ascii_alphanumeric() || matches!(c, '-' | '_' | '.' | '~'))
+        {
+            return Err(invalid("bad path segment"));
+        }
+    }
+    Ok(base)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
+
+    #[test]
+    fn derives_the_base_path_from_the_public_url() {
+        for (url, expected) in [
+            ("http://localhost", ""),
+            ("http://localhost:8080", ""),
+            ("https://mcp.example/", ""),
+            ("https://mcp.example/memory", "/memory"),
+            ("https://mcp.example/memory/", "/memory"),
+            ("https://mcp.example/tools/memory", "/tools/memory"),
+        ] {
+            assert_eq!(derive_base_path(url).expect(url), expected, "{url}");
+        }
+    }
+
+    #[test]
+    fn rejects_public_urls_that_cannot_name_a_mount_base() {
+        for url in [
+            "mcp.example/memory",             // no scheme
+            "https://",                       // no host
+            "https:///memory",                // no host
+            "https://mcp.example//memory",    // empty segment
+            "https://mcp.example/mem/../x",   // dot-dot segment
+            "https://mcp.example/.",          // dot segment
+            "https://mcp.example/mem ory",    // space
+            "https://mcp.example/мемори",     // non-ASCII
+            "https://mcp.example/memory?q=1", // query
+        ] {
+            assert!(derive_base_path(url).is_err(), "{url}");
+        }
+    }
 
     #[test]
     fn parses_ipv4_cidr() {

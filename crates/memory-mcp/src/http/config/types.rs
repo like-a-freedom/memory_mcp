@@ -159,6 +159,9 @@ pub struct OidcBrowserConfig {
 pub struct HttpConfig {
     pub bind: SocketAddr,
     pub public_base_url: String,
+    /// Mount base path derived from the path of `public_base_url`
+    /// (`""` = origin root). See `derive_base_path`.
+    pub base_path: String,
     pub trusted_proxy_cidrs: Vec<TrustedCidr>,
     pub allowed_hosts: Vec<String>,
     pub allowed_origins: Vec<String>,
@@ -218,6 +221,7 @@ impl fmt::Debug for HttpConfig {
         f.debug_struct("HttpConfig")
             .field("bind", &self.bind)
             .field("public_base_url", &self.public_base_url)
+            .field("base_path", &self.base_path)
             .field("trusted_proxy_cidrs", &self.trusted_proxy_cidrs)
             .field("allowed_hosts", &self.allowed_hosts)
             .field("allowed_origins", &self.allowed_origins)
@@ -415,6 +419,7 @@ impl HttpConfig {
             .map_err(|e| MemoryError::ConfigInvalid(format!("DEFAULT_BIND parse failed: {e}")))?;
         let bind = parse_env_or("MEMORY_MCP_HTTP_BIND", default_bind)?;
         let public_base_url = require_env("MEMORY_MCP_HTTP_PUBLIC_BASE_URL")?;
+        let base_path = super::parse::derive_base_path(&public_base_url)?;
         let allowed_hosts = parse_csv("ALLOWED_HOSTS")?;
         let allowed_origins = parse_csv("ALLOWED_ORIGINS")?;
         let body_limit_bytes: usize =
@@ -645,6 +650,7 @@ impl HttpConfig {
         let cfg = Self {
             bind,
             public_base_url,
+            base_path,
             trusted_proxy_cidrs,
             allowed_hosts,
             allowed_origins,
@@ -717,6 +723,7 @@ impl HttpConfig {
         Self {
             bind: "127.0.0.1:0".parse().expect("test bind"),
             public_base_url: "http://localhost".into(),
+            base_path: String::new(),
             trusted_proxy_cidrs: Vec::new(),
             allowed_hosts: vec!["localhost".into(), "127.0.0.1".into()],
             allowed_origins: vec!["http://localhost".into()],
