@@ -8,6 +8,8 @@ use axum::body::Body;
 use axum::http::{HeaderValue, StatusCode, header::CACHE_CONTROL, header::CONTENT_TYPE};
 use axum::response::Response;
 
+use crate::error::MemoryError;
+
 #[derive(Debug, Clone, Copy)]
 struct Asset {
     path: &'static str,
@@ -25,6 +27,71 @@ include!(concat!(env!("OUT_DIR"), "/control_plane_assets.rs"));
 const ASSETS: &[Asset] = &[];
 
 const INDEX_PATH: &str = "/index.html";
+
+/// Build-time marker baked into the UI bundle by
+/// `dx bundle --base-path /__memory_mcp_base__`. The compiled `index.html`
+/// carries it in every prefix-dependent URL and in the `DIOXUS_ASSET_ROOT`
+/// meta; [`stamp_index_html`] replaces it with the deployed mount base at
+/// startup. The same literal lives in `crates/control-plane-ui/src/base.rs`,
+/// `crates/control-plane-ui/index.html`, the `Dockerfile`'s `dx bundle`
+/// invocation and `scripts/ci/local_admin_browser.mjs` — all five must change
+/// together.
+pub(crate) const BASE_PATH_SENTINEL: &str = "/__memory_mcp_base__";
+
+const META_PREFIX: &str = r#"<meta name="DIOXUS_ASSET_ROOT" content=""#;
+const HEAD_TAG: &str = "<head>";
+
+/// Replaces every sentinel occurrence in the compiled `index.html` with
+/// `base` and guarantees the `DIOXUS_ASSET_ROOT` meta carries exactly `base`,
+/// so the WASM's runtime base resolution reads the deployed base. `base` is
+/// the validated mount base (`""` = origin root).
+pub fn stamp_index_html(raw: &[u8], base: &str) -> Result<Vec<u8>, MemoryError> {
+    if base.contains(BASE_PATH_SENTINEL) {
+        return Err(MemoryError::ConfigInvalid(
+            "the mount base itself must not contain the bundle sentinel".to_string(),
+        ));
+    }
+    let html = std::str::from_utf8(raw).map_err(|_| {
+        MemoryError::ConfigInvalid(
+            "the embedded control-plane index.html is not valid UTF-8".to_string(),
+        )
+    })?;
+    if !base.is_empty() && !html.contains(BASE_PATH_SENTINEL) {
+        return Err(MemoryError::ConfigInvalid(format!(
+            "the embedded control-plane bundle was not built with \
+             `dx bundle --base-path {BASE_PATH_SENTINEL}`; rebuild the UI bundle \
+             (see README \"Control-plane UI asset packaging\")"
+        )));
+    }
+    let stamped = html.replace(BASE_PATH_SENTINEL, base);
+    let stamped = with_meta(stamped, base);
+    debug_assert!(!stamped.contains(BASE_PATH_SENTINEL));
+    Ok(stamped.into_bytes())
+}
+
+/// Rewrites the `content` of the `DIOXUS_ASSET_ROOT` meta to `base`, or
+/// inserts the element at the start of `<head>` when the bundle has none
+/// (dioxus-cli 0.7.10 does not emit the meta, so insertion is the live path).
+fn with_meta(html: String, base: &str) -> String {
+    if let Some(start) = html.find(META_PREFIX) {
+        let value_start = start + META_PREFIX.len();
+        let width = html[value_start..].find('"').unwrap_or(0);
+        let mut out = String::with_capacity(html.len() + base.len());
+        out.push_str(&html[..value_start]);
+        out.push_str(base);
+        out.push_str(&html[value_start + width..]);
+        return out;
+    }
+    let insert_at = html.find(HEAD_TAG).map_or(0, |pos| pos + HEAD_TAG.len());
+    let mut out = String::with_capacity(html.len() + base.len() + META_PREFIX.len() + 2);
+    out.push_str(&html[..insert_at]);
+    out.push_str(META_PREFIX);
+    out.push_str(base);
+    out.push('"');
+    out.push('>');
+    out.push_str(&html[insert_at..]);
+    out
+}
 
 /// The single source of truth for the SPA policy, shared by the header
 /// emitter and its test so the two cannot drift apart.
@@ -330,5 +397,71 @@ mod tests {
         let response = Response::new(Body::from("test"));
         let response = attach_security_headers(response);
         assert_security_headers(&response);
+    }
+
+    const PROBE_INDEX: &str = r#"<!DOCTYPE html><html><head><meta name="DIOXUS_ASSET_ROOT" content="/__memory_mcp_base__"><link rel="icon" type="image/svg+xml" href="/__memory_mcp_base__/assets/favicon.svg"></head><body><script src="/__memory_mcp_base__/./assets/app-1.js"></script></body></html>"#;
+
+    #[test]
+    fn stamps_every_sentinel_occurrence_with_the_mount_base() {
+        let out = stamp_index_html(PROBE_INDEX.as_bytes(), "/memory").expect("stamps");
+        let out = String::from_utf8(out).expect("utf-8");
+        assert!(!out.contains(BASE_PATH_SENTINEL));
+        assert!(out.contains(r#"href="/memory/assets/favicon.svg""#));
+        assert!(out.contains(r#"src="/memory/./assets/app-1.js""#));
+        assert!(out.contains(r#"<meta name="DIOXUS_ASSET_ROOT" content="/memory">"#));
+    }
+
+    #[test]
+    fn an_empty_base_reproduces_root_absolute_urls() {
+        let out = stamp_index_html(PROBE_INDEX.as_bytes(), "").expect("stamps");
+        let out = String::from_utf8(out).expect("utf-8");
+        assert!(out.contains(r#"href="/assets/favicon.svg""#));
+        assert!(out.contains(r#"src="/./assets/app-1.js""#));
+        assert!(out.contains(r#"<meta name="DIOXUS_ASSET_ROOT" content="">"#));
+    }
+
+    #[test]
+    fn a_root_base_accepts_a_legacy_bundle_without_the_sentinel() {
+        let raw = r#"<!DOCTYPE html><html><head></head><body></body></html>"#;
+        assert!(stamp_index_html(raw.as_bytes(), "").is_ok());
+    }
+
+    #[test]
+    fn a_prefixed_base_rejects_a_bundle_without_the_sentinel() {
+        let raw = r#"<!DOCTYPE html><html><head></head><body></body></html>"#;
+        let err = stamp_index_html(raw.as_bytes(), "/memory").expect_err("must reject");
+        assert!(matches!(err, MemoryError::ConfigInvalid(_)), "{err:?}");
+    }
+
+    #[test]
+    fn missing_meta_is_injected_so_the_wasm_reads_the_deployed_base() {
+        let raw = r#"<!DOCTYPE html><html><head><title>t</title></head><body><script src="/__memory_mcp_base__/./assets/app-1.js"></script></body></html>"#;
+        let out = stamp_index_html(raw.as_bytes(), "/memory").expect("stamps");
+        let out = String::from_utf8(out).expect("utf-8");
+        assert!(out.contains(r#"<head><meta name="DIOXUS_ASSET_ROOT" content="/memory">"#));
+    }
+
+    #[test]
+    fn a_stale_meta_content_is_rewritten_to_the_deployed_base() {
+        let raw = r#"<!DOCTYPE html><html><head><meta name="DIOXUS_ASSET_ROOT" content=""></head><body><script src="/__memory_mcp_base__/./assets/app-1.js"></script></body></html>"#;
+        let out = stamp_index_html(raw.as_bytes(), "/memory").expect("stamps");
+        let out = String::from_utf8(out).expect("utf-8");
+        assert!(out.contains(r#"<meta name="DIOXUS_ASSET_ROOT" content="/memory">"#));
+    }
+
+    #[test]
+    fn non_utf8_input_is_a_config_error() {
+        let err = stamp_index_html(&[0xff, 0xfe], "/memory").expect_err("must reject");
+        assert!(matches!(err, MemoryError::ConfigInvalid(_)), "{err:?}");
+    }
+
+    #[test]
+    fn a_base_that_itself_contains_the_sentinel_is_rejected() {
+        // The public-URL grammar would allow such a base segment; stamping it
+        // would leave sentinel residue in the served shell, so it must fail
+        // loudly at router assembly instead.
+        let err =
+            stamp_index_html(PROBE_INDEX.as_bytes(), BASE_PATH_SENTINEL).expect_err("must reject");
+        assert!(matches!(err, MemoryError::ConfigInvalid(_)), "{err:?}");
     }
 }
