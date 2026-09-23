@@ -58,4 +58,9 @@ runs:
         cache-key: native-v3-${{ inputs.target }}-${{ inputs.cache-key }}
         cache-shared-key: ${{ inputs.cache-shared-key != '' && format('native-v3-{0}-{1}', inputs.target, inputs.cache-shared-key) || '' }}
         cache-on-failure: false
-        cache-save-if: ${{ github.event_name != 'pull_request' }}
+        # Save on every event, pull requests included: caches are scoped to
+        # their branch, so later pushes of the same PR reuse the first build
+        # (a cold rebuild per push was the biggest repeated cost for PRs that
+        # touch Cargo.lock). Failed builds are still not saved
+        # (cache-on-failure: false).
+        cache-save-if: true

@@ -63,7 +63,9 @@ smoke checks as well and skip compiling a second test profile.
   and the native Linux x64 job (`cache-shared-key`) — the platform build
   restores the dependency tree the gate just compiled instead of rebuilding it.
   Release builds keep their own separate key. Failed builds are not saved. Pull
-  requests restore caches but do not save them. Rust, lockfile and Cargo config
+  requests restore caches and save their own branch-scoped cache, so later
+  pushes of the same PR reuse the first build; GitHub expires these caches on
+  inactivity. Rust, lockfile and Cargo config
   changes invalidate Rust caches. Bump `native-v3` if changing native compiler
   policy outside Cargo configuration.
 - The first uncached build is expensive: SurrealDB, RocksDB, ML libraries and
