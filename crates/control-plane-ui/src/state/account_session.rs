@@ -32,7 +32,7 @@ pub fn end_account_session(
     busy.set(true);
     error.set(None);
     spawn(async move {
-        match ApiClient::new("/".to_owned()).logout().await {
+        match ApiClient::same_origin().logout().await {
             Ok(()) => {
                 navigator.replace(Route::Login {});
             }

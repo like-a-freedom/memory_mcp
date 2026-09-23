@@ -28,7 +28,7 @@ use crate::state::account_session::end_account_session;
 #[component]
 pub fn KeysPage() -> Element {
     let navigator = use_navigator();
-    let mut keys = use_resource(|| async { ApiClient::new("/".to_owned()).list_keys().await });
+    let mut keys = use_resource(|| async { ApiClient::same_origin().list_keys().await });
     let mut new_key_secret = use_signal(|| None::<String>);
     let mut new_key_name = use_signal(String::new);
     let mut error = use_signal(|| None::<String>);
@@ -43,7 +43,7 @@ pub fn KeysPage() -> Element {
         if *pending.peek() {
             return;
         }
-        let api = ApiClient::new("/".to_owned());
+        let api = ApiClient::same_origin();
         let name = new_key_name.read().trim().to_owned();
         if name.is_empty() {
             error.set(Some("Enter a key name.".to_owned()));
@@ -71,7 +71,7 @@ pub fn KeysPage() -> Element {
         error.set(None);
         pending.set(true);
         spawn(async move {
-            match ApiClient::new("/".to_owned()).revoke_key(id).await {
+            match ApiClient::same_origin().revoke_key(id).await {
                 Ok(()) => keys.restart(),
                 Err(value) => error.set(Some(value.message)),
             }

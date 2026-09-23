@@ -21,7 +21,7 @@ pub fn StatusPage() -> Element {
     let navigator = use_navigator();
     // `use_resource` owns loading, cancellation and the latest result, and
     // `restart` gives the operator an explicit retry.
-    let mut account = use_resource(|| async { ApiClient::new("/".to_owned()).me().await });
+    let mut account = use_resource(|| async { ApiClient::same_origin().me().await });
     let signing_out = use_signal(|| false);
     let logout_error = use_signal(|| None::<String>);
     let sign_out = move |_| end_account_session(navigator, signing_out, logout_error);

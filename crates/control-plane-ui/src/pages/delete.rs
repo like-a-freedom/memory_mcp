@@ -31,7 +31,7 @@ pub fn DeletePage() -> Element {
         error.set(None);
         pending.set(true);
         spawn(async move {
-            match ApiClient::new("/".to_owned()).start_delete().await {
+            match ApiClient::same_origin().start_delete().await {
                 Ok(value) => challenge.set(Some(value)),
                 Err(value) => error.set(Some(value.message)),
             }
@@ -56,7 +56,7 @@ pub fn DeletePage() -> Element {
         error.set(None);
         pending.set(true);
         spawn(async move {
-            match ApiClient::new("/".to_owned())
+            match ApiClient::same_origin()
                 .confirm_delete(value.confirmation_token, typed_phrase)
                 .await
             {

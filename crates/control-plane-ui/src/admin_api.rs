@@ -1150,7 +1150,7 @@ impl AdminApi {
     }
 
     async fn get_json<T: DeserializeOwned>(&self, path: &str) -> Result<T, AdminApiError> {
-        let request = Request::get(path)
+        let request = Request::get(&crate::base::url(path))
             .build()
             .map_err(|error| AdminApiError::transport(&error.to_string()))?;
         self.send_json(request, None).await
@@ -1216,7 +1216,7 @@ impl AdminApi {
         kind: ChallengeKind,
     ) -> Result<ChallengeResponse, AdminApiError> {
         let csrf = self.preauth_csrf().await?.csrf_token;
-        let request = Request::post(PATH_CHALLENGE)
+        let request = Request::post(&crate::base::url(PATH_CHALLENGE))
             .header(HEADER_CSRF, &csrf)
             .json(&ChallengeBody {
                 code,
@@ -1255,7 +1255,7 @@ impl AdminApi {
         code: &str,
         password: &str,
     ) -> Result<Request, gloo_net::Error> {
-        Request::post(path)
+        Request::post(&crate::base::url(path))
             .header(HEADER_CSRF, csrf)
             .json(&FinishBody { code, password })
     }
@@ -1266,7 +1266,7 @@ impl AdminApi {
     /// deliberate attempt and must not multiply the throttle budget.
     pub async fn login(&self, username: &str, password: &str) -> Result<(), AdminApiError> {
         let csrf = self.preauth_csrf().await?.csrf_token;
-        let request = Request::post(PATH_LOGIN)
+        let request = Request::post(&crate::base::url(PATH_LOGIN))
             .header(HEADER_CSRF, &csrf)
             .json(&LoginBody { username, password })
             .map_err(|error| AdminApiError::transport(&error.to_string()))?;
@@ -1282,7 +1282,7 @@ impl AdminApi {
     /// re-enters the password. Never retried automatically.
     pub async fn reauth(&self, password: &str) -> Result<(), AdminApiError> {
         let csrf = self.session_csrf()?;
-        let request = Request::post(PATH_REAUTH)
+        let request = Request::post(&crate::base::url(PATH_REAUTH))
             .header(HEADER_CSRF, csrf)
             .json(&ReauthBody { password })
             .map_err(|error| AdminApiError::transport(&error.to_string()))?;
@@ -1295,7 +1295,7 @@ impl AdminApi {
     /// still sent unauthenticated: the backend documents that a repeat logout
     /// returns `204` without touching another session.
     pub async fn logout(&self) -> Result<(), AdminApiError> {
-        let mut request = Request::post(PATH_LOGOUT);
+        let mut request = Request::post(&crate::base::url(PATH_LOGOUT));
         if let Some(csrf) = self.session_csrf.as_ref() {
             request = request.header(HEADER_CSRF, csrf.as_str());
         }
@@ -1311,7 +1311,7 @@ impl AdminApi {
         after: Option<&str>,
         limit: u16,
     ) -> Result<Page<ClientView>, AdminApiError> {
-        let request = page_request(Request::get(PATH_CLIENTS), after, limit)?;
+        let request = page_request(Request::get(&crate::base::url(PATH_CLIENTS)), after, limit)?;
         self.send_json(request, None).await
     }
 
@@ -1326,7 +1326,7 @@ impl AdminApi {
         operation_id: &OperationId,
     ) -> Result<CreateClientResponse, AdminApiError> {
         let csrf = self.session_csrf()?;
-        let request = Request::post(PATH_CLIENTS)
+        let request = Request::post(&crate::base::url(PATH_CLIENTS))
             .header(HEADER_CSRF, csrf)
             .header(HEADER_IDEMPOTENCY, operation_id.as_str())
             .json(&CreateClientBody { display_name })
@@ -1349,7 +1349,11 @@ impl AdminApi {
         after: Option<&str>,
         limit: u16,
     ) -> Result<Page<ApiKeyMeta>, AdminApiError> {
-        let request = page_request(Request::get(&keys_path(account_id)), after, limit)?;
+        let request = page_request(
+            Request::get(&crate::base::url(&keys_path(account_id))),
+            after,
+            limit,
+        )?;
         self.send_json(request, None).await
     }
 
@@ -1366,7 +1370,7 @@ impl AdminApi {
         operation_id: &OperationId,
     ) -> Result<CreatedKey, AdminApiError> {
         let csrf = self.session_csrf()?;
-        let request = Request::post(&keys_path(account_id))
+        let request = Request::post(&crate::base::url(&keys_path(account_id)))
             .header(HEADER_CSRF, csrf)
             .header(HEADER_IDEMPOTENCY, operation_id.as_str())
             .json(&IssueKeyBody { name, expiry })
@@ -1396,7 +1400,7 @@ impl AdminApi {
         action: ClientStateAction,
     ) -> Result<(), AdminApiError> {
         let csrf = self.session_csrf()?;
-        let request = Request::post(&state_path(account_id, action))
+        let request = Request::post(&crate::base::url(&state_path(account_id, action)))
             .header(HEADER_CSRF, csrf)
             .json(&SetStateBody { expected_version })
             .map_err(|error| AdminApiError::transport(&error.to_string()))?;

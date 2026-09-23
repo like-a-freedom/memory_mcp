@@ -146,6 +146,11 @@ impl ApiClient {
         Self { base }
     }
 
+    /// A client for this bundle's own origin, under its base path.
+    pub fn same_origin() -> Self {
+        Self::new(crate::base::base_path())
+    }
+
     /// Join `base` and `path` into one same-origin request path.
     ///
     /// Callers pass `/` (the bundle is served from the root), which has to join
@@ -158,8 +163,7 @@ impl ApiClient {
     /// the request is simply never sent — so the join lives in one place and is
     /// pinned from both sides by `mod tests`.
     fn endpoint(&self, path: &str) -> String {
-        let base = self.base.trim_end_matches('/');
-        format!("{base}/{}", path.trim_start_matches('/'))
+        crate::base::join(&self.base, path)
     }
 
     /// GET /api/v1/account — read account metadata.

@@ -48,7 +48,7 @@ pub fn LoginPage() -> Element {
                     // An anchor, not a button nested inside one: this leaves the
                     // SPA for the provider, and nesting interactive content is
                     // invalid and confuses assistive technology.
-                    a { class: "button", href: PATH_OIDC_AUTHORIZE, "Sign in with OIDC" }
+                    a { class: "button", href: crate::base::url(PATH_OIDC_AUTHORIZE), "Sign in with OIDC" }
                     // The administrator form is a second door, not an
                     // alternative: it is where the deployment's own operator
                     // signs in, so it is named that way rather than left to look

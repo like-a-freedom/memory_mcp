@@ -11,6 +11,7 @@ use crate::layouts::app::App;
 mod admin_api;
 mod api;
 mod assets;
+mod base;
 mod components;
 mod inert;
 mod layouts;
