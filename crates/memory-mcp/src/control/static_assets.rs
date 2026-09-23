@@ -4,6 +4,8 @@
 //! `include_bytes!` and served under `/` with a fallback to `index.html`.
 //! API routes take priority via axum's `nest`.
 
+use std::sync::Arc;
+
 use axum::body::Body;
 use axum::http::{HeaderValue, StatusCode, header::CACHE_CONTROL, header::CONTENT_TYPE};
 use axum::response::Response;
@@ -123,28 +125,45 @@ pub fn attach_security_headers(mut resp: Response) -> Response {
     resp
 }
 
-/// Serve a compiled Dioxus asset by path.
+/// Stamps the compiled `index.html` with the deployed mount base once, at
+/// router assembly. `None` when no UI bundle is compiled into the binary.
+pub fn build_stamped_index(base: &str) -> Result<Option<Arc<[u8]>>, MemoryError> {
+    let Some(index) = ASSETS.iter().find(|asset| asset.path == INDEX_PATH) else {
+        return Ok(None);
+    };
+    Ok(Some(Arc::from(
+        stamp_index_html(index.body, base)?.into_boxed_slice(),
+    )))
+}
+
+/// Serve a compiled Dioxus asset by path. `stamped_index` is the
+/// mount-base-stamped `index.html` from [`build_stamped_index`]; SPA routes
+/// and `/index.html` serve those bytes instead of the raw compiled document.
 ///
 /// Exact bundle paths win. Extensionless paths outside the asset directory use
 /// the compiled index for client-side SPA routes; missing files and malformed
 /// paths return 404.
-pub fn serve_asset(path: &str) -> Response {
-    serve_asset_from(path, ASSETS)
+pub fn serve_asset(path: &str, stamped_index: Option<&[u8]>) -> Response {
+    serve_asset_from(path, ASSETS, stamped_index)
 }
 
-fn serve_asset_from(path: &str, assets: &[Asset]) -> Response {
+fn serve_asset_from(path: &str, assets: &[Asset], stamped_index: Option<&[u8]>) -> Response {
     let Some(path) = request_path(path) else {
         return not_found_response();
     };
 
     if let Some(asset) = assets.iter().find(|asset| asset.path == path) {
-        return asset_response(asset);
+        return if asset.path == INDEX_PATH {
+            index_response(asset, stamped_index)
+        } else {
+            asset_response(asset)
+        };
     }
 
     if is_spa_route(path)
         && let Some(index) = assets.iter().find(|asset| asset.path == INDEX_PATH)
     {
-        return asset_response(index);
+        return index_response(index, stamped_index);
     }
 
     not_found_response()
@@ -177,7 +196,21 @@ fn is_spa_route(path: &str) -> bool {
 }
 
 fn asset_response(asset: &Asset) -> Response {
-    let mut resp = Response::new(Body::from(asset.body));
+    asset_response_with_body(asset, Body::from(asset.body))
+}
+
+/// The index document is `no-cache` and served from the stamped buffer when
+/// one exists: the compiled bytes still carry the build sentinel and must
+/// never reach a client on a prefixed deployment.
+fn index_response(asset: &Asset, stamped_index: Option<&[u8]>) -> Response {
+    match stamped_index {
+        Some(stamped) => asset_response_with_body(asset, Body::from(stamped.to_vec())),
+        None => asset_response(asset),
+    }
+}
+
+fn asset_response_with_body(asset: &Asset, body: Body) -> Response {
+    let mut resp = Response::new(body);
     resp.headers_mut()
         .insert(CONTENT_TYPE, HeaderValue::from_static(asset.content_type));
     // Content-addressed bundle assets never change once published, so they can
@@ -271,8 +304,11 @@ mod tests {
 
     #[tokio::test]
     async fn fixture_asset_returns_compiled_bytes_and_content_type() {
-        let response =
-            serve_asset_from("/assets/app-dxh395eca31249da547.js?cache=1", FIXTURE_ASSETS);
+        let response = serve_asset_from(
+            "/assets/app-dxh395eca31249da547.js?cache=1",
+            FIXTURE_ASSETS,
+            None,
+        );
 
         assert_eq!(response.status(), StatusCode::OK);
         assert_eq!(
@@ -296,7 +332,7 @@ mod tests {
     #[tokio::test]
     async fn root_and_extensionless_routes_return_revalidated_compiled_index() {
         for path in ["/", "/index.html", "/operator/settings"] {
-            let response = serve_asset_from(path, FIXTURE_ASSETS);
+            let response = serve_asset_from(path, FIXTURE_ASSETS, None);
 
             assert_eq!(response.status(), StatusCode::OK, "path: {path}");
             assert_eq!(
@@ -325,7 +361,7 @@ mod tests {
 
     #[test]
     fn stable_unhashed_assets_are_revalidated() {
-        let response = serve_asset_from("/assets/favicon.svg", FIXTURE_ASSETS);
+        let response = serve_asset_from("/assets/favicon.svg", FIXTURE_ASSETS, None);
         assert_eq!(
             response
                 .headers()
@@ -343,7 +379,7 @@ mod tests {
             "/assets/unknown.js",
             "/assets/unknown.wasm",
         ] {
-            let response = serve_asset_from(path, FIXTURE_ASSETS);
+            let response = serve_asset_from(path, FIXTURE_ASSETS, None);
             assert_eq!(response.status(), StatusCode::NOT_FOUND, "path: {path}");
             assert_security_headers(&response);
         }
@@ -359,7 +395,7 @@ mod tests {
             "/assets\\app.js",
         ] {
             assert_eq!(
-                serve_asset_from(path, FIXTURE_ASSETS).status(),
+                serve_asset_from(path, FIXTURE_ASSETS, None).status(),
                 StatusCode::NOT_FOUND,
                 "path: {path}"
             );
@@ -369,7 +405,7 @@ mod tests {
     #[cfg(not(feature = "control-plane-ui"))]
     #[test]
     fn disabled_ui_feature_does_not_serve_root() {
-        assert_eq!(serve_asset("/").status(), StatusCode::NOT_FOUND);
+        assert_eq!(serve_asset("/", None).status(), StatusCode::NOT_FOUND);
     }
 
     #[cfg(feature = "control-plane-ui")]
@@ -463,5 +499,25 @@ mod tests {
         let err =
             stamp_index_html(PROBE_INDEX.as_bytes(), BASE_PATH_SENTINEL).expect_err("must reject");
         assert!(matches!(err, MemoryError::ConfigInvalid(_)), "{err:?}");
+    }
+
+    #[tokio::test]
+    async fn a_stamped_index_replaces_the_compiled_document_on_spa_routes() {
+        let response = serve_asset_from(
+            "/admin/clients",
+            FIXTURE_ASSETS,
+            Some(b"stamped-fixture".as_slice()),
+        );
+        assert_eq!(response_body(response).await, b"stamped-fixture");
+    }
+
+    #[tokio::test]
+    async fn the_index_path_also_serves_the_stamped_document() {
+        let response = serve_asset_from(
+            "/index.html",
+            FIXTURE_ASSETS,
+            Some(b"stamped-fixture".as_slice()),
+        );
+        assert_eq!(response_body(response).await, b"stamped-fixture");
     }
 }

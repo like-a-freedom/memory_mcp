@@ -104,13 +104,15 @@ async fn main() -> ExitCode {
         state.shutdown.token(),
     );
 
+    let router = match router::build_router(state.clone(), Some(runtime.fault_injector.clone())) {
+        Ok(router) => router,
+        Err(err) => {
+            eprintln!("router config error: {err}");
+            return ExitCode::from(2);
+        }
+    };
     bootstrap::emit_startup_log(&logger, &cfg);
-    let server_result = server::serve(
-        cfg,
-        router::build_router(state.clone(), Some(runtime.fault_injector.clone())),
-        state.shutdown.clone(),
-    )
-    .await;
+    let server_result = server::serve(cfg, router, state.shutdown.clone()).await;
     state.admission.close();
     state.shutdown.begin();
     scheduler.join().await;

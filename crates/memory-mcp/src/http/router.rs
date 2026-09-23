@@ -16,7 +16,7 @@ use crate::http::config::BrowserAuthMethod;
 pub fn build_router(
     state: Arc<HttpState>,
     #[allow(unused_variables)] control_plane_injector: Option<Arc<dyn FaultInjector>>,
-) -> Router {
+) -> Result<Router, crate::error::MemoryError> {
     // Route-scoped layers added EARLIER are INNER (run
     // later). `acquire_runtime` runs after `authenticate`
     // because the principal must be in the request
@@ -285,32 +285,50 @@ pub fn build_router(
             false
         }
     };
-    let router = router.fallback(move |uri: axum::http::Uri| async move {
-        let path = uri.path();
-        if path.starts_with("/api/") || path == "/api" {
-            return axum::response::IntoResponse::into_response((
+    // The SPA shell is stamped with the mount base once, here: the fallback
+    // below serves these bytes for every SPA route so a prefixed deployment
+    // never ships the build-time sentinel to a client. Stamping is gated on
+    // `ui_enabled` so a deployment that turns the UI off never fails on a
+    // bundle contract it does not serve; the `#[cfg]` mirrors the gate on
+    // the `serve_asset` call inside the fallback.
+    #[cfg(feature = "control-plane-ui")]
+    let ui_index = if ui_enabled {
+        crate::control::static_assets::build_stamped_index(&state.config.base_path)?
+    } else {
+        None
+    };
+    #[cfg(not(feature = "control-plane-ui"))]
+    let ui_index: Option<std::sync::Arc<[u8]>> = None;
+
+    let router = router.fallback(move |uri: axum::http::Uri| {
+        let ui_index = ui_index.clone();
+        async move {
+            let path = uri.path();
+            if path.starts_with("/api/") || path == "/api" {
+                return axum::response::IntoResponse::into_response((
+                    axum::http::StatusCode::NOT_FOUND,
+                    [(axum::http::header::CONTENT_TYPE, "application/json")],
+                    "{\"error\":{\"code\":\"not_found\",\"message\":\"not found\"}}",
+                ));
+            }
+            if path.starts_with("/auth/") || path == "/auth" {
+                return axum::response::IntoResponse::into_response((
+                    axum::http::StatusCode::NOT_FOUND,
+                    [(axum::http::header::CONTENT_TYPE, "application/json")],
+                    "{\"error\":{\"code\":\"not_found\",\"message\":\"not found\"}}",
+                ));
+            }
+            #[cfg(feature = "control-plane-ui")]
+            if ui_enabled {
+                return crate::control::static_assets::serve_asset(path, ui_index.as_deref());
+            }
+            let _ = (ui_enabled, &ui_index);
+            axum::response::IntoResponse::into_response((
                 axum::http::StatusCode::NOT_FOUND,
                 [(axum::http::header::CONTENT_TYPE, "application/json")],
                 "{\"error\":{\"code\":\"not_found\",\"message\":\"not found\"}}",
-            ));
+            ))
         }
-        if path.starts_with("/auth/") || path == "/auth" {
-            return axum::response::IntoResponse::into_response((
-                axum::http::StatusCode::NOT_FOUND,
-                [(axum::http::header::CONTENT_TYPE, "application/json")],
-                "{\"error\":{\"code\":\"not_found\",\"message\":\"not found\"}}",
-            ));
-        }
-        #[cfg(feature = "control-plane-ui")]
-        if ui_enabled {
-            return crate::control::static_assets::serve_asset(path);
-        }
-        let _ = ui_enabled;
-        axum::response::IntoResponse::into_response((
-            axum::http::StatusCode::NOT_FOUND,
-            [(axum::http::header::CONTENT_TYPE, "application/json")],
-            "{\"error\":{\"code\":\"not_found\",\"message\":\"not found\"}}",
-        ))
     });
 
     // The deployment boundary goes on last, and last is what makes it a
@@ -357,14 +375,15 @@ pub fn build_router(
                 }
             })
     };
-    app.layer(axum::middleware::from_fn_with_state(
-        state,
-        super::middleware::host_origin,
-    ))
-    .layer(axum::middleware::from_fn(
-        super::middleware::inject_sse_headers,
-    ))
-    .layer(axum::middleware::from_fn(super::logging::request_log))
+    Ok(app
+        .layer(axum::middleware::from_fn_with_state(
+            state,
+            super::middleware::host_origin,
+        ))
+        .layer(axum::middleware::from_fn(
+            super::middleware::inject_sse_headers,
+        ))
+        .layer(axum::middleware::from_fn(super::logging::request_log)))
 }
 
 #[cfg(test)]
@@ -405,7 +424,7 @@ mod tests {
             "the fixture is off mode"
         );
 
-        let mut router = build_router(state, None);
+        let mut router = build_router(state, None).expect("router builds in tests");
         let response = router
             .call(request(Method::GET, "/api/v1/auth/config"))
             .await
@@ -429,7 +448,7 @@ mod tests {
             "the fixture is local mode"
         );
 
-        let mut router = build_router(state, None);
+        let mut router = build_router(state, None).expect("router builds in tests");
         let response = router
             .call(request(Method::GET, "/api/v1/auth/config"))
             .await
@@ -450,7 +469,7 @@ mod tests {
         let (builder, _store) = HttpStateTestBuilder::local_admin().await;
         let state = builder.build().await.expect("local admin HTTP state");
 
-        let mut refused = build_router(state.clone(), None);
+        let mut refused = build_router(state.clone(), None).expect("router builds in tests");
         let response = refused
             .call(request_with_host(
                 Method::GET,
@@ -464,7 +483,7 @@ mod tests {
         // The local surface used to carry its own copy of this check. It does
         // not any more, so a merged route has to be covered by the boundary
         // layer as well.
-        let mut merged = build_router(state.clone(), None);
+        let mut merged = build_router(state.clone(), None).expect("router builds in tests");
         let response = merged
             .call(request_with_host(
                 Method::GET,
@@ -477,7 +496,7 @@ mod tests {
 
         // The same route under an allowlisted host, so the assertions above
         // cannot pass for an unrelated reason.
-        let mut allowed = build_router(state, None);
+        let mut allowed = build_router(state, None).expect("router builds in tests");
         let response = allowed
             .call(request(Method::GET, "/api/v1/auth/config"))
             .await
@@ -497,7 +516,7 @@ mod tests {
             .await
             .expect("off-mode HTTP state");
 
-        let mut refused = build_router(state.clone(), None);
+        let mut refused = build_router(state.clone(), None).expect("router builds in tests");
         let response = refused
             .call(request_with_host(
                 Method::GET,
@@ -508,7 +527,7 @@ mod tests {
             .expect("dispatch");
         assert_eq!(response.status(), StatusCode::FORBIDDEN);
 
-        let mut allowed = build_router(state, None);
+        let mut allowed = build_router(state, None).expect("router builds in tests");
         let response = allowed
             .call(request(Method::GET, "/assets/no-such-file.css"))
             .await
@@ -540,7 +559,8 @@ mod tests {
     /// and `GET /health/live` is a 200 — both must become the 404 envelope.
     #[tokio::test]
     async fn with_a_base_path_root_paths_answer_the_404_envelope() {
-        let mut router = build_router(prefixed_state("/memory").await, None);
+        let mut router =
+            build_router(prefixed_state("/memory").await, None).expect("router builds in tests");
         for (method, uri) in [
             (Method::GET, "/health/live"),
             (Method::GET, "/mcp"),
@@ -554,7 +574,8 @@ mod tests {
 
     #[tokio::test]
     async fn with_a_base_path_routes_reach_their_handlers() {
-        let mut router = build_router(prefixed_state("/memory").await, None);
+        let mut router =
+            build_router(prefixed_state("/memory").await, None).expect("router builds in tests");
 
         let response = router
             .call(request(Method::GET, "/memory/health/live"))
@@ -593,7 +614,8 @@ mod tests {
 
     #[tokio::test]
     async fn a_query_string_survives_the_mount() {
-        let mut router = build_router(prefixed_state("/memory").await, None);
+        let mut router =
+            build_router(prefixed_state("/memory").await, None).expect("router builds in tests");
         let response = router
             .call(request(Method::GET, "/memory/health/live?probe=1"))
             .await
@@ -603,7 +625,8 @@ mod tests {
 
     #[tokio::test]
     async fn the_trailing_slash_form_canonicalizes_to_the_bare_prefix() {
-        let mut router = build_router(prefixed_state("/memory").await, None);
+        let mut router =
+            build_router(prefixed_state("/memory").await, None).expect("router builds in tests");
         let response = router
             .call(request(Method::GET, "/memory/"))
             .await
@@ -625,7 +648,8 @@ mod tests {
     #[cfg(feature = "control-plane-ui")]
     #[tokio::test]
     async fn the_bare_prefix_reaches_the_inner_spa_fallback() {
-        let mut router = build_router(prefixed_state("/memory").await, None);
+        let mut router =
+            build_router(prefixed_state("/memory").await, None).expect("router builds in tests");
         let response = router
             .call(request(Method::GET, "/memory"))
             .await
@@ -638,7 +662,8 @@ mod tests {
     #[cfg(feature = "control-plane-ui")]
     #[tokio::test]
     async fn deep_spa_paths_reach_the_inner_spa_fallback() {
-        let mut router = build_router(prefixed_state("/memory").await, None);
+        let mut router =
+            build_router(prefixed_state("/memory").await, None).expect("router builds in tests");
         let response = router
             .call(request(Method::GET, "/memory/admin/login"))
             .await
@@ -650,7 +675,8 @@ mod tests {
     /// one surface that does not sit inside the nested router.
     #[tokio::test]
     async fn the_host_allowlist_covers_the_gap_fallback() {
-        let mut router = build_router(prefixed_state("/memory").await, None);
+        let mut router =
+            build_router(prefixed_state("/memory").await, None).expect("router builds in tests");
         let response = router
             .call(request_with_host(Method::GET, "/memory/", "evil.example"))
             .await
@@ -661,7 +687,8 @@ mod tests {
     /// An empty base must keep the exact pre-feature surface.
     #[tokio::test]
     async fn an_empty_base_path_keeps_root_serving() {
-        let mut router = build_router(prefixed_state("").await, None);
+        let mut router =
+            build_router(prefixed_state("").await, None).expect("router builds in tests");
         let response = router
             .call(request(Method::GET, "/health/live"))
             .await

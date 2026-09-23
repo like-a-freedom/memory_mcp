@@ -59,7 +59,8 @@ mod tests {
         let mut state = super::super::HttpState::default_for_test().await;
         let inner = std::sync::Arc::get_mut(&mut state).expect("single owner");
         inner.registry = super::super::registry::RegistryHandle::in_memory();
-        let router = super::super::router::build_router(state, None);
+        let router =
+            super::super::router::build_router(state, None).expect("router builds in tests");
         let mut svc = router;
         let req = axum::http::Request::builder()
             .uri("/health/ready")

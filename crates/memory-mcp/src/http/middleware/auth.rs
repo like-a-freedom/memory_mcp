@@ -254,7 +254,7 @@ mod tests {
         // health endpoint remains unauthenticated.
         use crate::http::router as build_router;
         let state = crate::http::HttpState::default_for_test().await;
-        let router = build_router::build_router(state, None);
+        let router = build_router::build_router(state, None).expect("router builds in tests");
         let mut svc = router;
 
         let malformed = axum::http::Request::builder()
@@ -303,7 +303,7 @@ mod tests {
         // /health/live is unauthenticated; rebuild a fresh
         // router to drive the second request.
         let state2 = crate::http::HttpState::default_for_test().await;
-        let router2 = build_router::build_router(state2, None);
+        let router2 = build_router::build_router(state2, None).expect("router builds in tests");
         let req = axum::http::Request::builder()
             .method("GET")
             .uri("/health/live")
