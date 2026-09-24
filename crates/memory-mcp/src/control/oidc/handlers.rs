@@ -600,6 +600,29 @@ mod tests {
     /// The identity belongs to whoever the provider says it belongs to, so a
     /// second Account cannot attach an identity the first already holds. This is
     /// the case the body-supplied route could not distinguish from the first.
+    #[tokio::test]
+    async fn an_invitation_for_an_unknown_account_is_refused() {
+        let store = store_with_two_accounts().await;
+        let policy = crate::http::registry::RegistryStore::reconcile_browser_policy(
+            store.as_ref(),
+            &[crate::http::config::BrowserAuthMethod::Oidc],
+            None,
+        )
+        .await
+        .expect("reconcile browser policy");
+        let registry = crate::http::registry::RegistryHandle::in_memory().with_inner_store(store);
+        let state = crate::http::test_state::HttpStateTestBuilder::new()
+            .await
+            .with_registry(registry)
+            .with_browser_policy(policy)
+            .build()
+            .await
+            .expect("test HTTP state");
+
+        let refused = start_invite_flow(&state, "acct_missing", "admin_root", false).await;
+        assert!(matches!(refused, Err(ApiError::NotFound)));
+    }
+
     /// Invitation acceptance (R2): a browser with no control-plane session is
     /// signed in as the bound Account — the provider just attested ownership,
     /// so the acceptance is the first login (ADR-0057 invitations).

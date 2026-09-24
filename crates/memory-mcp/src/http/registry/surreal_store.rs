@@ -355,16 +355,23 @@ fn identity_audit_vars(event: &ControlAuditEvent) -> Value {
 /// own sentinel is the refusal; everything else keeps the adapter's mapping, so a
 /// unique-tuple violation still reads as a `Conflict` and a missing Account or
 /// identity still reads as `NotFound`.
-/// The replace guard's refusal sentinel, classified as `Conflict` like the
-/// last-identity guard's own.
-const REPLACE_GUARD_SENTINEL: &str = "replace requires exactly one existing identity";
+/// Token the replace transaction `THROW`s when the Account does not hold
+/// exactly one identity. It is a token rather than message prose (see
+/// `thrown_token`), and the script assembles it from split literals so a
+/// parse-error echo of the transaction text can never carry the assembled
+/// token and be misclassified as a refusal — that false match once cost a
+/// full debugging round. The user-facing message lives in
+/// `classify_identity_change_error`.
+const REPLACE_GUARD_TOKEN: &str = "replace_guard";
 
 fn classify_identity_change_error(context: &str, error: MemoryError) -> MemoryError {
     let message = error.to_string();
     if message.contains(LAST_IDENTITY_SENTINEL) {
         return MemoryError::Conflict("the account's last identity cannot be unlinked".into());
     }
-    if message.contains(REPLACE_GUARD_SENTINEL) {
+    // Token match on storage text only, never message prose: a parse error
+    // echoes the transaction source, so prose sentinels would false-match it.
+    if matches!(&error, MemoryError::Storage(_)) && message.contains(REPLACE_GUARD_TOKEN) {
         return MemoryError::Conflict("replace requires exactly one existing identity".into());
     }
     map_storage_error(context, error)
@@ -1471,7 +1478,7 @@ impl RegistryStore for SurrealRegistryStore {
             IF array::len($account) = 0 { THROW 'account not found'; }; \
             LET $held = SELECT id, issuer, subject_verifier FROM external_identity \
                 WHERE account_id = $account_id; \
-            IF array::len($held) != 1 { THROW 'replace requires exactly one existing identity'; }; \
+            IF array::len($held) != 1 { THROW string::concat('replace_', 'guard'); }; \
             IF $held[0].issuer != $issuer OR $held[0].subject_verifier != $verifier { \
                 DELETE type::record('external_identity', $held[0].id); \
                 CREATE type::record('external_identity', $identity_id) SET \
@@ -3809,6 +3816,23 @@ mod tests {
                 .expect("stale lookup")
                 .is_none(),
             "a session with a stale epoch must not resolve"
+        );
+    }
+
+    /// A parse error echoes the transaction source, so it must never be
+    /// mistaken for the guard's refusal: the script throws the token assembled
+    /// from split literals, and only a real `THROW` carries it.
+    #[test]
+    fn a_parse_error_echo_is_not_a_replace_refusal() {
+        let echoed = MemoryError::Storage(
+            "query statement errors: statement 4: Parse error at `IF array::len($held) != 1 { \
+             THROW string::concat('replace_', 'guard'); }`"
+                .into(),
+        );
+        let classified = classify_identity_change_error("replace external identity", echoed);
+        assert!(
+            !matches!(classified, MemoryError::Conflict(_)),
+            "an infrastructure failure must not read as a refusal"
         );
     }
 
