@@ -175,8 +175,10 @@ pub(super) fn validate(cfg: &HttpConfig) -> Result<(), MemoryError> {
         ));
     }
     // Keep in lockstep with the algorithm mapping in `control::oidc::client`.
-    if uses_oidc
-        && cfg.oidc_allowed_alg != super::parse::AUTO_OIDC_ALG
+    // Checked unconditionally: the pin is inert policy without the `oidc`
+    // method (the Compose file injects one by default), but a garbage value
+    // is refused early either way.
+    if cfg.oidc_allowed_alg != super::parse::AUTO_OIDC_ALG
         && !matches!(
             cfg.oidc_allowed_alg.as_str(),
             "RS256" | "RS384" | "RS512" | "ES256" | "EdDSA"
@@ -219,13 +221,6 @@ pub(super) fn validate(cfg: &HttpConfig) -> Result<(), MemoryError> {
                      enabled; add 'oidc' to MEMORY_MCP_HTTP_AUTH_METHODS"
                 )));
             }
-        }
-        if cfg.oidc_allowed_alg != super::parse::DEFAULT_OIDC_ALG {
-            return Err(MemoryError::ConfigInvalid(
-                "MEMORY_MCP_HTTP_OIDC_ALLOWED_ALG is set but the 'oidc' browser authentication \
-                 method is not enabled; add 'oidc' to MEMORY_MCP_HTTP_AUTH_METHODS"
-                    .into(),
-            ));
         }
         // Open signup is meaningless without an identity provider and would
         // advertise accounts nobody can create. Invite-only is the only

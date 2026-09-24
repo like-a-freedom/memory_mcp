@@ -16,8 +16,10 @@
 #
 # The default is `local` because it is the only set that needs no external
 # input. To add a provider, set `MEMORY_MCP_HTTP_AUTH_METHODS=local,oidc` and
-# the four `MEMORY_MCP_HTTP_OIDC_*` values plus the three provider keys; the
-# server keeps serving the local door and adds the redirect beside it.
+# the two required values `MEMORY_MCP_HTTP_OIDC_ISSUER` and
+# `MEMORY_MCP_HTTP_OIDC_CLIENT_ID`; everything else derives when unset (the
+# secret slots also come from `MEMORY_MCP_HTTP_SECRET_KEY`). The server keeps
+# serving the local door and adds the redirect beside it.
 #
 # To go the other way and drop the local door, the set alone is not enough:
 # startup reconciliation is additive and refuses to narrow the stored set. Run
@@ -107,9 +109,8 @@ services:
       SURREALDB_TENANT_DB: "${SURREALDB_TENANT_DB:-tenant}"
 
       # ── Browser surface ───────────────────────────────────────────────
-      # Set the control plane to `false` for a data-plane-only deployment, in
-      # which case `MEMORY_MCP_HTTP_SIGNUP_MODE` and the three provider keys are
-      # still required by the server.
+      # Set the control plane to `false` for a data-plane-only deployment: no
+      # browser or provider material is required at all in that case.
       MEMORY_MCP_HTTP_ENABLE_CONTROL_PLANE: "${MEMORY_MCP_HTTP_ENABLE_CONTROL_PLANE:-true}"
       MEMORY_MCP_HTTP_ENABLE_CONTROL_PLANE_UI: "${MEMORY_MCP_HTTP_ENABLE_CONTROL_PLANE_UI:-true}"
       MEMORY_MCP_HTTP_AUTH_METHODS: "${MEMORY_MCP_HTTP_AUTH_METHODS:-local}"
@@ -138,7 +139,9 @@ services:
       MEMORY_MCP_HTTP_OIDC_CLIENT_ID: "${MEMORY_MCP_HTTP_OIDC_CLIENT_ID:-}"
       MEMORY_MCP_HTTP_OIDC_AUDIENCE: "${MEMORY_MCP_HTTP_OIDC_AUDIENCE:-}"
       MEMORY_MCP_HTTP_OIDC_REDIRECT_URI: "${MEMORY_MCP_HTTP_OIDC_REDIRECT_URI:-}"
-      MEMORY_MCP_HTTP_OIDC_ALLOWED_ALG: "${MEMORY_MCP_HTTP_OIDC_ALLOWED_ALG:-RS256}"
+      # Unset derives `auto` (the provider's advertised set intersected with
+      # the safe set); an explicit value is a single-algorithm pin.
+      MEMORY_MCP_HTTP_OIDC_ALLOWED_ALG: "${MEMORY_MCP_HTTP_OIDC_ALLOWED_ALG:-}"
       MEMORY_MCP_HTTP_OPERATOR_IDENTITIES: "${MEMORY_MCP_HTTP_OPERATOR_IDENTITIES:-}"
       MEMORY_MCP_HTTP_IDENTITY_INDEX_KEY: "${MEMORY_MCP_HTTP_IDENTITY_INDEX_KEY:-}"
       MEMORY_MCP_HTTP_OIDC_STATE_KEY: "${MEMORY_MCP_HTTP_OIDC_STATE_KEY:-}"

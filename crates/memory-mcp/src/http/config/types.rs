@@ -602,7 +602,10 @@ impl HttpConfig {
         // Material for a method this deployment does not enable is a
         // configuration error rather than something to ignore: a provider that
         // is configured but not enabled is a deployment that believes it has
-        // SSO when it does not.
+        // SSO when it does not. The algorithm allowlist is absent from this
+        // set on purpose: it is inert policy rather than provider material
+        // (the Compose file injects one), and its value is validated
+        // regardless in `config::validate`.
         if !configured_methods.contains(&BrowserAuthMethod::Oidc) {
             let stray = [
                 ("MEMORY_MCP_HTTP_OIDC_ISSUER", &oidc_issuer),
@@ -612,9 +615,6 @@ impl HttpConfig {
             ]
             .into_iter()
             .find_map(|(name, value)| (!value.is_empty()).then_some(name))
-            .or_else(|| {
-                (oidc_allowed_alg != DEFAULT_OIDC_ALG).then_some("MEMORY_MCP_HTTP_OIDC_ALLOWED_ALG")
-            })
             .or_else(|| {
                 (!operator_identity_allowlist.is_empty())
                     .then_some("MEMORY_MCP_HTTP_OPERATOR_IDENTITIES")
@@ -1532,6 +1532,41 @@ mod tests {
             run(root_a, &other_session),
             "under a fixed root the session key must not touch derived slots"
         );
+    }
+
+    /// Regression (v1.13.0 CI break): the Compose file injects
+    /// `MEMORY_MCP_HTTP_OIDC_ALLOWED_ALG=RS256` by default. An algorithm pin
+    /// is inert policy rather than provider material, so a `local`-only
+    /// deployment must accept it instead of refusing to start; only its value
+    /// is checked.
+    #[test]
+    fn local_mode_accepts_an_algorithm_pin_without_the_provider() {
+        for alg in ["RS256", "EdDSA", "auto"] {
+            let mut vars = local_mode_env();
+            vars.push(("MEMORY_MCP_HTTP_OIDC_ALLOWED_ALG", alg.into()));
+            let refs: Vec<(&str, &str)> = vars.iter().map(|(k, v)| (*k, v.as_str())).collect();
+            with_env(&refs, || {
+                let cfg = HttpConfig::from_env().expect("local mode with an algorithm pin loads");
+                cfg.validate().expect("valid");
+            });
+        }
+    }
+
+    /// The pin is inert, not unchecked: a garbage value still fails early,
+    /// with or without the `oidc` method.
+    #[test]
+    fn an_invalid_algorithm_is_refused_even_without_the_provider() {
+        let mut vars = local_mode_env();
+        vars.push(("MEMORY_MCP_HTTP_OIDC_ALLOWED_ALG", "none".into()));
+        let refs: Vec<(&str, &str)> = vars.iter().map(|(k, v)| (*k, v.as_str())).collect();
+        with_env(&refs, || {
+            let cfg =
+                HttpConfig::from_env().expect("loads; the value itself is checked in validate");
+            assert!(matches!(
+                cfg.validate(),
+                Err(MemoryError::ConfigInvalid(message)) if message.contains("allowed algorithm")
+            ));
+        });
     }
 
     #[test]
