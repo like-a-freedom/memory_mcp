@@ -481,7 +481,21 @@ impl HttpConfig {
             .into_iter()
             .map(|s| TrustedCidr::parse(&s))
             .collect::<Result<Vec<_>, _>>()?;
-        let api_key_pepper = require_env("MEMORY_MCP_API_KEY_PEPPER")?;
+        // One root secret can derive every secret slot (the five HMAC keys and
+        // the API-key pepper). An explicit variable always wins over the root
+        // derivation for its slot, and without either form the original
+        // `ConfigMissing` contract stands: secret material is never invented.
+        let root_secret = optional_env("MEMORY_MCP_HTTP_SECRET_KEY");
+        let api_key_pepper = match optional_env("MEMORY_MCP_API_KEY_PEPPER") {
+            Some(supplied) => supplied,
+            None => match root_secret.as_deref() {
+                Some(root) => hex::encode(derive_key_from_root_secret(
+                    root,
+                    "MEMORY_MCP_API_KEY_PEPPER",
+                )?),
+                None => require_env("MEMORY_MCP_API_KEY_PEPPER")?,
+            },
+        };
         // Enable flags and the method set are read before any secret so a
         // deployment that does not enable `oidc` is never forced to configure
         // OIDC-only material, and so each method's keys are demanded only when
@@ -498,41 +512,57 @@ impl HttpConfig {
         // enabled those slots are real material for a real provider.
         let derives_local_keys = configured_methods == [BrowserAuthMethod::Local];
 
-        let identity_index = if derives_local_keys {
-            // Local mode has no external identity to index, but the field
-            // is not optional. Rather than zero-fill it (which would make
-            // an accidental use trivially forgeable) derive it from the
-            // local session key under a purpose label.
-            Ok(derive_local_key("MEMORY_MCP_HTTP_IDENTITY_INDEX_KEY")?)
-        } else {
-            parse_hex_32_env("MEMORY_MCP_HTTP_IDENTITY_INDEX_KEY")
-        }?;
-        let oidc_state = if derives_local_keys {
-            Ok(derive_local_key("MEMORY_MCP_HTTP_OIDC_STATE_KEY")?)
-        } else {
-            parse_hex_32_env("MEMORY_MCP_HTTP_OIDC_STATE_KEY")
-        }?;
-        let oidc_nonce = if derives_local_keys {
-            Ok(derive_local_key("MEMORY_MCP_HTTP_OIDC_NONCE_KEY")?)
-        } else {
-            parse_hex_32_env("MEMORY_MCP_HTTP_OIDC_NONCE_KEY")
-        }?;
+        // Slot resolution: an explicit variable wins, then the root-secret
+        // derivation, then (for the three OIDC-typed slots under a `local`-
+        // only set) the local-mode derivation from the session key.
+        let control_plane_session = resolve_key_slot(
+            "MEMORY_MCP_HTTP_SESSION_KEY",
+            root_secret.as_deref(),
+            || parse_hex_32_env("MEMORY_MCP_HTTP_SESSION_KEY"),
+        )?;
+        let local_slot = |label: &str| {
+            if derives_local_keys {
+                derive_local_key(&control_plane_session, label)
+            } else {
+                parse_hex_32_env(label)
+            }
+        };
+        let identity_index = resolve_key_slot(
+            "MEMORY_MCP_HTTP_IDENTITY_INDEX_KEY",
+            root_secret.as_deref(),
+            || local_slot("MEMORY_MCP_HTTP_IDENTITY_INDEX_KEY"),
+        )?;
+        let oidc_state = resolve_key_slot(
+            "MEMORY_MCP_HTTP_OIDC_STATE_KEY",
+            root_secret.as_deref(),
+            || local_slot("MEMORY_MCP_HTTP_OIDC_STATE_KEY"),
+        )?;
+        let oidc_nonce = resolve_key_slot(
+            "MEMORY_MCP_HTTP_OIDC_NONCE_KEY",
+            root_secret.as_deref(),
+            || local_slot("MEMORY_MCP_HTTP_OIDC_NONCE_KEY"),
+        )?;
+        let csrf = resolve_key_slot("MEMORY_MCP_HTTP_CSRF_KEY", root_secret.as_deref(), || {
+            parse_hex_32_env("MEMORY_MCP_HTTP_CSRF_KEY")
+        })?;
         let keys = HmacKeys {
             identity_index,
-            control_plane_session: parse_hex_32_env("MEMORY_MCP_HTTP_SESSION_KEY")?,
+            control_plane_session,
             oidc_state,
             oidc_nonce,
-            csrf: parse_hex_32_env("MEMORY_MCP_HTTP_CSRF_KEY")?,
+            csrf,
         };
         // Signup policy: only the `oidc` method has an identity provider to
         // sign up with, so a set without it is invite-only and rejects an
         // explicit `open` rather than silently ignoring it. Defaulting the
         // variable keeps a local environment from carrying an OIDC-only key.
         let signup_mode = if configured_methods.contains(&BrowserAuthMethod::Oidc) {
-            match require_env("MEMORY_MCP_HTTP_SIGNUP_MODE")?.as_str() {
-                "invite_only" => SignupMode::InviteOnly,
-                "open" => SignupMode::Open,
-                other => {
+            // Zero-config default: `invite_only` is the safe policy; `open` is
+            // always an explicit choice.
+            match optional_env("MEMORY_MCP_HTTP_SIGNUP_MODE").as_deref() {
+                None | Some("invite_only") => SignupMode::InviteOnly,
+                Some("open") => SignupMode::Open,
+                Some(other) => {
                     return Err(MemoryError::ConfigInvalid(format!("signup mode: {other}")));
                 }
             }
@@ -586,6 +616,27 @@ impl HttpConfig {
                 )));
             }
         }
+        // Zero-config derivation: only the issuer and the client id are
+        // vitally necessary. The audience defaults to the client id (OIDC
+        // Core: `aud` is the RP's client id), the redirect URI to this
+        // deployment's own callback under the public base URL, and the
+        // algorithm allowlist to `auto`. A supplied value always wins.
+        let (oidc_audience, oidc_redirect_uri, oidc_allowed_alg) =
+            if configured_methods.contains(&BrowserAuthMethod::Oidc) {
+                let audience = if oidc_audience.is_empty() {
+                    oidc_client_id.clone()
+                } else {
+                    oidc_audience
+                };
+                let redirect_uri = if oidc_redirect_uri.is_empty() {
+                    super::parse::derive_oidc_redirect_uri(&public_base_url)
+                } else {
+                    oidc_redirect_uri
+                };
+                (audience, redirect_uri, oidc_allowed_alg)
+            } else {
+                (oidc_audience, oidc_redirect_uri, oidc_allowed_alg)
+            };
         // The three OIDC-typed HMAC slots are real key material in every set
         // that enables `oidc`, and are derived from the session key only while
         // `local` is the *whole* set. A deployment that supplies one there is
@@ -791,16 +842,52 @@ impl HttpConfig {
 /// from the local session key under a purpose-separated label, so it is
 /// never a zero key (which would make an accidental use trivially
 /// forgeable) and never equal to another slot's value.
-fn derive_local_key(label: &str) -> Result<[u8; 32], MemoryError> {
+fn derive_local_key(session: &[u8; 32], label: &str) -> Result<[u8; 32], MemoryError> {
     use hmac::{Hmac, KeyInit, Mac};
     use sha2::Sha256;
 
-    let session = parse_hex_32_env("MEMORY_MCP_HTTP_SESSION_KEY")?;
-    let mut mac = Hmac::<Sha256>::new_from_slice(&session)
+    let mut mac = Hmac::<Sha256>::new_from_slice(session)
         .map_err(|_| MemoryError::ConfigInvalid("invalid session key".into()))?;
     mac.update(b"local_mode_derived_key\0");
     mac.update(label.as_bytes());
     Ok(mac.finalize().into_bytes().into())
+}
+
+/// Purpose-separated derivation from `MEMORY_MCP_HTTP_SECRET_KEY`: one root
+/// secret yields every slot, each under the absent variable's name as its
+/// label, so derived slots are never zero and never equal to a sibling.
+fn derive_key_from_root_secret(root: &str, label: &str) -> Result<[u8; 32], MemoryError> {
+    use hmac::{Hmac, KeyInit, Mac};
+    use sha2::Sha256;
+
+    let mut mac = Hmac::<Sha256>::new_from_slice(root.as_bytes())
+        .map_err(|_| MemoryError::ConfigInvalid("invalid root secret".into()))?;
+    mac.update(b"memory_mcp_http_secret_key\0");
+    mac.update(label.as_bytes());
+    Ok(mac.finalize().into_bytes().into())
+}
+
+/// Resolve one 32-byte HMAC key slot: an explicit value wins, then the
+/// root-secret derivation, then the caller's fallback (which preserves the
+/// original `ConfigMissing` contract).
+fn resolve_key_slot(
+    env_name: &str,
+    root_secret: Option<&str>,
+    fallback: impl FnOnce() -> Result<[u8; 32], MemoryError>,
+) -> Result<[u8; 32], MemoryError> {
+    match optional_env(env_name) {
+        Some(raw) => {
+            let bytes =
+                hex::decode(raw).map_err(|_| MemoryError::ConfigInvalid(env_name.into()))?;
+            bytes
+                .try_into()
+                .map_err(|_| MemoryError::ConfigInvalid(env_name.into()))
+        }
+        None => match root_secret {
+            Some(root) => derive_key_from_root_secret(root, env_name),
+            None => fallback(),
+        },
+    }
 }
 
 #[cfg(test)]
@@ -843,6 +930,13 @@ mod tests {
             "MEMORY_MCP_HTTP_OIDC_NONCE_KEY",
             "MEMORY_MCP_HTTP_SESSION_KEY",
             "MEMORY_MCP_HTTP_IDENTITY_INDEX_KEY",
+            "MEMORY_MCP_HTTP_OIDC_ISSUER",
+            "MEMORY_MCP_HTTP_OIDC_CLIENT_ID",
+            "MEMORY_MCP_HTTP_OIDC_AUDIENCE",
+            "MEMORY_MCP_HTTP_OIDC_REDIRECT_URI",
+            "MEMORY_MCP_HTTP_OIDC_ALLOWED_ALG",
+            "MEMORY_MCP_HTTP_SECRET_KEY",
+            "MEMORY_MCP_HTTP_AUTH_METHODS",
             "MEMORY_MCP_HTTP_OPERATOR_IDENTITIES",
             "MEMORY_MCP_HTTP_MAX_INGESTED_BYTES",
             "MEMORY_MCP_HTTP_MAX_EPISODE_COUNT",
@@ -1193,16 +1287,179 @@ mod tests {
 
     /// RS384 and RS512 are advertised by mainstream providers (Rauthy lists
     /// `RS256, RS384, RS512, EdDSA`) and must be selectable in
-    /// `MEMORY_MCP_HTTP_OIDC_ALLOWED_ALG` alongside the original three.
+    /// `MEMORY_MCP_HTTP_OIDC_ALLOWED_ALG` alongside `auto` (the default: the
+    /// safe set intersected with the provider's advertisement at discovery).
     #[test]
-    fn control_plane_accepts_rs384_and_rs512_algorithms() {
-        for alg in ["RS384", "RS512"] {
+    fn control_plane_accepts_derived_and_rs_algorithms() {
+        for alg in ["auto", "RS384", "RS512"] {
             let mut cfg = HttpConfig::default_for_test();
             cfg.enable_control_plane = true;
             cfg.oidc_allowed_alg = alg.into();
             cfg.validate()
                 .unwrap_or_else(|error| panic!("{alg} must be accepted: {error}"));
         }
+    }
+
+    /// `oidc`-only env with every derivable OIDC knob removed: the two vitally
+    /// necessary ones (issuer, client id) and the secrets stay.
+    fn minimal_oidc_env() -> Vec<(&'static str, String)> {
+        let mut vars: Vec<(&'static str, String)> = base_required_env()
+            .into_iter()
+            .filter(|(k, _)| !matches!(*k, "MEMORY_MCP_HTTP_SIGNUP_MODE"))
+            .collect();
+        vars.push(("MEMORY_MCP_HTTP_ENABLE_CONTROL_PLANE", "true".into()));
+        vars.push(("MEMORY_MCP_HTTP_AUTH_METHODS", "oidc".into()));
+        vars.push((
+            "MEMORY_MCP_HTTP_OIDC_ISSUER",
+            "https://issuer.example.com".into(),
+        ));
+        vars.push(("MEMORY_MCP_HTTP_OIDC_CLIENT_ID", "test-client".into()));
+        vars
+    }
+
+    /// `minimal_oidc_env` with every explicit secret replaced by one root
+    /// secret.
+    fn root_secret_env() -> Vec<(&'static str, String)> {
+        let mut vars: Vec<(&'static str, String)> = minimal_oidc_env()
+            .into_iter()
+            .filter(|(k, _)| {
+                !matches!(
+                    *k,
+                    "MEMORY_MCP_API_KEY_PEPPER"
+                        | "MEMORY_MCP_HTTP_IDENTITY_INDEX_KEY"
+                        | "MEMORY_MCP_HTTP_CSRF_KEY"
+                        | "MEMORY_MCP_HTTP_OIDC_STATE_KEY"
+                        | "MEMORY_MCP_HTTP_OIDC_NONCE_KEY"
+                        | "MEMORY_MCP_HTTP_SESSION_KEY"
+                )
+            })
+            .collect();
+        vars.push((
+            "MEMORY_MCP_HTTP_SECRET_KEY",
+            "root-secret-with-plenty-of-entropy-0123456789".into(),
+        ));
+        vars
+    }
+
+    /// Zero-config OIDC: only the issuer and client id are vitally necessary.
+    /// The audience defaults to the client id (OIDC Core: `aud` is the RP's
+    /// client id), the redirect URI to this deployment's own callback under
+    /// the public base URL, the algorithm allowlist to `auto`, and the signup
+    /// policy to `invite_only`.
+    #[test]
+    fn unset_oidc_material_is_derived_from_client_id_and_public_url() {
+        let vars = minimal_oidc_env();
+        let refs: Vec<(&str, &str)> = vars.iter().map(|(k, v)| (*k, v.as_str())).collect();
+        with_env(&refs, || {
+            let cfg = HttpConfig::from_env().expect("minimal oidc config loads");
+            cfg.validate().expect("minimal oidc config validates");
+            assert_eq!(cfg.oidc_audience, "test-client");
+            assert_eq!(cfg.oidc_redirect_uri, "http://localhost/auth/oidc/callback");
+            assert_eq!(cfg.oidc_allowed_alg, "auto");
+            assert_eq!(cfg.signup_mode, SignupMode::InviteOnly);
+        });
+    }
+
+    /// Supplied values win over every derivation, so providers that do not
+    /// follow the common shapes keep their escape hatch.
+    #[test]
+    fn explicit_oidc_material_overrides_the_derivations() {
+        let mut vars = minimal_oidc_env();
+        vars.push(("MEMORY_MCP_HTTP_OIDC_AUDIENCE", "custom-aud".into()));
+        vars.push((
+            "MEMORY_MCP_HTTP_OIDC_REDIRECT_URI",
+            "https://memory.example.com/custom-callback".into(),
+        ));
+        vars.push(("MEMORY_MCP_HTTP_OIDC_ALLOWED_ALG", "EdDSA".into()));
+        let refs: Vec<(&str, &str)> = vars.iter().map(|(k, v)| (*k, v.as_str())).collect();
+        with_env(&refs, || {
+            let cfg = HttpConfig::from_env().expect("config loads");
+            cfg.validate().expect("valid");
+            assert_eq!(cfg.oidc_audience, "custom-aud");
+            assert_eq!(
+                cfg.oidc_redirect_uri,
+                "https://memory.example.com/custom-callback"
+            );
+            assert_eq!(cfg.oidc_allowed_alg, "EdDSA");
+        });
+    }
+
+    #[test]
+    fn the_oidc_callback_derives_from_the_public_url() {
+        assert_eq!(
+            crate::http::config::parse::derive_oidc_redirect_uri("https://memory.example.com"),
+            "https://memory.example.com/auth/oidc/callback"
+        );
+        assert_eq!(
+            crate::http::config::parse::derive_oidc_redirect_uri(
+                "https://memory.example.com/memory"
+            ),
+            "https://memory.example.com/memory/auth/oidc/callback"
+        );
+        assert_eq!(
+            crate::http::config::parse::derive_oidc_redirect_uri(
+                "https://memory.example.com/memory/"
+            ),
+            "https://memory.example.com/memory/auth/oidc/callback"
+        );
+    }
+
+    /// One root secret replaces the five HMAC keys and the API-key pepper:
+    /// each slot is a purpose-separated derivation, never equal to a sibling.
+    #[test]
+    fn a_root_secret_derives_every_secret_slot_differently() {
+        let vars = root_secret_env();
+        let refs: Vec<(&str, &str)> = vars.iter().map(|(k, v)| (*k, v.as_str())).collect();
+        with_env(&refs, || {
+            let cfg = HttpConfig::from_env().expect("root-secret config loads");
+            cfg.validate().expect("valid");
+            assert!(cfg.api_key_pepper.len() >= 32);
+            let keys = &cfg.keys;
+            let slots: [&[u8; 32]; 5] = [
+                &keys.identity_index,
+                &keys.control_plane_session,
+                &keys.oidc_state,
+                &keys.oidc_nonce,
+                &keys.csrf,
+            ];
+            for (i, slot) in slots.iter().enumerate() {
+                for sibling in &slots[i + 1..] {
+                    assert_ne!(slot, sibling, "secret slots must be purpose-separated");
+                }
+            }
+        });
+    }
+
+    /// A supplied key wins over the root derivation for its slot alone.
+    #[test]
+    fn a_supplied_secret_wins_over_the_root_secret() {
+        let mut vars = root_secret_env();
+        vars.push(("MEMORY_MCP_HTTP_SESSION_KEY", "0".repeat(64)));
+        let refs: Vec<(&str, &str)> = vars.iter().map(|(k, v)| (*k, v.as_str())).collect();
+        with_env(&refs, || {
+            let cfg = HttpConfig::from_env().expect("config loads");
+            assert_eq!(cfg.keys.control_plane_session, [0; 32]);
+            assert_ne!(cfg.keys.identity_index, [0; 32]);
+            assert_ne!(cfg.keys.csrf, [0; 32]);
+        });
+    }
+
+    /// The root secret is a derivation source, never a license to invent
+    /// material: without either form the old `ConfigMissing` contract stands.
+    #[test]
+    fn missing_secrets_without_a_root_secret_still_fail() {
+        let vars: Vec<(&'static str, String)> = minimal_oidc_env()
+            .into_iter()
+            .filter(|(k, _)| *k != "MEMORY_MCP_API_KEY_PEPPER")
+            .collect();
+        let refs: Vec<(&str, &str)> = vars.iter().map(|(k, v)| (*k, v.as_str())).collect();
+        with_env(&refs, || {
+            assert!(matches!(
+                HttpConfig::from_env(),
+                Err(MemoryError::ConfigMissing(name))
+                    if name == "MEMORY_MCP_API_KEY_PEPPER"
+            ));
+        });
     }
 
     #[test]

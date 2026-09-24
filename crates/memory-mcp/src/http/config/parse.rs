@@ -32,7 +32,22 @@ pub const DEFAULT_TASK_QUEUE_CAPACITY: usize = 256;
 pub const DEFAULT_TASK_SYNC_MAX_BYTES: usize = 1024 * 1024;
 pub const DEFAULT_ALLOWED_HOSTS: &[&str] = &[]; // must be set explicitly in production
 pub const DEFAULT_ALLOWED_ORIGINS: &[&str] = &[];
-pub const DEFAULT_OIDC_ALG: &str = "RS256";
+/// Sentinel for `MEMORY_MCP_HTTP_OIDC_ALLOWED_ALG`: accept what the provider
+/// advertises in discovery, intersected with the safe set in
+/// `control::oidc::client`. Also the default.
+pub const AUTO_OIDC_ALG: &str = "auto";
+pub const DEFAULT_OIDC_ALG: &str = AUTO_OIDC_ALG;
+
+/// The OIDC callback this deployment itself serves, derived from the public
+/// base URL: the router mounts `/auth/oidc/callback` and nests the whole app
+/// under the base path, so the registered redirect URI is fixed by the
+/// deployment's own public URL. `MEMORY_MCP_HTTP_OIDC_REDIRECT_URI` overrides.
+pub(super) fn derive_oidc_redirect_uri(public_base_url: &str) -> String {
+    format!(
+        "{}/auth/oidc/callback",
+        public_base_url.trim_end_matches('/')
+    )
+}
 
 pub(super) fn require_env(k: &str) -> Result<String, MemoryError> {
     std::env::var(k).map_err(|_| MemoryError::ConfigMissing(k.into()))

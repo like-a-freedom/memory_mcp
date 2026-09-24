@@ -342,13 +342,16 @@ page lists every enabled method.
 
 The Compose file defaults the non-secret method material, including
 `MEMORY_MCP_HTTP_AUTH_METHODS=local`, so a deployment with no identity provider
-starts from the file plus the exports below. Secrets are never defaulted, so
-export the required values before starting Compose:
+starts from the file plus the exports below. Secret material is never
+invented: export the individual secrets, or one `MEMORY_MCP_HTTP_SECRET_KEY`
+root from which every unset slot is derived, before starting Compose:
 
 ```bash
 # Required in every configuration.
 export SURREALDB_USERNAME=... SURREALDB_PASSWORD=...
 export MEMORY_MCP_API_KEY_PEPPER=... MEMORY_MCP_HTTP_SESSION_KEY=... MEMORY_MCP_HTTP_CSRF_KEY=...
+# Or one root secret instead of the individual ones:
+# export MEMORY_MCP_HTTP_SECRET_KEY=...
 export MEMORY_MCP_HTTP_PUBLIC_BASE_URL=http://localhost:8080
 export ALLOWED_HOSTS=localhost:8080,127.0.0.1:8080 ALLOWED_ORIGINS=http://localhost:8080
 
@@ -366,15 +369,18 @@ and restart. The local method keeps working through the same restart:
 ```bash
 export MEMORY_MCP_HTTP_AUTH_METHODS=local,oidc
 export MEMORY_MCP_HTTP_OIDC_ISSUER=... MEMORY_MCP_HTTP_OIDC_CLIENT_ID=...
-export MEMORY_MCP_HTTP_OIDC_AUDIENCE=... MEMORY_MCP_HTTP_OIDC_REDIRECT_URI=...
-export MEMORY_MCP_HTTP_IDENTITY_INDEX_KEY=... MEMORY_MCP_HTTP_OIDC_STATE_KEY=... MEMORY_MCP_HTTP_OIDC_NONCE_KEY=...
+# Everything else derives when unset: audience <- the client id, redirect URI
+# <- {public base URL}/auth/oidc/callback, algorithms <- 'auto', signup <-
+# invite_only. The individual *_KEY variables work instead of the root secret.
+export MEMORY_MCP_HTTP_SECRET_KEY=...
 
 docker compose up -d
 ```
 
 The three provider keys are 64 hex characters each and are derived from
 `MEMORY_MCP_HTTP_SESSION_KEY` only while `local` is the whole set. With `oidc`
-enabled they are real key material and must be supplied.
+enabled they are real key material: supply them explicitly, or derive them
+from `MEMORY_MCP_HTTP_SECRET_KEY`.
 
 Material for a method the set omits is refused, and so is a set that drops a
 method the deployment has already enabled: turning a method off is an explicit
@@ -708,7 +714,9 @@ A method that is not enabled mounts nothing, not an unauthenticated route.
 Material for a method the set omits is refused, and the three OIDC-typed HMAC
 keys (`MEMORY_MCP_HTTP_IDENTITY_INDEX_KEY`, `..._OIDC_STATE_KEY`,
 `..._OIDC_NONCE_KEY`) are derived from `MEMORY_MCP_HTTP_SESSION_KEY` only while
-`local` is the whole set; supplying one there is an error.
+`local` is the whole set; supplying one there is an error. Every secret slot
+additionally derives from `MEMORY_MCP_HTTP_SECRET_KEY` when its variable is
+unset.
 
 A set that omits a method the deployment has already enabled fails startup.
 Removing a method is an explicit operation, not a startup reconciliation, and it
@@ -720,8 +728,10 @@ is the only path to "SSO only":
 export MEMORY_MCP_HTTP_AUTH_METHODS=local,oidc
 export MEMORY_MCP_HTTP_OPERATOR_IDENTITIES='<issuer>|<hex(subject_verifier)>'
 export MEMORY_MCP_HTTP_OIDC_ISSUER=... MEMORY_MCP_HTTP_OIDC_CLIENT_ID=...
-export MEMORY_MCP_HTTP_OIDC_AUDIENCE=... MEMORY_MCP_HTTP_OIDC_REDIRECT_URI=...
-export MEMORY_MCP_HTTP_IDENTITY_INDEX_KEY=... MEMORY_MCP_HTTP_OIDC_STATE_KEY=... MEMORY_MCP_HTTP_OIDC_NONCE_KEY=...
+# Everything else derives when unset: audience <- the client id, redirect URI
+# <- {public base URL}/auth/oidc/callback, algorithms <- 'auto', signup <-
+# invite_only. The individual *_KEY variables work instead of the root secret.
+export MEMORY_MCP_HTTP_SECRET_KEY=...
 docker compose up -d
 
 # 2. Narrow the durable policy to the target set: one audited operation.
@@ -777,19 +787,11 @@ SURREALDB_TENANT_USERNAME=... \
 SURREALDB_TENANT_PASSWORD=... \
 SURREALDB_TENANT_NAMESPACE=tenant \
 SURREALDB_TENANT_DB=tenant \
-MEMORY_MCP_API_KEY_PEPPER=... \
-MEMORY_MCP_HTTP_IDENTITY_INDEX_KEY=... \
-MEMORY_MCP_HTTP_SESSION_KEY=... \
-MEMORY_MCP_HTTP_OIDC_STATE_KEY=... \
-MEMORY_MCP_HTTP_OIDC_NONCE_KEY=... \
-MEMORY_MCP_HTTP_CSRF_KEY=... \
+MEMORY_MCP_HTTP_SECRET_KEY=... \
 MEMORY_MCP_HTTP_AUTH_METHODS=oidc \
-MEMORY_MCP_HTTP_SIGNUP_MODE=invite_only \
 MEMORY_MCP_HTTP_ENABLE_CONTROL_PLANE=true \
 MEMORY_MCP_HTTP_OIDC_ISSUER=https://issuer.example.com \
 MEMORY_MCP_HTTP_OIDC_CLIENT_ID=memory_mcp \
-MEMORY_MCP_HTTP_OIDC_AUDIENCE=https://mcp.example.com \
-MEMORY_MCP_HTTP_OIDC_REDIRECT_URI=https://mcp.example.com/auth/oidc/callback \
 MEMORY_MCP_HTTP_REPLICA_ID=node-a \
 ./target/release/memory_mcp_http
 ```
@@ -1085,16 +1087,20 @@ Read only by the `memory_mcp_http` binary built with the `streamable-http` featu
 | `SURREALDB_TENANT_NAMESPACE` | string | Tenant engine namespace |
 | `SURREALDB_TENANT_DB` | string | Tenant engine database name |
 
-**Keyed verifiers and secrets**: required, 32-byte hex each (raw secrets are never persisted or logged)
+**Keyed verifiers and secrets**: 32-byte hex each (raw secrets are never
+persisted or logged). Each slot is either supplied explicitly or derived from
+the root secret; an explicit variable always wins per slot, and without either
+form startup fails — material is never invented.
 
 | Variable | Description |
 | --- | --- |
-| `MEMORY_MCP_API_KEY_PEPPER` | Pepper for the keyed HMAC verifier of Account API keys; rotating it invalidates every existing key. Must be **≥ 32 bytes** of secret material; the server does not require hex encoding for this field |
-| `MEMORY_MCP_HTTP_IDENTITY_INDEX_KEY` | Blind index key for OIDC subject verifiers; rotating it requires every OIDC identity to relink. Required when `oidc` is enabled, and derived from `MEMORY_MCP_HTTP_SESSION_KEY` when `local` is the whole method set (supplying it there is an error) |
-| `MEMORY_MCP_HTTP_SESSION_KEY` | HMAC key for browser-session cookie verifiers; rotating it invalidates every browser session |
+| `MEMORY_MCP_HTTP_SECRET_KEY` | Optional root secret (**≥ 32 bytes** of secret material, any encoding). Every secret slot below that is not supplied explicitly is derived from it under a purpose-separated label, so derived slots are never zero and never equal to a sibling. Rotating it rotates every derived slot at once (combine with the per-slot notes below) |
+| `MEMORY_MCP_API_KEY_PEPPER` | Pepper for the keyed HMAC verifier of Account API keys; rotating it invalidates every existing key. Must be **≥ 32 bytes** of secret material; the server does not require hex encoding for this field. Derived from `MEMORY_MCP_HTTP_SECRET_KEY` when unset |
+| `MEMORY_MCP_HTTP_IDENTITY_INDEX_KEY` | Blind index key for OIDC subject verifiers; rotating it requires every OIDC identity to relink. Required when `oidc` is enabled, and derived from `MEMORY_MCP_HTTP_SESSION_KEY` when `local` is the whole method set (supplying it there is an error). Also derived from `MEMORY_MCP_HTTP_SECRET_KEY` when unset |
+| `MEMORY_MCP_HTTP_SESSION_KEY` | HMAC key for browser-session cookie verifiers; rotating it invalidates every browser session. Derived from `MEMORY_MCP_HTTP_SECRET_KEY` when unset |
 | `MEMORY_MCP_HTTP_OIDC_STATE_KEY` | AEAD key for OIDC state nonces; rotating it invalidates in-flight login flows. Same requirement rule as `MEMORY_MCP_HTTP_IDENTITY_INDEX_KEY` |
 | `MEMORY_MCP_HTTP_OIDC_NONCE_KEY` | AEAD key for OIDC ID-token nonces; rotating it invalidates in-flight login flows. Same requirement rule as `MEMORY_MCP_HTTP_IDENTITY_INDEX_KEY` |
-| `MEMORY_MCP_HTTP_CSRF_KEY` | HMAC key for CSRF tokens; rotating it invalidates every active browser session |
+| `MEMORY_MCP_HTTP_CSRF_KEY` | HMAC key for CSRF tokens; rotating it invalidates every active browser session. Derived from `MEMORY_MCP_HTTP_SECRET_KEY` when unset |
 
 **Browser authentication methods, signup policy, control plane, and OIDC**
 
@@ -1102,14 +1108,14 @@ Read only by the `memory_mcp_http` binary built with the `streamable-http` featu
 | --- | --- | --- | --- |
 | `MEMORY_MCP_HTTP_AUTH_METHODS` | comma-separated set of `local` \| `oidc` | `oidc` | The browser authentication methods this deployment serves. Each enabled method mounts its own surface and each disabled method mounts nothing. A set that omits a method the deployment has already enabled fails startup: removing a method is an explicit guarded operation, `memory_mcp admin auth-methods remove --method local` |
 | `MEMORY_MCP_HTTP_AUTH_MODE` | one of `local` \| `oidc` | unset | Deprecated alias for a one-element `MEMORY_MCP_HTTP_AUTH_METHODS`, accepted for one release. Supplying both is an error unless they agree |
-| `MEMORY_MCP_HTTP_SIGNUP_MODE` | enum: `invite_only` \| `open` | unset | Required when `oidc` is enabled. `invite_only` rejects self-service sign-up; `open` requires the seven plan seed variables below and is rejected without the `oidc` method |
+| `MEMORY_MCP_HTTP_SIGNUP_MODE` | enum: `invite_only` \| `open` | `invite_only` | Optional. The default `invite_only` rejects self-service sign-up; `open` must be explicit, requires the seven plan seed variables below, and is rejected without the `oidc` method |
 | `MEMORY_MCP_HTTP_ENABLE_CONTROL_PLANE` | boolean | `false` | Enable browser sign-in, sessions, and control-plane `/api/v1` endpoints. The `POST /mcp` endpoint remains available when this is `false` |
 | `MEMORY_MCP_HTTP_ENABLE_CONTROL_PLANE_UI` | boolean | `false` | Serve the embedded web UI from `/`. Requires the control plane and the `streamable-http` build profile |
 | `MEMORY_MCP_HTTP_OIDC_ISSUER` | URL | unset | Required when `oidc` is enabled, refused when it is not. May be written with or without a trailing slash: comparison against the provider's published issuer is normalized on both sides (providers such as Rauthy >= 0.35 always publish a trailing slash), and the published form from the discovery document is authoritative for ID-token `iss` validation and identity keying. The discovery document is fetched at startup, so an unreachable issuer is a startup failure |
-| `MEMORY_MCP_HTTP_OIDC_CLIENT_ID` | string | unset | Required when `oidc` is enabled, refused when it is not |
-| `MEMORY_MCP_HTTP_OIDC_AUDIENCE` | URL string | unset | Required when `oidc` is enabled, refused when it is not. Exact audience match is enforced against the ID token's `aud` claim; supply a single audience identifier (the server does not currently parse a list) |
-| `MEMORY_MCP_HTTP_OIDC_REDIRECT_URI` | URL | unset | Required when `oidc` is enabled, refused when it is not. Must match the registered redirect URI exactly |
-| `MEMORY_MCP_HTTP_OIDC_ALLOWED_ALG` | enum | `RS256` | JWT algorithm allowlist; accepted values are `RS256`, `RS384`, `RS512`, `ES256`, and `EdDSA`. Must equal the signing algorithm of the provider's ID tokens (Rauthy >= 0.35 signs new clients' tokens with `EdDSA`/Ed25519 by default). Tokens signed with any other algorithm are rejected. Mismatched values fail startup with `ConfigInvalid` |
+| `MEMORY_MCP_HTTP_OIDC_CLIENT_ID` | string | unset | Required when `oidc` is enabled, refused when it is not. The derived audience defaults to this value |
+| `MEMORY_MCP_HTTP_OIDC_AUDIENCE` | URL string | client id | Optional; derived from `MEMORY_MCP_HTTP_OIDC_CLIENT_ID` when unset (OIDC Core: `aud` is the RP's client id). Refused when `oidc` is not enabled. Exact audience match is enforced against the ID token's `aud` claim; supply a single audience identifier (the server does not currently parse a list) |
+| `MEMORY_MCP_HTTP_OIDC_REDIRECT_URI` | URL | `{MEMORY_MCP_HTTP_PUBLIC_BASE_URL}/auth/oidc/callback` | Optional; derived from the public base URL when unset — this deployment's own callback. Refused when `oidc` is not enabled. Must match the redirect URI registered at the provider exactly |
+| `MEMORY_MCP_HTTP_OIDC_ALLOWED_ALG` | enum | `auto` | JWT algorithm allowlist. `auto` accepts the algorithms the provider advertises in discovery (`id_token_signing_alg_values_supported`), intersected with `RS256`, `RS384`, `RS512`, `ES256`, `EdDSA`; a provider advertising nothing safe fails startup. An explicit value is a single-algorithm pin and must equal the signing algorithm of the provider's ID tokens (Rauthy >= 0.35 signs new clients' tokens with `EdDSA`/Ed25519 by default). Tokens signed outside the accepted set are rejected. Values outside `auto` and the five algorithms fail startup with `ConfigInvalid` |
 | `MEMORY_MCP_HTTP_OPERATOR_IDENTITIES` | comma-separated `issuer\|hex(subject_verifier)` list | unset | Immutable operator allowlist; requires the `oidc` method. Account APIs cannot grant operator status. The `issuer` component must spell the issuer exactly as the provider publishes it (the ID token's `iss`, trailing slash included where the provider emits one) |
 | `MEMORY_MCP_HTTP_LOCAL_DEFAULT_PLAN_VERSION` | positive `u32` | unset | Required when `local` is enabled: the version of the plan this deployment publishes for the clients the administrator provisions |
 

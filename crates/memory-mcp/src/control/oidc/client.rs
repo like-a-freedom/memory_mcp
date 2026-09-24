@@ -15,7 +15,10 @@ pub struct OidcClient {
     client_id: String,
     audience: String,
     redirect_uri: String,
-    allowed_algorithm: String,
+    /// The algorithms accepted for ID tokens: an explicit
+    /// `MEMORY_MCP_HTTP_OIDC_ALLOWED_ALG` is a single pin; `auto` is the safe
+    /// set intersected with the provider's advertisement at discovery.
+    allowed_algorithms: Vec<&'static str>,
     authorization_endpoint: String,
     token_endpoint: String,
     jwks: JwksCache,
@@ -51,6 +54,7 @@ impl OidcClient {
             .map_err(|e| MemoryError::ConfigInvalid(format!("OIDC discovery parse failed: {e}")))?;
 
         let issuer = resolve_published_issuer(issuer, &discovery)?;
+        let allowed_algorithms = resolve_allowed_algorithms(allowed_algorithm, &discovery)?;
         let authorization_endpoint = discovery
             .get("authorization_endpoint")
             .and_then(|value| value.as_str())
@@ -82,7 +86,7 @@ impl OidcClient {
             client_id: client_id.to_string(),
             audience: audience.to_string(),
             redirect_uri: redirect_uri.to_string(),
-            allowed_algorithm: allowed_algorithm.to_string(),
+            allowed_algorithms,
             authorization_endpoint,
             token_endpoint,
             jwks,
@@ -200,7 +204,7 @@ impl OidcClient {
             _ => return Err(AuthError::DisallowedAlgorithm),
         };
 
-        if alg != self.allowed_algorithm {
+        if !self.allowed_algorithms.contains(&alg) {
             return Err(AuthError::DisallowedAlgorithm);
         }
 
@@ -261,6 +265,46 @@ fn resolve_published_issuer(
         ));
     }
     Ok(published.to_string())
+}
+
+/// Resolve the accepted ID-token algorithms. An explicit
+/// `MEMORY_MCP_HTTP_OIDC_ALLOWED_ALG` stays a single pin; `auto` (the
+/// default) intersects the provider's advertised set (discovery
+/// `id_token_signing_alg_values_supported`) with the safe set below, and a
+/// provider that advertises nothing usable is a startup error rather than a
+/// silent widening.
+fn resolve_allowed_algorithms(
+    configured: &str,
+    discovery: &serde_json::Value,
+) -> Result<Vec<&'static str>, MemoryError> {
+    const SUPPORTED: [&str; 5] = ["RS256", "RS384", "RS512", "ES256", "EdDSA"];
+    if configured != crate::http::config::AUTO_OIDC_ALG {
+        let pinned = SUPPORTED
+            .iter()
+            .copied()
+            .find(|name| *name == configured)
+            .ok_or_else(|| {
+                MemoryError::ConfigInvalid(format!("OIDC allowed algorithm: {configured}"))
+            })?;
+        return Ok(vec![pinned]);
+    }
+    let Some(advertised) = discovery
+        .get("id_token_signing_alg_values_supported")
+        .and_then(serde_json::Value::as_array)
+    else {
+        return Ok(SUPPORTED.to_vec());
+    };
+    let resolved: Vec<&'static str> = SUPPORTED
+        .iter()
+        .copied()
+        .filter(|name| advertised.iter().any(|value| value.as_str() == Some(name)))
+        .collect();
+    if resolved.is_empty() {
+        return Err(MemoryError::ConfigInvalid(
+            "OIDC provider advertises no supported ID-token signing algorithm".into(),
+        ));
+    }
+    Ok(resolved)
 }
 
 fn form_urlencode_component(value: &str) -> String {
@@ -345,6 +389,61 @@ mod tests {
         assert!(!issuers_match(
             "https://idp.example.com/",
             "https://other.example.com/"
+        ));
+    }
+
+    /// `auto` intersects the provider's advertised algorithms with the safe
+    /// set — the shape Rauthy publishes (`RS256, RS384, RS512, EdDSA`) is
+    /// accepted whole, anything outside the safe set is dropped.
+    #[test]
+    fn auto_algorithms_intersect_the_advertisement_with_the_safe_set() {
+        let advertised = serde_json::json!({"id_token_signing_alg_values_supported": ["RS256", "RS384", "RS512", "EdDSA"]});
+        assert_eq!(
+            resolve_allowed_algorithms("auto", &advertised).expect("advertised"),
+            vec!["RS256", "RS384", "RS512", "EdDSA"]
+        );
+        let mixed =
+            serde_json::json!({"id_token_signing_alg_values_supported": ["HS256", "RS256"]});
+        assert_eq!(
+            resolve_allowed_algorithms("auto", &mixed).expect("mixed"),
+            vec!["RS256"]
+        );
+    }
+
+    /// A provider that does not advertise its algorithms gets the safe set.
+    #[test]
+    fn auto_algorithms_fall_back_to_the_safe_set_when_the_provider_is_silent() {
+        assert_eq!(
+            resolve_allowed_algorithms("auto", &serde_json::json!({})).expect("silent"),
+            vec!["RS256", "RS384", "RS512", "ES256", "EdDSA"]
+        );
+    }
+
+    #[test]
+    fn auto_algorithms_fail_startup_when_nothing_safe_is_advertised() {
+        let unsafe_only =
+            serde_json::json!({"id_token_signing_alg_values_supported": ["HS256", "PS256"]});
+        assert!(matches!(
+            resolve_allowed_algorithms("auto", &unsafe_only),
+            Err(MemoryError::ConfigInvalid(_))
+        ));
+    }
+
+    /// An explicit `MEMORY_MCP_HTTP_OIDC_ALLOWED_ALG` stays a single pin, no
+    /// matter what the provider advertises.
+    #[test]
+    fn an_explicit_algorithm_stays_a_single_pin() {
+        assert_eq!(
+            resolve_allowed_algorithms(
+                "EdDSA",
+                &serde_json::json!({"id_token_signing_alg_values_supported": ["RS256"]})
+            )
+            .expect("pinned"),
+            vec!["EdDSA"]
+        );
+        assert!(matches!(
+            resolve_allowed_algorithms("PS256", &serde_json::json!({})),
+            Err(MemoryError::ConfigInvalid(_))
         ));
     }
 }

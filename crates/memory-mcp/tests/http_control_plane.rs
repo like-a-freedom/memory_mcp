@@ -222,6 +222,63 @@ async fn a_configured_issuer_with_a_trailing_slash_still_boots() {
     assert_eq!(resp.status(), 200);
 }
 
+/// Zero-config OIDC: only the issuer and the client id are vitally necessary.
+/// With audience, redirect URI, and algorithm allowlist left unset they are
+/// derived, the server boots against the provider, and the authorize URL
+/// carries the derived callback under the public base URL.
+#[tokio::test]
+async fn minimal_oidc_env_derives_the_rest() {
+    let (fixture, _mock, cookie) = spawn_with_env(vec![
+        ("MEMORY_MCP_HTTP_OIDC_AUDIENCE", String::new()),
+        ("MEMORY_MCP_HTTP_OIDC_REDIRECT_URI", String::new()),
+        ("MEMORY_MCP_HTTP_OIDC_ALLOWED_ALG", String::new()),
+    ])
+    .await;
+    let client = reqwest::Client::builder()
+        .timeout(Duration::from_secs(5))
+        .build()
+        .expect("client");
+
+    let resp = client
+        .get(format!("{}/api/v1/account", fixture.base_url))
+        .header("host", "localhost")
+        .header(cookie_header(&cookie).0, cookie_header(&cookie).1)
+        .send()
+        .await
+        .expect("account request");
+    assert_eq!(resp.status(), 200);
+
+    let (status, csrf_body) = fetch_csrf(&client, &fixture.base_url, &cookie).await;
+    assert_eq!(status, reqwest::StatusCode::OK);
+    let csrf = csrf_body["csrf_token"]
+        .as_str()
+        .expect("csrf token")
+        .to_owned();
+    let resp = client
+        .post(format!(
+            "{}/api/v1/account/identity_links",
+            fixture.base_url
+        ))
+        .header("host", "localhost")
+        .header(cookie_header(&cookie).0, cookie_header(&cookie).1)
+        .header("x-csrf-token", csrf)
+        .json(&json!({}))
+        .send()
+        .await
+        .expect("start identity link");
+    assert_eq!(resp.status(), reqwest::StatusCode::OK);
+    let body: serde_json::Value = resp.json().await.expect("link json");
+    let url = body["authorize_url"].as_str().expect("authorize url");
+    let parsed = reqwest::Url::parse(url).expect("parse authorize url");
+    let redirect = parsed
+        .query_pairs()
+        .find(|(key, _)| key == "redirect_uri")
+        .map(|(_, value)| value.into_owned())
+        .expect("redirect_uri param");
+    // The fixture's public base URL is http://localhost.
+    assert_eq!(redirect, "http://localhost/auth/oidc/callback");
+}
+
 #[tokio::test]
 async fn session_cookie_resolves_to_account_endpoint() {
     let (fixture, _mock, cookie) = spawn_with_env(Vec::new()).await;

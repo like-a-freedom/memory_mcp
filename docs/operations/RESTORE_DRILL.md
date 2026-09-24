@@ -40,6 +40,7 @@ backup into a fresh deployment.
 
 5. **Before opening ingress**, rotate:
    - API-key pepper (`MEMORY_MCP_API_KEY_PEPPER`; must be ≥ 32 bytes of secret material)
+- Root secret (`MEMORY_MCP_HTTP_SECRET_KEY`) when the deployment derives its secret slots from it: rotating it rotates every derived slot listed here at once
    - OIDC identity-index key (`MEMORY_MCP_HTTP_IDENTITY_INDEX_KEY`); require users to relink restored OIDC identities
    - Control Plane Session cookie/verifier key (`MEMORY_MCP_HTTP_SESSION_KEY`)
    - OIDC state and nonce keys (`MEMORY_MCP_HTTP_OIDC_STATE_KEY`, `MEMORY_MCP_HTTP_OIDC_NONCE_KEY`)
