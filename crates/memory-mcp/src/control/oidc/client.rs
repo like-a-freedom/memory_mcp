@@ -8,6 +8,9 @@ use super::jwks::JwksCache;
 
 #[derive(Clone)]
 pub struct OidcClient {
+    /// The issuer exactly as the provider publishes it in discovery — not the
+    /// configured spelling. `jsonwebtoken` compares the `iss` claim exactly,
+    /// so the published form is authoritative (see `resolve_published_issuer`).
     issuer: String,
     client_id: String,
     audience: String,
@@ -32,8 +35,10 @@ impl OidcClient {
             .build()
             .map_err(|e| MemoryError::ConfigInvalid(e.to_string()))?;
 
-        let issuer = issuer.trim_end_matches('/');
-        let discovery_url = format!("{issuer}/.well-known/openid-configuration");
+        let discovery_url = format!(
+            "{}/.well-known/openid-configuration",
+            normalize_issuer(issuer)
+        );
         let discovery: serde_json::Value = client
             .get(&discovery_url)
             .send()
@@ -45,11 +50,7 @@ impl OidcClient {
             .await
             .map_err(|e| MemoryError::ConfigInvalid(format!("OIDC discovery parse failed: {e}")))?;
 
-        if discovery.get("issuer").and_then(|value| value.as_str()) != Some(issuer) {
-            return Err(MemoryError::ConfigInvalid(
-                "OIDC discovery issuer does not match configured issuer".into(),
-            ));
-        }
+        let issuer = resolve_published_issuer(issuer, &discovery)?;
         let authorization_endpoint = discovery
             .get("authorization_endpoint")
             .and_then(|value| value.as_str())
@@ -77,7 +78,7 @@ impl OidcClient {
         );
 
         Ok(Self {
-            issuer: issuer.to_string(),
+            issuer,
             client_id: client_id.to_string(),
             audience: audience.to_string(),
             redirect_uri: redirect_uri.to_string(),
@@ -192,6 +193,8 @@ impl OidcClient {
 
         let alg = match header.alg {
             Algorithm::RS256 => "RS256",
+            Algorithm::RS384 => "RS384",
+            Algorithm::RS512 => "RS512",
             Algorithm::ES256 => "ES256",
             Algorithm::EdDSA => "EdDSA",
             _ => return Err(AuthError::DisallowedAlgorithm),
@@ -203,8 +206,11 @@ impl OidcClient {
 
         let key: DecodingKey = self.jwks.key_for(&kid).await?;
 
+        // Keep in lockstep with the allowlist in `http::config::validate`.
         let validation_algorithm = match alg {
             "RS256" => Algorithm::RS256,
+            "RS384" => Algorithm::RS384,
+            "RS512" => Algorithm::RS512,
             "ES256" => Algorithm::ES256,
             "EdDSA" => Algorithm::EdDSA,
             _ => return Err(AuthError::DisallowedAlgorithm),
@@ -219,6 +225,42 @@ impl OidcClient {
 
         Ok(token_data.claims)
     }
+}
+
+/// Normalize an issuer identifier for comparison.
+///
+/// Providers disagree about a trailing slash on the issuer path — Rauthy >=
+/// 0.35, for example, always publishes `https://host/auth/v1/` and cannot be
+/// configured otherwise — so every config-vs-provider issuer comparison
+/// normalizes both sides. Validation of tokens uses the provider's published
+/// form verbatim instead.
+pub(super) fn normalize_issuer(issuer: &str) -> &str {
+    issuer.trim_end_matches('/')
+}
+
+/// Compare two issuer identifiers modulo a trailing slash.
+pub(super) fn issuers_match(left: &str, right: &str) -> bool {
+    normalize_issuer(left) == normalize_issuer(right)
+}
+
+/// Check a discovery document's `issuer` against the configured one and
+/// return the *published* form. The published form is authoritative for
+/// ID-token `iss` validation (`validate_id_token`) and for identity keying,
+/// because `jsonwebtoken` compares `iss` exactly as published.
+fn resolve_published_issuer(
+    configured_issuer: &str,
+    discovery: &serde_json::Value,
+) -> Result<String, MemoryError> {
+    let published = discovery
+        .get("issuer")
+        .and_then(|value| value.as_str())
+        .ok_or_else(|| MemoryError::ConfigInvalid("OIDC discovery missing issuer".into()))?;
+    if !issuers_match(published, configured_issuer) {
+        return Err(MemoryError::ConfigInvalid(
+            "OIDC discovery issuer does not match configured issuer".into(),
+        ));
+    }
+    Ok(published.to_string())
 }
 
 fn form_urlencode_component(value: &str) -> String {
@@ -238,4 +280,71 @@ fn form_urlencode_component(value: &str) -> String {
         }
     }
     encoded
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn discovery_with_issuer(issuer: &str) -> serde_json::Value {
+        serde_json::json!({ "issuer": issuer })
+    }
+
+    /// Rauthy >= 0.35 publishes its issuer with a trailing slash and refuses
+    /// to drop it, so a bare configuration must still pass — and the published
+    /// slashed form is what later `iss` validation compares against.
+    #[test]
+    fn a_published_trailing_slash_matches_a_bare_configuration() {
+        let published = resolve_published_issuer(
+            "https://idp.example.com/auth/v1",
+            &discovery_with_issuer("https://idp.example.com/auth/v1/"),
+        )
+        .expect("slash-insensitive comparison");
+        assert_eq!(published, "https://idp.example.com/auth/v1/");
+    }
+
+    /// The reverse spelling (the operator copies the published form including
+    /// the slash) must pass too, and the published form stays authoritative.
+    #[test]
+    fn a_configured_trailing_slash_matches_a_bare_published_issuer() {
+        let published = resolve_published_issuer(
+            "https://idp.example.com/auth/v1/",
+            &discovery_with_issuer("https://idp.example.com/auth/v1"),
+        )
+        .expect("slash-insensitive comparison");
+        assert_eq!(published, "https://idp.example.com/auth/v1");
+    }
+
+    #[test]
+    fn a_different_issuer_is_rejected() {
+        let result = resolve_published_issuer(
+            "https://idp.example.com/auth/v1",
+            &discovery_with_issuer("https://other.example.com/auth/v1"),
+        );
+        assert!(matches!(result, Err(MemoryError::ConfigInvalid(_))));
+    }
+
+    #[test]
+    fn a_discovery_document_without_an_issuer_is_rejected() {
+        let result = resolve_published_issuer("https://idp.example.com", &serde_json::json!({}));
+        assert!(matches!(result, Err(MemoryError::ConfigInvalid(_))));
+    }
+
+    /// The RFC 9207 authorization-response `iss` is compared against the
+    /// configured issuer with the same normalization.
+    #[test]
+    fn issuer_comparison_normalizes_trailing_slashes() {
+        assert!(issuers_match(
+            "https://idp.example.com/",
+            "https://idp.example.com"
+        ));
+        assert!(issuers_match(
+            "https://idp.example.com",
+            "https://idp.example.com/"
+        ));
+        assert!(!issuers_match(
+            "https://idp.example.com/",
+            "https://other.example.com/"
+        ));
+    }
 }

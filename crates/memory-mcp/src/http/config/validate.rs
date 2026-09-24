@@ -172,9 +172,15 @@ pub(super) fn validate(cfg: &HttpConfig) -> Result<(), MemoryError> {
             "control plane requires OIDC issuer, client id, audience, and redirect URI".into(),
         ));
     }
-    if uses_oidc && !matches!(cfg.oidc_allowed_alg.as_str(), "RS256" | "ES256" | "EdDSA") {
+    // Keep in lockstep with the algorithm mapping in `control::oidc::client`.
+    if uses_oidc
+        && !matches!(
+            cfg.oidc_allowed_alg.as_str(),
+            "RS256" | "RS384" | "RS512" | "ES256" | "EdDSA"
+        )
+    {
         return Err(MemoryError::ConfigInvalid(
-            "OIDC allowed algorithm must be RS256, ES256, or EdDSA".into(),
+            "OIDC allowed algorithm must be RS256, RS384, RS512, ES256, or EdDSA".into(),
         ));
     }
     if cfg.enable_control_plane_ui && !cfg.enable_control_plane {

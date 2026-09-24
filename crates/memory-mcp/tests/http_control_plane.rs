@@ -72,10 +72,14 @@ async fn spawn_oidc_mock() -> OidcMock {
         .await
         .expect("oidc mock bind");
     let addr = listener.local_addr().expect("oidc mock addr");
-    // The OidcClient validates that discovery's `issuer` matches
-    // the configured issuer (after stripping a trailing slash). The
-    // issuer is the bind address, so we have to return it from the
-    // discovery handler.
+    // The OidcClient validates discovery's `issuer` against the configured
+    // issuer (comparison normalizes a trailing slash on both sides) and keeps
+    // the *published* form authoritative for ID-token `iss` validation. Rauthy
+    // >= 0.35 always publishes its issuer with a trailing slash and refuses to
+    // drop it, so the mock does the same: the bare bind address is what the
+    // fixture configures and discovery answers with `{addr}/`. Every test in
+    // this suite therefore boots against a provider whose published issuer is
+    // spelled differently from the configured one.
     let issuer = Arc::new(format!("http://{addr}"));
     let issuer_for_handler = issuer.clone();
 
@@ -83,7 +87,7 @@ async fn spawn_oidc_mock() -> OidcMock {
         axum::extract::State(issuer): axum::extract::State<Arc<String>>,
     ) -> Response {
         let body = serde_json::to_vec(&serde_json::json!({
-            "issuer": issuer.as_str(),
+            "issuer": format!("{}/", issuer.as_str()),
             "authorization_endpoint": format!("{}/auth", issuer.as_str()),
             "token_endpoint": format!("{}/token", issuer.as_str()),
             "jwks_uri": format!("{}/jwks", issuer.as_str()),
@@ -120,12 +124,28 @@ async fn spawn_oidc_mock() -> OidcMock {
 async fn spawn_with_env(
     extra_env: Vec<(&'static str, String)>,
 ) -> (HttpServerFixture, OidcMock, String) {
+    spawn_with_env_configured_issuer(extra_env, false).await
+}
+
+/// Like [`spawn_with_env`], but controls the spelling of the configured
+/// `MEMORY_MCP_HTTP_OIDC_ISSUER`. The mock always publishes its issuer with a
+/// trailing slash (Rauthy >= 0.35 behavior), so `true` exercises an operator
+/// typing the issuer exactly as published and `false` the bare form.
+async fn spawn_with_env_configured_issuer(
+    extra_env: Vec<(&'static str, String)>,
+    configured_issuer_with_trailing_slash: bool,
+) -> (HttpServerFixture, OidcMock, String) {
     let cookie = deterministic_cookie();
     let oidc = spawn_oidc_mock().await;
+    let configured_issuer = if configured_issuer_with_trailing_slash {
+        format!("{}/", oidc.base_url)
+    } else {
+        oidc.base_url.clone()
+    };
     let mut config = HttpServerConfig::default()
         .with_tenant(TestTenant::new(ACCOUNT_NAME, BOOTSTRAP_KEY))
         .with_env("MEMORY_MCP_HTTP_ENABLE_CONTROL_PLANE", "true")
-        .with_env("MEMORY_MCP_HTTP_OIDC_ISSUER", &oidc.base_url)
+        .with_env("MEMORY_MCP_HTTP_OIDC_ISSUER", &configured_issuer)
         .with_env("MEMORY_MCP_HTTP_OIDC_CLIENT_ID", "test-client")
         .with_env("MEMORY_MCP_HTTP_OIDC_AUDIENCE", "memory-mcp-test")
         .with_env(
@@ -178,6 +198,28 @@ async fn fetch_csrf(
     let status = resp.status();
     let body: serde_json::Value = resp.json().await.expect("csrf json");
     (status, body)
+}
+
+/// Providers disagree about a trailing slash on the issuer path: Rauthy >=
+/// 0.35 always publishes `.../auth/v1/` and cannot be configured otherwise.
+/// Both spellings of `MEMORY_MCP_HTTP_OIDC_ISSUER` must boot against the same
+/// provider (OIDC Discovery compares issuer identifiers modulo this slash).
+#[tokio::test]
+async fn a_configured_issuer_with_a_trailing_slash_still_boots() {
+    let (fixture, _mock, cookie) = spawn_with_env_configured_issuer(Vec::new(), true).await;
+    let client = reqwest::Client::builder()
+        .timeout(Duration::from_secs(5))
+        .build()
+        .expect("client");
+
+    let resp = client
+        .get(format!("{}/api/v1/account", fixture.base_url))
+        .header("host", "localhost")
+        .header(cookie_header(&cookie).0, cookie_header(&cookie).1)
+        .send()
+        .await
+        .expect("account request");
+    assert_eq!(resp.status(), 200);
 }
 
 #[tokio::test]

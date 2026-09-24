@@ -185,11 +185,17 @@ pub async fn callback(
         return Err(ApiError::Unauthorized);
     }
 
-    // RFC 9207 issuer check.
+    // RFC 9207 issuer check. Opportunistic defense-in-depth: the `iss`
+    // parameter is optional and some providers never send it (Rauthy does
+    // not), so `is_some_and` skips the check when absent — the binding one is
+    // the id_token `iss` validation in `client::validate_id_token`. When the
+    // parameter is present both sides are normalized (see
+    // `client::normalize_issuer`): providers disagree about a trailing slash
+    // on the issuer path.
     if params
         .iss
         .as_deref()
-        .is_some_and(|issuer| issuer != state.config.oidc_issuer)
+        .is_some_and(|issuer| !super::client::issuers_match(issuer, &state.config.oidc_issuer))
     {
         return Err(ApiError::Unauthorized);
     }

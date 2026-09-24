@@ -1191,6 +1191,20 @@ mod tests {
         ));
     }
 
+    /// RS384 and RS512 are advertised by mainstream providers (Rauthy lists
+    /// `RS256, RS384, RS512, EdDSA`) and must be selectable in
+    /// `MEMORY_MCP_HTTP_OIDC_ALLOWED_ALG` alongside the original three.
+    #[test]
+    fn control_plane_accepts_rs384_and_rs512_algorithms() {
+        for alg in ["RS384", "RS512"] {
+            let mut cfg = HttpConfig::default_for_test();
+            cfg.enable_control_plane = true;
+            cfg.oidc_allowed_alg = alg.into();
+            cfg.validate()
+                .unwrap_or_else(|error| panic!("{alg} must be accepted: {error}"));
+        }
+    }
+
     #[test]
     fn control_plane_ui_requires_control_plane() {
         let mut cfg = HttpConfig::default_for_test();
