@@ -24,6 +24,13 @@ in ADR-0016.
 
 ## Module seams
 
+> Reorganizing into bounded contexts per **ADR-0058** (`identity`, `tenancy`,
+> `provisioning`, `operations`, `memory`, `knowledge`, `embedding`, `shared`;
+> console delivery is the layer-free `ui` adapter, not a context).
+> The map below describes the pre-0058 layout and stays authoritative until
+> each context lands; the target contract (layers inside contexts, `api`
+> facades, source-guard enforcement) lives in the ADR and its spec.
+
 - `src/models/` — domain values and typed records.
 - `src/service/agent_memory/` — internal lifecycle orchestration (policy,
   recall, capture, projection, worker). Not registered in `tools/list`.
@@ -213,12 +220,20 @@ _Avoid_: OAuth identity, Tenant selector, stored secret
 The request-scoped server identity produced by successful credential verification and Account-to-Tenant resolution. API keys and future OAuth access tokens produce the same principal shape; neither credential contents nor MCP arguments select a Tenant Namespace.
 _Avoid_: Access token, transport session, namespace parameter
 
+**Control plane**:
+The SaaS subsystem that owns Accounts, External Identities, tenancy bindings, provisioning state and operator commands — as opposed to the data plane (MCP capability surface) and as opposed to the operator console that renders it. The term names the subsystem; it is never a package or artifact name. It is present exactly in the SaaS profile and has no runtime off-switch (ADR-0058).
+_Avoid_: control-panel, admin app, `control-plane-ui` (former package name)
+
+**Operator console (`ui`)**:
+The packaged single-page WebAssembly console served under the mount base: sign-in surfaces, client/key administration, operator views. Package and binary are named `ui`; its emitted assets are `ui-*.js` / `ui_bg-*.wasm`. Formerly packaged as `control-plane-ui` (renamed by ADR-0058).
+_Avoid_: control-plane UI, dashboard, frontend of control
+
 **Control Plane Session**:
 A short-lived server-side browser session created after successful login — OIDC for an Account owner, or a local password for a Local Administrator — for credential and client administration. It is represented to the browser only by a secure opaque cookie and is distinct from an App Session, Account API Key, OAuth access token, and MCP transport state. The OIDC and local forms are separate records on separate routes; neither substitutes for the other.
 _Avoid_: App Session, MCP session, API key, browser token
 
 **Browser Authentication Method**:
-One way a browser signs in, currently either an External Identity at an OIDC provider or a Local Administrator password. An enabled control plane serves a *set* of methods and mounts each enabled method's routes; that set is durable deployment state, and a replica joining with a drifted set or drifted local key material fails closed instead of adopting it. A disabled control plane mounts no browser-auth route at all. Adding a method is configuration reconciled at startup, while removing one is an explicit, audited operator command guarded by the Last-Administrator Rule — never a console action, because the configuration is what declares the set. A method is never implied by another method's absence.
+One way a browser signs in, currently either an External Identity at an OIDC provider or a Local Administrator password. The control plane (always present in the SaaS profile since ADR-0058; compiled out entirely in the local profile — no runtime switch disables it) serves a *set* of methods and mounts each enabled method's routes; that set is durable deployment state, and a replica joining with a drifted set or drifted local key material fails closed instead of adopting it. Which mounted routes are externally reachable is reverse-proxy policy. Adding a method is configuration reconciled at startup, while removing one is an explicit, audited operator command guarded by the Last-Administrator Rule — never a console action, because the configuration is what declares the set. A method is never implied by another method's absence.
 _Avoid_: single mode, either/or login, provider list, per-request mode, automatic fallback
 
 **Last-Administrator Rule**:
