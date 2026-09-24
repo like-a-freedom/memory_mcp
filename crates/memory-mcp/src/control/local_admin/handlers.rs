@@ -1018,6 +1018,68 @@ pub async fn create_client(
     }
 }
 
+/// `POST /api/v1/admin/clients/{account_id}/identity_invitation`
+///
+/// Issue an identity invitation (ADR-0057): a sealed OIDC provider round trip
+/// that attaches the next attested identity to this client's Account. The
+/// returned `authorize_url` is the invitation — hand it to whoever owns the
+/// identity; the link is created only when they complete the provider
+/// attestation. `replace_existing` swaps the Account's single mis-bound
+/// identity instead of adding beside it.
+pub async fn invite_client_identity(
+    RequireAdmin(principal): RequireAdmin,
+    State(state): State<Arc<HttpState>>,
+    Path(account_id): Path<String>,
+    request: axum::extract::Request,
+) -> Response {
+    let (parts, body) = request.into_parts();
+    let ext = match get_ext(&state) {
+        Ok(ext) => ext,
+        Err(rejection) => return rejection.at(&parts).into_response(),
+    };
+    if let Err(rejection) = guard_session(ext, &state, &parts, &principal) {
+        return rejection.at(&parts).into_response();
+    }
+    if let Err(rejection) = require_recent_auth(&principal) {
+        return rejection.at(&parts).into_response();
+    }
+    if let Err(rejection) = require_json_content_type(&parts) {
+        return rejection.at(&parts).into_response();
+    }
+    let req: InviteIdentityRequest = match parse_body(body).await {
+        Ok(req) => req,
+        Err(rejection) => return rejection.at(&parts).into_response(),
+    };
+    match crate::control::oidc::start_invite_flow(
+        &state,
+        &account_id,
+        &principal.username,
+        req.replace_existing,
+    )
+    .await
+    {
+        Ok(authorize_url) => no_store(json_response(
+            StatusCode::OK,
+            &InviteIdentityResponse { authorize_url },
+        )),
+        Err(error) => error.into_response(),
+    }
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct InviteIdentityRequest {
+    /// Swap the Account's single mis-bound identity instead of adding beside
+    /// it (the remediation for an invitation the wrong person completed).
+    #[serde(default)]
+    pub replace_existing: bool,
+}
+
+#[derive(Serialize)]
+pub struct InviteIdentityResponse {
+    pub authorize_url: String,
+}
+
 /// `GET /api/v1/admin/clients/{account_id}`
 pub async fn get_client(
     RequireAdmin(principal): RequireAdmin,

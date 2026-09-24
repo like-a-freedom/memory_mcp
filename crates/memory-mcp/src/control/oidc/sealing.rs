@@ -51,6 +51,16 @@ pub fn seal_oidc_payload(
         OidcFlowIntent::Link { account_id } => {
             serde_json::json!({ "kind": "link", "account_id": account_id })
         }
+        OidcFlowIntent::Invite {
+            account_id,
+            invited_by,
+            replace,
+        } => serde_json::json!({
+            "kind": "invite",
+            "account_id": account_id,
+            "invited_by": invited_by,
+            "replace": replace,
+        }),
     };
     let plaintext = serde_json::json!({
         "state": state.as_str(),
@@ -96,7 +106,15 @@ pub fn unseal_oidc_payload(
     #[serde(tag = "kind", rename_all = "snake_case")]
     enum SealedIntent {
         SignIn,
-        Link { account_id: String },
+        Link {
+            account_id: String,
+        },
+        Invite {
+            account_id: String,
+            invited_by: String,
+            #[serde(default)]
+            replace: bool,
+        },
     }
 
     #[derive(serde::Deserialize)]
@@ -116,6 +134,15 @@ pub fn unseal_oidc_payload(
     let intent = match payload.intent {
         None | Some(SealedIntent::SignIn) => OidcFlowIntent::SignIn,
         Some(SealedIntent::Link { account_id }) => OidcFlowIntent::Link { account_id },
+        Some(SealedIntent::Invite {
+            account_id,
+            invited_by,
+            replace,
+        }) => OidcFlowIntent::Invite {
+            account_id,
+            invited_by,
+            replace,
+        },
     };
 
     Ok(StoredOidcRequest {

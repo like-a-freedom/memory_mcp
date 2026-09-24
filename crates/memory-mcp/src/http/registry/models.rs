@@ -295,6 +295,17 @@ impl IdentityAudit {
             occurred_at,
         }
     }
+
+    /// An identity change initiated by the deployment administrator (an
+    /// identity invitation, ADR-0057). The provider attestation happens in
+    /// the flow; the administrator is who caused the binding.
+    pub fn by_operator(principal: &str, occurred_at: DateTime<Utc>) -> Self {
+        Self {
+            actor_kind: AuditActorKind::Operator,
+            actor_principal: principal.to_owned(),
+            occurred_at,
+        }
+    }
 }
 
 /// Which identity change an audit row records.

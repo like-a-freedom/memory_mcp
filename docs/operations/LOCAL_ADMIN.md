@@ -1144,6 +1144,7 @@ wrapped in the host-allowlist middleware and the local deadline middleware.
 | DELETE | `/api/v1/admin/clients/{account_id}/keys/{key_id}` | session + CSRF | `204` | `401`, `403`, `404 not_found` |
 | POST | `/api/v1/admin/clients/{account_id}/suspend` | session + CSRF + recent auth | `204` | `401`, `403`, `404`, `409 conflict` |
 | POST | `/api/v1/admin/clients/{account_id}/resume` | session + CSRF + recent auth | `204` | `401`, `403`, `404`, `409 conflict` |
+| POST | `/api/v1/admin/clients/{account_id}/identity_invitation` | session + CSRF + recent auth | `200 {"authorize_url": ...}` | `401`, `403`, `404`, `409 conflict` |
 
 There is no client-delete, purge, quota-edit, or admin-removal route.
 
@@ -1307,6 +1308,34 @@ drift from the authorization row. `http_local_admin.rs::issued_key_authenticates
 asserts the round trip; `revoking_an_issued_key_denies_with_and_without_a_warm_cache`
 asserts that revocation takes effect immediately, on a cold and a warm cache;
 `a_key_for_one_client_cannot_reach_another` asserts cross-client isolation.
+
+### 6.6 Identity invitations (OIDC bootstrap)
+
+`invite_only` has no self-service path, so the first identity of a client's
+Account is delivered by invitation:
+`POST /api/v1/admin/clients/{account_id}/identity_invitation` with `{}` (or
+`{"replace_existing": true}`) returns an `authorize_url`. That URL *is* the
+invitation — hand it to whoever owns the identity. The link is created only
+when they complete the provider round trip (ADR-0057: proof of ownership,
+never an assertion); the flow is single-use and expires in ten minutes.
+
+- Accepting the invitation signs the browser in as the bound Account (the
+  acceptance is the first login). A browser that already holds a session keeps
+  it.
+- `replace_existing` is the remediation for an invitation the wrong person
+  completed: the Account's single mis-bound identity is swapped for the newly
+  attested one in one guarded transaction (both audit rows land with it, and
+  the Account never has zero identities). It is refused unless the Account
+  currently holds exactly one identity.
+- Both changes are audited as `actor_kind=operator`, naming the inviting
+  administrator.
+
+This is also the SSO-only bootstrap: invite your own identity to a client,
+sign in, read the identity's `subject_verifier` from
+`GET /api/v1/account/identity_links`, and put
+`<issuer>|<hex(subject_verifier)>` into `MEMORY_MCP_HTTP_OPERATOR_IDENTITIES`.
+Only then does `memory_mcp admin auth-methods remove --method local` pass its
+last-administrator rule (§ 5).
 
 ## 7. Suspend and resume
 

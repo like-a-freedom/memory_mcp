@@ -39,7 +39,7 @@ pub use flow_material::{
     AccessClaims, Audience, AuthError, OidcCallback, OidcFlowIntent, OidcNonce, OidcState,
     OidcTokens, PkceCode, StoredOidcRequest,
 };
-pub use handlers::{authorize, callback, logout, start_link_flow};
+pub use handlers::{authorize, callback, logout, start_invite_flow, start_link_flow};
 pub use jwks::JwksCache;
 pub use sealing::{identity_subject_verifier, seal_oidc_payload, unseal_oidc_payload};
 
@@ -318,6 +318,28 @@ mod tests {
                 .any(|window| window == b"acct_link"),
             "the Account id must be sealed, not merely serialized"
         );
+    }
+
+    /// The invitation intent survives sealing: the Account, the inviting
+    /// administrator and the replace flag are bound into the AEAD payload
+    /// exactly like the link intent is (ADR-0057 invitations).
+    #[test]
+    fn seal_unseal_roundtrip_carries_an_invite_intent() {
+        let key = [0x24u8; 32];
+        let state = OidcState::new();
+        let nonce = OidcNonce::new();
+        let pkce = PkceCode::new();
+        let intent = OidcFlowIntent::Invite {
+            account_id: "acct_invite".to_owned(),
+            invited_by: "admin_root".to_owned(),
+            replace: false,
+        };
+
+        let (ciphertext, nonce_bytes) =
+            seal_oidc_payload(&key, &state, &nonce, &pkce, &intent).unwrap();
+        let stored = unseal_oidc_payload(&key, &ciphertext, &nonce_bytes).unwrap();
+
+        assert_eq!(stored.intent, intent);
     }
 
     #[test]

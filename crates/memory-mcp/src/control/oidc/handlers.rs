@@ -143,6 +143,7 @@ pub async fn logout(
 pub async fn callback(
     axum::extract::State(state): axum::extract::State<std::sync::Arc<HttpState>>,
     axum::extract::Query(params): axum::extract::Query<OidcCallback>,
+    request_headers: axum::http::HeaderMap,
 ) -> Result<(axum::http::header::HeaderMap, axum::response::Redirect), ApiError> {
     // Reject if the provider reported an error.
     if params.error.is_some() {
@@ -220,18 +221,41 @@ pub async fn callback(
     // it and leaves the session alone: the browser is already signed in. The
     // Account comes from the sealed intent, so nothing the callback received
     // chose it.
-    if let OidcFlowIntent::Link { account_id } = stored.intent {
-        link_verified_identity(
-            &state.registry.store_clone(),
-            &account_id,
-            &claims.iss,
-            subject_verifier,
-        )
-        .await?;
-        return Ok((
-            axum::http::header::HeaderMap::new(),
-            axum::response::Redirect::to(&console_home(&state.config.base_path)),
-        ));
+    match stored.intent {
+        OidcFlowIntent::Link { account_id } => {
+            link_verified_identity(
+                &state.registry.store_clone(),
+                &account_id,
+                &claims.iss,
+                subject_verifier,
+            )
+            .await?;
+            return Ok((
+                axum::http::header::HeaderMap::new(),
+                axum::response::Redirect::to(&console_home(&state.config.base_path)),
+            ));
+        }
+        // An invitation is the same link flow with the administrator as its
+        // initiator: the Account and the inviter travel in the sealed intent.
+        // Accepting one without a session is the first login, so the browser
+        // is signed in as the bound Account unless it already holds a session.
+        OidcFlowIntent::Invite {
+            account_id,
+            invited_by,
+            replace,
+        } => {
+            return accept_invitation(
+                &state,
+                &account_id,
+                &invited_by,
+                replace,
+                &claims.iss,
+                subject_verifier,
+                &request_headers,
+            )
+            .await;
+        }
+        OidcFlowIntent::SignIn => {}
     }
 
     // The HTTP callback enforces the signup policy before
@@ -268,22 +292,7 @@ pub async fn callback(
         .await
         .map_err(ApiError::Internal)?;
 
-    let cookie_value = crate::control::session::generate_session_cookie_value();
-    let session = ControlPlaneSession::new(&account, &cookie_value, policy.epoch, &state.config)?;
-    state
-        .registry
-        .store_clone()
-        .store_session(policy, &session)
-        .await?;
-
-    let cookie = crate::control::session::build_session_cookie(cookie_value, &state.config);
-    let mut headers = axum::http::header::HeaderMap::new();
-    headers.insert(
-        axum::http::header::SET_COOKIE,
-        cookie.parse().map_err(|_| {
-            ApiError::Internal(MemoryError::ConfigInvalid("invalid cookie header".into()))
-        })?,
-    );
+    let headers = issue_session(&state, &account, policy).await?;
     Ok((
         headers,
         axum::response::Redirect::to(&console_home(&state.config.base_path)),
@@ -306,6 +315,30 @@ async fn link_verified_identity(
     issuer: &str,
     subject_verifier: SubjectVerifier,
 ) -> Result<(), MemoryError> {
+    // Self-service link: the Account holder is the actor (the browser is
+    // already signed in, and the identity is the one the provider attested).
+    attach_verified_identity(
+        store,
+        account_id,
+        issuer,
+        subject_verifier,
+        &IdentityAudit::by_account(account_id, Utc::now()),
+    )
+    .await
+}
+
+/// Attach a provider-verified identity under the caller's audit actor, with
+/// the same proof-of-ownership rules as [`link_verified_identity`]: idempotent
+/// for an identity the Account already holds, refused when *another* Account
+/// holds the tuple.
+#[cfg(feature = "control-plane")]
+async fn attach_verified_identity(
+    store: &std::sync::Arc<dyn crate::http::registry::storage::RegistryStore>,
+    account_id: &str,
+    issuer: &str,
+    subject_verifier: SubjectVerifier,
+    audit: &IdentityAudit,
+) -> Result<(), MemoryError> {
     match store
         .find_account_by_identity(issuer, &subject_verifier)
         .await?
@@ -325,15 +358,168 @@ async fn link_verified_identity(
         account_id: account_id.to_owned(),
         created_at: Utc::now(),
     };
-    // The Account holder is the actor: the browser is already signed in, and the
-    // identity being attached is the one the provider just attested to.
-    store
-        .link_external_identity(
-            &identity,
-            &IdentityAudit::by_account(account_id, Utc::now()),
-        )
-        .await?;
+    store.link_external_identity(&identity, audit).await?;
     Ok(())
+}
+
+/// Swap an Account's single mis-bound identity for the one just attested
+/// (invitation remediation). The store performs the swap as one guarded
+/// change, so the Account never has zero identities.
+#[cfg(feature = "control-plane")]
+async fn replace_verified_identity(
+    store: &std::sync::Arc<dyn crate::http::registry::storage::RegistryStore>,
+    account_id: &str,
+    issuer: &str,
+    subject_verifier: SubjectVerifier,
+    audit: &IdentityAudit,
+) -> Result<(), MemoryError> {
+    match store
+        .find_account_by_identity(issuer, &subject_verifier)
+        .await?
+    {
+        Some(existing) if existing.id == account_id => return Ok(()),
+        Some(_) => {
+            return Err(MemoryError::Conflict(
+                "this identity is already linked to another account".into(),
+            ));
+        }
+        None => {}
+    }
+    let identity = ExternalIdentity {
+        id: new_external_identity_id(),
+        issuer: issuer.to_owned(),
+        subject_verifier,
+        account_id: account_id.to_owned(),
+        created_at: Utc::now(),
+    };
+    store.replace_external_identity(&identity, audit).await
+}
+
+/// Issue an identity invitation (ADR-0057): a sealed provider round trip that
+/// attaches the next attested identity to `account_id`. The returned
+/// authorize URL *is* the invitation — it is completed by whoever owns the
+/// identity, within the flow's TTL. `replace` swaps the Account's single
+/// mis-bound identity instead of adding beside it.
+#[cfg(feature = "control-plane")]
+pub async fn start_invite_flow(
+    state: &std::sync::Arc<HttpState>,
+    account_id: &str,
+    invited_by: &str,
+    replace: bool,
+) -> Result<String, ApiError> {
+    let store = state.registry.store_clone();
+    store
+        .find_account_by_id(account_id)
+        .await
+        .map_err(ApiError::Internal)?
+        .ok_or(ApiError::NotFound)?;
+    if replace {
+        let held = store
+            .find_external_identities(account_id)
+            .await
+            .map_err(ApiError::Internal)?;
+        if held.len() != 1 {
+            return Err(ApiError::Conflict);
+        }
+    }
+    begin_flow(
+        state,
+        OidcFlowIntent::Invite {
+            account_id: account_id.to_owned(),
+            invited_by: invited_by.to_owned(),
+            replace,
+        },
+    )
+    .await
+}
+
+/// Accept an identity invitation: attach the attested identity (adding beside
+/// the Account's identities, or replacing a single mis-bound one) and, when the
+/// browser holds no session yet, sign it in as the bound Account — the
+/// acceptance is the first login (R2). An existing session is left alone.
+#[cfg(feature = "control-plane")]
+pub(crate) async fn accept_invitation(
+    state: &std::sync::Arc<HttpState>,
+    account_id: &str,
+    invited_by: &str,
+    replace: bool,
+    issuer: &str,
+    subject_verifier: SubjectVerifier,
+    request_headers: &axum::http::header::HeaderMap,
+) -> Result<(axum::http::header::HeaderMap, axum::response::Redirect), ApiError> {
+    let store = state.registry.store_clone();
+    let audit = IdentityAudit::by_operator(invited_by, Utc::now());
+    if replace {
+        replace_verified_identity(&store, account_id, issuer, subject_verifier, &audit).await?;
+    } else {
+        attach_verified_identity(&store, account_id, issuer, subject_verifier, &audit).await?;
+    }
+
+    let headers = if browser_has_valid_session(state, request_headers).await? {
+        axum::http::header::HeaderMap::new()
+    } else {
+        let account = store
+            .find_account_by_id(account_id)
+            .await
+            .map_err(ApiError::Internal)?
+            .ok_or(ApiError::NotFound)?;
+        let policy = state.browser_policy.as_ref().ok_or(ApiError::Unavailable)?;
+        issue_session(state, &account, policy).await?
+    };
+    Ok((
+        headers,
+        axum::response::Redirect::to(&console_home(&state.config.base_path)),
+    ))
+}
+
+/// Mint a control-plane session for the Account and the Set-Cookie header
+/// that carries it. Shared by sign-in and invitation acceptance.
+#[cfg(feature = "control-plane")]
+async fn issue_session(
+    state: &std::sync::Arc<HttpState>,
+    account: &crate::http::registry::models::Account,
+    policy: &crate::http::registry::models::BrowserPolicyFence,
+) -> Result<axum::http::header::HeaderMap, ApiError> {
+    let cookie_value = crate::control::session::generate_session_cookie_value();
+    let session = ControlPlaneSession::new(account, &cookie_value, policy.epoch, &state.config)?;
+    state
+        .registry
+        .store_clone()
+        .store_session(policy, &session)
+        .await?;
+
+    let cookie = crate::control::session::build_session_cookie(cookie_value, &state.config);
+    let mut headers = axum::http::header::HeaderMap::new();
+    headers.insert(
+        axum::http::header::SET_COOKIE,
+        cookie.parse().map_err(|_| {
+            ApiError::Internal(MemoryError::ConfigInvalid("invalid cookie header".into()))
+        })?,
+    );
+    Ok(headers)
+}
+
+/// Whether the browser already holds a valid control-plane session: an
+/// invitation acceptance must leave one alone.
+#[cfg(feature = "control-plane")]
+async fn browser_has_valid_session(
+    state: &std::sync::Arc<HttpState>,
+    request_headers: &axum::http::header::HeaderMap,
+) -> Result<bool, ApiError> {
+    let Some(cookie_value) = request_headers
+        .get(axum::http::header::COOKIE)
+        .and_then(|value| value.to_str().ok())
+        .and_then(|raw| {
+            crate::control::session::parse_session_cookie(raw, &state.config.base_path)
+        })
+    else {
+        return Ok(false);
+    };
+    Ok(
+        crate::control::session::resolve_session_record(state, cookie_value)
+            .await
+            .is_ok(),
+    )
 }
 
 #[cfg(all(test, feature = "control-plane"))]
@@ -414,6 +600,181 @@ mod tests {
     /// The identity belongs to whoever the provider says it belongs to, so a
     /// second Account cannot attach an identity the first already holds. This is
     /// the case the body-supplied route could not distinguish from the first.
+    /// Invitation acceptance (R2): a browser with no control-plane session is
+    /// signed in as the bound Account — the provider just attested ownership,
+    /// so the acceptance is the first login (ADR-0057 invitations).
+    #[tokio::test]
+    async fn an_invitation_acceptance_signs_the_browser_in_when_it_has_no_session() {
+        let store = store_with_two_accounts().await;
+        let policy = crate::http::registry::RegistryStore::reconcile_browser_policy(
+            store.as_ref(),
+            &[crate::http::config::BrowserAuthMethod::Oidc],
+            None,
+        )
+        .await
+        .expect("reconcile browser policy");
+        let registry =
+            crate::http::registry::RegistryHandle::in_memory().with_inner_store(store.clone());
+        let state = crate::http::test_state::HttpStateTestBuilder::new()
+            .await
+            .with_registry(registry)
+            .with_browser_policy(policy.clone())
+            .build()
+            .await
+            .expect("test HTTP state");
+
+        let (headers, redirect) = accept_invitation(
+            &state,
+            "acct_one",
+            "admin_root",
+            false,
+            "https://idp.example.com",
+            verifier(0xA7),
+            &axum::http::HeaderMap::new(),
+        )
+        .await
+        .ok()
+        .expect("invitation acceptance");
+
+        assert!(
+            headers.get(axum::http::header::SET_COOKIE).is_some(),
+            "an acceptance without a session must sign the browser in"
+        );
+        let redirect_response = axum::response::IntoResponse::into_response(redirect);
+        assert_eq!(
+            redirect_response.status(),
+            axum::http::StatusCode::SEE_OTHER
+        );
+    }
+
+    #[tokio::test]
+    async fn an_invitation_acceptance_leaves_an_existing_session_alone() {
+        let store = store_with_two_accounts().await;
+        let policy = crate::http::registry::RegistryStore::reconcile_browser_policy(
+            store.as_ref(),
+            &[crate::http::config::BrowserAuthMethod::Oidc],
+            None,
+        )
+        .await
+        .expect("reconcile browser policy");
+        let registry =
+            crate::http::registry::RegistryHandle::in_memory().with_inner_store(store.clone());
+        let config = crate::http::config::HttpConfig::default_for_test();
+        let state = crate::http::test_state::HttpStateTestBuilder::new()
+            .await
+            .with_config(config.clone())
+            .with_registry(registry)
+            .with_browser_policy(policy.clone())
+            .build()
+            .await
+            .expect("test HTTP state");
+
+        let cookie_value = "existing-session-cookie-value";
+        let cookie_hash = hex::encode(
+            crate::control::session::keyed_session_hash(
+                &config.keys.control_plane_session,
+                cookie_value.as_bytes(),
+            )
+            .expect("session hash"),
+        );
+        let now = Utc::now();
+        store
+            .store_session(
+                &policy,
+                &ControlPlaneSession {
+                    id: "ses_existing".into(),
+                    cookie_hash,
+                    account_id: "acct_one".into(),
+                    browser_policy_epoch: Some(policy.epoch),
+                    auth_time: now,
+                    idle_expiry: now + chrono::Duration::minutes(30),
+                    absolute_expiry: now + chrono::Duration::hours(1),
+                },
+            )
+            .await
+            .expect("store session");
+        let mut request_headers = axum::http::HeaderMap::new();
+        request_headers.insert(
+            axum::http::header::COOKIE,
+            format!(
+                "{}={cookie_value}",
+                crate::control::session::session_cookie_name(&config.base_path)
+            )
+            .parse()
+            .expect("cookie header"),
+        );
+
+        let (headers, _redirect) = accept_invitation(
+            &state,
+            "acct_one",
+            "admin_root",
+            false,
+            "https://idp.example.com",
+            verifier(0xA8),
+            &request_headers,
+        )
+        .await
+        .ok()
+        .expect("invitation acceptance");
+
+        assert!(
+            headers.get(axum::http::header::SET_COOKIE).is_none(),
+            "an already-signed-in browser keeps its session"
+        );
+    }
+
+    /// Q1 remediation: a replacing acceptance swaps the mis-bound identity.
+    #[tokio::test]
+    async fn a_replacing_invitation_swaps_the_misbound_identity() {
+        let store = store_with_two_accounts().await;
+        let policy = crate::http::registry::RegistryStore::reconcile_browser_policy(
+            store.as_ref(),
+            &[crate::http::config::BrowserAuthMethod::Oidc],
+            None,
+        )
+        .await
+        .expect("reconcile browser policy");
+        let registry =
+            crate::http::registry::RegistryHandle::in_memory().with_inner_store(store.clone());
+        let state = crate::http::test_state::HttpStateTestBuilder::new()
+            .await
+            .with_registry(registry)
+            .with_browser_policy(policy)
+            .build()
+            .await
+            .expect("test HTTP state");
+
+        // The account is mis-bound to somebody else's identity.
+        link_verified_identity(
+            &state.registry.store_clone(),
+            "acct_one",
+            "https://idp.example.com",
+            verifier(0xB1),
+        )
+        .await
+        .expect("mis-bound link");
+
+        let (_headers, _redirect) = accept_invitation(
+            &state,
+            "acct_one",
+            "admin_root",
+            true,
+            "https://idp.example.com",
+            verifier(0xB2),
+            &axum::http::HeaderMap::new(),
+        )
+        .await
+        .ok()
+        .expect("replacing acceptance");
+
+        let identities = store
+            .find_external_identities("acct_one")
+            .await
+            .expect("list");
+        assert_eq!(identities.len(), 1, "replace swaps, never accumulates");
+        assert_eq!(identities[0].subject_verifier, verifier(0xB2));
+    }
+
     #[tokio::test]
     async fn an_identity_held_by_another_account_is_refused() {
         let store = store_with_two_accounts().await;

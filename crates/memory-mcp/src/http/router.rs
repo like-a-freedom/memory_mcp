@@ -239,6 +239,10 @@ pub fn build_router(
                 "/api/v1/admin/clients/{account_id}/resume",
                 post(handlers::resume_client),
             )
+            .route(
+                "/api/v1/admin/clients/{account_id}/identity_invitation",
+                post(handlers::invite_client_identity),
+            )
             // Local routes are merged after the base router's route-scoped
             // layers were applied, so they carry their own copy of the local
             // deadline. Host/Origin is not repeated here: it is a property of
@@ -438,6 +442,30 @@ mod tests {
 
     /// The same route *is* mounted once the control plane is enabled, so the
     /// assertion above cannot pass for the wrong reason.
+    /// The identity-invitation route exists and is guarded: an unauthenticated
+    /// request is refused with an auth rejection rather than a 404.
+    #[cfg(feature = "control-plane")]
+    #[tokio::test]
+    async fn the_identity_invitation_route_is_mounted_behind_the_admin_guards() {
+        let (builder, _store) = HttpStateTestBuilder::local_admin().await;
+        let state = builder.build().await.expect("local admin HTTP state");
+
+        let mut router = build_router(state, None).expect("router builds in tests");
+        let response = router
+            .call(request(
+                Method::POST,
+                "/api/v1/admin/clients/acct_x/identity_invitation",
+            ))
+            .await
+            .expect("dispatch");
+        assert_ne!(
+            response.status(),
+            StatusCode::NOT_FOUND,
+            "the route must be mounted"
+        );
+        assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
+    }
+
     #[cfg(feature = "control-plane")]
     #[tokio::test]
     async fn an_enabled_control_plane_mounts_the_mode_disclosure() {

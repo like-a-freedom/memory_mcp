@@ -355,9 +355,17 @@ fn identity_audit_vars(event: &ControlAuditEvent) -> Value {
 /// own sentinel is the refusal; everything else keeps the adapter's mapping, so a
 /// unique-tuple violation still reads as a `Conflict` and a missing Account or
 /// identity still reads as `NotFound`.
+/// The replace guard's refusal sentinel, classified as `Conflict` like the
+/// last-identity guard's own.
+const REPLACE_GUARD_SENTINEL: &str = "replace requires exactly one existing identity";
+
 fn classify_identity_change_error(context: &str, error: MemoryError) -> MemoryError {
-    if error.to_string().contains(LAST_IDENTITY_SENTINEL) {
+    let message = error.to_string();
+    if message.contains(LAST_IDENTITY_SENTINEL) {
         return MemoryError::Conflict("the account's last identity cannot be unlinked".into());
+    }
+    if message.contains(REPLACE_GUARD_SENTINEL) {
+        return MemoryError::Conflict("replace requires exactly one existing identity".into());
     }
     map_storage_error(context, error)
 }
@@ -1434,6 +1442,65 @@ impl RegistryStore for SurrealRegistryStore {
             .query_json(script, Some(identity_audit_vars(&event)))
             .await
             .map_err(|error| classify_identity_change_error("unlink external identity", error))?;
+        Ok(())
+    }
+
+    async fn replace_external_identity(
+        &self,
+        new_identity: &ExternalIdentity,
+        audit: &IdentityAudit,
+    ) -> Result<(), MemoryError> {
+        // One transaction: the removal, the addition and both audit rows
+        // commit together, so the Account never has zero identities and two
+        // racing replacements cannot both swap (ADR-0057 invitation
+        // remediation). The exactly-one guard is the refusal; the unique-tuple
+        // index stays the backstop the classifier reads as `Conflict`. A
+        // replay of the same tuple is a guarded no-op.
+        let linked = ControlAuditEvent::identity_change(
+            IdentityAuditAction::Linked,
+            &new_identity.id,
+            &new_identity.account_id,
+            audit,
+        );
+        let mut vars = identity_audit_vars(&linked);
+        vars["issuer"] = json!(new_identity.issuer);
+        vars["verifier"] = json!(hex::encode(new_identity.subject_verifier.0));
+        vars["created_at"] = json!(new_identity.created_at.to_rfc3339());
+        let script = "BEGIN TRANSACTION; \
+            LET $account = SELECT id FROM type::record('account', $account_id) LIMIT 1; \
+            IF array::len($account) = 0 { THROW 'account not found'; }; \
+            LET $held = SELECT id, issuer, subject_verifier FROM external_identity \
+                WHERE account_id = $account_id; \
+            IF array::len($held) != 1 { THROW 'replace requires exactly one existing identity'; }; \
+            IF $held[0].issuer != $issuer OR $held[0].subject_verifier != $verifier { \
+                DELETE type::record('external_identity', $held[0].id); \
+                CREATE type::record('external_identity', $identity_id) SET \
+                    id = $identity_id, issuer = $issuer, \
+                    subject_verifier = $verifier, account_id = $account_id, \
+                    created_at = type::datetime($created_at); \
+                CREATE type::record('audit_event', \
+                    string::concat('identity_unlinked_', record::id($held[0].id))) SET \
+                    account_id = $account_id, \
+                    actor_kind = $actor_kind, \
+                    actor_principal = $actor_principal, \
+                    action = 'identity_unlinked', \
+                    target_identity_id = record::id($held[0].id), \
+                    occurred_at = type::datetime($occurred_at), \
+                    correlation_id = string::concat('identity_unlinked_', record::id($held[0].id)); \
+                CREATE type::record('audit_event', $correlation_id) SET \
+                    account_id = $account_id, \
+                    actor_kind = $actor_kind, \
+                    actor_principal = $actor_principal, \
+                    action = $action, \
+                    target_identity_id = $identity_id, \
+                    occurred_at = type::datetime($occurred_at), \
+                    correlation_id = $correlation_id; \
+            }; \
+            COMMIT TRANSACTION;";
+        self.handle()
+            .query_json(script, Some(vars))
+            .await
+            .map_err(|error| classify_identity_change_error("replace external identity", error))?;
         Ok(())
     }
 
@@ -3743,6 +3810,58 @@ mod tests {
                 .is_none(),
             "a session with a stale epoch must not resolve"
         );
+    }
+
+    /// The invitation remediation against the real engine: the swap is one
+    /// transaction, both audit rows land with it, and the Account never has
+    /// zero identities.
+    #[cfg(feature = "control-plane")]
+    #[tokio::test]
+    async fn replace_external_identity_swaps_in_one_transaction() {
+        let store = identity_change_store().await;
+        let old = linked_identity("idn_old", 0x01);
+        store
+            .link_external_identity(&old, &IdentityAudit::by_operator("admin_root", Utc::now()))
+            .await
+            .expect("link the mis-bound identity");
+        let new = linked_identity("idn_new", 0x02);
+        store
+            .replace_external_identity(&new, &IdentityAudit::by_operator("admin_root", Utc::now()))
+            .await
+            .expect("replace through the guarded transaction");
+
+        let held = store
+            .find_external_identities("acct_shared")
+            .await
+            .expect("list");
+        assert_eq!(held.len(), 1, "the Account never has zero identities");
+        assert_eq!(held[0].id, "idn_new");
+        let unlinked = audit_rows(&store, "identity_unlinked").await;
+        assert!(
+            unlinked
+                .iter()
+                .any(|row| row["target_identity_id"] == "idn_old"),
+            "the removal is audited: {unlinked:?}"
+        );
+        let linked = audit_rows(&store, "identity_linked").await;
+        assert!(
+            linked
+                .iter()
+                .any(|row| row["target_identity_id"] == "idn_new"),
+            "the addition is audited: {linked:?}"
+        );
+    }
+
+    /// The exactly-one guard against the real engine.
+    #[cfg(feature = "control-plane")]
+    #[tokio::test]
+    async fn replace_external_identity_requires_exactly_one_existing() {
+        let store = identity_change_store().await;
+        let new = linked_identity("idn_new", 0x03);
+        let refused = store
+            .replace_external_identity(&new, &IdentityAudit::by_operator("admin_root", Utc::now()))
+            .await;
+        assert!(matches!(refused, Err(MemoryError::Conflict(_))));
     }
 
     /// A migrated control namespace with one Active Account, which is all an

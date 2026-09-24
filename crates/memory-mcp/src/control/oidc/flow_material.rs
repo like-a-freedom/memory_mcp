@@ -94,6 +94,15 @@ pub enum OidcFlowIntent {
     /// named here because the flow began inside that Account's session, not
     /// because a client asserted it at the callback.
     Link { account_id: String },
+    /// Attach the provider-verified identity to this Account on the
+    /// administrator's invitation (ADR-0057). The Account and the inviting
+    /// administrator travel inside the sealed payload; `replace` swaps the
+    /// Account's single mis-bound identity instead of adding beside it.
+    Invite {
+        account_id: String,
+        invited_by: String,
+        replace: bool,
+    },
 }
 
 /// Stored OIDC request — decrypted projection from the registry.

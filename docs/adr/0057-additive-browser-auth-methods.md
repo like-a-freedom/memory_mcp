@@ -177,6 +177,35 @@ the store methods that change an Account's identities take the actor and the
 instant, and the mutation, the audit row and the last-identity check share one
 guarded transaction.
 
+### Identity invitations
+
+The link flow above presupposes an Account session, which presupposes a linked
+identity — so a `local`-bootstrapped deployment could not bring its clients into
+OIDC mode at all, and `invite_only` had no reachable first login. An invitation
+is the same sealed link flow with the deployment administrator as its
+initiator: `POST /api/v1/admin/clients/{account_id}/identity_invitation` seals
+the intent naming the Account and the inviting administrator, and the returned
+authorize URL is the invitation itself. It is completed only by a provider
+round trip, exactly as above — nothing new is trusted, and the flow stays
+single-use and short-lived.
+
+Two consequences are deliberate:
+
+- Accepting an invitation without a control-plane session is the first login:
+  the callback mints a session for the bound Account. A browser that already
+  holds a session keeps it (the self-service link behaviour).
+- An invitation the wrong person completed is remedied by issuing a replacement
+  (`replace_existing`): the store swaps the Account's single identity in one
+  guarded transaction, both audit rows land with it, and the Account never has
+  zero identities — which is the property the last-identity rule protects.
+  Invitation changes are audited as `actor_kind=operator`, naming the inviting
+  administrator.
+
+This also unblocks the SSO-only endgame: the administrator invites their own
+identity, reads its `subject_verifier` from the identity listing, and places
+`issuer|hex(subject_verifier)` in the operator allowlist before removing the
+`local` method.
+
 ## Implementation notes
 
 Recorded the day this decision landed, because three details are checkable and
