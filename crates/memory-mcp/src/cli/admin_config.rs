@@ -38,8 +38,8 @@ impl AdminCliConfig {
     /// is fine for every command.
     pub fn from_env() -> Result<Self, MemoryError> {
         let auth_methods = resolve_auth_methods()?;
-        let session_key = parse_hex_32_env("MEMORY_MCP_HTTP_SESSION_KEY")?;
-        let csrf_key = parse_hex_32_env("MEMORY_MCP_HTTP_CSRF_KEY")?;
+        let session_key = resolve_secret_slot("MEMORY_MCP_HTTP_SESSION_KEY")?;
+        let csrf_key = resolve_secret_slot("MEMORY_MCP_HTTP_CSRF_KEY")?;
         let public_base_url = std::env::var("MEMORY_MCP_HTTP_PUBLIC_BASE_URL")
             .unwrap_or_else(|_| "https://localhost".into());
         let operator_identities = parse_csv_env("MEMORY_MCP_HTTP_OPERATOR_IDENTITIES");
@@ -60,6 +60,30 @@ impl AdminCliConfig {
             auth_methods,
             operator_identities,
         })
+    }
+}
+
+/// One HMAC secret slot for the CLI: the same resolution the server uses
+/// (explicit value, then `MEMORY_MCP_HTTP_SECRET_KEY`, then the missing-value
+/// error), so a root-only deployment the server accepts can also run
+/// `memory_mcp admin`. Root expansion exists where `hmac` is compiled
+/// (the `streamable-http` profile); other profiles keep the strict
+/// explicit-only contract.
+fn resolve_secret_slot(key: &str) -> Result<[u8; 32], MemoryError> {
+    let root_secret = crate::config::secrets::read_root_secret()?;
+    let supplied = std::env::var(key)
+        .ok()
+        .filter(|value| !value.trim().is_empty());
+    #[cfg(feature = "streamable-http")]
+    {
+        crate::config::secrets::resolve_key_slot(supplied, key, root_secret.as_deref(), || {
+            parse_hex_32_env(key)
+        })
+    }
+    #[cfg(not(feature = "streamable-http"))]
+    {
+        let _ = (root_secret, supplied);
+        parse_hex_32_env(key)
     }
 }
 

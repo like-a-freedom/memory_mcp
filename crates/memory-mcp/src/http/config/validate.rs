@@ -176,9 +176,10 @@ pub(super) fn validate(cfg: &HttpConfig) -> Result<(), MemoryError> {
     }
     // Keep in lockstep with the algorithm mapping in `control::oidc::client`.
     if uses_oidc
+        && cfg.oidc_allowed_alg != super::parse::AUTO_OIDC_ALG
         && !matches!(
             cfg.oidc_allowed_alg.as_str(),
-            "auto" | "RS256" | "RS384" | "RS512" | "ES256" | "EdDSA"
+            "RS256" | "RS384" | "RS512" | "ES256" | "EdDSA"
         )
     {
         return Err(MemoryError::ConfigInvalid(

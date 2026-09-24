@@ -401,9 +401,9 @@ image built with the `streamable-http` profile (see
 first local administrator and issues API keys. Setting
 `MEMORY_MCP_HTTP_ENABLE_CONTROL_PLANE=false` gives a data-plane-only deployment,
 but the method set still decides which material is required: an `oidc` set (the
-server's default when `MEMORY_MCP_HTTP_AUTH_METHODS` is unset) still demands
-`MEMORY_MCP_HTTP_SIGNUP_MODE` and the three
-provider keys.
+server's default when `MEMORY_MCP_HTTP_AUTH_METHODS` is unset) needs only
+`MEMORY_MCP_HTTP_OIDC_ISSUER` and `MEMORY_MCP_HTTP_OIDC_CLIENT_ID` — signup
+policy and every secret slot derive when unset.
 
 Validate the configuration without starting it and without printing secrets:
 
@@ -1094,7 +1094,7 @@ form startup fails — material is never invented.
 
 | Variable | Description |
 | --- | --- |
-| `MEMORY_MCP_HTTP_SECRET_KEY` | Optional root secret (**≥ 32 bytes** of secret material, any encoding). Every secret slot below that is not supplied explicitly is derived from it under a purpose-separated label, so derived slots are never zero and never equal to a sibling. Rotating it rotates every derived slot at once (combine with the per-slot notes below) |
+| `MEMORY_MCP_HTTP_SECRET_KEY` | Optional root secret (**≥ 32 bytes** of secret material, enforced at startup; any encoding). Every secret slot below that is not supplied explicitly is derived from it under a purpose-separated label, so derived slots are never zero and never equal to a sibling. Rotating it rotates every derived slot at once (combine with the per-slot notes below) |
 | `MEMORY_MCP_API_KEY_PEPPER` | Pepper for the keyed HMAC verifier of Account API keys; rotating it invalidates every existing key. Must be **≥ 32 bytes** of secret material; the server does not require hex encoding for this field. Derived from `MEMORY_MCP_HTTP_SECRET_KEY` when unset |
 | `MEMORY_MCP_HTTP_IDENTITY_INDEX_KEY` | Blind index key for OIDC subject verifiers; rotating it requires every OIDC identity to relink. Required when `oidc` is enabled, and derived from `MEMORY_MCP_HTTP_SESSION_KEY` when `local` is the whole method set (supplying it there is an error). Also derived from `MEMORY_MCP_HTTP_SECRET_KEY` when unset |
 | `MEMORY_MCP_HTTP_SESSION_KEY` | HMAC key for browser-session cookie verifiers; rotating it invalidates every browser session. Derived from `MEMORY_MCP_HTTP_SECRET_KEY` when unset |
@@ -1115,7 +1115,7 @@ form startup fails — material is never invented.
 | `MEMORY_MCP_HTTP_OIDC_CLIENT_ID` | string | unset | Required when `oidc` is enabled, refused when it is not. The derived audience defaults to this value |
 | `MEMORY_MCP_HTTP_OIDC_AUDIENCE` | URL string | client id | Optional; derived from `MEMORY_MCP_HTTP_OIDC_CLIENT_ID` when unset (OIDC Core: `aud` is the RP's client id). Refused when `oidc` is not enabled. Exact audience match is enforced against the ID token's `aud` claim; supply a single audience identifier (the server does not currently parse a list) |
 | `MEMORY_MCP_HTTP_OIDC_REDIRECT_URI` | URL | `{MEMORY_MCP_HTTP_PUBLIC_BASE_URL}/auth/oidc/callback` | Optional; derived from the public base URL when unset — this deployment's own callback. Refused when `oidc` is not enabled. Must match the redirect URI registered at the provider exactly |
-| `MEMORY_MCP_HTTP_OIDC_ALLOWED_ALG` | enum | `auto` | JWT algorithm allowlist. `auto` accepts the algorithms the provider advertises in discovery (`id_token_signing_alg_values_supported`), intersected with `RS256`, `RS384`, `RS512`, `ES256`, `EdDSA`; a provider advertising nothing safe fails startup. An explicit value is a single-algorithm pin and must equal the signing algorithm of the provider's ID tokens (Rauthy >= 0.35 signs new clients' tokens with `EdDSA`/Ed25519 by default). Tokens signed outside the accepted set are rejected. Values outside `auto` and the five algorithms fail startup with `ConfigInvalid` |
+| `MEMORY_MCP_HTTP_OIDC_ALLOWED_ALG` | enum | `auto` | JWT algorithm allowlist. `auto` accepts the algorithms the provider advertises in discovery (`id_token_signing_alg_values_supported`), intersected with `RS256`, `RS384`, `RS512`, `ES256`, `EdDSA`; a provider advertising only algorithms outside the safe set fails startup, while a provider that advertises none at all falls back to the full safe set. An explicit value is a single-algorithm pin and must equal the signing algorithm of the provider's ID tokens (Rauthy >= 0.35 signs new clients' tokens with `EdDSA`/Ed25519 by default). Tokens signed outside the accepted set are rejected. Values outside `auto` and the five algorithms fail startup with `ConfigInvalid` |
 | `MEMORY_MCP_HTTP_OPERATOR_IDENTITIES` | comma-separated `issuer\|hex(subject_verifier)` list | unset | Immutable operator allowlist; requires the `oidc` method. Account APIs cannot grant operator status. The `issuer` component must spell the issuer exactly as the provider publishes it (the ID token's `iss`, trailing slash included where the provider emits one) |
 | `MEMORY_MCP_HTTP_LOCAL_DEFAULT_PLAN_VERSION` | positive `u32` | unset | Required when `local` is enabled: the version of the plan this deployment publishes for the clients the administrator provisions |
 

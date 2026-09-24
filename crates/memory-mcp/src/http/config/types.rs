@@ -377,7 +377,10 @@ fn auth_method_error(token: &str) -> MemoryError {
 
 /// Build the `local` method's configuration, demanding the plan material that
 /// method uses and nothing else.
-fn build_local_browser_config() -> Result<LocalBrowserConfig, MemoryError> {
+fn build_local_browser_config(
+    session_key: [u8; 32],
+    csrf_key: [u8; 32],
+) -> Result<LocalBrowserConfig, MemoryError> {
     let default_plan_version: u32 = require_env("MEMORY_MCP_HTTP_LOCAL_DEFAULT_PLAN_VERSION")?
         .parse()
         .map_err(|_| {
@@ -398,8 +401,8 @@ fn build_local_browser_config() -> Result<LocalBrowserConfig, MemoryError> {
         )
     })?;
     Ok(LocalBrowserConfig {
-        session_key: parse_hex_32_env("MEMORY_MCP_HTTP_SESSION_KEY")?,
-        csrf_key: parse_hex_32_env("MEMORY_MCP_HTTP_CSRF_KEY")?,
+        session_key,
+        csrf_key,
         default_plan_version,
         default_plan_limits,
     })
@@ -485,11 +488,11 @@ impl HttpConfig {
         // the API-key pepper). An explicit variable always wins over the root
         // derivation for its slot, and without either form the original
         // `ConfigMissing` contract stands: secret material is never invented.
-        let root_secret = optional_env("MEMORY_MCP_HTTP_SECRET_KEY");
+        let root_secret = crate::config::secrets::read_root_secret()?;
         let api_key_pepper = match optional_env("MEMORY_MCP_API_KEY_PEPPER") {
             Some(supplied) => supplied,
             None => match root_secret.as_deref() {
-                Some(root) => hex::encode(derive_key_from_root_secret(
+                Some(root) => hex::encode(crate::config::secrets::derive_key_from_root_secret(
                     root,
                     "MEMORY_MCP_API_KEY_PEPPER",
                 )?),
@@ -515,7 +518,8 @@ impl HttpConfig {
         // Slot resolution: an explicit variable wins, then the root-secret
         // derivation, then (for the three OIDC-typed slots under a `local`-
         // only set) the local-mode derivation from the session key.
-        let control_plane_session = resolve_key_slot(
+        let control_plane_session = crate::config::secrets::resolve_key_slot(
+            optional_env("MEMORY_MCP_HTTP_SESSION_KEY"),
             "MEMORY_MCP_HTTP_SESSION_KEY",
             root_secret.as_deref(),
             || parse_hex_32_env("MEMORY_MCP_HTTP_SESSION_KEY"),
@@ -527,24 +531,30 @@ impl HttpConfig {
                 parse_hex_32_env(label)
             }
         };
-        let identity_index = resolve_key_slot(
+        let identity_index = crate::config::secrets::resolve_key_slot(
+            optional_env("MEMORY_MCP_HTTP_IDENTITY_INDEX_KEY"),
             "MEMORY_MCP_HTTP_IDENTITY_INDEX_KEY",
             root_secret.as_deref(),
             || local_slot("MEMORY_MCP_HTTP_IDENTITY_INDEX_KEY"),
         )?;
-        let oidc_state = resolve_key_slot(
+        let oidc_state = crate::config::secrets::resolve_key_slot(
+            optional_env("MEMORY_MCP_HTTP_OIDC_STATE_KEY"),
             "MEMORY_MCP_HTTP_OIDC_STATE_KEY",
             root_secret.as_deref(),
             || local_slot("MEMORY_MCP_HTTP_OIDC_STATE_KEY"),
         )?;
-        let oidc_nonce = resolve_key_slot(
+        let oidc_nonce = crate::config::secrets::resolve_key_slot(
+            optional_env("MEMORY_MCP_HTTP_OIDC_NONCE_KEY"),
             "MEMORY_MCP_HTTP_OIDC_NONCE_KEY",
             root_secret.as_deref(),
             || local_slot("MEMORY_MCP_HTTP_OIDC_NONCE_KEY"),
         )?;
-        let csrf = resolve_key_slot("MEMORY_MCP_HTTP_CSRF_KEY", root_secret.as_deref(), || {
-            parse_hex_32_env("MEMORY_MCP_HTTP_CSRF_KEY")
-        })?;
+        let csrf = crate::config::secrets::resolve_key_slot(
+            optional_env("MEMORY_MCP_HTTP_CSRF_KEY"),
+            "MEMORY_MCP_HTTP_CSRF_KEY",
+            root_secret.as_deref(),
+            || parse_hex_32_env("MEMORY_MCP_HTTP_CSRF_KEY"),
+        )?;
         let keys = HmacKeys {
             identity_index,
             control_plane_session,
@@ -664,7 +674,7 @@ impl HttpConfig {
             Some(BrowserAuthMethods {
                 local: configured_methods
                     .contains(&BrowserAuthMethod::Local)
-                    .then(build_local_browser_config)
+                    .then(|| build_local_browser_config(keys.control_plane_session, keys.csrf))
                     .transpose()?,
                 oidc: configured_methods
                     .contains(&BrowserAuthMethod::Oidc)
@@ -851,43 +861,6 @@ fn derive_local_key(session: &[u8; 32], label: &str) -> Result<[u8; 32], MemoryE
     mac.update(b"local_mode_derived_key\0");
     mac.update(label.as_bytes());
     Ok(mac.finalize().into_bytes().into())
-}
-
-/// Purpose-separated derivation from `MEMORY_MCP_HTTP_SECRET_KEY`: one root
-/// secret yields every slot, each under the absent variable's name as its
-/// label, so derived slots are never zero and never equal to a sibling.
-fn derive_key_from_root_secret(root: &str, label: &str) -> Result<[u8; 32], MemoryError> {
-    use hmac::{Hmac, KeyInit, Mac};
-    use sha2::Sha256;
-
-    let mut mac = Hmac::<Sha256>::new_from_slice(root.as_bytes())
-        .map_err(|_| MemoryError::ConfigInvalid("invalid root secret".into()))?;
-    mac.update(b"memory_mcp_http_secret_key\0");
-    mac.update(label.as_bytes());
-    Ok(mac.finalize().into_bytes().into())
-}
-
-/// Resolve one 32-byte HMAC key slot: an explicit value wins, then the
-/// root-secret derivation, then the caller's fallback (which preserves the
-/// original `ConfigMissing` contract).
-fn resolve_key_slot(
-    env_name: &str,
-    root_secret: Option<&str>,
-    fallback: impl FnOnce() -> Result<[u8; 32], MemoryError>,
-) -> Result<[u8; 32], MemoryError> {
-    match optional_env(env_name) {
-        Some(raw) => {
-            let bytes =
-                hex::decode(raw).map_err(|_| MemoryError::ConfigInvalid(env_name.into()))?;
-            bytes
-                .try_into()
-                .map_err(|_| MemoryError::ConfigInvalid(env_name.into()))
-        }
-        None => match root_secret {
-            Some(root) => derive_key_from_root_secret(root, env_name),
-            None => fallback(),
-        },
-    }
 }
 
 #[cfg(test)]
@@ -1460,6 +1433,105 @@ mod tests {
                     if name == "MEMORY_MCP_API_KEY_PEPPER"
             ));
         });
+    }
+
+    /// The documented strength floor is enforced: a short root is refused
+    /// rather than silently expanded into every secret slot.
+    #[test]
+    fn a_too_short_root_secret_is_refused() {
+        let mut vars = root_secret_env();
+        vars.push(("MEMORY_MCP_HTTP_SECRET_KEY", "short-root".into()));
+        let refs: Vec<(&str, &str)> = vars.iter().map(|(k, v)| (*k, v.as_str())).collect();
+        with_env(&refs, || {
+            assert!(matches!(
+                HttpConfig::from_env(),
+                Err(MemoryError::ConfigInvalid(message))
+                    if message.contains("MEMORY_MCP_HTTP_SECRET_KEY")
+            ));
+        });
+    }
+
+    /// The root-secret flow covers `local` deployments too: with only
+    /// `MEMORY_MCP_HTTP_SECRET_KEY`, every slot resolves and the local
+    /// browser config carries the same resolved keys (regression: it used to
+    /// re-read raw env and broke the root-only flow at startup).
+    #[test]
+    fn local_mode_with_only_a_root_secret_loads() {
+        let mut vars: Vec<(&'static str, String)> = local_mode_env()
+            .into_iter()
+            .filter(|(k, _)| {
+                !matches!(
+                    *k,
+                    "MEMORY_MCP_API_KEY_PEPPER"
+                        | "MEMORY_MCP_HTTP_IDENTITY_INDEX_KEY"
+                        | "MEMORY_MCP_HTTP_CSRF_KEY"
+                        | "MEMORY_MCP_HTTP_OIDC_STATE_KEY"
+                        | "MEMORY_MCP_HTTP_OIDC_NONCE_KEY"
+                        | "MEMORY_MCP_HTTP_SESSION_KEY"
+                )
+            })
+            .collect();
+        vars.push((
+            "MEMORY_MCP_HTTP_SECRET_KEY",
+            "root-secret-with-plenty-of-entropy-0123456789".into(),
+        ));
+        let refs: Vec<(&str, &str)> = vars.iter().map(|(k, v)| (*k, v.as_str())).collect();
+        with_env(&refs, || {
+            let cfg = HttpConfig::from_env().expect("local root-secret config loads");
+            cfg.validate().expect("valid");
+            let local = cfg
+                .browser_auth
+                .as_ref()
+                .and_then(|methods| methods.local.as_ref())
+                .expect("local browser config");
+            assert_eq!(local.session_key, cfg.keys.control_plane_session);
+            assert_eq!(local.csrf_key, cfg.keys.csrf);
+        });
+    }
+
+    /// Root derivation beats the local-mode derivation from the session key:
+    /// under a fixed root, rotating the session key must not touch the derived
+    /// slots, while rotating the root must.
+    #[test]
+    fn the_root_derivation_beats_the_local_derivation() {
+        let run = |root: &str, session: &str| -> [u8; 32] {
+            let mut vars: Vec<(&'static str, String)> = local_mode_env()
+                .into_iter()
+                .filter(|(k, _)| {
+                    !matches!(
+                        *k,
+                        "MEMORY_MCP_API_KEY_PEPPER"
+                            | "MEMORY_MCP_HTTP_IDENTITY_INDEX_KEY"
+                            | "MEMORY_MCP_HTTP_CSRF_KEY"
+                            | "MEMORY_MCP_HTTP_OIDC_STATE_KEY"
+                            | "MEMORY_MCP_HTTP_OIDC_NONCE_KEY"
+                            | "MEMORY_MCP_HTTP_SESSION_KEY"
+                    )
+                })
+                .collect();
+            vars.push(("MEMORY_MCP_HTTP_SECRET_KEY", root.to_owned()));
+            vars.push(("MEMORY_MCP_HTTP_SESSION_KEY", session.to_owned()));
+            let refs: Vec<(&str, &str)> = vars.iter().map(|(k, v)| (*k, v.as_str())).collect();
+            let mut derived = [0u8; 32];
+            with_env(&refs, || {
+                derived = HttpConfig::from_env().expect("loads").keys.identity_index;
+            });
+            derived
+        };
+        let session = "0".repeat(64);
+        let other_session = "1".repeat(64);
+        let root_a = "root-secret-A-with-plenty-of-entropy-0123456789";
+        let root_b = "root-secret-B-with-plenty-of-entropy-0123456789";
+        assert_ne!(
+            run(root_a, &session),
+            run(root_b, &session),
+            "the root must feed the derived slots"
+        );
+        assert_eq!(
+            run(root_a, &session),
+            run(root_a, &other_session),
+            "under a fixed root the session key must not touch derived slots"
+        );
     }
 
     #[test]

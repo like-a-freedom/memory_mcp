@@ -7,6 +7,7 @@ pub mod fs_watch;
 mod helpers;
 mod lifecycle;
 pub(crate) mod ner;
+pub mod secrets;
 mod surreal;
 mod target;
 
