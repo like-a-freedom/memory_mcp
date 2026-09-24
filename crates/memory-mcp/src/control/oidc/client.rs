@@ -429,6 +429,30 @@ mod tests {
         ));
     }
 
+    /// `jsonwebtoken` 11 verifies signatures only when the build enables
+    /// exactly one crypto-provider feature (`rust_crypto` or `aws_lc_rs`);
+    /// with neither, `decode` panics instead of returning — under the release
+    /// profile's `panic = "abort"` that killed the whole process on the first
+    /// OIDC callback. This pins the wiring: a valid RS256 token fed through
+    /// the production JWKS path (`from_rsa_components`) must verify.
+    #[test]
+    fn signature_verification_decodes_a_valid_rs256_token() {
+        use jsonwebtoken::{Algorithm, DecodingKey, Validation, decode};
+
+        const N: &str = "jFDolAoizo_h2RyMsAYYCP0yJsg_oEZNlRDkY41tS23Ns0KH9xo0S2x26YSOzro5PjByxjuxPUczAKfjT5a8fCnqzGWZzetcpunRTD1GNqa0yoojJlWpIMSQsPBwkpPdZxlzokcKpWZT_zuSSQPitxW1JQeLs6mXdkEduHv5xnxuSs6YA4usiWjqCAprMf7QGl_y_NIjmZ3fOzqRfo8sZmV-5C9lrKtVnk28DtuFS6tjuZgNULCRWSQtek0JVfKs0D2_yrfyBoUKTDGggMAN3ytVokl3xwA2U9CCiIP2iNQoR-6lU0c78IPWksBWTWMt0LMtNZtu412Ur1c4EaS71w";
+        const E: &str = "AQAB";
+        const TOKEN: &str = "eyJhbGciOiJSUzI1NiIsImtpZCI6ImZpeHR1cmUta2V5IiwidHlwIjoiSldUIn0.eyJpc3MiOiJodHRwczovL2lkcC5leGFtcGxlLmNvbSIsInN1YiI6ImZpeHR1cmUtdXNlciIsImF1ZCI6Im1lbW9yeS1tY3AiLCJleHAiOjQxMDI0NDQ4MDB9.RQUb1jTpNpHx5geL9PYGUwTtWwsRHWC4SggqOgWB43_vCL8w2Br9qdnjm-icqzvUWXAl6nW-AgXbnjC89682M3wMGlHxggShZeX_rwg-QXu_ZmCkAALFXZKXbvssvqHiP4K4UbuKSbx93RZ2Tzm-I2-64H5EfwMf8o2UaI_hXuH50oH3eKVmEUcLwRqajN7SsYn0d6IKQsYQGNa8MmZvRBGloFdxwLidTh-eQXrsvNZo4Odbr7UhkEWwA0RP1SsVLDmAO9Exk4ptGnJ75j6GlvY1F7ONipYO5EW13n_fYMvfJ0ypkiaK4TWFoZ6Zu7z8rTHqTbY9oJHP8GyMdIIqjw";
+
+        let key = DecodingKey::from_rsa_components(N, E).expect("fixture JWKS key");
+        let mut validation = Validation::new(Algorithm::RS256);
+        validation.set_issuer(&["https://idp.example.com"]);
+        validation.set_audience(&["memory-mcp"]);
+
+        let token = decode::<serde_json::Value>(TOKEN, &key, &validation)
+            .expect("RS256 signature verification must work");
+        assert_eq!(token.claims["sub"], serde_json::json!("fixture-user"));
+    }
+
     /// An explicit `MEMORY_MCP_HTTP_OIDC_ALLOWED_ALG` stays a single pin, no
     /// matter what the provider advertises.
     #[test]

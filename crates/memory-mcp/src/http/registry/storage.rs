@@ -174,6 +174,18 @@ pub trait RegistryStore: Send + Sync + 'static {
         audit: &IdentityAudit,
     ) -> Result<(), MemoryError>;
 
+    /// Replace an Account's single linked identity with a newly attested one
+    /// (identity-invitation remediation, ADR-0057). The removal and the
+    /// addition share one guarded change with both audit rows, so the Account
+    /// never has zero identities. Refuses unless the Account holds exactly one
+    /// identity; a replay of the same `(issuer, subject_verifier)` tuple is a
+    /// no-op; a tuple held by another Account is a `Conflict`.
+    async fn replace_external_identity(
+        &self,
+        new_identity: &ExternalIdentity,
+        audit: &IdentityAudit,
+    ) -> Result<(), MemoryError>;
+
     async fn find_api_key(&self, key_id: &str) -> Result<Option<ApiKey>, MemoryError>;
     async fn write_api_key(&self, key: &ApiKey) -> Result<(), MemoryError>;
     async fn list_api_keys(&self, account_id: &str) -> Result<Vec<ApiKeyMeta>, MemoryError>;
@@ -888,6 +900,81 @@ impl RegistryStore for InMemoryStore {
                 account_id,
                 audit,
             ));
+        Ok(())
+    }
+
+    async fn replace_external_identity(
+        &self,
+        new_identity: &ExternalIdentity,
+        audit: &IdentityAudit,
+    ) -> Result<(), MemoryError> {
+        let account_exists = self
+            .accounts
+            .lock()
+            .expect("poisoned")
+            .iter()
+            .any(|account| account.id == new_identity.account_id);
+        if !account_exists {
+            return Err(MemoryError::NotFound(format!(
+                "account {}",
+                new_identity.account_id
+            )));
+        }
+        let mut identities = self.lock_identities();
+        if identities.iter().any(|i| {
+            i.issuer == new_identity.issuer
+                && i.subject_verifier.0 == new_identity.subject_verifier.0
+                && i.account_id != new_identity.account_id
+        }) {
+            return Err(MemoryError::Conflict(format!(
+                "identity tuple ({}, *) already linked",
+                new_identity.issuer
+            )));
+        }
+        let old_id = {
+            let mut held = identities
+                .iter()
+                .filter(|i| i.account_id == new_identity.account_id);
+            match (held.next(), held.next()) {
+                (Some(existing), None)
+                    if existing.issuer == new_identity.issuer
+                        && existing.subject_verifier.0 == new_identity.subject_verifier.0 =>
+                {
+                    // Idempotent replay of the same attested tuple.
+                    return Ok(());
+                }
+                (Some(existing), None) => existing.id.clone(),
+                _ => {
+                    return Err(MemoryError::Conflict(
+                        "replace requires exactly one existing identity".into(),
+                    ));
+                }
+            }
+        };
+        if identities.iter().any(|i| i.id == new_identity.id) {
+            return Err(MemoryError::Conflict(format!(
+                "identity {} already exists",
+                new_identity.id
+            )));
+        }
+        identities.retain(|i| i.id != old_id);
+        identities.push(new_identity.clone());
+        drop(identities);
+        // Both rows land with the swap: the removal and the addition describe
+        // one change (ADR-0057).
+        let mut audit_events = self.lock_audit_events();
+        audit_events.push(ControlAuditEvent::identity_change(
+            IdentityAuditAction::Unlinked,
+            &old_id,
+            &new_identity.account_id,
+            audit,
+        ));
+        audit_events.push(ControlAuditEvent::identity_change(
+            IdentityAuditAction::Linked,
+            &new_identity.id,
+            &new_identity.account_id,
+            audit,
+        ));
         Ok(())
     }
 
@@ -2132,6 +2219,191 @@ mod tests {
         };
         let res = s.create_account_bundle(&account, &tenant, None).await;
         assert!(matches!(res, Err(MemoryError::Validation(_))));
+    }
+
+    /// Invitation remediation: an administrator may replace a mis-bound
+    /// single identity through a new attested round trip. The swap is one
+    /// guarded change — the Account never has zero identities and both audit
+    /// rows (unlink + link) commit together with it (ADR-0057).
+    #[tokio::test]
+    async fn replace_external_identity_swaps_the_single_identity_atomically() {
+        let s = InMemoryStore::default();
+        s.write_account(&Account {
+            id: "acct_a".into(),
+            status: AccountStatus::Active,
+            tenant_id: "ten_a".into(),
+            created_at: chrono::Utc::now(),
+        })
+        .await
+        .unwrap();
+        let old = ExternalIdentity {
+            id: "idn_old".into(),
+            issuer: "https://issuer".into(),
+            subject_verifier: SubjectVerifier([0x01u8; 32]),
+            account_id: "acct_a".into(),
+            created_at: chrono::Utc::now(),
+        };
+        s.link_external_identity(
+            &old,
+            &IdentityAudit::by_account("acct_a", chrono::Utc::now()),
+        )
+        .await
+        .unwrap();
+        let new = ExternalIdentity {
+            id: "idn_new".into(),
+            issuer: "https://issuer".into(),
+            subject_verifier: SubjectVerifier([0x02u8; 32]),
+            account_id: "acct_a".into(),
+            created_at: chrono::Utc::now(),
+        };
+        s.replace_external_identity(
+            &new,
+            &IdentityAudit::by_operator("admin_root", chrono::Utc::now()),
+        )
+        .await
+        .expect("replace the mis-bound identity");
+
+        let held = s.find_external_identities("acct_a").await.unwrap();
+        assert_eq!(held.len(), 1, "the Account never has zero identities");
+        assert_eq!(held[0].id, "idn_new");
+    }
+
+    #[tokio::test]
+    async fn replace_external_identity_requires_exactly_one_existing_identity() {
+        let s = InMemoryStore::default();
+        s.write_account(&Account {
+            id: "acct_a".into(),
+            status: AccountStatus::Active,
+            tenant_id: "ten_a".into(),
+            created_at: chrono::Utc::now(),
+        })
+        .await
+        .unwrap();
+        let new = ExternalIdentity {
+            id: "idn_new".into(),
+            issuer: "https://issuer".into(),
+            subject_verifier: SubjectVerifier([0x02u8; 32]),
+            account_id: "acct_a".into(),
+            created_at: chrono::Utc::now(),
+        };
+        // No identity yet: an invitation is `add`, not `replace`.
+        let res = s
+            .replace_external_identity(
+                &new,
+                &IdentityAudit::by_operator("admin_root", chrono::Utc::now()),
+            )
+            .await;
+        assert!(matches!(res, Err(MemoryError::Conflict(_))));
+
+        for id in ["idn_one", "idn_two"] {
+            let held = ExternalIdentity {
+                id: id.into(),
+                issuer: "https://issuer".into(),
+                subject_verifier: SubjectVerifier([id.as_bytes()[id.len() - 1]; 32]),
+                account_id: "acct_a".into(),
+                created_at: chrono::Utc::now(),
+            };
+            s.link_external_identity(
+                &held,
+                &IdentityAudit::by_account("acct_a", chrono::Utc::now()),
+            )
+            .await
+            .unwrap();
+        }
+        // Two identities: which one would be replaced is ambiguous.
+        let res = s
+            .replace_external_identity(
+                &new,
+                &IdentityAudit::by_operator("admin_root", chrono::Utc::now()),
+            )
+            .await;
+        assert!(matches!(res, Err(MemoryError::Conflict(_))));
+    }
+
+    #[tokio::test]
+    async fn replace_external_identity_refuses_a_tuple_held_by_another_account() {
+        let s = InMemoryStore::default();
+        for (id, tenant_id) in [("acct_a", "ten_a"), ("acct_b", "ten_b")] {
+            s.write_account(&Account {
+                id: id.into(),
+                status: AccountStatus::Active,
+                tenant_id: tenant_id.into(),
+                created_at: chrono::Utc::now(),
+            })
+            .await
+            .unwrap();
+        }
+        let sv = SubjectVerifier([0x42u8; 32]);
+        let held = ExternalIdentity {
+            id: "idn_a".into(),
+            issuer: "https://issuer".into(),
+            subject_verifier: sv.clone(),
+            account_id: "acct_a".into(),
+            created_at: chrono::Utc::now(),
+        };
+        s.link_external_identity(
+            &held,
+            &IdentityAudit::by_account("acct_a", chrono::Utc::now()),
+        )
+        .await
+        .unwrap();
+        let stolen = ExternalIdentity {
+            id: "idn_b".into(),
+            issuer: "https://issuer".into(),
+            subject_verifier: sv,
+            account_id: "acct_b".into(),
+            created_at: chrono::Utc::now(),
+        };
+        let res = s
+            .replace_external_identity(
+                &stolen,
+                &IdentityAudit::by_operator("admin_root", chrono::Utc::now()),
+            )
+            .await;
+        assert!(matches!(res, Err(MemoryError::Conflict(_))));
+    }
+
+    #[tokio::test]
+    async fn replace_external_identity_is_idempotent_for_the_same_tuple() {
+        let s = InMemoryStore::default();
+        s.write_account(&Account {
+            id: "acct_a".into(),
+            status: AccountStatus::Active,
+            tenant_id: "ten_a".into(),
+            created_at: chrono::Utc::now(),
+        })
+        .await
+        .unwrap();
+        let sv = SubjectVerifier([0x07u8; 32]);
+        let held = ExternalIdentity {
+            id: "idn_same".into(),
+            issuer: "https://issuer".into(),
+            subject_verifier: sv.clone(),
+            account_id: "acct_a".into(),
+            created_at: chrono::Utc::now(),
+        };
+        s.link_external_identity(
+            &held,
+            &IdentityAudit::by_account("acct_a", chrono::Utc::now()),
+        )
+        .await
+        .unwrap();
+        let replay = ExternalIdentity {
+            id: "idn_other".into(),
+            issuer: "https://issuer".into(),
+            subject_verifier: sv,
+            account_id: "acct_a".into(),
+            created_at: chrono::Utc::now(),
+        };
+        s.replace_external_identity(
+            &replay,
+            &IdentityAudit::by_operator("admin_root", chrono::Utc::now()),
+        )
+        .await
+        .expect("the same tuple is a no-op, not a conflict");
+        let held = s.find_external_identities("acct_a").await.unwrap();
+        assert_eq!(held.len(), 1);
+        assert_eq!(held[0].id, "idn_same", "the held identity stays as is");
     }
 
     #[tokio::test]
