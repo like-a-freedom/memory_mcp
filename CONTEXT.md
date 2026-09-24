@@ -24,12 +24,15 @@ in ADR-0016.
 
 ## Module seams
 
-> Reorganizing into bounded contexts per **ADR-0058** (`identity`, `tenancy`,
-> `provisioning`, `operations`, `memory`, `knowledge`, `embedding`, `shared`;
-> console delivery is the layer-free `ui` adapter, not a context).
-> The map below describes the pre-0058 layout and stays authoritative until
-> each context lands; the target contract (layers inside contexts, `api`
-> facades, source-guard enforcement) lives in the ADR and its spec.
+> Target reorganization per **ADR-0058**: `identity`, `tenancy`,
+> `provisioning`, `operations`, `memory`, `knowledge`, and the technical
+> `embedding` capability; a small pure `shared` kernel is separate from
+> technical `platform` and privileged `bootstrap` wiring. Console delivery
+> remains the layer-free `ui` adapter. These names are not all aggregates.
+> The map below describes the current pre-0058 layout and remains authoritative
+> until implementation lands. The target ownership, transaction boundaries,
+> acyclic API graph and enforcement contract live in the ADR/spec; an accepted
+> design does not mean runtime switches or package names have already changed.
 
 - `src/models/` — domain values and typed records.
 - `src/service/agent_memory/` — internal lifecycle orchestration (policy,
@@ -221,11 +224,11 @@ The request-scoped server identity produced by successful credential verificatio
 _Avoid_: Access token, transport session, namespace parameter
 
 **Control plane**:
-The SaaS subsystem that owns Accounts, External Identities, tenancy bindings, provisioning state and operator commands — as opposed to the data plane (MCP capability surface) and as opposed to the operator console that renders it. The term names the subsystem; it is never a package or artifact name. It is present exactly in the SaaS profile and has no runtime off-switch (ADR-0058).
-_Avoid_: control-panel, admin app, `control-plane-ui` (former package name)
+The SaaS subsystem responsible for Accounts, External Identities, tenancy bindings, provisioning state and operator commands. It is distinct from the data plane (MCP capabilities) and the operator console that renders its workflows. It names a subsystem, not one aggregate or one bounded context. ADR-0058 specifies removal of its runtime off-switch; that is a target change until implementation lands.
+_Avoid_: control-panel, admin app, `control-plane-ui` (current package name, not the subsystem name)
 
 **Operator console (`ui`)**:
-The packaged single-page WebAssembly console served under the mount base: sign-in surfaces, client/key administration, operator views. Package and binary are named `ui`; its emitted assets are `ui-*.js` / `ui_bg-*.wasm`. Formerly packaged as `control-plane-ui` (renamed by ADR-0058).
+The browser interface for sign-in, client/key administration and operator workflows. It renders control-plane capabilities and does not own their business rules. ADR-0058 targets the package/binary name `ui` in place of the current `control-plane-ui`; build and asset details are specified there.
 _Avoid_: control-plane UI, dashboard, frontend of control
 
 **Control Plane Session**:
@@ -233,7 +236,7 @@ A short-lived server-side browser session created after successful login — OID
 _Avoid_: App Session, MCP session, API key, browser token
 
 **Browser Authentication Method**:
-One way a browser signs in, currently either an External Identity at an OIDC provider or a Local Administrator password. The control plane (always present in the SaaS profile since ADR-0058; compiled out entirely in the local profile — no runtime switch disables it) serves a *set* of methods and mounts each enabled method's routes; that set is durable deployment state, and a replica joining with a drifted set or drifted local key material fails closed instead of adopting it. Which mounted routes are externally reachable is reverse-proxy policy. Adding a method is configuration reconciled at startup, while removing one is an explicit, audited operator command guarded by the Last-Administrator Rule — never a console action, because the configuration is what declares the set. A method is never implied by another method's absence.
+One way a browser signs in, currently either an External Identity at an OIDC provider or a Local Administrator password. The control plane serves a *set* of methods and mounts each enabled method's routes; that set is durable deployment state, and a replica joining with a drifted set or drifted local key material fails closed instead of adopting it. External route exposure does not replace server-side authentication or authorization. Adding a method is configuration reconciled at startup, while removing one is an explicit, audited operator command guarded by the Last-Administrator Rule — never a console action, because the configuration is what declares the set. A method is never implied by another method's absence.
 _Avoid_: single mode, either/or login, provider list, per-request mode, automatic fallback
 
 **Last-Administrator Rule**:
@@ -362,7 +365,7 @@ temporal change, and disagreement between sources.
 ### Vocabulary
 
 **Active Namespace**:
-The single native SurrealDB namespace selected for one Memory MCP server process. All memory operations in that process use it implicitly; `main` is selected when no override is configured. This is the implemented runtime language from ADR-0038; compatibility work for historical records and the remaining release gates is tracked in the one-active-namespace plan.
+The single native SurrealDB namespace selected for one local stdio Memory MCP process, as defined above. All local memory operations use it implicitly; `main` is selected without an override. In SaaS, use Tenant Namespace and Tenant Runtime instead: one process can host several independently bound runtimes. Neither model accepts namespace selection through data-plane arguments.
 _Avoid_: Scope, project, collection, basket, tenant, vault, default namespace
 
 **Fact**:

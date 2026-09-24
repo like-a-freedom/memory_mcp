@@ -1,127 +1,256 @@
 # DDD Modular Monolith — design spec
 
-**Date:** 2026-09-23
-**Status:** Agreed in grill-with-docs design interview (all frontier decisions settled); ready for planning
-**Plan:** `docs/superpowers/plans/2026-09-23-ddd-modular-monolith.md`
-**ADR:** `docs/adr/0058-bounded-contexts-modular-monolith.md`
+**Date:** 2026-09-23; architecture review: 2026-09-24
+**Status:** Accepted direction; strengthened design contract. Phase 0 evidence is required before structural extraction.
+**Baseline reviewed:** `5bcb2bf3309ecebf71417c5ab2576e6cca0ca4ee` (`ddd-refactorings`).
+**Plan:** [implementation plan](../plans/2026-09-23-ddd-modular-monolith.md)
+**ADR:** [ADR-0058](../../adr/0058-bounded-contexts-modular-monolith.md)
 
-## Context
+## Context and retained decisions
 
-The domain model is already written down and crisp — `CONTEXT.md` defines Account,
-External Identity, Tenant, Tenant Namespace, Tenant Registry, Tenant Runtime,
-Account API Key, Authenticated Principal, Browser Auth Method as separate
-aggregates with explicit isolation rules. The code does not express that model:
-the SaaS side is a `control/` grab-bag of 20+ modules (`oidc`, `local_admin`,
-`account_api`, `leases`, `session`, `registry`, `tasks`, …) where accounts,
-tenancy, provisioning and delivery concerns sit side by side, and `service/` +
-`storage/` form a second, parallel universe (the memory domain) outside any
-shared structural contract.
+The current `control/`, `service/`, and `storage/` organization mixes policies,
+use cases, database access and delivery. The objective is explicit ownership
+and inward dependencies, not a directory rename or a trait around every method.
+A glossary term is not automatically an aggregate or a bounded context:
+Authenticated Principal is an authentication result; Tenant Runtime is a
+runtime resource; Tenant Registry is a control-plane persistence capability.
 
-The trigger was a rename request: the package `control-plane-ui` produces ugly
-outward asset names (`/memory/assets/control-plane-ui-dxh8e6d38ccf6ed368.js`).
-The interview escalated correctly: the name is ugly because it names a *layer*
-("control plane UI") instead of a thing. Renaming alone would hide the symptom;
-the cure is making the code's structure match the glossary, then naming the
-console for what it is.
+Retain the agreed scope: one coordinated initiative covers the full monolith,
+contexts outside and layers inside, one production library crate, console
+package rename to `ui`, and removal of both runtime product-shape switches.
+The initiative is implemented as buildable commits on the branch and released
+as one coherent change. Intermediate extraction is not an independently
+supported product architecture. No microservices, per-context crates, new MCP
+tools, generic event bus, distributed transaction framework or repository
+framework are introduced.
 
-Operator decisions (settled across three interview rounds):
+The seven names below are **module boundaries with different roles**. The
+business boundaries are working hypotheses verified against invariants and
+transactions in Phase 0; embedding and operational orchestration must not be
+presented as seven equally rich business domains. Empty domain layers are not
+required for modules that contain no domain policy.
 
-1. **Big bang**: one initiative — bounded contexts + clean architecture +
-   rename. Not split.
-2. **Full scope**: the memory domain (`service/`, `storage/`) is reworked too.
-   "Clean architecture over half the monolith" was explicitly rejected: two
-   competing dependency contracts in one crate are worse than either extreme.
-3. **Contexts outside, layers inside**: `src/<context>/{domain, application,
-   infra}` per context (variant A), not layers-outside/contexts-inside and not
-   flat folders with facades only.
-4. **Boundaries are enforced**, not decorative: per-context `api` facade +
-   source-guard tests in the repo's existing pin-test style.
-5. **Modules in one crate** (modular monolith): context crates are YAGNI for
-   one deployable and the one-Active-Namespace invariant (ADR-0038).
-6. **Rename**: package/binary `control-plane-ui` → `ui`; internal names follow
-   (`ui` feature, `ui_assets.rs`, `MEMORY_MCP_UI_DIST`; no successor enable
-   flag — the UI off-switch is removed entirely).
-   Historical documents (ADRs, past specs/plans) stay verbatim.
-7. **No runtime product-shape knobs** (creator ruling, review round 4): both
-   runtime switches are deleted — `MEMORY_MCP_HTTP_ENABLE_CONTROL_PLANE_UI`
-   and `MEMORY_MCP_HTTP_ENABLE_CONTROL_PLANE` — retiring the data-plane-only
-   runtime mode. The build profile is the single product-shape axis:
-   `streamable-http` = data plane + control plane + console as **one product**;
-   local = standalone stdio memory. Route exposure is reverse-proxy policy.
-8. **Behavior freeze**: apart from the four declared changes below, this is
-   strictly structural.
+## Ownership and context map
 
-## Target architecture
-
-### Bounded contexts (top level under `crates/memory-mcp/src/`)
-
-| Context | Owns (aggregates from CONTEXT.md) | Sourced from today |
+| Module | Responsibility and invariant | Explicit exclusions |
 |---|---|---|
-| `identity` | Account, External Identity, Browser Authentication Method, Local Administrator, Control Plane Session (incl. its cookie/CSRF hardening), principal resolution | `control/{account_api.rs (auth part), oidc.rs, oidc/, local_admin.rs, local_admin/, session.rs, recent_auth.rs, secret.rs, csrf.rs}`, `control/application/{oidc_signup.rs}`, `service/{local_admin/, credential_material.rs}`, `http/{oauth.rs, principal/, principal.rs}` |
-| `tenancy` | Tenant, Tenant Namespace binding, Tenant Registry, Tenant Runtime | `http/{registry/, registry.rs, runtime/, runtime.rs, sync.rs}`, namespace-selection parts of `service/` |
-| `provisioning` | Client, Account API Key, Lease, App Session, provisioning tasks | `http/{leases/, leases.rs, tasks/, tasks.rs, app_sessions/, app_sessions.rs}`, `control/application/api_keys.rs`, `service/{apps/, apps.rs}`, `control/account_api.rs` (client/key administration part) |
-| `operations` | operator commands, deletion/recovery | `control/{operator.rs, deletion.rs}` |
-| `memory` | Episode, recall/assembly, ingestion, agent-memory lifecycle, explain, procedural memory (candidates, ranking, review) | `service/{episode/, episode.rs, context/, capabilities/, capabilities.rs, agent_memory/, lifecycle/, lifecycle.rs, core/, core.rs, procedures/, procedures.rs, ingestion.rs, explanation.rs}` |
-| `knowledge` | Entity, Fact, Claim (bi-temporal), claim reconciliation, aliases, content/entity extraction, triples, inbox revisions, search | `service/{fact.rs, entity.rs, entity_resolution.rs, claims/, conflict_resolver.rs, community.rs, content_extraction/, content_extraction.rs, entity_extraction/, entity_extraction.rs, triple_extractor.rs, query/, query.rs}` |
-| `embedding` (platform context) | embedding generation and caching, embedding recovery/backfill, model artifacts and runtimes, re-embedding jobs | `service/{embedding/, embedding.rs, embedding_service.rs, embedding_recovery.rs, embedding_runtime.rs, model_artifacts/, model_artifacts.rs, model_artifact_refresh.rs, model_loader.rs, model_runtime.rs, cache/, cache.rs, reembed.rs, reembed_options.rs, reembed_progress.rs}` |
-| `shared` | kernel: errors, typed ids/records, `ServiceContext`-shaped ports, SurrealDB connection and migrations, the bi-temporal close protocol | `models/`, `error.rs`, `control/error.rs`, config value types and parsing (root `config.rs` + `config/`, `http/config.rs` + `http/config/`), `service/{service_context.rs, util/, util.rs, value_helpers.rs, durable_work.rs}`, `storage/{client.rs, migrations.rs, close.rs, helpers.rs, queries.rs, types.rs}` |
+| `identity` | Accounts, external links, local administrators, credential verification, browser-session lifecycle, auth-method policy and last-administrator rule. An external identity is linked only after proof; a credential is never a namespace selector. | Tenant activation, client provisioning workflow, HTTP cookies/headers, SQL |
+| `tenancy` | Account-to-Tenant binding, readiness and immutable namespace binding; bounded runtime acquisition/eviction. Trusted resolution selects one runtime for one tenant. | Account authentication, global service locator, constructing memory services in application code |
+| `provisioning` | Client/account/tenant provisioning orchestration, API-key issuance/revocation administration, provisioning leases; tenant task and app-session workflow submodules. Preserve durable state transitions, lease fencing and command idempotency. | Owning every table touched by an app; implementing fact/entity writes or credential verification a second time |
+| `operations` | Authorized administrative deletion/recovery orchestration over the owning modules. Preserve recent-auth checks, confirmation and durable deletion stages. | A second implementation of identity rules, a generic privileged database API |
+| `memory` | Episode ingestion, recall/assembly, explanation, lifecycle and procedures. Source episodes and provenance survive derived-knowledge changes. | SQL over another module's canonical tables, shared service container |
+| `knowledge` | Entities, aliases, facts, claims, triples, communities, extraction/reconciliation and knowledge queries. Distinguish contradiction, correction, supersession and retraction. | Transport DTOs, episode lifecycle ownership, model runtime management |
+| `embedding` | Technical capability: embeddings, cache, model artifacts/runtime, recovery/backfill and re-embedding. Own model/version/dimension consistency and job state. | Owning facts, claims or episodes because their vectors need updating |
 
-Transports stay outer adapters at their current seams: `http/` (router, server,
-transport, health, metrics, logging, composition, shutdown, validation,
-`middleware/`, fault_injection, test harnesses — and the `subscriptions/listen`
-stream machinery of `http/{subscriptions/, subscriptions.rs}`, whose
-Tenant-Runtime dependencies go through `tenancy::api`), `mcp/`, `cli/`,
-`tools/` (the MCP/CLI-shared adapter; its delegation targets become
-`memory::api` / `knowledge::api`), and `ui/` — the console-delivery adapter
-(`control/static_assets.rs` moves here: embedded-bundle serving and the
-base-stamping contract). `ui/` is deliberately **layer-free**: it is delivery
-plumbing for `crates/ui`'s bundle, not a domain, and inventing
-`domain/application/infra` for it would be the DDD theater this rework
-exists to remove. `bin/` stays the composition root. Platform modules stay at
-the root unchanged: `logging.rs`, `observability.rs`, `runner.rs`,
-`eval_support.rs`, `service/{startup.rs, fs_watch/, fs_watch.rs}`
-(composition glue and the filesystem-ingestion input adapter),
-`service/mock_db.rs` (test support), `main.rs`, `lib.rs`.
+`provisioning` retains tasks/app sessions as cohesive submodules for this
+initiative, not as a claim that an MCP App Session is a client-provisioning
+aggregate. Its workflow methods call memory/knowledge capabilities; task state
+and leases are not domain entities of identity. Split this module later only
+with demonstrated independent invariants/change pressure.
 
-`storage/` dissolves into per-context `infra` by store:
-`{episode_store.rs, agent_memory.rs, procedures.rs}` → `memory::infra`;
-`{fact_store.rs, entity_store.rs, triple_store.rs, claims.rs,
-inbox_revision_store.rs}` → `knowledge::infra`;
-`{app_store.rs, context_store.rs}` → `provisioning::infra`;
-`{embedding_backfill_store.rs, embedding_state_store.rs, reembed_store.rs}` →
-`embedding::infra`; `{client.rs, migrations.rs, close.rs, helpers.rs,
-queries.rs, types.rs}` → `shared` kernel infra. Module roots
-(`control.rs`, `http.rs`, `service.rs`, `storage.rs`, `models.rs`, `tools.rs`,
-`mcp.rs`, and per-tree submodule roots) dissolve as their content moves.
+### Directed dependencies
 
-**Census rule (completeness contract):** every top-level unit of
-`crates/memory-mcp/src/` **and every file of the dissolving trees** (`control/`,
-`service/`, `storage/`) has exactly one home — a context row, the
-transport/platform residual list, or the `storage/` split above. Any move not
-covered by census is a spec bug and must amend this section before it lands.
+Allowed **static business-module dependencies** (consumer → provider API):
 
-### Layout and dependency rules (the contract)
+- `operations` → `identity`, `tenancy`, `provisioning`.
+- `provisioning` → `identity`, `tenancy`, `memory`, `knowledge`.
+- `memory` → `knowledge`, `embedding`.
+- `knowledge` → `embedding`.
+- `identity`, `tenancy`, `embedding` have no outgoing business-context edges.
 
+This is an allowlist, not a requirement to use every edge. Cross-module calls
+use provider `api` commands/queries and data-only contracts. No reverse static
+dependency or static API cycle is permitted. For example, identity verifies a credential;
+the outer request pipeline then asks tenancy to resolve its account. Identity
+does not load a Tenant Runtime. Knowledge receives source evidence/episode IDs
+as input and never calls memory back to fetch them.
+
+Infrastructure integration may implement a **consumer-owned port** using a
+provider facade (e.g. tenancy's runtime factory builds a memory runtime).
+Such adapters live in `bootstrap/integration/`, are wired once, and are listed
+separately from business edges. The guard checks the static module DAG and
+these exact integration edges separately; implementing a port is not a blanket
+cycle exemption. Enumerate the runtime paths as well:
+
+- Tenancy runtime acquisition → injected factory → memory runtime construction;
+  that constructor must not acquire the same tenant runtime again.
+- Embedding recovery/re-embedding job → injected canonical-record vector port
+  → knowledge or memory vector read/update endpoint. These endpoints only read
+  the required source/version data or persist the already-computed vector under
+  the existing concurrency/event contract; they must not call embedding again.
+  Record-owner application paths may independently request embedding generation.
+
+Thus a reverse runtime callback through a consumer-owned port is permitted
+without a reverse static business dependency, but recursive orchestration is
+not. Check integration paths with behavior tests in addition to source guards.
+Passing `Arc<ServiceContext>` or a namespace-selecting database handle across
+an API is not dependency inversion.
+
+### Aggregates, ports and consistency boundaries
+
+Each command names an invariant owner, authorized actor, commit boundary and
+failure/retry result. An aggregate is the consistency boundary established by
+those rules, not an entire directory. Phase 0 must identify actual persisted
+records participating in the following operations before moving stores:
+
+| Operation | Policy/use-case owner | Required preservation |
+|---|---|---|
+| Account + identity + tenant creation | `provisioning`, with identity/tenancy validation | Existing `create_account_bundle` remains one atomic operation; no sequential facade writes that can leave half a client |
+| Identity links, auth methods, local admin/session changes | `identity` | Last-link/last-admin checks and mutation + control audit commit together; failed checks leave no audit of a successful change |
+| API-key administration | `provisioning`, verification contract owned by `identity` | Issuance secret shown once, irreversible verifier, revocation/cache semantics preserved; no duplicate verifier policy |
+| Begin/finalize account/operator deletion | `operations` | Preserve existing atomic registry methods and durable recovery state; tenant purge is not ordinary fact invalidation |
+| Tenant task / app command | `provisioning` | Lease generation, cancellation, terminal result and durable change-event rules survive restart and replica races |
+| Fact retraction, claims and temporal close | `knowledge` | Preserve paired timestamps, source facts, atomic retraction scope and existing event commit |
+| Episode capture / projection work | `memory` | Preserve deduplication identity, durable pending work and retry behavior |
+
+The physical control database is shared; **logical write ownership is not**.
+Existing cross-module registry transactions are an explicit integration seam:
+`platform/persistence/control/` implements narrow use-case-owned atomic ports
+and composes private SQL fragments under one database transaction. Each port
+is published through its owner's API for wiring only; applications cannot
+get a raw transaction or `query(sql)` escape hatch. Cross-owner writes are
+limited to the named operations above and recorded in the ownership manifest.
+This seam depends on published contracts, never context internals. It does
+not become a universal registry/service object. Ordinary stores remain in
+their owner's `infra`.
+
+Preserve existing synchronous/atomic and asynchronous behavior separately.
+Do not introduce an outbox everywhere, eventual consistency, retries of
+non-idempotent commands, or a saga merely to make a diagram acyclic. Existing
+outbox, lease and recovery protocols are retained with failure-injection
+checks. If the existing transaction cannot be preserved under a proposed
+split, revise that split before implementation.
+
+## Clean architecture contract
+
+```text
+src/<module>/
+  mod.rs        # private internals, explicit facade exports
+  api.rs        # commands, queries, data contracts, minimal wiring ports
+  domain/       # pure policies/value objects, only when needed
+  application/  # use cases, consumer-owned ports
+  infra/        # persistence/provider implementations
+src/shared/     # small pure kernel only
+src/platform/   # technical mechanisms; no business orchestration
+src/bootstrap/  # composition and narrowly named integration adapters
+src/{http,mcp,cli,tools,ui}/  # input/output protocol adapters
 ```
-src/<context>/
-  api.rs        # the ONLY cross-context entry point (pub(crate) facade)
-  domain/       # pure: entities, value objects, policies. No async runtime,
-                # no axum, no surrealdb, no other context's types except shared
-  application/  # use cases / workflows; depends on own domain + own ports (traits)
-  infra/        # port implementations: SurrealDB stores, KDF, clocks
-```
 
-| From ↓ / To → | own `domain` | own `application` | own `infra` | other ctx `api` | other ctx internals | `shared` | axum/surrealdb |
-|---|---|---|---|---|---|---|---|
-| `domain` | ✅ | ❌ | ❌ | ❌ | ❌ | ✅ | ❌ |
-| `application` | ✅ | ✅ | via ports only | ✅ | ❌ | ✅ | ❌ |
-| `infra` | ✅ | ✅ | ✅ | ✅ | ❌ | ✅ | ✅ |
-| transports (`http`,`mcp`,`cli`,`tools`,`bin`) | ❌ | via `<ctx>::api` only | ❌ | ✅ | ❌ | ✅ | ✅ |
+| Caller | Allowed dependencies |
+|---|---|
+| Domain | Own domain and explicitly approved pure kernel types; no other module, application, infra, runtime, environment, filesystem, network, SQL or HTTP |
+| Application | Own domain/ports, pure kernel, approved provider `api`; no concrete stores or platform/runtime/config parsing |
+| API | Own application and deliberately exported data contracts/ports; no infra re-exports, handlers, database rows, router/state bags |
+| Infra | Own ports/domain, pure kernel and specific platform mechanisms; another provider API only through an approved integration adapter |
+| HTTP/MCP/CLI/tools/UI | Module APIs, protocol/runtime libraries and adapter utilities; never module internals or raw storage |
+| Bootstrap | Explicit context factories, constructors/ports, platform adapters, validated configuration and integration wiring; no business decisions |
+| Platform | Technical dependencies and pure kernel; the named control-transaction adapter may import published owner contracts only |
 
-Enforcement: `crates/memory-mcp/tests/module_boundaries.rs` — source-pin tests
-in the existing style (`admin_api.rs`'s constructor guard; `test_ui_bundle_pin.py`
-for the Dockerfile). One assertion group per rule row: scan each context's
-source files for forbidden `use` paths and forbidden crate deps per layer.
+Composition is an explicit exception to the request-adapter rule. A context
+may expose `wiring` factories that internally construct its private infra;
+only bootstrap may call them. `main.rs` and `bin/memory_mcp_http.rs` remain
+thin dispatchers into public library bootstrap entrypoints. Rust binaries,
+integration tests and `eval-harness` are separate crates: `pub(crate)` APIs
+alone cannot serve them. Inventory their existing public imports; retain
+minimal library entrypoints and feature-gated test/eval facades rather than
+making all context internals public. Existing external Rust compatibility
+paths, if needed, are one-way delegating re-exports with no new internal users;
+their removal is not silently included in the four declared changes.
+
+### Pure kernel versus technical platform
+
+`shared` may contain runtime/storage-independent `MemoryError` variants, common
+validated identifiers and temporal value semantics. It cannot contain the
+whole `models/` tree, `ServiceContext`, registry, database client, SQL, config
+parser, global cache or worker runtime. Context-owned models stay with their
+owner; API DTOs do not expose mutable aggregates. Reuse a pure value only
+when both sides share its meaning, not because fields look alike.
+
+Split current seams by responsibility:
+
+- `ServiceContext` becomes explicit per-use-case dependencies with no service
+  lookup, concrete stores or table names in application code.
+- `DbClient`, connection pooling, migration runners and reusable transaction
+  mechanics belong to `platform/persistence`; only infra/bootstrap use them.
+  Keep migration SQL/order/checksums unchanged; moving generated/migration
+  files still requires the repository's explicit approval.
+- `storage/queries.rs`, record parsing and database-specific value helpers
+  split by owning query/store. `close.rs` policy and fact/claim close operations
+  belong to knowledge; common timestamp value semantics can be pure kernel.
+- `error.rs`'s pure error enum can remain shared; database error classification
+  goes to persistence. `control/error.rs` maps HTTP responses and stays in
+  `http`, never the shared kernel.
+- Environment parsing/secret loading belongs to bootstrap configuration;
+  use cases receive typed values, never read environment variables themselves.
+- `durable_work.rs` backoff/cancellation mechanics and model/download runtime
+  are technical facilities, not business aggregates. Share mechanisms without
+  sharing unrelated lease or retry policies accidentally.
+
+### DRY, SOLID, KISS and YAGNI acceptance
+
+One owner per business rule and canonical write path (SRP/DRY). Ports follow
+use-case needs, not a universal CRUD repository (ISP/DIP). In-memory and durable
+adapters obey the same error, atomicity and ordering contract; fakes must not
+make impossible partial writes pass (LSP). Extend an established provider seam
+when needed; do not invent plugin registries for hypothetical providers (OCP).
+Use direct pure functions and concrete domain types where a trait adds no
+boundary. Do not create one trait per struct, empty layers, generic units of
+work, a mediator or an event bus. Similar DTOs in different contexts are not
+necessarily duplicate policy. Preserve the existing single temporal-close
+implementation while moving it to the correct owner.
+
+### Mechanical enforcement
+
+Use Rust privacy first: private `domain`, `application`, `infra` modules;
+expose only named API/wiring items. `pub(crate)` is crate-wide visibility, not
+a context wall. Restrict internal items to the context ancestor where needed.
+Source guards supplement compiler privacy; they do not prove architectural
+correctness or authorization.
+
+`tests/module_boundaries.rs` must cover layer imports, API exports/signatures,
+fully qualified paths, grouped/aliased imports, `crate`/`self`/`super` paths,
+re-exports and the allowed dependency graph including cycle detection. Cover
+feature-gated code, `#[path]`/`include!` and macro-based bypasses by an explicit
+reviewed policy; do not claim a `use` substring scan resolves Rust semantics.
+Use existing parsing facilities or a constrained guard plus compiler checks;
+new dependencies require approval. Add negative fixtures for each forbidden
+class and positive fixtures for bootstrap/test/eval exceptions. A checker
+that passes empty directories is not evidence. New extracted modules must
+have zero violations; legacy exceptions name exact paths/edges and a removal
+phase, never `allow service::*` or a whole-tree exemption.
+
+## Migration inventory and ownership corrections
+
+A prose list of directory globs is not a completed machine census. Phase 0
+produces a checked manifest for every tracked `src` file (and affected tests,
+binaries, build scripts): source → destination(s), symbols when split,
+layer, table/command owner, phase, consumers and exception expiry. A file may
+split; every item ends with exactly one owner. Reject unmapped files and
+unexplained overlaps. Module roots contain behavior too; never discard a
+`*.rs` file merely because there is also a directory with the same name.
+
+| Source family | Target and required split |
+|---|---|
+| `control/static_assets.rs` | Layer-free `ui` delivery adapter |
+| `control/{operator,deletion}.rs` | HTTP handlers to `http`; administrative workflows to `operations`; registry transactions to the named control persistence seam |
+| `control/{account_api,oidc,local_admin,session,recent_auth,secret,csrf}*`, `control/application/*`, `service/local_admin/*`, `credential_material.rs` | Identity policy/use cases versus provisioning client/key commands; keep cookies, CSRF HTTP checks and request/response mapping in `http`; KDF/OIDC client implementations in identity infra |
+| `http/{oauth,principal}*` | Transport metadata/middleware stays HTTP; credential verification to identity; trusted tenant resolution remains a separate tenancy call |
+| `http/registry*` | Split account/link/session records to identity contracts, tenant binding/readiness to tenancy, client/key/provisioning commands to provisioning; preserve atomic control adapter exceptions |
+| `http/runtime*`, `http/sync.rs` | Tenancy lifecycle/pool; concrete runtime construction to bootstrap integration; protocol concerns remain HTTP |
+| `http/{leases,tasks,app_sessions}*`, `service/apps*` | Provisioning workflow/state; transport parts remain adapters; memory/knowledge actions call owner APIs |
+| `http/subscriptions*` | Stream delivery in HTTP; `outbox.rs` transaction mechanism in platform persistence with owner-owned mutations/events; no infra-to-HTTP dependency |
+| `service/{episode,context,capabilities,agent_memory,lifecycle,core,procedures}*`, `ingestion.rs`, `explanation.rs` | Memory use cases/domain; split extraction/knowledge work, provider wiring, SQL and protocol logging instead of relocating wholesale |
+| `service/{fact,entity,entity_resolution,claims,conflict_resolver,community,content_extraction,entity_extraction,triple_extractor,query}*` | Knowledge policy/use cases and infra as appropriate; model runtime adapters use embedding capability |
+| `service/{embedding*,model_*,cache*,reembed*}` | Embedding technical capability; recall-result cache belongs to memory rather than all cache code automatically going to embedding |
+| `storage/{episode_store,agent_memory,procedures}.rs` | Memory infra |
+| `storage/{fact_store,entity_store,triple_store,claims,inbox_revision_store}.rs` | Knowledge infra; preserve cross-owner inbox/episode transaction behavior explicitly |
+| `storage/context_store.rs` | Memory context-access log and episode reads; knowledge fact/entity/triple queries behind knowledge API. It is not a provisioning store |
+| `storage/app_store.rs` | Split by canonical data owner: knowledge graph/fact/entity/community operations and memory episode/lifecycle operations; app workflow orchestration stays provisioning |
+| `storage/{embedding_backfill_store,embedding_state_store,reembed_store}.rs` | Embedding infra job state; canonical record mutations through owner-owned integration ports |
+| `models*`, `error.rs`, `control/error.rs`, `config*`, `http/config*`, `service/{service_context,util*,value_helpers,durable_work}*`, remaining storage helpers/client/migrations | Split by the pure-kernel/platform rules above, not wholesale into shared |
+| `service/startup.rs`, `service/core/builder.rs` | Bootstrap; no business logic |
+| `service/fs_watch*`, `service/mock_db.rs` | Filesystem input adapter and test support respectively |
+| `logging.rs`, `observability.rs`, `runner.rs`, `eval_support.rs`, `lib.rs`, `main.rs`, `bin/*`, `http*`, `mcp*`, `cli*`, `tools*` and all module roots | Classify actual contents as adapter, bootstrap, platform, test/eval facade or module glue; retained roots for transports do not dissolve just because storage/service roots do |
 
 ### Rename surface (the four declared behavior-visible changes)
 
@@ -151,56 +280,85 @@ content-driven and **not** affected by file names. Cookie contracts, OIDC
 redirects, HTTP routes, the eight-tool MCP surface and the bi-temporal model
 are untouched.
 
-### No runtime product-shape knobs (to-be doctrine)
+### Runtime configuration and deployment
 
-An earlier draft of this spec kept `MEMORY_MCP_HTTP_ENABLE_CONTROL_PLANE`,
-arguing from the shipped implementation (default `false`, "control off" test
-rows, store-level degradation). The creator's ruling overturns that: the
-implementation history is not a design argument. The flag conflated three
-concerns — what is compiled, what is mounted, what is externally reachable —
-and the to-be decomposes them onto three clean axes:
+Removing the two flags is a product decision, **not a requirement of DDD or
+Twelve-Factor**. Auth-method selection, signup policy, quotas, endpoints and
+secrets remain runtime configuration. Cargo features remain additive:
+`streamable-http` is the supported SaaS entrypoint, `default = ["fs-watch"]`
+remains local, and orthogonal features retain their existing meaning. Internal
+compatibility aliases must keep compiling until explicitly retired.
 
-1. **build profile** (`streamable-http` vs local) — which product is compiled;
-   `streamable-http` is *data plane + control plane + console*, one whole
-   product, always mounted;
-2. **runtime configuration** — deployment *values* only (URLs, keys, auth
-   method set, signup mode, quotas). Nothing at runtime selects product
-   shape;
-3. **reverse proxy** — which mounted routes are externally reachable (the
-   `/metrics` precedent elevated to a principle: exposure is a proxy concern,
-   never a config knob).
+SaaS always mounts its compiled product capabilities. Reverse-proxy routing
+controls exposure, but never replaces application authentication, authorization,
+Host/Origin/CSRF checks or safe bind/firewall configuration. Method-specific
+routes still follow the configured browser-auth method set. Removing a product
+flag does not imply mounting every authentication method.
 
-Consequences embraced as declared breaks: the data-plane-only runtime mode is
-retired (its tests and config-validation branches are deleted, not adapted),
-and an API-only *exposure* is achieved by proxy routing, not by mutilating the
-product. This also resolves two documented roughnesses by deletion: the
-compose-vs-code default divergence (`true` vs `false`) disappears with the
-flag, and the oddity that provider settings were demanded even with the flag
-`false` disappears with its validation branch.
+Preserve OIDC validation based on the selected method and local-auth durable
+reconciliation. Test startup with the now-unconditional control plane: provider
+discovery, local administrator bootstrap, readiness and method/key drift
+failures. Do not remove optional-store safeguards solely because a flag was
+removed; establish constructor invariants for every supported build/test path.
+Document upgrade prerequisites for former data-plane-only deployments before
+release. Old environment keys no longer select product shape; deploy manifests
+must remove them and must not rely on ignored values to disable routes.
 
-## Non-goals (behavior freeze)
+ADR-0056's no-bundle developer/test build remains valid: an unset
+`MEMORY_MCP_UI_DIST` produces an empty catalog with the existing fallback
+behavior. A supported release image must contain a real bundle; verify it from
+the final binary/image at root and `/memory`. Thus "unconditional" means no
+runtime UI switch, not that every developer binary embeds assets.
 
-- MCP public surface stays exactly eight tools (`public_surface_snapshot`).
-- HTTP routes, status codes, envelopes: unchanged.
-- Bi-temporal validity (`t_ref`/`t_ingested`, invalidate-never-delete): unchanged.
-- One Active Namespace per process / Tenant-never-by-request invariant: unchanged.
-- Cookie contracts (`__Host-`/`__Secure-`, `Path` scoping): unchanged.
-- `MEMORY_MCP_HTTP_SIGNUP_MODE`, `MEMORY_MCP_HTTP_AUTH_METHODS`, quotas and all
-  other deployment *value* knobs: unchanged.
-- Crate splitting into a workspace per context: out of scope (ADR-0058 records
-  the revisit condition).
-- ADR-0056's build optionality stays as-is: `MEMORY_MCP_UI_DIST` unset still
-  yields a binary with an empty UI catalog ("unconditional UI" means the SaaS
-  profile always *carries* the console capability and serves it whenever it is
-  bundled — compile-without-`dx` is what makes the test matrix possible).
-- Historical documents (ADRs 0001–0057, past specs and plans) are not rewritten.
+### Twelve-Factor application profile
 
-## Risks and mitigations
+The following are acceptance concerns, not a claim that this documentation
+refactor achieves full Twelve-Factor compliance. The local embedded/stdio
+profile deliberately retains durable local storage and stdout protocol framing.
+For SaaS, record baseline behavior and preserve it; any newly discovered
+operational shortfall requiring behavior change becomes a separate issue.
 
-| Risk | Mitigation |
+| Factor | Concrete check / boundary |
 |---|---|
-| Big-bang diff is unreviewable | The plan lands as ordered phases; every phase leaves `master` green (full CI matrix), each phase is one reviewable commit series per context |
-| DDD theater (folders without rules) | Guard tests land in the *first* extraction phase and only grow |
-| Storage seams (`ServiceContext`, `DbClient`) resist clean layering | `shared` keeps the narrow ports; extraction order runs `ui`/`operations` first and the storage-heavy `knowledge`/`memory` last |
-| Concurrent writers on this repo (observed twice) | Rename + scaffolding phases are conflict-hot; announce the branch, land fast |
-| `dx` bundle layout assumptions keyed on the bin name | Re-verify with a probe bundle before/after (the relocatable-bundle spike pattern); `test_ui_bundle_pin.py` extended for the `ui` name |
+| I Codebase | One versioned source/release revision; modules are not separately deployed services |
+| II Dependencies | Locked dependencies/toolchain, explicit build tools and reproducible UI assets |
+| III Config | Startup parsing into typed values; no environment reads in domain/use cases, no baked-in deployment credentials |
+| IV Backing services | Durable storage/provider adapters configured at composition; remote shared storage for replicas, not a shared embedded database directory |
+| V Build/release/run | UI built and embedded before release, same immutable artifact promoted with runtime config; no runtime asset compilation |
+| VI Processes | Caches/runtimes disposable; authoritative SaaS sessions/tasks/leases remain durable. Local embedded profile is an explicit exception |
+| VII Port binding | HTTP listener lifecycle remains application-owned; proxy topology does not alter authorization |
+| VIII Concurrency | Existing replica coordination and fencing verified against durable storage; no claim that folder separation grants horizontal scalability |
+| IX Disposability | Stop accepting work, drain/cancel within existing bounds, preserve recoverable work and lease expiry on termination |
+| X Dev/prod parity | Durable-adapter tests supplement fakes; exercise actual image, OIDC/local modes and mount bases |
+| XI Logs | Structured diagnostic streams, bounded labels, no secrets; stdio stdout remains reserved for MCP protocol |
+| XII Admin processes | CLI maintenance uses the same policies/config/adapters as the service; no bypass of audit or migrations |
+
+## Compatibility and completion gates
+
+Except for the four declared changes, preserve eight MCP tools, HTTP payloads,
+status/envelope/error sanitization, cookie/OIDC contracts, temporal semantics,
+config defaults and persisted schema. Namespace invariant: **one immutable
+Active Namespace per local stdio process; one immutable Tenant Namespace per
+SaaS Tenant Runtime**, selected through authenticated server-side resolution.
+Neither accepts a namespace in data-plane arguments. Tenant A's cached/runtime
+state must never be reused for Tenant B.
+
+Identity administration, operational purge and ordinary fact invalidation are
+different capabilities; preserve their distinct authorization and audit rules.
+No schema, migration or data-copy change is authorized by a module move.
+Historical ADRs 0001–0057 and prior specs/plans stay unchanged; living docs and
+this ADR/spec/plan must agree on the target and implementation status.
+
+Completion requires the plan's code gates, architecture negative tests,
+transaction/tenant-isolation tests, actual evaluation gate and shipped-artifact
+acceptance. Record exact revision/features/commands and skips. Unit tests,
+source pins and a successful UI filename probe cannot alone prove this design.
+
+## Reference basis
+
+- [Clean Architecture dependency rule](https://blog.cleancoder.com/uncle-bob/2012/08/13/the-clean-architecture.html): inward source dependencies and simple boundary data.
+- [Rust visibility and privacy](https://doc.rust-lang.org/reference/visibility-and-privacy.html): module privacy versus crate-wide visibility.
+- [The Twelve-Factor App](https://12factor.net/): SaaS operational criteria, applied above with explicit local-profile exceptions.
+
+These sources support the principles; ownership choices and the dependency
+allowlist are project design decisions grounded in the reviewed checkout.
