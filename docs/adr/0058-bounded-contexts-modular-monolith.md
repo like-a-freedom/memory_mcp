@@ -36,8 +36,10 @@ both the package surface and ownership across the full application.
    Ordinary canonical writes have one owner. Existing cross-owner registry
    transactions use narrow owner-defined atomic ports implemented by an
    explicit control persistence integration seam; do not split them into
-   separately committed facade calls. No universal registry, event bus or
-   distributed transaction framework is introduced.
+   separately committed facade calls. Identity invitation consumption,
+   identity mutation/audit and optional first-login session creation remain
+   distinct operations. No universal registry, event bus or distributed
+   transaction framework is introduced.
 5. Transports (`http`, `mcp`, `cli`, `tools`, `ui`) remain outer adapters.
    `ui` serves the bundled console without domain layers. HTTP cookie/CSRF
    mechanics stay in HTTP; identity owns session and authentication policies.
@@ -54,7 +56,9 @@ both the package surface and ownership across the full application.
    routing controls exposure; application authorization/CSRF protections still
    apply. Flag removal is a product choice, not a consequence of DDD or
    Twelve-Factor. Validate upgrades with now-active authentication startup and
-   readiness requirements.
+   readiness requirements. OIDC extraction must retain a usable
+   `jsonwebtoken` crypto provider, the real signature-verification path and
+   compatibility decoding for sealed flows issued before invitation intents.
 9. Apply Twelve-Factor operational checks to SaaS with explicit local embedded/
    stdio exceptions. Keep the local process's immutable Active Namespace and
    each SaaS Tenant Runtime's immutable Tenant Namespace distinct. Neither
@@ -74,8 +78,9 @@ service deployment is not a prerequisite.
 The benefit is explicit policy/transaction ownership and testable dependency
 rules. The cost is a broad migration with significant registry, retrieval and
 public Rust API seams. One initiative lands as buildable commits with exact
-expiring legacy bridges; it is released as a coherent whole. Phase 0 inventory
-and transaction evidence are gates, not claims already satisfied by this ADR.
+expiring legacy bridges and must be released as a coherent whole. Phase 0
+inventory and transaction evidence are gates, not claims already satisfied by
+this ADR.
 
 There are four declared surface-change categories: package/assets rename,
 UI runtime switch removal, control-plane runtime switch removal, and related

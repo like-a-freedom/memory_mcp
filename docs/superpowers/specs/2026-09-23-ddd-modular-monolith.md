@@ -2,7 +2,8 @@
 
 **Date:** 2026-09-23; architecture review: 2026-09-24
 **Status:** Accepted direction; strengthened design contract. Phase 0 evidence is required before structural extraction.
-**Baseline reviewed:** `5bcb2bf3309ecebf71417c5ab2576e6cca0ca4ee` (`ddd-refactorings`).
+**Original review baseline:** `5bcb2bf3309ecebf71417c5ab2576e6cca0ca4ee` (`ddd-refactorings`).
+**Post-review source baseline:** `791f903fb453f5d40e4bcea9ff8e5e9b4fbeb261` (`origin/master`, merged as `b11c12c77e86f135364006437526db9a061791dc`); the identity-invitation and OIDC signature-provider changes introduced after the original review are included in the compatibility baseline.
 **Plan:** [implementation plan](../plans/2026-09-23-ddd-modular-monolith.md)
 **ADR:** [ADR-0058](../../adr/0058-bounded-contexts-modular-monolith.md)
 
@@ -18,8 +19,8 @@ runtime resource; Tenant Registry is a control-plane persistence capability.
 Retain the agreed scope: one coordinated initiative covers the full monolith,
 contexts outside and layers inside, one production library crate, console
 package rename to `ui`, and removal of both runtime product-shape switches.
-The initiative is implemented as buildable commits on the branch and released
-as one coherent change. Intermediate extraction is not an independently
+The initiative must be implemented as buildable commits on the branch and
+released as one coherent change. Intermediate extraction is not an independently
 supported product architecture. No microservices, per-context crates, new MCP
 tools, generic event bus, distributed transaction framework or repository
 framework are introduced.
@@ -97,6 +98,7 @@ records participating in the following operations before moving stores:
 |---|---|---|
 | Account + identity + tenant creation | `provisioning`, with identity/tenancy validation | Existing `create_account_bundle` remains one atomic operation; no sequential facade writes that can leave half a client |
 | Identity links, auth methods, local admin/session changes | `identity` | Last-link/last-admin checks and mutation + control audit commit together; failed checks leave no audit of a successful change |
+| Identity invitation issue/accept | `identity`; HTTP route remains an adapter | `oidc_request` creation and single-use consumption stay policy-epoch guarded and ten-minute bounded. Sealed invite intent never trusts callback input. Link/replace and its audit rows are one guarded `external_identity` transaction; a first-login `control_plane_session` is a separate follow-up write only when the browser has no valid session. Same-tuple replay is a no-op; another Account's tuple and a non-exactly-one replace target are conflicts, while policy-epoch drift, parser and storage failures retain their existing typed mapping. |
 | API-key administration | `provisioning`, verification contract owned by `identity` | Issuance secret shown once, irreversible verifier, revocation/cache semantics preserved; no duplicate verifier policy |
 | Begin/finalize account/operator deletion | `operations` | Preserve existing atomic registry methods and durable recovery state; tenant purge is not ordinary fact invalidation |
 | Tenant task / app command | `provisioning` | Lease generation, cancellation, terminal result and durable change-event rules survive restart and replica races |
@@ -233,7 +235,7 @@ unexplained overlaps. Module roots contain behavior too; never discard a
 |---|---|
 | `control/static_assets.rs` | Layer-free `ui` delivery adapter |
 | `control/{operator,deletion}.rs` | HTTP handlers to `http`; administrative workflows to `operations`; registry transactions to the named control persistence seam |
-| `control/{account_api,oidc,local_admin,session,recent_auth,secret,csrf}*`, `control/application/*`, `service/local_admin/*`, `credential_material.rs` | Identity policy/use cases versus provisioning client/key commands; keep cookies, CSRF HTTP checks and request/response mapping in `http`; KDF/OIDC client implementations in identity infra |
+| `control/{account_api,oidc,local_admin,session,recent_auth,secret,csrf}*`, `control/application/*`, `service/local_admin/*`, `credential_material.rs` | Identity policy/use cases versus provisioning client/key commands; keep route guards, cookies, CSRF HTTP checks and request/response mapping in `http`; sealed OIDC request/intent, provider verification, KDF and OIDC client implementations belong to identity infra. Durable `oidc_request` consumption, identity link/replace plus audit, and optional first-login session creation remain separate owner-defined operations/transactions under the control persistence seam. |
 | `http/{oauth,principal}*` | Transport metadata/middleware stays HTTP; credential verification to identity; trusted tenant resolution remains a separate tenancy call |
 | `http/registry*` | Split account/link/session records to identity contracts, tenant binding/readiness to tenancy, client/key/provisioning commands to provisioning; preserve atomic control adapter exceptions |
 | `http/runtime*`, `http/sync.rs` | Tenancy lifecycle/pool; concrete runtime construction to bootstrap integration; protocol concerns remain HTTP |
@@ -296,10 +298,15 @@ routes still follow the configured browser-auth method set. Removing a product
 flag does not imply mounting every authentication method.
 
 Preserve OIDC validation based on the selected method and local-auth durable
-reconciliation. Test startup with the now-unconditional control plane: provider
-discovery, local administrator bootstrap, readiness and method/key drift
-failures. Do not remove optional-store safeguards solely because a flag was
-removed; establish constructor invariants for every supported build/test path.
+reconciliation. The `jsonwebtoken` dependency must keep exactly one usable
+crypto-provider feature (`rust_crypto` or the explicitly reviewed alternative);
+a feature-less OIDC build is unsupported, because signature verification can
+panic before returning an error. Keep the real RS256/JWKS verification test
+in the identity adapter and in the supported feature matrix. Test startup with
+the now-unconditional control plane: provider discovery, local administrator
+bootstrap, readiness and method/key drift failures. Do not remove optional-store
+safeguards solely because a flag was removed; establish constructor invariants
+for every supported build/test path.
 Document upgrade prerequisites for former data-plane-only deployments before
 release. Old environment keys no longer select product shape; deploy manifests
 must remove them and must not rely on ignored values to disable routes.
@@ -337,11 +344,13 @@ operational shortfall requiring behavior change becomes a separate issue.
 
 Except for the four declared changes, preserve eight MCP tools, HTTP payloads,
 status/envelope/error sanitization, cookie/OIDC contracts, temporal semantics,
-config defaults and persisted schema. Namespace invariant: **one immutable
-Active Namespace per local stdio process; one immutable Tenant Namespace per
-SaaS Tenant Runtime**, selected through authenticated server-side resolution.
-Neither accepts a namespace in data-plane arguments. Tenant A's cached/runtime
-state must never be reused for Tenant B.
+config defaults and persisted schema. Preserve the `jsonwebtoken` crypto
+provider wiring and legacy sealed-flow decoding (`absent intent` means sign-in;
+`absent replace` means `false`) while identity is extracted. Namespace invariant:
+**one immutable Active Namespace per local stdio process; one immutable Tenant
+Namespace per SaaS Tenant Runtime**, selected through authenticated server-side
+resolution. Neither accepts a namespace in data-plane arguments. Tenant A's
+cached/runtime state must never be reused for Tenant B.
 
 Identity administration, operational purge and ordinary fact invalidation are
 different capabilities; preserve their distinct authorization and audit rules.

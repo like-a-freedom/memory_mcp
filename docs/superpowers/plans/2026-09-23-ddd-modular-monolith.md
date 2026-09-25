@@ -2,12 +2,12 @@
 
 **Date:** 2026-09-23; architecture review: 2026-09-24
 **Status:** Execution plan; unchecked items are future work, not completed evidence.
+**Source baseline:** original review `5bcb2bf3309ecebf71417c5ab2576e6cca0ca4ee`; post-review `origin/master` `791f903fb453f5d40e4bcea9ff8e5e9b4fbeb261`, merged as `b11c12c77e86f135364006437526db9a061791dc`.
 **Goal:** Enforce module ownership and clean dependencies across the full
 monolith, rename the console to `ui`, and remove both runtime product-shape
 switches with no other externally observable change.
 **Spec:** [design contract](../specs/2026-09-23-ddd-modular-monolith.md)
 **ADR:** [ADR-0058](../../adr/0058-bounded-contexts-modular-monolith.md)
-**Review:** [findings and resolution](2026-09-24-ddd-architecture-review.md)
 
 ## Execution contract
 
@@ -46,8 +46,11 @@ inward dependencies when moving behavior, not only when updating imports.
 **Deliverable:** verified migration manifest and behavioral baseline before
 file moves. This phase resolves actual seams rather than creating empty modules.
 
-- [ ] Record starting revision, clean/dirty state, toolchain and CI feature
-  matrix; inspect current AGENTS instructions. Do not overwrite unrelated work.
+- [ ] Record starting revision, clean/dirty state, toolchain, package names and
+  CI feature matrix; inspect current AGENTS instructions. Treat
+  `791f903fb453f5d40e4bcea9ff8e5e9b4fbeb261` plus the documented merge
+  (`b11c12c77e86f135364006437526db9a061791dc`) as the post-review source
+  baseline. Do not overwrite unrelated work.
 - [ ] Enumerate all tracked `src` files and affected consumers/build artifacts.
   Produce a versioned migration manifest under `docs/architecture/` with each
   source, destination(s), symbol split, layer, canonical-table/command owner,
@@ -61,12 +64,17 @@ file moves. This phase resolves actual seams rather than creating empty modules.
   public bootstrap and minimal test/eval facade before restricting visibility.
 - [ ] For each atomic operation in the spec, record exact tables, namespace,
   store method, audit/event side effects, failure/retry semantics and test.
-  Keep existing transaction boundaries; design narrow atomic ports before
+  For identity invitations, keep `oidc_request` issue/consume, guarded
+  `external_identity` link/replace plus audit, and optional first-login
+  `control_plane_session` creation as distinct boundaries. Include
+  single-use/ten-minute expiry, policy epoch, sealed-intent compatibility,
+  exactly-one replacement, replay and conflict-classification cases. Keep
+  existing transaction boundaries; design narrow atomic ports before
   replacing the broad registry or splitting any store.
 - [ ] Record the allowed dependency graph, public data contracts and bootstrap
-  integration exceptions. Specify identity administration/link/auth-method
-  commands as well as sign-in/verification. Specify tenant runtime factory
-  and canonical vector-update ports without reverse context dependencies.
+  integration exceptions. Specify identity administration/link/auth-method/
+  invitation commands as well as sign-in/verification. Specify tenant runtime
+  factory and canonical vector-update ports without reverse context dependencies.
 - [ ] Add `tests/module_boundaries.rs` harness with positive and negative
   fixtures for privacy/paths/re-exports/signatures/cycles and feature branches.
   Record legacy violations explicitly; start production enforcement with the
@@ -132,10 +140,18 @@ no domain extraction is hidden in this phase.
 - [ ] Split registry by policy/table ownership; do not move the entire registry
   into tenancy. Introduce the explicit control transaction integration adapter
   for existing cross-owner atomic methods, with narrow published ports.
-- [ ] Extract identity verification, links, administrator/session/auth-method
-  use cases and provider/KDF adapters. HTTP handlers/cookies/CSRF are adapters.
+- [ ] Extract identity verification, links, invitations, administrator/session/
+  auth-method use cases and provider/KDF adapters. HTTP handlers/cookies/CSRF
+  are adapters. Keep invitation request consumption, identity mutation/audit and
+  optional first-login session creation as separate use-case ports/transactions.
+  Preserve the `jsonwebtoken` crypto-provider feature and the real RS256/JWKS
+  verification path.
 - [ ] Test last-link/last-admin and mutation-with-audit invariants, including
-  concurrent failure paths on the durable adapter.
+  concurrent failure paths on the durable adapter. Cover invitation
+  single-use/TTL and policy-epoch guards, exact-one replacement with both audit
+  rows, same-tuple replay, cross-Account conflict, refusal-vs-storage error
+  classification, legacy sealed-intent defaults, and first-login session
+  creation without changing an existing session.
 - [ ] Extract trusted tenant resolution and runtime lifecycle. Bootstrap supplies
   a runtime factory; tenancy application does not construct memory services.
 - [ ] Test tenant A/B isolation, immutable binding, eviction/reactivation,
@@ -227,9 +243,18 @@ python3 -m unittest discover -s scripts/ci -p 'test_*.py'
 ```
 
 The internal `control-plane` compatibility feature remains a build check, not
-a supported data-plane-only runtime mode. Also test the actual supported
-local, local+apps, SaaS and SaaS+apps feature combinations; additive Cargo
-features must not accidentally make SaaS dependencies mandatory in local.
+a supported data-plane-only runtime mode. Keep the four supported profile
+combinations explicit and compile each with no implicit default feature:
+
+```sh
+cargo check -p memory_mcp --all-targets --no-default-features --features fs-watch --locked
+cargo check -p memory_mcp --all-targets --no-default-features --features fs-watch,mcp-apps --locked
+cargo check -p memory_mcp --all-targets --no-default-features --features streamable-http --locked
+cargo check -p memory_mcp --all-targets --no-default-features --features streamable-http,mcp-apps --locked
+```
+
+Additive Cargo features must not accidentally make SaaS dependencies mandatory
+in either local combination.
 
 Run the **actual** evaluation job for the phase/final revision; create the
 artifact directory first, as CI does:

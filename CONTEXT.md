@@ -244,8 +244,12 @@ The constraint that no operation may leave a deployment without a reachable way 
 _Avoid_: lockout warning, best-effort check
 
 **Identity Link**:
-The binding of one External Identity to an Account, which is what lets a person reach the same Account through more than one provider. An Account may hold several links. A link is created only from an already-authenticated session, after the provider has verified the identity being attached — never from a matching email address and never from a caller's assertion — and the final link cannot be removed. Attaching and detaching a link are both recorded as Control Audit Events that name the identities involved. The Account's identity anchor remains the issuer and subject pair; email is profile data.
+The binding of one External Identity to an Account, which is what lets a person reach the same Account through more than one provider. An Account may hold several links. A link is created only after provider verification, either from an already-authenticated self-service flow or from an administrator-issued Identity Invitation — never from a matching email address and never from a caller's assertion — and the final link cannot be removed. Attaching and detaching a link are both recorded as Control Audit Events that name the identities involved. The Account's identity anchor remains the issuer and subject pair; email is profile data.
 _Avoid_: email match, account merge, identity provider list
+
+**Identity Invitation**:
+A short-lived, single-use, sealed OIDC flow issued by an authenticated Local Administrator for one Account. The sealed intent names the Account, inviting administrator and whether to replace the Account's single existing identity. Acceptance requires provider-attested identity data; without a browser session it is the Account's first login, while an existing session is left unchanged. Request consumption, identity mutation plus audit, and optional first-login session creation are distinct persistence boundaries.
+_Avoid_: shared enrollment link, callback-supplied Account, unauthenticated identity assertion
 
 **Control Audit Event**:
 One append-only row in the durable `audit_event` log, naming the Account the action concerned, the actor, the action token, the resource inside that Account which was touched, and the instant it happened. The store method that performs an action writes its own row inside the same transaction, so an action cannot be recorded without happening or happen without being recorded, and a refusal leaves nothing behind. The log is never updated or deleted, and it is readable only by a privileged caller.

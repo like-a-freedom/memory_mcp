@@ -20,7 +20,9 @@ use super::super::response::OpenAppResult;
 use super::super::session;
 use super::MemoryMcp;
 #[cfg(feature = "mcp-apps")]
-use crate::service::apps::session::{AppSessionState, SessionManager};
+use crate::service::apps::session::AppSessionState;
+#[cfg(all(feature = "mcp-apps", feature = "streamable-http"))]
+use crate::service::apps::session::SessionManager;
 
 pub(super) fn upsert_json_field(payload: &mut Value, key: &str, value: Value) {
     if let Some(object) = payload.as_object_mut() {
