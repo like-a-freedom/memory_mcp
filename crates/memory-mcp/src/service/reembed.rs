@@ -15,7 +15,7 @@ use tokio_util::sync::CancellationToken;
 
 use super::reembed_options::{ReembedOptions, ReembedOutcome};
 use super::reembed_progress::ReembedProgressReporter;
-use super::{MemoryError, MemoryService, normalize_dt};
+use super::{MemoryError, MemoryService};
 use crate::logging::LogLevel;
 use crate::service::value_helpers::{json_i64, json_string};
 
@@ -821,24 +821,20 @@ impl MemoryService {
         target_dimension: usize,
     ) -> Result<String, MemoryError> {
         let embedding_state = self.embedding_runtime_snapshot();
-        let mut updated = fact
-            .as_object()
-            .cloned()
-            .ok_or_else(|| MemoryError::Validation("fact record must be an object".to_string()))?;
-        let fact_id = updated
+        let fact_id = fact
             .get("fact_id")
             .and_then(json_string)
             .ok_or_else(|| MemoryError::Validation("missing fact_id".to_string()))?
             .to_string();
-        let fact_type = updated
+        let fact_type = fact
             .get("fact_type")
             .and_then(json_string)
             .ok_or_else(|| MemoryError::Validation("missing fact_type".to_string()))?;
-        let content = updated
+        let content = fact
             .get("content")
             .and_then(json_string)
             .ok_or_else(|| MemoryError::Validation("missing content".to_string()))?;
-        let quote = updated
+        let quote = fact
             .get("quote")
             .and_then(json_string)
             .ok_or_else(|| MemoryError::Validation("missing quote".to_string()))?;
@@ -856,31 +852,29 @@ impl MemoryService {
                 )
             })?;
 
-        if embedding.len() != target_dimension {
-            return Err(MemoryError::Validation(format!(
-                "embedding dimension mismatch: provider returned {}, expected {target_dimension}",
-                embedding.len()
-            )));
-        }
-
-        updated.insert("embedding".to_string(), json!(embedding));
-        updated.insert(
-            "embedding_provider".to_string(),
-            json!(embedding_state.provider.provider_name()),
+        let port = crate::embedding::infra::FactVectorAdapter::new(
+            self.db_client.clone(),
+            self.active_namespace.clone(),
+            embedding_state.model.clone(),
+            Some(target_dimension),
         );
-        if let Some(model) = &embedding_state.model {
-            updated.insert("embedding_model".to_string(), json!(model));
-        }
-        updated.insert("embedding_dimension".to_string(), json!(target_dimension));
-        updated.insert("embedding_signature".to_string(), json!(target_signature));
-        updated.insert(
-            "embedding_updated_at".to_string(),
-            json!(normalize_dt(chrono::Utc::now())),
-        );
-
-        self.reembed_store()
-            .upsert_record(&fact_id, Value::Object(updated))
-            .await?;
+        crate::embedding::api::update_canonical_vector(
+            &port,
+            &fact_id,
+            embedding,
+            &crate::embedding::api::VectorIdentity {
+                provider: embedding_state.provider.provider_name().to_owned(),
+                model: embedding_state.model.clone(),
+                dimension: target_dimension,
+                signature: target_signature.to_owned(),
+            },
+            chrono::Utc::now(),
+            // Re-embedding exists to replace a stale signature,
+            // so a mismatched vector is overwritten; a fact that
+            // is already current is left alone.
+            crate::embedding::api::VectorWritePolicy::ReplaceStale,
+        )
+        .await?;
         Ok(fact_id)
     }
 

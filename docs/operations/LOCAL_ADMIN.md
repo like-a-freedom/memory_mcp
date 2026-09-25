@@ -58,8 +58,8 @@ All of the following were executed in this repository and passed:
 | Durable query-shape regression | `... --test registry_query_shape` — 4 passed |
 | Provisioning crash recovery | `... --test http_crash_recovery` — 11 passed |
 | Whole conformance suite | `cargo test -p memory_mcp --features control-plane,test-fixtures --locked` and `cargo test -p memory_mcp --locked` — every target green |
-| UI crate | `cargo test -p control-plane-ui --locked` — 87 passed; `cargo check -p control-plane-ui --target wasm32-unknown-unknown` and the matching `cargo clippy … -D warnings` clean |
-| Static assets + CSP | `MEMORY_MCP_CONTROL_PLANE_UI_DIST=<abs dist> cargo test -p memory_mcp --lib --features control-plane-ui,test-fixtures --locked control::static_assets` — 7 passed |
+| UI crate | `cargo test -p ui --locked` — 87 passed; `cargo check -p ui --target wasm32-unknown-unknown` and the matching `cargo clippy … -D warnings` clean |
+| Static assets + CSP | `MEMORY_MCP_UI_DIST=<abs dist> cargo test -p memory_mcp --lib --features ui,test-fixtures --locked control::static_assets` — 7 passed |
 | Format, lint, non-default builds | `cargo fmt --all --check`; `cargo clippy --workspace --all-targets --features … --locked -- -D warnings` for all four documented feature combinations; `cargo check -p memory_mcp --no-default-features --locked` and `--features streamable-http` |
 | End-to-end against the real binaries | `sh scripts/ci/local_admin_local_check.sh` — local mode starts from env, activation/login/session, client create/list/get, provisioning reaches `ready` in one poll, restart persistence, plan-mismatch startup rejection, recovery invalidates the session, negative route/CSRF/Origin checks |
 | Packaged image over real TLS in a real browser | `docker build --tag memory-mcp-local-admin:test .` then `python3 scripts/ci/local_admin_image.py --image memory-mcp-local-admin:test --scenario all` — 6 scenarios, exit 0: 81 browser checks (`auth` 9, `clients` 29, `regression` 6, `ui` 20, `flow` 17) plus the harness-owned `removal` scenario against the same stack. The `ui` scenario proves the bundle boots, is styled and ships a correct document shell; the `flow` scenario drives the console's own interactive paths through the real DOM and is the guard for the defects recorded in §2.6.1; `removal` reaches "SSO only" through the CLI and then asserts the routes on a restarted server (§5) |
@@ -170,14 +170,14 @@ Run from the repository root.
 | `cargo test -p memory_mcp --features control-plane,test-fixtures --locked --test local_admin_cli` | ✅ executed, 11 passed |
 | `cargo test -p memory_mcp --features control-plane,test-fixtures --locked --test local_admin_durable` | ❌ superseded: the target was not created (§13.4). Its two remote-race cases moved inline into `surreal_store/local_admin_remote.rs`, so the `-- --ignored` row below replaces it. This row is the only plan §6 command that no longer exists verbatim |
 | `cargo test -p memory_mcp --features control-plane,test-fixtures --locked` | ✅ executed, every target green |
-| `cargo test -p control-plane-ui --locked` | ✅ executed, 87 passed |
-| `cargo check -p control-plane-ui --locked` | ✅ executed, clean (native check only; proves nothing about WASM) |
+| `cargo test -p ui --locked` | ✅ executed, 87 passed |
+| `cargo check -p ui --locked` | ✅ executed, clean (native check only; proves nothing about WASM) |
 | `cargo clippy --workspace --all-targets --features fs-watch,mcp-apps,streamable-http,control-plane --locked -- -D warnings` | ✅ executed, clean |
 | `cargo clippy --workspace --all-targets --features fs-watch,mcp-apps,streamable-http,control-plane,test-fixtures --locked -- -D warnings` | ✅ executed, clean |
-| `cargo clippy ... --features ...,control-plane-ui,test-fixtures ...` | ✅ executed, clean (with `MEMORY_MCP_CONTROL_PLANE_UI_DIST` set) |
+| `cargo clippy ... --features ...,ui,test-fixtures ...` | ✅ executed, clean (with `MEMORY_MCP_UI_DIST` set) |
 | `cargo test -p memory_mcp --lib --features control-plane,test-fixtures --locked local_admin_remote_replica_races -- --ignored` | ⚠️ not executed (needs an isolated remote SurrealDB 3.2.4 and the three `LOCAL_ADMIN_TEST_CONTROL_*` variables); the test is now an inline adapter test, so the command selects it, and running it without the variables **fails** rather than skipping |
-| `MEMORY_MCP_CONTROL_PLANE_UI_DIST=<abs dist> cargo test -p memory_mcp --lib --features control-plane-ui,test-fixtures --locked control::static_assets` | ✅ executed, 7 passed — the build script requires an absolute, non-symlink dist directory containing a non-empty `index.html` |
-| `MEMORY_MCP_CONTROL_PLANE_UI_DIST=<abs dist> cargo test -p memory_mcp --features control-plane-ui,test-fixtures --locked --test http_local_admin` | ✅ executed, 42 passed |
+| `MEMORY_MCP_UI_DIST=<abs dist> cargo test -p memory_mcp --lib --features ui,test-fixtures --locked control::static_assets` | ✅ executed, 7 passed — the build script requires an absolute, non-symlink dist directory containing a non-empty `index.html` |
+| `MEMORY_MCP_UI_DIST=<abs dist> cargo test -p memory_mcp --features ui,test-fixtures --locked --test http_local_admin` | ✅ executed, 42 passed |
 | `docker compose --env-file <operator env> config --quiet` | ✅ executed, the single runtime file resolves. The browser method set is a runtime value, so the provider half resolves from the same file rather than from a second overlay. The file alone still fails by design: it refuses to default any secret |
 | `docker build --tag memory-mcp-local-admin:test .` | ✅ executed, `25/25 FINISHED`. A cold build is dominated by the `ui-builder` WASM cargo layer — one observed cold run was still at `17/24` after 30 minutes, with that layer alone at ~1596 s — while a warm-cache rebuild finished in ~193 s. Give the build a generous timeout; do not read a slow cold build as a failure |
 | `python3 scripts/ci/local_admin_image.py --image memory-mcp-local-admin:test --scenario all` | ✅ executed, 6 scenarios, exit 0 — 81 browser checks and the harness-owned `removal` scenario |
@@ -242,8 +242,8 @@ paths; `removal` restarts the server around a CLI policy change (§5).
 |---|---|
 | Compiles with `streamable-http,control-plane,test-fixtures` | ✅ verified (all local-admin suites) |
 | `admin` subcommand requires `streamable-http` + `control-plane` | ✅ verified (`cli.rs` gates `Command::Admin`; the `--no-default-features` help output has no `admin`, and the gated build adds exactly that one command to the frozen CLI snapshot) |
-| Local routes require `control-plane`; UI requires `control-plane-ui` **and** a built bundle | ✅ verified for both: the image builds the bundle and serves it, and the UI-disabled router answers `/api/*` with JSON 404 |
-| `control-plane-ui` + `test-fixtures` builds | ✅ verified with `MEMORY_MCP_CONTROL_PLANE_UI_DIST` set (build script requires it) |
+| Local routes require `control-plane`; UI requires `ui` **and** a built bundle | ✅ verified for both: the image builds the bundle and serves it, and the UI-disabled router answers `/api/*` with JSON 404 |
+| `ui` + `test-fixtures` builds | ✅ verified with `MEMORY_MCP_UI_DIST` set (build script requires it) |
 | Default stdio build unchanged / no `admin` | ✅ verified via `--help` |
 | Local mode from environment variables | ✅ verified end-to-end against the real binary (§2.5) |
 | Two local replicas sharing durable auth/throttle/caps | ❌ not demonstrated (no multi-process test against a remote registry) |
@@ -301,10 +301,10 @@ python3 scripts/ci/local_admin_image.py --image memory-mcp-local-admin:test --sc
 ```
 
 The image is three stages: `dx bundle --platform web --release --package
-control-plane-ui --out-dir /src/control-plane-ui-dist` (pinned `dioxus-cli
+ui --out-dir /src/ui-dist` (pinned `dioxus-cli
 0.7.10`), then both binaries with
-`streamable-http,control-plane,control-plane-ui` and
-`MEMORY_MCP_CONTROL_PLANE_UI_DIST=/src/control-plane-ui-dist/public`, then a
+`streamable-http,control-plane,ui` and
+`MEMORY_MCP_UI_DIST=/src/ui-dist/public`, then a
 `distroless/cc-debian13:nonroot` runtime. The final runtime contains the two
 binaries, native libraries, and migrations only; it does not copy the UI bundle
 or require a runtime asset directory.
@@ -319,7 +319,7 @@ grown to eight files (3.2 MB) and `crates/memory-mcp/build.rs` embeds all of
 them into the binary.
 
 **The document shell is owned by this repository.**
-`crates/control-plane-ui/index.html` is the served shell — the CLI uses a
+`crates/ui/index.html` is the served shell — the CLI uses a
 crate-root `index.html` when one exists and injects the script and stylesheet
 tags into it. It carries `lang="en"`, a description, and `color-scheme` and
 `theme-color` metas, and a `<noscript>` block, so a client that cannot run
@@ -329,11 +329,11 @@ WebAssembly reads an explanation instead of a blank page. It also declares the f
 directly, because a browser probes for an icon before the module boots and
 runtime injection arrives only after that 404. The `<title>` element
 is left empty on purpose: the CLI appends `[web.app] title` from
-`crates/control-plane-ui/Dioxus.toml` into it, so a literal title there is
+`crates/ui/Dioxus.toml` into it, so a literal title there is
 duplicated.
 
 **Styling is a first-party bundle asset.**
-`crates/control-plane-ui/assets/main.css` is declared as
+`crates/ui/assets/main.css` is declared as
 `asset!("/assets/main.css", AssetOptions::css().with_static_head(true))`, which
 makes the CLI write a same-origin `<link rel="stylesheet">` into the served
 head rather than having the app add it from Rust. That keeps the shipped
@@ -361,7 +361,7 @@ Three rules in that file are what keep the pages looking like one application:
   phrase.
 
 **The console is split along the seams its routes create.**
-`crates/control-plane-ui/src/` keeps `main.rs` (launch only), `assets.rs` (the
+`crates/ui/src/` keeps `main.rs` (launch only), `assets.rs` (the
 bundle assets and their bundler options), `routes.rs` (the single `Routable`
 enum, with the two client routes nested under `#[layout(ConsoleLayout)]` and a
 trailing `/:..route` catch-all that renders a page-not-found screen), `pages/` (one directory per route, plus the sections of a single page
@@ -581,7 +581,7 @@ that the image stays one all-in-one binary with no extra crates, and every crate
 named is already in `Cargo.lock` and already compiled into this crate's
 WebAssembly through `dioxus-web` and `gloo-net`. Naming them adds dependency
 *edges* and not one package or version — `git diff Cargo.lock` for the whole
-change is five added edges under `control-plane-ui` and no other line. The
+change is five added edges under `ui` and no other line. The
 alternative (a first-party inline script) was rejected because it would have
 required a CSP change, and the CSP is deliberately byte-identical: no
 `'unsafe-eval'`, no `'unsafe-inline'`, no script hash.
@@ -698,8 +698,7 @@ Local-mode-specific:
 
 | Variable | Notes |
 |---|---|
-| `MEMORY_MCP_HTTP_ENABLE_CONTROL_PLANE=true` | Required; without it no browser auth is configured at all |
-| `MEMORY_MCP_HTTP_AUTH_METHODS=local` | Explicitly set it; the default is `oidc`. Any unrecognised token fails startup, and so does a set that omits `local` if you then want to run the `admin` CLI |
+| `MEMORY_MCP_HTTP_AUTH_METHODS=local` | Required for this workflow; the default is `oidc`. Any unrecognised token fails startup, and so does a set that omits `local` if you then want to run the `admin` CLI |
 | `MEMORY_MCP_HTTP_AUTH_MODE=local` | The one-release alias for the above, still accepted on its own. Supplying both with disagreeing values fails startup |
 | `MEMORY_MCP_HTTP_LOCAL_DEFAULT_PLAN_VERSION` | Required positive `u32`; never taken from browser input |
 | See §3.3 | All seven plan-limit variables are required |
@@ -728,7 +727,7 @@ three variables — startup fails with
 Optional in local mode: `MEMORY_MCP_HTTP_BIND`, `MEMORY_MCP_HTTP_BODY_LIMIT`,
 `MEMORY_MCP_HTTP_REQUEST_DEADLINE_SECS` (the local deadline; exhaustion returns
 `503 temporarily_unavailable` with `Retry-After: 1`), the pool/runtime limits,
-`MEMORY_MCP_HTTP_TRUSTED_PROXY_CIDRS`, `MEMORY_MCP_HTTP_ENABLE_CONTROL_PLANE_UI`.
+`MEMORY_MCP_HTTP_TRUSTED_PROXY_CIDRS`.
 
 ### 3.2 HTTPS and cookies
 
@@ -938,10 +937,10 @@ corrupt or foreign hashes fail closed as invalid credentials.
 
 ### 4.2 Activation over the browser
 
-The activation page is the UI route `/admin/activate` (the CLI prints it). Note
-that this route is only served when the binary is built with `control-plane-ui`
-**and** `MEMORY_MCP_HTTP_ENABLE_CONTROL_PLANE_UI=true`; otherwise it is an empty
-`404` (`/api/` and `/auth/` paths always return JSON `404` instead). The API
+The activation page is the UI route `/admin/activate` (the CLI prints it). It is
+served when the binary has the `ui` feature and a non-empty catalog; developer or
+test builds without `MEMORY_MCP_UI_DIST` return `404` for the page while
+`/api/` and `/auth/` paths always return JSON `404`. The API
 sequence the page drives, in order (all verified at the router level by
 `activation_login_session_roundtrip`):
 
@@ -1623,12 +1622,11 @@ against the code:
 | What happens to a locally created Account/Tenant? | The `account` and `tenant` rows are ordinary rows in existing tables and remain. With the local surface unmounted they have no browser administrator; they are not adopted by any other workflow. |
 | Can an old binary serve local administrators? | No. There is no local admin route or credential in a pre-047 binary; administrators created locally have no OIDC identity, so they cannot authenticate against the OIDC control plane. |
 
-Practical rollback sequence: stop all replicas → switch to the mode you are
-rolling back to (`MEMORY_MCP_HTTP_ENABLE_CONTROL_PLANE=false` for a pure
-data-plane rollback, or an OIDC-mode configuration) → start the older binary.
-Re-enabling local mode afterwards requires the identical session/CSRF keys,
-otherwise the policy join fails (`policy_mismatch`); administrators are retained
-unless you deliberately recover or rotate them.
+Practical rollback sequence: stop all replicas → deploy the previous binary and
+its matching configuration together. A rollback is not a current-version data-plane
+switch: the old artifact may still support one. Re-enabling local mode afterwards
+requires the identical session/CSRF keys; administrators are retained unless you
+deliberately recover or rotate them.
 
 ## 12. Explicit non-goals
 
@@ -1697,8 +1695,8 @@ regardless.
 | Suspend/resume coherent no-op, stale CAS, and no reprovision while suspended | `http_local_admin.rs::suspend_and_resume_follow_the_coherent_state_contract`, `a_provisioning_client_cannot_be_suspended` |
 | A stale plan is refused at startup rather than adopted | `scripts/ci/local_admin_local_check.sh` §10 — `plan_limit_mismatch` |
 | Pre-auth code, activation, login, session and recovery survive a real restart | Same script §9, §11 |
-| `control-plane-ui` requires an absolute, non-symlink bundle directory containing `index.html` | `crates/memory-mcp/build.rs`; the suite only builds with `MEMORY_MCP_CONTROL_PLANE_UI_DIST` pointing at one |
-| The image builds both binaries and a real UI bundle | `docker build` → `25/25 FINISHED`; `memory_mcp --help` lists `admin`; `control-plane-ui-dist/public` contains `index.html`, a 46 KB JS and a 775 KB WASM |
+| `ui` requires an absolute, non-symlink bundle directory containing `index.html` | `crates/memory-mcp/build.rs`; the suite only builds with `MEMORY_MCP_UI_DIST` pointing at one |
+| The image builds both binaries and a real UI bundle | `docker build` → `25/25 FINISHED`; `memory_mcp --help` lists `admin`; `ui-dist/public` contains `index.html`, a 46 KB JS and a 775 KB WASM |
 | The UI boots in a real browser under the shipped CSP | `local_admin_image.py --scenario ui` → 20 checks, including `wasm app boots under the shipped csp` and no console/page errors |
 | A modal frame takes focus as it opens, so Escape reaches it | `--scenario flow` → `the one-time secret arrives in an alertdialog that has taken focus`, plus the two-stage close (`the first escape asks before discarding the secret`, `the second escape discards the secret and leaves the page interactive`). The re-authentication panel is the case that needed the frame to take focus, and the one the scenario cannot reach: `reauth_required` is driven by `control::recent_auth::DEFAULT_REAUTH_MAX_AGE`, a 600-second constant with no configuration knob, so a fresh session cannot provoke it. For that panel the evidence is a before/after in a real browser against the packaged bundle: before, the dialog open with `document.activeElement` on `BODY` and Escape leaving it open; after, focus on `#reauth-password` and Escape dismissing it (§2.6) |
 | The CLI in the image issues a code and the browser completes activation, login, client, key, suspend/resume | `--scenario all` → 81 checks (auth 9, clients 29, regression 6, ui 20, flow 17) |
@@ -1710,7 +1708,7 @@ regardless.
 | The durable rate caps are enforced and per-identity | `security_tests.rs::exp9_rate_buckets_enforce_the_cap`, `exp9b_challenge_budget_is_shared_and_source_scoped` |
 | Two administrators racing the last key slot on one client issue exactly one key | `http_local_admin.rs::two_administrators_racing_the_last_key_slot_issue_exactly_one_key` — one `201`, one `409 key_cap_reached`, and the client holds exactly `cap` keys |
 | Generated secrets never reach a durable row, `Debug` or `Display` | `surreal_store/local_admin.rs::secret_hygiene_tests::sentinel_secrets_never_reach_debug_display_or_a_durable_row` |
-| An off deployment mounts no browser-auth route | `http::router::tests::off_mode_mounts_no_browser_auth_route` (paired with `an_enabled_control_plane_mounts_the_mode_disclosure`, so it cannot pass vacuously) |
+| The browser-auth disclosure mounts without a runtime product switch | `http::router::tests::the_mode_disclosure_is_mounted_without_a_runtime_switch` |
 
 ### 13.2 Claims NOT demonstrated
 

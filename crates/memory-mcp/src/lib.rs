@@ -52,8 +52,38 @@ pub mod service;
 pub mod storage;
 pub mod tools;
 
+/// Embedding technical capability. Available in every profile
+/// because the local stdio server also embeds facts; it owns
+/// model/version/dimension consistency, never canonical records.
+pub mod embedding;
+
+/// Knowledge bounded context. Owns entities, aliases, facts,
+/// claims, triples, communities and knowledge queries,
+/// including the single bi-temporal close implementation.
+pub mod knowledge;
+
+/// Memory bounded context. Owns episode ingestion, recall and
+/// assembly, explanation, lifecycle and procedures. Capabilities
+/// depend on consumer-owned ports rather than a shared
+/// service container.
+pub mod memory;
+
 #[cfg(feature = "streamable-http")]
 pub mod http;
+#[cfg(feature = "ui")]
+pub mod ui;
+
+#[cfg(feature = "streamable-http")]
+pub mod bootstrap;
+#[cfg(feature = "streamable-http")]
+pub mod tenancy;
+
+#[cfg(feature = "control-plane")]
+pub mod identity;
+#[cfg(feature = "control-plane")]
+pub mod operations;
+#[cfg(feature = "streamable-http")]
+pub mod provisioning;
 
 #[cfg(feature = "control-plane")]
 pub mod control;

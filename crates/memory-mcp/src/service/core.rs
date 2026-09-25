@@ -28,6 +28,15 @@ impl MemoryService {
         )
     }
 
+    /// Platform-owned event log store, used for the startup
+    /// connectivity check.
+    pub(crate) fn event_log_store(&self) -> crate::storage::EventLogStoreClient {
+        crate::storage::EventLogStoreClient::new(
+            self.db_client.clone(),
+            self.active_namespace.clone(),
+        )
+    }
+
     pub(crate) fn embedding_runtime_snapshot(
         &self,
     ) -> crate::service::embedding_runtime::EmbeddingRuntimeState {
@@ -347,7 +356,7 @@ impl MemoryService {
     }
 
     async fn check_surrealdb_connection(&self) -> Result<(), MemoryError> {
-        let _ = self.app_store().select_records("event_log").await?;
+        let _ = self.event_log_store().select_event_log().await?;
         Ok(())
     }
 
@@ -908,7 +917,7 @@ mod tests {
     }
 
     // -----------------------------------------------------------------------
-    // validate_record_id wired into AppStoreClient::find_record_by_id
+    // record-id validation wired into the owner-scoped accessors
     // (tests — exercised via the MemoryService entry points).
     // -----------------------------------------------------------------------
 

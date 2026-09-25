@@ -140,15 +140,34 @@ async fn remove_method(
     store: Arc<SurrealRegistryStore>,
     method: BrowserAuthMethod,
 ) -> Result<(), MemoryError> {
-    let policy = store.remove_browser_auth_method(method).await?;
+    let removed_method = method.as_str();
+    let method = match method {
+        crate::http::config::BrowserAuthMethod::Local => crate::identity::api::AuthMethod::Local,
+        crate::http::config::BrowserAuthMethod::Oidc => crate::identity::api::AuthMethod::Oidc,
+    };
+    let port = crate::bootstrap::integration::auth_method_policy::RegistryAuthMethodPolicy::for_explicit_removal(
+        store.clone(),
+    );
+    let policy = crate::identity::api::remove_auth_method(&port, method)
+        .await
+        .map_err(|error| match error {
+            crate::identity::api::IdentityError::MethodNotEnabled(message) => {
+                MemoryError::Conflict(message)
+            }
+            crate::identity::api::IdentityError::Persistence(error) => error,
+            _ => MemoryError::ConfigInvalid("invalid auth method removal".into()),
+        })?;
     let enabled = policy
         .methods
         .iter()
-        .map(|method| method.as_str())
+        .map(|method| match method {
+            crate::identity::api::AuthMethod::Local => "local",
+            crate::identity::api::AuthMethod::Oidc => "oidc",
+        })
         .collect::<Vec<_>>()
         .join(",");
     let output = serde_json::json!({
-        "removed_method": method.as_str(),
+        "removed_method": removed_method,
         "enabled_methods": enabled,
         "epoch": policy.epoch.to_string(),
         "guidance": format!(

@@ -194,18 +194,10 @@ pub async fn create_api_key(
         })?
     };
 
-    // Delegate the business workflow to the application
-    // layer. The handler is responsible for transport
-    // (parsing, headers, status code) only; the workflow
-    // owns account/tenant/plan resolution, secret
-    // generation, and the atomic cap check.
     let now = chrono::Utc::now();
-    let created = super::application::api_keys::ApiKeyCreation::new(
-        state.registry.store_clone(),
-        std::borrow::Cow::Borrowed(state.config.api_key_pepper.as_str()),
-    )
-    .execute(
-        super::application::api_keys::CreateApiKeyCommand {
+    let created = crate::provisioning::api::create_api_key(
+        state.api_key_issuance.as_ref(),
+        crate::provisioning::api::CreateApiKeyCommand {
             account_id: session.account_id.clone(),
             name: req.name,
             expires_in_days: req.expires_in_days,
@@ -214,9 +206,7 @@ pub async fn create_api_key(
     )
     .await
     .map_err(|err| match err {
-        // 404 mapping: missing account or tenant.
-        crate::error::MemoryError::Validation(_) => ApiError::NotFound,
-        // 409 mapping: cap exhausted.
+        crate::error::MemoryError::NotFound(_) => ApiError::NotFound,
         crate::error::MemoryError::Conflict(_) => ApiError::Internal(
             crate::error::MemoryError::Conflict("api key cap exhausted".into()),
         ),
@@ -339,16 +329,25 @@ pub async fn unlink_identity(
     >,
     axum::extract::Path(identity_id): axum::extract::Path<String>,
 ) -> Result<StatusCode, ApiError> {
-    super::recent_auth::require_recent_auth(&session, super::recent_auth::DEFAULT_REAUTH_MAX_AGE)?;
-    state
-        .registry
-        .store_clone()
-        .unlink_external_identity(
-            &session.account_id,
-            &identity_id,
-            &IdentityAudit::by_account(&session.account_id, chrono::Utc::now()),
-        )
-        .await?;
+    crate::identity::api::unlink_identity(
+        state.identity_link_transactions.as_ref(),
+        &crate::identity::api::UnlinkIdentityCommand {
+            account_id: session.account_id.clone(),
+            identity_id,
+            actor: session.account_id.clone(),
+            authenticated_at: session.auth_time,
+        },
+        chrono::Utc::now(),
+    )
+    .await
+    .map_err(|error| match error {
+        crate::identity::api::IdentityError::ReauthenticationRequired => ApiError::ReauthRequired,
+        crate::identity::api::IdentityError::LastIdentityOrConflict => ApiError::Conflict,
+        crate::identity::api::IdentityError::NotFound => ApiError::NotFound,
+        crate::identity::api::IdentityError::IdentityHeldByAnotherAccount
+        | crate::identity::api::IdentityError::MethodNotEnabled(_) => ApiError::Conflict,
+        crate::identity::api::IdentityError::Persistence(error) => ApiError::Internal(error),
+    })?;
     Ok(StatusCode::NO_CONTENT)
 }
 
@@ -437,15 +436,26 @@ pub async fn confirm_account_deletion(
         &state.config.keys.control_plane_session,
         &request.confirmation_token,
     )?;
-    let store = state.registry.store_clone();
-    super::deletion::execute_deletion(
-        &session,
-        &request.typed_phrase,
-        &verifier,
-        store.as_ref(),
-        &injector,
+    crate::operations::api::begin_account_deletion(
+        state.account_deletion_port.as_ref(),
+        &crate::operations::api::BeginAccountDeletionCommand {
+            account_id: session.account_id.clone(),
+            session_id: session.id.clone(),
+            authenticated_at: session.auth_time,
+            typed_phrase: request.typed_phrase,
+            challenge_verifier: verifier,
+        },
+        chrono::Utc::now(),
     )
-    .await?;
+    .await
+    .map_err(|error| match error {
+        crate::operations::api::OperationsError::ReauthenticationRequired => {
+            ApiError::ReauthRequired
+        }
+        crate::operations::api::OperationsError::ConfirmationPhraseRejected => ApiError::Forbidden,
+        crate::operations::api::OperationsError::Persistence(error) => ApiError::Internal(error),
+    })?;
+    injector.hit(crate::http::fault_injection::FaultPoint::AccountDeletionStarted)?;
     Ok(StatusCode::NO_CONTENT)
 }
 

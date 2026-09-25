@@ -19,9 +19,10 @@ use crate::control::session::ControlPlaneSession;
 use crate::error::MemoryError;
 use crate::http::HttpState;
 use crate::http::config::SignupMode;
-use crate::http::registry::models::{
-    ExternalIdentity, IdentityAudit, SubjectVerifier, new_external_identity_id,
-};
+use crate::http::registry::models::SubjectVerifier;
+
+#[cfg(test)]
+use crate::http::registry::models::{ExternalIdentity, IdentityAudit, new_external_identity_id};
 
 use super::flow_material::{OidcCallback, OidcFlowIntent, OidcNonce, OidcState, PkceCode};
 use super::sealing::{identity_subject_verifier, seal_oidc_payload, unseal_oidc_payload};
@@ -223,13 +224,25 @@ pub async fn callback(
     // chose it.
     match stored.intent {
         OidcFlowIntent::Link { account_id } => {
-            link_verified_identity(
-                &state.registry.store_clone(),
-                &account_id,
-                &claims.iss,
-                subject_verifier,
+            let actor = account_id.clone();
+            crate::identity::api::link_verified_identity(
+                state.verified_identity_transactions.as_ref(),
+                &crate::identity::api::VerifiedIdentityCommand {
+                    account_id,
+                    issuer: claims.iss.clone(),
+                    subject_verifier: subject_verifier.0,
+                    actor,
+                    mode: crate::identity::api::LinkMode::Add,
+                },
+                Utc::now(),
             )
-            .await?;
+            .await
+            .map_err(|error| match error {
+                crate::identity::api::IdentityError::Persistence(error) => {
+                    ApiError::Internal(error)
+                }
+                _ => ApiError::Conflict,
+            })?;
             return Ok((
                 axum::http::header::HeaderMap::new(),
                 axum::response::Redirect::to(&console_home(&state.config.base_path)),
@@ -308,7 +321,7 @@ pub async fn callback(
 /// subject first, which is why the old body-supplied route was not safe to
 /// keep. `(issuer, subject_verifier)` is unique in the durable schema, so two
 /// racing flows cannot both succeed.
-#[cfg(feature = "control-plane")]
+#[cfg(all(test, feature = "control-plane"))]
 async fn link_verified_identity(
     store: &std::sync::Arc<dyn crate::http::registry::storage::RegistryStore>,
     account_id: &str,
@@ -331,7 +344,7 @@ async fn link_verified_identity(
 /// the same proof-of-ownership rules as [`link_verified_identity`]: idempotent
 /// for an identity the Account already holds, refused when *another* Account
 /// holds the tuple.
-#[cfg(feature = "control-plane")]
+#[cfg(all(test, feature = "control-plane"))]
 async fn attach_verified_identity(
     store: &std::sync::Arc<dyn crate::http::registry::storage::RegistryStore>,
     account_id: &str,
@@ -362,39 +375,6 @@ async fn attach_verified_identity(
     Ok(())
 }
 
-/// Swap an Account's single mis-bound identity for the one just attested
-/// (invitation remediation). The store performs the swap as one guarded
-/// change, so the Account never has zero identities.
-#[cfg(feature = "control-plane")]
-async fn replace_verified_identity(
-    store: &std::sync::Arc<dyn crate::http::registry::storage::RegistryStore>,
-    account_id: &str,
-    issuer: &str,
-    subject_verifier: SubjectVerifier,
-    audit: &IdentityAudit,
-) -> Result<(), MemoryError> {
-    match store
-        .find_account_by_identity(issuer, &subject_verifier)
-        .await?
-    {
-        Some(existing) if existing.id == account_id => return Ok(()),
-        Some(_) => {
-            return Err(MemoryError::Conflict(
-                "this identity is already linked to another account".into(),
-            ));
-        }
-        None => {}
-    }
-    let identity = ExternalIdentity {
-        id: new_external_identity_id(),
-        issuer: issuer.to_owned(),
-        subject_verifier,
-        account_id: account_id.to_owned(),
-        created_at: Utc::now(),
-    };
-    store.replace_external_identity(&identity, audit).await
-}
-
 /// Issue an identity invitation (ADR-0057): a sealed provider round trip that
 /// attaches the next attested identity to `account_id`. The returned
 /// authorize URL *is* the invitation — it is completed by whoever owns the
@@ -407,21 +387,23 @@ pub async fn start_invite_flow(
     invited_by: &str,
     replace: bool,
 ) -> Result<String, ApiError> {
-    let store = state.registry.store_clone();
-    store
-        .find_account_by_id(account_id)
-        .await
-        .map_err(ApiError::Internal)?
-        .ok_or(ApiError::NotFound)?;
-    if replace {
-        let held = store
-            .find_external_identities(account_id)
-            .await
-            .map_err(ApiError::Internal)?;
-        if held.len() != 1 {
-            return Err(ApiError::Conflict);
-        }
-    }
+    crate::identity::api::validate_identity_invitation(
+        state.identity_invitation_port.as_ref(),
+        &crate::identity::api::IdentityInvitationCommand {
+            account_id: account_id.to_owned(),
+            invited_by: invited_by.to_owned(),
+            replace,
+        },
+    )
+    .await
+    .map_err(|error| match error {
+        crate::identity::api::IdentityError::NotFound => ApiError::NotFound,
+        crate::identity::api::IdentityError::LastIdentityOrConflict => ApiError::Conflict,
+        crate::identity::api::IdentityError::Persistence(error) => ApiError::Internal(error),
+        _ => ApiError::Internal(MemoryError::ConfigInvalid(
+            "invalid identity invitation".into(),
+        )),
+    })?;
     begin_flow(
         state,
         OidcFlowIntent::Invite {
@@ -447,24 +429,53 @@ pub(crate) async fn accept_invitation(
     subject_verifier: SubjectVerifier,
     request_headers: &axum::http::header::HeaderMap,
 ) -> Result<(axum::http::header::HeaderMap, axum::response::Redirect), ApiError> {
-    let store = state.registry.store_clone();
-    let audit = IdentityAudit::by_operator(invited_by, Utc::now());
-    if replace {
-        replace_verified_identity(&store, account_id, issuer, subject_verifier, &audit).await?;
-    } else {
-        attach_verified_identity(&store, account_id, issuer, subject_verifier, &audit).await?;
-    }
+    crate::identity::api::link_verified_identity(
+        state.verified_identity_transactions.as_ref(),
+        &crate::identity::api::VerifiedIdentityCommand {
+            account_id: account_id.to_owned(),
+            issuer: issuer.to_owned(),
+            subject_verifier: subject_verifier.0,
+            actor: invited_by.to_owned(),
+            mode: if replace {
+                crate::identity::api::LinkMode::Replace
+            } else {
+                crate::identity::api::LinkMode::Add
+            },
+        },
+        Utc::now(),
+    )
+    .await
+    .map_err(|error| match error {
+        crate::identity::api::IdentityError::Persistence(error) => ApiError::Internal(error),
+        _ => ApiError::Conflict,
+    })?;
 
-    let headers = if browser_has_valid_session(state, request_headers).await? {
-        axum::http::header::HeaderMap::new()
+    let cookie_value = request_headers
+        .get(axum::http::header::COOKIE)
+        .and_then(|value| value.to_str().ok())
+        .and_then(|raw| {
+            crate::control::session::parse_session_cookie(raw, &state.config.base_path)
+        });
+    let session = crate::identity::api::ensure_invitation_session(
+        state.invitation_session_port.as_ref(),
+        account_id,
+        cookie_value,
+    )
+    .await
+    .map_err(ApiError::Internal)?;
+    let headers = if let Some(session) = session {
+        let cookie =
+            crate::control::session::build_session_cookie(session.cookie_value, &state.config);
+        let mut headers = axum::http::header::HeaderMap::new();
+        headers.insert(
+            axum::http::header::SET_COOKIE,
+            cookie.parse().map_err(|_| {
+                ApiError::Internal(MemoryError::ConfigInvalid("invalid cookie header".into()))
+            })?,
+        );
+        headers
     } else {
-        let account = store
-            .find_account_by_id(account_id)
-            .await
-            .map_err(ApiError::Internal)?
-            .ok_or(ApiError::NotFound)?;
-        let policy = state.browser_policy.as_ref().ok_or(ApiError::Unavailable)?;
-        issue_session(state, &account, policy).await?
+        axum::http::header::HeaderMap::new()
     };
     Ok((
         headers,
@@ -497,29 +508,6 @@ async fn issue_session(
         })?,
     );
     Ok(headers)
-}
-
-/// Whether the browser already holds a valid control-plane session: an
-/// invitation acceptance must leave one alone.
-#[cfg(feature = "control-plane")]
-async fn browser_has_valid_session(
-    state: &std::sync::Arc<HttpState>,
-    request_headers: &axum::http::header::HeaderMap,
-) -> Result<bool, ApiError> {
-    let Some(cookie_value) = request_headers
-        .get(axum::http::header::COOKIE)
-        .and_then(|value| value.to_str().ok())
-        .and_then(|raw| {
-            crate::control::session::parse_session_cookie(raw, &state.config.base_path)
-        })
-    else {
-        return Ok(false);
-    };
-    Ok(
-        crate::control::session::resolve_session_record(state, cookie_value)
-            .await
-            .is_ok(),
-    )
 }
 
 #[cfg(all(test, feature = "control-plane"))]

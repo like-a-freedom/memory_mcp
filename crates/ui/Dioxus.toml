@@ -5,7 +5,7 @@
 # `index.html` next to this file.
 
 [application]
-name = "memory-mcp-control-plane"
+name = "memory-mcp-ui"
 
 [web.app]
 # Overrides the CLI's default title. The same string is set in `index.html` so

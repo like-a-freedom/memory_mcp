@@ -49,6 +49,35 @@ pub fn is_missing_index_error(message: &str) -> bool {
     lowered.contains("does not exist") && lowered.contains("index")
 }
 
+/// A single-record read result: the record body and the Active
+/// Namespace it was read from.
+pub type RecordLookup = (
+    Option<serde_json::Map<String, serde_json::Value>>,
+    Option<String>,
+);
+
+/// Require that a record id names a record of exactly `table`.
+///
+/// The low-level accessors derive their target table from the
+/// record-id string, so an owner-scoped accessor must check the
+/// prefix itself: without this, a `fact:…` id passed to the
+/// episode accessor reads the wrong aggregate. Every owner-scoped
+/// read and write goes through this, so the rule has one
+/// definition rather than one per store.
+pub fn require_record_kind(record_id: &str, table: &str) -> Result<(), crate::error::MemoryError> {
+    crate::storage::queries::validate_record_id(record_id)?;
+    let actual = record_id
+        .split_once(':')
+        .map(|(kind, _)| kind)
+        .unwrap_or_default();
+    if actual != table {
+        return Err(crate::error::MemoryError::Validation(format!(
+            "record_id '{record_id}' is not a {table} record id"
+        )));
+    }
+    Ok(())
+}
+
 pub fn surreal_to_json(value: SurrealValue) -> Value {
     serde_json::to_value(value).unwrap_or(Value::Null)
 }

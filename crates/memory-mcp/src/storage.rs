@@ -25,6 +25,7 @@ pub(crate) mod embedding_backfill_store;
 pub(crate) mod embedding_state_store;
 pub(crate) mod entity_store;
 pub(crate) mod episode_store;
+pub mod event_log_store;
 pub(crate) mod fact_store;
 mod helpers;
 pub mod inbox_revision_store;
@@ -52,8 +53,9 @@ pub use context_store::{ContextAccessLogClient, ContextStoreClient};
 pub(crate) use embedding_state_store::{EmbeddingStateStatus, EmbeddingStateStoreClient};
 pub(crate) use entity_store::EntityStoreClient;
 pub use episode_store::EpisodeStoreClient;
+pub use event_log_store::EventLogStoreClient;
 pub use fact_store::FactStoreClient;
-pub use helpers::is_missing_index_error;
+pub use helpers::{RecordLookup, is_missing_index_error};
 pub use inbox_revision_store::InboxRevisionStoreClient;
 pub use procedures::ProcedureStore;
 pub use queries::{

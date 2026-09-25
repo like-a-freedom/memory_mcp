@@ -255,7 +255,7 @@ async fn scan_fact_records_by_query_terms(
 ) -> Result<Vec<Value>, MemoryError> {
     let records = service
         .context_store()
-        .select_table("fact")
+        .scan_facts()
         .await
         .map_err(|err| MemoryError::Storage(format!("SurrealDB query error: {err}")))?;
 

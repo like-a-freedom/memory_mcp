@@ -19,6 +19,9 @@ pub struct LocalAdminExtension {
     pub hasher: Arc<crate::service::local_admin::password::PasswordHasher>,
     /// Plan version applied to clients created through the local workflow.
     pub plan_version: u32,
+    /// The provisioning port behind client creation, kept next to the
+    /// authority it authorizes so a handler cannot pick a different store.
+    pub client_creation: Arc<dyn crate::provisioning::api::ClientCreationPort>,
 }
 
 impl LocalAdminExtension {

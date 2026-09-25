@@ -3,9 +3,9 @@ use std::ffi::OsStr;
 use std::fs;
 use std::path::{Component, Path, PathBuf};
 
-const DIST_ENV: &str = "MEMORY_MCP_CONTROL_PLANE_UI_DIST";
-const STAGED_DIR: &str = "control-plane-ui";
-const MANIFEST_FILE: &str = "control_plane_assets.rs";
+const DIST_ENV: &str = "MEMORY_MCP_UI_DIST";
+const STAGED_DIR: &str = "ui";
+const MANIFEST_FILE: &str = "ui_assets.rs";
 
 #[derive(Debug)]
 struct Asset {
@@ -19,7 +19,7 @@ struct Asset {
 fn main() {
     println!("cargo:rerun-if-env-changed={DIST_ENV}");
 
-    if env::var_os("CARGO_FEATURE_CONTROL_PLANE_UI").is_none() {
+    if env::var_os("CARGO_FEATURE_UI").is_none() {
         return;
     }
 
@@ -128,7 +128,7 @@ fn build_assets(dist: &Path, out_dir: &Path) -> Result<Vec<Asset>, String> {
     Ok(assets)
 }
 
-/// Writes the `control_plane_assets.rs` manifest that `static_assets.rs`
+/// Writes the `ui_assets.rs` manifest that `static_assets.rs`
 /// `include!`s. When no bundle was provided the asset list is empty, so the
 /// binary compiles with a catalog that simply serves no UI.
 fn write_manifest(out_dir: &Path, assets: &[Asset]) {
@@ -319,9 +319,7 @@ mod tests {
 
     #[test]
     fn recognizes_dioxus_hashed_assets() {
-        assert!(is_content_addressed(
-            "/assets/control-plane-ui-dxh395eca31249da547.js"
-        ));
+        assert!(is_content_addressed("/assets/ui-dxh395eca31249da547.js"));
         assert!(is_content_addressed("/assets/main-dxh8aea88cdab71b47.css"));
     }
 

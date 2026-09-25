@@ -144,7 +144,7 @@ async fn spawn_with_env_configured_issuer(
     };
     let mut config = HttpServerConfig::default()
         .with_tenant(TestTenant::new(ACCOUNT_NAME, BOOTSTRAP_KEY))
-        .with_env("MEMORY_MCP_HTTP_ENABLE_CONTROL_PLANE", "true")
+        .with_env("MEMORY_MCP_HTTP_AUTH_METHODS", "oidc")
         .with_env("MEMORY_MCP_HTTP_OIDC_ISSUER", &configured_issuer)
         .with_env("MEMORY_MCP_HTTP_OIDC_CLIENT_ID", "test-client")
         .with_env("MEMORY_MCP_HTTP_OIDC_AUDIENCE", "memory-mcp-test")
@@ -337,7 +337,7 @@ async fn csrf_token_is_session_bound_and_unique_per_session() {
     let config = HttpServerConfig::default()
         .with_tenant(TestTenant::new(ACCOUNT_NAME, BOOTSTRAP_KEY))
         .with_tenant(TestTenant::new("control_plane_two", bootstrap_two_key))
-        .with_env("MEMORY_MCP_HTTP_ENABLE_CONTROL_PLANE", "true")
+        .with_env("MEMORY_MCP_HTTP_AUTH_METHODS", "oidc")
         .with_env("MEMORY_MCP_HTTP_OIDC_ISSUER", &oidc.base_url)
         .with_env("MEMORY_MCP_HTTP_OIDC_CLIENT_ID", "test-client")
         .with_env("MEMORY_MCP_HTTP_OIDC_AUDIENCE", "memory-mcp-test")
@@ -731,7 +731,8 @@ async fn operator_route_returns_403_without_operator_identity() {
 
 #[tokio::test]
 async fn api_v1_routes_take_precedence_over_static_fallback() {
-    // The control-plane is enabled but the control-plane-ui is not.
+    // The control plane and its compiled UI are part of this profile; the
+    // route must still take precedence over any static fallback.
     // The /api/v1/account/csrf route must still resolve to the
     // control-plane handler, not be swallowed by any future static
     // fallback mounted at /. 200 + a JSON body proves precedence.

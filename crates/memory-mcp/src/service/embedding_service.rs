@@ -7,7 +7,7 @@ use std::sync::Arc;
 use std::time::Instant;
 
 use lru::LruCache;
-use serde_json::{Value, json};
+use serde_json::json;
 use tokio::sync::{Mutex, RwLock};
 
 use crate::error::MemoryError;
@@ -526,54 +526,48 @@ impl EmbeddingService {
         Ok(())
     }
 
-    fn insert_current_embedding_fields(
-        &self,
-        payload: &mut serde_json::Map<String, Value>,
-        embedding: Vec<f64>,
-    ) -> Result<(), MemoryError> {
-        let expected_dim = self.embedding_provider.dimension();
-        if embedding.len() != expected_dim {
-            return Err(MemoryError::Validation(format!(
-                "embedding dimension mismatch: provider returned {}, expected {expected_dim}",
-                embedding.len()
-            )));
-        }
-        payload.insert("embedding".to_string(), json!(embedding));
-        payload.insert(
-            "embedding_provider".to_string(),
-            json!(self.embedding_provider.provider_name()),
-        );
-        if let Some(signature) = &self.current_embedding_signature {
-            payload.insert("embedding_signature".to_string(), json!(signature));
-        }
-        payload.insert(
-            "embedding_updated_at".to_string(),
-            json!(crate::service::normalize_dt(crate::service::query::now())),
-        );
-        Ok(())
-    }
-
     async fn store_embedding_on_fact(
         &self,
         fact_id: &str,
         embedding: Vec<f64>,
     ) -> Result<(), MemoryError> {
-        let Some(Value::Object(mut record)) = self.db.select_one(fact_id).await? else {
-            return Err(MemoryError::NotFound(format!(
-                "fact_id not found for background embedding: {fact_id}"
-            )));
+        let Some(identity) = self.current_vector_identity() else {
+            return Err(MemoryError::Validation(
+                "no resolved embedding target for background embedding".into(),
+            ));
         };
-
-        if let Some(current_signature) = self.current_embedding_signature.as_deref()
-            && record.get("embedding_signature").and_then(Value::as_str) == Some(current_signature)
-        {
-            return Ok(());
-        }
-
-        self.insert_current_embedding_fields(&mut record, embedding)?;
-        self.db.update(fact_id, Value::Object(record)).await?;
+        let adapter = crate::embedding::infra::FactVectorAdapter::new(
+            self.db.db.clone(),
+            self.db.namespace(),
+            self.current_embedding_model.clone(),
+            self.current_embedding_dimension,
+        );
+        crate::embedding::api::update_canonical_vector(
+            &adapter,
+            fact_id,
+            embedding,
+            &identity,
+            chrono::Utc::now(),
+            // The retry only ever skipped a fact whose stored
+            // signature already matched the runtime, so a stale
+            // vector is replaced rather than preserved.
+            crate::embedding::api::VectorWritePolicy::ReplaceStale,
+        )
+        .await?;
         crate::service::cache::invalidate_cache(&self.context_cache).await;
         Ok(())
+    }
+
+    /// Resolved target identity for a vector produced by the
+    /// current provider, or `None` when the runtime has not
+    /// resolved one.
+    fn current_vector_identity(&self) -> Option<crate::embedding::api::VectorIdentity> {
+        Some(crate::embedding::api::VectorIdentity {
+            provider: self.embedding_provider.provider_name().to_owned(),
+            model: self.current_embedding_model.clone(),
+            dimension: self.current_embedding_dimension?,
+            signature: self.current_embedding_signature.clone()?,
+        })
     }
 
     async fn release_background_embedding_task(&self, task_key: &str) {

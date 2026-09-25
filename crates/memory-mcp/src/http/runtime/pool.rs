@@ -156,7 +156,6 @@ pub use crate::http::registry::models::DEFAULT_PER_TENANT_REQUEST_CONCURRENCY as
 /// `build_runtime`; the handle is cheap to clone.
 pub struct Pool {
     map: Mutex<LruCache<String, Arc<Mutex<TenantRuntimeSlot>>>>,
-    registry: Arc<crate::http::registry::RegistryHandle>,
     cap: usize,
     // Read by `evict_idle` and the tracked scheduler job.
     idle_ttl: Duration,
@@ -166,6 +165,11 @@ pub struct Pool {
     // Bound for concurrent in-flight requests against a single tenant runtime.
     per_tenant_concurrency: u32,
     runtime_options: super::storage::RuntimeOptions,
+    tenancy: Arc<
+        crate::tenancy::api::Tenancy<
+            crate::bootstrap::integration::tenancy_runtime::LegacyTenantRuntimeFactory,
+        >,
+    >,
 }
 
 impl Pool {
@@ -178,17 +182,29 @@ impl Pool {
         registry: Arc<crate::http::registry::RegistryHandle>,
     ) -> Self {
         let cap = cap.max(1);
+        let runtime_options = super::storage::RuntimeOptions::default();
+        let tenancy = Arc::new(crate::tenancy::api::Tenancy::new(
+            Arc::new(
+                crate::bootstrap::integration::tenancy_runtime::LegacyTenantRuntimeFactory::new(
+                    Arc::clone(&registry),
+                    runtime_options.clone(),
+                ),
+            ),
+            cap,
+            idle_ttl,
+            activation_timeout,
+        ));
         Self {
             map: Mutex::new(LruCache::new(
                 std::num::NonZeroUsize::new(cap).unwrap_or(std::num::NonZeroUsize::MIN),
             )),
-            registry,
             cap,
             idle_ttl,
             capacity_wait,
             activation_timeout,
             per_tenant_concurrency,
-            runtime_options: super::storage::RuntimeOptions::default(),
+            runtime_options,
+            tenancy,
         }
     }
 
@@ -223,6 +239,9 @@ impl Pool {
             registry,
         );
         pool.runtime_options = super::storage::RuntimeOptions::from_http_config(config);
+        pool.tenancy
+            .factory()
+            .set_options(super::storage::RuntimeOptions::from_http_config(config));
         pool
     }
 
@@ -256,6 +275,7 @@ impl Pool {
             .collect();
         let evicted = candidates.len();
         for tenant_id in candidates {
+            self.tenancy.evict_tenant(&tenant_id);
             map.pop(&tenant_id);
         }
         evicted
@@ -302,7 +322,26 @@ impl Pool {
         tenant: &Tenant,
         per_tenant_concurrency: u32,
     ) -> Result<super::guard::OperationGuard, PoolError> {
-        let slot = self.slot_for(tenant, per_tenant_concurrency).await?;
+        self.acquire_spec_with_limit(
+            &crate::tenancy::api::TenantRuntimeSpec {
+                tenant_id: tenant.id.clone(),
+                namespace: tenant.namespace_binding.namespace.clone(),
+                database: tenant.namespace_binding.database.clone(),
+                plan_version: tenant.plan_version,
+                schema_version: tenant.schema_version,
+            },
+            per_tenant_concurrency,
+        )
+        .await
+    }
+
+    pub async fn acquire_spec_with_limit(
+        self: &Arc<Self>,
+        spec: &crate::tenancy::api::TenantRuntimeSpec,
+        per_tenant_concurrency: u32,
+    ) -> Result<super::guard::OperationGuard, PoolError> {
+        let tenant_id = spec.tenant_id.clone();
+        let slot = self.slot_for(&tenant_id, per_tenant_concurrency).await?;
         let mut guard = slot.lock().await;
 
         // Fast path: already Ready.
@@ -331,7 +370,7 @@ impl Pool {
             drop(guard);
             match rx.recv().await {
                 Ok(runtime) => {
-                    let slot = match self.slot_for(tenant, per_tenant_concurrency).await {
+                    let slot = match self.slot_for(&tenant_id, per_tenant_concurrency).await {
                         Ok(s) => s,
                         Err(e) => return Err(e),
                     };
@@ -356,29 +395,24 @@ impl Pool {
 
         // First arriver: kick off the activation.
         let _rx = guard.activation.begin();
-        let registry = self.registry.clone();
-        let tenant_clone = tenant.clone();
-        let tenant_id = tenant.id.clone();
+        let tenant_id = spec.tenant_id.clone();
         drop(guard);
-        let activation_result = tokio::time::timeout(
-            self.activation_timeout,
-            super::storage::build_runtime_with_options(
-                &registry,
-                &tenant_clone,
-                self.runtime_options.clone(),
-            ),
-        )
+        let activation_result = tokio::time::timeout(self.activation_timeout, async {
+            self.tenancy
+                .activate(spec.clone())
+                .await
+                .map(|lease| lease.into_runtime())
+        })
         .await
         .map_err(|_| MemoryError::Unavailable("tenant runtime activation timed out".into()))
         .and_then(|result| result);
-        let slot = match self.slot_for(tenant, per_tenant_concurrency).await {
+        let slot = match self.slot_for(&tenant_id, per_tenant_concurrency).await {
             Ok(s) => s,
             Err(e) => return Err(e),
         };
         let mut guard = slot.lock().await;
         match activation_result {
             Ok(runtime) => {
-                let runtime = Arc::new(runtime);
                 guard.runtime = Some(runtime.clone());
                 guard.phase = RuntimePhase::Ready;
                 if let Some(sender) = guard.activation.in_flight.take() {
@@ -413,10 +447,10 @@ impl Pool {
     /// return `CapacityTimeout` if none does.
     async fn slot_for(
         self: &Arc<Self>,
-        tenant: &Tenant,
+        tenant_id: &str,
         per_tenant_concurrency: u32,
     ) -> Result<Arc<Mutex<TenantRuntimeSlot>>, PoolError> {
-        let key = tenant.id.clone();
+        let key = tenant_id.to_string();
         loop {
             {
                 let mut map = self.map.lock().await;
@@ -450,7 +484,10 @@ impl Pool {
                     }
                 });
                 if let Some(candidate) = candidate {
-                    map.pop(&candidate);
+                    if let Some(slot_guard) = map.pop(&candidate) {
+                        drop(slot_guard);
+                        self.tenancy.evict_tenant(&candidate);
+                    }
                     let slot = Arc::new(Mutex::new(TenantRuntimeSlot::new_with_limit(
                         per_tenant_concurrency.max(1),
                     )));

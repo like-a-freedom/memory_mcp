@@ -1,0 +1,350 @@
+source,destination,layer,owner,canonical_operations,phase,consumers,temporary_edge
+bin/memory_mcp_http.rs,src/,module-glue,platform,composition and module glue,Phase 2,bootstrap and module roots,legacy:current module layout -> Phase 2
+cli.rs,src/,adapter-or-platform,platform,public adapter and operational support,Phase 2,"binaries, tools and eval harness",legacy:adapter layout -> Phase 2
+cli/admin_config.rs,src/,adapter-or-platform,platform,public adapter and operational support,Phase 2,"binaries, tools and eval harness",legacy:adapter layout -> Phase 2
+cli/args.rs,src/,adapter-or-platform,platform,public adapter and operational support,Phase 2,"binaries, tools and eval harness",legacy:adapter layout -> Phase 2
+cli/commands.rs,src/,adapter-or-platform,platform,public adapter and operational support,Phase 2,"binaries, tools and eval harness",legacy:adapter layout -> Phase 2
+cli/commands/admin.rs,src/,adapter-or-platform,platform,public adapter and operational support,Phase 2,"binaries, tools and eval harness",legacy:adapter layout -> Phase 2
+cli/commands/assemble_context.rs,src/,adapter-or-platform,platform,public adapter and operational support,Phase 2,"binaries, tools and eval harness",legacy:adapter layout -> Phase 2
+cli/commands/explain.rs,src/,adapter-or-platform,platform,public adapter and operational support,Phase 2,"binaries, tools and eval harness",legacy:adapter layout -> Phase 2
+cli/commands/extract.rs,src/,adapter-or-platform,platform,public adapter and operational support,Phase 2,"binaries, tools and eval harness",legacy:adapter layout -> Phase 2
+cli/commands/ingest.rs,src/,adapter-or-platform,platform,public adapter and operational support,Phase 2,"binaries, tools and eval harness",legacy:adapter layout -> Phase 2
+cli/commands/init.rs,src/,adapter-or-platform,platform,public adapter and operational support,Phase 2,"binaries, tools and eval harness",legacy:adapter layout -> Phase 2
+cli/commands/invalidate.rs,src/,adapter-or-platform,platform,public adapter and operational support,Phase 2,"binaries, tools and eval harness",legacy:adapter layout -> Phase 2
+cli/commands/lifecycle.rs,src/memory/,application-or-domain,memory,episodes recall and lifecycle,Phase 5,"MCP, CLI, eval harness",legacy:service/memory -> Phase 5
+cli/commands/lifecycle_capture.rs,src/memory/,application-or-domain,memory,episodes recall and lifecycle,Phase 5,"MCP, CLI, eval harness",legacy:service/memory -> Phase 5
+cli/commands/lifecycle_recall.rs,src/memory/,application-or-domain,memory,episodes recall and lifecycle,Phase 5,"MCP, CLI, eval harness",legacy:service/memory -> Phase 5
+cli/commands/resolve.rs,src/,adapter-or-platform,platform,public adapter and operational support,Phase 2,"binaries, tools and eval harness",legacy:adapter layout -> Phase 2
+cli/runtime.rs,src/,adapter-or-platform,platform,public adapter and operational support,Phase 2,"binaries, tools and eval harness",legacy:adapter layout -> Phase 2
+config.rs,src/bootstrap/config/,configuration,bootstrap,typed startup configuration,Phase 2,binaries and bootstrap,legacy:config -> Phase 2
+config/claims.rs,src/bootstrap/config/,configuration,bootstrap,typed startup configuration,Phase 2,binaries and bootstrap,legacy:config -> Phase 2
+config/constants.rs,src/bootstrap/config/,configuration,bootstrap,typed startup configuration,Phase 2,binaries and bootstrap,legacy:config -> Phase 2
+config/embedding.rs,src/bootstrap/config/,configuration,bootstrap,typed startup configuration,Phase 2,binaries and bootstrap,legacy:config -> Phase 2
+config/fs_watch.rs,src/bootstrap/config/,configuration,bootstrap,typed startup configuration,Phase 2,binaries and bootstrap,legacy:config -> Phase 2
+config/helpers.rs,src/bootstrap/config/,configuration,bootstrap,typed startup configuration,Phase 2,binaries and bootstrap,legacy:config -> Phase 2
+config/lifecycle.rs,src/memory/,application-or-domain,memory,episodes recall and lifecycle,Phase 5,"MCP, CLI, eval harness",legacy:service/memory -> Phase 5
+config/ner.rs,src/bootstrap/config/,configuration,bootstrap,typed startup configuration,Phase 2,binaries and bootstrap,legacy:config -> Phase 2
+config/secrets.rs,src/bootstrap/config/,configuration,bootstrap,typed startup configuration,Phase 2,binaries and bootstrap,legacy:config -> Phase 2
+config/surreal.rs,src/bootstrap/config/,configuration,bootstrap,typed startup configuration,Phase 2,binaries and bootstrap,legacy:config -> Phase 2
+config/target.rs,src/bootstrap/config/,configuration,bootstrap,typed startup configuration,Phase 2,binaries and bootstrap,legacy:config -> Phase 2
+control.rs,src/,module-glue,platform,composition and module glue,Phase 2,bootstrap and module roots,legacy:current module layout -> Phase 2
+control/account_api.rs,src/operations/,adapter-or-use-case,operations,administrative deletion and recovery,Phase 2,HTTP handlers and scheduler,legacy:control -> Phase 2
+control/application/mod.rs,src/http/,adapter,http,HTTP control-plane routes and mapping,Phase 2,HTTP router,legacy:control -> Phase 2
+control/application/oidc_signup.rs,src/identity/,api-or-adapter,identity,identity administration and browser sessions,Phase 3,HTTP and bootstrap,legacy:control/service/http registry -> Phase 3
+control/csrf.rs,src/identity/,api-or-adapter,identity,identity administration and browser sessions,Phase 3,HTTP and bootstrap,legacy:control/service/http registry -> Phase 3
+control/deletion.rs,src/operations/,adapter-or-use-case,operations,administrative deletion and recovery (Phase 6 reduced this to the typed phrase and token verifier; the decision and recovery loop are operations-owned),Phase 2,HTTP handlers and scheduler,legacy:control -> Phase 2
+control/error.rs,src/http/,adapter,http,HTTP control-plane routes and mapping,Phase 2,HTTP router,legacy:control -> Phase 2
+control/local_admin.rs,src/identity/,api-or-adapter,identity,identity administration and browser sessions,Phase 3,HTTP and bootstrap,legacy:control/service/http registry -> Phase 3
+control/local_admin/csrf.rs,src/identity/,api-or-adapter,identity,identity administration and browser sessions,Phase 3,HTTP and bootstrap,legacy:control/service/http registry -> Phase 3
+control/local_admin/handlers.rs,src/identity/,api-or-adapter,identity,identity administration and browser sessions,Phase 3,HTTP and bootstrap,legacy:control/service/http registry -> Phase 3
+control/oidc.rs,src/identity/,api-or-adapter,identity,identity administration and browser sessions,Phase 3,HTTP and bootstrap,legacy:control/service/http registry -> Phase 3
+control/oidc/client.rs,src/identity/,api-or-adapter,identity,identity administration and browser sessions,Phase 3,HTTP and bootstrap,legacy:control/service/http registry -> Phase 3
+control/oidc/flow_material.rs,src/identity/,api-or-adapter,identity,identity administration and browser sessions,Phase 3,HTTP and bootstrap,legacy:control/service/http registry -> Phase 3
+control/oidc/handlers.rs,src/identity/,api-or-adapter,identity,identity administration and browser sessions,Phase 3,HTTP and bootstrap,legacy:control/service/http registry -> Phase 3
+control/oidc/jwks.rs,src/identity/,api-or-adapter,identity,identity administration and browser sessions,Phase 3,HTTP and bootstrap,legacy:control/service/http registry -> Phase 3
+control/oidc/sealing.rs,src/identity/,api-or-adapter,identity,identity administration and browser sessions,Phase 3,HTTP and bootstrap,legacy:control/service/http registry -> Phase 3
+control/operator.rs,src/operations/,adapter-or-use-case,operations,administrative deletion and recovery,Phase 2,HTTP handlers and scheduler,legacy:control -> Phase 2
+control/recent_auth.rs,src/identity/,api-or-adapter,identity,identity administration and browser sessions,Phase 3,HTTP and bootstrap,legacy:control/service/http registry -> Phase 3
+control/secret.rs,src/identity/,api-or-adapter,identity,identity administration and browser sessions,Phase 3,HTTP and bootstrap,legacy:control/service/http registry -> Phase 3
+control/session.rs,src/identity/,api-or-adapter,identity,identity administration and browser sessions,Phase 3,HTTP and bootstrap,legacy:control/service/http registry -> Phase 3
+error.rs,src/shared/,pure-kernel,shared,typed error contract,Phase 2,all contexts,legacy:error.rs -> Phase 2
+eval_support.rs,src/,adapter-or-platform,platform,public adapter and operational support,Phase 2,"binaries, tools and eval harness",legacy:adapter layout -> Phase 2
+http.rs,src/,module-glue,platform,composition and module glue,Phase 2,bootstrap and module roots,legacy:current module layout -> Phase 2
+http/app_sessions.rs,src/http/,adapter,http,protocol adapter and request mapping,Phase 2,HTTP router,legacy:http -> Phase 2
+http/app_sessions/scheduler.rs,src/provisioning/,application-or-adapter,provisioning,durable workflows and app sessions,Phase 4,HTTP bootstrap and owner APIs,legacy:http workflow modules -> Phase 4
+http/app_sessions/store.rs,src/provisioning/,application-or-adapter,provisioning,durable workflows and app sessions,Phase 4,HTTP bootstrap and owner APIs,legacy:http workflow modules -> Phase 4
+http/composition.rs,src/http/,adapter,http,protocol adapter and request mapping,Phase 2,HTTP router,legacy:http -> Phase 2
+http/config.rs,src/http/,adapter,http,protocol adapter and request mapping,Phase 2,HTTP router,legacy:http -> Phase 2
+http/config/parse.rs,src/http/,adapter,http,protocol adapter and request mapping,Phase 2,HTTP router,legacy:http -> Phase 2
+http/config/types.rs,src/http/,adapter,http,protocol adapter and request mapping,Phase 2,HTTP router,legacy:http -> Phase 2
+http/config/validate.rs,src/http/,adapter,http,protocol adapter and request mapping,Phase 2,HTTP router,legacy:http -> Phase 2
+http/fault_injection.rs,src/http/,adapter,http,protocol adapter and request mapping,Phase 2,HTTP router,legacy:http -> Phase 2
+http/health.rs,src/http/,adapter,http,protocol adapter and request mapping,Phase 2,HTTP router,legacy:http -> Phase 2
+http/leases.rs,src/provisioning/,application-or-adapter,provisioning,durable workflows and app sessions,Phase 4,HTTP bootstrap and owner APIs,legacy:http workflow modules -> Phase 4
+http/leases/migration.rs,src/provisioning/,application-or-adapter,provisioning,durable workflows and app sessions,Phase 4,HTTP bootstrap and owner APIs,legacy:http workflow modules -> Phase 4
+http/leases/scheduler.rs,src/provisioning/,application-or-adapter,provisioning,durable workflows and app sessions,Phase 4,HTTP bootstrap and owner APIs,legacy:http workflow modules -> Phase 4
+http/logging.rs,src/http/,adapter,http,protocol adapter and request mapping,Phase 2,HTTP router,legacy:http -> Phase 2
+http/metrics.rs,src/http/,adapter,http,protocol adapter and request mapping,Phase 2,HTTP router,legacy:http -> Phase 2
+http/middleware.rs,src/http/,adapter,http,protocol adapter and request mapping,Phase 2,HTTP router,legacy:http -> Phase 2
+http/middleware/acquire_runtime.rs,src/http/,adapter,http,protocol adapter and request mapping,Phase 2,HTTP router,legacy:http -> Phase 2
+http/middleware/auth.rs,src/http/,adapter,http,protocol adapter and request mapping,Phase 2,HTTP router,legacy:http -> Phase 2
+http/middleware/deadline.rs,src/http/,adapter,http,protocol adapter and request mapping,Phase 2,HTTP router,legacy:http -> Phase 2
+http/middleware/host_origin.rs,src/http/,adapter,http,protocol adapter and request mapping,Phase 2,HTTP router,legacy:http -> Phase 2
+http/middleware/local_deadline.rs,src/http/,adapter,http,protocol adapter and request mapping,Phase 2,HTTP router,legacy:http -> Phase 2
+http/middleware/preflight.rs,src/http/,adapter,http,protocol adapter and request mapping,Phase 2,HTTP router,legacy:http -> Phase 2
+http/middleware/sse_headers.rs,src/http/,adapter,http,protocol adapter and request mapping,Phase 2,HTTP router,legacy:http -> Phase 2
+http/oauth.rs,src/http/,adapter,http,protocol adapter and request mapping,Phase 2,HTTP router,legacy:http -> Phase 2
+http/principal.rs,src/http/,adapter,http,protocol adapter and request mapping,Phase 2,HTTP router,legacy:http -> Phase 2
+http/principal/api_keys.rs,src/http/,adapter,http,protocol adapter and request mapping,Phase 2,HTTP router,legacy:http -> Phase 2
+http/principal/auth.rs,src/http/,adapter,http,protocol adapter and request mapping,Phase 2,HTTP router,legacy:http -> Phase 2
+http/principal/cache.rs,src/http/,adapter,http,protocol adapter and request mapping,Phase 2,HTTP router,legacy:http -> Phase 2
+http/registry.rs,src/platform/persistence/control/,infra,platform,control database stores,Phase 2,bootstrap and owner ports,legacy:http/registry -> Phase 2
+http/registry/account.rs,src/platform/persistence/control/,infra,platform,control database stores,Phase 2,bootstrap and owner ports,legacy:http/registry -> Phase 2
+http/registry/migrations.rs,src/platform/persistence/control/,infra,platform,control database stores,Phase 2,bootstrap and owner ports,legacy:http/registry -> Phase 2
+http/registry/models.rs,src/platform/persistence/control/,infra,platform,control database stores,Phase 2,bootstrap and owner ports,legacy:http/registry -> Phase 2
+http/registry/plan.rs,src/platform/persistence/control/,infra,platform,control database stores,Phase 2,bootstrap and owner ports,legacy:http/registry -> Phase 2
+http/registry/provisioning.rs,src/platform/persistence/control/,infra,platform,control database stores,Phase 2,bootstrap and owner ports,legacy:http/registry -> Phase 2
+http/registry/storage.rs,src/platform/persistence/control/,infra,platform,control database stores,Phase 2,bootstrap and owner ports,legacy:http/registry -> Phase 2
+http/registry/surreal_store.rs,src/platform/persistence/control/,infra,platform,control database stores,Phase 2,bootstrap and owner ports,legacy:http/registry -> Phase 2
+http/registry/surreal_store/local_admin.rs,src/platform/persistence/control/,infra,platform,control database stores,Phase 2,bootstrap and owner ports,legacy:http/registry -> Phase 2
+http/registry/surreal_store/local_admin_rate.rs,src/platform/persistence/control/,infra,platform,control database stores,Phase 2,bootstrap and owner ports,legacy:http/registry -> Phase 2
+http/registry/surreal_store/local_admin_remote.rs,src/platform/persistence/control/,infra,platform,control database stores,Phase 2,bootstrap and owner ports,legacy:http/registry -> Phase 2
+http/router.rs,src/http/,adapter,http,protocol adapter and request mapping,Phase 2,HTTP router,legacy:http -> Phase 2
+http/runtime.rs,src/tenancy/,api-or-bootstrap,tenancy,tenant runtime lifecycle,Phase 2,HTTP bootstrap,legacy:http/runtime -> Phase 2
+http/runtime/bootstrap.rs,src/tenancy/,api-or-bootstrap,tenancy,tenant runtime lifecycle,Phase 2,HTTP bootstrap,legacy:http/runtime -> Phase 2
+http/runtime/guard.rs,src/tenancy/,api-or-bootstrap,tenancy,tenant runtime lifecycle,Phase 2,HTTP bootstrap,legacy:http/runtime -> Phase 2
+http/runtime/lifecycle.rs,src/tenancy/,api-or-bootstrap,tenancy,tenant runtime lifecycle,Phase 2,HTTP bootstrap,legacy:http/runtime -> Phase 2
+http/runtime/pool.rs,src/tenancy/,api-or-bootstrap,tenancy,tenant runtime lifecycle,Phase 2,HTTP bootstrap,legacy:http/runtime -> Phase 2
+http/runtime/signal.rs,src/tenancy/,api-or-bootstrap,tenancy,tenant runtime lifecycle,Phase 2,HTTP bootstrap,legacy:http/runtime -> Phase 2
+http/runtime/storage.rs,src/tenancy/,api-or-bootstrap,tenancy,tenant runtime lifecycle,Phase 2,HTTP bootstrap,legacy:http/runtime -> Phase 2
+http/server.rs,src/http/,adapter,http,protocol adapter and request mapping,Phase 2,HTTP router,legacy:http -> Phase 2
+http/shutdown.rs,src/http/,adapter,http,protocol adapter and request mapping,Phase 2,HTTP router,legacy:http -> Phase 2
+http/subscriptions.rs,src/http/,adapter,http,protocol adapter and request mapping,Phase 2,HTTP router,legacy:http -> Phase 2
+http/subscriptions/outbox.rs,src/http/,adapter,http,subscription transport and outbox stream,Phase 4,HTTP routes,legacy:http/subscriptions -> Phase 4
+http/subscriptions/scheduler.rs,src/http/,adapter,http,subscription transport and outbox stream,Phase 4,HTTP routes,legacy:http/subscriptions -> Phase 4
+http/subscriptions/stream.rs,src/http/,adapter,http,subscription transport and outbox stream,Phase 4,HTTP routes,legacy:http/subscriptions -> Phase 4
+http/sync.rs,src/http/,adapter,http,protocol adapter and request mapping,Phase 2,HTTP router,legacy:http -> Phase 2
+http/tasks.rs,src/provisioning/,application-or-adapter,provisioning,durable workflows and app sessions,Phase 4,HTTP bootstrap and owner APIs,legacy:http workflow modules -> Phase 4
+http/tasks/scheduler.rs,src/provisioning/,application-or-adapter,provisioning,durable workflows and app sessions,Phase 4,HTTP bootstrap and owner APIs,legacy:http workflow modules -> Phase 4
+http/tasks/state.rs,src/provisioning/,application-or-adapter,provisioning,durable workflows and app sessions,Phase 4,HTTP bootstrap and owner APIs,legacy:http workflow modules -> Phase 4
+http/tasks/worker.rs,src/provisioning/,application-or-adapter,provisioning,durable workflows and app sessions,Phase 4,HTTP bootstrap and owner APIs,legacy:http workflow modules -> Phase 4
+http/test_bootstrap.rs,src/http/,adapter,http,protocol adapter and request mapping,Phase 2,HTTP router,legacy:http -> Phase 2
+http/test_state.rs,src/http/,adapter,http,protocol adapter and request mapping,Phase 2,HTTP router,legacy:http -> Phase 2
+http/transport.rs,src/http/,adapter,http,protocol adapter and request mapping,Phase 2,HTTP router,legacy:http -> Phase 2
+http/validation.rs,src/http/,adapter,http,protocol adapter and request mapping,Phase 2,HTTP router,legacy:http -> Phase 2
+lib.rs,src/<module>/mod.rs,module-glue,platform,public bootstrap and compatibility facades,Phase 2,"binaries, integration tests, eval harness",legacy:service/http/control layout -> Phase 2
+logging.rs,src/,adapter-or-platform,platform,public adapter and operational support,Phase 2,"binaries, tools and eval harness",legacy:adapter layout -> Phase 2
+main.rs,src/,module-glue,platform,composition and module glue,Phase 2,bootstrap and module roots,legacy:current module layout -> Phase 2
+mcp.rs,src/,adapter-or-platform,platform,public adapter and operational support,Phase 2,"binaries, tools and eval harness",legacy:adapter layout -> Phase 2
+mcp/error.rs,src/,adapter-or-platform,platform,public adapter and operational support,Phase 2,"binaries, tools and eval harness",legacy:adapter layout -> Phase 2
+mcp/handlers.rs,src/,adapter-or-platform,platform,public adapter and operational support,Phase 2,"binaries, tools and eval harness",legacy:adapter layout -> Phase 2
+mcp/handlers/apps.rs,src/,adapter-or-platform,platform,public adapter and operational support,Phase 2,"binaries, tools and eval harness",legacy:adapter layout -> Phase 2
+mcp/params.rs,src/,adapter-or-platform,platform,public adapter and operational support,Phase 2,"binaries, tools and eval harness",legacy:adapter layout -> Phase 2
+mcp/parsers.rs,src/,adapter-or-platform,platform,public adapter and operational support,Phase 2,"binaries, tools and eval harness",legacy:adapter layout -> Phase 2
+mcp/resources.rs,src/,adapter-or-platform,platform,public adapter and operational support,Phase 2,"binaries, tools and eval harness",legacy:adapter layout -> Phase 2
+mcp/response.rs,src/,adapter-or-platform,platform,public adapter and operational support,Phase 2,"binaries, tools and eval harness",legacy:adapter layout -> Phase 2
+mcp/session.rs,src/,adapter-or-platform,platform,public adapter and operational support,Phase 2,"binaries, tools and eval harness",legacy:adapter layout -> Phase 2
+models.rs,src/,pure-values-by-owner,shared,validated values and domain records,Phase 5,all contexts,legacy:models -> Phase 5
+models/access.rs,src/,pure-values-by-owner,shared,validated values and domain records,Phase 5,all contexts,legacy:models -> Phase 5
+models/claim.rs,src/,pure-values-by-owner,shared,validated values and domain records,Phase 5,all contexts,legacy:models -> Phase 5
+models/domain.rs,src/,pure-values-by-owner,shared,validated values and domain records,Phase 5,all contexts,legacy:models -> Phase 5
+models/ids.rs,src/,pure-values-by-owner,shared,validated values and domain records,Phase 5,all contexts,legacy:models -> Phase 5
+models/inbox_revision.rs,src/,pure-values-by-owner,shared,validated values and domain records,Phase 5,all contexts,legacy:models -> Phase 5
+models/lifecycle_trace.rs,src/memory/,application-or-domain,memory,episodes recall and lifecycle,Phase 5,"MCP, CLI, eval harness",legacy:service/memory -> Phase 5
+models/memory_event.rs,src/,pure-values-by-owner,shared,validated values and domain records,Phase 5,all contexts,legacy:models -> Phase 5
+models/procedure.rs,src/,pure-values-by-owner,shared,validated values and domain records,Phase 5,all contexts,legacy:models -> Phase 5
+models/provenance.rs,src/,pure-values-by-owner,shared,validated values and domain records,Phase 5,all contexts,legacy:models -> Phase 5
+models/request.rs,src/,pure-values-by-owner,shared,validated values and domain records,Phase 5,all contexts,legacy:models -> Phase 5
+models/rounding.rs,src/,pure-values-by-owner,shared,validated values and domain records,Phase 5,all contexts,legacy:models -> Phase 5
+observability.rs,src/,adapter-or-platform,platform,public adapter and operational support,Phase 2,"binaries, tools and eval harness",legacy:adapter layout -> Phase 2
+runner.rs,src/,adapter-or-platform,platform,public adapter and operational support,Phase 2,"binaries, tools and eval harness",legacy:adapter layout -> Phase 2
+service.rs,src/,module-glue,platform,composition and module glue,Phase 2,bootstrap and module roots,legacy:current module layout -> Phase 2
+service/agent_memory.rs,src/memory/,application-or-domain,memory,episodes recall and lifecycle,Phase 5,"MCP, CLI, eval harness",legacy:service/memory -> Phase 5
+service/agent_memory/capture.rs,src/memory/,application-or-domain,memory,episodes recall and lifecycle,Phase 5,"MCP, CLI, eval harness",legacy:service/memory -> Phase 5
+service/agent_memory/policy.rs,src/memory/,application-or-domain,memory,episodes recall and lifecycle,Phase 5,"MCP, CLI, eval harness",legacy:service/memory -> Phase 5
+service/agent_memory/projection.rs,src/memory/,application-or-domain,memory,episodes recall and lifecycle,Phase 5,"MCP, CLI, eval harness",legacy:service/memory -> Phase 5
+service/agent_memory/recall.rs,src/memory/,application-or-domain,memory,episodes recall and lifecycle,Phase 5,"MCP, CLI, eval harness",legacy:service/memory -> Phase 5
+service/agent_memory/worker.rs,src/memory/,application-or-domain,memory,episodes recall and lifecycle,Phase 5,"MCP, CLI, eval harness",legacy:service/memory -> Phase 5
+service/apps.rs,src/,platform-or-bootstrap,platform,technical mechanism and composition,Phase 2,bootstrap and owners,legacy:service -> Phase 2
+service/apps/diff.rs,src/,platform-or-bootstrap,platform,technical mechanism and composition,Phase 2,bootstrap and owners,legacy:service -> Phase 2
+service/apps/dispatch.rs,src/,platform-or-bootstrap,platform,technical mechanism and composition,Phase 2,bootstrap and owners,legacy:service -> Phase 2
+service/apps/graph.rs,src/,platform-or-bootstrap,platform,technical mechanism and composition,Phase 2,bootstrap and owners,legacy:service -> Phase 2
+service/apps/ingestion_review.rs,src/memory/,application-or-domain,memory,episodes recall and lifecycle,Phase 5,"MCP, CLI, eval harness",legacy:service/memory -> Phase 5
+service/apps/lifecycle.rs,src/memory/,application-or-domain,memory,episodes recall and lifecycle,Phase 5,"MCP, CLI, eval harness",legacy:service/memory -> Phase 5
+service/apps/session.rs,src/,platform-or-bootstrap,platform,technical mechanism and composition,Phase 2,bootstrap and owners,legacy:service -> Phase 2
+service/apps/session_lifecycle.rs,src/,platform-or-bootstrap,platform,technical mechanism and composition,Phase 2,bootstrap and owners,legacy:service -> Phase 2
+service/apps/types.rs,src/,platform-or-bootstrap,platform,technical mechanism and composition,Phase 2,bootstrap and owners,legacy:service -> Phase 2
+service/apps/workflow.rs,src/,platform-or-bootstrap,platform,technical mechanism and composition,Phase 2,bootstrap and owners,legacy:service -> Phase 2
+service/cache.rs,src/,module-glue,platform,composition and module glue,Phase 2,bootstrap and module roots,legacy:current module layout -> Phase 2
+service/cache/invalidation.rs,src/,module-glue,platform,composition and module glue,Phase 2,bootstrap and module roots,legacy:current module layout -> Phase 2
+service/cache/key.rs,src/,module-glue,platform,composition and module glue,Phase 2,bootstrap and module roots,legacy:current module layout -> Phase 2
+service/capabilities.rs,src/memory/,application-or-domain,memory,episodes recall and lifecycle,Phase 5,"MCP, CLI, eval harness",legacy:service/memory -> Phase 5
+service/capabilities/assemble_context.rs,src/memory/,application-or-domain,memory,episodes recall and lifecycle,Phase 5,"MCP, CLI, eval harness",legacy:service/memory -> Phase 5
+service/capabilities/explain.rs,src/memory/,application-or-domain,memory,episodes recall and lifecycle,Phase 5,"MCP, CLI, eval harness",legacy:service/memory -> Phase 5
+service/capabilities/extract.rs,src/memory/,application-or-domain,memory,episodes recall and lifecycle,Phase 5,"MCP, CLI, eval harness",legacy:service/memory -> Phase 5
+service/capabilities/ingest.rs,src/memory/,application-or-domain,memory,episodes recall and lifecycle,Phase 5,"MCP, CLI, eval harness",legacy:service/memory -> Phase 5
+service/capabilities/invalidate.rs,src/memory/,application-or-domain,memory,episodes recall and lifecycle,Phase 5,"MCP, CLI, eval harness",legacy:service/memory -> Phase 5
+service/capabilities/resolve.rs,src/memory/,application-or-domain,memory,episodes recall and lifecycle,Phase 5,"MCP, CLI, eval harness",legacy:service/memory -> Phase 5
+service/claims.rs,src/knowledge/,application-or-domain,knowledge,entities facts and claims,Phase 5,"MCP, CLI, eval harness",legacy:service/knowledge -> Phase 5
+service/claims/backfill.rs,src/knowledge/,application-or-domain,knowledge,entities facts and claims,Phase 5,"MCP, CLI, eval harness",legacy:service/knowledge -> Phase 5
+service/claims/extract.rs,src/knowledge/,application-or-domain,knowledge,entities facts and claims,Phase 5,"MCP, CLI, eval harness",legacy:service/knowledge -> Phase 5
+service/claims/projection.rs,src/knowledge/,application-or-domain,knowledge,entities facts and claims,Phase 5,"MCP, CLI, eval harness",legacy:service/knowledge -> Phase 5
+service/claims/reconcile.rs,src/knowledge/,application-or-domain,knowledge,entities facts and claims,Phase 5,"MCP, CLI, eval harness",legacy:service/knowledge -> Phase 5
+service/claims/schema.rs,src/knowledge/,application-or-domain,knowledge,entities facts and claims,Phase 5,"MCP, CLI, eval harness",legacy:service/knowledge -> Phase 5
+service/claims/structural.rs,src/knowledge/,application-or-domain,knowledge,entities facts and claims,Phase 5,"MCP, CLI, eval harness",legacy:service/knowledge -> Phase 5
+service/claims/telemetry.rs,src/knowledge/,application-or-domain,knowledge,entities facts and claims,Phase 5,"MCP, CLI, eval harness",legacy:service/knowledge -> Phase 5
+service/claims/worker.rs,src/knowledge/,application-or-domain,knowledge,entities facts and claims,Phase 5,"MCP, CLI, eval harness",legacy:service/knowledge -> Phase 5
+service/community.rs,src/knowledge/,application-or-domain,knowledge,entities facts and claims,Phase 5,"MCP, CLI, eval harness",legacy:service/knowledge -> Phase 5
+service/conflict_resolver.rs,src/knowledge/,application-or-domain,knowledge,entities facts and claims,Phase 5,"MCP, CLI, eval harness",legacy:service/knowledge -> Phase 5
+service/content_extraction.rs,src/knowledge/,application-or-domain,knowledge,entities facts and claims,Phase 5,"MCP, CLI, eval harness",legacy:service/knowledge -> Phase 5
+service/content_extraction/chunker.rs,src/knowledge/,application-or-domain,knowledge,entities facts and claims,Phase 5,"MCP, CLI, eval harness",legacy:service/knowledge -> Phase 5
+service/content_extraction/email.rs,src/knowledge/,application-or-domain,knowledge,entities facts and claims,Phase 5,"MCP, CLI, eval harness",legacy:service/knowledge -> Phase 5
+service/content_extraction/office.rs,src/knowledge/,application-or-domain,knowledge,entities facts and claims,Phase 5,"MCP, CLI, eval harness",legacy:service/knowledge -> Phase 5
+service/content_extraction/pdf.rs,src/knowledge/,application-or-domain,knowledge,entities facts and claims,Phase 5,"MCP, CLI, eval harness",legacy:service/knowledge -> Phase 5
+service/content_extraction/text.rs,src/knowledge/,application-or-domain,knowledge,entities facts and claims,Phase 5,"MCP, CLI, eval harness",legacy:service/knowledge -> Phase 5
+service/context.rs,src/memory/,application-or-domain,memory,episodes recall and lifecycle,Phase 5,"MCP, CLI, eval harness",legacy:service/memory -> Phase 5
+service/context/alias_expansion.rs,src/memory/,application-or-domain,memory,episodes recall and lifecycle,Phase 5,"MCP, CLI, eval harness",legacy:service/memory -> Phase 5
+service/context/budget.rs,src/memory/,application-or-domain,memory,episodes recall and lifecycle,Phase 5,"MCP, CLI, eval harness",legacy:service/memory -> Phase 5
+service/context/community.rs,src/memory/,application-or-domain,memory,episodes recall and lifecycle,Phase 5,"MCP, CLI, eval harness",legacy:service/memory -> Phase 5
+service/context/experience.rs,src/memory/,application-or-domain,memory,episodes recall and lifecycle,Phase 5,"MCP, CLI, eval harness",legacy:service/memory -> Phase 5
+service/context/filtering.rs,src/memory/,application-or-domain,memory,episodes recall and lifecycle,Phase 5,"MCP, CLI, eval harness",legacy:service/memory -> Phase 5
+service/context/graph.rs,src/memory/,application-or-domain,memory,episodes recall and lifecycle,Phase 5,"MCP, CLI, eval harness",legacy:service/memory -> Phase 5
+service/context/lexical.rs,src/memory/,application-or-domain,memory,episodes recall and lifecycle,Phase 5,"MCP, CLI, eval harness",legacy:service/memory -> Phase 5
+service/context/logging.rs,src/memory/,application-or-domain,memory,episodes recall and lifecycle,Phase 5,"MCP, CLI, eval harness",legacy:service/memory -> Phase 5
+service/context/params.rs,src/memory/,application-or-domain,memory,episodes recall and lifecycle,Phase 5,"MCP, CLI, eval harness",legacy:service/memory -> Phase 5
+service/context/pipeline.rs,src/memory/,application-or-domain,memory,episodes recall and lifecycle,Phase 5,"MCP, CLI, eval harness",legacy:service/memory -> Phase 5
+service/context/query_mode.rs,src/memory/,application-or-domain,memory,episodes recall and lifecycle,Phase 5,"MCP, CLI, eval harness",legacy:service/memory -> Phase 5
+service/context/ranking.rs,src/memory/,application-or-domain,memory,episodes recall and lifecycle,Phase 5,"MCP, CLI, eval harness",legacy:service/memory -> Phase 5
+service/context/rescue.rs,src/memory/,application-or-domain,memory,episodes recall and lifecycle,Phase 5,"MCP, CLI, eval harness",legacy:service/memory -> Phase 5
+service/context/scoring.rs,src/memory/,application-or-domain,memory,episodes recall and lifecycle,Phase 5,"MCP, CLI, eval harness",legacy:service/memory -> Phase 5
+service/context/semantic.rs,src/memory/,application-or-domain,memory,episodes recall and lifecycle,Phase 5,"MCP, CLI, eval harness",legacy:service/memory -> Phase 5
+service/context/temporal.rs,src/memory/,application-or-domain,memory,episodes recall and lifecycle,Phase 5,"MCP, CLI, eval harness",legacy:service/memory -> Phase 5
+service/context/triple.rs,src/memory/,application-or-domain,memory,episodes recall and lifecycle,Phase 5,"MCP, CLI, eval harness",legacy:service/memory -> Phase 5
+service/context/types.rs,src/memory/,application-or-domain,memory,episodes recall and lifecycle,Phase 5,"MCP, CLI, eval harness",legacy:service/memory -> Phase 5
+service/context/views.rs,src/memory/,application-or-domain,memory,episodes recall and lifecycle,Phase 5,"MCP, CLI, eval harness",legacy:service/memory -> Phase 5
+service/core.rs,src/,platform-or-bootstrap,platform,technical mechanism and composition,Phase 2,bootstrap and owners,legacy:service -> Phase 2
+service/core/builder.rs,src/,platform-or-bootstrap,platform,technical mechanism and composition,Phase 2,bootstrap and owners,legacy:service -> Phase 2
+service/core/helpers.rs,src/,platform-or-bootstrap,platform,technical mechanism and composition,Phase 2,bootstrap and owners,legacy:service -> Phase 2
+service/credential_material.rs,src/,module-glue,platform,composition and module glue,Phase 2,bootstrap and module roots,legacy:current module layout -> Phase 2
+service/durable_work.rs,src/,platform-or-bootstrap,platform,technical mechanism and composition,Phase 2,bootstrap and owners,legacy:service -> Phase 2
+service/embedding.rs,src/embedding/,technical-capability,embedding,embedding generation and job state,Phase 5,memory and knowledge APIs,legacy:service/embedding -> Phase 5
+service/embedding/local.rs,src/embedding/,technical-capability,embedding,embedding generation and job state,Phase 5,memory and knowledge APIs,legacy:service/embedding -> Phase 5
+service/embedding/remote.rs,src/embedding/,technical-capability,embedding,embedding generation and job state,Phase 5,memory and knowledge APIs,legacy:service/embedding -> Phase 5
+service/embedding/task_runner.rs,src/embedding/,technical-capability,embedding,embedding generation and job state,Phase 5,memory and knowledge APIs,legacy:service/embedding -> Phase 5
+service/embedding_recovery.rs,src/embedding/,technical-capability,embedding,embedding generation and job state,Phase 5,memory and knowledge APIs,legacy:service/embedding -> Phase 5
+service/embedding_runtime.rs,src/embedding/,technical-capability,embedding,embedding generation and job state,Phase 5,memory and knowledge APIs,legacy:service/embedding -> Phase 5
+service/embedding_service.rs,src/embedding/,technical-capability,embedding,embedding generation and job state,Phase 5,memory and knowledge APIs,legacy:service/embedding -> Phase 5
+service/entity.rs,src/knowledge/,application-or-domain,knowledge,entities facts and claims,Phase 5,"MCP, CLI, eval harness",legacy:service/knowledge -> Phase 5
+service/entity_extraction.rs,src/knowledge/,application-or-domain,knowledge,entities facts and claims,Phase 5,"MCP, CLI, eval harness",legacy:service/knowledge -> Phase 5
+service/entity_extraction/anno.rs,src/knowledge/,application-or-domain,knowledge,entities facts and claims,Phase 5,"MCP, CLI, eval harness",legacy:service/knowledge -> Phase 5
+service/entity_extraction/anno_onnx.rs,src/knowledge/,application-or-domain,knowledge,entities facts and claims,Phase 5,"MCP, CLI, eval harness",legacy:service/knowledge -> Phase 5
+service/entity_extraction/classifier.rs,src/knowledge/,application-or-domain,knowledge,entities facts and claims,Phase 5,"MCP, CLI, eval harness",legacy:service/knowledge -> Phase 5
+service/entity_extraction/gliner.rs,src/knowledge/,application-or-domain,knowledge,entities facts and claims,Phase 5,"MCP, CLI, eval harness",legacy:service/knowledge -> Phase 5
+service/entity_extraction/gliner/batching.rs,src/knowledge/,application-or-domain,knowledge,entities facts and claims,Phase 5,"MCP, CLI, eval harness",legacy:service/knowledge -> Phase 5
+service/entity_extraction/gliner/scoring.rs,src/knowledge/,application-or-domain,knowledge,entities facts and claims,Phase 5,"MCP, CLI, eval harness",legacy:service/knowledge -> Phase 5
+service/entity_extraction/lfm2_gliner.rs,src/knowledge/,application-or-domain,knowledge,entities facts and claims,Phase 5,"MCP, CLI, eval harness",legacy:service/knowledge -> Phase 5
+service/entity_extraction/lfm2_gliner/config.rs,src/knowledge/,application-or-domain,knowledge,entities facts and claims,Phase 5,"MCP, CLI, eval harness",legacy:service/knowledge -> Phase 5
+service/entity_extraction/lfm2_gliner/decode.rs,src/knowledge/,application-or-domain,knowledge,entities facts and claims,Phase 5,"MCP, CLI, eval harness",legacy:service/knowledge -> Phase 5
+service/entity_extraction/lfm2_gliner/model.rs,src/knowledge/,application-or-domain,knowledge,entities facts and claims,Phase 5,"MCP, CLI, eval harness",legacy:service/knowledge -> Phase 5
+service/entity_extraction/lfm2_gliner/tensors.rs,src/knowledge/,application-or-domain,knowledge,entities facts and claims,Phase 5,"MCP, CLI, eval harness",legacy:service/knowledge -> Phase 5
+service/entity_extraction/regex.rs,src/knowledge/,application-or-domain,knowledge,entities facts and claims,Phase 5,"MCP, CLI, eval harness",legacy:service/knowledge -> Phase 5
+service/entity_extraction/unavailable.rs,src/knowledge/,application-or-domain,knowledge,entities facts and claims,Phase 5,"MCP, CLI, eval harness",legacy:service/knowledge -> Phase 5
+service/entity_resolution.rs,src/knowledge/,application-or-domain,knowledge,entities facts and claims,Phase 5,"MCP, CLI, eval harness",legacy:service/knowledge -> Phase 5
+service/episode.rs,src/memory/,application-or-domain,memory,episodes recall and lifecycle,Phase 5,"MCP, CLI, eval harness",legacy:service/memory -> Phase 5
+service/episode/communities.rs,src/memory/,application-or-domain,memory,episodes recall and lifecycle,Phase 5,"MCP, CLI, eval harness",legacy:service/memory -> Phase 5
+service/episode/edges.rs,src/memory/,application-or-domain,memory,episodes recall and lifecycle,Phase 5,"MCP, CLI, eval harness",legacy:service/memory -> Phase 5
+service/episode/entity_extraction.rs,src/memory/,application-or-domain,memory,episodes recall and lifecycle,Phase 5,"MCP, CLI, eval harness",legacy:service/memory -> Phase 5
+service/episode/fact_extraction.rs,src/memory/,application-or-domain,memory,episodes recall and lifecycle,Phase 5,"MCP, CLI, eval harness",legacy:service/memory -> Phase 5
+service/episode/record_parsing.rs,src/memory/,application-or-domain,memory,episodes recall and lifecycle,Phase 5,"MCP, CLI, eval harness",legacy:service/memory -> Phase 5
+service/episode/statement_detection.rs,src/memory/,application-or-domain,memory,episodes recall and lifecycle,Phase 5,"MCP, CLI, eval harness",legacy:service/memory -> Phase 5
+service/episode/summary_parser.rs,src/memory/,application-or-domain,memory,episodes recall and lifecycle,Phase 5,"MCP, CLI, eval harness",legacy:service/memory -> Phase 5
+service/episode/triples.rs,src/memory/,application-or-domain,memory,episodes recall and lifecycle,Phase 5,"MCP, CLI, eval harness",legacy:service/memory -> Phase 5
+service/explanation.rs,src/memory/,application-or-domain,memory,episodes recall and lifecycle,Phase 5,"MCP, CLI, eval harness",legacy:service/memory -> Phase 5
+service/fact.rs,src/knowledge/,application-or-domain,knowledge,entities facts and claims,Phase 5,"MCP, CLI, eval harness",legacy:service/knowledge -> Phase 5
+service/fs_watch.rs,src/,module-glue,platform,composition and module glue,Phase 2,bootstrap and module roots,legacy:current module layout -> Phase 2
+service/fs_watch/candidate.rs,src/,module-glue,platform,composition and module glue,Phase 2,bootstrap and module roots,legacy:current module layout -> Phase 2
+service/fs_watch/processor.rs,src/,module-glue,platform,composition and module glue,Phase 2,bootstrap and module roots,legacy:current module layout -> Phase 2
+service/fs_watch/runtime.rs,src/,module-glue,platform,composition and module glue,Phase 2,bootstrap and module roots,legacy:current module layout -> Phase 2
+service/fs_watch/telemetry.rs,src/,module-glue,platform,composition and module glue,Phase 2,bootstrap and module roots,legacy:current module layout -> Phase 2
+service/ingestion.rs,src/memory/,application-or-domain,memory,episodes recall and lifecycle,Phase 5,"MCP, CLI, eval harness",legacy:service/memory -> Phase 5
+service/lifecycle.rs,src/memory/,application-or-domain,memory,episodes recall and lifecycle,Phase 5,"MCP, CLI, eval harness",legacy:service/memory -> Phase 5
+service/lifecycle/archival.rs,src/memory/,application-or-domain,memory,episodes recall and lifecycle,Phase 5,"MCP, CLI, eval harness",legacy:service/memory -> Phase 5
+service/lifecycle/communities.rs,src/memory/,application-or-domain,memory,episodes recall and lifecycle,Phase 5,"MCP, CLI, eval harness",legacy:service/memory -> Phase 5
+service/lifecycle/decay.rs,src/memory/,application-or-domain,memory,episodes recall and lifecycle,Phase 5,"MCP, CLI, eval harness",legacy:service/memory -> Phase 5
+service/local_admin/auth.rs,src/,module-glue,platform,composition and module glue,Phase 2,bootstrap and module roots,legacy:current module layout -> Phase 2
+service/local_admin/client.rs,src/,module-glue,platform,composition and module glue,Phase 2,bootstrap and module roots,legacy:current module layout -> Phase 2
+service/local_admin/contracts.rs,src/,module-glue,platform,composition and module glue,Phase 2,bootstrap and module roots,legacy:current module layout -> Phase 2
+service/local_admin/mod.rs,src/,module-glue,platform,composition and module glue,Phase 2,bootstrap and module roots,legacy:current module layout -> Phase 2
+service/local_admin/password.rs,src/,module-glue,platform,composition and module glue,Phase 2,bootstrap and module roots,legacy:current module layout -> Phase 2
+service/local_admin/policy.rs,src/,module-glue,platform,composition and module glue,Phase 2,bootstrap and module roots,legacy:current module layout -> Phase 2
+service/local_admin/security_tests.rs,src/,module-glue,platform,composition and module glue,Phase 2,bootstrap and module roots,legacy:current module layout -> Phase 2
+service/local_admin/tests.rs,src/,module-glue,platform,composition and module glue,Phase 2,bootstrap and module roots,legacy:current module layout -> Phase 2
+service/mock_db.rs,src/,module-glue,platform,composition and module glue,Phase 2,bootstrap and module roots,legacy:current module layout -> Phase 2
+service/model_artifact_refresh.rs,src/embedding/,technical-capability,embedding,embedding generation and job state,Phase 5,memory and knowledge APIs,legacy:service/embedding -> Phase 5
+service/model_artifacts.rs,src/embedding/,technical-capability,embedding,embedding generation and job state,Phase 5,memory and knowledge APIs,legacy:service/embedding -> Phase 5
+service/model_artifacts/download.rs,src/embedding/,technical-capability,embedding,embedding generation and job state,Phase 5,memory and knowledge APIs,legacy:service/embedding -> Phase 5
+service/model_artifacts/lease.rs,src/embedding/,technical-capability,embedding,embedding generation and job state,Phase 5,memory and knowledge APIs,legacy:service/embedding -> Phase 5
+service/model_artifacts/manifest.rs,src/embedding/,technical-capability,embedding,embedding generation and job state,Phase 5,memory and knowledge APIs,legacy:service/embedding -> Phase 5
+service/model_artifacts/progress.rs,src/embedding/,technical-capability,embedding,embedding generation and job state,Phase 5,memory and knowledge APIs,legacy:service/embedding -> Phase 5
+service/model_artifacts/state.rs,src/embedding/,technical-capability,embedding,embedding generation and job state,Phase 5,memory and knowledge APIs,legacy:service/embedding -> Phase 5
+service/model_loader.rs,src/embedding/,technical-capability,embedding,embedding generation and job state,Phase 5,memory and knowledge APIs,legacy:service/embedding -> Phase 5
+service/model_runtime.rs,src/embedding/,technical-capability,embedding,embedding generation and job state,Phase 5,memory and knowledge APIs,legacy:service/embedding -> Phase 5
+service/procedures.rs,src/memory/,application-or-domain,memory,episodes recall and lifecycle,Phase 5,"MCP, CLI, eval harness",legacy:service/memory -> Phase 5
+service/procedures/ranking.rs,src/memory/,application-or-domain,memory,episodes recall and lifecycle,Phase 5,"MCP, CLI, eval harness",legacy:service/memory -> Phase 5
+service/procedures/review.rs,src/memory/,application-or-domain,memory,episodes recall and lifecycle,Phase 5,"MCP, CLI, eval harness",legacy:service/memory -> Phase 5
+service/query.rs,src/knowledge/,application-or-domain,knowledge,entities facts and claims,Phase 5,"MCP, CLI, eval harness",legacy:service/knowledge -> Phase 5
+service/query/lexical.rs,src/knowledge/,application-or-domain,knowledge,entities facts and claims,Phase 5,"MCP, CLI, eval harness",legacy:service/knowledge -> Phase 5
+service/query/search.rs,src/knowledge/,application-or-domain,knowledge,entities facts and claims,Phase 5,"MCP, CLI, eval harness",legacy:service/knowledge -> Phase 5
+service/query/time.rs,src/knowledge/,application-or-domain,knowledge,entities facts and claims,Phase 5,"MCP, CLI, eval harness",legacy:service/knowledge -> Phase 5
+service/reembed.rs,src/embedding/,technical-capability,embedding,embedding generation and job state,Phase 5,memory and knowledge APIs,legacy:service/embedding -> Phase 5
+service/reembed_options.rs,src/embedding/,technical-capability,embedding,embedding generation and job state,Phase 5,memory and knowledge APIs,legacy:service/embedding -> Phase 5
+service/reembed_progress.rs,src/embedding/,technical-capability,embedding,embedding generation and job state,Phase 5,memory and knowledge APIs,legacy:service/embedding -> Phase 5
+service/service_context.rs,src/,platform-or-bootstrap,platform,technical mechanism and composition,Phase 2,bootstrap and owners,legacy:service -> Phase 2
+service/startup.rs,src/,platform-or-bootstrap,platform,technical mechanism and composition,Phase 2,bootstrap and owners,legacy:service -> Phase 2
+service/triple_extractor.rs,src/knowledge/,application-or-domain,knowledge,entities facts and claims,Phase 5,"MCP, CLI, eval harness",legacy:service/knowledge -> Phase 5
+service/util.rs,src/,platform-or-bootstrap,platform,technical mechanism and composition,Phase 2,bootstrap and owners,legacy:service -> Phase 2
+service/util/ids.rs,src/,platform-or-bootstrap,platform,technical mechanism and composition,Phase 2,bootstrap and owners,legacy:service -> Phase 2
+service/util/rate_limiter.rs,src/,platform-or-bootstrap,platform,technical mechanism and composition,Phase 2,bootstrap and owners,legacy:service -> Phase 2
+service/util/validation.rs,src/,platform-or-bootstrap,platform,technical mechanism and composition,Phase 2,bootstrap and owners,legacy:service -> Phase 2
+service/value_helpers.rs,src/,platform-or-bootstrap,platform,technical mechanism and composition,Phase 2,bootstrap and owners,legacy:service -> Phase 2
+storage.rs,src/,infra-by-owner,platform,owner-specific persistence,Phase 5,owner adapters,legacy:storage -> Phase 5
+storage/agent_memory.rs,src/,infra-by-owner,platform,owner-specific persistence,Phase 5,owner adapters,legacy:storage -> Phase 5
+storage/app_store.rs,src/knowledge/,infra-by-owner,knowledge,knowledge-owned persistence (Phase 6: episode archival event-log and the generic record accessor moved to owner-scoped stores),Phase 5,owner adapters,legacy:storage -> Phase 5
+storage/claims.rs,src/,infra-by-owner,platform,owner-specific persistence,Phase 5,owner adapters,legacy:storage -> Phase 5
+storage/client.rs,src/,infra-by-owner,platform,owner-specific persistence,Phase 5,owner adapters,legacy:storage -> Phase 5
+storage/close.rs,src/,infra-by-owner,platform,owner-specific persistence,Phase 5,owner adapters,legacy:storage -> Phase 5
+storage/context_store.rs,src/memory/,application-or-domain,memory,episodes recall and lifecycle,Phase 5,"MCP, CLI, eval harness",legacy:service/memory -> Phase 5
+storage/embedding_backfill_store.rs,src/embedding/,technical-capability,embedding,embedding generation and job state,Phase 5,memory and knowledge APIs,legacy:service/embedding -> Phase 5
+storage/embedding_state_store.rs,src/embedding/,technical-capability,embedding,embedding generation and job state,Phase 5,memory and knowledge APIs,legacy:service/embedding -> Phase 5
+storage/entity_store.rs,src/,infra-by-owner,platform,owner-specific persistence,Phase 5,owner adapters,legacy:storage -> Phase 5
+storage/episode_store.rs,src/memory/,application-or-domain,memory,episodes recall and lifecycle (Phase 6: owns archival candidates and typed episode updates),Phase 5,"MCP, CLI, eval harness",legacy:service/memory -> Phase 5
+storage/event_log_store.rs,src/,infra-by-owner,platform,platform event log reads,Phase 6,startup connectivity check,forbidden
+storage/fact_store.rs,src/,infra-by-owner,platform,owner-specific persistence,Phase 5,owner adapters,legacy:storage -> Phase 5
+storage/helpers.rs,src/,infra-by-owner,platform,owner-specific persistence,Phase 5,owner adapters,legacy:storage -> Phase 5
+storage/inbox_revision_store.rs,src/,infra-by-owner,platform,owner-specific persistence,Phase 5,owner adapters,legacy:storage -> Phase 5
+storage/migrations.rs,src/,infra-by-owner,platform,owner-specific persistence,Phase 5,owner adapters,legacy:storage -> Phase 5
+storage/procedures.rs,src/memory/,application-or-domain,memory,episodes recall and lifecycle,Phase 5,"MCP, CLI, eval harness",legacy:service/memory -> Phase 5
+storage/queries.rs,src/,infra-by-owner,platform,owner-specific persistence,Phase 5,owner adapters,legacy:storage -> Phase 5
+storage/reembed_store.rs,src/embedding/,technical-capability,embedding,embedding generation and job state,Phase 5,memory and knowledge APIs,legacy:service/embedding -> Phase 5
+storage/triple_store.rs,src/,infra-by-owner,platform,owner-specific persistence,Phase 5,owner adapters,legacy:storage -> Phase 5
+storage/types.rs,src/,infra-by-owner,platform,owner-specific persistence,Phase 5,owner adapters,legacy:storage -> Phase 5
+tools.rs,src/,adapter-or-platform,platform,public adapter and operational support,Phase 2,"binaries, tools and eval harness",legacy:adapter layout -> Phase 2
+tools/assemble_context.rs,src/,adapter-or-platform,platform,public adapter and operational support,Phase 2,"binaries, tools and eval harness",legacy:adapter layout -> Phase 2
+tools/compact.rs,src/,adapter-or-platform,platform,public adapter and operational support,Phase 2,"binaries, tools and eval harness",legacy:adapter layout -> Phase 2
+tools/explain.rs,src/,adapter-or-platform,platform,public adapter and operational support,Phase 2,"binaries, tools and eval harness",legacy:adapter layout -> Phase 2
+tools/extract.rs,src/,adapter-or-platform,platform,public adapter and operational support,Phase 2,"binaries, tools and eval harness",legacy:adapter layout -> Phase 2
+tools/ingest.rs,src/,adapter-or-platform,platform,public adapter and operational support,Phase 2,"binaries, tools and eval harness",legacy:adapter layout -> Phase 2
+tools/invalidate.rs,src/,adapter-or-platform,platform,public adapter and operational support,Phase 2,"binaries, tools and eval harness",legacy:adapter layout -> Phase 2
+tools/params.rs,src/,adapter-or-platform,platform,public adapter and operational support,Phase 2,"binaries, tools and eval harness",legacy:adapter layout -> Phase 2
+tools/parsers.rs,src/,adapter-or-platform,platform,public adapter and operational support,Phase 2,"binaries, tools and eval harness",legacy:adapter layout -> Phase 2
+tools/request_id.rs,src/,adapter-or-platform,platform,public adapter and operational support,Phase 2,"binaries, tools and eval harness",legacy:adapter layout -> Phase 2
+tools/resolve.rs,src/,adapter-or-platform,platform,public adapter and operational support,Phase 2,"binaries, tools and eval harness",legacy:adapter layout -> Phase 2
+tools/response.rs,src/,adapter-or-platform,platform,public adapter and operational support,Phase 2,"binaries, tools and eval harness",legacy:adapter layout -> Phase 2
+ui.rs,src/ui/,module-glue,ui,operator console asset delivery,Phase 2,HTTP router and public Rust callers,allowed:edge=memory->ui integration expiry=Phase 2
+ui/assets.rs,src/ui/assets.rs,adapter,ui,compiled asset delivery and base stamping (Phase 6 removed the control::static_assets facade),Phase 2,HTTP router,forbidden
+operations.rs,src/operations/,module-glue,operations,administrative deletion and recovery interface,Phase 2,HTTP adapter and bootstrap,forbidden
+operations/api.rs,src/operations/api.rs,api-and-application,operations,account deletion command and atomic port,Phase 2,HTTP account handler and compatibility facade,forbidden
+bootstrap.rs,src/bootstrap/,module-glue,bootstrap,application composition entrypoints (Phase 6 removed the control/deletion edge; the recovery job composes operations::api directly),Phase 2,HTTP binary and integration tests,forbidden
+bootstrap/integration.rs,src/bootstrap/integration/,module-glue,bootstrap,integration adapter registry,Phase 2,bootstrap modules,forbidden
+bootstrap/integration/legacy_registry_operations.rs,src/bootstrap/integration/legacy_registry_operations.rs,integration-adapter,platform,legacy RegistryStore to operations AccountDeletionPort,Phase 2,HttpState composition,legacy:http registry adapter -> Phase 4
+identity.rs,src/identity/,module-glue,identity,identity module facade,Phase 3,HTTP adapters and bootstrap,forbidden
+identity/api.rs,src/identity/api.rs,api-and-application,identity,identity link commands and transaction ports,Phase 3,HTTP account handler and bootstrap adapter,forbidden
+tenancy.rs,src/tenancy/,module-glue,tenancy,trusted tenant runtime lifecycle,Phase 3,HTTP and bootstrap,forbidden
+tenancy/api.rs,src/tenancy/api.rs,api-and-application,tenancy,runtime factory and opaque runtime lease,Phase 3,HTTP runtime composition,forbidden
+bootstrap/integration/legacy_registry_identity.rs,src/bootstrap/integration/legacy_registry_identity.rs,integration-adapter,platform,legacy RegistryStore to identity transaction port,Phase 3,HttpState composition,legacy:http registry adapter -> Phase 4
+bootstrap/integration/tenancy_runtime.rs,src/bootstrap/integration/tenancy_runtime.rs,integration-adapter,platform,legacy tenant runtime construction behind tenancy factory,Phase 3,HTTP runtime pool and Tenancy factory,legacy:http/runtime/storage -> Phase 5
+bootstrap/integration/control_sessions.rs,src/bootstrap/integration/control_sessions.rs,integration-adapter,identity,policy-guarded invitation session creation and refresh,Phase 3,HttpState and OIDC invitation adapter,legacy:http/registry/session -> Phase 3
+bootstrap/integration/tenancy_resolution.rs,src/bootstrap/integration/tenancy_resolution.rs,integration-adapter,tenancy,AccountResolver to TenantRuntimeSpec resolution,Phase 3,HTTP middleware and composition,legacy:http/registry/account -> Phase 3
+bootstrap/integration/auth_method_policy.rs,src/bootstrap/integration/auth_method_policy.rs,integration-adapter,identity,durable browser-auth policy reconciliation and guarded removal,Phase 3,HTTP startup and admin CLI,legacy:http/registry/auth policy -> Phase 3
+provisioning.rs,src/provisioning/,module-glue,provisioning,client account tenant API-key and durable workflow facade,Phase 4,HTTP handlers bootstrap and future memory knowledge APIs,forbidden
+provisioning/api.rs,src/provisioning/api.rs,api-and-application,provisioning,API-key client durable task and App Session use cases,Phase 4,HTTP account adapter and bootstrap Registry adapter,forbidden
+bootstrap/integration/provisioning.rs,src/bootstrap/integration/provisioning.rs,integration-adapter,provisioning,legacy RegistryStore to API-key issuance port,Phase 4,HTTP account handler,legacy:http/registry/api keys -> Phase 4
+bootstrap/integration/provisioning_app_sessions.rs,src/bootstrap/integration/provisioning_app_sessions.rs,integration-adapter,provisioning,legacy AppSessionStore to App Session port,Phase 4,MCP app session handlers,legacy:http/app_sessions/store -> Phase 4
+bootstrap/integration/durable_tasks.rs,src/bootstrap/integration/durable_tasks.rs,integration-adapter,provisioning,legacy TaskStore to durable task port,Phase 4,MCP task handlers and scheduler,legacy:http/tasks store -> Phase 4
+embedding.rs,src/embedding/,module-glue,embedding,embedding technical capability facade,Phase 5,knowledge and memory use cases and bootstrap wiring,forbidden
+embedding/api.rs,src/embedding/api.rs,api-and-application,embedding,canonical vector update use case with named write policies,Phase 5,knowledge vector endpoints and embedding jobs,forbidden
+embedding/infra.rs,src/embedding/infra.rs,infra,embedding,fact vector adapter honouring gap-fill and replace-stale policies,Phase 5,knowledge-owned fact records,legacy:service/embedding_service vector write -> Phase 5
+knowledge.rs,src/knowledge/,module-glue,knowledge,knowledge bounded context facade,Phase 5,memory use cases and bootstrap wiring,forbidden
+knowledge/api.rs,src/knowledge/api.rs,api-and-application,knowledge,owner-named read scopes replacing arbitrary-table reads,Phase 5,memory retrieval and provenance assembly,forbidden
+memory.rs,src/memory/,module-glue,memory,memory bounded context facade,Phase 5,transport adapters and bootstrap wiring,forbidden
+memory/api.rs,src/memory/api.rs,api-and-application,memory,consumer-owned ingestion extraction recall explanation invalidation and rate-limit ports,Phase 5,capability adapters in service/capabilities,forbidden

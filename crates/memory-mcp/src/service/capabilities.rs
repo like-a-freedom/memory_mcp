@@ -6,6 +6,28 @@ pub mod extract;
 pub mod ingest;
 pub mod resolve;
 
+use crate::error::MemoryError;
+use crate::service::service_context::ServiceContext;
+
+/// Adapts the shared token-bucket limiter to the memory-owned
+/// rate-limit port.
+///
+/// Capabilities reach the limiter only through this adapter, so
+/// the access policy is charged in exactly one place.
+pub(crate) struct ServiceRateLimitPort<'a> {
+    pub(crate) ctx: &'a ServiceContext,
+}
+
+impl crate::memory::api::RateLimitPort for ServiceRateLimitPort<'_> {
+    fn check(&self, caller: Option<&str>) -> Result<(), MemoryError> {
+        let access = caller.map(|caller_id| crate::models::AccessPayload {
+            caller_id: Some(caller_id.to_owned()),
+            ..Default::default()
+        });
+        self.ctx.enforce_rate_limit(access.as_ref())
+    }
+}
+
 #[cfg(test)]
 pub(crate) mod test_support {
     //! Shared test helpers for capability unit tests.

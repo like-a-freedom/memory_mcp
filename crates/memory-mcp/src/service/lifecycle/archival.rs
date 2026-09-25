@@ -87,7 +87,7 @@ pub async fn run_archival_pass(
     let mut archived = 0;
 
     let episodes = service
-        .app_store()
+        .episode_store()
         .select_episodes_for_archival(&cutoff_str, ARCHIVAL_BATCH_LIMIT)
         .await?;
 
@@ -108,8 +108,8 @@ pub async fn run_archival_pass(
             });
 
             service
-                .app_store()
-                .update_record(episode_id, payload)
+                .episode_store()
+                .update_episode(episode_id, payload)
                 .await?;
 
             archived += 1;

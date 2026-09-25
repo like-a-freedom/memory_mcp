@@ -94,20 +94,6 @@ impl ServiceContext {
         }
     }
 
-    /// Looks up a record in the process-bound Active Namespace.
-    pub(crate) async fn find_record_by_id(
-        &self,
-        record_id: &str,
-    ) -> Result<
-        (
-            Option<serde_json::Map<String, serde_json::Value>>,
-            Option<String>,
-        ),
-        MemoryError,
-    > {
-        self.app_store().find_record_by_id(record_id).await
-    }
-
     /// Enforces rate limit based on the caller ID in the access payload.
     ///
     /// Delegates to [`RateLimiter::check_access`], the single enforcement
@@ -120,31 +106,52 @@ impl ServiceContext {
     }
 
     /// Returns the episode record for the given episode ID.
+    ///
+    /// Owner-scoped: the episode store refuses an id that does
+    /// not name an episode, so a caller cannot read another
+    /// owner's record through this.
     pub(crate) async fn find_episode_record(
         &self,
         episode_id: &str,
-    ) -> Result<
-        (
-            Option<serde_json::Map<String, serde_json::Value>>,
-            Option<String>,
-        ),
-        MemoryError,
-    > {
-        self.find_record_by_id(episode_id).await
+    ) -> Result<crate::storage::RecordLookup, MemoryError> {
+        self.find_owned_record(
+            crate::storage::EpisodeStoreClient::new(
+                self.db_client.clone(),
+                self.active_namespace.clone(),
+            )
+            .select_episode(episode_id)
+            .await,
+        )
     }
 
     /// Returns the fact record for the given fact ID.
+    ///
+    /// Owner-scoped, as with [`Self::find_episode_record`].
     pub(crate) async fn find_fact_record(
         &self,
         fact_id: &str,
-    ) -> Result<
-        (
-            Option<serde_json::Map<String, serde_json::Value>>,
-            Option<String>,
-        ),
-        MemoryError,
-    > {
-        self.find_record_by_id(fact_id).await
+    ) -> Result<crate::storage::RecordLookup, MemoryError> {
+        self.find_owned_record(
+            crate::storage::FactStoreClient::new(
+                self.db_client.clone(),
+                self.active_namespace.clone(),
+            )
+            .select_fact(fact_id)
+            .await,
+        )
+    }
+
+    /// Normalise an owner-scoped single-record read into the
+    /// `(record, namespace)` shape the callers expect.
+    fn find_owned_record(
+        &self,
+        read: Result<Option<serde_json::Value>, MemoryError>,
+    ) -> Result<crate::storage::RecordLookup, MemoryError> {
+        let record = read?;
+        Ok((
+            record.and_then(|value| value.as_object().cloned()),
+            Some(self.active_namespace.clone()),
+        ))
     }
 
     /// Public helper for tool-level logging.
@@ -310,17 +317,19 @@ mod tests {
     use crate::service::capabilities::test_support::make_context_base;
     use crate::service::mock_db::MockDbClient;
 
-    // These tests drive the wiring of `validate_record_id` into
-    // `ServiceContext::find_record_by_id`.
+    // These tests drive record-id validation through the
+    // owner-scoped accessors. The generic table-deriving accessor
+    // is gone, so the rule now lives in the typed accessors and is
+    // reached from here through the same public helpers the
+    // capabilities use.
 
     #[tokio::test]
-    async fn find_record_by_id_rejects_bare_hex_with_validation_error() {
+    async fn find_episode_record_rejects_bare_hex_with_validation_error() {
         let db = MockDbClient::new();
         let ctx = make_context_base(db);
-        let result = ctx.find_record_by_id("474b2d8b81b3feabf832ef08").await;
+        let result = ctx.find_episode_record("474b2d8b81b3feabf832ef08").await;
         match result {
             Err(MemoryError::Validation(msg)) => {
-                assert!(msg.contains("'<table>:<id>'"), "{msg}");
                 assert!(msg.contains("474b2d8b81b3feabf832ef08"), "{msg}");
             }
             other => panic!("expected Validation, got {other:?}"),
@@ -328,28 +337,41 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn find_record_by_id_rejects_empty_id_part() {
+    async fn find_episode_record_rejects_empty_id_part() {
         let db = MockDbClient::new();
         let ctx = make_context_base(db);
-        let result = ctx.find_record_by_id("episode:").await;
+        let result = ctx.find_episode_record("episode:").await;
         assert!(matches!(result, Err(MemoryError::Validation(_))));
     }
 
     #[tokio::test]
-    async fn find_record_by_id_rejects_empty_input() {
+    async fn find_episode_record_rejects_empty_input() {
         let db = MockDbClient::new();
         let ctx = make_context_base(db);
-        let result = ctx.find_record_by_id("").await;
+        let result = ctx.find_episode_record("").await;
         assert!(matches!(result, Err(MemoryError::Validation(_))));
     }
 
     #[tokio::test]
-    async fn find_record_by_id_accepts_wellformed_episode_id() {
+    async fn find_fact_record_rejects_an_episode_id() {
+        // Owner scoping: the fact accessor refuses an episode id
+        // rather than reading across aggregates.
+        let db = MockDbClient::new();
+        let ctx = make_context_base(db);
+        let result = ctx.find_fact_record("episode:abc").await;
+        assert!(
+            matches!(&result, Err(MemoryError::Validation(msg)) if msg.contains("episode:abc")),
+            "expected a kind refusal, got {result:?}"
+        );
+    }
+
+    #[tokio::test]
+    async fn find_episode_record_accepts_wellformed_episode_id() {
         // Sanity: fully-formed ID must not be rejected by pre-validation.
-        // DB layer may still return Ok(None, None) — that's an honest "not found".
+        // DB layer may still return Ok(None) — that's an honest "not found".
         let db = MockDbClient::new();
         let ctx = make_context_base(db);
-        let result = ctx.find_record_by_id("episode:doesnotexist").await;
+        let result = ctx.find_episode_record("episode:doesnotexist").await;
         assert!(
             result.is_ok(),
             "well-formed id must pass validation: {result:?}"

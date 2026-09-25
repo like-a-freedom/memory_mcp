@@ -46,7 +46,12 @@ cargo run --features streamable-http --bin memory_mcp_http  # Start SaaS HTTP se
 
 **Never:**
 - Add business logic to `main.rs` — keeps CLI parsing + mode dispatch only
-- Expose raw SurrealDB queries as MCP tools — wrap in service methods
+- Put new business logic in `src/service/` — use cases belong in the owning
+  context's `api.rs`
+- Give a use case a shared service container — inject the narrow ports it needs
+- Expose raw SurrealDB queries as MCP tools — wrap in owner use cases
+- Expose a caller-supplied table name to an application-facing read — use
+  owner-named scopes
 - Delete facts — use `invalidate` to preserve audit trail
 - Use `unwrap()` in production code — return `Result` or `?`
 - Add large dependencies without feature-gating them
@@ -64,11 +69,11 @@ cargo run --features streamable-http --bin memory_mcp_http  # Start SaaS HTTP se
 ## Design Principles
 
 1. **`main.rs` stays thin** — CLI parsing and mode dispatch only
-2. **Business logic in `src/service/`** — MCP layer is a thin adapter
+2. **Context-local use cases** — business logic lives in the owning context's public interface (`src/{identity,tenancy,provisioning,operations,knowledge,memory,embedding}/api.rs`); transport handlers in `src/mcp/`, `src/http/` and `src/control/` are thin adapters. Do not put new business logic in `src/service/`, and do not add a shared service container that capabilities depend on: a capability takes the narrow ports it needs, not the whole context. See [ADR-0058](docs/adr/0058-bounded-contexts-modular-monolith.md) and [the migration manifest](docs/architecture/ddd-migration-manifest.csv).
 3. **Tool responses are decision-ready** — includes `guidance` for next steps
 4. **Bi-temporal model** — `t_ref` (valid time) and `t_ingested` (transaction time); never delete, only invalidate
 5. **One Active Namespace** — storage is selected once at startup; do not add request-level partitioning
-6. **Feature flags are additive** — `default = []`, no implicit dependencies
+6. **Feature flags are additive** — the current default is `["fs-watch"]`; every other feature is opt-in and features must not imply each other implicitly
 7. **Errors are thiserror-based** — `MemoryError` with descriptive variants
 
 ## Agent Memory Lifecycle
@@ -100,7 +105,7 @@ See [ADR-0016](docs/adr/0016-agent-memory-lifecycle-integration.md) and the oper
 | `SURREALDB_USERNAME` | Auth username |
 | `SURREALDB_PASSWORD` | Auth password |
 
-**Feature flags:** `default = ["fs-watch"]` is the local personal profile (stdio MCP + embedded SurrealDB + filesystem ingestion). `streamable-http` is the single coarse switch for the whole SaaS product (Streamable HTTP MCP data plane + control plane with OIDC/local-admin auth + embedded web UI + Prometheus; it implies the internal `control-plane`, `control-plane-ui` and `prometheus` names, which are never written by users). Orthogonal axes that can be added to either profile: `mcp-apps` (app-session surface: in-memory in local, durable in HTTP), `metal` (explicit Metal GPU backend), `accelerate` (explicit Apple Accelerate CPU backend), `mimalloc` (optional server allocator), `eval-support` (eval harness), `prometheus` (metrics), and `test-fixtures` (test-only bootstrap helpers). The default build enables neither allocator nor Apple backend implicitly. See [ADR-0034](docs/adr/0034-allocator-and-accelerator-default-policy.md), [the memory profile](docs/performance/MEMORY_PROFILE.md), and [ADR-0052](docs/adr/0052-streamable-http-saas-profile.md) for the SaaS profile.
+**Feature flags:** `default = ["fs-watch"]` is the local personal profile (stdio MCP + embedded SurrealDB + filesystem ingestion). `streamable-http` is the single coarse switch for the whole SaaS product (Streamable HTTP MCP data plane + control plane with OIDC/local-admin auth + compiled web UI + Prometheus; it implies the internal `control-plane`, `ui` and `prometheus` names, which are never written by users). Orthogonal axes that can be added to either profile: `mcp-apps` (app-session surface: in-memory in local, durable in HTTP), `metal` (explicit Metal GPU backend), `accelerate` (explicit Apple Accelerate CPU backend), `mimalloc` (optional server allocator), `eval-support` (eval harness), `prometheus` (metrics), and `test-fixtures` (test-only bootstrap helpers). The default build enables neither allocator nor Apple backend implicitly. See [ADR-0034](docs/adr/0034-allocator-and-accelerator-default-policy.md), [the memory profile](docs/performance/MEMORY_PROFILE.md), and [ADR-0052](docs/adr/0052-streamable-http-saas-profile.md) for the SaaS profile.
 
 ## Hooks
 
@@ -124,5 +129,5 @@ Read on demand:
 - [`docs/compatibility/`](docs/compatibility/) — scope/namespace compatibility contract
 - [`docs/evals/`](docs/evals/) — evaluation results, benchmark reports, claim reconciliation baselines, and procedural memory evidence
 - [`hooks/README.md`](hooks/README.md) — lifecycle hooks contract and editor-by-editor configuration
-- [`crates/memory-mcp/src/`](crates/memory-mcp/src/) — production source tree; `mcp/`, `service/`, `http/`, and `control/` are the structural seams
+- [`crates/memory-mcp/src/`](crates/memory-mcp/src/) — production source tree; `identity/`, `tenancy/`, `provisioning/`, `operations/`, `knowledge/`, `memory/` and `embedding/` are the bounded contexts, while `mcp/`, `http/`, `control/` and `service/` hold transport adapters and legacy bridges pending expiry (see [the migration manifest](docs/architecture/ddd-migration-manifest.csv))
 - [`crates/eval-harness/`](crates/eval-harness/) — private evaluation package (Criterion benches, profiles, corpora references)

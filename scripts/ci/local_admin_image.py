@@ -208,8 +208,6 @@ class Harness:
             "MEMORY_MCP_API_KEY_PEPPER": secrets_map["pepper"],
             "MEMORY_MCP_HTTP_SESSION_KEY": secrets_map["session_key"],
             "MEMORY_MCP_HTTP_CSRF_KEY": secrets_map["csrf_key"],
-            "MEMORY_MCP_HTTP_ENABLE_CONTROL_PLANE": "true",
-            "MEMORY_MCP_HTTP_ENABLE_CONTROL_PLANE_UI": "true",
             "MEMORY_MCP_HTTP_AUTH_METHODS": "local",
             "MEMORY_MCP_HTTP_SIGNUP_MODE": "invite_only",
             "MEMORY_MCP_HTTP_LOCAL_DEFAULT_PLAN_VERSION": "1",
@@ -366,7 +364,7 @@ class Harness:
         logs = run(["docker", "logs", "--tail", "30", self.http_name], check=False).stdout
         raise HarnessError(
             "the HTTPS endpoint did not become ready; the image must be built with "
-            "control-plane-ui and a real bundle for local browser auth.\n"
+            "ui and a real bundle for local browser auth.\n"
             f"last error: {last}\nhttp server logs (tail):\n{logs}"
         )
 

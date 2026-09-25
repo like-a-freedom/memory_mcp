@@ -27,29 +27,8 @@ impl AppStoreClient {
         }
     }
 
-    pub(crate) fn from_bound(db: BoundDbClient) -> Self {
+    pub fn from_bound(db: BoundDbClient) -> Self {
         Self { db }
-    }
-
-    pub async fn select_record(&self, record_id: &str) -> Result<Option<Value>, MemoryError> {
-        self.db.select_one(record_id).await
-    }
-
-    /// Looks up a validated record in the process-bound Active Namespace.
-    pub(crate) async fn find_record_by_id(
-        &self,
-        record_id: &str,
-    ) -> Result<(Option<serde_json::Map<String, Value>>, Option<String>), MemoryError> {
-        crate::storage::validate_record_id(record_id)?;
-        let record = self.select_record(record_id).await?;
-        Ok((
-            record.and_then(|value| value.as_object().cloned()),
-            Some(self.db.namespace().to_string()),
-        ))
-    }
-
-    pub async fn select_records(&self, table: &str) -> Result<Vec<Value>, MemoryError> {
-        self.db.select_table(table).await
     }
 
     pub async fn select_entities(&self) -> Result<Vec<Value>, MemoryError> {
@@ -174,22 +153,12 @@ impl AppStoreClient {
         self.db.query_rows(&sql, Some(vars)).await
     }
 
-    pub async fn select_episodes_for_archival(
-        &self,
-        cutoff: &str,
-        limit: i32,
-    ) -> Result<Vec<Value>, MemoryError> {
-        let sql = "SELECT * FROM episode WHERE status != 'archived' \
-                   AND t_ref < type::datetime($cutoff) ORDER BY t_ref ASC LIMIT $limit";
-        let vars = json!({ "cutoff": cutoff, "limit": limit });
-        self.db.query_rows(sql, Some(vars)).await
-    }
-
     /// Increments fact access metadata without exposing record mutation details
     /// to retrieval or explanation orchestration.
     pub async fn record_fact_access(&self, fact_id: &str, boost: i64) -> Result<(), MemoryError> {
-        let (record, _namespace) = self.find_record_by_id(fact_id).await?;
-        let Some(mut record) = record else {
+        crate::storage::helpers::require_record_kind(fact_id, "fact")?;
+        let record = self.db.select_one(fact_id).await?;
+        let Some(mut record) = record.and_then(|value| value.as_object().cloned()) else {
             return Ok(());
         };
 
@@ -206,14 +175,6 @@ impl AppStoreClient {
 
         self.db.update(fact_id, Value::Object(record)).await?;
         Ok(())
-    }
-
-    pub async fn update_record(
-        &self,
-        record_id: &str,
-        content: Value,
-    ) -> Result<Value, MemoryError> {
-        self.db.update(record_id, content).await
     }
 
     /// Whether any fact linked to `episode_id` was accessed at or after
@@ -241,39 +202,21 @@ impl AppStoreClient {
 mod tests {
     use std::sync::Arc;
 
-    use serde_json::json;
-
     use super::AppStoreClient;
     use crate::service::MemoryError;
     use crate::service::mock_db::MockDbClient;
 
     #[tokio::test]
-    async fn find_record_by_id_rejects_invalid_record_ids() {
+    async fn record_fact_access_rejects_invalid_record_ids() {
         let store = AppStoreClient::new(Arc::new(MockDbClient::new()), "org");
 
-        let result = store.find_record_by_id("bare-hex-id").await;
-
-        assert!(matches!(result, Err(MemoryError::Validation(_))));
-    }
-
-    #[tokio::test]
-    async fn find_record_by_id_returns_record_and_active_namespace() {
-        let db = MockDbClient::new().expect_select_one(
-            "fact:known",
-            Some(json!({"fact_id": "fact:known", "content": "remembered"})),
-        );
-        let store = AppStoreClient::new(Arc::new(db), "org");
-
-        let (record, namespace) = store
-            .find_record_by_id("fact:known")
-            .await
-            .expect("record lookup should succeed");
-
-        assert_eq!(
-            record.and_then(|map| map.get("fact_id").cloned()),
-            Some(json!("fact:known"))
-        );
-        assert_eq!(namespace.as_deref(), Some("org"));
+        for bad_id in ["bare-hex-id", "", "episode:xyz"] {
+            let result = store.record_fact_access(bad_id, 1).await;
+            assert!(
+                matches!(result, Err(MemoryError::Validation(_))),
+                "expected validation error for '{bad_id}'"
+            );
+        }
     }
 
     #[tokio::test]

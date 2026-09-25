@@ -188,11 +188,6 @@ pub(super) fn validate(cfg: &HttpConfig) -> Result<(), MemoryError> {
             "OIDC allowed algorithm must be 'auto', RS256, RS384, RS512, ES256, or EdDSA".into(),
         ));
     }
-    if cfg.enable_control_plane_ui && !cfg.enable_control_plane {
-        return Err(MemoryError::ConfigInvalid(
-            "control-plane UI requires control plane to be enabled".into(),
-        ));
-    }
     if cfg.control_db.url == cfg.tenant_db.url
         && cfg.control_db.namespace == cfg.tenant_db.namespace
         && cfg.control_db.database == cfg.tenant_db.database
@@ -259,18 +254,6 @@ pub(super) fn validate(cfg: &HttpConfig) -> Result<(), MemoryError> {
         return Err(MemoryError::ConfigInvalid(
             "mem:// is test-only; production HTTP SaaS requires remote SurrealDB or documented embedded RocksDB"
                 .into(),
-        ));
-    }
-    #[cfg(not(feature = "control-plane"))]
-    if cfg.enable_control_plane || cfg.enable_control_plane_ui {
-        return Err(MemoryError::ConfigInvalid(
-            "control-plane settings require the control-plane feature".into(),
-        ));
-    }
-    #[cfg(not(feature = "control-plane-ui"))]
-    if cfg.enable_control_plane_ui {
-        return Err(MemoryError::ConfigInvalid(
-            "control-plane UI requires the control-plane-ui feature".into(),
         ));
     }
     // fs-watch is the stdio-only ingestion path. The

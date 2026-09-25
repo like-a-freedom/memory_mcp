@@ -86,7 +86,7 @@ impl crate::service::MemoryService {
             Utc::now() - chrono::Duration::days(policy.archival_age_days as i64),
         );
         let archival_candidates = self
-            .app_store()
+            .episode_store()
             .select_episodes_for_archival(&cutoff, 1_000)
             .await?;
         let communities = self.app_store().select_communities().await?;
@@ -120,8 +120,8 @@ impl crate::service::MemoryService {
             crate::observability::OperationMetrics::new("lifecycle_archive_candidates");
         if !dry_run {
             for episode_id in target_ids {
-                self.app_store()
-                    .update_record(
+                self.episode_store()
+                    .update_episode(
                         episode_id,
                         json!({
                             "status": "archived",
@@ -149,8 +149,8 @@ impl crate::service::MemoryService {
         let mut operation_metrics =
             crate::observability::OperationMetrics::new("lifecycle_restore_archived");
         for episode_id in target_ids {
-            self.app_store()
-                .update_record(
+            self.episode_store()
+                .update_episode(
                     episode_id,
                     json!({
                         "status": "active",

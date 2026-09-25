@@ -100,19 +100,20 @@ impl MemoryMcp {
                 .tenant_id
                 .as_deref()
                 .ok_or_else(|| Self::internal_error("durable app session has no tenant binding"))?;
-            let record = store
-                .load(tenant_id, session_id)
+            let view =
+                crate::bootstrap::integration::provisioning_app_sessions::read_tenant_app_session(
+                    store,
+                    tenant_id,
+                    session_id,
+                    Utc::now(),
+                )
                 .await
                 .map_err(crate::mcp::mcp_error)?
                 .ok_or_else(|| Self::invalid_params("unknown or expired app session"))?;
-            let expires_at = Some(record.idle_expiry.min(record.absolute_expiry));
-            if expires_at.is_some_and(|expiry| expiry <= Utc::now()) {
-                return Err(Self::invalid_params("unknown or expired app session"));
-            }
             return Ok(AppSessionState {
-                app: record.app,
-                expires_at,
-                payload: record.payload,
+                app: view.app,
+                expires_at: Some(view.expires_at),
+                payload: view.payload,
             });
         }
         self.session_manager.purge_expired().await;
@@ -135,15 +136,23 @@ impl MemoryMcp {
                 .tenant_id
                 .as_deref()
                 .ok_or_else(|| Self::internal_error("durable app session has no tenant binding"))?;
-            let max_open_sessions = self.tenant_plan.as_ref().map_or(
+            let max_open_per_tenant = self.tenant_plan.as_ref().map_or(
                 crate::http::app_sessions::store::MAX_OPEN_PER_TENANT as u32,
                 |plan| plan.max_open_app_sessions,
             );
-            let (session_id, _) = store
-                .open_with_limit(tenant_id, app, payload.clone(), max_open_sessions)
+            let record =
+                crate::bootstrap::integration::provisioning_app_sessions::open_tenant_app_session(
+                    store,
+                    tenant_id,
+                    crate::provisioning::api::OpenAppSessionCommand {
+                        app: app.to_owned(),
+                        payload: payload.clone(),
+                        max_open_per_tenant,
+                    },
+                )
                 .await
                 .map_err(crate::mcp::mcp_error)?;
-            return Ok(session::open_app_result(app, session_id, payload));
+            return Ok(session::open_app_result(app, record.handle, payload));
         }
         let (session_id, fallback) = self
             .session_manager
@@ -167,8 +176,13 @@ impl MemoryMcp {
             .tenant_id
             .as_deref()
             .ok_or_else(|| Self::internal_error("durable app session has no tenant binding"))?;
-        let record = store
-            .load(tenant_id, session_id)
+        let record =
+            crate::bootstrap::integration::provisioning_app_sessions::read_tenant_app_session(
+                store,
+                tenant_id,
+                session_id,
+                Utc::now(),
+            )
             .await
             .map_err(crate::mcp::mcp_error)?
             .ok_or_else(|| Self::invalid_params("unknown or expired app session"))?;
@@ -178,7 +192,7 @@ impl MemoryMcp {
                 session_id.to_owned(),
                 AppSessionState {
                     app: record.app,
-                    expires_at: Some(record.idle_expiry.min(record.absolute_expiry)),
+                    expires_at: Some(record.expires_at),
                     payload: record.payload,
                 },
             )
@@ -193,19 +207,25 @@ impl MemoryMcp {
         .await
         .map_err(crate::mcp::mcp_error)?;
         if outcome.action == "close_session" {
-            store
-                .close(tenant_id, session_id)
-                .await
-                .map_err(crate::mcp::mcp_error)?;
+            crate::bootstrap::integration::provisioning_app_sessions::close_tenant_app_session(
+                store, tenant_id, session_id,
+            )
+            .await
+            .map_err(crate::mcp::mcp_error)?;
         } else {
             let updated = manager
                 .get(session_id)
                 .await
                 .map_err(crate::mcp::mcp_error)?;
-            store
-                .command(tenant_id, session_id, expected_version, updated.payload)
-                .await
-                .map_err(crate::mcp::mcp_error)?;
+            crate::bootstrap::integration::provisioning_app_sessions::write_tenant_app_session(
+                store,
+                tenant_id,
+                session_id,
+                expected_version,
+                updated.payload,
+            )
+            .await
+            .map_err(crate::mcp::mcp_error)?;
         }
         Ok(outcome)
     }

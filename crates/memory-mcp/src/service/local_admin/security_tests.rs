@@ -26,7 +26,7 @@
 //! | DB unavailable during reserve/auth/success audit/failure audit | `sql_fault_tests::reservation_storage_error_fails_closed_without_admitting_the_attempt`; `sql_fault_tests::failure_audit_storage_error_is_sanitized_unavailable_not_a_rejection`; `control::local_admin::handlers::tests::spec_status_table_is_exhaustive` |
 //! | Two admins issue at cap−1 | `http_local_admin.rs::two_administrators_racing_the_last_key_slot_issue_exactly_one_key` (two logged-in administrators, one client, exactly one `201`); `active_key_cap_counts_only_live_keys` for the serial cap arithmetic |
 //! | Create same operation/body; different body; lost response | `http_local_admin.rs::client_lifecycle_uses_the_durable_store` |
-//! | Key issue response lost and repeated | `insert_client_key` returns `AlreadyIssued`; `control-plane-ui` `secret_already_issued` tests |
+//! | Key issue response lost and repeated | `insert_client_key` returns `AlreadyIssued`; `ui` `secret_already_issued` tests |
 //! | Provisioner restart | `http_crash_recovery.rs` (11 tests) |
 //! | Coherent suspend/resume, stale CAS | `http_local_admin.rs::suspend_and_resume_follow_the_coherent_state_contract` |
 //! | Warm key cache; revoke/expire | `http_local_admin.rs::revoking_an_issued_key_denies_with_and_without_a_warm_cache`, `expiry_at_the_boundary_is_rejected` |

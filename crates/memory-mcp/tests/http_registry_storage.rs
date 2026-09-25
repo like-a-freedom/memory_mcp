@@ -48,12 +48,31 @@ fn binary_env(store_url: &str) -> Vec<(String, String)> {
         ("ALLOWED_HOSTS".into(), "localhost,127.0.0.1".into()),
         ("ALLOWED_ORIGINS".into(), "http://localhost".into()),
         ("MEMORY_MCP_API_KEY_PEPPER".into(), "x".repeat(40)),
-        ("MEMORY_MCP_HTTP_IDENTITY_INDEX_KEY".into(), zeros.clone()),
-        ("MEMORY_MCP_HTTP_SIGNUP_MODE".into(), "invite_only".into()),
+        // This suite starts a real bound server, so it uses the
+        // `local` method: `oidc` runs discovery at startup and would
+        // try to reach a placeholder issuer. In `local` mode the three
+        // OIDC-typed HMAC keys are derived from the session key, so
+        // supplying one here would itself be a refusal.
+        ("MEMORY_MCP_HTTP_SESSION_KEY".into(), zeros.clone()),
         ("MEMORY_MCP_HTTP_CSRF_KEY".into(), zeros.clone()),
-        ("MEMORY_MCP_HTTP_OIDC_STATE_KEY".into(), zeros.clone()),
-        ("MEMORY_MCP_HTTP_OIDC_NONCE_KEY".into(), zeros.clone()),
-        ("MEMORY_MCP_HTTP_SESSION_KEY".into(), zeros),
+        ("MEMORY_MCP_HTTP_AUTH_METHODS".into(), "local".into()),
+        (
+            "MEMORY_MCP_HTTP_LOCAL_DEFAULT_PLAN_VERSION".into(),
+            "1".into(),
+        ),
+        (
+            "MEMORY_MCP_HTTP_MAX_INGESTED_BYTES".into(),
+            "1073741824".into(),
+        ),
+        ("MEMORY_MCP_HTTP_MAX_EPISODE_COUNT".into(), "100000".into()),
+        ("MEMORY_MCP_HTTP_INGEST_PER_MINUTE".into(), "60".into()),
+        ("MEMORY_MCP_HTTP_MAX_OPEN_APP_SESSIONS".into(), "32".into()),
+        ("MEMORY_MCP_HTTP_MAX_ACTIVE_API_KEYS".into(), "5".into()),
+        (
+            "MEMORY_MCP_HTTP_PER_TENANT_REQUEST_CONCURRENCY".into(),
+            "4".into(),
+        ),
+        ("MEMORY_MCP_HTTP_EXTRACTION_CONCURRENCY".into(), "2".into()),
         ("SURREALDB_CONTROL_URL".into(), store_url.to_owned()),
         ("SURREALDB_CONTROL_USERNAME".into(), "root".into()),
         ("SURREALDB_CONTROL_PASSWORD".into(), "root".into()),
@@ -64,14 +83,6 @@ fn binary_env(store_url: &str) -> Vec<(String, String)> {
         ("SURREALDB_TENANT_PASSWORD".into(), "root".into()),
         ("SURREALDB_TENANT_DB".into(), "tenant".into()),
         ("SURREALDB_TENANT_NAMESPACE".into(), "tenant".into()),
-        (
-            "MEMORY_MCP_HTTP_ENABLE_CONTROL_PLANE".into(),
-            "false".into(),
-        ),
-        (
-            "MEMORY_MCP_HTTP_ENABLE_CONTROL_PLANE_UI".into(),
-            "false".into(),
-        ),
     ]
 }
 

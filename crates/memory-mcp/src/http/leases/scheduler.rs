@@ -74,19 +74,7 @@ impl SchedulerHooks {
                 registry, migrations, injector,
             ))
         });
-        #[allow(unused_mut)]
-        let mut jobs: Vec<SchedulerJob> = vec![provisioning];
-        #[cfg(feature = "control-plane")]
-        {
-            let deletion_injector = Arc::clone(&fault_injector);
-            jobs.push(Arc::new(move |registry| {
-                let injector = Arc::clone(&deletion_injector);
-                Box::pin(crate::control::deletion::run_deletion_worker(
-                    registry, injector,
-                ))
-            }));
-        }
-        Self::new(jobs, 4)
+        Self::new(vec![provisioning], 4)
     }
 
     /// Tasks 7–9 call this before the binary starts serving
@@ -227,13 +215,20 @@ mod tests {
 
     #[cfg(feature = "control-plane")]
     #[test]
-    fn provisioning_hooks_include_deletion_worker() {
-        let hooks = SchedulerHooks::with_provisioning_only(
+    fn bootstrap_scheduler_hooks_include_deletion_worker() {
+        let hooks = crate::bootstrap::provisioning_scheduler_hooks(
             Arc::new(crate::http::leases::migration::NoopMigrations),
             Arc::new(crate::http::fault_injection::NoFaults),
         )
         .expect("provisioning hooks");
         assert_eq!(hooks.jobs.len(), 2);
+
+        let platform_hooks = SchedulerHooks::with_provisioning_only(
+            Arc::new(crate::http::leases::migration::NoopMigrations),
+            Arc::new(crate::http::fault_injection::NoFaults),
+        )
+        .expect("platform provisioning hooks");
+        assert_eq!(platform_hooks.jobs.len(), 1);
     }
 
     #[tokio::test]

@@ -42,6 +42,19 @@ impl ExplanationService {
     }
 }
 
+/// Normalise an owner-scoped single-record read into the
+/// `(record, namespace)` shape the provenance helpers expect.
+fn owned_read(
+    read: Result<Option<Value>, MemoryError>,
+    namespace: &str,
+) -> Result<crate::storage::RecordLookup, MemoryError> {
+    let record = read?;
+    Ok((
+        record.and_then(|value| value.as_object().cloned()),
+        Some(namespace.to_owned()),
+    ))
+}
+
 impl GraphContext for ExplanationService {
     fn app_store(&self) -> crate::storage::AppStoreClient {
         AppStoreClient::from_bound(self.db.clone())
@@ -73,13 +86,29 @@ impl ExplanationService {
                     "source_episode is required for explain items".into(),
                 ));
             }
-            let (record, _) = self.find_episode_record(&item.source_episode).await?;
+            // A source_episode that is not an episode is not an
+            // error: explain reports what it can and leaves the
+            // item's provenance empty, the same as it does for an
+            // episode id that no longer exists. The owner-scoped
+            // accessor refuses the cross-kind read; this absorbs
+            // the refusal rather than failing the whole pack.
+            let record = match self.find_episode_record(&item.source_episode).await {
+                Ok((record, _)) => record,
+                Err(MemoryError::Validation(_)) => None,
+                Err(error) => return Err(error),
+            };
             let episode = record
                 .as_ref()
                 .and_then(crate::service::episode::episode_from_record);
 
             let entity_links = if let Some(ref fact_id) = item.fact_id {
-                let (fact_record, _) = self.find_fact_record(fact_id).await?;
+                // Same policy for the fact side: an id that names
+                // another kind contributes no entity links.
+                let fact_record = match self.find_fact_record(fact_id).await {
+                    Ok((record, _)) => record,
+                    Err(MemoryError::Validation(_)) => None,
+                    Err(error) => return Err(error),
+                };
                 let links = fact_record
                     .and_then(|r| {
                         r.get("entity_links").and_then(|v| v.as_array()).map(|arr| {
@@ -245,15 +274,25 @@ impl ExplanationService {
     pub(crate) async fn find_episode_record(
         &self,
         episode_id: &str,
-    ) -> Result<(Option<serde_json::Map<String, Value>>, Option<String>), MemoryError> {
-        self.app_store().find_record_by_id(episode_id).await
+    ) -> Result<crate::storage::RecordLookup, MemoryError> {
+        owned_read(
+            crate::storage::EpisodeStoreClient::from_bound(self.db.clone())
+                .select_episode(episode_id)
+                .await,
+            self.db.namespace(),
+        )
     }
 
     pub(crate) async fn find_fact_record(
         &self,
         fact_id: &str,
-    ) -> Result<(Option<serde_json::Map<String, Value>>, Option<String>), MemoryError> {
-        self.app_store().find_record_by_id(fact_id).await
+    ) -> Result<crate::storage::RecordLookup, MemoryError> {
+        owned_read(
+            crate::storage::FactStoreClient::from_bound(self.db.clone())
+                .select_fact(fact_id)
+                .await,
+            self.db.namespace(),
+        )
     }
 
     pub(crate) async fn record_fact_access(
@@ -462,12 +501,10 @@ impl ExplanationService {
 
 #[cfg(test)]
 mod tests {
-    //! Tests: drive validation into
-    //! `ExplanationService::find_record_by_id` and the entry points that
-    //! delegate to it (`find_episode_record`, `find_fact_record`).
-    //!
-    //! `find_fact_record` has its own body and does NOT delegate to
-    //! `find_record_by_id`, so its validation must be wired in independently.
+    //! Tests: drive validation into the owner-scoped accessors
+    //! behind `ExplanationService::find_episode_record` and
+    //! `find_fact_record`. Each goes through the store that owns
+    //! that record kind, so a cross-kind id is refused.
 
     use super::*;
     use crate::error::MemoryError;
@@ -497,8 +534,6 @@ mod tests {
 
     #[tokio::test]
     async fn find_fact_record_rejects_bare_hex() {
-        // `find_fact_record` has its own implementation that does not delegate
-        // to `find_record_by_id`, so this test guards that path independently.
         let svc = make_service();
         let result = svc.find_fact_record("072d682d0d467aa94aad684d").await;
         assert!(matches!(result, Err(MemoryError::Validation(_))));

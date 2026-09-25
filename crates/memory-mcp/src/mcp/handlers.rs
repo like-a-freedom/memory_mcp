@@ -84,10 +84,10 @@ pub struct MemoryMcp {
     durable_app_sessions: Option<std::sync::Arc<crate::http::app_sessions::store::AppSessionStore>>,
     /// Durable task overlay. When `Some`, `get_task`,
     /// `cancel_task`, and the `extract` path dispatch
-    /// through the `TaskStore` seam rather than the
+    /// through the `DurableTaskPort` seam rather than the
     /// in-memory `TaskManager`.
     #[cfg(feature = "streamable-http")]
-    durable_tasks: Option<std::sync::Arc<dyn crate::http::tasks::state::TaskStore>>,
+    durable_tasks: Option<std::sync::Arc<dyn crate::provisioning::api::DurableTaskPort>>,
     /// Durable subscription store. When `Some`, the
     /// handler advertises resource subscriptions and
     /// dispatches `subscriptions/listen` through the
@@ -201,7 +201,7 @@ impl MemoryMcp {
     #[cfg(feature = "streamable-http")]
     pub fn with_durable_tasks(
         mut self,
-        tasks: std::sync::Arc<dyn crate::http::tasks::state::TaskStore>,
+        tasks: std::sync::Arc<dyn crate::provisioning::api::DurableTaskPort>,
     ) -> Self {
         self.durable_tasks = Some(tasks);
         self
@@ -459,15 +459,20 @@ impl ServerHandler for MemoryMcp {
                     )
                 })?;
                 let fingerprint = durable_task_fingerprint(&request.name, &task_params);
-                let task_id = task_store
-                    .enqueue(&fingerprint, task_params)
-                    .await
-                    .map_err(|error| {
-                        ErrorData::internal_error(
-                            format!("failed to enqueue extract task: {error}"),
-                            None,
-                        )
-                    })?;
+                let task_id = crate::provisioning::api::enqueue_task(
+                    task_store.as_ref(),
+                    crate::provisioning::api::EnqueueTaskCommand {
+                        fingerprint,
+                        params: task_params,
+                    },
+                )
+                .await
+                .map_err(|error| {
+                    ErrorData::internal_error(
+                        format!("failed to enqueue extract task: {error}"),
+                        None,
+                    )
+                })?;
                 let now = chrono::Utc::now().to_rfc3339();
                 let seed = rmcp::model::Task::new(
                     task_id,
@@ -516,18 +521,18 @@ impl ServerHandler for MemoryMcp {
         // Durable overlay: try TaskStore first, fall back to in-memory.
         #[cfg(feature = "streamable-http")]
         if let Some(task_store) = self.durable_tasks.as_ref()
-            && let Some(record) = task_store.load(&request.task_id).await.map_err(|error| {
-                ErrorData::internal_error(format!("failed to load task: {error}"), None)
-            })?
+            && let Some(record) =
+                crate::provisioning::api::task_view(task_store.as_ref(), &request.task_id)
+                    .await
+                    .map_err(|error| {
+                        ErrorData::internal_error(format!("failed to load task: {error}"), None)
+                    })?
         {
-            let status = match record.state {
-                crate::http::tasks::state::TaskState::Queued
-                | crate::http::tasks::state::TaskState::Running => rmcp::model::TaskStatus::Working,
-                crate::http::tasks::state::TaskState::Completed => {
-                    rmcp::model::TaskStatus::Completed
-                }
-                crate::http::tasks::state::TaskState::Failed => rmcp::model::TaskStatus::Failed,
-                _ => rmcp::model::TaskStatus::Cancelled,
+            let status = match record.status() {
+                "completed" => rmcp::model::TaskStatus::Completed,
+                "failed" => rmcp::model::TaskStatus::Failed,
+                "cancelled" => rmcp::model::TaskStatus::Cancelled,
+                _ => rmcp::model::TaskStatus::Working,
             };
             let now = chrono::Utc::now().to_rfc3339();
             let task = rmcp::model::Task::new(
@@ -589,12 +594,16 @@ impl ServerHandler for MemoryMcp {
         // Durable overlay: delegate to TaskStore::set_cancellation_intent.
         #[cfg(feature = "streamable-http")]
         if let Some(task_store) = self.durable_tasks.as_ref() {
-            task_store
-                .set_cancellation_intent(&request.task_id)
-                .await
-                .map_err(|error| {
-                    ErrorData::internal_error(format!("failed to cancel task: {error}"), None)
-                })?;
+            crate::provisioning::api::cancel_task(
+                task_store.as_ref(),
+                &crate::provisioning::api::CancelTaskCommand {
+                    task_id: request.task_id,
+                },
+            )
+            .await
+            .map_err(|error| {
+                ErrorData::internal_error(format!("failed to cancel task: {error}"), None)
+            })?;
             return Ok(());
         }
         self.tasks.cancel_task(&request.task_id)

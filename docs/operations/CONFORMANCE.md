@@ -42,17 +42,17 @@ inside the backend binary. Build the bundle with the matching Dioxus CLI and
 provide its absolute output directory when compiling `memory_mcp`:
 
 ```bash
-cd crates/control-plane-ui
-dx bundle --platform web --release --out-dir "$PWD/../../target/control-plane-ui-dist"
+cd crates/ui
+dx bundle --platform web --release --out-dir "$PWD/../../target/ui-dist"
 cd ../..
-MEMORY_MCP_CONTROL_PLANE_UI_DIST="$PWD/target/control-plane-ui-dist" \
+MEMORY_MCP_UI_DIST="$PWD/target/ui-dist/public" \
   cargo build --release --features streamable-http
 ```
 
 The directory must contain a non-empty `index.html`. Asset paths are sorted and
 embedded at compile time; the backend does not read the directory at runtime or
 fetch missing assets. Providing the bundle is optional: when
-`MEMORY_MCP_CONTROL_PLANE_UI_DIST` is absent the binary still compiles with an
+`MEMORY_MCP_UI_DIST` is absent the binary still compiles with an
 empty UI catalog and does not serve a UI. If the variable is set but the bundle
 is malformed (no `index.html`, a symlink, an invalid entry), the build fails
 fast rather than silently shipping a UI-less image. The Dioxus CLI is not part

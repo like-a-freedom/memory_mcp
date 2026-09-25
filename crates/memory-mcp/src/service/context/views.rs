@@ -209,7 +209,7 @@ pub(crate) async fn build_facets_view(
 ) -> Result<Vec<AssembledContextItem>, MemoryError> {
     let records = service
         .context_store()
-        .select_table("episode")
+        .scan_episodes()
         .await
         .map_err(|err| MemoryError::Storage(format!("SurrealDB query error: {err}")))?;
 
@@ -307,7 +307,7 @@ pub(crate) async fn build_wake_up_view(
 ) -> Result<Vec<AssembledContextItem>, MemoryError> {
     let records = service
         .context_store()
-        .select_table("fact")
+        .scan_facts()
         .await
         .map_err(|err| MemoryError::Storage(format!("SurrealDB query error: {err}")))?;
 

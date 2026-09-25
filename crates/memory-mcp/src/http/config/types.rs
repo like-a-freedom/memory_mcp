@@ -20,8 +20,7 @@ use super::parse::{
     DEFAULT_SHUTDOWN_GRACE, DEFAULT_SUBSCRIPTION_AUTH_RECHECK, DEFAULT_SUBSCRIPTION_LIMIT,
     DEFAULT_SUBSCRIPTION_QUEUE_CAPACITY, DEFAULT_TASK_QUEUE_CAPACITY, DEFAULT_TASK_RETENTION_SECS,
     DEFAULT_TASK_SYNC_MAX_BYTES, TrustedCidr, deserialize_duration_secs, deserialize_hex_32,
-    load_signup_plan_limits, optional_env, parse_bool, parse_csv, parse_env_or, parse_hex_32_env,
-    require_env,
+    load_signup_plan_limits, optional_env, parse_csv, parse_env_or, parse_hex_32_env, require_env,
 };
 use super::validate::validate;
 pub use crate::config::SurrealTargetConfig;
@@ -199,8 +198,6 @@ pub struct HttpConfig {
     pub oidc_allowed_alg: String,
     pub operator_identity_allowlist: Vec<String>,
     pub signup_mode: SignupMode,
-    pub enable_control_plane: bool,
-    pub enable_control_plane_ui: bool,
     /// Explicit plan values for open signup. The plan is persisted in the
     /// durable Registry at startup and is never read from request input.
     #[serde(skip)]
@@ -260,8 +257,6 @@ impl fmt::Debug for HttpConfig {
                 &self.operator_identity_allowlist,
             )
             .field("signup_mode", &self.signup_mode)
-            .field("enable_control_plane", &self.enable_control_plane)
-            .field("enable_control_plane_ui", &self.enable_control_plane_ui)
             .field("signup_plan_limits", &self.signup_plan_limits)
             .field("browser_auth", &self.browser_auth)
             .finish()
@@ -499,17 +494,11 @@ impl HttpConfig {
                 None => require_env("MEMORY_MCP_API_KEY_PEPPER")?,
             },
         };
-        // Enable flags and the method set are read before any secret so a
-        // deployment that does not enable `oidc` is never forced to configure
-        // OIDC-only material, and so each method's keys are demanded only when
-        // that method is enabled.
-        let enable_control_plane = parse_bool("MEMORY_MCP_HTTP_ENABLE_CONTROL_PLANE", false)?;
-        let enable_control_plane_ui = parse_bool("MEMORY_MCP_HTTP_ENABLE_CONTROL_PLANE_UI", false)?;
-        let configured_methods = if enable_control_plane {
-            resolve_auth_methods()?
-        } else {
-            Vec::new()
-        };
+        // The configured method set is authoritative for browser auth. A
+        // deployment never selects product shape through an enable flag; the
+        // supported `streamable-http` profile always carries its configured
+        // control-plane methods.
+        let configured_methods = resolve_auth_methods()?;
         // `local` derives the three key slots it cannot use from the session
         // key, which is only coherent while it is the *whole* set: with `oidc`
         // enabled those slots are real material for a real provider.
@@ -670,29 +659,24 @@ impl HttpConfig {
 
         // One configuration per enabled method, so each method demands exactly
         // the material it uses (ADR-0057).
-        let browser_auth = if enable_control_plane {
-            Some(BrowserAuthMethods {
-                local: configured_methods
-                    .contains(&BrowserAuthMethod::Local)
-                    .then(|| build_local_browser_config(keys.control_plane_session, keys.csrf))
-                    .transpose()?,
-                oidc: configured_methods
-                    .contains(&BrowserAuthMethod::Oidc)
-                    .then(|| OidcBrowserConfig {
-                        issuer: oidc_issuer.clone(),
-                        client_id: oidc_client_id.clone(),
-                        audience: oidc_audience.clone(),
-                        redirect_uri: oidc_redirect_uri.clone(),
-                        allowed_alg: oidc_allowed_alg.clone(),
-                        operator_identity_allowlist: operator_identity_allowlist.clone(),
-                        signup_mode,
-                        keys,
-                    }),
-            })
-        } else {
-            None
-        };
-
+        let browser_auth = Some(BrowserAuthMethods {
+            local: configured_methods
+                .contains(&BrowserAuthMethod::Local)
+                .then(|| build_local_browser_config(keys.control_plane_session, keys.csrf))
+                .transpose()?,
+            oidc: configured_methods
+                .contains(&BrowserAuthMethod::Oidc)
+                .then(|| OidcBrowserConfig {
+                    issuer: oidc_issuer.clone(),
+                    client_id: oidc_client_id.clone(),
+                    audience: oidc_audience.clone(),
+                    redirect_uri: oidc_redirect_uri.clone(),
+                    allowed_alg: oidc_allowed_alg.clone(),
+                    operator_identity_allowlist: operator_identity_allowlist.clone(),
+                    signup_mode,
+                    keys,
+                }),
+        });
         let control_db = SurrealTargetConfig {
             url: require_env("SURREALDB_CONTROL_URL")?,
             username: require_env("SURREALDB_CONTROL_USERNAME")?,
@@ -741,8 +725,6 @@ impl HttpConfig {
             oidc_allowed_alg,
             operator_identity_allowlist,
             signup_mode,
-            enable_control_plane,
-            enable_control_plane_ui,
             signup_plan_limits,
             browser_auth,
         };
@@ -820,8 +802,6 @@ impl HttpConfig {
             oidc_allowed_alg: DEFAULT_OIDC_ALG.into(),
             operator_identity_allowlist: Vec::new(),
             signup_mode: SignupMode::InviteOnly,
-            enable_control_plane: false,
-            enable_control_plane_ui: false,
             signup_plan_limits: None,
             browser_auth: Some(BrowserAuthMethods {
                 local: None,
@@ -896,8 +876,6 @@ mod tests {
             "SURREALDB_TENANT_PASSWORD",
             "SURREALDB_TENANT_DB",
             "SURREALDB_TENANT_NAMESPACE",
-            "MEMORY_MCP_HTTP_ENABLE_CONTROL_PLANE",
-            "MEMORY_MCP_HTTP_ENABLE_CONTROL_PLANE_UI",
             "MEMORY_MCP_HTTP_CSRF_KEY",
             "MEMORY_MCP_HTTP_OIDC_STATE_KEY",
             "MEMORY_MCP_HTTP_OIDC_NONCE_KEY",
@@ -966,6 +944,12 @@ mod tests {
             ("MEMORY_MCP_HTTP_OIDC_STATE_KEY", key.clone()),
             ("MEMORY_MCP_HTTP_OIDC_NONCE_KEY", key.clone()),
             ("MEMORY_MCP_HTTP_SESSION_KEY", key),
+            ("MEMORY_MCP_HTTP_AUTH_METHODS", "oidc".into()),
+            (
+                "MEMORY_MCP_HTTP_OIDC_ISSUER",
+                "https://issuer.example.com".into(),
+            ),
+            ("MEMORY_MCP_HTTP_OIDC_CLIENT_ID", "test-client".into()),
             ("SURREALDB_CONTROL_URL", "ws://localhost:8000".into()),
             ("SURREALDB_CONTROL_USERNAME", "root".into()),
             ("SURREALDB_CONTROL_PASSWORD", "root".into()),
@@ -976,8 +960,6 @@ mod tests {
             ("SURREALDB_TENANT_PASSWORD", "root".into()),
             ("SURREALDB_TENANT_DB", "tenant".into()),
             ("SURREALDB_TENANT_NAMESPACE", "tenant".into()),
-            ("MEMORY_MCP_HTTP_ENABLE_CONTROL_PLANE", "false".into()),
-            ("MEMORY_MCP_HTTP_ENABLE_CONTROL_PLANE_UI", "false".into()),
         ]
     }
 
@@ -1011,14 +993,29 @@ mod tests {
                     "MEMORY_MCP_HTTP_IDENTITY_INDEX_KEY"
                         | "MEMORY_MCP_HTTP_OIDC_STATE_KEY"
                         | "MEMORY_MCP_HTTP_OIDC_NONCE_KEY"
+                        | "MEMORY_MCP_HTTP_AUTH_METHODS"
+                        | "MEMORY_MCP_HTTP_OIDC_ISSUER"
+                        | "MEMORY_MCP_HTTP_OIDC_CLIENT_ID"
                 )
             })
             .collect();
-        vars.push(("MEMORY_MCP_HTTP_ENABLE_CONTROL_PLANE", "true".into()));
         vars.push(("MEMORY_MCP_HTTP_AUTH_METHODS", "local".into()));
+        vars.push(("MEMORY_MCP_HTTP_ENABLE_CONTROL_PLANE", "false".into()));
+        vars.push(("MEMORY_MCP_HTTP_ENABLE_CONTROL_PLANE_UI", "false".into()));
         vars.push(("MEMORY_MCP_HTTP_LOCAL_DEFAULT_PLAN_VERSION", "1".into()));
         vars.extend(plan_limit_env());
         vars
+    }
+
+    #[test]
+    fn retired_product_flags_do_not_select_browser_auth_shape() {
+        let vars = local_mode_env();
+        let refs: Vec<(&str, &str)> = vars.iter().map(|(k, v)| (*k, v.as_str())).collect();
+        with_env(&refs, || {
+            let cfg = HttpConfig::from_env().expect("method configuration is authoritative");
+            assert!(cfg.has_method(BrowserAuthMethod::Local));
+            assert!(cfg.browser_auth.is_some());
+        });
     }
 
     #[test]
@@ -1068,7 +1065,6 @@ mod tests {
     #[test]
     fn both_methods_load_and_validate_together() {
         let mut vars = base_required_env();
-        vars.push(("MEMORY_MCP_HTTP_ENABLE_CONTROL_PLANE", "true".into()));
         vars.push(("MEMORY_MCP_HTTP_AUTH_METHODS", "oidc,local".into()));
         vars.push(("MEMORY_MCP_HTTP_LOCAL_DEFAULT_PLAN_VERSION", "1".into()));
         vars.push((
@@ -1127,7 +1123,6 @@ mod tests {
     fn open_signup_loads_explicit_plan_limits() {
         let mut vars = base_required_env();
         vars[6] = ("MEMORY_MCP_HTTP_SIGNUP_MODE", "open".into());
-        vars.push(("MEMORY_MCP_HTTP_ENABLE_CONTROL_PLANE", "true".into()));
         vars.push((
             "MEMORY_MCP_HTTP_OIDC_ISSUER",
             "https://issuer.example.com".into(),
@@ -1239,7 +1234,6 @@ mod tests {
     #[test]
     fn control_plane_requires_complete_oidc_config() {
         let mut cfg = HttpConfig::default_for_test();
-        cfg.enable_control_plane = true;
         cfg.oidc_issuer.clear();
         assert!(matches!(
             cfg.validate(),
@@ -1250,7 +1244,6 @@ mod tests {
     #[test]
     fn control_plane_rejects_unknown_oidc_algorithm() {
         let mut cfg = HttpConfig::default_for_test();
-        cfg.enable_control_plane = true;
         cfg.oidc_allowed_alg = "none".into();
         assert!(matches!(
             cfg.validate(),
@@ -1266,7 +1259,6 @@ mod tests {
     fn control_plane_accepts_derived_and_rs_algorithms() {
         for alg in ["auto", "RS384", "RS512"] {
             let mut cfg = HttpConfig::default_for_test();
-            cfg.enable_control_plane = true;
             cfg.oidc_allowed_alg = alg.into();
             cfg.validate()
                 .unwrap_or_else(|error| panic!("{alg} must be accepted: {error}"));
@@ -1280,7 +1272,6 @@ mod tests {
             .into_iter()
             .filter(|(k, _)| !matches!(*k, "MEMORY_MCP_HTTP_SIGNUP_MODE"))
             .collect();
-        vars.push(("MEMORY_MCP_HTTP_ENABLE_CONTROL_PLANE", "true".into()));
         vars.push(("MEMORY_MCP_HTTP_AUTH_METHODS", "oidc".into()));
         vars.push((
             "MEMORY_MCP_HTTP_OIDC_ISSUER",
@@ -1570,16 +1561,6 @@ mod tests {
     }
 
     #[test]
-    fn control_plane_ui_requires_control_plane() {
-        let mut cfg = HttpConfig::default_for_test();
-        cfg.enable_control_plane_ui = true;
-        assert!(matches!(
-            cfg.validate(),
-            Err(MemoryError::ConfigInvalid(message)) if message.contains("UI requires control plane")
-        ));
-    }
-
-    #[test]
     fn csv_allowlists_trim_entries() {
         let mut vars = base_required_env();
         vars[2] = ("ALLOWED_HOSTS", " localhost , 127.0.0.1 ".into());
@@ -1646,7 +1627,6 @@ mod tests {
     /// otherwise a test can pass for the wrong reason.
     fn valid_local_config() -> HttpConfig {
         let mut cfg = HttpConfig::default_for_test();
-        cfg.enable_control_plane = true;
         cfg.browser_auth = Some(BrowserAuthMethods {
             local: Some(local_browser_config()),
             oidc: None,
@@ -1796,20 +1776,8 @@ mod tests {
         // was enabled but the OIDC fields were empty, and validation
         // demanded an issuer nobody had configured.
         let cfg = valid_local_config();
-        assert!(cfg.enable_control_plane);
         assert!(cfg.oidc_issuer.is_empty());
         assert!(cfg.oidc_client_id.is_empty());
         assert!(cfg.validate().is_ok());
-    }
-
-    #[test]
-    fn off_mode_rejects_oidc_credentials() {
-        let mut cfg = HttpConfig::default_for_test();
-        cfg.browser_auth = None;
-        cfg.oidc_issuer = "https://issuer.example.com".into();
-        assert!(matches!(
-            cfg.validate(),
-            Err(MemoryError::ConfigInvalid(msg)) if msg.contains("MEMORY_MCP_HTTP_OIDC_ISSUER")
-        ));
     }
 }

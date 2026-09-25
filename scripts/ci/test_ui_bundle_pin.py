@@ -7,7 +7,7 @@ crate's own `dioxus` requirement, and what keeps the output layout the build
 stage asserts from being edited into something `dx` no longer produces.
 
 The layout checks are textual on purpose: they pin the contract between the
-Dockerfile's `dx bundle` invocation, its `MEMORY_MCP_CONTROL_PLANE_UI_DIST`, and
+Dockerfile's `dx bundle` invocation, its `MEMORY_MCP_UI_DIST`, and
 the assertions that follow it, without running a container. Whitespace is
 normalised before matching, so reindenting the build block does not fail a test
 that is about the commands in it.
@@ -19,7 +19,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 DOCKERFILE = ROOT / "Dockerfile"
-UI_MANIFEST = ROOT / "crates" / "control-plane-ui" / "Cargo.toml"
+UI_MANIFEST = ROOT / "crates" / "ui" / "Cargo.toml"
 
 
 def collapsed(text: str) -> str:
@@ -51,15 +51,15 @@ class DioxusCliPinTests(unittest.TestCase):
         # running it from the crate directory panics on a missing path. The
         # explicit `--package` is what makes the root invocation unambiguous.
         self.assertIn("cd /src;", self.text)
-        self.assertIn("dx bundle --platform web --release --package control-plane-ui", self.text)
+        self.assertIn("dx bundle --platform web --release --package ui", self.text)
 
     def test_the_dist_directory_is_the_one_the_build_script_reads(self):
         # `dx bundle --out-dir X` writes the document to `X/public`, and
         # `crates/memory-mcp/build.rs` requires a non-empty `index.html` at the
-        # root of whatever `MEMORY_MCP_CONTROL_PLANE_UI_DIST` names.
-        self.assertIn("--out-dir /src/control-plane-ui-dist", self.text)
+        # root of whatever `MEMORY_MCP_UI_DIST` names.
+        self.assertIn("--out-dir /src/ui-dist", self.text)
         self.assertIn(
-            "ENV MEMORY_MCP_CONTROL_PLANE_UI_DIST=/src/control-plane-ui-dist/public",
+            "ENV MEMORY_MCP_UI_DIST=/src/ui-dist/public",
             self.text,
         )
 
@@ -67,10 +67,10 @@ class DioxusCliPinTests(unittest.TestCase):
         # One document, one stylesheet, one module and one WebAssembly payload:
         # `crates/memory-mcp/build.rs` embeds an index plus the assets it
         # references, and a stale staging directory would add a second pair.
-        self.assertIn("test -s /src/control-plane-ui-dist/public/index.html;", self.text)
+        self.assertIn("test -s /src/ui-dist/public/index.html;", self.text)
         for extension in ("js", "wasm", "css"):
             self.assertIn(
-                f"find /src/control-plane-ui-dist/public -type f -name '*.{extension}' "
+                f"find /src/ui-dist/public -type f -name '*.{extension}' "
                 '| wc -l)" = "1"',
                 self.text,
             )
@@ -92,7 +92,7 @@ class DioxusCliPinTests(unittest.TestCase):
         # `dx` copies its staging directory wholesale, so without this the
         # embedded bundle grows by one stale JS/WASM pair per build.
         self.assertIn(
-            "rm -rf /src/target/dx/control-plane-ui/release/web/public /src/control-plane-ui-dist;",
+            "rm -rf /src/target/dx/ui/release/web/public /src/ui-dist;",
             self.text,
         )
 

@@ -23,11 +23,20 @@ pub struct HttpStateTestBuilder {
 
 impl HttpStateTestBuilder {
     pub async fn new() -> Self {
+        // The default test state carries the OIDC method shape from
+        // `default_for_test`, but with a pre-joined policy so
+        // composition does not run discovery against the placeholder
+        // `issuer.invalid` issuer. Tests that drive the OIDC handlers
+        // rely on the policy override path; tests that need the local
+        // door use `local_admin()`.
         Self {
             config: super::config::HttpConfig::default_for_test(),
             registry: super::registry::RegistryHandle::in_memory_with_default_mem_engine().await,
             #[cfg(feature = "control-plane")]
-            browser_policy: None,
+            browser_policy: Some(super::registry::models::BrowserPolicyFence {
+                methods: vec![super::config::BrowserAuthMethod::Oidc],
+                epoch: 1,
+            }),
             #[cfg(feature = "prometheus")]
             metrics_handle: super::HttpState::test_metrics_handle(),
         }
@@ -65,7 +74,6 @@ impl HttpStateTestBuilder {
             engine,
         );
         let mut config = super::config::HttpConfig::default_for_test();
-        config.enable_control_plane = true;
         config.browser_auth = Some(BrowserAuthMethods {
             local: Some(LocalBrowserConfig {
                 session_key: Self::LOCAL_TEST_SESSION_KEY,

@@ -48,6 +48,14 @@ async fn track_fact_accesses(
     access: &AccessPayload,
 ) {
     for item in items {
+        // Only real fact records carry access heat. Several view
+        // modes synthesise items under a non-fact id
+        // (`episode_fallback:`, `facet:`, `map:`), and those have
+        // nothing to record; attempting one is a validation
+        // refusal, not a failure worth logging on every request.
+        if !item.fact_id.starts_with("fact:") {
+            continue;
+        }
         if let Err(err) = ctx.record_fact_access(&item.fact_id, 1).await {
             ctx.logger.log(
                 log_event(
@@ -70,9 +78,42 @@ pub async fn assemble_context(
     request: AssembleContextRequest,
 ) -> Result<Vec<AssembledContextItem>, MemoryError> {
     let access = AccessPayload::from_payload(request.access.clone());
-    ctx.enforce_rate_limit(access.as_ref())?;
-    let retrieval = ctx.retrieval_context();
-    assemble_context_inner(&retrieval, request).await
+    let command = crate::memory::api::RecallCommand {
+        query: request.query.clone(),
+        budget: request.budget,
+        caller_id: access.and_then(|payload| payload.caller_id),
+    };
+    crate::memory::api::recall_context(
+        &RetrievalPort { ctx, request },
+        &crate::service::capabilities::ServiceRateLimitPort { ctx },
+        &command,
+    )
+    .await
+}
+
+/// Adapts the legacy multi-tier retrieval pipeline to the
+/// memory-owned recall port.
+///
+/// The port is the seam: the entry point above only charges
+/// the access policy, and everything below runs against the
+/// already-narrowed `RetrievalContext`.
+///
+/// Expiry removal: Phase 5, when the retrieval pipeline takes
+/// the narrow context directly instead of the shared one.
+struct RetrievalPort<'a> {
+    ctx: &'a ServiceContext,
+    request: AssembleContextRequest,
+}
+
+#[async_trait::async_trait]
+impl crate::memory::api::ContextRetrievalPort for RetrievalPort<'_> {
+    async fn retrieve(
+        &self,
+        _command: &crate::memory::api::RecallCommand,
+    ) -> Result<Vec<AssembledContextItem>, MemoryError> {
+        let retrieval = self.ctx.retrieval_context();
+        assemble_context_inner(&retrieval, self.request.clone()).await
+    }
 }
 
 /// Assembles context after the outer service adapter has entered the narrow

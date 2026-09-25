@@ -18,8 +18,38 @@ impl ExplainCapability {
         request: ExplainRequest,
         access: Option<AccessPayload>,
     ) -> Result<Vec<ExplainItem>, MemoryError> {
-        ctx.enforce_rate_limit(access.as_ref())?;
-        ctx.explanation_service.explain(request, access).await
+        crate::memory::api::explain_context(
+            &ExplanationPort {
+                service: &ctx.explanation_service,
+                access: access.clone(),
+            },
+            &super::ServiceRateLimitPort { ctx },
+            request,
+            access.and_then(|payload| payload.caller_id),
+        )
+        .await
+    }
+}
+
+/// Adapts the legacy `ExplanationService` to the memory-owned
+/// explanation port.
+///
+/// Expiry removal: Phase 5, when the provenance pipeline becomes
+/// memory-owned rather than a context-held service.
+struct ExplanationPort<'a> {
+    service: &'a crate::service::explanation::ExplanationService,
+    /// Caller identity, recorded on each explained item for
+    /// provenance auditing.
+    access: Option<AccessPayload>,
+}
+
+#[async_trait::async_trait]
+impl crate::memory::api::ExplanationPort for ExplanationPort<'_> {
+    async fn explain(
+        &self,
+        request: crate::models::ExplainRequest,
+    ) -> Result<Vec<crate::models::ExplainItem>, MemoryError> {
+        self.service.explain(request, self.access.clone()).await
     }
 }
 

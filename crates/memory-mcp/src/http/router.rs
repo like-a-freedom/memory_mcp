@@ -67,14 +67,10 @@ pub fn build_router(
     // otherwise off mode would both expose a browser-auth route and answer
     // `{"mode":"oidc"}` for a surface it does not serve.
     #[cfg(feature = "control-plane")]
-    let router = if state.config.enable_control_plane {
-        router.route(
-            "/api/v1/auth/config",
-            get(crate::control::local_admin::handlers::auth_config),
-        )
-    } else {
-        router
-    };
+    let router = router.route(
+        "/api/v1/auth/config",
+        get(crate::control::local_admin::handlers::auth_config),
+    );
 
     #[cfg(feature = "control-plane")]
     let control_extension: Option<axum::Extension<Arc<dyn FaultInjector>>> =
@@ -279,30 +275,15 @@ pub fn build_router(
     // This is installed as the single outer fallback, after any mode
     // specific fallback, so it cannot be shadowed by the static-asset
     // router.
-    let ui_enabled = {
-        #[cfg(feature = "control-plane-ui")]
-        {
-            state.config.enable_control_plane_ui
-        }
-        #[cfg(not(feature = "control-plane-ui"))]
-        {
-            false
-        }
-    };
     // The SPA shell is stamped with the mount base once, here: the fallback
     // below serves these bytes for every SPA route so a prefixed deployment
-    // never ships the build-time sentinel to a client. Stamping is gated on
-    // `ui_enabled` so a deployment that turns the UI off never fails on a
-    // bundle contract it does not serve; the `#[cfg]` mirrors the gate on
-    // the `serve_asset` call inside the fallback.
-    #[cfg(feature = "control-plane-ui")]
-    let stamped_assets = if ui_enabled {
-        crate::control::static_assets::build_stamped_assets(&state.config.base_path)?
-    } else {
-        None
-    };
-    #[cfg(not(feature = "control-plane-ui"))]
-    let stamped_assets: Option<std::sync::Arc<crate::control::static_assets::StampedAssets>> = None;
+    // never ships the build-time sentinel to a client. The compiled UI
+    // feature determines whether an embedded catalog exists; an empty catalog
+    // still deliberately serves the no-UI fallback.
+    #[cfg(feature = "ui")]
+    let stamped_assets = crate::ui::assets::build_stamped_assets(&state.config.base_path)?;
+    #[cfg(not(feature = "ui"))]
+    let stamped_assets: Option<std::sync::Arc<crate::ui::assets::StampedAssets>> = None;
 
     let router = router.fallback(move |uri: axum::http::Uri| {
         let stamped_assets = stamped_assets.clone();
@@ -322,16 +303,19 @@ pub fn build_router(
                     "{\"error\":{\"code\":\"not_found\",\"message\":\"not found\"}}",
                 ));
             }
-            #[cfg(feature = "control-plane-ui")]
-            if ui_enabled {
-                return crate::control::static_assets::serve_asset(path, stamped_assets.as_deref());
+            #[cfg(feature = "ui")]
+            {
+                crate::ui::assets::serve_asset(path, stamped_assets.as_deref())
             }
-            let _ = (ui_enabled, &stamped_assets);
-            axum::response::IntoResponse::into_response((
-                axum::http::StatusCode::NOT_FOUND,
-                [(axum::http::header::CONTENT_TYPE, "application/json")],
-                "{\"error\":{\"code\":\"not_found\",\"message\":\"not found\"}}",
-            ))
+            #[cfg(not(feature = "ui"))]
+            {
+                let _ = &stamped_assets;
+                return axum::response::IntoResponse::into_response((
+                    axum::http::StatusCode::NOT_FOUND,
+                    [(axum::http::header::CONTENT_TYPE, "application/json")],
+                    "{\"error\":{\"code\":\"not_found\",\"message\":\"not found\"}}",
+                ));
+            }
         }
     });
 
@@ -411,37 +395,22 @@ mod tests {
         request_with_host(method, uri, "localhost")
     }
 
-    /// Plan §6 feature matrix: "control off | … no browser keys/plan/discovery/
-    /// routes". The mode-disclosure route is the one that would otherwise be
-    /// reachable in every mode, because it is mounted outside the OIDC-mode
-    /// branch, so it is the regression case. An off deployment must answer
-    /// `404` rather than claim a browser-auth mode it does not serve.
+    /// The mode disclosure is mounted in the supported control-plane profile
+    /// without a runtime product switch.
+    #[cfg(feature = "control-plane")]
     #[tokio::test]
-    async fn off_mode_mounts_no_browser_auth_route() {
-        let state = HttpStateTestBuilder::new()
-            .await
-            .build()
-            .await
-            .expect("off-mode HTTP state");
-        assert!(
-            !state.config.enable_control_plane,
-            "the fixture is off mode"
-        );
+    async fn the_mode_disclosure_is_mounted_without_a_runtime_switch() {
+        let (builder, _store) = HttpStateTestBuilder::local_admin().await;
+        let state = builder.build().await.expect("local admin HTTP state");
 
         let mut router = build_router(state, None).expect("router builds in tests");
         let response = router
             .call(request(Method::GET, "/api/v1/auth/config"))
             .await
             .expect("dispatch");
-        assert_eq!(
-            response.status(),
-            StatusCode::NOT_FOUND,
-            "off mode must not answer the browser-auth mode disclosure"
-        );
+        assert_eq!(response.status(), StatusCode::OK);
     }
 
-    /// The same route *is* mounted once the control plane is enabled, so the
-    /// assertion above cannot pass for the wrong reason.
     /// The identity-invitation route exists and is guarded: an unauthenticated
     /// request is refused with an auth rejection rather than a 404.
     #[cfg(feature = "control-plane")]
@@ -464,24 +433,6 @@ mod tests {
             "the route must be mounted"
         );
         assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
-    }
-
-    #[cfg(feature = "control-plane")]
-    #[tokio::test]
-    async fn an_enabled_control_plane_mounts_the_mode_disclosure() {
-        let (builder, _store) = HttpStateTestBuilder::local_admin().await;
-        let state = builder.build().await.expect("local admin HTTP state");
-        assert!(
-            state.config.enable_control_plane,
-            "the fixture is local mode"
-        );
-
-        let mut router = build_router(state, None).expect("router builds in tests");
-        let response = router
-            .call(request(Method::GET, "/api/v1/auth/config"))
-            .await
-            .expect("dispatch");
-        assert_eq!(response.status(), StatusCode::OK);
     }
 
     /// `Router::layer` wraps only the routes that exist at the moment it is
@@ -566,7 +517,6 @@ mod tests {
     async fn prefixed_state(base: &str) -> std::sync::Arc<crate::http::HttpState> {
         let mut config = crate::http::config::HttpConfig::default_for_test();
         config.base_path = base.to_owned();
-        config.enable_control_plane_ui = true;
         HttpStateTestBuilder::new()
             .await
             .with_config(config)
@@ -673,7 +623,7 @@ mod tests {
     /// the gap fallback's is the JSON envelope. The body proves the bare
     /// prefix routed to the *inner* SPA fallback (the bundle is absent in
     /// tests, so the SPA route itself 404s — through `serve_asset`).
-    #[cfg(feature = "control-plane-ui")]
+    #[cfg(feature = "ui")]
     #[tokio::test]
     async fn the_bare_prefix_reaches_the_inner_spa_fallback() {
         let mut router =
@@ -687,7 +637,7 @@ mod tests {
         assert_eq!(body_text(response).await, "not found");
     }
 
-    #[cfg(feature = "control-plane-ui")]
+    #[cfg(feature = "ui")]
     #[tokio::test]
     async fn deep_spa_paths_reach_the_inner_spa_fallback() {
         let mut router =

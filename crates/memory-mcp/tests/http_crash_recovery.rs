@@ -54,6 +54,15 @@ use tempfile::TempDir;
 
 const UNIT_KEY_A: &str =
     "mem_sk_ak_aaaa0000-0000-4000-8000-000000000000_crashrecover000000000000000000000000aaaa";
+
+/// One deletion-recovery pass, composed through the same public
+/// entry point the production scheduler uses.
+async fn run_deletion_recovery_pass(
+    registry: RegistryHandle,
+    fault_injector: Arc<dyn FaultInjector>,
+) -> Result<(), MemoryError> {
+    memory_mcp::bootstrap::run_deletion_recovery_pass(registry, fault_injector).await
+}
 const UNIT_KEY_B: &str =
     "mem_sk_ak_bbbb0000-0000-4000-8000-000000000000_crashrecover000000000000000000000000bbbb";
 
@@ -592,7 +601,7 @@ async fn deletion_recovers_after_finalize_transient() {
         .await
         .expect("begin operator deletion");
     let fault_injector = Arc::new(FailOnceAt::new(FaultPoint::AccountDeletionFinalized));
-    memory_mcp::control::deletion::run_deletion_worker(registry.clone(), fault_injector.clone())
+    run_deletion_recovery_pass(registry.clone(), fault_injector.clone())
         .await
         .expect("a durably committed deletion is reported as success");
     let after_first = store
@@ -601,7 +610,7 @@ async fn deletion_recovers_after_finalize_transient() {
         .expect("tenant lookup")
         .expect("tenant present");
     assert_eq!(after_first.status, TenantStatus::Purged);
-    memory_mcp::control::deletion::run_deletion_worker(registry.clone(), Arc::new(NoFaults))
+    run_deletion_recovery_pass(registry.clone(), Arc::new(NoFaults))
         .await
         .expect("deletion worker retries");
     let after_second = store

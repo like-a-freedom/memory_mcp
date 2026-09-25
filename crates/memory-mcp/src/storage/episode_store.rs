@@ -25,7 +25,18 @@ impl EpisodeStoreClient {
         }
     }
 
+    pub(crate) fn from_bound(db: BoundDbClient) -> Self {
+        Self { db }
+    }
+
     pub async fn select_one(&self, record_id: &str) -> Result<Option<Value>, MemoryError> {
+        self.db.select_one(record_id).await
+    }
+
+    /// Returns an episode record, refusing any id that does not
+    /// name an episode.
+    pub async fn select_episode(&self, record_id: &str) -> Result<Option<Value>, MemoryError> {
+        crate::storage::helpers::require_record_kind(record_id, "episode")?;
         self.db.select_one(record_id).await
     }
 
@@ -130,6 +141,38 @@ impl EpisodeStoreClient {
 
     pub async fn update(&self, record_id: &str, content: Value) -> Result<Value, MemoryError> {
         self.db.update(record_id, content).await
+    }
+
+    /// Update an episode, refusing any record id that is not
+    /// episode-scoped.
+    ///
+    /// The generic [`Self::update`] derives its table from the
+    /// record id string, so a `fact:…` id passed to an episode
+    /// write would silently write a different owner's table.
+    /// This method closes that hole at the owner boundary.
+    pub async fn update_episode(
+        &self,
+        record_id: &str,
+        content: Value,
+    ) -> Result<Value, MemoryError> {
+        crate::storage::helpers::require_record_kind(record_id, "episode")?;
+        self.db.update(record_id, content).await
+    }
+
+    /// Episodes that are old enough to archive and are not
+    /// already archived, oldest first.
+    ///
+    /// Memory-owned: this is the lifecycle read over the
+    /// `episode` table.
+    pub async fn select_episodes_for_archival(
+        &self,
+        cutoff: &str,
+        limit: i32,
+    ) -> Result<Vec<Value>, MemoryError> {
+        let sql = "SELECT * FROM episode WHERE status != 'archived' \
+                   AND t_ref < type::datetime($cutoff) ORDER BY t_ref ASC LIMIT $limit";
+        let vars = json!({ "cutoff": cutoff, "limit": limit });
+        self.db.query_rows(sql, Some(vars)).await
     }
 
     /// Persists an entity extraction projection row (the CREATE

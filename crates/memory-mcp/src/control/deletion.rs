@@ -6,23 +6,19 @@
 //! 4. Server-issued short-lived one-use confirmation token.
 //! 5. Durable credential/session revocation.
 //! 6. Idempotent logical deletion job.
-
-use std::sync::Arc;
+//!
+//! The deletion decision and recovery loop are owned by
+//! `crate::operations::api`; this module keeps only the
+//! control-plane protocol concerns (typed phrase and the durable
+//! one-use token verifier).
 
 use chrono::Utc;
 use hmac::{Hmac, KeyInit, Mac};
 use sha2::Sha256;
 
-use super::error::ApiError;
-use super::recent_auth;
-use super::session::ControlPlaneSession;
-use crate::error::MemoryError;
-use crate::http::fault_injection::{FaultInjector, FaultPoint};
-use crate::http::registry::RegistryHandle;
-use crate::http::registry::storage::RegistryStore;
-
 /// The typed phrase the user must type to confirm deletion.
-pub const DELETION_TYPED_PHRASE: &str = "DELETE my account";
+pub use crate::operations::api::DELETION_TYPED_PHRASE;
+pub use crate::operations::api::begin_account_deletion;
 
 /// Short-lived confirmation token for the deletion flow.
 #[derive(Debug, Clone)]
@@ -50,7 +46,7 @@ impl DeletionConfirmationToken {
 
 /// Validate that the typed phrase matches the expected deletion phrase.
 pub fn validate_typed_phrase(phrase: &str) -> bool {
-    phrase.trim() == DELETION_TYPED_PHRASE
+    crate::operations::api::DELETION_TYPED_PHRASE.eq(phrase.trim())
 }
 
 /// Derive the durable verifier for a one-use confirmation token. The raw token
@@ -60,164 +56,6 @@ pub fn token_verifier(key: &[u8; 32], token: &str) -> Result<String, crate::erro
         .map_err(|_| crate::error::MemoryError::ConfigInvalid("deletion token key".into()))?;
     mac.update(token.as_bytes());
     Ok(hex::encode(mac.finalize().into_bytes()))
-}
-
-/// Execute the safe deletion-start path. The caller supplies only the durable
-/// challenge verifier; the store consumes the challenge and performs every
-/// control-plane mutation in one transaction/critical section.
-///
-/// The fault injector is consulted after the durable
-/// `AccountDeletionStarted` transition; a transient there leaves the
-/// account+tenant in `Deleting` so the deletion worker can finalize on
-/// the next tick.
-pub async fn execute_deletion(
-    session: &ControlPlaneSession,
-    typed_phrase: &str,
-    challenge_verifier: &str,
-    store: &dyn RegistryStore,
-    fault_injector: &Arc<dyn FaultInjector>,
-) -> Result<(), ApiError> {
-    recent_auth::require_recent_auth(session, recent_auth::DEFAULT_REAUTH_MAX_AGE)?;
-    if !validate_typed_phrase(typed_phrase) {
-        return Err(ApiError::Forbidden);
-    }
-    store
-        .begin_account_deletion(
-            challenge_verifier,
-            &session.account_id,
-            &session.id,
-            Utc::now(),
-        )
-        .await?;
-    fault_injector.hit(FaultPoint::AccountDeletionStarted)?;
-    Ok(())
-}
-
-const DELETION_LEASE_TTL_SECS: i64 = 60;
-const DELETION_BATCH_SIZE: usize = 64;
-const APP_SESSION_CLEANUP_SQL: &str =
-    "DELETE FROM app_session WHERE idle_expiry <= time::now() OR absolute_expiry <= time::now();";
-const TASK_CLEANUP_SQL: &str = "DELETE FROM tenant_task WHERE retention_expiry <= time::now() AND state IN ['completed', 'completed_before_cancel', 'cancelled', 'cancelled_before_commit', 'failed'];";
-
-/// Run one crash-safe deletion pass. The registry lease is the only worker
-/// lease: it fences both tenant-local cleanup and the final tombstone update.
-///
-/// The fault injector is consulted after the durable
-/// `AccountDeletionFinalized` transition; a transient there leaves the
-/// tenant in `Deleting` with a still-valid lease, so the next worker
-/// re-claims and finalizes.
-pub async fn run_deletion_worker(
-    registry: RegistryHandle,
-    fault_injector: Arc<dyn FaultInjector>,
-) -> Result<(), MemoryError> {
-    let store = registry.store_clone();
-    let tenants = store
-        .list_deleting_tenants(DELETION_BATCH_SIZE, Utc::now())
-        .await?;
-    if tenants.is_empty() {
-        return Ok(());
-    }
-    let engine = registry.tenant_engine()?;
-    let mut first_error = None;
-    let owner_id = crate::http::leases::scheduler::replica_id();
-
-    for tenant in tenants {
-        let lease_id = uuid::Uuid::new_v4().to_string();
-        let Some(lease) = store
-            .claim_provisioning(&tenant.id, &owner_id, &lease_id, DELETION_LEASE_TTL_SECS)
-            .await?
-        else {
-            continue;
-        };
-        let tenant_id = tenant.id.clone();
-        let tenant_id_for_work = tenant_id.clone();
-        let namespace = tenant.namespace_binding.namespace.clone();
-        let store_for_work = Arc::clone(&store);
-        let engine_for_work = engine.clone();
-        let lease_for_work = lease.clone();
-        let injector_for_work = fault_injector.clone();
-        let cleanup = lease
-            .run_with_heartbeat(registry.clone(), &tenant_id, async move {
-                let client = engine_for_work.bind(&tenant).await?;
-                match client
-                    .execute_migration_script(APP_SESSION_CLEANUP_SQL, &namespace)
-                    .await
-                {
-                    Ok(()) => {}
-                    Err(error) if missing_app_session_table(&error) => {}
-                    Err(error) => return Err(error),
-                }
-                match client
-                    .execute_migration_script(TASK_CLEANUP_SQL, &namespace)
-                    .await
-                {
-                    Ok(()) => {}
-                    Err(error) if missing_task_table(&error) => {}
-                    Err(error) => return Err(error),
-                }
-                store_for_work
-                    .finalize_account_deletion(
-                        &tenant_id_for_work,
-                        &lease_for_work.owner_id,
-                        &lease_for_work.lease_id,
-                        lease_for_work.fencing_generation,
-                        Utc::now(),
-                    )
-                    .await?;
-                // Hit after the tenant is finalized. The next
-                // worker sees the same tenant again via
-                // `list_deleting_tenants`? No — finalize moves
-                // the tenant to `Purged`. So the recovery
-                // scenario is: a transient here leaves the
-                // cleanup SQLs (which run before finalize) and
-                // the lease release unwritten; the next worker
-                // re-runs the cleanup + finalize.
-                injector_for_work.hit(FaultPoint::AccountDeletionFinalized)?;
-                Ok(())
-            })
-            .await;
-
-        if let Err(error) = cleanup {
-            if deletion_is_purged(store.as_ref(), &tenant_id).await? {
-                continue;
-            }
-            let _ = lease.release(store.as_ref(), &tenant_id).await;
-            if first_error.is_none() {
-                first_error = Some(error);
-            }
-        }
-    }
-
-    first_error.map_or(Ok(()), Err)
-}
-
-fn missing_app_session_table(error: &MemoryError) -> bool {
-    missing_table(error, "app_session")
-}
-
-async fn deletion_is_purged(
-    store: &dyn RegistryStore,
-    tenant_id: &str,
-) -> Result<bool, MemoryError> {
-    Ok(store
-        .find_tenant_by_id(tenant_id)
-        .await?
-        .is_some_and(|tenant| tenant.status == crate::http::registry::models::TenantStatus::Purged))
-}
-
-fn missing_task_table(error: &MemoryError) -> bool {
-    missing_table(error, "tenant_task")
-}
-
-fn missing_table(error: &MemoryError, table: &str) -> bool {
-    let MemoryError::Storage(message) = error else {
-        return false;
-    };
-    let lower = message.to_ascii_lowercase();
-    lower.contains(table)
-        && ((lower.contains("does not exist") && lower.contains("table"))
-            || lower.contains("unknown table")
-            || lower.contains("table not found"))
 }
 
 #[cfg(test)]

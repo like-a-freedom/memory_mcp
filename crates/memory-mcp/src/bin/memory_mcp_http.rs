@@ -57,47 +57,44 @@ async fn main() -> ExitCode {
 
     signal_watcher::spawn(state.shutdown.clone(), state.admission.clone());
 
-    let scheduler_hooks =
-        match memory_mcp::http::leases::scheduler::SchedulerHooks::with_provisioning_only(
-            runtime.tenant_migrations.clone(),
-            runtime.fault_injector.clone(),
-        )
-        .map(|hooks| {
-            let task_options =
-                memory_mcp::http::runtime::storage::RuntimeOptions::from_http_config(&cfg)
-                    .with_fault_injector(runtime.fault_injector.clone());
-            let hooks = hooks
-                .with_additional_job(memory_mcp::http::app_sessions::scheduler::scheduler_job())
-                .with_additional_job(
-                    memory_mcp::http::tasks::scheduler::scheduler_job_with_options(task_options),
-                )
-                .with_additional_job(memory_mcp::http::subscriptions::scheduler::scheduler_job())
-                .with_additional_job(memory_mcp::http::registry::plan::scheduler_job())
-                .with_additional_job(
-                    memory_mcp::http::runtime::pool::Pool::eviction_scheduler_job(
-                        state.pool.clone(),
-                    ),
-                )
-                .with_additional_job(
-                    memory_mcp::http::registry::provisioning::reconciliation_scheduler_job(),
-                );
-            // The throttle table only exists under `control-plane`; the
-            // maintenance pass is registered with the same feature so a
-            // data-plane-only HTTP build does not carry it.
-            #[cfg(feature = "control-plane")]
-            let hooks = hooks.with_additional_job(
-                memory_mcp::http::registry::surreal_store::rate_bucket_cleanup_scheduler_job(),
+    let scheduler_hooks = match memory_mcp::bootstrap::provisioning_scheduler_hooks(
+        runtime.tenant_migrations.clone(),
+        runtime.fault_injector.clone(),
+    )
+    .map(|hooks| {
+        let task_options =
+            memory_mcp::http::runtime::storage::RuntimeOptions::from_http_config(&cfg)
+                .with_fault_injector(runtime.fault_injector.clone());
+        let hooks = hooks
+            .with_additional_job(memory_mcp::http::app_sessions::scheduler::scheduler_job())
+            .with_additional_job(
+                memory_mcp::http::tasks::scheduler::scheduler_job_with_options(task_options),
+            )
+            .with_additional_job(memory_mcp::http::subscriptions::scheduler::scheduler_job())
+            .with_additional_job(memory_mcp::http::registry::plan::scheduler_job())
+            .with_additional_job(
+                memory_mcp::http::runtime::pool::Pool::eviction_scheduler_job(state.pool.clone()),
+            )
+            .with_additional_job(
+                memory_mcp::http::registry::provisioning::reconciliation_scheduler_job(),
             );
-            hooks
-        })
-        .and_then(|hooks| hooks.with_maintenance_parallelism(cfg.maintenance_parallelism))
-        {
-            Ok(hooks) => hooks,
-            Err(err) => {
-                eprintln!("scheduler config error: {err}");
-                return ExitCode::from(2);
-            }
-        };
+        // The throttle table only exists under `control-plane`; the
+        // maintenance pass is registered with the same feature so a
+        // data-plane-only HTTP build does not carry it.
+        #[cfg(feature = "control-plane")]
+        let hooks = hooks.with_additional_job(
+            memory_mcp::http::registry::surreal_store::rate_bucket_cleanup_scheduler_job(),
+        );
+        hooks
+    })
+    .and_then(|hooks| hooks.with_maintenance_parallelism(cfg.maintenance_parallelism))
+    {
+        Ok(hooks) => hooks,
+        Err(err) => {
+            eprintln!("scheduler config error: {err}");
+            return ExitCode::from(2);
+        }
+    };
     let scheduler = memory_mcp::http::leases::scheduler::start(
         state.registry.clone(),
         scheduler_hooks,

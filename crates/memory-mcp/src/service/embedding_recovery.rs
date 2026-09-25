@@ -166,39 +166,6 @@ fn required_fact_string(record: &Value, field: &str) -> Result<String, MemoryErr
         .ok_or_else(|| MemoryError::Validation(format!("missing fact field `{field}`")))
 }
 
-fn embedding_fields_for_backfill(
-    provider: &dyn EmbeddingProvider,
-    embedding: Vec<f64>,
-    signature: &str,
-    model: Option<&str>,
-    dimension: usize,
-) -> Result<Value, MemoryError> {
-    if embedding.len() != dimension {
-        return Err(MemoryError::Validation(format!(
-            "embedding dimension mismatch: provider returned {}, expected {dimension}",
-            embedding.len()
-        )));
-    }
-
-    let mut fields = serde_json::Map::from_iter([
-        ("embedding".to_string(), json!(embedding)),
-        (
-            "embedding_provider".to_string(),
-            json!(provider.provider_name()),
-        ),
-        ("embedding_dimension".to_string(), json!(dimension)),
-        ("embedding_signature".to_string(), json!(signature)),
-        (
-            "embedding_updated_at".to_string(),
-            json!(crate::service::normalize_dt(crate::service::now())),
-        ),
-    ]);
-    if let Some(model) = model {
-        fields.insert("embedding_model".to_string(), json!(model));
-    }
-    Ok(Value::Object(fields))
-}
-
 pub(crate) async fn run_backfill(
     service: &crate::service::MemoryService,
     provider: Arc<dyn EmbeddingProvider>,
@@ -230,6 +197,12 @@ pub(crate) async fn run_backfill(
         }
 
         let batch_size = batch.len();
+        let vector_port = crate::embedding::infra::FactVectorAdapter::new(
+            service.db_client.clone(),
+            service.active_namespace.clone(),
+            model.map(str::to_owned),
+            Some(dimension),
+        );
         for fact in batch {
             let fact_id = required_fact_string(&fact, "fact_id")?;
             let fact_type = required_fact_string(&fact, "fact_type")?;
@@ -237,14 +210,23 @@ pub(crate) async fn run_backfill(
             let quote = required_fact_string(&fact, "quote")?;
             let input = FactService::build_fact_embedding_input(&fact_type, &content, &quote);
             let embedding = provider.embed(&input).await?;
-            let fields = embedding_fields_for_backfill(
-                provider.as_ref(),
+            crate::embedding::api::update_canonical_vector(
+                &vector_port,
+                &fact_id,
                 embedding,
-                signature,
-                model,
-                dimension,
-            )?;
-            store.update_embedding_fields(&fact_id, fields).await?;
+                &crate::embedding::api::VectorIdentity {
+                    provider: provider.provider_name().to_owned(),
+                    model: model.map(str::to_owned),
+                    dimension,
+                    signature: signature.to_owned(),
+                },
+                chrono::Utc::now(),
+                // Backfill only fills gaps: a fact selected here
+                // had no vector, and a concurrent pass that
+                // already wrote one keeps it.
+                crate::embedding::api::VectorWritePolicy::FillMissing,
+            )
+            .await?;
             crate::service::invalidate_cache(&service.context_cache).await;
             cursor = Some(fact_id);
             processed += 1;

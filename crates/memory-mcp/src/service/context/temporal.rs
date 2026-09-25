@@ -495,13 +495,9 @@ pub(crate) async fn collect_temporal_facts(
         .unwrap_or_default();
 
     if let Some(temporal_window) = infer_temporal_window(request.query, request.cutoff) {
-        let records = service
-            .context_store()
-            .select_table("fact")
-            .await
-            .map_err(|err| {
-                crate::error::MemoryError::Storage(format!("SurrealDB query error: {err}"))
-            })?;
+        let records = service.context_store().scan_facts().await.map_err(|err| {
+            crate::error::MemoryError::Storage(format!("SurrealDB query error: {err}"))
+        })?;
 
         let mut facts = filter_facts_by_constraints(records, request.access, request.fact_types)
             .into_iter()

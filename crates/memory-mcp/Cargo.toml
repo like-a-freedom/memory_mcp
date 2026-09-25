@@ -71,13 +71,13 @@ mimalloc = ["dep:mimalloc"]
 eval-support = []
 # One coarse switch = the whole SaaS product (Streamable HTTP MCP data plane +
 # control plane with OIDC/local-admin auth + embedded web UI + Prometheus).
-# `control-plane`, `control-plane-ui` and `prometheus` are internal names implied
+# `control-plane`, `ui` and `prometheus` are internal names implied
 # by `streamable-http`; they exist only so the cfg sites in `http/` and `control/`
 # keep compiling and are never written by users. App sessions stay a separate
 # orthogonal axis (`mcp-apps`): in-memory in local/stdio, durable in HTTP.
 streamable-http = [
     "control-plane",
-    "control-plane-ui",
+    "ui",
     "prometheus",
     "rmcp/transport-streamable-http-server",
     "dep:axum",
@@ -108,8 +108,8 @@ control-plane = [
     "dep:base64",
     "dep:argon2",
 ]
-# Internal: embedded control-plane web UI bundle. Implied by `streamable-http`.
-control-plane-ui = ["control-plane"]
+# Internal: embedded web UI bundle. Implied by `streamable-http`.
+ui = ["control-plane"]
 # Test-only: exposes #[cfg(any(test, feature = "test-fixtures"))] fixtures to
 # integration tests in tests/. Declared so cfg references pass unexpected_cfgs.
 test-fixtures = []

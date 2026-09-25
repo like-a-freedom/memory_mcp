@@ -108,10 +108,6 @@ pub fn emit_startup_log(logger: &StdoutLogger, cfg: &HttpConfig) {
     );
     fields.insert("bind".into(), serde_json::Value::from(cfg.bind.to_string()));
     fields.insert(
-        "control_plane".into(),
-        serde_json::Value::from(cfg.enable_control_plane),
-    );
-    fields.insert(
         "embedded_tenant_db".into(),
         serde_json::Value::from(cfg.tenant_db.url == "mem://"),
     );

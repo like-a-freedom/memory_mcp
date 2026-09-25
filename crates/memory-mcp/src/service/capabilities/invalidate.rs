@@ -20,26 +20,82 @@ impl InvalidateCapability {
         request: InvalidateRequest,
         access: Option<AccessPayload>,
     ) -> Result<(), MemoryError> {
-        ctx.enforce_rate_limit(access.as_ref())?;
+        crate::memory::api::invalidate_fact(
+            &InvalidationPort { ctx },
+            &crate::service::capabilities::ServiceRateLimitPort { ctx },
+            &crate::memory::api::InvalidationRequest {
+                fact_id: request.fact_id,
+                t_invalid: request.t_invalid,
+                reason: request.reason,
+                caller_id: access.and_then(|payload| payload.caller_id),
+            },
+        )
+        .await
+    }
+}
 
-        let (record, _namespace) = ctx.find_record_by_id(&request.fact_id).await?;
-        record.ok_or_else(|| MemoryError::NotFound("fact_id not found".into()))?;
+/// Adapts the legacy context's record/close/cache accessors to
+/// the memory-owned invalidation port.
+///
+/// Expiry removal: Phase 5, when the fact close becomes
+/// knowledge-owned storage rather than a context accessor.
+struct InvalidationPort<'a> {
+    ctx: &'a ServiceContext,
+}
 
-        let close_store = ctx.close_store();
-        close_store
+#[async_trait::async_trait]
+impl crate::memory::api::InvalidationPort for InvalidationPort<'_> {
+    async fn find_record(
+        &self,
+        record_id: &str,
+    ) -> Result<crate::memory::api::StoredRecord, MemoryError> {
+        // Owner-scoped: the fact store refuses a non-fact id, so
+        // the existence check cannot be satisfied by another
+        // owner's record even though the use case already
+        // validated the kind.
+        let record = crate::storage::FactStoreClient::new(
+            self.ctx.db_client.clone(),
+            self.ctx.active_namespace.clone(),
+        )
+        .select_fact(record_id)
+        .await?;
+        Ok(if record.is_some() {
+            crate::memory::api::StoredRecord::Present
+        } else {
+            crate::memory::api::StoredRecord::Absent
+        })
+    }
+
+    async fn close_record(
+        &self,
+        record_id: &str,
+        t_invalid: chrono::DateTime<chrono::Utc>,
+        t_invalid_ingested: Option<chrono::DateTime<chrono::Utc>>,
+        reason: &str,
+    ) -> Result<(), MemoryError> {
+        self.ctx
+            .close_store()
             .close_record(
-                &request.fact_id,
+                record_id,
                 &CloseTimestamps {
-                    t_invalid: Some(request.t_invalid),
-                    t_invalid_ingested: None,
+                    t_invalid: Some(t_invalid),
+                    t_invalid_ingested,
                 },
-                Some(&request.reason),
+                Some(reason),
             )
-            .await?;
-        if ctx.claim_store.is_some() {
-            close_store.close_claims_for_fact(&request.fact_id).await?;
-        }
-        invalidate_cache(&ctx.context_cache).await;
+            .await
+    }
+
+    async fn close_claims_for_fact(&self, fact_id: &str) -> Result<(), MemoryError> {
+        self.ctx.close_store().close_claims_for_fact(fact_id).await
+    }
+
+    fn claim_pipeline_is_wired(&self) -> bool {
+        self.ctx.claim_store.is_some()
+    }
+
+    async fn invalidate_assembled_context(&self) -> Result<(), MemoryError> {
+        invalidate_cache(&self.ctx.context_cache).await;
         Ok(())
     }
 }

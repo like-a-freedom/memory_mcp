@@ -35,18 +35,24 @@ impl ExtractCapability {
         access: Option<AccessPayload>,
         zero_shot_labels: Option<&[String]>,
     ) -> Result<ExtractResult, MemoryError> {
-        ctx.enforce_rate_limit(access.as_ref())?;
         let timer = Instant::now();
-        let (record, _) = ctx.find_episode_record(episode_id).await?;
-        if record.is_none() {
-            return Err(MemoryError::NotFound(format!(
-                "episode_id not found: {episode_id}"
-            )));
-        }
-        let episode = record.as_ref().and_then(episode_from_record);
-        let payload =
-            crate::service::episode::extract_from_episode(ctx, episode_id, zero_shot_labels)
-                .await?;
+        let caller_id = access
+            .as_ref()
+            .and_then(|payload| payload.caller_id.clone());
+        let command = crate::memory::api::ExtractCommand {
+            episode_id: episode_id.to_owned(),
+            zero_shot_labels,
+            caller_id,
+        };
+        let extracted = crate::memory::api::extract_from_episode(
+            &ExtractionPort { ctx },
+            &super::ServiceRateLimitPort { ctx },
+            &command,
+        )
+        .await?;
+        let episode = extracted.episode;
+        let payload = extracted.result;
+
         ctx.logger.log(
             log_event(
                 "extract",
@@ -65,6 +71,41 @@ impl ExtractCapability {
             LogLevel::Info,
         );
         Ok(payload)
+    }
+}
+
+/// Adapts the legacy context's episode lookup and extraction
+/// pipeline to the memory-owned extraction port.
+///
+/// Expiry removal: Phase 5, when the episode extraction pipeline
+/// takes narrow ports instead of the shared context.
+struct ExtractionPort<'a> {
+    ctx: &'a ServiceContext,
+}
+
+#[async_trait::async_trait]
+impl crate::memory::api::EpisodeExtractionPort for ExtractionPort<'_> {
+    async fn episode_exists(&self, episode_id: &str) -> Result<bool, MemoryError> {
+        let (record, _) = self.ctx.find_episode_record(episode_id).await?;
+        Ok(record.is_some())
+    }
+
+    async fn extract(
+        &self,
+        command: &crate::memory::api::ExtractCommand<'_>,
+    ) -> Result<crate::memory::api::ExtractedEpisode, MemoryError> {
+        // The episode is re-read here because the caller needs it
+        // for the log line (its own fields alongside the fact and
+        // entity counts), not just a yes/no existence answer.
+        let (record, _) = self.ctx.find_episode_record(&command.episode_id).await?;
+        let episode = record.as_ref().and_then(episode_from_record);
+        let result = crate::service::episode::extract_from_episode(
+            self.ctx,
+            &command.episode_id,
+            command.zero_shot_labels,
+        )
+        .await?;
+        Ok(crate::memory::api::ExtractedEpisode { episode, result })
     }
 }
 

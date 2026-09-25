@@ -81,11 +81,11 @@ flowchart TD
 
     MCP --> Tools["Protocol-agnostic tools\ningest, extract, resolve, retrieve, explain, invalidate"]
     CLI --> Tools
-    Tools --> Capabilities["Capabilities\nsmall use-case adapters"]
-    Capabilities --> Context["ServiceContext\nnarrow dependency seam\nrate limiting + stores + providers"]
-
-    Context --> Domain["Domain services\ningestion, facts, entities, claims,\nembeddings, lifecycle, procedures"]
-    Context --> Retrieval["Context pipeline\nlexical, semantic, graph, community,\ntemporal filtering and ranking"]
+    Tools --> Capabilities["Capabilities\nthin adapters"]
+    Capabilities --> Contexts["Bounded contexts\nidentity, tenancy, provisioning,\noperations, knowledge, memory, embedding"]
+    Contexts --> Embedding["Embedding capability\nprovider, runtime, recovery"]
+    Contexts --> Domain["Domain services\ningestion, facts, entities, claims,\nlifecycle, procedures"]
+    Contexts --> Retrieval["Context pipeline\nlexical, semantic, graph, community,\ntemporal filtering and ranking"]
     Domain --> Storage["Storage abstraction\nnarrow stores + append-only migrations"]
     Retrieval --> Storage
     Storage --> DB[("SurrealDB\nActive Namespace")]
@@ -94,7 +94,10 @@ flowchart TD
 **Important boundaries**
 
 - `main.rs` is thin: argument parsing and dispatch only.
-- `mcp/` is a protocol adapter; business logic stays in `service/`.
+- `mcp/` is a protocol adapter; business logic lives in the owning context's
+  `api.rs`. `service/` is a legacy bridge pending expiry.
+- Each use case takes the narrow ports it needs, not a shared service
+  container. Capabilities adapt the legacy context into those ports.
 - `tools/` and `service/capabilities/` are reusable from both MCP and CLI.
 - Storage is selected once at startup. Requests do not choose a namespace.
 - Facts and claims are never deleted. They are invalidated while preserving
@@ -394,16 +397,10 @@ docker compose run --rm --entrypoint /usr/local/bin/memory_mcp memory_mcp \
   admin create --username ops.one
 ```
 
-`MEMORY_MCP_HTTP_ENABLE_CONTROL_PLANE_UI=true` (the Compose default) is valid only for an
-image built with the `streamable-http` profile (see
-[Build features](#build-features));
-[`docs/operations/LOCAL_ADMIN.md`](docs/operations/LOCAL_ADMIN.md) provisions the
-first local administrator and issues API keys. Setting
-`MEMORY_MCP_HTTP_ENABLE_CONTROL_PLANE=false` gives a data-plane-only deployment,
-but the method set still decides which material is required: an `oidc` set (the
-server's default when `MEMORY_MCP_HTTP_AUTH_METHODS` is unset) needs only
-`MEMORY_MCP_HTTP_OIDC_ISSUER` and `MEMORY_MCP_HTTP_OIDC_CLIENT_ID` — signup
-policy and every secret slot derive when unset.
+The compiled `ui` catalog is served whenever the image is built with the `streamable-http` profile. The old
+`MEMORY_MCP_HTTP_ENABLE_CONTROL_PLANE_UI` and `MEMORY_MCP_HTTP_ENABLE_CONTROL_PLANE` variables are retired;
+remove them from deployment manifests. The method set still decides which authentication material is required: an `oidc` set (the server's default when `MEMORY_MCP_HTTP_AUTH_METHODS` is unset) needs only
+`MEMORY_MCP_HTTP_OIDC_ISSUER` and `MEMORY_MCP_HTTP_OIDC_CLIENT_ID` — signup policy and every secret slot derive when unset.
 
 Validate the configuration without starting it and without printing secrets:
 
@@ -674,22 +671,9 @@ request validation, and release gates live in the
 
 ### Control plane and web UI
 
-The Streamable HTTP transport and the control plane are separate. The `POST /mcp`
-route remains enabled when `MEMORY_MCP_HTTP_ENABLE_CONTROL_PLANE=false`.
-That flag controls browser sign-in, sessions, account management, API-key
-management, and operator routes.
+The Streamable HTTP profile mounts the data plane, control plane, and compiled web UI together. The `POST /mcp` route, browser sign-in, sessions, account management, API-key management, and operator routes are all part of the supported profile. The old `MEMORY_MCP_HTTP_ENABLE_CONTROL_PLANE` and `MEMORY_MCP_HTTP_ENABLE_CONTROL_PLANE_UI` variables are removed; remove them from deployment manifests.
 
-The optional web UI is the browser client for the control-plane API. It lets
-users sign in through the enabled browser authentication methods and create,
-list, and revoke API keys. To use it, enable both runtime flags:
-
-`MEMORY_MCP_HTTP_ENABLE_CONTROL_PLANE=true` and
-`MEMORY_MCP_HTTP_ENABLE_CONTROL_PLANE_UI=true`.
-
-The binary must be built with the `streamable-http` profile, which embeds the UI
-assets; enabling the UI flag on a build without them is a startup error. The
-control plane must be enabled first, and any `oidc` method it enables must
-contain real provider values. The UI is served from `/`.
+The web UI is the browser client for the control-plane API. It lets users sign in through the enabled browser authentication methods and create, list, and revoke API keys. The binary must be built with the `streamable-http` profile, which embeds the UI assets; the UI is served from `/`.
 
 The browser session and the MCP API key are separate credentials. A user signs
 in through the UI, creates an API key, and configures that key in the MCP
@@ -789,7 +773,6 @@ SURREALDB_TENANT_NAMESPACE=tenant \
 SURREALDB_TENANT_DB=tenant \
 MEMORY_MCP_HTTP_SECRET_KEY=... \
 MEMORY_MCP_HTTP_AUTH_METHODS=oidc \
-MEMORY_MCP_HTTP_ENABLE_CONTROL_PLANE=true \
 MEMORY_MCP_HTTP_OIDC_ISSUER=https://issuer.example.com \
 MEMORY_MCP_HTTP_OIDC_CLIENT_ID=memory_mcp \
 MEMORY_MCP_HTTP_REPLICA_ID=node-a \
@@ -808,14 +791,9 @@ MEMORY_MCP_HTTP_REPLICA_ID=node-a \
 | `/api/v1/admin/*` | Local administrator session + CSRF | Client provisioning, key issuance and revocation, suspend and resume |
 | `/health/live`, `/health/ready` | Public | Process liveness and admission readiness |
 | `/metrics` | Public (no app auth) | Prometheus scrape (enabled by the `streamable-http` profile). Restrict at the reverse proxy or network layer. |
-| `/` and SPA fallback | Public | Control-plane web UI, when `MEMORY_MCP_HTTP_ENABLE_CONTROL_PLANE_UI=true` (the UI is embedded by the `streamable-http` build) |
+| `/` and SPA fallback | Public | Control-plane web UI embedded by the `streamable-http` build |
 
-Which of these exist depends on the configured method set, and a disabled method
-mounts nothing. `/auth/oidc/*`, `/api/v1/account/*` and `/api/v1/operator/*`
-appear only while `oidc` is enabled; `/api/v1/auth/local/*` and `/api/v1/admin/*`
-only while `local` is. The paths of a disabled method return `404`, not an
-unauthenticated route, and all of them disappear when
-`MEMORY_MCP_HTTP_ENABLE_CONTROL_PLANE=false`.
+Which of these exist depends on the configured method set, and a disabled method mounts nothing. `/auth/oidc/*`, `/api/v1/account/*` and `/api/v1/operator/*` appear only while `oidc` is enabled; `/api/v1/auth/local/*` and `/api/v1/admin/*` only while `local` is. The paths of a disabled method return `404`, not an unauthenticated route.
 
 "Public" is about application auth only. The `Host`/`Origin` allowlist is
 enforced on every row above, including `/` and the SPA fallback: it is a property
@@ -1102,15 +1080,13 @@ form startup fails — material is never invented.
 | `MEMORY_MCP_HTTP_OIDC_NONCE_KEY` | AEAD key for OIDC ID-token nonces; rotating it invalidates in-flight login flows. Same requirement rule as `MEMORY_MCP_HTTP_IDENTITY_INDEX_KEY` |
 | `MEMORY_MCP_HTTP_CSRF_KEY` | HMAC key for CSRF tokens; rotating it invalidates every active browser session. Derived from `MEMORY_MCP_HTTP_SECRET_KEY` when unset |
 
-**Browser authentication methods, signup policy, control plane, and OIDC**
+**Browser authentication methods, signup policy, and OIDC**
 
 | Variable | Type | Default | Description |
 | --- | --- | --- | --- |
 | `MEMORY_MCP_HTTP_AUTH_METHODS` | comma-separated set of `local` \| `oidc` | `oidc` | The browser authentication methods this deployment serves. Each enabled method mounts its own surface and each disabled method mounts nothing. A set that omits a method the deployment has already enabled fails startup: removing a method is an explicit guarded operation, `memory_mcp admin auth-methods remove --method local` |
 | `MEMORY_MCP_HTTP_AUTH_MODE` | one of `local` \| `oidc` | unset | Deprecated alias for a one-element `MEMORY_MCP_HTTP_AUTH_METHODS`, accepted for one release. Supplying both is an error unless they agree |
 | `MEMORY_MCP_HTTP_SIGNUP_MODE` | enum: `invite_only` \| `open` | `invite_only` | Optional. The default `invite_only` rejects self-service sign-up; `open` must be explicit, requires the seven plan seed variables below, and is rejected without the `oidc` method. The first identity under `invite_only` arrives through an identity invitation: `POST /api/v1/admin/clients/{account_id}/identity_invitation` (local administrator) returns the authorize URL to hand to the user |
-| `MEMORY_MCP_HTTP_ENABLE_CONTROL_PLANE` | boolean | `false` | Enable browser sign-in, sessions, and control-plane `/api/v1` endpoints. The `POST /mcp` endpoint remains available when this is `false` |
-| `MEMORY_MCP_HTTP_ENABLE_CONTROL_PLANE_UI` | boolean | `false` | Serve the embedded web UI from `/`. Requires the control plane and the `streamable-http` build profile |
 | `MEMORY_MCP_HTTP_OIDC_ISSUER` | URL | unset | Required when `oidc` is enabled, refused when it is not. May be written with or without a trailing slash: comparison against the provider's published issuer is normalized on both sides (providers such as Rauthy >= 0.35 always publish a trailing slash), and the published form from the discovery document is authoritative for ID-token `iss` validation and identity keying. The discovery document is fetched at startup, so an unreachable issuer is a startup failure |
 | `MEMORY_MCP_HTTP_OIDC_CLIENT_ID` | string | unset | Required when `oidc` is enabled, refused when it is not. The derived audience defaults to this value |
 | `MEMORY_MCP_HTTP_OIDC_AUDIENCE` | URL string | client id | Optional; derived from `MEMORY_MCP_HTTP_OIDC_CLIENT_ID` when unset (OIDC Core: `aud` is the RP's client id). Refused when `oidc` is not enabled. Exact audience match is enforced against the ID token's `aud` claim; supply a single audience identifier (the server does not currently parse a list) |
@@ -1207,10 +1183,10 @@ Build the UI with the Dioxus CLI 0.7; the Docker build pins the verified
 variable must name the absolute `public` directory:
 
 ```bash
-dx bundle --platform web --release --package control-plane-ui \
+dx bundle --platform web --release --package ui \
   --base-path /__memory_mcp_base__ \
-  --out-dir "$PWD/target/control-plane-ui-dist"
-MEMORY_MCP_CONTROL_PLANE_UI_DIST="$PWD/target/control-plane-ui-dist/public" \
+  --out-dir "$PWD/target/ui-dist"
+MEMORY_MCP_UI_DIST="$PWD/target/ui-dist/public" \
   cargo build --release --features streamable-http
 ```
 
@@ -1219,8 +1195,7 @@ deployment prefix. The bundle carries the sentinel in every prefix-dependent
 URL (the `index.html` asset URLs, the JS loader's hashed WASM URL) and in its
 `DIOXUS_ASSET_ROOT` meta; `memory_mcp_http` replaces it with
 the path of `MEMORY_MCP_HTTP_PUBLIC_BASE_URL` at startup (see *Deploying under
-a path prefix*). The same literal lives in `crates/control-plane-ui/index.html`,
-`crates/control-plane-ui/src/base.rs` and `BASE_PATH_SENTINEL`
+a path prefix*). The same literal lives in `crates/ui/index.html`, `crates/ui/src/base.rs` and `BASE_PATH_SENTINEL`
 (`crates/memory-mcp/src/control/static_assets.rs`), the `Dockerfile`, and
 `scripts/ci/local_admin_browser.mjs`; changing it means changing all five
 sites together.
@@ -1230,14 +1205,7 @@ in deterministic path order into Cargo's `OUT_DIR` and embedded with
 `include_bytes!`; symlinks, non-UTF-8 paths, and invalid bundle entries are
 rejected.
 
-Providing the bundle is **optional**: if `MEMORY_MCP_CONTROL_PLANE_UI_DIST` is
-absent, the `streamable-http` binary still compiles with an empty UI catalog
-and simply does not serve a UI. This keeps every HTTP build and test
-executable without a Dioxus WASM build; set the variable only when you actually
-want the browser UI. If the variable **is** set but the bundle is malformed
-(no `index.html`, a symlink, an invalid entry), the build fails fast rather than
-silently shipping a UI-less image. Builds without the `streamable-http` profile
-do not compile the UI at all.
+Providing the bundle is **optional** for developer and test builds: if `MEMORY_MCP_UI_DIST` is absent, the `streamable-http` binary compiles with an empty UI catalog and does not serve a UI. Release images must provide a real bundle.
 
 ### One active namespace
 
@@ -1667,7 +1635,7 @@ GLINER_DEVICE=auto cargo run --release --features metal -- serve
 - `crates/memory-mcp/src/main.rs`: main MCP server binary (`memory_mcp`); stdio profile, CLI, and lifecycle hooks
 - `crates/memory-mcp/src/bin/memory_mcp_http.rs`: Streamable HTTP SaaS binary (`memory_mcp_http`); built when the `streamable-http` feature is enabled
 - `crates/eval-harness/src/main.rs`: evaluation harness binary (`memory-eval`); never linked into the production binary
-- `crates/control-plane-ui/src/main.rs`: Dioxus web SPA build target; built with the Dioxus CLI and embedded by the backend when the `streamable-http` profile is enabled
+- `crates/ui/src/main.rs`: Dioxus web SPA build target; built with the Dioxus CLI and embedded by the backend when the `streamable-http` profile is enabled
 
 MCP input/output schemas are exposed by the server itself through the protocol's
 tool metadata and remain regression-covered by the schema tests under
@@ -1709,7 +1677,7 @@ Coverage output is stored under `coverage/` when generated with Tarpaulin.
 │   │   ├── migrations/
 │   │   ├── src/            # library, two binary entry points, MCP/HTTP, control plane, and domain services
 │   │   └── tests/          # production integration and release-gate tests
-│   ├── control-plane-ui/   # Dioxus 0.7 web SPA (embedded by the streamable-http profile)
+│   ├── ui/             # Dioxus 0.7 web SPA (embedded by the streamable-http profile)
 │   │   └── src/            # SPA routes, API client, OIDC and local-admin pages
 │   └── eval-harness/       # private evaluation package
 │       ├── benches/        # Criterion benchmark families

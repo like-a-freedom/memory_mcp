@@ -24,8 +24,23 @@ impl FactStoreClient {
         }
     }
 
+    pub(crate) fn from_bound(db: BoundDbClient) -> Self {
+        Self { db }
+    }
+
     /// Returns the persisted record for `fact_id`, or `None` if absent.
     pub async fn select_one(&self, fact_id: &str) -> Result<Option<Value>, MemoryError> {
+        self.db.select_one(fact_id).await
+    }
+
+    /// Returns a fact record, refusing any id that does not name a
+    /// fact.
+    ///
+    /// [`Self::select_one`] is retained for the callers inside
+    /// this module that already hold a validated id; this is the
+    /// owner-scoped entry point for everything else.
+    pub async fn select_fact(&self, fact_id: &str) -> Result<Option<Value>, MemoryError> {
+        crate::storage::helpers::require_record_kind(fact_id, "fact")?;
         self.db.select_one(fact_id).await
     }
 

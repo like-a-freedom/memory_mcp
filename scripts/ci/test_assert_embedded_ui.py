@@ -225,12 +225,12 @@ class ScriptReferenceTests(unittest.TestCase):
         # The Dioxus loader requests both of these by path at runtime, so the
         # HTML alone cannot prove they are embedded.
         source = (
-            "const wasm = '/assets/control-plane-ui_bg-dxh1.wasm';"
-            'import("/assets/control-plane-ui-dxh1.js");'
+            "const wasm = '/assets/ui_bg-dxh1.wasm';"
+            'import("/assets/ui-dxh1.js");'
         )
         self.assertEqual(
             ui.asset_references_in_script(source),
-            ["/assets/control-plane-ui_bg-dxh1.wasm", "/assets/control-plane-ui-dxh1.js"],
+            ["/assets/ui_bg-dxh1.wasm", "/assets/ui-dxh1.js"],
         )
 
     def test_deduplicates_repeated_paths(self):

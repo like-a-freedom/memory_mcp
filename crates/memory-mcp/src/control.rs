@@ -35,5 +35,3 @@ pub mod recent_auth;
 pub(crate) mod secret;
 #[cfg(feature = "control-plane")]
 pub mod session;
-#[cfg(feature = "control-plane")]
-pub mod static_assets;

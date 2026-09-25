@@ -17,12 +17,41 @@ impl ResolveCapability {
         candidate: EntityCandidate,
         access: Option<AccessPayload>,
     ) -> Result<String, MemoryError> {
-        ctx.enforce_rate_limit(access.as_ref())?;
-        let (entity_id, _was_created) = ctx
-            .entity_resolver
-            .resolve_or_create(&ctx.entity_service, candidate)
-            .await?;
+        let (entity_id, _was_created) = crate::memory::api::resolve_entity(
+            &ResolverPort {
+                resolver: &ctx.entity_resolver,
+                entity_service: &ctx.entity_service,
+            },
+            &super::ServiceRateLimitPort { ctx },
+            &crate::memory::api::ResolveCommand {
+                candidate,
+                caller_id: access.and_then(|payload| payload.caller_id),
+            },
+        )
+        .await?;
         Ok(entity_id)
+    }
+}
+
+/// Adapts the legacy `EntityResolver`/`EntityService` pair to
+/// the memory-owned resolution port.
+///
+/// Expiry removal: Phase 5, when entity resolution becomes
+/// knowledge-owned and the legacy pair is deleted.
+struct ResolverPort<'a> {
+    resolver: &'a crate::service::entity_resolution::EntityResolver,
+    entity_service: &'a crate::service::entity::EntityService,
+}
+
+#[async_trait::async_trait]
+impl crate::memory::api::EntityResolutionPort for ResolverPort<'_> {
+    async fn resolve_or_create(
+        &self,
+        candidate: crate::models::EntityCandidate,
+    ) -> Result<(String, bool), MemoryError> {
+        self.resolver
+            .resolve_or_create(self.entity_service, candidate)
+            .await
     }
 }
 

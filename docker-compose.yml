@@ -109,10 +109,9 @@ services:
       SURREALDB_TENANT_DB: "${SURREALDB_TENANT_DB:-tenant}"
 
       # ── Browser surface ───────────────────────────────────────────────
-      # Set the control plane to `false` for a data-plane-only deployment: no
-      # browser or provider material is required at all in that case.
-      MEMORY_MCP_HTTP_ENABLE_CONTROL_PLANE: "${MEMORY_MCP_HTTP_ENABLE_CONTROL_PLANE:-true}"
-      MEMORY_MCP_HTTP_ENABLE_CONTROL_PLANE_UI: "${MEMORY_MCP_HTTP_ENABLE_CONTROL_PLANE_UI:-true}"
+      # Browser methods select which authentication routes are mounted. The
+      # supported streamable-http profile always mounts the control plane and
+      # compiled UI; no runtime product-shape switch is available.
       MEMORY_MCP_HTTP_AUTH_METHODS: "${MEMORY_MCP_HTTP_AUTH_METHODS:-local}"
       MEMORY_MCP_HTTP_SIGNUP_MODE: "${MEMORY_MCP_HTTP_SIGNUP_MODE:-invite_only}"
 

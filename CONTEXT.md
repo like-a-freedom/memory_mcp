@@ -29,33 +29,44 @@ in ADR-0016.
 > `embedding` capability; a small pure `shared` kernel is separate from
 > technical `platform` and privileged `bootstrap` wiring. Console delivery
 > remains the layer-free `ui` adapter. These names are not all aggregates.
-> The map below describes the current pre-0058 layout and remains authoritative
-> until implementation lands. The target ownership, transaction boundaries,
-> acyclic API graph and enforcement contract live in the ADR/spec; an accepted
-> design does not mean runtime switches or package names have already changed.
+> The bounded-context `api.rs` seams below are live. Ownership that is not
+> fully migrated yet is tracked per file in
+> [the migration manifest](docs/architecture/ddd-migration-manifest.csv), and
+> the target transaction boundaries and acyclic API graph live in the ADR/spec.
 
 - `src/models/` — domain values and typed records.
+- `src/identity/api.rs` — identity use cases: unlink/last-link, verified link
+  and replace, invitation policy and first-login session, browser-auth method
+  policy.
+- `src/tenancy/api.rs` — Account→Tenant resolution to a server-owned
+  `TenantRuntimeSpec`, plus a single-flight runtime factory with eviction.
+- `src/provisioning/api.rs` — client creation, API-key issuance, durable-task
+  request surface, and App Session open/read/write/close.
+- `src/operations/api.rs` — account deletion and deletion recovery loops.
+- `src/knowledge/api.rs` — owner-named read scopes, replacing the previous
+  caller-supplied table selectors.
+- `src/memory/api.rs` — consumer-owned ports for ingestion, extraction,
+  recall, explanation, invalidation and the shared rate-limit policy.
+- `src/embedding/api.rs` — canonical vector updates with named write policies
+  (`FillMissing` for backfill, `ReplaceStale` for re-embedding and retry), so
+  a vector endpoint never calls generation again.
 - `src/service/agent_memory/` — internal lifecycle orchestration (policy,
   recall, capture, projection, worker). Not registered in `tools/list`.
-- `src/service/capabilities/` — protocol-agnostic capability modules
-  (ingest, extract, resolve, assemble_context, explain, invalidate).
-  Each takes `&ServiceContext` (the narrow seam) and delegates to
-  domain services. This is the deepening that replaced the god-object
-  `MemoryService`.
+- `src/service/capabilities/` — transport-adapter layer over the context
+  APIs. Each module adapts `&ServiceContext` into the narrow port its use case
+  declares; no use case receives the shared container.
 - `src/service/embedding_service.rs` — embedding generation, query
   embedding caching, and background retry logic. Holds the
   `EmbeddingService` struct that owns embedding-specific concerns.
-- `src/service/` — core business logic, `ServiceContext` (narrow
-  shared infrastructure), `FactService`, `EmbeddingService`, lifecycle
-  workers, claim reconciliation.
+- `src/service/` — remaining legacy bridges pending expiry, tracked per file
+  in the migration manifest. Do not add new business logic here.
 - `src/storage/` — `DbClient` and narrow stores. Backward compatible.
 - `src/storage/agent_memory.rs` — narrow store for lifecycle events and
   durable projection jobs.
 - `src/storage/claims.rs` — narrow store for the claim reconciliation
   pipeline.
 - `src/tools/` — protocol-agnostic tool implementations shared by MCP
-  and CLI. Each tool delegates to its matching capability via
-  `ServiceContext`.
+  and CLI. Each tool delegates to its matching capability.
 - `src/mcp/` — MCP protocol handlers.
 - `src/cli/` — clap-based CLI surface, including hidden internal
   `lifecycle-capture` and `lifecycle-recall` subcommands consumed by
@@ -224,11 +235,11 @@ The request-scoped server identity produced by successful credential verificatio
 _Avoid_: Access token, transport session, namespace parameter
 
 **Control plane**:
-The SaaS subsystem responsible for Accounts, External Identities, tenancy bindings, provisioning state and operator commands. It is distinct from the data plane (MCP capabilities) and the operator console that renders its workflows. It names a subsystem, not one aggregate or one bounded context. ADR-0058 specifies removal of its runtime off-switch; that is a target change until implementation lands.
-_Avoid_: control-panel, admin app, `control-plane-ui` (current package name, not the subsystem name)
+The SaaS subsystem responsible for Accounts, External Identities, tenancy bindings, provisioning state and operator commands. It is distinct from the data plane (MCP capabilities) and the operator console that renders its workflows. It names a subsystem, not one aggregate or one bounded context. ADR-0058 removes its runtime off-switch; `streamable-http` always carries the control plane.
+_Avoid_: control-panel, admin app, legacy `control-plane-ui` package name
 
 **Operator console (`ui`)**:
-The browser interface for sign-in, client/key administration and operator workflows. It renders control-plane capabilities and does not own their business rules. ADR-0058 targets the package/binary name `ui` in place of the current `control-plane-ui`; build and asset details are specified there.
+The browser interface for sign-in, client/key administration and operator workflows. It renders control-plane capabilities and does not own their business rules. The package and binary are named `ui`; build and asset details are specified in ADR-0058.
 _Avoid_: control-plane UI, dashboard, frontend of control
 
 **Control Plane Session**:

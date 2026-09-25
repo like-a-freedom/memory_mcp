@@ -147,9 +147,17 @@ impl ContextStoreClient {
         self.db.query_rows(&sql, Some(vars)).await
     }
 
-    /// Full table scan (used by graph views and the occasional admin operation).
-    pub async fn select_table(&self, table: &str) -> Result<Vec<Value>, MemoryError> {
-        self.db.select_table(table).await
+    /// Owner-named full scans.
+    ///
+    /// These replace the previous caller-supplied `select_table`
+    /// escape hatch: an application-facing read names the scope
+    /// it wants, never a table string.
+    pub async fn scan_facts(&self) -> Result<Vec<Value>, MemoryError> {
+        self.db.select_table("fact").await
+    }
+
+    pub async fn scan_episodes(&self) -> Result<Vec<Value>, MemoryError> {
+        self.db.select_table("episode").await
     }
 
     /// Episode contents matching a query, bi-temporally scoped.

@@ -1,6 +1,6 @@
 //! Static asset serving for the optional Dioxus SPA.
 //!
-//! When `control-plane-ui` is enabled, built assets are embedded via
+//! When `ui` is enabled, built assets are embedded via
 //! `include_bytes!` and served under `/` with a fallback to `index.html`.
 //! API routes take priority via axum's `nest`.
 
@@ -22,10 +22,10 @@ struct Asset {
     body: &'static [u8],
 }
 
-#[cfg(feature = "control-plane-ui")]
-include!(concat!(env!("OUT_DIR"), "/control_plane_assets.rs"));
+#[cfg(feature = "ui")]
+include!(concat!(env!("OUT_DIR"), "/ui_assets.rs"));
 
-#[cfg(not(feature = "control-plane-ui"))]
+#[cfg(not(feature = "ui"))]
 const ASSETS: &[Asset] = &[];
 
 const INDEX_PATH: &str = "/index.html";
@@ -34,8 +34,8 @@ const INDEX_PATH: &str = "/index.html";
 /// `dx bundle --base-path /__memory_mcp_base__`. The compiled `index.html`
 /// carries it in every prefix-dependent URL and in the `DIOXUS_ASSET_ROOT`
 /// meta; [`stamp_index_html`] replaces it with the deployed mount base at
-/// startup. The same literal lives in `crates/control-plane-ui/src/base.rs`,
-/// `crates/control-plane-ui/index.html`, the `Dockerfile`'s `dx bundle`
+/// startup. The same literal lives in `crates/ui/src/base.rs`,
+/// `crates/ui/index.html`, the `Dockerfile`'s `dx bundle`
 /// invocation and `scripts/ci/local_admin_browser.mjs` — all five must change
 /// together.
 pub(crate) const BASE_PATH_SENTINEL: &str = "/__memory_mcp_base__";
@@ -443,16 +443,16 @@ mod tests {
         }
     }
 
-    #[cfg(not(feature = "control-plane-ui"))]
+    #[cfg(not(feature = "ui"))]
     #[test]
     fn disabled_ui_feature_does_not_serve_root() {
         assert_eq!(serve_asset("/", None).status(), StatusCode::NOT_FOUND);
     }
 
-    #[cfg(feature = "control-plane-ui")]
+    #[cfg(feature = "ui")]
     #[test]
     fn generated_catalog_is_sorted_and_matches_the_embedded_bundle() {
-        // `build.rs` emits an empty catalog when `MEMORY_MCP_CONTROL_PLANE_UI_DIST`
+        // `build.rs` emits an empty catalog when `MEMORY_MCP_UI_DIST`
         // was absent (ADR-0056 makes the bundle optional), so sorting is the
         // only invariant that holds for every build. The index assertions apply
         // to a build that embedded a real bundle, where `build.rs` has already

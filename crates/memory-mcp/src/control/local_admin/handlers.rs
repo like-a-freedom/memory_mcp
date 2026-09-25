@@ -30,8 +30,8 @@ use crate::http::HttpState;
 use crate::service::local_admin::auth::LocalAdminService;
 use crate::service::local_admin::client::ClientAdminService;
 use crate::service::local_admin::contracts::{
-    AdminKeyCreate, AdminPrincipal, AuthAttemptContext, ChallengeKind, ClientCreate,
-    ClientStateAction, KeyExpiry, LocalAdminError, LocalResult, PageRequest, RequestContext,
+    AdminKeyCreate, AdminPrincipal, AuthAttemptContext, ChallengeKind, ClientStateAction,
+    KeyExpiry, LocalAdminError, LocalResult, PageRequest, RequestContext,
 };
 
 const MAX_BODY_BYTES: usize = 16 * 1024; // 16KiB
@@ -993,13 +993,41 @@ pub async fn create_client(
         Err(error) => return map_error(error).at(&parts).into_response(),
     };
 
-    let service = make_client_service(ext, &state.config.api_key_pepper);
     let ctx = request_ctx(&parts);
-    let command = ClientCreate {
-        display_name,
+    let command = crate::provisioning::api::CreateClientCommand {
+        authority: crate::provisioning::api::ClientAuthority {
+            admin_id: principal.fence.admin_id.clone(),
+            session_verifier: principal.fence.session_id.clone(),
+            credential_generation: principal.fence.credential_generation,
+            policy_epoch: principal.fence.policy.epoch,
+            policy_methods: principal
+                .fence
+                .policy
+                .methods
+                .iter()
+                .map(|method| match method {
+                    crate::http::config::BrowserAuthMethod::Local => {
+                        crate::identity::api::AuthMethod::Local
+                    }
+                    crate::http::config::BrowserAuthMethod::Oidc => {
+                        crate::identity::api::AuthMethod::Oidc
+                    }
+                })
+                .collect(),
+            request_id: ctx.request_id,
+        },
         operation_id,
+        display_name,
+        plan_version: ext.plan_version,
     };
-    match service.create(&principal.fence, &ctx, command).await {
+    match crate::provisioning::api::create_client(
+        ext.client_creation.as_ref(),
+        command,
+        chrono::Utc::now(),
+    )
+    .await
+    .map_err(client_creation_rejection)
+    {
         Ok(view) => {
             let mut response = no_store(json_response(StatusCode::ACCEPTED, &view));
             // Root-absolute inside the mount base: a spec-following client
@@ -1014,7 +1042,43 @@ pub async fn create_client(
             }
             response
         }
-        Err(error) => map_error(error).at(&parts).into_response(),
+        Err(rejection) => rejection.at(&parts).into_response(),
+    }
+}
+
+/// Map a provisioning client-creation refusal onto the single local-admin
+/// error table, so the route keeps its documented status/code pairs.
+fn client_creation_rejection(error: crate::provisioning::api::ClientCreationError) -> Rejection {
+    match error {
+        crate::provisioning::api::ClientCreationError::InvalidInput(message) => {
+            Rejection::new(StatusCode::BAD_REQUEST, "bad_request", &message)
+        }
+        crate::provisioning::api::ClientCreationError::ReauthenticationRequired => Rejection::new(
+            StatusCode::FORBIDDEN,
+            "reauth_required",
+            "recent authentication required",
+        ),
+        crate::provisioning::api::ClientCreationError::Unauthorized => Rejection::new(
+            StatusCode::UNAUTHORIZED,
+            "unauthorized",
+            "administrator session required",
+        ),
+        crate::provisioning::api::ClientCreationError::Forbidden => {
+            Rejection::new(StatusCode::FORBIDDEN, "forbidden", "request rejected")
+        }
+        crate::provisioning::api::ClientCreationError::NotFound => {
+            Rejection::new(StatusCode::NOT_FOUND, "not_found", "not found")
+        }
+        crate::provisioning::api::ClientCreationError::IdempotencyConflict => Rejection::new(
+            StatusCode::CONFLICT,
+            "idempotency_conflict",
+            "a different request already used this idempotency key",
+        ),
+        crate::provisioning::api::ClientCreationError::Unavailable => Rejection::new(
+            StatusCode::SERVICE_UNAVAILABLE,
+            "temporarily_unavailable",
+            "temporarily unavailable",
+        ),
     }
 }
 

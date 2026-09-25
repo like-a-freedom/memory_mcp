@@ -183,12 +183,14 @@ impl TenantRuntime {
                 ));
             }
             mcp_service = mcp_service.with_durable_tasks(Arc::new(
-                crate::http::tasks::worker::DurableTaskStore::new_with_options(
-                    bound_db.clone(),
-                    tenant.id.clone(),
-                    options.task_retention_secs,
-                    options.task_queue_capacity,
-                ),
+                crate::bootstrap::integration::durable_tasks::DurableTaskAdapter::new(Arc::new(
+                    crate::http::tasks::worker::DurableTaskStore::new_with_options(
+                        bound_db.clone(),
+                        tenant.id.clone(),
+                        options.task_retention_secs,
+                        options.task_queue_capacity,
+                    ),
+                )),
             ));
             mcp_service = mcp_service.with_durable_subscriptions(Arc::new(
                 crate::http::subscriptions::DurableSubscriptionStore::new(

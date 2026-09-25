@@ -19,17 +19,17 @@
 # Stage 1 — control-plane UI bundle (Dioxus 0.7 -> WASM).
 #
 # VERIFIED: `dx bundle` is run with Dioxus CLI 0.7.10 (the newest 0.7 line, the
-# version the crates/control-plane-ui 0.7 dependency resolves against) from the
-# workspace root. Running it from crates/control-plane-ui panics:
+# version the crates/ui 0.7 dependency resolves against) from the
+# workspace root. Running it from crates/ui panics:
 #
 #   dx 0.7.10 -> find_main_package -> std::fs::canonicalize(default_member)
 #   unwrap on NotFound, because this workspace declares
 #   `default-members = ["crates/memory-mcp"]` and dx resolves those paths
 #   relative to the current directory instead of the workspace root.
 #
-# Invoking from /src with an explicit `--package control-plane-ui` avoids that
+# Invoking from /src with an explicit `--package ui` avoids that
 # path. The verified output layout is `<out-dir>/public/` (index.html, JS and
-# WASM under `public/`), which is why `MEMORY_MCP_CONTROL_PLANE_UI_DIST` below
+# WASM under `public/`), which is why `MEMORY_MCP_UI_DIST` below
 # points at the `public` subdirectory: `crates/memory-mcp/build.rs` requires a
 # non-empty `index.html` at the root of the dist directory. Bump the pinned CLI
 # only after re-running `dx --version` / `dx bundle --help` and re-checking this
@@ -68,24 +68,24 @@ COPY . .
 # memory_mcp_http replaces with the deployed MEMORY_MCP_HTTP_PUBLIC_BASE_URL
 # path at startup. Never pass a deployment prefix here. The literal must match
 # BASE_PATH_SENTINEL in crates/memory-mcp/src/control/static_assets.rs and
-# crates/control-plane-ui/src/base.rs, and the favicon href in
-# crates/control-plane-ui/index.html.
+# crates/ui/src/base.rs, and the favicon href in
+# crates/ui/index.html.
 RUN --mount=type=cache,id=memory-mcp-cargo-registry-ui,target=/usr/local/cargo/registry \
     --mount=type=cache,id=memory-mcp-cargo-git-ui,target=/usr/local/cargo/git \
     --mount=type=cache,id=memory-mcp-target-ui,target=/src/target \
     set -eux; \
     cd /src; \
-    rm -rf /src/target/dx/control-plane-ui/release/web/public /src/control-plane-ui-dist; \
-    dx bundle --platform web --release --package control-plane-ui --out-dir /src/control-plane-ui-dist --base-path /__memory_mcp_base__; \
-    test -s /src/control-plane-ui-dist/public/index.html; \
-    grep -q '__memory_mcp_base__' /src/control-plane-ui-dist/public/index.html; \
-    test "$(find /src/control-plane-ui-dist/public -type f -name '*.js'   | wc -l)" = "1"; \
-    test "$(find /src/control-plane-ui-dist/public -type f -name '*.wasm' | wc -l)" = "1"; \
-    test "$(find /src/control-plane-ui-dist/public -type f -name '*.css'  | wc -l)" = "1"
+    rm -rf /src/target/dx/ui/release/web/public /src/ui-dist; \
+    dx bundle --platform web --release --package ui --out-dir /src/ui-dist --base-path /__memory_mcp_base__; \
+    test -s /src/ui-dist/public/index.html; \
+    grep -q '__memory_mcp_base__' /src/ui-dist/public/index.html; \
+    test "$(find /src/ui-dist/public -type f -name '*.js'   | wc -l)" = "1"; \
+    test "$(find /src/ui-dist/public -type f -name '*.wasm' | wc -l)" = "1"; \
+    test "$(find /src/ui-dist/public -type f -name '*.css'  | wc -l)" = "1"
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Stage 2 — Rust binaries. Consumes the UI bundle produced by stage 1 and
-# embeds it at compile time through `MEMORY_MCP_CONTROL_PLANE_UI_DIST`.
+# embeds it at compile time through `MEMORY_MCP_UI_DIST`.
 # ─────────────────────────────────────────────────────────────────────────────
 FROM rust:1.97.1-slim-trixie AS builder
 
@@ -109,8 +109,8 @@ COPY . .
 # it into the build stage (rather than pointing at a stage-relative path) keeps
 # the contract identical to a host build. The dist directory is copied, not
 # symlinked, so `build.rs`'s `symlink_metadata` check passes.
-COPY --from=ui-builder /src/control-plane-ui-dist /src/control-plane-ui-dist
-ENV MEMORY_MCP_CONTROL_PLANE_UI_DIST=/src/control-plane-ui-dist/public
+COPY --from=ui-builder /src/ui-dist /src/ui-dist
+ENV MEMORY_MCP_UI_DIST=/src/ui-dist/public
 
 # `streamable-http` is the profile switch; `mcp-apps` is the orthogonal
 # app-session axis that nothing implies, so the image has to name it explicitly.

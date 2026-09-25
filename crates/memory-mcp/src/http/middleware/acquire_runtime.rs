@@ -13,7 +13,6 @@ use std::sync::Arc;
 
 use crate::http::HttpState;
 use crate::http::principal::AuthenticatedPrincipal;
-use crate::http::registry::account::ResolvedTenant;
 use crate::http::registry::plan::{Plan, QuotaDecision};
 use crate::http::runtime::guard::{AdmissionPermitRef, OperationGuardRef};
 
@@ -37,27 +36,25 @@ pub async fn acquire_runtime(
                 .into_response();
         }
     };
-    let tenant = match state
-        .account_resolver
-        .resolve_ready_tenant(principal.account_id())
-        .await
+    let tenant = match crate::tenancy::api::resolve_tenant_runtime(
+        state.tenant_resolver.as_ref(),
+        principal.account_id(),
+    )
+    .await
     {
-        Ok(ResolvedTenant::Ready(t)) => t,
-        Ok(ResolvedTenant::Provisioning(_, _)) => {
-            return (
-                axum::http::StatusCode::SERVICE_UNAVAILABLE,
-                "tenant provisioning",
-            )
-                .into_response();
-        }
-        Ok(ResolvedTenant::Suspended) => {
+        Ok(tenant) => tenant,
+        Err(crate::error::MemoryError::Auth(message)) if message.contains("suspended") => {
             return (axum::http::StatusCode::FORBIDDEN, "tenant suspended").into_response();
         }
-        Ok(ResolvedTenant::Failed(_)) => {
-            return (axum::http::StatusCode::SERVICE_UNAVAILABLE, "tenant failed").into_response();
-        }
-        Ok(ResolvedTenant::NotFound) | Err(_) => {
+        Err(crate::error::MemoryError::NotFound(_)) => {
             return (axum::http::StatusCode::NOT_FOUND, "tenant not found").into_response();
+        }
+        Err(_) => {
+            return (
+                axum::http::StatusCode::SERVICE_UNAVAILABLE,
+                "tenant unavailable",
+            )
+                .into_response();
         }
     };
     let validated = req.extensions().get::<ValidatedMcpRequest>().cloned();
@@ -80,7 +77,7 @@ pub async fn acquire_runtime(
     let plan = Plan::from(&registry_plan);
     if let Some(source_bytes) = source_bytes {
         let decision = match store
-            .reserve_ingest_usage(&tenant.id, source_bytes, &plan, chrono::Utc::now())
+            .reserve_ingest_usage(&tenant.tenant_id, source_bytes, &plan, chrono::Utc::now())
             .await
         {
             Ok(decision) => decision,
@@ -114,7 +111,7 @@ pub async fn acquire_runtime(
     };
     let guard = match state
         .pool
-        .acquire_or_wait_with_limit(&tenant, plan.per_tenant_request_concurrency)
+        .acquire_spec_with_limit(&tenant, plan.per_tenant_request_concurrency)
         .await
     {
         Ok(g) => g,
@@ -136,7 +133,7 @@ pub async fn acquire_runtime(
     // Log context: hex of the first 8 bytes of the SHA-256 of
     // the tenant id. Cheap and stable across processes.
     use sha2::Digest;
-    let digest = sha2::Sha256::digest(tenant.id.as_bytes());
+    let digest = sha2::Sha256::digest(tenant.tenant_id.as_bytes());
     let fingerprint = hex::encode(&digest[..8]);
     resp.extensions_mut()
         .insert(crate::http::logging::TenantLogContext {

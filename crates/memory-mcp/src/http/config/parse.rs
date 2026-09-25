@@ -84,15 +84,6 @@ pub(super) fn parse_csv(k: &str) -> Result<Vec<String>, MemoryError> {
     }
 }
 
-pub(super) fn parse_bool(k: &str, default: bool) -> Result<bool, MemoryError> {
-    match std::env::var(k) {
-        Ok(v) => v
-            .parse::<bool>()
-            .map_err(|_| MemoryError::ConfigInvalid(k.into())),
-        Err(_) => Ok(default),
-    }
-}
-
 pub(super) fn parse_hex_32_env(k: &str) -> Result<[u8; 32], MemoryError> {
     let raw = require_env(k)?;
     let bytes = hex::decode(&raw).map_err(|_| MemoryError::ConfigInvalid(k.into()))?;

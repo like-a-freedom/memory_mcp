@@ -22,5 +22,4 @@
 //! `docs/adr/0054-capability-specific-control-registry-interfaces.md`
 //! and the plan's Task 10 status note).
 
-pub mod api_keys;
 pub mod oidc_signup;

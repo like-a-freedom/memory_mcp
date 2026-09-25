@@ -32,7 +32,7 @@ pub mod test_state;
 
 use std::sync::Arc;
 
-use config::HttpConfig;
+use config::{BrowserAuthMethod, HttpConfig};
 
 /// Process-wide HTTP state. Config + the
 /// runtime pool + shutdown/admission/registry/auth/resolver.
@@ -46,12 +46,25 @@ pub struct HttpState {
     pub shutdown: shutdown::ShutdownState,
     pub admission: Arc<runtime::pool::AdmissionGate>,
     pub registry: registry::RegistryHandle,
+    #[cfg(feature = "control-plane")]
+    pub(crate) identity_link_transactions: Arc<dyn crate::identity::api::IdentityLinkTransactions>,
+    #[cfg(feature = "control-plane")]
+    pub(crate) verified_identity_transactions:
+        Arc<dyn crate::identity::api::VerifiedIdentityLinkTransactions>,
+    #[cfg(feature = "control-plane")]
+    pub(crate) identity_invitation_port: Arc<dyn crate::identity::api::IdentityInvitationPort>,
+    #[cfg(feature = "control-plane")]
+    pub(crate) invitation_session_port: Arc<dyn crate::identity::api::InvitationSessionPort>,
+    #[cfg(feature = "control-plane")]
+    pub(crate) account_deletion_port: Arc<dyn crate::operations::api::AccountDeletionPort>,
     /// Bearer-token authenticator. The auth middleware
     /// dispatches to it for every POST /mcp.
     pub authenticator: Arc<principal::auth::Authenticator>,
-    /// Account → Tenant resolver. The Tenant Runtime
-    /// consumes the `Ready` arm; the others become 4xx/5xx.
-    pub account_resolver: Arc<registry::account::AccountResolver>,
+    /// Trusted Account → Tenant resolution owned by tenancy.
+    pub tenant_resolver: Arc<dyn crate::tenancy::api::ResolveTenantPort>,
+    pub api_key_issuance: Arc<dyn crate::provisioning::api::ApiKeyIssuancePort>,
+    #[cfg(feature = "control-plane")]
+    pub client_creation: Option<Arc<dyn crate::provisioning::api::ClientCreationPort>>,
     /// OIDC client for the control-plane login flow.
     /// `None` when the control plane is disabled.
     #[cfg(feature = "control-plane")]
@@ -161,31 +174,43 @@ impl HttpState {
         // The join is reconcile-and-extend and never removes: a pre-existing
         // policy that enables a method this configuration omits fails startup
         // here, before any browser request is served (ADR-0057).
-        let desired_methods = config.browser_auth_methods();
-        // One reconciliation, from the full configured set. `local` and `oidc`
-        // are not two competing claims on the singleton row: whichever methods
-        // are enabled are written together, in one transaction, by one writer.
-        #[cfg(feature = "control-plane")]
-        let browser_policy = if let Some(policy) = browser_policy_override {
+        let desired_methods = config
+            .browser_auth_methods()
+            .into_iter()
+            .map(|method| match method {
+                BrowserAuthMethod::Local => crate::identity::api::AuthMethod::Local,
+                BrowserAuthMethod::Oidc => crate::identity::api::AuthMethod::Oidc,
+            })
+            .collect::<Vec<_>>();
+        let policy_port: Arc<dyn crate::identity::api::AuthMethodPolicyPort> = Arc::new(
+            crate::bootstrap::integration::auth_method_policy::RegistryAuthMethodPolicy::new(
+                store.clone(),
+                config.clone(),
+            ),
+        );
+        let browser_policy = if let Some(policy) = browser_policy_override.clone() {
             Some(policy)
-        } else if config.enable_control_plane && config.browser_auth.is_some() {
-            let local = config
-                .browser_auth
-                .as_ref()
-                .and_then(|methods| methods.local.as_ref())
-                .map(|local| {
-                    crate::service::local_admin::auth::compute_fingerprints(
-                        &local.session_key,
-                        &local.csrf_key,
-                    )
-                })
-                .transpose()
-                .map_err(|error| crate::error::MemoryError::Auth(error.to_string()))?;
-            Some(
-                store
-                    .reconcile_browser_policy(&desired_methods, local)
-                    .await?,
+        } else if config.browser_auth.is_some() {
+            let policy = crate::identity::api::reconcile_auth_methods(
+                policy_port.as_ref(),
+                &desired_methods,
             )
+            .await
+            .map_err(|error| match error {
+                crate::identity::api::IdentityError::Persistence(error) => error,
+                _ => crate::error::MemoryError::ConfigInvalid("invalid auth methods".into()),
+            })?;
+            Some(registry::models::BrowserPolicyFence {
+                methods: policy
+                    .methods
+                    .into_iter()
+                    .map(|method| match method {
+                        crate::identity::api::AuthMethod::Local => BrowserAuthMethod::Local,
+                        crate::identity::api::AuthMethod::Oidc => BrowserAuthMethod::Oidc,
+                    })
+                    .collect(),
+                epoch: policy.epoch,
+            })
         } else {
             None
         };
@@ -201,14 +226,25 @@ impl HttpState {
                 20,
             )),
         ));
+        let api_key_issuance: Arc<dyn crate::provisioning::api::ApiKeyIssuancePort> = Arc::new(
+            crate::bootstrap::integration::provisioning::RegistryApiKeyIssuance::new(
+                store.clone(),
+                config.api_key_pepper.clone(),
+            ),
+        );
         let account_resolver = Arc::new(registry::account::AccountResolver::new(store));
+        let tenant_resolver: Arc<dyn crate::tenancy::api::ResolveTenantPort> = Arc::new(
+            crate::bootstrap::integration::tenancy_resolution::LegacyTenantResolver::new(
+                account_resolver.clone(),
+            ),
+        );
         // The OIDC client performs discovery against the configured
         // issuer at startup. Without the `oidc` method there is no issuer to
         // reach and no OIDC route is mounted, so discovery must not run: such a
         // deployment has no dependency on any identity provider being online.
         // A disabled control plane mounts no browser surface at all.
         #[cfg(feature = "control-plane")]
-        let oidc_client = if config.enable_control_plane
+        let oidc_client = if browser_policy_override.is_none()
             && config.has_method(crate::http::config::BrowserAuthMethod::Oidc)
         {
             Some(Arc::new(
@@ -225,9 +261,7 @@ impl HttpState {
             None
         };
         #[cfg(feature = "control-plane")]
-        let local_admin = if !config.enable_control_plane {
-            None
-        } else if let Some(local_config) = config
+        let local_admin = if let Some(local_config) = config
             .browser_auth
             .as_ref()
             .and_then(|methods| methods.local.as_ref())
@@ -270,14 +304,55 @@ impl HttpState {
                 PasswordHasher::new()
                     .map_err(|e| crate::error::MemoryError::Auth(e.to_string()))?,
             );
+            let client_creation: Arc<dyn crate::provisioning::api::ClientCreationPort> = Arc::new(
+                crate::bootstrap::integration::provisioning::LocalAdminClientCreation::new(
+                    Arc::clone(&registry.local_admin_store_clone().ok_or_else(|| {
+                        crate::error::MemoryError::ConfigInvalid(
+                            "local browser auth requires the durable local admin store".into(),
+                        )
+                    })?),
+                ),
+            );
             Some(crate::control::local_admin::LocalAdminExtension {
                 authority,
                 hasher,
                 plan_version: local_config.default_plan_version,
+                client_creation,
             })
         } else {
             None
         };
+        #[cfg(feature = "control-plane")]
+        let identity_transactions = Arc::new(
+            crate::bootstrap::integration::legacy_registry_identity::RegistryIdentityLinkTransactions::new(
+                registry.store_clone(),
+            ),
+        );
+        let identity_link_transactions: Arc<dyn crate::identity::api::IdentityLinkTransactions> =
+            identity_transactions.clone();
+        let verified_identity_transactions: Arc<
+            dyn crate::identity::api::VerifiedIdentityLinkTransactions,
+        > = identity_transactions.clone();
+        let identity_invitation_port: Arc<dyn crate::identity::api::IdentityInvitationPort> =
+            identity_transactions.clone();
+        let policy_for_sessions = browser_policy.clone().ok_or_else(|| {
+            crate::error::MemoryError::ConfigInvalid(
+                "OIDC browser policy is required for invitation sessions".into(),
+            )
+        })?;
+        let invitation_session_port: Arc<dyn crate::identity::api::InvitationSessionPort> = Arc::new(
+            crate::bootstrap::integration::control_sessions::ControlSessionInvitationAdapter::new(
+                registry.store_clone(),
+                config.clone(),
+                policy_for_sessions,
+            ),
+        );
+        #[cfg(feature = "control-plane")]
+        let account_deletion_port: Arc<dyn crate::operations::api::AccountDeletionPort> = Arc::new(
+            crate::bootstrap::integration::legacy_registry_operations::RegistryAccountDeletionAdapter::new(
+                registry.store_clone(),
+            ),
+        );
         #[cfg(feature = "prometheus")]
         let metrics_handle = _metrics_handle;
         Ok(Arc::new(Self {
@@ -289,8 +364,22 @@ impl HttpState {
                 config.subscription_limit,
             )),
             registry,
+            #[cfg(feature = "control-plane")]
+            identity_link_transactions,
+            #[cfg(feature = "control-plane")]
+            verified_identity_transactions,
+            #[cfg(feature = "control-plane")]
+            identity_invitation_port,
+            #[cfg(feature = "control-plane")]
+            invitation_session_port,
+            #[cfg(feature = "control-plane")]
+            account_deletion_port,
             authenticator,
-            account_resolver,
+            api_key_issuance,
+            client_creation: local_admin
+                .as_ref()
+                .map(|extension| Arc::clone(&extension.client_creation)),
+            tenant_resolver,
             #[cfg(feature = "control-plane")]
             oidc_client,
             #[cfg(feature = "control-plane")]
