@@ -1274,24 +1274,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "ui"
-version = "0.1.0"
-dependencies = [
- "dioxus",
- "dioxus-cli-config",
- "dioxus-router",
- "dioxus-web",
- "gloo-net 0.7.0",
- "gloo-storage",
- "gloo-timers",
- "js-sys",
- "serde",
- "serde_json",
- "wasm-bindgen-futures",
- "web-sys",
-]
-
-[[package]]
 name = "convert_case"
 version = "0.8.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -9045,6 +9027,24 @@ dependencies = [
  "serde",
  "thiserror 1.0.69",
  "ug",
+]
+
+[[package]]
+name = "ui"
+version = "0.1.0"
+dependencies = [
+ "dioxus",
+ "dioxus-cli-config",
+ "dioxus-router",
+ "dioxus-web",
+ "gloo-net 0.7.0",
+ "gloo-storage",
+ "gloo-timers",
+ "js-sys",
+ "serde",
+ "serde_json",
+ "wasm-bindgen-futures",
+ "web-sys",
 ]
 
 [[package]]

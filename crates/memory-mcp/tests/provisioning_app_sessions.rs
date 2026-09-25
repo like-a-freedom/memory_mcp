@@ -1,4 +1,7 @@
-#![cfg(feature = "mcp-apps")]
+// The App Session use cases live in `provisioning`, which is
+// composed only under `streamable-http`. `mcp-apps` is the
+// app-session surface feature and does not imply it.
+#![cfg(feature = "streamable-http")]
 
 use std::sync::{Arc, Mutex};
 
