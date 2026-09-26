@@ -9,10 +9,7 @@ use crate::logging::LogLevel;
 use crate::models::{AccessPayload, ExtractResult, IngestRequest};
 use crate::service::MemoryError;
 use crate::service::build_extract_log_result;
-use crate::service::capabilities::extract::ExtractCapability;
-use crate::service::capabilities::ingest::IngestCapability;
-use crate::service::episode_from_record;
-use crate::service::service_context::ServiceContext;
+use crate::tools::context::{ToolContext, ToolEvent};
 use crate::tools::params::ExtractParams;
 use crate::tools::parsers::{content_hash, normalize_optional_string, parse_datetime};
 use crate::tools::request_id::next_request_id;
@@ -21,8 +18,8 @@ use crate::tools::response::ToolResponse;
 /// Extract entities, facts, and relationships from remembered content.
 ///
 /// Handles extracting from `episode_id` or ingesting inline content first.
-pub async fn extract(
-    ctx: &ServiceContext,
+pub async fn extract<T: ToolContext>(
+    ctx: &T,
     params: ExtractParams,
 ) -> Result<ToolResponse<ExtractResult>, MemoryError> {
     let mut operation_metrics = crate::observability::OperationMetrics::new("extract");
@@ -37,24 +34,25 @@ pub async fn extract(
     let timer = Instant::now();
     let request_id = next_request_id();
 
-    ctx.log_tool_event(
-        "extract.start",
-        json!({"episode_id": &episode_id, "has_content": content.is_some() || text.is_some()}),
-        json!({}),
-        LogLevel::Info,
-        Some(&request_id),
-    );
+    ctx.record(ToolEvent {
+        op: "extract.start",
+        args: json!({"episode_id": &episode_id, "has_content": content.is_some() || text.is_some()}),
+        result: json!({}),
+        level: LogLevel::Info,
+        request_id: Some(request_id.clone()),
+        duration: None,
+    });
 
     if content.is_some() && text.is_some() {
         let message = "Invalid extract arguments: use only one inline snake_case field — `content` or `text` — not both. Do not wrap arguments in `payload`.";
-        ctx.log_tool_event_with_duration(
-            "extract.invalid_input",
-            json!({"episode_id": &episode_id, "has_content": true}),
-            json!({"error": message}),
-            LogLevel::Warn,
-            timer.elapsed(),
-            Some(&request_id),
-        );
+        ctx.record(ToolEvent {
+            op: "extract.invalid_input",
+            args: json!({"episode_id": &episode_id, "has_content": true}),
+            result: json!({"error": message}),
+            level: LogLevel::Warn,
+            request_id: Some(request_id.clone()),
+            duration: Some(timer.elapsed()),
+        });
         return Err(MemoryError::Validation(message.to_string()));
     }
 
@@ -62,48 +60,46 @@ pub async fn extract(
 
     if episode_id.is_some() && inline_content.is_some() {
         let message = "Invalid extract arguments: provide exactly one snake_case input source. Use `episode_id` for stored content, or `content`/`text` for inline text, but not both. Do not wrap arguments in `payload`.";
-        ctx.log_tool_event_with_duration(
-            "extract.invalid_input",
-            json!({"episode_id": &episode_id, "has_content": true}),
-            json!({"error": message}),
-            LogLevel::Warn,
-            timer.elapsed(),
-            Some(&request_id),
-        );
+        ctx.record(ToolEvent {
+            op: "extract.invalid_input",
+            args: json!({"episode_id": &episode_id, "has_content": true}),
+            result: json!({"error": message}),
+            level: LogLevel::Warn,
+            request_id: Some(request_id.clone()),
+            duration: Some(timer.elapsed()),
+        });
         return Err(MemoryError::Validation(message.to_string()));
     }
 
     if episode_id.is_none() && inline_content.is_none() {
         let message = "Invalid extract arguments: provide exactly one snake_case input source — `episode_id` or non-empty `content`/`text`. Do not wrap arguments in `payload`.";
-        ctx.log_tool_event_with_duration(
-            "extract.invalid_input",
-            json!({"episode_id": &episode_id, "has_content": false}),
-            json!({"error": message}),
-            LogLevel::Warn,
-            timer.elapsed(),
-            Some(&request_id),
-        );
+        ctx.record(ToolEvent {
+            op: "extract.invalid_input",
+            args: json!({"episode_id": &episode_id, "has_content": false}),
+            result: json!({"error": message}),
+            level: LogLevel::Warn,
+            request_id: Some(request_id.clone()),
+            duration: Some(timer.elapsed()),
+        });
         return Err(MemoryError::Validation(message.to_string()));
     }
 
     if let Some(ref episode_id) = episode_id {
-        match ExtractCapability::extract(ctx, episode_id, Some(access), zero_shot_labels.as_deref())
+        match ctx
+            .extract(episode_id, Some(access), zero_shot_labels.as_deref())
             .await
         {
             Ok(result) => {
                 record_extract_results(&operation_metrics, &result);
                 operation_metrics.success();
-                let log_result = match ctx.find_episode_record(episode_id).await {
-                    Ok(record) => {
-                        let episode = record.as_ref().and_then(episode_from_record);
-                        build_extract_log_result(
-                            episode.as_ref(),
-                            result.entities.len(),
-                            &result.facts,
-                            result.links.len(),
-                            result.warnings.len(),
-                        )
-                    }
+                let log_result = match ctx.find_episode(episode_id).await {
+                    Ok(episode) => build_extract_log_result(
+                        episode.as_ref(),
+                        result.entities.len(),
+                        &result.facts,
+                        result.links.len(),
+                        result.warnings.len(),
+                    ),
                     Err(_) => build_extract_log_result(
                         None,
                         result.entities.len(),
@@ -113,28 +109,28 @@ pub async fn extract(
                     ),
                 };
 
-                ctx.log_tool_event_with_duration(
-                    "extract.done",
-                    json!({"episode_id": episode_id}),
-                    log_result,
-                    LogLevel::Info,
-                    timer.elapsed(),
-                    Some(&request_id),
-                );
+                ctx.record(ToolEvent {
+                    op: "extract.done",
+                    args: json!({"episode_id": episode_id}),
+                    result: log_result,
+                    level: LogLevel::Info,
+                    request_id: Some(request_id.clone()),
+                    duration: Some(timer.elapsed()),
+                });
                 return Ok(ToolResponse::success_with_guidance(
                     result,
                     "Resolve canonical entities for any ambiguous names before creating manual links.",
                 ));
             }
             Err(err) => {
-                ctx.log_tool_event_with_duration(
-                    "extract.error",
-                    json!({"episode_id": episode_id}),
-                    json!({"error": err.to_string()}),
-                    LogLevel::Warn,
-                    timer.elapsed(),
-                    Some(&request_id),
-                );
+                ctx.record(ToolEvent {
+                    op: "extract.error",
+                    args: json!({"episode_id": episode_id}),
+                    result: json!({"error": err.to_string()}),
+                    level: LogLevel::Warn,
+                    request_id: Some(request_id.clone()),
+                    duration: Some(timer.elapsed()),
+                });
                 return Err(err);
             }
         }
@@ -150,43 +146,36 @@ pub async fn extract(
         .as_ref()
         .and_then(|s| parse_datetime(s))
         .unwrap_or_else(Utc::now);
-    match IngestCapability::ingest(
-        ctx,
-        IngestRequest {
-            source_type,
-            source_id,
-            content,
-            t_ref,
-            t_ingested: None,
-            policy_tags: Vec::new(),
-        },
-        Some(access.clone()),
-    )
-    .await
+    match ctx
+        .ingest(
+            IngestRequest {
+                source_type,
+                source_id,
+                content,
+                t_ref,
+                t_ingested: None,
+                policy_tags: Vec::new(),
+            },
+            Some(access.clone()),
+        )
+        .await
     {
         Ok(episode_id) => {
-            match ExtractCapability::extract(
-                ctx,
-                &episode_id,
-                Some(access),
-                zero_shot_labels.as_deref(),
-            )
-            .await
+            match ctx
+                .extract(&episode_id, Some(access), zero_shot_labels.as_deref())
+                .await
             {
                 Ok(result) => {
                     record_extract_results(&operation_metrics, &result);
                     operation_metrics.success();
-                    let log_result = match ctx.find_episode_record(&episode_id).await {
-                        Ok(record) => {
-                            let episode = record.as_ref().and_then(episode_from_record);
-                            build_extract_log_result(
-                                episode.as_ref(),
-                                result.entities.len(),
-                                &result.facts,
-                                result.links.len(),
-                                result.warnings.len(),
-                            )
-                        }
+                    let log_result = match ctx.find_episode(&episode_id).await {
+                        Ok(episode) => build_extract_log_result(
+                            episode.as_ref(),
+                            result.entities.len(),
+                            &result.facts,
+                            result.links.len(),
+                            result.warnings.len(),
+                        ),
                         Err(_) => build_extract_log_result(
                             None,
                             result.entities.len(),
@@ -196,41 +185,41 @@ pub async fn extract(
                         ),
                     };
 
-                    ctx.log_tool_event_with_duration(
-                        "extract.done",
-                        json!({"episode_id": &episode_id}),
-                        log_result,
-                        LogLevel::Info,
-                        timer.elapsed(),
-                        Some(&request_id),
-                    );
+                    ctx.record(ToolEvent {
+                        op: "extract.done",
+                        args: json!({"episode_id": &episode_id}),
+                        result: log_result,
+                        level: LogLevel::Info,
+                        request_id: Some(request_id.clone()),
+                        duration: Some(timer.elapsed()),
+                    });
                     Ok(ToolResponse::success_with_guidance(
                         result,
                         "Resolve canonical entities for any ambiguous names before creating manual links.",
                     ))
                 }
                 Err(err) => {
-                    ctx.log_tool_event_with_duration(
-                        "extract.error",
-                        json!({}),
-                        json!({"error": err.to_string()}),
-                        LogLevel::Warn,
-                        timer.elapsed(),
-                        Some(&request_id),
-                    );
+                    ctx.record(ToolEvent {
+                        op: "extract.error",
+                        args: json!({}),
+                        result: json!({"error": err.to_string()}),
+                        level: LogLevel::Warn,
+                        request_id: Some(request_id.clone()),
+                        duration: Some(timer.elapsed()),
+                    });
                     Err(err)
                 }
             }
         }
         Err(err) => {
-            ctx.log_tool_event_with_duration(
-                "extract.error",
-                json!({}),
-                json!({"error": err.to_string()}),
-                LogLevel::Warn,
-                timer.elapsed(),
-                Some(&request_id),
-            );
+            ctx.record(ToolEvent {
+                op: "extract.error",
+                args: json!({}),
+                result: json!({"error": err.to_string()}),
+                level: LogLevel::Warn,
+                request_id: Some(request_id),
+                duration: Some(timer.elapsed()),
+            });
             Err(err)
         }
     }

@@ -7,8 +7,7 @@ use serde_json::json;
 use crate::logging::LogLevel;
 use crate::models::{AccessPayload, IngestRequest};
 use crate::service::MemoryError;
-use crate::service::capabilities::ingest::IngestCapability;
-use crate::service::service_context::ServiceContext;
+use crate::tools::context::{ToolContext, ToolEvent};
 use crate::tools::params::IngestParams;
 use crate::tools::parsers::parse_datetime;
 use crate::tools::request_id::next_request_id;
@@ -19,8 +18,8 @@ use crate::tools::response::ToolResponse;
 /// Mirrors the previous `MemoryMcp::ingest` body exactly: same validation,
 /// same `ingest.start` / `ingest.done` / `ingest.error` events, same
 /// `ToolResponse::success_with_guidance` guidance string.
-pub async fn ingest(
-    ctx: &ServiceContext,
+pub async fn ingest<T: ToolContext>(
+    ctx: &T,
     params: IngestParams,
 ) -> Result<ToolResponse<String>, MemoryError> {
     let mut operation_metrics = crate::observability::OperationMetrics::new("ingest");
@@ -46,40 +45,41 @@ pub async fn ingest(
     let timer = Instant::now();
     let request_id = next_request_id();
     let source_id = request.source_id.clone();
-    ctx.log_tool_event(
-        "ingest.start",
-        json!({"source_type": &request.source_type, "source_id": &source_id}),
-        json!({}),
-        LogLevel::Info,
-        Some(&request_id),
-    );
+    ctx.record(ToolEvent {
+        op: "ingest.start",
+        args: json!({"source_type": &request.source_type, "source_id": &source_id}),
+        result: json!({}),
+        level: LogLevel::Info,
+        request_id: Some(request_id.clone()),
+        duration: None,
+    });
 
-    match IngestCapability::ingest(ctx, request, Some(access)).await {
+    match ctx.ingest(request, Some(access)).await {
         Ok(episode_id) => {
             operation_metrics.record_result("episodes", 1);
             operation_metrics.success();
-            ctx.log_tool_event_with_duration(
-                "ingest.done",
-                json!({"source_id": &source_id}),
-                json!({"episode_id": &episode_id}),
-                LogLevel::Info,
-                timer.elapsed(),
-                Some(&request_id),
-            );
+            ctx.record(ToolEvent {
+                op: "ingest.done",
+                args: json!({"source_id": &source_id}),
+                result: json!({"episode_id": &episode_id}),
+                level: LogLevel::Info,
+                request_id: Some(request_id),
+                duration: Some(timer.elapsed()),
+            });
             Ok(ToolResponse::success_with_guidance(
                 episode_id,
                 "Call extract next to derive entities and facts.",
             ))
         }
         Err(err) => {
-            ctx.log_tool_event_with_duration(
-                "ingest.error",
-                json!({"source_id": &source_id}),
-                json!({"error": err.to_string()}),
-                LogLevel::Warn,
-                timer.elapsed(),
-                Some(&request_id),
-            );
+            ctx.record(ToolEvent {
+                op: "ingest.error",
+                args: json!({"source_id": &source_id}),
+                result: json!({"error": err.to_string()}),
+                level: LogLevel::Warn,
+                request_id: Some(request_id),
+                duration: Some(timer.elapsed()),
+            });
             Err(err)
         }
     }

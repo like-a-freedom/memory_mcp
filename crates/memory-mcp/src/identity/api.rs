@@ -4,6 +4,11 @@ use chrono::{DateTime, Utc};
 
 use crate::MemoryError;
 
+/// How recently a session must have authenticated before a
+/// sensitive account action is allowed.
+///
+/// This is the single definition: `operations` reads it rather than
+/// declaring its own copy, so the two cannot drift apart.
 pub const RECENT_AUTH_MAX_AGE: Duration = Duration::from_secs(600);
 
 #[derive(Debug, Clone, PartialEq, Eq)]

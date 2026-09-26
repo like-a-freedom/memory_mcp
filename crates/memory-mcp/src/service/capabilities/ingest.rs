@@ -17,12 +17,7 @@ impl IngestCapability {
         // The rate-limit charge stays inside the ingestion port: the
         // use case deliberately does not enforce it, so calling both
         // here and there would debit the shared bucket twice.
-        crate::memory::api::ingest_episode(
-            &IngestionAdapter { ctx },
-            request,
-            access,
-        )
-        .await
+        crate::memory::api::ingest_episode(&IngestionAdapter { ctx }, request, access).await
     }
 }
 

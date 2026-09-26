@@ -92,6 +92,29 @@ assemble overall 38.77% smaller responses, explain 14.15%.
 
 ## Recorded limitations
 
+- **The migration is not complete.** An adversarial review of
+  `791f903..5a41c16` found that this branch delivers the bounded
+  contexts' *public interfaces*, their consumer-owned ports, the
+  owner-scoped accessors, the composed bootstrap integration
+  adapters, and the renamed surface — but **not** the movement of
+  the 330 remaining legacy files out of `service/`, `control/`,
+  `http/registry/` and `storage/`. In particular:
+  - `src/shared/` and `src/platform/`, which the plan calls for,
+    do not exist.
+  - `ServiceContext` still exists. It no longer reaches the MCP
+    tool handlers (they now take `tools::context::ToolContext`),
+    but it remains the shared container the capabilities adapt.
+  - The manifest's `legacy: … -> Phase N` column records *intended
+    destination and intended removal phase*, not completed
+    movement. Most of those files have not moved yet.
+  - The plan's own checkboxes are deliberately left unchecked for
+    the items that are not done; see the plan for the true status.
+  Phases 0–2 (surface changes, `ui` rename, flag retirement,
+  manifest, docs, release evidence) are complete. Phase 5's
+  "Replace `ServiceContext` with explicit consumer-owned
+  ports/dependencies" is complete at the transport boundary and
+  inside the capabilities, but the legacy module split it implies
+  is outstanding.
 - `ner_progress_channels::blocked_gliner_refresh_does_not_delay_initialize`
   hangs intermittently when test targets run concurrently. It
   passes in isolation (2.02s) and passes in the full suite when

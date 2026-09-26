@@ -981,10 +981,15 @@ mod tests {
         });
     }
 
-    /// The required environment for a *local-mode* control plane, with every
-    /// OIDC-only key removed: local mode derives identity/state/nonce from the
-    /// session key and rejects a supplied value (spec §3).
-    fn local_mode_env() -> Vec<(&'static str, String)> {
+    /// The required environment for a control plane that authenticates
+    /// with the local method only, with every OIDC-only key removed:
+    /// local auth derives identity/state/nonce from the session key and
+    /// rejects a supplied value (spec §3).
+    ///
+    /// The control plane is always composed, so this no longer needs to
+    /// disable anything; the retired `MEMORY_MCP_HTTP_ENABLE_CONTROL_PLANE*`
+    /// flags are deliberately absent rather than set to `false`.
+    fn local_only_env() -> Vec<(&'static str, String)> {
         let mut vars: Vec<(&'static str, String)> = base_required_env()
             .into_iter()
             .filter(|(k, _)| {
@@ -1000,8 +1005,6 @@ mod tests {
             })
             .collect();
         vars.push(("MEMORY_MCP_HTTP_AUTH_METHODS", "local".into()));
-        vars.push(("MEMORY_MCP_HTTP_ENABLE_CONTROL_PLANE", "false".into()));
-        vars.push(("MEMORY_MCP_HTTP_ENABLE_CONTROL_PLANE_UI", "false".into()));
         vars.push(("MEMORY_MCP_HTTP_LOCAL_DEFAULT_PLAN_VERSION", "1".into()));
         vars.extend(plan_limit_env());
         vars
@@ -1009,7 +1012,7 @@ mod tests {
 
     #[test]
     fn retired_product_flags_do_not_select_browser_auth_shape() {
-        let vars = local_mode_env();
+        let vars = local_only_env();
         let refs: Vec<(&str, &str)> = vars.iter().map(|(k, v)| (*k, v.as_str())).collect();
         with_env(&refs, || {
             let cfg = HttpConfig::from_env().expect("method configuration is authoritative");
@@ -1020,7 +1023,7 @@ mod tests {
 
     #[test]
     fn local_mode_loads_without_oidc_only_keys() {
-        let vars = local_mode_env();
+        let vars = local_only_env();
         let refs: Vec<(&str, &str)> = vars.iter().map(|(k, v)| (*k, v.as_str())).collect();
         with_env(&refs, || {
             let cfg = HttpConfig::from_env().expect("a local-mode deployment loads");
@@ -1036,7 +1039,7 @@ mod tests {
     /// and a set that contradicts it is refused rather than silently winning.
     #[test]
     fn auth_mode_is_a_one_element_alias_for_the_method_set() {
-        let mut vars = local_mode_env();
+        let mut vars = local_only_env();
         vars.retain(|(k, _)| *k != "MEMORY_MCP_HTTP_AUTH_METHODS");
         vars.push(("MEMORY_MCP_HTTP_AUTH_MODE", "local".into()));
         let refs: Vec<(&str, &str)> = vars.iter().map(|(k, v)| (*k, v.as_str())).collect();
@@ -1045,7 +1048,7 @@ mod tests {
             assert_eq!(cfg.browser_auth_methods(), vec![BrowserAuthMethod::Local]);
         });
 
-        let mut vars = local_mode_env();
+        let mut vars = local_only_env();
         vars.push(("MEMORY_MCP_HTTP_AUTH_MODE", "oidc".into()));
         let refs: Vec<(&str, &str)> = vars.iter().map(|(k, v)| (*k, v.as_str())).collect();
         with_env(&refs, || {
@@ -1103,7 +1106,7 @@ mod tests {
             "MEMORY_MCP_HTTP_OIDC_STATE_KEY",
             "MEMORY_MCP_HTTP_OIDC_NONCE_KEY",
         ] {
-            let mut vars = local_mode_env();
+            let mut vars = local_only_env();
             vars.push((name, "0".repeat(64)));
             let refs: Vec<(&str, &str)> = vars.iter().map(|(k, v)| (*k, v.as_str())).collect();
             with_env(&refs, || {
@@ -1448,7 +1451,7 @@ mod tests {
     /// re-read raw env and broke the root-only flow at startup).
     #[test]
     fn local_mode_with_only_a_root_secret_loads() {
-        let mut vars: Vec<(&'static str, String)> = local_mode_env()
+        let mut vars: Vec<(&'static str, String)> = local_only_env()
             .into_iter()
             .filter(|(k, _)| {
                 !matches!(
@@ -1486,7 +1489,7 @@ mod tests {
     #[test]
     fn the_root_derivation_beats_the_local_derivation() {
         let run = |root: &str, session: &str| -> [u8; 32] {
-            let mut vars: Vec<(&'static str, String)> = local_mode_env()
+            let mut vars: Vec<(&'static str, String)> = local_only_env()
                 .into_iter()
                 .filter(|(k, _)| {
                     !matches!(
@@ -1533,7 +1536,7 @@ mod tests {
     #[test]
     fn local_mode_accepts_an_algorithm_pin_without_the_provider() {
         for alg in ["RS256", "EdDSA", "auto"] {
-            let mut vars = local_mode_env();
+            let mut vars = local_only_env();
             vars.push(("MEMORY_MCP_HTTP_OIDC_ALLOWED_ALG", alg.into()));
             let refs: Vec<(&str, &str)> = vars.iter().map(|(k, v)| (*k, v.as_str())).collect();
             with_env(&refs, || {
@@ -1547,7 +1550,7 @@ mod tests {
     /// with or without the `oidc` method.
     #[test]
     fn an_invalid_algorithm_is_refused_even_without_the_provider() {
-        let mut vars = local_mode_env();
+        let mut vars = local_only_env();
         vars.push(("MEMORY_MCP_HTTP_OIDC_ALLOWED_ALG", "none".into()));
         let refs: Vec<(&str, &str)> = vars.iter().map(|(k, v)| (*k, v.as_str())).collect();
         with_env(&refs, || {

@@ -2099,7 +2099,10 @@ async fn test_service_assemble_context_does_not_track_access_for_synthetic_view_
     // observable as a new `fact`-table row or a logged refusal.
     let (service, db_client) = common::make_service_with_client().await;
 
-    let alice = service.resolve_entity("person", "Alice Smith").await.unwrap();
+    let alice = service
+        .resolve_entity("person", "Alice Smith")
+        .await
+        .unwrap();
     let bob = service.resolve_entity("person", "Bob Jones").await.unwrap();
     service.relate(&alice, "knows", &bob).await.unwrap();
 
@@ -2153,8 +2156,7 @@ async fn test_service_assemble_context_does_not_track_access_for_synthetic_view_
     // producing a logged validation error. Asserting the refusal
     // pins the contract the guard implements, and fails if owner
     // scoping is ever weakened back into a table-deriving read.
-    let app_store =
-        memory_mcp::storage::AppStoreClient::new(db_client.clone(), "org".to_string());
+    let app_store = memory_mcp::storage::AppStoreClient::new(db_client.clone(), "org".to_string());
     for item in &items {
         let result = app_store.record_fact_access(&item.fact_id, 1).await;
         assert!(

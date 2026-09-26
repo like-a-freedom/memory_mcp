@@ -7,15 +7,14 @@ use serde_json::json;
 use crate::logging::LogLevel;
 use crate::models::{AccessPayload, EntityCandidate};
 use crate::service::MemoryError;
-use crate::service::capabilities::resolve::ResolveCapability;
-use crate::service::service_context::ServiceContext;
+use crate::tools::context::{ToolContext, ToolEvent};
 use crate::tools::params::ResolveParams;
 use crate::tools::request_id::next_request_id;
 use crate::tools::response::ToolResponse;
 
 /// Resolve a canonical entity identifier for a name and its aliases.
-pub async fn resolve(
-    ctx: &ServiceContext,
+pub async fn resolve<T: ToolContext>(
+    ctx: &T,
     params: ResolveParams,
 ) -> Result<ToolResponse<String>, MemoryError> {
     let mut operation_metrics = crate::observability::OperationMetrics::new("resolve");
@@ -28,40 +27,41 @@ pub async fn resolve(
 
     let timer = Instant::now();
     let request_id = next_request_id();
-    ctx.log_tool_event(
-        "resolve.start",
-        json!({"entity_type": candidate.entity_type, "canonical": candidate.canonical_name}),
-        json!({}),
-        LogLevel::Info,
-        Some(&request_id),
-    );
+    ctx.record(ToolEvent {
+        op: "resolve.start",
+        args: json!({"entity_type": candidate.entity_type, "canonical": candidate.canonical_name}),
+        result: json!({}),
+        level: LogLevel::Info,
+        request_id: Some(request_id.clone()),
+        duration: None,
+    });
 
-    match ResolveCapability::resolve(ctx, candidate, Some(access)).await {
+    match ctx.resolve(candidate, Some(access)).await {
         Ok(entity_id) => {
             operation_metrics.record_result("entities", 1);
             operation_metrics.success();
-            ctx.log_tool_event_with_duration(
-                "resolve.done",
-                json!({}),
-                json!({"entity_id": &entity_id}),
-                LogLevel::Info,
-                timer.elapsed(),
-                Some(&request_id),
-            );
+            ctx.record(ToolEvent {
+                op: "resolve.done",
+                args: json!({}),
+                result: json!({"entity_id": &entity_id}),
+                level: LogLevel::Info,
+                request_id: Some(request_id),
+                duration: Some(timer.elapsed()),
+            });
             Ok(ToolResponse::success_with_guidance(
                 entity_id,
                 "Use this entity_id when linking facts or relationships.",
             ))
         }
         Err(err) => {
-            ctx.log_tool_event_with_duration(
-                "resolve.error",
-                json!({}),
-                json!({"error": err.to_string()}),
-                LogLevel::Warn,
-                timer.elapsed(),
-                Some(&request_id),
-            );
+            ctx.record(ToolEvent {
+                op: "resolve.error",
+                args: json!({}),
+                result: json!({"error": err.to_string()}),
+                level: LogLevel::Warn,
+                request_id: Some(request_id),
+                duration: Some(timer.elapsed()),
+            });
             Err(err)
         }
     }

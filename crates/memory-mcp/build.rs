@@ -31,7 +31,7 @@ fn main() {
                 Ok(assets) => assets,
                 // A bundle was provided but is malformed; fail fast rather than
                 // silently shipping a UI-less build.
-                Err(error) => panic!("control-plane-ui asset packaging failed: {error}"),
+                Err(error) => panic!("ui asset packaging failed: {error}"),
             }
         }
         // No bundle was provided. Emit an empty asset catalog so the binary
@@ -134,7 +134,7 @@ fn build_assets(dist: &Path, out_dir: &Path) -> Result<Vec<Asset>, String> {
 fn write_manifest(out_dir: &Path, assets: &[Asset]) {
     let manifest = generate_manifest(assets);
     fs::write(out_dir.join(MANIFEST_FILE), manifest)
-        .expect("cannot write generated control-plane asset manifest")
+        .expect("cannot write generated ui asset manifest")
 }
 
 fn collect_assets(root: &Path, current: &Path, assets: &mut Vec<Asset>) -> Result<(), String> {

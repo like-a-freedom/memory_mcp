@@ -1,6 +1,8 @@
 # Decision: typed record accessors and the cross-owner provenance read
 
-Status: accepted, to implement in Phase 6d3.
+Status: accepted. The typed accessors and the `invalidate` guard are
+implemented (see "Status of implementation" below); the cross-owner
+`select_episodes_via_entity` read is deliberately deferred.
 
 ## Context
 
@@ -161,14 +163,28 @@ decomposition before splitting a cross-owner optimized read. So:
   - `ExplanationService` used to read any record id as an
     episode/fact. It now treats a wrong-kind id as "no
     provenance for this item", which is what it already did for an
-    id that no longer exists. Pinned by
-    `tools_e2e::test_mcp_explain_mixed_array`.
+    id that no longer exists. The classification is the named
+    `provenance_lookup_error`, and
+    `explanation::tests::a_wrong_kind_lookup_is_absorbed_but_a_storage_failure_is_not`
+    pins that a `Storage` or `ConfigInvalid` failure still
+    propagates, so the absorption cannot widen into a silent
+    degradation. End-to-end: `tools_e2e::test_mcp_explain_mixed_array`.
   - `assemble_context` access tracking was calling
     `record_fact_access` for synthesised view items
     (`episode_fallback:`, `facet:`, `map:`), which produced a
     validation refusal logged on every such request. It now
-    tracks only `fact:` ids. Pinned by
-    `service_integration::test_service_assemble_context_records_fact_access_heat*`.
+    tracks only `fact:` ids, decided by the named predicate
+    `context::is_fact_access_trackable`. Pinned by
+    `context::tests::only_real_fact_ids_are_access_trackable`, which
+    fails if the predicate is inverted, and by
+    `service_integration::test_service_assemble_context_does_not_track_access_for_synthetic_view_ids`.
+
+    **Correction.** This checklist previously cited
+    `test_service_assemble_context_records_fact_access_heat*` as the
+    pin for this change. That citation was false: those tests only
+    exercise the pass-through arm, and deleting the guard failed
+    nothing in the suite. The predicate test above was added
+    specifically to close that gap.
 - [ ] `select_episodes_via_entity` — deferred, see decision 3.
 
 ## Behaviour change to record on release

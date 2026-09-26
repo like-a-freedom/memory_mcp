@@ -6,6 +6,7 @@
 
 pub mod assemble_context;
 pub mod compact;
+pub mod context;
 pub mod explain;
 pub mod extract;
 pub mod ingest;

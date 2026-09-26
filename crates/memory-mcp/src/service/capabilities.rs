@@ -6,6 +6,11 @@ pub mod extract;
 pub mod ingest;
 pub mod resolve;
 
+/// Implements the transport-facing tool port for the legacy
+/// service container. This is the single adapter between
+/// `ServiceContext` and the tool handlers.
+mod tool_context_impl;
+
 use crate::error::MemoryError;
 use crate::service::service_context::ServiceContext;
 

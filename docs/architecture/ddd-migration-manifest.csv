@@ -165,6 +165,7 @@ service/capabilities/extract.rs,src/memory/,application-or-domain,memory,episode
 service/capabilities/ingest.rs,src/memory/,application-or-domain,memory,episodes recall and lifecycle,Phase 5,"MCP, CLI, eval harness",legacy:service/memory -> Phase 5
 service/capabilities/invalidate.rs,src/memory/,application-or-domain,memory,episodes recall and lifecycle,Phase 5,"MCP, CLI, eval harness",legacy:service/memory -> Phase 5
 service/capabilities/resolve.rs,src/memory/,application-or-domain,memory,episodes recall and lifecycle,Phase 5,"MCP, CLI, eval harness",legacy:service/memory -> Phase 5
+service/capabilities/tool_context_impl.rs,src/memory/,adapter,memory,single adapter from the service container to the transport-facing tool port,Phase 5,tool handlers via tools::context::ToolContext,forbidden
 service/claims.rs,src/knowledge/,application-or-domain,knowledge,entities facts and claims,Phase 5,"MCP, CLI, eval harness",legacy:service/knowledge -> Phase 5
 service/claims/backfill.rs,src/knowledge/,application-or-domain,knowledge,entities facts and claims,Phase 5,"MCP, CLI, eval harness",legacy:service/knowledge -> Phase 5
 service/claims/extract.rs,src/knowledge/,application-or-domain,knowledge,entities facts and claims,Phase 5,"MCP, CLI, eval harness",legacy:service/knowledge -> Phase 5
@@ -311,6 +312,7 @@ storage/types.rs,src/,infra-by-owner,platform,owner-specific persistence,Phase 5
 tools.rs,src/,adapter-or-platform,platform,public adapter and operational support,Phase 2,"binaries, tools and eval harness",legacy:adapter layout -> Phase 2
 tools/assemble_context.rs,src/,adapter-or-platform,platform,public adapter and operational support,Phase 2,"binaries, tools and eval harness",legacy:adapter layout -> Phase 2
 tools/compact.rs,src/,adapter-or-platform,platform,public adapter and operational support,Phase 2,"binaries, tools and eval harness",legacy:adapter layout -> Phase 2
+tools/context.rs,src/,api-and-application,platform,transport-facing tool port that keeps the service container out of the tool handlers,Phase 5,tool handlers via ToolContext,forbidden
 tools/explain.rs,src/,adapter-or-platform,platform,public adapter and operational support,Phase 2,"binaries, tools and eval harness",legacy:adapter layout -> Phase 2
 tools/extract.rs,src/,adapter-or-platform,platform,public adapter and operational support,Phase 2,"binaries, tools and eval harness",legacy:adapter layout -> Phase 2
 tools/ingest.rs,src/,adapter-or-platform,platform,public adapter and operational support,Phase 2,"binaries, tools and eval harness",legacy:adapter layout -> Phase 2
@@ -320,7 +322,7 @@ tools/parsers.rs,src/,adapter-or-platform,platform,public adapter and operationa
 tools/request_id.rs,src/,adapter-or-platform,platform,public adapter and operational support,Phase 2,"binaries, tools and eval harness",legacy:adapter layout -> Phase 2
 tools/resolve.rs,src/,adapter-or-platform,platform,public adapter and operational support,Phase 2,"binaries, tools and eval harness",legacy:adapter layout -> Phase 2
 tools/response.rs,src/,adapter-or-platform,platform,public adapter and operational support,Phase 2,"binaries, tools and eval harness",legacy:adapter layout -> Phase 2
-ui.rs,src/ui/,module-glue,ui,operator console asset delivery,Phase 2,HTTP router and public Rust callers,allowed:edge=memory->ui integration expiry=Phase 2
+ui.rs,src/ui/,module-glue,ui,operator console asset delivery,Phase 2,HTTP router and public Rust callers,forbidden
 ui/assets.rs,src/ui/assets.rs,adapter,ui,compiled asset delivery and base stamping (Phase 6 removed the control::static_assets facade),Phase 2,HTTP router,forbidden
 operations.rs,src/operations/,module-glue,operations,administrative deletion and recovery interface,Phase 2,HTTP adapter and bootstrap,forbidden
 operations/api.rs,src/operations/api.rs,api-and-application,operations,account deletion command and atomic port,Phase 2,HTTP account handler and compatibility facade,forbidden
@@ -344,7 +346,8 @@ bootstrap/integration/durable_tasks.rs,src/bootstrap/integration/durable_tasks.r
 embedding.rs,src/embedding/,module-glue,embedding,embedding technical capability facade,Phase 5,knowledge and memory use cases and bootstrap wiring,forbidden
 embedding/api.rs,src/embedding/api.rs,api-and-application,embedding,canonical vector update use case with named write policies,Phase 5,knowledge vector endpoints and embedding jobs,forbidden
 embedding/infra.rs,src/embedding/infra.rs,infra,embedding,fact vector adapter honouring gap-fill and replace-stale policies,Phase 5,knowledge-owned fact records,legacy:service/embedding_service vector write -> Phase 5
-knowledge.rs,src/knowledge/,module-glue,knowledge,knowledge bounded context facade,Phase 5,memory use cases and bootstrap wiring,forbidden
-knowledge/api.rs,src/knowledge/api.rs,api-and-application,knowledge,owner-named read scopes replacing arbitrary-table reads,Phase 5,memory retrieval and provenance assembly,forbidden
+knowledge.rs,src/knowledge/,module-glue,knowledge,knowledge bounded context facade,Phase 5,build_diff provenance reads,forbidden
+knowledge/api.rs,src/knowledge/api.rs,api-and-application,knowledge,owner-named read scopes replacing arbitrary-table reads,Phase 5,build_diff through the Facts scope,forbidden
+knowledge/infra.rs,src/knowledge/infra.rs,infra,knowledge,knowledge read adapter mapping a scope to a query,Phase 5,build_diff via owned_fact_scan,forbidden
 memory.rs,src/memory/,module-glue,memory,memory bounded context facade,Phase 5,transport adapters and bootstrap wiring,forbidden
 memory/api.rs,src/memory/api.rs,api-and-application,memory,consumer-owned ingestion extraction recall explanation invalidation and rate-limit ports,Phase 5,capability adapters in service/capabilities,forbidden

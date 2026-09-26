@@ -136,11 +136,44 @@ fn checker_rejects_forbidden_dependencies_paths_reexports_and_cycles() {
             "src/knowledge/application/reconcile.rs",
             "use crate::memory::api::Episode;",
         ),
+        // Grouped imports must not hide a forbidden dependency.
+        (
+            "grouped import hiding a forbidden dependency",
+            "src/memory/infra/reader.rs",
+            "use crate::{identity::api::Account, knowledge::api::Fact};",
+        ),
+        (
+            "grouped import of a bare forbidden context",
+            "src/embedding/infra/store.rs",
+            "use crate::{embedding::api, identity};",
+        ),
     ];
 
     for (label, path, source) in cases {
         let violations = checker.check_file(path, source);
         assert!(!violations.is_empty(), "checker accepted {label}");
+    }
+
+    // A grouped import that names only allowed or same-context
+    // members must still pass, or the hardening would be too broad.
+    for (label, path, source) in [
+        (
+            "grouped import of allowed dependencies",
+            "src/memory/infra/reader.rs",
+            "use crate::{knowledge::api::Fact, embedding::api::Vector};",
+        ),
+        (
+            "grouped import of a same-context module",
+            "src/memory/infra/reader.rs",
+            "use crate::{memory::api::Recall, memory::ports::Port};",
+        ),
+    ] {
+        let violations = checker.check_file(path, source);
+        assert!(
+            violations.is_empty(),
+            "checker rejected a legitimate {label}: {}",
+            format_violations(&violations)
+        );
     }
 }
 

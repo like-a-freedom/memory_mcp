@@ -7,8 +7,7 @@ use serde_json::json;
 use crate::logging::LogLevel;
 use crate::models::AssembleContextRequest;
 use crate::service::MemoryError;
-use crate::service::capabilities::assemble_context::AssembleContextCapability;
-use crate::service::service_context::ServiceContext;
+use crate::tools::context::{ToolContext, ToolEvent};
 use crate::tools::params::AssembleContextParams;
 use crate::tools::parsers::parse_datetime;
 use crate::tools::request_id::next_request_id;
@@ -20,8 +19,8 @@ use crate::tools::response::ToolResponse;
 /// function while the compact-mode guard is alive, and the outer
 /// `ToolResponse<Value>` envelope is returned. Serialize happens on the same
 /// thread and task as the guard; the guard is dropped before this returns.
-pub async fn assemble_context(
-    ctx: &ServiceContext,
+pub async fn assemble_context<T: ToolContext>(
+    ctx: &T,
     params: AssembleContextParams,
 ) -> Result<ToolResponse<serde_json::Value>, MemoryError> {
     let mut operation_metrics = crate::observability::OperationMetrics::new("assemble_context");
@@ -49,24 +48,25 @@ pub async fn assemble_context(
 
     let timer = Instant::now();
     let request_id = next_request_id();
-    ctx.log_tool_event(
-        "assemble_context.start",
-        json!({"query": request.query}),
-        json!({}),
-        LogLevel::Info,
-        Some(&request_id),
-    );
+    ctx.record(ToolEvent {
+        op: "assemble_context.start",
+        args: json!({"query": request.query}),
+        result: json!({}),
+        level: LogLevel::Info,
+        request_id: Some(request_id.clone()),
+        duration: None,
+    });
 
-    match AssembleContextCapability::assemble_context(ctx, request).await {
+    match ctx.assemble_context(request).await {
         Ok(results) => {
-            ctx.log_tool_event_with_duration(
-                "assemble_context.done",
-                json!({}),
-                json!({"count": results.len()}),
-                LogLevel::Info,
-                timer.elapsed(),
-                Some(&request_id),
-            );
+            ctx.record(ToolEvent {
+                op: "assemble_context.done",
+                args: json!({}),
+                result: json!({"count": results.len()}),
+                level: LogLevel::Info,
+                request_id: Some(request_id.clone()),
+                duration: Some(timer.elapsed()),
+            });
             let count = results.len();
             operation_metrics.record_result("items", count);
             // Under compact mode, omit `quote` and slim `rationale` via the
@@ -93,14 +93,14 @@ pub async fn assemble_context(
             }
         }
         Err(err) => {
-            ctx.log_tool_event_with_duration(
-                "assemble_context.error",
-                json!({}),
-                json!({"error": err.to_string()}),
-                LogLevel::Warn,
-                timer.elapsed(),
-                Some(&request_id),
-            );
+            ctx.record(ToolEvent {
+                op: "assemble_context.error",
+                args: json!({}),
+                result: json!({"error": err.to_string()}),
+                level: LogLevel::Warn,
+                request_id: Some(request_id),
+                duration: Some(timer.elapsed()),
+            });
             Err(err)
         }
     }

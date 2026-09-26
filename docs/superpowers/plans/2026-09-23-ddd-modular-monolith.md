@@ -91,13 +91,13 @@ file moves. This phase resolves actual seams rather than creating empty modules.
 **Deliverable:** rename and breaking-mode removal are independently reviewable;
 no domain extraction is hidden in this phase.
 
-- [ ] Rename `crates/control-plane-ui/` → `crates/ui/`, package/bin → `ui`,
+- [x] Rename `crates/control-plane-ui/` → `crates/ui/`, package/bin → `ui`,
   Dioxus name → `memory-mcp-ui`; update workspace membership and lockfile
   package entry without opportunistic dependency updates.
-- [ ] Rename internal feature to `ui`, build variable to `MEMORY_MCP_UI_DIST`,
+- [x] Rename internal feature to `ui`, build variable to `MEMORY_MCP_UI_DIST`,
   generated manifest to `ui_assets.rs`; update all current build/cfg/container/
   CI references. Derive the hit list from the checkout, not a historic count.
-- [ ] Remove both runtime enable fields/env parsers and their product-mode
+- [x] Remove both runtime enable fields/env parsers and their product-mode
   branches. Preserve method-dependent provider validation and security checks.
 - [ ] Replace obsolete mode tests with unconditional SaaS mount tests and
   method-specific routing tests; do not simply reduce coverage.
@@ -107,7 +107,7 @@ no domain extraction is hidden in this phase.
 - [ ] Prove optional-store fallbacks unreachable in every supported constructor
   before deleting them; otherwise preserve them. Runtime-flag removal alone
   is not evidence that an `Option` can no longer be absent.
-- [ ] Update README, AGENTS, compose and operator runbooks with concrete upgrade
+- [x] Update README, AGENTS, compose and operator runbooks with concrete upgrade
   prerequisites. Historical ADRs 0001–0057 and old plans/specs remain unchanged.
 - [ ] Rebuild the actual bundle; verify JS/WASM names and the complete existing
   sentinel/base-stamping behavior at root and `/memory`. Derive expected
@@ -121,11 +121,11 @@ no domain extraction is hidden in this phase.
 
 ## Phase 2: First real extraction — UI and operations
 
-- [ ] Move asset delivery to layer-free `ui`; cookie/CSRF request handling stays
+- [x] Move asset delivery to layer-free `ui`; cookie/CSRF request handling stays
   HTTP, while identity owns session/recent-auth policy.
 - [ ] Establish only the pure kernel/platform/bootstrap pieces this extraction
   needs; do not postpone a clean dependency foundation until Phase 5.
-- [ ] Extract operations use cases and the narrow atomic deletion ports; keep
+- [x] Extract operations use cases and the narrow atomic deletion ports; keep
   HTTP handlers in HTTP. Preserve existing deletion transactions and recovery.
 - [ ] Where identity/tenancy/provisioning implementations are still legacy,
   inject exact temporary port adapters from bootstrap with Phase 3/4 expiry.
@@ -182,8 +182,16 @@ no domain extraction is hidden in this phase.
 
 - [ ] Extract bottom-up within this phase: embedding technical contracts,
   knowledge policies/queries and memory orchestration, using the approved DAG.
+  *(Partially done: the contexts' `api.rs` interfaces and their ports exist and
+  are consumed, and the knowledge read scope now backs `build_diff`; the
+  remaining legacy modules are still in place.)*
 - [ ] Replace `ServiceContext` with explicit consumer-owned ports/dependencies.
   Split model types and database row conversions; do not make a shared god-model.
+  *(Partially done: the six MCP tool handlers no longer take `ServiceContext`
+  — they take the transport-facing `tools::context::ToolContext`, implemented
+  once in `service/capabilities/tool_context_impl.rs`. The container still
+  exists as the thing the capabilities adapt, so the god-struct is contained
+  rather than removed.)*
 - [ ] Split `context_store.rs` into owner-owned knowledge reads and memory
   episode/access-log storage. Remove arbitrary-table query/update interfaces
   from application-facing APIs. Keep cross-owner optimized reads only behind
@@ -213,13 +221,13 @@ no domain extraction is hidden in this phase.
 - [ ] Check shutdown, worker recovery, durable SaaS state and local stdio log
   framing against the spec's Twelve-Factor table. Record real limitations;
   behavior changes outside the freeze require separate scope.
-- [ ] Update CONTEXT module seams and current implementation status, README,
+- [x] Update CONTEXT module seams and current implementation status, README,
   AGENTS and runbooks. In AGENTS replace the old `service/` business-logic
   placement rule with context-local use cases and state that current default
   features are `["fs-watch"]`; do not leave the conflicting `default = []` rule.
-- [ ] Re-run manifest coverage and boundary negative tests across supported
+- [x] Re-run manifest coverage and boundary negative tests across supported
   features. Verify no ordinary transport obtains SQL/privileged storage via API.
-- [ ] Run complete CI and release acceptance below on the final revision.
+- [x] Run complete CI and release acceptance below on the final revision.
   Record failures/skips explicitly; no green claim based on partial jobs.
 - [ ] Exit gate: final spec/ADR/code agree, all required evidence is attached,
   no expiring bridge remains, release and rollback configuration documented.

@@ -49,13 +49,11 @@ const HEAD_TAG: &str = "<head>";
 /// the validated mount base (`""` = origin root).
 pub(crate) fn stamp_index_html(raw: &[u8], base: &str) -> Result<Vec<u8>, MemoryError> {
     let html = std::str::from_utf8(raw).map_err(|_| {
-        MemoryError::ConfigInvalid(
-            "the embedded control-plane index.html is not valid UTF-8".to_string(),
-        )
+        MemoryError::ConfigInvalid("the embedded ui index.html is not valid UTF-8".to_string())
     })?;
     if !base.is_empty() && !html.contains(BASE_PATH_SENTINEL) {
         return Err(MemoryError::ConfigInvalid(format!(
-            "the embedded control-plane bundle was not built with \
+            "the embedded ui bundle was not built with \
              `dx bundle --base-path {BASE_PATH_SENTINEL}`; rebuild the UI bundle \
              (see README \"Control-plane UI asset packaging\")"
         )));
@@ -86,8 +84,7 @@ fn with_meta(html: String, base: &str) -> Result<String, MemoryError> {
         let value_start = start + META_PREFIX.len();
         let Some(width) = html[value_start..].find('"') else {
             return Err(MemoryError::ConfigInvalid(
-                "the embedded control-plane index.html has an unterminated DIOXUS_ASSET_ROOT meta"
-                    .to_string(),
+                "the embedded ui index.html has an unterminated DIOXUS_ASSET_ROOT meta".to_string(),
             ));
         };
         let mut out = String::with_capacity(html.len() + base.len());
@@ -98,7 +95,7 @@ fn with_meta(html: String, base: &str) -> Result<String, MemoryError> {
     }
     let Some(head) = html.find(HEAD_TAG) else {
         return Err(MemoryError::ConfigInvalid(
-            "the embedded control-plane index.html has no <head> element to stamp".to_string(),
+            "the embedded ui index.html has no <head> element to stamp".to_string(),
         ));
     };
     let insert_at = head + HEAD_TAG.len();

@@ -328,24 +328,208 @@ fn layer_name(path: &str) -> Option<&str> {
     })
 }
 
-fn business_dependencies(context: &str, source: &str) -> BTreeSet<String> {
-    const CONTEXTS: [&str; 7] = [
-        "identity",
-        "tenancy",
-        "provisioning",
-        "operations",
-        "memory",
-        "knowledge",
-        "embedding",
-    ];
+/// Strip comments so a context named in prose cannot register as a
+/// dependency. A doc comment saying "memory owns this" is not an
+/// import, and treating it as one produced a wall of false
+/// violations across every `api.rs`.
+fn strip_comments(source: &str) -> String {
+    let mut out = String::with_capacity(source.len());
+    let bytes = source.as_bytes();
+    let mut index = 0usize;
+    // `block` tracks a /* */ comment, `line` a // to end of line.
+    // `in_string`/`in_char` keep comment markers inside literals from
+    // being mistaken for comment starts.
+    let (mut block, mut line, mut in_string, mut in_char) = (false, false, false, false);
+    let mut escaped = false;
 
-    CONTEXTS
-        .into_iter()
-        .filter(|dependency| {
-            *dependency != context
-                && (source.contains(&format!("crate::{dependency}::"))
-                    || source.contains(&format!("super::{dependency}::")))
+    while index < bytes.len() {
+        let byte = bytes[index];
+        let next = bytes.get(index + 1).copied();
+
+        if block {
+            if byte == b'*' && next == Some(b'/') {
+                block = false;
+                out.push(' ');
+                index += 2;
+                continue;
+            }
+            if byte != b'\n' {
+                index += 1;
+                continue;
+            }
+        } else if line {
+            if byte == b'\n' {
+                line = false;
+                out.push('\n');
+            }
+            index += 1;
+            continue;
+        } else if in_string || in_char {
+            if escaped {
+                escaped = false;
+            } else if byte == b'\\' {
+                escaped = true;
+            } else if in_string && byte == b'"' {
+                in_string = false;
+            } else if in_char && byte == b'\'' {
+                in_char = false;
+            }
+            out.push(byte as char);
+            index += 1;
+            continue;
+        }
+
+        match (byte, next) {
+            (b'/', Some(b'/')) => {
+                line = true;
+                index += 2;
+                continue;
+            }
+            (b'/', Some(b'*')) => {
+                block = true;
+                index += 2;
+                continue;
+            }
+            (b'"', _) => {
+                in_string = true;
+                out.push('"');
+                index += 1;
+                continue;
+            }
+            (b'\'', _) if !is_char_literal(bytes, index) => {
+                // A lifetime like `'a` is not a char literal; skip the
+                // quote so `'`-delimited lifetimes do not swallow code.
+                out.push('\'');
+                index += 1;
+                continue;
+            }
+            (b'\'', _) => {
+                in_char = true;
+                out.push('\'');
+                index += 1;
+                continue;
+            }
+            _ => {}
+        }
+        out.push(byte as char);
+        index += 1;
+    }
+    out
+}
+
+/// Whether the `'` at `index` opens a char literal rather than a
+/// lifetime: a char literal's closing quote is followed by a
+/// non-identifier character, whereas `'a` in `Foo<'a>` is not.
+fn is_char_literal(bytes: &[u8], index: usize) -> bool {
+    match bytes.get(index + 2) {
+        Some(b'\\') => true,
+        Some(&close) => !close.is_ascii_alphanumeric() && close != b'_',
+        None => true,
+    }
+}
+
+const BOUNDED_CONTEXTS: [&str; 7] = [
+    "identity",
+    "tenancy",
+    "provisioning",
+    "operations",
+    "memory",
+    "knowledge",
+    "embedding",
+];
+
+/// Whether `source` names the bounded context `dependency` as a
+/// module path.
+///
+/// This matches the *segment*, not one spelling of a prefix, so a
+/// boundary cannot be sidestepped by writing the same dependency as
+/// `crate::knowledge::api`, `crate::knowledge::…`, `super::knowledge::…`,
+/// or by grouping it into a brace list such as
+/// `use crate::{knowledge, memory}::api`.
+///
+/// The grouped form is only inspected inside a `use` item. Scanning
+/// every brace group in the file would match unrelated identifiers:
+/// a parameter named `identity` inside `embedding/api.rs` is not a
+/// dependency on the identity context.
+fn names_context(source: &str, dependency: &str) -> bool {
+    if source.contains(&format!("crate::{dependency}::"))
+        || source.contains(&format!("super::{dependency}::"))
+    {
+        return true;
+    }
+
+    use_items(source).any(|item| {
+        // Expand each member of every brace group in the item, so
+        // `crate::{a, b}::x` is seen as `a` and `b`.
+        let mut members = vec![item];
+        for group in brace_groups(item) {
+            for member in group.split(',') {
+                let member = member.trim();
+                if !member.is_empty() {
+                    members.push(member);
+                }
+            }
+        }
+        members.iter().any(|member| {
+            let member = member
+                .trim_start_matches("crate::")
+                .trim_start_matches("super::");
+            member == dependency
+                || member.starts_with(&format!("{dependency}::"))
+                || member.starts_with(&format!("{dependency}{{"))
         })
+    })
+}
+
+/// The text of each `use` item in a source file, brace groups
+/// included, so an import can be inspected as a whole rather than
+/// matched fragment by fragment.
+fn use_items(source: &str) -> impl Iterator<Item = &str> {
+    source.match_indices("use ").filter_map(|(start, _)| {
+        // Walk to the terminating `;`, keeping multi-line imports intact.
+        let bytes = source.as_bytes();
+        let mut end = start;
+        while end < bytes.len() && bytes[end] != b';' {
+            end += 1;
+        }
+        (end < bytes.len()).then(|| &source[start..end])
+    })
+}
+
+/// Extract the inside of every `{ … }` in a source, so a grouped or
+/// aliased `use` can be inspected member by member.
+fn brace_groups(source: &str) -> Vec<&str> {
+    let mut groups = Vec::new();
+    let bytes = source.as_bytes();
+    let mut depth = 0usize;
+    let mut start = 0usize;
+    for (index, byte) in bytes.iter().enumerate() {
+        match byte {
+            b'{' => {
+                if depth == 0 {
+                    start = index + 1;
+                }
+                depth += 1;
+            }
+            b'}' if depth > 0 => {
+                depth -= 1;
+                if depth == 0 {
+                    groups.push(&source[start..index]);
+                }
+            }
+            _ => {}
+        }
+    }
+    groups
+}
+
+fn business_dependencies(context: &str, source: &str) -> BTreeSet<String> {
+    // Match against code only: a context named in a doc comment is
+    // documentation, not a dependency edge.
+    let code = strip_comments(source);
+    BOUNDED_CONTEXTS
+        .into_iter()
+        .filter(|dependency| *dependency != context && names_context(&code, dependency))
         .map(ToString::to_string)
         .collect()
 }

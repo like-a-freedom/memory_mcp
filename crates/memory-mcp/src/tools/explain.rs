@@ -7,8 +7,7 @@ use serde_json::json;
 use crate::logging::LogLevel;
 use crate::models::{AccessPayload, ExplainRequest};
 use crate::service::MemoryError;
-use crate::service::capabilities::explain::ExplainCapability;
-use crate::service::service_context::ServiceContext;
+use crate::tools::context::{ToolContext, ToolEvent};
 use crate::tools::params::ExplainParams;
 use crate::tools::parsers::parse_context_items;
 use crate::tools::request_id::next_request_id;
@@ -20,8 +19,8 @@ use crate::tools::response::ToolResponse;
 /// function while the compact-mode guard is alive, and the outer
 /// `ToolResponse<Value>` envelope is returned. Serialize happens on the same
 /// thread and task as the guard; the guard is dropped before this returns.
-pub async fn explain(
-    ctx: &ServiceContext,
+pub async fn explain<T: ToolContext>(
+    ctx: &T,
     params: ExplainParams,
 ) -> Result<ToolResponse<serde_json::Value>, MemoryError> {
     let mut operation_metrics = crate::observability::OperationMetrics::new("explain");
@@ -36,24 +35,25 @@ pub async fn explain(
 
     let timer = Instant::now();
     let request_id = next_request_id();
-    ctx.log_tool_event(
-        "explain.start",
-        json!({"count": request.context_pack.len()}),
-        json!({}),
-        LogLevel::Info,
-        Some(&request_id),
-    );
+    ctx.record(ToolEvent {
+        op: "explain.start",
+        args: json!({"count": request.context_pack.len()}),
+        result: json!({}),
+        level: LogLevel::Info,
+        request_id: Some(request_id.clone()),
+        duration: None,
+    });
 
-    match ExplainCapability::explain(ctx, request, Some(access)).await {
+    match ctx.explain(request, Some(access)).await {
         Ok(explanations) => {
-            ctx.log_tool_event_with_duration(
-                "explain.done",
-                json!({}),
-                json!({"count": explanations.len()}),
-                LogLevel::Info,
-                timer.elapsed(),
-                Some(&request_id),
-            );
+            ctx.record(ToolEvent {
+                op: "explain.done",
+                args: json!({}),
+                result: json!({"count": explanations.len()}),
+                level: LogLevel::Info,
+                request_id: Some(request_id.clone()),
+                duration: Some(timer.elapsed()),
+            });
             let count = explanations.len();
             operation_metrics.record_result("explanations", count);
             // Under compact mode, omit `quote` via the serde adapters reading
@@ -80,14 +80,14 @@ pub async fn explain(
             }
         }
         Err(err) => {
-            ctx.log_tool_event_with_duration(
-                "explain.error",
-                json!({}),
-                json!({"error": err.to_string()}),
-                LogLevel::Warn,
-                timer.elapsed(),
-                Some(&request_id),
-            );
+            ctx.record(ToolEvent {
+                op: "explain.error",
+                args: json!({}),
+                result: json!({"error": err.to_string()}),
+                level: LogLevel::Warn,
+                request_id: Some(request_id),
+                duration: Some(timer.elapsed()),
+            });
             Err(err)
         }
     }

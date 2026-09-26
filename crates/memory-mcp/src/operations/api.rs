@@ -1,11 +1,13 @@
-use std::time::Duration;
-
 use chrono::{DateTime, Utc};
 
 use crate::MemoryError;
 
 pub const DELETION_TYPED_PHRASE: &str = "DELETE my account";
-pub const RECENT_AUTH_MAX_AGE: Duration = Duration::from_secs(600);
+
+/// Identity owns the recent-authentication window, so this context
+/// reads that policy rather than defining a second copy of it. A
+/// security constant with two owners is two values waiting to drift.
+pub use crate::identity::api::RECENT_AUTH_MAX_AGE;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct BeginAccountDeletionCommand {
