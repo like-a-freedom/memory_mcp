@@ -21,6 +21,27 @@ use crate::storage::{AppStoreClient, BoundDbClient, DbClient};
 
 use crate::service::value_helpers::string_from_value;
 
+/// How an item-level provenance lookup failure is handled.
+///
+/// A wrong-kind id is a legitimate outcome for `explain`: callers
+/// pass whatever id they hold, and an item whose `source_episode`
+/// names another kind simply has no episode provenance. That is
+/// the same outcome as an id that no longer exists, so it is
+/// absorbed rather than failing the whole pack.
+///
+/// Every other error is real and must propagate. Suppressing them
+/// would turn a storage outage into a silently degraded response,
+/// so this classification is the whole safety property and is
+/// tested directly.
+fn provenance_lookup_error(
+    error: MemoryError,
+) -> Result<Option<serde_json::Map<String, Value>>, MemoryError> {
+    match error {
+        MemoryError::Validation(_) => Ok(None),
+        other => Err(other),
+    }
+}
+
 /// Handles `explain` orchestration: episode/fact resolution, provenance
 /// collection, graph insights, and explain item construction.
 #[derive(Clone)]
@@ -40,19 +61,6 @@ impl ExplanationService {
             logger,
         }
     }
-}
-
-/// Normalise an owner-scoped single-record read into the
-/// `(record, namespace)` shape the provenance helpers expect.
-fn owned_read(
-    read: Result<Option<Value>, MemoryError>,
-    namespace: &str,
-) -> Result<crate::storage::RecordLookup, MemoryError> {
-    let record = read?;
-    Ok((
-        record.and_then(|value| value.as_object().cloned()),
-        Some(namespace.to_owned()),
-    ))
 }
 
 impl GraphContext for ExplanationService {
@@ -93,9 +101,8 @@ impl ExplanationService {
             // accessor refuses the cross-kind read; this absorbs
             // the refusal rather than failing the whole pack.
             let record = match self.find_episode_record(&item.source_episode).await {
-                Ok((record, _)) => record,
-                Err(MemoryError::Validation(_)) => None,
-                Err(error) => return Err(error),
+                Ok(record) => record,
+                Err(error) => provenance_lookup_error(error)?,
             };
             let episode = record
                 .as_ref()
@@ -105,9 +112,8 @@ impl ExplanationService {
                 // Same policy for the fact side: an id that names
                 // another kind contributes no entity links.
                 let fact_record = match self.find_fact_record(fact_id).await {
-                    Ok((record, _)) => record,
-                    Err(MemoryError::Validation(_)) => None,
-                    Err(error) => return Err(error),
+                    Ok(record) => record,
+                    Err(error) => provenance_lookup_error(error)?,
                 };
                 let links = fact_record
                     .and_then(|r| {
@@ -185,7 +191,7 @@ impl ExplanationService {
             let mut ingestion_method: Option<String> = None;
 
             if let Some(fact_id) = &resolved_item.item.fact_id
-                && let Ok((fact_record, _ns)) = self.find_fact_record(fact_id).await
+                && let Ok(fact_record) = self.find_fact_record(fact_id).await
                 && let Some(record) = &fact_record
             {
                 let prov_value = record.get("provenance").cloned().unwrap_or(Value::Null);
@@ -275,11 +281,10 @@ impl ExplanationService {
         &self,
         episode_id: &str,
     ) -> Result<crate::storage::RecordLookup, MemoryError> {
-        owned_read(
+        crate::service::service_context::owner_scoped_read(
             crate::storage::EpisodeStoreClient::from_bound(self.db.clone())
                 .select_episode(episode_id)
                 .await,
-            self.db.namespace(),
         )
     }
 
@@ -287,11 +292,10 @@ impl ExplanationService {
         &self,
         fact_id: &str,
     ) -> Result<crate::storage::RecordLookup, MemoryError> {
-        owned_read(
+        crate::service::service_context::owner_scoped_read(
             crate::storage::FactStoreClient::from_bound(self.db.clone())
                 .select_fact(fact_id)
                 .await,
-            self.db.namespace(),
         )
     }
 
@@ -537,6 +541,38 @@ mod tests {
         let svc = make_service();
         let result = svc.find_fact_record("072d682d0d467aa94aad684d").await;
         assert!(matches!(result, Err(MemoryError::Validation(_))));
+    }
+
+    #[test]
+    fn a_wrong_kind_lookup_is_absorbed_but_a_storage_failure_is_not() {
+        // The cross-kind refusal from an owner-scoped accessor is an
+        // expected outcome and yields "no provenance for this item".
+        let absorbed = provenance_lookup_error(MemoryError::Validation(
+            "record_id 'task:obj' is not a episode record id".into(),
+        ));
+        assert!(
+            matches!(absorbed, Ok(None)),
+            "a wrong-kind id must degrade to no provenance, got {absorbed:?}"
+        );
+
+        // Anything else is a real failure. If a storage error were
+        // absorbed here, a database outage would look like a
+        // successful explain with empty provenance, which is exactly
+        // the kind of silent degradation this policy must not allow.
+        assert!(
+            matches!(
+                provenance_lookup_error(MemoryError::Storage("connection refused".into())),
+                Err(MemoryError::Storage(message)) if message == "connection refused"
+            ),
+            "a storage failure must propagate, not degrade to no provenance"
+        );
+        assert!(
+            matches!(
+                provenance_lookup_error(MemoryError::ConfigInvalid("missing key".into())),
+                Err(MemoryError::ConfigInvalid(message)) if message == "missing key"
+            ),
+            "a configuration failure must propagate, not degrade to no provenance"
+        );
     }
 
     #[tokio::test]

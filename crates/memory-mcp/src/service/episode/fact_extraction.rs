@@ -296,7 +296,7 @@ async fn claim_based_contradiction_warnings(
             .find_fact_record(current_fact_id)
             .await
             .ok()
-            .and_then(|(r, _)| {
+            .and_then(|r| {
                 r.and_then(|record| {
                     let v = serde_json::Value::Object(record);
                     fact_from_value_or_wrapper(&v)
@@ -310,7 +310,7 @@ async fn claim_based_contradiction_warnings(
             .find_fact_record(counterpart_id)
             .await
             .ok()
-            .and_then(|(r, _)| {
+            .and_then(|r| {
                 r.and_then(|record| {
                     let v = serde_json::Value::Object(record);
                     fact_from_value_or_wrapper(&v)
@@ -355,7 +355,7 @@ pub async fn extract_from_episode(
         LogLevel::Info,
     );
 
-    let (record, _namespace) = service.find_episode_record(episode_id).await?;
+    let record = service.find_episode_record(episode_id).await?;
     let record = record.ok_or_else(|| MemoryError::NotFound("episode_id not found".into()))?;
 
     let episode = episode_from_record(&record)
@@ -398,7 +398,7 @@ pub async fn extract_from_episode(
     }
 
     for fact in &facts {
-        let (fact_record, _) = service.find_fact_record(&fact.fact_id).await?;
+        let fact_record = service.find_fact_record(&fact.fact_id).await?;
         let Some(fact_record) = fact_record else {
             continue;
         };

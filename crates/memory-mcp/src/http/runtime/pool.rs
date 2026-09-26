@@ -515,9 +515,9 @@ impl Pool {
     }
 
     /// Test-only: mark a slot as Draining if it has been idle
-    /// since `threshold`. The current implementation leaves the
-    /// eviction tick to the scheduler; this helper is the
-    /// production path used by the unit tests.
+    /// since `threshold`. The production eviction tick is driven by
+    /// the scheduler; this helper exposes the same transition to the
+    /// unit tests below, which are its only callers.
     #[allow(dead_code)]
     pub async fn mark_draining_if_idle(
         &self,

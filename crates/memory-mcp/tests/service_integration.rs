@@ -2087,6 +2087,86 @@ async fn test_service_assemble_context_cache_hit_tracks_fact_access() {
 }
 
 #[tokio::test]
+async fn test_service_assemble_context_does_not_track_access_for_synthetic_view_ids() {
+    // The map view synthesises items under `map:hub:<entity>` and
+    // `map:community:<entity>` ids. These are not fact records, so
+    // access heat must not be written for them. Before the
+    // owner-scoped fact accessor this path recorded access for every
+    // such id and logged a validation refusal on each request.
+    //
+    // The guard under test is in `track_fact_accesses`; the failure it
+    // prevents is a write attempt against a non-fact table, which is
+    // observable as a new `fact`-table row or a logged refusal.
+    let (service, db_client) = common::make_service_with_client().await;
+
+    let alice = service.resolve_entity("person", "Alice Smith").await.unwrap();
+    let bob = service.resolve_entity("person", "Bob Jones").await.unwrap();
+    service.relate(&alice, "knows", &bob).await.unwrap();
+
+    let items = AssembleContextCapability::assemble_context(
+        &service.build_context(),
+        memory_mcp::models::AssembleContextRequest {
+            query: String::new(),
+            as_of: Some(Utc::now() + chrono::Duration::seconds(1)),
+            budget: 3,
+            fact_types: vec![],
+            view_mode: Some("map".to_string()),
+            window_start: None,
+            window_end: None,
+            access: None,
+            compact: false,
+        },
+    )
+    .await
+    .unwrap();
+
+    assert!(
+        !items.is_empty(),
+        "the map view must synthesise items for this fixture, otherwise \
+         the test asserts nothing and cannot detect a regression"
+    );
+    assert!(
+        items.iter().all(|i| i.fact_id.starts_with("map:")),
+        "expected only synthesised map ids, got {:?}",
+        items.iter().map(|i| &i.fact_id).collect::<Vec<_>>()
+    );
+
+    // The observable consequence of the guard: none of these ids
+    // exists as a stored record, so no access heat can have been
+    // written for them.
+    for item in &items {
+        assert!(
+            db_client
+                .select_one(&item.fact_id, "org")
+                .await
+                .unwrap()
+                .is_none(),
+            "a synthesised map id must not exist as a stored record: {}",
+            item.fact_id
+        );
+    }
+
+    // The reason the guard exists rather than the access writer
+    // silently tolerating the id: the fact-scoped writer refuses a
+    // non-fact id outright. Without the guard in `track_fact_accesses`
+    // this write would be attempted on every request and refused,
+    // producing a logged validation error. Asserting the refusal
+    // pins the contract the guard implements, and fails if owner
+    // scoping is ever weakened back into a table-deriving read.
+    let app_store =
+        memory_mcp::storage::AppStoreClient::new(db_client.clone(), "org".to_string());
+    for item in &items {
+        let result = app_store.record_fact_access(&item.fact_id, 1).await;
+        assert!(
+            result.is_err(),
+            "recording access for a synthesised id {} must be refused, \
+             otherwise `track_fact_accesses` has no reason to skip it",
+            item.fact_id
+        );
+    }
+}
+
+#[tokio::test]
 async fn test_service_assemble_context_appends_recent_experience_for_browse_like_requests() {
     let (service, _db_client) = common::make_service_with_client().await;
 

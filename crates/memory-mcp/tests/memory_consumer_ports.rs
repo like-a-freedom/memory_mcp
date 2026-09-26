@@ -15,7 +15,12 @@ struct IngestRecorder {
 
 #[async_trait::async_trait]
 impl IngestionPort for IngestRecorder {
-    async fn ingest_episode(&self, source_id: String) -> Result<String, MemoryError> {
+    async fn ingest_episode(
+        &self,
+        request: memory_mcp::models::IngestRequest,
+        _access: Option<memory_mcp::models::AccessPayload>,
+    ) -> Result<String, MemoryError> {
+        let source_id = request.source_id.clone();
         self.calls
             .lock()
             .expect("calls lock")
@@ -64,7 +69,16 @@ async fn an_ingest_capability_only_needs_the_ingestion_port() {
         calls: std::sync::Mutex::new(Vec::new()),
     };
 
-    let episode = memory_mcp::memory::api::ingest_episode(&port, "MSG-1".into())
+    let request = memory_mcp::models::IngestRequest {
+        source_type: "message".to_owned(),
+        source_id: "MSG-1".to_owned(),
+        content: "remembered".to_owned(),
+        t_ref: chrono::Utc::now(),
+        t_ingested: None,
+        policy_tags: Vec::new(),
+    };
+
+    let episode = memory_mcp::memory::api::ingest_episode(&port, request, None)
         .await
         .expect("ingest succeeds");
 
@@ -121,7 +135,15 @@ async fn the_ports_are_object_safe_so_they_can_be_injected() {
     let port: Arc<dyn IngestionPort> = Arc::new(IngestRecorder {
         calls: std::sync::Mutex::new(Vec::new()),
     });
-    let episode = memory_mcp::memory::api::ingest_episode(port.as_ref(), "MSG-2".into())
+    let request = memory_mcp::models::IngestRequest {
+        source_type: "message".to_owned(),
+        source_id: "MSG-2".to_owned(),
+        content: "remembered".to_owned(),
+        t_ref: chrono::Utc::now(),
+        t_ingested: None,
+        policy_tags: Vec::new(),
+    };
+    let episode = memory_mcp::memory::api::ingest_episode(port.as_ref(), request, None)
         .await
         .expect("a trait object port is usable");
     assert_eq!(episode, "episode:MSG-2");

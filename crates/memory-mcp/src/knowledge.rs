@@ -11,3 +11,4 @@
 //! than caller-supplied tables.
 
 pub mod api;
+pub mod infra;

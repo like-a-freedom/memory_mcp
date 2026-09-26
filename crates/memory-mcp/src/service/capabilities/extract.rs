@@ -86,7 +86,7 @@ struct ExtractionPort<'a> {
 #[async_trait::async_trait]
 impl crate::memory::api::EpisodeExtractionPort for ExtractionPort<'_> {
     async fn episode_exists(&self, episode_id: &str) -> Result<bool, MemoryError> {
-        let (record, _) = self.ctx.find_episode_record(episode_id).await?;
+        let record = self.ctx.find_episode_record(episode_id).await?;
         Ok(record.is_some())
     }
 
@@ -97,7 +97,7 @@ impl crate::memory::api::EpisodeExtractionPort for ExtractionPort<'_> {
         // The episode is re-read here because the caller needs it
         // for the log line (its own fields alongside the fact and
         // entity counts), not just a yes/no existence answer.
-        let (record, _) = self.ctx.find_episode_record(&command.episode_id).await?;
+        let record = self.ctx.find_episode_record(&command.episode_id).await?;
         let episode = record.as_ref().and_then(episode_from_record);
         let result = crate::service::episode::extract_from_episode(
             self.ctx,

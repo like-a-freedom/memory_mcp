@@ -55,6 +55,18 @@ pub struct ServiceContext {
     pub(crate) outbox_enabled: bool,
 }
 
+/// Normalise an owner-scoped single-record read into the record
+/// body the provenance helpers expect.
+///
+/// The owner-scoped accessors (`select_episode`, `select_fact`)
+/// return a JSON value; the provenance helpers work on the object
+/// form, so this is the one place the conversion happens.
+pub(crate) fn owner_scoped_read(
+    read: Result<Option<serde_json::Value>, MemoryError>,
+) -> Result<crate::storage::RecordLookup, MemoryError> {
+    Ok(read?.and_then(|value| value.as_object().cloned()))
+}
+
 /// Narrow infrastructure seam for the context retrieval pipeline.
 ///
 /// This owns the stores and services retrieval uses so helper modules do not
@@ -114,7 +126,7 @@ impl ServiceContext {
         &self,
         episode_id: &str,
     ) -> Result<crate::storage::RecordLookup, MemoryError> {
-        self.find_owned_record(
+        owner_scoped_read(
             crate::storage::EpisodeStoreClient::new(
                 self.db_client.clone(),
                 self.active_namespace.clone(),
@@ -131,7 +143,7 @@ impl ServiceContext {
         &self,
         fact_id: &str,
     ) -> Result<crate::storage::RecordLookup, MemoryError> {
-        self.find_owned_record(
+        owner_scoped_read(
             crate::storage::FactStoreClient::new(
                 self.db_client.clone(),
                 self.active_namespace.clone(),
@@ -139,19 +151,6 @@ impl ServiceContext {
             .select_fact(fact_id)
             .await,
         )
-    }
-
-    /// Normalise an owner-scoped single-record read into the
-    /// `(record, namespace)` shape the callers expect.
-    fn find_owned_record(
-        &self,
-        read: Result<Option<serde_json::Value>, MemoryError>,
-    ) -> Result<crate::storage::RecordLookup, MemoryError> {
-        let record = read?;
-        Ok((
-            record.and_then(|value| value.as_object().cloned()),
-            Some(self.active_namespace.clone()),
-        ))
     }
 
     /// Public helper for tool-level logging.

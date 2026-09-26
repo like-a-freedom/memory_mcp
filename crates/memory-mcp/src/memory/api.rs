@@ -21,7 +21,16 @@ use crate::models::{AssembledContextItem, ExtractResult};
 #[async_trait::async_trait]
 pub trait IngestionPort: Send + Sync {
     /// Persist source material as an episode and return its ID.
-    async fn ingest_episode(&self, source_id: String) -> Result<String, MemoryError>;
+    ///
+    /// The whole request travels through the port, including the
+    /// caller identity, because the rate-limit charge is part of
+    /// ingestion and must not be duplicated by a caller that also
+    /// wants the access policy applied.
+    async fn ingest_episode(
+        &self,
+        request: crate::models::IngestRequest,
+        access: Option<crate::models::AccessPayload>,
+    ) -> Result<String, MemoryError>;
 }
 
 /// Token-bucket access policy.
@@ -62,11 +71,16 @@ pub async fn resolve_entity(
 }
 
 /// Ingest one episode through the injected port.
+///
+/// The rate-limit charge lives inside the ingestion port rather than
+/// here, so a caller that also enforces the access policy would
+/// debit the shared bucket twice.
 pub async fn ingest_episode(
     ingestion: &(impl IngestionPort + ?Sized),
-    source_id: String,
+    request: crate::models::IngestRequest,
+    access: Option<crate::models::AccessPayload>,
 ) -> Result<String, MemoryError> {
-    ingestion.ingest_episode(source_id).await
+    ingestion.ingest_episode(request, access).await
 }
 
 /// Recall dependency: the multi-tier retrieval pipeline.

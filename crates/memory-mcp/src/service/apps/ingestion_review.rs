@@ -56,7 +56,7 @@ impl crate::service::MemoryService {
             }
         };
 
-        let (episode_record, _) = self.find_episode_record(&episode_id).await?;
+        let episode_record = self.find_episode_record(&episode_id).await?;
         let episode = episode_record
             .as_ref()
             .and_then(crate::service::episode_from_record)

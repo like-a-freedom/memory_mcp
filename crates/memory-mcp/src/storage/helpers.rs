@@ -49,12 +49,13 @@ pub fn is_missing_index_error(message: &str) -> bool {
     lowered.contains("does not exist") && lowered.contains("index")
 }
 
-/// A single-record read result: the record body and the Active
-/// Namespace it was read from.
-pub type RecordLookup = (
-    Option<serde_json::Map<String, serde_json::Value>>,
-    Option<String>,
-);
+/// A single-record read result: the record body, if it exists.
+///
+/// The lookup is always against the process-bound Active Namespace,
+/// so a caller never needs the namespace echoed back; the previous
+/// `(record, namespace)` tuple carried a half that every caller
+/// discarded.
+pub type RecordLookup = Option<serde_json::Map<String, serde_json::Value>>;
 
 /// Require that a record id names a record of exactly `table`.
 ///

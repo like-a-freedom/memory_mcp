@@ -12,37 +12,11 @@
 //! control-plane protocol concerns (typed phrase and the durable
 //! one-use token verifier).
 
-use chrono::Utc;
 use hmac::{Hmac, KeyInit, Mac};
 use sha2::Sha256;
 
 /// The typed phrase the user must type to confirm deletion.
 pub use crate::operations::api::DELETION_TYPED_PHRASE;
-pub use crate::operations::api::begin_account_deletion;
-
-/// Short-lived confirmation token for the deletion flow.
-#[derive(Debug, Clone)]
-pub struct DeletionConfirmationToken {
-    pub account_id: String,
-    pub session_id: String,
-    pub expires_at: chrono::DateTime<chrono::Utc>,
-    pub used: bool,
-}
-
-impl DeletionConfirmationToken {
-    pub fn new(account_id: &str, session_id: &str) -> Self {
-        Self {
-            account_id: account_id.to_string(),
-            session_id: session_id.to_string(),
-            expires_at: Utc::now() + chrono::Duration::minutes(5),
-            used: false,
-        }
-    }
-
-    pub fn is_valid(&self) -> bool {
-        !self.used && self.expires_at > Utc::now()
-    }
-}
 
 /// Validate that the typed phrase matches the expected deletion phrase.
 pub fn validate_typed_phrase(phrase: &str) -> bool {
@@ -80,23 +54,25 @@ mod tests {
     }
 
     #[test]
-    fn deletion_token_is_valid_initially() {
-        let token = DeletionConfirmationToken::new("acc1", "sess1");
-        assert!(token.is_valid());
-    }
+    fn token_verifier_is_deterministic_and_key_dependent() {
+        let key = [7u8; 32];
+        let other_key = [9u8; 32];
 
-    #[test]
-    fn deletion_token_expires() {
-        let mut token = DeletionConfirmationToken::new("acc1", "sess1");
-        token.expires_at = Utc::now() - chrono::Duration::minutes(1);
-        assert!(!token.is_valid());
-    }
-
-    #[test]
-    fn deletion_token_one_use() {
-        let mut token = DeletionConfirmationToken::new("acc1", "sess1");
-        assert!(token.is_valid());
-        token.used = true;
-        assert!(!token.is_valid());
+        let verifier = token_verifier(&key, "token-a").expect("verifier");
+        assert_eq!(
+            verifier,
+            token_verifier(&key, "token-a").expect("verifier"),
+            "the same key and token must produce the same verifier"
+        );
+        assert_ne!(
+            verifier,
+            token_verifier(&key, "token-b").expect("verifier"),
+            "a different token must produce a different verifier"
+        );
+        assert_ne!(
+            verifier,
+            token_verifier(&other_key, "token-a").expect("verifier"),
+            "a different key must produce a different verifier"
+        );
     }
 }

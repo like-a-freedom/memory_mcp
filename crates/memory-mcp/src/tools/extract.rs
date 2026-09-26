@@ -94,7 +94,7 @@ pub async fn extract(
                 record_extract_results(&operation_metrics, &result);
                 operation_metrics.success();
                 let log_result = match ctx.find_episode_record(episode_id).await {
-                    Ok((record, _)) => {
+                    Ok(record) => {
                         let episode = record.as_ref().and_then(episode_from_record);
                         build_extract_log_result(
                             episode.as_ref(),
@@ -177,7 +177,7 @@ pub async fn extract(
                     record_extract_results(&operation_metrics, &result);
                     operation_metrics.success();
                     let log_result = match ctx.find_episode_record(&episode_id).await {
-                        Ok((record, _)) => {
+                        Ok(record) => {
                             let episode = record.as_ref().and_then(episode_from_record);
                             build_extract_log_result(
                                 episode.as_ref(),

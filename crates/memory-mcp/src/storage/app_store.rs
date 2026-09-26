@@ -93,10 +93,6 @@ impl AppStoreClient {
             .await
     }
 
-    pub async fn select_facts(&self) -> Result<Vec<Value>, MemoryError> {
-        self.db.select_table("fact").await
-    }
-
     pub async fn select_edge(&self, edge_id: &str) -> Result<Option<Value>, MemoryError> {
         self.db.select_one(edge_id).await
     }

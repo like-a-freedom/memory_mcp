@@ -265,20 +265,20 @@ impl MemoryMcp {
                 (record, Some(namespace.clone()))
             }
             "fact" => {
-                let (record, ns) = self
+                let record = self
                     .service
                     .find_fact_record(target_id)
                     .await
                     .map_err(mcp_error)?;
-                (record.map(Value::Object), ns)
+                (record.map(Value::Object), Some(namespace.clone()))
             }
             "episode" => {
-                let (record, ns) = self
+                let record = self
                     .service
                     .find_episode_record(target_id)
                     .await
                     .map_err(mcp_error)?;
-                (record.map(Value::Object), ns)
+                (record.map(Value::Object), Some(namespace.clone()))
             }
             other => {
                 return Err(Self::invalid_params(format!(

@@ -41,6 +41,19 @@ use params::DefaultContextParams;
 use pipeline::assemble_default_context;
 use views::{build_facets_view, build_map_view, build_wake_up_view};
 
+/// Whether an assembled item's id names a real fact record that
+/// can carry access heat.
+///
+/// Several view modes synthesise items under a non-fact id
+/// (`episode_fallback:`, `facet:`, `map:`). Those have no fact
+/// record to update, and the fact-scoped access writer refuses
+/// them, so attempting one is a validation refusal rather than a
+/// failure. This predicate is the single place that decision is
+/// made, so it is named and tested rather than inlined in the loop.
+pub(crate) fn is_fact_access_trackable(fact_id: &str) -> bool {
+    fact_id.starts_with("fact:")
+}
+
 /// Records fact access for each item, logging errors without failing the operation.
 async fn track_fact_accesses(
     ctx: &RetrievalContext,
@@ -48,12 +61,7 @@ async fn track_fact_accesses(
     access: &AccessPayload,
 ) {
     for item in items {
-        // Only real fact records carry access heat. Several view
-        // modes synthesise items under a non-fact id
-        // (`episode_fallback:`, `facet:`, `map:`), and those have
-        // nothing to record; attempting one is a validation
-        // refusal, not a failure worth logging on every request.
-        if !item.fact_id.starts_with("fact:") {
+        if !is_fact_access_trackable(&item.fact_id) {
             continue;
         }
         if let Err(err) = ctx.record_fact_access(&item.fact_id, 1).await {
@@ -348,6 +356,38 @@ mod tests {
     use serde_json::{Value, json};
     use std::sync::Arc;
     use std::sync::atomic::{AtomicUsize, Ordering};
+
+    #[test]
+    fn only_real_fact_ids_are_access_trackable() {
+        // A real fact record: heat is recorded.
+        assert!(is_fact_access_trackable("fact:abc123"));
+
+        // Synthesised view ids. Each of these reaches
+        // `track_fact_accesses` in production (map, facets and
+        // episode-fallback views), and each is refused by the
+        // fact-scoped access writer, so none may be recorded.
+        for synthetic in [
+            "map:hub:entity:58c3bf0176e35089f2dcce6d",
+            "map:community:community:atlas-team",
+            "facet:uncategorized",
+            "facet:persona",
+            "episode_fallback:episode:02f58543a58ded9a15e12912",
+        ] {
+            assert!(
+                !is_fact_access_trackable(synthetic),
+                "{synthetic} is a synthesised id and must not be access-tracked"
+            );
+        }
+
+        // A record kind that is not a fact, reached through the
+        // generic id space, is equally untrackable.
+        for other in ["edge:abc", "episode:abc", "entity:abc", ""] {
+            assert!(
+                !is_fact_access_trackable(other),
+                "{other} is not a fact record id and must not be access-tracked"
+            );
+        }
+    }
 
     /// Seeds a `fact` record the way a real ingestion would, so the real
     /// retrieval SQL (full-text `search::score`, bi-temporal visibility)

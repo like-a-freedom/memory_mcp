@@ -8,15 +8,37 @@ use crate::service::service_context::ServiceContext;
 pub struct IngestCapability;
 
 impl IngestCapability {
-    /// Ingests a new episode, delegating to `IngestionService`.
+    /// Ingests a new episode through the memory-owned use case.
     pub async fn ingest(
         ctx: &ServiceContext,
         request: IngestRequest,
         access: Option<AccessPayload>,
     ) -> Result<String, MemoryError> {
-        // IngestionService owns rate-limit enforcement for this path. Keeping
-        // the check there avoids debiting the shared bucket twice.
-        ctx.ingestion_service.ingest(request, access).await
+        // The rate-limit charge stays inside the ingestion port: the
+        // use case deliberately does not enforce it, so calling both
+        // here and there would debit the shared bucket twice.
+        crate::memory::api::ingest_episode(
+            &IngestionAdapter { ctx },
+            request,
+            access,
+        )
+        .await
+    }
+}
+
+/// Adapts the legacy ingestion service to the memory-owned port.
+struct IngestionAdapter<'a> {
+    ctx: &'a ServiceContext,
+}
+
+#[async_trait::async_trait]
+impl crate::memory::api::IngestionPort for IngestionAdapter<'_> {
+    async fn ingest_episode(
+        &self,
+        request: IngestRequest,
+        access: Option<AccessPayload>,
+    ) -> Result<String, MemoryError> {
+        self.ctx.ingestion_service.ingest(request, access).await
     }
 }
 

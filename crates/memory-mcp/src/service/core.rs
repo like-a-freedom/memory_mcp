@@ -363,14 +363,14 @@ impl MemoryService {
     pub(crate) async fn find_episode_record(
         &self,
         episode_id: &str,
-    ) -> Result<(Option<serde_json::Map<String, Value>>, Option<String>), MemoryError> {
+    ) -> Result<crate::storage::RecordLookup, MemoryError> {
         self.build_context().find_episode_record(episode_id).await
     }
 
     pub(crate) async fn find_fact_record(
         &self,
         fact_id: &str,
-    ) -> Result<(Option<serde_json::Map<String, Value>>, Option<String>), MemoryError> {
+    ) -> Result<crate::storage::RecordLookup, MemoryError> {
         self.build_context().find_fact_record(fact_id).await
     }
 }

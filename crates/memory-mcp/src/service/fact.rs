@@ -271,7 +271,7 @@ impl FactService {
         // lineage for claim projection (the connector's stable record
         // identifier). Filesystem episodes carry an explicit `source_lineage`
         // that is preferred over the versioned `source_id`.
-        let (episode_record, _) = ctx.find_episode_record(source_episode).await?;
+        let episode_record = ctx.find_episode_record(source_episode).await?;
         let episode_source_id = episode_record
             .as_ref()
             .and_then(|map| map.get("source_id"))

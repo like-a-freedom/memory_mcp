@@ -8,7 +8,17 @@ use crate::service::{
 
 impl crate::service::MemoryService {
     pub async fn build_diff(&self, request: DiffRequest) -> Result<DiffView, MemoryError> {
-        let facts = self.app_store().select_facts().await?;
+        // Knowledge owns canonical fact reads. This asks for the
+        // `Facts` scope by name rather than selecting the `fact`
+        // table directly, so the table this reads is a decision
+        // knowledge makes, not a string this caller supplies.
+        let facts = crate::knowledge::api::owned_fact_scan(
+            &crate::knowledge::infra::KnowledgeReadAdapter::new(
+                self.db_client.clone(),
+                self.active_namespace.clone(),
+            ),
+        )
+        .await?;
 
         let left = facts_at(
             &facts,

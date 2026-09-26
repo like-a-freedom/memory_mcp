@@ -1753,7 +1753,6 @@ mod tests {
             .find_episode_record(&stale_episode_id)
             .await
             .expect("load archived episode")
-            .0
             .expect("archived episode exists");
         assert_eq!(archived_episode["status"], "archived");
 
@@ -1795,7 +1794,6 @@ mod tests {
             .find_episode_record(&stale_episode_id)
             .await
             .expect("load restored episode")
-            .0
             .expect("restored episode exists");
         assert_eq!(restored_episode["status"], "active");
         assert!(
