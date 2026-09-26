@@ -159,6 +159,7 @@ service/cache.rs,src/,module-glue,platform,composition and module glue,Phase 2,b
 service/cache/invalidation.rs,src/,module-glue,platform,composition and module glue,Phase 2,bootstrap and module roots,legacy:current module layout -> Phase 2
 service/cache/key.rs,src/,module-glue,platform,composition and module glue,Phase 2,bootstrap and module roots,legacy:current module layout -> Phase 2
 service/capabilities.rs,src/memory/,application-or-domain,memory,episodes recall and lifecycle,Phase 5,"MCP, CLI, eval harness",legacy:service/memory -> Phase 5
+service/capabilities/deps.rs,src/memory/,application-or-domain,memory,per-capability dependency structs replacing the shared service container,Phase 5,capability entry points and their internal pipelines,forbidden
 service/capabilities/assemble_context.rs,src/memory/,application-or-domain,memory,episodes recall and lifecycle,Phase 5,"MCP, CLI, eval harness",legacy:service/memory -> Phase 5
 service/capabilities/explain.rs,src/memory/,application-or-domain,memory,episodes recall and lifecycle,Phase 5,"MCP, CLI, eval harness",legacy:service/memory -> Phase 5
 service/capabilities/extract.rs,src/memory/,application-or-domain,memory,episodes recall and lifecycle,Phase 5,"MCP, CLI, eval harness",legacy:service/memory -> Phase 5
@@ -280,7 +281,6 @@ service/query/time.rs,src/knowledge/,application-or-domain,knowledge,entities fa
 service/reembed.rs,src/embedding/,technical-capability,embedding,embedding generation and job state,Phase 5,memory and knowledge APIs,legacy:service/embedding -> Phase 5
 service/reembed_options.rs,src/embedding/,technical-capability,embedding,embedding generation and job state,Phase 5,memory and knowledge APIs,legacy:service/embedding -> Phase 5
 service/reembed_progress.rs,src/embedding/,technical-capability,embedding,embedding generation and job state,Phase 5,memory and knowledge APIs,legacy:service/embedding -> Phase 5
-service/service_context.rs,src/,platform-or-bootstrap,platform,technical mechanism and composition,Phase 2,bootstrap and owners,legacy:service -> Phase 2
 service/startup.rs,src/,platform-or-bootstrap,platform,technical mechanism and composition,Phase 2,bootstrap and owners,legacy:service -> Phase 2
 service/triple_extractor.rs,src/knowledge/,application-or-domain,knowledge,entities facts and claims,Phase 5,"MCP, CLI, eval harness",legacy:service/knowledge -> Phase 5
 service/util.rs,src/,platform-or-bootstrap,platform,technical mechanism and composition,Phase 2,bootstrap and owners,legacy:service -> Phase 2

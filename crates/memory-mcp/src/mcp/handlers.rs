@@ -392,7 +392,7 @@ async fn extract_response(
     service: Arc<MemoryService>,
     params: ExtractParams,
 ) -> Result<ToolResponse<ExtractResult>, ErrorData> {
-    crate::tools::extract(&service.build_context(), params)
+    crate::tools::extract(service.as_ref(), params)
         .await
         .map_err(mcp_error)
 }
@@ -778,7 +778,7 @@ impl MemoryMcp {
         &self,
         params: Parameters<IngestParams>,
     ) -> Result<Json<ToolResponse<String>>, ErrorData> {
-        crate::tools::ingest(&self.service.build_context(), params.0)
+        crate::tools::ingest(self.service.as_ref(), params.0)
             .await
             .map(Json)
             .map_err(mcp_error)
@@ -791,7 +791,7 @@ impl MemoryMcp {
         &self,
         params: Parameters<ExplainParams>,
     ) -> Result<Json<ToolResponse<serde_json::Value>>, ErrorData> {
-        crate::tools::explain(&self.service.build_context(), params.0)
+        crate::tools::explain(self.service.as_ref(), params.0)
             .await
             .map(Json)
             .map_err(mcp_error)
@@ -824,7 +824,7 @@ impl MemoryMcp {
         &self,
         params: Parameters<ResolveParams>,
     ) -> Result<Json<ToolResponse<String>>, ErrorData> {
-        crate::tools::resolve(&self.service.build_context(), params.0)
+        crate::tools::resolve(self.service.as_ref(), params.0)
             .await
             .map(Json)
             .map_err(mcp_error)
@@ -837,7 +837,7 @@ impl MemoryMcp {
         &self,
         params: Parameters<InvalidateParams>,
     ) -> Result<Json<ToolResponse<String>>, ErrorData> {
-        crate::tools::invalidate(&self.service.build_context(), params.0)
+        crate::tools::invalidate(self.service.as_ref(), params.0)
             .await
             .map(Json)
             .map_err(mcp_error)
@@ -1023,7 +1023,7 @@ impl MemoryMcp {
         &self,
         params: Parameters<AssembleContextParams>,
     ) -> Result<Json<ToolResponse<serde_json::Value>>, ErrorData> {
-        crate::tools::assemble_context(&self.service.build_context(), params.0)
+        crate::tools::assemble_context(self.service.as_ref(), params.0)
             .await
             .map(Json)
             .map_err(mcp_error)
@@ -1114,7 +1114,7 @@ mod tests {
     #[cfg(feature = "mcp-apps")]
     async fn create_test_entity(mcp: &MemoryMcp, canonical_name: &str) -> String {
         ResolveCapability::resolve(
-            &mcp.service().build_context(),
+            mcp.service().as_ref(),
             EntityCandidate {
                 entity_type: "person".to_string(),
                 canonical_name: canonical_name.to_string(),
@@ -1676,7 +1676,7 @@ mod tests {
     async fn lifecycle_app_commands_archive_and_restore_candidates() {
         let mcp = create_test_mcp().await;
         let stale_episode_id = IngestCapability::ingest(
-            &mcp.service().build_context(),
+            mcp.service().as_ref(),
             IngestRequest {
                 source_type: "meeting".to_string(),
                 source_id: "stale-lifecycle-episode".to_string(),

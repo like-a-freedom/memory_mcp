@@ -184,7 +184,7 @@ async fn run_e2e_case(case: &EndToEndCase) -> EvalCaseOutcome {
 
     for source in &case.sources {
         let episode_id = match IngestCapability::ingest(
-            &service.build_context(),
+            &service,
             memory_mcp::models::IngestRequest {
                 source_type: source.source_type.clone(),
                 source_id: source.source_id.clone(),
@@ -218,7 +218,7 @@ async fn run_e2e_case(case: &EndToEndCase) -> EvalCaseOutcome {
             }
         };
 
-        match ExtractCapability::extract(&service.build_context(), &episode_id, None, None).await {
+        match ExtractCapability::extract(&service, &episode_id, None, None).await {
             Ok(extraction) => {
                 all_entities.extend(extraction.entities.iter().map(|e| e.canonical_name.clone()));
             }
@@ -242,7 +242,7 @@ async fn run_e2e_case(case: &EndToEndCase) -> EvalCaseOutcome {
 
     let query_start = std::time::Instant::now();
     let context_result = AssembleContextCapability::assemble_context(
-        &service.build_context(),
+        &service,
         memory_mcp::models::AssembleContextRequest {
             query: case.query.clone(),
             as_of: Some(case.as_of),

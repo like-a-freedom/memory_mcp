@@ -27,7 +27,7 @@ impl crate::service::MemoryService {
             (Some(source_text), None) => {
                 let now = Utc::now();
                 crate::service::capabilities::ingest::IngestCapability::ingest(
-                    &self.build_context(),
+                    self,
                     IngestRequest {
                         source_type: "app_ingestion_review".to_string(),
                         source_id: format!(

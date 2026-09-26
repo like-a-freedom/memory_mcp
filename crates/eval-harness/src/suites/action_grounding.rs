@@ -76,7 +76,7 @@ impl ActionGroundingSuite {
 
         let content = "The security review was approved by the CISO on March 15, 2026.";
         let episode_id = match IngestCapability::ingest(
-            &service.build_context(),
+            &service,
             memory_mcp::models::IngestRequest {
                 source_type: "email".into(),
                 source_id: format!("grounding-{mode_name}"),
@@ -107,10 +107,10 @@ impl ActionGroundingSuite {
             }
         };
 
-        let _ = ExtractCapability::extract(&service.build_context(), &episode_id, None, None).await;
+        let _ = ExtractCapability::extract(&service, &episode_id, None, None).await;
 
         let context_result = AssembleContextCapability::assemble_context(
-            &service.build_context(),
+            &service,
             memory_mcp::models::AssembleContextRequest {
                 query: "security review approval".into(),
                 as_of: Some(chrono::Utc::now()),

@@ -55,7 +55,7 @@ pub(crate) use entity_store::EntityStoreClient;
 pub use episode_store::EpisodeStoreClient;
 pub use event_log_store::EventLogStoreClient;
 pub use fact_store::FactStoreClient;
-pub use helpers::{RecordLookup, is_missing_index_error};
+pub use helpers::{RecordLookup, is_missing_index_error, owner_scoped_read, require_record_kind};
 pub use inbox_revision_store::InboxRevisionStoreClient;
 pub use procedures::ProcedureStore;
 pub use queries::{

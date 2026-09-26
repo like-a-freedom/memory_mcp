@@ -841,9 +841,8 @@ impl MemoryService {
 
         let embedding_input =
             super::fact::FactService::build_fact_embedding_input(fact_type, content, quote);
-        let context = self.build_context();
-        let embedding = context
-            .embedding_service
+        let embedding = self
+            .embedding_service()
             .generate_embedding(&embedding_input)
             .await?
             .ok_or_else(|| {

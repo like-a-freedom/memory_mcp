@@ -11,6 +11,7 @@ use crate::models::{
     ContradictionWarning, Edge, EdgeOrigin, Episode, ExtractResult, ExtractedEntity, ExtractedFact,
     ExtractedLink, FactType,
 };
+use crate::service::capabilities::deps::ExtractDeps;
 use crate::service::episode::communities::update_communities;
 use crate::service::episode::edges::store_edge;
 use crate::service::episode::entity_extraction::extract_entities;
@@ -20,7 +21,6 @@ use crate::service::episode::summary_parser::{
     structured_summary_fact_candidates,
 };
 use crate::service::query::now;
-use crate::service::service_context::ServiceContext;
 use crate::service::{log_args_with_duration, log_event};
 
 #[derive(Debug, Default)]
@@ -48,7 +48,7 @@ pub(super) fn should_extract_note_fact(episode: &Episode, facts: &[ExtractedFact
 }
 
 pub(super) async fn add_extracted_fact(
-    service: &ServiceContext,
+    service: &ExtractDeps,
     episode: &Episode,
     fact_type: &str,
     content: &str,
@@ -85,7 +85,7 @@ pub(super) async fn add_extracted_fact(
 
 /// Extract facts from an episode.
 pub async fn extract_facts(
-    service: &ServiceContext,
+    service: &ExtractDeps,
     episode: &Episode,
     entities: &[ExtractedEntity],
 ) -> Result<FactExtractionOutcome, MemoryError> {
@@ -226,7 +226,7 @@ pub async fn extract_facts(
 }
 
 pub(super) async fn detect_contradiction_warnings(
-    service: &ServiceContext,
+    service: &ExtractDeps,
     facts: &[ExtractedFact],
 ) -> Result<Vec<ContradictionWarning>, MemoryError> {
     claim_based_contradiction_warnings(service, facts).await
@@ -234,7 +234,7 @@ pub(super) async fn detect_contradiction_warnings(
 
 /// Query claim relations for active contradictions involving the extracted facts.
 async fn claim_based_contradiction_warnings(
-    service: &ServiceContext,
+    service: &ExtractDeps,
     facts: &[ExtractedFact],
 ) -> Result<Vec<ContradictionWarning>, MemoryError> {
     let fact_ids: Vec<_> = facts
@@ -335,7 +335,7 @@ async fn claim_based_contradiction_warnings(
 
 /// Extract entities and facts from an episode.
 pub async fn extract_from_episode(
-    service: &ServiceContext,
+    service: &ExtractDeps,
     episode_id: &str,
     zero_shot_labels: Option<&[String]>,
 ) -> Result<ExtractResult, MemoryError> {

@@ -81,7 +81,6 @@ pub mod capabilities;
 #[cfg(feature = "control-plane")]
 pub mod credential_material;
 mod model_loader;
-pub mod service_context;
 pub(crate) mod value_helpers;
 
 #[cfg(test)]

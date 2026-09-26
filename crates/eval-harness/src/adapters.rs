@@ -240,7 +240,7 @@ mod tests {
         import_canonical_facts(&service, &facts).await.unwrap();
 
         let items = AssembleContextCapability::assemble_context(
-            &service.build_context(),
+            &service,
             memory_mcp::models::AssembleContextRequest {
                 query: "Alice Orbital".into(),
                 as_of: Some(chrono::Utc::now()),

@@ -222,7 +222,7 @@ async fn ingest_and_extract(
     let t_ref_datetime = parse_reference_time(params.t_ref)?;
 
     let episode_id = IngestCapability::ingest(
-        &service.build_context(),
+        &service,
         IngestRequest {
             source_type: params.source_type.to_string(),
             source_id: params.source_id.to_string(),
@@ -236,7 +236,7 @@ async fn ingest_and_extract(
     .await
     .map_err(|e| EvalError::Suite(format!("ingest failed for {}: {e}", params.source_id)))?;
 
-    let extraction = ExtractCapability::extract(&service.build_context(), &episode_id, None, None)
+    let extraction = ExtractCapability::extract(&service, &episode_id, None, None)
         .await
         .map_err(|e| EvalError::Suite(format!("extract failed for {}: {e}", params.source_id)))?;
 

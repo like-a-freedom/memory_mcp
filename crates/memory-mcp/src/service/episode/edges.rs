@@ -5,10 +5,10 @@ use serde_json::{Value, json};
 
 use crate::error::MemoryError;
 use crate::models::Edge;
+use crate::service::capabilities::deps::ExtractDeps;
 use crate::service::ids;
 use crate::service::normalize_dt;
 use crate::service::parse_iso;
-use crate::service::service_context::ServiceContext;
 use crate::service::value_helpers::string_from_value;
 
 /// Payload map for edge database records.
@@ -46,7 +46,7 @@ pub(crate) fn build_edge_payload(edge: &Edge, edge_id: &str) -> serde_json::Map<
 }
 
 /// Persist a new edge after confirming it does not already exist.
-pub(crate) async fn store_edge(service: &ServiceContext, edge: &Edge) -> Result<(), MemoryError> {
+pub(crate) async fn store_edge(service: &ExtractDeps, edge: &Edge) -> Result<(), MemoryError> {
     let edge_id =
         ids::deterministic_edge_id(&edge.in_id, &edge.relation, &edge.out_id, edge.t_valid);
 
@@ -81,7 +81,7 @@ pub(crate) struct StoredEdgeVersion {
 }
 
 async fn invalidate_conflicting_edges(
-    service: &ServiceContext,
+    service: &ExtractDeps,
     new_edge: &Edge,
 ) -> Result<(), MemoryError> {
     let existing_edges = service

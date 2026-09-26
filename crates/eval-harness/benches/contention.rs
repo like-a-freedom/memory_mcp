@@ -21,7 +21,7 @@ fn bench_contention_single_client(c: &mut Criterion) {
                     )
                     .await;
                     let _ = ExtractCapability::extract(
-                        &service.build_context(),
+                        &service,
                         &episode_id,
                         None,
                         None,
@@ -60,7 +60,7 @@ fn bench_contention_multi_client(c: &mut Criterion) {
                                 )
                                 .await;
                                 let _ = ExtractCapability::extract(
-                                    &svc.build_context(),
+                                    &svc,
                                     &episode_id,
                                     None,
                                     None,

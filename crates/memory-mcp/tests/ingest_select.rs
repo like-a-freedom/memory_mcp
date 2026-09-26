@@ -50,11 +50,11 @@ async fn ingest_then_extract_roundtrip() -> Result<(), Box<dyn std::error::Error
         policy_tags: vec![],
     };
 
-    let episode_id = IngestCapability::ingest(&svc.build_context(), req.clone(), None).await?;
-    let episode_id_2 = IngestCapability::ingest(&svc.build_context(), req, None).await?;
+    let episode_id = IngestCapability::ingest(&svc, req.clone(), None).await?;
+    let episode_id_2 = IngestCapability::ingest(&svc, req, None).await?;
     assert_eq!(episode_id, episode_id_2);
 
-    let payload = ExtractCapability::extract(&svc.build_context(), &episode_id, None, None).await?;
+    let payload = ExtractCapability::extract(&svc, &episode_id, None, None).await?;
     assert_eq!(payload.episode_id, episode_id);
     assert!(!payload.entities.is_empty());
     assert!(!payload.facts.is_empty());
@@ -81,7 +81,7 @@ async fn ingest_reuses_one_legacy_episode_by_source_identity()
     .await?;
 
     let episode_id = IngestCapability::ingest(
-        &service.build_context(),
+        &service,
         IngestRequest {
             source_type: "inline".into(),
             source_id: "legacy-source".into(),
@@ -120,7 +120,7 @@ async fn ingest_rejects_ambiguous_legacy_episode_identity_without_writing()
     }
 
     let result = IngestCapability::ingest(
-        &service.build_context(),
+        &service,
         IngestRequest {
             source_type: "inline".into(),
             source_id: "ambiguous-source".into(),

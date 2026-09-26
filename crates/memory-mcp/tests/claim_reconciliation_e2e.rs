@@ -32,7 +32,7 @@ async fn ingest_source(
     t_ref: &str,
 ) -> String {
     let episode_id = IngestCapability::ingest(
-        &service.build_context(),
+        &service,
         IngestRequest {
             source_type: source_type.to_string(),
             source_id: source_id.to_string(),
@@ -45,7 +45,7 @@ async fn ingest_source(
     )
     .await
     .expect("ingest should succeed");
-    ExtractCapability::extract(&service.build_context(), &episode_id, None, None)
+    ExtractCapability::extract(&service, &episode_id, None, None)
         .await
         .expect("extract should succeed");
     episode_id
@@ -308,7 +308,7 @@ async fn repeat_extract_is_idempotent_and_preserves_derived_records() {
 
     // Same-id/same-content is idempotent by contract: re-extracting the same
     // episode must neither duplicate facts/claims/jobs nor surface an error.
-    ExtractCapability::extract(&service.build_context(), &ep, None, None)
+    ExtractCapability::extract(&service, &ep, None, None)
         .await
         .expect("repeat extract should succeed");
 
@@ -356,7 +356,7 @@ async fn ingest_episode_with_lineage(
         )
         .await
         .expect("create episode with lineage");
-    ExtractCapability::extract(&service.build_context(), episode_id, None, None)
+    ExtractCapability::extract(&service, episode_id, None, None)
         .await
         .expect("extract episode with lineage");
 }

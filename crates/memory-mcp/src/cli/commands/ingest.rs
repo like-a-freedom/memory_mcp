@@ -13,7 +13,7 @@ pub async fn run(service: &MemoryService, args: IngestArgs) -> Result<(), Memory
         t_ingested: args.t_ingested,
         policy_tags: args.policy_tags,
     };
-    let response = crate::tools::ingest(&service.build_context(), params).await?;
+    let response = crate::tools::ingest(service, params).await?;
     write_response(&response).map_err(|err| MemoryError::Transient(err.to_string()))?;
     Ok(())
 }

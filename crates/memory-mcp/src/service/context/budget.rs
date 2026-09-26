@@ -7,8 +7,8 @@ use super::ranking::default_episode_fallback_rationale;
 use super::scoring::selected_fact_query_term_coverage;
 use super::types::{RankedContextFact, RetrievalTier};
 use crate::error::MemoryError;
+use crate::service::context::RetrievalContext;
 use crate::service::query::matched_query_terms_for_text;
-use crate::service::service_context::RetrievalContext;
 
 pub(super) fn should_prefer_episode_content(
     selected_facts: &[RankedContextFact],

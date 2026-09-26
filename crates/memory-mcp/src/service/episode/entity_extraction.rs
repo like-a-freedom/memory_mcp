@@ -6,9 +6,9 @@ use serde_json::{Value, json};
 use crate::error::MemoryError;
 use crate::logging::LogLevel;
 use crate::models::{EntityCandidate, ExtractedEntity};
+use crate::service::capabilities::deps::ExtractDeps;
 use crate::service::entity_extraction::NerScheduling;
 use crate::service::normalize_text;
-use crate::service::service_context::ServiceContext;
 use crate::service::{log_args_with_duration, log_event};
 
 /// Extract entities from content.
@@ -22,7 +22,7 @@ use crate::service::{log_args_with_duration, log_event};
 /// * `zero_shot_labels` - Optional custom entity labels for GLiNER extraction.
 ///   When provided, these labels override the default NER configuration.
 pub async fn extract_entities(
-    service: &ServiceContext,
+    service: &ExtractDeps,
     episode_id: &str,
     content: &str,
     zero_shot_labels: Option<&[String]>,
@@ -145,7 +145,7 @@ pub async fn extract_entities(
 /// timestamp. Historical outputs therefore stay attributable to the exact
 /// extractor selector, backend, labels, and threshold.
 pub(super) async fn persist_extraction_projection(
-    service: &ServiceContext,
+    service: &ExtractDeps,
     episode_id: &str,
     entities: &[ExtractedEntity],
 ) -> Result<(), MemoryError> {
@@ -337,7 +337,7 @@ pub(super) fn build_ner_log_result(
 }
 
 fn log_ner_error(
-    service: &ServiceContext,
+    service: &ExtractDeps,
     provider: &str,
     content_chars: usize,
     zero_shot_label_count: Option<usize>,

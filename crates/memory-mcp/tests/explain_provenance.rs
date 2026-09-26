@@ -64,7 +64,7 @@ async fn explain_returns_direct_provenance_source() {
         compact: false,
     };
 
-    let result = ExplainCapability::explain(&service.build_context(), request, None)
+    let result = ExplainCapability::explain(&service, request, None)
         .await
         .expect("explain completed");
 
@@ -131,7 +131,7 @@ async fn explain_backward_compatible_with_empty_all_sources() {
         compact: false,
     };
 
-    let result = ExplainCapability::explain(&service.build_context(), request, None)
+    let result = ExplainCapability::explain(&service, request, None)
         .await
         .expect("explain completed");
 
@@ -188,7 +188,7 @@ async fn explain_populates_all_sources_field() {
         compact: false,
     };
 
-    let result = ExplainCapability::explain(&service.build_context(), request, None)
+    let result = ExplainCapability::explain(&service, request, None)
         .await
         .expect("explain completed");
 
@@ -228,7 +228,7 @@ async fn explain_includes_linked_episodes_via_shared_entity() {
 
     // Episode A
     let episode_a_id = IngestCapability::ingest(
-        &service.build_context(),
+        &service,
         memory_mcp::models::IngestRequest {
             source_type: "email".into(),
             source_id: "linked-ep-a".into(),
@@ -260,7 +260,7 @@ async fn explain_includes_linked_episodes_via_shared_entity() {
 
     // Episode B
     let episode_b_id = IngestCapability::ingest(
-        &service.build_context(),
+        &service,
         memory_mcp::models::IngestRequest {
             source_type: "email".into(),
             source_id: "linked-ep-b".into(),
@@ -334,7 +334,7 @@ async fn explain_includes_linked_episodes_via_shared_entity() {
         compact: false,
     };
 
-    let result = ExplainCapability::explain(&service.build_context(), request, None)
+    let result = ExplainCapability::explain(&service, request, None)
         .await
         .expect("explain completed");
 
@@ -375,7 +375,7 @@ async fn explain_when_fact_is_cited_then_access_count_increases() {
         .expect("add fact");
 
     let result = ExplainCapability::explain(
-        &service.build_context(),
+        &service,
         ExplainRequest {
             context_pack: vec![ExplainItem {
                 fact_id: Some(fact_id.clone()),
@@ -438,7 +438,7 @@ async fn explain_with_empty_source_episode_returns_validation_error() {
         compact: false,
     };
 
-    let result = ExplainCapability::explain(&service.build_context(), request, None).await;
+    let result = ExplainCapability::explain(&service, request, None).await;
 
     // Assert: Should return a validation error, not a SurrealDB parse error
     assert!(result.is_err(), "Expected error for empty source_episode");
@@ -491,7 +491,7 @@ async fn explain_with_context_items_missing_source_episode_returns_validation_er
         compact: false,
     };
 
-    let result = ExplainCapability::explain(&service.build_context(), request, None).await;
+    let result = ExplainCapability::explain(&service, request, None).await;
 
     assert!(result.is_err(), "Expected error for empty source_episode");
     let err = result.unwrap_err();
@@ -528,7 +528,7 @@ async fn explain_batch_shares_graph_insights() {
 
     // Episode A → fact with Alice
     let ep_a = IngestCapability::ingest(
-        &service.build_context(),
+        &service,
         IngestRequest {
             source_type: "note".into(),
             source_id: "batch-ep-a".into(),
@@ -558,7 +558,7 @@ async fn explain_batch_shares_graph_insights() {
 
     // Episode B → fact with same entity set (Alice + Bob)
     let ep_b = IngestCapability::ingest(
-        &service.build_context(),
+        &service,
         IngestRequest {
             source_type: "note".into(),
             source_id: "batch-ep-b".into(),
@@ -588,7 +588,7 @@ async fn explain_batch_shares_graph_insights() {
 
     // Explain both facts in a single batch
     let result = ExplainCapability::explain(
-        &service.build_context(),
+        &service,
         ExplainRequest {
             context_pack: vec![
                 ExplainItem {
@@ -639,7 +639,7 @@ async fn explain_batch_mixed_with_and_without_fact_ids() {
 
     // Episode with fact
     let ep_with = IngestCapability::ingest(
-        &service.build_context(),
+        &service,
         IngestRequest {
             source_type: "note".into(),
             source_id: "mixed-ep-1".into(),
@@ -673,7 +673,7 @@ async fn explain_batch_mixed_with_and_without_fact_ids() {
 
     // Episode without fact (raw episode explain)
     let ep_without = IngestCapability::ingest(
-        &service.build_context(),
+        &service,
         IngestRequest {
             source_type: "note".into(),
             source_id: "mixed-ep-2".into(),
@@ -688,7 +688,7 @@ async fn explain_batch_mixed_with_and_without_fact_ids() {
     .expect("ingest");
 
     let result = ExplainCapability::explain(
-        &service.build_context(),
+        &service,
         ExplainRequest {
             context_pack: vec![
                 ExplainItem {
@@ -731,7 +731,7 @@ async fn explain_empty_context_pack() {
     let service = common::make_service().await;
 
     let result = ExplainCapability::explain(
-        &service.build_context(),
+        &service,
         ExplainRequest {
             context_pack: vec![],
             compact: false,
@@ -753,7 +753,7 @@ async fn explain_skips_unknown_episode() {
     let service = common::make_service().await;
 
     let result = ExplainCapability::explain(
-        &service.build_context(),
+        &service,
         ExplainRequest {
             context_pack: vec![ExplainItem {
                 source_episode: "episode:nonexistent-99999".into(),

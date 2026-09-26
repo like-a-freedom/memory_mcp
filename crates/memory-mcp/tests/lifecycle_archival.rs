@@ -22,7 +22,7 @@ async fn archival_pass_processes_only_active_namespace() {
     let old_date = Utc::now() - Duration::days(150);
 
     let episode_id = IngestCapability::ingest(
-        &service.build_context(),
+        &service,
         memory_mcp::models::IngestRequest {
             source_type: "meeting".to_string(),
             source_id: "personal-archival-1".to_string(),
@@ -52,7 +52,7 @@ async fn archival_pass_processes_only_active_namespace() {
         .expect("add fact");
 
     InvalidateCapability::invalidate(
-        &service.build_context(),
+        &service,
         memory_mcp::models::InvalidateRequest {
             fact_id,
             reason: "prepare archival".to_string(),
@@ -83,7 +83,7 @@ async fn archival_pass_when_episode_fact_was_recently_accessed_then_skips_archiv
     let old_date = Utc::now() - Duration::days(150);
 
     let episode_id = IngestCapability::ingest(
-        &service.build_context(),
+        &service,
         memory_mcp::models::IngestRequest {
             source_type: "meeting".to_string(),
             source_id: "personal-archival-hot-1".to_string(),
@@ -113,7 +113,7 @@ async fn archival_pass_when_episode_fact_was_recently_accessed_then_skips_archiv
         .expect("add fact");
 
     InvalidateCapability::invalidate(
-        &service.build_context(),
+        &service,
         memory_mcp::models::InvalidateRequest {
             fact_id: fact_id.clone(),
             reason: "prepare archival".to_string(),
@@ -206,7 +206,7 @@ async fn archival_pass_archives_old_episodes_without_active_facts() {
     .await;
 
     InvalidateCapability::invalidate(
-        &service.build_context(),
+        &service,
         memory_mcp::models::InvalidateRequest {
             fact_id: fact_id.clone(),
             reason: "test invalidation".to_string(),
@@ -252,7 +252,7 @@ async fn archival_pass_respects_age_threshold() {
     .await;
 
     InvalidateCapability::invalidate(
-        &service.build_context(),
+        &service,
         memory_mcp::models::InvalidateRequest {
             fact_id,
             reason: "test".to_string(),
@@ -287,7 +287,7 @@ async fn archival_pass_batch_limit_respected() {
         .await;
 
         InvalidateCapability::invalidate(
-            &service.build_context(),
+            &service,
             memory_mcp::models::InvalidateRequest {
                 fact_id,
                 reason: "test".to_string(),

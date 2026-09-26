@@ -28,7 +28,7 @@ async fn embedded_invalidate_removes_fact_from_context() -> Result<(), Box<dyn s
     let as_of_before = Utc::now() + Duration::seconds(1);
 
     let context_before = AssembleContextCapability::assemble_context(
-        &service.build_context(),
+        &service,
         AssembleContextRequest {
             query: "ARR".to_string(),
             as_of: Some(as_of_before),
@@ -45,7 +45,7 @@ async fn embedded_invalidate_removes_fact_from_context() -> Result<(), Box<dyn s
     assert!(!context_before.is_empty());
 
     InvalidateCapability::invalidate(
-        &service.build_context(),
+        &service,
         InvalidateRequest {
             fact_id,
             reason: "Superseded".to_string(),
@@ -57,7 +57,7 @@ async fn embedded_invalidate_removes_fact_from_context() -> Result<(), Box<dyn s
 
     let as_of_after = Utc::now() + Duration::seconds(2);
     let context_after = AssembleContextCapability::assemble_context(
-        &service.build_context(),
+        &service,
         AssembleContextRequest {
             query: "ARR".to_string(),
             as_of: Some(as_of_after),
@@ -96,7 +96,7 @@ async fn embedded_invalidate_persists_bitemporal_close_and_reason()
         .await?;
 
     InvalidateCapability::invalidate(
-        &service.build_context(),
+        &service,
         InvalidateRequest {
             fact_id: fact_id.clone(),
             reason: "Superseded by a newer ARR report".to_string(),

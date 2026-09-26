@@ -26,7 +26,7 @@ async fn build_diff_reports_added_and_removed_facts_across_timepoints() {
     .await;
 
     InvalidateCapability::invalidate(
-        &service.build_context(),
+        &service,
         memory_mcp::models::InvalidateRequest {
             fact_id: left_fact.clone(),
             reason: "superseded".to_string(),

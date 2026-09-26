@@ -12,8 +12,8 @@
 
 use crate::error::MemoryError;
 use crate::models::Fact;
+use crate::service::context::RetrievalContext;
 use crate::service::episode::fact_from_value_or_wrapper;
-use crate::service::service_context::RetrievalContext;
 
 /// Collect facts linked via triples matching the given query text.
 ///

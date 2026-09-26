@@ -171,7 +171,7 @@ async fn execute_one_task(
     let service =
         crate::service::MemoryService::new(db, namespace.to_owned(), "info".into(), 100, 100)?
             .with_http_outbox();
-    let extraction = crate::tools::extract(&service.build_context(), params).await;
+    let extraction = crate::tools::extract(&service, params).await;
     match extraction {
         Ok(result) => {
             let value = serde_json::to_value(result).map_err(|error| {

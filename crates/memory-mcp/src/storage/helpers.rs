@@ -57,6 +57,20 @@ pub fn is_missing_index_error(message: &str) -> bool {
 /// discarded.
 pub type RecordLookup = Option<serde_json::Map<String, serde_json::Value>>;
 
+/// Normalise an owner-scoped single-record read into the record
+/// body the provenance helpers expect.
+///
+/// The owner-scoped accessors (`select_episode`, `select_fact`)
+/// return a JSON value; the provenance helpers work on the object
+/// form, so this is the one place the conversion happens. It sits
+/// with [`RecordLookup`] and [`require_record_kind`] because all
+/// three describe the same owner-scoped read discipline.
+pub fn owner_scoped_read(
+    read: Result<Option<serde_json::Value>, crate::error::MemoryError>,
+) -> Result<RecordLookup, crate::error::MemoryError> {
+    Ok(read?.and_then(|value| value.as_object().cloned()))
+}
+
 /// Require that a record id names a record of exactly `table`.
 ///
 /// The low-level accessors derive their target table from the

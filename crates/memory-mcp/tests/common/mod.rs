@@ -104,10 +104,10 @@ pub async fn ingest_episode(service: &MemoryService, source_id: &str, content: &
         t_ingested: None,
         policy_tags: vec![],
     };
-    let episode_id = IngestCapability::ingest(&service.build_context(), request, None)
+    let episode_id = IngestCapability::ingest(&service, request, None)
         .await
         .expect("ingest should succeed");
-    ExtractCapability::extract(&service.build_context(), &episode_id, None, None)
+    ExtractCapability::extract(&service, &episode_id, None, None)
         .await
         .expect("extract should succeed");
     episode_id
@@ -156,7 +156,7 @@ pub async fn seed_episode_backed_fact_with_source_id(
     source_id: &str,
 ) -> String {
     let episode_id = IngestCapability::ingest(
-        &service.build_context(),
+        &service,
         IngestRequest {
             source_type: "seed".to_string(),
             source_id: source_id.to_string(),
@@ -170,7 +170,7 @@ pub async fn seed_episode_backed_fact_with_source_id(
     .await
     .expect("seed episode should succeed");
 
-    let extracted = ExtractCapability::extract(&service.build_context(), &episode_id, None, None)
+    let extracted = ExtractCapability::extract(&service, &episode_id, None, None)
         .await
         .expect("seed extraction should succeed");
     let entity_links = extracted
@@ -222,7 +222,7 @@ pub async fn seed_fact_with_links_and_project(
     });
 
     let episode_id = IngestCapability::ingest(
-        &service.build_context(),
+        &service,
         IngestRequest {
             source_type: "seed".to_string(),
             source_id,

@@ -67,7 +67,7 @@ fn insert_shortest_hop(
 }
 
 async fn resolve_query_anchor_entities(
-    service: &crate::service::service_context::RetrievalContext,
+    service: &crate::service::context::RetrievalContext,
     raw_query: &str,
     lexical_facts: &[Fact],
 ) -> Result<BTreeMap<String, String>, MemoryError> {
@@ -97,7 +97,7 @@ async fn resolve_query_anchor_entities(
 }
 
 async fn walk_anchor_entities(
-    service: &crate::service::service_context::RetrievalContext,
+    service: &crate::service::context::RetrievalContext,
     cutoff_iso: &str,
     anchors: &BTreeMap<String, String>,
     max_hops: usize,
@@ -168,7 +168,7 @@ async fn walk_anchor_entities(
 }
 
 pub(crate) async fn collect_graph_facts(
-    service: &crate::service::service_context::RetrievalContext,
+    service: &crate::service::context::RetrievalContext,
     request: CollectGraphFactsRequest<'_>,
 ) -> Result<Vec<GraphCandidate>, MemoryError> {
     if request.raw_query.trim().is_empty() || request.max_hops == 0 {
@@ -374,7 +374,7 @@ mod tests {
         };
         let cutoff_iso = crate::service::normalize_dt(cutoff);
 
-        let retrieval = service.build_context().retrieval_context();
+        let retrieval = crate::service::capabilities::deps::AssembleContextDeps::from(&service);
         let anchors = resolve_query_anchor_entities(&retrieval, "Alice Stone", &[])
             .await
             .expect("resolve anchors");

@@ -281,7 +281,7 @@ impl ExplanationService {
         &self,
         episode_id: &str,
     ) -> Result<crate::storage::RecordLookup, MemoryError> {
-        crate::service::service_context::owner_scoped_read(
+        crate::storage::owner_scoped_read(
             crate::storage::EpisodeStoreClient::from_bound(self.db.clone())
                 .select_episode(episode_id)
                 .await,
@@ -292,7 +292,7 @@ impl ExplanationService {
         &self,
         fact_id: &str,
     ) -> Result<crate::storage::RecordLookup, MemoryError> {
-        crate::service::service_context::owner_scoped_read(
+        crate::storage::owner_scoped_read(
             crate::storage::FactStoreClient::from_bound(self.db.clone())
                 .select_fact(fact_id)
                 .await,

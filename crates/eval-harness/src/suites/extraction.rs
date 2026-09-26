@@ -75,7 +75,7 @@ async fn ingest_and_extract(
     content: &str,
 ) -> Result<memory_mcp::models::ExtractResult, memory_mcp::MemoryError> {
     let episode_id = IngestCapability::ingest(
-        &service.build_context(),
+        &service,
         IngestRequest {
             source_type: source_type.to_string(),
             source_id: source_id.to_string(),
@@ -90,7 +90,7 @@ async fn ingest_and_extract(
     )
     .await?;
 
-    ExtractCapability::extract(&service.build_context(), &episode_id, None, None).await
+    ExtractCapability::extract(&service, &episode_id, None, None).await
 }
 
 struct CaseResult {

@@ -179,7 +179,7 @@ async fn load_event(
 /// origin through provenance. No new LLM or second extraction implementation.
 async fn run_extraction(service: &MemoryService, episode_id: &str) -> Result<(), MemoryError> {
     crate::service::capabilities::extract::ExtractCapability::extract(
-        &service.build_context(),
+        service,
         episode_id,
         None,
         None,

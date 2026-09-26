@@ -475,7 +475,7 @@ pub(crate) struct CollectTemporalFactsRequest<'a> {
 }
 
 pub(crate) async fn collect_temporal_facts(
-    service: &crate::service::service_context::RetrievalContext,
+    service: &crate::service::context::RetrievalContext,
     request: CollectTemporalFactsRequest<'_>,
 ) -> Result<Vec<crate::models::Fact>, crate::error::MemoryError> {
     use crate::service::query::search_query_terms;

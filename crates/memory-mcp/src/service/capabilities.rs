@@ -11,122 +11,64 @@ pub mod resolve;
 /// `ServiceContext` and the tool handlers.
 mod tool_context_impl;
 
-use crate::error::MemoryError;
-use crate::service::service_context::ServiceContext;
+/// The per-capability dependency structs, so a capability declares
+/// what it uses instead of receiving the shared container.
+pub(crate) mod deps;
 
-/// Adapts the shared token-bucket limiter to the memory-owned
-/// rate-limit port.
+use std::sync::Arc;
+
+use crate::error::MemoryError;
+use crate::service::util::RateLimiter;
+
+/// The rate-limit policy a capability charges, as a dependency
+/// rather than a field reached through the shared container.
 ///
-/// Capabilities reach the limiter only through this adapter, so
-/// the access policy is charged in exactly one place.
-pub(crate) struct ServiceRateLimitPort<'a> {
-    pub(crate) ctx: &'a ServiceContext,
+/// Capabilities reach the limiter only through this adapter, so the
+/// access policy is charged in exactly one place.
+pub(crate) struct RateLimitDeps<'a> {
+    pub(crate) rate_limiter: &'a Arc<RateLimiter>,
 }
 
-impl crate::memory::api::RateLimitPort for ServiceRateLimitPort<'_> {
+impl crate::memory::api::RateLimitPort for RateLimitDeps<'_> {
     fn check(&self, caller: Option<&str>) -> Result<(), MemoryError> {
         let access = caller.map(|caller_id| crate::models::AccessPayload {
             caller_id: Some(caller_id.to_owned()),
             ..Default::default()
         });
-        self.ctx.enforce_rate_limit(access.as_ref())
+        // `check_access` is the single enforcement point, exactly as
+        // the container's `enforce_rate_limit` was, so the bucket is
+        // charged once and a `None` caller still costs one call.
+        self.rate_limiter.check_access(access.as_ref())
     }
 }
 
 #[cfg(test)]
 pub(crate) mod test_support {
     //! Shared test helpers for capability unit tests.
-    use std::num::NonZeroUsize;
     use std::sync::Arc;
 
-    use lru::LruCache;
-    use tokio::sync::{Mutex, RwLock};
-
-    use crate::logging::StdoutLogger;
-    use crate::service::embedding::DisabledEmbeddingProvider;
-    use crate::service::entity::EntityService;
-    use crate::service::entity_resolution::EntityResolver;
-    use crate::service::explanation::ExplanationService;
-    use crate::service::ingestion::IngestionService;
+    use crate::service::MemoryService;
     use crate::service::mock_db::MockDbClient;
-    use crate::service::service_context::ServiceContext;
-    use crate::service::triple_extractor::RuleBasedTripleExtractor;
-    use crate::service::util::RateLimiter;
-    use crate::storage::claims::SurrealClaimStore;
 
-    /// Builds a `ServiceContext` wired to a `MockDbClient` and no-op
-    /// providers, suitable for capability unit tests.
-    pub(crate) fn make_context_base(db: MockDbClient) -> ServiceContext {
-        make_context_with_rate_limiter(db, Arc::new(RateLimiter::new(100, 100)))
+    /// Builds a service wired to a `MockDbClient`, suitable for
+    /// capability unit tests.
+    ///
+    /// This is the same builder production uses, so a test exercises
+    /// the real composition rather than a hand-assembled stand-in.
+    pub(crate) fn make_service_base(db: MockDbClient) -> MemoryService {
+        make_service_with_rate_limit(db, 100, 100)
     }
 
-    /// Builds a capability test context with one limiter shared by the
-    /// context and the service that owns ingest enforcement.
-    pub(crate) fn make_context_with_rate_limiter(
+    /// A service whose token bucket is `rps`/`burst`, for the
+    /// rate-limit tests that need a bucket they can exhaust.
+    pub(crate) fn make_service_with_rate_limit(
         db: MockDbClient,
-        rate_limiter: Arc<RateLimiter>,
-    ) -> ServiceContext {
+        rps: i32,
+        burst: i32,
+    ) -> MemoryService {
         let db_client: Arc<dyn crate::storage::DbClient> = Arc::new(db);
-        ServiceContext {
-            db_client: db_client.clone(),
-            active_namespace: "org".to_string(),
-            logger: StdoutLogger::new("warn"),
-            rate_limiter: rate_limiter.clone(),
-            ingestion_service: IngestionService::new(
-                db_client.clone(),
-                "org".to_string(),
-                StdoutLogger::new("warn"),
-                rate_limiter,
-            ),
-            explanation_service: ExplanationService::new(
-                db_client.clone(),
-                StdoutLogger::new("warn"),
-                "org".to_string(),
-            ),
-            entity_resolver: EntityResolver::new(0.85),
-            entity_service: EntityService::new(db_client.clone(), "org"),
-            entity_extractor: Arc::new(
-                crate::service::entity_extraction::RegexEntityExtractor::new()
-                    .expect("regex extractor"),
-            )
-                as Arc<dyn crate::service::entity_extraction::EntityExtractor>,
-            embedding_service: crate::service::embedding_service::EmbeddingService::new(
-                db_client.clone(),
-                "org",
-                StdoutLogger::new("warn"),
-                Arc::new(DisabledEmbeddingProvider::new(0))
-                    as Arc<dyn crate::service::embedding::EmbeddingProvider>,
-                0.0,
-                None,
-                None,
-                None,
-                Arc::new(RwLock::new(LruCache::new(
-                    NonZeroUsize::new(64).expect("valid size"),
-                ))),
-                Arc::new(Mutex::new(LruCache::new(
-                    NonZeroUsize::new(64).expect("valid size"),
-                ))),
-                Arc::new(crate::service::embedding::task_runner::BackgroundTaskRunner::new()),
-            ),
-            fact_service: crate::service::fact::FactService::new(
-                crate::storage::FactStoreClient::new(db_client.clone(), "org"),
-            ),
-            triple_extractor: Arc::new(RuleBasedTripleExtractor::new())
-                as Arc<dyn crate::service::triple_extractor::TripleExtractor>,
-            context_cache: Arc::new(RwLock::new(LruCache::new(
-                NonZeroUsize::new(64).expect("valid size"),
-            ))),
-            claim_store: None,
-            query_logging_enabled: false,
-            query_log_retention_days: 7,
-            claim_service: crate::service::claims::projection::ClaimService::new(Arc::new(
-                SurrealClaimStore::new(db_client.clone(), "org"),
-            )),
-            triple_extraction_semaphore: Arc::new(tokio::sync::Semaphore::new(
-                crate::service::TRIPLE_EXTRACTION_MAX_CONCURRENCY,
-            )),
-            #[cfg(feature = "streamable-http")]
-            outbox_enabled: false,
-        }
+        MemoryService::new(db_client, "org".to_string(), "warn".to_string(), rps, burst)
+            .expect("test service builds from a mock db")
     }
+
 }

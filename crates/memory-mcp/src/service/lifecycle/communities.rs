@@ -14,7 +14,7 @@ use tokio_util::sync::CancellationToken;
 use crate::service::MemoryError;
 use crate::service::MemoryService;
 use crate::service::community::converge_communities_from_active_edges;
-use crate::service::service_context::ServiceContext;
+
 
 /// Spawns the community recomputation background task.
 ///
@@ -76,11 +76,12 @@ pub fn spawn_community_worker(
 
 /// Rebuilds the community table from all currently active edges.
 pub async fn run_community_rebuild_pass(service: &MemoryService) -> Result<usize, MemoryError> {
-    let ctx = service.build_context();
-    run_community_rebuild_pass_inner(&ctx).await
+    run_community_rebuild_pass_inner(service).await
 }
 
-async fn run_community_rebuild_pass_inner(service: &ServiceContext) -> Result<usize, MemoryError> {
+async fn run_community_rebuild_pass_inner(
+    service: &MemoryService,
+) -> Result<usize, MemoryError> {
     let cutoff = crate::service::normalize_dt(Utc::now());
     let updated_at = crate::service::normalize_dt(Utc::now());
     let mut rebuilt_total = 0;
@@ -104,7 +105,7 @@ async fn run_community_rebuild_pass_inner(service: &ServiceContext) -> Result<us
 }
 
 async fn rebuild_namespace_communities(
-    service: &ServiceContext,
+    service: &MemoryService,
     namespace: &str,
     cutoff: &str,
     updated_at: &str,
@@ -117,7 +118,7 @@ async fn rebuild_namespace_communities(
 }
 
 async fn rebuild_namespace_communities_with_batch_size(
-    service: &ServiceContext,
+    service: &MemoryService,
     namespace: &str,
     cutoff: &str,
     updated_at: &str,
@@ -225,15 +226,16 @@ async fn collect_active_edge_records(
 }
 
 async fn build_communities_from_active_edges(
-    service: &ServiceContext,
+    service: &MemoryService,
     edge_records: &[serde_json::Value],
 ) -> Result<Vec<RebuiltCommunity>, MemoryError> {
     let memberships = converge_communities_from_active_edges(edge_records);
+    let deps = crate::service::capabilities::deps::ExtractDeps::from(service);
 
     let mut rebuilt = Vec::new();
     for membership in memberships {
         let summary =
-            super::super::episode::build_community_summary(service, &membership.member_entities)
+            super::super::episode::build_community_summary(&deps, &membership.member_entities)
                 .await?;
 
         rebuilt.push(RebuiltCommunity {

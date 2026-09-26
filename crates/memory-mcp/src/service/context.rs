@@ -11,7 +11,12 @@ use serde_json::json;
 use crate::logging::LogLevel;
 use crate::models::{AccessPayload, AssembleContextRequest, AssembledContextItem};
 
-use super::service_context::{RetrievalContext, ServiceContext};
+use crate::service::capabilities::deps::AssembleContextDeps;
+
+/// The retrieval pipeline's dependency set. Named here so the
+/// retrieval helper modules read as depending on a retrieval seam
+/// rather than on a shared container.
+pub(crate) type RetrievalContext = AssembleContextDeps;
 use super::{log_event, normalize_dt};
 use crate::error::MemoryError;
 
@@ -80,9 +85,9 @@ async fn track_fact_accesses(
     }
 }
 
-/// Enters the narrow retrieval seam for one context assembly.
+/// Enters the retrieval seam for one context assembly.
 pub async fn assemble_context(
-    ctx: &ServiceContext,
+    ctx: &AssembleContextDeps,
     request: AssembleContextRequest,
 ) -> Result<Vec<AssembledContextItem>, MemoryError> {
     let access = AccessPayload::from_payload(request.access.clone());
@@ -93,23 +98,22 @@ pub async fn assemble_context(
     };
     crate::memory::api::recall_context(
         &RetrievalPort { ctx, request },
-        &crate::service::capabilities::ServiceRateLimitPort { ctx },
+        &crate::service::capabilities::RateLimitDeps {
+            rate_limiter: &ctx.rate_limiter,
+        },
         &command,
     )
     .await
 }
 
-/// Adapts the legacy multi-tier retrieval pipeline to the
-/// memory-owned recall port.
+/// Adapts the multi-tier retrieval pipeline to the memory-owned
+/// recall port.
 ///
-/// The port is the seam: the entry point above only charges
-/// the access policy, and everything below runs against the
-/// already-narrowed `RetrievalContext`.
-///
-/// Expiry removal: Phase 5, when the retrieval pipeline takes
-/// the narrow context directly instead of the shared one.
+/// The port is the seam: the entry point above only charges the
+/// access policy, and everything below runs against the
+/// already-narrowed retrieval dependencies.
 struct RetrievalPort<'a> {
-    ctx: &'a ServiceContext,
+    ctx: &'a AssembleContextDeps,
     request: AssembleContextRequest,
 }
 
@@ -119,12 +123,11 @@ impl crate::memory::api::ContextRetrievalPort for RetrievalPort<'_> {
         &self,
         _command: &crate::memory::api::RecallCommand,
     ) -> Result<Vec<AssembledContextItem>, MemoryError> {
-        let retrieval = self.ctx.retrieval_context();
-        assemble_context_inner(&retrieval, self.request.clone()).await
+        assemble_context_inner(self.ctx, self.request.clone()).await
     }
 }
 
-/// Assembles context after the outer service adapter has entered the narrow
+/// Assembles context after the outer service adapter has entered the
 /// retrieval seam.
 ///
 /// Orchestrates: parameter preparation → cache check → view-mode dispatch
@@ -526,7 +529,7 @@ mod tests {
         .expect("service");
 
         let items = assemble_context(
-            &service.build_context(),
+            &crate::service::capabilities::deps::AssembleContextDeps::from(&service),
             AssembleContextRequest {
                 query: "atlas launch checklist".to_string(),
                 as_of: None,
@@ -630,7 +633,7 @@ mod tests {
         .expect("service");
 
         let items = assemble_context(
-            &service.build_context(),
+            &crate::service::capabilities::deps::AssembleContextDeps::from(&service),
             AssembleContextRequest {
                 query: "hello world".to_string(),
                 as_of: Some(Utc::now()),
@@ -781,7 +784,7 @@ mod tests {
         .expect("service");
 
         let results = assemble_context(
-            &service.build_context(),
+            &crate::service::capabilities::deps::AssembleContextDeps::from(&service),
             crate::models::AssembleContextRequest {
                 query: "alice atlas".to_string(),
                 as_of: Some(Utc::now()),
@@ -817,7 +820,7 @@ mod tests {
         .expect("service");
 
         let results = assemble_context(
-            &service.build_context(),
+            &crate::service::capabilities::deps::AssembleContextDeps::from(&service),
             crate::models::AssembleContextRequest {
                 query: "alice platform".to_string(),
                 as_of: Some(Utc::now()),
@@ -945,7 +948,7 @@ mod tests {
         .expect("service");
 
         let results = assemble_context(
-            &service.build_context(),
+            &crate::service::capabilities::deps::AssembleContextDeps::from(&service),
             crate::models::AssembleContextRequest {
                 query: "atlas launch".to_string(),
                 as_of: Some(Utc::now()),
@@ -1095,7 +1098,7 @@ mod tests {
         .expect("service");
 
         let results = assemble_context(
-            &service.build_context(),
+            &crate::service::capabilities::deps::AssembleContextDeps::from(&service),
             crate::models::AssembleContextRequest {
                 query: "launch workstream".to_string(),
                 as_of: Some(Utc::now()),
@@ -1264,7 +1267,7 @@ mod tests {
         .expect("service");
 
         let results = assemble_context(
-            &service.build_context(),
+            &crate::service::capabilities::deps::AssembleContextDeps::from(&service),
             crate::models::AssembleContextRequest {
                 query: "launch workstream".to_string(),
                 as_of: Some(Utc::now()),
@@ -1399,7 +1402,7 @@ mod tests {
         .expect("service");
 
         let results = assemble_context(
-            &service.build_context(),
+            &crate::service::capabilities::deps::AssembleContextDeps::from(&service),
             crate::models::AssembleContextRequest {
                 query: "salary raise".to_string(),
                 as_of: Some(Utc::now()),
@@ -1485,7 +1488,7 @@ mod tests {
         .expect("service");
 
         let results = assemble_context(
-            &service.build_context(),
+            &crate::service::capabilities::deps::AssembleContextDeps::from(&service),
             crate::models::AssembleContextRequest {
                 query: "orphan community query".to_string(),
                 as_of: Some(Utc::now()),
@@ -1561,7 +1564,7 @@ mod tests {
         .expect("service");
 
         let results = assemble_context(
-            &service.build_context(),
+            &crate::service::capabilities::deps::AssembleContextDeps::from(&service),
             crate::models::AssembleContextRequest {
                 query: "Which hotel is better if I want somewhere quieter away from nightlife?"
                     .to_string(),
@@ -1649,7 +1652,7 @@ mod tests {
         .expect("service");
 
         let results = assemble_context(
-            &service.build_context(),
+            &crate::service::capabilities::deps::AssembleContextDeps::from(&service),
             crate::models::AssembleContextRequest {
                 query: "Which venue would work best for my conference?".to_string(),
                 as_of: Some(

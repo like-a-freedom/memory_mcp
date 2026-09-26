@@ -134,7 +134,7 @@ impl EvalSuite for ResponseSizeSuite {
             };
 
             let items = match AssembleContextCapability::assemble_context(
-                &service.build_context(),
+                &service,
                 request_verbose,
             )
             .await
@@ -165,7 +165,7 @@ impl EvalSuite for ResponseSizeSuite {
                 })
                 .collect();
             let explain_items = match ExplainCapability::explain(
-                &service.build_context(),
+                &service,
                 memory_mcp::models::ExplainRequest {
                     context_pack: explain_input,
                     compact: false,

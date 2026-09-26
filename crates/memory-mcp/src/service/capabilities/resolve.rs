@@ -2,7 +2,7 @@
 
 use crate::error::MemoryError;
 use crate::models::{AccessPayload, EntityCandidate};
-use crate::service::service_context::ServiceContext;
+use crate::service::capabilities::deps::ResolveDeps;
 
 /// Capability for fuzzy entity resolution and deduplication.
 pub struct ResolveCapability;
@@ -13,16 +13,19 @@ impl ResolveCapability {
     /// Uses fuzzy matching via `EntityResolver` to deduplicate entities
     /// with similar names (e.g., "Иван Петров" vs "I. Petrov").
     pub async fn resolve(
-        ctx: &ServiceContext,
+        service: &crate::service::MemoryService,
         candidate: EntityCandidate,
         access: Option<AccessPayload>,
     ) -> Result<String, MemoryError> {
+        let deps = ResolveDeps::from(service);
         let (entity_id, _was_created) = crate::memory::api::resolve_entity(
             &ResolverPort {
-                resolver: &ctx.entity_resolver,
-                entity_service: &ctx.entity_service,
+                resolver: &deps.entity_resolver,
+                entity_service: &deps.entity_service,
             },
-            &super::ServiceRateLimitPort { ctx },
+            &super::RateLimitDeps {
+                rate_limiter: &deps.rate_limiter,
+            },
             &crate::memory::api::ResolveCommand {
                 candidate,
                 caller_id: access.and_then(|payload| payload.caller_id),
@@ -60,7 +63,7 @@ mod tests {
     use super::*;
     use crate::models::EntityCandidate;
     use crate::service::MemoryService;
-    use crate::service::capabilities::test_support::make_context_base;
+    use crate::service::capabilities::test_support::make_service_base;
     use crate::service::mock_db::MockDbClient;
     use crate::storage::{DbClient, SurrealDbClient};
     use serde_json::{Value, json};
@@ -69,13 +72,13 @@ mod tests {
     #[tokio::test]
     async fn resolve_delegates_to_entity_resolver() {
         let db = MockDbClient::new();
-        let ctx = make_context_base(db);
+        let svc = make_service_base(db);
         let candidate = EntityCandidate {
             entity_type: "person".to_string(),
             canonical_name: "Alice Smith".to_string(),
             aliases: vec!["Ali".to_string()],
         };
-        let result = ResolveCapability::resolve(&ctx, candidate, None).await;
+        let result = ResolveCapability::resolve(&svc, candidate, None).await;
         assert!(result.is_ok(), "resolve must succeed with a mock db");
         let entity_id = result.unwrap();
         assert!(!entity_id.is_empty(), "entity_id must be non-empty");
@@ -84,7 +87,7 @@ mod tests {
     #[tokio::test]
     async fn resolve_respects_rate_limit() {
         let db = MockDbClient::new();
-        let ctx = make_context_base(db);
+        let svc = make_service_base(db);
         // Exhaust the rate limiter (0 allowed calls).
         let access = AccessPayload {
             caller_id: Some("spammer".to_string()),
@@ -92,14 +95,14 @@ mod tests {
         };
         // RateLimiter::new(100, 100) allows 100 calls; exhaust it.
         for _ in 0..100 {
-            let _ = ctx.rate_limiter.allow("spammer");
+            let _ = svc.rate_limiter.allow("spammer");
         }
         let candidate = EntityCandidate {
             entity_type: "person".to_string(),
             canonical_name: "Bob".to_string(),
             aliases: vec![],
         };
-        let result = ResolveCapability::resolve(&ctx, candidate, Some(access)).await;
+        let result = ResolveCapability::resolve(&svc, candidate, Some(access)).await;
         assert!(result.is_err(), "rate-limited resolve must fail");
     }
 
@@ -229,7 +232,7 @@ mod tests {
         .unwrap();
 
         let resolved = ResolveCapability::resolve(
-            &service.build_context(),
+            &(service).into(),
             EntityCandidate {
                 entity_type: "person".to_string(),
                 canonical_name: "Dima Ivanov".to_string(),

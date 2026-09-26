@@ -10,7 +10,7 @@ async fn lifecycle_view_and_archive_restore_flow_are_service_backed() {
     let request_time = Utc.with_ymd_and_hms(2026, 1, 10, 9, 0, 0).unwrap();
 
     let episode_id = IngestCapability::ingest(
-        &service.build_context(),
+        &service,
         memory_mcp::models::IngestRequest {
             source_type: "meeting".to_string(),
             source_id: "lifecycle-archive-1".to_string(),

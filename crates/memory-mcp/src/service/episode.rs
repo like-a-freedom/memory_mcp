@@ -588,7 +588,7 @@ mod tests {
         tokio::task::yield_now().await;
 
         let _ = extract_entities(
-            &service.build_context(),
+            &crate::service::capabilities::deps::ExtractDeps::from(&service),
             "episode:blocking-test",
             "Atlas project status",
             None,
@@ -711,7 +711,7 @@ mod tests {
         .unwrap();
 
         let connected = collect_connected_entity_component(
-            &service.build_context(),
+            &crate::service::capabilities::deps::ExtractDeps::from(&service),
             &["entity:alice".to_string()],
         )
         .await
@@ -806,7 +806,7 @@ mod tests {
         .unwrap();
 
         let _ = find_overlapping_communities(
-            &service.build_context(),
+            &crate::service::capabilities::deps::ExtractDeps::from(&service),
             &["entity:alice".to_string(), "entity:bob".to_string()],
         )
         .await;

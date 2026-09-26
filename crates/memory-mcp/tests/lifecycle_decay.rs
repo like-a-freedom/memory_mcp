@@ -275,7 +275,7 @@ async fn decay_pass_skips_already_invalidated_facts() {
 
     // Pre-invalidate the fact
     InvalidateCapability::invalidate(
-        &service.build_context(),
+        &service,
         memory_mcp::models::InvalidateRequest {
             fact_id: fact_id.clone(),
             reason: "test pre-invalidation".to_string(),

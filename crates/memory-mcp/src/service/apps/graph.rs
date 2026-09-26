@@ -53,7 +53,7 @@ impl MemoryService {
     ) -> Result<String, MemoryError> {
         use crate::service::capabilities::resolve::ResolveCapability;
         ResolveCapability::resolve(
-            &self.build_context(),
+            self,
             crate::models::EntityCandidate {
                 entity_type: entity_type.to_string(),
                 canonical_name: name.to_string(),
@@ -85,7 +85,11 @@ impl MemoryService {
             t_invalid: None,
             t_invalid_ingested: None,
         };
-        crate::service::episode::store_edge(&self.build_context(), &edge).await
+        crate::service::episode::store_edge(
+            &crate::service::capabilities::deps::ExtractDeps::from(self),
+            &edge,
+        )
+        .await
     }
 }
 
@@ -1267,5 +1271,15 @@ mod tests {
             .relate(&from_id, "works_at", &to_id)
             .await
             .expect("relate entities");
+    }
+}
+
+impl GraphContext for crate::service::capabilities::deps::AssembleContextDeps {
+    fn app_store(&self) -> crate::storage::AppStoreClient {
+        self.app_store.clone()
+    }
+
+    fn logger(&self) -> &StdoutLogger {
+        &self.logger
     }
 }

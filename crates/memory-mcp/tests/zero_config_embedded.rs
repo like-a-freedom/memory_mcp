@@ -126,7 +126,7 @@ async fn zero_config_anno_creates_no_model_cache_and_round_trips() {
     );
 
     let episode_id = IngestCapability::ingest(
-        &service.build_context(),
+        &service,
         memory_mcp::models::IngestRequest {
             source_type: "test".to_string(),
             source_id: "zero-config-1".to_string(),
@@ -140,7 +140,7 @@ async fn zero_config_anno_creates_no_model_cache_and_round_trips() {
     .await
     .expect("ingest succeeds");
 
-    let extracted = ExtractCapability::extract(&service.build_context(), &episode_id, None, None)
+    let extracted = ExtractCapability::extract(&service, &episode_id, None, None)
         .await
         .expect("extract succeeds");
     assert!(
@@ -154,7 +154,7 @@ async fn zero_config_anno_creates_no_model_cache_and_round_trips() {
     );
 
     let recalled = AssembleContextCapability::assemble_context(
-        &service.build_context(),
+        &service,
         memory_mcp::models::AssembleContextRequest {
             query: "Who presented Project Atlas?".to_string(),
             fact_types: Vec::new(),

@@ -231,9 +231,10 @@ impl FactService {
 // `add_fact` orchestrates the full fact-creation pipeline: validation,
 // index-key building, embedding generation (with transient-failure background
 // retry), fact persistence, cache invalidation, triple extraction, and claim
-// projection. It lives on `FactService` but takes `&ServiceContext` as the seam
-// that bundles the infrastructure handles (embedding service, entity lookups,
-// claim service, logger, and the bound Active Namespace) it needs.
+// projection. It lives on `FactService` but takes `&ExtractDeps`, the
+// seam that bundles exactly the infrastructure handles it needs
+// (embedding service, entity lookups, claim service, logger, and the
+// bound Active Namespace).
 
 impl FactService {
     /// Adds a new fact, orchestrating embedding generation, triple extraction,
@@ -241,11 +242,11 @@ impl FactService {
     ///
     /// This is the full fact-creation entry point. The persistence core is
     /// delegated to [`FactService::create_fact`]; this method handles the
-    /// surrounding orchestration previously held on `ServiceContext`.
+    /// surrounding orchestration previously held on the container.
     #[allow(clippy::too_many_arguments)]
     pub(crate) async fn add_fact(
         &self,
-        ctx: &crate::service::service_context::ServiceContext,
+        ctx: &crate::service::capabilities::deps::ExtractDeps,
         fact_type: &str,
         content: &str,
         quote: &str,
@@ -416,7 +417,7 @@ impl FactService {
     /// state held on the context.
     fn build_embedding_payload(
         &self,
-        ctx: &crate::service::service_context::ServiceContext,
+        ctx: &crate::service::capabilities::deps::ExtractDeps,
         embedding: Vec<f64>,
     ) -> Result<EmbeddingPayload, MemoryError> {
         let provider = ctx.embedding_service.embedding_provider();

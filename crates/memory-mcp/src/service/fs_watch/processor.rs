@@ -231,10 +231,9 @@ pub async fn process_claimed_revision(
     // Phase 2: extract, retried for transient model/extractor failures.
     let extract_outcome = retry_until_settled("extract", MAX_PROCESSOR_ATTEMPTS, telemetry, || {
         let episode_id = episode_id.clone();
-        let context = service.build_context();
         async move {
             crate::service::capabilities::extract::ExtractCapability::extract(
-                &context,
+                service,
                 &episode_id,
                 None,
                 None,

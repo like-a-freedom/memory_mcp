@@ -128,7 +128,7 @@ fn bench_default_service_probe(c: &mut Criterion) {
                 rt.block_on(async {
                     black_box(
                         ExtractCapability::extract(
-                            &service.build_context(),
+                            &service,
                             &episode_id,
                             None,
                             None,

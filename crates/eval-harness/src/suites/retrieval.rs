@@ -121,7 +121,7 @@ impl LocalRetrievalSuite {
 
         let as_of = case_as_of(case);
         let items = match AssembleContextCapability::assemble_context(
-            &service.build_context(),
+            &service,
             memory_mcp::models::AssembleContextRequest {
                 query: case.query.clone(),
                 as_of: Some(as_of),

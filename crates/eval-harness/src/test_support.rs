@@ -65,7 +65,7 @@ pub async fn make_service_with_client() -> (MemoryService, Arc<SurrealDbClient>)
 /// The request shape every bench used to hand-roll lives here.
 pub async fn ingest_probe(service: &MemoryService, source_id: &str, content: &str) -> String {
     IngestCapability::ingest(
-        &service.build_context(),
+        &service,
         IngestRequest {
             source_type: "bench".into(),
             source_id: source_id.to_string(),
@@ -156,7 +156,7 @@ pub async fn seed_fact_with_links(
         .unwrap_or_else(|| format!("seed:{}", normalize_text(content)));
 
     let episode_id = IngestCapability::ingest(
-        &service.build_context(),
+        &service,
         IngestRequest {
             source_type: "seed".to_string(),
             source_id,

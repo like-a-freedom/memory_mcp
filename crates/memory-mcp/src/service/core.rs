@@ -1,6 +1,5 @@
 //! MemoryService implementation - core service orchestration.
 
-#[cfg(test)]
 use std::sync::Arc;
 
 use chrono::{DateTime, Utc};
@@ -64,46 +63,33 @@ impl MemoryService {
         )
     }
 
-    /// Builds a `ServiceContext` from this service's fields.
+    /// The embedding service bound to the current runtime state.
     ///
-    /// Used by capability modules and tools that need a narrow reference
-    /// instead of `&self`.
-    pub fn build_context(&self) -> super::service_context::ServiceContext {
-        let embedding_state = self.embedding_runtime_snapshot();
-        super::service_context::ServiceContext {
-            db_client: self.db_client.clone(),
-            active_namespace: self.active_namespace.clone(),
-            logger: self.logger.clone(),
-            rate_limiter: self.rate_limiter.clone(),
-            ingestion_service: self.ingestion_service.clone(),
-            explanation_service: self.explanation_service.clone(),
-            entity_resolver: self.entity_resolver.clone(),
-            entity_service: self.entity_service.clone(),
-            entity_extractor: self.entity_extractor.clone(),
-            embedding_service: super::embedding_service::EmbeddingService::new(
-                self.db_client.clone(),
-                self.active_namespace.clone(),
-                self.logger.clone(),
-                embedding_state.provider,
-                self.embedding_similarity_threshold,
-                embedding_state.signature,
-                embedding_state.model,
-                embedding_state.dimension,
-                self.context_cache.clone(),
-                self.query_embedding_cache.clone(),
-                self.task_runner.clone(),
-            ),
-            fact_service: self.fact_service.clone(),
-            triple_extractor: self.triple_extractor.clone(),
-            context_cache: self.context_cache.clone(),
-            claim_store: Some(self.claim_service.store.clone()),
-            query_logging_enabled: self.query_logging_enabled,
-            query_log_retention_days: self.query_log_retention_days,
-            claim_service: self.claim_service.clone(),
-            triple_extraction_semaphore: self.triple_extraction_semaphore.clone(),
-            #[cfg(feature = "streamable-http")]
-            outbox_enabled: self.outbox_enabled,
-        }
+    /// The provider, signature and dimension are read from the live
+    /// runtime snapshot, so a runtime that swapped its target is
+    /// reflected without rebuilding the service.
+    pub(crate) fn embedding_service(&self) -> super::embedding_service::EmbeddingService {
+        let state = self.embedding_runtime_snapshot();
+        super::embedding_service::EmbeddingService::new(
+            self.db_client.clone(),
+            self.active_namespace.clone(),
+            self.logger.clone(),
+            state.provider,
+            self.embedding_similarity_threshold,
+            state.signature,
+            state.model,
+            state.dimension,
+            self.context_cache.clone(),
+            self.query_embedding_cache.clone(),
+            self.task_runner.clone(),
+        )
+    }
+
+    /// The claim store behind the claim service. Present whenever the
+    /// claim pipeline is wired, which is the condition the
+    /// invalidation use case checks before closing derived claims.
+    pub(crate) fn claim_store(&self) -> Option<Arc<dyn crate::storage::claims::ClaimStore>> {
+        Some(self.claim_service.store.clone())
     }
 
     /// Public helper for tool-level logging.
@@ -164,10 +150,10 @@ impl MemoryService {
         policy_tags: Vec<String>,
         provenance: crate::models::Provenance,
     ) -> Result<String, MemoryError> {
-        let ctx = self.build_context();
-        ctx.fact_service
+        let deps = crate::service::capabilities::deps::ExtractDeps::from(self);
+        self.fact_service
             .add_fact(
-                &ctx,
+                &deps,
                 fact_type,
                 content,
                 quote,
@@ -360,18 +346,35 @@ impl MemoryService {
         Ok(())
     }
 
+    /// Read one episode record, refusing an id that names another
+    /// kind.
     pub(crate) async fn find_episode_record(
         &self,
         episode_id: &str,
     ) -> Result<crate::storage::RecordLookup, MemoryError> {
-        self.build_context().find_episode_record(episode_id).await
+        crate::storage::owner_scoped_read(
+            crate::storage::EpisodeStoreClient::new(
+                self.db_client.clone(),
+                self.active_namespace.clone(),
+            )
+            .select_episode(episode_id)
+            .await,
+        )
     }
 
+    /// Read one fact record, refusing an id that names another kind.
     pub(crate) async fn find_fact_record(
         &self,
         fact_id: &str,
     ) -> Result<crate::storage::RecordLookup, MemoryError> {
-        self.build_context().find_fact_record(fact_id).await
+        crate::storage::owner_scoped_read(
+            crate::storage::FactStoreClient::new(
+                self.db_client.clone(),
+                self.active_namespace.clone(),
+            )
+            .select_fact(fact_id)
+            .await,
+        )
     }
 }
 
@@ -391,9 +394,9 @@ impl<'a> super::agent_memory::recall::RecallPipeline for ProductionRecallPipelin
         &self,
         request: crate::models::AssembleContextRequest,
     ) -> Result<Vec<crate::models::AssembledContextItem>, MemoryError> {
-        let ctx = self.service.build_context();
         super::capabilities::assemble_context::AssembleContextCapability::assemble_context(
-            &ctx, request,
+            self.service,
+            request,
         )
         .await
     }
@@ -517,20 +520,19 @@ mod tests {
             Some(DEFAULT_EMBEDDING_DIMENSION),
         ));
 
-        let context = service.build_context();
+        let embedding = service.embedding_service();
         assert_eq!(
-            context
-                .embedding_service
+            embedding
                 .embedding_provider()
                 .provider_name(),
             "test"
         );
         assert_eq!(
-            context.embedding_service.current_embedding_signature(),
+            embedding.current_embedding_signature(),
             Some("embsig:test")
         );
         assert_eq!(
-            context.embedding_service.current_embedding_dimension(),
+            embedding.current_embedding_dimension(),
             Some(DEFAULT_EMBEDDING_DIMENSION)
         );
     }
@@ -779,9 +781,8 @@ mod tests {
             Some(DEFAULT_EMBEDDING_DIMENSION),
         ));
 
-        let ctx = service.build_context();
-        let first = ctx
-            .embedding_service
+        let first = service
+            .embedding_service()
             .generate_query_embedding_with_background("salary raise")
             .await
             .expect("transient failure should degrade to background mode");
@@ -789,8 +790,8 @@ mod tests {
 
         tokio::time::timeout(Duration::from_secs(2), async {
             loop {
-                if ctx
-                    .embedding_service
+                if service
+                    .embedding_service()
                     .cached_query_embedding("salary raise")
                     .await
                     .is_some()
@@ -803,8 +804,8 @@ mod tests {
         .await
         .expect("background query embedding should populate cache");
 
-        let second = ctx
-            .embedding_service
+        let second = service
+            .embedding_service()
             .generate_query_embedding_with_background("salary raise")
             .await
             .expect("cached embedding");

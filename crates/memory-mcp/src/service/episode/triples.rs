@@ -7,7 +7,7 @@
 use serde_json::json;
 
 use crate::logging::LogLevel;
-use crate::service::service_context::ServiceContext;
+use crate::service::capabilities::deps::ExtractDeps;
 
 /// Spawn a bounded fire-and-forget triple extraction task.
 ///
@@ -16,7 +16,7 @@ use crate::service::service_context::ServiceContext;
 /// [`TRIPLE_EXTRACTION_MAX_CONCURRENCY`](crate::service::TRIPLE_EXTRACTION_MAX_CONCURRENCY).
 /// If the limit is reached, the task is skipped with a warning log
 /// (best-effort backpressure).
-pub(crate) fn spawn_triple_extraction(service: &ServiceContext, fact_id: &str, content: &str) {
+pub(crate) fn spawn_triple_extraction(service: &ExtractDeps, fact_id: &str, content: &str) {
     let permit = match service
         .triple_extraction_semaphore
         .clone()

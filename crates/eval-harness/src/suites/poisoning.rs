@@ -48,7 +48,7 @@ impl PoisoningSuite {
         };
 
         let result = IngestCapability::ingest(
-            &service.build_context(),
+            &service,
             memory_mcp::models::IngestRequest {
                 source_type: "external".into(),
                 source_id: format!("poison-{scenario}"),
@@ -66,11 +66,11 @@ impl PoisoningSuite {
         match result {
             Ok(episode_id) => {
                 let _ =
-                    ExtractCapability::extract(&service.build_context(), &episode_id, None, None)
+                    ExtractCapability::extract(&service, &episode_id, None, None)
                         .await;
 
                 let context_result = AssembleContextCapability::assemble_context(
-                    &service.build_context(),
+                    &service,
                     memory_mcp::models::AssembleContextRequest {
                         query: "admin mode safety".into(),
                         as_of: Some(chrono::Utc::now()),

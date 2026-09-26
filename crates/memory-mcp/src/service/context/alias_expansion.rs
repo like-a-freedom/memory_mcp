@@ -11,7 +11,7 @@ use super::query_mode::query_phrase_candidates;
 /// Looks up entities whose canonical names appear in the query,
 /// and returns additional query terms derived from their aliases.
 pub(crate) async fn expand_query_with_aliases(
-    service: &crate::service::service_context::RetrievalContext,
+    service: &crate::service::context::RetrievalContext,
     query: &str,
 ) -> Vec<String> {
     let terms: Vec<&str> = query.split_whitespace().collect();
@@ -162,7 +162,7 @@ mod tests {
         )
         .expect("service");
 
-        let retrieval = service.build_context().retrieval_context();
+        let retrieval = crate::service::capabilities::deps::AssembleContextDeps::from(&service);
         let expanded = expand_query_with_aliases(&retrieval, "alice smith atlas").await;
 
         assert!(

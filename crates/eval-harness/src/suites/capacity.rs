@@ -74,7 +74,7 @@ impl CapacitySuite {
         };
 
         let result = IngestCapability::ingest(
-            &service.build_context(),
+            &service,
             memory_mcp::models::IngestRequest {
                 source_type: "lifecycle".into(),
                 source_id: format!("cap-{scenario}"),
@@ -92,7 +92,7 @@ impl CapacitySuite {
         match result {
             Ok(episode_id) => {
                 let extraction =
-                    ExtractCapability::extract(&service.build_context(), &episode_id, None, None)
+                    ExtractCapability::extract(&service, &episode_id, None, None)
                         .await;
                 let fact_count = extraction.as_ref().map(|e| e.facts.len()).unwrap_or(0) as f64;
 

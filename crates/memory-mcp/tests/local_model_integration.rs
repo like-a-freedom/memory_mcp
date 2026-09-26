@@ -617,7 +617,7 @@ async fn memory_service_uses_local_gliner_zero_shot_labels() {
     for (case_name, text, expected_entities) in zero_shot_gliner_coverage_cases() {
         let episode_id = ingest_episode(&service, text).await;
         let extracted = ExtractCapability::extract(
-            &service.build_context(),
+            &service,
             &episode_id,
             None,
             None,
@@ -696,7 +696,7 @@ fn content_source_id(content: &str) -> String {
 
 async fn ingest_episode(service: &MemoryService, content: &str) -> String {
     IngestCapability::ingest(
-        &service.build_context(),
+        &service,
         IngestRequest {
             source_type: "test".to_string(),
             source_id: content_source_id(content),
@@ -767,7 +767,7 @@ async fn memory_service_uses_local_gliner_defaults_across_diverse_texts() {
     for (case_name, text, expected_entities) in cases {
         let episode_id = ingest_episode(&service, text).await;
         let extracted =
-            ExtractCapability::extract(&service.build_context(), &episode_id, None, None)
+            ExtractCapability::extract(&service, &episode_id, None, None)
                 .await
                 .unwrap_or_else(|err| {
                     panic!("extract should succeed with local GLiNER for `{case_name}`: {err}")
@@ -818,7 +818,7 @@ async fn memory_service_persists_real_local_candle_embeddings() {
 
     // Verify embeddings were persisted by checking semantic similarity
     let context = AssembleContextCapability::assemble_context(
-        &service.build_context(),
+        &service,
         AssembleContextRequest {
             query: "compensation raise engineering".to_string(),
             fact_types: vec![],
@@ -894,7 +894,7 @@ async fn memory_service_assemble_context_uses_real_local_candle_embeddings() {
     .await;
 
     let context = AssembleContextCapability::assemble_context(
-        &service.build_context(),
+        &service,
         AssembleContextRequest {
             query: "salary raise for engineers".to_string(),
             fact_types: Vec::new(),

@@ -39,7 +39,7 @@ fn bench_extract(c: &mut Criterion) {
             },
             |(service, episode_id)| {
                 rt.block_on(async {
-                    ExtractCapability::extract(&service.build_context(), &episode_id, None, None)
+                    ExtractCapability::extract(&service, &episode_id, None, None)
                         .await
                         .unwrap();
                 });
@@ -67,7 +67,7 @@ fn bench_retrieval(c: &mut Criterion) {
                     .await;
                 }
                 AssembleContextCapability::assemble_context(
-                    &service.build_context(),
+                    &service,
                     memory_mcp::models::AssembleContextRequest {
                         query: "project status".into(),
                         as_of: Some(chrono::Utc::now()),

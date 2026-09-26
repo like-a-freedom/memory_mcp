@@ -42,10 +42,10 @@ async fn embedded_context_cache_returns_same_results() -> Result<(), Box<dyn std
     };
 
     let first =
-        AssembleContextCapability::assemble_context(&service.build_context(), request.clone())
+        AssembleContextCapability::assemble_context(&service, request.clone())
             .await?;
     let second =
-        AssembleContextCapability::assemble_context(&service.build_context(), request).await?;
+        AssembleContextCapability::assemble_context(&service, request).await?;
 
     assert_eq!(first, second);
     Ok(())

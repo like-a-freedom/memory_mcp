@@ -5,13 +5,13 @@ use std::collections::{BTreeSet, HashSet, VecDeque};
 use serde_json::{Value, json};
 
 use crate::error::MemoryError;
+use crate::service::capabilities::deps::ExtractDeps;
 use crate::service::community::{
     CommunityMembership, CommunityRecord, is_entity_id, parse_community_record,
 };
 use crate::service::normalize_dt;
 use crate::service::now;
 use crate::service::parse_iso;
-use crate::service::service_context::ServiceContext;
 use crate::service::value_helpers::string_from_value;
 use crate::storage::GraphDirection;
 
@@ -58,7 +58,7 @@ fn stored_edge_version_for_community(record: &Value) -> Option<StoredEdgeVersion
 
 /// Update community memberships after entity changes.
 pub(crate) async fn update_communities(
-    service: &ServiceContext,
+    service: &ExtractDeps,
     entity_ids: &[String],
 ) -> Result<(), MemoryError> {
     if entity_ids.len() < 2 {
@@ -99,7 +99,7 @@ pub(crate) async fn update_communities(
 
 /// BFS traversal over active edges to find all connected entities.
 pub(crate) async fn collect_connected_entity_component(
-    service: &ServiceContext,
+    service: &ExtractDeps,
     entity_ids: &[String],
 ) -> Result<Vec<String>, MemoryError> {
     let cutoff = normalize_dt(now());
@@ -153,7 +153,7 @@ fn is_traversable_context_node(record_id: &str) -> bool {
 
 /// Build a human-readable summary of community members.
 pub(crate) async fn build_community_summary(
-    service: &ServiceContext,
+    service: &ExtractDeps,
     member_entities: &[String],
 ) -> Result<String, MemoryError> {
     let records = service
@@ -203,7 +203,7 @@ fn condense_community_labels(labels: &[String]) -> String {
 }
 
 pub(crate) async fn find_overlapping_communities(
-    service: &ServiceContext,
+    service: &ExtractDeps,
     member_entities: &[String],
 ) -> Result<Vec<CommunityRecord>, MemoryError> {
     let member_set: HashSet<_> = member_entities.iter().cloned().collect();

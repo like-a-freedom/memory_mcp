@@ -1,10 +1,9 @@
 //! Service-side implementation of the transport-facing tool port.
 //!
-//! This is the only place `ServiceContext` is adapted to
-//! [`crate::tools::context::ToolContext`]. Every method is a thin
-//! delegation to the capability that already owns the behaviour, so
-//! the god-struct stops at this file instead of reaching the tool
-//! handlers.
+//! The tool handlers reach the service through this port and never
+//! through the shared container. Each capability assembles the
+//! dependency struct it declares, so what a tool can reach is
+//! exactly what that tool needs.
 
 use crate::error::MemoryError;
 use crate::models::{
@@ -17,10 +16,9 @@ use crate::service::capabilities::extract::ExtractCapability;
 use crate::service::capabilities::ingest::IngestCapability;
 use crate::service::capabilities::invalidate::InvalidateCapability;
 use crate::service::capabilities::resolve::ResolveCapability;
-use crate::service::service_context::ServiceContext;
 use crate::tools::context::{ToolContext, ToolEvent};
 
-impl ToolContext for ServiceContext {
+impl ToolContext for crate::service::MemoryService {
     fn record(&self, event: ToolEvent) {
         match event.duration {
             Some(duration) => self.log_tool_event_with_duration(

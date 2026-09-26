@@ -6,9 +6,9 @@ use serde_json::json;
 use crate::error::MemoryError;
 use crate::logging::LogLevel;
 use crate::models::{AccessPayload, AssembleContextRequest, AssembledContextItem};
+use crate::service::context::RetrievalContext;
 use crate::service::decayed_confidence;
 use crate::service::log_event;
-use crate::service::service_context::RetrievalContext;
 
 use super::alias_expansion::expand_query_with_aliases;
 use super::budget::{collect_episode_fallback_items, should_prefer_episode_content};
