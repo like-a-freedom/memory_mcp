@@ -82,7 +82,7 @@ pub(crate) async fn collect_recent_experience_facts(
     }
 
     let records = service
-        .context_store()
+        .knowledge_store()
         .select_active_facts(500)
         .await
         .map_err(|err| MemoryError::Storage(format!("SurrealDB query error: {err}")))?;

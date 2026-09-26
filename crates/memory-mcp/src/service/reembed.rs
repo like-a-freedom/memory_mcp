@@ -2317,7 +2317,7 @@ mod tests {
         assert_eq!(state.get("status"), Some(&json!("ready")));
         assert_eq!(state.get("active_signature"), Some(&json!("embsig:new")));
 
-        let matches = crate::storage::ContextStoreClient::new(db.clone(), "org")
+        let matches = crate::storage::KnowledgeStoreClient::new(db.clone(), "org")
             .select_facts_ann(
                 &normalize_dt(Utc::now()),
                 &vec![1.0; DEFAULT_EMBEDDING_DIMENSION],

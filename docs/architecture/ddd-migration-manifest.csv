@@ -294,7 +294,9 @@ storage/app_store.rs,src/knowledge/,infra-by-owner,knowledge,knowledge-owned per
 storage/claims.rs,src/,infra-by-owner,platform,owner-specific persistence,Phase 5,owner adapters,legacy:storage -> Phase 5
 storage/client.rs,src/,infra-by-owner,platform,owner-specific persistence,Phase 5,owner adapters,legacy:storage -> Phase 5
 storage/close.rs,src/,infra-by-owner,platform,owner-specific persistence,Phase 5,owner adapters,legacy:storage -> Phase 5
-storage/context_store.rs,src/memory/,application-or-domain,memory,episodes recall and lifecycle,Phase 5,"MCP, CLI, eval harness",legacy:service/memory -> Phase 5
+storage/knowledge_store.rs,src/knowledge/,infra-by-owner,knowledge,owner-scoped reads over the fact entity community triple and edge tables (Phase 5 split this out of the mixed context store),Phase 5,retrieval pipeline knowledge reads,forbidden
+storage/episode_context_store.rs,src/memory/,infra-by-owner,memory,owner-scoped episode reads for context assembly (Phase 5 split this out of the mixed context store),Phase 5,retrieval pipeline episode reads and provenance,forbidden
+storage/access_log_store.rs,src/,infra-by-owner,platform,query-log writes and retention (Phase 5 split this out of the mixed context store),Phase 5,retrieval pipeline query logging,forbidden
 storage/embedding_backfill_store.rs,src/embedding/,technical-capability,embedding,embedding generation and job state,Phase 5,memory and knowledge APIs,legacy:service/embedding -> Phase 5
 storage/embedding_state_store.rs,src/embedding/,technical-capability,embedding,embedding generation and job state,Phase 5,memory and knowledge APIs,legacy:service/embedding -> Phase 5
 storage/entity_store.rs,src/,infra-by-owner,platform,owner-specific persistence,Phase 5,owner adapters,legacy:storage -> Phase 5

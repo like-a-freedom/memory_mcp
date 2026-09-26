@@ -53,7 +53,7 @@ pub(crate) async fn collect_community_facts(
         .collect::<Vec<_>>();
 
     let fallback_records = service
-        .context_store()
+        .knowledge_store()
         .select_facts_by_entity_links(request.cutoff_iso, &member_ids, request.budget.max(1))
         .await
         .map_err(|err| MemoryError::Storage(format!("SurrealDB query error: {err}")))?;
@@ -174,7 +174,7 @@ async fn entity_origin_factor(
     let mut best_factor: Option<f64> = None;
     for direction in [GraphDirection::Incoming, GraphDirection::Outgoing] {
         for edge in service
-            .context_store()
+            .knowledge_store()
             .select_edge_neighbors(entity_id, cutoff_iso, direction)
             .await?
         {
@@ -212,7 +212,7 @@ pub(crate) async fn find_matching_communities(
     query: &str,
 ) -> Result<Vec<StoredCommunitySummary>, MemoryError> {
     let communities = service
-        .context_store()
+        .knowledge_store()
         .select_communities_matching_summary(query)
         .await?;
 

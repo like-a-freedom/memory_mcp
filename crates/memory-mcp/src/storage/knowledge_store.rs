@@ -1,10 +1,13 @@
-//! Narrow context assembly store over `Arc<dyn DbClient>`.
+//! Knowledge-owned context assembly reads.
 //!
-//! Capability seams replaced by concrete structs. Queries are
-//! owned here, not on a trait that forwards to `DbClient`. Context Assembly
-//! consumers (ranking, lexical, semantic, temporal, graph, alias expansion,
-//! views, experience, triple, logging) depend on this struct instead of the
-//! `ContextStore` / `ContextAccessLog` trait objects.
+//! Knowledge owns facts, entities, communities, claims and triples,
+//! so the reads over those tables belong to one store. The episode
+//! reads are memory's and live in `episode_context_store.rs`; the
+//! retrieval pipeline holds both, which makes the ownership visible
+//! in the types rather than only in a comment.
+//!
+//! The method bodies are unchanged from the single store this split
+//! came from, so this is a move rather than a rewrite.
 
 use std::sync::Arc;
 
@@ -14,22 +17,19 @@ use crate::service::MemoryError;
 use crate::storage::queries::BI_TEMPORAL_WHERE;
 use crate::storage::{BoundDbClient, ContextFactQuery, DbClient, GraphDirection};
 
-/// Read-side context assembly store. Holds the `DbClient` adapter and owns
-/// the queries that context modules execute across it.
+/// Read-side store for the knowledge-owned tables consulted during
+/// context assembly: `fact`, `entity`, `community`, `triple` and
+/// `edge`.
 #[derive(Clone)]
-pub struct ContextStoreClient {
+pub struct KnowledgeStoreClient {
     db: BoundDbClient,
 }
 
-impl ContextStoreClient {
+impl KnowledgeStoreClient {
     pub fn new(db: Arc<dyn DbClient>, namespace: impl Into<String>) -> Self {
         Self {
             db: BoundDbClient::new(db, namespace),
         }
-    }
-
-    pub(crate) fn from_bound(db: BoundDbClient) -> Self {
-        Self { db }
     }
 
     /// Facts matching a query at query-time with bi-temporal and fact-type filters.
@@ -156,22 +156,6 @@ impl ContextStoreClient {
         self.db.select_table("fact").await
     }
 
-    pub async fn scan_episodes(&self) -> Result<Vec<Value>, MemoryError> {
-        self.db.select_table("episode").await
-    }
-
-    /// Episode contents matching a query, bi-temporally scoped.
-    pub async fn select_episodes_by_content(
-        &self,
-        cutoff: &str,
-        query: Option<&str>,
-        limit: i32,
-    ) -> Result<Vec<Value>, MemoryError> {
-        let (sql, vars) =
-            crate::storage::queries::build_select_episodes_by_content_query(cutoff, query, limit);
-        self.db.query_rows(&sql, Some(vars)).await
-    }
-
     /// Active (not-yet-invalidated) facts in the bound Active Namespace.
     pub async fn select_active_facts(&self, limit: i32) -> Result<Vec<Value>, MemoryError> {
         let (sql, vars) = crate::storage::queries::build_select_active_facts_query(
@@ -179,56 +163,5 @@ impl ContextStoreClient {
             limit,
         );
         self.db.query_rows(&sql, Some(vars)).await
-    }
-
-    /// Episodes linked to an entity through the fact→edge graph
-    /// (`entity ←edge← fact →episode`), newest first (graph-shaped
-    /// read-model queries belong to this store).
-    pub async fn select_episodes_via_entity(
-        &self,
-        entity_id: &str,
-    ) -> Result<Vec<Value>, MemoryError> {
-        let sql = "SELECT * FROM episode WHERE episode_id IN (\
-                   SELECT VALUE source_episode FROM fact WHERE fact_id IN (\
-                   SELECT VALUE type::string(out) FROM edge \
-                   WHERE in = <record> $entity_id AND relation = 'involved_in')) \
-                   ORDER BY t_ref DESC LIMIT 10";
-        self.db
-            .query_rows(sql, Some(json!({ "entity_id": entity_id })))
-            .await
-    }
-}
-
-/// Write-side context store — only the access-log path. Keeps narrow
-/// ownership of its two operations instead of forwarding `create`/`query` to
-/// `DbClient` through a trait.
-#[derive(Clone)]
-pub struct ContextAccessLogClient {
-    db: BoundDbClient,
-}
-
-impl ContextAccessLogClient {
-    pub fn new(db: Arc<dyn DbClient>, namespace: impl Into<String>) -> Self {
-        Self {
-            db: BoundDbClient::new(db, namespace),
-        }
-    }
-
-    pub async fn create(&self, record_id: &str, content: Value) -> Result<Value, MemoryError> {
-        self.db.create(record_id, content).await
-    }
-
-    /// Deletes query-log rows older than `cutoff` and returns how many were
-    /// removed (the retention DELETE lives in the owning store).
-    pub async fn prune_expired_logs(&self, cutoff: &str) -> Result<usize, MemoryError> {
-        let deleted = self
-            .db
-            .query(
-                "DELETE query_log WHERE logged_at IS NOT NONE \
-                 AND type::datetime(logged_at) < type::datetime($cutoff) RETURN BEFORE",
-                Some(json!({ "cutoff": cutoff })),
-            )
-            .await?;
-        Ok(deleted.as_array().map_or(0, Vec::len))
     }
 }

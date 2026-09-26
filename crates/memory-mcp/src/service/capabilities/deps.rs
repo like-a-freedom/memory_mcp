@@ -97,7 +97,11 @@ impl From<&crate::service::MemoryService> for AssembleContextDeps {
         Self {
             active_namespace: ctx.active_namespace.clone(),
             logger: ctx.logger.clone(),
-            context_store: crate::storage::ContextStoreClient::new(
+            knowledge_store: crate::storage::KnowledgeStoreClient::new(
+                ctx.db_client.clone(),
+                ctx.active_namespace.clone(),
+            ),
+            episode_store: crate::storage::EpisodeContextStore::new(
                 ctx.db_client.clone(),
                 ctx.active_namespace.clone(),
             ),
@@ -307,7 +311,8 @@ pub(crate) struct InvalidateDeps {
 pub(crate) struct AssembleContextDeps {
     pub(crate) active_namespace: String,
     pub(crate) logger: StdoutLogger,
-    pub(crate) context_store: crate::storage::ContextStoreClient,
+    pub(crate) knowledge_store: crate::storage::KnowledgeStoreClient,
+    pub(crate) episode_store: crate::storage::EpisodeContextStore,
     pub(crate) context_access_log: crate::storage::ContextAccessLogClient,
     pub(crate) app_store: crate::storage::AppStoreClient,
     pub(crate) embedding_service: crate::service::embedding_service::EmbeddingService,
@@ -320,9 +325,15 @@ pub(crate) struct AssembleContextDeps {
 }
 
 impl AssembleContextDeps {
-    /// The knowledge read owner, for canonical fact reads.
-    pub(crate) fn context_store(&self) -> &crate::storage::ContextStoreClient {
-        &self.context_store
+    /// The knowledge read owner: facts, entities, communities and
+    /// edges.
+    pub(crate) fn knowledge_store(&self) -> &crate::storage::KnowledgeStoreClient {
+        &self.knowledge_store
+    }
+
+    /// The memory read owner for episodes.
+    pub(crate) fn episode_context_store(&self) -> &crate::storage::EpisodeContextStore {
+        &self.episode_store
     }
 
     /// The access-log owner, for query-log writes.

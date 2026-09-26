@@ -311,7 +311,7 @@ impl ExplanationService {
         &self,
         entity_id: &str,
     ) -> Result<Vec<crate::models::Episode>, MemoryError> {
-        let rows = crate::storage::ContextStoreClient::from_bound(self.db.clone())
+        let rows = crate::storage::EpisodeContextStore::from_bound(self.db.clone())
             .select_episodes_via_entity(entity_id)
             .await?;
 

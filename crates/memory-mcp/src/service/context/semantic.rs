@@ -60,7 +60,7 @@ pub(crate) async fn collect_semantic_facts(
     let search_limit = request.budget.max(1) * 4;
 
     let fact_records = service
-        .context_store()
+        .knowledge_store()
         .select_facts_ann(
             &crate::service::normalize_dt(request.cutoff),
             &query_embedding,

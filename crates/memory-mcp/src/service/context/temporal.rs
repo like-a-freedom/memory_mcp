@@ -495,7 +495,7 @@ pub(crate) async fn collect_temporal_facts(
         .unwrap_or_default();
 
     if let Some(temporal_window) = infer_temporal_window(request.query, request.cutoff) {
-        let records = service.context_store().scan_facts().await.map_err(|err| {
+        let records = service.knowledge_store().scan_facts().await.map_err(|err| {
             crate::error::MemoryError::Storage(format!("SurrealDB query error: {err}"))
         })?;
 
@@ -528,7 +528,7 @@ pub(crate) async fn collect_temporal_facts(
 
         for temporal_query in temporal_group {
             let records = service
-                .context_store()
+                .knowledge_store()
                 .select_facts_filtered(ContextFactQuery {
                     cutoff: request.cutoff_iso,
                     query_contains: Some(&temporal_query),

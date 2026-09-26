@@ -45,7 +45,7 @@ pub(crate) async fn expand_query_with_aliases(
 
     // Single batch query instead of O(N²) individual lookups
     let entities = service
-        .context_store()
+        .knowledge_store()
         .select_entities_batch(&normalized_names)
         .await
         .unwrap_or_default();
