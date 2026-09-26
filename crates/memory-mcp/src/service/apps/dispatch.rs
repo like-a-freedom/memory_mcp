@@ -647,7 +647,7 @@ fn execute_expand_neighbors<'a>(
             .and_then(parse_datetime)
             .unwrap_or_else(chrono::Utc::now);
         let expansion = crate::service::graph_neighbor_expansion(
-            &ctx.service.app_store(),
+            &ctx.service.knowledge_graph_store(),
             target_id,
             direction,
             *depth,
@@ -681,7 +681,7 @@ fn execute_open_edge_details<'a>(
         };
         let edge = ctx
             .service
-            .app_store()
+            .knowledge_graph_store()
             .select_edge(edge_id)
             .await
             .map_err(mcp_error)?

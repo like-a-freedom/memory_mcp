@@ -80,7 +80,7 @@ impl crate::service::MemoryService {
     pub async fn lifecycle_dashboard(&self) -> Result<LifecycleDashboard, MemoryError> {
         let mut operation_metrics =
             crate::observability::OperationMetrics::new("lifecycle_dashboard");
-        let active_facts = self.app_store().select_active_facts(10_000).await?;
+        let active_facts = self.knowledge_graph_store().select_active_facts(10_000).await?;
         let policy = self.lifecycle_policy();
         let cutoff = crate::service::normalize_dt(
             Utc::now() - chrono::Duration::days(policy.archival_age_days as i64),
@@ -89,7 +89,7 @@ impl crate::service::MemoryService {
             .episode_store()
             .select_episodes_for_archival(&cutoff, 1_000)
             .await?;
-        let communities = self.app_store().select_communities().await?;
+        let communities = self.knowledge_graph_store().select_communities().await?;
 
         operation_metrics.record_result("active_facts", active_facts.len());
         operation_metrics.record_result("archival_candidates", archival_candidates.len());

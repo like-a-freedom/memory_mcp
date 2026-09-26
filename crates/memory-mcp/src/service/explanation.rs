@@ -17,7 +17,7 @@ use crate::models::{
 };
 use crate::service::apps::graph::GraphContext;
 use crate::service::{log_event, normalize_dt, now};
-use crate::storage::{AppStoreClient, BoundDbClient, DbClient};
+use crate::storage::{BoundDbClient, DbClient};
 
 use crate::service::value_helpers::string_from_value;
 
@@ -64,8 +64,8 @@ impl ExplanationService {
 }
 
 impl GraphContext for ExplanationService {
-    fn app_store(&self) -> crate::storage::AppStoreClient {
-        AppStoreClient::from_bound(self.db.clone())
+    fn knowledge_graph_store(&self) -> crate::storage::KnowledgeGraphStore {
+        crate::storage::KnowledgeGraphStore::from_bound(self.db.clone())
     }
     fn logger(&self) -> &StdoutLogger {
         &self.logger
@@ -304,7 +304,9 @@ impl ExplanationService {
         fact_id: &str,
         boost: i64,
     ) -> Result<(), MemoryError> {
-        self.app_store().record_fact_access(fact_id, boost).await
+        crate::storage::FactAccessStore::from_bound(self.db.clone())
+            .record_fact_access(fact_id, boost)
+            .await
     }
 
     async fn find_episodes_via_entity(

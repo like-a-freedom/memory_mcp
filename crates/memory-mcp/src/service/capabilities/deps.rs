@@ -101,15 +101,19 @@ impl From<&crate::service::MemoryService> for AssembleContextDeps {
                 ctx.db_client.clone(),
                 ctx.active_namespace.clone(),
             ),
+            graph_store: crate::storage::KnowledgeGraphStore::new(
+                ctx.db_client.clone(),
+                ctx.active_namespace.clone(),
+            ),
+            fact_access_store: crate::storage::FactAccessStore::new(
+                ctx.db_client.clone(),
+                ctx.active_namespace.clone(),
+            ),
             episode_store: crate::storage::EpisodeContextStore::new(
                 ctx.db_client.clone(),
                 ctx.active_namespace.clone(),
             ),
             context_access_log: crate::storage::ContextAccessLogClient::new(
-                ctx.db_client.clone(),
-                ctx.active_namespace.clone(),
-            ),
-            app_store: crate::storage::AppStoreClient::new(
                 ctx.db_client.clone(),
                 ctx.active_namespace.clone(),
             ),
@@ -234,7 +238,7 @@ impl ExtractDeps {
         if entity_ids.is_empty() {
             return Ok(result);
         }
-        let rows = self.app_store().select_entities_by_ids(entity_ids).await?;
+        let rows = self.knowledge_graph_store().select_entities_by_ids(entity_ids).await?;
         for row in rows {
             let serde_json::Value::Object(map) = row else {
                 continue;
@@ -265,8 +269,8 @@ impl ExtractDeps {
     }
 
     /// The app store the community and entity reads use.
-    pub(crate) fn app_store(&self) -> crate::storage::AppStoreClient {
-        crate::storage::AppStoreClient::new(self.db_client.clone(), self.active_namespace.clone())
+    pub(crate) fn knowledge_graph_store(&self) -> crate::storage::KnowledgeGraphStore {
+        crate::storage::KnowledgeGraphStore::new(self.db_client.clone(), self.active_namespace.clone())
     }
 }
 
@@ -312,9 +316,14 @@ pub(crate) struct AssembleContextDeps {
     pub(crate) active_namespace: String,
     pub(crate) logger: StdoutLogger,
     pub(crate) knowledge_store: crate::storage::KnowledgeStoreClient,
+    /// The knowledge graph store, for the app graph and lifecycle
+    /// reads that sit alongside retrieval.
+    pub(crate) graph_store: crate::storage::KnowledgeGraphStore,
     pub(crate) episode_store: crate::storage::EpisodeContextStore,
+    /// The fact access log. Memory owns it: memory performs the
+    /// retrieval that produces the heat.
+    pub(crate) fact_access_store: crate::storage::FactAccessStore,
     pub(crate) context_access_log: crate::storage::ContextAccessLogClient,
-    pub(crate) app_store: crate::storage::AppStoreClient,
     pub(crate) embedding_service: crate::service::embedding_service::EmbeddingService,
     pub(crate) context_cache: Arc<
         RwLock<LruCache<crate::service::cache::CacheKey, Vec<crate::models::AssembledContextItem>>>,
@@ -357,6 +366,6 @@ impl AssembleContextDeps {
         fact_id: &str,
         boost: i64,
     ) -> Result<(), crate::error::MemoryError> {
-        self.app_store.record_fact_access(fact_id, boost).await
+        self.fact_access_store.record_fact_access(fact_id, boost).await
     }
 }

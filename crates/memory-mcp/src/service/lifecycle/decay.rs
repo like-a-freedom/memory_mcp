@@ -84,7 +84,7 @@ pub async fn run_decay_pass(
     let mut invalidated = 0;
 
     let facts = service
-        .app_store()
+        .knowledge_graph_store()
         .select_active_facts(DECAY_BATCH_LIMIT)
         .await?;
 

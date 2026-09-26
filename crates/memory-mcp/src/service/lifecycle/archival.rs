@@ -141,7 +141,7 @@ async fn check_episode_has_recent_fact_access(
     let hot_cutoff =
         crate::service::normalize_dt(Utc::now() - chrono::Duration::days(age_days as i64));
     service
-        .app_store()
+        .fact_access_store()
         .has_recent_fact_access(episode_id, &hot_cutoff)
         .await
 }

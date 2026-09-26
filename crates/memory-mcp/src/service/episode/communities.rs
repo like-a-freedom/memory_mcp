@@ -80,7 +80,7 @@ pub(crate) async fn update_communities(
     });
 
     service
-        .app_store()
+        .knowledge_graph_store()
         .upsert_community(&membership.community_id, payload)
         .await?;
 
@@ -89,7 +89,7 @@ pub(crate) async fn update_communities(
         .filter(|community| community.community_id != membership.community_id)
     {
         service
-            .app_store()
+            .knowledge_graph_store()
             .delete_community(&stale.community_id)
             .await?;
     }

@@ -15,8 +15,21 @@ pub use builder::MemoryService;
 pub(crate) use helpers::*;
 
 impl MemoryService {
-    pub(crate) fn app_store(&self) -> crate::storage::AppStoreClient {
-        crate::storage::AppStoreClient::new(self.db_client.clone(), self.active_namespace.clone())
+    /// The knowledge-owned graph store: entities, communities and
+    /// edges.
+    pub(crate) fn knowledge_graph_store(&self) -> crate::storage::KnowledgeGraphStore {
+        crate::storage::KnowledgeGraphStore::new(
+            self.db_client.clone(),
+            self.active_namespace.clone(),
+        )
+    }
+
+    /// The memory-owned fact access log: retrieval heat.
+    pub(crate) fn fact_access_store(&self) -> crate::storage::FactAccessStore {
+        crate::storage::FactAccessStore::new(
+            self.db_client.clone(),
+            self.active_namespace.clone(),
+        )
     }
 
     /// Read-side store for the batch reembed worker.

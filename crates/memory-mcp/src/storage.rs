@@ -16,7 +16,8 @@
 //! - `types`: Type definitions like [`GraphDirection`]
 
 mod agent_memory;
-pub(crate) mod app_store;
+pub(crate) mod fact_access_store;
+mod knowledge_graph_store;
 pub(crate) mod claims;
 pub(crate) mod client;
 pub(crate) mod close;
@@ -44,7 +45,8 @@ pub use agent_memory::{
     disposition_str, origin_kind_str, reason_codes_str, source_kind_str, trust_class_str,
 };
 
-pub use app_store::AppStoreClient;
+pub use fact_access_store::FactAccessStore;
+pub use knowledge_graph_store::KnowledgeGraphStore;
 #[cfg(any(test, feature = "test-fixtures"))]
 pub use client::BoundDbClient;
 #[cfg(not(any(test, feature = "test-fixtures")))]

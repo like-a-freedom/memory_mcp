@@ -9,19 +9,19 @@ use crate::models::SurprisingConnection;
 use crate::service::community::{CommunityRecord, is_entity_id, parse_community_record};
 use crate::service::value_helpers::string_from_value;
 use crate::service::{MemoryError, MemoryService, normalize_dt};
-use crate::storage::{AppStoreClient, GraphDirection};
+use crate::storage::{GraphDirection, KnowledgeGraphStore};
 
 /// Minimal context required by graph traversal functions.
 /// Allows `ExplanationService` (and future services) to call graph
 /// operations without depending on `MemoryService` directly.
 pub(crate) trait GraphContext: Send + Sync {
-    fn app_store(&self) -> AppStoreClient;
+    fn knowledge_graph_store(&self) -> KnowledgeGraphStore;
     fn logger(&self) -> &StdoutLogger;
 }
 
 impl GraphContext for MemoryService {
-    fn app_store(&self) -> AppStoreClient {
-        AppStoreClient::new(self.db_client.clone(), self.active_namespace.clone())
+    fn knowledge_graph_store(&self) -> KnowledgeGraphStore {
+        KnowledgeGraphStore::new(self.db_client.clone(), self.active_namespace.clone())
     }
     fn logger(&self) -> &StdoutLogger {
         &self.logger
@@ -159,7 +159,7 @@ pub(crate) async fn find_hub_entities(
         ),
         LogLevel::Debug,
     );
-    let entity_records = ctx.app_store().select_entities().await?;
+    let entity_records = ctx.knowledge_graph_store().select_entities().await?;
     let mut hubs = Vec::new();
     let candidate_scan_limit =
         (limit.max(1) as usize * HUB_CANDIDATE_SCAN_MULTIPLIER).min(budget.max_hub_scan);
@@ -188,7 +188,7 @@ pub(crate) async fn find_hub_entities(
         let mut unique_edges = HashSet::new();
         for direction in [GraphDirection::Incoming, GraphDirection::Outgoing] {
             for edge in ctx
-                .app_store()
+                .knowledge_graph_store()
                 .select_graph_neighbors(&entity_id, &cutoff_iso, direction)
                 .await?
             {
@@ -248,7 +248,7 @@ pub(crate) async fn list_communities(
         LogLevel::Debug,
     );
     let mut communities = ctx
-        .app_store()
+        .knowledge_graph_store()
         .select_communities()
         .await?
         .into_iter()
@@ -316,7 +316,7 @@ pub(crate) async fn find_surprising_connections(
 
     let cutoff_iso = normalize_dt(crate::service::now());
     let communities = ctx
-        .app_store()
+        .knowledge_graph_store()
         .select_communities()
         .await?
         .into_iter()
@@ -358,7 +358,7 @@ pub(crate) async fn find_surprising_connections(
 
             neighbor_queries += 1;
             for edge in ctx
-                .app_store()
+                .knowledge_graph_store()
                 .select_graph_neighbors(&current, &cutoff_iso, direction)
                 .await?
             {
@@ -515,7 +515,7 @@ async fn cached_entity_name(
     }
 
     let name = ctx
-        .app_store()
+        .knowledge_graph_store()
         .select_entity(entity_id)
         .await?
         .as_ref()
@@ -576,7 +576,7 @@ pub(crate) fn intro_chain_from_start(
 /// returning the smallest discovered chain to any starting entity.
 ///
 /// Free function (not a method on `MemoryService`) so later stages
-/// can supply any context that exposes an `AppStore`, without dragging a
+/// can supply any context that exposes an `KnowledgeGraphStore`, without dragging a
 /// `MemoryService` construction into the call.
 pub(crate) async fn find_intro_chain(
     ctx: &impl GraphContext,
@@ -603,7 +603,7 @@ pub(crate) async fn find_intro_chain(
 
         for node_id in &frontier {
             for record in ctx
-                .app_store()
+                .knowledge_graph_store()
                 .select_graph_neighbors(node_id, &cutoff_iso, GraphDirection::Incoming)
                 .await?
             {
@@ -658,7 +658,7 @@ async fn find_entity_id_by_name(
 
     // Prefer the indexed lookup in the store's bound Active Namespace.
     if let Some(record) = ctx
-        .app_store()
+        .knowledge_graph_store()
         .select_entity_lookup(&normalized_name)
         .await?
         .and_then(|value| value.as_object().cloned())
@@ -669,7 +669,7 @@ async fn find_entity_id_by_name(
             .or_else(|| record.get("id").and_then(string_from_value)));
     }
 
-    for record in ctx.app_store().select_entities().await? {
+    for record in ctx.knowledge_graph_store().select_entities().await? {
         let Some(map) = record.as_object() else {
             continue;
         };
@@ -771,7 +771,7 @@ pub fn edge_neighbor(record: &Value, direction: GraphDirection) -> Option<String
 
 /// Returns a JSON snapshot of an entity (entity_id + canonical_name).
 pub async fn entity_snapshot(
-    store: &AppStoreClient,
+    store: &KnowledgeGraphStore,
     entity_id: &str,
 ) -> Result<Value, MemoryError> {
     let record = store.select_entity(entity_id).await?;
@@ -791,7 +791,7 @@ pub async fn entity_snapshot(
 
 /// BFS path finding between two entities in the knowledge graph.
 pub async fn graph_path_snapshot(
-    store: &AppStoreClient,
+    store: &KnowledgeGraphStore,
     from_entity_id: &str,
     to_entity_id: &str,
     cutoff: DateTime<Utc>,
@@ -864,7 +864,7 @@ pub async fn graph_path_snapshot(
 
 /// BFS neighbor expansion from a target entity.
 pub async fn graph_neighbor_expansion(
-    store: &AppStoreClient,
+    store: &KnowledgeGraphStore,
     target_id: &str,
     direction: &str,
     depth: i32,
@@ -925,7 +925,7 @@ pub async fn graph_neighbor_expansion(
 
 /// Builds the full graph payload: path + neighbor expansion for both endpoints.
 pub async fn graph_payload(
-    store: &AppStoreClient,
+    store: &KnowledgeGraphStore,
     from_entity_id: &str,
     to_entity_id: &str,
     cutoff: DateTime<Utc>,
@@ -1275,8 +1275,8 @@ mod tests {
 }
 
 impl GraphContext for crate::service::capabilities::deps::AssembleContextDeps {
-    fn app_store(&self) -> crate::storage::AppStoreClient {
-        self.app_store.clone()
+    fn knowledge_graph_store(&self) -> KnowledgeGraphStore {
+        self.graph_store.clone()
     }
 
     fn logger(&self) -> &StdoutLogger {

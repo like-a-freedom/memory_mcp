@@ -295,7 +295,8 @@ service/util/validation.rs,src/,platform-or-bootstrap,platform,technical mechani
 service/value_helpers.rs,src/,platform-or-bootstrap,platform,technical mechanism and composition,Phase 2,bootstrap and owners,legacy:service -> Phase 2
 storage.rs,src/,infra-by-owner,platform,owner-specific persistence,Phase 5,owner adapters,legacy:storage -> Phase 5
 storage/agent_memory.rs,src/,infra-by-owner,platform,owner-specific persistence,Phase 5,owner adapters,legacy:storage -> Phase 5
-storage/app_store.rs,src/knowledge/,infra-by-owner,knowledge,knowledge-owned persistence (Phase 6: episode archival event-log and the generic record accessor moved to owner-scoped stores),Phase 5,owner adapters,legacy:storage -> Phase 5
+storage/knowledge_graph_store.rs,src/knowledge/,infra-by-owner,knowledge,entity community and edge reads and mutations (Phase 4 split this out of app_store.rs),Phase 4,app graph lifecycle and community paths,forbidden
+storage/fact_access_store.rs,src/memory/,infra-by-owner,memory,fact access log for retrieval heat (Phase 4 split this out of app_store.rs; memory owns it because memory performs the retrieval),Phase 4,assemble_context and explain,forbidden
 storage/claims.rs,src/,infra-by-owner,platform,owner-specific persistence,Phase 5,owner adapters,legacy:storage -> Phase 5
 storage/client.rs,src/,infra-by-owner,platform,owner-specific persistence,Phase 5,owner adapters,legacy:storage -> Phase 5
 storage/close.rs,src/,infra-by-owner,platform,owner-specific persistence,Phase 5,owner adapters,legacy:storage -> Phase 5

@@ -258,7 +258,7 @@ impl MemoryMcp {
             "entity" => {
                 let record = self
                     .service
-                    .app_store()
+                    .knowledge_graph_store()
                     .select_entity(target_id)
                     .await
                     .map_err(mcp_error)?;
@@ -328,7 +328,7 @@ impl MemoryMcp {
         max_depth: i32,
     ) -> Result<Value, ErrorData> {
         let cutoff = as_of.and_then(parse_datetime).unwrap_or_else(Utc::now);
-        let store = self.service.app_store();
+        let store = self.service.knowledge_graph_store();
         crate::service::graph_payload(&store, from_entity_id, to_entity_id, cutoff, max_depth)
             .await
             .map_err(mcp_error)

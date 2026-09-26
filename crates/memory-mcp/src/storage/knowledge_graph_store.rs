@@ -1,7 +1,12 @@
-//! Concrete app store: owns the queries that MCP apps, lifecycle, and graph
-//! expansion need, without exposing the full `DbClient` surface.
+//! Knowledge-owned reads and mutations for the graph tables.
 //!
-//! Replaces the `AppStore` trait seam.
+//! Entities, communities, edges and canonical facts belong to
+//! knowledge, so the operations on them live here. This was
+//! `app_store.rs`, which also carried the fact access log; that
+//! half is memory's and is now `fact_access_store.rs`.
+//!
+//! The method bodies are unchanged from that store, so this is a
+//! split rather than a rewrite.
 
 use std::sync::Arc;
 
@@ -10,17 +15,18 @@ use serde_json::{Value, json};
 use crate::service::MemoryError;
 use crate::storage::{BoundDbClient, DbClient, GraphDirection};
 
-/// Concrete store for app-facing graph + entity + record reads and mutations.
+/// Concrete store for knowledge-owned graph reads and mutations.
 ///
-/// Unlike the removed `AppStore` trait this is not an interface: it's a real
-/// struct that owns its queries. Callers get this — not a trait object — so
-/// the call graph is visible without an opaqueness layer.
+/// Not a trait: a real struct that owns its queries, so the call
+/// graph is visible without an opaqueness layer. App workflow
+/// orchestration that composes these operations belongs to
+/// provisioning, not here.
 #[derive(Clone)]
-pub struct AppStoreClient {
+pub struct KnowledgeGraphStore {
     db: BoundDbClient,
 }
 
-impl AppStoreClient {
+impl KnowledgeGraphStore {
     pub fn new(db: Arc<dyn DbClient>, namespace: impl Into<String>) -> Self {
         Self {
             db: BoundDbClient::new(db, namespace),
@@ -148,76 +154,19 @@ impl AppStoreClient {
         );
         self.db.query_rows(&sql, Some(vars)).await
     }
-
-    /// Increments fact access metadata without exposing record mutation details
-    /// to retrieval or explanation orchestration.
-    pub async fn record_fact_access(&self, fact_id: &str, boost: i64) -> Result<(), MemoryError> {
-        crate::storage::helpers::require_record_kind(fact_id, "fact")?;
-        let record = self.db.select_one(fact_id).await?;
-        let Some(mut record) = record.and_then(|value| value.as_object().cloned()) else {
-            return Ok(());
-        };
-
-        let access_count = record
-            .get("access_count")
-            .and_then(crate::service::value_helpers::json_i64)
-            .unwrap_or(0)
-            .saturating_add(boost);
-        record.insert("access_count".to_string(), json!(access_count));
-        record.insert(
-            "last_accessed".to_string(),
-            json!(crate::service::normalize_dt(crate::service::now())),
-        );
-
-        self.db.update(fact_id, Value::Object(record)).await?;
-        Ok(())
-    }
-
-    /// Whether any fact linked to `episode_id` was accessed at or after
-    /// `hot_cutoff`.
-    pub async fn has_recent_fact_access(
-        &self,
-        episode_id: &str,
-        hot_cutoff: &str,
-    ) -> Result<bool, MemoryError> {
-        let rows = self
-            .db
-            .query_rows(
-                "SELECT fact_id FROM fact \
-                 WHERE source_episode = $episode_id \
-                 AND last_accessed IS NOT NONE \
-                 AND last_accessed >= type::datetime($hot_cutoff) LIMIT 1",
-                Some(json!({ "episode_id": episode_id, "hot_cutoff": hot_cutoff })),
-            )
-            .await?;
-        Ok(!rows.is_empty())
-    }
 }
 
 #[cfg(test)]
 mod tests {
     use std::sync::Arc;
 
-    use super::AppStoreClient;
+    use super::KnowledgeGraphStore;
     use crate::service::MemoryError;
     use crate::service::mock_db::MockDbClient;
 
     #[tokio::test]
-    async fn record_fact_access_rejects_invalid_record_ids() {
-        let store = AppStoreClient::new(Arc::new(MockDbClient::new()), "org");
-
-        for bad_id in ["bare-hex-id", "", "episode:xyz"] {
-            let result = store.record_fact_access(bad_id, 1).await;
-            assert!(
-                matches!(result, Err(MemoryError::Validation(_))),
-                "expected validation error for '{bad_id}'"
-            );
-        }
-    }
-
-    #[tokio::test]
     async fn delete_community_rejects_non_community_record_ids() {
-        let store = AppStoreClient::new(Arc::new(MockDbClient::new()), "org");
+        let store = KnowledgeGraphStore::new(Arc::new(MockDbClient::new()), "org");
 
         for bad_id in ["fact:abc", "episode:xyz", "community", ""] {
             let result = store.delete_community(bad_id).await;
