@@ -4,7 +4,13 @@ use chrono::{DateTime, Utc};
 
 mod lexical;
 mod search;
-mod time;
+
+/// Temporal value semantics live in the pure kernel; they are
+/// re-exported here so the many existing `crate::service::{normalize_dt,
+/// now, …}` paths keep working.
+pub use crate::shared::temporal::{
+    bucket_to_five_minutes, bucket_to_hour, normalize_dt, now, parse_iso,
+};
 
 use crate::models::Fact;
 pub use lexical::{
@@ -14,8 +20,6 @@ pub use search::{
     normalize_text, preprocess_search_query, query_hard_anchor_terms, query_term_rarity_weight,
     query_term_should_be_soft_anchor, search_query_terms, unique_query_terms,
 };
-
-pub use time::{bucket_to_five_minutes, bucket_to_hour, normalize_dt, now, parse_iso};
 
 /// Calculate decayed confidence based on fact age.
 /// Delegates to [`crate::models::Fact::decayed_confidence`] (single source of truth).

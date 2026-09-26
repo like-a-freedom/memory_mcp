@@ -34,11 +34,16 @@
 
 pub mod cli;
 pub mod config;
-pub mod error;
+/// The pure error vocabulary. Re-exported here so the many existing
+/// `crate::error::MemoryError` paths stay valid; the definition
+/// lives in the shared kernel.
+pub use shared::error;
 pub mod logging;
+pub mod platform;
 pub mod mcp;
 pub mod models;
 pub mod observability;
+pub mod shared;
 pub mod runner;
 
 /// # SaaS tenant invariant
@@ -92,7 +97,8 @@ pub mod control;
 #[doc(hidden)]
 pub mod eval_support;
 
-pub use error::{MemoryError, is_transient_db_error};
+pub use error::MemoryError;
 pub use mcp::MemoryMcp;
+pub use platform::persistence::db_errors::is_transient_db_error;
 pub use service::MemoryService;
 pub use service::reembed_options::{ReembedOptions, ReembedOutcome};

@@ -1,3 +1,15 @@
+//! Temporal value semantics.
+//!
+//! Formatting, parsing and cache bucketing are pure: they read no
+//! clock, no environment and no storage. Every context writes the
+//! same instant in the same form and reads it back the same way, so
+//! this is a shared *meaning* rather than a convenience that happens
+//! to be used in several places.
+//!
+//! `now()` is included because it is the same vocabulary — a caller
+//! that needs the current instant should not have to reach for a
+//! storage module to get it.
+
 use chrono::{DateTime, Timelike, Utc};
 
 /// Normalize a datetime to RFC3339 string.
@@ -69,5 +81,12 @@ mod tests {
         let dt = Utc.with_ymd_and_hms(2024, 1, 15, 10, 47, 30).unwrap();
         let result = bucket_to_five_minutes(dt);
         assert_eq!(result, "2024-01-15T10:45:00Z");
+    }
+
+    #[test]
+    fn a_normalized_instant_round_trips() {
+        let dt = Utc.with_ymd_and_hms(2024, 1, 15, 10, 30, 0).unwrap();
+        let round_tripped = parse_iso(&normalize_dt(dt)).expect("round trip");
+        assert_eq!(round_tripped.timestamp(), dt.timestamp());
     }
 }

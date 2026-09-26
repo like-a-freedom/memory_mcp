@@ -552,7 +552,10 @@ impl SurrealDbClient {
         );
 
         let vars_for_retry = vars.clone();
-        let result = with_db_retry("execute_query", &self.logger, || {
+        let result = crate::platform::persistence::transactions::with_db_retry(
+            "execute_query",
+            &self.logger,
+            || {
             self.execute_sql_with_timing(sql, vars_for_retry.clone(), namespace)
         })
         .await;
@@ -611,7 +614,10 @@ impl SurrealDbClient {
         );
 
         let vars_for_retry = vars.clone();
-        let result = with_db_retry("execute_raw_query", &self.logger, || {
+        let result = crate::platform::persistence::transactions::with_db_retry(
+            "execute_raw_query",
+            &self.logger,
+            || {
             self.execute_sql_void_with_timing(sql, vars_for_retry.clone(), namespace)
         })
         .await;
@@ -723,112 +729,6 @@ pub(crate) fn is_record_already_exists_error(message: &str) -> bool {
     let lowered = message.to_ascii_lowercase();
     lowered.contains("already exists")
         && (lowered.contains("record") || lowered.contains("script_migration"))
-}
-
-/// Default maximum attempts for database retry on transient errors.
-const DEFAULT_DB_RETRY_ATTEMPTS: u32 = 3;
-/// Initial delay in milliseconds for database retry backoff (doubles each attempt).
-const DEFAULT_DB_RETRY_INITIAL_DELAY_MS: u64 = 200;
-/// Per-query timeout to guard against stalled database connections (e.g. WebSocket hang).
-const DEFAULT_DB_QUERY_TIMEOUT_SECS: u64 = 30;
-
-/// Runs a fallible database operation with exponential backoff retry and a per-query timeout.
-///
-/// Each individual attempt is guarded by `DEFAULT_DB_QUERY_TIMEOUT_SECS` to prevent
-/// hanging indefinitely on stalled connections (e.g. WebSocket to SurrealDB).
-/// Only retries on errors identified as transient by `is_transient_db_error`.
-/// Logs each retry attempt via the provided logger with the operation name.
-async fn with_db_retry<T, F, Fut>(
-    op_name: &str,
-    logger: &StdoutLogger,
-    f: F,
-) -> Result<T, MemoryError>
-where
-    F: Fn() -> Fut,
-    Fut: std::future::Future<Output = Result<T, MemoryError>>,
-{
-    let mut attempt = 0u32;
-    let timeout = Duration::from_secs(DEFAULT_DB_QUERY_TIMEOUT_SECS);
-    loop {
-        match tokio::time::timeout(timeout, f()).await {
-            Ok(Ok(value)) => return Ok(value),
-            Ok(Err(err)) => {
-                attempt += 1;
-                if attempt >= DEFAULT_DB_RETRY_ATTEMPTS
-                    || !crate::service::is_transient_db_error(&err)
-                {
-                    return Err(err);
-                }
-                let delay_ms =
-                    DEFAULT_DB_RETRY_INITIAL_DELAY_MS << attempt.saturating_sub(1).min(6);
-                let delay = Duration::from_millis(delay_ms);
-                logger.log(
-                    std::collections::HashMap::from([
-                        (
-                            "op".to_string(),
-                            serde_json::Value::String(format!("db.{op_name}.retry")),
-                        ),
-                        (
-                            "attempt".to_string(),
-                            serde_json::Value::Number(serde_json::Number::from(attempt)),
-                        ),
-                        (
-                            "delay_ms".to_string(),
-                            serde_json::Value::Number(serde_json::Number::from(delay_ms)),
-                        ),
-                        (
-                            "max_attempts".to_string(),
-                            serde_json::Value::Number(serde_json::Number::from(
-                                DEFAULT_DB_RETRY_ATTEMPTS,
-                            )),
-                        ),
-                        (
-                            "error".to_string(),
-                            serde_json::Value::String(err.to_string()),
-                        ),
-                    ]),
-                    LogLevel::Warn,
-                );
-                tokio::time::sleep(delay).await;
-            }
-            Err(_elapsed) => {
-                // Timeout elapsed — treat as a transient error for retry purposes
-                attempt += 1;
-                if attempt >= DEFAULT_DB_RETRY_ATTEMPTS {
-                    return Err(MemoryError::Storage(format!(
-                        "db.{op_name}: timed out after {DEFAULT_DB_QUERY_TIMEOUT_SECS}s ({DEFAULT_DB_RETRY_ATTEMPTS} attempts)"
-                    )));
-                }
-                let delay_ms =
-                    DEFAULT_DB_RETRY_INITIAL_DELAY_MS << attempt.saturating_sub(1).min(6);
-                let delay = Duration::from_millis(delay_ms);
-                logger.log(
-                    std::collections::HashMap::from([
-                        (
-                            "op".to_string(),
-                            serde_json::Value::String(format!("db.{op_name}.timeout")),
-                        ),
-                        (
-                            "attempt".to_string(),
-                            serde_json::Value::Number(serde_json::Number::from(attempt)),
-                        ),
-                        (
-                            "delay_ms".to_string(),
-                            serde_json::Value::Number(serde_json::Number::from(delay_ms)),
-                        ),
-                        (
-                            "max_attempts".to_string(),
-                            serde_json::Value::Number(serde_json::Number::from(
-                                DEFAULT_DB_RETRY_ATTEMPTS,
-                            )),
-                        ),
-                    ]),
-                    LogLevel::Warn,
-                );
-                tokio::time::sleep(delay).await;
-            }
-        }
-    }
 }
 
 fn duration_ms(duration: Duration) -> u64 {
@@ -1062,11 +962,9 @@ fn validate_table_name(table: &str) -> Result<(), MemoryError> {
 
 #[cfg(test)]
 mod tests {
-    use std::sync::atomic::{AtomicU32, Ordering};
     use std::sync::{Arc, Mutex};
 
     use super::*;
-    use crate::logging::StdoutLogger;
 
     #[test]
     fn embedded_init_error_translates_lock_signatures_actionably() {
@@ -1500,97 +1398,4 @@ mod tests {
         assert!(fact.get("scope").is_none());
     }
 
-    #[tokio::test]
-    async fn with_db_retry_succeeds_on_first_attempt() {
-        let logger = StdoutLogger::new("warn");
-        let result = with_db_retry("test_op", &logger, || async { Ok::<_, MemoryError>(42) }).await;
-        assert_eq!(result.unwrap(), 42);
-    }
-
-    #[tokio::test]
-    async fn with_db_retry_retries_on_transient_then_succeeds() {
-        let logger = StdoutLogger::new("warn");
-        let call_count = Arc::new(AtomicU32::new(0));
-        let count = call_count.clone();
-
-        let result = with_db_retry("test_op", &logger, || {
-            let count = count.clone();
-            async move {
-                let n = count.fetch_add(1, Ordering::SeqCst);
-                if n < 2 {
-                    Err(MemoryError::Storage(
-                        "Transaction conflict: Resource busy".into(),
-                    ))
-                } else {
-                    Ok::<_, MemoryError>(99)
-                }
-            }
-        })
-        .await;
-
-        assert_eq!(result.unwrap(), 99);
-        assert_eq!(call_count.load(Ordering::SeqCst), 3);
-    }
-
-    #[tokio::test]
-    async fn with_db_retry_fails_after_max_attempts() {
-        let logger = StdoutLogger::new("warn");
-        let call_count = Arc::new(AtomicU32::new(0));
-        let count = call_count.clone();
-
-        let result: Result<i32, MemoryError> = with_db_retry("test_op", &logger, || {
-            let count = count.clone();
-            async move {
-                count.fetch_add(1, Ordering::SeqCst);
-                Err(MemoryError::Storage(
-                    "Transaction conflict: Resource busy".into(),
-                ))
-            }
-        })
-        .await;
-
-        assert!(result.is_err());
-        assert_eq!(call_count.load(Ordering::SeqCst), 3);
-        assert!(
-            result
-                .unwrap_err()
-                .to_string()
-                .contains("Transaction conflict")
-        );
-    }
-
-    #[tokio::test]
-    async fn with_db_retry_does_not_retry_non_transient() {
-        let logger = StdoutLogger::new("warn");
-        let call_count = Arc::new(AtomicU32::new(0));
-        let count = call_count.clone();
-
-        let result: Result<i32, MemoryError> = with_db_retry("test_op", &logger, || {
-            let count = count.clone();
-            async move {
-                count.fetch_add(1, Ordering::SeqCst);
-                Err(MemoryError::Storage("connection refused".into()))
-            }
-        })
-        .await;
-
-        assert!(result.is_err());
-        assert_eq!(call_count.load(Ordering::SeqCst), 1);
-    }
-
-    #[tokio::test]
-    async fn with_db_retry_exhaustion_keeps_last_error() {
-        let logger = StdoutLogger::new("warn");
-        let result: Result<i32, MemoryError> = with_db_retry("test_op", &logger, || async {
-            Err(MemoryError::Storage(
-                "Transaction conflict: Resource busy".into(),
-            ))
-        })
-        .await;
-
-        assert!(result.is_err());
-        let err = result.unwrap_err();
-        assert!(matches!(err, MemoryError::Storage(_)));
-        assert!(err.to_string().contains("Resource busy"));
-    }
 }

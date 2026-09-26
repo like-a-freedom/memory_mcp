@@ -377,7 +377,7 @@ fn classify_failure(err: &MemoryError) -> InboxFailureClass {
             InboxFailureClass::Corrupt
         }
         MemoryError::Validation(_) => InboxFailureClass::Validation,
-        MemoryError::Storage(message) if crate::service::is_transient_db_error(err) => {
+        MemoryError::Storage(message) if crate::platform::persistence::db_errors::is_transient_db_error(err) => {
             InboxFailureClass::Storage
         }
         MemoryError::Storage(message) if message.contains("table") => InboxFailureClass::Storage,
@@ -412,7 +412,7 @@ fn is_corrupt_content(message: &str) -> bool {
 /// DB query retries; the processor must not multiply them).
 fn is_retryable(err: &MemoryError, class: InboxFailureClass) -> bool {
     if let MemoryError::Storage(_) = err {
-        return crate::service::is_transient_db_error(err);
+        return crate::platform::persistence::db_errors::is_transient_db_error(err);
     }
     is_transient_class(class)
 }

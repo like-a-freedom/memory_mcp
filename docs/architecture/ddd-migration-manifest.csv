@@ -47,8 +47,14 @@ control/operator.rs,src/operations/,adapter-or-use-case,operations,administrativ
 control/recent_auth.rs,src/identity/,api-or-adapter,identity,identity administration and browser sessions,Phase 3,HTTP and bootstrap,legacy:control/service/http registry -> Phase 3
 control/secret.rs,src/identity/,api-or-adapter,identity,identity administration and browser sessions,Phase 3,HTTP and bootstrap,legacy:control/service/http registry -> Phase 3
 control/session.rs,src/identity/,api-or-adapter,identity,identity administration and browser sessions,Phase 3,HTTP and bootstrap,legacy:control/service/http registry -> Phase 3
-error.rs,src/shared/,pure-kernel,shared,typed error contract,Phase 2,all contexts,legacy:error.rs -> Phase 2
 eval_support.rs,src/,adapter-or-platform,platform,public adapter and operational support,Phase 2,"binaries, tools and eval harness",legacy:adapter layout -> Phase 2
+platform.rs,src/platform/,module-glue,platform,technical mechanism root (Phase 2 created it; no business orchestration),Phase 2,infra and bootstrap only,forbidden
+platform/persistence.rs,src/platform/,module-glue,platform,database mechanism root,Phase 2,infra and bootstrap only,forbidden
+platform/persistence/db_errors.rs,src/platform/,infra-by-owner,platform,database error classification (Phase 2 moved is_transient_db_error out of the shared kernel),Phase 2,infra and the retry mechanism,forbidden
+platform/persistence/transactions.rs,src/platform/,infra-by-owner,platform,retry-with-backoff and per-query timeout (Phase 2 moved with_db_retry out of the storage client),Phase 2,storage client and bootstrap,forbidden
+shared.rs,src/shared/,module-glue,platform,pure kernel root (Phase 2 created it; holds only runtime- and storage-independent values),Phase 2,every bounded context,forbidden
+shared/error.rs,src/shared/,api-and-application,platform,error vocabulary shared by every context (Phase 2 moved error.rs here),Phase 2,every bounded context,forbidden
+shared/temporal.rs,src/shared/,api-and-application,platform,temporal value semantics (Phase 2 moved service/query/time.rs here),Phase 2,every bounded context,forbidden
 http.rs,src/,module-glue,platform,composition and module glue,Phase 2,bootstrap and module roots,legacy:current module layout -> Phase 2
 http/app_sessions.rs,src/http/,adapter,http,protocol adapter and request mapping,Phase 2,HTTP router,legacy:http -> Phase 2
 http/app_sessions/scheduler.rs,src/provisioning/,application-or-adapter,provisioning,durable workflows and app sessions,Phase 4,HTTP bootstrap and owner APIs,legacy:http workflow modules -> Phase 4
@@ -277,7 +283,6 @@ service/procedures/review.rs,src/memory/,application-or-domain,memory,episodes r
 service/query.rs,src/knowledge/,application-or-domain,knowledge,entities facts and claims,Phase 5,"MCP, CLI, eval harness",legacy:service/knowledge -> Phase 5
 service/query/lexical.rs,src/knowledge/,application-or-domain,knowledge,entities facts and claims,Phase 5,"MCP, CLI, eval harness",legacy:service/knowledge -> Phase 5
 service/query/search.rs,src/knowledge/,application-or-domain,knowledge,entities facts and claims,Phase 5,"MCP, CLI, eval harness",legacy:service/knowledge -> Phase 5
-service/query/time.rs,src/knowledge/,application-or-domain,knowledge,entities facts and claims,Phase 5,"MCP, CLI, eval harness",legacy:service/knowledge -> Phase 5
 service/reembed.rs,src/embedding/,technical-capability,embedding,embedding generation and job state,Phase 5,memory and knowledge APIs,legacy:service/embedding -> Phase 5
 service/reembed_options.rs,src/embedding/,technical-capability,embedding,embedding generation and job state,Phase 5,memory and knowledge APIs,legacy:service/embedding -> Phase 5
 service/reembed_progress.rs,src/embedding/,technical-capability,embedding,embedding generation and job state,Phase 5,memory and knowledge APIs,legacy:service/embedding -> Phase 5

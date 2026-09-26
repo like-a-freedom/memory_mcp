@@ -24,7 +24,6 @@ pub mod entity_extraction_gliner {
 }
 // Re-exported from the neutral `crate::error` home (ADR-0045).
 pub use crate::error::MemoryError;
-pub(crate) use crate::error::is_transient_db_error;
 
 pub(crate) mod apps;
 #[cfg(feature = "mcp-apps")]

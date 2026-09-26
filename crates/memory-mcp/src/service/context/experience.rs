@@ -6,8 +6,8 @@ use chrono::{DateTime, Utc};
 
 use crate::error::MemoryError;
 use crate::models::{AccessPayload, AssembledContextItem, Fact, FactType};
-use crate::service::query::search_query_terms;
-use crate::service::query::{decayed_confidence, normalize_dt};
+use crate::service::query::{decayed_confidence, search_query_terms};
+use crate::shared::temporal::normalize_dt;
 
 use super::filtering::{compare_facts_by_recency, fact_is_active_at, filter_facts_by_constraints};
 use super::lexical::{lexical_query_overlap_for_fact, lexical_query_score_for_fact};
