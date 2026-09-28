@@ -22,7 +22,7 @@ impl LocalAdminAuthority {
     /// reconciled at startup (ADR-0057).
     ///
     /// The fence is passed in rather than joined here because there is one
-    /// writer of `browser_auth_policy` — `RegistryStore::reconcile_browser_policy`
+    /// writer of `browser_auth_policy` — `BrowserPolicyStore::reconcile_browser_policy`
     /// — and the composition already called it once with the full configured
     /// method set. Joining again would be a second transaction against the same
     /// singleton, and a fence that does not enable `local` would let the local

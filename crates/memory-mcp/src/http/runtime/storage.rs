@@ -235,10 +235,7 @@ pub async fn build_runtime_with_options(
     options: RuntimeOptions,
 ) -> Result<TenantRuntime, MemoryError> {
     let plan = crate::http::registry::plan::Plan::from(
-        &registry
-            .store_clone()
-            .load_plan(tenant.plan_version)
-            .await?,
+        &registry.usage().load_plan(tenant.plan_version).await?,
     );
     let tenant_db = match registry.tenant_engine()? {
         super::super::registry::PrivilegedEngine::Remote(privileged) => {

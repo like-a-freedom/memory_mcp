@@ -252,8 +252,8 @@ async fn reconcile_all(
         }
         *last = Some(std::time::Instant::now());
     }
-    let store = registry.store_clone();
-    let tenants = store.list_ready_tenants(None, 100).await?;
+    let usage = registry.usage();
+    let tenants = registry.tenants().list_ready_tenants(None, 100).await?;
     let Some(engine) = registry.tenant_engine_optional() else {
         return Ok(());
     };
@@ -278,8 +278,8 @@ async fn reconcile_all(
             .and_then(|value| value.get("ingested_bytes"))
             .and_then(serde_json::Value::as_u64)
             .unwrap_or(0);
-        let current = store.load_usage(&tenant.id).await?;
-        let registry_plan = store.load_plan(tenant.plan_version).await?;
+        let current = usage.load_usage(&tenant.id).await?;
+        let registry_plan = usage.load_plan(tenant.plan_version).await?;
         let plan = Plan::from(&registry_plan);
         let report = reconcile_usage(
             &plan,
@@ -289,7 +289,7 @@ async fn reconcile_all(
         );
         let bytes_drift = ingested_bytes.abs_diff(current.ingested_bytes);
         if report.repaired || bytes_drift > u64::from(plan.reconciler_drift_threshold) {
-            store
+            usage
                 .reconcile_usage(
                     &tenant.id,
                     UsageCounter {

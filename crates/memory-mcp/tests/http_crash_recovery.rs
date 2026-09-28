@@ -42,7 +42,6 @@ use memory_mcp::http::registry::models::{
     TenantStatus,
 };
 #[allow(unused_imports)]
-use memory_mcp::http::registry::storage::RegistryStore;
 use memory_mcp::http::tasks::scheduler::{ExtractorFn, execute_one_task_for_test};
 use memory_mcp::http::tasks::state::TaskStore as _;
 use memory_mcp::http::tasks::worker::DurableTaskStore;
@@ -103,8 +102,9 @@ async fn seed_reserved_tenant_with_key(registry: RegistryHandle, name: &str, api
     let tenant_id = tenant_id_for(name);
     let tenant_namespace = format!("tns_test_{suffix}");
     let now = chrono::Utc::now();
-    let store = registry.store_clone();
-    store
+    let stores = registry.stores().clone();
+    stores
+        .accounts()
         .write_account(&Account {
             id: account_id.clone(),
             status: AccountStatus::Active,
@@ -113,7 +113,8 @@ async fn seed_reserved_tenant_with_key(registry: RegistryHandle, name: &str, api
         })
         .await
         .expect("write account");
-    store
+    stores
+        .tenants()
         .write_tenant(&Tenant {
             id: tenant_id.clone(),
             status: TenantStatus::Reserved,
@@ -130,7 +131,8 @@ async fn seed_reserved_tenant_with_key(registry: RegistryHandle, name: &str, api
         })
         .await
         .expect("write tenant");
-    store
+    stores
+        .api_keys()
         .write_api_key(&ApiKey {
             id: cred.key_id().to_string(),
             account_id: account_id.clone(),
@@ -163,8 +165,9 @@ async fn seed_ready_sibling(registry: RegistryHandle, name: &str, api_key: &str)
     let tenant_id = tenant_id_for(name);
     let tenant_namespace = format!("tns_test_{suffix}");
     let now = chrono::Utc::now();
-    let store = registry.store_clone();
-    store
+    let stores = registry.stores().clone();
+    stores
+        .accounts()
         .write_account(&Account {
             id: account_id.clone(),
             status: AccountStatus::Active,
@@ -173,7 +176,8 @@ async fn seed_ready_sibling(registry: RegistryHandle, name: &str, api_key: &str)
         })
         .await
         .expect("write sibling account");
-    store
+    stores
+        .tenants()
         .write_tenant(&Tenant {
             id: tenant_id.clone(),
             status: TenantStatus::Ready,
@@ -190,7 +194,8 @@ async fn seed_ready_sibling(registry: RegistryHandle, name: &str, api_key: &str)
         })
         .await
         .expect("write sibling tenant");
-    store
+    stores
+        .api_keys()
         .write_api_key(&ApiKey {
             id: cred.key_id().to_string(),
             account_id: account_id.clone(),
@@ -222,13 +227,13 @@ async fn tick_provisioning_with_injector_and_ttl(
     lease_ttl_secs: i64,
 ) {
     use memory_mcp::http::leases::migration::run_due_provisioning_for;
-    let store = registry.store_clone();
+    let stores = registry.stores().clone();
     let migrations = Arc::new(SurrealTenantMigrations::new(
         registry.tenant_engine().expect("tenant engine"),
     ));
     let _ = run_due_provisioning_for(
         registry,
-        store,
+        memory_mcp::http::leases::migration::TenantAndProvisioning::from_stores(&stores),
         migrations,
         injector,
         100,
@@ -249,7 +254,7 @@ async fn run_provisioning_recovery_in_process(label: &str, fault: FaultPoint) {
     let tenant_id = tenant_id_for(label);
     let injector = Arc::new(FailOnceAt::new(fault));
     let injector_dyn: Arc<dyn FaultInjector> = injector.clone();
-    let store = registry.store_clone();
+    let stores = registry.stores().clone();
     let now = chrono::Utc::now();
     // `TenantReadyCommitted` fires AFTER the Ready transition
     // is committed, so the tenant reaches Ready on the very
@@ -262,7 +267,8 @@ async fn run_provisioning_recovery_in_process(label: &str, fault: FaultPoint) {
         if injector.consumed() == 1 && !fault_observed {
             fault_observed = true;
         }
-        let tenant = store
+        let tenant = stores
+            .tenants()
             .find_tenant_by_id(&tenant_id)
             .await
             .expect("tenant lookup")
@@ -303,7 +309,7 @@ async fn provisioning_recovers_after_lease_claim_fault() {
     let tenant_id = tenant_id_for("recovery_lease");
     let injector = Arc::new(FailOnceAt::new(FaultPoint::ProvisioningLeaseClaimed));
     let injector_dyn: Arc<dyn FaultInjector> = injector.clone();
-    let store = registry.store_clone();
+    let stores = registry.stores().clone();
     let started = Instant::now();
     let mut fault_seen = false;
     // The injected claim fault releases the lease immediately, so a short
@@ -311,7 +317,8 @@ async fn provisioning_recovers_after_lease_claim_fault() {
     // the next tick reclaims the tenant without racing the heartbeat.
     for _ in 0..120 {
         tick_provisioning_with_injector_and_ttl(registry.clone(), injector_dyn.clone(), 30).await;
-        let tenant = store
+        let tenant = stores
+            .tenants()
             .find_tenant_by_id(&tenant_id)
             .await
             .expect("tenant lookup")
@@ -368,9 +375,10 @@ async fn provisioning_resumes_a_tenant_stranded_in_namespace_creating() {
     let label = "recovery_namespace_creating";
     let suffix = hex::encode(&Sha256::digest(label.as_bytes())[..8]);
     let tenant_id = tenant_id_for(label);
-    let store = registry.store_clone();
+    let stores = registry.stores().clone();
     let now = chrono::Utc::now();
-    store
+    stores
+        .accounts()
         .write_account(&Account {
             id: account_id_for(label),
             status: AccountStatus::Active,
@@ -379,7 +387,8 @@ async fn provisioning_resumes_a_tenant_stranded_in_namespace_creating() {
         })
         .await
         .expect("write account");
-    store
+    stores
+        .tenants()
         .write_tenant(&Tenant {
             id: tenant_id.clone(),
             status: TenantStatus::NamespaceCreating,
@@ -398,7 +407,8 @@ async fn provisioning_resumes_a_tenant_stranded_in_namespace_creating() {
         .expect("write stranded tenant");
 
     // The worker must see it as due work at all.
-    let due = store
+    let due = stores
+        .provisioning()
         .list_due_provisioning(100, chrono::Utc::now())
         .await
         .expect("due list");
@@ -411,7 +421,8 @@ async fn provisioning_resumes_a_tenant_stranded_in_namespace_creating() {
         Arc::new(FailOnceAt::new(FaultPoint::TenantReadyCommitted));
     for _ in 0..400 {
         tick_provisioning_with_injector(registry.clone(), injector.clone()).await;
-        let tenant = store
+        let tenant = stores
+            .tenants()
             .find_tenant_by_id(&tenant_id)
             .await
             .expect("tenant lookup")
@@ -440,12 +451,13 @@ async fn outbox_recovery_after_first_mutation_transient() {
     seed_reserved_tenant(registry.clone(), "outbox_recovery").await;
     let tenant_id = tenant_id_for("outbox_recovery");
     let injector_noop: Arc<dyn FaultInjector> = Arc::new(NoFaults);
-    let store = registry.store_clone();
+    let stores = registry.stores().clone();
     let now = chrono::Utc::now();
     let mut converged = false;
     for _ in 0..400 {
         tick_provisioning_with_injector(registry.clone(), injector_noop.clone()).await;
-        let t = store
+        let t = stores
+            .tenants()
             .find_tenant_by_id(&tenant_id)
             .await
             .expect("tenant lookup")
@@ -460,7 +472,8 @@ async fn outbox_recovery_after_first_mutation_transient() {
         tokio::time::sleep(Duration::from_millis(50)).await;
     }
     assert!(converged, "tenant must reach Ready before outbox commit");
-    let tenant = store
+    let tenant = stores
+        .tenants()
         .find_tenant_by_id(&tenant_id)
         .await
         .expect("tenant lookup")
@@ -559,12 +572,13 @@ async fn deletion_recovers_after_finalize_transient() {
     seed_reserved_tenant(registry.clone(), "deletion_recovery").await;
     let tenant_id = tenant_id_for("deletion_recovery");
     let injector_noop: Arc<dyn FaultInjector> = Arc::new(NoFaults);
-    let store = registry.store_clone();
+    let stores = registry.stores().clone();
     let now = chrono::Utc::now();
     let mut converged = false;
     for _ in 0..400 {
         tick_provisioning_with_injector(registry.clone(), injector_noop.clone()).await;
-        let t = store
+        let t = stores
+            .tenants()
             .find_tenant_by_id(&tenant_id)
             .await
             .expect("tenant lookup")
@@ -589,14 +603,17 @@ async fn deletion_recovers_after_finalize_transient() {
     // multi-row limitation that is out of scope for Task 6.
     seed_ready_sibling(registry.clone(), "deletion_recovery_sibling", UNIT_KEY_B).await;
     let sibling_id = tenant_id_for("deletion_recovery_sibling");
-    let sibling_before = store
+    let sibling_before = stores
+        .tenants()
         .find_tenant_by_id(&sibling_id)
         .await
         .expect("sibling lookup")
         .expect("sibling present");
     assert_eq!(sibling_before.status, TenantStatus::Ready);
     let sibling_schema_before = sibling_before.schema_version;
-    store
+    let operator_deletion =
+        memory_mcp::http::registry::control_impl::account_deletion_tx(registry.stores());
+    operator_deletion
         .begin_operator_deletion(&tenant_id, "test", chrono::Utc::now())
         .await
         .expect("begin operator deletion");
@@ -604,7 +621,8 @@ async fn deletion_recovers_after_finalize_transient() {
     run_deletion_recovery_pass(registry.clone(), fault_injector.clone())
         .await
         .expect("a durably committed deletion is reported as success");
-    let after_first = store
+    let after_first = stores
+        .tenants()
         .find_tenant_by_id(&tenant_id)
         .await
         .expect("tenant lookup")
@@ -613,13 +631,15 @@ async fn deletion_recovers_after_finalize_transient() {
     run_deletion_recovery_pass(registry.clone(), Arc::new(NoFaults))
         .await
         .expect("deletion worker retries");
-    let after_second = store
+    let after_second = stores
+        .tenants()
         .find_tenant_by_id(&tenant_id)
         .await
         .expect("tenant lookup")
         .expect("tenant present");
     assert_eq!(after_second.status, TenantStatus::Purged);
-    let sibling_after = store
+    let sibling_after = stores
+        .tenants()
         .find_tenant_by_id(&sibling_id)
         .await
         .expect("sibling lookup")
@@ -679,12 +699,13 @@ async fn bring_tenant_to_ready(
     seed_reserved_tenant(registry.clone(), name).await;
     let tenant_id = tenant_id_for(name);
     let injector_noop: Arc<dyn FaultInjector> = Arc::new(NoFaults);
-    let store = registry.store_clone();
+    let stores = registry.stores().clone();
     let now = chrono::Utc::now();
     let mut converged = false;
     for _ in 0..400 {
         tick_provisioning_with_injector(registry.clone(), injector_noop.clone()).await;
-        let t = store
+        let t = stores
+            .tenants()
             .find_tenant_by_id(&tenant_id)
             .await
             .expect("tenant lookup")
@@ -699,7 +720,8 @@ async fn bring_tenant_to_ready(
         tokio::time::sleep(Duration::from_millis(50)).await;
     }
     assert!(converged, "{name}: tenant must reach Ready");
-    let tenant = store
+    let tenant = stores
+        .tenants()
         .find_tenant_by_id(&tenant_id)
         .await
         .expect("tenant lookup")

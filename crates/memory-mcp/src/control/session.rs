@@ -145,7 +145,7 @@ pub async fn resolve_session_record(
         )
         .map_err(super::error::ApiError::Internal)?,
     );
-    let store = state.registry.store_clone();
+    let store = state.registry.sessions();
     let session = store
         .find_session(policy, &cookie_hash)
         .await
@@ -157,7 +157,9 @@ pub async fn resolve_session_record(
     if session.browser_policy_epoch != Some(policy.epoch) {
         return Err(super::error::ApiError::Unauthorized);
     }
-    let account = store
+    let account = state
+        .registry
+        .accounts()
         .find_account_by_id(&session.account_id)
         .await
         .map_err(super::error::ApiError::Internal)?
@@ -187,7 +189,7 @@ pub async fn resolve_session(
     let session = resolve_session_record(state, cookie_value).await?;
     state
         .registry
-        .store_clone()
+        .accounts()
         .find_account_by_id(&session.account_id)
         .await
         .map_err(super::error::ApiError::Internal)?

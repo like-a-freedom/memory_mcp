@@ -13,13 +13,13 @@
 //! Both halves are now testable in isolation:
 //!
 //! - The application workflow is exercised against an
-//!   in-memory `RegistryStore` without an Axum router.
+//!   in-memory registry backend without an Axum router.
 //! - The HTTP adapter is exercised with a fake workflow.
 //!
-//! The workflows hold the omnibus `Arc<dyn RegistryStore>`
-//! (the `RegistryStores` aggregator that would hold typed
-//! `Arc<dyn Capability>` views is deferred; see
-//! `docs/adr/0054-capability-specific-control-registry-interfaces.md`
-//! and the plan's Task 10 status note).
+//! Each workflow holds the owner traits it crosses — `OidcSignup` takes the
+//! account and provisioning stores and nothing else — so a test wires two
+//! fakes rather than a registry it would then have to implement in full. That
+//! is the shape ADR-0054 argued for, and
+//! [`crate::http::registry::RegistryStores`] now provides it.
 
 pub mod oidc_signup;

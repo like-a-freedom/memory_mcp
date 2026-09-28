@@ -7,7 +7,7 @@
 //!
 //! [`HttpStateTestBuilder::local_admin`] is the explicit durable
 //! local composition: a migrated in-memory Registry store exposed as
-//! both `RegistryStore` and `LocalAdminStore`, a local-mode browser
+//! both the registry owner traits and `LocalAdminStore`, a local-mode browser
 //! policy, and fixed test keys. Nothing is partially injected — the
 //! policy, the store and the config are validated together by
 //! `HttpState::assemble`.
@@ -66,10 +66,10 @@ impl HttpStateTestBuilder {
                 .expect("migrated in-memory registry"),
         );
         let local_store: std::sync::Arc<dyn LocalAdminStore> = store.clone();
-        let registry_store: std::sync::Arc<dyn super::registry::RegistryStore> = store.clone();
+        let registry_backend: std::sync::Arc<dyn super::registry::RegistryBackend> = store.clone();
         let engine = store.privileged_engine();
         let registry = super::registry::RegistryHandle::from_durable(
-            registry_store,
+            registry_backend,
             Some(local_store),
             engine,
         );

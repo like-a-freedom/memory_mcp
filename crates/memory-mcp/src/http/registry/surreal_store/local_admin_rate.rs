@@ -149,8 +149,8 @@ mod tests {
     /// A registry handle carrying both trait surfaces for the same durable
     /// store, exactly as the production composition builds it.
     fn handle(store: Arc<SurrealRegistryStore>) -> crate::http::registry::RegistryHandle {
-        let registry: Arc<dyn crate::http::registry::RegistryStore> = store.clone();
-        crate::http::registry::RegistryHandle::from_store(registry).with_local_admin_store(store)
+        let backend: Arc<dyn crate::http::registry::RegistryBackend> = store.clone();
+        crate::http::registry::RegistryHandle::from_store(backend).with_local_admin_store(store)
     }
 
     async fn insert_bucket(store: &SurrealRegistryStore, id: &str, expires_offset_secs: i64) {
@@ -230,8 +230,8 @@ mod tests {
     #[tokio::test]
     async fn scheduler_job_is_a_no_op_without_a_local_admin_store() {
         let store = Arc::new(store().await);
-        let registry: Arc<dyn crate::http::registry::RegistryStore> = store.clone();
-        let handle = crate::http::registry::RegistryHandle::from_store(registry);
+        let backend: Arc<dyn crate::http::registry::RegistryBackend> = store.clone();
+        let handle = crate::http::registry::RegistryHandle::from_store(backend);
         cleanup_expired_now(handle)
             .await
             .expect("a data-plane-only handle must not fail the job");

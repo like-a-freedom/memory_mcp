@@ -12,7 +12,7 @@ use crate::error::MemoryError;
 use crate::http::registry::models::Account;
 use crate::http::registry::models::BrowserPolicyFence;
 use crate::http::registry::models::SubjectVerifier;
-use crate::http::registry::storage::RegistryStore;
+use crate::http::registry::storage::{AccountStore, ProvisioningStore};
 
 /// An OIDC-verified identity, ready to be resolved to an
 /// existing account or to provision a new one. The raw OIDC
@@ -26,20 +26,26 @@ pub(crate) struct VerifiedExternalIdentity {
 
 /// The application-layer OIDC signup workflow.
 ///
-/// The struct holds the omnibus `Arc<dyn RegistryStore>` while
-/// Task 10 (consumer migration onto capability traits) is
-/// deferred. The two-capability field shape documented in the
-/// plan returns when the `RegistryStores` aggregator is
-/// available.
+/// The struct holds the two owner traits the workflow actually crosses, as
+/// this plan's deferred two-field shape required. Reading an account by
+/// identity and creating a bundle are account-owned; the provisioning event
+/// that advances a new tenant toward Ready is provisioning's. Nothing else
+/// was reachable here before, because it held the whole registry.
 pub(crate) struct OidcSignup {
-    store: Arc<dyn RegistryStore>,
+    accounts: Arc<dyn AccountStore>,
+    provisioning: Arc<dyn ProvisioningStore>,
 }
 
 impl OidcSignup {
-    /// Build a workflow from the registry store the HTTP
-    /// composition selected.
-    pub(crate) fn new(store: Arc<dyn RegistryStore>) -> Self {
-        Self { store }
+    /// Build a workflow from the owner stores the HTTP composition selected.
+    pub(crate) fn new(
+        accounts: Arc<dyn AccountStore>,
+        provisioning: Arc<dyn ProvisioningStore>,
+    ) -> Self {
+        Self {
+            accounts,
+            provisioning,
+        }
     }
 
     /// Resolve the verified identity to an existing account,
@@ -78,7 +84,7 @@ impl OidcSignup {
         // (no move) so the conflict-handling path can
         // borrow it again after the read.
         if let Some(account) = self
-            .store
+            .accounts
             .find_account_by_identity(&identity.issuer, &identity.subject_verifier)
             .await?
         {
@@ -103,7 +109,7 @@ impl OidcSignup {
         let (account, tenant, identity_record) =
             build_bundle(identity.issuer, identity.subject_verifier, now);
         match self
-            .store
+            .accounts
             .create_oidc_account_bundle(policy, &account, &tenant, &identity_record)
             .await
         {
@@ -111,7 +117,7 @@ impl OidcSignup {
                 // We won the race. Append the provisioning
                 // event so the scheduler advances the new
                 // tenant through Reserved -> Ready.
-                self.store
+                self.provisioning
                     .append_provisioning_event(&tenant.id, "reserved")
                     .await?;
                 Ok(account)
@@ -121,7 +127,7 @@ impl OidcSignup {
                 // winner now exists, return it. Otherwise
                 // surface the original conflict.
                 if let Some(account) = self
-                    .store
+                    .accounts
                     .find_account_by_identity(&issuer, &subject_verifier)
                     .await?
                 {
@@ -165,7 +171,7 @@ fn build_bundle(
 #[cfg(test)]
 mod tests {
     //! Workflow tests for `OidcSignup`. They construct the
-    //! workflow against an in-memory `RegistryStore` and
+    //! workflow against an in-memory registry backend and
     //! exercise the contract: existing identity, atomic
     //! bundle, provisioning-event append, and the race-loss
     //! reread. The HTTP-adapter tests in `oidc.rs` cover
@@ -210,7 +216,10 @@ mod tests {
         let store = Arc::new(InMemoryStore::default());
         let now = chrono::Utc::now();
         let fence = join_fence(&store).await;
-        let workflow = OidcSignup::new(store.clone());
+        let workflow = OidcSignup::new(
+            store.clone() as Arc<dyn AccountStore>,
+            store.clone() as Arc<dyn ProvisioningStore>,
+        );
         let account = workflow
             .resolve_or_create(&fence, verified("https://issuer.example.com", 0xAA), now)
             .await
@@ -236,7 +245,10 @@ mod tests {
         let store = Arc::new(InMemoryStore::default());
         let now = chrono::Utc::now();
         let fence = join_fence(&store).await;
-        let workflow = OidcSignup::new(store.clone());
+        let workflow = OidcSignup::new(
+            store.clone() as Arc<dyn AccountStore>,
+            store.clone() as Arc<dyn ProvisioningStore>,
+        );
         let first = workflow
             .resolve_or_create(&fence, verified("https://issuer.example.com", 0xBB), now)
             .await
@@ -303,7 +315,10 @@ mod tests {
         // path requires a race that the unit test cannot
         // stage deterministically. The test still proves
         // the idempotency contract.
-        let workflow = OidcSignup::new(store.clone());
+        let workflow = OidcSignup::new(
+            store.clone() as Arc<dyn AccountStore>,
+            store.clone() as Arc<dyn ProvisioningStore>,
+        );
         let fence = join_fence(&store).await;
         let account = workflow
             .resolve_or_create(&fence, verified("https://issuer.example.com", 0xCC), now)
@@ -322,10 +337,13 @@ mod tests {
         store.inject_oidc_conflict(Some((winner, winner_tenant, winner_identity)));
 
         let fence = join_fence(&store).await;
-        let account = OidcSignup::new(store)
-            .resolve_or_create(&fence, verified("https://issuer.example.com", 0xCD), now)
-            .await
-            .expect("conflict must resolve to the concurrent winner");
+        let account = OidcSignup::new(
+            store.clone() as Arc<dyn AccountStore>,
+            store.clone() as Arc<dyn ProvisioningStore>,
+        )
+        .resolve_or_create(&fence, verified("https://issuer.example.com", 0xCD), now)
+        .await
+        .expect("conflict must resolve to the concurrent winner");
         assert_eq!(account.id, winner_id);
     }
 
@@ -335,9 +353,12 @@ mod tests {
         let now = chrono::Utc::now();
         store.inject_oidc_conflict(None);
         let fence = join_fence(&store).await;
-        let result = OidcSignup::new(store)
-            .resolve_or_create(&fence, verified("https://issuer.example.com", 0xCE), now)
-            .await;
+        let result = OidcSignup::new(
+            store.clone() as Arc<dyn AccountStore>,
+            store.clone() as Arc<dyn ProvisioningStore>,
+        )
+        .resolve_or_create(&fence, verified("https://issuer.example.com", 0xCE), now)
+        .await;
         assert!(matches!(result, Err(MemoryError::Conflict(_))));
     }
 
@@ -359,7 +380,10 @@ mod tests {
             methods: vec![BrowserAuthMethod::Oidc],
             epoch: durable.epoch + 1,
         };
-        let workflow = OidcSignup::new(store.clone());
+        let workflow = OidcSignup::new(
+            store.clone() as Arc<dyn AccountStore>,
+            store.clone() as Arc<dyn ProvisioningStore>,
+        );
         let stale_result = workflow
             .resolve_or_create(&stale, verified("https://issuer.example.com", 0xD1), now)
             .await;
@@ -405,7 +429,10 @@ mod tests {
         let store = Arc::new(InMemoryStore::default());
         let now = chrono::Utc::now();
         let fence = join_fence(&store).await;
-        let workflow = OidcSignup::new(store.clone());
+        let workflow = OidcSignup::new(
+            store.clone() as Arc<dyn AccountStore>,
+            store.clone() as Arc<dyn ProvisioningStore>,
+        );
         let alice = workflow
             .resolve_or_create(&fence, verified("https://issuer.example.com", 0x01), now)
             .await

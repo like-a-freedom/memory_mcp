@@ -6,7 +6,7 @@
 //! (body parsing, headers, status codes, cookies); the
 //! business workflows live in `super::application::*` so
 //! each can be exercised in isolation against an in-memory
-//! `RegistryStore`.
+//! registry backend.
 //!
 //! Routes:
 //!
@@ -52,8 +52,6 @@ use super::operator::OperatorPrincipal;
 use crate::http::HttpState;
 use crate::http::registry::models::*;
 use crate::http::registry::provisioning::enqueue_provisioning;
-
-use crate::platform::persistence::control::AccountBundleTx;
 
 #[derive(serde::Deserialize)]
 pub struct CreateAccountRequest {
@@ -106,10 +104,17 @@ pub async fn get_account(
         super::session::ControlPlaneSession,
     >,
 ) -> Result<Response, ApiError> {
-    let store = state.registry.store_clone();
-    let account = store.find_account_by_id(&session.account_id).await?;
+    let account = state
+        .registry
+        .accounts()
+        .find_account_by_id(&session.account_id)
+        .await?;
     let account = account.ok_or(ApiError::NotFound)?;
-    let tenant = store.find_tenant_by_account(&account.id).await?;
+    let tenant = state
+        .registry
+        .tenants()
+        .find_tenant_by_account(&account.id)
+        .await?;
     let resp = serde_json::json!({
         "account": account,
         "tenant_status": tenant.map(|t| t.status),
@@ -251,7 +256,7 @@ pub async fn list_api_keys(
 ) -> Result<Response, ApiError> {
     let keys = state
         .registry
-        .store_clone()
+        .api_keys()
         .list_api_keys(&session.account_id)
         .await?;
     json_response(StatusCode::OK, &keys)
@@ -267,7 +272,7 @@ pub async fn revoke_api_key(
 ) -> Result<StatusCode, ApiError> {
     state
         .registry
-        .store_clone()
+        .api_keys()
         .revoke_api_key(&session.account_id, &key_id)
         .await?;
     Ok(StatusCode::NO_CONTENT)
@@ -282,7 +287,7 @@ pub async fn list_identity_links(
 ) -> Result<Response, ApiError> {
     let identities = state
         .registry
-        .store_clone()
+        .identities()
         .find_external_identities(&session.account_id)
         .await?;
     json_response(StatusCode::OK, &identities)
@@ -375,7 +380,7 @@ pub async fn start_account_deletion(
     };
     state
         .registry
-        .store_clone()
+        .sessions()
         .create_deletion_challenge(&challenge)
         .await?;
     let response = serde_json::json!({
@@ -507,12 +512,11 @@ pub async fn create_account(
         created_at: chrono::Utc::now(),
         version: 0,
     };
-    let store = state.registry.store_clone();
-    let bundle_tx: Arc<dyn AccountBundleTx> = Arc::new(store.clone()) as Arc<dyn AccountBundleTx>;
+    let bundle_tx = crate::http::registry::control_impl::account_bundle_tx(state.registry.stores());
     bundle_tx
         .create_account_bundle(&account, &tenant, None)
         .await?;
-    enqueue_provisioning(&store, &tenant).await?;
+    enqueue_provisioning(&state.registry.stores().provisioning(), &tenant).await?;
     account_created_response(&account)
 }
 

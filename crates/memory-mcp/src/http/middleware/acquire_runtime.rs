@@ -62,8 +62,9 @@ pub async fn acquire_runtime(
         .as_ref()
         .is_some_and(|request| request.subscription);
     let source_bytes = validated.and_then(|request| request.ingest_source_bytes);
-    let store = state.registry.store_clone();
-    let registry_plan = match store.load_plan(tenant.plan_version).await {
+    // The admission gate reads the tenant's plan, which is the whole of what
+    // it needs from the registry.
+    let registry_plan = match state.registry.usage().load_plan(tenant.plan_version).await {
         Ok(plan) => plan,
         Err(error) => {
             eprintln!("memory_mcp::http: quota plan load failed: {error}");
@@ -76,7 +77,9 @@ pub async fn acquire_runtime(
     };
     let plan = Plan::from(&registry_plan);
     if let Some(source_bytes) = source_bytes {
-        let decision = match store
+        let decision = match state
+            .registry
+            .usage()
             .reserve_ingest_usage(&tenant.tenant_id, source_bytes, &plan, chrono::Utc::now())
             .await
         {

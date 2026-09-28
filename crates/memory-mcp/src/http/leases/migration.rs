@@ -19,11 +19,43 @@ use std::sync::Arc;
 
 use crate::error::MemoryError;
 use crate::http::leases::ProvisioningLease;
-use crate::http::registry::RegistryStore;
 use crate::http::registry::models::TenantStatus;
 use crate::http::registry::provisioning::transition_fenced;
 use crate::http::registry::storage::LeaseFence;
+use crate::http::registry::storage::{ProvisioningStore, TenantStore};
 use crate::platform::fault_injection::{FaultInjector, FaultPoint};
+
+/// The two owner traits the provisioning worker crosses.
+///
+/// Advancing a tenant is a `tenant` write under a lease; the lease itself
+/// lives in provisioning's fenced store. They are one workflow, so they arrive
+/// together — but naming them is the point: this worker can no longer reach the
+/// account, identity, session or API-key tables, which the omnibus handle
+/// allowed it to.
+#[derive(Clone)]
+pub struct TenantAndProvisioning {
+    pub tenants: Arc<dyn TenantStore>,
+    pub provisioning: Arc<dyn ProvisioningStore>,
+}
+
+impl TenantAndProvisioning {
+    pub fn from_stores(stores: &crate::http::registry::RegistryStores) -> Self {
+        Self {
+            tenants: Arc::clone(&stores.tenants),
+            provisioning: Arc::clone(&stores.provisioning),
+        }
+    }
+}
+
+impl std::ops::Deref for TenantAndProvisioning {
+    type Target = dyn TenantStore;
+
+    /// Tenant reads resolve through this, so the worker's existing call sites
+    /// read the same as before. Provisioning's own calls name the field.
+    fn deref(&self) -> &Self::Target {
+        &*self.tenants
+    }
+}
 
 /// The schema version this binary ships. The actual
 /// migrations live in
@@ -208,7 +240,7 @@ impl ApplyMigrations for SurrealTenantMigrations {
 /// on a fresh process, sees the partial state and advances
 /// it forward.
 pub async fn provision_one(
-    store: Arc<dyn RegistryStore>,
+    store: TenantAndProvisioning,
     tenant_id: &str,
     lease: ProvisioningLease,
     migrations: Arc<dyn ApplyMigrations>,
@@ -260,7 +292,7 @@ pub async fn provision_one(
     let retry_from = tenant.retry_stage;
     if tenant.status == TenantStatus::Reserved {
         transition_fenced(
-            store.as_ref(),
+            &*store,
             tenant_id,
             tenant.version,
             TenantStatus::Reserved,
@@ -272,7 +304,7 @@ pub async fn provision_one(
         let stage = retry_from
             .ok_or_else(|| MemoryError::Validation("failed tenant has no retry stage".into()))?;
         transition_fenced(
-            store.as_ref(),
+            &*store,
             tenant_id,
             tenant.version,
             TenantStatus::Failed,
@@ -288,7 +320,7 @@ pub async fn provision_one(
         .ok_or_else(|| MemoryError::NotFound(format!("tenant {tenant_id}")))?;
     if tenant.status == TenantStatus::NamespaceCreating {
         transition_fenced(
-            store.as_ref(),
+            &*store,
             tenant_id,
             tenant.version,
             TenantStatus::NamespaceCreating,
@@ -321,6 +353,7 @@ pub async fn provision_one(
             // Release the lease so the next worker re-claims
             // and re-runs the migration scripts.
             let _ = store
+                .provisioning
                 .release_provisioning_lease(
                     tenant_id,
                     &lease.owner_id,
@@ -355,6 +388,7 @@ pub async fn provision_one(
             // `Migrating`.
             if matches!(error, MemoryError::Transient(_)) || is_lease_loss(&error) {
                 let _ = store
+                    .provisioning
                     .release_provisioning_lease(
                         tenant_id,
                         &lease.owner_id,
@@ -369,7 +403,7 @@ pub async fn provision_one(
                 )
             {
                 let _ = transition_fenced(
-                    store.as_ref(),
+                    &*store,
                     tenant_id,
                     failed.version,
                     failed.status,
@@ -391,6 +425,7 @@ pub async fn provision_one(
         // Transient: release the lease so the next worker
         // re-claims and finishes the Ready transition.
         let _ = store
+            .provisioning
             .release_provisioning_lease(
                 tenant_id,
                 &lease.owner_id,
@@ -417,7 +452,7 @@ pub async fn provision_one(
         )
         .await?;
     transition_fenced(
-        store.as_ref(),
+        &*store,
         tenant_id,
         new_version,
         TenantStatus::Migrating,
@@ -435,6 +470,7 @@ pub async fn provision_one(
     // sweep. We do not regress the Ready transition on a
     // release failure.
     if let Err(error) = store
+        .provisioning
         .release_provisioning_lease(
             tenant_id,
             &lease.owner_id,
@@ -465,7 +501,7 @@ pub async fn run_due_provisioning(
     migrations: Arc<dyn ApplyMigrations>,
     fault_injector: Arc<dyn FaultInjector>,
 ) -> Result<(), MemoryError> {
-    let store = registry.store_clone();
+    let store = TenantAndProvisioning::from_stores(registry.stores());
     run_due_provisioning_for(
         registry,
         store,
@@ -485,18 +521,19 @@ pub async fn run_due_provisioning(
 /// re-claim without waiting for a 60-second TTL.
 pub async fn run_due_provisioning_for(
     registry: crate::http::registry::RegistryHandle,
-    store: Arc<dyn crate::http::registry::RegistryStore>,
+    store: TenantAndProvisioning,
     migrations: Arc<dyn ApplyMigrations>,
     fault_injector: Arc<dyn FaultInjector>,
     limit: usize,
     now: chrono::DateTime<chrono::Utc>,
     lease_ttl_secs: i64,
 ) -> Result<(), MemoryError> {
-    let due = store.list_due_provisioning(limit, now).await?;
+    let due = store.provisioning.list_due_provisioning(limit, now).await?;
     for tenant in due {
         let lease_id = uuid::Uuid::new_v4().to_string();
         let owner_id = crate::http::leases::scheduler::replica_id();
         let claim = match store
+            .provisioning
             .claim_provisioning(&tenant.id, &owner_id, &lease_id, lease_ttl_secs)
             .await
         {
@@ -532,6 +569,7 @@ pub async fn run_due_provisioning_for(
         // waiting for the TTL.
         if let Err(transient) = fault_injector.hit(FaultPoint::ProvisioningLeaseClaimed) {
             let _ = store
+                .provisioning
                 .release_provisioning_lease(
                     &tenant.id,
                     &owner_id,
@@ -595,7 +633,7 @@ fn is_lease_loss(error: &MemoryError) -> bool {
 /// Heartbeat the lease on a `lease_ttl / 3` cadence with
 /// ±20% jitter while the body runs.
 pub async fn run_heartbeated<F, T>(
-    store: Arc<dyn RegistryStore>,
+    store: TenantAndProvisioning,
     tenant_id: &str,
     lease: ProvisioningLease,
     body: F,
@@ -629,7 +667,7 @@ where
 
     let heartbeat_cancel = tokio_util::sync::CancellationToken::new();
     let (lost_tx, mut lost_rx) = tokio::sync::oneshot::channel();
-    let heartbeat_store = store;
+    let heartbeat_store = store.provisioning;
     let heartbeat_tenant = tenant_id.to_owned();
     let heartbeat_lease = lease;
     let heartbeat_cancel_task = heartbeat_cancel.clone();
@@ -641,7 +679,7 @@ where
                     let now = chrono::Utc::now();
                     let expiry = now + chrono::Duration::seconds(ttl_secs);
                     if heartbeat_lease
-                        .heartbeat(heartbeat_store.as_ref(), &heartbeat_tenant, now, expiry)
+                        .heartbeat(&*heartbeat_store, &heartbeat_tenant, now, expiry)
                         .await
                         .is_err()
                     {
@@ -752,7 +790,9 @@ mod tests {
         let lease = lease_for("ten_1");
         seed_with_lease(&store, "ten_1", &lease).await;
         provision_one(
-            store.clone(),
+            TenantAndProvisioning::from_stores(
+                &crate::http::registry::RegistryStores::from_backend(store.clone()),
+            ),
             "ten_1",
             lease,
             Arc::new(NoopMigrations),
@@ -796,7 +836,9 @@ mod tests {
         let lease = lease_for("ten_2");
         seed_with_lease(&store, "ten_2", &lease).await;
         let res = provision_one(
-            store.clone(),
+            TenantAndProvisioning::from_stores(
+                &crate::http::registry::RegistryStores::from_backend(store.clone()),
+            ),
             "ten_2",
             lease,
             Arc::new(FailingMigrations),
@@ -828,7 +870,9 @@ mod tests {
         seed_reserved(&store, &tenant).await;
         let lease = lease_for("ten_3");
         provision_one(
-            store.clone(),
+            TenantAndProvisioning::from_stores(
+                &crate::http::registry::RegistryStores::from_backend(store.clone()),
+            ),
             "ten_3",
             lease,
             Arc::new(NoopMigrations),
@@ -861,7 +905,9 @@ mod tests {
         seed_reserved(&store, &tenant).await;
         run_due_provisioning_for(
             registry.clone(),
-            store.clone(),
+            TenantAndProvisioning::from_stores(
+                &crate::http::registry::RegistryStores::from_backend(store.clone()),
+            ),
             Arc::new(NoopMigrations),
             no_faults(),
             1,
@@ -891,7 +937,9 @@ mod tests {
         let lease = lease_for("ten_old");
         seed_with_lease(&store, "ten_old", &lease).await;
         let result = provision_one(
-            store.clone(),
+            TenantAndProvisioning::from_stores(
+                &crate::http::registry::RegistryStores::from_backend(store.clone()),
+            ),
             "ten_old",
             lease,
             Arc::new(NoopMigrations),
@@ -950,10 +998,19 @@ mod tests {
             .expect("claim")
             .expect("lease");
         let adapter = Arc::new(SurrealTenantMigrations::new(durable.privileged_engine()));
-        provision_one(durable.clone(), &tenant.id, lease, adapter, no_faults())
-            .await
-            .expect("durable provisioning");
-        let ready = durable
+        provision_one(
+            TenantAndProvisioning::from_stores(
+                &crate::http::registry::RegistryStores::from_backend(durable.clone()),
+            ),
+            &tenant.id,
+            lease,
+            adapter,
+            no_faults(),
+        )
+        .await
+        .expect("durable provisioning");
+        let ready = crate::http::registry::RegistryStores::from_backend(durable.clone())
+            .tenants()
             .find_tenant_by_id(&tenant.id)
             .await
             .expect("read tenant")
@@ -974,7 +1031,9 @@ mod tests {
         let lease = lease_for("ten_roll");
         seed_with_lease(&store, "ten_roll", &lease).await;
         provision_one(
-            store.clone(),
+            TenantAndProvisioning::from_stores(
+                &crate::http::registry::RegistryStores::from_backend(store.clone()),
+            ),
             "ten_roll",
             lease,
             Arc::new(NoopMigrations),

@@ -3,23 +3,31 @@ use std::sync::Arc;
 use crate::MemoryError;
 use crate::http::config::HttpConfig;
 use crate::http::registry::models::BrowserPolicyFence;
-use crate::http::registry::storage::RegistryStore;
+use crate::http::registry::storage::{AccountStore, SessionStore};
 use crate::identity::api::{InvitationSession, InvitationSessionPort};
 
+/// A first-login session for an invited account.
+///
+/// Two owner traits, and the pair is the whole of what it needs: it reads the
+/// account to mint a session against, and it reads and writes the session. It
+/// used to hold the registry, which also let it issue API keys.
 pub(crate) struct ControlSessionInvitationAdapter {
-    store: Arc<dyn RegistryStore>,
+    accounts: Arc<dyn AccountStore>,
+    sessions: Arc<dyn SessionStore>,
     config: HttpConfig,
     policy: BrowserPolicyFence,
 }
 
 impl ControlSessionInvitationAdapter {
     pub(crate) fn new(
-        store: Arc<dyn RegistryStore>,
+        accounts: Arc<dyn AccountStore>,
+        sessions: Arc<dyn SessionStore>,
         config: HttpConfig,
         policy: BrowserPolicyFence,
     ) -> Self {
         Self {
-            store,
+            accounts,
+            sessions,
             config,
             policy,
         }
@@ -40,10 +48,14 @@ impl InvitationSessionPort for ControlSessionInvitationAdapter {
             &self.config.keys.control_plane_session,
             cookie.as_bytes(),
         )?);
-        let Some(session) = self.store.find_session(&self.policy, &cookie_hash).await? else {
+        let Some(session) = self
+            .sessions
+            .find_session(&self.policy, &cookie_hash)
+            .await?
+        else {
             return Ok(false);
         };
-        self.store
+        self.sessions
             .touch_session(&self.policy, &session.id, &cookie_hash)
             .await?;
         Ok(true)
@@ -51,7 +63,7 @@ impl InvitationSessionPort for ControlSessionInvitationAdapter {
 
     async fn issue_session(&self, account_id: &str) -> Result<InvitationSession, MemoryError> {
         let account = self
-            .store
+            .accounts
             .find_account_by_id(account_id)
             .await?
             .ok_or_else(|| MemoryError::NotFound("invitation account not found".into()))?;
@@ -62,7 +74,7 @@ impl InvitationSessionPort for ControlSessionInvitationAdapter {
             self.policy.epoch,
             &self.config,
         )?;
-        self.store.store_session(&self.policy, &session).await?;
+        self.sessions.store_session(&self.policy, &session).await?;
         Ok(InvitationSession { cookie_value })
     }
 }

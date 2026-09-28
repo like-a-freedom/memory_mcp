@@ -198,7 +198,7 @@ pub struct IdentityRef {
 }
 
 /// Browser-auth policy fence returned by `reconcile_browser_policy`.
-/// The storage layer defines this so the `RegistryStore` trait can
+/// The storage layer defines this so the owner store traits can
 /// reference it without importing the local_admin service contracts.
 #[derive(Debug, Clone)]
 pub struct BrowserPolicyFence {

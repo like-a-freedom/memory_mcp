@@ -1556,7 +1556,7 @@ impl LocalAdminStore for SurrealRegistryStore {
     ///
     /// The key is persisted in **two** tables in the same transaction:
     /// `api_key` is the single durable source of truth for data-plane
-    /// bearer authorization (`RegistryStore::find_api_key`) and for key
+    /// bearer authorization (`ApiKeyStore::find_api_key`) and for key
     /// metadata (this method reads it back from there), and
     /// `local_admin_client_key` is the local-workflow ledger the admin
     /// surface scopes revocation by. Because both rows commit together

@@ -75,8 +75,7 @@ async fn retry_reconcile_and_retain_with_options(
     options: crate::http::runtime::storage::RuntimeOptions,
     fault_injector: Arc<dyn FaultInjector>,
 ) -> Result<(), MemoryError> {
-    let store = registry.store_clone();
-    let tenants = store.list_ready_tenants(None, 100).await?;
+    let tenants = registry.tenants().list_ready_tenants(None, 100).await?;
     let Some(engine) = registry.tenant_engine_optional() else {
         return Ok(());
     };

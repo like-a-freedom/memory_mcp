@@ -2,23 +2,29 @@ use std::sync::Arc;
 
 use crate::MemoryError;
 use crate::http::config::{BrowserAuthMethod, HttpConfig};
-use crate::http::registry::storage::RegistryStore;
+use crate::http::registry::storage::BrowserPolicyStore;
 use crate::identity::api::{AuthMethod, AuthMethodPolicy, AuthMethodPolicyPort};
 
+/// The durable browser-auth policy, behind the one trait that owns it.
+///
+/// Both methods this port needs live on `BrowserPolicyStore` and nowhere else,
+/// so the adapter takes that trait rather than the registry it used to be
+/// handed. The capability it gives up — issuing API keys, mutating tenants —
+/// was never its to exercise.
 pub(crate) struct RegistryAuthMethodPolicy {
-    store: Arc<dyn RegistryStore>,
+    store: Arc<dyn BrowserPolicyStore>,
     config: Option<HttpConfig>,
 }
 
 impl RegistryAuthMethodPolicy {
-    pub(crate) fn new(store: Arc<dyn RegistryStore>, config: HttpConfig) -> Self {
+    pub(crate) fn new(store: Arc<dyn BrowserPolicyStore>, config: HttpConfig) -> Self {
         Self {
             store,
             config: Some(config),
         }
     }
 
-    pub(crate) fn for_explicit_removal(store: Arc<dyn RegistryStore>) -> Self {
+    pub(crate) fn for_explicit_removal(store: Arc<dyn BrowserPolicyStore>) -> Self {
         Self {
             store,
             config: None,

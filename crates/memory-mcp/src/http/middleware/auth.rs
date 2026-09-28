@@ -120,7 +120,7 @@ pub async fn authenticate_control_plane_operator(
     };
     let identities = match state
         .registry
-        .store_clone()
+        .identities()
         .find_external_identities(&session.account_id)
         .await
     {

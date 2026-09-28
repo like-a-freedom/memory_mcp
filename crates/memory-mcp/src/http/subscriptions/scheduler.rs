@@ -24,7 +24,7 @@ pub fn scheduler_job() -> SchedulerJob {
 /// outbox probe. The event log itself is authoritative; no volatile subscriber
 /// state is written here.
 pub async fn poll_and_repair_all(registry: &RegistryHandle) -> Result<(), MemoryError> {
-    let tenants = registry.store_clone().list_ready_tenants(None, 100).await?;
+    let tenants = registry.tenants().list_ready_tenants(None, 100).await?;
     let Some(engine) = registry.tenant_engine_optional() else {
         return Ok(());
     };

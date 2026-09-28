@@ -10,8 +10,6 @@
 
 use std::sync::Arc;
 
-use crate::platform::persistence::control::AccountDeletionTx;
-
 #[cfg(any(test, feature = "test-fixtures"))]
 use axum::http::StatusCode;
 #[cfg(any(test, feature = "test-fixtures"))]
@@ -86,7 +84,7 @@ pub async fn get_tenant(
     operator.require_recent_auth()?;
     let tenant = state
         .registry
-        .store_clone()
+        .tenants()
         .find_tenant_by_id(&tenant_id)
         .await?;
     let tenant = tenant.ok_or(super::error::ApiError::NotFound)?;
@@ -111,7 +109,7 @@ pub async fn retry_tenant(
     axum::extract::Path(tenant_id): axum::extract::Path<String>,
 ) -> Result<axum::http::StatusCode, super::error::ApiError> {
     operator.require_recent_auth()?;
-    let store = state.registry.store_clone();
+    let store = state.registry.tenants();
     let tenant = store
         .find_tenant_by_id(&tenant_id)
         .await?
@@ -140,7 +138,7 @@ pub async fn suspend_tenant(
     axum::extract::Path(tenant_id): axum::extract::Path<String>,
 ) -> Result<axum::http::StatusCode, super::error::ApiError> {
     operator.require_recent_auth()?;
-    let store = state.registry.store_clone();
+    let store = state.registry.tenants();
     let tenant = store
         .find_tenant_by_id(&tenant_id)
         .await?
@@ -176,7 +174,7 @@ pub async fn resume_tenant(
     axum::extract::Path(tenant_id): axum::extract::Path<String>,
 ) -> Result<axum::http::StatusCode, super::error::ApiError> {
     operator.require_recent_auth()?;
-    let store = state.registry.store_clone();
+    let store = state.registry.tenants();
     let tenant = store
         .find_tenant_by_id(&tenant_id)
         .await?
@@ -199,8 +197,8 @@ pub async fn purge_tenant(
     axum::extract::Path(tenant_id): axum::extract::Path<String>,
 ) -> Result<axum::http::StatusCode, super::error::ApiError> {
     operator.require_recent_auth()?;
-    let store = state.registry.store_clone();
-    let tx: Arc<dyn AccountDeletionTx> = Arc::new(store.clone()) as Arc<dyn AccountDeletionTx>;
+    let store = state.registry.tenants();
+    let tx = crate::http::registry::control_impl::account_deletion_tx(state.registry.stores());
     let tenant = store
         .find_tenant_by_id(&tenant_id)
         .await?

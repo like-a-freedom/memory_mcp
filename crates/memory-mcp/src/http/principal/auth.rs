@@ -13,8 +13,8 @@ use lru::LruCache;
 use super::AuthenticatedPrincipal;
 use super::api_keys::ApiKeyCredential;
 use crate::http::principal::cache::PrincipalCache;
-use crate::http::registry::RegistryStore;
 use crate::http::registry::models::{AccountStatus, ApiKey, ApiKeyStatus};
+use crate::http::registry::storage::{AccountStore, ApiKeyStore};
 use crate::http::sync::recover_lock;
 
 #[derive(Debug)]
@@ -69,8 +69,15 @@ fn is_key_current(key: &ApiKey, now: DateTime<Utc>) -> bool {
     key.status == ApiKeyStatus::Active && key.expires_at.map(|expiry| expiry > now).unwrap_or(true)
 }
 
+/// Verifies API-key credentials against the durable stores.
+///
+/// Two owner traits, and the pair is what verification actually needs: a key
+/// is only valid while its account is active, so `is_current` revalidates both.
+/// It used to hold the whole registry, which also let it mutate tenants,
+/// sessions and browser policy.
 pub struct Authenticator {
-    store: Arc<dyn RegistryStore>,
+    accounts: Arc<dyn AccountStore>,
+    api_keys: Arc<dyn ApiKeyStore>,
     cache: Arc<PrincipalCache>,
     pepper: Arc<Vec<u8>>,
     rate_limiter: Arc<RateLimiter>,
@@ -78,13 +85,15 @@ pub struct Authenticator {
 
 impl Authenticator {
     pub fn new(
-        store: Arc<dyn RegistryStore>,
+        accounts: Arc<dyn AccountStore>,
+        api_keys: Arc<dyn ApiKeyStore>,
         cache: Arc<PrincipalCache>,
         pepper: Vec<u8>,
         rate_limiter: Arc<RateLimiter>,
     ) -> Self {
         Self {
-            store,
+            accounts,
+            api_keys,
             cache,
             pepper: Arc::new(pepper),
             rate_limiter,
@@ -110,7 +119,12 @@ impl Authenticator {
             // Re-validate the ApiKey status/expiry on every cache hit so
             // a revoked or expired key is rejected within one request
             // round-trip rather than waiting for the 60 s positive TTL.
-            let current_key = self.store.find_api_key(cred.key_id()).await.ok().flatten();
+            let current_key = self
+                .api_keys
+                .find_api_key(cred.key_id())
+                .await
+                .ok()
+                .flatten();
             // Ownership is re-read alongside status/expiry: a key that no
             // longer belongs to the cached account must not keep acting as
             // that account just because its verifier still matches.
@@ -121,7 +135,7 @@ impl Authenticator {
             // closes the deletion revocation window without requiring the
             // cache to become a second source of account lifecycle truth.
             let current_account = self
-                .store
+                .accounts
                 .find_account_by_id(&cached.account.id)
                 .await
                 .ok()
@@ -147,13 +161,18 @@ impl Authenticator {
             // the registry-stored verifier; we re-fetch the
             // verifier field from the store (not from the
             // credential) so a rotated key still works.
-            let key = self.store.find_api_key(cred.key_id()).await.ok().flatten();
+            let key = self
+                .api_keys
+                .find_api_key(cred.key_id())
+                .await
+                .ok()
+                .flatten();
             if let Some(k) = key.as_ref()
                 && is_key_current(k, now)
                 && k.verifier.verify(&self.pepper, cred.secret())
             {
                 let account = self
-                    .store
+                    .accounts
                     .find_account_by_id(&k.account_id)
                     .await
                     .ok()
@@ -190,7 +209,7 @@ impl Authenticator {
         // A transient telemetry timestamp failure must not turn an
         // already valid request into an authentication failure, and
         // the raw secret is never written.
-        let _ = self.store.touch_api_key(cred.key_id(), now).await;
+        let _ = self.api_keys.touch_api_key(cred.key_id(), now).await;
         principal
             .map(AuthDecision::Allow)
             .unwrap_or(AuthDecision::Deny)
@@ -200,9 +219,9 @@ impl Authenticator {
         let now = Utc::now();
         match principal {
             AuthenticatedPrincipal::ApiKey { account, key_id } => {
-                let key = self.store.find_api_key(key_id).await.ok().flatten();
+                let key = self.api_keys.find_api_key(key_id).await.ok().flatten();
                 let current = self
-                    .store
+                    .accounts
                     .find_account_by_id(&account.id)
                     .await
                     .ok()
@@ -214,7 +233,7 @@ impl Authenticator {
             }
             #[cfg(feature = "control-plane")]
             AuthenticatedPrincipal::Oidc { account, .. } => self
-                .store
+                .accounts
                 .find_account_by_id(&account.id)
                 .await
                 .ok()
@@ -230,7 +249,7 @@ mod tests {
     use crate::http::registry::models::{
         Account, AccountStatus, ApiKey, ApiKeyStatus, KeyedVerifier,
     };
-    use crate::http::registry::storage::{AccountStore, ApiKeyStore, InMemoryStore};
+    use crate::http::registry::storage::InMemoryStore;
 
     fn active_account(id: &str, tenant_id: &str) -> Account {
         Account {
@@ -261,9 +280,11 @@ mod tests {
 
     #[tokio::test]
     async fn unparseable_header_returns_deny() {
-        let store: Arc<dyn RegistryStore> = Arc::new(InMemoryStore::default());
+        let stores =
+            crate::http::registry::RegistryStores::from_backend(Arc::new(InMemoryStore::default()));
         let auth = Authenticator::new(
-            store,
+            stores.accounts(),
+            stores.api_keys(),
             Arc::new(PrincipalCache::new(8)),
             b"p".to_vec(),
             Arc::new(RateLimiter::new(4, Duration::from_secs(60), 100)),
@@ -291,13 +312,16 @@ mod tests {
             last_used_at: None,
             version: 1,
         };
-        store.write_api_key(&k).await.unwrap();
-        store
+        let stores = crate::http::registry::RegistryStores::from_backend(store.clone());
+        stores
+            .accounts()
             .write_account(&active_account("acct_1", "ten_1"))
             .await
             .unwrap();
+        stores.api_keys().write_api_key(&k).await.unwrap();
         let auth = Authenticator::new(
-            store,
+            stores.accounts(),
+            stores.api_keys(),
             Arc::new(PrincipalCache::new(8)),
             pepper.to_vec(),
             Arc::new(RateLimiter::new(4, Duration::from_secs(60), 100)),
@@ -334,13 +358,16 @@ mod tests {
             last_used_at: None,
             version: 1,
         };
-        store.write_api_key(&k).await.unwrap();
-        store
+        let stores = crate::http::registry::RegistryStores::from_backend(store.clone());
+        stores
+            .accounts()
             .write_account(&active_account("acct_1", "ten_1"))
             .await
             .unwrap();
+        stores.api_keys().write_api_key(&k).await.unwrap();
         let auth = Authenticator::new(
-            store,
+            stores.accounts(),
+            stores.api_keys(),
             Arc::new(PrincipalCache::new(8)),
             pepper.to_vec(),
             Arc::new(RateLimiter::new(4, Duration::from_secs(60), 100)),
@@ -359,11 +386,13 @@ mod tests {
     #[tokio::test]
     async fn cache_hit_with_a_mismatched_owner_is_denied() {
         let store = Arc::new(InMemoryStore::default());
+        let stores = crate::http::registry::RegistryStores::from_backend(store.clone());
         let pepper = b"pepper";
         let secret = b"Ab3defghij0123456789Ab3defghij0123456789";
         let verifier = KeyedVerifier::compute(pepper, secret);
         let key_id = "ak_01234567-89ab-4cde-8f01-23456789abcd";
-        store
+        stores
+            .api_keys()
             .write_api_key(&ApiKey {
                 id: key_id.into(),
                 account_id: "acct_owner".into(),
@@ -377,17 +406,20 @@ mod tests {
             })
             .await
             .unwrap();
-        store
+        stores
+            .accounts()
             .write_account(&active_account("acct_owner", "ten_1"))
             .await
             .unwrap();
-        store
+        stores
+            .accounts()
             .write_account(&active_account("acct_other", "ten_2"))
             .await
             .unwrap();
         let cache = Arc::new(PrincipalCache::new(8));
         let auth = Authenticator::new(
-            store,
+            stores.accounts(),
+            stores.api_keys(),
             cache.clone(),
             pepper.to_vec(),
             Arc::new(RateLimiter::new(4, Duration::from_secs(60), 100)),

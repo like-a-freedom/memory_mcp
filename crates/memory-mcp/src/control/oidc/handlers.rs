@@ -59,7 +59,7 @@ async fn begin_flow(
     let policy = state.browser_policy.as_ref().ok_or(ApiError::Unavailable)?;
     state
         .registry
-        .store_clone()
+        .sessions()
         .store_oidc_request(policy, &state_hash, &sealed, &aead_nonce)
         .await?;
 
@@ -117,7 +117,7 @@ pub async fn logout(
     let policy = state.browser_policy.as_ref().ok_or(ApiError::Unavailable)?;
     state
         .registry
-        .store_clone()
+        .sessions()
         .delete_session(policy, &session.cookie_hash)
         .await?;
     let mut headers = axum::http::HeaderMap::new();
@@ -167,7 +167,7 @@ pub async fn callback(
     #[cfg(feature = "control-plane")]
     let (sealed, aead_nonce) = state
         .registry
-        .store_clone()
+        .sessions()
         .take_oidc_request(policy, &state_hash)
         .await?
         .ok_or(ApiError::Unauthorized)?;
@@ -282,8 +282,9 @@ pub async fn callback(
         // genuinely new. An existing account linked to this
         // identity is allowed to re-login even under
         // invite-only policy.
-        let store = state.registry.store_clone();
-        if store
+        if state
+            .registry
+            .accounts()
             .find_account_by_identity(&claims.iss, &subject_verifier)
             .await?
             .is_none()
@@ -294,7 +295,7 @@ pub async fn callback(
 
     // The deployment joined the durable OIDC policy at startup; the
     // signup bundle is guarded by that fence in one transaction.
-    let account = OidcSignup::new(state.registry.store_clone())
+    let account = OidcSignup::new(state.registry.accounts(), state.registry.provisioning())
         .resolve_or_create(
             policy,
             VerifiedExternalIdentity {
@@ -324,7 +325,8 @@ pub async fn callback(
 /// racing flows cannot both succeed.
 #[cfg(all(test, feature = "control-plane"))]
 async fn link_verified_identity(
-    store: &std::sync::Arc<dyn crate::http::registry::storage::RegistryStore>,
+    accounts: &std::sync::Arc<dyn crate::http::registry::storage::AccountStore>,
+    identities: &std::sync::Arc<dyn crate::http::registry::storage::IdentityStore>,
     account_id: &str,
     issuer: &str,
     subject_verifier: SubjectVerifier,
@@ -332,7 +334,8 @@ async fn link_verified_identity(
     // Self-service link: the Account holder is the actor (the browser is
     // already signed in, and the identity is the one the provider attested).
     attach_verified_identity(
-        store,
+        accounts,
+        identities,
         account_id,
         issuer,
         subject_verifier,
@@ -347,13 +350,14 @@ async fn link_verified_identity(
 /// holds the tuple.
 #[cfg(all(test, feature = "control-plane"))]
 async fn attach_verified_identity(
-    store: &std::sync::Arc<dyn crate::http::registry::storage::RegistryStore>,
+    accounts: &std::sync::Arc<dyn crate::http::registry::storage::AccountStore>,
+    identities: &std::sync::Arc<dyn crate::http::registry::storage::IdentityStore>,
     account_id: &str,
     issuer: &str,
     subject_verifier: SubjectVerifier,
     audit: &IdentityAudit,
 ) -> Result<(), MemoryError> {
-    match store
+    match accounts
         .find_account_by_identity(issuer, &subject_verifier)
         .await?
     {
@@ -372,7 +376,7 @@ async fn attach_verified_identity(
         account_id: account_id.to_owned(),
         created_at: Utc::now(),
     };
-    store.link_external_identity(&identity, audit).await?;
+    identities.link_external_identity(&identity, audit).await?;
     Ok(())
 }
 
@@ -496,7 +500,7 @@ async fn issue_session(
     let session = ControlPlaneSession::new(account, &cookie_value, policy.epoch, &state.config)?;
     state
         .registry
-        .store_clone()
+        .sessions()
         .store_session(policy, &session)
         .await?;
 
@@ -515,7 +519,7 @@ async fn issue_session(
 mod tests {
     use super::*;
     use crate::http::registry::models::{Account, AccountStatus};
-    use crate::http::registry::storage::{AccountStore, InMemoryStore, RegistryStore};
+    use crate::http::registry::storage::{AccountStore, InMemoryStore};
     use std::sync::Arc;
 
     /// Every post-flow redirect lands on the console root *inside the
@@ -529,8 +533,11 @@ mod tests {
 
     const ISSUER: &str = "https://idp.example.com";
 
-    async fn store_with_two_accounts() -> Arc<dyn RegistryStore> {
-        let store = InMemoryStore::default();
+    async fn store_with_two_accounts() -> (
+        crate::http::registry::RegistryHandle,
+        crate::http::registry::RegistryStores,
+    ) {
+        let store = Arc::new(InMemoryStore::default());
         for id in ["acct_one", "acct_two"] {
             store
                 .write_account(&Account {
@@ -542,7 +549,12 @@ mod tests {
                 .await
                 .expect("write account");
         }
-        Arc::new(store)
+        let handle =
+            crate::http::registry::RegistryHandle::in_memory().with_inner_store(store.clone());
+        (
+            handle,
+            crate::http::registry::RegistryStores::from_backend(store),
+        )
     }
 
     fn verifier(byte: u8) -> SubjectVerifier {
@@ -551,12 +563,19 @@ mod tests {
 
     #[tokio::test]
     async fn a_verified_identity_is_linked_to_the_account_that_started_the_flow() {
-        let store = store_with_two_accounts().await;
-        link_verified_identity(&store, "acct_one", ISSUER, verifier(0xA1))
-            .await
-            .expect("link");
+        let (_registry, stores) = store_with_two_accounts().await;
+        link_verified_identity(
+            &stores.accounts(),
+            &stores.identities(),
+            "acct_one",
+            ISSUER,
+            verifier(0xA1),
+        )
+        .await
+        .expect("link");
 
-        let identities = store
+        let identities = stores
+            .identities()
             .find_external_identities("acct_one")
             .await
             .expect("list");
@@ -570,14 +589,21 @@ mod tests {
     /// accumulate links to the same identity.
     #[tokio::test]
     async fn linking_the_same_identity_twice_is_idempotent() {
-        let store = store_with_two_accounts().await;
+        let (_registry, stores) = store_with_two_accounts().await;
         for _ in 0..2 {
-            link_verified_identity(&store, "acct_one", ISSUER, verifier(0xA1))
-                .await
-                .expect("link");
+            link_verified_identity(
+                &stores.accounts(),
+                &stores.identities(),
+                "acct_one",
+                ISSUER,
+                verifier(0xA1),
+            )
+            .await
+            .expect("link");
         }
         assert_eq!(
-            store
+            stores
+                .identities()
                 .find_external_identities("acct_one")
                 .await
                 .expect("list")
@@ -591,15 +617,12 @@ mod tests {
     /// the case the body-supplied route could not distinguish from the first.
     #[tokio::test]
     async fn an_invitation_for_an_unknown_account_is_refused() {
-        let store = store_with_two_accounts().await;
-        let policy = crate::http::registry::BrowserPolicyStore::reconcile_browser_policy(
-            store.as_ref(),
-            &[crate::http::config::BrowserAuthMethod::Oidc],
-            None,
-        )
-        .await
-        .expect("reconcile browser policy");
-        let registry = crate::http::registry::RegistryHandle::in_memory().with_inner_store(store);
+        let (registry, stores) = store_with_two_accounts().await;
+        let policy = stores
+            .browser_policy()
+            .reconcile_browser_policy(&[crate::http::config::BrowserAuthMethod::Oidc], None)
+            .await
+            .expect("reconcile browser policy");
         let state = crate::http::test_state::HttpStateTestBuilder::new()
             .await
             .with_registry(registry)
@@ -617,16 +640,12 @@ mod tests {
     /// so the acceptance is the first login (ADR-0057 invitations).
     #[tokio::test]
     async fn an_invitation_acceptance_signs_the_browser_in_when_it_has_no_session() {
-        let store = store_with_two_accounts().await;
-        let policy = crate::http::registry::BrowserPolicyStore::reconcile_browser_policy(
-            store.as_ref(),
-            &[crate::http::config::BrowserAuthMethod::Oidc],
-            None,
-        )
-        .await
-        .expect("reconcile browser policy");
-        let registry =
-            crate::http::registry::RegistryHandle::in_memory().with_inner_store(store.clone());
+        let (registry, stores) = store_with_two_accounts().await;
+        let policy = stores
+            .browser_policy()
+            .reconcile_browser_policy(&[crate::http::config::BrowserAuthMethod::Oidc], None)
+            .await
+            .expect("reconcile browser policy");
         let state = crate::http::test_state::HttpStateTestBuilder::new()
             .await
             .with_registry(registry)
@@ -661,16 +680,12 @@ mod tests {
 
     #[tokio::test]
     async fn an_invitation_acceptance_leaves_an_existing_session_alone() {
-        let store = store_with_two_accounts().await;
-        let policy = crate::http::registry::BrowserPolicyStore::reconcile_browser_policy(
-            store.as_ref(),
-            &[crate::http::config::BrowserAuthMethod::Oidc],
-            None,
-        )
-        .await
-        .expect("reconcile browser policy");
-        let registry =
-            crate::http::registry::RegistryHandle::in_memory().with_inner_store(store.clone());
+        let (registry, stores) = store_with_two_accounts().await;
+        let policy = stores
+            .browser_policy()
+            .reconcile_browser_policy(&[crate::http::config::BrowserAuthMethod::Oidc], None)
+            .await
+            .expect("reconcile browser policy");
         let config = crate::http::config::HttpConfig::default_for_test();
         let state = crate::http::test_state::HttpStateTestBuilder::new()
             .await
@@ -690,7 +705,8 @@ mod tests {
             .expect("session hash"),
         );
         let now = Utc::now();
-        store
+        stores
+            .sessions()
             .store_session(
                 &policy,
                 &ControlPlaneSession {
@@ -738,16 +754,12 @@ mod tests {
     /// Q1 remediation: a replacing acceptance swaps the mis-bound identity.
     #[tokio::test]
     async fn a_replacing_invitation_swaps_the_misbound_identity() {
-        let store = store_with_two_accounts().await;
-        let policy = crate::http::registry::BrowserPolicyStore::reconcile_browser_policy(
-            store.as_ref(),
-            &[crate::http::config::BrowserAuthMethod::Oidc],
-            None,
-        )
-        .await
-        .expect("reconcile browser policy");
-        let registry =
-            crate::http::registry::RegistryHandle::in_memory().with_inner_store(store.clone());
+        let (registry, stores) = store_with_two_accounts().await;
+        let policy = stores
+            .browser_policy()
+            .reconcile_browser_policy(&[crate::http::config::BrowserAuthMethod::Oidc], None)
+            .await
+            .expect("reconcile browser policy");
         let state = crate::http::test_state::HttpStateTestBuilder::new()
             .await
             .with_registry(registry)
@@ -758,7 +770,8 @@ mod tests {
 
         // The account is mis-bound to somebody else's identity.
         link_verified_identity(
-            &state.registry.store_clone(),
+            &state.registry.accounts(),
+            &state.registry.identities(),
             "acct_one",
             "https://idp.example.com",
             verifier(0xB1),
@@ -779,7 +792,8 @@ mod tests {
         .ok()
         .expect("replacing acceptance");
 
-        let identities = store
+        let identities = stores
+            .identities()
             .find_external_identities("acct_one")
             .await
             .expect("list");
@@ -789,18 +803,32 @@ mod tests {
 
     #[tokio::test]
     async fn an_identity_held_by_another_account_is_refused() {
-        let store = store_with_two_accounts().await;
-        link_verified_identity(&store, "acct_one", ISSUER, verifier(0xA1))
-            .await
-            .expect("first link");
+        let (_registry, stores) = store_with_two_accounts().await;
+        link_verified_identity(
+            &stores.accounts(),
+            &stores.identities(),
+            "acct_one",
+            ISSUER,
+            verifier(0xA1),
+        )
+        .await
+        .expect("first link");
 
-        let refused = link_verified_identity(&store, "acct_two", ISSUER, verifier(0xA1)).await;
+        let refused = link_verified_identity(
+            &stores.accounts(),
+            &stores.identities(),
+            "acct_two",
+            ISSUER,
+            verifier(0xA1),
+        )
+        .await;
         assert!(
             matches!(refused, Err(MemoryError::Conflict(_))),
             "a second account must be refused"
         );
         assert!(
-            store
+            stores
+                .identities()
                 .find_external_identities("acct_two")
                 .await
                 .expect("list")

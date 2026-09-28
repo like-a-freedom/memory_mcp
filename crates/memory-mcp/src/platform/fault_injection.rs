@@ -25,7 +25,7 @@ use crate::error::MemoryError;
 /// sees the partial state and advances it forward.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum FaultPoint {
-    /// `RegistryStore::claim_provisioning` returned a `ProvisioningLease`.
+    /// `ProvisioningStore::claim_provisioning` returned a `ProvisioningLease`.
     ProvisioningLeaseClaimed,
     /// `ApplyMigrations::ensure_namespace` returned `Ok(())`.
     NamespaceCreated,
@@ -41,9 +41,9 @@ pub enum FaultPoint {
     TaskCompleted,
     /// `commit_tenant_mutation_with_event` committed the outbox transaction.
     OutboxMutationCommitted,
-    /// `RegistryStore::begin_account_deletion` returned `Ok(())`.
+    /// `AccountStore::begin_account_deletion` returned `Ok(())`.
     AccountDeletionStarted,
-    /// `RegistryStore::finalize_account_deletion` returned `Ok(())`.
+    /// `TenantStore::finalize_account_deletion` returned `Ok(())`.
     AccountDeletionFinalized,
 }
 

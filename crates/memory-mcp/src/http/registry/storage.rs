@@ -566,7 +566,7 @@ pub trait BrowserPolicyStore: Send + Sync + 'static {
     /// resulting fence (ADR-0057).
     ///
     /// This is the guarded removal operation, and the only path that can narrow
-    /// the durable set: [`RegistryStore::reconcile_browser_policy`] adds methods
+    /// the durable set: [`BrowserPolicyStore::reconcile_browser_policy`] adds methods
     /// and refuses to drop one, so a deployment reaches "SSO only" by calling
     /// this explicitly, never by editing the environment.
     ///
@@ -587,31 +587,18 @@ pub trait BrowserPolicyStore: Send + Sync + 'static {
     ) -> Result<BrowserPolicyFence, MemoryError>;
 }
 
-/// Every registry operation, grouped by canonical table owner.
+/// Liveness of the registry's backing store.
 ///
-/// This is the omnibus handle composition passes around. It is a
-/// *bundle* of the owner traits above, not a second definition of
-/// them: a consumer that needs one owner's tables should depend on
-/// that owner's trait directly. It exists so the two store
-/// implementations and the existing call sites are unaffected by the
-/// split, not because the omnibus capability is wanted.
-///
-/// `ping` stays here rather than in an owner trait: it is a liveness
-/// probe over the connection, not a table operation.
+/// Deliberately not one of the table-owner traits above: a readiness probe
+/// asks whether the connection answers, not whether any particular table can
+/// be read. It was once `ping` on an omnibus registry trait, which forced
+/// every consumer of that bundle to be handed a liveness method it had no use
+/// for, and made the bundle impossible to retire while the probe remained.
 #[async_trait::async_trait]
-pub trait RegistryStore:
-    Send
-    + Sync
-    + 'static
-    + AccountStore
-    + IdentityStore
-    + TenantStore
-    + ApiKeyStore
-    + ProvisioningStore
-    + UsageStore
-    + SessionStore
-    + BrowserPolicyStore
-{
+pub trait StoreHealth: Send + Sync + 'static {
+    /// Whether the backing store is reachable. A `false` here is a readiness
+    /// failure, not an error to propagate: the caller is a health endpoint
+    /// deciding a status code, not a use case that can recover.
     async fn ping(&self) -> bool;
 }
 
@@ -619,7 +606,7 @@ pub trait RegistryStore:
 /// module path for callers that imported the original storage seam.
 pub use super::surreal_store::SurrealRegistryStore;
 
-/// In-memory `RegistryStore` for unit tests. The fields are
+/// In-memory registry backend for unit tests. The fields are
 /// behind a single `Mutex`; the contention is acceptable for
 /// unit-test traffic. The struct is feature-gated on
 /// `test-fixtures` so a production build cannot accidentally
@@ -2193,7 +2180,7 @@ impl BrowserPolicyStore for InMemoryStore {
 
 #[async_trait::async_trait]
 #[cfg(any(test, feature = "test-fixtures"))]
-impl RegistryStore for InMemoryStore {
+impl StoreHealth for InMemoryStore {
     async fn ping(&self) -> bool {
         true
     }
@@ -2224,7 +2211,15 @@ mod tests {
     #[test]
     fn trait_object_is_send_and_sync() {
         fn assert_send_sync<T: Send + Sync>() {}
-        assert_send_sync::<Arc<dyn RegistryStore>>();
+        assert_send_sync::<Arc<dyn StoreHealth>>();
+        assert_send_sync::<Arc<dyn AccountStore>>();
+        assert_send_sync::<Arc<dyn IdentityStore>>();
+        assert_send_sync::<Arc<dyn TenantStore>>();
+        assert_send_sync::<Arc<dyn ApiKeyStore>>();
+        assert_send_sync::<Arc<dyn ProvisioningStore>>();
+        assert_send_sync::<Arc<dyn UsageStore>>();
+        assert_send_sync::<Arc<dyn SessionStore>>();
+        assert_send_sync::<Arc<dyn BrowserPolicyStore>>();
     }
 
     /// The bundle's blanket vtable only builds because every supertrait
@@ -2249,8 +2244,7 @@ mod tests {
     /// split cannot drift so that a concrete store no longer matches a
     /// supertrait the bundle names.
     #[test]
-    fn both_stores_satisfy_every_owner_trait_and_the_bundle() {
-        fn assert_bundle<T: RegistryStore>() {}
+    fn both_stores_satisfy_every_owner_trait() {
         fn assert_each<T>()
         where
             T: AccountStore
@@ -2263,9 +2257,9 @@ mod tests {
                 + BrowserPolicyStore,
         {
         }
-        assert_bundle::<InMemoryStore>();
         assert_each::<InMemoryStore>();
-        assert_bundle::<crate::http::registry::SurrealRegistryStore>();
+        assert_each::<InMemoryStore>();
+        assert_each::<crate::http::registry::SurrealRegistryStore>();
         assert_each::<crate::http::registry::SurrealRegistryStore>();
     }
 

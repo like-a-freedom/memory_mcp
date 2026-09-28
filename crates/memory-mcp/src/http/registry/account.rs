@@ -7,11 +7,17 @@
 use std::sync::Arc;
 
 use super::models::{Tenant, TenantStatus};
-use super::storage::RegistryStore;
+use super::storage::TenantStore;
 use crate::error::MemoryError;
 
+/// Resolves an account to its tenant.
+///
+/// Takes [`TenantStore`] alone. Both methods it calls — the account-to-tenant
+/// lookup and the by-id read — read the `tenant` table, which tenancy owns; it
+/// used to hold the whole registry, which handed this resolver the ability to
+/// issue API keys and mutate browser policy in exchange for two lookups.
 pub struct AccountResolver {
-    store: Arc<dyn RegistryStore>,
+    store: Arc<dyn TenantStore>,
 }
 
 /// Outcome of resolving an account to a tenant. The Tenant
@@ -29,7 +35,7 @@ pub enum ResolvedTenant {
 }
 
 impl AccountResolver {
-    pub fn new(store: Arc<dyn RegistryStore>) -> Self {
+    pub fn new(store: Arc<dyn TenantStore>) -> Self {
         Self { store }
     }
 
@@ -71,7 +77,7 @@ mod tests {
     use crate::http::registry::models::{
         Account, AccountStatus, NamespaceBinding, Tenant, TenantStatus,
     };
-    use crate::http::registry::storage::InMemoryStore;
+    use crate::http::registry::storage::{AccountStore, InMemoryStore};
     use std::sync::Arc;
 
     fn tenant(status: TenantStatus) -> Tenant {
@@ -91,9 +97,11 @@ mod tests {
         }
     }
 
-    async fn store_with(tenant: Option<Tenant>) -> Arc<dyn RegistryStore> {
-        let store: Arc<dyn RegistryStore> = Arc::new(InMemoryStore::default());
-        store
+    async fn store_with(tenant: Option<Tenant>) -> Arc<dyn TenantStore> {
+        let backend = Arc::new(InMemoryStore::default());
+        let accounts: Arc<dyn AccountStore> = backend.clone();
+        let store: Arc<dyn TenantStore> = backend;
+        accounts
             .write_account(&Account {
                 id: "acct_1".into(),
                 status: AccountStatus::Active,

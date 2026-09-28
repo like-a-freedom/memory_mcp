@@ -7,7 +7,7 @@
 pub mod account;
 pub mod migrations;
 pub use crate::models::registry as models;
-mod control_impl;
+pub mod control_impl;
 pub mod plan;
 pub mod provisioning;
 pub mod storage;
@@ -15,8 +15,8 @@ pub mod storage;
 pub mod surreal_store;
 
 pub use storage::{
-    AccountStore, ApiKeyStore, BrowserPolicyStore, IdentityStore, ProvisioningStore, RegistryStore,
-    SessionStore, SurrealRegistryStore, TenantStore, UsageStore,
+    AccountStore, ApiKeyStore, BrowserPolicyStore, IdentityStore, ProvisioningStore, SessionStore,
+    StoreHealth, SurrealRegistryStore, TenantStore, UsageStore,
 };
 
 #[cfg(any(test, feature = "test-fixtures"))]
@@ -216,13 +216,131 @@ impl PrivilegedEngine {
     }
 }
 
-/// Thin facade over `Arc<dyn RegistryStore>` plus the
-/// privileged engine seam. The auth pipeline dispatches against
-/// the trait, not the handle; the handle exists so the
-/// construction site reads `state.registry` and not `state.store`.
+/// The registry's stores, grouped by canonical table owner.
+///
+/// Replaces the single omnibus trait that every caller used to be handed. A
+/// consumer that needs one owner's tables takes that owner's trait; a consumer
+/// that genuinely spans two — provisioning, which reads a tenant's plan and
+/// its account to decide whether it may issue a key — holds this and names the
+/// two capabilities it actually uses.
+///
+/// The two adapters, `InMemoryStore` and `SurrealRegistryStore`, satisfy every
+/// field from one object, so constructing this is a fan-out rather than a
+/// second set of implementations to keep in step.
+#[derive(Clone)]
+pub struct RegistryStores {
+    pub accounts: Arc<dyn AccountStore>,
+    pub identities: Arc<dyn IdentityStore>,
+    pub tenants: Arc<dyn TenantStore>,
+    pub api_keys: Arc<dyn ApiKeyStore>,
+    pub provisioning: Arc<dyn ProvisioningStore>,
+    pub usage: Arc<dyn UsageStore>,
+    pub sessions: Arc<dyn SessionStore>,
+    pub browser_policy: Arc<dyn BrowserPolicyStore>,
+}
+
+impl RegistryStores {
+    /// The account store. A caller that needs this and one other owner holds
+    /// the struct; a caller that needs only this takes the field.
+    pub fn accounts(&self) -> Arc<dyn AccountStore> {
+        Arc::clone(&self.accounts)
+    }
+
+    pub fn identities(&self) -> Arc<dyn IdentityStore> {
+        Arc::clone(&self.identities)
+    }
+
+    pub fn tenants(&self) -> Arc<dyn TenantStore> {
+        Arc::clone(&self.tenants)
+    }
+
+    pub fn api_keys(&self) -> Arc<dyn ApiKeyStore> {
+        Arc::clone(&self.api_keys)
+    }
+
+    pub fn provisioning(&self) -> Arc<dyn ProvisioningStore> {
+        Arc::clone(&self.provisioning)
+    }
+
+    pub fn usage(&self) -> Arc<dyn UsageStore> {
+        Arc::clone(&self.usage)
+    }
+
+    pub fn sessions(&self) -> Arc<dyn SessionStore> {
+        Arc::clone(&self.sessions)
+    }
+
+    pub fn browser_policy(&self) -> Arc<dyn BrowserPolicyStore> {
+        Arc::clone(&self.browser_policy)
+    }
+
+    /// Fan a backend out into the owner stores.
+    ///
+    /// Public so a test that seeds an in-memory backend can hand the same
+    /// adapter constructors production composition uses, rather than a
+    /// parallel wiring path that only exists under `cfg(test)`.
+    pub fn from_backend(backend: Arc<dyn RegistryBackend>) -> Self {
+        // Trait upcasting in the direction that actually works: the concrete
+        // adapter is converted to each owner trait in turn, so each field is a
+        // `dyn OwnerStore` view of one shared object. The compiler checks
+        // every coercion here, which is the point — an owner trait that gained
+        // a method its impl does not have stops compiling at this line rather
+        // than at whichever context later asked for it.
+        Self {
+            accounts: backend.clone(),
+            identities: backend.clone(),
+            tenants: backend.clone(),
+            api_keys: backend.clone(),
+            provisioning: backend.clone(),
+            usage: backend.clone(),
+            sessions: backend.clone(),
+            browser_policy: backend.clone(),
+        }
+    }
+}
+
+/// A store that satisfies every registry table-owner trait.
+///
+/// Both adapters implement the full set, so production composition has one
+/// implementation of this. It exists so `RegistryStores::from_backend` can
+/// upcast once per field rather than needing a blanket impl per adapter; a
+/// new adapter that implements only part of the registry is a compile error
+/// here rather than a runtime surprise in whichever context asked for the part
+/// it does not have.
+pub trait RegistryBackend:
+    StoreHealth
+    + AccountStore
+    + IdentityStore
+    + TenantStore
+    + ApiKeyStore
+    + ProvisioningStore
+    + UsageStore
+    + SessionStore
+    + BrowserPolicyStore
+{
+}
+
+impl<T> RegistryBackend for T where
+    T: StoreHealth
+        + AccountStore
+        + IdentityStore
+        + TenantStore
+        + ApiKeyStore
+        + ProvisioningStore
+        + UsageStore
+        + SessionStore
+        + BrowserPolicyStore
+{
+}
+
+/// Thin facade over the registry's stores plus the privileged engine seam.
+/// The auth pipeline dispatches against the owner traits, not the handle; the
+/// handle exists so the construction site reads `state.registry` and not
+/// `state.registry_stores`.
 #[derive(Clone)]
 pub struct RegistryHandle {
-    pub(crate) store: Arc<dyn RegistryStore>,
+    pub(crate) stores: RegistryStores,
+    health: Arc<dyn StoreHealth>,
     #[cfg(feature = "control-plane")]
     pub(crate) local_admin_store:
         Option<Arc<dyn crate::service::local_admin::contracts::LocalAdminStore>>,
@@ -235,12 +353,7 @@ impl RegistryHandle {
     /// cannot accidentally swap it in.
     #[cfg(any(test, feature = "test-fixtures"))]
     pub fn in_memory() -> Self {
-        Self {
-            store: Arc::new(InMemoryStore::default()),
-            #[cfg(feature = "control-plane")]
-            local_admin_store: None,
-            engine: None,
-        }
+        Self::from_backend(Arc::new(InMemoryStore::default()), None)
     }
 
     /// Build a handle backed by the in-memory test backend
@@ -249,12 +362,10 @@ impl RegistryHandle {
     /// engine.
     #[cfg(any(test, feature = "test-fixtures"))]
     pub fn in_memory_with_mem_engine(privileged: Arc<Surreal<Db>>) -> Self {
-        Self {
-            store: Arc::new(InMemoryStore::default()),
-            #[cfg(feature = "control-plane")]
-            local_admin_store: None,
-            engine: Some(Arc::new(PrivilegedEngine::LocalMem(privileged))),
-        }
+        Self::from_backend_with_engine(
+            Arc::new(InMemoryStore::default()),
+            PrivilegedEngine::LocalMem(privileged),
+        )
     }
 
     /// Convenience: build a Mem engine and use it for both the
@@ -268,12 +379,83 @@ impl RegistryHandle {
             .expect("mem engine init");
         db.use_ns("control").use_db("control").await.unwrap();
         let db_arc: Arc<Surreal<Db>> = Arc::new(db);
+        Self::from_backend_with_engine(
+            Arc::new(InMemoryStore::default()),
+            PrivilegedEngine::LocalMem(db_arc),
+        )
+    }
+
+    /// The single construction path every backend goes through.
+    ///
+    /// Test-only: production composes with [`Self::from_durable`], which
+    /// also supplies the privileged engine. Keeping the engine-free path
+    /// behind the same gate as the in-memory backend means a production
+    /// build cannot construct a handle with no tenant engine.
+    #[cfg(any(test, feature = "test-fixtures"))]
+    fn from_backend(
+        backend: Arc<dyn RegistryBackend>,
+        #[cfg(feature = "control-plane")] local_admin_store: Option<
+            Arc<dyn crate::service::local_admin::contracts::LocalAdminStore>,
+        >,
+    ) -> Self {
         Self {
-            store: Arc::new(InMemoryStore::default()),
+            stores: RegistryStores::from_backend(backend.clone()),
+            health: backend,
+            #[cfg(feature = "control-plane")]
+            local_admin_store,
+            engine: None,
+        }
+    }
+
+    #[cfg(any(test, feature = "test-fixtures"))]
+    fn from_backend_with_engine(
+        backend: Arc<dyn RegistryBackend>,
+        engine: PrivilegedEngine,
+    ) -> Self {
+        Self {
+            stores: RegistryStores::from_backend(backend.clone()),
+            health: backend,
             #[cfg(feature = "control-plane")]
             local_admin_store: None,
-            engine: Some(Arc::new(PrivilegedEngine::LocalMem(db_arc))),
+            engine: Some(Arc::new(engine)),
         }
+    }
+
+    /// The owner stores, for a caller that genuinely spans two of them.
+    pub fn stores(&self) -> &RegistryStores {
+        &self.stores
+    }
+
+    pub fn accounts(&self) -> Arc<dyn AccountStore> {
+        Arc::clone(&self.stores.accounts)
+    }
+
+    pub fn identities(&self) -> Arc<dyn IdentityStore> {
+        Arc::clone(&self.stores.identities)
+    }
+
+    pub fn tenants(&self) -> Arc<dyn TenantStore> {
+        Arc::clone(&self.stores.tenants)
+    }
+
+    pub fn api_keys(&self) -> Arc<dyn ApiKeyStore> {
+        Arc::clone(&self.stores.api_keys)
+    }
+
+    pub fn provisioning(&self) -> Arc<dyn ProvisioningStore> {
+        Arc::clone(&self.stores.provisioning)
+    }
+
+    pub fn usage(&self) -> Arc<dyn UsageStore> {
+        Arc::clone(&self.stores.usage)
+    }
+
+    pub fn sessions(&self) -> Arc<dyn SessionStore> {
+        Arc::clone(&self.stores.sessions)
+    }
+
+    pub fn browser_policy(&self) -> Arc<dyn BrowserPolicyStore> {
+        Arc::clone(&self.stores.browser_policy)
     }
 
     /// Set the privileged engine after construction. Used by
@@ -284,13 +466,14 @@ impl RegistryHandle {
         self
     }
 
-    /// Replace the underlying store. Used by tests that need
+    /// Replace the underlying backend. Used by tests that need
     /// an in-memory backend seeded with specific data; the
     /// default `in_memory()` constructor creates a fresh
     /// backend that the test cannot reach.
     #[cfg(any(test, feature = "test-fixtures"))]
-    pub fn with_inner_store(mut self, store: Arc<dyn RegistryStore>) -> Self {
-        self.store = store;
+    pub fn with_inner_store(mut self, store: Arc<dyn RegistryBackend>) -> Self {
+        self.stores = RegistryStores::from_backend(store.clone());
+        self.health = store;
         self
     }
 
@@ -339,20 +522,13 @@ impl RegistryHandle {
     }
 
     pub async fn ping(&self) -> bool {
-        self.store.ping().await
-    }
-
-    /// Clone the inner `Arc<dyn RegistryStore>`. The authenticator
-    /// takes the store by trait-object, not by handle, so the
-    /// handle is a thin facade over the store.
-    pub fn store_clone(&self) -> Arc<dyn RegistryStore> {
-        Arc::clone(&self.store)
+        self.health.ping().await
     }
 
     /// Ensure the deployment's version-1 signup plan exists without
     /// overwriting an operator-managed durable plan.
     pub async fn ensure_plan(&self, plan: &models::Plan) -> Result<(), crate::error::MemoryError> {
-        self.store.ensure_plan(plan).await
+        self.stores.usage.ensure_plan(plan).await
     }
 
     /// Ensure the local browser-authentication plan exists and has not
@@ -361,7 +537,7 @@ impl RegistryHandle {
         &self,
         plan: &models::Plan,
     ) -> Result<models::Plan, crate::error::MemoryError> {
-        self.store.ensure_local_plan(plan).await
+        self.stores.usage.ensure_local_plan(plan).await
     }
 
     /// Build a handle from a store without an engine.
@@ -369,26 +545,26 @@ impl RegistryHandle {
     /// builds: production tenant activation requires an explicit
     /// privileged engine.
     #[cfg(any(test, feature = "test-fixtures"))]
-    pub fn from_store(store: Arc<dyn RegistryStore>) -> Self {
-        Self {
+    pub fn from_store(store: Arc<dyn RegistryBackend>) -> Self {
+        Self::from_backend(
             store,
             #[cfg(feature = "control-plane")]
-            local_admin_store: None,
-            engine: None,
-        }
+            None,
+        )
     }
 
     /// Build the production handle from the durable registry store and
     /// the separately configured privileged tenant engine.
     pub fn from_durable(
-        store: Arc<dyn RegistryStore>,
+        store: Arc<dyn RegistryBackend>,
         #[cfg(feature = "control-plane")] local_admin_store: Option<
             Arc<dyn crate::service::local_admin::contracts::LocalAdminStore>,
         >,
         engine: PrivilegedEngine,
     ) -> Self {
         Self {
-            store,
+            stores: RegistryStores::from_backend(store.clone()),
+            health: store,
             #[cfg(feature = "control-plane")]
             local_admin_store,
             engine: Some(Arc::new(engine)),

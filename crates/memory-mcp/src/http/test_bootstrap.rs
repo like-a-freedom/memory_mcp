@@ -149,7 +149,8 @@ async fn bootstrap_one(
     let tenant_id = format!("ten_test_{suffix}");
     let tenant_namespace = format!("tns_test_{suffix}");
     let now = chrono::Utc::now();
-    let store = state.registry.store_clone();
+    let stores = state.registry.stores().clone();
+    let store = stores.tenants();
     // Idempotent: a previous bootstrap that already reached
     // Ready means the recovery test restarted the fixture
     // against the same rocksdb path; do NOT regress.
@@ -193,9 +194,9 @@ async fn bootstrap_one(
         last_used_at: None,
         version: 0,
     };
-    store.write_account(&account).await?;
+    stores.accounts().write_account(&account).await?;
     store.write_tenant(&tenant).await?;
-    store.write_api_key(&api_key).await?;
+    stores.api_keys().write_api_key(&api_key).await?;
 
     // Seed a lease so provision_one can advance from
     // Reserved to Ready without external claim.
@@ -222,7 +223,7 @@ async fn bootstrap_one(
     // allowed to advance without fault injection: it is a
     // synchronous seeding path, not a recovery scenario.
     provision_one(
-        store.clone(),
+        crate::http::leases::migration::TenantAndProvisioning::from_stores(&stores),
         &tenant.id,
         lease,
         migrations,
@@ -252,7 +253,8 @@ async fn seed_reserved_one(
     let tenant_id = format!("ten_test_{suffix}");
     let tenant_namespace = format!("tns_test_{suffix}");
     let now = chrono::Utc::now();
-    let store = state.registry.store_clone();
+    let stores = state.registry.stores().clone();
+    let store = stores.tenants();
     let existing = store.find_tenant_by_id(&tenant_id).await?;
     if let Some(existing) = existing
         && existing.status == TenantStatus::Ready
@@ -294,9 +296,9 @@ async fn seed_reserved_one(
         last_used_at: None,
         version: 0,
     };
-    store.write_account(&account).await?;
+    stores.accounts().write_account(&account).await?;
     store.write_tenant(&tenant).await?;
-    store.write_api_key(&api_key).await?;
+    stores.api_keys().write_api_key(&api_key).await?;
     Ok(())
 }
 
@@ -323,7 +325,8 @@ async fn seed_session_one(
     let digest = Sha256::digest(name.as_bytes());
     let suffix = hex::encode(&digest[..8]);
     let account_id = format!("acct_test_{suffix}");
-    let store = state.registry.store_clone();
+    let stores = state.registry.stores().clone();
+    let store = stores.accounts();
     let account = store
         .find_account_by_id(&account_id)
         .await?
@@ -348,14 +351,15 @@ async fn seed_session_one(
     // The InMemoryStore refuses to overwrite an existing cookie hash
     // or session id. Restart-safe: if we have already seeded this
     // exact session in a prior run, do nothing.
-    if store
+    if stores
+        .sessions()
         .find_session(policy, &session.cookie_hash)
         .await?
         .is_some()
     {
         return Ok(());
     }
-    store.store_session(policy, &session).await?;
+    stores.sessions().store_session(policy, &session).await?;
     Ok(())
 }
 
@@ -382,7 +386,7 @@ mod tests {
         let suffix = hex::encode(&digest[..8]);
         let tenant = state
             .registry
-            .store_clone()
+            .tenants()
             .find_tenant_by_id(&format!("ten_test_{suffix}"))
             .await
             .expect("tenant lookup")

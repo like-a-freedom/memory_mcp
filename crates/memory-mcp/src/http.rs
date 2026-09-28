@@ -168,7 +168,10 @@ impl HttpState {
             &config,
             Arc::new(registry.clone()),
         ));
-        let store = registry.store_clone();
+        // Each consumer below is handed the owner traits it uses, not the
+        // registry. One handle is still built above, but nothing below reaches
+        // through it for a table it does not own.
+        let stores = registry.stores().clone();
         // The configured method set is what the durable policy reconciles to.
         // The join is reconcile-and-extend and never removes: a pre-existing
         // policy that enables a method this configuration omits fails startup
@@ -183,7 +186,7 @@ impl HttpState {
             .collect::<Vec<_>>();
         let policy_port: Arc<dyn crate::identity::api::AuthMethodPolicyPort> = Arc::new(
             crate::bootstrap::integration::auth_method_policy::RegistryAuthMethodPolicy::new(
-                store.clone(),
+                stores.browser_policy(),
                 config.clone(),
             ),
         );
@@ -216,7 +219,8 @@ impl HttpState {
         #[cfg(not(feature = "control-plane"))]
         let _ = browser_policy_override;
         let authenticator = Arc::new(principal::auth::Authenticator::new(
-            store.clone(),
+            stores.accounts(),
+            stores.api_keys(),
             Arc::new(principal::cache::PrincipalCache::new(1024)),
             config.api_key_pepper.as_bytes().to_vec(),
             Arc::new(principal::auth::RateLimiter::new(
@@ -227,11 +231,14 @@ impl HttpState {
         ));
         let api_key_issuance: Arc<dyn crate::provisioning::api::ApiKeyIssuancePort> = Arc::new(
             crate::bootstrap::integration::provisioning::RegistryApiKeyIssuance::new(
-                store.clone(),
+                stores.accounts(),
+                stores.tenants(),
+                stores.usage(),
+                stores.api_keys(),
                 config.api_key_pepper.clone(),
             ),
         );
-        let account_resolver = Arc::new(registry::account::AccountResolver::new(store));
+        let account_resolver = Arc::new(registry::account::AccountResolver::new(stores.tenants()));
         let tenant_resolver: Arc<dyn crate::tenancy::api::ResolveTenantPort> = Arc::new(
             crate::bootstrap::integration::tenancy_resolution::LegacyTenantResolver::new(
                 account_resolver.clone(),
@@ -323,7 +330,7 @@ impl HttpState {
         };
         #[cfg(feature = "control-plane")]
         let identity_transactions = Arc::new(
-            crate::bootstrap::integration::legacy_registry_identity::RegistryIdentityLinkTransactions::from_registry(registry.store_clone()),
+            crate::bootstrap::integration::legacy_registry_identity::RegistryIdentityLinkTransactions::from_stores(registry.stores()),
         );
         let identity_link_transactions: Arc<dyn crate::identity::api::IdentityLinkTransactions> =
             identity_transactions.clone();
@@ -339,15 +346,16 @@ impl HttpState {
         })?;
         let invitation_session_port: Arc<dyn crate::identity::api::InvitationSessionPort> = Arc::new(
             crate::bootstrap::integration::control_sessions::ControlSessionInvitationAdapter::new(
-                registry.store_clone(),
+                stores.accounts(),
+                stores.sessions(),
                 config.clone(),
                 policy_for_sessions,
             ),
         );
         #[cfg(feature = "control-plane")]
         let account_deletion_port: Arc<dyn crate::operations::api::AccountDeletionPort> = Arc::new(
-            crate::bootstrap::integration::registry_operations::RegistryAccountDeletionAdapter::from_registry(
-                registry.store_clone(),
+            crate::bootstrap::integration::registry_operations::RegistryAccountDeletionAdapter::from_stores(
+                registry.stores(),
             ),
         );
         #[cfg(feature = "prometheus")]

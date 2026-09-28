@@ -1,4 +1,4 @@
-//! Durable SurrealDB-backed `RegistryStore` implementation.
+//! Durable SurrealDB-backed implementation of every registry owner trait.
 //!
 //! The control namespace is bound at construction; every read/write
 //! resolves against that binding. The store dispatches between the
@@ -25,7 +25,7 @@ use surrealdb::opt::auth as surrealdb_auth;
 use super::models::*;
 use super::storage::{
     AccountStore, ApiKeyStore, BrowserPolicyStore, IdentityStore, LeaseFence, ProvisioningStore,
-    RegistryStore, SessionStore, TenantStore, UsageStore, is_safe_identifier,
+    SessionStore, StoreHealth, TenantStore, UsageStore, is_safe_identifier,
 };
 use crate::error::MemoryError;
 #[cfg(feature = "control-plane")]
@@ -3139,7 +3139,7 @@ impl BrowserPolicyStore for SurrealRegistryStore {
 }
 
 #[async_trait::async_trait]
-impl RegistryStore for SurrealRegistryStore {
+impl StoreHealth for SurrealRegistryStore {
     async fn ping(&self) -> bool {
         self.handle().ping().await
     }

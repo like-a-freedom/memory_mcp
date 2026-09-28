@@ -5,7 +5,6 @@ use chrono::{DateTime, Utc};
 use crate::MemoryError;
 use crate::http::registry::RegistryHandle;
 use crate::http::registry::models::TenantStatus;
-use crate::http::registry::storage::RegistryStore;
 use crate::operations::api::{
     AccountDeletionPort, DeletionLease, DeletionRecoveryPort, RetainedTenantWork,
     TenantUnderDeletion,
@@ -19,12 +18,12 @@ pub(crate) struct RegistryAccountDeletionAdapter {
 }
 
 impl RegistryAccountDeletionAdapter {
-    /// Composition still holds the omnibus registry handle, so this wraps
-    /// it as the deletion port. The adapter itself is typed against the
-    /// port only and cannot reach the wider trait — that is the point.
-    pub(crate) fn from_registry(store: Arc<dyn RegistryStore>) -> Self {
+    /// Wrap the owner stores as the deletion port. The adapter is typed
+    /// against the port only and cannot reach the wider traits — that is the
+    /// point.
+    pub(crate) fn from_stores(stores: &crate::http::registry::RegistryStores) -> Self {
         Self {
-            tx: Arc::new(store) as Arc<dyn AccountDeletionTx>,
+            tx: crate::http::registry::control_impl::account_deletion_tx(stores),
         }
     }
 }
@@ -59,7 +58,7 @@ pub(crate) struct RegistryDeletionRecoveryAdapter {
 impl RegistryDeletionRecoveryAdapter {
     pub(crate) fn new(registry: RegistryHandle, fault_injector: Arc<dyn FaultInjector>) -> Self {
         let tx: Arc<dyn AccountDeletionTx> =
-            Arc::new(registry.store_clone()) as Arc<dyn AccountDeletionTx>;
+            crate::http::registry::control_impl::account_deletion_tx(registry.stores());
         Self {
             registry,
             tx,
@@ -77,7 +76,7 @@ impl DeletionRecoveryPort for RegistryDeletionRecoveryAdapter {
     ) -> Result<Vec<String>, MemoryError> {
         Ok(self
             .registry
-            .store_clone()
+            .tenants()
             .list_deleting_tenants(limit, now)
             .await?
             .into_iter()
@@ -89,12 +88,7 @@ impl DeletionRecoveryPort for RegistryDeletionRecoveryAdapter {
         &self,
         tenant_id: &str,
     ) -> Result<Option<TenantUnderDeletion>, MemoryError> {
-        let Some(tenant) = self
-            .registry
-            .store_clone()
-            .find_tenant_by_id(tenant_id)
-            .await?
-        else {
+        let Some(tenant) = self.registry.tenants().find_tenant_by_id(tenant_id).await? else {
             return Ok(None);
         };
         Ok(Some(TenantUnderDeletion {
@@ -114,7 +108,7 @@ impl DeletionRecoveryPort for RegistryDeletionRecoveryAdapter {
     ) -> Result<Option<DeletionLease>, MemoryError> {
         let Some(lease) = self
             .registry
-            .store_clone()
+            .provisioning()
             .claim_provisioning(tenant_id, owner_id, lease_id, ttl_secs)
             .await?
         else {
@@ -169,7 +163,7 @@ impl DeletionRecoveryPort for RegistryDeletionRecoveryAdapter {
     async fn is_tenant_purged(&self, tenant_id: &str) -> Result<bool, MemoryError> {
         Ok(self
             .registry
-            .store_clone()
+            .tenants()
             .find_tenant_by_id(tenant_id)
             .await?
             .is_some_and(|tenant| tenant.status == TenantStatus::Purged))
@@ -180,8 +174,8 @@ impl DeletionRecoveryPort for RegistryDeletionRecoveryAdapter {
         tenant_id: &str,
         lease: &DeletionLease,
     ) -> Result<(), MemoryError> {
-        let store = self.registry.store_clone();
-        let _ = store
+        let provisioning = self.registry.provisioning();
+        let _ = provisioning
             .release_provisioning_lease(
                 tenant_id,
                 &lease.owner_id,
@@ -244,9 +238,7 @@ mod tests {
     use crate::http::registry::models::{
         Account, AccountStatus, DeletionChallengeRecord, NamespaceBinding, Tenant,
     };
-    use crate::http::registry::storage::{
-        AccountStore, InMemoryStore, RegistryStore, SessionStore, TenantStore,
-    };
+    use crate::http::registry::storage::{AccountStore, InMemoryStore, SessionStore, TenantStore};
 
     async fn seeded_store() -> Arc<InMemoryStore> {
         let store = Arc::new(InMemoryStore::default());
@@ -283,8 +275,9 @@ mod tests {
     #[tokio::test]
     async fn a_verified_start_lands_the_tombstone() {
         let store = seeded_store().await;
-        let adapter =
-            RegistryAccountDeletionAdapter::from_registry(store.clone() as Arc<dyn RegistryStore>);
+        let adapter = RegistryAccountDeletionAdapter::from_stores(
+            &crate::http::registry::RegistryStores::from_backend(store.clone()),
+        );
 
         // `verifier` is the single-use challenge token, not an actor id:
         // the store matches it, then checks the (account, session)
@@ -321,8 +314,9 @@ mod tests {
     #[tokio::test]
     async fn an_unminted_verifier_is_refused() {
         let store = seeded_store().await;
-        let adapter =
-            RegistryAccountDeletionAdapter::from_registry(store.clone() as Arc<dyn RegistryStore>);
+        let adapter = RegistryAccountDeletionAdapter::from_stores(
+            &crate::http::registry::RegistryStores::from_backend(store.clone()),
+        );
 
         assert!(
             adapter

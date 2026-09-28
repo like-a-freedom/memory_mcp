@@ -12,7 +12,7 @@ use crate::error::MemoryError;
 
 use super::config::HttpConfig;
 use super::leases::migration::{ApplyMigrations, SurrealTenantMigrations};
-use super::registry::{RegistryHandle, RegistryStore, SurrealRegistryStore};
+use super::registry::{RegistryBackend, RegistryHandle, SurrealRegistryStore};
 use crate::platform::fault_injection::{FaultInjector, NoFaults};
 
 /// The production adapter bundle: durable control Registry plus the
@@ -59,12 +59,12 @@ impl HttpProductionComposition {
         // authentication routes. Trait objects cannot be downcast, so
         // both clones are taken here, once, at composition time.
         let store = Arc::new(store);
-        let registry_store: Arc<dyn RegistryStore> = store.clone();
+        let registry_backend: Arc<dyn RegistryBackend> = store.clone();
         #[cfg(feature = "control-plane")]
         let local_admin_store = store;
         Ok(Self {
             registry: RegistryHandle::from_durable(
-                registry_store,
+                registry_backend,
                 #[cfg(feature = "control-plane")]
                 Some(local_admin_store),
                 engine,

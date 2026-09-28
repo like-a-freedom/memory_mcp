@@ -167,20 +167,27 @@ async fn durable_composition_reads_data_written_by_another_process() {
     let composition = HttpProductionComposition::connect(&config)
         .await
         .expect("composition connects to the durable store another process wrote");
-    let store = composition.registry.store_clone();
-    let reloaded_plan = store.load_plan(1).await.expect("signup plan is durable");
+    let stores = composition.registry.stores().clone();
+    let reloaded_plan = stores
+        .usage()
+        .load_plan(1)
+        .await
+        .expect("signup plan is durable");
     assert_eq!(reloaded_plan.version, 1);
-    let api_key = store
+    let api_key = stores
+        .api_keys()
         .find_api_key(GATE_KEY_ID)
         .await
         .expect("api key lookup")
         .expect("bootstrap api key is durable");
-    let account = store
+    let account = stores
+        .accounts()
         .find_account_by_id(&api_key.account_id)
         .await
         .expect("account lookup")
         .expect("bootstrap account is durable");
-    let reloaded_tenant = store
+    let reloaded_tenant = stores
+        .tenants()
         .find_tenant_by_id(&account.tenant_id)
         .await
         .expect("tenant lookup")
@@ -226,14 +233,15 @@ async fn real_registry_store_admits_ingest_on_mem_engine() {
         tenant_id: tenant.id.clone(),
         created_at: now,
     };
-    comp.registry
-        .store_clone()
+    let bundle_tx =
+        memory_mcp::http::registry::control_impl::account_bundle_tx(comp.registry.stores());
+    bundle_tx
         .create_account_bundle(&account, &tenant, None)
         .await
         .expect("create bundle");
     let registry_plan = comp
         .registry
-        .store_clone()
+        .usage()
         .load_plan(1)
         .await
         .expect("load_plan must succeed");
@@ -241,7 +249,7 @@ async fn real_registry_store_admits_ingest_on_mem_engine() {
     let plan_contract = memory_mcp::http::registry::plan::Plan::from(&registry_plan);
     let decision = comp
         .registry
-        .store_clone()
+        .usage()
         .reserve_ingest_usage("ten_diag", 1024, &plan_contract, now)
         .await
         .expect("reserve_ingest_usage must succeed");

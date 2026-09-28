@@ -3,7 +3,7 @@ use std::sync::Arc;
 use crate::MemoryError;
 use crate::http::registry::models::{AccountStatus, NamespaceBinding, Tenant, TenantStatus};
 use crate::http::registry::models::{ApiKey, ApiKeyStatus, KeyedVerifier};
-use crate::http::registry::storage::RegistryStore;
+use crate::http::registry::storage::{AccountStore, ApiKeyStore, TenantStore, UsageStore};
 use crate::provisioning::api::{
     ApiKeyIssuancePort, ApiKeyOwner, ClientCreation, ClientCreationError, ClientCreationPort,
     ClientView, NewApiKeyRecord,
@@ -141,24 +141,46 @@ fn client_creation_error(error: LocalAdminError) -> ClientCreationError {
     }
 }
 
+/// Key issuance, across the four owners it genuinely reads.
+///
+/// Resolving the owner of an account is an account read; its tenant id to a
+/// plan is a tenant read; the cap itself is plan data; the write and the
+/// revocation list are key writes. Four capabilities, named — and none of the
+/// session, identity or browser-policy tables the omnibus handle used to
+/// expose to this struct.
 pub(crate) struct RegistryApiKeyIssuance {
-    store: Arc<dyn RegistryStore>,
+    accounts: Arc<dyn AccountStore>,
+    tenants: Arc<dyn TenantStore>,
+    usage: Arc<dyn UsageStore>,
+    api_keys: Arc<dyn ApiKeyStore>,
     pepper: String,
 }
 
 impl RegistryApiKeyIssuance {
-    pub(crate) fn new(store: Arc<dyn RegistryStore>, pepper: String) -> Self {
-        Self { store, pepper }
+    pub(crate) fn new(
+        accounts: Arc<dyn AccountStore>,
+        tenants: Arc<dyn TenantStore>,
+        usage: Arc<dyn UsageStore>,
+        api_keys: Arc<dyn ApiKeyStore>,
+        pepper: String,
+    ) -> Self {
+        Self {
+            accounts,
+            tenants,
+            usage,
+            api_keys,
+            pepper,
+        }
     }
 }
 
 #[async_trait::async_trait]
 impl ApiKeyIssuancePort for RegistryApiKeyIssuance {
     async fn owner(&self, account_id: &str) -> Result<Option<ApiKeyOwner>, MemoryError> {
-        let Some(account) = self.store.find_account_by_id(account_id).await? else {
+        let Some(account) = self.accounts.find_account_by_id(account_id).await? else {
             return Ok(None);
         };
-        let Some(tenant) = self.store.find_tenant_by_id(&account.tenant_id).await? else {
+        let Some(tenant) = self.tenants.find_tenant_by_id(&account.tenant_id).await? else {
             return Err(MemoryError::NotFound(format!(
                 "tenant {} not found",
                 account.tenant_id
@@ -176,7 +198,7 @@ impl ApiKeyIssuancePort for RegistryApiKeyIssuance {
         plan_version: u32,
     ) -> Result<u32, MemoryError> {
         Ok(self
-            .store
+            .usage
             .load_plan(plan_version)
             .await?
             .limits
@@ -195,7 +217,7 @@ impl ApiKeyIssuancePort for RegistryApiKeyIssuance {
             last_used_at: None,
             version: 0,
         };
-        self.store
+        self.api_keys
             .create_api_key_if_below_limit(&api_key, key.cap)
             .await
     }

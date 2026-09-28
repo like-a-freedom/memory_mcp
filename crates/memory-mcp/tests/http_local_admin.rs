@@ -32,7 +32,6 @@ use memory_mcp::http::principal::api_keys::ApiKeyCredential;
 use memory_mcp::http::principal::auth::{AuthDecision, Authenticator};
 use memory_mcp::http::registry::SurrealRegistryStore;
 use memory_mcp::http::registry::models::{ApiKey, ApiKeyStatus, KeyedVerifier, TenantStatus};
-use memory_mcp::http::registry::storage::RegistryStore;
 use memory_mcp::http::registry::storage::{
     AccountStore, ApiKeyStore, ProvisioningStore, TenantStore,
 };

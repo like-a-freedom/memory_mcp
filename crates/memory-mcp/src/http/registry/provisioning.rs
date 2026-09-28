@@ -17,9 +17,9 @@ use std::sync::Arc;
 
 use crate::error::MemoryError;
 use crate::http::leases::ProvisioningLease;
-use crate::http::registry::RegistryStore;
 use crate::http::registry::models::TenantStatus;
 use crate::http::registry::storage::LeaseFence;
+use crate::http::registry::storage::{ProvisioningStore, TenantStore};
 
 /// The `ProvisioningStage` is the same enum as `TenantStatus`
 /// (re-exported so the state machine file is the one place
@@ -29,7 +29,7 @@ pub use crate::http::registry::models::TenantStatus as ProvisioningStage;
 /// CAS-update the tenant's status without a fencing
 /// predicate. Use only for operator state changes.
 pub async fn transition(
-    store: &dyn RegistryStore,
+    store: &dyn TenantStore,
     tenant_id: &str,
     expected_version: u64,
     from: ProvisioningStage,
@@ -50,7 +50,7 @@ pub async fn transition(
 /// stale worker cannot advance a tenant whose lease has been
 /// reassigned.
 pub async fn transition_fenced(
-    store: &dyn RegistryStore,
+    store: &dyn TenantStore,
     tenant_id: &str,
     expected_version: u64,
     from: ProvisioningStage,
@@ -109,7 +109,7 @@ pub fn can_transition(from: ProvisioningStage, to: ProvisioningStage) -> bool {
 /// reserved Tenant. The scheduler consumes the events; bootstrap
 /// calls it for each ready tenant.
 pub async fn enqueue_provisioning(
-    store: &Arc<dyn RegistryStore>,
+    store: &Arc<dyn ProvisioningStore>,
     tenant: &crate::http::registry::models::Tenant,
 ) -> Result<(), MemoryError> {
     store
@@ -171,7 +171,8 @@ async fn reconcile_namespaces(
         }
         *last = Some(std::time::Instant::now());
     }
-    let registered = registry.store_clone().list_tenants(10_000).await?;
+    let tenant_store = registry.tenants();
+    let registered = tenant_store.list_tenants(10_000).await?;
     let Some(engine) = registry.tenant_engine_optional() else {
         return Ok(());
     };
@@ -221,7 +222,7 @@ fn identifier_fingerprint(value: &str) -> String {
 /// in the DB without a tenant) is logged and surfaced via
 /// the `orphans` field; no destructive action is taken.
 pub async fn reconcile(
-    store: &Arc<dyn RegistryStore>,
+    tenant_store: &Arc<dyn TenantStore>,
     tenants: &[crate::http::registry::models::Tenant],
 ) -> Result<ReconcileReport, MemoryError> {
     let mut report = ReconcileReport::default();
@@ -238,7 +239,7 @@ pub async fn reconcile(
         // The production store cannot probe the DB; the
         // `InMemoryStore` returns Some(tenant) for every
         // probe, so this branch is exercised by tests.
-        let found = store.find_tenant_by_id(&tenant.id).await?;
+        let found = tenant_store.find_tenant_by_id(&tenant.id).await?;
         if found.is_none() {
             report.missing_records.push(tenant.id.clone());
         } else {
@@ -465,12 +466,10 @@ mod reconcile_tests {
             created_at: Utc::now(),
             version: 0,
         };
-        let report = reconcile(
-            &(s.clone() as Arc<dyn RegistryStore>),
-            std::slice::from_ref(&tenant),
-        )
-        .await
-        .unwrap();
+        let tenant_store = s.clone() as Arc<dyn TenantStore>;
+        let report = reconcile(&tenant_store, std::slice::from_ref(&tenant))
+            .await
+            .unwrap();
         assert_eq!(report.missing_records, vec!["ten_orphan".to_string()]);
         assert!(report.orphans.is_empty());
     }
@@ -503,9 +502,8 @@ mod reconcile_tests {
         };
         s.write_tenant(&ready).await.unwrap();
         s.write_tenant(&reserved).await.unwrap();
-        let report = reconcile(&(s.clone() as Arc<dyn RegistryStore>), &[ready, reserved])
-            .await
-            .unwrap();
+        let tenant_store = s.clone() as Arc<dyn TenantStore>;
+        let report = reconcile(&tenant_store, &[ready, reserved]).await.unwrap();
         assert!(report.missing_records.is_empty());
         assert_eq!(report.orphans, vec!["ten_b".to_string()]);
     }

@@ -31,8 +31,8 @@ pub fn scheduler_job() -> SchedulerJob {
 /// The job is short-lived; it does not hold a per-tenant
 /// runtime pin while iterating.
 pub async fn cleanup_expired_for_all(registry: &RegistryHandle) -> Result<(), MemoryError> {
-    let store = registry.store_clone();
-    let due = store.list_ready_tenants(None, 100).await?;
+    // Tenant listing is tenancy's; the sweeper never needed the rest of the registry.
+    let due = registry.tenants().list_ready_tenants(None, 100).await?;
     for tenant in due {
         // Production path: bind the tenant namespace
         // through the privileged engine and issue the

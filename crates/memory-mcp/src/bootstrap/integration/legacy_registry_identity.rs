@@ -3,10 +3,10 @@ use std::sync::Arc;
 use chrono::{DateTime, Utc};
 
 use crate::MemoryError;
+use crate::http::registry::RegistryStores;
 use crate::http::registry::models::{
     ExternalIdentity, IdentityAudit, SubjectVerifier, new_external_identity_id,
 };
-use crate::http::registry::storage::RegistryStore;
 use crate::identity::api::{
     IdentityInvitationPort, IdentityLinkTransactions, LinkMode, VerifiedIdentityLinkTransactions,
 };
@@ -20,12 +20,12 @@ pub(crate) struct RegistryIdentityLinkTransactions {
 }
 
 impl RegistryIdentityLinkTransactions {
-    /// Composition holds the omnibus registry handle; wrap it as each
-    /// port here so the adapter is typed against the ports only.
-    pub(crate) fn from_registry(store: Arc<dyn RegistryStore>) -> Self {
+    /// Wrap the owner stores as each port here, so the adapter is typed
+    /// against the ports only.
+    pub(crate) fn from_stores(stores: &RegistryStores) -> Self {
         Self {
-            links: Arc::new(store.clone()) as Arc<dyn IdentityLinkTx>,
-            lookup: Arc::new(store) as Arc<dyn IdentityLookup>,
+            links: crate::http::registry::control_impl::identity_link_tx(stores),
+            lookup: crate::http::registry::control_impl::identity_lookup(stores),
         }
     }
 }
@@ -171,7 +171,9 @@ mod tests {
     #[tokio::test]
     async fn linking_as_the_account_records_an_account_actor() {
         let store = store_with_account().await;
-        let transactions = RegistryIdentityLinkTransactions::from_registry(store.clone());
+        let transactions = RegistryIdentityLinkTransactions::from_stores(
+            &crate::http::registry::RegistryStores::from_backend(store.clone()),
+        );
         let now = Utc::now();
 
         transactions
@@ -200,7 +202,9 @@ mod tests {
     #[tokio::test]
     async fn linking_as_an_administrator_records_an_operator_actor() {
         let store = store_with_account().await;
-        let transactions = RegistryIdentityLinkTransactions::from_registry(store.clone());
+        let transactions = RegistryIdentityLinkTransactions::from_stores(
+            &crate::http::registry::RegistryStores::from_backend(store.clone()),
+        );
         let now = Utc::now();
 
         transactions
@@ -261,7 +265,9 @@ mod tests {
             .await
             .expect("seed second identity");
 
-        let transactions = RegistryIdentityLinkTransactions::from_registry(store.clone());
+        let transactions = RegistryIdentityLinkTransactions::from_stores(
+            &crate::http::registry::RegistryStores::from_backend(store.clone()),
+        );
         transactions
             .unlink_external_identity("acct_1", "idn_two", "admin_root", now)
             .await
@@ -283,7 +289,9 @@ mod tests {
     #[tokio::test]
     async fn a_replayed_tuple_does_not_accumulate_duplicate_rows() {
         let store = store_with_account().await;
-        let transactions = RegistryIdentityLinkTransactions::from_registry(store.clone());
+        let transactions = RegistryIdentityLinkTransactions::from_stores(
+            &crate::http::registry::RegistryStores::from_backend(store.clone()),
+        );
         let now = Utc::now();
 
         for _ in 0..3 {
@@ -344,7 +352,9 @@ mod tests {
     #[tokio::test]
     async fn replace_supersedes_rather_than_accumulating() {
         let store = store_with_account().await;
-        let transactions = RegistryIdentityLinkTransactions::from_registry(store.clone());
+        let transactions = RegistryIdentityLinkTransactions::from_stores(
+            &crate::http::registry::RegistryStores::from_backend(store.clone()),
+        );
         link_one(&transactions, 0xB1).await;
 
         transactions
@@ -393,7 +403,9 @@ mod tests {
     #[tokio::test]
     async fn account_exists_reads_through_the_lookup_port() {
         let store = store_with_account().await;
-        let transactions = RegistryIdentityLinkTransactions::from_registry(store.clone());
+        let transactions = RegistryIdentityLinkTransactions::from_stores(
+            &crate::http::registry::RegistryStores::from_backend(store.clone()),
+        );
 
         assert!(
             transactions
@@ -414,7 +426,9 @@ mod tests {
     #[tokio::test]
     async fn identity_count_reads_through_the_lookup_port() {
         let store = store_with_account().await;
-        let transactions = RegistryIdentityLinkTransactions::from_registry(store.clone());
+        let transactions = RegistryIdentityLinkTransactions::from_stores(
+            &crate::http::registry::RegistryStores::from_backend(store.clone()),
+        );
 
         assert_eq!(
             transactions.identity_count("acct_1").await.expect("count"),
@@ -433,7 +447,9 @@ mod tests {
     #[tokio::test]
     async fn unlink_dispatches_through_the_port_and_removes_the_row() {
         let store = store_with_account().await;
-        let transactions = RegistryIdentityLinkTransactions::from_registry(store.clone());
+        let transactions = RegistryIdentityLinkTransactions::from_stores(
+            &crate::http::registry::RegistryStores::from_backend(store.clone()),
+        );
         link_one(&transactions, 0xD1).await;
         link_one(&transactions, 0xD2).await;
 

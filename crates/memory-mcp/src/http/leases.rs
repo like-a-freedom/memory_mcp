@@ -1,7 +1,7 @@
 //! Provisioning leases.
 //!
 //! `ProvisioningLease` is the durable claim returned by
-//! `RegistryStore::claim_provisioning`. The fenced CAS in
+//! `ProvisioningStore::claim_provisioning`. The fenced CAS in
 //! the registry matches `(owner_id, lease_id,
 //! fencing_generation)` against the stored lease before any
 //! state advance. The `run_with_heartbeat` helper spawns a
@@ -50,7 +50,7 @@ pub struct LeaseRecord {
 }
 
 /// Fenced provisioning lease returned by
-/// `RegistryStore::claim_provisioning`. The token is
+/// `ProvisioningStore::claim_provisioning`. The token is
 /// intentionally not constructible by a request handler; only
 /// the atomic registry claim returns it.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -75,10 +75,10 @@ impl ProvisioningLease {
     }
 
     /// Heartbeat the lease. Forwarded to
-    /// `RegistryStore::heartbeat_provisioning`.
+    /// `ProvisioningStore::heartbeat_provisioning`.
     pub async fn heartbeat(
         &self,
-        store: &dyn crate::http::registry::RegistryStore,
+        store: &dyn crate::http::registry::ProvisioningStore,
         tenant_id: &str,
         now: DateTime<Utc>,
         expires_at: DateTime<Utc>,
@@ -96,10 +96,10 @@ impl ProvisioningLease {
     }
 
     /// Release the lease. Forwarded to
-    /// `RegistryStore::release_provisioning_lease`.
+    /// `ProvisioningStore::release_provisioning_lease`.
     pub async fn release(
         &self,
-        store: &dyn crate::http::registry::RegistryStore,
+        store: &dyn crate::http::registry::ProvisioningStore,
         tenant_id: &str,
     ) -> Result<(), crate::error::MemoryError> {
         store
@@ -128,7 +128,9 @@ impl ProvisioningLease {
         T: Send + 'static,
         F: std::future::Future<Output = Result<T, crate::error::MemoryError>> + Send,
     {
-        let store = registry.store_clone();
+        // Heartbeats are provisioning's fenced-lease store; the holder of the
+        // lease needs nothing else from the registry.
+        let provisioning = registry.provisioning();
         let tenant_id = tenant_id.to_owned();
         let heartbeat_cancel = tokio_util::sync::CancellationToken::new();
         let (lost_tx, mut lost_rx) = tokio::sync::oneshot::channel();
@@ -145,7 +147,7 @@ impl ProvisioningLease {
                     _ = tokio::time::sleep(delay) => {
                         let now = chrono::Utc::now();
                         let expiry = now + chrono::Duration::seconds(60);
-                        if lease.heartbeat(store.as_ref(), &tenant_id, now, expiry).await.is_err() {
+                        if lease.heartbeat(&*provisioning, &tenant_id, now, expiry).await.is_err() {
                             let _ = lost_tx.send(());
                             break;
                         }
