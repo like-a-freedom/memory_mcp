@@ -4,6 +4,11 @@
 
 Superseded — 2026-09-04, hobby-scope simplification.
 
+Reversed by [ADR-0059](0059-capability-specific-control-registry-split.md)
+— 2026-09-28, which adopts the split after the bounded contexts gave it
+the production consumers ADR-0054's own reconsideration condition was
+waiting for. The reasoning below is kept as the historical record.
+
 ## Superseding decision
 
 The project keeps the existing crate-private `RegistryStore` seam. The

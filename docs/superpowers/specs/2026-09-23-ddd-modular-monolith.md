@@ -4,7 +4,6 @@
 **Status:** Accepted direction; strengthened design contract. Phase 0 evidence is required before structural extraction.
 **Original review baseline:** `5bcb2bf3309ecebf71417c5ab2576e6cca0ca4ee` (`ddd-refactorings`).
 **Post-review source baseline:** `791f903fb453f5d40e4bcea9ff8e5e9b4fbeb261` (`origin/master`, merged as `b11c12c77e86f135364006437526db9a061791dc`); the identity-invitation and OIDC signature-provider changes introduced after the original review are included in the compatibility baseline.
-**Plan:** [implementation plan](../plans/2026-09-23-ddd-modular-monolith.md)
 **ADR:** [ADR-0058](../../adr/0058-bounded-contexts-modular-monolith.md)
 
 ## Context and retained decisions
@@ -206,20 +205,8 @@ implementation while moving it to the correct owner.
 Use Rust privacy first: private `domain`, `application`, `infra` modules;
 expose only named API/wiring items. `pub(crate)` is crate-wide visibility, not
 a context wall. Restrict internal items to the context ancestor where needed.
-Source guards supplement compiler privacy; they do not prove architectural
-correctness or authorization.
-
-`tests/module_boundaries.rs` must cover layer imports, API exports/signatures,
-fully qualified paths, grouped/aliased imports, `crate`/`self`/`super` paths,
-re-exports and the allowed dependency graph including cycle detection. Cover
-feature-gated code, `#[path]`/`include!` and macro-based bypasses by an explicit
-reviewed policy; do not claim a `use` substring scan resolves Rust semantics.
-Use existing parsing facilities or a constrained guard plus compiler checks;
-new dependencies require approval. Add negative fixtures for each forbidden
-class and positive fixtures for bootstrap/test/eval exceptions. A checker
-that passes empty directories is not evidence. New extracted modules must
-have zero violations; legacy exceptions name exact paths/edges and a removal
-phase, never `allow service::*` or a whole-tree exemption.
+Module privacy does not prove architectural correctness or authorization; the
+rules above hold only where they are kept.
 
 ## Migration inventory and ownership corrections
 

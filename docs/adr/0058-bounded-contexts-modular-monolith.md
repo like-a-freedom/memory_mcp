@@ -28,7 +28,7 @@ both the package surface and ownership across the full application.
    application must not acquire infrastructure through a shared re-export.
 3. Cross-module behavior goes through published API data contracts and the
    acyclic allowlist in the spec. Keep context internals private; combine Rust
-   privacy with source guards and negative fixtures for bypasses/cycles.
+   privacy with module privacy.
    Bootstrap has explicit wiring privileges and public library entrypoints for
    separate binary crates. Tests/evaluation use deliberate feature-gated
    surfaces. Facade-only rules do not prohibit constructing adapters at startup.
@@ -69,14 +69,15 @@ both the package surface and ownership across the full application.
 A package rename alone fixes artifact names but leaves ownership ambiguous.
 Top-level horizontal layers preserve the existing cross-domain coupling.
 Per-context crates could strengthen compiler dependency walls even within one
-monolith, but are deferred because module privacy plus tested guards are less
-migration work now. Namespace semantics do not determine crate topology.
-Reconsider crates if guards repeatedly miss violations, independent ownership
-needs stronger walls, or build isolation demonstrably benefits; independent
-service deployment is not a prerequisite.
+monolith, but are deferred as more migration work than module privacy requires.
+Namespace semantics do not determine crate topology.
+Reconsider crates if independent ownership needs stronger walls or build
+isolation demonstrably benefits; independent service deployment is not a
+prerequisite.
 
-The benefit is explicit policy/transaction ownership and testable dependency
-rules. The cost is a broad migration with significant registry, retrieval and
+The benefit is explicit policy/transaction ownership and dependency rules
+stated in one place rather than spread across the tree. The cost is a broad
+migration with significant registry, retrieval and
 public Rust API seams. One initiative lands as buildable commits with exact
 expiring legacy bridges and must be released as a coherent whole. Phase 0
 inventory and transaction evidence are gates, not claims already satisfied by
