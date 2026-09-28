@@ -3,10 +3,23 @@
 # RocksDB-backed control registry. The server and the CLI cannot hold the
 # same embedded RocksDB path at once, so the server is stopped while the
 # CLI issues a code.
+#
+# Requires $ROOT/env (below) to exist; this script reads it and does not
+# create it. The contract it must satisfy is the environment table in
+# docs/operations/LOCAL_ADMIN.md section 3.3 -- both SURREALDB_*_URL
+# values must be `rocksdb://` (the validator rejects `mem://` outside
+# test-fixtures), control and tenant credentials are required, and
+# ALLOWED_HOSTS must be explicit for the HTTP SaaS profile.
 set -e
 
 REPO=/Users/solovey/Documents/dev/memory_mcp
 ROOT=/tmp/lmcp_local_check
+
+if [ ! -f "$ROOT/env" ]; then
+    echo "missing $ROOT/env -- see the header of this script and" >&2
+    echo "docs/operations/LOCAL_ADMIN.md section 3.3 for the required variables" >&2
+    exit 2
+fi
 CLI="$REPO/target/debug/memory_mcp"
 HTTP="$REPO/target/debug/memory_mcp_http"
 BASE=http://127.0.0.1:18443
