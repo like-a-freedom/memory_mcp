@@ -42,6 +42,12 @@ jobs:
       - run: cargo fmt --all --check
       - name: Packaging regressions
         run: python3 -m unittest discover -s scripts/ci -p 'test_*.py'
+      # A `.rs` file no `mod` declaration reaches is invisible to rustc, so no
+      # lint or test in the jobs above can report it. `test_undeclared_sources.py`
+      # runs in the discovery step above; this runs the audit on its own so the
+      # offending file is named in the job log, not only as a test failure.
+      - name: No undeclared source files
+        run: python3 scripts/ci/audit_undeclared_sources.py
       - run: cargo clippy --workspace --all-targets --features fs-watch,mcp-apps,streamable-http --locked -- -D warnings
       - name: Control-plane UI WASM lint
         run: |

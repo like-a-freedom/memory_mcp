@@ -34,6 +34,14 @@ in ADR-0016.
 > container-shaped entry points that do read it live under
 > `service/memory_container_shims/`. The target transaction boundaries and
 > acyclic API graph live in the ADR/spec.
+>
+> **A file in the tree is code only if a `mod` declaration reaches it.** An
+> undeclared `.rs` file is invisible to rustc, so no lint, no warning and no
+> test reports it — the migration's reorganisation left 137 such files behind
+> while the build stayed green. The per-file manifest that used to track this
+> was retired with the migration record; `scripts/ci/audit_undeclared_sources.py`
+> now derives the same fact from rustc's own dependency graph
+> ([ADR-0061](docs/adr/0061-compiler-graph-defines-the-source-tree.md)).
 
 - `src/models/` — domain values and typed records.
 - `src/identity/api.rs` — identity use cases: unlink/last-link, verified link
@@ -51,20 +59,24 @@ in ADR-0016.
 - `src/embedding/api.rs` — canonical vector updates with named write policies
   (`FillMissing` for backfill, `ReplaceStale` for re-embedding and retry), so
   a vector endpoint never calls generation again.
-- `src/service/agent_memory/` — internal lifecycle orchestration (policy,
-  recall, capture, projection, worker). Not registered in `tools/list`.
-- `src/service/capabilities/` — transport-adapter layer over the context
-  APIs. Each module adapts the service container (`MemoryService`, the
-  former `ServiceContext`) into the narrow port its use case declares, so
-  the container no longer appears in any capability signature. The
-  container is *contained* at this edge, not yet removed: the adapters
-  still extract their subset from it, and Phase 5 is where that
-  narrows to explicit consumer-owned ports.
-- `src/service/embedding_service.rs` — embedding generation, query
-  embedding caching, and background retry logic. Holds the
-  `EmbeddingService` struct that owns embedding-specific concerns.
-- `src/service/` — remaining legacy bridges pending expiry, tracked per file
-  in the migration manifest. Do not add new business logic here.
+- `src/service/agent_memory/{projection,worker}.rs` — the lifecycle projection
+  worker. The policy, recall and capture use cases it runs live in
+  `src/memory/agent_memory/`. Not registered in `tools/list`.
+- `src/service/capability_deps.rs`, `src/service/memory_container_shims/`,
+  `src/service/retrieval_deps_from_container.rs` — the transport-adapter edge
+  that contains the service container. Each module adapts `MemoryService` (the
+  former `ServiceContext`) into the narrow port its use case declares, so the
+  container appears in no capability signature. This is the only place the
+  container is read; see [ADR-0061](docs/adr/0061-compiler-graph-defines-the-source-tree.md).
+- `src/embedding/service.rs` — embedding generation, query embedding caching,
+  and background retry logic. Holds the `EmbeddingService` struct that owns
+  embedding-specific concerns.
+- `src/service/` — the service container and the layers built on it: the App
+  Session surface, the CLI entry points, the background workers, the
+  local-administrator business logic, and one-way compatibility re-exports. It
+  holds no business logic of its own; use cases belong to the owning context's
+  `api.rs`. A file here that no `mod` declaration reaches is not part of the
+  build at all, and `scripts/ci/audit_undeclared_sources.py` fails on one.
 - `src/storage/` — the technical persistence platform: `DbClient`, the
   query builders, migrations, row unwrapping and the platform's own
   access and event logs. No domain data; every canonical table's store

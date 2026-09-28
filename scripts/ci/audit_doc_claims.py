@@ -14,6 +14,18 @@ import re
 import sys
 
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+# ADRs that describe the architecture as it currently stands, and so are held to
+# the tree. Everything below 0058 is a historical record of an earlier design:
+# it names APIs that have since been removed (`select_record`, `service_context`)
+# and is never rewritten, so auditing it would produce only false failures. A
+# record of what was must not be held to the tree as it is.
+#
+# ADR-0062 joins this set when the control-plane persistence split lands; until
+# then it does not exist, and listing a missing number is harmless.
+LIVE_ADRS = frozenset({"0058", "0060", "0061", "0062"})
+
+
 def discover_docs():
     """Every markdown file under the evidence and planning trees.
 
@@ -24,27 +36,35 @@ def discover_docs():
     This migration's own spec is included explicitly; earlier specs are
     historical records and are excluded along with the ADRs.
 
-    Historical ADRs under `docs/architecture/decisions/` are excluded on
-    purpose: per the plan they are never rewritten, and they describe
-    APIs that have since been removed (`select_record`, `service_context`).
-    A record of what was must not be held to the tree as it is.
+    Every configured tree is asserted to exist. A tree that silently
+    disappears — as `docs/architecture` and `docs/superpowers/plans` both did
+    when the migration record was retired — narrows the audit to a fraction of
+    the documents while it still reports success, which is the one outcome
+    worse than a false positive.
     """
     docs = []
     for tree in (
-        "docs/architecture",
         "docs/superpowers/plans",
         "docs/operations",
         "docs/adr",
     ):
+        if not os.path.isdir(os.path.join(ROOT, tree)):
+            sys.exit(
+                f"{tree} is configured for the doc-claim audit but does not "
+                f"exist. Restore it, or remove it from the tree list in "
+                f"discover_docs() so the audit stops claiming to cover it."
+            )
         for base, _dirs, names in os.walk(os.path.join(ROOT, tree)):
-            # The plan states this boundary: "Historical ADRs 0001–0057
-            # and old plans/specs remain unchanged." Those name APIs
-            # since removed. ADR-0058 is this migration's own ADR and is
-            # audited like everything else.
-            if os.path.join("docs", "architecture", "decisions") in base:
-                continue
+            # Historical ADRs name APIs since removed and are never rewritten,
+            # so they are excluded. These three describe the architecture as it
+            # stands, so they are audited like everything else: 0058 is the
+            # bounded-context reorganisation, 0060 closed the last context to
+            # `service` edges, and 0061 made the compiler graph the source-tree
+            # contract. Historical ADRs under `docs/architecture/decisions/` were
+            # excluded for the same reason before that tree was retired in
+            # `6bf227a`.
             if base.endswith(os.path.join("docs", "adr")):
-                names[:] = [n for n in names if n.startswith("0058")]
+                names[:] = [n for n in names if n[:4] in LIVE_ADRS]
             for name in sorted(names):
                 if name.endswith(".md"):
                     docs.append(os.path.relpath(os.path.join(base, name), ROOT))
