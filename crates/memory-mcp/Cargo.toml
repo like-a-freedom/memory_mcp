@@ -120,8 +120,6 @@ path = "src/bin/memory_mcp_http.rs"
 required-features = ["streamable-http"]
 
 [dev-dependencies]
-csv.workspace = true
-mockall.workspace = true
 proptest.workspace = true
 serde_json.workspace = true
 tempfile.workspace = true
