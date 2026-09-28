@@ -66,7 +66,7 @@ transaction rather than widening a read port.
 `#[async_trait]` on the owner traits is load-bearing, not decorative.
 Dropping it from a supertrait still compiles the declarations and fails
 only where a trait object is constructed, so `every_owner_trait_is_dyn_compatible`
-and `both_stores_satisfy_every_owner_trait_and_the_bundle` in
+and `both_stores_satisfy_every_owner_trait` in
 `http/registry/storage.rs` pin the invariant. Removing the attribute from
 `AccountStore` alone produces 606 errors citing `not dyn compatible`,
 which is what the guard was written to catch.

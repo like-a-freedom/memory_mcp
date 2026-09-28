@@ -23,7 +23,7 @@ ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)
 #
 # ADR-0062 joins this set when the control-plane persistence split lands; until
 # then it does not exist, and listing a missing number is harmless.
-LIVE_ADRS = frozenset({"0058", "0060", "0061", "0062"})
+LIVE_ADRS = frozenset({"0057", "0058", "0059", "0060", "0061", "0062"})
 
 
 def discover_docs():
@@ -237,6 +237,17 @@ def main():
         "import", "format", "collect", "extend", "insert", "remove", "clone",
         "default", "equals", "value", "error", "errors", "null", "true",
         "false", "whole", "whole_file", "forbidden_layer",
+        # Not prose — real symbols, cited in a context where the tree cannot
+        # settle them. `join_oidc_policy` / `join_local_policy` are the two
+        # pre-ADR-0057 joins, named in ADR-0057's own Context section as the
+        # thing the decision replaced, and in Implementation notes as the
+        # history of the single writer. Both are removed on purpose; a
+        # decision record has to be able to name what it replaced.
+        "join_oidc_policy", "join_local_policy",
+        # `protected_roles` is Grafana's own configuration option, quoted in
+        # ADR-0057's product survey and its Alternatives section. It is not a
+        # symbol in this tree and never was.
+        "protected_roles",
     }
 
     for doc in DOCS:

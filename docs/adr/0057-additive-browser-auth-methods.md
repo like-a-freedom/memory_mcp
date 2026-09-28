@@ -214,7 +214,7 @@ notes were added with the audit change that followed.
 
 - **One writer, not two.** The two joins this decision replaced
   (`join_oidc_policy`, `join_local_policy`) became
-  `RegistryStore::reconcile_browser_policy(desired, local)`. The row holds the
+  `BrowserPolicyStore::reconcile_browser_policy(desired, local)`. The row holds the
   whole configured set after a single transaction, so two methods cannot race
   for the singleton and the local method's fingerprints are written by the same
   statement that writes the set. The stored set is written in canonical order
