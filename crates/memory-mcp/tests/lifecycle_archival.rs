@@ -8,9 +8,9 @@
 
 use chrono::{Duration, Utc};
 use memory_mcp::models::Provenance;
-use memory_mcp::service::capabilities::ingest::IngestCapability;
-use memory_mcp::service::capabilities::invalidate::InvalidateCapability;
-use memory_mcp::service::run_archival_pass;
+use memory_mcp::platform::lifecycle_runtime::archival_pass;
+use memory_mcp::service::memory_container_shims::memory_capabilities_ingest::IngestCapability;
+use memory_mcp::service::memory_container_shims::memory_capabilities_invalidate::InvalidateCapability;
 use memory_mcp::storage::DbClient;
 use serde_json::json;
 
@@ -21,7 +21,7 @@ async fn archival_pass_processes_only_active_namespace() {
     let (service, db_client) = common::make_service_with_client().await;
     let old_date = Utc::now() - Duration::days(150);
 
-    let episode_id = IngestCapability::ingest(
+    let episode_id = IngestCapability::ingest_from_service(
         &service,
         memory_mcp::models::IngestRequest {
             source_type: "meeting".to_string(),
@@ -51,7 +51,7 @@ async fn archival_pass_processes_only_active_namespace() {
         .await
         .expect("add fact");
 
-    InvalidateCapability::invalidate(
+    InvalidateCapability::invalidate_from_service(
         &service,
         memory_mcp::models::InvalidateRequest {
             fact_id,
@@ -63,7 +63,7 @@ async fn archival_pass_processes_only_active_namespace() {
     .await
     .expect("invalidate fact");
 
-    let count = run_archival_pass(&service, 90)
+    let count = archival_pass(&service, 90)
         .await
         .expect("archival pass completed");
 
@@ -82,7 +82,7 @@ async fn archival_pass_when_episode_fact_was_recently_accessed_then_skips_archiv
     let (service, db_client) = common::make_service_with_client().await;
     let old_date = Utc::now() - Duration::days(150);
 
-    let episode_id = IngestCapability::ingest(
+    let episode_id = IngestCapability::ingest_from_service(
         &service,
         memory_mcp::models::IngestRequest {
             source_type: "meeting".to_string(),
@@ -112,7 +112,7 @@ async fn archival_pass_when_episode_fact_was_recently_accessed_then_skips_archiv
         .await
         .expect("add fact");
 
-    InvalidateCapability::invalidate(
+    InvalidateCapability::invalidate_from_service(
         &service,
         memory_mcp::models::InvalidateRequest {
             fact_id: fact_id.clone(),
@@ -136,7 +136,7 @@ async fn archival_pass_when_episode_fact_was_recently_accessed_then_skips_archiv
         .await
         .expect("touch fact");
 
-    let count = run_archival_pass(&service, 90)
+    let count = archival_pass(&service, 90)
         .await
         .expect("archival pass completed");
 
@@ -158,7 +158,7 @@ async fn archival_pass_with_empty_database() {
     let (service, _db_client) = common::make_service_with_client().await;
 
     // Act: Run archival pass
-    let count = run_archival_pass(&service, 90)
+    let count = archival_pass(&service, 90)
         .await
         .expect("archival pass completed");
 
@@ -182,7 +182,7 @@ async fn archival_pass_preserves_recent_episodes() {
     .await;
 
     // Act: Run archival pass with 90 day threshold
-    let count = run_archival_pass(&service, 90)
+    let count = archival_pass(&service, 90)
         .await
         .expect("archival pass completed");
 
@@ -205,7 +205,7 @@ async fn archival_pass_archives_old_episodes_without_active_facts() {
     )
     .await;
 
-    InvalidateCapability::invalidate(
+    InvalidateCapability::invalidate_from_service(
         &service,
         memory_mcp::models::InvalidateRequest {
             fact_id: fact_id.clone(),
@@ -217,7 +217,7 @@ async fn archival_pass_archives_old_episodes_without_active_facts() {
     .await
     .expect("fact invalidated");
 
-    let count = run_archival_pass(&service, 90)
+    let count = archival_pass(&service, 90)
         .await
         .expect("archival pass completed");
 
@@ -251,7 +251,7 @@ async fn archival_pass_respects_age_threshold() {
     )
     .await;
 
-    InvalidateCapability::invalidate(
+    InvalidateCapability::invalidate_from_service(
         &service,
         memory_mcp::models::InvalidateRequest {
             fact_id,
@@ -263,7 +263,7 @@ async fn archival_pass_respects_age_threshold() {
     .await
     .expect("fact invalidated");
 
-    let count = run_archival_pass(&service, 90)
+    let count = archival_pass(&service, 90)
         .await
         .expect("archival pass completed");
 
@@ -286,7 +286,7 @@ async fn archival_pass_batch_limit_respected() {
         )
         .await;
 
-        InvalidateCapability::invalidate(
+        InvalidateCapability::invalidate_from_service(
             &service,
             memory_mcp::models::InvalidateRequest {
                 fact_id,
@@ -300,7 +300,7 @@ async fn archival_pass_batch_limit_respected() {
     }
 
     // Act: Run archival pass
-    let count = run_archival_pass(&service, 90)
+    let count = archival_pass(&service, 90)
         .await
         .expect("archival pass completed");
 

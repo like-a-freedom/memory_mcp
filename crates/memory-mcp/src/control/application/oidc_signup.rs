@@ -174,7 +174,7 @@ mod tests {
 
     use super::*;
     use crate::http::registry::models::SubjectVerifier;
-    use crate::http::registry::storage::InMemoryStore;
+    use crate::http::registry::storage::{AccountStore, IdentityStore, InMemoryStore};
     use std::sync::Arc;
 
     fn verifier(byte: u8) -> SubjectVerifier {
@@ -193,7 +193,7 @@ mod tests {
     async fn join_fence(
         store: &InMemoryStore,
     ) -> crate::http::registry::models::BrowserPolicyFence {
-        crate::http::registry::RegistryStore::reconcile_browser_policy(
+        crate::http::registry::BrowserPolicyStore::reconcile_browser_policy(
             store,
             &[crate::http::config::BrowserAuthMethod::Oidc],
             None,

@@ -4,6 +4,7 @@
 //! including request/response types, domain entities, and access control types.
 
 mod access;
+pub mod auth;
 pub mod claim;
 mod domain;
 mod ids;
@@ -12,6 +13,7 @@ mod lifecycle_trace;
 mod memory_event;
 mod procedure;
 mod provenance;
+pub mod registry;
 mod request;
 pub(crate) mod rounding;
 

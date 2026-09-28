@@ -253,7 +253,7 @@ impl MemoryMcp {
         target_id: &str,
         as_of: Option<&str>,
     ) -> Result<Value, ErrorData> {
-        let namespace = self.service.active_namespace.clone();
+        let namespace = self.service.namespace_for_port();
         let (record, record_namespace) = match target_type {
             "entity" => {
                 let record = self
@@ -311,8 +311,7 @@ impl MemoryMcp {
 
     pub(super) async fn lifecycle_payload(&self) -> Result<Value, ErrorData> {
         serde_json::to_value(
-            &self
-                .service
+            &crate::platform::lifecycle_runtime::handles_from(self.service.as_ref())
                 .build_lifecycle_view()
                 .await
                 .map_err(mcp_error)?,
@@ -367,9 +366,15 @@ impl MemoryMcp {
             .as_of_right
             .as_deref()
             .ok_or_else(|| Self::missing_app_field("diff", "as_of_right"))?;
-        let diff = self
-            .service
-            .build_diff(crate::service::DiffRequest {
+        // The diff is knowledge's bi-temporal comparison over its own
+        // facts. The handler supplies the read adapter and the
+        // namespace, never a table name.
+        let diff = crate::knowledge::diff::build_diff(
+            &crate::knowledge::infra::KnowledgeReadAdapter::new(
+                self.service.db_client_for_port(),
+                self.service.namespace_for_port(),
+            ),
+            crate::service::DiffRequest {
                 target_type: params.target_type.clone().unwrap_or_else(|| {
                     if params.target_id.is_some() {
                         "entity".to_string()
@@ -388,9 +393,10 @@ impl MemoryMcp {
                     .time_axis
                     .clone()
                     .unwrap_or_else(|| "valid".to_string()),
-            })
-            .await
-            .map_err(mcp_error)?;
+            },
+        )
+        .await
+        .map_err(mcp_error)?;
         let mut payload =
             serde_json::to_value(&diff).map_err(|error| Self::internal_error(error.to_string()))?;
         upsert_json_field(&mut payload, "exports", json!([]));
@@ -403,14 +409,15 @@ impl MemoryMcp {
         &self,
         params: &OpenAppParams,
     ) -> Result<OpenAppResult, ErrorData> {
-        let bundle = self
-            .service
-            .prepare_ingestion_review(crate::service::PrepareIngestionReviewRequest {
+        let bundle = crate::memory::ingestion_review::prepare_ingestion_review(
+            &crate::memory::ingestion_review::IngestionReviewDeps::from(self.service.as_ref()),
+            crate::service::PrepareIngestionReviewRequest {
                 source_text: params.source_text.clone(),
                 draft_episode_id: params.draft_episode_id.clone(),
-            })
-            .await
-            .map_err(mcp_error)?;
+            },
+        )
+        .await
+        .map_err(mcp_error)?;
         let payload = serde_json::to_value(&bundle)
             .map_err(|error| Self::internal_error(error.to_string()))?;
         self.create_session("ingestion_review", params.ttl_seconds, payload)

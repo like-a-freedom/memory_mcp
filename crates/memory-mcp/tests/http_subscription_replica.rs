@@ -23,9 +23,9 @@
 use std::sync::Arc;
 
 use memory_mcp::http::registry::RegistryHandle;
-use memory_mcp::http::subscriptions::outbox::TenantChangeEvent;
 use memory_mcp::http::subscriptions::stream::CoalescingQueue;
 use memory_mcp::http::subscriptions::{SubscriptionTestDriver, ValidatedSubscriptionFilter};
+use memory_mcp::platform::persistence::outbox::TenantChangeEvent;
 use memory_mcp::storage::BoundDbClient;
 
 /// Two independent `BoundDbClient` handles bound to the same

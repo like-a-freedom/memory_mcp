@@ -19,6 +19,7 @@ use crate::control::session::ControlPlaneSession;
 use crate::error::MemoryError;
 use crate::http::HttpState;
 use crate::http::config::SignupMode;
+
 use crate::http::registry::models::SubjectVerifier;
 
 #[cfg(test)]
@@ -514,7 +515,7 @@ async fn issue_session(
 mod tests {
     use super::*;
     use crate::http::registry::models::{Account, AccountStatus};
-    use crate::http::registry::storage::{InMemoryStore, RegistryStore};
+    use crate::http::registry::storage::{AccountStore, InMemoryStore, RegistryStore};
     use std::sync::Arc;
 
     /// Every post-flow redirect lands on the console root *inside the
@@ -591,7 +592,7 @@ mod tests {
     #[tokio::test]
     async fn an_invitation_for_an_unknown_account_is_refused() {
         let store = store_with_two_accounts().await;
-        let policy = crate::http::registry::RegistryStore::reconcile_browser_policy(
+        let policy = crate::http::registry::BrowserPolicyStore::reconcile_browser_policy(
             store.as_ref(),
             &[crate::http::config::BrowserAuthMethod::Oidc],
             None,
@@ -617,7 +618,7 @@ mod tests {
     #[tokio::test]
     async fn an_invitation_acceptance_signs_the_browser_in_when_it_has_no_session() {
         let store = store_with_two_accounts().await;
-        let policy = crate::http::registry::RegistryStore::reconcile_browser_policy(
+        let policy = crate::http::registry::BrowserPolicyStore::reconcile_browser_policy(
             store.as_ref(),
             &[crate::http::config::BrowserAuthMethod::Oidc],
             None,
@@ -661,7 +662,7 @@ mod tests {
     #[tokio::test]
     async fn an_invitation_acceptance_leaves_an_existing_session_alone() {
         let store = store_with_two_accounts().await;
-        let policy = crate::http::registry::RegistryStore::reconcile_browser_policy(
+        let policy = crate::http::registry::BrowserPolicyStore::reconcile_browser_policy(
             store.as_ref(),
             &[crate::http::config::BrowserAuthMethod::Oidc],
             None,
@@ -738,7 +739,7 @@ mod tests {
     #[tokio::test]
     async fn a_replacing_invitation_swaps_the_misbound_identity() {
         let store = store_with_two_accounts().await;
-        let policy = crate::http::registry::RegistryStore::reconcile_browser_policy(
+        let policy = crate::http::registry::BrowserPolicyStore::reconcile_browser_policy(
             store.as_ref(),
             &[crate::http::config::BrowserAuthMethod::Oidc],
             None,

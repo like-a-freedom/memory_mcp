@@ -16,7 +16,7 @@ fn tracing_warn(message: &str) {
 use crate::error::MemoryError;
 use crate::http::registry::models::Tenant;
 
-use super::lifecycle::{RuntimePhase, TenantRuntimeSlot};
+use crate::http::runtime::lifecycle::{RuntimePhase, TenantRuntimeSlot};
 
 /// Errors returned by bounded runtime acquisition.
 #[derive(Debug, thiserror::Error)]
@@ -245,8 +245,12 @@ impl Pool {
         pool
     }
 
-    /// Capacity as reported to /health/ready and metrics.
-    #[allow(dead_code)]
+    /// The configured maximum number of concurrently resident runtimes.
+    ///
+    /// No caller reads this today: `/health/ready` and the metrics
+    /// report the configured value from `HttpConfig` rather than from
+    /// the pool, so this is the pool's own view of its bound and is
+    /// kept as the place a caller would read it from.
     pub fn capacity(&self) -> usize {
         self.cap
     }
@@ -518,7 +522,6 @@ impl Pool {
     /// since `threshold`. The production eviction tick is driven by
     /// the scheduler; this helper exposes the same transition to the
     /// unit tests below, which are its only callers.
-    #[allow(dead_code)]
     pub async fn mark_draining_if_idle(
         &self,
         tenant_id: &str,
@@ -541,7 +544,6 @@ impl Pool {
 
     /// Test-only: True if the slot is in the Ready state and
     /// `runtime` is Some.
-    #[allow(dead_code)]
     pub async fn contains_ready(&self, tenant_id: &str) -> bool {
         let mut map = self.map.lock().await;
         let Some(slot) = map.get(tenant_id) else {
@@ -555,7 +557,6 @@ impl Pool {
 
     /// Test-only: activation count for a tenant, derived
     /// from the `ActivationSlot.generation` counter.
-    #[allow(dead_code)]
     pub async fn activation_count(&self, tenant_id: &str) -> u64 {
         let map = self.map.lock().await;
         let Some(slot) = map.peek(tenant_id) else {
@@ -849,5 +850,60 @@ mod tests {
         // activation_count stays at 1 because the negative
         // cache short-circuited the second call.
         assert_eq!(pool.activation_count("ten_neg").await, 1);
+    }
+
+    /// Activation is never refused while the pool has capacity.
+    ///
+    /// The pool owns an LRU of runtime slots and separately consults
+    /// `Tenancy`, which keeps its own resident-binding map. Both apply
+    /// a capacity check, so a binding `Tenancy` retained for a tenant
+    /// the pool had already evicted would eventually reject an
+    /// activation the pool had made room for — degrading a live server
+    /// to `CapacityTimeout` with nothing to explain it. Cycling many
+    /// tenants through a two-slot pool makes that show up as a
+    /// refused activation, which the loop below asserts never happens.
+    #[tokio::test]
+    async fn repeated_activation_cycles_within_capacity() {
+        let db = Surreal::new::<Mem>(()).await.unwrap();
+        db.use_ns("control").use_db("control").await.unwrap();
+        let registry = Arc::new(RegistryHandle::in_memory_with_mem_engine(Arc::new(db)));
+        let pool = Arc::new(Pool::new(
+            2,
+            Duration::ZERO,
+            Duration::from_millis(50),
+            DEFAULT_ACTIVATION_TIMEOUT,
+            DEFAULT_PER_TENANT_CONCURRENCY,
+            registry,
+        ));
+
+        // Cycle well past the capacity so any retained binding would
+        // accumulate and eventually trip `Tenancy`'s own limit.
+        for round in 0..6 {
+            for name in ["a", "b", "c"] {
+                let tenant_id = format!("ten_{name}_{round}");
+                let guard = pool
+                    .acquire_or_wait(&ready_tenant(&tenant_id, &format!("tns_{name}")))
+                    .await
+                    .expect("activation must never be rejected by a stale tenancy entry");
+                drop(guard);
+            }
+        }
+
+        // Only the two most-recently-inserted slots survive in the LRU,
+        // and every survivor is Ready: a `Tenancy` entry left behind for
+        // an evicted tenant would have rejected an activation here.
+        let map = pool.map.lock().await;
+        assert!(map.len() <= 2, "pool LRU must respect its capacity");
+        for tenant_id in ["ten_a_5", "ten_b_5", "ten_c_5"] {
+            let Some(slot) = map.peek(tenant_id) else {
+                continue;
+            };
+            let guard = slot.lock().await;
+            assert_eq!(
+                guard.phase,
+                RuntimePhase::Ready,
+                "a resident slot must be Ready after a successful activation"
+            );
+        }
     }
 }

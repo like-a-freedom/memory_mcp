@@ -9,9 +9,9 @@ use axum::routing::{get, post};
 use axum::routing::delete;
 
 use super::HttpState;
-use super::fault_injection::FaultInjector;
 #[cfg(feature = "control-plane")]
 use crate::http::config::BrowserAuthMethod;
+use crate::platform::fault_injection::FaultInjector;
 
 pub fn build_router(
     state: Arc<HttpState>,
@@ -280,10 +280,7 @@ pub fn build_router(
     // never ships the build-time sentinel to a client. The compiled UI
     // feature determines whether an embedded catalog exists; an empty catalog
     // still deliberately serves the no-UI fallback.
-    #[cfg(feature = "ui")]
     let stamped_assets = crate::ui::assets::build_stamped_assets(&state.config.base_path)?;
-    #[cfg(not(feature = "ui"))]
-    let stamped_assets: Option<std::sync::Arc<crate::ui::assets::StampedAssets>> = None;
 
     let router = router.fallback(move |uri: axum::http::Uri| {
         let stamped_assets = stamped_assets.clone();
@@ -303,19 +300,7 @@ pub fn build_router(
                     "{\"error\":{\"code\":\"not_found\",\"message\":\"not found\"}}",
                 ));
             }
-            #[cfg(feature = "ui")]
-            {
-                crate::ui::assets::serve_asset(path, stamped_assets.as_deref())
-            }
-            #[cfg(not(feature = "ui"))]
-            {
-                let _ = &stamped_assets;
-                return axum::response::IntoResponse::into_response((
-                    axum::http::StatusCode::NOT_FOUND,
-                    [(axum::http::header::CONTENT_TYPE, "application/json")],
-                    "{\"error\":{\"code\":\"not_found\",\"message\":\"not found\"}}",
-                ));
-            }
+            crate::ui::assets::serve_asset(path, stamped_assets.as_deref())
         }
     });
 

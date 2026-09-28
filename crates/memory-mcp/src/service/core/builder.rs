@@ -3,27 +3,26 @@ use std::sync::Arc;
 use lru::LruCache;
 
 use crate::config::SurrealConfig;
-use crate::error::MemoryError;
-use crate::logging::StdoutLogger;
-use crate::models::AssembledContextItem;
-use crate::service::AnnoEntityExtractor;
-use crate::service::EntityExtractor;
-use crate::service::cache::CacheKey;
-use crate::service::embedding::{
+use crate::embedding::providers::{
     DisabledEmbeddingProvider, EmbeddingProvider, create_embedding_provider_with_dimension,
 };
+use crate::embedding::runtime::EmbeddingRuntimeState;
+use crate::error::MemoryError;
+use crate::knowledge::entity_extraction::create_entity_extractor_with_progress;
+use crate::logging::StdoutLogger;
+use crate::memory::context_cache::ContextCache;
+use crate::platform::rate_limiter::RateLimiter;
+use crate::service::AnnoEntityExtractor;
+use crate::service::EntityExtractor;
 use crate::service::embedding_recovery::{
     EmbeddingRecoveryRuntime, should_spawn_embedding_recovery,
 };
-use crate::service::embedding_runtime::EmbeddingRuntimeState;
-use crate::service::entity_extraction::create_entity_extractor_with_progress;
 use crate::service::startup::{
     EmbeddingActivationMode, EmbeddingStartupDecision, apply_startup_migrations,
     build_startup_versions_event, resolve_embedding_startup, write_bootstrap_ready_state,
 };
-use crate::service::triple_extractor::RuleBasedTripleExtractor;
-use crate::service::triple_extractor::TripleExtractor;
-use crate::service::util::RateLimiter;
+use crate::shared::triple_extractor::RuleBasedTripleExtractor;
+use crate::shared::triple_extractor::TripleExtractor;
 use crate::storage::{DbClient, SurrealDbClient};
 
 /// Core service for memory operations.
@@ -34,34 +33,33 @@ pub struct MemoryService {
     pub(crate) active_namespace: String,
     pub(crate) logger: StdoutLogger,
     pub(crate) rate_limiter: Arc<RateLimiter>,
-    pub(crate) ingestion_service: super::super::ingestion::IngestionService,
-    pub(crate) entity_service: super::super::entity::EntityService,
-    pub(crate) fact_service: super::super::fact::FactService,
-    pub(crate) explanation_service: super::super::explanation::ExplanationService,
-    pub(crate) context_cache:
-        Arc<tokio::sync::RwLock<LruCache<CacheKey, Vec<AssembledContextItem>>>>,
+    pub(crate) ingestion_service: crate::memory::ingestion::IngestionService,
+    pub(crate) entity_service: crate::knowledge::entity_service::EntityService,
+    pub(crate) fact_service: crate::knowledge::fact_service::FactService,
+    pub(crate) explanation_service: crate::memory::explanation::ExplanationService,
+    pub(crate) context_cache: ContextCache,
     pub(crate) entity_extractor: Arc<dyn EntityExtractor>,
     pub(crate) embedding_runtime_state: Arc<std::sync::RwLock<EmbeddingRuntimeState>>,
     pub(crate) embedding_similarity_threshold: f64,
-    pub(crate) task_runner: Arc<super::super::embedding::task_runner::BackgroundTaskRunner>,
+    pub(crate) task_runner: Arc<crate::embedding::providers::task_runner::BackgroundTaskRunner>,
     pub(crate) query_embedding_cache:
         Arc<tokio::sync::Mutex<LruCache<String, crate::service::CachedQueryEmbedding>>>,
     pub(crate) query_logging_enabled: bool,
     pub(crate) query_log_retention_days: u32,
-    pub(crate) entity_resolver: super::super::entity_resolution::EntityResolver,
-    pub(crate) triple_extractor: Arc<dyn super::super::triple_extractor::TripleExtractor>,
+    pub(crate) entity_resolver: crate::knowledge::entity_resolution::EntityResolver,
+    pub(crate) triple_extractor: Arc<dyn crate::shared::triple_extractor::TripleExtractor>,
     pub(crate) lifecycle_config: crate::config::LifecycleConfig,
-    pub(crate) claim_service: super::super::claims::projection::ClaimService,
+    pub(crate) claim_service: crate::knowledge::claims_policy::projection::ClaimService,
     /// Shared per-session exposure-trace registry for selective recall.
     ///
     /// Holds at most 32 traces per session for 30 minutes. Persists only when a
     /// later significant capture links a trace.
-    pub(crate) trace_registry: Arc<super::super::agent_memory::recall::SessionTraceRegistry>,
+    pub(crate) trace_registry: Arc<crate::memory::agent_memory::recall::SessionTraceRegistry>,
     /// Owned runtime for the lifecycle background workers (decay, archival,
     /// community). `None` when constructed via the test builders that do not
     /// spawn lifecycle workers; populated by `new_from_env_with_mode`.
     pub(crate) lifecycle_background_workers:
-        Option<super::super::lifecycle::LifecycleBackgroundWorkerRuntime>,
+        Option<crate::memory::lifecycle_workers::LifecycleBackgroundWorkerRuntime>,
     /// Owned runtime for remote embedding recovery after a degraded startup.
     pub(crate) embedding_recovery_runtime: Option<EmbeddingRecoveryRuntime>,
     /// Bounded-concurrency semaphore for fire-and-forget triple extraction
@@ -187,17 +185,17 @@ impl MemoryService {
     ) -> Result<Self, MemoryError> {
         Self::new_from_env_with_mode_and_progress(
             mode,
-            std::sync::Arc::new(crate::service::model_artifacts::CliProgressSink::new()),
+            std::sync::Arc::new(crate::embedding::model_artifacts::CliProgressSink::new()),
         )
         .await
     }
 
     /// Creates a service with an explicit model-progress sink. MCP stdio
-    /// processes pass [`crate::service::model_artifacts::JsonLineProgressSink`]
+    /// processes pass [`crate::embedding::model_artifacts::JsonLineProgressSink`]
     /// so stdout stays JSON-RPC-only; CLI paths use the default human sink.
     pub(crate) async fn new_from_env_with_mode_and_progress(
         mode: EmbeddingActivationMode,
-        ner_progress: std::sync::Arc<dyn crate::service::model_artifacts::ModelProgressSink>,
+        ner_progress: std::sync::Arc<dyn crate::embedding::model_artifacts::ModelProgressSink>,
     ) -> Result<Self, MemoryError> {
         let config = SurrealConfig::from_env()?;
         let active_namespace = config.active_namespace().as_str().to_string();
@@ -362,9 +360,9 @@ impl MemoryService {
                     .join("ner");
                 let store_root = native.model.cache_dir.clone().unwrap_or(default_root);
                 let progress_for_refresh: std::sync::Arc<
-                    dyn crate::service::model_artifacts::ModelProgressSink,
+                    dyn crate::embedding::model_artifacts::ModelProgressSink,
                 > = std::sync::Arc::new(
-                    crate::service::model_artifacts::JsonLineProgressSink::new(),
+                    crate::embedding::model_artifacts::JsonLineProgressSink::new(),
                 );
                 (
                     Some(
@@ -447,7 +445,7 @@ impl MemoryService {
         // The initial durable backfill schedule is part of readiness. A worker
         // must never start with a best-effort, in-memory-only promise to process
         // legacy facts later.
-        crate::service::claims::backfill::schedule_namespace_backfill(
+        crate::knowledge::claims_policy::backfill::schedule_namespace_backfill(
             &service.claim_service,
             &service.active_namespace,
         )
@@ -455,7 +453,10 @@ impl MemoryService {
 
         // Spawn lifecycle workers if enabled
         let lifecycle_background_workers =
-            super::super::lifecycle::spawn_workers_from_config(&service, &config.lifecycle);
+            crate::platform::lifecycle_runtime::spawn_workers_from_config(
+                &service,
+                &config.lifecycle,
+            );
         service.lifecycle_background_workers = Some(lifecycle_background_workers);
 
         if should_spawn_embedding_recovery(mode, &decision, &config.embedding) {
@@ -548,23 +549,25 @@ impl MemoryService {
             build_config.rate_limit_burst,
         ));
         let db_client = dependencies.db_client.clone();
-        let ingestion_service = super::super::ingestion::IngestionService::new(
+        let ingestion_service = crate::memory::ingestion::IngestionService::new(
             db_client.clone(),
             active_namespace.clone(),
             logger.clone(),
             rate_limiter.clone(),
         );
-        let entity_service =
-            super::super::entity::EntityService::new(db_client.clone(), active_namespace.clone());
-        let fact_service = super::super::fact::FactService::new(
-            crate::storage::FactStoreClient::new(db_client.clone(), active_namespace.clone()),
+        let entity_service = crate::knowledge::entity_service::EntityService::new(
+            db_client.clone(),
+            active_namespace.clone(),
         );
-        let explanation_service = super::super::explanation::ExplanationService::new(
+        let fact_service = crate::knowledge::fact_service::FactService::new(
+            crate::knowledge::FactStoreClient::new(db_client.clone(), active_namespace.clone()),
+        );
+        let explanation_service = crate::memory::explanation::ExplanationService::new(
             db_client.clone(),
             logger.clone(),
             active_namespace.clone(),
         );
-        let claim_store = Arc::new(crate::storage::claims::SurrealClaimStore::new(
+        let claim_store = Arc::new(crate::knowledge::claims::SurrealClaimStore::new(
             db_client.clone(),
             active_namespace.clone(),
         ));
@@ -588,19 +591,23 @@ impl MemoryService {
             ))),
             embedding_similarity_threshold: build_config.embedding_similarity_threshold,
             task_runner: Arc::new(
-                super::super::embedding::task_runner::BackgroundTaskRunner::new(),
+                crate::embedding::providers::task_runner::BackgroundTaskRunner::new(),
             ),
             query_embedding_cache: Arc::new(tokio::sync::Mutex::new(LruCache::new(
                 query_embedding_cache_size,
             ))),
             query_logging_enabled: false,
             query_log_retention_days: crate::config::DEFAULT_QUERY_LOG_RETENTION_DAYS,
-            entity_resolver: super::super::entity_resolution::EntityResolver::new(fuzzy_threshold),
+            entity_resolver: crate::knowledge::entity_resolution::EntityResolver::new(
+                fuzzy_threshold,
+            ),
             triple_extractor: dependencies.triple_extractor,
             lifecycle_config: crate::config::LifecycleConfig::default(),
-            claim_service: super::super::claims::projection::ClaimService::new(claim_store),
+            claim_service: crate::knowledge::claims_policy::projection::ClaimService::new(
+                claim_store,
+            ),
             trace_registry: Arc::new(
-                super::super::agent_memory::recall::SessionTraceRegistry::new(),
+                crate::memory::agent_memory::recall::SessionTraceRegistry::new(),
             ),
             lifecycle_background_workers: None,
             embedding_recovery_runtime: None,
@@ -745,7 +752,7 @@ mod tests {
     /// is observable in CI.
     #[tokio::test]
     async fn triple_extractor_is_retained_by_the_service() {
-        use crate::service::triple_extractor::TripleExtractor;
+        use crate::shared::triple_extractor::TripleExtractor;
         use std::sync::Arc;
 
         // Build a real `DbClient` against an in-memory
@@ -777,7 +784,7 @@ mod tests {
             "error".to_string(),
             100,
             10,
-            Arc::new(crate::service::embedding::DisabledEmbeddingProvider::new(
+            Arc::new(crate::embedding::providers::DisabledEmbeddingProvider::new(
                 crate::config::DEFAULT_EMBEDDING_DIMENSION,
             )),
             crate::config::DEFAULT_EMBEDDING_SIMILARITY_THRESHOLD,

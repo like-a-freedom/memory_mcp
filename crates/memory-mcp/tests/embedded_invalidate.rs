@@ -2,8 +2,8 @@ mod common;
 
 use chrono::{Duration, Utc};
 use memory_mcp::models::{AssembleContextRequest, InvalidateRequest, Provenance};
-use memory_mcp::service::capabilities::assemble_context::AssembleContextCapability;
-use memory_mcp::service::capabilities::invalidate::InvalidateCapability;
+use memory_mcp::service::memory_container_shims::memory_capabilities_assemble_context::AssembleContextCapability;
+use memory_mcp::service::memory_container_shims::memory_capabilities_invalidate::InvalidateCapability;
 use memory_mcp::storage::DbClient;
 
 #[tokio::test]
@@ -27,7 +27,7 @@ async fn embedded_invalidate_removes_fact_from_context() -> Result<(), Box<dyn s
 
     let as_of_before = Utc::now() + Duration::seconds(1);
 
-    let context_before = AssembleContextCapability::assemble_context(
+    let context_before = AssembleContextCapability::assemble_context_from_service(
         &service,
         AssembleContextRequest {
             query: "ARR".to_string(),
@@ -44,7 +44,7 @@ async fn embedded_invalidate_removes_fact_from_context() -> Result<(), Box<dyn s
     .await?;
     assert!(!context_before.is_empty());
 
-    InvalidateCapability::invalidate(
+    InvalidateCapability::invalidate_from_service(
         &service,
         InvalidateRequest {
             fact_id,
@@ -56,7 +56,7 @@ async fn embedded_invalidate_removes_fact_from_context() -> Result<(), Box<dyn s
     .await?;
 
     let as_of_after = Utc::now() + Duration::seconds(2);
-    let context_after = AssembleContextCapability::assemble_context(
+    let context_after = AssembleContextCapability::assemble_context_from_service(
         &service,
         AssembleContextRequest {
             query: "ARR".to_string(),
@@ -95,7 +95,7 @@ async fn embedded_invalidate_persists_bitemporal_close_and_reason()
         )
         .await?;
 
-    InvalidateCapability::invalidate(
+    InvalidateCapability::invalidate_from_service(
         &service,
         InvalidateRequest {
             fact_id: fact_id.clone(),

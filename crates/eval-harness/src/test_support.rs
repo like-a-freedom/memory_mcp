@@ -3,7 +3,7 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 
 use chrono::{DateTime, Utc};
 use memory_mcp::models::{IngestRequest, Provenance};
-use memory_mcp::service::capabilities::ingest::IngestCapability;
+use memory_mcp::service::memory_container_shims::memory_capabilities_ingest::IngestCapability;
 use memory_mcp::service::{MemoryService, normalize_dt, normalize_text};
 use memory_mcp::storage::{DbClient, SurrealDbClient};
 use serde_json::json;
@@ -64,8 +64,8 @@ pub async fn make_service_with_client() -> (MemoryService, Arc<SurrealDbClient>)
 /// Ingests one episode through the production path for benchmark probes.
 /// The request shape every bench used to hand-roll lives here.
 pub async fn ingest_probe(service: &MemoryService, source_id: &str, content: &str) -> String {
-    IngestCapability::ingest(
-        &service,
+    IngestCapability::ingest_from_service(
+        service,
         IngestRequest {
             source_type: "bench".into(),
             source_id: source_id.to_string(),
@@ -155,8 +155,8 @@ pub async fn seed_fact_with_links(
         .map(str::to_string)
         .unwrap_or_else(|| format!("seed:{}", normalize_text(content)));
 
-    let episode_id = IngestCapability::ingest(
-        &service,
+    let episode_id = IngestCapability::ingest_from_service(
+        service,
         IngestRequest {
             source_type: "seed".to_string(),
             source_id,

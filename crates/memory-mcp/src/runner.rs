@@ -20,8 +20,8 @@ use crate::logging::{LogLevel, StdoutLogger, install_log_file};
 // underlying `startup` module is private). The `error` submodule is also
 // private — reach `MemoryError` via the `pub use error::MemoryError;` at
 // `src/service.rs:15`, not via `service::error::`. See Risk R12.
+use crate::error::MemoryError;
 use crate::service::EmbeddingActivationMode;
-use crate::service::MemoryError;
 
 /// Normalizes a raw `MEMORY_LOG_FILE` value. Returns `Some(trimmed_path)`
 /// if the value is non-empty after trimming; `None` otherwise.

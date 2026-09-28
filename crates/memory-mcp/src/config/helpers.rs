@@ -3,7 +3,7 @@
 use std::env;
 use std::path::{Path, PathBuf};
 
-use crate::service::MemoryError;
+use crate::error::MemoryError;
 
 /// Parses a typed environment variable, returning `Ok(None)` when unset.
 ///

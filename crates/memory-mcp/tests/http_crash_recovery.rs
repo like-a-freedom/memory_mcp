@@ -32,7 +32,6 @@ use memory_mcp::config::SurrealTargetConfig;
 use memory_mcp::error::MemoryError;
 use memory_mcp::http::composition::HttpProductionComposition;
 use memory_mcp::http::config::HttpConfig;
-use memory_mcp::http::fault_injection::{FailOnceAt, FaultInjector, FaultPoint, NoFaults};
 use memory_mcp::http::leases::migration::{
     CURRENT_SCHEMA_VERSION, SurrealTenantMigrations, run_due_provisioning,
 };
@@ -47,6 +46,7 @@ use memory_mcp::http::registry::storage::RegistryStore;
 use memory_mcp::http::tasks::scheduler::{ExtractorFn, execute_one_task_for_test};
 use memory_mcp::http::tasks::state::TaskStore as _;
 use memory_mcp::http::tasks::worker::DurableTaskStore;
+use memory_mcp::platform::fault_injection::{FailOnceAt, FaultInjector, FaultPoint, NoFaults};
 use memory_mcp::storage::{BoundDbClient, SurrealDbClient};
 use memory_mcp::tools::params::ExtractParams;
 use sha2::{Digest, Sha256};
@@ -431,7 +431,7 @@ async fn provisioning_resumes_a_tenant_stranded_in_namespace_creating() {
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
 async fn outbox_recovery_after_first_mutation_transient() {
-    use memory_mcp::http::subscriptions::outbox::{
+    use memory_mcp::platform::persistence::outbox::{
         TenantChangeEvent, TenantMutation, commit_tenant_mutation_with_event,
     };
     use memory_mcp::storage::DbClient;

@@ -11,21 +11,22 @@ use crate::config::{
     DEFAULT_EMBEDDING_RECOVERY_BACKOFF_SECS, DEFAULT_EMBEDDING_RECOVERY_MAX_BACKOFF_SECS,
     EmbeddingConfig, build_embedding_signature,
 };
-use crate::logging::{LogLevel, StdoutLogger};
-use crate::service::MemoryError;
-use crate::service::MemoryService;
-use crate::service::cache::invalidate_cache;
-use crate::service::embedding::{
+use crate::embedding::backfill_store::EmbeddingBackfillStoreClient;
+use crate::embedding::providers::{
     EmbeddingProvider, ResolvedEmbeddingTarget, create_embedding_provider_with_dimension,
     probe_remote_embedding_dimension,
 };
-use crate::service::fact::FactService;
+use crate::error::MemoryError;
+use crate::knowledge::fact_service::FactService;
+use crate::logging::{LogLevel, StdoutLogger};
+use crate::memory::context_cache::{ContextCache, invalidate_cache};
+use crate::service::MemoryService;
 use crate::service::is_remote_embedding_provider;
 use crate::service::startup::{
     EmbeddingActivationMode, EmbeddingStartupDecision, load_embedding_state,
     write_bootstrap_ready_state,
 };
-use crate::storage::{BoundDbClient, embedding_backfill_store::EmbeddingBackfillStoreClient};
+use crate::storage::{BoundDbClient, DbClient};
 use tokio_util::sync::CancellationToken;
 
 #[async_trait]
@@ -166,23 +167,63 @@ fn required_fact_string(record: &Value, field: &str) -> Result<String, MemoryErr
         .ok_or_else(|| MemoryError::Validation(format!("missing fact field `{field}`")))
 }
 
+/// The handles embedding recovery needs, and nothing else.
+///
+/// Recovery reads the database client, the bound namespace, the logger
+/// and the context cache, and installs a new embedding runtime. Naming
+/// those here rather than taking the whole container is what lets this
+/// module be exercised without building a service, and keeps the
+/// recovery worker from depending on capabilities it never calls.
+pub(crate) struct RecoveryHandles<'a> {
+    pub(crate) db_client: Arc<dyn DbClient>,
+    pub(crate) active_namespace: &'a str,
+    pub(crate) logger: &'a StdoutLogger,
+    pub(crate) context_cache: &'a ContextCache,
+    pub(crate) service: &'a MemoryService,
+}
+
+impl<'a> RecoveryHandles<'a> {
+    /// Installs a new embedding runtime.
+    ///
+    /// This is the one operation the port cannot express as a read of a
+    /// borrowed handle: it mutates state behind a lock the port does
+    /// not own, so the port keeps the container for exactly this call
+    /// and nothing else.
+    pub(crate) fn replace_runtime_state(
+        &self,
+        state: crate::embedding::runtime::EmbeddingRuntimeState,
+    ) {
+        self.service.replace_embedding_runtime_state(state);
+    }
+}
+
+impl<'a> From<&'a MemoryService> for RecoveryHandles<'a> {
+    fn from(service: &'a MemoryService) -> Self {
+        Self {
+            db_client: service.db_client.clone(),
+            active_namespace: &service.active_namespace,
+            logger: &service.logger,
+            context_cache: &service.context_cache,
+            service,
+        }
+    }
+}
+
 pub(crate) async fn run_backfill(
-    service: &crate::service::MemoryService,
+    service: &RecoveryHandles<'_>,
     provider: Arc<dyn EmbeddingProvider>,
     signature: &str,
     model: Option<&str>,
     dimension: usize,
     batch_size: i32,
 ) -> Result<BackfillOutcome, MemoryError> {
-    let store = EmbeddingBackfillStoreClient::new(
-        service.db_client.clone(),
-        service.active_namespace.clone(),
-    );
+    let store =
+        EmbeddingBackfillStoreClient::new(service.db_client.clone(), service.active_namespace);
     let mut cursor: Option<String> = None;
     let mut processed = 0usize;
     let total = store.count_facts_missing_embeddings().await?;
     log_recovery_event(
-        &service.logger,
+        service.logger,
         "embedding.backfill_started",
         LogLevel::Info,
         [("total_missing", json!(total))],
@@ -199,7 +240,7 @@ pub(crate) async fn run_backfill(
         let batch_size = batch.len();
         let vector_port = crate::embedding::infra::FactVectorAdapter::new(
             service.db_client.clone(),
-            service.active_namespace.clone(),
+            service.active_namespace,
             model.map(str::to_owned),
             Some(dimension),
         );
@@ -227,13 +268,13 @@ pub(crate) async fn run_backfill(
                 crate::embedding::api::VectorWritePolicy::FillMissing,
             )
             .await?;
-            crate::service::invalidate_cache(&service.context_cache).await;
+            crate::memory::context_cache::invalidate_cache(service.context_cache).await;
             cursor = Some(fact_id);
             processed += 1;
         }
         let remaining = store.count_facts_missing_embeddings().await?;
         log_recovery_event(
-            &service.logger,
+            service.logger,
             "embedding.backfill_progress",
             LogLevel::Info,
             [
@@ -251,7 +292,7 @@ enum RecoveryCycleOutcome {
 }
 
 async fn install_recovery_provider(
-    service: &MemoryService,
+    service: &RecoveryHandles<'_>,
     db: &BoundDbClient,
     target: &ResolvedEmbeddingTarget,
     provider: Arc<dyn EmbeddingProvider>,
@@ -268,20 +309,18 @@ async fn install_recovery_provider(
         )
         .await?;
     }
-    service.replace_embedding_runtime_state(
-        crate::service::embedding_runtime::EmbeddingRuntimeState::new(
-            provider,
-            Some(target.signature.clone()),
-            target.model.clone(),
-            Some(target.dimension),
-        ),
-    );
-    invalidate_cache(&service.context_cache).await;
+    service.replace_runtime_state(crate::embedding::runtime::EmbeddingRuntimeState::new(
+        provider,
+        Some(target.signature.clone()),
+        target.model.clone(),
+        Some(target.dimension),
+    ));
+    invalidate_cache(service.context_cache).await;
     Ok(())
 }
 
 async fn backfill_and_mark_ready(
-    service: &MemoryService,
+    service: &RecoveryHandles<'_>,
     db: &BoundDbClient,
     provider: Arc<dyn EmbeddingProvider>,
     target: &ResolvedEmbeddingTarget,
@@ -331,12 +370,12 @@ fn recovery_backoff_with_settings(failures: u32, base: Duration, cap: Duration) 
 }
 
 async fn run_recovery_cycle(
-    service: &MemoryService,
+    service: &RecoveryHandles<'_>,
     config: &EmbeddingConfig,
     backend: &dyn EmbeddingRecoveryBackend,
     settings: &RecoveryWorkerSettings,
 ) -> Result<RecoveryCycleOutcome, MemoryError> {
-    let db = BoundDbClient::new(service.db_client.clone(), service.active_namespace.clone());
+    let db = BoundDbClient::new(service.db_client.clone(), service.active_namespace);
     let persisted_state = load_embedding_state(&db).await?;
     let index_dimension = persisted_state
         .as_ref()
@@ -355,7 +394,7 @@ async fn run_recovery_cycle(
             let provider = backend.create_provider(target.dimension).await?;
             install_recovery_provider(service, &db, &target, provider.clone(), true).await?;
             log_recovery_event(
-                &service.logger,
+                service.logger,
                 "embedding.recovered",
                 LogLevel::Info,
                 [
@@ -371,7 +410,7 @@ async fn run_recovery_cycle(
                 backfill_and_mark_ready(service, &db, provider, &target, settings.batch_size)
                     .await?;
             log_recovery_event(
-                &service.logger,
+                service.logger,
                 "embedding.backfill_completed",
                 LogLevel::Info,
                 [("processed", serde_json::json!(processed))],
@@ -382,7 +421,7 @@ async fn run_recovery_cycle(
             let provider = backend.create_provider(target.dimension).await?;
             install_recovery_provider(service, &db, &target, provider.clone(), false).await?;
             log_recovery_event(
-                &service.logger,
+                service.logger,
                 "embedding.reembed_required",
                 LogLevel::Warn,
                 [
@@ -404,7 +443,7 @@ async fn run_recovery_cycle(
                 BackfillOutcome::Complete { processed } => processed,
             };
             log_recovery_event(
-                &service.logger,
+                service.logger,
                 "embedding.backfill_completed",
                 LogLevel::Info,
                 [("processed", serde_json::json!(processed))],
@@ -416,7 +455,7 @@ async fn run_recovery_cycle(
             probed_dimension,
         } => {
             log_recovery_event(
-                &service.logger,
+                service.logger,
                 "embedding.reembed_required",
                 LogLevel::Warn,
                 [
@@ -484,7 +523,14 @@ pub(crate) async fn run_recovery_worker(
             return;
         }
 
-        match run_recovery_cycle(&service, &config, backend.as_ref(), &settings).await {
+        match run_recovery_cycle(
+            &RecoveryHandles::from(&service),
+            &config,
+            backend.as_ref(),
+            &settings,
+        )
+        .await
+        {
             Ok(RecoveryCycleOutcome::Completed) => return,
             Err(error) => {
                 consecutive_failures = consecutive_failures.saturating_add(1);
@@ -639,11 +685,11 @@ mod tests {
             self.dimension
         }
 
-        async fn embed(&self, _input: &str) -> Result<Vec<f64>, crate::service::MemoryError> {
+        async fn embed(&self, _input: &str) -> Result<Vec<f64>, crate::error::MemoryError> {
             let remaining = self.remaining_failures.load(Ordering::SeqCst);
             if remaining > 0 {
                 self.remaining_failures.fetch_sub(1, Ordering::SeqCst);
-                return Err(crate::service::MemoryError::Transient(
+                return Err(crate::error::MemoryError::Transient(
                     "synthetic backfill outage".to_string(),
                 ));
             }
@@ -824,12 +870,12 @@ mod tests {
 
     #[async_trait]
     impl EmbeddingRecoveryBackend for FakeRecoveryBackend {
-        async fn probe_dimension(&self) -> Result<usize, crate::service::MemoryError> {
+        async fn probe_dimension(&self) -> Result<usize, crate::error::MemoryError> {
             self.probe_count.fetch_add(1, Ordering::SeqCst);
             let remaining = self.remaining_probe_failures.load(Ordering::SeqCst);
             if remaining > 0 {
                 self.remaining_probe_failures.fetch_sub(1, Ordering::SeqCst);
-                return Err(crate::service::MemoryError::Transient(
+                return Err(crate::error::MemoryError::Transient(
                     "synthetic probe outage".to_string(),
                 ));
             }
@@ -839,7 +885,7 @@ mod tests {
         async fn create_provider(
             &self,
             _dimension: usize,
-        ) -> Result<Arc<dyn EmbeddingProvider>, crate::service::MemoryError> {
+        ) -> Result<Arc<dyn EmbeddingProvider>, crate::error::MemoryError> {
             Ok(self.provider.clone())
         }
     }
@@ -886,7 +932,7 @@ mod tests {
             DEFAULT_EMBEDDING_DIMENSION,
         );
         db.create(
-            crate::storage::embedding_state_store::EMBEDDING_STATE_RECORD_ID,
+            crate::embedding::state_store::EMBEDDING_STATE_RECORD_ID,
             json!({
                 "status": "backfill_pending",
                 "active_signature": signature,
@@ -917,7 +963,7 @@ mod tests {
 
         let state = db
             .select_one(
-                crate::storage::embedding_state_store::EMBEDDING_STATE_RECORD_ID,
+                crate::embedding::state_store::EMBEDDING_STATE_RECORD_ID,
                 "org",
             )
             .await
@@ -934,7 +980,7 @@ mod tests {
         seed_fact_with_embedding(&db, "fact:stale").await;
         let config = remote_config();
         db.create(
-            crate::storage::embedding_state_store::EMBEDDING_STATE_RECORD_ID,
+            crate::embedding::state_store::EMBEDDING_STATE_RECORD_ID,
             json!({
                 "status": "ready",
                 "active_signature": "embsig:old",
@@ -988,7 +1034,7 @@ mod tests {
         );
         let state = db
             .select_one(
-                crate::storage::embedding_state_store::EMBEDDING_STATE_RECORD_ID,
+                crate::embedding::state_store::EMBEDDING_STATE_RECORD_ID,
                 "org",
             )
             .await
@@ -1133,7 +1179,7 @@ mod tests {
         let provider = Arc::new(FakeEmbeddingProvider::new(DEFAULT_EMBEDDING_DIMENSION));
 
         let outcome = run_backfill(
-            &service,
+            &RecoveryHandles::from(&service),
             provider,
             "embsig:target",
             Some("test-model"),
@@ -1245,7 +1291,7 @@ mod tests {
         ));
 
         let result = run_backfill(
-            &service,
+            &RecoveryHandles::from(&service),
             provider,
             "embsig:target",
             None,
@@ -1255,7 +1301,7 @@ mod tests {
         .await;
         assert!(matches!(
             result,
-            Err(crate::service::MemoryError::Transient(_))
+            Err(crate::error::MemoryError::Transient(_))
         ));
     }
 }

@@ -1,14 +1,14 @@
 mod common;
 
 use memory_mcp::models::EntityCandidate;
-use memory_mcp::service::capabilities::resolve::ResolveCapability;
+use memory_mcp::service::memory_container_shims::memory_capabilities_resolve::ResolveCapability;
 
 #[tokio::test]
 async fn embedded_resolve_idempotent_for_canonical_name() -> Result<(), Box<dyn std::error::Error>>
 {
     let service = common::make_service().await;
 
-    let canonical_id = ResolveCapability::resolve(
+    let canonical_id = ResolveCapability::resolve_from_service(
         &service,
         EntityCandidate {
             entity_type: "person".to_string(),
@@ -19,7 +19,7 @@ async fn embedded_resolve_idempotent_for_canonical_name() -> Result<(), Box<dyn 
     )
     .await?;
 
-    let second_id = ResolveCapability::resolve(
+    let second_id = ResolveCapability::resolve_from_service(
         &service,
         EntityCandidate {
             entity_type: "person".to_string(),
@@ -38,7 +38,7 @@ async fn embedded_resolve_idempotent_for_canonical_name() -> Result<(), Box<dyn 
 async fn embedded_resolve_matches_existing_alias() -> Result<(), Box<dyn std::error::Error>> {
     let service = common::make_service().await;
 
-    let canonical_id = ResolveCapability::resolve(
+    let canonical_id = ResolveCapability::resolve_from_service(
         &service,
         EntityCandidate {
             entity_type: "person".to_string(),
@@ -49,7 +49,7 @@ async fn embedded_resolve_matches_existing_alias() -> Result<(), Box<dyn std::er
     )
     .await?;
 
-    let alias_id = ResolveCapability::resolve(
+    let alias_id = ResolveCapability::resolve_from_service(
         &service,
         EntityCandidate {
             entity_type: "person".to_string(),
@@ -69,7 +69,7 @@ async fn embedded_batch_lookup_finds_entity_by_alias() -> Result<(), Box<dyn std
     let service = common::make_service().await;
 
     // Create entity with alias
-    let entity_id = ResolveCapability::resolve(
+    let entity_id = ResolveCapability::resolve_from_service(
         &service,
         EntityCandidate {
             entity_type: "person".to_string(),
@@ -81,7 +81,7 @@ async fn embedded_batch_lookup_finds_entity_by_alias() -> Result<(), Box<dyn std
     .await?;
 
     // Resolve by alias should return the same entity ID
-    let resolved_by_alias = ResolveCapability::resolve(
+    let resolved_by_alias = ResolveCapability::resolve_from_service(
         &service,
         EntityCandidate {
             entity_type: "person".to_string(),
@@ -105,7 +105,7 @@ async fn embedded_resolve_creates_new_entity_when_not_found()
 -> Result<(), Box<dyn std::error::Error>> {
     let service = common::make_service().await;
 
-    let entity_id = ResolveCapability::resolve(
+    let entity_id = ResolveCapability::resolve_from_service(
         &service,
         EntityCandidate {
             entity_type: "person".to_string(),
@@ -125,7 +125,7 @@ async fn embedded_resolve_fuzzy_matches_non_identical_cyrillic_name_and_persists
 -> Result<(), Box<dyn std::error::Error>> {
     let service = common::make_service().await;
 
-    let canonical_id = ResolveCapability::resolve(
+    let canonical_id = ResolveCapability::resolve_from_service(
         &service,
         EntityCandidate {
             entity_type: "person".to_string(),
@@ -138,7 +138,7 @@ async fn embedded_resolve_fuzzy_matches_non_identical_cyrillic_name_and_persists
 
     // "Петрёв" is not equal to the canonical "Петров" after normalization,
     // but the one-character difference is above the default fuzzy threshold.
-    let fuzzy_id = ResolveCapability::resolve(
+    let fuzzy_id = ResolveCapability::resolve_from_service(
         &service,
         EntityCandidate {
             entity_type: "person".to_string(),
@@ -154,7 +154,7 @@ async fn embedded_resolve_fuzzy_matches_non_identical_cyrillic_name_and_persists
         "above-threshold fuzzy match should merge"
     );
 
-    let persisted_alias_id = ResolveCapability::resolve(
+    let persisted_alias_id = ResolveCapability::resolve_from_service(
         &service,
         EntityCandidate {
             entity_type: "person".to_string(),
@@ -177,7 +177,7 @@ async fn embedded_resolve_below_threshold_creates_new_entity()
 -> Result<(), Box<dyn std::error::Error>> {
     let service = common::make_service().await;
 
-    let existing_id = ResolveCapability::resolve(
+    let existing_id = ResolveCapability::resolve_from_service(
         &service,
         EntityCandidate {
             entity_type: "person".to_string(),
@@ -188,7 +188,7 @@ async fn embedded_resolve_below_threshold_creates_new_entity()
     )
     .await?;
 
-    let new_id = ResolveCapability::resolve(
+    let new_id = ResolveCapability::resolve_from_service(
         &service,
         EntityCandidate {
             entity_type: "person".to_string(),

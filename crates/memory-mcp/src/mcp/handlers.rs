@@ -1041,10 +1041,6 @@ mod tests {
     use crate::models::IngestRequest;
     #[cfg(feature = "mcp-apps")]
     use crate::service::apps::session::enrich_session_payload;
-    #[cfg(feature = "mcp-apps")]
-    use crate::service::capabilities::ingest::IngestCapability;
-    #[cfg(feature = "mcp-apps")]
-    use crate::service::capabilities::resolve::ResolveCapability;
     use crate::service::edge_neighbor;
     use crate::service::{DisabledEmbeddingProvider, EntityExtractor, GlinerEntityExtractor};
     use crate::storage::{DbClient, SurrealDbClient};
@@ -1113,7 +1109,7 @@ mod tests {
 
     #[cfg(feature = "mcp-apps")]
     async fn create_test_entity(mcp: &MemoryMcp, canonical_name: &str) -> String {
-        ResolveCapability::resolve(
+        crate::service::memory_container_shims::memory_capabilities_resolve::ResolveCapability::resolve_from_service(
             mcp.service().as_ref(),
             EntityCandidate {
                 entity_type: "person".to_string(),
@@ -1675,7 +1671,7 @@ mod tests {
     #[tokio::test]
     async fn lifecycle_app_commands_archive_and_restore_candidates() {
         let mcp = create_test_mcp().await;
-        let stale_episode_id = IngestCapability::ingest(
+        let stale_episode_id = crate::service::memory_container_shims::memory_capabilities_ingest::IngestCapability::ingest_from_service(
             mcp.service().as_ref(),
             IngestRequest {
                 source_type: "meeting".to_string(),

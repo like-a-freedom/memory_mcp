@@ -311,12 +311,30 @@ pub struct ApiKeyOwner {
     pub plan_version: u32,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+/// A newly issued API key.
+///
+/// `secret` is a one-time credential. The derived `Debug` is
+/// overridden so a `{:?}` in a log line or an error report cannot
+/// render it; recovering the value is only possible through the
+/// explicit field access the issuing handler performs.
+#[derive(Clone, PartialEq, Eq)]
 pub struct CreatedApiKey {
     pub id: String,
     pub secret: String,
     pub name: String,
     pub expires_at: Option<DateTime<Utc>>,
+}
+
+impl std::fmt::Debug for CreatedApiKey {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter
+            .debug_struct("CreatedApiKey")
+            .field("id", &self.id)
+            .field("secret", &"[REDACTED]")
+            .field("name", &self.name)
+            .field("expires_at", &self.expires_at)
+            .finish()
+    }
 }
 
 #[derive(Debug, Clone)]

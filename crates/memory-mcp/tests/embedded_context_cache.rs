@@ -2,7 +2,7 @@ mod common;
 
 use chrono::{Duration, Utc};
 use memory_mcp::models::{AccessPayload, AssembleContextRequest, Provenance};
-use memory_mcp::service::capabilities::assemble_context::AssembleContextCapability;
+use memory_mcp::service::memory_container_shims::memory_capabilities_assemble_context::AssembleContextCapability;
 
 #[tokio::test]
 async fn embedded_context_cache_returns_same_results() -> Result<(), Box<dyn std::error::Error>> {
@@ -42,10 +42,9 @@ async fn embedded_context_cache_returns_same_results() -> Result<(), Box<dyn std
     };
 
     let first =
-        AssembleContextCapability::assemble_context(&service, request.clone())
-            .await?;
+        AssembleContextCapability::assemble_context_from_service(&service, request.clone()).await?;
     let second =
-        AssembleContextCapability::assemble_context(&service, request).await?;
+        AssembleContextCapability::assemble_context_from_service(&service, request).await?;
 
     assert_eq!(first, second);
     Ok(())

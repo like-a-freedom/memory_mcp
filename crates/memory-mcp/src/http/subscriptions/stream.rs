@@ -3,7 +3,7 @@
 use std::collections::VecDeque;
 use std::time::Duration;
 
-use crate::http::subscriptions::outbox::TenantChangeEvent;
+use crate::platform::persistence::outbox::TenantChangeEvent;
 
 /// Maximum number of distinct resource invalidations buffered for one listener.
 pub const DEFAULT_QUEUE_CAPACITY: usize = 64;

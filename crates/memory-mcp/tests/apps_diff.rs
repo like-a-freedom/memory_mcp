@@ -1,6 +1,6 @@
 use chrono::{TimeZone, Utc};
 use memory_mcp::service::DiffRequest;
-use memory_mcp::service::capabilities::invalidate::InvalidateCapability;
+use memory_mcp::service::memory_container_shims::memory_capabilities_invalidate::InvalidateCapability;
 
 mod common;
 
@@ -25,7 +25,7 @@ async fn build_diff_reports_added_and_removed_facts_across_timepoints() {
     )
     .await;
 
-    InvalidateCapability::invalidate(
+    InvalidateCapability::invalidate_from_service(
         &service,
         memory_mcp::models::InvalidateRequest {
             fact_id: left_fact.clone(),
@@ -37,16 +37,21 @@ async fn build_diff_reports_added_and_removed_facts_across_timepoints() {
     .await
     .expect("invalidate left fact");
 
-    let diff = service
-        .build_diff(DiffRequest {
+    let diff = memory_mcp::knowledge::diff::build_diff(
+        &memory_mcp::knowledge::infra::KnowledgeReadAdapter::new(
+            service.db_client_for_port(),
+            service.namespace_for_port(),
+        ),
+        DiffRequest {
             target_type: "all".to_string(),
             target_id: None,
             as_of_left: Utc.with_ymd_and_hms(2026, 3, 1, 10, 0, 0).unwrap(),
             as_of_right: Utc.with_ymd_and_hms(2026, 3, 3, 10, 0, 0).unwrap(),
             time_axis: "valid".to_string(),
-        })
-        .await
-        .expect("build diff");
+        },
+    )
+    .await
+    .expect("build diff");
 
     assert_eq!(diff.summary.added_count, 1);
     assert_eq!(diff.summary.removed_count, 1);

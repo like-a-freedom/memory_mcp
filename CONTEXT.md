@@ -29,10 +29,11 @@ in ADR-0016.
 > `embedding` capability; a small pure `shared` kernel is separate from
 > technical `platform` and privileged `bootstrap` wiring. Console delivery
 > remains the layer-free `ui` adapter. These names are not all aggregates.
-> The bounded-context `api.rs` seams below are live. Ownership that is not
-> fully migrated yet is tracked per file in
-> [the migration manifest](docs/architecture/ddd-migration-manifest.csv), and
-> the target transaction boundaries and acyclic API graph live in the ADR/spec.
+> The bounded-context `api.rs` seams below are live. The reorganisation is
+> complete: no bounded context reaches the legacy container, and the
+> container-shaped entry points that do read it live under
+> `service/memory_container_shims/`. The target transaction boundaries and
+> acyclic API graph live in the ADR/spec.
 
 - `src/models/` — domain values and typed records.
 - `src/identity/api.rs` — identity use cases: unlink/last-link, verified link
@@ -53,17 +54,24 @@ in ADR-0016.
 - `src/service/agent_memory/` — internal lifecycle orchestration (policy,
   recall, capture, projection, worker). Not registered in `tools/list`.
 - `src/service/capabilities/` — transport-adapter layer over the context
-  APIs. Each module adapts `&ServiceContext` into the narrow port its use case
-  declares; no use case receives the shared container.
+  APIs. Each module adapts the service container (`MemoryService`, the
+  former `ServiceContext`) into the narrow port its use case declares, so
+  the container no longer appears in any capability signature. The
+  container is *contained* at this edge, not yet removed: the adapters
+  still extract their subset from it, and Phase 5 is where that
+  narrows to explicit consumer-owned ports.
 - `src/service/embedding_service.rs` — embedding generation, query
   embedding caching, and background retry logic. Holds the
   `EmbeddingService` struct that owns embedding-specific concerns.
 - `src/service/` — remaining legacy bridges pending expiry, tracked per file
   in the migration manifest. Do not add new business logic here.
-- `src/storage/` — `DbClient` and narrow stores. Backward compatible.
-- `src/storage/agent_memory.rs` — narrow store for lifecycle events and
+- `src/storage/` — the technical persistence platform: `DbClient`, the
+  query builders, migrations, row unwrapping and the platform's own
+  access and event logs. No domain data; every canonical table's store
+  lives with the context that owns it.
+- `src/memory/agent_memory.rs` — narrow store for lifecycle events and
   durable projection jobs.
-- `src/storage/claims.rs` — narrow store for the claim reconciliation
+- `src/knowledge/claims.rs` — narrow store for the claim reconciliation
   pipeline.
 - `src/tools/` — protocol-agnostic tool implementations shared by MCP
   and CLI. Each tool delegates to its matching capability.

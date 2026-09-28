@@ -10,8 +10,8 @@ use std::sync::Arc;
 use tokio::time::{self, Duration as TokioDuration};
 use tokio_util::sync::CancellationToken;
 
+use crate::platform::durable_work;
 use crate::service::MemoryService;
-use crate::service::durable_work;
 
 use super::projection::run_projection_pass;
 
@@ -35,6 +35,11 @@ impl LifecycleWorkerRuntime {
 
     /// Spawn the projection worker, polling every `poll_interval_secs`.
     pub(crate) async fn spawn(&self, service: MemoryService, poll_interval_secs: u64) {
+        // The worker itself only logs; the pass it drives takes the
+        // container and converts it. Holding the service for the whole
+        // loop would mean the background task keeps every field alive
+        // just to emit two log lines.
+        let logger = service.logger.clone();
         let shutdown = self.shutdown.clone();
         let handle = tokio::spawn(async move {
             let mut interval = time::interval(TokioDuration::from_secs(poll_interval_secs));
@@ -43,9 +48,7 @@ impl LifecycleWorkerRuntime {
                 "op".to_string(),
                 serde_json::Value::String("lifecycle.projection.start".to_string()),
             );
-            service
-                .logger
-                .log(startup_event, crate::logging::LogLevel::Info);
+            logger.log(startup_event, crate::logging::LogLevel::Info);
             loop {
                 tokio::select! {
                     _ = shutdown.cancelled() => break,
@@ -78,7 +81,7 @@ impl LifecycleWorkerRuntime {
                             "error".to_string(),
                             serde_json::Value::String(format!("{e}")),
                         );
-                        service.logger.log(event, crate::logging::LogLevel::Warn);
+                        logger.log(event, crate::logging::LogLevel::Warn);
                     }
                 }
             }
@@ -119,7 +122,6 @@ pub fn empty_poll_interval() -> std::time::Duration {
 pub fn transient_backoff() -> std::time::Duration {
     durable_work::transient_error_backoff()
 }
-
 #[cfg(test)]
 mod tests {
     use super::super::projection::run_projection_pass;
@@ -182,7 +184,7 @@ mod tests {
         let service = setup_service().await;
         let namespace = "test";
         let episode_id = "episode:e2e-1";
-        let now = crate::service::now();
+        let now = crate::shared::temporal::now();
 
         let episode_payload = serde_json::json!({
             "episode_id": episode_id,
@@ -263,7 +265,7 @@ mod tests {
     async fn expired_lease_is_reacquired() {
         let service = setup_service().await;
         let namespace = "test";
-        let now = crate::service::now();
+        let now = crate::shared::temporal::now();
 
         let job_payload = serde_json::json!({
             "job_id": "job-expired",
@@ -300,7 +302,7 @@ mod tests {
     async fn retry_exhaustion_enters_visible_dead_letter() {
         let service = setup_service().await;
         let namespace = "test";
-        let now = crate::service::now();
+        let now = crate::shared::temporal::now();
 
         let job_payload = serde_json::json!({
             "job_id": "job-deadletter",

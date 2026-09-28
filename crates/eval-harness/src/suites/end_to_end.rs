@@ -1,9 +1,9 @@
 use std::path::PathBuf;
 
 use async_trait::async_trait;
-use memory_mcp::service::capabilities::assemble_context::AssembleContextCapability;
-use memory_mcp::service::capabilities::extract::ExtractCapability;
-use memory_mcp::service::capabilities::ingest::IngestCapability;
+use memory_mcp::service::memory_container_shims::memory_capabilities_assemble_context::AssembleContextCapability;
+use memory_mcp::service::memory_container_shims::memory_capabilities_extract::ExtractCapability;
+use memory_mcp::service::memory_container_shims::memory_capabilities_ingest::IngestCapability;
 use serde::Deserialize;
 
 use crate::domain::*;
@@ -183,7 +183,7 @@ async fn run_e2e_case(case: &EndToEndCase) -> EvalCaseOutcome {
     let mut all_entities: Vec<String> = Vec::new();
 
     for source in &case.sources {
-        let episode_id = match IngestCapability::ingest(
+        let episode_id = match IngestCapability::ingest_from_service(
             &service,
             memory_mcp::models::IngestRequest {
                 source_type: source.source_type.clone(),
@@ -218,7 +218,7 @@ async fn run_e2e_case(case: &EndToEndCase) -> EvalCaseOutcome {
             }
         };
 
-        match ExtractCapability::extract(&service, &episode_id, None, None).await {
+        match ExtractCapability::extract_from_service(&service, &episode_id, None, None).await {
             Ok(extraction) => {
                 all_entities.extend(extraction.entities.iter().map(|e| e.canonical_name.clone()));
             }
@@ -241,7 +241,7 @@ async fn run_e2e_case(case: &EndToEndCase) -> EvalCaseOutcome {
     }
 
     let query_start = std::time::Instant::now();
-    let context_result = AssembleContextCapability::assemble_context(
+    let context_result = AssembleContextCapability::assemble_context_from_service(
         &service,
         memory_mcp::models::AssembleContextRequest {
             query: case.query.clone(),

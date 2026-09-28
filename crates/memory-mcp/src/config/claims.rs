@@ -1,6 +1,6 @@
 //! Claim reconciliation rollout configuration.
 
-use crate::service::MemoryError;
+use crate::error::MemoryError;
 
 /// Rollout stage for claim reconciliation.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]

@@ -4,9 +4,9 @@ use std::time::Instant;
 
 use serde_json::json;
 
+use crate::error::MemoryError;
 use crate::logging::LogLevel;
 use crate::models::{AccessPayload, IngestRequest};
-use crate::service::MemoryError;
 use crate::tools::context::{ToolContext, ToolEvent};
 use crate::tools::params::IngestParams;
 use crate::tools::parsers::parse_datetime;

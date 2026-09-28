@@ -12,7 +12,7 @@ use lru::LruCache;
 
 use super::AuthenticatedPrincipal;
 use super::api_keys::ApiKeyCredential;
-use super::cache::PrincipalCache;
+use crate::http::principal::cache::PrincipalCache;
 use crate::http::registry::RegistryStore;
 use crate::http::registry::models::{AccountStatus, ApiKey, ApiKeyStatus};
 use crate::http::sync::recover_lock;
@@ -230,7 +230,7 @@ mod tests {
     use crate::http::registry::models::{
         Account, AccountStatus, ApiKey, ApiKeyStatus, KeyedVerifier,
     };
-    use crate::http::registry::storage::InMemoryStore;
+    use crate::http::registry::storage::{AccountStore, ApiKeyStore, InMemoryStore};
 
     fn active_account(id: &str, tenant_id: &str) -> Account {
         Account {

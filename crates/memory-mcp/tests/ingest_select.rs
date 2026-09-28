@@ -4,8 +4,8 @@ use std::sync::Arc;
 
 use chrono::{DateTime, TimeZone, Utc};
 use memory_mcp::models::IngestRequest;
-use memory_mcp::service::capabilities::extract::ExtractCapability;
-use memory_mcp::service::capabilities::ingest::IngestCapability;
+use memory_mcp::service::memory_container_shims::memory_capabilities_extract::ExtractCapability;
+use memory_mcp::service::memory_container_shims::memory_capabilities_ingest::IngestCapability;
 use memory_mcp::service::{MemoryError, normalize_dt};
 use memory_mcp::storage::{DbClient, SurrealDbClient};
 use serde_json::json;
@@ -50,11 +50,11 @@ async fn ingest_then_extract_roundtrip() -> Result<(), Box<dyn std::error::Error
         policy_tags: vec![],
     };
 
-    let episode_id = IngestCapability::ingest(&svc, req.clone(), None).await?;
-    let episode_id_2 = IngestCapability::ingest(&svc, req, None).await?;
+    let episode_id = IngestCapability::ingest_from_service(&svc, req.clone(), None).await?;
+    let episode_id_2 = IngestCapability::ingest_from_service(&svc, req, None).await?;
     assert_eq!(episode_id, episode_id_2);
 
-    let payload = ExtractCapability::extract(&svc, &episode_id, None, None).await?;
+    let payload = ExtractCapability::extract_from_service(&svc, &episode_id, None, None).await?;
     assert_eq!(payload.episode_id, episode_id);
     assert!(!payload.entities.is_empty());
     assert!(!payload.facts.is_empty());
@@ -80,7 +80,7 @@ async fn ingest_reuses_one_legacy_episode_by_source_identity()
     )
     .await?;
 
-    let episode_id = IngestCapability::ingest(
+    let episode_id = IngestCapability::ingest_from_service(
         &service,
         IngestRequest {
             source_type: "inline".into(),
@@ -119,7 +119,7 @@ async fn ingest_rejects_ambiguous_legacy_episode_identity_without_writing()
         .await?;
     }
 
-    let result = IngestCapability::ingest(
+    let result = IngestCapability::ingest_from_service(
         &service,
         IngestRequest {
             source_type: "inline".into(),

@@ -2,8 +2,8 @@ mod common;
 
 use chrono::{Duration, TimeZone, Utc};
 use memory_mcp::models::{AssembleContextRequest, Provenance};
-use memory_mcp::service::capabilities::assemble_context::AssembleContextCapability;
-use memory_mcp::service::capabilities::resolve::ResolveCapability;
+use memory_mcp::service::memory_container_shims::memory_capabilities_assemble_context::AssembleContextCapability;
+use memory_mcp::service::memory_container_shims::memory_capabilities_resolve::ResolveCapability;
 
 /// Integration test: verifies that multi-word queries work through the full
 /// SurrealDB stack (embedded) with the configured full-text analyzer.
@@ -40,7 +40,7 @@ async fn embedded_multiword_fts_search() -> Result<(), Box<dyn std::error::Error
         )
         .await?;
 
-    let ctx = AssembleContextCapability::assemble_context(
+    let ctx = AssembleContextCapability::assemble_context_from_service(
         &service,
         AssembleContextRequest {
             query: "Delta Enrollment".to_string(),
@@ -66,7 +66,7 @@ async fn embedded_multiword_fts_search() -> Result<(), Box<dyn std::error::Error
         "Result content should contain 'enrollment', got: {content}"
     );
 
-    let ctx2 = AssembleContextCapability::assemble_context(
+    let ctx2 = AssembleContextCapability::assemble_context_from_service(
         &service,
         AssembleContextRequest {
             query: "mobile certs tokens ports episode:fts_test_2".to_string(),
@@ -87,7 +87,7 @@ async fn embedded_multiword_fts_search() -> Result<(), Box<dyn std::error::Error
         "Query with episode ref should find facts after preprocessing (got empty)"
     );
 
-    let ctx3 = AssembleContextCapability::assemble_context(
+    let ctx3 = AssembleContextCapability::assemble_context_from_service(
         &service,
         AssembleContextRequest {
             query: "cert".to_string(),
@@ -130,7 +130,7 @@ async fn embedded_fts_matches_separator_variants() -> Result<(), Box<dyn std::er
         )
         .await?;
 
-    let ctx = AssembleContextCapability::assemble_context(
+    let ctx = AssembleContextCapability::assemble_context_from_service(
         &service,
         AssembleContextRequest {
             query: "atlas launch".to_string(),
@@ -175,7 +175,7 @@ async fn embedded_fts_matches_fact_index_keys() -> Result<(), Box<dyn std::error
         )
         .await?;
 
-    let person_ctx = AssembleContextCapability::assemble_context(
+    let person_ctx = AssembleContextCapability::assemble_context_from_service(
         &service,
         AssembleContextRequest {
             query: "alice smith".to_string(),
@@ -196,7 +196,7 @@ async fn embedded_fts_matches_fact_index_keys() -> Result<(), Box<dyn std::error
         "query should match canonical entity name through fact.index_keys"
     );
 
-    let time_ctx = AssembleContextCapability::assemble_context(
+    let time_ctx = AssembleContextCapability::assemble_context_from_service(
         &service,
         AssembleContextRequest {
             query: "march 2026".to_string(),
@@ -239,7 +239,7 @@ async fn embedded_fts_matches_source_id_reference_keys() -> Result<(), Box<dyn s
         )
         .await?;
 
-    let ctx = AssembleContextCapability::assemble_context(
+    let ctx = AssembleContextCapability::assemble_context_from_service(
         &service,
         AssembleContextRequest {
             query: "9794206".to_string(),
@@ -412,7 +412,7 @@ async fn embedded_resolve_finds_entity_by_alias() -> Result<(), Box<dyn std::err
     let service = common::make_service().await;
 
     // Create "Alice Smith" and attach the alias "Alicia".
-    let alice_id = ResolveCapability::resolve(
+    let alice_id = ResolveCapability::resolve_from_service(
         &service,
         memory_mcp::models::EntityCandidate {
             entity_type: "person".to_string(),
@@ -425,7 +425,7 @@ async fn embedded_resolve_finds_entity_by_alias() -> Result<(), Box<dyn std::err
 
     // Resolving the bare canonical "Alicia" (which only matches via alias)
     // must return the same entity id, NOT create a new one.
-    let alicia_id = ResolveCapability::resolve(
+    let alicia_id = ResolveCapability::resolve_from_service(
         &service,
         memory_mcp::models::EntityCandidate {
             entity_type: "person".to_string(),
@@ -469,7 +469,7 @@ async fn embedded_fts_finds_russian_content() -> Result<(), Box<dyn std::error::
         )
         .await?;
 
-    let ctx = AssembleContextCapability::assemble_context(
+    let ctx = AssembleContextCapability::assemble_context_from_service(
         &service,
         AssembleContextRequest {
             // Query the nominative form; the stored fact has the prepositional

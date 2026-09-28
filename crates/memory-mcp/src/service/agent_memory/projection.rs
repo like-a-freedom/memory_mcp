@@ -7,14 +7,46 @@
 //! on each poll tick.
 //!
 //! No new LLM or second extraction implementation lives here — the projection
-//! reuses `MemoryService::extract` to propagate origin through provenance.
+//! reuses `ExtractCapability::extract_with` to propagate origin through
+//! provenance.
+
+use std::sync::Arc;
 
 use serde_json::json;
 
-use crate::service::MemoryError;
+use crate::error::MemoryError;
+use crate::memory::capabilities::deps::ExtractDeps;
+use crate::platform::durable_work;
 use crate::service::MemoryService;
-use crate::service::durable_work;
 use crate::storage::EventProjectionJobRecord;
+
+/// The handles the projection pass needs.
+///
+/// Leasing a job and re-extracting its episode are two different
+/// concerns: the first reads the projection queue directly, and the
+/// second goes through the extract capability's port. Naming the two
+/// apart keeps the pass from holding a container it only borrows for
+/// the second.
+pub(crate) struct ProjectionHandles<'a> {
+    pub(crate) db_client: Arc<dyn crate::storage::DbClient>,
+    pub(crate) active_namespace: &'a str,
+    pub(crate) deps: &'a ExtractDeps,
+}
+
+impl<'a> ProjectionHandles<'a> {
+    /// Builds the handles from a service.
+    ///
+    /// The extract deps are a separate port derived from the same
+    /// service; taking them together here means the caller converts
+    /// the container once rather than at each use site.
+    pub(crate) fn new(service: &'a MemoryService, deps: &'a ExtractDeps) -> Self {
+        Self {
+            db_client: service.db_client.clone(),
+            active_namespace: &service.active_namespace,
+            deps,
+        }
+    }
+}
 
 /// Maximum number of jobs leased per projection pass.
 pub(crate) const PROJECTION_BATCH_LIMIT: i32 = 50;
@@ -22,16 +54,26 @@ pub(crate) const PROJECTION_BATCH_LIMIT: i32 = 50;
 /// Runs a single projection pass: lease pending jobs, project, complete.
 ///
 /// Returns the number of jobs successfully projected in this pass.
+/// Runs one projection pass over a service.
+///
+/// The pass itself takes [`ProjectionHandles`]; this wrapper keeps the
+/// service-shaped entry point the worker and the integration tests use,
+/// and is the one place the container is converted.
 pub async fn run_projection_pass(service: &MemoryService) -> Result<usize, MemoryError> {
+    let deps = ExtractDeps::from(service);
+    run_projection_pass_with(&ProjectionHandles::new(service, &deps)).await
+}
+
+async fn run_projection_pass_with(service: &ProjectionHandles<'_>) -> Result<usize, MemoryError> {
     let mut projected = 0;
-    let now_str = crate::service::normalize_dt(chrono::Utc::now());
-    let lease_expires = crate::service::normalize_dt(
+    let now_str = crate::shared::temporal::normalize_dt(chrono::Utc::now());
+    let lease_expires = crate::shared::temporal::normalize_dt(
         chrono::Utc::now() + chrono::Duration::seconds(durable_work::DEFAULT_LEASE_SECS as i64),
     );
 
     let store = crate::storage::AgentMemoryStore::new(
         service.db_client.clone(),
-        service.active_namespace.clone(),
+        service.active_namespace.to_string(),
     );
     let pending_jobs = store
         .load_pending_jobs(&now_str, PROJECTION_BATCH_LIMIT)
@@ -50,7 +92,7 @@ pub async fn run_projection_pass(service: &MemoryService) -> Result<usize, Memor
 
 /// Processes one projection job: lease it, run projection, mark complete.
 async fn process_one_job(
-    service: &MemoryService,
+    service: &ProjectionHandles<'_>,
     store: &crate::storage::AgentMemoryStore,
     job: &EventProjectionJobRecord,
     now_str: &str,
@@ -177,9 +219,12 @@ async fn load_event(
 ///
 /// This reuses the `ExtractCapability` with an `episode_id`, propagating
 /// origin through provenance. No new LLM or second extraction implementation.
-async fn run_extraction(service: &MemoryService, episode_id: &str) -> Result<(), MemoryError> {
-    crate::service::capabilities::extract::ExtractCapability::extract(
-        service,
+async fn run_extraction(
+    service: &ProjectionHandles<'_>,
+    episode_id: &str,
+) -> Result<(), MemoryError> {
+    crate::service::memory_container_shims::memory_capabilities_extract::ExtractCapability::extract_with(
+        service.deps,
         episode_id,
         None,
         None,
@@ -187,7 +232,6 @@ async fn run_extraction(service: &MemoryService, episode_id: &str) -> Result<(),
     .await
     .map(|_| ())
 }
-
 #[cfg(test)]
 mod tests {
     use super::*;

@@ -15,13 +15,15 @@ async fn prepare_ingestion_review_uses_episode_backed_drafts() {
     )
     .await;
 
-    let bundle = service
-        .prepare_ingestion_review(PrepareIngestionReviewRequest {
+    let bundle = memory_mcp::memory::ingestion_review::prepare_ingestion_review(
+        &memory_mcp::memory::ingestion_review::IngestionReviewDeps::from(&service),
+        PrepareIngestionReviewRequest {
             source_text: None,
             draft_episode_id: Some(episode_id.clone()),
-        })
-        .await
-        .expect("prepare ingestion review");
+        },
+    )
+    .await
+    .expect("prepare ingestion review");
 
     assert_eq!(
         bundle.source.draft_episode_id.as_deref(),
@@ -37,21 +39,25 @@ async fn prepare_ingestion_review_uses_episode_backed_drafts() {
 #[tokio::test]
 async fn commit_ingestion_review_persists_approved_items_as_facts() {
     let (service, db_client) = common::make_service_with_client().await;
-    let bundle = service
-        .prepare_ingestion_review(PrepareIngestionReviewRequest {
+    let bundle = memory_mcp::memory::ingestion_review::prepare_ingestion_review(
+        &memory_mcp::memory::ingestion_review::IngestionReviewDeps::from(&service),
+        PrepareIngestionReviewRequest {
             source_text: Some("Beta launch is scheduled for Friday.".to_string()),
             draft_episode_id: None,
-        })
-        .await
-        .expect("prepare ingestion review");
+        },
+    )
+    .await
+    .expect("prepare ingestion review");
 
     let mut approved = bundle.items.clone();
     approved[0].status = "approved".to_string();
 
-    let outcome = service
-        .commit_ingestion_review(CommitIngestionReviewRequest { items: approved })
-        .await
-        .expect("commit ingestion review");
+    let outcome = memory_mcp::memory::ingestion_review::commit_ingestion_review(
+        &memory_mcp::memory::ingestion_review::IngestionReviewDeps::from(&service),
+        CommitIngestionReviewRequest { items: approved },
+    )
+    .await
+    .expect("commit ingestion review");
 
     assert_eq!(outcome.committed_count, 1);
     let stored = db_client

@@ -2,7 +2,7 @@
 
 use crate::cli::args::InitArgs;
 use crate::cli::commands::write_response;
-use crate::service::MemoryError;
+use crate::error::MemoryError;
 
 const NEXT_STEP: &str = "Copy the snippet into the indicated host configuration, start the host, then ingest and extract one source before assembling context.";
 

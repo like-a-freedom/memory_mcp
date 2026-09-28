@@ -12,7 +12,7 @@ use rmcp::ErrorData;
 use rmcp::model::ErrorCode;
 use serde_json::{Value, json};
 
-use crate::service::MemoryError;
+use crate::error::MemoryError;
 
 // ---------------------------------------------------------------------------
 // Public API

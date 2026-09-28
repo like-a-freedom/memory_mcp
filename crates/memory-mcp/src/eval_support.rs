@@ -2,10 +2,10 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::sync::Arc;
 
 use crate::error::MemoryError;
+use crate::knowledge::claims::ClaimStore;
+use crate::knowledge::claims::{RelationsForFactsQuery, SurrealClaimStore};
 use crate::models::claim::{ClaimRelation, ClaimRelationOutcome, PolicyFingerprint};
 use crate::storage::DbClient;
-use crate::storage::claims::ClaimStore;
-use crate::storage::claims::{RelationsForFactsQuery, SurrealClaimStore};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct EvaluatedRelation {

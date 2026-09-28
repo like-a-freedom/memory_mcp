@@ -14,7 +14,7 @@ use std::sync::Arc;
 
 use serde_json::{Value, json};
 
-use crate::service::MemoryError;
+use crate::error::MemoryError;
 use crate::storage::{BoundDbClient, DbClient};
 
 /// Write-side store for the `query_log` table.

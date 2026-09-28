@@ -8,17 +8,16 @@
 //!
 //! See ADR 0016 and `docs/agent_integration/CONTRACT.md`.
 
-pub mod capture;
-pub mod policy;
 pub mod projection;
-pub mod recall;
 pub mod worker;
 
-pub use capture::{AgentMemoryStoreBackend, LifecycleCapture, LifecycleCaptureResult};
-pub use policy::CapturePolicy;
-pub use projection::run_projection_pass;
-pub use recall::{
+pub use crate::memory::agent_memory::capture::{
+    AgentMemoryStoreBackend, LifecycleCapture, LifecycleCaptureResult,
+};
+pub use crate::memory::agent_memory::policy::CapturePolicy;
+pub use crate::memory::agent_memory::recall::{
     LifecycleRecall, LifecycleRecallResult, MAX_SESSIONS, MEMORY_IS_DATA_PREAMBLE, RecallDecision,
     RecallKey, RecallPipeline, SessionTraceRegistry, evaluate_recall,
 };
+pub use projection::run_projection_pass;
 pub use worker::LifecycleWorkerRuntime;

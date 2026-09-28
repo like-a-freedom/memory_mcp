@@ -15,11 +15,9 @@ use serde_json::json;
 use super::workflow::AppCommand;
 use super::{LifecycleCommand, LifecycleCommandOutcome};
 use crate::error::MemoryError;
+use crate::memory::ingestion_review::{apply_ingestion_review_edit, apply_ingestion_review_status};
 use crate::service::apps::graph::GraphSessionState;
-use crate::service::apps::ingestion_review::{
-    apply_ingestion_review_edit, apply_ingestion_review_status,
-};
-use crate::service::apps::lifecycle::execute_lifecycle_command;
+use crate::service::memory_container_shims::memory_lifecycle::execute_lifecycle_command;
 use crate::service::{CommitIngestionReviewRequest, IngestionReviewItem, MemoryService};
 use crate::tools::parsers::parse_datetime;
 
@@ -246,7 +244,7 @@ async fn run_lifecycle(
         .await
         .map_err(mcp_error)?;
     let lifecycle_value = serde_json::to_value(
-        ctx.service
+        crate::platform::lifecycle_runtime::handles_from(ctx.service)
             .build_lifecycle_view()
             .await
             .map_err(mcp_error)?,
@@ -442,11 +440,12 @@ fn execute_commit_review<'a>(
             serde_json::from_value(items_value).map_err(|error| {
                 internal(format!("failed to decode ingestion review items: {error}"))
             })?;
-        let outcome = ctx
-            .service
-            .commit_ingestion_review(CommitIngestionReviewRequest { items })
-            .await
-            .map_err(mcp_error)?;
+        let outcome = crate::memory::ingestion_review::commit_ingestion_review(
+            &crate::memory::ingestion_review::IngestionReviewDeps::from(ctx.service),
+            CommitIngestionReviewRequest { items },
+        )
+        .await
+        .map_err(mcp_error)?;
         Ok(AppCommandOutcome::closed(
             "commit_review",
             false,

@@ -13,10 +13,10 @@ use tokio::task::JoinHandle;
 use tokio_util::sync::CancellationToken;
 
 use crate::config::NativeGlinerConfig;
+use crate::embedding::model_artifacts::{ModelProgressSink, NerArtifactSpec};
 use crate::logging::{LogLevel, StdoutLogger};
-use crate::service::model_artifacts::{ModelProgressSink, NerArtifactSpec};
 
-use super::model_artifacts::CandidateRefreshOutcome;
+use crate::embedding::model_artifacts::CandidateRefreshOutcome;
 
 /// Configuration captured at service build time and consumed after
 /// `server.serve(...)` returns.
@@ -87,7 +87,8 @@ async fn run_one_refresh(
         // refresh that never started from one that failed during resolution.
         LogLevel::Warn,
     );
-    let store = match super::model_artifacts::NerArtifactStore::new(store_root, progress) {
+    let store = match crate::embedding::model_artifacts::NerArtifactStore::new(store_root, progress)
+    {
         Ok(store) => store,
         Err(err) => {
             logger.log(
@@ -146,7 +147,7 @@ fn structured_event(
     args: serde_json::Value,
     result: serde_json::Value,
 ) -> std::collections::HashMap<String, serde_json::Value> {
-    super::log_event(op, args, result, None, None, None)
+    crate::platform::log_event::log_event(op, args, result, None, None, None)
 }
 
 use serde_json::json;
@@ -155,7 +156,7 @@ use serde_json::json;
 mod tests {
     use super::*;
     use crate::config::{GlinerDeviceKind, ModelBackedNerConfig};
-    use crate::service::model_artifacts::{
+    use crate::embedding::model_artifacts::{
         ArtifactRole, CapturingSink, NerArtifactStore, PersistedArtifactState, RevisionState,
         RevisionStatus, SystemClock, ValidationStatus, persist_state,
     };
@@ -179,7 +180,7 @@ mod tests {
     }
 
     fn spec() -> NerArtifactSpec {
-        crate::service::entity_extraction::gliner::CLASSIC_GLINER_SPEC.clone()
+        crate::knowledge::entity_extraction::gliner::CLASSIC_GLINER_SPEC.clone()
     }
 
     struct CountingResolver {
@@ -187,8 +188,8 @@ mod tests {
         revision: &'static str,
     }
     #[async_trait::async_trait]
-    impl super::super::model_artifacts::RevisionResolver for CountingResolver {
-        async fn latest(&self, _repository: &str) -> Result<String, crate::service::MemoryError> {
+    impl crate::embedding::model_artifacts::RevisionResolver for CountingResolver {
+        async fn latest(&self, _repository: &str) -> Result<String, crate::error::MemoryError> {
             self.calls.fetch_add(1, Ordering::SeqCst);
             Ok(self.revision.to_string())
         }
@@ -196,16 +197,16 @@ mod tests {
 
     struct FakeFetcher;
     #[async_trait::async_trait]
-    impl super::super::model_artifacts::ArtifactFetcher for FakeFetcher {
+    impl crate::embedding::model_artifacts::ArtifactFetcher for FakeFetcher {
         async fn fetch(
             &self,
             _repository: &str,
             _revision: &str,
-            requirement: &super::super::model_artifacts::ArtifactRequirement,
+            requirement: &crate::embedding::model_artifacts::ArtifactRequirement,
             target: &std::path::Path,
-            _progress: &dyn super::super::model_artifacts::ModelProgressSink,
+            _progress: &dyn crate::embedding::model_artifacts::ModelProgressSink,
             _cancellation: &tokio_util::sync::CancellationToken,
-        ) -> Result<(), crate::service::MemoryError> {
+        ) -> Result<(), crate::error::MemoryError> {
             std::fs::create_dir_all(target.parent().expect("parent")).expect("create parent");
             std::fs::write(target, format!("content-of-{}", requirement.path))
                 .expect("write artifact");
@@ -218,11 +219,11 @@ mod tests {
             calls: Arc::new(AtomicUsize::new(0)),
             revision: "candidate-1",
         });
-        let fetcher: Arc<dyn super::super::model_artifacts::ArtifactFetcher> =
+        let fetcher: Arc<dyn crate::embedding::model_artifacts::ArtifactFetcher> =
             Arc::new(FakeFetcher);
-        let progress: Arc<dyn super::super::model_artifacts::ModelProgressSink> =
+        let progress: Arc<dyn crate::embedding::model_artifacts::ModelProgressSink> =
             Arc::new(CapturingSink::default());
-        let clock: Arc<dyn super::super::model_artifacts::Clock> = Arc::new(SystemClock);
+        let clock: Arc<dyn crate::embedding::model_artifacts::Clock> = Arc::new(SystemClock);
         NerArtifactStore::with_parts(
             temp.path().join("models").join("ner"),
             resolver,
@@ -351,8 +352,9 @@ mod tests {
         let layout_root = temp.path().join("models").join("ner").join("gliner");
         std::fs::create_dir_all(&layout_root).expect("dirs");
         persist_state(&layout_root.join("state.json"), &state).expect("persist");
-        let reloaded = super::super::model_artifacts::read_state(&layout_root.join("state.json"))
-            .expect("read");
+        let reloaded =
+            crate::embedding::model_artifacts::read_state(&layout_root.join("state.json"))
+                .expect("read");
         assert!(reloaded.candidate().is_some());
     }
 }

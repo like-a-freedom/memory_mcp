@@ -1,23 +1,24 @@
-use std::collections::{BTreeMap, HashMap, HashSet, VecDeque};
+//! The knowledge-graph write paths and the app-session state machine.
+//!
+//! Reads live in `memory::retrieval::graph_reads`, reached through the
+//! `GraphContext` contract implemented here for the container and for
+//! context assembly. What remains is what writes: relating entities,
+//! recording edges, and the traversal state the map app serialises.
+
+use std::collections::{HashMap, HashSet, VecDeque};
 
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 
-use crate::logging::{LogLevel, StdoutLogger};
-use crate::models::SurprisingConnection;
-use crate::service::community::{CommunityRecord, is_entity_id, parse_community_record};
-use crate::service::value_helpers::string_from_value;
-use crate::service::{MemoryError, MemoryService, normalize_dt};
-use crate::storage::{GraphDirection, KnowledgeGraphStore};
-
-/// Minimal context required by graph traversal functions.
-/// Allows `ExplanationService` (and future services) to call graph
-/// operations without depending on `MemoryService` directly.
-pub(crate) trait GraphContext: Send + Sync {
-    fn knowledge_graph_store(&self) -> KnowledgeGraphStore;
-    fn logger(&self) -> &StdoutLogger;
-}
+use crate::error::MemoryError;
+use crate::knowledge::graph_store::KnowledgeGraphStore;
+use crate::logging::StdoutLogger;
+use crate::memory::retrieval::graph_reads::GraphContext;
+use crate::service::MemoryService;
+use crate::shared::temporal::normalize_dt;
+use crate::storage::GraphDirection;
+use crate::storage::value_helpers::string_from_value;
 
 impl GraphContext for MemoryService {
     fn knowledge_graph_store(&self) -> KnowledgeGraphStore {
@@ -51,8 +52,7 @@ impl MemoryService {
         entity_type: &str,
         name: &str,
     ) -> Result<String, MemoryError> {
-        use crate::service::capabilities::resolve::ResolveCapability;
-        ResolveCapability::resolve(
+        crate::service::memory_container_shims::memory_capabilities_resolve::ResolveCapability::resolve_from_service(
             self,
             crate::models::EntityCandidate {
                 entity_type: entity_type.to_string(),
@@ -80,467 +80,17 @@ impl MemoryService {
             strength: 1.0,
             confidence: 0.8,
             provenance: crate::models::Provenance::manual(),
-            t_valid: crate::service::query::now(),
-            t_ingested: crate::service::query::now(),
+            t_valid: crate::shared::temporal::now(),
+            t_ingested: crate::shared::temporal::now(),
             t_invalid: None,
             t_invalid_ingested: None,
         };
-        crate::service::episode::store_edge(
-            &crate::service::capabilities::deps::ExtractDeps::from(self),
+        crate::memory::episode::store_edge(
+            &crate::memory::capabilities::deps::ExtractDeps::from(self),
             &edge,
         )
         .await
     }
-}
-
-const HUB_CANDIDATE_SCAN_MULTIPLIER: usize = 12;
-const MAX_HUB_CANDIDATE_SCAN: usize = 64;
-const MAX_SURPRISING_CONNECTION_NODE_EXPANSIONS: usize = 64;
-const MAX_SURPRISING_CONNECTION_NEIGHBOR_QUERIES: usize = 128;
-const MAX_SURPRISING_CONNECTION_RESULTS: usize = 12;
-
-/// Budget controls for graph traversal to prevent query explosion in different contexts.
-#[derive(Debug, Clone, Copy)]
-pub struct GraphTraversalBudget {
-    pub max_hub_scan: usize,
-    pub max_node_expansions: usize,
-    pub max_neighbor_queries: usize,
-    pub max_results: usize,
-}
-
-impl GraphTraversalBudget {
-    /// Full budget — used by dedicated graph exploration (open_app, context views).
-    pub const FULL: Self = Self {
-        max_hub_scan: MAX_HUB_CANDIDATE_SCAN,
-        max_node_expansions: MAX_SURPRISING_CONNECTION_NODE_EXPANSIONS,
-        max_neighbor_queries: MAX_SURPRISING_CONNECTION_NEIGHBOR_QUERIES,
-        max_results: MAX_SURPRISING_CONNECTION_RESULTS,
-    };
-
-    /// Reduced budget — used by inline `explain` calls to avoid per-item query explosion.
-    pub const EXPLAIN: Self = Self {
-        max_hub_scan: 24,
-        max_node_expansions: 16,
-        max_neighbor_queries: 32,
-        max_results: 5,
-    };
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub(crate) struct HubEntity {
-    pub entity_id: String,
-    pub canonical_name: String,
-    pub degree: usize,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub(crate) struct GraphCommunity {
-    pub community_id: String,
-    pub summary: String,
-    pub member_entities: Vec<String>,
-    pub updated_at: Option<DateTime<Utc>>,
-}
-
-pub(crate) async fn find_hub_entities(
-    ctx: &impl GraphContext,
-    cutoff: DateTime<Utc>,
-    limit: i32,
-    budget: GraphTraversalBudget,
-) -> Result<Vec<HubEntity>, MemoryError> {
-    let cutoff_iso = normalize_dt(cutoff);
-    ctx.logger().log(
-        crate::service::log_event(
-            "graph.hubs.start",
-            json!({"cutoff": cutoff_iso, "limit": limit}),
-            json!({}),
-            None,
-            None,
-            None,
-        ),
-        LogLevel::Debug,
-    );
-    let entity_records = ctx.knowledge_graph_store().select_entities().await?;
-    let mut hubs = Vec::new();
-    let candidate_scan_limit =
-        (limit.max(1) as usize * HUB_CANDIDATE_SCAN_MULTIPLIER).min(budget.max_hub_scan);
-
-    for record in entity_records.into_iter().take(candidate_scan_limit) {
-        let Some(map) = record.as_object() else {
-            continue;
-        };
-        let Some(entity_id) = map
-            .get("entity_id")
-            .and_then(super::super::episode::unwrap_record_string)
-            .or_else(|| {
-                map.get("id")
-                    .and_then(super::super::episode::unwrap_record_string)
-            })
-        else {
-            continue;
-        };
-
-        let canonical_name = map
-            .get("canonical_name")
-            .and_then(super::super::episode::unwrap_record_string)
-            .filter(|name| !name.trim().is_empty())
-            .unwrap_or_else(|| entity_id.clone());
-
-        let mut unique_edges = HashSet::new();
-        for direction in [GraphDirection::Incoming, GraphDirection::Outgoing] {
-            for edge in ctx
-                .knowledge_graph_store()
-                .select_graph_neighbors(&entity_id, &cutoff_iso, direction)
-                .await?
-            {
-                if let Some(edge_key) = edge_identity(&edge) {
-                    unique_edges.insert(edge_key);
-                }
-            }
-        }
-
-        if unique_edges.is_empty() {
-            continue;
-        }
-
-        hubs.push(HubEntity {
-            entity_id,
-            canonical_name,
-            degree: unique_edges.len(),
-        });
-    }
-
-    hubs.sort_by(|left, right| {
-        right
-            .degree
-            .cmp(&left.degree)
-            .then_with(|| left.canonical_name.cmp(&right.canonical_name))
-            .then_with(|| left.entity_id.cmp(&right.entity_id))
-    });
-    hubs.truncate(limit.max(1) as usize);
-    ctx.logger().log(
-        crate::service::log_event(
-            "graph.hubs.done",
-            json!({"limit": limit}),
-            json!({"count": hubs.len()}),
-            None,
-            None,
-            None,
-        ),
-        LogLevel::Trace,
-    );
-    Ok(hubs)
-}
-
-pub(crate) async fn list_communities(
-    ctx: &impl GraphContext,
-    cutoff: DateTime<Utc>,
-    limit: i32,
-) -> Result<Vec<GraphCommunity>, MemoryError> {
-    ctx.logger().log(
-        crate::service::log_event(
-            "graph.communities.start",
-            json!({"limit": limit}),
-            json!({}),
-            None,
-            None,
-            None,
-        ),
-        LogLevel::Debug,
-    );
-    let mut communities = ctx
-        .knowledge_graph_store()
-        .select_communities()
-        .await?
-        .into_iter()
-        .filter_map(|record| graph_community_from_value(&record))
-        .filter(|community| {
-            community
-                .updated_at
-                .is_none_or(|updated_at| updated_at <= cutoff)
-        })
-        .collect::<Vec<_>>();
-
-    communities.sort_by(|left, right| {
-        right
-            .updated_at
-            .cmp(&left.updated_at)
-            .then_with(|| left.community_id.cmp(&right.community_id))
-    });
-    communities.truncate(limit.max(1) as usize);
-    ctx.logger().log(
-        crate::service::log_event(
-            "graph.communities.done",
-            json!({"limit": limit}),
-            json!({"count": communities.len()}),
-            None,
-            None,
-            None,
-        ),
-        LogLevel::Trace,
-    );
-    Ok(communities)
-}
-
-pub(crate) async fn find_surprising_connections(
-    ctx: &impl GraphContext,
-    source_entity: &str,
-    max_depth: i32,
-    budget: GraphTraversalBudget,
-) -> Result<Vec<SurprisingConnection>, MemoryError> {
-    if !is_entity_id(source_entity) || max_depth < 2 {
-        ctx.logger().log(
-            crate::service::log_event(
-                "graph.surprising_connections.skipped",
-                json!({"source_entity": source_entity, "max_depth": max_depth}),
-                json!({"reason": "invalid_source_or_depth"}),
-                None,
-                None,
-                None,
-            ),
-            LogLevel::Trace,
-        );
-        return Ok(Vec::new());
-    }
-
-    ctx.logger().log(
-        crate::service::log_event(
-            "graph.surprising_connections.start",
-            json!({"source_entity": source_entity, "max_depth": max_depth}),
-            json!({}),
-            None,
-            None,
-            None,
-        ),
-        LogLevel::Debug,
-    );
-
-    let cutoff_iso = normalize_dt(crate::service::now());
-    let communities = ctx
-        .knowledge_graph_store()
-        .select_communities()
-        .await?
-        .into_iter()
-        .filter_map(|record| graph_community_from_value(&record))
-        .collect::<Vec<_>>();
-    let source_community_ids = community_ids_for_member(&communities, source_entity);
-    let mut name_cache = HashMap::new();
-    let source_entity_name = cached_entity_name(ctx, source_entity, &mut name_cache).await?;
-
-    let mut visited = HashSet::from([source_entity.to_string()]);
-    let mut frontier = VecDeque::from([(
-        source_entity.to_string(),
-        vec![source_entity.to_string()],
-        0_usize,
-    )]);
-    let mut connections = BTreeMap::new();
-    let mut expanded_nodes = 0usize;
-    let mut neighbor_queries = 0usize;
-
-    while let Some((current, path, depth)) = frontier.pop_front() {
-        if expanded_nodes >= budget.max_node_expansions
-            || neighbor_queries >= budget.max_neighbor_queries
-            || connections.len() >= budget.max_results
-        {
-            break;
-        }
-
-        expanded_nodes += 1;
-        if depth >= max_depth as usize {
-            continue;
-        }
-
-        for direction in [GraphDirection::Incoming, GraphDirection::Outgoing] {
-            if neighbor_queries >= budget.max_neighbor_queries
-                || connections.len() >= budget.max_results
-            {
-                break;
-            }
-
-            neighbor_queries += 1;
-            for edge in ctx
-                .knowledge_graph_store()
-                .select_graph_neighbors(&current, &cutoff_iso, direction)
-                .await?
-            {
-                let Some(neighbor) = neighbor_node(&edge, direction, &current) else {
-                    continue;
-                };
-                if !is_traversable_graph_node(&neighbor) {
-                    continue;
-                }
-
-                let next_depth = depth + 1;
-                let mut next_path = path.clone();
-                next_path.push(neighbor.clone());
-
-                if is_entity_id(&neighbor)
-                    && neighbor != source_entity
-                    && next_depth >= 2
-                    && is_surprising_target(
-                        &source_community_ids,
-                        &community_ids_for_member(&communities, &neighbor),
-                    )
-                {
-                    let target_entity_name =
-                        cached_entity_name(ctx, &neighbor, &mut name_cache).await?;
-                    connections
-                        .entry(neighbor.clone())
-                        .or_insert_with(|| SurprisingConnection {
-                            source_entity_id: source_entity.to_string(),
-                            source_entity_name: source_entity_name.clone(),
-                            target_entity_id: neighbor.clone(),
-                            target_entity_name,
-                            hop_count: next_depth,
-                            path: next_path.clone(),
-                        });
-                    if connections.len() >= budget.max_results {
-                        break;
-                    }
-                }
-                if !is_traversable_graph_node(&neighbor) {
-                    continue;
-                }
-
-                if visited.insert(neighbor.clone()) && next_depth < max_depth as usize {
-                    frontier.push_back((neighbor, next_path, next_depth));
-                }
-            }
-        }
-    }
-
-    let mut surprising_connections = connections.into_values().collect::<Vec<_>>();
-    surprising_connections.sort_by(|left, right| {
-        left.hop_count
-            .cmp(&right.hop_count)
-            .then_with(|| left.target_entity_name.cmp(&right.target_entity_name))
-            .then_with(|| left.target_entity_id.cmp(&right.target_entity_id))
-    });
-    ctx.logger().log(
-        crate::service::log_event(
-            "graph.surprising_connections.done",
-            json!({"source_entity": source_entity}),
-            json!({"count": surprising_connections.len()}),
-            None,
-            None,
-            None,
-        ),
-        LogLevel::Trace,
-    );
-    Ok(surprising_connections)
-}
-
-fn edge_identity(record: &Value) -> Option<String> {
-    let map = record.as_object()?;
-
-    map.get("edge_id")
-        .and_then(super::super::episode::unwrap_record_string)
-        .or_else(|| {
-            let in_id = map
-                .get("in")
-                .and_then(super::super::episode::unwrap_record_string)?;
-            let relation = map
-                .get("relation")
-                .and_then(super::super::episode::unwrap_record_string)?;
-            let out_id = map
-                .get("out")
-                .and_then(super::super::episode::unwrap_record_string)?;
-            Some(format!("{in_id}:{relation}:{out_id}"))
-        })
-}
-
-fn neighbor_node(record: &Value, direction: GraphDirection, current: &str) -> Option<String> {
-    let map = record.as_object()?;
-    let in_id = map
-        .get("in")
-        .and_then(super::super::episode::unwrap_record_string)?;
-    let out_id = map
-        .get("out")
-        .and_then(super::super::episode::unwrap_record_string)?;
-
-    match direction {
-        GraphDirection::Incoming if out_id == current => Some(in_id),
-        GraphDirection::Outgoing if in_id == current => Some(out_id),
-        _ => None,
-    }
-}
-
-fn graph_community_from_value(value: &Value) -> Option<GraphCommunity> {
-    let CommunityRecord {
-        community_id,
-        summary,
-        member_entities,
-        updated_at,
-    } = parse_community_record(value)?;
-
-    if summary.is_empty() || member_entities.is_empty() {
-        return None;
-    }
-
-    Some(GraphCommunity {
-        community_id,
-        summary,
-        member_entities,
-        updated_at,
-    })
-}
-
-fn community_ids_for_member(communities: &[GraphCommunity], entity_id: &str) -> HashSet<String> {
-    communities
-        .iter()
-        .filter(|community| {
-            community
-                .member_entities
-                .iter()
-                .any(|member| member == entity_id)
-        })
-        .map(|community| community.community_id.clone())
-        .collect()
-}
-
-fn is_surprising_target(
-    source_communities: &HashSet<String>,
-    target_communities: &HashSet<String>,
-) -> bool {
-    !target_communities.is_empty()
-        && (source_communities.is_empty() || source_communities.is_disjoint(target_communities))
-}
-
-async fn cached_entity_name(
-    ctx: &impl GraphContext,
-    entity_id: &str,
-    cache: &mut HashMap<String, String>,
-) -> Result<String, MemoryError> {
-    if let Some(name) = cache.get(entity_id) {
-        return Ok(name.clone());
-    }
-
-    let name = ctx
-        .knowledge_graph_store()
-        .select_entity(entity_id)
-        .await?
-        .as_ref()
-        .and_then(Value::as_object)
-        .and_then(|map| {
-            map.get("canonical_name")
-                .and_then(super::super::episode::unwrap_record_string)
-                .filter(|candidate| !candidate.trim().is_empty())
-                .or_else(|| {
-                    map.get("entity_id")
-                        .and_then(super::super::episode::unwrap_record_string)
-                        .or_else(|| {
-                            map.get("id")
-                                .and_then(super::super::episode::unwrap_record_string)
-                        })
-                })
-        })
-        .unwrap_or_else(|| entity_id.to_string());
-
-    cache.insert(entity_id.to_string(), name.clone());
-    Ok(name)
-}
-
-fn is_traversable_graph_node(record_id: &str) -> bool {
-    is_entity_id(record_id) || record_id.starts_with("episode:") || record_id.starts_with("fact:")
 }
 
 // ---------------------------------------------------------------------------
@@ -604,7 +154,7 @@ pub(crate) async fn find_intro_chain(
         for node_id in &frontier {
             for record in ctx
                 .knowledge_graph_store()
-                .select_graph_neighbors(node_id, &cutoff_iso, GraphDirection::Incoming)
+                .select_edge_neighbors(node_id, &cutoff_iso, GraphDirection::Incoming)
                 .await?
             {
                 if let Value::Object(map) = record
@@ -654,7 +204,7 @@ async fn find_entity_id_by_name(
     ctx: &impl GraphContext,
     target_name: &str,
 ) -> Result<Option<String>, MemoryError> {
-    let normalized_name = crate::service::normalize_text(target_name);
+    let normalized_name = crate::shared::search::normalize_text(target_name);
 
     // Prefer the indexed lookup in the store's bound Active Namespace.
     if let Some(record) = ctx
@@ -680,7 +230,7 @@ async fn find_entity_id_by_name(
         let Some(name) = entity_name else {
             continue;
         };
-        if crate::service::normalize_text(&name) != normalized_name {
+        if crate::shared::search::normalize_text(&name) != normalized_name {
             continue;
         }
         return Ok(map
@@ -820,7 +370,7 @@ pub async fn graph_path_snapshot(
 
         for direction in [GraphDirection::Outgoing, GraphDirection::Incoming] {
             let records = store
-                .select_graph_neighbors(&current, &cutoff_iso, direction)
+                .select_edge_neighbors(&current, &cutoff_iso, direction)
                 .await?;
             for record in records {
                 let Some(neighbor) = edge_neighbor(&record, direction) else {
@@ -829,7 +379,7 @@ pub async fn graph_path_snapshot(
                 let mut next_nodes = nodes.clone();
                 next_nodes.push(neighbor.clone());
                 let mut next_edges = edges.clone();
-                next_edges.push(crate::service::value_helpers::normalized_edge_record(
+                next_edges.push(crate::storage::value_helpers::normalized_edge_record(
                     &record,
                 ));
 
@@ -892,11 +442,11 @@ pub async fn graph_neighbor_expansion(
         for node_id in &frontier {
             for graph_direction in &directions {
                 for record in store
-                    .select_graph_neighbors(node_id, &cutoff_iso, *graph_direction)
+                    .select_edge_neighbors(node_id, &cutoff_iso, *graph_direction)
                     .await?
                 {
                     if let Some(neighbor) = edge_neighbor(&record, *graph_direction) {
-                        edges.push(crate::service::value_helpers::normalized_edge_record(
+                        edges.push(crate::storage::value_helpers::normalized_edge_record(
                             &record,
                         ));
                         if visited.insert(neighbor.clone()) {
@@ -960,9 +510,25 @@ pub async fn graph_payload(
     .to_payload()
 }
 
+/// The graph reads are also reached during context assembly, which holds a
+/// narrow dependency set rather than the container. This is the second
+/// implementor of the same read contract.
+impl GraphContext for crate::memory::retrieval_deps::AssembleContextDeps {
+    fn knowledge_graph_store(&self) -> KnowledgeGraphStore {
+        self.graph_store.clone()
+    }
+
+    fn logger(&self) -> &StdoutLogger {
+        &self.logger
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::sync::Arc;
+
+    use crate::storage::{DbClient, SurrealDbClient};
 
     #[test]
     fn graph_session_state_round_trips_the_app_payload_shape() {
@@ -1003,203 +569,6 @@ mod tests {
         let encoded = state.to_payload().expect("graph payload should serialize");
 
         assert_eq!(encoded, payload);
-    }
-    use std::sync::{
-        Arc,
-        atomic::{AtomicUsize, Ordering},
-    };
-
-    use crate::storage::SurrealDbClient;
-    use async_trait::async_trait;
-    use serde_json::Value;
-
-    use crate::storage::DbClient;
-
-    #[test]
-    fn is_traversable_graph_node_accepts_valid_types() {
-        assert!(is_traversable_graph_node("entity:abc"));
-        assert!(is_traversable_graph_node("episode:123"));
-        assert!(is_traversable_graph_node("fact:456"));
-    }
-
-    #[test]
-    fn is_traversable_graph_node_rejects_other_types() {
-        assert!(!is_traversable_graph_node("community:abc"));
-        assert!(!is_traversable_graph_node("user:123"));
-        assert!(!is_traversable_graph_node("random"));
-    }
-
-    #[test]
-    fn graph_community_from_value_returns_none_for_empty() {
-        let value = json!({});
-        assert!(graph_community_from_value(&value).is_none());
-    }
-
-    // ------------------------------------------------------------------
-    // GraphTraversalBudget
-    // ------------------------------------------------------------------
-
-    #[test]
-    fn explain_budget_is_stricter_than_full() {
-        const {
-            assert!(
-                GraphTraversalBudget::EXPLAIN.max_hub_scan
-                    < GraphTraversalBudget::FULL.max_hub_scan
-            );
-            assert!(
-                GraphTraversalBudget::EXPLAIN.max_node_expansions
-                    < GraphTraversalBudget::FULL.max_node_expansions
-            );
-            assert!(
-                GraphTraversalBudget::EXPLAIN.max_neighbor_queries
-                    < GraphTraversalBudget::FULL.max_neighbor_queries
-            );
-            assert!(
-                GraphTraversalBudget::EXPLAIN.max_results < GraphTraversalBudget::FULL.max_results
-            );
-        }
-    }
-
-    #[test]
-    fn graph_traversal_budget_is_copy() {
-        let a = GraphTraversalBudget::FULL;
-        let b = a; // Copy, not move
-        assert_eq!(a.max_hub_scan, b.max_hub_scan);
-    }
-
-    #[test]
-    fn graph_traversal_budget_constants_are_nonzero() {
-        for budget in [GraphTraversalBudget::FULL, GraphTraversalBudget::EXPLAIN] {
-            assert!(budget.max_hub_scan > 0);
-            assert!(budget.max_node_expansions > 0);
-            assert!(budget.max_neighbor_queries > 0);
-            assert!(budget.max_results > 0);
-        }
-    }
-
-    #[tokio::test]
-    async fn find_surprising_connections_honors_neighbor_query_budget() {
-        #[derive(Default)]
-        struct BudgetedGraphDbClient {
-            neighbor_queries: AtomicUsize,
-        }
-
-        #[async_trait]
-        impl DbClient for BudgetedGraphDbClient {
-            async fn select_one(
-                &self,
-                record_id: &str,
-                _namespace: &str,
-            ) -> Result<Option<Value>, MemoryError> {
-                Ok(Some(json!({
-                    "entity_id": record_id,
-                    "canonical_name": record_id,
-                })))
-            }
-
-            async fn select_table(
-                &self,
-                table: &str,
-                _namespace: &str,
-            ) -> Result<Vec<Value>, MemoryError> {
-                if table == "community" {
-                    return Ok((0..256)
-                        .map(|idx| {
-                            json!({
-                                "community_id": format!("community:{idx}"),
-                                "summary": format!("Community {idx}"),
-                                "member_entities": [format!("entity:{idx}")],
-                                "updated_at": "2026-04-15T00:00:00Z",
-                            })
-                        })
-                        .collect());
-                }
-
-                Ok(vec![])
-            }
-
-            #[allow(clippy::too_many_arguments)]
-            async fn create(
-                &self,
-                _record_id: &str,
-                _content: Value,
-                _namespace: &str,
-            ) -> Result<Value, MemoryError> {
-                Ok(Value::Null)
-            }
-
-            async fn update(
-                &self,
-                _record_id: &str,
-                _content: Value,
-                _namespace: &str,
-            ) -> Result<Value, MemoryError> {
-                Ok(Value::Null)
-            }
-
-            async fn query(
-                &self,
-                sql: &str,
-                vars: Option<Value>,
-                _namespace: &str,
-            ) -> Result<Value, MemoryError> {
-                // The app store now runs graph-neighbor lookups through the core
-                // `query` op; serve the deterministic chain of edges here.
-                if sql.contains("FROM edge") {
-                    self.neighbor_queries.fetch_add(1, Ordering::Relaxed);
-                    if sql.contains("WHERE out =") {
-                        return Ok(Value::Array(Vec::new()));
-                    }
-                    let node_id = vars
-                        .and_then(|vars| vars["node_id"].as_str().map(str::to_string))
-                        .unwrap_or_default();
-                    let next_edge = if let Some(idx) = node_id.strip_prefix("entity:") {
-                        json!({
-                            "in": format!("entity:{idx}"),
-                            "out": format!("episode:{idx}"),
-                            "relation": "linked",
-                        })
-                    } else if let Some(idx) = node_id.strip_prefix("episode:") {
-                        let idx = idx.parse::<usize>().unwrap_or(0);
-                        json!({
-                            "in": format!("episode:{idx}"),
-                            "out": format!("entity:{}", idx + 1),
-                            "relation": "linked",
-                        })
-                    } else {
-                        return Ok(Value::Array(Vec::new()));
-                    };
-                    return Ok(Value::Array(vec![next_edge]));
-                }
-                Ok(Value::Null)
-            }
-
-            async fn apply_migrations(&self, _namespace: &str) -> Result<(), MemoryError> {
-                Ok(())
-            }
-        }
-
-        let db = Arc::new(BudgetedGraphDbClient::default());
-        let service = crate::service::MemoryService::new(
-            db.clone(),
-            "org".to_string(),
-            "warn".to_string(),
-            50,
-            100,
-        )
-        .expect("service");
-
-        let connections =
-            find_surprising_connections(&service, "entity:0", 32, GraphTraversalBudget::FULL)
-                .await
-                .expect("connections");
-
-        assert!(
-            db.neighbor_queries.load(Ordering::Relaxed)
-                <= GraphTraversalBudget::FULL.max_neighbor_queries,
-            "neighbor queries should stop at the configured traversal budget"
-        );
-        assert!(connections.len() <= GraphTraversalBudget::FULL.max_results);
     }
 
     #[tokio::test]
@@ -1271,15 +640,5 @@ mod tests {
             .relate(&from_id, "works_at", &to_id)
             .await
             .expect("relate entities");
-    }
-}
-
-impl GraphContext for crate::service::capabilities::deps::AssembleContextDeps {
-    fn knowledge_graph_store(&self) -> KnowledgeGraphStore {
-        self.graph_store.clone()
-    }
-
-    fn logger(&self) -> &StdoutLogger {
-        &self.logger
     }
 }

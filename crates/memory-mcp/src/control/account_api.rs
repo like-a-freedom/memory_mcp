@@ -53,6 +53,8 @@ use crate::http::HttpState;
 use crate::http::registry::models::*;
 use crate::http::registry::provisioning::enqueue_provisioning;
 
+use crate::platform::persistence::control::AccountBundleTx;
+
 #[derive(serde::Deserialize)]
 pub struct CreateAccountRequest {
     pub display_name: Option<String>,
@@ -415,7 +417,7 @@ pub async fn confirm_account_deletion(
         super::session::ControlPlaneSession,
     >,
     axum::extract::Extension(injector): axum::extract::Extension<
-        std::sync::Arc<dyn crate::http::fault_injection::FaultInjector>,
+        std::sync::Arc<dyn crate::platform::fault_injection::FaultInjector>,
     >,
     body: Body,
 ) -> Result<StatusCode, ApiError> {
@@ -455,7 +457,7 @@ pub async fn confirm_account_deletion(
         crate::operations::api::OperationsError::ConfirmationPhraseRejected => ApiError::Forbidden,
         crate::operations::api::OperationsError::Persistence(error) => ApiError::Internal(error),
     })?;
-    injector.hit(crate::http::fault_injection::FaultPoint::AccountDeletionStarted)?;
+    injector.hit(crate::platform::fault_injection::FaultPoint::AccountDeletionStarted)?;
     Ok(StatusCode::NO_CONTENT)
 }
 
@@ -506,7 +508,10 @@ pub async fn create_account(
         version: 0,
     };
     let store = state.registry.store_clone();
-    store.create_account_bundle(&account, &tenant, None).await?;
+    let bundle_tx: Arc<dyn AccountBundleTx> = Arc::new(store.clone()) as Arc<dyn AccountBundleTx>;
+    bundle_tx
+        .create_account_bundle(&account, &tenant, None)
+        .await?;
     enqueue_provisioning(&store, &tenant).await?;
     account_created_response(&account)
 }
@@ -518,7 +523,7 @@ mod tests {
     use crate::http::registry::models::{
         Account, AccountStatus, ExternalIdentity, SubjectVerifier,
     };
-    use crate::http::registry::storage::{InMemoryStore, RegistryStore};
+    use crate::http::registry::storage::{AccountStore, IdentityStore, InMemoryStore};
     use axum::Router;
     use axum::body::Body;
     use axum::http::{Request, StatusCode};

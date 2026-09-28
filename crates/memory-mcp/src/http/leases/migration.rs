@@ -18,12 +18,12 @@
 use std::sync::Arc;
 
 use crate::error::MemoryError;
-use crate::http::fault_injection::{FaultInjector, FaultPoint};
 use crate::http::leases::ProvisioningLease;
 use crate::http::registry::RegistryStore;
 use crate::http::registry::models::TenantStatus;
 use crate::http::registry::provisioning::transition_fenced;
 use crate::http::registry::storage::LeaseFence;
+use crate::platform::fault_injection::{FaultInjector, FaultPoint};
 
 /// The schema version this binary ships. The actual
 /// migrations live in
@@ -662,14 +662,16 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::http::fault_injection::NoFaults;
     use crate::http::registry::models::*;
-    use crate::http::registry::storage::InMemoryStore;
+    use crate::http::registry::storage::{
+        AccountStore, InMemoryStore, ProvisioningStore, TenantStore,
+    };
+    use crate::platform::fault_injection::NoFaults;
     use chrono::Utc;
 
     /// Tests that just want to exercise the state machine
     /// without exercising the fault injector use this constant.
-    fn no_faults() -> std::sync::Arc<dyn crate::http::fault_injection::FaultInjector> {
+    fn no_faults() -> std::sync::Arc<dyn crate::platform::fault_injection::FaultInjector> {
         std::sync::Arc::new(NoFaults)
     }
 
@@ -839,7 +841,7 @@ mod tests {
     #[tokio::test]
     async fn run_due_provisioning_claims_and_provisions_due_tenant() {
         use crate::http::registry::RegistryHandle;
-        use crate::http::registry::storage::InMemoryStore;
+        use crate::http::registry::storage::{InMemoryStore, TenantStore};
         let store = Arc::new(InMemoryStore::default());
         let registry = RegistryHandle::from_store(store.clone());
         let tenant = Tenant {

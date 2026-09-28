@@ -12,7 +12,7 @@ use crate::cli::admin_config::AdminCliConfig;
 use crate::cli::args::{AdminOperation, AuthMethodsArgs};
 use crate::error::MemoryError;
 use crate::http::config::BrowserAuthMethod;
-use crate::http::registry::{RegistryStore, SurrealRegistryStore};
+use crate::http::registry::{BrowserPolicyStore, SurrealRegistryStore};
 use crate::service::local_admin::auth::{
     AdminManagementService, LocalAdminAuthority, compute_fingerprints,
 };
@@ -189,7 +189,7 @@ async fn join_authority(
 ) -> Result<AdminManagementService, MemoryError> {
     let fingerprints =
         compute_fingerprints(&config.session_key, &config.csrf_key).map_err(admin_error)?;
-    let policy = RegistryStore::reconcile_browser_policy(
+    let policy = BrowserPolicyStore::reconcile_browser_policy(
         store.as_ref(),
         &config.auth_methods,
         Some(fingerprints),

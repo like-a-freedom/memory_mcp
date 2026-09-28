@@ -1,9 +1,9 @@
 use std::collections::BTreeMap;
 
 use async_trait::async_trait;
-use memory_mcp::service::capabilities::assemble_context::AssembleContextCapability;
-use memory_mcp::service::capabilities::extract::ExtractCapability;
-use memory_mcp::service::capabilities::ingest::IngestCapability;
+use memory_mcp::service::memory_container_shims::memory_capabilities_assemble_context::AssembleContextCapability;
+use memory_mcp::service::memory_container_shims::memory_capabilities_extract::ExtractCapability;
+use memory_mcp::service::memory_container_shims::memory_capabilities_ingest::IngestCapability;
 
 use crate::domain::*;
 use crate::runner::{EvalSuite, RunContext};
@@ -75,7 +75,7 @@ impl ActionGroundingSuite {
         let service = test_support::make_service().await;
 
         let content = "The security review was approved by the CISO on March 15, 2026.";
-        let episode_id = match IngestCapability::ingest(
+        let episode_id = match IngestCapability::ingest_from_service(
             &service,
             memory_mcp::models::IngestRequest {
                 source_type: "email".into(),
@@ -107,9 +107,9 @@ impl ActionGroundingSuite {
             }
         };
 
-        let _ = ExtractCapability::extract(&service, &episode_id, None, None).await;
+        let _ = ExtractCapability::extract_from_service(&service, &episode_id, None, None).await;
 
-        let context_result = AssembleContextCapability::assemble_context(
+        let context_result = AssembleContextCapability::assemble_context_from_service(
             &service,
             memory_mcp::models::AssembleContextRequest {
                 query: "security review approval".into(),

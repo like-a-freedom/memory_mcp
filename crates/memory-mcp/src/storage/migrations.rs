@@ -12,8 +12,8 @@ use std::time::{Duration, Instant};
 use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
 
+use crate::error::MemoryError;
 use crate::logging::LogLevel;
-use crate::service::MemoryError;
 use crate::storage::DbClient;
 use crate::storage::client::SurrealDbClient;
 

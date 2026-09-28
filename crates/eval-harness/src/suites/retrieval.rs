@@ -1,6 +1,6 @@
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};
-use memory_mcp::service::capabilities::assemble_context::AssembleContextCapability;
+use memory_mcp::service::memory_container_shims::memory_capabilities_assemble_context::AssembleContextCapability;
 
 use super::retrieval_cases::{RetrievalEvalCase, case_as_of, load_cases};
 use crate::domain::*;
@@ -120,7 +120,7 @@ impl LocalRetrievalSuite {
         }
 
         let as_of = case_as_of(case);
-        let items = match AssembleContextCapability::assemble_context(
+        let items = match AssembleContextCapability::assemble_context_from_service(
             &service,
             memory_mcp::models::AssembleContextRequest {
                 query: case.query.clone(),

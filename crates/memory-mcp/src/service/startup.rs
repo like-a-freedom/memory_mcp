@@ -1,5 +1,5 @@
+use crate::embedding::providers::embedding_from_value;
 use crate::error::MemoryError;
-use crate::service::embedding::embedding_from_value;
 use crate::storage::{BoundDbClient, DbClient};
 use std::sync::Arc;
 
@@ -53,7 +53,7 @@ pub(crate) async fn apply_startup_migrations(
 pub(crate) async fn load_embedding_state(
     db: &BoundDbClient,
 ) -> Result<Option<serde_json::Value>, MemoryError> {
-    crate::storage::EmbeddingStateStoreClient::from_bound(db.clone())
+    crate::embedding::state_store::EmbeddingStateStoreClient::from_bound(db.clone())
         .load_state()
         .await
 }
@@ -63,7 +63,7 @@ async fn count_facts(db: &BoundDbClient) -> Result<usize, MemoryError> {
 }
 
 async fn count_facts_missing_embeddings(db: &BoundDbClient) -> Result<usize, MemoryError> {
-    crate::storage::embedding_backfill_store::EmbeddingBackfillStoreClient::from_bound(db.clone())
+    crate::embedding::backfill_store::EmbeddingBackfillStoreClient::from_bound(db.clone())
         .count_facts_missing_embeddings()
         .await
 }
@@ -90,7 +90,7 @@ pub(crate) async fn write_bootstrap_ready_state(
     dimension: usize,
     backfill_pending: bool,
 ) -> Result<(), MemoryError> {
-    use crate::storage::{EmbeddingStateStatus, EmbeddingStateStoreClient};
+    use crate::embedding::state_store::{EmbeddingStateStatus, EmbeddingStateStoreClient};
 
     let status = if backfill_pending {
         EmbeddingStateStatus::BackfillPending
@@ -194,11 +194,11 @@ pub(crate) async fn resolve_embedding_startup(
 ) -> Result<
     (
         EmbeddingStartupDecision,
-        Option<crate::service::embedding::ResolvedEmbeddingTarget>,
+        Option<crate::embedding::providers::ResolvedEmbeddingTarget>,
     ),
     MemoryError,
 > {
-    use crate::service::embedding::resolve_embedding_target_identity;
+    use crate::embedding::providers::resolve_embedding_target_identity;
 
     let target = if config.is_enabled() {
         match resolve_embedding_target_identity(config, data_dir).await {
@@ -220,7 +220,7 @@ pub(crate) async fn resolve_embedding_startup(
                         config
                             .base_url
                             .as_deref()
-                            .map(crate::service::embedding::embedding_endpoint_for_log)
+                            .map(crate::embedding::providers::embedding_endpoint_for_log)
                     ),
                 );
                 event.insert("model".to_string(), serde_json::json!(config.model.clone()));
@@ -296,7 +296,7 @@ pub(crate) async fn resolve_embedding_startup(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::service::util::rate_limiter::SafeMutex;
+    use crate::platform::rate_limiter::SafeMutex;
     use serde_json::Value;
 
     #[test]

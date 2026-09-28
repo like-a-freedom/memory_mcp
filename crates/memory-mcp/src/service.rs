@@ -6,26 +6,34 @@
 //! - Fact management with bi-temporal validity
 //! - Context assembly for queries
 
-pub use core::MemoryService;
-pub use embedding::{DisabledEmbeddingProvider, EmbeddingProvider};
-pub use entity_extraction::NerBuildContext;
+pub use crate::embedding::providers::{DisabledEmbeddingProvider, EmbeddingProvider};
+pub use crate::knowledge::entity_extraction::NerBuildContext;
 #[doc(hidden)]
-pub use entity_extraction::VagoLfm2EntityExtractor;
-pub use entity_extraction::{
+pub use crate::knowledge::entity_extraction::VagoLfm2EntityExtractor;
+pub use crate::knowledge::entity_extraction::{
     AnnoEntityExtractor, EntityExtractor, GlinerEntityExtractor, LlmEntityExtractor, NerScheduling,
     RegexEntityExtractor, create_entity_extractor,
 };
+pub use core::MemoryService;
 pub mod entity_extraction_gliner {
     //! Public re-exports of the Classic GLiNER backend helpers used by
     //! real-fixture integration tests. Production callers should construct
     //! the extractor through the normal backend registry, not these items.
-    pub use crate::service::entity_extraction::gliner;
+    pub use crate::knowledge::entity_extraction::gliner;
     pub use gliner::{CLASSIC_GLINER_SPEC, build_from_store};
 }
 // Re-exported from the neutral `crate::error` home (ADR-0045).
 pub use crate::error::MemoryError;
 
-pub(crate) mod apps;
+pub mod agent_memory;
+pub mod apps;
+pub mod capability_deps;
+pub mod cli;
+pub mod memory_container_shims;
+/// Compatibility re-exports for the embedding-owned modules that moved
+/// out of `service/`. One-way, with no internal consumers; retired with
+/// the compatibility surface.
+pub use crate::embedding::model_artifacts;
 #[cfg(feature = "mcp-apps")]
 pub(crate) use apps::AppCommandInput;
 pub use apps::{
@@ -36,57 +44,42 @@ pub use apps::{
     LifecycleDefaults, LifecycleView, PrepareIngestionReviewRequest, RebuildCommunitiesOutcome,
     RecomputeDecayOutcome, RestoreArchivedOutcome,
 };
-pub mod agent_memory;
-mod cache;
+
+/// Compatibility re-export: the procedural-memory use cases moved to
+/// the memory context, which owns the procedure table. One-way, with no
+/// internal consumers.
+pub use crate::memory::procedures_service as procedures;
+
+/// Compatibility alias for the claim use cases, which moved to the
+/// knowledge context that owns the claim domain. This is a one-way
+/// re-export with no internal consumers; it is retired with the
+/// compatibility surface, not silently removed here.
 #[cfg(any(test, feature = "prometheus"))]
-pub mod claims;
-#[cfg(not(any(test, feature = "prometheus")))]
-pub(crate) mod claims;
-mod community;
-mod conflict_resolver;
-mod content_extraction;
-mod context;
+pub mod claims {
+    pub use crate::knowledge::claims_policy::telemetry;
+}
 mod core;
-pub(crate) mod durable_work;
-mod embedding;
 mod embedding_recovery;
-mod embedding_runtime;
-mod embedding_service;
-mod entity;
-mod entity_extraction;
-pub(crate) mod entity_resolution;
-mod episode;
-pub(crate) mod explanation;
-pub(crate) mod fact;
+pub(crate) mod fact_orchestration;
 #[cfg(feature = "fs-watch")]
 pub mod fs_watch;
-pub(crate) mod ingestion;
-pub(crate) mod lifecycle;
 pub(crate) mod model_artifact_refresh;
 #[doc(hidden)]
-pub mod model_artifacts;
-mod model_runtime;
 mod query;
 mod reembed;
 pub mod reembed_options;
 pub mod reembed_progress;
+pub mod retrieval_deps_from_container;
 mod startup;
-mod triple_extractor;
-mod util;
 
-pub mod procedures;
-
-pub mod capabilities;
 #[cfg(feature = "control-plane")]
 pub mod credential_material;
-mod model_loader;
-pub(crate) mod value_helpers;
 
 #[cfg(test)]
 pub mod mock_db;
 
+pub(crate) use crate::memory::lifecycle_workers::LifecyclePolicy;
 pub(crate) use apps::LifecycleOperation;
-pub(crate) use lifecycle::LifecyclePolicy;
 
 #[cfg(test)]
 pub(crate) use apps::edge_neighbor;
@@ -109,31 +102,29 @@ mod constants {
 /// Re-export fact decay constants for backwards compatibility.
 pub use crate::models::Fact;
 
-pub use cache::{CacheKey, invalidate_cache};
-pub(crate) use episode::build_extract_log_result;
-pub use episode::{episode_from_record, fact_from_record};
-pub use lifecycle::{
-    LifecycleBackgroundWorkerRuntime, run_archival_pass, run_community_rebuild_pass,
-    run_decay_pass, spawn_archival_worker, spawn_community_worker, spawn_decay_worker,
-    spawn_workers_from_config,
+pub(crate) use crate::memory::episode::build_extract_log_result;
+pub use crate::memory::episode::{episode_from_record, fact_from_record};
+/// Re-export the deterministic-id module for direct access.
+pub use crate::shared::ids;
+// The decay and archival passes themselves take `LifecycleHandles`, a
+// crate-private port, so they cannot leave the crate. The public
+// `decay_pass` and `archival_pass` wrappers are the service-shaped
+// entry points; `spawn_workers_from_config` starts the background
+// workers.
+pub use crate::shared::ids::{
+    deterministic_community_id, deterministic_edge_id, deterministic_entity_id,
+    deterministic_episode_id, deterministic_episode_id_v2, deterministic_fact_id, hash_prefix,
+};
+pub use crate::shared::validation::{
+    validate_entity_candidate, validate_fact_input, validate_ingest_request,
 };
 pub use query::{
     bucket_to_five_minutes, bucket_to_hour, decayed_confidence, normalize_dt, normalize_text, now,
     parse_iso, preprocess_search_query,
 };
 pub use reembed::ReembedSummary;
-/// Re-export ids module for direct access.
-pub use util::ids;
-pub use util::{
-    deterministic_community_id, deterministic_edge_id, deterministic_entity_id,
-    deterministic_episode_id, deterministic_episode_id_v2, deterministic_fact_id, hash_prefix,
-    validate_entity_candidate, validate_fact_input, validate_ingest_request,
-};
 
-pub(crate) use core::{log_args_with_duration, log_event};
-pub(crate) use embedding_runtime::{
-    CachedQueryEmbedding, DEFAULT_BACKGROUND_EMBEDDING_ATTEMPTS,
-    DEFAULT_QUERY_EMBEDDING_CACHE_SIZE, background_embedding_retry_delay,
-    is_remote_embedding_provider, is_transient_embedding_error, query_embedding_cache_ttl,
+pub(crate) use crate::embedding::runtime::{
+    CachedQueryEmbedding, DEFAULT_QUERY_EMBEDDING_CACHE_SIZE, is_remote_embedding_provider,
 };
 pub(crate) use startup::EmbeddingActivationMode;

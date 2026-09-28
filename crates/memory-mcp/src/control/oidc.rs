@@ -48,7 +48,7 @@ mod tests {
     use super::*;
     use crate::control::session::ControlPlaneSession;
     use crate::http::registry::RegistryHandle;
-    use crate::http::registry::storage::RegistryStore;
+    use crate::http::registry::storage::SessionStore;
     use std::sync::Arc;
 
     /// `form_urlencode_component` is a `fn` in `client.rs`. The
@@ -90,7 +90,7 @@ mod tests {
             Arc::new(crate::http::registry::storage::InMemoryStore::default());
         // Reconcile the durable policy so the session write is guarded by
         // a current epoch, mirroring startup composition.
-        let policy = crate::http::registry::RegistryStore::reconcile_browser_policy(
+        let policy = crate::http::registry::BrowserPolicyStore::reconcile_browser_policy(
             store.as_ref(),
             &[crate::http::config::BrowserAuthMethod::Oidc],
             None,
@@ -188,7 +188,7 @@ mod tests {
     async fn logout_redirects_into_the_mount_base() {
         let store: Arc<crate::http::registry::storage::InMemoryStore> =
             Arc::new(crate::http::registry::storage::InMemoryStore::default());
-        let policy = crate::http::registry::RegistryStore::reconcile_browser_policy(
+        let policy = crate::http::registry::BrowserPolicyStore::reconcile_browser_policy(
             store.as_ref(),
             &[crate::http::config::BrowserAuthMethod::Oidc],
             None,

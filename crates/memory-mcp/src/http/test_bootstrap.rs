@@ -226,7 +226,7 @@ async fn bootstrap_one(
         &tenant.id,
         lease,
         migrations,
-        Arc::new(crate::http::fault_injection::NoFaults),
+        Arc::new(crate::platform::fault_injection::NoFaults),
     )
     .await?;
     Ok(())

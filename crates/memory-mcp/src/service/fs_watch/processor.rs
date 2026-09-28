@@ -13,12 +13,12 @@
 use std::time::Duration;
 
 use crate::error::MemoryError;
+use crate::logging::StdoutLogger;
+use crate::memory::InboxRevisionStoreClient;
+use crate::memory::ingestion::IngestionMetadata;
 use crate::models::inbox_revision::{
     ClaimedInboxRevision, InboxFailureClass, InboxProcessingStage, InboxRevisionLease,
 };
-use crate::service::MemoryService;
-use crate::service::ingestion::IngestionMetadata;
-use crate::storage::InboxRevisionStoreClient;
 
 use super::telemetry::FsWatchTelemetry;
 
@@ -41,7 +41,9 @@ pub enum ProcessOutcome {
 /// Sequential processor runtime.
 pub(crate) struct InboxRevisionProcessor {
     store: InboxRevisionStoreClient,
-    service: MemoryService,
+    extract_deps: crate::memory::capabilities::deps::ExtractDeps,
+    ingestion_service: crate::memory::ingestion::IngestionService,
+    logger: StdoutLogger,
     telemetry: FsWatchTelemetry,
     stop_dequeue: tokio_util::sync::CancellationToken,
     /// Current lease, published so the runtime can release it on bounded
@@ -52,14 +54,18 @@ pub(crate) struct InboxRevisionProcessor {
 impl InboxRevisionProcessor {
     pub(crate) fn new(
         store: InboxRevisionStoreClient,
-        service: MemoryService,
+        extract_deps: crate::memory::capabilities::deps::ExtractDeps,
+        ingestion_service: crate::memory::ingestion::IngestionService,
+        logger: StdoutLogger,
         telemetry: FsWatchTelemetry,
         stop_dequeue: tokio_util::sync::CancellationToken,
         current_lease: std::sync::Arc<tokio::sync::Mutex<Option<InboxRevisionLease>>>,
     ) -> Self {
         Self {
             store,
-            service,
+            extract_deps,
+            ingestion_service,
+            logger,
             telemetry,
             stop_dequeue,
             current_lease,
@@ -73,7 +79,7 @@ impl InboxRevisionProcessor {
                 break;
             }
             let owner = format!("processor-{}", std::process::id());
-            let lease_secs = crate::storage::inbox_revision_store::DEFAULT_REVISION_LEASE_SECS;
+            let lease_secs = crate::memory::inbox_revision_store::DEFAULT_REVISION_LEASE_SECS;
             let claim = match self
                 .store
                 .claim_next(&owner, chrono::Duration::seconds(lease_secs))
@@ -102,8 +108,14 @@ impl InboxRevisionProcessor {
                 .collect::<String>();
             self.telemetry.set_inflight(1);
             let started = std::time::Instant::now();
-            let outcome =
-                process_claimed_revision(&self.service, &self.store, claim, &self.telemetry).await;
+            let outcome = process_with_deps(
+                &self.extract_deps,
+                &self.ingestion_service,
+                &self.store,
+                claim,
+                &self.telemetry,
+            )
+            .await;
             self.telemetry
                 .record_revision_duration(outcome, started.elapsed());
             self.telemetry.set_inflight(0);
@@ -111,8 +123,8 @@ impl InboxRevisionProcessor {
                 let mut guard = self.current_lease.lock().await;
                 *guard = None;
             }
-            self.service.logger.log(
-                crate::service::log_event(
+            self.logger.log(
+                crate::platform::log_event::log_event(
                     "fs_watch.revision",
                     serde_json::json!({
                         "path": relative_path,
@@ -132,9 +144,31 @@ impl InboxRevisionProcessor {
     }
 }
 
-/// Processes one claimed revision using only its durable snapshot.
+/// Processes one claimed revision from a service.
+///
+/// The work itself takes the narrow ports; this wrapper keeps the
+/// service-shaped entry point the integration test uses, and is the one
+/// place the container is converted.
 pub async fn process_claimed_revision(
-    service: &MemoryService,
+    service: &crate::service::MemoryService,
+    store: &InboxRevisionStoreClient,
+    claim: ClaimedInboxRevision,
+    telemetry: &FsWatchTelemetry,
+) -> ProcessOutcome {
+    process_with_deps(
+        &crate::memory::capabilities::deps::ExtractDeps::from(service),
+        &service.ingestion_service,
+        store,
+        claim,
+        telemetry,
+    )
+    .await
+}
+
+/// Processes one claimed revision using only its durable snapshot.
+async fn process_with_deps(
+    service: &crate::memory::capabilities::deps::ExtractDeps,
+    ingestion_service: &crate::memory::ingestion::IngestionService,
     store: &InboxRevisionStoreClient,
     claim: ClaimedInboxRevision,
     telemetry: &FsWatchTelemetry,
@@ -167,8 +201,7 @@ pub async fn process_claimed_revision(
         let prepared_content = prepared_content.clone();
         let log_source_id = log_source_id.clone();
         async move {
-            let episode_id = service
-                .ingestion_service
+            let episode_id = ingestion_service
                 .ingest_with_metadata(
                     crate::models::IngestRequest {
                         source_type,
@@ -232,7 +265,7 @@ pub async fn process_claimed_revision(
     let extract_outcome = retry_until_settled("extract", MAX_PROCESSOR_ATTEMPTS, telemetry, || {
         let episode_id = episode_id.clone();
         async move {
-            crate::service::capabilities::extract::ExtractCapability::extract(
+            crate::service::memory_container_shims::memory_capabilities_extract::ExtractCapability::extract_with(
                 service,
                 &episode_id,
                 None,
@@ -377,7 +410,9 @@ fn classify_failure(err: &MemoryError) -> InboxFailureClass {
             InboxFailureClass::Corrupt
         }
         MemoryError::Validation(_) => InboxFailureClass::Validation,
-        MemoryError::Storage(message) if crate::platform::persistence::db_errors::is_transient_db_error(err) => {
+        MemoryError::Storage(message)
+            if crate::platform::persistence::db_errors::is_transient_db_error(err) =>
+        {
             InboxFailureClass::Storage
         }
         MemoryError::Storage(message) if message.contains("table") => InboxFailureClass::Storage,
@@ -443,11 +478,13 @@ fn outcome_label(outcome: ProcessOutcome) -> &'static str {
 mod tests {
     use super::*;
     use crate::service::fs_watch::telemetry::FsWatchTelemetry;
-    use crate::service::util::deterministic_episode_id_v2;
+    use crate::shared::ids::deterministic_episode_id_v2;
     use crate::storage::{DbClient, SurrealDbClient};
     use chrono::Utc;
     use sha2::Digest;
     use std::sync::Arc;
+
+    use crate::service::MemoryService;
 
     async fn make_processor_service() -> (MemoryService, Arc<SurrealDbClient>) {
         let db = Arc::new(
@@ -470,6 +507,20 @@ mod tests {
         FsWatchTelemetry::new()
     }
 
+    /// The three things `process_claimed_revision` now takes, pulled off
+    /// the service the test already builds.
+    fn make_deps(
+        service: &MemoryService,
+    ) -> (
+        crate::memory::capabilities::deps::ExtractDeps,
+        crate::memory::ingestion::IngestionService,
+    ) {
+        (
+            crate::memory::capabilities::deps::ExtractDeps::from(service),
+            service.ingestion_service.clone(),
+        )
+    }
+
     #[tokio::test]
     async fn successful_processing_stores_episode_and_marks_processed() {
         let (service, db) = make_processor_service().await;
@@ -482,7 +533,7 @@ mod tests {
             &format!("fs:docs/spec.md:{content_sha256}"),
             t_ref,
         );
-        let record = crate::storage::inbox_revision_store::new_revision_record(
+        let record = crate::memory::inbox_revision_store::new_revision_record(
             "fs:docs/spec.md".to_string(),
             "docs/spec.md".to_string(),
             content_sha256,
@@ -501,7 +552,15 @@ mod tests {
             .expect("claim")
             .expect("claimable");
 
-        let outcome = process_claimed_revision(&service, &store, claim, &make_telemetry()).await;
+        let (extract_deps, ingestion_service) = make_deps(&service);
+        let outcome = process_with_deps(
+            &extract_deps,
+            &ingestion_service,
+            &store,
+            claim,
+            &make_telemetry(),
+        )
+        .await;
         assert_eq!(outcome, ProcessOutcome::Processed);
 
         // Episode exists with lineage.
@@ -527,9 +586,9 @@ mod tests {
 
     #[tokio::test]
     async fn transient_extractor_failures_are_retried_within_bounds() {
+        use crate::embedding::providers::DisabledEmbeddingProvider;
+        use crate::knowledge::entity_extraction::NerScheduling;
         use crate::service::EntityExtractor;
-        use crate::service::embedding::DisabledEmbeddingProvider;
-        use crate::service::entity_extraction::NerScheduling;
         use std::sync::Arc;
         use std::sync::atomic::{AtomicBool, Ordering};
 
@@ -588,7 +647,7 @@ mod tests {
         let content_hash = hex::encode(sha2::Sha256::digest(content.as_bytes()));
         let expected_episode_id =
             deterministic_episode_id_v2("document", &format!("fs:retry:{content_hash}"), t_ref);
-        let record = crate::storage::inbox_revision_store::new_revision_record(
+        let record = crate::memory::inbox_revision_store::new_revision_record(
             "fs:retry".to_string(),
             "retry.md".to_string(),
             content_hash,
@@ -607,15 +666,23 @@ mod tests {
             .expect("claimable");
         // The flaky extractor fails once, then succeeds; the processor retries
         // within its bounded cycle and reaches Processed.
-        let outcome = process_claimed_revision(&service, &store, claim, &make_telemetry()).await;
+        let (extract_deps, ingestion_service) = make_deps(&service);
+        let outcome = process_with_deps(
+            &extract_deps,
+            &ingestion_service,
+            &store,
+            claim,
+            &make_telemetry(),
+        )
+        .await;
         assert_eq!(outcome, ProcessOutcome::Processed);
     }
 
     #[tokio::test]
     async fn retries_exhausted_marks_failed_after_bounded_attempts() {
+        use crate::embedding::providers::DisabledEmbeddingProvider;
+        use crate::knowledge::entity_extraction::NerScheduling;
         use crate::service::EntityExtractor;
-        use crate::service::embedding::DisabledEmbeddingProvider;
-        use crate::service::entity_extraction::NerScheduling;
 
         struct AlwaysFailExtractor;
 
@@ -668,7 +735,7 @@ mod tests {
             &format!("fs:retry-exhaust:{content_hash}"),
             t_ref,
         );
-        let record = crate::storage::inbox_revision_store::new_revision_record(
+        let record = crate::memory::inbox_revision_store::new_revision_record(
             "fs:retry-exhaust".to_string(),
             "retry-exhaust.md".to_string(),
             content_hash,
@@ -685,7 +752,15 @@ mod tests {
             .await
             .expect("claim")
             .expect("claimable");
-        let outcome = process_claimed_revision(&service, &store, claim, &make_telemetry()).await;
+        let (extract_deps, ingestion_service) = make_deps(&service);
+        let outcome = process_with_deps(
+            &extract_deps,
+            &ingestion_service,
+            &store,
+            claim,
+            &make_telemetry(),
+        )
+        .await;
         assert_eq!(outcome, ProcessOutcome::FailedRetriesExhausted);
 
         let row = db

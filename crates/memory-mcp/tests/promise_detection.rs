@@ -1,7 +1,7 @@
 use chrono::Utc;
 use memory_mcp::models::IngestRequest;
-use memory_mcp::service::capabilities::extract::ExtractCapability;
-use memory_mcp::service::capabilities::ingest::IngestCapability;
+use memory_mcp::service::memory_container_shims::memory_capabilities_extract::ExtractCapability;
+use memory_mcp::service::memory_container_shims::memory_capabilities_ingest::IngestCapability;
 
 mod common;
 
@@ -17,10 +17,10 @@ async fn test_promise_detection_extracts_promise_fact() {
         policy_tags: vec![],
     };
 
-    let episode_id = IngestCapability::ingest(&service, req, None)
+    let episode_id = IngestCapability::ingest_from_service(&service, req, None)
         .await
         .expect("ingest");
-    let extraction = ExtractCapability::extract(&service, &episode_id, None, None)
+    let extraction = ExtractCapability::extract_from_service(&service, &episode_id, None, None)
         .await
         .expect("extract");
     let facts = extraction.facts;

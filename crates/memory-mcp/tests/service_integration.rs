@@ -5,11 +5,11 @@
 use chrono::{TimeZone, Utc};
 use memory_mcp::models::Provenance;
 use memory_mcp::service::EntityExtractor;
-use memory_mcp::service::capabilities::assemble_context::AssembleContextCapability;
-use memory_mcp::service::capabilities::explain::ExplainCapability;
-use memory_mcp::service::capabilities::extract::ExtractCapability;
-use memory_mcp::service::capabilities::ingest::IngestCapability;
-use memory_mcp::service::capabilities::invalidate::InvalidateCapability;
+use memory_mcp::service::memory_container_shims::memory_capabilities_assemble_context::AssembleContextCapability;
+use memory_mcp::service::memory_container_shims::memory_capabilities_explain::ExplainCapability;
+use memory_mcp::service::memory_container_shims::memory_capabilities_extract::ExtractCapability;
+use memory_mcp::service::memory_container_shims::memory_capabilities_ingest::IngestCapability;
+use memory_mcp::service::memory_container_shims::memory_capabilities_invalidate::InvalidateCapability;
 use memory_mcp::storage::DbClient;
 use serde_json::{Value, json};
 
@@ -60,12 +60,12 @@ async fn test_service_ingest_and_extract_flow() {
         policy_tags: vec![],
     };
 
-    let episode_id = IngestCapability::ingest(&service, request, None)
+    let episode_id = IngestCapability::ingest_from_service(&service, request, None)
         .await
         .unwrap();
     assert!(episode_id.starts_with("episode:"));
 
-    let result = ExtractCapability::extract(&service, &episode_id, None, None)
+    let result = ExtractCapability::extract_from_service(&service, &episode_id, None, None)
         .await
         .unwrap();
 
@@ -106,12 +106,12 @@ async fn extractor_fingerprint_projection() {
         policy_tags: vec![],
     };
 
-    let episode_id = IngestCapability::ingest(&service, request, None)
+    let episode_id = IngestCapability::ingest_from_service(&service, request, None)
         .await
         .unwrap();
     assert!(episode_id.starts_with("episode:"));
 
-    let first = ExtractCapability::extract(&service, &episode_id, None, None)
+    let first = ExtractCapability::extract_from_service(&service, &episode_id, None, None)
         .await
         .unwrap();
     assert!(!first.entities.is_empty());
@@ -155,7 +155,7 @@ async fn extractor_fingerprint_projection() {
     );
 
     // Re-extracting appends a SECOND projection row; the first stays unchanged.
-    let _second = ExtractCapability::extract(&service, &episode_id, None, None)
+    let _second = ExtractCapability::extract_from_service(&service, &episode_id, None, None)
         .await
         .unwrap();
 
@@ -260,7 +260,7 @@ async fn test_service_add_fact_and_assemble_context() {
         compact: false,
     };
 
-    let context = AssembleContextCapability::assemble_context(&service, request)
+    let context = AssembleContextCapability::assemble_context_from_service(&service, request)
         .await
         .unwrap();
     assert!(!context.is_empty());
@@ -311,7 +311,7 @@ async fn test_service_add_fact_persists_provenance() {
 async fn test_service_extract_persists_edge_provenance_and_extracted_origin() {
     let (service, db_client) = common::make_service_with_client().await;
 
-    let episode_id = IngestCapability::ingest(
+    let episode_id = IngestCapability::ingest_from_service(
         &service,
         memory_mcp::models::IngestRequest {
             source_type: "meeting".to_string(),
@@ -326,7 +326,7 @@ async fn test_service_extract_persists_edge_provenance_and_extracted_origin() {
     .await
     .unwrap();
 
-    let extraction = ExtractCapability::extract(&service, &episode_id, None, None)
+    let extraction = ExtractCapability::extract_from_service(&service, &episode_id, None, None)
         .await
         .unwrap();
     assert!(!extraction.links.is_empty());
@@ -349,7 +349,7 @@ async fn test_service_extract_persists_edge_provenance_and_extracted_origin() {
 async fn test_service_extract_returns_contradiction_warning_for_conflicting_metric_fact() {
     let service = common::make_service().await;
 
-    let first_episode = IngestCapability::ingest(
+    let first_episode = IngestCapability::ingest_from_service(
         &service,
         memory_mcp::models::IngestRequest {
             source_type: "chat".to_string(),
@@ -366,7 +366,7 @@ async fn test_service_extract_returns_contradiction_warning_for_conflicting_metr
     .await
     .expect("ingest first episode");
     let first_result =
-        ExtractCapability::extract(&service, &first_episode, None, None)
+        ExtractCapability::extract_from_service(&service, &first_episode, None, None)
             .await
             .unwrap();
     let first_json = serde_json::to_value(&first_result).expect("serialize first extract result");
@@ -380,7 +380,7 @@ async fn test_service_extract_returns_contradiction_warning_for_conflicting_metr
         0
     );
 
-    let second_episode = IngestCapability::ingest(
+    let second_episode = IngestCapability::ingest_from_service(
         &service,
         memory_mcp::models::IngestRequest {
             source_type: "chat".to_string(),
@@ -397,7 +397,7 @@ async fn test_service_extract_returns_contradiction_warning_for_conflicting_metr
     .await
     .expect("ingest second episode");
     let second_result =
-        ExtractCapability::extract(&service, &second_episode, None, None)
+        ExtractCapability::extract_from_service(&service, &second_episode, None, None)
             .await
             .unwrap();
     let second_json =
@@ -503,7 +503,7 @@ async fn test_service_exposes_regex_entity_extractor() {
 async fn test_service_does_not_persist_fact_embeddings_without_provider() {
     let (service, db_client) = common::make_service_with_client().await;
 
-    let episode_id = IngestCapability::ingest(
+    let episode_id = IngestCapability::ingest_from_service(
         &service,
         memory_mcp::models::IngestRequest {
             source_type: "meeting".to_string(),
@@ -577,7 +577,7 @@ async fn test_service_assemble_context_without_provider_skips_semantic_similarit
         .await
         .unwrap();
 
-    let context = AssembleContextCapability::assemble_context(
+    let context = AssembleContextCapability::assemble_context_from_service(
         &service,
         memory_mcp::models::AssembleContextRequest {
             query: "salary raise".to_string(),
@@ -617,7 +617,7 @@ async fn test_service_merges_overlapping_entity_cohorts_into_one_community() {
         ("community-merge-1", "Alice Smith met Bob Jones"),
         ("community-merge-2", "Bob Jones met Carol White"),
     ] {
-        let episode_id = IngestCapability::ingest(
+        let episode_id = IngestCapability::ingest_from_service(
             &service,
             memory_mcp::models::IngestRequest {
                 source_type: "meeting".to_string(),
@@ -631,7 +631,7 @@ async fn test_service_merges_overlapping_entity_cohorts_into_one_community() {
         )
         .await
         .unwrap();
-        ExtractCapability::extract(&service, &episode_id, None, None)
+        ExtractCapability::extract_from_service(&service, &episode_id, None, None)
             .await
             .unwrap();
     }
@@ -689,13 +689,13 @@ async fn test_service_fact_invalidation() {
         compact: false,
     };
     let context_before =
-        AssembleContextCapability::assemble_context(&service, request_before)
+        AssembleContextCapability::assemble_context_from_service(&service, request_before)
             .await
             .unwrap();
     assert!(context_before.iter().any(|f| f.fact_id == fact_id));
 
     let t_invalid = Utc.with_ymd_and_hms(2024, 6, 1, 0, 0, 0).unwrap();
-    InvalidateCapability::invalidate(
+    InvalidateCapability::invalidate_from_service(
         &service,
         memory_mcp::models::InvalidateRequest {
             fact_id: fact_id.clone(),
@@ -719,7 +719,7 @@ async fn test_service_fact_invalidation() {
         compact: false,
     };
     let context_after =
-        AssembleContextCapability::assemble_context(&service, request_after)
+        AssembleContextCapability::assemble_context_from_service(&service, request_after)
             .await
             .unwrap();
     assert!(!context_after.iter().any(|f| f.fact_id == fact_id));
@@ -758,12 +758,12 @@ async fn test_service_cache_behavior() {
         compact: false,
     };
     let result1 =
-        AssembleContextCapability::assemble_context(&service, request.clone())
+        AssembleContextCapability::assemble_context_from_service(&service, request.clone())
             .await
             .unwrap();
     assert!(!result1.is_empty());
 
-    let result2 = AssembleContextCapability::assemble_context(&service, request)
+    let result2 = AssembleContextCapability::assemble_context_from_service(&service, request)
         .await
         .unwrap();
     assert_eq!(result1.len(), result2.len());
@@ -788,7 +788,7 @@ async fn test_service_assemble_context_records_fact_access_heat() {
         .await
         .unwrap();
 
-    let items = AssembleContextCapability::assemble_context(
+    let items = AssembleContextCapability::assemble_context_from_service(
         &service,
         memory_mcp::models::AssembleContextRequest {
             query: "heat tracking retrieval".to_string(),
@@ -854,7 +854,7 @@ async fn test_service_assemble_context_records_fact_access_heat_on_cache_hit_and
     };
 
     let first_items =
-        AssembleContextCapability::assemble_context(&service, request.clone())
+        AssembleContextCapability::assemble_context_from_service(&service, request.clone())
             .await
             .unwrap();
     assert!(first_items.iter().any(|item| item.fact_id == fact_id));
@@ -873,10 +873,9 @@ async fn test_service_assemble_context_records_fact_access_heat_on_cache_hit_and
     );
     assert!(stored_after_first.get("last_accessed").is_some());
 
-    let second_items =
-        AssembleContextCapability::assemble_context(&service, request)
-            .await
-            .unwrap();
+    let second_items = AssembleContextCapability::assemble_context_from_service(&service, request)
+        .await
+        .unwrap();
     assert!(second_items.iter().any(|item| item.fact_id == fact_id));
 
     let stored_after_second = db_client
@@ -913,7 +912,7 @@ async fn test_service_assemble_context_does_not_record_query_log_when_disabled_b
         .await
         .unwrap();
 
-    let items = AssembleContextCapability::assemble_context(
+    let items = AssembleContextCapability::assemble_context_from_service(
         &service,
         memory_mcp::models::AssembleContextRequest {
             query: "default disabled query logging".to_string(),
@@ -958,7 +957,7 @@ async fn test_service_assemble_context_records_query_log_with_tier_latency_and_r
         .await
         .unwrap();
 
-    let items = AssembleContextCapability::assemble_context(
+    let items = AssembleContextCapability::assemble_context_from_service(
         &service,
         memory_mcp::models::AssembleContextRequest {
             query: "query analytics retrieval".to_string(),
@@ -1035,7 +1034,7 @@ async fn test_service_assemble_context_records_query_log_with_resolved_view_mode
     )
     .await;
 
-    let _ = AssembleContextCapability::assemble_context(
+    let _ = AssembleContextCapability::assemble_context_from_service(
         &service,
         memory_mcp::models::AssembleContextRequest {
             query: "timeline of atlas changes in q1 2026".to_string(),
@@ -1104,11 +1103,10 @@ async fn test_service_assemble_context_records_query_log_for_cache_hit_queries()
         compact: false,
     };
 
-    let first =
-        AssembleContextCapability::assemble_context(&service, request.clone())
-            .await
-            .unwrap();
-    let second = AssembleContextCapability::assemble_context(&service, request)
+    let first = AssembleContextCapability::assemble_context_from_service(&service, request.clone())
+        .await
+        .unwrap();
+    let second = AssembleContextCapability::assemble_context_from_service(&service, request)
         .await
         .unwrap();
 
@@ -1167,7 +1165,7 @@ async fn test_service_assemble_context_prunes_query_logs_older_than_default_rete
         .await
         .unwrap();
 
-    let items = AssembleContextCapability::assemble_context(
+    let items = AssembleContextCapability::assemble_context_from_service(
         &service,
         memory_mcp::models::AssembleContextRequest {
             query: "default retention pruning".to_string(),
@@ -1239,7 +1237,7 @@ async fn test_service_assemble_context_honors_custom_query_log_retention_days() 
         .await
         .unwrap();
 
-    let items = AssembleContextCapability::assemble_context(
+    let items = AssembleContextCapability::assemble_context_from_service(
         &service,
         memory_mcp::models::AssembleContextRequest {
             query: "custom retention pruning".to_string(),
@@ -1330,7 +1328,7 @@ async fn test_service_active_namespace_contains_legacy_scope_records_without_fil
         compact: false,
     };
     let org_results =
-        AssembleContextCapability::assemble_context(&service, request_org)
+        AssembleContextCapability::assemble_context_from_service(&service, request_org)
             .await
             .unwrap();
     assert!(org_results.iter().any(|r| r.content.contains("Org")));
@@ -1363,7 +1361,7 @@ async fn test_service_assemble_context_timeline_view_sorts_and_filters_by_window
     )
     .await;
 
-    let items = AssembleContextCapability::assemble_context(
+    let items = AssembleContextCapability::assemble_context_from_service(
         &service,
         memory_mcp::models::AssembleContextRequest {
             query: "atlas".to_string(),
@@ -1416,7 +1414,7 @@ async fn assemble_context_auto_timeline_orders_results_without_explicit_view_mod
     )
     .await;
 
-    let items = AssembleContextCapability::assemble_context(
+    let items = AssembleContextCapability::assemble_context_from_service(
         &service,
         memory_mcp::models::AssembleContextRequest {
             query: "timeline of atlas changes in q1 2026".to_string(),
@@ -1469,7 +1467,7 @@ async fn assemble_context_graph_expansion_returns_anchor_neighbor_fact() {
     )
     .await;
 
-    let items = AssembleContextCapability::assemble_context(
+    let items = AssembleContextCapability::assemble_context_from_service(
         &service,
         memory_mcp::models::AssembleContextRequest {
             query: "Alice Stone".to_string(),
@@ -1498,7 +1496,7 @@ async fn test_service_assemble_context_filters_by_fact_type_within_active_namesp
     let service = common::make_service().await;
     let t_valid = Utc.with_ymd_and_hms(2026, 4, 7, 10, 0, 0).unwrap();
 
-    let atlas_episode = IngestCapability::ingest(
+    let atlas_episode = IngestCapability::ingest_from_service(
         &service,
         memory_mcp::models::IngestRequest {
             source_type: "document".to_string(),
@@ -1513,7 +1511,7 @@ async fn test_service_assemble_context_filters_by_fact_type_within_active_namesp
     .await
     .unwrap();
 
-    let beacon_episode = IngestCapability::ingest(
+    let beacon_episode = IngestCapability::ingest_from_service(
         &service,
         memory_mcp::models::IngestRequest {
             source_type: "document".to_string(),
@@ -1574,7 +1572,7 @@ async fn test_service_assemble_context_filters_by_fact_type_within_active_namesp
         .unwrap();
     let as_of = Utc::now() + chrono::Duration::seconds(1);
 
-    let items = AssembleContextCapability::assemble_context(
+    let items = AssembleContextCapability::assemble_context_from_service(
         &service,
         memory_mcp::models::AssembleContextRequest {
             query: "budget".to_string(),
@@ -1609,7 +1607,7 @@ async fn test_service_assemble_context_does_not_append_recent_experience_for_que
     let note_time = Utc.with_ymd_and_hms(2026, 4, 7, 10, 0, 0).unwrap();
     let experience_time = Utc.with_ymd_and_hms(2026, 4, 8, 9, 0, 0).unwrap();
 
-    let source_episode = IngestCapability::ingest(
+    let source_episode = IngestCapability::ingest_from_service(
         &service,
         memory_mcp::models::IngestRequest {
             source_type: "document".to_string(),
@@ -1654,7 +1652,7 @@ async fn test_service_assemble_context_does_not_append_recent_experience_for_que
         .await
         .unwrap();
 
-    let items = AssembleContextCapability::assemble_context(
+    let items = AssembleContextCapability::assemble_context_from_service(
         &service,
         memory_mcp::models::AssembleContextRequest {
             query: "budget".to_string(),
@@ -1722,7 +1720,7 @@ async fn test_service_assemble_context_facets_view_groups_by_policy_tags() {
             t_valid + chrono::Duration::minutes(2),
         ),
     ] {
-        IngestCapability::ingest(
+        IngestCapability::ingest_from_service(
             &service,
             memory_mcp::models::IngestRequest {
                 source_type: "document".to_string(),
@@ -1740,7 +1738,7 @@ async fn test_service_assemble_context_facets_view_groups_by_policy_tags() {
 
     let as_of = Utc::now() + chrono::Duration::seconds(1);
 
-    let items = AssembleContextCapability::assemble_context(
+    let items = AssembleContextCapability::assemble_context_from_service(
         &service,
         memory_mcp::models::AssembleContextRequest {
             query: String::new(),
@@ -1822,7 +1820,7 @@ async fn test_service_assemble_context_wake_up_prioritizes_persona_then_recent()
 
     let as_of = Utc::now() + chrono::Duration::seconds(1);
 
-    let items = AssembleContextCapability::assemble_context(
+    let items = AssembleContextCapability::assemble_context_from_service(
         &service,
         memory_mcp::models::AssembleContextRequest {
             query: "ignored".to_string(),
@@ -1875,7 +1873,7 @@ async fn test_service_assemble_context_map_view_returns_hub_entities_sorted_by_d
     service.relate(&bob_id, "knows", &carol_id).await.unwrap();
     service.relate(&bob_id, "knows", &diana_id).await.unwrap();
 
-    let items = AssembleContextCapability::assemble_context(
+    let items = AssembleContextCapability::assemble_context_from_service(
         &service,
         memory_mcp::models::AssembleContextRequest {
             query: String::new(),
@@ -1935,7 +1933,7 @@ async fn test_service_assemble_context_map_view_includes_communities() {
     )
     .await;
 
-    let items = AssembleContextCapability::assemble_context(
+    let items = AssembleContextCapability::assemble_context_from_service(
         &service,
         memory_mcp::models::AssembleContextRequest {
             query: String::new(),
@@ -2005,7 +2003,7 @@ async fn test_service_assemble_context_timeline_view_sorts_chronologically() {
             .unwrap();
     }
 
-    let items = AssembleContextCapability::assemble_context(
+    let items = AssembleContextCapability::assemble_context_from_service(
         &service,
         memory_mcp::models::AssembleContextRequest {
             query: "event".to_string(),
@@ -2061,14 +2059,13 @@ async fn test_service_assemble_context_cache_hit_tracks_fact_access() {
     };
 
     // First call: cache miss, computes and stores in cache.
-    let first =
-        AssembleContextCapability::assemble_context(&service, request.clone())
-            .await
-            .unwrap();
+    let first = AssembleContextCapability::assemble_context_from_service(&service, request.clone())
+        .await
+        .unwrap();
     assert!(first.iter().any(|item| item.fact_id == fact_id));
 
     // Second call with identical params: cache hit, still tracks access.
-    let second = AssembleContextCapability::assemble_context(&service, request)
+    let second = AssembleContextCapability::assemble_context_from_service(&service, request)
         .await
         .unwrap();
     assert_eq!(first.len(), second.len());
@@ -2106,7 +2103,7 @@ async fn test_service_assemble_context_does_not_track_access_for_synthetic_view_
     let bob = service.resolve_entity("person", "Bob Jones").await.unwrap();
     service.relate(&alice, "knows", &bob).await.unwrap();
 
-    let items = AssembleContextCapability::assemble_context(
+    let items = AssembleContextCapability::assemble_context_from_service(
         &service,
         memory_mcp::models::AssembleContextRequest {
             query: String::new(),
@@ -2156,7 +2153,8 @@ async fn test_service_assemble_context_does_not_track_access_for_synthetic_view_
     // producing a logged validation error. Asserting the refusal
     // pins the contract the guard implements, and fails if owner
     // scoping is ever weakened back into a table-deriving read.
-    let access_store = memory_mcp::storage::FactAccessStore::new(db_client.clone(), "org".to_string());
+    let access_store =
+        memory_mcp::storage::FactAccessStore::new(db_client.clone(), "org".to_string());
     for item in &items {
         let result = access_store.record_fact_access(&item.fact_id, 1).await;
         assert!(
@@ -2172,7 +2170,7 @@ async fn test_service_assemble_context_does_not_track_access_for_synthetic_view_
 async fn test_service_assemble_context_appends_recent_experience_for_browse_like_requests() {
     let (service, _db_client) = common::make_service_with_client().await;
 
-    let source_episode = IngestCapability::ingest(
+    let source_episode = IngestCapability::ingest_from_service(
         &service,
         memory_mcp::models::IngestRequest {
             source_type: "document".to_string(),
@@ -2217,7 +2215,7 @@ async fn test_service_assemble_context_appends_recent_experience_for_browse_like
         .await
         .unwrap();
 
-    let items = AssembleContextCapability::assemble_context(
+    let items = AssembleContextCapability::assemble_context_from_service(
         &service,
         memory_mcp::models::AssembleContextRequest {
             query: String::new(),
@@ -2265,7 +2263,7 @@ async fn test_service_assemble_context_records_query_log_when_enabled() {
         .await
         .unwrap();
 
-    let items = AssembleContextCapability::assemble_context(
+    let items = AssembleContextCapability::assemble_context_from_service(
         &service,
         memory_mcp::models::AssembleContextRequest {
             query: "query logging enabled".to_string(),
@@ -2389,13 +2387,13 @@ async fn test_service_invalidate_sets_t_invalid_and_clears_cache() {
         compact: false,
     };
     let cached =
-        AssembleContextCapability::assemble_context(&service, request.clone())
+        AssembleContextCapability::assemble_context_from_service(&service, request.clone())
             .await
             .unwrap();
     assert!(cached.iter().any(|item| item.fact_id == fact_id));
 
     // Invalidate the fact.
-    InvalidateCapability::invalidate(
+    InvalidateCapability::invalidate_from_service(
         &service,
         memory_mcp::models::InvalidateRequest {
             fact_id: fact_id.clone(),
@@ -2419,10 +2417,9 @@ async fn test_service_invalidate_sets_t_invalid_and_clears_cache() {
         access: None,
         compact: false,
     };
-    let after =
-        AssembleContextCapability::assemble_context(&service, after_request)
-            .await
-            .unwrap();
+    let after = AssembleContextCapability::assemble_context_from_service(&service, after_request)
+        .await
+        .unwrap();
     assert!(
         !after.iter().any(|item| item.fact_id == fact_id),
         "invalidated fact should not appear in context after cache invalidation"
@@ -2463,7 +2460,7 @@ async fn test_service_explain_with_graph_insights_returns_hub_and_connections() 
     )
     .await;
 
-    let episode_id = IngestCapability::ingest(
+    let episode_id = IngestCapability::ingest_from_service(
         &service,
         memory_mcp::models::IngestRequest {
             source_type: "meeting".to_string(),
@@ -2493,7 +2490,7 @@ async fn test_service_explain_with_graph_insights_returns_hub_and_connections() 
         .await
         .unwrap();
 
-    let explanation = ExplainCapability::explain(
+    let explanation = ExplainCapability::explain_from_service(
         &service,
         memory_mcp::models::ExplainRequest {
             context_pack: vec![memory_mcp::models::ExplainItem {
@@ -2581,7 +2578,7 @@ async fn test_service_active_namespace_does_not_route_by_legacy_scope() {
         .unwrap();
 
     // A query cannot select a legacy scope; both records are candidates.
-    let personal_items = AssembleContextCapability::assemble_context(
+    let personal_items = AssembleContextCapability::assemble_context_from_service(
         &service,
         memory_mcp::models::AssembleContextRequest {
             query: "isolated fact".to_string(),
@@ -2612,7 +2609,7 @@ async fn test_service_active_namespace_does_not_route_by_legacy_scope() {
     );
 
     // Repeating the query has the same process-bound routing.
-    let org_items = AssembleContextCapability::assemble_context(
+    let org_items = AssembleContextCapability::assemble_context_from_service(
         &service,
         memory_mcp::models::AssembleContextRequest {
             query: "isolated fact".to_string(),
@@ -2664,7 +2661,7 @@ async fn test_service_semantic_returns_empty_without_embedding_provider() {
         .await
         .unwrap();
 
-    let items = AssembleContextCapability::assemble_context(
+    let items = AssembleContextCapability::assemble_context_from_service(
         &service,
         memory_mcp::models::AssembleContextRequest {
             query: "quantum entanglement photon superposition".to_string(),
@@ -2707,7 +2704,7 @@ async fn test_service_decay_pass_with_real_surrealdb_invalidates_old_low_confide
         .await
         .unwrap();
 
-    let count = memory_mcp::service::run_decay_pass(&service, 0.3, 100.0)
+    let count = memory_mcp::platform::lifecycle_runtime::decay_pass(&service, 0.3, 100.0)
         .await
         .expect("decay pass should succeed");
 
@@ -2748,7 +2745,7 @@ async fn test_service_decay_pass_skips_already_invalidated_facts() {
         .unwrap();
 
     // Manually invalidate first.
-    InvalidateCapability::invalidate(
+    InvalidateCapability::invalidate_from_service(
         &service,
         memory_mcp::models::InvalidateRequest {
             fact_id: fact_id.clone(),
@@ -2760,7 +2757,7 @@ async fn test_service_decay_pass_skips_already_invalidated_facts() {
     .await
     .unwrap();
 
-    let count = memory_mcp::service::run_decay_pass(&service, 0.3, 100.0)
+    let count = memory_mcp::platform::lifecycle_runtime::decay_pass(&service, 0.3, 100.0)
         .await
         .expect("decay pass should succeed");
 
@@ -2782,7 +2779,7 @@ async fn test_service_archival_pass_with_real_surrealdb_archives_old_episode() {
     let (service, db_client) = common::make_service_with_client().await;
     let old_date = Utc::now() - chrono::Duration::days(200);
 
-    let episode_id = IngestCapability::ingest(
+    let episode_id = IngestCapability::ingest_from_service(
         &service,
         memory_mcp::models::IngestRequest {
             source_type: "meeting".to_string(),
@@ -2813,7 +2810,7 @@ async fn test_service_archival_pass_with_real_surrealdb_archives_old_episode() {
         .unwrap();
 
     // Invalidate the fact so the episode becomes eligible for archival.
-    InvalidateCapability::invalidate(
+    InvalidateCapability::invalidate_from_service(
         &service,
         memory_mcp::models::InvalidateRequest {
             fact_id,
@@ -2825,7 +2822,7 @@ async fn test_service_archival_pass_with_real_surrealdb_archives_old_episode() {
     .await
     .unwrap();
 
-    let count = memory_mcp::service::run_archival_pass(&service, 90)
+    let count = memory_mcp::platform::lifecycle_runtime::archival_pass(&service, 90)
         .await
         .expect("archival pass should succeed");
 
@@ -2851,7 +2848,7 @@ async fn test_service_archival_pass_skips_recent_episodes() {
     let (service, db_client) = common::make_service_with_client().await;
     let recent_date = Utc::now() - chrono::Duration::days(10);
 
-    let episode_id = IngestCapability::ingest(
+    let episode_id = IngestCapability::ingest_from_service(
         &service,
         memory_mcp::models::IngestRequest {
             source_type: "chat".to_string(),
@@ -2881,7 +2878,7 @@ async fn test_service_archival_pass_skips_recent_episodes() {
         .await
         .unwrap();
 
-    let count = memory_mcp::service::run_archival_pass(&service, 90)
+    let count = memory_mcp::platform::lifecycle_runtime::archival_pass(&service, 90)
         .await
         .expect("archival pass should succeed");
 
@@ -2902,7 +2899,7 @@ async fn test_service_archival_pass_skips_recent_episodes() {
 #[tokio::test]
 async fn test_extract_generates_note_fact_for_summary_requirement_episode() {
     let service = common::make_service().await;
-    let episode_id = IngestCapability::ingest(
+    let episode_id = IngestCapability::ingest_from_service(
         &service,
 
             memory_mcp::models::IngestRequest {
@@ -2918,7 +2915,7 @@ async fn test_extract_generates_note_fact_for_summary_requirement_episode() {
         .await
         .expect("ingest summary episode");
 
-    let extraction = ExtractCapability::extract(&service, &episode_id, None, None)
+    let extraction = ExtractCapability::extract_from_service(&service, &episode_id, None, None)
         .await
         .expect("extract summary episode");
 
@@ -2931,7 +2928,7 @@ async fn test_extract_generates_note_fact_for_summary_requirement_episode() {
 #[tokio::test]
 async fn test_extract_meeting_summary_generates_line_level_decision_and_fact_records() {
     let (service, db_client) = common::make_service_with_client().await;
-    let episode_id = IngestCapability::ingest(
+    let episode_id = IngestCapability::ingest_from_service(
         &service,
 
             memory_mcp::models::IngestRequest {
@@ -2947,7 +2944,7 @@ async fn test_extract_meeting_summary_generates_line_level_decision_and_fact_rec
         .await
         .expect("ingest meeting summary episode");
 
-    let extraction = ExtractCapability::extract(&service, &episode_id, None, None)
+    let extraction = ExtractCapability::extract_from_service(&service, &episode_id, None, None)
         .await
         .expect("extract meeting summary episode");
 
@@ -2967,7 +2964,7 @@ async fn test_extract_meeting_summary_generates_line_level_decision_and_fact_rec
         "expected at least one fact/note record, got {extraction:?}"
     );
 
-    let stored_facts = memory_mcp::storage::EpisodeStoreClient::new(db_client.clone(), "org")
+    let stored_facts = memory_mcp::knowledge::KnowledgeGraphStore::new(db_client.clone(), "org")
         .select_active_facts_by_episode(
             &episode_id,
             &memory_mcp::service::normalize_dt(Utc::now() + chrono::Duration::seconds(1)),
@@ -3004,7 +3001,7 @@ async fn test_extract_meeting_summary_generates_line_level_decision_and_fact_rec
 #[tokio::test]
 async fn test_extract_summary_with_thematic_sections_generates_line_level_note_records() {
     let (service, db_client) = common::make_service_with_client().await;
-    let episode_id = IngestCapability::ingest(
+    let episode_id = IngestCapability::ingest_from_service(
         &service,
 
             memory_mcp::models::IngestRequest {
@@ -3020,7 +3017,7 @@ async fn test_extract_summary_with_thematic_sections_generates_line_level_note_r
         .await
         .expect("ingest thematic summary episode");
 
-    let extraction = ExtractCapability::extract(&service, &episode_id, None, None)
+    let extraction = ExtractCapability::extract_from_service(&service, &episode_id, None, None)
         .await
         .expect("extract thematic summary episode");
 
@@ -3033,7 +3030,7 @@ async fn test_extract_summary_with_thematic_sections_generates_line_level_note_r
         "expected thematic section lines to become note facts, got {extraction:?}"
     );
 
-    let stored_facts = memory_mcp::storage::EpisodeStoreClient::new(db_client.clone(), "org")
+    let stored_facts = memory_mcp::knowledge::KnowledgeGraphStore::new(db_client.clone(), "org")
         .select_active_facts_by_episode(
             &episode_id,
             &memory_mcp::service::normalize_dt(Utc::now() + chrono::Duration::seconds(1)),

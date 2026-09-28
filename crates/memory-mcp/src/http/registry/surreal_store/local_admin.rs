@@ -1964,7 +1964,7 @@ fn saturated_retry(row: &Value, cap: u64, now: chrono::DateTime<Utc>) -> LocalRe
 mod sql_fault_tests {
     //! Plan §5 experiments that need a *statement* to fail.
     //!
-    //! Each case arms [`crate::http::fault_injection::SqlFaultHook`] with a
+    //! Each case arms [`crate::platform::fault_injection::SqlFaultHook`] with a
     //! needle naming a local-admin statement, drives the real service over
     //! the real durable store, and asserts both the surfaced error and the
     //! absence of any partial credential, session, client or state change.

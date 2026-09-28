@@ -1,7 +1,7 @@
 use chrono::{Duration, TimeZone, Utc};
 use memory_mcp::models::{AssembleContextRequest, InvalidateRequest};
-use memory_mcp::service::capabilities::assemble_context::AssembleContextCapability;
-use memory_mcp::service::capabilities::invalidate::InvalidateCapability;
+use memory_mcp::service::memory_container_shims::memory_capabilities_assemble_context::AssembleContextCapability;
+use memory_mcp::service::memory_container_shims::memory_capabilities_invalidate::InvalidateCapability;
 
 mod common;
 
@@ -23,7 +23,7 @@ async fn assemble_context_when_fact_is_needed_across_sessions_then_returns_evide
     )
     .await;
 
-    let items = AssembleContextCapability::assemble_context(
+    let items = AssembleContextCapability::assemble_context_from_service(
         &service,
         AssembleContextRequest {
             query: "alice atlas deck".into(),
@@ -52,7 +52,7 @@ async fn assemble_context_when_fact_is_needed_across_sessions_then_returns_evide
 async fn assemble_context_when_question_is_unanswerable_then_returns_empty() {
     let service = common::make_service().await;
 
-    let items = AssembleContextCapability::assemble_context(
+    let items = AssembleContextCapability::assemble_context_from_service(
         &service,
         AssembleContextRequest {
             query: "what is Bob's passport number".into(),
@@ -81,7 +81,7 @@ async fn assemble_context_when_fact_is_invalid_after_cutoff_then_old_view_keeps_
         common::seed_fact_at(&service, "personal", "Atlas launch was scheduled", t_valid).await;
     let invalid_at = now + Duration::days(2);
 
-    InvalidateCapability::invalidate(
+    InvalidateCapability::invalidate_from_service(
         &service,
         InvalidateRequest {
             fact_id: fact_id.clone(),
@@ -93,7 +93,7 @@ async fn assemble_context_when_fact_is_invalid_after_cutoff_then_old_view_keeps_
     .await
     .expect("invalidate should succeed");
 
-    let before_items = AssembleContextCapability::assemble_context(
+    let before_items = AssembleContextCapability::assemble_context_from_service(
         &service,
         AssembleContextRequest {
             query: "atlas launch".into(),
@@ -109,7 +109,7 @@ async fn assemble_context_when_fact_is_invalid_after_cutoff_then_old_view_keeps_
     )
     .await
     .expect("historical context should assemble");
-    let after_items = AssembleContextCapability::assemble_context(
+    let after_items = AssembleContextCapability::assemble_context_from_service(
         &service,
         AssembleContextRequest {
             query: "atlas launch".into(),
@@ -138,7 +138,7 @@ async fn assemble_context_when_newer_fact_supersedes_older_one_then_latest_view_
     let old_fact_id =
         common::seed_fact_at(&service, "personal", "Atlas budget is $1M", old_time).await;
 
-    InvalidateCapability::invalidate(
+    InvalidateCapability::invalidate_from_service(
         &service,
         InvalidateRequest {
             fact_id: old_fact_id.clone(),
@@ -154,7 +154,7 @@ async fn assemble_context_when_newer_fact_supersedes_older_one_then_latest_view_
     let new_fact_id =
         common::seed_fact_at(&service, "personal", "Atlas budget is $2M", new_time).await;
 
-    let items = AssembleContextCapability::assemble_context(
+    let items = AssembleContextCapability::assemble_context_from_service(
         &service,
         AssembleContextRequest {
             query: "atlas budget".into(),
@@ -186,7 +186,7 @@ async fn assemble_context_when_direct_fact_lookup_then_returns_exact_evidence() 
     )
     .await;
 
-    let items = AssembleContextCapability::assemble_context(
+    let items = AssembleContextCapability::assemble_context_from_service(
         &service,
         AssembleContextRequest {
             query: "deployment window thursday".into(),

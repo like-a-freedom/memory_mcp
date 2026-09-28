@@ -5,7 +5,7 @@ use std::path::PathBuf;
 
 use super::constants::*;
 use super::helpers::parse_env;
-use crate::service::MemoryError;
+use crate::error::MemoryError;
 
 /// Exact selector for `VAGOsolutions/SauerkrautLM-LFM2.5-GLiNER`.
 pub const SELECTOR_SAUKRAUT_LFM25: &str = "VAGOsolutions/SauerkrautLM-LFM2.5-GLiNER";
@@ -177,7 +177,7 @@ fn parse_nonzero_usize(var_name: &str, default: usize) -> Result<usize, MemoryEr
 /// [`MemoryError::ConfigInvalid`] instead of silently falling back.
 pub fn entity_fuzzy_threshold() -> Result<f64, MemoryError> {
     let value = parse_env::<f64>("ENTITY_FUZZY_THRESHOLD")?
-        .unwrap_or(crate::service::entity_resolution::DEFAULT_FUZZY_THRESHOLD);
+        .unwrap_or(crate::knowledge::entity_resolution::DEFAULT_FUZZY_THRESHOLD);
     if !value.is_finite() || !(0.0..=1.0).contains(&value) {
         return Err(MemoryError::ConfigInvalid(
             "ENTITY_FUZZY_THRESHOLD must be a finite number in 0.0..=1.0".to_string(),

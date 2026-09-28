@@ -4,9 +4,9 @@ use std::time::Instant;
 
 use serde_json::json;
 
+use crate::error::MemoryError;
 use crate::logging::LogLevel;
 use crate::models::{AccessPayload, EntityCandidate};
-use crate::service::MemoryError;
 use crate::tools::context::{ToolContext, ToolEvent};
 use crate::tools::params::ResolveParams;
 use crate::tools::request_id::next_request_id;

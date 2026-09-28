@@ -1,6 +1,6 @@
 use criterion::{Criterion, criterion_group, criterion_main};
-use memory_mcp::service::capabilities::assemble_context::AssembleContextCapability;
-use memory_mcp::service::capabilities::extract::ExtractCapability;
+use memory_mcp::service::memory_container_shims::memory_capabilities_assemble_context::AssembleContextCapability;
+use memory_mcp::service::memory_container_shims::memory_capabilities_extract::ExtractCapability;
 
 fn bench_ingest(c: &mut Criterion) {
     let rt = tokio::runtime::Runtime::new().unwrap();
@@ -39,7 +39,7 @@ fn bench_extract(c: &mut Criterion) {
             },
             |(service, episode_id)| {
                 rt.block_on(async {
-                    ExtractCapability::extract(&service, &episode_id, None, None)
+                    ExtractCapability::extract_from_service(&service, &episode_id, None, None)
                         .await
                         .unwrap();
                 });
@@ -66,7 +66,7 @@ fn bench_retrieval(c: &mut Criterion) {
                     )
                     .await;
                 }
-                AssembleContextCapability::assemble_context(
+                AssembleContextCapability::assemble_context_from_service(
                     &service,
                     memory_mcp::models::AssembleContextRequest {
                         query: "project status".into(),

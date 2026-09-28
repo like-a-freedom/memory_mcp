@@ -7,7 +7,7 @@ use serde_json::json;
 
 use super::constants::*;
 use super::helpers::{parse_bool_env, parse_env};
-use crate::service::MemoryError;
+use crate::error::MemoryError;
 
 /// Supported embedding provider kinds.
 #[derive(Debug, Clone, PartialEq, Eq)]

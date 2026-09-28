@@ -17,7 +17,7 @@ use super::reembed_options::{ReembedOptions, ReembedOutcome};
 use super::reembed_progress::ReembedProgressReporter;
 use super::{MemoryError, MemoryService};
 use crate::logging::LogLevel;
-use crate::service::value_helpers::{json_i64, json_string};
+use crate::storage::value_helpers::{json_i64, json_string};
 
 const REEMBED_JOB_ID: &str = "embedding_job:fact_reembed";
 const REEMBED_BATCH_SIZE: i32 = 100;
@@ -73,7 +73,7 @@ impl MemoryService {
     /// The DDL and its idempotency rule live in [`ReembedStoreClient`];
     /// this method only orchestrates logging around the call.
     async fn remove_embedding_index(&self, namespace: &str) -> Result<(), MemoryError> {
-        use crate::storage::{EMBEDDING_INDEX_NAME, IndexRemoval};
+        use crate::embedding::reembed_store::{EMBEDDING_INDEX_NAME, IndexRemoval};
         self.logger.log(
             std::collections::HashMap::from([
                 ("op".to_string(), json!("reembed.index_drop_start")),
@@ -128,7 +128,7 @@ impl MemoryService {
         namespace: &str,
         dimension: usize,
     ) -> Result<(), MemoryError> {
-        use crate::storage::EMBEDDING_INDEX_NAME;
+        use crate::embedding::reembed_store::EMBEDDING_INDEX_NAME;
         self.logger.log(
             std::collections::HashMap::from([
                 ("op".to_string(), json!("reembed.index_create_start")),
@@ -840,7 +840,9 @@ impl MemoryService {
             .ok_or_else(|| MemoryError::Validation("missing quote".to_string()))?;
 
         let embedding_input =
-            super::fact::FactService::build_fact_embedding_input(fact_type, content, quote);
+            crate::knowledge::fact_service::FactService::build_fact_embedding_input(
+                fact_type, content, quote,
+            );
         let embedding = self
             .embedding_service()
             .generate_embedding(&embedding_input)
@@ -884,7 +886,7 @@ impl MemoryService {
         active_signature: Option<&str>,
         last_job_id: Option<&str>,
     ) -> Result<(), MemoryError> {
-        use crate::storage::EmbeddingStateStatus;
+        use crate::embedding::state_store::EmbeddingStateStatus;
 
         let status = match status {
             "ready" => EmbeddingStateStatus::Ready,
@@ -898,7 +900,7 @@ impl MemoryService {
             }
         };
         let embedding_state = self.embedding_runtime_snapshot();
-        crate::storage::EmbeddingStateStoreClient::new(
+        crate::embedding::state_store::EmbeddingStateStoreClient::new(
             self.db_client.clone(),
             self.active_namespace.clone(),
         )
@@ -1096,10 +1098,11 @@ mod tests {
     use std::sync::atomic::{AtomicUsize, Ordering};
 
     use async_trait::async_trait;
+
+    use super::super::{EmbeddingProvider, MemoryError, MemoryService, normalize_dt};
     use chrono::Utc;
     use serde_json::json;
 
-    use super::super::{EmbeddingProvider, MemoryError, MemoryService, normalize_dt};
     use crate::config::{DEFAULT_EMBEDDING_DIMENSION, DEFAULT_EMBEDDING_SIMILARITY_THRESHOLD};
     use crate::service::reembed_options::ReembedOptions;
     use crate::service::reembed_options::ReembedOutcome;
@@ -1252,7 +1255,7 @@ mod tests {
         .expect("service should build");
         let provider = service.embedding_runtime_snapshot().provider;
         service.replace_embedding_runtime_state(
-            crate::service::embedding_runtime::EmbeddingRuntimeState::new(
+            crate::embedding::runtime::EmbeddingRuntimeState::new(
                 provider,
                 Some("embsig:new".to_string()),
                 Some("test-model".to_string()),
@@ -2259,7 +2262,7 @@ mod tests {
 
     #[tokio::test]
     async fn reembed_nothing_to_do_restores_semantic_readiness() {
-        use crate::storage::embedding_state_store::EMBEDDING_STATE_RECORD_ID;
+        use crate::embedding::state_store::EMBEDDING_STATE_RECORD_ID;
 
         let db = make_in_memory_db(&["org"]).await;
         seed_fact_with_embedding(
@@ -2317,7 +2320,7 @@ mod tests {
         assert_eq!(state.get("status"), Some(&json!("ready")));
         assert_eq!(state.get("active_signature"), Some(&json!("embsig:new")));
 
-        let matches = crate::storage::KnowledgeStoreClient::new(db.clone(), "org")
+        let matches = crate::knowledge::KnowledgeStoreClient::new(db.clone(), "org")
             .select_facts_ann(
                 &normalize_dt(Utc::now()),
                 &vec![1.0; DEFAULT_EMBEDDING_DIMENSION],

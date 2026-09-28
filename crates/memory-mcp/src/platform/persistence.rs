@@ -5,5 +5,7 @@
 //! nothing about facts, episodes or sessions. Which *table* a query
 //! touches is an owner decision and lives in that owner's store.
 
+pub mod control;
 pub mod db_errors;
+pub mod outbox;
 pub mod transactions;

@@ -11,7 +11,9 @@ use std::time::Duration;
 use serde::Deserialize;
 
 use crate::error::MemoryError;
+
 use crate::http::registry::models::PlanLimits;
+pub use crate::models::auth::{AUTH_METHOD_LOCAL, AUTH_METHOD_OIDC, BrowserAuthMethod};
 
 use super::parse::{
     DEFAULT_BIND, DEFAULT_BODY_LIMIT_BYTES, DEFAULT_GLOBAL_REQUEST_LIMIT,
@@ -28,54 +30,6 @@ pub use crate::config::SurrealTargetConfig;
 /// Substituted for a secret field by a hand-written `Debug` (plan Task 1:
 /// "Redact Debug of config and keys").
 const REDACTED: &str = "<redacted>";
-
-/// One browser authentication method (ADR-0057). A deployment enables a **set**
-/// of these rather than choosing one, and each enabled method mounts its own
-/// routes.
-#[derive(Debug, Clone, Copy, Deserialize, PartialEq, Eq)]
-#[serde(rename_all = "snake_case")]
-pub enum BrowserAuthMethod {
-    Local,
-    Oidc,
-}
-
-impl BrowserAuthMethod {
-    /// Every method a deployment can serve. The set is closed: adding one
-    /// touches the durable schema, the router, the login page and the removal
-    /// guard, which is why the guard may name the tokens individually.
-    pub const ALL: [Self; 2] = [Self::Local, Self::Oidc];
-
-    /// The durable token for this method, as stored in `browser_auth_policy`.
-    pub const fn as_str(self) -> &'static str {
-        match self {
-            Self::Local => AUTH_METHOD_LOCAL,
-            Self::Oidc => AUTH_METHOD_OIDC,
-        }
-    }
-
-    /// Parse a durable token, or `None` for an unknown method so the caller can
-    /// fail closed with its own error type.
-    pub fn parse(token: &str) -> Option<Self> {
-        match token {
-            AUTH_METHOD_LOCAL => Some(Self::Local),
-            AUTH_METHOD_OIDC => Some(Self::Oidc),
-            _ => None,
-        }
-    }
-
-    /// The enabled methods in the canonical order every representation uses:
-    /// `local` before `oidc`.
-    ///
-    /// A set has one representation however it was enumerated, which is what
-    /// lets the durable row, the configuration and the login page be compared
-    /// as values instead of as sets.
-    pub fn canonical_set(desired: &[Self]) -> Vec<Self> {
-        Self::ALL
-            .into_iter()
-            .filter(|method| desired.contains(method))
-            .collect()
-    }
-}
 
 /// The browser authentication methods this deployment enables, each with the
 /// configuration it needs (ADR-0057). `None` on `HttpConfig` when the control
@@ -402,12 +356,6 @@ fn build_local_browser_config(
         default_plan_limits,
     })
 }
-
-/// The two method tokens `MEMORY_MCP_HTTP_AUTH_METHODS` accepts, shared by the
-/// parser, the validator and the durable policy so no caller re-types the
-/// literal.
-pub const AUTH_METHOD_LOCAL: &str = "local";
-pub const AUTH_METHOD_OIDC: &str = "oidc";
 
 impl HttpConfig {
     /// Loads the HTTP config from process environment variables.

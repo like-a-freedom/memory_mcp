@@ -9,22 +9,19 @@ pub mod extract;
 pub mod ingest;
 pub mod init;
 pub mod invalidate;
-pub mod lifecycle;
-pub mod lifecycle_capture;
-pub mod lifecycle_recall;
 pub mod resolve;
 
 #[cfg(all(feature = "streamable-http", feature = "control-plane"))]
 pub mod admin;
 
+pub use crate::service::cli::lifecycle::run as run_lifecycle;
+pub use crate::service::cli::lifecycle_capture::run as run_lifecycle_capture;
+pub use crate::service::cli::lifecycle_recall::run as run_lifecycle_recall;
 pub use assemble_context::run as run_assemble_context;
 pub use explain::run as run_explain;
 pub use extract::run as run_extract;
 pub use ingest::run as run_ingest;
 pub use invalidate::run as run_invalidate;
-pub use lifecycle::run as run_lifecycle;
-pub use lifecycle_capture::run as run_lifecycle_capture;
-pub use lifecycle_recall::run as run_lifecycle_recall;
 pub use resolve::run as run_resolve;
 
 #[cfg(all(feature = "streamable-http", feature = "control-plane"))]

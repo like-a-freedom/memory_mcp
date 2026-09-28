@@ -3,7 +3,8 @@
 use std::sync::Arc;
 
 use chrono::{TimeZone, Utc};
-use memory_mcp::service::{normalize_dt, run_community_rebuild_pass};
+use memory_mcp::platform::lifecycle_runtime::run_community_rebuild_pass;
+use memory_mcp::service::normalize_dt;
 use memory_mcp::storage::DbClient;
 use serde_json::json;
 
@@ -18,7 +19,7 @@ async fn seed_edge(
     to_id: &str,
     t_valid: chrono::DateTime<Utc>,
 ) {
-    memory_mcp::storage::EpisodeStoreClient::new(db_client.clone(), namespace)
+    memory_mcp::knowledge::KnowledgeGraphStore::new(db_client.clone(), namespace)
         .relate_edge(
             edge_id,
             from_id,

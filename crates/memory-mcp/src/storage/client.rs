@@ -16,8 +16,8 @@ use surrealdb::opt::auth::Root;
 use surrealdb::types::Value as SurrealValue;
 
 use crate::config::{StorageBackend, SurrealConfig};
+use crate::error::MemoryError;
 use crate::logging::{LogLevel, StdoutLogger};
-use crate::service::MemoryError;
 
 use super::helpers::{
     ensure_dir_exists, extract_first_record, extract_records, find_version_in_json,
@@ -102,7 +102,7 @@ pub struct BoundDbClient {
     /// in; stdio builds carry the default [`NoFaults`] and never
     /// touch the outbox commit path.
     #[cfg(feature = "streamable-http")]
-    pub fault_injector: Arc<dyn crate::http::fault_injection::FaultInjector>,
+    pub fault_injector: Arc<dyn crate::platform::fault_injection::FaultInjector>,
 }
 
 impl BoundDbClient {
@@ -112,7 +112,7 @@ impl BoundDbClient {
             db,
             namespace: namespace.into(),
             #[cfg(feature = "streamable-http")]
-            fault_injector: Arc::new(crate::http::fault_injection::NoFaults),
+            fault_injector: Arc::new(crate::platform::fault_injection::NoFaults),
         }
     }
 
@@ -124,7 +124,7 @@ impl BoundDbClient {
     #[cfg(feature = "streamable-http")]
     pub fn set_fault_injector(
         &mut self,
-        injector: Arc<dyn crate::http::fault_injection::FaultInjector>,
+        injector: Arc<dyn crate::platform::fault_injection::FaultInjector>,
     ) {
         self.fault_injector = injector;
     }
@@ -555,9 +555,8 @@ impl SurrealDbClient {
         let result = crate::platform::persistence::transactions::with_db_retry(
             "execute_query",
             &self.logger,
-            || {
-            self.execute_sql_with_timing(sql, vars_for_retry.clone(), namespace)
-        })
+            || self.execute_sql_with_timing(sql, vars_for_retry.clone(), namespace),
+        )
         .await;
 
         match result {
@@ -617,9 +616,8 @@ impl SurrealDbClient {
         let result = crate::platform::persistence::transactions::with_db_retry(
             "execute_raw_query",
             &self.logger,
-            || {
-            self.execute_sql_void_with_timing(sql, vars_for_retry.clone(), namespace)
-        })
+            || self.execute_sql_void_with_timing(sql, vars_for_retry.clone(), namespace),
+        )
         .await;
 
         match result {
@@ -1397,5 +1395,4 @@ mod tests {
             .expect("fact exists");
         assert!(fact.get("scope").is_none());
     }
-
 }

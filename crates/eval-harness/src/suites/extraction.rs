@@ -4,8 +4,8 @@ use std::path::PathBuf;
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};
 use memory_mcp::models::{ContradictionWarning, IngestRequest};
-use memory_mcp::service::capabilities::extract::ExtractCapability;
-use memory_mcp::service::capabilities::ingest::IngestCapability;
+use memory_mcp::service::memory_container_shims::memory_capabilities_extract::ExtractCapability;
+use memory_mcp::service::memory_container_shims::memory_capabilities_ingest::IngestCapability;
 use serde::Deserialize;
 
 use crate::domain::*;
@@ -74,8 +74,8 @@ async fn ingest_and_extract(
     source_id: &str,
     content: &str,
 ) -> Result<memory_mcp::models::ExtractResult, memory_mcp::MemoryError> {
-    let episode_id = IngestCapability::ingest(
-        &service,
+    let episode_id = IngestCapability::ingest_from_service(
+        service,
         IngestRequest {
             source_type: source_type.to_string(),
             source_id: source_id.to_string(),
@@ -90,7 +90,7 @@ async fn ingest_and_extract(
     )
     .await?;
 
-    ExtractCapability::extract(&service, &episode_id, None, None).await
+    ExtractCapability::extract_from_service(service, &episode_id, None, None).await
 }
 
 struct CaseResult {

@@ -122,7 +122,7 @@ pub fn facts_for_case(case: &ExternalCase) -> Vec<CanonicalFact> {
 mod tests {
     use super::*;
     use crate::corpus::adapters::{RetrievalExpectation, SeedFact};
-    use memory_mcp::service::capabilities::assemble_context::AssembleContextCapability;
+    use memory_mcp::service::memory_container_shims::memory_capabilities_assemble_context::AssembleContextCapability;
 
     fn test_case() -> ExternalCase {
         ExternalCase {
@@ -239,7 +239,7 @@ mod tests {
         }];
         import_canonical_facts(&service, &facts).await.unwrap();
 
-        let items = AssembleContextCapability::assemble_context(
+        let items = AssembleContextCapability::assemble_context_from_service(
             &service,
             memory_mcp::models::AssembleContextRequest {
                 query: "Alice Orbital".into(),

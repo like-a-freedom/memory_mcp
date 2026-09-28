@@ -3,7 +3,7 @@ use std::str::FromStr;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-use crate::service::MemoryError;
+use crate::error::MemoryError;
 
 macro_rules! define_id_type {
     ($name:ident, $doc:expr) => {

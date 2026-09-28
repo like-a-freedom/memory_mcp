@@ -14,7 +14,7 @@ use std::sync::Mutex;
 use async_trait::async_trait;
 use serde_json::Value;
 
-use crate::service::MemoryError;
+use crate::error::MemoryError;
 use crate::storage::DbClient;
 
 type SelectOneFn = dyn Fn(&str) -> Result<Option<Value>, MemoryError> + Send + Sync;

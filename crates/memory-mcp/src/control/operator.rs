@@ -10,6 +10,8 @@
 
 use std::sync::Arc;
 
+use crate::platform::persistence::control::AccountDeletionTx;
+
 #[cfg(any(test, feature = "test-fixtures"))]
 use axum::http::StatusCode;
 #[cfg(any(test, feature = "test-fixtures"))]
@@ -198,6 +200,7 @@ pub async fn purge_tenant(
 ) -> Result<axum::http::StatusCode, super::error::ApiError> {
     operator.require_recent_auth()?;
     let store = state.registry.store_clone();
+    let tx: Arc<dyn AccountDeletionTx> = Arc::new(store.clone()) as Arc<dyn AccountDeletionTx>;
     let tenant = store
         .find_tenant_by_id(&tenant_id)
         .await?
@@ -205,8 +208,7 @@ pub async fn purge_tenant(
     if tenant.status == crate::http::registry::models::TenantStatus::Purged {
         return Ok(axum::http::StatusCode::NO_CONTENT);
     }
-    store
-        .begin_operator_deletion(&tenant.id, "operator", chrono::Utc::now())
+    tx.begin_operator_deletion(&tenant.id, "operator", chrono::Utc::now())
         .await?;
     Ok(axum::http::StatusCode::ACCEPTED)
 }

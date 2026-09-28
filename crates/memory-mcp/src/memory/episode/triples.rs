@@ -1,0 +1,72 @@
+//! Fire-and-forget triple extraction spawned after fact creation.
+//!
+//! Colocates triple-extraction logic with the rest of the episode module.
+//! The `triple_extraction_semaphore` stays on the service container as
+//! shared infrastructure bounding concurrency.
+
+use serde_json::json;
+
+use crate::logging::LogLevel;
+use crate::memory::capabilities::deps::ExtractDeps;
+
+/// Spawn a bounded fire-and-forget triple extraction task.
+///
+/// Uses the `triple_extraction_semaphore` on the service container to limit
+/// concurrent extraction tasks to
+/// [`TRIPLE_EXTRACTION_MAX_CONCURRENCY`](crate::service::TRIPLE_EXTRACTION_MAX_CONCURRENCY).
+/// If the limit is reached, the task is skipped with a warning log
+/// (best-effort backpressure).
+pub(crate) fn spawn_triple_extraction(service: &ExtractDeps, fact_id: &str, content: &str) {
+    let permit = match service
+        .triple_extraction_semaphore
+        .clone()
+        .try_acquire_owned()
+    {
+        Ok(permit) => permit,
+        Err(_) => {
+            service.logger.log(
+                std::collections::HashMap::from([
+                    (
+                        "op".to_string(),
+                        json!("triple_extraction.skipped_concurrency_limit"),
+                    ),
+                    ("fact_id".to_string(), json!(fact_id)),
+                ]),
+                LogLevel::Warn,
+            );
+            return;
+        }
+    };
+
+    let extractor = service.triple_extractor.clone();
+    let fact_id = fact_id.to_string();
+    let content = content.to_string();
+    let triple_store = service.triple_store();
+
+    tokio::spawn(async move {
+        // Hold the permit for the duration of the task.
+        let _permit = permit;
+
+        if let Ok(triples) = extractor.extract(&content, &fact_id).await {
+            for triple in &triples {
+                let _ = triple_store
+                    .create_triple(
+                        &triple.subject,
+                        &triple.predicate,
+                        &triple.object,
+                        triple.confidence,
+                        &triple.source_fact_id,
+                    )
+                    .await;
+
+                if crate::shared::triple_extractor::is_singleton_predicate(&triple.predicate) {
+                    let _ = crate::knowledge::conflict_resolver::resolve_conflicts_for_triple(
+                        &triple_store,
+                        triple,
+                    )
+                    .await;
+                }
+            }
+        }
+    });
+}

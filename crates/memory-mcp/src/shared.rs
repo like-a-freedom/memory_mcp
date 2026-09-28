@@ -15,4 +15,14 @@
 //! value semantic.
 
 pub mod error;
+pub mod ids;
+pub mod search;
+pub mod search_lexical;
 pub mod temporal;
+pub mod triple_extractor;
+pub mod validation;
+
+// No root re-exports: every call site names the module it needs
+// (`shared::ids::deterministic_fact_id`, `shared::search::normalize_text`,
+// `shared::validation::validate_fact_input`). A facade here would be a
+// second path to the same item with no owner and no user.

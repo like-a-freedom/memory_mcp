@@ -13,7 +13,7 @@ pub mod integration;
 #[cfg(feature = "control-plane")]
 pub async fn run_deletion_recovery_pass(
     registry: crate::http::registry::RegistryHandle,
-    fault_injector: Arc<dyn crate::http::fault_injection::FaultInjector>,
+    fault_injector: Arc<dyn crate::platform::fault_injection::FaultInjector>,
 ) -> Result<(), crate::MemoryError> {
     let adapter = integration::legacy_registry_operations::LegacyDeletionRecoveryAdapter::new(
         registry,
@@ -25,7 +25,7 @@ pub async fn run_deletion_recovery_pass(
 #[cfg(feature = "control-plane")]
 pub fn provisioning_scheduler_hooks(
     migrations: Arc<dyn crate::http::leases::migration::ApplyMigrations>,
-    fault_injector: Arc<dyn crate::http::fault_injection::FaultInjector>,
+    fault_injector: Arc<dyn crate::platform::fault_injection::FaultInjector>,
 ) -> Result<crate::http::leases::scheduler::SchedulerHooks, crate::MemoryError> {
     let hooks = crate::http::leases::scheduler::SchedulerHooks::with_provisioning_only(
         migrations,

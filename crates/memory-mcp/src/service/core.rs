@@ -10,31 +10,39 @@ use crate::logging::LogLevel;
 use crate::error::MemoryError;
 
 mod builder;
-mod helpers;
+use crate::platform::log_event::log_event;
 pub use builder::MemoryService;
-pub(crate) use helpers::*;
 
 impl MemoryService {
-    /// The knowledge-owned graph store: entities, communities and
-    /// edges.
-    pub(crate) fn knowledge_graph_store(&self) -> crate::storage::KnowledgeGraphStore {
-        crate::storage::KnowledgeGraphStore::new(
-            self.db_client.clone(),
-            self.active_namespace.clone(),
-        )
+    /// The database client, for callers that own their own query.
+    ///
+    /// The diff command lives in knowledge but is reached from the
+    /// transport, which holds the service; this is the narrow handoff
+    /// that lets knowledge own the query without the transport
+    /// reaching into the container's fields.
+    pub fn db_client_for_port(&self) -> Arc<dyn crate::storage::DbClient> {
+        self.db_client.clone()
     }
 
-    /// The memory-owned fact access log: retrieval heat.
-    pub(crate) fn fact_access_store(&self) -> crate::storage::FactAccessStore {
-        crate::storage::FactAccessStore::new(
+    /// The bound Active Namespace, for the same handoff.
+    pub fn namespace_for_port(&self) -> String {
+        self.active_namespace.clone()
+    }
+
+    /// The knowledge-owned graph store: entities, communities and
+    /// edges.
+    pub(crate) fn knowledge_graph_store(
+        &self,
+    ) -> crate::knowledge::graph_store::KnowledgeGraphStore {
+        crate::knowledge::graph_store::KnowledgeGraphStore::new(
             self.db_client.clone(),
             self.active_namespace.clone(),
         )
     }
 
     /// Read-side store for the batch reembed worker.
-    pub(crate) fn reembed_store(&self) -> crate::storage::ReembedStoreClient {
-        crate::storage::ReembedStoreClient::new(
+    pub(crate) fn reembed_store(&self) -> crate::embedding::reembed_store::ReembedStoreClient {
+        crate::embedding::reembed_store::ReembedStoreClient::new(
             self.db_client.clone(),
             self.active_namespace.clone(),
         )
@@ -51,7 +59,7 @@ impl MemoryService {
 
     pub(crate) fn embedding_runtime_snapshot(
         &self,
-    ) -> crate::service::embedding_runtime::EmbeddingRuntimeState {
+    ) -> crate::embedding::runtime::EmbeddingRuntimeState {
         self.embedding_runtime_state
             .read()
             .unwrap_or_else(std::sync::PoisonError::into_inner)
@@ -60,7 +68,7 @@ impl MemoryService {
 
     pub(crate) fn replace_embedding_runtime_state(
         &self,
-        state: crate::service::embedding_runtime::EmbeddingRuntimeState,
+        state: crate::embedding::runtime::EmbeddingRuntimeState,
     ) {
         *self
             .embedding_runtime_state
@@ -69,8 +77,8 @@ impl MemoryService {
     }
 
     /// Episode-domain store.
-    pub(crate) fn episode_store(&self) -> crate::storage::EpisodeStoreClient {
-        crate::storage::EpisodeStoreClient::new(
+    pub(crate) fn episode_store(&self) -> crate::memory::episode_store::EpisodeStoreClient {
+        crate::memory::episode_store::EpisodeStoreClient::new(
             self.db_client.clone(),
             self.active_namespace.clone(),
         )
@@ -81,9 +89,9 @@ impl MemoryService {
     /// The provider, signature and dimension are read from the live
     /// runtime snapshot, so a runtime that swapped its target is
     /// reflected without rebuilding the service.
-    pub(crate) fn embedding_service(&self) -> super::embedding_service::EmbeddingService {
+    pub(crate) fn embedding_service(&self) -> crate::embedding::service::EmbeddingService {
         let state = self.embedding_runtime_snapshot();
-        super::embedding_service::EmbeddingService::new(
+        crate::embedding::service::EmbeddingService::new(
             self.db_client.clone(),
             self.active_namespace.clone(),
             self.logger.clone(),
@@ -101,7 +109,7 @@ impl MemoryService {
     /// The claim store behind the claim service. Present whenever the
     /// claim pipeline is wired, which is the condition the
     /// invalidation use case checks before closing derived claims.
-    pub(crate) fn claim_store(&self) -> Option<Arc<dyn crate::storage::claims::ClaimStore>> {
+    pub(crate) fn claim_store(&self) -> Option<Arc<dyn crate::knowledge::claims::ClaimStore>> {
         Some(self.claim_service.store.clone())
     }
 
@@ -163,7 +171,7 @@ impl MemoryService {
         policy_tags: Vec<String>,
         provenance: crate::models::Provenance,
     ) -> Result<String, MemoryError> {
-        let deps = crate::service::capabilities::deps::ExtractDeps::from(self);
+        let deps = crate::memory::capabilities::deps::ExtractDeps::from(self);
         self.fact_service
             .add_fact(
                 &deps,
@@ -181,8 +189,10 @@ impl MemoryService {
     }
 
     /// Start claim reconciliation workers and schedule backfill.
-    pub(crate) async fn start_claim_workers(&self) -> super::claims::worker::ClaimWorkerRuntime {
-        let runtime = super::claims::worker::ClaimWorkerRuntime::new();
+    pub(crate) async fn start_claim_workers(
+        &self,
+    ) -> crate::knowledge::claims_policy::worker::ClaimWorkerRuntime {
+        let runtime = crate::knowledge::claims_policy::worker::ClaimWorkerRuntime::new();
         let worker_id = format!("claim-worker-{}", std::process::id());
         runtime
             .spawn_worker(self.claim_service.clone(), worker_id)
@@ -206,9 +216,9 @@ impl MemoryService {
     /// no-op when no lifecycle events have been captured.
     pub(crate) async fn start_lifecycle_worker(
         &self,
-    ) -> super::agent_memory::worker::LifecycleWorkerRuntime {
-        let runtime = super::agent_memory::worker::LifecycleWorkerRuntime::new();
-        let poll_interval = super::agent_memory::worker::empty_poll_interval().as_secs();
+    ) -> crate::service::agent_memory::worker::LifecycleWorkerRuntime {
+        let runtime = crate::service::agent_memory::worker::LifecycleWorkerRuntime::new();
+        let poll_interval = crate::service::agent_memory::worker::empty_poll_interval().as_secs();
         runtime.spawn(self.clone(), poll_interval).await;
         runtime
     }
@@ -247,7 +257,7 @@ impl MemoryService {
     ) -> Option<super::model_artifact_refresh::NerArtifactRefreshRuntime> {
         let config = self.ner_artifact_refresh_config.clone()?;
         let native = self.ner_artifact_refresh_native.clone()?;
-        let spec = super::entity_extraction::gliner::CLASSIC_GLINER_SPEC.clone();
+        let spec = crate::knowledge::entity_extraction::gliner::CLASSIC_GLINER_SPEC.clone();
         Some(
             super::model_artifact_refresh::NerArtifactRefreshRuntime::start(
                 config,
@@ -275,7 +285,9 @@ impl MemoryService {
 
     /// Build a `LifecycleCapture` wired to the production storage and ingestion
     /// backends. Returns `None` if lifecycle integration is not enabled.
-    pub fn lifecycle_capture(&self) -> Option<super::agent_memory::capture::LifecycleCapture> {
+    pub fn lifecycle_capture(
+        &self,
+    ) -> Option<crate::memory::agent_memory::capture::LifecycleCapture> {
         if !self.lifecycle_config.enabled {
             return None;
         }
@@ -285,9 +297,11 @@ impl MemoryService {
         ));
         let ingestion = std::sync::Arc::new(self.ingestion_service.clone());
         let backend = std::sync::Arc::new(
-            super::agent_memory::capture::ProductionCaptureBackend::new(store, ingestion),
+            crate::memory::agent_memory::capture::ProductionCaptureBackend::new(store, ingestion),
         );
-        Some(super::agent_memory::capture::LifecycleCapture::new(backend))
+        Some(crate::memory::agent_memory::capture::LifecycleCapture::new(
+            backend,
+        ))
     }
 
     /// Capture a lifecycle event through the internal selective-capture path.
@@ -300,11 +314,12 @@ impl MemoryService {
         &self,
         event: &crate::models::NormalizedHostEvent,
         context: &crate::models::InvocationContext,
-    ) -> Result<Option<super::agent_memory::capture::LifecycleCaptureResult>, MemoryError> {
+    ) -> Result<Option<crate::memory::agent_memory::capture::LifecycleCaptureResult>, MemoryError>
+    {
         let Some(capture) = self.lifecycle_capture() else {
             return Ok(None);
         };
-        let budget = super::agent_memory::capture::default_capture_budget();
+        let budget = crate::memory::agent_memory::capture::default_capture_budget();
         let result = capture
             .execute(event, context, &budget, 16 * 1024, 16)
             .await?;
@@ -316,12 +331,12 @@ impl MemoryService {
     /// Returns `None` if lifecycle integration is not enabled. The orchestrator
     /// delegates to the existing `assemble_context` pipeline via the
     /// `RecallPipeline` trait.
-    pub fn lifecycle_recall(&self) -> Option<super::agent_memory::recall::LifecycleRecall> {
+    pub fn lifecycle_recall(&self) -> Option<crate::memory::agent_memory::recall::LifecycleRecall> {
         if !self.lifecycle_config.enabled {
             return None;
         }
         Some(
-            super::agent_memory::recall::LifecycleRecall::with_trace_registry(
+            crate::memory::agent_memory::recall::LifecycleRecall::with_trace_registry(
                 self.trace_registry.clone(),
             ),
         )
@@ -337,7 +352,8 @@ impl MemoryService {
         &self,
         event: &crate::models::NormalizedHostEvent,
         context: &crate::models::InvocationContext,
-    ) -> Result<Option<super::agent_memory::recall::LifecycleRecallResult>, MemoryError> {
+    ) -> Result<Option<crate::memory::agent_memory::recall::LifecycleRecallResult>, MemoryError>
+    {
         let Some(recall) = self.lifecycle_recall() else {
             return Ok(None);
         };
@@ -366,7 +382,7 @@ impl MemoryService {
         episode_id: &str,
     ) -> Result<crate::storage::RecordLookup, MemoryError> {
         crate::storage::owner_scoped_read(
-            crate::storage::EpisodeStoreClient::new(
+            crate::memory::episode_store::EpisodeStoreClient::new(
                 self.db_client.clone(),
                 self.active_namespace.clone(),
             )
@@ -381,7 +397,7 @@ impl MemoryService {
         fact_id: &str,
     ) -> Result<crate::storage::RecordLookup, MemoryError> {
         crate::storage::owner_scoped_read(
-            crate::storage::FactStoreClient::new(
+            crate::knowledge::FactStoreClient::new(
                 self.db_client.clone(),
                 self.active_namespace.clone(),
             )
@@ -402,12 +418,12 @@ pub(crate) struct ProductionRecallPipeline<'a> {
 }
 
 #[async_trait::async_trait]
-impl<'a> super::agent_memory::recall::RecallPipeline for ProductionRecallPipeline<'a> {
+impl<'a> crate::memory::agent_memory::recall::RecallPipeline for ProductionRecallPipeline<'a> {
     async fn assemble(
         &self,
         request: crate::models::AssembleContextRequest,
     ) -> Result<Vec<crate::models::AssembledContextItem>, MemoryError> {
-        super::capabilities::assemble_context::AssembleContextCapability::assemble_context(
+        crate::service::memory_container_shims::memory_capabilities_assemble_context::AssembleContextCapability::assemble_context_from_service(
             self.service,
             request,
         )
@@ -422,9 +438,9 @@ impl<'a> super::agent_memory::recall::RecallPipeline for ProductionRecallPipelin
 mod tests {
     use super::*;
     use crate::config::DEFAULT_EMBEDDING_DIMENSION;
+    use crate::embedding::runtime::EmbeddingRuntimeState;
     use crate::models::{AccessPayload, Provenance};
     use crate::service::EmbeddingProvider;
-    use crate::service::embedding_runtime::EmbeddingRuntimeState;
     use crate::storage::{DbClient, SurrealDbClient};
     use async_trait::async_trait;
     use serde_json::json;
@@ -478,7 +494,7 @@ mod tests {
             transport: Some("http".to_string()),
             content_type: Some("application/json".to_string()),
         };
-        let serialized = serialize_access(&access);
+        let serialized = crate::platform::log_event::serialize_access(&access);
         assert!(serialized.get("caller_id").is_some());
         assert!(serialized.get("allowed_tags").is_some());
         assert!(serialized.get("session_vars").is_some());
@@ -497,7 +513,7 @@ mod tests {
         // Simulate what build_fact_embedding_input produces for a very long
         // fact, then verify the truncation would apply.
         let long_content = "x".repeat(60_000);
-        let full_input = crate::service::fact::FactService::build_fact_embedding_input(
+        let full_input = crate::knowledge::fact_service::FactService::build_fact_embedding_input(
             "note",
             &long_content,
             &long_content,
@@ -534,16 +550,8 @@ mod tests {
         ));
 
         let embedding = service.embedding_service();
-        assert_eq!(
-            embedding
-                .embedding_provider()
-                .provider_name(),
-            "test"
-        );
-        assert_eq!(
-            embedding.current_embedding_signature(),
-            Some("embsig:test")
-        );
+        assert_eq!(embedding.embedding_provider().provider_name(), "test");
+        assert_eq!(embedding.current_embedding_signature(), Some("embsig:test"));
         assert_eq!(
             embedding.current_embedding_dimension(),
             Some(DEFAULT_EMBEDDING_DIMENSION)
@@ -876,7 +884,7 @@ mod tests {
 
     #[test]
     fn log_args_with_duration_adds_duration_ms_field() {
-        let args = log_args_with_duration(
+        let args = crate::platform::log_event::log_args_with_duration(
             json!({"scope": "org"}),
             std::time::Duration::from_millis(42),
         );
@@ -887,7 +895,7 @@ mod tests {
 
     #[test]
     fn build_embedding_log_result_reports_generated_count_and_dimension() {
-        let result = build_embedding_log_result(1, Some(384));
+        let result = crate::platform::log_event::build_embedding_log_result(1, Some(384));
 
         assert_eq!(
             result.get("generated_embeddings").and_then(Value::as_u64),
@@ -905,7 +913,7 @@ mod tests {
             transport: None,
             content_type: None,
         };
-        let serialized = serialize_access(&access);
+        let serialized = crate::platform::log_event::serialize_access(&access);
         assert!(serialized.get("caller_id").is_some());
         assert!(serialized.get("allowed_tags").is_some());
         assert!(serialized.get("session_vars").is_some());

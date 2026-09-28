@@ -4,7 +4,6 @@
 pub mod app_sessions;
 pub mod composition;
 pub mod config;
-pub mod fault_injection;
 pub mod health;
 pub mod leases;
 pub mod logging;
@@ -324,9 +323,7 @@ impl HttpState {
         };
         #[cfg(feature = "control-plane")]
         let identity_transactions = Arc::new(
-            crate::bootstrap::integration::legacy_registry_identity::RegistryIdentityLinkTransactions::new(
-                registry.store_clone(),
-            ),
+            crate::bootstrap::integration::legacy_registry_identity::RegistryIdentityLinkTransactions::from_registry(registry.store_clone()),
         );
         let identity_link_transactions: Arc<dyn crate::identity::api::IdentityLinkTransactions> =
             identity_transactions.clone();
@@ -349,7 +346,7 @@ impl HttpState {
         );
         #[cfg(feature = "control-plane")]
         let account_deletion_port: Arc<dyn crate::operations::api::AccountDeletionPort> = Arc::new(
-            crate::bootstrap::integration::legacy_registry_operations::RegistryAccountDeletionAdapter::new(
+            crate::bootstrap::integration::legacy_registry_operations::RegistryAccountDeletionAdapter::from_registry(
                 registry.store_clone(),
             ),
         );

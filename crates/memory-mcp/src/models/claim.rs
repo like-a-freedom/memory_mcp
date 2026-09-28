@@ -5,8 +5,8 @@ use std::fmt;
 
 use serde::{Deserialize, Serialize};
 
+use crate::error::MemoryError;
 use crate::models::ids::{ClaimId, ClaimJobId, ClaimRelationId, EpisodeId, FactId};
-use crate::service::MemoryError;
 
 // ─── Canonical Decimal ────────────────────────────────────────────────────────
 

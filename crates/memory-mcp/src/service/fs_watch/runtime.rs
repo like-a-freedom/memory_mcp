@@ -20,6 +20,9 @@ use tokio_util::sync::CancellationToken;
 
 use crate::config::fs_watch::FsWatchConfig;
 use crate::error::MemoryError;
+use crate::logging::StdoutLogger;
+use crate::memory::InboxRevisionStoreClient;
+use crate::memory::inbox_revision_store::new_revision_record;
 use crate::models::inbox_revision::{InboxRevisionLease, InboxRevisionRecord};
 use crate::service::fs_watch::candidate::{
     CandidateOutcome, CandidateSkipReason, PreparedInboxRevision, prepare_candidate,
@@ -27,8 +30,6 @@ use crate::service::fs_watch::candidate::{
 use crate::service::fs_watch::processor::InboxRevisionProcessor;
 use crate::service::fs_watch::telemetry::FsWatchTelemetry;
 use crate::service::{MemoryService, deterministic_episode_id_v2};
-use crate::storage::InboxRevisionStoreClient;
-use crate::storage::inbox_revision_store::new_revision_record;
 
 /// Startup generation marker for requeueing failed revisions once per start.
 fn startup_generation() -> String {
@@ -66,7 +67,7 @@ pub struct FsWatchRuntime {
 fn spawn_event_bridge(
     inbox: std::path::PathBuf,
     store: InboxRevisionStoreClient,
-    service: MemoryService,
+    logger: StdoutLogger,
     telemetry: FsWatchTelemetry,
     stop_discovery: CancellationToken,
 ) -> tokio::task::JoinHandle<()> {
@@ -83,8 +84,8 @@ fn spawn_event_bridge(
                     const MAX_BACKOFF_ATTEMPTS: u32 = 5;
                     if backoff_attempts >= MAX_BACKOFF_ATTEMPTS {
                         telemetry.set_degraded(true);
-                        service.logger.log(
-                            crate::service::log_event(
+                        logger.log(
+                            crate::platform::log_event::log_event(
                                 "fs_watch.degraded",
                                 serde_json::json!({}),
                                 serde_json::json!({"status": "watcher_backend_exhausted"}),
@@ -293,7 +294,7 @@ impl FsWatchRuntime {
         }
 
         service.logger.log(
-            crate::service::log_event(
+            crate::platform::log_event::log_event(
                 "fs_watch.ready",
                 serde_json::json!({"inbox": config.inbox.display().to_string()}),
                 serde_json::json!({"status": "listening"}),
@@ -312,7 +313,7 @@ impl FsWatchRuntime {
         let watcher_handle = spawn_event_bridge(
             config.inbox.clone(),
             store.clone(),
-            service.clone(),
+            service.logger.clone(),
             telemetry.clone(),
             stop_discovery.clone(),
         );
@@ -335,7 +336,9 @@ impl FsWatchRuntime {
             async move {
                 let processor = InboxRevisionProcessor::new(
                     processor_store,
-                    processor_service,
+                    crate::memory::capabilities::deps::ExtractDeps::from(&processor_service),
+                    processor_service.ingestion_service.clone(),
+                    processor_service.logger.clone(),
                     processor_telemetry,
                     processor_stop,
                     processor_lease,

@@ -1,0 +1,358 @@
+use std::collections::{HashMap, HashSet};
+use std::time::Instant;
+
+use serde_json::{Value, json};
+
+use crate::error::MemoryError;
+use crate::knowledge::entity_extraction::NerScheduling;
+use crate::logging::LogLevel;
+use crate::memory::capabilities::deps::ExtractDeps;
+use crate::models::{EntityCandidate, ExtractedEntity};
+use crate::platform::log_event::{log_args_with_duration, log_event};
+use crate::shared::search::normalize_text;
+
+/// Extract entities from content.
+///
+/// # Arguments
+///
+/// * `service` - The memory service containing the entity extractor.
+/// * `episode_id` - The episode being extracted; recorded on the append-only
+///   extraction projection row written after a successful run.
+/// * `content` - The text content to extract entities from.
+/// * `zero_shot_labels` - Optional custom entity labels for GLiNER extraction.
+///   When provided, these labels override the default NER configuration.
+pub async fn extract_entities(
+    service: &ExtractDeps,
+    episode_id: &str,
+    content: &str,
+    zero_shot_labels: Option<&[String]>,
+) -> Result<Vec<ExtractedEntity>, MemoryError> {
+    let timer = Instant::now();
+    let provider = service.entity_extractor.provider_name();
+    let content_chars = content.chars().count();
+
+    let extraction_result = match service.entity_extractor.scheduling() {
+        NerScheduling::BlockingPool => {
+            let extractor = service.entity_extractor.clone();
+            let content_owned = content.to_string();
+            let zero_shot_labels = zero_shot_labels.map(<[String]>::to_vec);
+            let handle = tokio::runtime::Handle::current();
+
+            tokio::task::spawn_blocking(move || {
+                handle.block_on(async move {
+                    match zero_shot_labels {
+                        Some(labels) => {
+                            extractor
+                                .extract_candidates_with_labels(&content_owned, &labels)
+                                .await
+                        }
+                        None => extractor.extract_candidates(&content_owned).await,
+                    }
+                })
+            })
+            .await
+            .map_err(|err| {
+                MemoryError::Storage(format!("entity extraction task panicked: {err}"))
+            })?
+        }
+        NerScheduling::Inline => match zero_shot_labels {
+            Some(labels) => {
+                service
+                    .entity_extractor
+                    .extract_candidates_with_labels(content, labels)
+                    .await
+            }
+            None => service.entity_extractor.extract_candidates(content).await,
+        },
+    };
+
+    let candidates = match extraction_result {
+        Ok(candidates) => candidates,
+        Err(err) => {
+            let label_count = zero_shot_labels.map(|labels| labels.len());
+            log_ner_error(service, provider, content_chars, label_count, &err, timer);
+            return Err(err);
+        }
+    };
+
+    service.logger.log(
+        log_event(
+            "ner.extract.done",
+            log_args_with_duration(json!({"content_chars": content_chars}), timer.elapsed()),
+            build_ner_log_result(
+                provider,
+                candidates.len(),
+                zero_shot_labels.map(|labels| labels.len()),
+                None,
+            ),
+            None,
+            None,
+            None,
+        ),
+        LogLevel::Info,
+    );
+
+    let candidates = dedupe_entity_candidates(candidates);
+    let mut entities = Vec::with_capacity(candidates.len());
+    let mut seen_entity_ids = HashSet::new();
+
+    for candidate in candidates {
+        let entity_type = candidate.entity_type.clone();
+        let canonical_name = candidate.canonical_name.clone();
+
+        let entity_id = service
+            .entity_resolver
+            .resolve_or_create(&service.entity_service, candidate.clone())
+            .await
+            .map(|(id, _created)| id)
+            .inspect_err(|err| {
+                service.logger.log(
+                    log_event(
+                        "ner.resolve.error",
+                        json!({
+                            "entity_type": &entity_type,
+                            "canonical_name": &canonical_name,
+                            "error": err.to_string(),
+                        }),
+                        json!({"provider": provider}),
+                        None,
+                        None,
+                        None,
+                    ),
+                    LogLevel::Warn,
+                );
+            })?;
+
+        if seen_entity_ids.insert(entity_id.clone()) {
+            entities.push(ExtractedEntity {
+                entity_id,
+                entity_type,
+                canonical_name,
+            });
+        }
+    }
+
+    persist_extraction_projection(service, episode_id, &entities).await?;
+
+    Ok(entities)
+}
+
+/// Persists one append-only projection row for a successful extraction run.
+///
+/// The row records the resolved entity ids and the durable extractor
+/// fingerprint that produced them. Rows are never updated or deleted: repeated
+/// extractions of the same episode accumulate rows, each keyed by its ingestion
+/// timestamp. Historical outputs therefore stay attributable to the exact
+/// extractor selector, backend, labels, and threshold.
+pub(super) async fn persist_extraction_projection(
+    service: &ExtractDeps,
+    episode_id: &str,
+    entities: &[ExtractedEntity],
+) -> Result<(), MemoryError> {
+    let ingested_at = crate::shared::temporal::now();
+    let fingerprint = service.entity_extractor.fingerprint();
+    let fingerprint_value = serde_json::to_value(&fingerprint).map_err(|err| {
+        MemoryError::Storage(format!("failed to serialize extractor fingerprint: {err}"))
+    })?;
+
+    let entity_ids = entities
+        .iter()
+        .map(|entity| entity.entity_id.clone())
+        .collect::<Vec<_>>();
+
+    // Record id: `entity_extraction_projection:<episode-key>:<projection-id>`.
+    // The projection suffix is deterministic over the episode, ingestion
+    // timestamp, and extractor selector, so each extraction run appends a
+    // distinct row. The Active Namespace is process-bound and never part of
+    // the projection identity.
+    let episode_key = episode_id.strip_prefix("episode:").unwrap_or(episode_id);
+    let projection_suffix = crate::shared::ids::hash_prefix(&format!(
+        "{episode_id}|{}|{}",
+        crate::shared::temporal::normalize_dt(ingested_at),
+        fingerprint.selector,
+    ));
+    // `⟨...⟩` keeps the two-part record body a single id string.
+    let record_body = format!("{episode_key}:{projection_suffix}");
+
+    // Written through the episode store so no raw SurrealDB queries leak into
+    // tools (ADR-0044): the store owns the CREATE statement and the
+    // `type::datetime(...)` coercion for temporal schema fields.
+    let vars = serde_json::json!({
+        "episode_id": episode_id,
+        "t_ingested": crate::shared::temporal::normalize_dt(ingested_at),
+        "t_created": crate::shared::temporal::normalize_dt(ingested_at),
+        "fingerprint": fingerprint_value,
+        "entity_ids": entity_ids,
+    });
+
+    service
+        .episode_store()
+        .create_extraction_projection(&record_body, vars)
+        .await?;
+
+    Ok(())
+}
+
+pub(super) fn dedupe_entity_candidates(candidates: Vec<EntityCandidate>) -> Vec<EntityCandidate> {
+    #[derive(Debug, Default)]
+    struct CandidateGroup {
+        canonical_name: String,
+        type_counts: HashMap<String, usize>,
+        type_first_seen: HashMap<String, usize>,
+        type_display_names: HashMap<String, String>,
+        aliases: HashMap<String, String>,
+    }
+
+    let mut order = Vec::new();
+    let mut groups = HashMap::<String, CandidateGroup>::new();
+
+    for (index, candidate) in candidates.into_iter().enumerate() {
+        let canonical_name = candidate.canonical_name.trim();
+        let entity_type = candidate.entity_type.trim();
+        if canonical_name.is_empty() || entity_type.is_empty() {
+            continue;
+        }
+
+        let name_key = normalize_text(canonical_name);
+        if name_key.is_empty() {
+            continue;
+        }
+
+        let group = groups.entry(name_key.clone()).or_insert_with(|| {
+            order.push(name_key.clone());
+            CandidateGroup {
+                canonical_name: canonical_name.to_string(),
+                ..CandidateGroup::default()
+            }
+        });
+
+        if canonical_name.len() > group.canonical_name.len() {
+            group.canonical_name = canonical_name.to_string();
+        }
+
+        let entity_type_key = normalize_text(entity_type);
+        *group
+            .type_counts
+            .entry(entity_type_key.clone())
+            .or_default() += 1;
+        group
+            .type_first_seen
+            .entry(entity_type_key.clone())
+            .or_insert(index);
+        group
+            .type_display_names
+            .entry(entity_type_key)
+            .or_insert_with(|| entity_type.to_string());
+
+        for alias in candidate.aliases {
+            let alias = alias.trim();
+            if alias.is_empty() {
+                continue;
+            }
+
+            let alias_key = normalize_text(alias);
+            if alias_key.is_empty() || alias_key == name_key {
+                continue;
+            }
+
+            group
+                .aliases
+                .entry(alias_key)
+                .or_insert_with(|| alias.to_string());
+        }
+    }
+
+    let mut deduped = Vec::with_capacity(order.len());
+
+    for key in order {
+        let Some(mut group) = groups.remove(&key) else {
+            continue;
+        };
+
+        let mut entity_types = group
+            .type_counts
+            .into_iter()
+            .collect::<Vec<(String, usize)>>();
+        entity_types.sort_by(|(left_key, left_count), (right_key, right_count)| {
+            right_count
+                .cmp(left_count)
+                .then_with(|| {
+                    group
+                        .type_first_seen
+                        .get(left_key)
+                        .copied()
+                        .unwrap_or(usize::MAX)
+                        .cmp(
+                            &group
+                                .type_first_seen
+                                .get(right_key)
+                                .copied()
+                                .unwrap_or(usize::MAX),
+                        )
+                })
+                .then_with(|| left_key.cmp(right_key))
+        });
+
+        let Some((entity_type_key, _)) = entity_types.into_iter().next() else {
+            continue;
+        };
+
+        let entity_type = group
+            .type_display_names
+            .remove(&entity_type_key)
+            .unwrap_or(entity_type_key);
+
+        let mut aliases = group.aliases.into_values().collect::<Vec<_>>();
+        aliases.sort();
+
+        deduped.push(EntityCandidate {
+            entity_type,
+            canonical_name: group.canonical_name,
+            aliases,
+        });
+    }
+
+    deduped
+}
+
+pub(super) fn build_ner_log_result(
+    provider: &str,
+    entity_count: usize,
+    zero_shot_label_count: Option<usize>,
+    error: Option<&str>,
+) -> Value {
+    let mut result = serde_json::Map::new();
+    result.insert("provider".to_string(), json!(provider));
+    result.insert("entity_count".to_string(), json!(entity_count));
+    if let Some(zero_shot_label_count) = zero_shot_label_count {
+        result.insert(
+            "zero_shot_label_count".to_string(),
+            json!(zero_shot_label_count),
+        );
+    }
+    if let Some(error) = error {
+        result.insert("error".to_string(), json!(error));
+    }
+    Value::Object(result)
+}
+
+fn log_ner_error(
+    service: &ExtractDeps,
+    provider: &str,
+    content_chars: usize,
+    zero_shot_label_count: Option<usize>,
+    err: &MemoryError,
+    timer: Instant,
+) {
+    service.logger.log(
+        log_event(
+            "ner.extract.error",
+            log_args_with_duration(json!({"content_chars": content_chars}), timer.elapsed()),
+            build_ner_log_result(provider, 0, zero_shot_label_count, Some(&err.to_string())),
+            None,
+            None,
+            None,
+        ),
+        LogLevel::Warn,
+    );
+}

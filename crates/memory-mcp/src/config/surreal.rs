@@ -8,9 +8,9 @@ use super::helpers::{
     default_embedded_data_dir, is_remote_url, normalize_url_scheme, parse_bool_env, parse_env,
     resolve_embedded_data_dir,
 };
-use super::lifecycle::LifecycleConfig;
 use super::ner::NerConfig;
-use crate::service::MemoryError;
+use crate::config::lifecycle::LifecycleConfig;
+use crate::error::MemoryError;
 
 /// The single SurrealDB namespace selected for the lifetime of a server process.
 ///

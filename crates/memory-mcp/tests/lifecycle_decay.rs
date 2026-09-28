@@ -8,8 +8,8 @@
 
 use chrono::{Duration, Utc};
 use memory_mcp::models::Provenance;
-use memory_mcp::service::capabilities::invalidate::InvalidateCapability;
-use memory_mcp::service::run_decay_pass;
+use memory_mcp::platform::lifecycle_runtime::decay_pass;
+use memory_mcp::service::memory_container_shims::memory_capabilities_invalidate::InvalidateCapability;
 use memory_mcp::storage::DbClient;
 use serde_json::json;
 
@@ -35,7 +35,7 @@ async fn decay_pass_invalidates_active_fact_with_absent_t_invalid_field() {
         .await
         .expect("fact added");
 
-    let count = run_decay_pass(&service, 0.3, 100.0)
+    let count = decay_pass(&service, 0.3, 100.0)
         .await
         .expect("decay pass completed");
 
@@ -69,7 +69,7 @@ async fn decay_pass_processes_only_active_namespace() {
         .await
         .expect("fact added");
 
-    let count = run_decay_pass(&service, 0.3, 100.0)
+    let count = decay_pass(&service, 0.3, 100.0)
         .await
         .expect("decay pass completed");
 
@@ -115,7 +115,7 @@ async fn decay_pass_when_fact_was_recently_accessed_then_skips_invalidation() {
         .await
         .expect("touch fact");
 
-    let count = run_decay_pass(&service, 0.3, 100.0)
+    let count = decay_pass(&service, 0.3, 100.0)
         .await
         .expect("decay pass completed");
 
@@ -134,7 +134,7 @@ async fn decay_pass_with_empty_database() {
     let (service, _db_client) = common::make_service_with_client().await;
 
     // Act: Run decay pass
-    let count = run_decay_pass(&service, 0.3, 365.0)
+    let count = decay_pass(&service, 0.3, 365.0)
         .await
         .expect("decay pass completed");
 
@@ -164,7 +164,7 @@ async fn decay_pass_preserves_recent_high_confidence_facts() {
         .expect("fact added");
 
     // Act: Run decay pass with 0.3 threshold and 365 day half-life
-    let count = run_decay_pass(&service, 0.3, 365.0)
+    let count = decay_pass(&service, 0.3, 365.0)
         .await
         .expect("decay pass completed");
 
@@ -197,7 +197,7 @@ async fn decay_pass_invalidates_old_low_confidence_facts() {
         .expect("fact added");
 
     // Act: Run decay pass with 0.3 threshold and 100 day half-life (fast decay)
-    let count = run_decay_pass(&service, 0.3, 100.0)
+    let count = decay_pass(&service, 0.3, 100.0)
         .await
         .expect("decay pass completed");
 
@@ -244,7 +244,7 @@ async fn decay_pass_respects_threshold_parameter() {
         .expect("fact added");
 
     // Act: Run decay pass with moderate threshold
-    let count = run_decay_pass(&service, 0.2, 100.0)
+    let count = decay_pass(&service, 0.2, 100.0)
         .await
         .expect("decay pass completed");
 
@@ -274,7 +274,7 @@ async fn decay_pass_skips_already_invalidated_facts() {
         .expect("fact added");
 
     // Pre-invalidate the fact
-    InvalidateCapability::invalidate(
+    InvalidateCapability::invalidate_from_service(
         &service,
         memory_mcp::models::InvalidateRequest {
             fact_id: fact_id.clone(),
@@ -287,7 +287,7 @@ async fn decay_pass_skips_already_invalidated_facts() {
     .expect("fact invalidated");
 
     // Act: Run decay pass
-    let count = run_decay_pass(&service, 0.3, 100.0)
+    let count = decay_pass(&service, 0.3, 100.0)
         .await
         .expect("decay pass completed");
 
@@ -334,7 +334,7 @@ async fn decay_pass_half_life_affects_decay_rate() {
         .expect("fact added");
 
     // Act: Run with short half-life (faster decay)
-    let count_short = run_decay_pass(&service, 0.3, 50.0)
+    let count_short = decay_pass(&service, 0.3, 50.0)
         .await
         .expect("decay pass completed");
 
@@ -355,7 +355,7 @@ async fn decay_pass_half_life_affects_decay_rate() {
         .expect("fact added");
 
     // Act: Run with long half-life (slower decay)
-    let count_long = run_decay_pass(&service, 0.3, 500.0)
+    let count_long = decay_pass(&service, 0.3, 500.0)
         .await
         .expect("decay pass completed");
 
@@ -394,7 +394,7 @@ async fn decay_confidence_calculation_exponential() {
 
     // Act: Run with threshold just above expected decayed value (0.26)
     // Expected: 0.5 * exp(-ln(2)/100 * 100) = 0.5 * exp(-ln(2)) = 0.5 * 0.5 = 0.25
-    let count = run_decay_pass(&service, 0.26, 100.0)
+    let count = decay_pass(&service, 0.26, 100.0)
         .await
         .expect("decay pass completed");
 

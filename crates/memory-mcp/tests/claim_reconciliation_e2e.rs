@@ -11,8 +11,8 @@ use std::sync::Arc;
 use chrono::{DateTime, Utc};
 use memory_mcp::models::IngestRequest;
 use memory_mcp::service::MemoryService;
-use memory_mcp::service::capabilities::extract::ExtractCapability;
-use memory_mcp::service::capabilities::ingest::IngestCapability;
+use memory_mcp::service::memory_container_shims::memory_capabilities_extract::ExtractCapability;
+use memory_mcp::service::memory_container_shims::memory_capabilities_ingest::IngestCapability;
 use memory_mcp::storage::{DbClient, SurrealDbClient};
 
 fn parse_t_ref(s: &str) -> DateTime<Utc> {
@@ -31,8 +31,8 @@ async fn ingest_source(
     content: &str,
     t_ref: &str,
 ) -> String {
-    let episode_id = IngestCapability::ingest(
-        &service,
+    let episode_id = IngestCapability::ingest_from_service(
+        service,
         IngestRequest {
             source_type: source_type.to_string(),
             source_id: source_id.to_string(),
@@ -45,7 +45,7 @@ async fn ingest_source(
     )
     .await
     .expect("ingest should succeed");
-    ExtractCapability::extract(&service, &episode_id, None, None)
+    ExtractCapability::extract_from_service(service, &episode_id, None, None)
         .await
         .expect("extract should succeed");
     episode_id
@@ -308,7 +308,7 @@ async fn repeat_extract_is_idempotent_and_preserves_derived_records() {
 
     // Same-id/same-content is idempotent by contract: re-extracting the same
     // episode must neither duplicate facts/claims/jobs nor surface an error.
-    ExtractCapability::extract(&service, &ep, None, None)
+    ExtractCapability::extract_from_service(&service, &ep, None, None)
         .await
         .expect("repeat extract should succeed");
 
@@ -356,7 +356,7 @@ async fn ingest_episode_with_lineage(
         )
         .await
         .expect("create episode with lineage");
-    ExtractCapability::extract(&service, episode_id, None, None)
+    ExtractCapability::extract_from_service(service, episode_id, None, None)
         .await
         .expect("extract episode with lineage");
 }

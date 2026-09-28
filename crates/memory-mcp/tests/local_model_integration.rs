@@ -12,9 +12,9 @@ use memory_mcp::config::{
 use memory_mcp::logging::StdoutLogger;
 use memory_mcp::mcp::MemoryMcp;
 use memory_mcp::models::{AssembleContextRequest, ExtractedEntity, IngestRequest, Provenance};
-use memory_mcp::service::capabilities::assemble_context::AssembleContextCapability;
-use memory_mcp::service::capabilities::extract::ExtractCapability;
-use memory_mcp::service::capabilities::ingest::IngestCapability;
+use memory_mcp::service::memory_container_shims::memory_capabilities_assemble_context::AssembleContextCapability;
+use memory_mcp::service::memory_container_shims::memory_capabilities_extract::ExtractCapability;
+use memory_mcp::service::memory_container_shims::memory_capabilities_ingest::IngestCapability;
 use memory_mcp::service::{EntityExtractor, GlinerEntityExtractor, create_entity_extractor};
 use memory_mcp::tools::params::{ExtractParams, IngestParams};
 use rmcp::handler::server::wrapper::Parameters;
@@ -616,7 +616,7 @@ async fn memory_service_uses_local_gliner_zero_shot_labels() {
 
     for (case_name, text, expected_entities) in zero_shot_gliner_coverage_cases() {
         let episode_id = ingest_episode(&service, text).await;
-        let extracted = ExtractCapability::extract(
+        let extracted = ExtractCapability::extract_from_service(
             &service,
             &episode_id,
             None,
@@ -695,8 +695,8 @@ fn content_source_id(content: &str) -> String {
 }
 
 async fn ingest_episode(service: &MemoryService, content: &str) -> String {
-    IngestCapability::ingest(
-        &service,
+    IngestCapability::ingest_from_service(
+        service,
         IngestRequest {
             source_type: "test".to_string(),
             source_id: content_source_id(content),
@@ -766,12 +766,11 @@ async fn memory_service_uses_local_gliner_defaults_across_diverse_texts() {
 
     for (case_name, text, expected_entities) in cases {
         let episode_id = ingest_episode(&service, text).await;
-        let extracted =
-            ExtractCapability::extract(&service, &episode_id, None, None)
-                .await
-                .unwrap_or_else(|err| {
-                    panic!("extract should succeed with local GLiNER for `{case_name}`: {err}")
-                });
+        let extracted = ExtractCapability::extract_from_service(&service, &episode_id, None, None)
+            .await
+            .unwrap_or_else(|err| {
+                panic!("extract should succeed with local GLiNER for `{case_name}`: {err}")
+            });
 
         assert_eq!(
             extracted.episode_id, episode_id,
@@ -817,7 +816,7 @@ async fn memory_service_persists_real_local_candle_embeddings() {
     .await;
 
     // Verify embeddings were persisted by checking semantic similarity
-    let context = AssembleContextCapability::assemble_context(
+    let context = AssembleContextCapability::assemble_context_from_service(
         &service,
         AssembleContextRequest {
             query: "compensation raise engineering".to_string(),
@@ -893,7 +892,7 @@ async fn memory_service_assemble_context_uses_real_local_candle_embeddings() {
     )
     .await;
 
-    let context = AssembleContextCapability::assemble_context(
+    let context = AssembleContextCapability::assemble_context_from_service(
         &service,
         AssembleContextRequest {
             query: "salary raise for engineers".to_string(),

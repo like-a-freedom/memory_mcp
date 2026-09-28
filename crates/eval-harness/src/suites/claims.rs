@@ -5,8 +5,8 @@ use async_trait::async_trait;
 use chrono::{DateTime, Utc};
 use memory_mcp::models::claim::PolicyFingerprint;
 use memory_mcp::models::{ContradictionWarning, IngestRequest};
-use memory_mcp::service::capabilities::extract::ExtractCapability;
-use memory_mcp::service::capabilities::ingest::IngestCapability;
+use memory_mcp::service::memory_container_shims::memory_capabilities_extract::ExtractCapability;
+use memory_mcp::service::memory_container_shims::memory_capabilities_ingest::IngestCapability;
 use serde::Deserialize;
 
 use crate::domain::*;
@@ -221,8 +221,8 @@ async fn ingest_and_extract(
 ) -> Result<(memory_mcp::models::ExtractResult, ExtractedSource), EvalError> {
     let t_ref_datetime = parse_reference_time(params.t_ref)?;
 
-    let episode_id = IngestCapability::ingest(
-        &service,
+    let episode_id = IngestCapability::ingest_from_service(
+        service,
         IngestRequest {
             source_type: params.source_type.to_string(),
             source_id: params.source_id.to_string(),
@@ -236,7 +236,7 @@ async fn ingest_and_extract(
     .await
     .map_err(|e| EvalError::Suite(format!("ingest failed for {}: {e}", params.source_id)))?;
 
-    let extraction = ExtractCapability::extract(&service, &episode_id, None, None)
+    let extraction = ExtractCapability::extract_from_service(service, &episode_id, None, None)
         .await
         .map_err(|e| EvalError::Suite(format!("extract failed for {}: {e}", params.source_id)))?;
 

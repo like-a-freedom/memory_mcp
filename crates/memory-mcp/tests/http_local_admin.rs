@@ -33,6 +33,9 @@ use memory_mcp::http::principal::auth::{AuthDecision, Authenticator};
 use memory_mcp::http::registry::SurrealRegistryStore;
 use memory_mcp::http::registry::models::{ApiKey, ApiKeyStatus, KeyedVerifier, TenantStatus};
 use memory_mcp::http::registry::storage::RegistryStore;
+use memory_mcp::http::registry::storage::{
+    AccountStore, ApiKeyStore, ProvisioningStore, TenantStore,
+};
 use memory_mcp::http::router::build_router;
 use memory_mcp::http::test_state::HttpStateTestBuilder;
 use memory_mcp::service::local_admin::{

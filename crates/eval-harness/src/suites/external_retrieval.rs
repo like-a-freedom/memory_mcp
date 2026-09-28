@@ -2,7 +2,7 @@ use std::collections::BTreeMap;
 use std::num::NonZeroUsize;
 
 use async_trait::async_trait;
-use memory_mcp::service::capabilities::assemble_context::AssembleContextCapability;
+use memory_mcp::service::memory_container_shims::memory_capabilities_assemble_context::AssembleContextCapability;
 
 use crate::corpus::adapters::ExternalCase;
 use crate::domain::*;
@@ -130,7 +130,7 @@ impl ExternalRetrievalSuite {
         }
 
         let start_query = std::time::Instant::now();
-        let context_result = AssembleContextCapability::assemble_context(
+        let context_result = AssembleContextCapability::assemble_context_from_service(
             &service,
             memory_mcp::models::AssembleContextRequest {
                 query: case.query.clone(),

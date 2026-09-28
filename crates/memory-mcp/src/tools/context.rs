@@ -2,13 +2,16 @@
 //!
 //! A tool handler needs two things from the service: somewhere to
 //! write its start/done/error events, and one capability call.
-//! Taking the whole `ServiceContext` for that is how the god-struct
+//! Taking the whole service container for that is how the god-struct
 //! reached the transport edge, so the transport depends on this
 //! trait instead and names only what it uses.
 //!
-//! The trait is implemented for `ServiceContext` in the service
-//! layer, which keeps the direction of the dependency pointing
-//! inward: tools know their port, not the container.
+//! The trait is implemented for `service::MemoryService` (the former
+//! `ServiceContext`, renamed in `3ccf3b0`) in the service layer,
+//! which keeps the direction of the dependency pointing inward: tools
+//! know their port, not the container. The container is contained at
+//! this edge, not yet removed — the remaining capabilities still
+//! adapt it, and Phase 5 is where that narrows.
 
 use std::time::Duration;
 
@@ -37,7 +40,7 @@ pub struct ToolEvent {
 /// Everything an MCP tool handler is allowed to reach.
 ///
 /// Implemented by the service layer; tools hold this, not
-/// `ServiceContext`.
+/// `service::MemoryService`.
 pub trait ToolContext {
     /// Records a tool lifecycle event.
     fn record(&self, event: ToolEvent);

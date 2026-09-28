@@ -17,6 +17,7 @@
 use memory_mcp::http::registry::SurrealRegistryStore;
 use memory_mcp::http::registry::models::{NamespaceBinding, Tenant, TenantStatus};
 use memory_mcp::http::registry::storage::RegistryStore;
+use memory_mcp::http::registry::storage::TenantStore;
 
 async fn store() -> SurrealRegistryStore {
     let namespace = format!("registry_query_shape_{}", uuid::Uuid::new_v4().simple());

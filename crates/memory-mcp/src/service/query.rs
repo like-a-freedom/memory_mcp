@@ -2,9 +2,6 @@
 
 use chrono::{DateTime, Utc};
 
-mod lexical;
-mod search;
-
 /// Temporal value semantics live in the pure kernel; they are
 /// re-exported here so the many existing `crate::service::{normalize_dt,
 /// now, …}` paths keep working.
@@ -13,13 +10,7 @@ pub use crate::shared::temporal::{
 };
 
 use crate::models::Fact;
-pub use lexical::{
-    fact_term_set, is_four_digit_year, matched_query_terms_for_fact, matched_query_terms_for_text,
-};
-pub use search::{
-    normalize_text, preprocess_search_query, query_hard_anchor_terms, query_term_rarity_weight,
-    query_term_should_be_soft_anchor, search_query_terms, unique_query_terms,
-};
+pub use crate::shared::search::{normalize_text, preprocess_search_query};
 
 /// Calculate decayed confidence based on fact age.
 /// Delegates to [`crate::models::Fact::decayed_confidence`] (single source of truth).

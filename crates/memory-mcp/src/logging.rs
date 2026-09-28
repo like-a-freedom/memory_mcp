@@ -1,7 +1,9 @@
 //! Structured logging utilities.
 //!
-//! This module provides a simple stdout logger with structured event formatting
-//! and configurable log levels.
+//! This module provides a simple logger with structured event formatting
+//! and configurable log levels. Events go to **stderr** (or to the file
+//! sink installed at startup), never to stdout: under the stdio transport
+//! stdout is reserved for MCP protocol framing.
 
 use std::collections::HashMap;
 use std::fs::{File, OpenOptions};

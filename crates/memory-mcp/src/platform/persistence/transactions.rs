@@ -125,8 +125,8 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::sync::atomic::{AtomicU32, Ordering};
     use std::sync::Arc;
+    use std::sync::atomic::{AtomicU32, Ordering};
 
     fn logger() -> StdoutLogger {
         StdoutLogger::new("error")
@@ -134,8 +134,8 @@ mod tests {
 
     #[tokio::test]
     async fn succeeds_on_first_attempt() {
-        let result = with_db_retry("test_op", &logger(), || async { Ok::<_, MemoryError>(42) })
-            .await;
+        let result =
+            with_db_retry("test_op", &logger(), || async { Ok::<_, MemoryError>(42) }).await;
         assert_eq!(result.unwrap(), 42);
     }
 

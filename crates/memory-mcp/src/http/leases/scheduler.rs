@@ -64,7 +64,7 @@ impl SchedulerHooks {
     /// itself.
     pub fn with_provisioning_only(
         migrations: Arc<dyn crate::http::leases::migration::ApplyMigrations>,
-        fault_injector: Arc<dyn crate::http::fault_injection::FaultInjector>,
+        fault_injector: Arc<dyn crate::platform::fault_injection::FaultInjector>,
     ) -> Result<Self, MemoryError> {
         let provisioning_injector = Arc::clone(&fault_injector);
         let provisioning: SchedulerJob = Arc::new(move |registry| {
@@ -218,14 +218,14 @@ mod tests {
     fn bootstrap_scheduler_hooks_include_deletion_worker() {
         let hooks = crate::bootstrap::provisioning_scheduler_hooks(
             Arc::new(crate::http::leases::migration::NoopMigrations),
-            Arc::new(crate::http::fault_injection::NoFaults),
+            Arc::new(crate::platform::fault_injection::NoFaults),
         )
         .expect("provisioning hooks");
         assert_eq!(hooks.jobs.len(), 2);
 
         let platform_hooks = SchedulerHooks::with_provisioning_only(
             Arc::new(crate::http::leases::migration::NoopMigrations),
-            Arc::new(crate::http::fault_injection::NoFaults),
+            Arc::new(crate::platform::fault_injection::NoFaults),
         )
         .expect("platform provisioning hooks");
         assert_eq!(platform_hooks.jobs.len(), 1);

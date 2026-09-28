@@ -21,7 +21,6 @@
 //! application layer cannot reconstruct multi-row writes as
 //! sequences.
 
-use async_trait::async_trait;
 use chrono::{DateTime, Utc};
 #[cfg(any(test, feature = "test-fixtures"))]
 use std::sync::Mutex;
@@ -108,11 +107,11 @@ pub fn is_safe_identifier(s: &str) -> bool {
 /// implementation does not use the `DbClient` trait because the
 /// `DbClient` trait is per-namespace and the registry is
 /// multi-record across many tables.
-#[async_trait]
-pub trait RegistryStore: Send + Sync + 'static {
-    async fn ping(&self) -> bool;
-
+/// Account rows, plus the cross-owner bundle writes that must commit the account, its tenant and its first identity in one transaction (`create_account_bundle`, `create_oidc_account_bundle`), and the account-side half of an account deletion.
+#[async_trait::async_trait]
+pub trait AccountStore: Send + Sync + 'static {
     async fn find_account_by_id(&self, account_id: &str) -> Result<Option<Account>, MemoryError>;
+
     /// `subject_verifier` is a keyed blind index; raw OIDC `sub`
     /// is never persisted.
     async fn find_account_by_identity(
@@ -120,6 +119,18 @@ pub trait RegistryStore: Send + Sync + 'static {
         issuer: &str,
         subject_verifier: &SubjectVerifier,
     ) -> Result<Option<Account>, MemoryError>;
+
+    async fn write_account(&self, account: &Account) -> Result<(), MemoryError>;
+
+    /// Transition an Account's status from `from` to `to`. The
+    /// transition is conditional on the current status; a
+    /// stale read returns `Conflict`.
+    async fn transition_account_state(
+        &self,
+        account_id: &str,
+        from: AccountStatus,
+        to: AccountStatus,
+    ) -> Result<(), MemoryError>;
 
     /// Atomically insert the Account, Tenant, and (optional)
     /// ExternalIdentity records that constitute a new tenant
@@ -136,10 +147,35 @@ pub trait RegistryStore: Send + Sync + 'static {
         identity: Option<&ExternalIdentity>,
     ) -> Result<(), MemoryError>;
 
-    async fn find_tenant_by_account(&self, account_id: &str)
-    -> Result<Option<Tenant>, MemoryError>;
-    async fn find_tenant_by_id(&self, tenant_id: &str) -> Result<Option<Tenant>, MemoryError>;
+    /// Atomically create the account, tenant, and external identity under a
+    /// matching browser auth policy fence. The policy mode/epoch are checked
+    /// before any record is written.
+    #[cfg(feature = "control-plane")]
+    async fn create_oidc_account_bundle(
+        &self,
+        policy: &BrowserPolicyFence,
+        account: &Account,
+        tenant: &Tenant,
+        identity: &ExternalIdentity,
+    ) -> Result<(), MemoryError>;
 
+    /// Atomically consume a valid deletion challenge, fence the account and
+    /// tenant into their deleting states, revoke all API keys, and append the
+    /// immutable deletion-start audit event. Control-plane sessions are
+    /// deliberately retained; their account-status check denies them.
+    #[cfg(feature = "control-plane")]
+    async fn begin_account_deletion(
+        &self,
+        verifier: &str,
+        account_id: &str,
+        session_id: &str,
+        now: DateTime<Utc>,
+    ) -> Result<(), MemoryError>;
+}
+
+/// `external_identity` rows and their paired audit rows. The three mutations take an `IdentityAudit` so the audit cannot commit separately from the change it records.
+#[async_trait::async_trait]
+pub trait IdentityStore: Send + Sync + 'static {
     /// List all external identities linked to `account_id`.
     /// Returns an empty Vec when the account has no linked
     /// identities (an invite account created without an
@@ -185,73 +221,17 @@ pub trait RegistryStore: Send + Sync + 'static {
         new_identity: &ExternalIdentity,
         audit: &IdentityAudit,
     ) -> Result<(), MemoryError>;
+}
 
-    async fn find_api_key(&self, key_id: &str) -> Result<Option<ApiKey>, MemoryError>;
-    async fn write_api_key(&self, key: &ApiKey) -> Result<(), MemoryError>;
-    async fn list_api_keys(&self, account_id: &str) -> Result<Vec<ApiKeyMeta>, MemoryError>;
-    async fn revoke_api_key(&self, account_id: &str, key_id: &str) -> Result<(), MemoryError>;
-    async fn touch_api_key(&self, key_id: &str, used_at: DateTime<Utc>) -> Result<(), MemoryError>;
+/// `tenant` rows, the fenced state transitions, and the tenant-side half of a deletion pass.
+#[async_trait::async_trait]
+pub trait TenantStore: Send + Sync + 'static {
+    async fn find_tenant_by_account(&self, account_id: &str)
+    -> Result<Option<Tenant>, MemoryError>;
 
-    /// Create an API key only when the account has fewer than
-    /// `max_active` currently-active keys. Atomic.
-    async fn create_api_key_if_below_limit(
-        &self,
-        key: &ApiKey,
-        max_active: u32,
-    ) -> Result<(), MemoryError>;
+    async fn find_tenant_by_id(&self, tenant_id: &str) -> Result<Option<Tenant>, MemoryError>;
 
-    /// Revoke every active key for an account; returns the
-    /// number of keys revoked.
-    async fn revoke_all_api_keys(&self, account_id: &str) -> Result<u64, MemoryError>;
-
-    async fn write_account(&self, account: &Account) -> Result<(), MemoryError>;
     async fn write_tenant(&self, tenant: &Tenant) -> Result<(), MemoryError>;
-
-    /// Transition an Account's status from `from` to `to`. The
-    /// transition is conditional on the current status; a
-    /// stale read returns `Conflict`.
-    async fn transition_account_state(
-        &self,
-        account_id: &str,
-        from: AccountStatus,
-        to: AccountStatus,
-    ) -> Result<(), MemoryError>;
-
-    /// Atomically consume a valid deletion challenge, fence the account and
-    /// tenant into their deleting states, revoke all API keys, and append the
-    /// immutable deletion-start audit event. Control-plane sessions are
-    /// deliberately retained; their account-status check denies them.
-    #[cfg(feature = "control-plane")]
-    async fn begin_account_deletion(
-        &self,
-        verifier: &str,
-        account_id: &str,
-        session_id: &str,
-        now: DateTime<Utc>,
-    ) -> Result<(), MemoryError>;
-
-    /// Start operator-initiated deletion without a user confirmation token.
-    /// The same control-plane revocation and tombstone invariants apply.
-    #[cfg(feature = "control-plane")]
-    async fn begin_operator_deletion(
-        &self,
-        tenant_id: &str,
-        actor: &str,
-        now: DateTime<Utc>,
-    ) -> Result<(), MemoryError>;
-
-    /// Fenced, idempotent completion of a deletion pass. The account and
-    /// tenant tombstones remain durable; only the tenant-local worker removes
-    /// expired ephemeral rows before this method is called.
-    #[cfg(feature = "control-plane")]
-    async fn finalize_account_deletion(
-        &self,
-        tenant_id: &str,
-        lease_owner_id: &str,
-        lease_id: &str,
-        fencing_generation: u64,
-        completed_at: DateTime<Utc>,
-    ) -> Result<(), MemoryError>;
 
     /// CAS-update the tenant's status. The predicate is
     /// `version = $expected_version AND status = $from`. Returns
@@ -293,6 +273,82 @@ pub trait RegistryStore: Send + Sync + 'static {
         fencing_generation: u64,
     ) -> Result<u64, MemoryError>;
 
+    /// Return a bounded page of every durable Tenant binding for reconciliation.
+    async fn list_tenants(
+        &self,
+        limit: usize,
+    ) -> Result<Vec<crate::http::registry::models::Tenant>, MemoryError>;
+
+    /// List tenants currently in `Ready` state, paginated by
+    /// an opaque cursor (the tenant id of the last item in the
+    /// previous page, or `None` for the first page).
+    async fn list_ready_tenants(
+        &self,
+        cursor: Option<&str>,
+        limit: usize,
+    ) -> Result<Vec<crate::http::registry::models::Tenant>, MemoryError>;
+
+    /// List tenants currently in `Deleting` state that are
+    /// eligible for the deletion worker.
+    async fn list_deleting_tenants(
+        &self,
+        limit: usize,
+        now: chrono::DateTime<chrono::Utc>,
+    ) -> Result<Vec<crate::http::registry::models::Tenant>, MemoryError>;
+
+    /// Start operator-initiated deletion without a user confirmation token.
+    /// The same control-plane revocation and tombstone invariants apply.
+    #[cfg(feature = "control-plane")]
+    async fn begin_operator_deletion(
+        &self,
+        tenant_id: &str,
+        actor: &str,
+        now: DateTime<Utc>,
+    ) -> Result<(), MemoryError>;
+
+    /// Fenced, idempotent completion of a deletion pass. The account and
+    /// tenant tombstones remain durable; only the tenant-local worker removes
+    /// expired ephemeral rows before this method is called.
+    #[cfg(feature = "control-plane")]
+    async fn finalize_account_deletion(
+        &self,
+        tenant_id: &str,
+        lease_owner_id: &str,
+        lease_id: &str,
+        fencing_generation: u64,
+        completed_at: DateTime<Utc>,
+    ) -> Result<(), MemoryError>;
+}
+
+/// `api_key` rows and the limit-enforcing issuance write.
+#[async_trait::async_trait]
+pub trait ApiKeyStore: Send + Sync + 'static {
+    async fn find_api_key(&self, key_id: &str) -> Result<Option<ApiKey>, MemoryError>;
+
+    async fn write_api_key(&self, key: &ApiKey) -> Result<(), MemoryError>;
+
+    async fn list_api_keys(&self, account_id: &str) -> Result<Vec<ApiKeyMeta>, MemoryError>;
+
+    async fn revoke_api_key(&self, account_id: &str, key_id: &str) -> Result<(), MemoryError>;
+
+    async fn touch_api_key(&self, key_id: &str, used_at: DateTime<Utc>) -> Result<(), MemoryError>;
+
+    /// Create an API key only when the account has fewer than
+    /// `max_active` currently-active keys. Atomic.
+    async fn create_api_key_if_below_limit(
+        &self,
+        key: &ApiKey,
+        max_active: u32,
+    ) -> Result<(), MemoryError>;
+
+    /// Revoke every active key for an account; returns the
+    /// number of keys revoked.
+    async fn revoke_all_api_keys(&self, account_id: &str) -> Result<u64, MemoryError>;
+}
+
+/// `tenant_task` provisioning work: leases, heartbeats, the due queue and the event log.
+#[async_trait::async_trait]
+pub trait ProvisioningStore: Send + Sync + 'static {
     /// Claim a provisioning lease for `tenant_id`. The
     /// implementation is responsible for fencing: if a prior
     /// lease is still active under a different owner the
@@ -343,29 +399,6 @@ pub trait RegistryStore: Send + Sync + 'static {
         now: chrono::DateTime<chrono::Utc>,
     ) -> Result<Vec<crate::http::registry::models::Tenant>, MemoryError>;
 
-    /// List tenants currently in `Ready` state, paginated by
-    /// an opaque cursor (the tenant id of the last item in the
-    /// previous page, or `None` for the first page).
-    async fn list_ready_tenants(
-        &self,
-        cursor: Option<&str>,
-        limit: usize,
-    ) -> Result<Vec<crate::http::registry::models::Tenant>, MemoryError>;
-
-    /// List tenants currently in `Deleting` state that are
-    /// eligible for the deletion worker.
-    async fn list_deleting_tenants(
-        &self,
-        limit: usize,
-        now: chrono::DateTime<chrono::Utc>,
-    ) -> Result<Vec<crate::http::registry::models::Tenant>, MemoryError>;
-
-    /// Return a bounded page of every durable Tenant binding for reconciliation.
-    async fn list_tenants(
-        &self,
-        limit: usize,
-    ) -> Result<Vec<crate::http::registry::models::Tenant>, MemoryError>;
-
     /// Append a provisioning event (durable seam consumed by the
     /// scheduler; written by `enqueue_provisioning`).
     async fn append_provisioning_event(
@@ -373,7 +406,11 @@ pub trait RegistryStore: Send + Sync + 'static {
         tenant_id: &str,
         stage: &str,
     ) -> Result<(), MemoryError>;
+}
 
+/// Plan and usage rows for the local profile.
+#[async_trait::async_trait]
+pub trait UsageStore: Send + Sync + 'static {
     /// Load the named Plan version. The durable default is the
     /// `Plan::default()` if no rows exist.
     async fn load_plan(&self, version: u32) -> Result<Plan, MemoryError>;
@@ -407,28 +444,15 @@ pub trait RegistryStore: Send + Sync + 'static {
         expected: crate::http::registry::plan::UsageCounter,
     ) -> Result<(), MemoryError>;
 
-    /// Store OIDC request sealed payload with explicit expiry
-    /// and AEAD nonce. `policy` is the durable OIDC fence; the write is
-    /// rejected unless the singleton mode is OIDC and the epoch matches.
-    #[cfg(feature = "control-plane")]
-    async fn store_oidc_request(
-        &self,
-        policy: &BrowserPolicyFence,
-        state_hash: &str,
-        sealed_payload: &[u8],
-        aead_nonce: &[u8; 12],
-    ) -> Result<(), MemoryError>;
+    /// Create the named local plan when absent; if present, verify every
+    /// limit field matches and fail with `'plan_limit_mismatch'` otherwise.
+    /// Returns the durable plan.
+    async fn ensure_local_plan(&self, plan: &Plan) -> Result<Plan, MemoryError>;
+}
 
-    /// Atomically consume an OIDC request by state hash.
-    /// Returns `None` if the state was already consumed or expired.
-    /// Guarded by the OIDC policy mode/epoch.
-    #[cfg(feature = "control-plane")]
-    async fn take_oidc_request(
-        &self,
-        policy: &BrowserPolicyFence,
-        state_hash: &str,
-    ) -> Result<Option<(Vec<u8>, [u8; 12])>, MemoryError>;
-
+/// `control_plane_session`, `oidc_request` and deletion-challenge rows.
+#[async_trait::async_trait]
+pub trait SessionStore: Send + Sync + 'static {
     /// Store a control-plane session under the current OIDC policy epoch.
     #[cfg(feature = "control-plane")]
     async fn store_session(
@@ -467,6 +491,28 @@ pub trait RegistryStore: Send + Sync + 'static {
         cookie_hash: &str,
     ) -> Result<(), MemoryError>;
 
+    /// Store OIDC request sealed payload with explicit expiry
+    /// and AEAD nonce. `policy` is the durable OIDC fence; the write is
+    /// rejected unless the singleton mode is OIDC and the epoch matches.
+    #[cfg(feature = "control-plane")]
+    async fn store_oidc_request(
+        &self,
+        policy: &BrowserPolicyFence,
+        state_hash: &str,
+        sealed_payload: &[u8],
+        aead_nonce: &[u8; 12],
+    ) -> Result<(), MemoryError>;
+
+    /// Atomically consume an OIDC request by state hash.
+    /// Returns `None` if the state was already consumed or expired.
+    /// Guarded by the OIDC policy mode/epoch.
+    #[cfg(feature = "control-plane")]
+    async fn take_oidc_request(
+        &self,
+        policy: &BrowserPolicyFence,
+        state_hash: &str,
+    ) -> Result<Option<(Vec<u8>, [u8; 12])>, MemoryError>;
+
     /// Persist a one-use deletion challenge keyed by a
     /// verifier; the raw token is never stored.
     #[cfg(feature = "control-plane")]
@@ -475,11 +521,23 @@ pub trait RegistryStore: Send + Sync + 'static {
         challenge: &crate::http::registry::models::DeletionChallengeRecord,
     ) -> Result<(), MemoryError>;
 
-    /// Create the named local plan when absent; if present, verify every
-    /// limit field matches and fail with `'plan_limit_mismatch'` otherwise.
-    /// Returns the durable plan.
-    async fn ensure_local_plan(&self, plan: &Plan) -> Result<Plan, MemoryError>;
+    /// Atomically consume a deletion challenge by verifier,
+    /// ensuring the same Account + session tuple match.
+    /// Returns `Conflict` when the challenge is missing,
+    /// expired, or already consumed.
+    #[cfg(feature = "control-plane")]
+    async fn consume_deletion_challenge(
+        &self,
+        verifier: &str,
+        account_id: &str,
+        session_id: &str,
+        now: chrono::DateTime<chrono::Utc>,
+    ) -> Result<(), MemoryError>;
+}
 
+/// The durable browser-auth policy fence (ADR-0057).
+#[async_trait::async_trait]
+pub trait BrowserPolicyStore: Send + Sync + 'static {
     /// Reconcile the durable browser-auth policy with the configured method
     /// set and return the resulting fence (ADR-0057).
     ///
@@ -527,31 +585,34 @@ pub trait RegistryStore: Send + Sync + 'static {
         &self,
         method: BrowserAuthMethod,
     ) -> Result<BrowserPolicyFence, MemoryError>;
+}
 
-    /// Atomically create the account, tenant, and external identity under a
-    /// matching browser auth policy fence. The policy mode/epoch are checked
-    /// before any record is written.
-    #[cfg(feature = "control-plane")]
-    async fn create_oidc_account_bundle(
-        &self,
-        policy: &BrowserPolicyFence,
-        account: &Account,
-        tenant: &Tenant,
-        identity: &ExternalIdentity,
-    ) -> Result<(), MemoryError>;
-
-    /// Atomically consume a deletion challenge by verifier,
-    /// ensuring the same Account + session tuple match.
-    /// Returns `Conflict` when the challenge is missing,
-    /// expired, or already consumed.
-    #[cfg(feature = "control-plane")]
-    async fn consume_deletion_challenge(
-        &self,
-        verifier: &str,
-        account_id: &str,
-        session_id: &str,
-        now: chrono::DateTime<chrono::Utc>,
-    ) -> Result<(), MemoryError>;
+/// Every registry operation, grouped by canonical table owner.
+///
+/// This is the omnibus handle composition passes around. It is a
+/// *bundle* of the owner traits above, not a second definition of
+/// them: a consumer that needs one owner's tables should depend on
+/// that owner's trait directly. It exists so the two store
+/// implementations and the existing call sites are unaffected by the
+/// split, not because the omnibus capability is wanted.
+///
+/// `ping` stays here rather than in an owner trait: it is a liveness
+/// probe over the connection, not a table operation.
+#[async_trait::async_trait]
+pub trait RegistryStore:
+    Send
+    + Sync
+    + 'static
+    + AccountStore
+    + IdentityStore
+    + TenantStore
+    + ApiKeyStore
+    + ProvisioningStore
+    + UsageStore
+    + SessionStore
+    + BrowserPolicyStore
+{
+    async fn ping(&self) -> bool;
 }
 
 /// Canonical durable implementation. Kept available through this
@@ -713,11 +774,8 @@ impl InMemoryStore {
 }
 
 #[cfg(any(test, feature = "test-fixtures"))]
-#[async_trait]
-impl RegistryStore for InMemoryStore {
-    async fn ping(&self) -> bool {
-        true
-    }
+#[async_trait::async_trait]
+impl AccountStore for InMemoryStore {
     async fn find_account_by_id(&self, id: &str) -> Result<Option<Account>, MemoryError> {
         Ok(self
             .accounts
@@ -727,6 +785,7 @@ impl RegistryStore for InMemoryStore {
             .find(|a| a.id == id)
             .cloned())
     }
+
     async fn find_account_by_identity(
         &self,
         issuer: &str,
@@ -743,6 +802,47 @@ impl RegistryStore for InMemoryStore {
             return Ok(None);
         };
         self.find_account_by_id(&account_id).await
+    }
+
+    async fn write_account(&self, account: &Account) -> Result<(), MemoryError> {
+        let mut accounts = self.lock_accounts();
+        if let Some(slot) = accounts.iter_mut().find(|a| a.id == account.id) {
+            if slot.status == AccountStatus::Deleting && account.status != AccountStatus::Deleting {
+                return Err(MemoryError::Conflict(
+                    "account deletion tombstone is immutable".into(),
+                ));
+            }
+            *slot = account.clone();
+        } else {
+            accounts.push(account.clone());
+        }
+        Ok(())
+    }
+
+    async fn transition_account_state(
+        &self,
+        account_id: &str,
+        from: AccountStatus,
+        to: AccountStatus,
+    ) -> Result<(), MemoryError> {
+        let mut accounts = self.lock_accounts();
+        let a = accounts
+            .iter_mut()
+            .find(|a| a.id == account_id)
+            .ok_or_else(|| MemoryError::NotFound(format!("account {account_id}")))?;
+        if a.status != from {
+            return Err(MemoryError::Conflict(format!(
+                "account {account_id} state transition failed: {:?} (expected {:?})",
+                a.status, from
+            )));
+        }
+        if a.status == AccountStatus::Deleting && to != AccountStatus::Deleting {
+            return Err(MemoryError::Conflict(format!(
+                "account {account_id} deletion tombstone is immutable"
+            )));
+        }
+        a.status = to;
+        Ok(())
     }
 
     async fn create_account_bundle(
@@ -813,6 +913,106 @@ impl RegistryStore for InMemoryStore {
         Ok(())
     }
 
+    #[cfg(feature = "control-plane")]
+    async fn create_oidc_account_bundle(
+        &self,
+        policy: &super::models::BrowserPolicyFence,
+        account: &Account,
+        tenant: &Tenant,
+        identity: &ExternalIdentity,
+    ) -> Result<(), MemoryError> {
+        {
+            let stored = self.lock_browser_policy();
+            match stored.as_ref() {
+                Some(existing)
+                    if existing.methods == policy.methods && existing.epoch == policy.epoch => {}
+                _ => return Err(MemoryError::Conflict("policy method/epoch mismatch".into())),
+            }
+        }
+        self.create_account_bundle(account, tenant, Some(identity))
+            .await
+    }
+
+    #[cfg(feature = "control-plane")]
+    async fn begin_account_deletion(
+        &self,
+        verifier: &str,
+        account_id: &str,
+        session_id: &str,
+        now: DateTime<Utc>,
+    ) -> Result<(), MemoryError> {
+        let mut challenges = self.lock_deletion_challenges();
+        let challenge_index = challenges
+            .iter()
+            .position(|challenge| challenge.verifier == verifier)
+            .ok_or_else(|| MemoryError::Conflict("deletion challenge is invalid".into()))?;
+        let challenge = &challenges[challenge_index];
+        if challenge.account_id != account_id || challenge.session_id != session_id {
+            return Err(MemoryError::Conflict(
+                "deletion challenge tuple mismatch".into(),
+            ));
+        }
+        if challenge.consumed_at.is_some() || challenge.expires_at <= now {
+            return Err(MemoryError::Conflict(
+                "deletion challenge is invalid or expired".into(),
+            ));
+        }
+
+        let mut accounts = self.lock_accounts();
+        let account_index = accounts
+            .iter()
+            .position(|account| account.id == account_id)
+            .ok_or_else(|| MemoryError::NotFound(format!("account {account_id}")))?;
+        if accounts[account_index].status != AccountStatus::Active {
+            return Err(MemoryError::Conflict("account is not active".into()));
+        }
+        let tenant_id = accounts[account_index].tenant_id.clone();
+
+        let mut tenants = self.lock_tenants();
+        let tenant_index = tenants
+            .iter()
+            .position(|tenant| tenant.id == tenant_id)
+            .ok_or_else(|| MemoryError::NotFound(format!("tenant {tenant_id}")))?;
+        if tenants[tenant_index].status == TenantStatus::Purged {
+            return Err(MemoryError::Conflict(
+                "tenant deletion tombstone is purged".into(),
+            ));
+        }
+
+        let mut keys = self.lock_api_keys();
+        let mut audit_events = self.lock_audit_events();
+        let next_tenant_version = tenants[tenant_index]
+            .version
+            .checked_add(1)
+            .ok_or_else(|| MemoryError::Conflict("tenant version overflow".into()))?;
+        accounts[account_index].status = AccountStatus::Deleting;
+        tenants[tenant_index].status = TenantStatus::Deleting;
+        tenants[tenant_index].provisioning_lease = None;
+        tenants[tenant_index].version = next_tenant_version;
+        for key in keys.iter_mut() {
+            if key.account_id == account_id && key.status == ApiKeyStatus::Active {
+                key.status = ApiKeyStatus::Revoked;
+            }
+        }
+        self.sessions
+            .lock()
+            .expect("poisoned")
+            .retain(|_, session| session.account_id != account_id);
+        challenges[challenge_index].consumed_at = Some(now);
+        audit_events.push(ControlAuditEvent::for_account(
+            account_id,
+            AuditActorKind::Account,
+            account_id,
+            "account_deletion_started",
+            now,
+        ));
+        Ok(())
+    }
+}
+
+#[async_trait::async_trait]
+#[cfg(any(test, feature = "test-fixtures"))]
+impl IdentityStore for InMemoryStore {
     async fn find_external_identities(
         &self,
         account_id: &str,
@@ -977,150 +1177,251 @@ impl RegistryStore for InMemoryStore {
         ));
         Ok(())
     }
+}
 
-    async fn create_api_key_if_below_limit(
-        &self,
-        key: &ApiKey,
-        max_active: u32,
-    ) -> Result<(), MemoryError> {
-        let mut keys = self.lock_api_keys();
-        let now = chrono::Utc::now();
-        let active = keys
-            .iter()
-            .filter(|k| {
-                k.account_id == key.account_id
-                    && matches!(k.status, ApiKeyStatus::Active)
-                    && k.expires_at.is_none_or(|expires_at| expires_at > now)
-            })
-            .count() as u32;
-        if active >= max_active {
-            return Err(MemoryError::Conflict(format!(
-                "account {} reached max active api keys {max_active}",
-                key.account_id
-            )));
-        }
-        if keys.iter().any(|k| k.id == key.id) {
-            return Err(MemoryError::Conflict(format!(
-                "api key {} already exists",
-                key.id
-            )));
-        }
-        keys.push(key.clone());
-        Ok(())
-    }
-
-    async fn revoke_all_api_keys(&self, account_id: &str) -> Result<u64, MemoryError> {
-        let mut keys = self.lock_api_keys();
-        let mut count = 0u64;
-        for k in keys.iter_mut() {
-            if k.account_id == account_id && matches!(k.status, ApiKeyStatus::Active) {
-                k.status = ApiKeyStatus::Revoked;
-                count += 1;
-            }
-        }
-        Ok(count)
-    }
-
-    async fn transition_account_state(
+#[async_trait::async_trait]
+#[cfg(any(test, feature = "test-fixtures"))]
+impl TenantStore for InMemoryStore {
+    async fn find_tenant_by_account(
         &self,
         account_id: &str,
-        from: AccountStatus,
-        to: AccountStatus,
-    ) -> Result<(), MemoryError> {
-        let mut accounts = self.lock_accounts();
-        let a = accounts
-            .iter_mut()
-            .find(|a| a.id == account_id)
-            .ok_or_else(|| MemoryError::NotFound(format!("account {account_id}")))?;
-        if a.status != from {
-            return Err(MemoryError::Conflict(format!(
-                "account {account_id} state transition failed: {:?} (expected {:?})",
-                a.status, from
-            )));
-        }
-        if a.status == AccountStatus::Deleting && to != AccountStatus::Deleting {
-            return Err(MemoryError::Conflict(format!(
-                "account {account_id} deletion tombstone is immutable"
-            )));
-        }
-        a.status = to;
-        Ok(())
+    ) -> Result<Option<Tenant>, MemoryError> {
+        let account = self.find_account_by_id(account_id).await?;
+        let Some(account) = account else {
+            return Ok(None);
+        };
+        Ok(self
+            .tenants
+            .lock()
+            .expect("in-memory store poisoned")
+            .iter()
+            .find(|t| t.id == account.tenant_id)
+            .cloned())
     }
 
-    #[cfg(feature = "control-plane")]
-    async fn begin_account_deletion(
-        &self,
-        verifier: &str,
-        account_id: &str,
-        session_id: &str,
-        now: DateTime<Utc>,
-    ) -> Result<(), MemoryError> {
-        let mut challenges = self.lock_deletion_challenges();
-        let challenge_index = challenges
+    async fn find_tenant_by_id(&self, id: &str) -> Result<Option<Tenant>, MemoryError> {
+        Ok(self
+            .tenants
+            .lock()
+            .expect("in-memory store poisoned")
             .iter()
-            .position(|challenge| challenge.verifier == verifier)
-            .ok_or_else(|| MemoryError::Conflict("deletion challenge is invalid".into()))?;
-        let challenge = &challenges[challenge_index];
-        if challenge.account_id != account_id || challenge.session_id != session_id {
-            return Err(MemoryError::Conflict(
-                "deletion challenge tuple mismatch".into(),
-            ));
-        }
-        if challenge.consumed_at.is_some() || challenge.expires_at <= now {
-            return Err(MemoryError::Conflict(
-                "deletion challenge is invalid or expired".into(),
-            ));
-        }
+            .find(|t| t.id == id)
+            .cloned())
+    }
 
-        let mut accounts = self.lock_accounts();
-        let account_index = accounts
-            .iter()
-            .position(|account| account.id == account_id)
-            .ok_or_else(|| MemoryError::NotFound(format!("account {account_id}")))?;
-        if accounts[account_index].status != AccountStatus::Active {
-            return Err(MemoryError::Conflict("account is not active".into()));
-        }
-        let tenant_id = accounts[account_index].tenant_id.clone();
-
+    async fn write_tenant(&self, tenant: &Tenant) -> Result<(), MemoryError> {
         let mut tenants = self.lock_tenants();
-        let tenant_index = tenants
-            .iter()
-            .position(|tenant| tenant.id == tenant_id)
-            .ok_or_else(|| MemoryError::NotFound(format!("tenant {tenant_id}")))?;
-        if tenants[tenant_index].status == TenantStatus::Purged {
-            return Err(MemoryError::Conflict(
-                "tenant deletion tombstone is purged".into(),
-            ));
+        if let Some(slot) = tenants.iter_mut().find(|t| t.id == tenant.id) {
+            if slot.namespace_binding.namespace != tenant.namespace_binding.namespace
+                || slot.namespace_binding.database != tenant.namespace_binding.database
+            {
+                return Err(MemoryError::Conflict(
+                    "tenant namespace binding is immutable".into(),
+                ));
+            }
+            if slot.status == TenantStatus::Purged && tenant.status != TenantStatus::Purged {
+                return Err(MemoryError::Conflict(
+                    "purged tenant tombstone is immutable".into(),
+                ));
+            }
+            *slot = tenant.clone();
+        } else if tenants.iter().any(|existing| {
+            existing.namespace_binding.namespace == tenant.namespace_binding.namespace
+        }) {
+            return Err(MemoryError::Conflict(format!(
+                "namespace {} is already bound",
+                tenant.namespace_binding.namespace
+            )));
+        } else {
+            tenants.push(tenant.clone());
         }
+        Ok(())
+    }
 
-        let mut keys = self.lock_api_keys();
-        let mut audit_events = self.lock_audit_events();
-        let next_tenant_version = tenants[tenant_index]
+    async fn update_tenant_state(
+        &self,
+        tenant_id: &str,
+        expected_version: u64,
+        from: TenantStatus,
+        to: TenantStatus,
+    ) -> Result<u64, MemoryError> {
+        let mut tenants = self.lock_tenants();
+        let t = tenants
+            .iter_mut()
+            .find(|t| t.id == tenant_id)
+            .ok_or_else(|| MemoryError::NotFound(format!("tenant {tenant_id}")))?;
+        if t.version != expected_version || t.status != from {
+            return Err(MemoryError::Conflict(format!(
+                "tenant {tenant_id} CAS failed: version {} (expected {}) status {:?} (expected {:?})",
+                t.version, expected_version, t.status, from
+            )));
+        }
+        t.status = to;
+        t.version = t
             .version
             .checked_add(1)
-            .ok_or_else(|| MemoryError::Conflict("tenant version overflow".into()))?;
-        accounts[account_index].status = AccountStatus::Deleting;
-        tenants[tenant_index].status = TenantStatus::Deleting;
-        tenants[tenant_index].provisioning_lease = None;
-        tenants[tenant_index].version = next_tenant_version;
-        for key in keys.iter_mut() {
-            if key.account_id == account_id && key.status == ApiKeyStatus::Active {
-                key.status = ApiKeyStatus::Revoked;
+            .ok_or_else(|| MemoryError::Conflict(format!("tenant {tenant_id} version overflow")))?;
+        Ok(t.version)
+    }
+
+    async fn update_tenant_state_fenced(
+        &self,
+        tenant_id: &str,
+        expected_version: u64,
+        from: TenantStatus,
+        to: TenantStatus,
+        lease: &LeaseFence<'_>,
+    ) -> Result<u64, MemoryError> {
+        let mut tenants = self.lock_tenants();
+        let t = tenants
+            .iter_mut()
+            .find(|t| t.id == tenant_id)
+            .ok_or_else(|| MemoryError::NotFound(format!("tenant {tenant_id}")))?;
+        if t.version != expected_version || t.status != from {
+            return Err(MemoryError::Conflict(format!(
+                "tenant {tenant_id} CAS failed: version {} (expected {}) status {:?} (expected {:?})",
+                t.version, expected_version, t.status, from
+            )));
+        }
+        match &t.provisioning_lease {
+            Some(stored)
+                if stored.owner_id == lease.owner_id
+                    && stored.lease_id == lease.lease_id
+                    && stored.fencing_generation == lease.fencing_generation
+                    && stored.expires_at > chrono::Utc::now() => {}
+            Some(stored) => {
+                return Err(MemoryError::Conflict(format!(
+                    "tenant {tenant_id} fenced CAS failed: lease mismatch (got owner={} lease={} gen={}; expected owner={} lease={} gen={})",
+                    stored.owner_id,
+                    stored.lease_id,
+                    stored.fencing_generation,
+                    lease.owner_id,
+                    lease.lease_id,
+                    lease.fencing_generation,
+                )));
+            }
+            None => {
+                return Err(MemoryError::Conflict(format!(
+                    "tenant {tenant_id} fenced CAS failed: no active lease"
+                )));
             }
         }
-        self.sessions
-            .lock()
-            .expect("poisoned")
-            .retain(|_, session| session.account_id != account_id);
-        challenges[challenge_index].consumed_at = Some(now);
-        audit_events.push(ControlAuditEvent::for_account(
-            account_id,
-            AuditActorKind::Account,
-            account_id,
-            "account_deletion_started",
-            now,
-        ));
-        Ok(())
+        t.status = to;
+        t.version = t
+            .version
+            .checked_add(1)
+            .ok_or_else(|| MemoryError::Conflict(format!("tenant {tenant_id} version overflow")))?;
+        Ok(t.version)
+    }
+
+    async fn update_tenant_schema_version_fenced(
+        &self,
+        tenant_id: &str,
+        expected_version: u64,
+        new_schema_version: u32,
+        lease_owner_id: &str,
+        lease_id: &str,
+        fencing_generation: u64,
+    ) -> Result<u64, MemoryError> {
+        let mut tenants = self.lock_tenants();
+        let t = tenants
+            .iter_mut()
+            .find(|t| t.id == tenant_id)
+            .ok_or_else(|| MemoryError::NotFound(format!("tenant {tenant_id}")))?;
+        if t.version != expected_version {
+            return Err(MemoryError::Conflict(format!(
+                "tenant {tenant_id} schema-version CAS failed: version {} (expected {})",
+                t.version, expected_version
+            )));
+        }
+        match &t.provisioning_lease {
+            Some(stored)
+                if stored.owner_id == lease_owner_id
+                    && stored.lease_id == lease_id
+                    && stored.fencing_generation == fencing_generation
+                    && stored.expires_at > chrono::Utc::now() => {}
+            Some(stored) => {
+                return Err(MemoryError::Conflict(format!(
+                    "tenant {tenant_id} schema-version fenced CAS failed: lease mismatch (got owner={} lease={} gen={}; expected owner={} lease={} gen={})",
+                    stored.owner_id,
+                    stored.lease_id,
+                    stored.fencing_generation,
+                    lease_owner_id,
+                    lease_id,
+                    fencing_generation,
+                )));
+            }
+            None => {
+                return Err(MemoryError::Conflict(format!(
+                    "tenant {tenant_id} schema-version fenced CAS failed: no active lease"
+                )));
+            }
+        }
+        t.schema_version = new_schema_version;
+        t.version = t
+            .version
+            .checked_add(1)
+            .ok_or_else(|| MemoryError::Conflict(format!("tenant {tenant_id} version overflow")))?;
+        Ok(t.version)
+    }
+
+    async fn list_tenants(
+        &self,
+        limit: usize,
+    ) -> Result<Vec<crate::http::registry::models::Tenant>, MemoryError> {
+        let tenants = self.lock_tenants();
+        Ok(tenants.iter().take(limit).cloned().collect())
+    }
+
+    async fn list_ready_tenants(
+        &self,
+        cursor: Option<&str>,
+        limit: usize,
+    ) -> Result<Vec<crate::http::registry::models::Tenant>, MemoryError> {
+        let tenants = self.lock_tenants();
+        let mut out = Vec::new();
+        let mut started = cursor.is_none();
+        for t in tenants.iter() {
+            if !matches!(t.status, TenantStatus::Ready) {
+                continue;
+            }
+            if !started {
+                if Some(t.id.as_str()) == cursor {
+                    started = true;
+                }
+                continue;
+            }
+            out.push(t.clone());
+            if out.len() >= limit {
+                break;
+            }
+        }
+        Ok(out)
+    }
+
+    async fn list_deleting_tenants(
+        &self,
+        limit: usize,
+        now: chrono::DateTime<Utc>,
+    ) -> Result<Vec<crate::http::registry::models::Tenant>, MemoryError> {
+        if limit == 0 {
+            return Ok(Vec::new());
+        }
+        let tenants = self.lock_tenants();
+        let mut out = Vec::new();
+        for t in tenants.iter() {
+            if matches!(t.status, TenantStatus::Deleting)
+                && t.provisioning_lease
+                    .as_ref()
+                    .is_none_or(|lease| lease.expires_at <= now)
+            {
+                out.push(t.clone());
+            }
+            if out.len() >= limit {
+                break;
+            }
+        }
+        Ok(out)
     }
 
     #[cfg(feature = "control-plane")]
@@ -1251,32 +1552,11 @@ impl RegistryStore for InMemoryStore {
         ));
         Ok(())
     }
+}
 
-    async fn find_tenant_by_account(
-        &self,
-        account_id: &str,
-    ) -> Result<Option<Tenant>, MemoryError> {
-        let account = self.find_account_by_id(account_id).await?;
-        let Some(account) = account else {
-            return Ok(None);
-        };
-        Ok(self
-            .tenants
-            .lock()
-            .expect("in-memory store poisoned")
-            .iter()
-            .find(|t| t.id == account.tenant_id)
-            .cloned())
-    }
-    async fn find_tenant_by_id(&self, id: &str) -> Result<Option<Tenant>, MemoryError> {
-        Ok(self
-            .tenants
-            .lock()
-            .expect("in-memory store poisoned")
-            .iter()
-            .find(|t| t.id == id)
-            .cloned())
-    }
+#[async_trait::async_trait]
+#[cfg(any(test, feature = "test-fixtures"))]
+impl ApiKeyStore for InMemoryStore {
     async fn find_api_key(&self, id: &str) -> Result<Option<ApiKey>, MemoryError> {
         Ok(self
             .api_keys
@@ -1286,6 +1566,7 @@ impl RegistryStore for InMemoryStore {
             .find(|k| k.id == id)
             .cloned())
     }
+
     async fn write_api_key(&self, key: &ApiKey) -> Result<(), MemoryError> {
         let mut keys = self.lock_api_keys();
         if keys.iter().any(|stored| stored.id == key.id) {
@@ -1297,6 +1578,7 @@ impl RegistryStore for InMemoryStore {
         keys.push(key.clone());
         Ok(())
     }
+
     async fn list_api_keys(&self, account_id: &str) -> Result<Vec<ApiKeyMeta>, MemoryError> {
         Ok(self
             .api_keys
@@ -1314,6 +1596,7 @@ impl RegistryStore for InMemoryStore {
             })
             .collect())
     }
+
     async fn revoke_api_key(&self, account_id: &str, key_id: &str) -> Result<(), MemoryError> {
         let mut keys = self.lock_api_keys();
         let k = keys
@@ -1332,6 +1615,7 @@ impl RegistryStore for InMemoryStore {
             .ok_or_else(|| MemoryError::Conflict(format!("api key {key_id} version overflow")))?;
         Ok(())
     }
+
     async fn touch_api_key(&self, key_id: &str, used_at: DateTime<Utc>) -> Result<(), MemoryError> {
         let mut keys = self.lock_api_keys();
         if let Some(k) = keys.iter_mut().find(|k| {
@@ -1343,172 +1627,54 @@ impl RegistryStore for InMemoryStore {
         }
         Ok(())
     }
-    async fn write_account(&self, account: &Account) -> Result<(), MemoryError> {
-        let mut accounts = self.lock_accounts();
-        if let Some(slot) = accounts.iter_mut().find(|a| a.id == account.id) {
-            if slot.status == AccountStatus::Deleting && account.status != AccountStatus::Deleting {
-                return Err(MemoryError::Conflict(
-                    "account deletion tombstone is immutable".into(),
-                ));
-            }
-            *slot = account.clone();
-        } else {
-            accounts.push(account.clone());
+
+    async fn create_api_key_if_below_limit(
+        &self,
+        key: &ApiKey,
+        max_active: u32,
+    ) -> Result<(), MemoryError> {
+        let mut keys = self.lock_api_keys();
+        let now = chrono::Utc::now();
+        let active = keys
+            .iter()
+            .filter(|k| {
+                k.account_id == key.account_id
+                    && matches!(k.status, ApiKeyStatus::Active)
+                    && k.expires_at.is_none_or(|expires_at| expires_at > now)
+            })
+            .count() as u32;
+        if active >= max_active {
+            return Err(MemoryError::Conflict(format!(
+                "account {} reached max active api keys {max_active}",
+                key.account_id
+            )));
         }
+        if keys.iter().any(|k| k.id == key.id) {
+            return Err(MemoryError::Conflict(format!(
+                "api key {} already exists",
+                key.id
+            )));
+        }
+        keys.push(key.clone());
         Ok(())
     }
-    async fn write_tenant(&self, tenant: &Tenant) -> Result<(), MemoryError> {
-        let mut tenants = self.lock_tenants();
-        if let Some(slot) = tenants.iter_mut().find(|t| t.id == tenant.id) {
-            if slot.namespace_binding.namespace != tenant.namespace_binding.namespace
-                || slot.namespace_binding.database != tenant.namespace_binding.database
-            {
-                return Err(MemoryError::Conflict(
-                    "tenant namespace binding is immutable".into(),
-                ));
+
+    async fn revoke_all_api_keys(&self, account_id: &str) -> Result<u64, MemoryError> {
+        let mut keys = self.lock_api_keys();
+        let mut count = 0u64;
+        for k in keys.iter_mut() {
+            if k.account_id == account_id && matches!(k.status, ApiKeyStatus::Active) {
+                k.status = ApiKeyStatus::Revoked;
+                count += 1;
             }
-            if slot.status == TenantStatus::Purged && tenant.status != TenantStatus::Purged {
-                return Err(MemoryError::Conflict(
-                    "purged tenant tombstone is immutable".into(),
-                ));
-            }
-            *slot = tenant.clone();
-        } else if tenants.iter().any(|existing| {
-            existing.namespace_binding.namespace == tenant.namespace_binding.namespace
-        }) {
-            return Err(MemoryError::Conflict(format!(
-                "namespace {} is already bound",
-                tenant.namespace_binding.namespace
-            )));
-        } else {
-            tenants.push(tenant.clone());
         }
-        Ok(())
+        Ok(count)
     }
-    async fn update_tenant_state(
-        &self,
-        tenant_id: &str,
-        expected_version: u64,
-        from: TenantStatus,
-        to: TenantStatus,
-    ) -> Result<u64, MemoryError> {
-        let mut tenants = self.lock_tenants();
-        let t = tenants
-            .iter_mut()
-            .find(|t| t.id == tenant_id)
-            .ok_or_else(|| MemoryError::NotFound(format!("tenant {tenant_id}")))?;
-        if t.version != expected_version || t.status != from {
-            return Err(MemoryError::Conflict(format!(
-                "tenant {tenant_id} CAS failed: version {} (expected {}) status {:?} (expected {:?})",
-                t.version, expected_version, t.status, from
-            )));
-        }
-        t.status = to;
-        t.version = t
-            .version
-            .checked_add(1)
-            .ok_or_else(|| MemoryError::Conflict(format!("tenant {tenant_id} version overflow")))?;
-        Ok(t.version)
-    }
-    async fn update_tenant_state_fenced(
-        &self,
-        tenant_id: &str,
-        expected_version: u64,
-        from: TenantStatus,
-        to: TenantStatus,
-        lease: &LeaseFence<'_>,
-    ) -> Result<u64, MemoryError> {
-        let mut tenants = self.lock_tenants();
-        let t = tenants
-            .iter_mut()
-            .find(|t| t.id == tenant_id)
-            .ok_or_else(|| MemoryError::NotFound(format!("tenant {tenant_id}")))?;
-        if t.version != expected_version || t.status != from {
-            return Err(MemoryError::Conflict(format!(
-                "tenant {tenant_id} CAS failed: version {} (expected {}) status {:?} (expected {:?})",
-                t.version, expected_version, t.status, from
-            )));
-        }
-        match &t.provisioning_lease {
-            Some(stored)
-                if stored.owner_id == lease.owner_id
-                    && stored.lease_id == lease.lease_id
-                    && stored.fencing_generation == lease.fencing_generation
-                    && stored.expires_at > chrono::Utc::now() => {}
-            Some(stored) => {
-                return Err(MemoryError::Conflict(format!(
-                    "tenant {tenant_id} fenced CAS failed: lease mismatch (got owner={} lease={} gen={}; expected owner={} lease={} gen={})",
-                    stored.owner_id,
-                    stored.lease_id,
-                    stored.fencing_generation,
-                    lease.owner_id,
-                    lease.lease_id,
-                    lease.fencing_generation,
-                )));
-            }
-            None => {
-                return Err(MemoryError::Conflict(format!(
-                    "tenant {tenant_id} fenced CAS failed: no active lease"
-                )));
-            }
-        }
-        t.status = to;
-        t.version = t
-            .version
-            .checked_add(1)
-            .ok_or_else(|| MemoryError::Conflict(format!("tenant {tenant_id} version overflow")))?;
-        Ok(t.version)
-    }
-    async fn update_tenant_schema_version_fenced(
-        &self,
-        tenant_id: &str,
-        expected_version: u64,
-        new_schema_version: u32,
-        lease_owner_id: &str,
-        lease_id: &str,
-        fencing_generation: u64,
-    ) -> Result<u64, MemoryError> {
-        let mut tenants = self.lock_tenants();
-        let t = tenants
-            .iter_mut()
-            .find(|t| t.id == tenant_id)
-            .ok_or_else(|| MemoryError::NotFound(format!("tenant {tenant_id}")))?;
-        if t.version != expected_version {
-            return Err(MemoryError::Conflict(format!(
-                "tenant {tenant_id} schema-version CAS failed: version {} (expected {})",
-                t.version, expected_version
-            )));
-        }
-        match &t.provisioning_lease {
-            Some(stored)
-                if stored.owner_id == lease_owner_id
-                    && stored.lease_id == lease_id
-                    && stored.fencing_generation == fencing_generation
-                    && stored.expires_at > chrono::Utc::now() => {}
-            Some(stored) => {
-                return Err(MemoryError::Conflict(format!(
-                    "tenant {tenant_id} schema-version fenced CAS failed: lease mismatch (got owner={} lease={} gen={}; expected owner={} lease={} gen={})",
-                    stored.owner_id,
-                    stored.lease_id,
-                    stored.fencing_generation,
-                    lease_owner_id,
-                    lease_id,
-                    fencing_generation,
-                )));
-            }
-            None => {
-                return Err(MemoryError::Conflict(format!(
-                    "tenant {tenant_id} schema-version fenced CAS failed: no active lease"
-                )));
-            }
-        }
-        t.schema_version = new_schema_version;
-        t.version = t
-            .version
-            .checked_add(1)
-            .ok_or_else(|| MemoryError::Conflict(format!("tenant {tenant_id} version overflow")))?;
-        Ok(t.version)
-    }
+}
+
+#[async_trait::async_trait]
+#[cfg(any(test, feature = "test-fixtures"))]
+impl ProvisioningStore for InMemoryStore {
     async fn claim_provisioning(
         &self,
         tenant_id: &str,
@@ -1570,6 +1736,7 @@ impl RegistryStore for InMemoryStore {
             heartbeat_at: lease.heartbeat_at,
         }))
     }
+
     async fn release_provisioning_lease(
         &self,
         tenant_id: &str,
@@ -1599,6 +1766,7 @@ impl RegistryStore for InMemoryStore {
             ))),
         }
     }
+
     async fn heartbeat_provisioning(
         &self,
         tenant_id: &str,
@@ -1638,6 +1806,7 @@ impl RegistryStore for InMemoryStore {
             )))
         }
     }
+
     async fn list_due_provisioning(
         &self,
         limit: usize,
@@ -1675,65 +1844,22 @@ impl RegistryStore for InMemoryStore {
         Ok(out)
     }
 
-    async fn list_ready_tenants(
+    async fn append_provisioning_event(
         &self,
-        cursor: Option<&str>,
-        limit: usize,
-    ) -> Result<Vec<crate::http::registry::models::Tenant>, MemoryError> {
-        let tenants = self.lock_tenants();
-        let mut out = Vec::new();
-        let mut started = cursor.is_none();
-        for t in tenants.iter() {
-            if !matches!(t.status, TenantStatus::Ready) {
-                continue;
-            }
-            if !started {
-                if Some(t.id.as_str()) == cursor {
-                    started = true;
-                }
-                continue;
-            }
-            out.push(t.clone());
-            if out.len() >= limit {
-                break;
-            }
-        }
-        Ok(out)
+        tenant_id: &str,
+        stage: &str,
+    ) -> Result<(), MemoryError> {
+        self.events
+            .lock()
+            .expect("in-memory store poisoned")
+            .push((tenant_id.to_string(), stage.to_string()));
+        Ok(())
     }
+}
 
-    async fn list_deleting_tenants(
-        &self,
-        limit: usize,
-        now: chrono::DateTime<Utc>,
-    ) -> Result<Vec<crate::http::registry::models::Tenant>, MemoryError> {
-        if limit == 0 {
-            return Ok(Vec::new());
-        }
-        let tenants = self.lock_tenants();
-        let mut out = Vec::new();
-        for t in tenants.iter() {
-            if matches!(t.status, TenantStatus::Deleting)
-                && t.provisioning_lease
-                    .as_ref()
-                    .is_none_or(|lease| lease.expires_at <= now)
-            {
-                out.push(t.clone());
-            }
-            if out.len() >= limit {
-                break;
-            }
-        }
-        Ok(out)
-    }
-
-    async fn list_tenants(
-        &self,
-        limit: usize,
-    ) -> Result<Vec<crate::http::registry::models::Tenant>, MemoryError> {
-        let tenants = self.lock_tenants();
-        Ok(tenants.iter().take(limit).cloned().collect())
-    }
-
+#[async_trait::async_trait]
+#[cfg(any(test, feature = "test-fixtures"))]
+impl UsageStore for InMemoryStore {
     async fn load_plan(&self, version: u32) -> Result<Plan, MemoryError> {
         Ok(self
             .plans
@@ -1797,54 +1923,25 @@ impl RegistryStore for InMemoryStore {
             .insert(tenant_id.to_owned(), expected);
         Ok(())
     }
-    async fn append_provisioning_event(
-        &self,
-        tenant_id: &str,
-        stage: &str,
-    ) -> Result<(), MemoryError> {
-        self.events
-            .lock()
-            .expect("in-memory store poisoned")
-            .push((tenant_id.to_string(), stage.to_string()));
-        Ok(())
-    }
 
-    #[cfg(feature = "control-plane")]
-    async fn store_oidc_request(
-        &self,
-        policy: &BrowserPolicyFence,
-        state_hash: &str,
-        sealed_payload: &[u8],
-        aead_nonce: &[u8; 12],
-    ) -> Result<(), MemoryError> {
-        self.require_oidc_policy(policy)?;
-        let mut requests = self.lock_oidc_requests();
-        if requests.contains_key(state_hash) {
-            return Err(MemoryError::Conflict(
-                "OIDC request state already exists".into(),
-            ));
+    async fn ensure_local_plan(&self, plan: &Plan) -> Result<Plan, MemoryError> {
+        let mut plans = self.plans.lock().expect("poisoned");
+        let plan_id = format!("local_plan_v{}", plan.version);
+        if let Some(existing) = plans.get(&plan.version).filter(|p| p.id == plan_id) {
+            if existing.limits != plan.limits {
+                return Err(MemoryError::Conflict("plan limit mismatch".into()));
+            }
+            Ok(existing.clone())
+        } else {
+            plans.insert(plan.version, plan.clone());
+            Ok(plan.clone())
         }
-        requests.insert(
-            state_hash.to_string(),
-            (sealed_payload.to_vec(), *aead_nonce),
-        );
-        Ok(())
     }
+}
 
-    #[cfg(feature = "control-plane")]
-    async fn take_oidc_request(
-        &self,
-        policy: &BrowserPolicyFence,
-        state_hash: &str,
-    ) -> Result<Option<(Vec<u8>, [u8; 12])>, MemoryError> {
-        self.require_oidc_policy(policy)?;
-        Ok(self
-            .oidc_requests
-            .lock()
-            .expect("poisoned")
-            .remove(state_hash))
-    }
-
+#[async_trait::async_trait]
+#[cfg(any(test, feature = "test-fixtures"))]
+impl SessionStore for InMemoryStore {
     #[cfg(feature = "control-plane")]
     async fn store_session(
         &self,
@@ -1933,6 +2030,42 @@ impl RegistryStore for InMemoryStore {
     }
 
     #[cfg(feature = "control-plane")]
+    async fn store_oidc_request(
+        &self,
+        policy: &BrowserPolicyFence,
+        state_hash: &str,
+        sealed_payload: &[u8],
+        aead_nonce: &[u8; 12],
+    ) -> Result<(), MemoryError> {
+        self.require_oidc_policy(policy)?;
+        let mut requests = self.lock_oidc_requests();
+        if requests.contains_key(state_hash) {
+            return Err(MemoryError::Conflict(
+                "OIDC request state already exists".into(),
+            ));
+        }
+        requests.insert(
+            state_hash.to_string(),
+            (sealed_payload.to_vec(), *aead_nonce),
+        );
+        Ok(())
+    }
+
+    #[cfg(feature = "control-plane")]
+    async fn take_oidc_request(
+        &self,
+        policy: &BrowserPolicyFence,
+        state_hash: &str,
+    ) -> Result<Option<(Vec<u8>, [u8; 12])>, MemoryError> {
+        self.require_oidc_policy(policy)?;
+        Ok(self
+            .oidc_requests
+            .lock()
+            .expect("poisoned")
+            .remove(state_hash))
+    }
+
+    #[cfg(feature = "control-plane")]
     async fn create_deletion_challenge(
         &self,
         challenge: &DeletionChallengeRecord,
@@ -1976,21 +2109,11 @@ impl RegistryStore for InMemoryStore {
         c.consumed_at = Some(now);
         Ok(())
     }
+}
 
-    async fn ensure_local_plan(&self, plan: &Plan) -> Result<Plan, MemoryError> {
-        let mut plans = self.plans.lock().expect("poisoned");
-        let plan_id = format!("local_plan_v{}", plan.version);
-        if let Some(existing) = plans.get(&plan.version).filter(|p| p.id == plan_id) {
-            if existing.limits != plan.limits {
-                return Err(MemoryError::Conflict("plan limit mismatch".into()));
-            }
-            Ok(existing.clone())
-        } else {
-            plans.insert(plan.version, plan.clone());
-            Ok(plan.clone())
-        }
-    }
-
+#[async_trait::async_trait]
+#[cfg(any(test, feature = "test-fixtures"))]
+impl BrowserPolicyStore for InMemoryStore {
     #[cfg(feature = "control-plane")]
     async fn reconcile_browser_policy(
         &self,
@@ -2066,25 +2189,13 @@ impl RegistryStore for InMemoryStore {
         existing.epoch += 1;
         Ok(existing.clone())
     }
+}
 
-    #[cfg(feature = "control-plane")]
-    async fn create_oidc_account_bundle(
-        &self,
-        policy: &super::models::BrowserPolicyFence,
-        account: &Account,
-        tenant: &Tenant,
-        identity: &ExternalIdentity,
-    ) -> Result<(), MemoryError> {
-        {
-            let stored = self.lock_browser_policy();
-            match stored.as_ref() {
-                Some(existing)
-                    if existing.methods == policy.methods && existing.epoch == policy.epoch => {}
-                _ => return Err(MemoryError::Conflict("policy method/epoch mismatch".into())),
-            }
-        }
-        self.create_account_bundle(account, tenant, Some(identity))
-            .await
+#[async_trait::async_trait]
+#[cfg(any(test, feature = "test-fixtures"))]
+impl RegistryStore for InMemoryStore {
+    async fn ping(&self) -> bool {
+        true
     }
 }
 
@@ -2116,9 +2227,50 @@ mod tests {
         assert_send_sync::<Arc<dyn RegistryStore>>();
     }
 
+    /// The bundle's blanket vtable only builds because every supertrait
+    /// desugars its `async fn`. Dropping `#[async_trait]` from one would
+    /// still compile the *declarations* and fail only where a trait object
+    /// is constructed, so pin it here rather than leaving it to a
+    /// downstream `dyn` use to notice.
+    #[test]
+    fn every_owner_trait_is_dyn_compatible() {
+        fn assert_dyn<T: Send + Sync + 'static>() {}
+        assert_dyn::<Arc<dyn AccountStore>>();
+        assert_dyn::<Arc<dyn IdentityStore>>();
+        assert_dyn::<Arc<dyn TenantStore>>();
+        assert_dyn::<Arc<dyn ApiKeyStore>>();
+        assert_dyn::<Arc<dyn ProvisioningStore>>();
+        assert_dyn::<Arc<dyn UsageStore>>();
+        assert_dyn::<Arc<dyn SessionStore>>();
+        assert_dyn::<Arc<dyn BrowserPolicyStore>>();
+    }
+
+    /// A store must satisfy each owner trait *and* the bundle, so the
+    /// split cannot drift so that a concrete store no longer matches a
+    /// supertrait the bundle names.
+    #[test]
+    fn both_stores_satisfy_every_owner_trait_and_the_bundle() {
+        fn assert_bundle<T: RegistryStore>() {}
+        fn assert_each<T>()
+        where
+            T: AccountStore
+                + IdentityStore
+                + TenantStore
+                + ApiKeyStore
+                + ProvisioningStore
+                + UsageStore
+                + SessionStore
+                + BrowserPolicyStore,
+        {
+        }
+        assert_bundle::<InMemoryStore>();
+        assert_each::<InMemoryStore>();
+        assert_bundle::<crate::http::registry::SurrealRegistryStore>();
+        assert_each::<crate::http::registry::SurrealRegistryStore>();
+    }
+
     #[tokio::test]
     async fn in_memory_store_round_trips_account_and_tenant() {
-        use super::super::models::{AccountStatus, NamespaceBinding, TenantStatus};
         let s = InMemoryStore::default();
         let account = Account {
             id: "acct_1".into(),
@@ -2150,7 +2302,6 @@ mod tests {
 
     #[tokio::test]
     async fn create_account_bundle_persists_all_three_records() {
-        use super::super::models::{AccountStatus, NamespaceBinding, TenantStatus};
         let s = InMemoryStore::default();
         let account = Account {
             id: "acct_bundle_1".into(),
@@ -2195,7 +2346,6 @@ mod tests {
 
     #[tokio::test]
     async fn create_account_bundle_rejects_tenant_account_mismatch() {
-        use super::super::models::{AccountStatus, NamespaceBinding, TenantStatus};
         let s = InMemoryStore::default();
         let account = Account {
             id: "acct_2".into(),
@@ -2602,7 +2752,6 @@ mod tests {
 
     #[tokio::test]
     async fn list_ready_tenants_pages_with_cursor() {
-        use super::super::models::{AccountStatus, NamespaceBinding, TenantStatus};
         let s = InMemoryStore::default();
         for i in 0..5 {
             let t = Tenant {

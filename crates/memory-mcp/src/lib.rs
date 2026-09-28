@@ -39,12 +39,12 @@ pub mod config;
 /// lives in the shared kernel.
 pub use shared::error;
 pub mod logging;
-pub mod platform;
 pub mod mcp;
 pub mod models;
 pub mod observability;
-pub mod shared;
+pub mod platform;
 pub mod runner;
+pub mod shared;
 
 /// # SaaS tenant invariant
 ///

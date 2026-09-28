@@ -11,8 +11,8 @@ use crate::logging::StdoutLogger;
 use super::super::HttpState;
 use super::super::composition::HttpProductionComposition;
 use super::super::config::HttpConfig;
-use super::super::fault_injection::FaultInjector;
 use super::super::leases::migration::ApplyMigrations;
+use crate::platform::fault_injection::FaultInjector;
 
 /// The startup-composed HTTP runtime. The binary keeps
 /// `tenant_migrations` alive for the scheduler hooks; it never
@@ -76,11 +76,11 @@ pub async fn build_state(cfg: &HttpConfig) -> Result<HttpRuntime, (ExitCode, Str
 fn load_fault_injector() -> Arc<dyn FaultInjector> {
     #[cfg(any(test, feature = "test-fixtures"))]
     {
-        crate::http::fault_injection::FailOnceAt::from_env()
+        crate::platform::fault_injection::FailOnceAt::from_env()
     }
     #[cfg(not(any(test, feature = "test-fixtures")))]
     {
-        Arc::new(crate::http::fault_injection::NoFaults)
+        Arc::new(crate::platform::fault_injection::NoFaults)
     }
 }
 

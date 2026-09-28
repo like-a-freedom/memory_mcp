@@ -8,9 +8,9 @@
 use std::sync::Arc;
 
 use crate::error::MemoryError;
-use crate::http::fault_injection::{FaultInjector, FaultPoint};
 use crate::http::leases::scheduler::SchedulerJob;
 use crate::http::registry::RegistryHandle;
+use crate::platform::fault_injection::{FaultInjector, FaultPoint};
 
 use crate::http::tasks::state::TaskStore;
 use crate::http::tasks::worker::DurableTaskStore;
@@ -65,7 +65,7 @@ pub async fn retry_reconcile_and_retain(registry: &RegistryHandle) -> Result<(),
     retry_reconcile_and_retain_with_options(
         registry,
         crate::http::runtime::storage::RuntimeOptions::default(),
-        Arc::new(crate::http::fault_injection::NoFaults),
+        Arc::new(crate::platform::fault_injection::NoFaults),
     )
     .await
 }

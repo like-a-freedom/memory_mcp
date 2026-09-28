@@ -23,7 +23,10 @@ use surrealdb::engine::remote::ws::{Client, Ws, Wss};
 use surrealdb::opt::auth as surrealdb_auth;
 
 use super::models::*;
-use super::storage::{LeaseFence, RegistryStore, is_safe_identifier};
+use super::storage::{
+    AccountStore, ApiKeyStore, BrowserPolicyStore, IdentityStore, LeaseFence, ProvisioningStore,
+    RegistryStore, SessionStore, TenantStore, UsageStore, is_safe_identifier,
+};
 use crate::error::MemoryError;
 #[cfg(feature = "control-plane")]
 use crate::http::config::BrowserAuthMethod;
@@ -454,7 +457,7 @@ pub struct SurrealRegistryStore {
     /// Only the `control-plane` local-admin statements consult it, so it
     /// is compiled with them.
     #[cfg(feature = "control-plane")]
-    sql_faults: crate::http::fault_injection::SqlFaultHook,
+    sql_faults: crate::platform::fault_injection::SqlFaultHook,
 }
 
 fn datetime_value(value: &Value) -> Option<DateTime<Utc>> {
@@ -752,7 +755,7 @@ impl SurrealRegistryStore {
             namespace,
             database,
             #[cfg(feature = "control-plane")]
-            sql_faults: crate::http::fault_injection::SqlFaultHook::new(),
+            sql_faults: crate::platform::fault_injection::SqlFaultHook::new(),
         })
     }
 
@@ -802,7 +805,7 @@ impl SurrealRegistryStore {
             namespace: namespace.to_owned(),
             database: database.to_owned(),
             #[cfg(feature = "control-plane")]
-            sql_faults: crate::http::fault_injection::SqlFaultHook::new(),
+            sql_faults: crate::platform::fault_injection::SqlFaultHook::new(),
         };
         store.handle().use_ns_db(namespace, database).await?;
         Ok(store)
@@ -1235,12 +1238,8 @@ IF NOT ('oidc' IN $policy[0].methods ?? [$policy[0].mode]) { THROW 'mode_mismatc
 IF $policy[0].epoch != $expected_epoch { THROW 'epoch_mismatch'; };
 "#;
 
-#[async_trait]
-impl RegistryStore for SurrealRegistryStore {
-    async fn ping(&self) -> bool {
-        self.handle().ping().await
-    }
-
+#[async_trait::async_trait]
+impl AccountStore for SurrealRegistryStore {
     async fn find_account_by_id(&self, account_id: &str) -> Result<Option<Account>, MemoryError> {
         let rows = self
             .handle()
@@ -1277,6 +1276,49 @@ impl RegistryStore for SurrealRegistryStore {
             return Ok(None);
         };
         self.find_account_by_id(account_id).await
+    }
+
+    async fn write_account(&self, account: &Account) -> Result<(), MemoryError> {
+        let status = serde_json::to_value(account.status)
+            .map_err(|error| MemoryError::Storage(format!("encode account status: {error}")))?;
+        self.handle()
+            .query_json(
+                "UPSERT type::record($table, $id) SET id = $id, status = IF status = 'deleting' AND $status != 'deleting' THEN status ELSE $status END, tenant_id = $tenant_id, created_at = type::datetime($created_at)",
+                Some(json!({
+                    "table": "account",
+                    "id": account.id,
+                    "status": status,
+                    "tenant_id": account.tenant_id,
+                    "created_at": account.created_at.to_rfc3339(),
+                })),
+            )
+            .await
+            .map_err(|err| map_storage_error("write_account", err))?;
+        Ok(())
+    }
+
+    async fn transition_account_state(
+        &self,
+        account_id: &str,
+        from: AccountStatus,
+        to: AccountStatus,
+    ) -> Result<(), MemoryError> {
+        let from = serde_json::to_value(from)
+            .map_err(|error| MemoryError::Storage(format!("encode account state: {error}")))?;
+        let to = serde_json::to_value(to)
+            .map_err(|error| MemoryError::Storage(format!("encode account state: {error}")))?;
+        let rows = self
+            .handle()
+            .query_json(
+                "UPDATE type::record($table, $id) SET status = $to WHERE status = $from AND NOT (status = 'deleting' AND $to != 'deleting') RETURN AFTER",
+                Some(json!({"table": "account", "id": account_id, "from": from, "to": to})),
+            )
+            .await
+            .map_err(|err| map_storage_error("transition account state", err))?;
+        if rows.is_empty() {
+            return Err(MemoryError::Conflict("account state CAS failed".into()));
+        }
+        Ok(())
     }
 
     async fn create_account_bundle(
@@ -1358,6 +1400,131 @@ impl RegistryStore for SurrealRegistryStore {
         Ok(())
     }
 
+    #[cfg(feature = "control-plane")]
+    async fn create_oidc_account_bundle(
+        &self,
+        policy: &BrowserPolicyFence,
+        account: &Account,
+        tenant: &Tenant,
+        identity: &ExternalIdentity,
+    ) -> Result<(), MemoryError> {
+        let account_status = serde_json::to_value(account.status)
+            .map_err(|error| MemoryError::Storage(format!("encode account status: {error}")))?;
+        let tenant_status = serde_json::to_value(tenant.status)
+            .map_err(|error| MemoryError::Storage(format!("encode tenant status: {error}")))?;
+        let (lease_assignment, lease_vars) =
+            lease_write_assignment(tenant.provisioning_lease.as_ref());
+        let retry_stage_assignment = if tenant.retry_stage.is_some() {
+            "retry_stage = $retry_stage"
+        } else {
+            "retry_stage = NONE"
+        };
+        let script = format!(
+            "BEGIN TRANSACTION;
+            LET $policy = (SELECT mode, epoch, methods FROM browser_auth_policy LIMIT 2);
+            IF array::len($policy) != 1 {{ THROW 'no_policy'; }};
+            IF NOT ('oidc' IN $policy[0].methods ?? [$policy[0].mode]) {{ THROW 'mode_mismatch'; }};
+            IF $policy[0].epoch != $expected_epoch {{ THROW 'epoch_mismatch'; }};
+            CREATE type::record('account', $account_id) SET id = $account_id, status = $account_status, tenant_id = $tenant_id, created_at = type::datetime($account_created_at);
+            CREATE type::record('tenant', $tenant_record_id) SET id = $tenant_record_id, status = $tenant_status, namespace_binding = $binding, plan_version = $plan_version, schema_version = $schema_version, {retry_stage_assignment}, {lease_assignment}, created_at = type::datetime($tenant_created_at), version = $version;
+            CREATE type::record('external_identity', $identity_id) SET id = $identity_id, issuer = $issuer, subject_verifier = $subject_verifier, account_id = $identity_account_id, created_at = type::datetime($identity_created_at);
+            COMMIT TRANSACTION;",
+        );
+        let mut vars = json!({
+            "expected_epoch": policy.epoch,
+            "account_id": account.id,
+            "account_status": account_status,
+            "tenant_id": account.tenant_id,
+            "tenant_record_id": tenant.id,
+            "tenant_status": tenant_status,
+            "namespace": tenant.namespace_binding.namespace,
+            "binding": tenant.namespace_binding,
+            "plan_version": tenant.plan_version,
+            "schema_version": tenant.schema_version,
+            "retry_stage": tenant.retry_stage,
+            "account_created_at": account.created_at.to_rfc3339(),
+            "tenant_created_at": tenant.created_at.to_rfc3339(),
+            "version": tenant.version,
+            "identity_id": identity.id,
+            "issuer": identity.issuer,
+            "subject_verifier": hex::encode(identity.subject_verifier.0),
+            "identity_account_id": identity.account_id,
+            "identity_created_at": identity.created_at.to_rfc3339(),
+        });
+        if let (Some(vars), Some(lease_vars)) = (vars.as_object_mut(), lease_vars.as_object()) {
+            vars.extend(lease_vars.clone());
+        }
+        self.handle()
+            .query_json(&script, Some(vars))
+            .await
+            .map_err(|error| map_storage_error("create OIDC account bundle", error))?;
+        Ok(())
+    }
+
+    #[cfg(feature = "control-plane")]
+    async fn begin_account_deletion(
+        &self,
+        verifier: &str,
+        account_id: &str,
+        session_id: &str,
+        now: DateTime<Utc>,
+    ) -> Result<(), MemoryError> {
+        let script = "BEGIN TRANSACTION; \
+            LET $challenge = SELECT * FROM deletion_challenge \
+                WHERE verifier = $verifier AND account_id = $account_id \
+                AND session_id = $session_id AND consumed_at IS NONE \
+                AND expires_at > type::datetime($now) LIMIT 1; \
+            IF array::len($challenge) = 0 { THROW 'deletion challenge is invalid or expired'; }; \
+            LET $account = UPDATE type::record('account', $account_id) \
+                SET status = 'deleting', \
+                    deletion_challenge_id = <string> record::id($challenge[0].id), \
+                    deletion_started_at = type::datetime($now) \
+                WHERE status = 'active' RETURN AFTER; \
+            IF array::len($account) = 0 { THROW 'account is not active'; }; \
+            LET $tenant = UPDATE type::record('tenant', $account[0].tenant_id) \
+                SET status = 'deleting', \
+                    deletion_started_at = type::datetime($now), \
+                    provisioning_lease = NONE, \
+                    version = version + 1 \
+                WHERE status IN ['reserved', 'namespace_creating', 'migrating', 'ready', 'suspended', 'failed', 'deleting'] \
+                RETURN AFTER; \
+            IF array::len($tenant) = 0 { THROW 'tenant deletion tombstone is already purged or missing'; }; \
+            UPDATE api_key SET status = 'revoked', version = version + 1 \
+                WHERE account_id = $account_id AND status = 'active'; \
+            DELETE FROM control_plane_session WHERE account_id = $account_id; \
+            LET $consumed = UPDATE deletion_challenge \
+                SET consumed_at = type::datetime($now) \
+                WHERE verifier = $verifier AND account_id = $account_id \
+                AND session_id = $session_id AND consumed_at IS NONE \
+                AND expires_at > type::datetime($now) RETURN AFTER; \
+            IF array::len($consumed) = 0 { THROW 'deletion challenge was consumed concurrently'; }; \
+            CREATE type::record('audit_event', $audit_id) SET \
+                account_id = $account_id, actor_kind = 'account', \
+                actor_principal = $account_id, action = 'account_deletion_started', \
+                occurred_at = type::datetime($now), correlation_id = $audit_id; \
+            COMMIT TRANSACTION;";
+        let result = self
+            .handle()
+            .query_json(
+                script,
+                Some(json!({
+                    "verifier": verifier,
+                    "account_id": account_id,
+                    "session_id": session_id,
+                    "now": now.to_rfc3339(),
+                    "audit_id": format!("deletion_start_{account_id}"),
+                })),
+            )
+            .await;
+        match result {
+            Ok(_) => Ok(()),
+            Err(error) => Err(classify_deletion_error(error)),
+        }
+    }
+}
+
+#[async_trait::async_trait]
+impl IdentityStore for SurrealRegistryStore {
     async fn find_external_identities(
         &self,
         account_id: &str,
@@ -1510,7 +1677,10 @@ impl RegistryStore for SurrealRegistryStore {
             .map_err(|error| classify_identity_change_error("replace external identity", error))?;
         Ok(())
     }
+}
 
+#[async_trait::async_trait]
+impl TenantStore for SurrealRegistryStore {
     async fn find_tenant_by_account(
         &self,
         account_id: &str,
@@ -1546,312 +1716,6 @@ impl RegistryStore for SurrealRegistryStore {
             .next()
             .map(|row| decode_tenant(&row))
             .transpose()
-    }
-
-    async fn find_api_key(&self, key_id: &str) -> Result<Option<ApiKey>, MemoryError> {
-        let rows = self
-            .handle()
-            .query_json(
-                "SELECT * FROM type::table($table) WHERE id = type::record($table, $id) LIMIT 1",
-                Some(json!({"table": "api_key", "id": key_id})),
-            )
-            .await
-            .map_err(|err| map_storage_error("find_api_key", err))?;
-        rows.into_iter()
-            .next()
-            .map(|row| decode_api_key(&row))
-            .transpose()
-    }
-
-    async fn write_api_key(&self, key: &ApiKey) -> Result<(), MemoryError> {
-        let expires_assignment = if key.expires_at.is_some() {
-            "expires_at = type::datetime($expires_at)"
-        } else {
-            "expires_at = NONE"
-        };
-        let used_assignment = if key.last_used_at.is_some() {
-            "last_used_at = type::datetime($last_used_at)"
-        } else {
-            "last_used_at = NONE"
-        };
-        let sql = format!(
-            "CREATE type::record($table, $id) SET id = $id, account_id = $account_id, name = $name, verifier = $verifier, status = $status, created_at = type::datetime($created_at), {expires_assignment}, {used_assignment}, version = $version"
-        );
-        self.handle()
-            .query_json(
-                &sql,
-                Some(json!({
-                    "table": "api_key",
-                    "id": key.id,
-                    "account_id": key.account_id,
-                    "name": key.name,
-                    "verifier": hex::encode(key.verifier.0),
-                    "status": serde_json::to_value(key.status).map_err(|error| MemoryError::Storage(format!("encode key status: {error}")))?,
-                    "created_at": key.created_at.to_rfc3339(),
-                    "expires_at": key.expires_at.map(|value| value.to_rfc3339()),
-                    "last_used_at": key.last_used_at.map(|value| value.to_rfc3339()),
-                    "version": key.version,
-                })),
-            )
-            .await
-            .map_err(|err| map_storage_error("write_api_key", err))?;
-        Ok(())
-    }
-
-    async fn list_api_keys(&self, account_id: &str) -> Result<Vec<ApiKeyMeta>, MemoryError> {
-        let rows = self
-            .handle()
-            .query_json(
-                "SELECT id, name, status, created_at, expires_at, last_used_at, verifier \
-                 FROM type::table($table) WHERE account_id = $account_id",
-                Some(json!({"table": "api_key", "account_id": account_id})),
-            )
-            .await
-            .map_err(|err| map_storage_error("list_api_keys", err))?;
-        rows.into_iter()
-            .map(|row| {
-                let key = decode_api_key(&row)?;
-                Ok(ApiKeyMeta {
-                    id: key.id,
-                    name: key.name,
-                    status: key.status,
-                    created_at: key.created_at,
-                    expires_at: key.expires_at,
-                    last_used_at: key.last_used_at,
-                })
-            })
-            .collect()
-    }
-
-    async fn revoke_api_key(&self, account_id: &str, key_id: &str) -> Result<(), MemoryError> {
-        let rows = self
-            .handle()
-            .query_json(
-                "UPDATE type::record($table, $id) SET status = 'revoked', version = version + 1 WHERE account_id = $account_id AND status = 'active' RETURN AFTER",
-                Some(json!({"table": "api_key", "id": key_id, "account_id": account_id})),
-            )
-            .await
-            .map_err(|err| map_storage_error("revoke_api_key", err))?;
-        if rows.is_empty() {
-            return Err(MemoryError::NotFound("api key not found".into()));
-        }
-        Ok(())
-    }
-
-    async fn create_api_key_if_below_limit(
-        &self,
-        key: &ApiKey,
-        max_active: u32,
-    ) -> Result<(), MemoryError> {
-        if max_active == 0 {
-            return Err(MemoryError::Conflict("active API key limit is zero".into()));
-        }
-        let expires_assignment = if key.expires_at.is_some() {
-            "expires_at = type::datetime($expires_at)"
-        } else {
-            "expires_at = NONE"
-        };
-        let used_assignment = if key.last_used_at.is_some() {
-            "last_used_at = type::datetime($last_used_at)"
-        } else {
-            "last_used_at = NONE"
-        };
-        let status = serde_json::to_value(key.status)
-            .map_err(|error| MemoryError::Storage(format!("encode key status: {error}")))?;
-        let sql = format!(
-            "BEGIN TRANSACTION; LET $active = SELECT count() AS count FROM api_key WHERE account_id = $account_id AND status = 'active' AND (expires_at IS NONE OR expires_at > time::now()) GROUP ALL; IF array::len($active) > 0 AND $active[0].count >= $max_active {{ THROW 'active API key limit reached'; }}; CREATE type::record('api_key', $id) SET id = $id, account_id = $account_id, name = $name, verifier = $verifier, status = $status, created_at = type::datetime($created_at), {expires_assignment}, {used_assignment}, version = $version; COMMIT TRANSACTION;"
-        );
-        self.handle()
-            .query_json(
-                &sql,
-                Some(json!({
-                    "id": key.id,
-                    "account_id": key.account_id,
-                    "name": key.name,
-                    "verifier": hex::encode(key.verifier.0),
-                    "status": status,
-                    "created_at": key.created_at.to_rfc3339(),
-                    "expires_at": key.expires_at.map(|value| value.to_rfc3339()),
-                    "last_used_at": key.last_used_at.map(|value| value.to_rfc3339()),
-                    "version": key.version,
-                    "max_active": max_active,
-                })),
-            )
-            .await
-            .map_err(|err| match err {
-                MemoryError::Storage(message)
-                    if message.contains("active API key limit reached") =>
-                {
-                    MemoryError::Conflict("active API key limit reached".into())
-                }
-                error => map_storage_error("create API key", error),
-            })?;
-        Ok(())
-    }
-
-    async fn revoke_all_api_keys(&self, account_id: &str) -> Result<u64, MemoryError> {
-        let rows = self
-            .handle()
-            .query_json(
-                "UPDATE type::table($table) SET status = 'revoked', version = version + 1 WHERE account_id = $account_id AND status = 'active' RETURN BEFORE",
-                Some(json!({"table": "api_key", "account_id": account_id})),
-            )
-            .await
-            .map_err(|err| map_storage_error("revoke all api keys", err))?;
-        Ok(rows.len() as u64)
-    }
-
-    async fn touch_api_key(&self, key_id: &str, used_at: DateTime<Utc>) -> Result<(), MemoryError> {
-        self.handle()
-            .query_json(
-                "UPDATE type::record($table, $id) SET last_used_at = type::datetime($used_at) WHERE status = 'active' AND (expires_at IS NONE OR expires_at > type::datetime($used_at))",
-                Some(json!({"table": "api_key", "id": key_id, "used_at": used_at.to_rfc3339()})),
-            )
-            .await
-            .map_err(|err| map_storage_error("touch_api_key", err))?;
-        Ok(())
-    }
-
-    async fn write_account(&self, account: &Account) -> Result<(), MemoryError> {
-        let status = serde_json::to_value(account.status)
-            .map_err(|error| MemoryError::Storage(format!("encode account status: {error}")))?;
-        self.handle()
-            .query_json(
-                "UPSERT type::record($table, $id) SET id = $id, status = IF status = 'deleting' AND $status != 'deleting' THEN status ELSE $status END, tenant_id = $tenant_id, created_at = type::datetime($created_at)",
-                Some(json!({
-                    "table": "account",
-                    "id": account.id,
-                    "status": status,
-                    "tenant_id": account.tenant_id,
-                    "created_at": account.created_at.to_rfc3339(),
-                })),
-            )
-            .await
-            .map_err(|err| map_storage_error("write_account", err))?;
-        Ok(())
-    }
-
-    async fn transition_account_state(
-        &self,
-        account_id: &str,
-        from: AccountStatus,
-        to: AccountStatus,
-    ) -> Result<(), MemoryError> {
-        let from = serde_json::to_value(from)
-            .map_err(|error| MemoryError::Storage(format!("encode account state: {error}")))?;
-        let to = serde_json::to_value(to)
-            .map_err(|error| MemoryError::Storage(format!("encode account state: {error}")))?;
-        let rows = self
-            .handle()
-            .query_json(
-                "UPDATE type::record($table, $id) SET status = $to WHERE status = $from AND NOT (status = 'deleting' AND $to != 'deleting') RETURN AFTER",
-                Some(json!({"table": "account", "id": account_id, "from": from, "to": to})),
-            )
-            .await
-            .map_err(|err| map_storage_error("transition account state", err))?;
-        if rows.is_empty() {
-            return Err(MemoryError::Conflict("account state CAS failed".into()));
-        }
-        Ok(())
-    }
-
-    #[cfg(feature = "control-plane")]
-    async fn begin_account_deletion(
-        &self,
-        verifier: &str,
-        account_id: &str,
-        session_id: &str,
-        now: DateTime<Utc>,
-    ) -> Result<(), MemoryError> {
-        let script = "BEGIN TRANSACTION; \
-            LET $challenge = SELECT * FROM deletion_challenge \
-                WHERE verifier = $verifier AND account_id = $account_id \
-                AND session_id = $session_id AND consumed_at IS NONE \
-                AND expires_at > type::datetime($now) LIMIT 1; \
-            IF array::len($challenge) = 0 { THROW 'deletion challenge is invalid or expired'; }; \
-            LET $account = UPDATE type::record('account', $account_id) \
-                SET status = 'deleting', \
-                    deletion_challenge_id = <string> record::id($challenge[0].id), \
-                    deletion_started_at = type::datetime($now) \
-                WHERE status = 'active' RETURN AFTER; \
-            IF array::len($account) = 0 { THROW 'account is not active'; }; \
-            LET $tenant = UPDATE type::record('tenant', $account[0].tenant_id) \
-                SET status = 'deleting', \
-                    deletion_started_at = type::datetime($now), \
-                    provisioning_lease = NONE, \
-                    version = version + 1 \
-                WHERE status IN ['reserved', 'namespace_creating', 'migrating', 'ready', 'suspended', 'failed', 'deleting'] \
-                RETURN AFTER; \
-            IF array::len($tenant) = 0 { THROW 'tenant deletion tombstone is already purged or missing'; }; \
-            UPDATE api_key SET status = 'revoked', version = version + 1 \
-                WHERE account_id = $account_id AND status = 'active'; \
-            DELETE FROM control_plane_session WHERE account_id = $account_id; \
-            LET $consumed = UPDATE deletion_challenge \
-                SET consumed_at = type::datetime($now) \
-                WHERE verifier = $verifier AND account_id = $account_id \
-                AND session_id = $session_id AND consumed_at IS NONE \
-                AND expires_at > type::datetime($now) RETURN AFTER; \
-            IF array::len($consumed) = 0 { THROW 'deletion challenge was consumed concurrently'; }; \
-            CREATE type::record('audit_event', $audit_id) SET \
-                account_id = $account_id, actor_kind = 'account', \
-                actor_principal = $account_id, action = 'account_deletion_started', \
-                occurred_at = type::datetime($now), correlation_id = $audit_id; \
-            COMMIT TRANSACTION;";
-        let result = self
-            .handle()
-            .query_json(
-                script,
-                Some(json!({
-                    "verifier": verifier,
-                    "account_id": account_id,
-                    "session_id": session_id,
-                    "now": now.to_rfc3339(),
-                    "audit_id": format!("deletion_start_{account_id}"),
-                })),
-            )
-            .await;
-        match result {
-            Ok(_) => Ok(()),
-            Err(error) => Err(classify_deletion_error(error)),
-        }
-    }
-
-    #[cfg(feature = "control-plane")]
-    async fn begin_operator_deletion(
-        &self,
-        tenant_id: &str,
-        actor: &str,
-        now: DateTime<Utc>,
-    ) -> Result<(), MemoryError> {
-        let audit_id = format!("operator_deletion_{tenant_id}");
-        let script = "BEGIN TRANSACTION; \
-            LET $tenant = SELECT * FROM tenant WHERE id = type::record('tenant', $tenant_id) LIMIT 1; \
-            IF array::len($tenant) = 0 { THROW 'tenant not found'; }; \
-            IF $tenant[0].status = 'purged' { THROW 'tenant is already purged'; }; \
-            LET $account_record = (SELECT VALUE id FROM account WHERE tenant_id = $tenant_id LIMIT 1)[0]; \
-            IF $account_record IS NONE { THROW 'account not found'; }; \
-            LET $account_id = <string> record::id($account_record); \
-            UPDATE account SET status = 'deleting', deletion_started_at = type::datetime($now) \
-                WHERE tenant_id = $tenant_id AND status IN ['active', 'deleting']; \
-            UPDATE tenant SET status = 'deleting', deletion_started_at = type::datetime($now), provisioning_lease = NONE, version = version + 1 \
-                WHERE id = type::record('tenant', $tenant_id) AND status IN ['reserved', 'namespace_creating', 'migrating', 'ready', 'suspended', 'failed', 'deleting']; \
-            UPDATE api_key SET status = 'revoked', version = version + 1 WHERE account_id = $account_id AND status = 'active'; \
-            DELETE FROM control_plane_session WHERE account_id = $account_id; \
-            IF count(SELECT * FROM audit_event WHERE correlation_id = $audit_id) = 0 { CREATE type::record('audit_event', $audit_id) SET account_id = $account_id, actor_kind = 'operator', actor_principal = $actor, action = 'account_deletion_started_operator', occurred_at = type::datetime($now), correlation_id = $audit_id; }; \
-            COMMIT TRANSACTION;";
-        self.handle()
-            .query_json(
-                script,
-                Some(json!({
-                    "tenant_id": tenant_id,
-                    "actor": actor,
-                    "now": now.to_rfc3339(),
-                    "audit_id": audit_id,
-                })),
-            )
-            .await
-            .map_err(classify_deletion_error)?;
-        Ok(())
     }
 
     async fn write_tenant(&self, tenant: &Tenant) -> Result<(), MemoryError> {
@@ -2007,6 +1871,334 @@ impl RegistryStore for SurrealRegistryStore {
         Ok(new_version)
     }
 
+    async fn list_tenants(&self, limit: usize) -> Result<Vec<Tenant>, MemoryError> {
+        let rows = self
+            .handle()
+            .query_json(
+                "SELECT * FROM tenant ORDER BY id LIMIT $limit",
+                Some(json!({"limit": limit})),
+            )
+            .await
+            .map_err(|error| map_storage_error("list tenants", error))?;
+        rows.into_iter().map(|row| decode_tenant(&row)).collect()
+    }
+
+    async fn list_ready_tenants(
+        &self,
+        cursor: Option<&str>,
+        limit: usize,
+    ) -> Result<Vec<Tenant>, MemoryError> {
+        let rows = self
+            .handle()
+            .query_json(
+                "SELECT * FROM tenant \
+                 WHERE status = 'ready' \
+                 AND ($cursor IS NONE OR id > type::record('tenant', $cursor)) \
+                 ORDER BY id LIMIT $limit",
+                Some(json!({"cursor": cursor, "limit": limit})),
+            )
+            .await
+            .map_err(|error| map_storage_error("list ready tenants", error))?;
+        rows.into_iter().map(|row| decode_tenant(&row)).collect()
+    }
+
+    async fn list_deleting_tenants(
+        &self,
+        limit: usize,
+        now: DateTime<Utc>,
+    ) -> Result<Vec<Tenant>, MemoryError> {
+        let rows = self
+            .handle()
+            .query_json(
+                "SELECT * FROM tenant WHERE status = 'deleting' \
+                 AND (provisioning_lease IS NONE OR provisioning_lease.expires_at <= type::datetime($now)) \
+                 ORDER BY id LIMIT $limit",
+                Some(json!({"limit": limit, "now": now.to_rfc3339()})),
+            )
+            .await
+            .map_err(|error| map_storage_error("list deleting tenants", error))?;
+        rows.into_iter().map(|row| decode_tenant(&row)).collect()
+    }
+
+    #[cfg(feature = "control-plane")]
+    async fn begin_operator_deletion(
+        &self,
+        tenant_id: &str,
+        actor: &str,
+        now: DateTime<Utc>,
+    ) -> Result<(), MemoryError> {
+        let audit_id = format!("operator_deletion_{tenant_id}");
+        let script = "BEGIN TRANSACTION; \
+            LET $tenant = SELECT * FROM tenant WHERE id = type::record('tenant', $tenant_id) LIMIT 1; \
+            IF array::len($tenant) = 0 { THROW 'tenant not found'; }; \
+            IF $tenant[0].status = 'purged' { THROW 'tenant is already purged'; }; \
+            LET $account_record = (SELECT VALUE id FROM account WHERE tenant_id = $tenant_id LIMIT 1)[0]; \
+            IF $account_record IS NONE { THROW 'account not found'; }; \
+            LET $account_id = <string> record::id($account_record); \
+            UPDATE account SET status = 'deleting', deletion_started_at = type::datetime($now) \
+                WHERE tenant_id = $tenant_id AND status IN ['active', 'deleting']; \
+            UPDATE tenant SET status = 'deleting', deletion_started_at = type::datetime($now), provisioning_lease = NONE, version = version + 1 \
+                WHERE id = type::record('tenant', $tenant_id) AND status IN ['reserved', 'namespace_creating', 'migrating', 'ready', 'suspended', 'failed', 'deleting']; \
+            UPDATE api_key SET status = 'revoked', version = version + 1 WHERE account_id = $account_id AND status = 'active'; \
+            DELETE FROM control_plane_session WHERE account_id = $account_id; \
+            IF count(SELECT * FROM audit_event WHERE correlation_id = $audit_id) = 0 { CREATE type::record('audit_event', $audit_id) SET account_id = $account_id, actor_kind = 'operator', actor_principal = $actor, action = 'account_deletion_started_operator', occurred_at = type::datetime($now), correlation_id = $audit_id; }; \
+            COMMIT TRANSACTION;";
+        self.handle()
+            .query_json(
+                script,
+                Some(json!({
+                    "tenant_id": tenant_id,
+                    "actor": actor,
+                    "now": now.to_rfc3339(),
+                    "audit_id": audit_id,
+                })),
+            )
+            .await
+            .map_err(classify_deletion_error)?;
+        Ok(())
+    }
+
+    #[cfg(feature = "control-plane")]
+    async fn finalize_account_deletion(
+        &self,
+        tenant_id: &str,
+        lease_owner_id: &str,
+        lease_id: &str,
+        fencing_generation: u64,
+        completed_at: DateTime<Utc>,
+    ) -> Result<(), MemoryError> {
+        let Some(tenant) = self.find_tenant_by_id(tenant_id).await? else {
+            return Err(MemoryError::NotFound(format!("tenant {tenant_id}")));
+        };
+        if tenant.status == TenantStatus::Purged {
+            return Ok(());
+        }
+        if tenant.status != TenantStatus::Deleting {
+            return Err(MemoryError::Conflict(format!(
+                "tenant {tenant_id} is not deleting"
+            )));
+        }
+        let script = "BEGIN TRANSACTION; \
+            LET $tenant = UPDATE type::record('tenant', $tenant_id) \
+                SET status = 'purged', \
+                    deletion_completed_at = type::datetime($completed_at), \
+                    provisioning_lease = NONE, \
+                    version = version + 1 \
+                WHERE status = 'deleting' \
+                AND provisioning_lease.owner_id = $owner_id \
+                AND provisioning_lease.lease_id = $lease_id \
+                AND provisioning_lease.fencing_generation = $fencing_generation \
+                AND provisioning_lease.expires_at > time::now() RETURN AFTER; \
+            IF array::len($tenant) = 0 { THROW 'deletion lease is stale or tenant is no longer deleting'; }; \
+            LET $account = UPDATE account SET deletion_completed_at = type::datetime($completed_at) \
+                WHERE tenant_id = $tenant_id AND status = 'deleting' RETURN AFTER; \
+            IF array::len($account) = 0 { THROW 'deleting account tombstone is missing'; }; \
+            CREATE type::record('audit_event', $audit_id) SET \
+                account_id = <string> record::id($account[0].id), actor_kind = 'system', \
+                actor_principal = $owner_id, action = 'account_deletion_completed', \
+                occurred_at = type::datetime($completed_at), correlation_id = $audit_id; \
+            COMMIT TRANSACTION;";
+        let result = self
+            .handle()
+            .query_json(
+                script,
+                Some(json!({
+                    "tenant_id": tenant_id,
+                    "owner_id": lease_owner_id,
+                    "lease_id": lease_id,
+                    "fencing_generation": fencing_generation,
+                    "completed_at": completed_at.to_rfc3339(),
+                    "audit_id": format!("deletion_complete_{tenant_id}"),
+                })),
+            )
+            .await;
+        match result {
+            Ok(_) => Ok(()),
+            Err(error) => {
+                let classified = classify_deletion_error(error);
+                if self
+                    .find_tenant_by_id(tenant_id)
+                    .await?
+                    .is_some_and(|current| current.status == TenantStatus::Purged)
+                {
+                    Ok(())
+                } else {
+                    Err(classified)
+                }
+            }
+        }
+    }
+}
+
+#[async_trait::async_trait]
+impl ApiKeyStore for SurrealRegistryStore {
+    async fn find_api_key(&self, key_id: &str) -> Result<Option<ApiKey>, MemoryError> {
+        let rows = self
+            .handle()
+            .query_json(
+                "SELECT * FROM type::table($table) WHERE id = type::record($table, $id) LIMIT 1",
+                Some(json!({"table": "api_key", "id": key_id})),
+            )
+            .await
+            .map_err(|err| map_storage_error("find_api_key", err))?;
+        rows.into_iter()
+            .next()
+            .map(|row| decode_api_key(&row))
+            .transpose()
+    }
+
+    async fn write_api_key(&self, key: &ApiKey) -> Result<(), MemoryError> {
+        let expires_assignment = if key.expires_at.is_some() {
+            "expires_at = type::datetime($expires_at)"
+        } else {
+            "expires_at = NONE"
+        };
+        let used_assignment = if key.last_used_at.is_some() {
+            "last_used_at = type::datetime($last_used_at)"
+        } else {
+            "last_used_at = NONE"
+        };
+        let sql = format!(
+            "CREATE type::record($table, $id) SET id = $id, account_id = $account_id, name = $name, verifier = $verifier, status = $status, created_at = type::datetime($created_at), {expires_assignment}, {used_assignment}, version = $version"
+        );
+        self.handle()
+            .query_json(
+                &sql,
+                Some(json!({
+                    "table": "api_key",
+                    "id": key.id,
+                    "account_id": key.account_id,
+                    "name": key.name,
+                    "verifier": hex::encode(key.verifier.0),
+                    "status": serde_json::to_value(key.status).map_err(|error| MemoryError::Storage(format!("encode key status: {error}")))?,
+                    "created_at": key.created_at.to_rfc3339(),
+                    "expires_at": key.expires_at.map(|value| value.to_rfc3339()),
+                    "last_used_at": key.last_used_at.map(|value| value.to_rfc3339()),
+                    "version": key.version,
+                })),
+            )
+            .await
+            .map_err(|err| map_storage_error("write_api_key", err))?;
+        Ok(())
+    }
+
+    async fn list_api_keys(&self, account_id: &str) -> Result<Vec<ApiKeyMeta>, MemoryError> {
+        let rows = self
+            .handle()
+            .query_json(
+                "SELECT id, name, status, created_at, expires_at, last_used_at, verifier \
+                 FROM type::table($table) WHERE account_id = $account_id",
+                Some(json!({"table": "api_key", "account_id": account_id})),
+            )
+            .await
+            .map_err(|err| map_storage_error("list_api_keys", err))?;
+        rows.into_iter()
+            .map(|row| {
+                let key = decode_api_key(&row)?;
+                Ok(ApiKeyMeta {
+                    id: key.id,
+                    name: key.name,
+                    status: key.status,
+                    created_at: key.created_at,
+                    expires_at: key.expires_at,
+                    last_used_at: key.last_used_at,
+                })
+            })
+            .collect()
+    }
+
+    async fn revoke_api_key(&self, account_id: &str, key_id: &str) -> Result<(), MemoryError> {
+        let rows = self
+            .handle()
+            .query_json(
+                "UPDATE type::record($table, $id) SET status = 'revoked', version = version + 1 WHERE account_id = $account_id AND status = 'active' RETURN AFTER",
+                Some(json!({"table": "api_key", "id": key_id, "account_id": account_id})),
+            )
+            .await
+            .map_err(|err| map_storage_error("revoke_api_key", err))?;
+        if rows.is_empty() {
+            return Err(MemoryError::NotFound("api key not found".into()));
+        }
+        Ok(())
+    }
+
+    async fn touch_api_key(&self, key_id: &str, used_at: DateTime<Utc>) -> Result<(), MemoryError> {
+        self.handle()
+            .query_json(
+                "UPDATE type::record($table, $id) SET last_used_at = type::datetime($used_at) WHERE status = 'active' AND (expires_at IS NONE OR expires_at > type::datetime($used_at))",
+                Some(json!({"table": "api_key", "id": key_id, "used_at": used_at.to_rfc3339()})),
+            )
+            .await
+            .map_err(|err| map_storage_error("touch_api_key", err))?;
+        Ok(())
+    }
+
+    async fn create_api_key_if_below_limit(
+        &self,
+        key: &ApiKey,
+        max_active: u32,
+    ) -> Result<(), MemoryError> {
+        if max_active == 0 {
+            return Err(MemoryError::Conflict("active API key limit is zero".into()));
+        }
+        let expires_assignment = if key.expires_at.is_some() {
+            "expires_at = type::datetime($expires_at)"
+        } else {
+            "expires_at = NONE"
+        };
+        let used_assignment = if key.last_used_at.is_some() {
+            "last_used_at = type::datetime($last_used_at)"
+        } else {
+            "last_used_at = NONE"
+        };
+        let status = serde_json::to_value(key.status)
+            .map_err(|error| MemoryError::Storage(format!("encode key status: {error}")))?;
+        let sql = format!(
+            "BEGIN TRANSACTION; LET $active = SELECT count() AS count FROM api_key WHERE account_id = $account_id AND status = 'active' AND (expires_at IS NONE OR expires_at > time::now()) GROUP ALL; IF array::len($active) > 0 AND $active[0].count >= $max_active {{ THROW 'active API key limit reached'; }}; CREATE type::record('api_key', $id) SET id = $id, account_id = $account_id, name = $name, verifier = $verifier, status = $status, created_at = type::datetime($created_at), {expires_assignment}, {used_assignment}, version = $version; COMMIT TRANSACTION;"
+        );
+        self.handle()
+            .query_json(
+                &sql,
+                Some(json!({
+                    "id": key.id,
+                    "account_id": key.account_id,
+                    "name": key.name,
+                    "verifier": hex::encode(key.verifier.0),
+                    "status": status,
+                    "created_at": key.created_at.to_rfc3339(),
+                    "expires_at": key.expires_at.map(|value| value.to_rfc3339()),
+                    "last_used_at": key.last_used_at.map(|value| value.to_rfc3339()),
+                    "version": key.version,
+                    "max_active": max_active,
+                })),
+            )
+            .await
+            .map_err(|err| match err {
+                MemoryError::Storage(message)
+                    if message.contains("active API key limit reached") =>
+                {
+                    MemoryError::Conflict("active API key limit reached".into())
+                }
+                error => map_storage_error("create API key", error),
+            })?;
+        Ok(())
+    }
+
+    async fn revoke_all_api_keys(&self, account_id: &str) -> Result<u64, MemoryError> {
+        let rows = self
+            .handle()
+            .query_json(
+                "UPDATE type::table($table) SET status = 'revoked', version = version + 1 WHERE account_id = $account_id AND status = 'active' RETURN BEFORE",
+                Some(json!({"table": "api_key", "account_id": account_id})),
+            )
+            .await
+            .map_err(|err| map_storage_error("revoke all api keys", err))?;
+        Ok(rows.len() as u64)
+    }
+}
+
+#[async_trait::async_trait]
+impl ProvisioningStore for SurrealRegistryStore {
     async fn claim_provisioning(
         &self,
         tenant_id: &str,
@@ -2163,126 +2355,24 @@ impl RegistryStore for SurrealRegistryStore {
         rows.into_iter().map(|row| decode_tenant(&row)).collect()
     }
 
-    async fn list_ready_tenants(
-        &self,
-        cursor: Option<&str>,
-        limit: usize,
-    ) -> Result<Vec<Tenant>, MemoryError> {
-        let rows = self
-            .handle()
-            .query_json(
-                "SELECT * FROM tenant \
-                 WHERE status = 'ready' \
-                 AND ($cursor IS NONE OR id > type::record('tenant', $cursor)) \
-                 ORDER BY id LIMIT $limit",
-                Some(json!({"cursor": cursor, "limit": limit})),
-            )
-            .await
-            .map_err(|error| map_storage_error("list ready tenants", error))?;
-        rows.into_iter().map(|row| decode_tenant(&row)).collect()
-    }
-
-    async fn list_deleting_tenants(
-        &self,
-        limit: usize,
-        now: DateTime<Utc>,
-    ) -> Result<Vec<Tenant>, MemoryError> {
-        let rows = self
-            .handle()
-            .query_json(
-                "SELECT * FROM tenant WHERE status = 'deleting' \
-                 AND (provisioning_lease IS NONE OR provisioning_lease.expires_at <= type::datetime($now)) \
-                 ORDER BY id LIMIT $limit",
-                Some(json!({"limit": limit, "now": now.to_rfc3339()})),
-            )
-            .await
-            .map_err(|error| map_storage_error("list deleting tenants", error))?;
-        rows.into_iter().map(|row| decode_tenant(&row)).collect()
-    }
-
-    async fn list_tenants(&self, limit: usize) -> Result<Vec<Tenant>, MemoryError> {
-        let rows = self
-            .handle()
-            .query_json(
-                "SELECT * FROM tenant ORDER BY id LIMIT $limit",
-                Some(json!({"limit": limit})),
-            )
-            .await
-            .map_err(|error| map_storage_error("list tenants", error))?;
-        rows.into_iter().map(|row| decode_tenant(&row)).collect()
-    }
-
-    #[cfg(feature = "control-plane")]
-    async fn finalize_account_deletion(
+    async fn append_provisioning_event(
         &self,
         tenant_id: &str,
-        lease_owner_id: &str,
-        lease_id: &str,
-        fencing_generation: u64,
-        completed_at: DateTime<Utc>,
+        stage: &str,
     ) -> Result<(), MemoryError> {
-        let Some(tenant) = self.find_tenant_by_id(tenant_id).await? else {
-            return Err(MemoryError::NotFound(format!("tenant {tenant_id}")));
-        };
-        if tenant.status == TenantStatus::Purged {
-            return Ok(());
-        }
-        if tenant.status != TenantStatus::Deleting {
-            return Err(MemoryError::Conflict(format!(
-                "tenant {tenant_id} is not deleting"
-            )));
-        }
-        let script = "BEGIN TRANSACTION; \
-            LET $tenant = UPDATE type::record('tenant', $tenant_id) \
-                SET status = 'purged', \
-                    deletion_completed_at = type::datetime($completed_at), \
-                    provisioning_lease = NONE, \
-                    version = version + 1 \
-                WHERE status = 'deleting' \
-                AND provisioning_lease.owner_id = $owner_id \
-                AND provisioning_lease.lease_id = $lease_id \
-                AND provisioning_lease.fencing_generation = $fencing_generation \
-                AND provisioning_lease.expires_at > time::now() RETURN AFTER; \
-            IF array::len($tenant) = 0 { THROW 'deletion lease is stale or tenant is no longer deleting'; }; \
-            LET $account = UPDATE account SET deletion_completed_at = type::datetime($completed_at) \
-                WHERE tenant_id = $tenant_id AND status = 'deleting' RETURN AFTER; \
-            IF array::len($account) = 0 { THROW 'deleting account tombstone is missing'; }; \
-            CREATE type::record('audit_event', $audit_id) SET \
-                account_id = <string> record::id($account[0].id), actor_kind = 'system', \
-                actor_principal = $owner_id, action = 'account_deletion_completed', \
-                occurred_at = type::datetime($completed_at), correlation_id = $audit_id; \
-            COMMIT TRANSACTION;";
-        let result = self
-            .handle()
+        self.handle()
             .query_json(
-                script,
-                Some(json!({
-                    "tenant_id": tenant_id,
-                    "owner_id": lease_owner_id,
-                    "lease_id": lease_id,
-                    "fencing_generation": fencing_generation,
-                    "completed_at": completed_at.to_rfc3339(),
-                    "audit_id": format!("deletion_complete_{tenant_id}"),
-                })),
+                "CREATE provisioning_event SET tenant_id = $tenant_id, stage = $stage",
+                Some(json!({"tenant_id": tenant_id, "stage": stage})),
             )
-            .await;
-        match result {
-            Ok(_) => Ok(()),
-            Err(error) => {
-                let classified = classify_deletion_error(error);
-                if self
-                    .find_tenant_by_id(tenant_id)
-                    .await?
-                    .is_some_and(|current| current.status == TenantStatus::Purged)
-                {
-                    Ok(())
-                } else {
-                    Err(classified)
-                }
-            }
-        }
+            .await
+            .map_err(|err| map_storage_error("append_provisioning_event", err))?;
+        Ok(())
     }
+}
 
+#[async_trait::async_trait]
+impl UsageStore for SurrealRegistryStore {
     async fn load_plan(&self, version: u32) -> Result<super::models::Plan, MemoryError> {
         let rows = self
             .handle()
@@ -2334,6 +2424,113 @@ impl RegistryStore for SurrealRegistryStore {
             )
             .await
             .map_err(|error| map_storage_error("ensure plan", error))?;
+        Ok(())
+    }
+
+    async fn load_usage(
+        &self,
+        tenant_id: &str,
+    ) -> Result<crate::http::registry::plan::UsageCounter, MemoryError> {
+        let rows = self
+            .handle()
+            .query_json(
+                "SELECT ingest_window_start, ingest_current_minute, ingested_bytes, episode_count FROM usage WHERE tenant_id = $tenant_id LIMIT 1",
+                Some(json!({"tenant_id": tenant_id})),
+            )
+            .await
+            .map_err(|error| map_storage_error("load usage", error))?;
+        let Some(row) = rows.into_iter().next() else {
+            return Ok(crate::http::registry::plan::UsageCounter::default());
+        };
+        Ok(crate::http::registry::plan::UsageCounter {
+            ingest_current_minute: required_u32(&row, "ingest_current_minute")?,
+            window_start: required_datetime(&row, "ingest_window_start")?,
+            ingested_bytes: required_u64(&row, "ingested_bytes")?,
+            episode_count: required_u64(&row, "episode_count")?,
+        })
+    }
+
+    async fn reserve_ingest_usage(
+        &self,
+        tenant_id: &str,
+        source_bytes: u64,
+        plan: &crate::http::registry::plan::Plan,
+        now: DateTime<Utc>,
+    ) -> Result<crate::http::registry::plan::QuotaDecision, MemoryError> {
+        // One hot usage row per Tenant; allow enough attempts that
+        // a burst of concurrent ingests each lands one clean write.
+        for _attempt in 0..8 {
+            // Create the usage row once. The conditional UPDATE below is the
+            // admission operation; it increments counters only when every
+            // quota predicate still holds at the datastore write point.
+            let init = self.handle().query_json(
+                    "UPSERT type::record($table, $tenant_id) SET tenant_id = $tenant_id, ingest_window_start = IF ingest_window_start IS NONE THEN type::datetime($now) ELSE ingest_window_start END, ingest_current_minute = IF ingest_current_minute IS NONE THEN 0 ELSE ingest_current_minute END, ingested_bytes = IF ingested_bytes IS NONE THEN 0 ELSE ingested_bytes END, episode_count = IF episode_count IS NONE THEN 0 ELSE episode_count END, open_app_sessions = IF open_app_sessions IS NONE THEN 0 ELSE open_app_sessions END, active_api_keys = IF active_api_keys IS NONE THEN 0 ELSE active_api_keys END, updated_at = time::now()",
+                    Some(json!({"table": "usage", "tenant_id": tenant_id, "now": now.to_rfc3339()})),
+                )
+                .await
+                .map_err(|error| map_storage_error("initialize ingest usage", error));
+            if let Err(error) = init {
+                if is_write_conflict(&error) {
+                    tokio::time::sleep(std::time::Duration::from_millis(2)).await;
+                    continue;
+                }
+                return Err(error);
+            }
+            let reserve = self
+                .handle()
+                .query_json(
+                    "UPDATE type::record($table, $tenant_id) SET ingest_window_start = IF ingest_window_start <= type::datetime($cutoff) THEN type::datetime($now) ELSE ingest_window_start END, ingest_current_minute = IF ingest_window_start <= type::datetime($cutoff) THEN 1 ELSE ingest_current_minute + 1 END, ingested_bytes = ingested_bytes + $bytes, episode_count = episode_count + 1, updated_at = time::now() WHERE tenant_id = $tenant_id AND ingested_bytes + $bytes <= $max_bytes AND episode_count < $max_episodes AND (ingest_current_minute < $per_minute OR ingest_window_start <= type::datetime($cutoff)) RETURN AFTER",
+                    Some(json!({
+                        "table": "usage",
+                        "tenant_id": tenant_id,
+                        "now": now.to_rfc3339(),
+                        "cutoff": (now - chrono::Duration::seconds(60)).to_rfc3339(),
+                        "bytes": source_bytes,
+                        "max_bytes": plan.max_ingested_bytes,
+                        "max_episodes": plan.max_episode_count,
+                        "per_minute": plan.ingest_per_minute,
+                    })),
+                )
+                .await
+                .map_err(|error| map_storage_error("reserve ingest usage", error));
+            let rows = match reserve {
+                Ok(rows) => rows,
+                Err(error) => {
+                    if is_write_conflict(&error) {
+                        tokio::time::sleep(std::time::Duration::from_millis(2)).await;
+                        continue;
+                    }
+                    return Err(error);
+                }
+            };
+            if !rows.is_empty() {
+                return Ok(crate::http::registry::plan::QuotaDecision::Allow);
+            }
+            let current = self.load_usage(tenant_id).await?;
+            let mut probe = current;
+            let decision =
+                crate::http::registry::plan::enforce_ingest(plan, &mut probe, source_bytes, now);
+            if decision.is_deny() {
+                return Ok(decision);
+            }
+        }
+        Err(MemoryError::Unavailable(
+            "ingest quota update contention; retry the request".into(),
+        ))
+    }
+
+    async fn reconcile_usage(
+        &self,
+        tenant_id: &str,
+        expected: crate::http::registry::plan::UsageCounter,
+    ) -> Result<(), MemoryError> {
+        self.handle()
+            .query_json(
+                "UPSERT type::record($table, $tenant_id) SET tenant_id = $tenant_id, ingest_window_start = type::datetime($window), ingest_current_minute = $count, ingested_bytes = $bytes, episode_count = $episodes, open_app_sessions = IF open_app_sessions IS NONE THEN 0 ELSE open_app_sessions END, active_api_keys = IF active_api_keys IS NONE THEN 0 ELSE active_api_keys END, updated_at = time::now()",
+                Some(json!({"table": "usage", "tenant_id": tenant_id, "window": expected.window_start.to_rfc3339(), "count": expected.ingest_current_minute, "bytes": expected.ingested_bytes, "episodes": expected.episode_count})),
+            )
+            .await
+            .map_err(|error| map_storage_error("reconcile usage", error))?;
         Ok(())
     }
 
@@ -2430,7 +2627,313 @@ impl RegistryStore for SurrealRegistryStore {
             limits,
         })
     }
+}
 
+#[async_trait::async_trait]
+impl SessionStore for SurrealRegistryStore {
+    #[cfg(feature = "control-plane")]
+    async fn store_session(
+        &self,
+        policy: &BrowserPolicyFence,
+        session: &crate::control::session::ControlPlaneSession,
+    ) -> Result<(), MemoryError> {
+        if session.browser_policy_epoch != Some(policy.epoch) {
+            return Err(MemoryError::Conflict(
+                "session epoch does not match the durable policy".into(),
+            ));
+        }
+        // Statement order: `BEGIN`(0) guard(1..=4) `CREATE`(5) `COMMIT`(6).
+        let sql = format!(
+            "BEGIN TRANSACTION;{OIDC_POLICY_GUARD}
+            CREATE type::record($table, $id) SET id = $id, cookie_hash = $cookie_hash, account_id = $account_id, browser_policy_epoch = $expected_epoch, auth_time = type::datetime($auth_time), idle_expiry = type::datetime($idle_expiry), absolute_expiry = type::datetime($absolute_expiry);
+            COMMIT TRANSACTION;",
+        );
+        self.handle()
+            .query_json_at(
+                &sql,
+                Some(json!({
+                    "expected_epoch": policy.epoch,
+                    "table": "control_plane_session",
+                    "id": session.id,
+                    "cookie_hash": session.cookie_hash,
+                    "account_id": session.account_id,
+                    "auth_time": session.auth_time.to_rfc3339(),
+                    "idle_expiry": session.idle_expiry.to_rfc3339(),
+                    "absolute_expiry": session.absolute_expiry.to_rfc3339(),
+                })),
+                5,
+            )
+            .await
+            .map_err(|err| map_storage_error("store_session", err))?;
+        Ok(())
+    }
+
+    #[cfg(feature = "control-plane")]
+    async fn find_session(
+        &self,
+        policy: &BrowserPolicyFence,
+        cookie_hash: &str,
+    ) -> Result<Option<crate::control::session::ControlPlaneSession>, MemoryError> {
+        // Statement order: `BEGIN`(0) guard(1..=4) `SELECT`(5) `COMMIT`(6).
+        // The `browser_policy_epoch` predicate excludes sessions created
+        // before the epoch column existed (decode as `NONE`), so an
+        // upgraded deployment requires a fresh login.
+        let sql = format!(
+            "BEGIN TRANSACTION;{OIDC_POLICY_GUARD}
+            SELECT * FROM type::table($table) WHERE cookie_hash = $cookie AND browser_policy_epoch = $expected_epoch AND idle_expiry > time::now() AND absolute_expiry > time::now() LIMIT 1;
+            COMMIT TRANSACTION;",
+        );
+        let rows = self
+            .handle()
+            .query_json_at(
+                &sql,
+                Some(json!({
+                    "expected_epoch": policy.epoch,
+                    "table": "control_plane_session",
+                    "cookie": cookie_hash,
+                })),
+                5,
+            )
+            .await
+            .map_err(|err| map_storage_error("find_session", err))?;
+        let Some(row) = rows.into_iter().next() else {
+            return Ok(None);
+        };
+        let cookie_hash = row
+            .get("cookie_hash")
+            .and_then(Value::as_str)
+            .ok_or_else(|| MemoryError::Storage("session cookie hash missing".into()))?;
+        let session = crate::control::session::ControlPlaneSession {
+            id: row_id(&row, ""),
+            cookie_hash: cookie_hash.to_owned(),
+            account_id: row
+                .get("account_id")
+                .and_then(Value::as_str)
+                .unwrap_or_default()
+                .to_owned(),
+            browser_policy_epoch: row.get("browser_policy_epoch").and_then(Value::as_u64),
+            auth_time: required_datetime(&row, "auth_time")?,
+            idle_expiry: required_datetime(&row, "idle_expiry")?,
+            absolute_expiry: required_datetime(&row, "absolute_expiry")?,
+        };
+        if session.idle_expiry <= Utc::now()
+            || session.absolute_expiry <= Utc::now()
+            || session.browser_policy_epoch != Some(policy.epoch)
+        {
+            return Ok(None);
+        }
+        Ok(Some(session))
+    }
+
+    #[cfg(feature = "control-plane")]
+    async fn touch_session(
+        &self,
+        policy: &BrowserPolicyFence,
+        session_id: &str,
+        cookie_hash: &str,
+    ) -> Result<(), MemoryError> {
+        // Statement order: `BEGIN`(0) guard(1..=4) `UPDATE`(5) `COMMIT`(6).
+        // The idle deadline is computed from database time; the `WHERE`
+        // clause refuses to extend a missing, expired or epoch-stale row,
+        // and `UPDATE` never recreates a row.
+        let sql = format!(
+            "BEGIN TRANSACTION;{OIDC_POLICY_GUARD}
+            UPDATE type::record($table, $id) SET idle_expiry = IF time::now() + 1800s < absolute_expiry THEN time::now() + 1800s ELSE absolute_expiry END WHERE cookie_hash = $cookie AND browser_policy_epoch = $expected_epoch AND idle_expiry > time::now() AND absolute_expiry > time::now() RETURN AFTER;
+            COMMIT TRANSACTION;",
+        );
+        let rows = self
+            .handle()
+            .query_json_at(
+                &sql,
+                Some(json!({
+                    "expected_epoch": policy.epoch,
+                    "table": "control_plane_session",
+                    "id": session_id,
+                    "cookie": cookie_hash,
+                })),
+                5,
+            )
+            .await
+            .map_err(|error| map_storage_error("touch session", error))?;
+        if rows.is_empty() {
+            return Err(MemoryError::NotFound("session not found".into()));
+        }
+        Ok(())
+    }
+
+    #[cfg(feature = "control-plane")]
+    async fn delete_session(
+        &self,
+        policy: &BrowserPolicyFence,
+        cookie_hash: &str,
+    ) -> Result<(), MemoryError> {
+        // Statement order: `BEGIN`(0) guard(1..=4) `DELETE`(5) `COMMIT`(6).
+        let sql = format!(
+            "BEGIN TRANSACTION;{OIDC_POLICY_GUARD}
+            DELETE FROM control_plane_session WHERE cookie_hash = $cookie_hash AND browser_policy_epoch = $expected_epoch RETURN BEFORE;
+            COMMIT TRANSACTION;",
+        );
+        let rows = self
+            .handle()
+            .query_json_at(
+                &sql,
+                Some(json!({
+                    "expected_epoch": policy.epoch,
+                    "cookie_hash": cookie_hash,
+                })),
+                5,
+            )
+            .await
+            .map_err(|error| map_storage_error("delete session", error))?;
+        if rows.is_empty() {
+            return Err(MemoryError::NotFound("session not found".into()));
+        }
+        Ok(())
+    }
+
+    #[cfg(feature = "control-plane")]
+    async fn store_oidc_request(
+        &self,
+        policy: &BrowserPolicyFence,
+        state_hash: &str,
+        sealed_payload: &[u8],
+        aead_nonce: &[u8; 12],
+    ) -> Result<(), MemoryError> {
+        let payload_b64 = base64_encode(sealed_payload);
+        let nonce_arr: Vec<u8> = aead_nonce.to_vec();
+        // Statement order: `BEGIN`(0) guard(1..=4) `CREATE`(5) `COMMIT`(6).
+        let sql = format!(
+            "BEGIN TRANSACTION;{OIDC_POLICY_GUARD}
+            CREATE type::record($table, $id) SET state_hash = $state, sealed_payload = $payload, aead_nonce = $nonce, expires_at = type::datetime($expires_at), created_at = time::now();
+            COMMIT TRANSACTION;",
+        );
+        self.handle()
+            .query_json_at(
+                &sql,
+                Some(json!({
+                    "expected_epoch": policy.epoch,
+                    "table": "oidc_request",
+                    "id": state_hash,
+                    "state": state_hash,
+                    "payload": payload_b64,
+                    "nonce": nonce_arr,
+                    "expires_at": (Utc::now() + chrono::Duration::minutes(10)).to_rfc3339(),
+                })),
+                5,
+            )
+            .await
+            .map_err(|err| map_storage_error("store_oidc_request", err))?;
+        Ok(())
+    }
+
+    #[cfg(feature = "control-plane")]
+    async fn take_oidc_request(
+        &self,
+        policy: &BrowserPolicyFence,
+        state_hash: &str,
+    ) -> Result<Option<(Vec<u8>, [u8; 12])>, MemoryError> {
+        // Statement order: `BEGIN`(0) guard(1..=4) `DELETE`(5) `COMMIT`(6).
+        let sql = format!(
+            "BEGIN TRANSACTION;{OIDC_POLICY_GUARD}
+            DELETE type::record($table, $id) WHERE state_hash = $state AND expires_at > time::now() RETURN BEFORE;
+            COMMIT TRANSACTION;",
+        );
+        let rows = self
+            .handle()
+            .query_json_at(
+                &sql,
+                Some(json!({
+                    "expected_epoch": policy.epoch,
+                    "table": "oidc_request",
+                    "id": state_hash,
+                    "state": state_hash,
+                })),
+                5,
+            )
+            .await
+            .map_err(|err| map_storage_error("take_oidc_request", err))?;
+        let Some(row) = rows.into_iter().next() else {
+            return Ok(None);
+        };
+        let payload_b64 = row
+            .get("sealed_payload")
+            .and_then(|v| v.as_str())
+            .map(|s| s.to_string());
+        let nonce_arr = row.get("aead_nonce").and_then(|v| v.as_array()).cloned();
+        let payload = payload_b64
+            .ok_or_else(|| MemoryError::Storage("oidc_request payload missing".into()))?;
+        let nonce =
+            nonce_arr.ok_or_else(|| MemoryError::Storage("oidc_request nonce missing".into()))?;
+        let nonce_bytes = nonce
+            .iter()
+            .map(|value| value.as_u64().and_then(|number| u8::try_from(number).ok()))
+            .collect::<Option<Vec<_>>>()
+            .and_then(|bytes| bytes.try_into().ok())
+            .ok_or_else(|| MemoryError::Storage("oidc_request nonce is invalid".into()))?;
+        let payload = base64_decode(&payload).map_err(|error| {
+            MemoryError::Storage(format!("oidc_request payload is invalid: {error}"))
+        })?;
+        Ok(Some((payload, nonce_bytes)))
+    }
+
+    #[cfg(feature = "control-plane")]
+    async fn create_deletion_challenge(
+        &self,
+        challenge: &DeletionChallengeRecord,
+    ) -> Result<(), MemoryError> {
+        let consumed_assignment = if challenge.consumed_at.is_some() {
+            "consumed_at = type::datetime($consumed_at)"
+        } else {
+            "consumed_at = NONE"
+        };
+        let sql = format!(
+            "CREATE type::record($table, $id) SET id = $id, verifier = $verifier, account_id = $account_id, session_id = $session_id, expires_at = type::datetime($expires_at), {consumed_assignment}, created_at = time::now()"
+        );
+        self.handle()
+            .query_json(
+                &sql,
+                Some(json!({
+                    "table": "deletion_challenge",
+                    "id": challenge.id,
+                    "verifier": challenge.verifier,
+                    "account_id": challenge.account_id,
+                    "session_id": challenge.session_id,
+                    "expires_at": challenge.expires_at.to_rfc3339(),
+                    "consumed_at": challenge.consumed_at.map(|value| value.to_rfc3339()),
+                })),
+            )
+            .await
+            .map_err(|error| map_storage_error("create deletion challenge", error))?;
+        Ok(())
+    }
+
+    #[cfg(feature = "control-plane")]
+    async fn consume_deletion_challenge(
+        &self,
+        verifier: &str,
+        account_id: &str,
+        session_id: &str,
+        now: DateTime<Utc>,
+    ) -> Result<(), MemoryError> {
+        let rows = self
+            .handle()
+            .query_json(
+                "UPDATE type::table($table) SET consumed_at = type::datetime($now) WHERE verifier = $verifier AND account_id = $account_id AND session_id = $session_id AND consumed_at IS NONE AND expires_at > type::datetime($now) RETURN AFTER",
+                Some(json!({"table": "deletion_challenge", "verifier": verifier, "account_id": account_id, "session_id": session_id, "now": now.to_rfc3339()})),
+            )
+            .await
+            .map_err(|error| map_storage_error("consume deletion challenge", error))?;
+        if rows.is_empty() {
+            return Err(MemoryError::Conflict(
+                "deletion challenge is invalid or expired".into(),
+            ));
+        }
+        Ok(())
+    }
+}
+
+#[async_trait::async_trait]
+impl BrowserPolicyStore for SurrealRegistryStore {
     #[cfg(feature = "control-plane")]
     async fn reconcile_browser_policy(
         &self,
@@ -2633,488 +3136,12 @@ impl RegistryStore for SurrealRegistryStore {
         let epoch = required_u64(&row, "epoch")?;
         Ok(BrowserPolicyFence { methods, epoch })
     }
+}
 
-    #[cfg(feature = "control-plane")]
-    async fn create_oidc_account_bundle(
-        &self,
-        policy: &BrowserPolicyFence,
-        account: &Account,
-        tenant: &Tenant,
-        identity: &ExternalIdentity,
-    ) -> Result<(), MemoryError> {
-        let account_status = serde_json::to_value(account.status)
-            .map_err(|error| MemoryError::Storage(format!("encode account status: {error}")))?;
-        let tenant_status = serde_json::to_value(tenant.status)
-            .map_err(|error| MemoryError::Storage(format!("encode tenant status: {error}")))?;
-        let (lease_assignment, lease_vars) =
-            lease_write_assignment(tenant.provisioning_lease.as_ref());
-        let retry_stage_assignment = if tenant.retry_stage.is_some() {
-            "retry_stage = $retry_stage"
-        } else {
-            "retry_stage = NONE"
-        };
-        let script = format!(
-            "BEGIN TRANSACTION;
-            LET $policy = (SELECT mode, epoch, methods FROM browser_auth_policy LIMIT 2);
-            IF array::len($policy) != 1 {{ THROW 'no_policy'; }};
-            IF NOT ('oidc' IN $policy[0].methods ?? [$policy[0].mode]) {{ THROW 'mode_mismatch'; }};
-            IF $policy[0].epoch != $expected_epoch {{ THROW 'epoch_mismatch'; }};
-            CREATE type::record('account', $account_id) SET id = $account_id, status = $account_status, tenant_id = $tenant_id, created_at = type::datetime($account_created_at);
-            CREATE type::record('tenant', $tenant_record_id) SET id = $tenant_record_id, status = $tenant_status, namespace_binding = $binding, plan_version = $plan_version, schema_version = $schema_version, {retry_stage_assignment}, {lease_assignment}, created_at = type::datetime($tenant_created_at), version = $version;
-            CREATE type::record('external_identity', $identity_id) SET id = $identity_id, issuer = $issuer, subject_verifier = $subject_verifier, account_id = $identity_account_id, created_at = type::datetime($identity_created_at);
-            COMMIT TRANSACTION;",
-        );
-        let mut vars = json!({
-            "expected_epoch": policy.epoch,
-            "account_id": account.id,
-            "account_status": account_status,
-            "tenant_id": account.tenant_id,
-            "tenant_record_id": tenant.id,
-            "tenant_status": tenant_status,
-            "namespace": tenant.namespace_binding.namespace,
-            "binding": tenant.namespace_binding,
-            "plan_version": tenant.plan_version,
-            "schema_version": tenant.schema_version,
-            "retry_stage": tenant.retry_stage,
-            "account_created_at": account.created_at.to_rfc3339(),
-            "tenant_created_at": tenant.created_at.to_rfc3339(),
-            "version": tenant.version,
-            "identity_id": identity.id,
-            "issuer": identity.issuer,
-            "subject_verifier": hex::encode(identity.subject_verifier.0),
-            "identity_account_id": identity.account_id,
-            "identity_created_at": identity.created_at.to_rfc3339(),
-        });
-        if let (Some(vars), Some(lease_vars)) = (vars.as_object_mut(), lease_vars.as_object()) {
-            vars.extend(lease_vars.clone());
-        }
-        self.handle()
-            .query_json(&script, Some(vars))
-            .await
-            .map_err(|error| map_storage_error("create OIDC account bundle", error))?;
-        Ok(())
-    }
-
-    async fn load_usage(
-        &self,
-        tenant_id: &str,
-    ) -> Result<crate::http::registry::plan::UsageCounter, MemoryError> {
-        let rows = self
-            .handle()
-            .query_json(
-                "SELECT ingest_window_start, ingest_current_minute, ingested_bytes, episode_count FROM usage WHERE tenant_id = $tenant_id LIMIT 1",
-                Some(json!({"tenant_id": tenant_id})),
-            )
-            .await
-            .map_err(|error| map_storage_error("load usage", error))?;
-        let Some(row) = rows.into_iter().next() else {
-            return Ok(crate::http::registry::plan::UsageCounter::default());
-        };
-        Ok(crate::http::registry::plan::UsageCounter {
-            ingest_current_minute: required_u32(&row, "ingest_current_minute")?,
-            window_start: required_datetime(&row, "ingest_window_start")?,
-            ingested_bytes: required_u64(&row, "ingested_bytes")?,
-            episode_count: required_u64(&row, "episode_count")?,
-        })
-    }
-
-    async fn reserve_ingest_usage(
-        &self,
-        tenant_id: &str,
-        source_bytes: u64,
-        plan: &crate::http::registry::plan::Plan,
-        now: DateTime<Utc>,
-    ) -> Result<crate::http::registry::plan::QuotaDecision, MemoryError> {
-        // One hot usage row per Tenant; allow enough attempts that
-        // a burst of concurrent ingests each lands one clean write.
-        for _attempt in 0..8 {
-            // Create the usage row once. The conditional UPDATE below is the
-            // admission operation; it increments counters only when every
-            // quota predicate still holds at the datastore write point.
-            let init = self.handle().query_json(
-                    "UPSERT type::record($table, $tenant_id) SET tenant_id = $tenant_id, ingest_window_start = IF ingest_window_start IS NONE THEN type::datetime($now) ELSE ingest_window_start END, ingest_current_minute = IF ingest_current_minute IS NONE THEN 0 ELSE ingest_current_minute END, ingested_bytes = IF ingested_bytes IS NONE THEN 0 ELSE ingested_bytes END, episode_count = IF episode_count IS NONE THEN 0 ELSE episode_count END, open_app_sessions = IF open_app_sessions IS NONE THEN 0 ELSE open_app_sessions END, active_api_keys = IF active_api_keys IS NONE THEN 0 ELSE active_api_keys END, updated_at = time::now()",
-                    Some(json!({"table": "usage", "tenant_id": tenant_id, "now": now.to_rfc3339()})),
-                )
-                .await
-                .map_err(|error| map_storage_error("initialize ingest usage", error));
-            if let Err(error) = init {
-                if is_write_conflict(&error) {
-                    tokio::time::sleep(std::time::Duration::from_millis(2)).await;
-                    continue;
-                }
-                return Err(error);
-            }
-            let reserve = self
-                .handle()
-                .query_json(
-                    "UPDATE type::record($table, $tenant_id) SET ingest_window_start = IF ingest_window_start <= type::datetime($cutoff) THEN type::datetime($now) ELSE ingest_window_start END, ingest_current_minute = IF ingest_window_start <= type::datetime($cutoff) THEN 1 ELSE ingest_current_minute + 1 END, ingested_bytes = ingested_bytes + $bytes, episode_count = episode_count + 1, updated_at = time::now() WHERE tenant_id = $tenant_id AND ingested_bytes + $bytes <= $max_bytes AND episode_count < $max_episodes AND (ingest_current_minute < $per_minute OR ingest_window_start <= type::datetime($cutoff)) RETURN AFTER",
-                    Some(json!({
-                        "table": "usage",
-                        "tenant_id": tenant_id,
-                        "now": now.to_rfc3339(),
-                        "cutoff": (now - chrono::Duration::seconds(60)).to_rfc3339(),
-                        "bytes": source_bytes,
-                        "max_bytes": plan.max_ingested_bytes,
-                        "max_episodes": plan.max_episode_count,
-                        "per_minute": plan.ingest_per_minute,
-                    })),
-                )
-                .await
-                .map_err(|error| map_storage_error("reserve ingest usage", error));
-            let rows = match reserve {
-                Ok(rows) => rows,
-                Err(error) => {
-                    if is_write_conflict(&error) {
-                        tokio::time::sleep(std::time::Duration::from_millis(2)).await;
-                        continue;
-                    }
-                    return Err(error);
-                }
-            };
-            if !rows.is_empty() {
-                return Ok(crate::http::registry::plan::QuotaDecision::Allow);
-            }
-            let current = self.load_usage(tenant_id).await?;
-            let mut probe = current;
-            let decision =
-                crate::http::registry::plan::enforce_ingest(plan, &mut probe, source_bytes, now);
-            if decision.is_deny() {
-                return Ok(decision);
-            }
-        }
-        Err(MemoryError::Unavailable(
-            "ingest quota update contention; retry the request".into(),
-        ))
-    }
-
-    async fn reconcile_usage(
-        &self,
-        tenant_id: &str,
-        expected: crate::http::registry::plan::UsageCounter,
-    ) -> Result<(), MemoryError> {
-        self.handle()
-            .query_json(
-                "UPSERT type::record($table, $tenant_id) SET tenant_id = $tenant_id, ingest_window_start = type::datetime($window), ingest_current_minute = $count, ingested_bytes = $bytes, episode_count = $episodes, open_app_sessions = IF open_app_sessions IS NONE THEN 0 ELSE open_app_sessions END, active_api_keys = IF active_api_keys IS NONE THEN 0 ELSE active_api_keys END, updated_at = time::now()",
-                Some(json!({"table": "usage", "tenant_id": tenant_id, "window": expected.window_start.to_rfc3339(), "count": expected.ingest_current_minute, "bytes": expected.ingested_bytes, "episodes": expected.episode_count})),
-            )
-            .await
-            .map_err(|error| map_storage_error("reconcile usage", error))?;
-        Ok(())
-    }
-
-    async fn append_provisioning_event(
-        &self,
-        tenant_id: &str,
-        stage: &str,
-    ) -> Result<(), MemoryError> {
-        self.handle()
-            .query_json(
-                "CREATE provisioning_event SET tenant_id = $tenant_id, stage = $stage",
-                Some(json!({"tenant_id": tenant_id, "stage": stage})),
-            )
-            .await
-            .map_err(|err| map_storage_error("append_provisioning_event", err))?;
-        Ok(())
-    }
-
-    #[cfg(feature = "control-plane")]
-    async fn store_oidc_request(
-        &self,
-        policy: &BrowserPolicyFence,
-        state_hash: &str,
-        sealed_payload: &[u8],
-        aead_nonce: &[u8; 12],
-    ) -> Result<(), MemoryError> {
-        let payload_b64 = base64_encode(sealed_payload);
-        let nonce_arr: Vec<u8> = aead_nonce.to_vec();
-        // Statement order: `BEGIN`(0) guard(1..=4) `CREATE`(5) `COMMIT`(6).
-        let sql = format!(
-            "BEGIN TRANSACTION;{OIDC_POLICY_GUARD}
-            CREATE type::record($table, $id) SET state_hash = $state, sealed_payload = $payload, aead_nonce = $nonce, expires_at = type::datetime($expires_at), created_at = time::now();
-            COMMIT TRANSACTION;",
-        );
-        self.handle()
-            .query_json_at(
-                &sql,
-                Some(json!({
-                    "expected_epoch": policy.epoch,
-                    "table": "oidc_request",
-                    "id": state_hash,
-                    "state": state_hash,
-                    "payload": payload_b64,
-                    "nonce": nonce_arr,
-                    "expires_at": (Utc::now() + chrono::Duration::minutes(10)).to_rfc3339(),
-                })),
-                5,
-            )
-            .await
-            .map_err(|err| map_storage_error("store_oidc_request", err))?;
-        Ok(())
-    }
-
-    #[cfg(feature = "control-plane")]
-    async fn take_oidc_request(
-        &self,
-        policy: &BrowserPolicyFence,
-        state_hash: &str,
-    ) -> Result<Option<(Vec<u8>, [u8; 12])>, MemoryError> {
-        // Statement order: `BEGIN`(0) guard(1..=4) `DELETE`(5) `COMMIT`(6).
-        let sql = format!(
-            "BEGIN TRANSACTION;{OIDC_POLICY_GUARD}
-            DELETE type::record($table, $id) WHERE state_hash = $state AND expires_at > time::now() RETURN BEFORE;
-            COMMIT TRANSACTION;",
-        );
-        let rows = self
-            .handle()
-            .query_json_at(
-                &sql,
-                Some(json!({
-                    "expected_epoch": policy.epoch,
-                    "table": "oidc_request",
-                    "id": state_hash,
-                    "state": state_hash,
-                })),
-                5,
-            )
-            .await
-            .map_err(|err| map_storage_error("take_oidc_request", err))?;
-        let Some(row) = rows.into_iter().next() else {
-            return Ok(None);
-        };
-        let payload_b64 = row
-            .get("sealed_payload")
-            .and_then(|v| v.as_str())
-            .map(|s| s.to_string());
-        let nonce_arr = row.get("aead_nonce").and_then(|v| v.as_array()).cloned();
-        let payload = payload_b64
-            .ok_or_else(|| MemoryError::Storage("oidc_request payload missing".into()))?;
-        let nonce =
-            nonce_arr.ok_or_else(|| MemoryError::Storage("oidc_request nonce missing".into()))?;
-        let nonce_bytes = nonce
-            .iter()
-            .map(|value| value.as_u64().and_then(|number| u8::try_from(number).ok()))
-            .collect::<Option<Vec<_>>>()
-            .and_then(|bytes| bytes.try_into().ok())
-            .ok_or_else(|| MemoryError::Storage("oidc_request nonce is invalid".into()))?;
-        let payload = base64_decode(&payload).map_err(|error| {
-            MemoryError::Storage(format!("oidc_request payload is invalid: {error}"))
-        })?;
-        Ok(Some((payload, nonce_bytes)))
-    }
-
-    #[cfg(feature = "control-plane")]
-    async fn store_session(
-        &self,
-        policy: &BrowserPolicyFence,
-        session: &crate::control::session::ControlPlaneSession,
-    ) -> Result<(), MemoryError> {
-        if session.browser_policy_epoch != Some(policy.epoch) {
-            return Err(MemoryError::Conflict(
-                "session epoch does not match the durable policy".into(),
-            ));
-        }
-        // Statement order: `BEGIN`(0) guard(1..=4) `CREATE`(5) `COMMIT`(6).
-        let sql = format!(
-            "BEGIN TRANSACTION;{OIDC_POLICY_GUARD}
-            CREATE type::record($table, $id) SET id = $id, cookie_hash = $cookie_hash, account_id = $account_id, browser_policy_epoch = $expected_epoch, auth_time = type::datetime($auth_time), idle_expiry = type::datetime($idle_expiry), absolute_expiry = type::datetime($absolute_expiry);
-            COMMIT TRANSACTION;",
-        );
-        self.handle()
-            .query_json_at(
-                &sql,
-                Some(json!({
-                    "expected_epoch": policy.epoch,
-                    "table": "control_plane_session",
-                    "id": session.id,
-                    "cookie_hash": session.cookie_hash,
-                    "account_id": session.account_id,
-                    "auth_time": session.auth_time.to_rfc3339(),
-                    "idle_expiry": session.idle_expiry.to_rfc3339(),
-                    "absolute_expiry": session.absolute_expiry.to_rfc3339(),
-                })),
-                5,
-            )
-            .await
-            .map_err(|err| map_storage_error("store_session", err))?;
-        Ok(())
-    }
-
-    #[cfg(feature = "control-plane")]
-    async fn find_session(
-        &self,
-        policy: &BrowserPolicyFence,
-        cookie_hash: &str,
-    ) -> Result<Option<crate::control::session::ControlPlaneSession>, MemoryError> {
-        // Statement order: `BEGIN`(0) guard(1..=4) `SELECT`(5) `COMMIT`(6).
-        // The `browser_policy_epoch` predicate excludes sessions created
-        // before the epoch column existed (decode as `NONE`), so an
-        // upgraded deployment requires a fresh login.
-        let sql = format!(
-            "BEGIN TRANSACTION;{OIDC_POLICY_GUARD}
-            SELECT * FROM type::table($table) WHERE cookie_hash = $cookie AND browser_policy_epoch = $expected_epoch AND idle_expiry > time::now() AND absolute_expiry > time::now() LIMIT 1;
-            COMMIT TRANSACTION;",
-        );
-        let rows = self
-            .handle()
-            .query_json_at(
-                &sql,
-                Some(json!({
-                    "expected_epoch": policy.epoch,
-                    "table": "control_plane_session",
-                    "cookie": cookie_hash,
-                })),
-                5,
-            )
-            .await
-            .map_err(|err| map_storage_error("find_session", err))?;
-        let Some(row) = rows.into_iter().next() else {
-            return Ok(None);
-        };
-        let cookie_hash = row
-            .get("cookie_hash")
-            .and_then(Value::as_str)
-            .ok_or_else(|| MemoryError::Storage("session cookie hash missing".into()))?;
-        let session = crate::control::session::ControlPlaneSession {
-            id: row_id(&row, ""),
-            cookie_hash: cookie_hash.to_owned(),
-            account_id: row
-                .get("account_id")
-                .and_then(Value::as_str)
-                .unwrap_or_default()
-                .to_owned(),
-            browser_policy_epoch: row.get("browser_policy_epoch").and_then(Value::as_u64),
-            auth_time: required_datetime(&row, "auth_time")?,
-            idle_expiry: required_datetime(&row, "idle_expiry")?,
-            absolute_expiry: required_datetime(&row, "absolute_expiry")?,
-        };
-        if session.idle_expiry <= Utc::now()
-            || session.absolute_expiry <= Utc::now()
-            || session.browser_policy_epoch != Some(policy.epoch)
-        {
-            return Ok(None);
-        }
-        Ok(Some(session))
-    }
-
-    #[cfg(feature = "control-plane")]
-    async fn touch_session(
-        &self,
-        policy: &BrowserPolicyFence,
-        session_id: &str,
-        cookie_hash: &str,
-    ) -> Result<(), MemoryError> {
-        // Statement order: `BEGIN`(0) guard(1..=4) `UPDATE`(5) `COMMIT`(6).
-        // The idle deadline is computed from database time; the `WHERE`
-        // clause refuses to extend a missing, expired or epoch-stale row,
-        // and `UPDATE` never recreates a row.
-        let sql = format!(
-            "BEGIN TRANSACTION;{OIDC_POLICY_GUARD}
-            UPDATE type::record($table, $id) SET idle_expiry = IF time::now() + 1800s < absolute_expiry THEN time::now() + 1800s ELSE absolute_expiry END WHERE cookie_hash = $cookie AND browser_policy_epoch = $expected_epoch AND idle_expiry > time::now() AND absolute_expiry > time::now() RETURN AFTER;
-            COMMIT TRANSACTION;",
-        );
-        let rows = self
-            .handle()
-            .query_json_at(
-                &sql,
-                Some(json!({
-                    "expected_epoch": policy.epoch,
-                    "table": "control_plane_session",
-                    "id": session_id,
-                    "cookie": cookie_hash,
-                })),
-                5,
-            )
-            .await
-            .map_err(|error| map_storage_error("touch session", error))?;
-        if rows.is_empty() {
-            return Err(MemoryError::NotFound("session not found".into()));
-        }
-        Ok(())
-    }
-
-    #[cfg(feature = "control-plane")]
-    async fn delete_session(
-        &self,
-        policy: &BrowserPolicyFence,
-        cookie_hash: &str,
-    ) -> Result<(), MemoryError> {
-        // Statement order: `BEGIN`(0) guard(1..=4) `DELETE`(5) `COMMIT`(6).
-        let sql = format!(
-            "BEGIN TRANSACTION;{OIDC_POLICY_GUARD}
-            DELETE FROM control_plane_session WHERE cookie_hash = $cookie_hash AND browser_policy_epoch = $expected_epoch RETURN BEFORE;
-            COMMIT TRANSACTION;",
-        );
-        let rows = self
-            .handle()
-            .query_json_at(
-                &sql,
-                Some(json!({
-                    "expected_epoch": policy.epoch,
-                    "cookie_hash": cookie_hash,
-                })),
-                5,
-            )
-            .await
-            .map_err(|error| map_storage_error("delete session", error))?;
-        if rows.is_empty() {
-            return Err(MemoryError::NotFound("session not found".into()));
-        }
-        Ok(())
-    }
-
-    #[cfg(feature = "control-plane")]
-    async fn create_deletion_challenge(
-        &self,
-        challenge: &DeletionChallengeRecord,
-    ) -> Result<(), MemoryError> {
-        let consumed_assignment = if challenge.consumed_at.is_some() {
-            "consumed_at = type::datetime($consumed_at)"
-        } else {
-            "consumed_at = NONE"
-        };
-        let sql = format!(
-            "CREATE type::record($table, $id) SET id = $id, verifier = $verifier, account_id = $account_id, session_id = $session_id, expires_at = type::datetime($expires_at), {consumed_assignment}, created_at = time::now()"
-        );
-        self.handle()
-            .query_json(
-                &sql,
-                Some(json!({
-                    "table": "deletion_challenge",
-                    "id": challenge.id,
-                    "verifier": challenge.verifier,
-                    "account_id": challenge.account_id,
-                    "session_id": challenge.session_id,
-                    "expires_at": challenge.expires_at.to_rfc3339(),
-                    "consumed_at": challenge.consumed_at.map(|value| value.to_rfc3339()),
-                })),
-            )
-            .await
-            .map_err(|error| map_storage_error("create deletion challenge", error))?;
-        Ok(())
-    }
-
-    #[cfg(feature = "control-plane")]
-    async fn consume_deletion_challenge(
-        &self,
-        verifier: &str,
-        account_id: &str,
-        session_id: &str,
-        now: DateTime<Utc>,
-    ) -> Result<(), MemoryError> {
-        let rows = self
-            .handle()
-            .query_json(
-                "UPDATE type::table($table) SET consumed_at = type::datetime($now) WHERE verifier = $verifier AND account_id = $account_id AND session_id = $session_id AND consumed_at IS NONE AND expires_at > type::datetime($now) RETURN AFTER",
-                Some(json!({"table": "deletion_challenge", "verifier": verifier, "account_id": account_id, "session_id": session_id, "now": now.to_rfc3339()})),
-            )
-            .await
-            .map_err(|error| map_storage_error("consume deletion challenge", error))?;
-        if rows.is_empty() {
-            return Err(MemoryError::Conflict(
-                "deletion challenge is invalid or expired".into(),
-            ));
-        }
-        Ok(())
+#[async_trait::async_trait]
+impl RegistryStore for SurrealRegistryStore {
+    async fn ping(&self) -> bool {
+        self.handle().ping().await
     }
 }
 
@@ -3209,7 +3236,7 @@ mod local_admin_remote;
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::http::registry::RegistryStore;
+
     use crate::http::registry::models::{AccountStatus, NamespaceBinding, TenantStatus};
     use surrealdb::engine::local::Mem;
 

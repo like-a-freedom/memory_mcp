@@ -25,9 +25,6 @@ struct Asset {
 #[cfg(feature = "ui")]
 include!(concat!(env!("OUT_DIR"), "/ui_assets.rs"));
 
-#[cfg(not(feature = "ui"))]
-const ASSETS: &[Asset] = &[];
-
 const INDEX_PATH: &str = "/index.html";
 
 /// Build-time marker baked into the UI bundle by
@@ -440,12 +437,6 @@ mod tests {
         }
     }
 
-    #[cfg(not(feature = "ui"))]
-    #[test]
-    fn disabled_ui_feature_does_not_serve_root() {
-        assert_eq!(serve_asset("/", None).status(), StatusCode::NOT_FOUND);
-    }
-
     #[cfg(feature = "ui")]
     #[test]
     fn generated_catalog_is_sorted_and_matches_the_embedded_bundle() {
@@ -637,5 +628,68 @@ mod tests {
             response_body(response).await,
             b"/__memory_mcp_base__\xff\xfe"
         );
+    }
+    // ---- empty-catalog developer/test build -------------------------
+    //
+    // `build.rs` emits `ASSETS: &[]` when `MEMORY_MCP_UI_DIST` names no
+    // bundle, so an empty catalog is the developer and test build even
+    // with the `ui` feature on. These exercise that catalog directly
+    // rather than through the build script, so the empty and bundled
+    // profiles are verified separately and a change to one cannot
+    // silently stand in for the other. An earlier revision of this block
+    // gated a test on `not(feature = "ui")`; that branch was unreachable,
+    // since `lib.rs` compiles the whole `ui` module only with the feature
+    // on and `streamable-http` implies it.
+
+    /// An empty catalog yields no stamped set. `build_stamped_assets`
+    /// reports this as `Ok(None)` — absence of stampable content is not
+    /// an error, and a developer build must start normally. `None` here
+    /// means "nothing to stamp", which is broader than "no bundle":
+    /// `BINARY_ASSETS` above also yields `None`, since a WASM binary is
+    /// served byte-for-byte and never stamped.
+    #[test]
+    fn the_empty_catalog_yields_no_stamped_assets() {
+        let stamped = stamped_entries(&[], "/memory").expect("an empty catalog is not an error");
+        assert!(
+            stamped.is_none(),
+            "an empty catalog has no prefix-dependent asset to stamp"
+        );
+    }
+
+    /// Every UI path 404s with the security headers still attached when
+    /// the catalog is empty. In particular an SPA route must not fall
+    /// through to a missing index and panic — there is no index.
+    #[test]
+    fn the_empty_catalog_404s_every_ui_path_with_security_headers() {
+        for path in ["/", "/index.html", "/settings", "/assets/app-dx.js"] {
+            let response = serve_asset_from(path, &[], None);
+            assert_eq!(
+                response.status(),
+                StatusCode::NOT_FOUND,
+                "an empty catalog serves nothing: {path}"
+            );
+            assert_security_headers(&response);
+        }
+    }
+
+    /// The two profiles must genuinely differ. Without this contrast a
+    /// refactor that made `stamped_entries` always return `None` would
+    /// leave the empty-catalog tests above green while quietly disabling
+    /// the bundled release image's base stamping.
+    #[test]
+    fn the_bundled_profile_stamps_where_the_empty_profile_silences() {
+        // `PREFIXED_ASSETS` is the fixture that carries the sentinel, so
+        // it is what a real bundled release image looks like to this
+        // function. `FIXTURE_ASSETS` is deliberately excluded: its index
+        // is a bare string with no sentinel and no `<head>`, so a
+        // prefixed base rejects it by design.
+        let bundled = stamped_entries(PREFIXED_ASSETS, "/memory").expect("walks the catalog");
+        assert!(
+            bundled.is_some(),
+            "a sentinel-carrying catalog must produce a stamped set, or \
+             the empty-catalog assertions prove nothing"
+        );
+        let empty = stamped_entries(&[], "/memory").expect("an empty catalog is not an error");
+        assert!(empty.is_none());
     }
 }

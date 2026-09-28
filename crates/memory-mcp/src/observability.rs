@@ -7,7 +7,7 @@
 use std::net::SocketAddr;
 use std::time::Instant;
 
-use crate::service::MemoryError;
+use crate::error::MemoryError;
 
 /// Total logical operations by bounded operation and outcome.
 pub const METRIC_OPERATIONS_TOTAL: &str = "memory_operation_calls_total";

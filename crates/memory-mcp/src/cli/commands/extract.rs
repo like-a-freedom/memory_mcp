@@ -1,6 +1,6 @@
 use crate::cli::args::ExtractArgs;
 use crate::cli::commands::write_response;
-use crate::service::MemoryError;
+use crate::error::MemoryError;
 use crate::service::MemoryService;
 use crate::tools::params::ExtractParams;
 

@@ -11,9 +11,9 @@ use std::sync::Arc;
 use std::time::Instant;
 
 use crate::error::MemoryError;
-use crate::http::fault_injection::{FaultInjector, NoFaults};
 use crate::http::registry::models::Tenant;
 use crate::mcp::handlers::MemoryMcp;
+use crate::platform::fault_injection::{FaultInjector, NoFaults};
 use crate::storage::client::BoundDbClient;
 use crate::storage::client::SurrealDbClient;
 

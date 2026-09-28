@@ -1,7 +1,7 @@
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};
-use memory_mcp::service::capabilities::assemble_context::AssembleContextCapability;
-use memory_mcp::service::capabilities::explain::ExplainCapability;
+use memory_mcp::service::memory_container_shims::memory_capabilities_assemble_context::AssembleContextCapability;
+use memory_mcp::service::memory_container_shims::memory_capabilities_explain::ExplainCapability;
 
 use super::retrieval_cases::{case_as_of, load_cases};
 use crate::domain::*;
@@ -133,7 +133,7 @@ impl EvalSuite for ResponseSizeSuite {
                 compact: false,
             };
 
-            let items = match AssembleContextCapability::assemble_context(
+            let items = match AssembleContextCapability::assemble_context_from_service(
                 &service,
                 request_verbose,
             )
@@ -164,7 +164,7 @@ impl EvalSuite for ResponseSizeSuite {
                     ..Default::default()
                 })
                 .collect();
-            let explain_items = match ExplainCapability::explain(
+            let explain_items = match ExplainCapability::explain_from_service(
                 &service,
                 memory_mcp::models::ExplainRequest {
                     context_pack: explain_input,

@@ -266,7 +266,7 @@ impl AppSessionStore {
         let now = chrono::Utc::now();
         let new_idle = now + chrono::Duration::seconds(IDLE_EXPIRY_SECS);
         let resource_id = format!("ui://memory/app/{}/{handle}", current.app);
-        let mutation = crate::http::subscriptions::outbox::TenantMutation::new(
+        let mutation = crate::platform::persistence::outbox::TenantMutation::new(
             "LET $updated = UPDATE app_session SET version = $expected + 1, payload = $mutation, idle_expiry = IF absolute_expiry < type::datetime($new_idle) THEN absolute_expiry ELSE type::datetime($new_idle) END WHERE tenant_id = $tenant_id AND handle = $handle AND version = $expected AND absolute_expiry > type::datetime($now) RETURN AFTER; IF array::len($updated) = 0 { THROW 'app_session version conflict'; }",
             serde_json::json!({
                 "tenant_id": tenant_id,
@@ -277,10 +277,10 @@ impl AppSessionStore {
                 "now": Self::to_surreal_datetime(now),
             }),
         )?;
-        crate::http::subscriptions::outbox::commit_tenant_mutation_with_event(
+        crate::platform::persistence::outbox::commit_tenant_mutation_with_event(
             &self.db,
             mutation,
-            crate::http::subscriptions::outbox::TenantChangeEvent {
+            crate::platform::persistence::outbox::TenantChangeEvent {
                 sequence: 0,
                 resource_id,
                 revision: expected_version.saturating_add(1),
@@ -301,14 +301,14 @@ impl AppSessionStore {
             let Some(current) = self.load(tenant_id, handle).await? else {
                 return Ok(());
             };
-            let mutation = crate::http::subscriptions::outbox::TenantMutation::new(
+            let mutation = crate::platform::persistence::outbox::TenantMutation::new(
                 "DELETE FROM app_session WHERE tenant_id = $tenant_id AND handle = $handle",
                 serde_json::json!({"tenant_id": tenant_id, "handle": handle}),
             )?;
-            return crate::http::subscriptions::outbox::commit_tenant_mutation_with_event(
+            return crate::platform::persistence::outbox::commit_tenant_mutation_with_event(
                 &self.db,
                 mutation,
-                crate::http::subscriptions::outbox::TenantChangeEvent {
+                crate::platform::persistence::outbox::TenantChangeEvent {
                     sequence: 0,
                     resource_id: format!("ui://memory/app/{}/{handle}", current.app),
                     revision: current.version,

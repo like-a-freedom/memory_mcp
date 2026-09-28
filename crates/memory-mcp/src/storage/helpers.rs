@@ -6,7 +6,7 @@ use regex::Regex;
 use serde_json::Value;
 use surrealdb::types::Value as SurrealValue;
 
-use crate::service::MemoryError;
+use crate::error::MemoryError;
 
 pub fn normalize_url(url: &str) -> String {
     let trimmed = url.trim();

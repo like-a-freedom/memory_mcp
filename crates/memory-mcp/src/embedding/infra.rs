@@ -12,7 +12,7 @@ use serde_json::Value;
 
 use crate::MemoryError;
 use crate::embedding::api::{CanonicalVectorPort, StoredVector, VectorIdentity, VectorWritePolicy};
-use crate::service::normalize_dt;
+use crate::shared::temporal::normalize_dt;
 use crate::storage::BoundDbClient;
 
 /// Applies validated vectors to canonical fact records.
@@ -24,7 +24,7 @@ use crate::storage::BoundDbClient;
 /// stores exactly what it stored before.
 pub struct FactVectorAdapter {
     db: BoundDbClient,
-    backfill: crate::storage::embedding_backfill_store::EmbeddingBackfillStoreClient,
+    backfill: crate::embedding::backfill_store::EmbeddingBackfillStoreClient,
     model: Option<String>,
     dimension: Option<usize>,
 }
@@ -39,7 +39,7 @@ impl FactVectorAdapter {
         let namespace = namespace.into();
         Self {
             db: BoundDbClient::new(Arc::clone(&db), namespace.clone()),
-            backfill: crate::storage::embedding_backfill_store::EmbeddingBackfillStoreClient::new(
+            backfill: crate::embedding::backfill_store::EmbeddingBackfillStoreClient::new(
                 db, namespace,
             ),
             model,

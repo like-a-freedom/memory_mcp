@@ -11,9 +11,9 @@ use std::sync::Arc;
 use crate::error::MemoryError;
 
 use super::config::HttpConfig;
-use super::fault_injection::{FaultInjector, NoFaults};
 use super::leases::migration::{ApplyMigrations, SurrealTenantMigrations};
 use super::registry::{RegistryHandle, RegistryStore, SurrealRegistryStore};
+use crate::platform::fault_injection::{FaultInjector, NoFaults};
 
 /// The production adapter bundle: durable control Registry plus the
 /// tenant migration worker. Selected once at startup; request

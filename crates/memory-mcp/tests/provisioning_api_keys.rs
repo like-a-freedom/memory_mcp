@@ -14,6 +14,10 @@ struct RecordingIssuance {
     owner: Mutex<Option<ApiKeyOwner>>,
     cap: Mutex<u32>,
     calls: Mutex<Vec<InsertedKey>>,
+    /// When false, `insert_key` accepts a key with no expiry. The
+    /// assertion follows the command rather than being hardcoded so a
+    /// test can issue a non-expiring key.
+    expect_expiry: Mutex<Option<bool>>,
 }
 
 #[async_trait::async_trait]
@@ -35,7 +39,12 @@ impl ApiKeyIssuancePort for RecordingIssuance {
         assert_eq!(key.name, "agent");
         assert!(key.id.starts_with("ak_"));
         assert_eq!(key.secret.len(), 64);
-        assert!(key.expires_at.is_some());
+        let expect_expiry = self
+            .expect_expiry
+            .lock()
+            .expect("expect_expiry lock")
+            .unwrap_or(true);
+        assert_eq!(key.expires_at.is_some(), expect_expiry);
         assert!(key.now >= chrono::Utc::now() - chrono::Duration::minutes(1));
         self.calls
             .lock()
@@ -89,4 +98,41 @@ async fn api_key_issue_refuses_missing_account_without_inserting() {
     .expect_err("missing account");
     assert!(matches!(error, MemoryError::NotFound(_)));
     assert!(port.calls.lock().expect("calls lock").is_empty());
+}
+
+/// The secret is a one-time credential. `CreatedApiKey` must never
+/// render it through `Debug`, so an accidental `{:?}` in a log line or
+/// an error report cannot leak it. The value is still reachable through
+/// explicit field access, which is what the issuing handler uses.
+#[tokio::test]
+async fn created_api_key_debug_redacts_the_one_time_secret() {
+    let port = RecordingIssuance::default();
+    *port.owner.lock().expect("owner lock") = Some(ApiKeyOwner {
+        tenant_id: "ten_1".into(),
+        plan_version: 1,
+    });
+    *port.cap.lock().expect("cap lock") = 5;
+    *port.expect_expiry.lock().expect("expect_expiry lock") = Some(false);
+
+    let created = create_api_key(
+        &port,
+        CreateApiKeyCommand {
+            account_id: "acct_1".into(),
+            name: "agent".into(),
+            expires_in_days: None,
+        },
+        chrono::Utc::now(),
+    )
+    .await
+    .expect("issue key");
+
+    let rendered = format!("{created:?}");
+    assert!(
+        !rendered.contains(&created.secret),
+        "Debug leaked the one-time secret: {rendered}"
+    );
+    assert!(rendered.contains("[REDACTED]"), "expected redaction marker");
+    // The non-secret fields stay useful for diagnosis.
+    assert!(rendered.contains(&created.id));
+    assert_eq!(created.secret.len(), 64, "the secret itself is intact");
 }

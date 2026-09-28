@@ -9,8 +9,8 @@ use tempfile::TempDir;
 
 use memory_mcp::mcp::MemoryMcp;
 use memory_mcp::models::{AssembleContextRequest, ExplainRequest};
-use memory_mcp::service::capabilities::assemble_context::AssembleContextCapability;
-use memory_mcp::service::capabilities::explain::ExplainCapability;
+use memory_mcp::service::memory_container_shims::memory_capabilities_assemble_context::AssembleContextCapability;
+use memory_mcp::service::memory_container_shims::memory_capabilities_explain::ExplainCapability;
 
 mod common;
 
@@ -207,7 +207,7 @@ async fn test_mcp_tools_flow() {
         "compact": false,
     }))
     .unwrap();
-    let context = AssembleContextCapability::assemble_context(
+    let context = AssembleContextCapability::assemble_context_from_service(
         mcp.service().as_ref(),
         assemble_request,
     )
@@ -243,7 +243,7 @@ async fn test_mcp_tools_flow() {
         compact: false,
     };
     let explanation =
-        ExplainCapability::explain(mcp.service().as_ref(), explain_request, None)
+        ExplainCapability::explain_from_service(mcp.service().as_ref(), explain_request, None)
             .await
             .expect("explain");
     assert_eq!(explanation[0].source_episode, episode_id);
@@ -284,7 +284,7 @@ async fn test_mcp_tools_flow() {
         compact: false,
     };
     let explanation_ids =
-        ExplainCapability::explain(mcp.service().as_ref(), explain_request_ids, None)
+        ExplainCapability::explain_from_service(mcp.service().as_ref(), explain_request_ids, None)
             .await
             .expect("explain ids");
     assert_eq!(explanation_ids[0].source_episode, episode_id);
@@ -584,7 +584,7 @@ async fn test_mcp_full_flow_end_to_end() {
         "compact": false,
     }))
     .unwrap();
-    let context = AssembleContextCapability::assemble_context(
+    let context = AssembleContextCapability::assemble_context_from_service(
         mcp.service().as_ref(),
         assemble_request,
     )
@@ -600,7 +600,7 @@ async fn test_mcp_full_flow_end_to_end() {
         compact: false,
     };
     let explanation =
-        ExplainCapability::explain(mcp.service().as_ref(), explain_request, None)
+        ExplainCapability::explain_from_service(mcp.service().as_ref(), explain_request, None)
             .await
             .expect("explain");
     assert_eq!(explanation[0].source_episode, episode_id);
@@ -622,7 +622,7 @@ async fn test_mcp_full_flow_end_to_end() {
             "compact": false,
         }))
         .unwrap();
-    let context_after = AssembleContextCapability::assemble_context(
+    let context_after = AssembleContextCapability::assemble_context_from_service(
         mcp.service().as_ref(),
         assemble_request_after,
     )
@@ -752,7 +752,7 @@ async fn test_mcp_explain_mixed_array() {
         compact: false,
     };
     let explanation =
-        ExplainCapability::explain(mcp.service().as_ref(), explain_request, None)
+        ExplainCapability::explain_from_service(mcp.service().as_ref(), explain_request, None)
             .await
             .expect("explain with mixed array should not fail");
     assert_eq!(explanation.len(), 2);
@@ -793,7 +793,7 @@ async fn test_mcp_explain_loads_episode_context() {
         compact: false,
     };
     let explanation =
-        ExplainCapability::explain(mcp.service().as_ref(), explain_request, None)
+        ExplainCapability::explain_from_service(mcp.service().as_ref(), explain_request, None)
             .await
             .expect("explain with loaded episode context");
 
@@ -854,7 +854,7 @@ async fn test_mcp_assemble_context_timeline_mode_passes_optional_fields() {
     });
 
     let assemble_request: AssembleContextRequest = serde_json::from_value(params).unwrap();
-    let context = AssembleContextCapability::assemble_context(
+    let context = AssembleContextCapability::assemble_context_from_service(
         mcp.service().as_ref(),
         assemble_request,
     )

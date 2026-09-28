@@ -65,7 +65,7 @@ impl LocalAdminAuthority {
         csrf_key: [u8; 32],
     ) -> LocalResult<Arc<Self>> {
         let fingerprints = compute_fingerprints(&session_key, &csrf_key)?;
-        let policy = crate::http::registry::RegistryStore::reconcile_browser_policy(
+        let policy = crate::http::registry::storage::BrowserPolicyStore::reconcile_browser_policy(
             store.as_ref(),
             &[BrowserAuthMethod::Local],
             Some(fingerprints),

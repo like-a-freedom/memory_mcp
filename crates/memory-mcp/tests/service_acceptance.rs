@@ -2,12 +2,12 @@ use chrono::{TimeZone, Utc};
 use memory_mcp::models::{
     AccessPayload, EntityCandidate, IngestRequest, InvalidateRequest, Provenance,
 };
-use memory_mcp::service::capabilities::assemble_context::AssembleContextCapability;
-use memory_mcp::service::capabilities::explain::ExplainCapability;
-use memory_mcp::service::capabilities::extract::ExtractCapability;
-use memory_mcp::service::capabilities::ingest::IngestCapability;
-use memory_mcp::service::capabilities::invalidate::InvalidateCapability;
-use memory_mcp::service::capabilities::resolve::ResolveCapability;
+use memory_mcp::service::memory_container_shims::memory_capabilities_assemble_context::AssembleContextCapability;
+use memory_mcp::service::memory_container_shims::memory_capabilities_explain::ExplainCapability;
+use memory_mcp::service::memory_container_shims::memory_capabilities_extract::ExtractCapability;
+use memory_mcp::service::memory_container_shims::memory_capabilities_ingest::IngestCapability;
+use memory_mcp::service::memory_container_shims::memory_capabilities_invalidate::InvalidateCapability;
+use memory_mcp::service::memory_container_shims::memory_capabilities_resolve::ResolveCapability;
 use memory_mcp::storage::DbClient;
 
 mod common;
@@ -16,7 +16,7 @@ mod common;
 async fn test_ingest_extract_and_assemble() {
     let service = common::make_service().await;
     let now = Utc::now();
-    let episode_id = IngestCapability::ingest(
+    let episode_id = IngestCapability::ingest_from_service(
         &service,
         IngestRequest {
             source_type: "email".to_string(),
@@ -31,14 +31,14 @@ async fn test_ingest_extract_and_assemble() {
     .await
     .expect("ingest");
 
-    let extraction = ExtractCapability::extract(&service, &episode_id, None, None)
+    let extraction = ExtractCapability::extract_from_service(&service, &episode_id, None, None)
         .await
         .expect("extract");
     let facts = extraction.facts;
     assert!(facts.iter().any(|fact| fact.fact_type == "metric"));
     assert!(facts.iter().any(|fact| fact.fact_type == "promise"));
 
-    let context = AssembleContextCapability::assemble_context(
+    let context = AssembleContextCapability::assemble_context_from_service(
         &service,
         memory_mcp::models::AssembleContextRequest {
             query: "ARR".to_string(),
@@ -60,7 +60,7 @@ async fn test_ingest_extract_and_assemble() {
 #[tokio::test]
 async fn test_extract_skips_low_value_email_header_roster_note_fallback() {
     let service = common::make_service().await;
-    let episode_id = IngestCapability::ingest(
+    let episode_id = IngestCapability::ingest_from_service(
         &service,
 
             IngestRequest {
@@ -76,7 +76,7 @@ async fn test_extract_skips_low_value_email_header_roster_note_fallback() {
         .await
         .expect("ingest low-value email");
 
-    let extraction = ExtractCapability::extract(&service, &episode_id, None, None)
+    let extraction = ExtractCapability::extract_from_service(&service, &episode_id, None, None)
         .await
         .expect("extract low-value email");
 
@@ -90,7 +90,7 @@ async fn test_extract_skips_low_value_email_header_roster_note_fallback() {
 #[tokio::test]
 async fn test_resolve_aliases() {
     let service = common::make_service().await;
-    let first = ResolveCapability::resolve(
+    let first = ResolveCapability::resolve_from_service(
         &service,
         EntityCandidate {
             entity_type: "person".to_string(),
@@ -101,7 +101,7 @@ async fn test_resolve_aliases() {
     )
     .await
     .expect("resolve");
-    let alias = ResolveCapability::resolve(
+    let alias = ResolveCapability::resolve_from_service(
         &service,
         EntityCandidate {
             entity_type: "person".to_string(),
@@ -118,7 +118,7 @@ async fn test_resolve_aliases() {
 #[tokio::test]
 async fn test_invalidate_and_explain() {
     let service = common::make_service().await;
-    let episode_id = IngestCapability::ingest(
+    let episode_id = IngestCapability::ingest_from_service(
         &service,
         IngestRequest {
             source_type: "email".to_string(),
@@ -132,12 +132,12 @@ async fn test_invalidate_and_explain() {
     )
     .await
     .expect("ingest");
-    let extraction = ExtractCapability::extract(&service, &episode_id, None, None)
+    let extraction = ExtractCapability::extract_from_service(&service, &episode_id, None, None)
         .await
         .expect("extract");
     let fact_id = extraction.facts[0].fact_id.clone();
 
-    InvalidateCapability::invalidate(
+    InvalidateCapability::invalidate_from_service(
         &service,
         InvalidateRequest {
             fact_id: fact_id.to_string(),
@@ -149,7 +149,7 @@ async fn test_invalidate_and_explain() {
     .await
     .expect("invalidate");
 
-    let context = AssembleContextCapability::assemble_context(
+    let context = AssembleContextCapability::assemble_context_from_service(
         &service,
         memory_mcp::models::AssembleContextRequest {
             query: "ARR".to_string(),
@@ -167,7 +167,7 @@ async fn test_invalidate_and_explain() {
     .expect("assemble");
     assert!(context.is_empty());
 
-    let explanation = ExplainCapability::explain(
+    let explanation = ExplainCapability::explain_from_service(
         &service,
         memory_mcp::models::ExplainRequest {
             context_pack: vec![memory_mcp::models::ExplainItem {
@@ -212,7 +212,7 @@ async fn test_policy_tag_filtering() {
         .await
         .expect("add_fact");
 
-    let context = AssembleContextCapability::assemble_context(
+    let context = AssembleContextCapability::assemble_context_from_service(
         &service,
         memory_mcp::models::AssembleContextRequest {
             query: "Salary".to_string(),
@@ -443,7 +443,7 @@ async fn test_explain_exposes_graph_insights_for_cross_community_connection() {
     )
     .await;
 
-    let episode_id = IngestCapability::ingest(
+    let episode_id = IngestCapability::ingest_from_service(
         &service,
         IngestRequest {
             source_type: "meeting".to_string(),
@@ -473,7 +473,7 @@ async fn test_explain_exposes_graph_insights_for_cross_community_connection() {
         .await
         .expect("add fact");
 
-    let explanation = ExplainCapability::explain(
+    let explanation = ExplainCapability::explain_from_service(
         &service,
         memory_mcp::models::ExplainRequest {
             context_pack: vec![memory_mcp::models::ExplainItem {
@@ -579,7 +579,7 @@ async fn test_assemble_context_uses_matching_community_summary() {
     let (service, db_client) = common::make_service_with_client().await;
     let t_ref = Utc.with_ymd_and_hms(2024, 4, 1, 10, 0, 0).unwrap();
 
-    let episode_id = IngestCapability::ingest(
+    let episode_id = IngestCapability::ingest_from_service(
         &service,
         IngestRequest {
             source_type: "meeting".to_string(),
@@ -594,7 +594,7 @@ async fn test_assemble_context_uses_matching_community_summary() {
     .await
     .expect("ingest");
 
-    let extraction = ExtractCapability::extract(&service, &episode_id, None, None)
+    let extraction = ExtractCapability::extract_from_service(&service, &episode_id, None, None)
         .await
         .expect("extract");
     let alice_id = extraction
@@ -636,7 +636,7 @@ async fn test_assemble_context_uses_matching_community_summary() {
         fact.get("fact_id").and_then(|value| value.as_str()) == Some(fact_id.as_str())
     }));
 
-    let context = AssembleContextCapability::assemble_context(
+    let context = AssembleContextCapability::assemble_context_from_service(
         &service,
         memory_mcp::models::AssembleContextRequest {
             query: "Bob Jones".to_string(),
@@ -687,7 +687,7 @@ async fn test_rate_limit_determinism() {
         content_type: None,
     };
 
-    let first = AssembleContextCapability::assemble_context(
+    let first = AssembleContextCapability::assemble_context_from_service(
         &service,
         memory_mcp::models::AssembleContextRequest {
             query: "ARR".to_string(),
@@ -709,7 +709,7 @@ async fn test_rate_limit_determinism() {
     )
     .await
     .expect("assemble");
-    let second = AssembleContextCapability::assemble_context(
+    let second = AssembleContextCapability::assemble_context_from_service(
         &service,
         memory_mcp::models::AssembleContextRequest {
             query: "ARR".to_string(),
@@ -785,7 +785,7 @@ async fn test_multiword_query_retrieval_quality() {
         .await
         .expect("add fact 3");
 
-    let ctx = AssembleContextCapability::assemble_context(
+    let ctx = AssembleContextCapability::assemble_context_from_service(
         &service,
         memory_mcp::models::AssembleContextRequest {
             query: "Delta Enrollment".to_string(),
@@ -806,7 +806,7 @@ async fn test_multiword_query_retrieval_quality() {
         "Delta Enrollment: expected matches for non-adjacent multi-word query"
     );
 
-    let ctx2 = AssembleContextCapability::assemble_context(
+    let ctx2 = AssembleContextCapability::assemble_context_from_service(
         &service,
         memory_mcp::models::AssembleContextRequest {
             query: "fleet checklist certs tokens ports pending checklist episode:035d8d47"
@@ -828,7 +828,7 @@ async fn test_multiword_query_retrieval_quality() {
         "mobile checklist query with episode ref: expected matches"
     );
 
-    let ctx3 = AssembleContextCapability::assemble_context(
+    let ctx3 = AssembleContextCapability::assemble_context_from_service(
         &service,
         memory_mcp::models::AssembleContextRequest {
             query: r#"release notes v2.2 Module "Module_6.0_Archive - Component v2.1.md" episode:8de581d5"#.to_string(),
@@ -899,7 +899,7 @@ async fn test_short_natural_language_query_uses_term_fallback() {
         .await
         .expect("add generic graduate fact");
 
-    let ctx = AssembleContextCapability::assemble_context(
+    let ctx = AssembleContextCapability::assemble_context_from_service(
         &service,
         memory_mcp::models::AssembleContextRequest {
             query: "What degree did I graduate with?".to_string(),
@@ -940,7 +940,7 @@ async fn test_assemble_context_exposes_retrieval_tier_and_rationale_metadata() {
     )
     .await;
 
-    let items = AssembleContextCapability::assemble_context(
+    let items = AssembleContextCapability::assemble_context_from_service(
         &service,
         memory_mcp::models::AssembleContextRequest {
             query: "deployment checklist rollout".to_string(),
@@ -1040,7 +1040,7 @@ async fn test_assemble_context_graph_results_include_anchor_and_hop_trace() {
     )
     .await;
 
-    let items = AssembleContextCapability::assemble_context(
+    let items = AssembleContextCapability::assemble_context_from_service(
         &service,
         memory_mcp::models::AssembleContextRequest {
             query: "Alice Stone".to_string(),
@@ -1111,7 +1111,7 @@ async fn test_low_grounding_long_query_returns_empty_instead_of_generic_overlap_
         .await
         .expect("seed generic rollout noise 2");
 
-    let items = AssembleContextCapability::assemble_context(
+    let items = AssembleContextCapability::assemble_context_from_service(
         &service,
         memory_mcp::models::AssembleContextRequest {
             query: "openshift migration exception compatibility rollout controls".to_string(),
@@ -1154,7 +1154,7 @@ async fn test_assemble_context_promotes_temporal_index_key_matches_to_temporal_t
         .await
         .expect("seed temporal fact");
 
-    let items = AssembleContextCapability::assemble_context(
+    let items = AssembleContextCapability::assemble_context_from_service(
         &service,
         memory_mcp::models::AssembleContextRequest {
             query: "march 2026 launch review".to_string(),
@@ -1239,7 +1239,7 @@ async fn test_queryful_assemble_context_skips_unrelated_recent_experience_and_te
         .await
         .expect("seed recent experience fact");
 
-    let items = AssembleContextCapability::assemble_context(
+    let items = AssembleContextCapability::assemble_context_from_service(
         &service,
         memory_mcp::models::AssembleContextRequest {
             query: "requirements created July 2025".to_string(),
@@ -1294,7 +1294,7 @@ async fn test_explicit_month_year_query_drops_out_of_window_summary_without_temp
         .await
         .expect("seed october summary fact");
 
-    let items = AssembleContextCapability::assemble_context(
+    let items = AssembleContextCapability::assemble_context_from_service(
         &service,
         memory_mcp::models::AssembleContextRequest {
             query: "Platform planning notes July 2025".to_string(),
@@ -1324,7 +1324,7 @@ async fn test_query_prefers_matching_episode_content_over_irrelevant_fact_fallba
     let service = common::make_service().await;
     let july = Utc.with_ymd_and_hms(2025, 7, 14, 10, 0, 0).unwrap();
 
-    let episode_id = IngestCapability::ingest(
+    let episode_id = IngestCapability::ingest_from_service(
         &service,
 
             IngestRequest {
@@ -1355,7 +1355,7 @@ async fn test_query_prefers_matching_episode_content_over_irrelevant_fact_fallba
         .await
         .expect("seed unrelated fact noise");
 
-    let items = AssembleContextCapability::assemble_context(
+    let items = AssembleContextCapability::assemble_context_from_service(
         &service,
         memory_mcp::models::AssembleContextRequest {
             query: "Platform planning notes July 2025".to_string(),
@@ -1386,7 +1386,7 @@ async fn test_assemble_context_returns_extracted_meeting_summary_fact_for_matchi
     let service = common::make_service().await;
     let t_ref = Utc.with_ymd_and_hms(2026, 4, 13, 9, 0, 0).unwrap();
 
-    let architecture_episode = IngestCapability::ingest(
+    let architecture_episode = IngestCapability::ingest_from_service(
         &service,
 
             IngestRequest {
@@ -1401,11 +1401,11 @@ async fn test_assemble_context_returns_extracted_meeting_summary_fact_for_matchi
         )
         .await
         .expect("ingest architecture episode");
-    ExtractCapability::extract(&service, &architecture_episode, None, None)
+    ExtractCapability::extract_from_service(&service, &architecture_episode, None, None)
         .await
         .expect("extract architecture episode");
 
-    let documentation_episode = IngestCapability::ingest(
+    let documentation_episode = IngestCapability::ingest_from_service(
         &service,
 
             IngestRequest {
@@ -1420,11 +1420,11 @@ async fn test_assemble_context_returns_extracted_meeting_summary_fact_for_matchi
         )
         .await
         .expect("ingest documentation episode");
-    ExtractCapability::extract(&service, &documentation_episode, None, None)
+    ExtractCapability::extract_from_service(&service, &documentation_episode, None, None)
         .await
         .expect("extract documentation episode");
 
-    let items = AssembleContextCapability::assemble_context(
+    let items = AssembleContextCapability::assemble_context_from_service(
         &service,
         memory_mcp::models::AssembleContextRequest {
             query: "help kickoff documentation localization terminology".to_string(),
@@ -1459,7 +1459,7 @@ async fn test_assemble_context_extracts_facts_from_ad_hoc_markdown_summary() {
     let service = common::make_service().await;
     let t_ref = Utc.with_ymd_and_hms(2026, 4, 13, 10, 0, 0).unwrap();
 
-    let episode_id = IngestCapability::ingest(
+    let episode_id = IngestCapability::ingest_from_service(
         &service,
 
             IngestRequest {
@@ -1475,7 +1475,7 @@ async fn test_assemble_context_extracts_facts_from_ad_hoc_markdown_summary() {
         .await
         .expect("ingest ad-hoc summary episode");
 
-    let extraction = ExtractCapability::extract(&service, &episode_id, None, None)
+    let extraction = ExtractCapability::extract_from_service(&service, &episode_id, None, None)
         .await
         .expect("extract ad-hoc summary episode");
 
@@ -1493,7 +1493,7 @@ async fn test_assemble_context_extracts_facts_from_ad_hoc_markdown_summary() {
         extraction.facts
     );
 
-    let launch_items = AssembleContextCapability::assemble_context(
+    let launch_items = AssembleContextCapability::assemble_context_from_service(
         &service,
         memory_mcp::models::AssembleContextRequest {
             query: "regional launch approved south market september 30".to_string(),
@@ -1519,7 +1519,7 @@ async fn test_assemble_context_extracts_facts_from_ad_hoc_markdown_summary() {
         "expected launch-relevant context from the imported summary, got {first_launch:?}"
     );
 
-    let development_items = AssembleContextCapability::assemble_context(
+    let development_items = AssembleContextCapability::assemble_context_from_service(
         &service,
         memory_mcp::models::AssembleContextRequest {
             query: "continue platform 1.5 development".to_string(),
@@ -1557,7 +1557,7 @@ async fn test_assemble_context_prefers_extracted_fact_from_thematic_markdown_sum
     let service = common::make_service().await;
     let t_ref = Utc.with_ymd_and_hms(2026, 4, 13, 10, 30, 0).unwrap();
 
-    let episode_id = IngestCapability::ingest(
+    let episode_id = IngestCapability::ingest_from_service(
         &service,
 
             IngestRequest {
@@ -1573,7 +1573,7 @@ async fn test_assemble_context_prefers_extracted_fact_from_thematic_markdown_sum
         .await
         .expect("ingest thematic ad-hoc summary episode");
 
-    let extraction = ExtractCapability::extract(&service, &episode_id, None, None)
+    let extraction = ExtractCapability::extract_from_service(&service, &episode_id, None, None)
         .await
         .expect("extract thematic ad-hoc summary episode");
 
@@ -1582,7 +1582,7 @@ async fn test_assemble_context_prefers_extracted_fact_from_thematic_markdown_sum
         "expected thematic markdown summary to produce line-level facts, got {extraction:?}"
     );
 
-    let items = AssembleContextCapability::assemble_context(
+    let items = AssembleContextCapability::assemble_context_from_service(
         &service,
         memory_mcp::models::AssembleContextRequest {
             query: "finalize phased rollout checklist".to_string(),
@@ -1617,7 +1617,7 @@ async fn test_assemble_context_keeps_extracted_presentation_summary_facts_for_br
     let service = common::make_service().await;
     let t_ref = Utc.with_ymd_and_hms(2026, 4, 13, 11, 0, 0).unwrap();
 
-    let episode_id = IngestCapability::ingest(
+    let episode_id = IngestCapability::ingest_from_service(
         &service,
 
             IngestRequest {
@@ -1633,7 +1633,7 @@ async fn test_assemble_context_keeps_extracted_presentation_summary_facts_for_br
         .await
         .expect("ingest presentation summary episode");
 
-    let extraction = ExtractCapability::extract(&service, &episode_id, None, None)
+    let extraction = ExtractCapability::extract_from_service(&service, &episode_id, None, None)
         .await
         .expect("extract presentation summary episode");
 
@@ -1642,7 +1642,7 @@ async fn test_assemble_context_keeps_extracted_presentation_summary_facts_for_br
         "expected line-level facts from presentation summary, got {extraction:?}"
     );
 
-    let items = AssembleContextCapability::assemble_context(
+    let items = AssembleContextCapability::assemble_context_from_service(
         &service,
         memory_mcp::models::AssembleContextRequest {
             query: "suite alpha beta gamma shared platform q3 2026 roadmap rollout controls versioning graphical rules".to_string(),
@@ -1720,7 +1720,7 @@ async fn test_assemble_context_prefers_anchor_backed_result_over_generic_overlap
         .await
         .expect("seed generic rollout fact 2");
 
-    let items = AssembleContextCapability::assemble_context(
+    let items = AssembleContextCapability::assemble_context_from_service(
         &service,
         memory_mcp::models::AssembleContextRequest {
             query: "openshift rollout controls".to_string(),

@@ -6,14 +6,18 @@
 
 pub mod account;
 pub mod migrations;
-pub mod models;
+pub use crate::models::registry as models;
+mod control_impl;
 pub mod plan;
 pub mod provisioning;
 pub mod storage;
 
 pub mod surreal_store;
 
-pub use storage::{RegistryStore, SurrealRegistryStore};
+pub use storage::{
+    AccountStore, ApiKeyStore, BrowserPolicyStore, IdentityStore, ProvisioningStore, RegistryStore,
+    SessionStore, SurrealRegistryStore, TenantStore, UsageStore,
+};
 
 #[cfg(any(test, feature = "test-fixtures"))]
 pub use storage::InMemoryStore;

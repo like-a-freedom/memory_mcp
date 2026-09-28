@@ -4,14 +4,13 @@
 //! listener may use a wake hint in the future, but it always polls this log so
 //! a lost cross-replica wake cannot lose a committed change.
 
-pub mod outbox;
 pub mod scheduler;
 pub mod stream;
 
 use std::collections::BTreeSet;
 
 use crate::error::MemoryError;
-use crate::http::subscriptions::outbox::TenantChangeEvent;
+use crate::platform::persistence::outbox::TenantChangeEvent;
 use crate::storage::client::BoundDbClient;
 
 const PUBLIC_APP_NAMES: [&str; 5] = [

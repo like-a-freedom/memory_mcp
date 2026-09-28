@@ -1,7 +1,7 @@
 use serde_json::Value;
 
-use super::types::{LifecycleCommand, LifecycleOperation};
-use crate::service::MemoryError;
+use crate::error::MemoryError;
+use crate::memory::lifecycle_types::{LifecycleCommand, LifecycleOperation};
 
 /// Protocol-neutral input used to classify an app command.
 #[derive(Debug, Clone, Default)]

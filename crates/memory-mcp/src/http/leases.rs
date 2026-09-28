@@ -326,9 +326,11 @@ impl ProvisioningLease {
 #[cfg(test)]
 mod tests {
     use crate::error::MemoryError;
-    use crate::http::registry::RegistryStore;
+
     use crate::http::registry::models::{Account, AccountStatus, Tenant, TenantStatus};
-    use crate::http::registry::storage::InMemoryStore;
+    use crate::http::registry::storage::{
+        AccountStore, InMemoryStore, ProvisioningStore, TenantStore,
+    };
     use std::sync::Arc;
 
     #[tokio::test]

@@ -9,7 +9,7 @@ use criterion::{Criterion, criterion_group, criterion_main};
 use eval_harness::ner_fixtures;
 use memory_mcp::config::NerExtractorKind;
 use memory_mcp::service::EntityExtractor;
-use memory_mcp::service::capabilities::extract::ExtractCapability;
+use memory_mcp::service::memory_container_shims::memory_capabilities_extract::ExtractCapability;
 use std::hint::black_box;
 use std::sync::Arc;
 use std::time::Instant;
@@ -127,14 +127,9 @@ fn bench_default_service_probe(c: &mut Criterion) {
             for _ in 0..iters {
                 rt.block_on(async {
                     black_box(
-                        ExtractCapability::extract(
-                            &service,
-                            &episode_id,
-                            None,
-                            None,
-                        )
-                        .await
-                        .unwrap(),
+                        ExtractCapability::extract_from_service(&service, &episode_id, None, None)
+                            .await
+                            .unwrap(),
                     );
                 });
             }

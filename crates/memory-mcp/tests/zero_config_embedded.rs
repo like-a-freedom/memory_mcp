@@ -3,9 +3,9 @@ use std::fs;
 use std::process::Command;
 
 use memory_mcp::config::SurrealConfigBuilder;
-use memory_mcp::service::capabilities::assemble_context::AssembleContextCapability;
-use memory_mcp::service::capabilities::extract::ExtractCapability;
-use memory_mcp::service::capabilities::ingest::IngestCapability;
+use memory_mcp::service::memory_container_shims::memory_capabilities_assemble_context::AssembleContextCapability;
+use memory_mcp::service::memory_container_shims::memory_capabilities_extract::ExtractCapability;
+use memory_mcp::service::memory_container_shims::memory_capabilities_ingest::IngestCapability;
 use memory_mcp::storage::{DbClient, SurrealDbClient};
 use serde_json::json;
 use tempfile::TempDir;
@@ -125,7 +125,7 @@ async fn zero_config_anno_creates_no_model_cache_and_round_trips() {
         "zero-config startup must not create a model cache under <data>/models/ner"
     );
 
-    let episode_id = IngestCapability::ingest(
+    let episode_id = IngestCapability::ingest_from_service(
         &service,
         memory_mcp::models::IngestRequest {
             source_type: "test".to_string(),
@@ -140,7 +140,7 @@ async fn zero_config_anno_creates_no_model_cache_and_round_trips() {
     .await
     .expect("ingest succeeds");
 
-    let extracted = ExtractCapability::extract(&service, &episode_id, None, None)
+    let extracted = ExtractCapability::extract_from_service(&service, &episode_id, None, None)
         .await
         .expect("extract succeeds");
     assert!(
@@ -153,7 +153,7 @@ async fn zero_config_anno_creates_no_model_cache_and_round_trips() {
         extracted.entities
     );
 
-    let recalled = AssembleContextCapability::assemble_context(
+    let recalled = AssembleContextCapability::assemble_context_from_service(
         &service,
         memory_mcp::models::AssembleContextRequest {
             query: "Who presented Project Atlas?".to_string(),

@@ -261,7 +261,7 @@ pub struct ReconcileReport {
 mod tests {
     use super::*;
     use crate::http::registry::models::*;
-    use crate::http::registry::storage::InMemoryStore;
+    use crate::http::registry::storage::{AccountStore, InMemoryStore, TenantStore};
     use std::sync::Arc;
 
     fn reserved_tenant(id: &str) -> Tenant {
@@ -411,7 +411,7 @@ mod tests {
 mod reconcile_tests {
     use super::*;
     use crate::http::registry::models::*;
-    use crate::http::registry::storage::InMemoryStore;
+    use crate::http::registry::storage::{AccountStore, InMemoryStore, TenantStore};
     use chrono::Utc;
     use std::sync::Arc;
 

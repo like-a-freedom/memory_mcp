@@ -2,7 +2,7 @@ use std::sync::Arc;
 use std::time::Instant;
 
 use criterion::{Criterion, criterion_group, criterion_main};
-use memory_mcp::service::capabilities::extract::ExtractCapability;
+use memory_mcp::service::memory_container_shims::memory_capabilities_extract::ExtractCapability;
 
 fn bench_contention_single_client(c: &mut Criterion) {
     let rt = tokio::runtime::Runtime::new().unwrap();
@@ -20,14 +20,10 @@ fn bench_contention_single_client(c: &mut Criterion) {
                         ),
                     )
                     .await;
-                    let _ = ExtractCapability::extract(
-                        &service,
-                        &episode_id,
-                        None,
-                        None,
-                    )
-                    .await
-                    .unwrap();
+                    let _ =
+                        ExtractCapability::extract_from_service(&service, &episode_id, None, None)
+                            .await
+                            .unwrap();
                 }
             });
         });
@@ -59,7 +55,7 @@ fn bench_contention_multi_client(c: &mut Criterion) {
                                     ),
                                 )
                                 .await;
-                                let _ = ExtractCapability::extract(
+                                let _ = ExtractCapability::extract_from_service(
                                     &svc,
                                     &episode_id,
                                     None,

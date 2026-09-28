@@ -42,8 +42,8 @@ pub fn fact_embedding_dimension_placeholder() -> &'static str {
 ///
 /// Rejects bare hex strings (the bug masked by `build_select_one_query`'s safe noop),
 /// empty input, malformed `<table>:<id>` (empty parts), and uppercase tables.
-pub fn validate_record_id(record_id: &str) -> Result<(), crate::service::MemoryError> {
-    use crate::service::MemoryError;
+pub fn validate_record_id(record_id: &str) -> Result<(), crate::error::MemoryError> {
+    use crate::error::MemoryError;
 
     let record_id = record_id.trim();
 
@@ -145,8 +145,8 @@ pub fn build_create_query(record_id: &str, content: Value) -> (String, Value) {
 pub fn build_update_query(
     record_id: &str,
     content: Value,
-) -> Result<(String, Value), crate::service::MemoryError> {
-    use crate::service::MemoryError;
+) -> Result<(String, Value), crate::error::MemoryError> {
+    use crate::error::MemoryError;
 
     let (table, id) = if let Some(idx) = record_id.find(':') {
         (&record_id[..idx], &record_id[idx + 1..])
@@ -189,8 +189,8 @@ pub fn build_update_query(
 pub fn build_upsert_query(
     record_id: &str,
     content: Value,
-) -> Result<(String, Value), crate::service::MemoryError> {
-    use crate::service::MemoryError;
+) -> Result<(String, Value), crate::error::MemoryError> {
+    use crate::error::MemoryError;
 
     let (table, id) = if let Some(idx) = record_id.find(':') {
         (&record_id[..idx], &record_id[idx + 1..])
@@ -587,7 +587,7 @@ fn normalize_surreal_json(v: &Value) -> Value {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::service::MemoryError;
+    use crate::error::MemoryError;
 
     // -----------------------------------------------------------------------
     // validate_record_id tests

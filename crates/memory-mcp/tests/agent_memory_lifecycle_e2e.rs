@@ -12,12 +12,12 @@
 
 mod common;
 
+use memory_mcp::memory::agent_memory::capture::LifecycleCaptureResult;
+use memory_mcp::memory::agent_memory::recall::{LifecycleRecallResult, RecallDecision};
 use memory_mcp::models::{
     InvocationContext, InvocationOrigin, LifecycleEventKind, NormalizedHostEvent,
 };
 use memory_mcp::service::MemoryService;
-use memory_mcp::service::agent_memory::capture::LifecycleCaptureResult;
-use memory_mcp::service::agent_memory::recall::{LifecycleRecallResult, RecallDecision};
 
 /// Build a lifecycle-enabled service with an in-memory DB.
 async fn lifecycle_service() -> MemoryService {
@@ -328,7 +328,7 @@ async fn capture_and_recall_full_cycle() {
 #[tokio::test]
 async fn lifecycle_cli_capture_entry_point_works() {
     use memory_mcp::cli::args::LifecycleCaptureArgs;
-    use memory_mcp::cli::commands::lifecycle_capture;
+    use memory_mcp::service::cli::lifecycle_capture;
 
     let service = lifecycle_service().await;
     let event_json = serde_json::json!({
@@ -360,7 +360,7 @@ async fn lifecycle_cli_capture_entry_point_works() {
 #[tokio::test]
 async fn lifecycle_cli_recall_entry_point_works() {
     use memory_mcp::cli::args::LifecycleRecallArgs;
-    use memory_mcp::cli::commands::lifecycle_recall;
+    use memory_mcp::service::cli::lifecycle_recall;
 
     let service = lifecycle_service().await;
     let event_json = serde_json::json!({
@@ -390,8 +390,8 @@ async fn lifecycle_cli_recall_entry_point_works() {
 #[tokio::test]
 async fn lifecycle_cli_rejects_legacy_scope_and_project_payloads() {
     use memory_mcp::cli::args::{LifecycleCaptureArgs, LifecycleRecallArgs};
-    use memory_mcp::cli::commands::{lifecycle_capture, lifecycle_recall};
     use memory_mcp::service::MemoryError;
+    use memory_mcp::service::cli::{lifecycle_capture, lifecycle_recall};
 
     let service = lifecycle_service().await;
     let context = serde_json::json!({
@@ -445,7 +445,7 @@ async fn lifecycle_cli_rejects_legacy_scope_and_project_payloads() {
 #[tokio::test]
 async fn lifecycle_cli_capture_rejects_invalid_json() {
     use memory_mcp::cli::args::LifecycleCaptureArgs;
-    use memory_mcp::cli::commands::lifecycle_capture;
+    use memory_mcp::service::cli::lifecycle_capture;
 
     let service = lifecycle_service().await;
     let args = LifecycleCaptureArgs {
@@ -469,13 +469,11 @@ async fn lifecycle_background_workers_shutdown_cleanly() {
 #[tokio::test]
 async fn lifecycle_background_worker_runtime_spawns_and_shuts_down_cleanly() {
     // Exercise the runtime directly to verify worker spawn + shutdown.
-    use memory_mcp::service::LifecycleBackgroundWorkerRuntime;
-
     let service = lifecycle_service().await;
-    let runtime = LifecycleBackgroundWorkerRuntime::new();
-    runtime.spawn_decay(service.clone(), 3600, 0.1, 365.0);
-    runtime.spawn_archival(service.clone(), 3600, 90);
-    runtime.spawn_community(service, 3600);
+    // The workers take the port's parts, not the container, so the test
+    // starts them through the adapter that performs the conversion.
+    let runtime =
+        memory_mcp::platform::lifecycle_runtime::spawn_all_for_test(&service, 3600, 0.1, 365.0, 90);
     // Shutdown should join all three workers without hanging.
     runtime.shutdown().await;
     // If we get here without hanging, the test passes.

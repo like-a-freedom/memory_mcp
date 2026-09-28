@@ -101,6 +101,26 @@ pub async fn resolve_tenant_runtime(
 type ActivationResult<R> = Result<Arc<R>, MemoryError>;
 type ActivationSender<R> = tokio::sync::broadcast::Sender<ActivationResult<R>>;
 
+/// Trusted tenant resolution and Tenant Runtime lifecycle.
+///
+/// `Tenancy` owns three guarantees, not a runtime cache:
+///
+/// 1. **Single-flight activation** — concurrent activations for one
+///    tenant share one factory call (`activating`).
+/// 2. **Immutable binding** — once a tenant's `TenantRuntimeSpec` is
+///    resolved, a different spec for the same tenant is a conflict.
+/// 3. **Resolved-spec bookkeeping** — `entries` remembers the spec and
+///    keeps the runtime alive for the lifetime of a lease.
+///
+/// The runtime *pool* (`http::runtime::pool`) remains the single
+/// authority for capacity and for serving warm requests. The pool must
+/// call `evict_tenant` on every path that drops a slot, which keeps
+/// `entries` a subset of the pool's LRU key set; the capacity check in
+/// `activate` is therefore a backstop that cannot reject an activation
+/// the pool had already made room for. That is what makes the pool's
+/// `repeated_activation_cycles_within_capacity` test meaningful: a
+/// stale entry left behind here would surface as an `ActivationFailed`
+/// on a tenant the pool had just made room for.
 pub struct Tenancy<F: TenantRuntimeFactory> {
     factory: Arc<F>,
     capacity: usize,
@@ -223,6 +243,7 @@ impl<F: TenantRuntimeFactory> Tenancy<F> {
             .is_some()
     }
 
+    /// Evict runtimes idle for longer than the configured TTL.
     pub async fn evict_idle(&self) -> usize {
         let threshold = std::time::Instant::now().checked_sub(self.idle_ttl);
         let mut entries = self.entries.lock().expect("tenancy entries lock");
@@ -231,10 +252,13 @@ impl<F: TenantRuntimeFactory> Tenancy<F> {
         before - entries.len()
     }
 
+    /// Make room for one more binding before the factory runs. Without
+    /// this, a cache full of recently-used bindings would reject the
+    /// activation outright instead of letting the pool reclaim an idle
+    /// one first.
     async fn evict_idle_if_needed(&self) -> Result<(), MemoryError> {
-        let should_evict =
-            self.entries.lock().expect("tenancy entries lock").len() >= self.capacity;
-        if should_evict {
+        let at_capacity = self.entries.lock().expect("tenancy entries lock").len() >= self.capacity;
+        if at_capacity {
             self.evict_idle().await;
         }
         Ok(())

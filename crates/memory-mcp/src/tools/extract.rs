@@ -5,9 +5,9 @@ use std::time::Instant;
 use chrono::Utc;
 use serde_json::json;
 
+use crate::error::MemoryError;
 use crate::logging::LogLevel;
 use crate::models::{AccessPayload, ExtractResult, IngestRequest};
-use crate::service::MemoryError;
 use crate::service::build_extract_log_result;
 use crate::tools::context::{ToolContext, ToolEvent};
 use crate::tools::params::ExtractParams;

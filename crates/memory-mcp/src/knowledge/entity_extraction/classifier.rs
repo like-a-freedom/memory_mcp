@@ -1,0 +1,322 @@
+//! Shared entity classification logic.
+
+use std::collections::HashSet;
+use std::sync::LazyLock;
+
+/// Static gazetteer of well-known toponyms for location classification.
+pub(super) static KNOWN_LOCATIONS: LazyLock<HashSet<&'static str>> = LazyLock::new(|| {
+    HashSet::from([
+        // Major cities
+        "New York",
+        "Los Angeles",
+        "Chicago",
+        "Houston",
+        "Phoenix",
+        "Philadelphia",
+        "San Antonio",
+        "San Diego",
+        "Dallas",
+        "Austin",
+        "San Francisco",
+        "Seattle",
+        "Denver",
+        "Boston",
+        "Nashville",
+        "Portland",
+        "Las Vegas",
+        "Miami",
+        "Atlanta",
+        "Minneapolis",
+        "Detroit",
+        "Tampa",
+        "Orlando",
+        "Sacramento",
+        "Pittsburgh",
+        "Cincinnati",
+        "Cleveland",
+        "Indianapolis",
+        "Milwaukee",
+        "Columbus",
+        "Kansas City",
+        "Raleigh",
+        "Virginia Beach",
+        "Baltimore",
+        "Memphis",
+        "Charlotte",
+        "Jacksonville",
+        "San Jose",
+        "Fort Worth",
+        "El Paso",
+        "London",
+        "Paris",
+        "Berlin",
+        "Madrid",
+        "Rome",
+        "Amsterdam",
+        "Vienna",
+        "Prague",
+        "Warsaw",
+        "Budapest",
+        "Dublin",
+        "Lisbon",
+        "Stockholm",
+        "Oslo",
+        "Helsinki",
+        "Copenhagen",
+        "Brussels",
+        "Zurich",
+        "Geneva",
+        "Munich",
+        "Frankfurt",
+        "Hamburg",
+        "Barcelona",
+        "Milan",
+        "Naples",
+        "Tokyo",
+        "Osaka",
+        "Kyoto",
+        "Seoul",
+        "Beijing",
+        "Shanghai",
+        "Hong Kong",
+        "Singapore",
+        "Taipei",
+        "Bangkok",
+        "Mumbai",
+        "Delhi",
+        "Bangalore",
+        "Hyderabad",
+        "Chennai",
+        "Kolkata",
+        "Jakarta",
+        "Manila",
+        "Hanoi",
+        "Kuala Lumpur",
+        "Sydney",
+        "Melbourne",
+        "Brisbane",
+        "Perth",
+        "Auckland",
+        "Toronto",
+        "Vancouver",
+        "Montreal",
+        "Ottawa",
+        "Calgary",
+        "Mexico City",
+        "Sao Paulo",
+        "Buenos Aires",
+        "Lima",
+        "Bogota",
+        "Santiago",
+        "Rio de Janeiro",
+        "Cairo",
+        "Lagos",
+        "Nairobi",
+        "Johannesburg",
+        "Cape Town",
+        "Dubai",
+        "Riyadh",
+        "Tel Aviv",
+        "Istanbul",
+        "Moscow",
+        "Saint Petersburg",
+        "Kiev",
+        "Bucharest",
+        "Stockholm",
+        "Tallinn",
+        "Riga",
+        "Vilnius",
+        "Belgrade",
+        // Countries
+        "United States",
+        "United Kingdom",
+        "Canada",
+        "Australia",
+        "Germany",
+        "France",
+        "Italy",
+        "Spain",
+        "Japan",
+        "China",
+        "India",
+        "Brazil",
+        "Mexico",
+        "Russia",
+        "South Korea",
+        "Indonesia",
+        "Turkey",
+        "Saudi Arabia",
+        "Argentina",
+        "South Africa",
+        "Nigeria",
+        "Egypt",
+        "Poland",
+        "Netherlands",
+        "Belgium",
+        "Sweden",
+        "Norway",
+        "Finland",
+        "Denmark",
+        "Switzerland",
+        "Austria",
+        "Portugal",
+        "Ireland",
+        "Greece",
+        "Czech Republic",
+        "Romania",
+        "Hungary",
+        "Ukraine",
+        "Israel",
+        "Thailand",
+        "Vietnam",
+        "Philippines",
+        "Malaysia",
+        "Singapore",
+        "New Zealand",
+        "Colombia",
+        "Chile",
+        "Peru",
+        // US states
+        "California",
+        "Texas",
+        "Florida",
+        "New York",
+        "Pennsylvania",
+        "Illinois",
+        "Ohio",
+        "Georgia",
+        "North Carolina",
+        "Michigan",
+        "New Jersey",
+        "Virginia",
+        "Washington",
+        "Arizona",
+        "Massachusetts",
+        "Tennessee",
+        "Indiana",
+        "Maryland",
+        "Missouri",
+        "Wisconsin",
+        "Colorado",
+        "Minnesota",
+        "Oregon",
+        "Alabama",
+        "Louisiana",
+        "Kentucky",
+        "South Carolina",
+        "Iowa",
+        "Nevada",
+        "Arkansas",
+        "Connecticut",
+        "Utah",
+        "Oklahoma",
+        "Hawaii",
+        // Regions / continents
+        "Europe",
+        "Asia",
+        "Africa",
+        "North America",
+        "South America",
+        "Oceania",
+        "Antarctica",
+        "Middle East",
+        "Southeast Asia",
+        "East Asia",
+        "Central America",
+        "Caribbean",
+        "Scandinavia",
+        "Balkans",
+        "Nordic",
+    ])
+});
+
+/// Classifies an entity candidate into a type based on naming patterns.
+pub(super) fn classify_entity_type(name: &str) -> &'static str {
+    static COMPANY_SUFFIXES: &[&str] = &[
+        "Corp",
+        "Inc",
+        "Ltd",
+        "LLC",
+        "GmbH",
+        "AG",
+        "SA",
+        "PLC",
+        "Company",
+        "Group",
+        "Systems",
+        "Technologies",
+        "Solutions",
+        "Labs",
+        "Studio",
+        "Partners",
+        "Associates",
+        "Holdings",
+        "Foundation",
+        "Institute",
+        "University",
+        "Academy",
+        "Limited",
+    ];
+
+    static EVENT_INDICATORS: &[&str] = &[
+        "Conference",
+        "Summit",
+        "Meetup",
+        "Hackathon",
+        "Workshop",
+        "Festival",
+        "Ceremony",
+        "Award",
+        "Championship",
+        "Olympics",
+    ];
+
+    static LOCATION_INDICATORS: &[&str] = &[
+        "City",
+        "County",
+        "State",
+        "Province",
+        "Country",
+        "District",
+        "Region",
+        "Territory",
+        "Island",
+    ];
+
+    for suffix in COMPANY_SUFFIXES {
+        if name.contains(suffix) {
+            return "company";
+        }
+    }
+    for indicator in EVENT_INDICATORS {
+        if name.contains(indicator) {
+            return "event";
+        }
+    }
+    for indicator in LOCATION_INDICATORS {
+        if name.contains(indicator) {
+            return "location";
+        }
+    }
+
+    if KNOWN_LOCATIONS.contains(name) {
+        return "location";
+    }
+
+    // Multi-word names without company suffixes are likely persons
+    // (e.g., "Alice Smith", "Иван Петров", "Maria Garcia")
+    if name.split_whitespace().count() >= 2 {
+        return "person";
+    }
+
+    // Single-word CamelCase names are likely technologies/products
+    // (e.g., "PostgreSQL", "OpenAI", "Kubernetes", "TensorFlow")
+    if name.chars().next().map(char::is_uppercase).unwrap_or(false)
+        && name.chars().any(|c| c.is_uppercase())
+        && !name.contains(' ')
+    {
+        return "technology";
+    }
+
+    "unknown"
+}

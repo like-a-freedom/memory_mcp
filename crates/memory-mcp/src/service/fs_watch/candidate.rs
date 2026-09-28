@@ -249,7 +249,7 @@ pub async fn prepare_candidate(
 
     // Format detection and parsing via the shared content-extraction module.
     let (source_type, prepared_content) =
-        match crate::service::content_extraction::parse_bytes_for_watch(&relative_path, &bytes) {
+        match crate::memory::content_extraction::parse_bytes_for_watch(&relative_path, &bytes) {
             Ok(parsed) => parsed,
             Err(_) => {
                 return Ok(CandidateOutcome::Skipped(
@@ -258,7 +258,7 @@ pub async fn prepare_candidate(
             }
         };
 
-    let t_ref = crate::service::content_extraction::watch_reference_time(
+    let t_ref = crate::memory::content_extraction::watch_reference_time(
         &relative_path,
         &bytes,
         &read_metadata,

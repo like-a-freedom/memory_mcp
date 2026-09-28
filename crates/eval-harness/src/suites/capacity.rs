@@ -1,8 +1,8 @@
 use std::sync::Arc;
 
 use async_trait::async_trait;
-use memory_mcp::service::capabilities::extract::ExtractCapability;
-use memory_mcp::service::capabilities::ingest::IngestCapability;
+use memory_mcp::service::memory_container_shims::memory_capabilities_extract::ExtractCapability;
+use memory_mcp::service::memory_container_shims::memory_capabilities_ingest::IngestCapability;
 
 use crate::domain::*;
 use crate::runner::{EvalSuite, RunContext};
@@ -73,7 +73,7 @@ impl CapacitySuite {
             _ => "test content",
         };
 
-        let result = IngestCapability::ingest(
+        let result = IngestCapability::ingest_from_service(
             &service,
             memory_mcp::models::IngestRequest {
                 source_type: "lifecycle".into(),
@@ -92,7 +92,7 @@ impl CapacitySuite {
         match result {
             Ok(episode_id) => {
                 let extraction =
-                    ExtractCapability::extract(&service, &episode_id, None, None)
+                    ExtractCapability::extract_from_service(&service, &episode_id, None, None)
                         .await;
                 let fact_count = extraction.as_ref().map(|e| e.facts.len()).unwrap_or(0) as f64;
 
