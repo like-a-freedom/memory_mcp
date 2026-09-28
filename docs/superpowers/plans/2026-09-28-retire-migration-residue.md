@@ -1,6 +1,6 @@
 # Retire the migration residue, then deepen the seams it left behind
 
-**Branch:** `ddd-refactorings` · **Baseline:** `f310a90` · **Status:** plan for approval (v2 — corrected)
+**Branch:** `ddd-refactorings` · **Baseline:** `f310a90` · **Status:** Phase 3b shipped (`59fd043`); Phase 4 outstanding
 **Scope:** the 5 candidates from the architecture review, in priority order, each independently shippable.
 
 > **v2 corrections.** Three errors in v1 were found by re-verification and are fixed here:
@@ -187,7 +187,9 @@ python3 scripts/ci/audit_undeclared_sources.py     # must exit 0 with an empty r
 
 **Already proven on a scratch worktree at this exact baseline:** 137 files deleted → `cargo check` clean
 across the full matrix (2 `unused import: RegistryStore` warnings, unchanged in count from baseline) →
-**2,176 tests passed, 0 failed**.
+**2,176 tests passed, 0 failed**. *(That count was scoped to this deletion's feature set. The full suite now
+runs 2,461 on the canonical set — a different scope, not a regression; use the Phase 3b gate numbers for the
+current baseline.)*
 
 **Verified on this baseline:** the canonical `cargo clippy` command from `AGENTS.md` (feature set
 `fs-watch,mcp-apps,streamable-http`) emits **0 warnings and 0 errors** today. The 2 `unused import` warnings
@@ -332,10 +334,30 @@ wrong and would have shipped cross-owner writes under a clean-looking name.
   meters episode ingestion (memory). The coupling is the bug: `plan.rs:264` aggregating over memory's
   `episode` table is a cross-canonical-table read. Split it; publish the aggregate as a memory query.
 
-### 3b. The 9th store: `LocalAdminStore`
+### 3b. The 9th store: `LocalAdminStore` — **RESOLVED, and not the way this plan said**
 
-`LocalAdminStore` (`service/local_admin/contracts.rs:580`) is **not** in `RegistryStore` but is the largest
-source of un-declared cross-owner writes, and a manifest built from the 8 would miss it:
+> **Outcome (commit `59fd043`), superseding the instruction below.** This section originally read:
+> *"route those writes through the owning contexts' capabilities and delete the duplicated guards."*
+>
+> **That instruction was wrong, and following it would have caused a security regression.** Verification
+> found every cross-owner write in `create_client`, `insert_client_key`, `revoke_client_key` and
+> `set_client_state` sits inside a single `BEGIN`/`COMMIT` with the `local_admin*` writes, and that the
+> atomicity is the load-bearing property rather than an accident of implementation. Splitting them breaks
+> four integration tests, and in `revoke_client_key` it would leave a revoked credential live whenever the
+> `api_key` write failed or raced independently of the ledger write.
+>
+> | Claim in this table | Actual finding |
+> |---|---|
+> | `api_key` writes "duplicate `ApiKeyStore`'s writes" | The cap *check* duplicates `ApiKeyStore::create_api_key_if_below_limit`; the write does not. The `local_admin_client.version` bump in the same transaction is what makes two concurrent issuances serialize, and `ApiKeyStore` has no equivalent. |
+> | Epoch guards should be "deleted" | They were **deduplicated**, not deleted. `POLICY_GUARD` is the single constant now interpolated at each of the 9 sites. A guard cannot be replaced by a `BrowserPolicyStore` call: that trait has no read method — both its methods are writes, and calling either to validate would mutate the policy. |
+> | "route those writes through the owning capabilities" | Not done, deliberately. The writes are already atomic *within one transaction*, which is the sanctioned cross-owner seam. The codebase already has `platform/persistence/control/` for exactly this (`AccountBundleTx`, `AccountDeletionTx`); building another variant for one adapter would be net-negative. |
+>
+> **What was actually done:** the 9 hand-inlined epoch guards became one `POLICY_GUARD` constant; the dead
+> `ClientAdminService::create` path was deleted (a second live route to the same durable write, with a
+> byte-identical copy of provisioning's `client_fingerprint`); and the now-unreferenced `ClientCreate`
+> went with it. The cross-owner writes stay where they are, with the reason recorded in the code.
+
+The original manifest, retained for traceability — the line numbers are the pre-`59fd043` ones:
 
 | Table(s) | Line | Other owner |
 |---|---|---|
@@ -437,7 +459,7 @@ Phase 1  delete residue + guard + docs
 Phase 2  operations owns deletion recovery (tenant-scoped cleanup)
    │        (operations becomes a real module before its ports are judged)
    ▼
-Phase 3  RegistryStore decomposed + LocalAdminStore re-homed
+Phase 3  RegistryStore decomposed + LocalAdminStore epoch guards deduplicated
    │        (the 13 ports now sit on per-context stores)
    ▼
 Phase 4  port collapse, per-port deletion test
@@ -459,7 +481,7 @@ means building the same adapter twice.
 | `crates/memory-mcp/src/provisioning/api.rs` + infra | tenant-scoped retained-work purge (Phase 2) |
 | `crates/memory-mcp/src/http/registry/storage.rs` | `RegistryStore` supertrait removed; `AccountStore`/`TenantStore`/`SessionStore`/`UsageStore` split (Phase 3) |
 | `crates/memory-mcp/src/http/registry.rs` | `RegistryHandle` → `ControlPlaneStores` (Phase 3) |
-| `crates/memory-mcp/src/http/registry/surreal_store/local_admin.rs` | cross-owner writes routed through owners; duplicate epoch guards removed (Phase 3b) |
+| `crates/memory-mcp/src/http/registry/surreal_store/local_admin.rs` | 9 hand-inlined epoch guards replaced by one `POLICY_GUARD` constant; the now-dead client-create path deleted (Phase 3b) |
 | `crates/memory-mcp/src/{identity,tenancy,provisioning,operations}/api.rs` | per-port collapse (Phase 4) |
 | `scripts/ci/audit_undeclared_sources.py` (+ self-test) | **new** (Phase 1) |
 | `scripts/ci/audit_doc_claims.py` | drop 2 deleted trees; assert configured trees exist (Phase 1c) |
@@ -497,8 +519,8 @@ means building the same adapter twice.
   spec are not silently at odds.
 - *Twelve-Factor* — disposability preserved (2e); XI (stdout reserved) untouched; III (typed config) untouched.
 - *No new MCP tools* — the 8-tool surface is untouched throughout.
-- *DRY* — Phase 3b deletes ~10 duplicated `browser_auth_policy` epoch guards; Phase 1 removes 54,502 lines of
-  duplicate implementation.
+- *DRY* — Phase 3b deduplicates the 9 `browser_auth_policy` epoch guards into one `POLICY_GUARD` constant and
+  deletes a second, dead route to client creation; Phase 1 removes 54,502 lines of duplicate implementation.
 
 **Risks carried, with mitigations:**
 
@@ -507,7 +529,7 @@ means building the same adapter twice.
 | A file gated behind an off-matrix feature is deleted wrongly | Phase 0 step 2 verifies the matrix covers every `mod` cfg; the guard fails if the matrix does not compile |
 | Phase 2b breaks tenant purge for a tenant that never had App Sessions | Preserve the `missing_table` tolerance; add a regression test for the absent-table path |
 | Phase 3 breaks the shared control-DB transaction contract | `platform/persistence/control/` stays the sole cross-owner seam; atomicity tests run as a Phase 3 gate |
-| Phase 3b's `LocalAdminStore` re-home is the largest blast radius | Isolate as its own sub-step, after the `RegistryStore` split is green |
+| Phase 3b's `LocalAdminStore` re-home is the largest blast radius | Isolate as its own sub-step, after the `RegistryStore` split is green. **Closed as a non-issue:** the re-home proved unnecessary — the writes are already atomic, and separating them would have been a security regression. What remained was a DRY fix confined to one constant. |
 | Phase 4 removes a port a test depends on | Per-port deletion test; keep-with-justification default flipped to delete |
 
 **Not covered / accepted:** the 2 `unused import: RegistryStore` warnings appear only under the *test*

@@ -478,12 +478,6 @@ pub struct Page<T> {
 
 // ─── Client types ─────────────────────────────────────────
 
-#[derive(Debug, Clone, serde::Deserialize)]
-pub struct ClientCreate {
-    pub display_name: String,
-    pub operation_id: uuid::Uuid,
-}
-
 #[derive(Debug, Clone, Serialize)]
 pub struct ClientView {
     pub account_id: String,

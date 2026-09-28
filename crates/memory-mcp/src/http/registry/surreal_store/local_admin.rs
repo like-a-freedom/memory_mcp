@@ -303,13 +303,17 @@ fn failure_reason_token(reason: FailureReason) -> &'static str {
 /// says so in its own doc comment, because the index arithmetic is what callers
 /// decode against.
 ///
-/// The check is deliberately two statements rather than one: the read must be
-/// in the same snapshot as the write that follows, and the throw must abort the
-/// transaction. A caller that checked the epoch in Rust first would leave a
-/// window between the check and the commit in which the policy epoch could
-/// advance. `BrowserPolicyStore` has no read method for exactly this reason —
-/// its two methods are both writes, and calling either to validate would mutate
-/// the policy. This fragment is the only way to read the row under the fence.
+/// The check is deliberately two statements rather than one. At the eight
+/// transaction sites the read must be in the same snapshot as the write that
+/// follows, and the throw must abort the transaction; checking the epoch in
+/// Rust first would leave a window between the check and the commit in which
+/// the policy epoch could advance. (`inspect_challenge` uses this fragment
+/// standalone, and its comment there explains why the snapshot argument does not
+/// apply to it — but it still uses the same rule, so an inspection and a
+/// mutation can never disagree about which epoch is current.)
+/// `BrowserPolicyStore` has no read method for exactly this reason — its two
+/// methods are both writes, and calling either to validate would mutate the
+/// policy. This fragment is the only way to read the row under the fence.
 ///
 /// It is the *local* half of the fence. The OIDC half is a different constant,
 /// `OIDC_POLICY_GUARD`, which tests for `oidc` rather than `local` and runs as
