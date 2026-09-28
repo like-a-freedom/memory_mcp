@@ -398,3 +398,47 @@ fn random_token() -> String {
 fn new_api_key_id() -> String {
     format!("ak_{}", hex::encode(rand::random::<[u8; 12]>()))
 }
+
+#[cfg(test)]
+mod tests {
+    use super::client_fingerprint;
+
+    /// The fingerprint decides whether a retried create resolves to the
+    /// existing client or raises `409 idempotency_conflict`, so stability
+    /// across a retry is the property the durable replay depends on.
+    #[test]
+    fn client_fingerprint_is_stable_for_identical_bodies() {
+        let operation = uuid::Uuid::new_v4();
+        assert_eq!(
+            client_fingerprint(operation, "team-alpha"),
+            client_fingerprint(operation, "team-alpha")
+        );
+    }
+
+    #[test]
+    fn client_fingerprint_changes_with_body() {
+        let operation = uuid::Uuid::new_v4();
+        assert_ne!(
+            client_fingerprint(operation, "team-alpha"),
+            client_fingerprint(operation, "team-beta")
+        );
+        assert_ne!(
+            client_fingerprint(operation, "team-alpha"),
+            client_fingerprint(uuid::Uuid::new_v4(), "team-alpha")
+        );
+    }
+
+    /// The domain-separation tag is what keeps a client-create fingerprint
+    /// from ever colliding with a key-issue one for the same body.
+    #[test]
+    fn client_fingerprint_is_domain_separated() {
+        let operation = uuid::Uuid::new_v4();
+        let mut hasher = <sha2::Sha256 as sha2::Digest>::new();
+        sha2::Digest::update(&mut hasher, b"local_admin_client_create\0");
+        sha2::Digest::update(&mut hasher, operation.as_bytes());
+        sha2::Digest::update(&mut hasher, b"\0");
+        sha2::Digest::update(&mut hasher, b"team-alpha");
+        let expected: [u8; 32] = sha2::Digest::finalize(hasher).into();
+        assert_eq!(client_fingerprint(operation, "team-alpha"), expected);
+    }
+}

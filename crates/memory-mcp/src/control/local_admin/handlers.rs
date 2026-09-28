@@ -380,7 +380,7 @@ fn make_auth_service(ext: &LocalAdminExtension) -> LocalAdminService {
 }
 
 fn make_client_service(ext: &LocalAdminExtension, pepper: &str) -> ClientAdminService {
-    ClientAdminService::new(ext.authority.clone(), ext.plan_version, pepper.to_owned())
+    ClientAdminService::new(ext.authority.clone(), pepper.to_owned())
 }
 
 /// Guard a public (pre-session) state-changing request.

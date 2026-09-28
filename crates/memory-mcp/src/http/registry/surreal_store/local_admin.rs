@@ -294,16 +294,45 @@ fn failure_reason_token(reason: FailureReason) -> &'static str {
     }
 }
 
-/// Shared mutation guard: policy → admin → presented session, then the
-/// conflict writes the spec requires.
+/// The browser-auth policy guard, shared by every local-admin statement that
+/// reads or mutates under a policy fence.
 ///
-/// It is a constant 8-statement fragment, so within any guarded mutation
-/// transaction it occupies result indices 1..=8 (index 0 is the opening
-/// `BEGIN TRANSACTION`) and the first method-specific statement is index 9.
-/// The two `UPDATE`s touch the admin `version` and the session row so a
-/// concurrent recovery, logout or rotation aborts the transaction. The
-/// session touch matches every live session, including the final 30 minutes
-/// of absolute lifetime, and caps the idle deadline at the absolute one.
+/// It is a two-statement fragment and, inside a transaction, occupies result
+/// indices 1 and 2 (index 0 is the opening `BEGIN TRANSACTION`); the first
+/// method-specific statement is index 3. Each method that interpolates it here
+/// says so in its own doc comment, because the index arithmetic is what callers
+/// decode against.
+///
+/// The check is deliberately two statements rather than one: the read must be
+/// in the same snapshot as the write that follows, and the throw must abort the
+/// transaction. A caller that checked the epoch in Rust first would leave a
+/// window between the check and the commit in which the policy epoch could
+/// advance. `BrowserPolicyStore` has no read method for exactly this reason —
+/// its two methods are both writes, and calling either to validate would mutate
+/// the policy. This fragment is the only way to read the row under the fence.
+///
+/// It is the *local* half of the fence. The OIDC half is a different constant,
+/// `OIDC_POLICY_GUARD`, which tests for `oidc` rather than `local` and runs as
+/// three statements; the two are not interchangeable and are not unified.
+const POLICY_GUARD: &str = r#"
+LET $guard_policy = (SELECT epoch, mode, methods FROM browser_auth_policy LIMIT 2);
+IF array::len($guard_policy) != 1 OR NOT ('local' IN $guard_policy[0].methods ?? [$guard_policy[0].mode]) OR $guard_policy[0].epoch != $epoch { THROW 'policy_stale'; };
+"#;
+
+/// The full mutation guard: the policy fence, then the presented admin, the
+/// presented session, and the two conflict writes.
+///
+/// A constant 8-statement fragment, so within any guarded mutation transaction it
+/// occupies result indices 1..=8 (index 0 is the opening `BEGIN TRANSACTION`) and
+/// the first method-specific statement is index 9. The two `UPDATE`s touch the
+/// admin `version` and the session row so a concurrent recovery, logout or
+/// rotation aborts the transaction. The session touch matches every live
+/// session, including the final 30 minutes of absolute lifetime, and caps the
+/// idle deadline at the absolute one.
+///
+/// It is [`POLICY_GUARD`] — the same two statements the read-only methods
+/// interpolate — followed by the admin and session checks, which those methods
+/// cannot use: they bind no `$admin_id`, `$generation` or `$session_verifier`.
 const MUTATION_GUARD: &str = r#"
 LET $guard_policy = (SELECT epoch, mode, methods FROM browser_auth_policy LIMIT 2);
 IF array::len($guard_policy) != 1 OR NOT ('local' IN $guard_policy[0].methods ?? [$guard_policy[0].mode]) OR $guard_policy[0].epoch != $epoch { THROW 'policy_stale'; };
@@ -439,10 +468,9 @@ impl LocalAdminStore for SurrealRegistryStore {
         let challenge_id = row_id("chg");
         let audit_id = row_id("aud");
 
-        let sql = "
-            BEGIN TRANSACTION;
-            LET $guard_policy = (SELECT epoch, mode, methods FROM browser_auth_policy LIMIT 2);
-            IF array::len($guard_policy) != 1 OR NOT ('local' IN $guard_policy[0].methods ?? [$guard_policy[0].mode]) OR $guard_policy[0].epoch != $epoch { THROW 'policy_stale'; };
+        let sql = String::from("BEGIN TRANSACTION;")
+            + POLICY_GUARD
+            + "
             LET $existing = (SELECT id, state, credential_generation FROM local_admin WHERE username = $username LIMIT 1);
             IF array::len($existing) = 0 AND $kind = 'reset' { THROW 'admin_not_found'; };
             IF array::len($existing) = 0 AND $kind = 'activate' {
@@ -510,7 +538,7 @@ impl LocalAdminStore for SurrealRegistryStore {
 
         let rows = self
             .admin_query_at(
-                sql,
+                &sql,
                 Some(json!({
                     "username": username.clone(),
                     "kind": kind,
@@ -566,16 +594,18 @@ impl LocalAdminStore for SurrealRegistryStore {
         // Re-read the durable policy fence first (spec §7: every local auth
         // transaction checks the policy): a fence that has moved rejects the
         // inspection with the same uniform answer as any other bad code.
-        self.admin_query(
-            "LET $guard_policy = (SELECT epoch, mode, methods FROM browser_auth_policy LIMIT 2);
-             IF array::len($guard_policy) != 1 OR NOT ('local' IN $guard_policy[0].methods ?? [$guard_policy[0].mode]) OR $guard_policy[0].epoch != $epoch { THROW 'policy_stale'; };",
-            Some(json!({"epoch": policy.epoch})),
-        )
-        .await
-        .map_err(|error| match thrown(&error, &["policy_stale"]) {
-            Some(_) => LocalAdminError::InvalidChallenge,
-            None => infra(error),
-        })?;
+        //
+        // Standalone rather than in a transaction, because an inspection reads
+        // nothing it writes, so there is no snapshot to protect and no write
+        // conflict to raise. It still uses the same fragment: an inspection
+        // under one epoch rule and a mutation under another would be a way to
+        // learn a challenge is valid after it should have stopped being so.
+        self.admin_query(POLICY_GUARD, Some(json!({"epoch": policy.epoch})))
+            .await
+            .map_err(|error| match thrown(&error, &["policy_stale"]) {
+                Some(_) => LocalAdminError::InvalidChallenge,
+                None => infra(error),
+            })?;
 
         let sql = "
             SELECT admin_id, expires_at FROM local_admin_challenge
@@ -632,10 +662,9 @@ impl LocalAdminStore for SurrealRegistryStore {
         };
         let audit_id = row_id("aud");
 
-        let sql = "
-            BEGIN TRANSACTION;
-            LET $guard_policy = (SELECT epoch, mode, methods FROM browser_auth_policy LIMIT 2);
-            IF array::len($guard_policy) != 1 OR NOT ('local' IN $guard_policy[0].methods ?? [$guard_policy[0].mode]) OR $guard_policy[0].epoch != $epoch { THROW 'policy_stale'; };
+        let sql = String::from("BEGIN TRANSACTION;")
+            + POLICY_GUARD
+            + "
             LET $challenge = (SELECT id, admin_id, kind, credential_generation FROM local_admin_challenge WHERE verifier = $verifier AND kind = $kind AND consumed_at IS NONE AND revoked_at IS NONE AND expires_at > time::now() AND mode_epoch = $epoch LIMIT 1);
             IF array::len($challenge) = 0 { THROW 'challenge_invalid'; };
             LET $ch = $challenge[0];
@@ -673,7 +702,7 @@ impl LocalAdminStore for SurrealRegistryStore {
         ";
 
         self.admin_query(
-            sql,
+            &sql,
             Some(json!({
                 "verifier": hex::encode(command.verifier),
                 "kind": kind_str,
@@ -744,10 +773,9 @@ impl LocalAdminStore for SurrealRegistryStore {
         let cookie_verifier = hex::encode(command.cookie_verifier);
         let audit_id = row_id("aud");
 
-        let sql = "
-            BEGIN TRANSACTION;
-            LET $guard_policy = (SELECT epoch, mode, methods FROM browser_auth_policy LIMIT 2);
-            IF array::len($guard_policy) != 1 OR NOT ('local' IN $guard_policy[0].methods ?? [$guard_policy[0].mode]) OR $guard_policy[0].epoch != $epoch { THROW 'policy_stale'; };
+        let sql = String::from("BEGIN TRANSACTION;")
+            + POLICY_GUARD
+            + "
             LET $admin = (SELECT state, credential_generation, password_phc FROM local_admin WHERE id = type::record('local_admin', $admin_id) LIMIT 1);
             IF array::len($admin) = 0 OR $admin[0].state != 'active' OR $admin[0].credential_generation != $generation OR $admin[0].password_phc != $password_phc {
                 THROW 'login_conflict';
@@ -782,7 +810,7 @@ impl LocalAdminStore for SurrealRegistryStore {
 
         let rows = self
             .admin_query_at(
-                sql,
+                &sql,
                 Some(json!({
                     "admin_id": command.credential.admin_id.clone(),
                     "generation": command.credential.credential_generation,
@@ -834,10 +862,9 @@ impl LocalAdminStore for SurrealRegistryStore {
     ) -> LocalResult<AdminPrincipal> {
         let cookie_verifier = hex::encode(cookie_verifier);
 
-        let sql = "
-            BEGIN TRANSACTION;
-            LET $guard_policy = (SELECT epoch, mode, methods FROM browser_auth_policy LIMIT 2);
-            IF array::len($guard_policy) != 1 OR NOT ('local' IN $guard_policy[0].methods ?? [$guard_policy[0].mode]) OR $guard_policy[0].epoch != $epoch { THROW 'policy_stale'; };
+        let sql = String::from("BEGIN TRANSACTION;")
+            + POLICY_GUARD
+            + "
             LET $session_row = (SELECT admin_id, credential_generation, mode_epoch, auth_time, idle_expiry, absolute_expiry FROM local_admin_session WHERE cookie_verifier = $cookie_verifier AND revoked_at IS NONE LIMIT 1);
             IF array::len($session_row) = 0 { THROW 'session_invalid'; };
             LET $s = $session_row[0];
@@ -853,7 +880,7 @@ impl LocalAdminStore for SurrealRegistryStore {
 
         let rows = self
             .admin_query_at(
-                sql,
+                &sql,
                 Some(json!({"cookie_verifier": cookie_verifier.clone(), "epoch": policy.epoch})),
                 12,
             )
@@ -896,10 +923,9 @@ impl LocalAdminStore for SurrealRegistryStore {
         let new_cookie = hex::encode(command.cookie_verifier);
         let audit_id = row_id("aud");
 
-        let sql = "
-            BEGIN TRANSACTION;
-            LET $guard_policy = (SELECT epoch, mode, methods FROM browser_auth_policy LIMIT 2);
-            IF array::len($guard_policy) != 1 OR NOT ('local' IN $guard_policy[0].methods ?? [$guard_policy[0].mode]) OR $guard_policy[0].epoch != $epoch { THROW 'policy_stale'; };
+        let sql = String::from("BEGIN TRANSACTION;")
+            + POLICY_GUARD
+            + "
             LET $old = (SELECT admin_id, credential_generation, mode_epoch, idle_expiry, absolute_expiry FROM local_admin_session WHERE cookie_verifier = $old_cookie_verifier AND revoked_at IS NONE LIMIT 1);
             IF array::len($old) = 0 { THROW 'session_invalid'; };
             LET $o = $old[0];
@@ -938,7 +964,7 @@ impl LocalAdminStore for SurrealRegistryStore {
 
         let rows = self
             .admin_query_at(
-                sql,
+                &sql,
                 Some(json!({
                     "admin_id": command.fence.admin_id,
                     "fence_generation": command.fence.credential_generation,
@@ -990,10 +1016,9 @@ impl LocalAdminStore for SurrealRegistryStore {
     ) -> LocalResult<()> {
         let audit_id = row_id("aud");
 
-        let sql = "
-            BEGIN TRANSACTION;
-            LET $guard_policy = (SELECT epoch, mode, methods FROM browser_auth_policy LIMIT 2);
-            IF array::len($guard_policy) != 1 OR NOT ('local' IN $guard_policy[0].methods ?? [$guard_policy[0].mode]) OR $guard_policy[0].epoch != $epoch { THROW 'policy_stale'; };
+        let sql = String::from("BEGIN TRANSACTION;")
+            + POLICY_GUARD
+            + "
             LET $session_row = (SELECT id FROM local_admin_session WHERE cookie_verifier = $session_verifier AND admin_id = $admin_id AND credential_generation = $generation AND revoked_at IS NONE LIMIT 1);
             IF array::len($session_row) = 0 { THROW 'session_not_found'; };
             UPDATE $session_row[0].id SET revoked_at = time::now();
@@ -1015,7 +1040,7 @@ impl LocalAdminStore for SurrealRegistryStore {
         ";
 
         self.admin_query(
-            sql,
+            &sql,
             Some(json!({
                 "session_verifier": fence.session_id.clone(),
                 "admin_id": fence.admin_id.clone(),
@@ -1106,10 +1131,9 @@ impl LocalAdminStore for SurrealRegistryStore {
         let has_b = !secondary.id.is_empty();
         let challenge_domain = primary.action == "challenge";
 
-        let sql = "
-            BEGIN TRANSACTION;
-            LET $guard_policy = (SELECT epoch, mode, methods FROM browser_auth_policy LIMIT 2);
-            IF array::len($guard_policy) != 1 OR NOT ('local' IN $guard_policy[0].methods ?? [$guard_policy[0].mode]) OR $guard_policy[0].epoch != $epoch { THROW 'policy_stale'; };
+        let sql = String::from("BEGIN TRANSACTION;")
+            + POLICY_GUARD
+            + "
             LET $a = (SELECT denied_count, expires_at FROM local_admin_rate_bucket WHERE bucket_id = $a_id LIMIT 1);
             IF array::len($a) = 0 {
                 CREATE type::record('local_admin_rate_bucket', $a_id) SET
@@ -1187,7 +1211,7 @@ impl LocalAdminStore for SurrealRegistryStore {
         // client behind one proxy sharing the source bucket) can lose the
         // write race; the shared execution seam retries that boundedly.
         let rows = self
-            .admin_query_at(sql, Some(vars.clone()), 13)
+            .admin_query_at(&sql, Some(vars.clone()), 13)
             .await
             .map_err(|error| match thrown(&error, &["policy_stale"]) {
                 // A stale fence refuses admission. Challenge flows keep their

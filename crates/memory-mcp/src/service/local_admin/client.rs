@@ -5,64 +5,35 @@ use sha2::{Digest, Sha256};
 use crate::service::credential_material::generate_api_key_material;
 use crate::service::local_admin::auth::LocalAdminAuthority;
 use crate::service::local_admin::contracts::{
-    AdminFence, AdminKeyCreate, AdminKeyInsert, ClientBundle, ClientCreate, ClientStateAction,
-    ClientView, IssuedClientKey, KeyExpiry, KeyInsertOutcome, LocalAdminError, LocalAdminStore,
-    LocalResult, Page, PageRequest, RequestContext,
+    AdminFence, AdminKeyCreate, AdminKeyInsert, ClientStateAction, ClientView, IssuedClientKey,
+    KeyExpiry, KeyInsertOutcome, LocalAdminError, LocalAdminStore, LocalResult, Page, PageRequest,
+    RequestContext,
 };
 
-/// Service for managing local clients and their API keys.
+/// Service for administering existing clients and their API keys.
 ///
-/// Holds the deployment's default plan version and API-key pepper (both handed
-/// in at composition), so the HTTP adapter only parses, authorizes and
-/// serializes: the account/tenant bundle, the credential material and the
-/// request fingerprints are all produced here (plan §3.2, §3.4).
+/// Client *creation* is not here. It is provisioning's: `create_client` is
+/// reached through `provisioning::api::create_client` and `ClientCreationPort`,
+/// which builds the account/tenant bundle and owns the workflow. This service
+/// kept a second copy of that bundle construction with no caller — a
+/// controller that issued its own accounts rather than going through the
+/// capability that owns client creation. It is deleted rather than wired up,
+/// because a second live path to the same durable write is the thing this
+/// refactor is removing everywhere else.
 pub struct ClientAdminService {
     authority: Arc<LocalAdminAuthority>,
-    plan_version: u32,
     pepper: String,
 }
 
 impl ClientAdminService {
-    pub fn new(authority: Arc<LocalAdminAuthority>, plan_version: u32, pepper: String) -> Self {
-        Self {
-            authority,
-            plan_version,
-            pepper,
-        }
+    /// `plan_version` is no longer taken. It existed only to build the reserved
+    /// tenant bundle, which creation now does through provisioning.
+    pub fn new(authority: Arc<LocalAdminAuthority>, pepper: String) -> Self {
+        Self { authority, pepper }
     }
 
     fn store(&self) -> &Arc<dyn LocalAdminStore> {
         self.authority.store()
-    }
-
-    /// Create a new client: the Account, its `Reserved` Tenant at the
-    /// deployment's default plan version, and the metadata sidecar, as one
-    /// store transaction.
-    ///
-    /// The request fingerprint is derived from the *canonical body*, not from
-    /// randomness: a retry carrying the same `operation_id` and the same
-    /// `display_name` must resolve to the existing resource rather than
-    /// raising an idempotency conflict. A changed body under the same
-    /// operation id is what produces `409 idempotency_conflict`.
-    pub async fn create(
-        &self,
-        fence: &AdminFence,
-        request: &RequestContext,
-        command: ClientCreate,
-    ) -> LocalResult<ClientView> {
-        use crate::http::registry::models as registry;
-
-        let now = chrono::Utc::now();
-        let fingerprint = client_request_fingerprint(command.operation_id, &command.display_name);
-        let (account, tenant) = registry::new_reserved_bundle(self.plan_version, now);
-        let bundle = ClientBundle {
-            account,
-            tenant,
-            display_name: command.display_name,
-            operation_id: command.operation_id,
-            request_fingerprint: fingerprint,
-        };
-        self.store().create_client(fence, request, bundle).await
     }
 
     /// List clients with pagination (plan §3.4 `list`).
@@ -161,16 +132,12 @@ impl ClientAdminService {
     }
 }
 
-/// Canonical, deterministic fingerprint of a client-create body.
-pub fn client_request_fingerprint(operation_id: uuid::Uuid, display_name: &str) -> [u8; 32] {
-    let mut hasher = Sha256::new();
-    hasher.update(b"local_admin_client_create\0");
-    hasher.update(operation_id.as_bytes());
-    hasher.update(b"\0");
-    hasher.update(display_name.as_bytes());
-    hasher.finalize().into()
-}
-
+/// The client-create fingerprint lives in [`crate::provisioning::api`], which
+/// computes it on the live create path. This service no longer creates
+/// clients, so it has no body to fingerprint; the two were byte-identical,
+/// including the domain-separation tag, so a retry written against either
+/// resolved to the same value while both existed.
+///
 /// Canonical, deterministic fingerprint of a key-issue body.
 pub fn key_request_fingerprint(
     operation_id: uuid::Uuid,
@@ -196,28 +163,6 @@ pub fn key_request_fingerprint(
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn client_fingerprint_is_stable_for_identical_bodies() {
-        let operation = uuid::Uuid::new_v4();
-        assert_eq!(
-            client_request_fingerprint(operation, "team-alpha"),
-            client_request_fingerprint(operation, "team-alpha")
-        );
-    }
-
-    #[test]
-    fn client_fingerprint_changes_with_body() {
-        let operation = uuid::Uuid::new_v4();
-        assert_ne!(
-            client_request_fingerprint(operation, "team-alpha"),
-            client_request_fingerprint(operation, "team-beta")
-        );
-        assert_ne!(
-            client_request_fingerprint(operation, "team-alpha"),
-            client_request_fingerprint(uuid::Uuid::new_v4(), "team-alpha")
-        );
-    }
 
     #[test]
     fn key_fingerprint_distinguishes_expiry_choices() {
