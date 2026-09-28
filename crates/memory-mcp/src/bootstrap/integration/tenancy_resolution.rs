@@ -7,18 +7,27 @@ use crate::tenancy::api::{
     TenantResolutionStatus, TenantRuntimeSpec,
 };
 
-pub(crate) struct LegacyTenantResolver {
+/// Adapts the registry's account→tenant resolution onto [`ResolveTenantPort`].
+///
+/// One struct serves both methods the port declares, and they serve different
+/// callers. `resolve_tenant` is the request path and refuses every tenant that
+/// is not `Ready`, because a request must not reach a tenant mid-deletion.
+/// `resolve_tenant_for_maintenance` is the privileged path the deletion-recovery
+/// workflow uses, keyed by tenant id rather than account id, and admits
+/// `Deleting` and `Purged`. They live together because they share the one
+/// registry resolver — not because one tenant resolution serves both purposes.
+pub(crate) struct RegistryTenantResolver {
     resolver: Arc<AccountResolver>,
 }
 
-impl LegacyTenantResolver {
+impl RegistryTenantResolver {
     pub(crate) fn new(resolver: Arc<AccountResolver>) -> Self {
         Self { resolver }
     }
 }
 
 #[async_trait::async_trait]
-impl ResolveTenantPort for LegacyTenantResolver {
+impl ResolveTenantPort for RegistryTenantResolver {
     async fn resolve_tenant(&self, account_id: &str) -> Result<TenantResolution, MemoryError> {
         Ok(
             match self.resolver.resolve_ready_tenant(account_id).await? {

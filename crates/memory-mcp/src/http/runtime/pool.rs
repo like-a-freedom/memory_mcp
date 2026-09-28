@@ -167,7 +167,7 @@ pub struct Pool {
     runtime_options: super::storage::RuntimeOptions,
     tenancy: Arc<
         crate::tenancy::api::Tenancy<
-            crate::bootstrap::integration::tenancy_runtime::LegacyTenantRuntimeFactory,
+            crate::bootstrap::integration::tenancy_runtime::RegistryTenantRuntimeFactory,
         >,
     >,
 }
@@ -185,7 +185,7 @@ impl Pool {
         let runtime_options = super::storage::RuntimeOptions::default();
         let tenancy = Arc::new(crate::tenancy::api::Tenancy::new(
             Arc::new(
-                crate::bootstrap::integration::tenancy_runtime::LegacyTenantRuntimeFactory::new(
+                crate::bootstrap::integration::tenancy_runtime::RegistryTenantRuntimeFactory::new(
                     Arc::clone(&registry),
                     runtime_options.clone(),
                 ),

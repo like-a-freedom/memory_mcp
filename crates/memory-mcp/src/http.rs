@@ -240,7 +240,7 @@ impl HttpState {
         );
         let account_resolver = Arc::new(registry::account::AccountResolver::new(stores.tenants()));
         let tenant_resolver: Arc<dyn crate::tenancy::api::ResolveTenantPort> = Arc::new(
-            crate::bootstrap::integration::tenancy_resolution::LegacyTenantResolver::new(
+            crate::bootstrap::integration::tenancy_resolution::RegistryTenantResolver::new(
                 account_resolver.clone(),
             ),
         );
@@ -330,7 +330,7 @@ impl HttpState {
         };
         #[cfg(feature = "control-plane")]
         let identity_transactions = Arc::new(
-            crate::bootstrap::integration::legacy_registry_identity::RegistryIdentityLinkTransactions::from_stores(registry.stores()),
+            crate::bootstrap::integration::registry_identity_links::RegistryIdentityLinkTransactions::from_stores(registry.stores()),
         );
         let identity_link_transactions: Arc<dyn crate::identity::api::IdentityLinkTransactions> =
             identity_transactions.clone();

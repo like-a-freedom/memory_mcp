@@ -7,12 +7,20 @@ use crate::tenancy::api::{
     RuntimeFactoryError, TenantLifecycleStatus, TenantRuntimeFactory, TenantRuntimeSpec,
 };
 
-pub(crate) struct LegacyTenantRuntimeFactory {
+/// Adapts a resolved [`TenantRuntimeSpec`] onto [`TenantRuntimeFactory`].
+///
+/// The name says registry because the *source* of the tenant record is the
+/// control registry. The runtime it builds is not a legacy path: it is the only
+/// way a tenant runtime is assembled, used by the request path and the
+/// maintenance path alike. It is an adapter rather than inline logic because the
+/// port is what lets `http/runtime` acquire a tenant without holding a registry
+/// handle of its own.
+pub(crate) struct RegistryTenantRuntimeFactory {
     registry: Arc<RegistryHandle>,
     options: std::sync::RwLock<RuntimeOptions>,
 }
 
-impl LegacyTenantRuntimeFactory {
+impl RegistryTenantRuntimeFactory {
     pub(crate) fn new(registry: Arc<RegistryHandle>, options: RuntimeOptions) -> Self {
         Self {
             registry,
@@ -26,7 +34,7 @@ impl LegacyTenantRuntimeFactory {
 }
 
 #[async_trait::async_trait]
-impl TenantRuntimeFactory for LegacyTenantRuntimeFactory {
+impl TenantRuntimeFactory for RegistryTenantRuntimeFactory {
     type Runtime = TenantRuntime;
 
     async fn activate(
