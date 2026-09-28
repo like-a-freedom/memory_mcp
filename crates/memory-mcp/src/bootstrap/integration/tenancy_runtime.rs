@@ -1,9 +1,11 @@
 use std::sync::Arc;
 
 use crate::http::registry::RegistryHandle;
-use crate::http::registry::models::Tenant;
+use crate::http::registry::models::{Tenant, TenantStatus};
 use crate::http::runtime::storage::{RuntimeOptions, TenantRuntime, build_runtime_with_options};
-use crate::tenancy::api::{RuntimeFactoryError, TenantRuntimeFactory, TenantRuntimeSpec};
+use crate::tenancy::api::{
+    RuntimeFactoryError, TenantLifecycleStatus, TenantRuntimeFactory, TenantRuntimeSpec,
+};
 
 pub(crate) struct LegacyTenantRuntimeFactory {
     registry: Arc<RegistryHandle>,
@@ -31,9 +33,18 @@ impl TenantRuntimeFactory for LegacyTenantRuntimeFactory {
         &self,
         spec: TenantRuntimeSpec,
     ) -> Result<Self::Runtime, RuntimeFactoryError> {
+        // The status comes from the spec rather than an assumed `Ready`. A
+        // maintenance caller binds a tenant that is being deleted, and a
+        // runtime assembled from a fabricated `Ready` record would be a lie
+        // the stores below could act on.
+        let status = match spec.status {
+            TenantLifecycleStatus::Ready => TenantStatus::Ready,
+            TenantLifecycleStatus::Deleting => TenantStatus::Deleting,
+            TenantLifecycleStatus::Purged => TenantStatus::Purged,
+        };
         let tenant = Tenant {
             id: spec.tenant_id,
-            status: crate::http::registry::models::TenantStatus::Ready,
+            status,
             namespace_binding: crate::http::registry::models::NamespaceBinding {
                 namespace: spec.namespace,
                 database: spec.database,

@@ -374,6 +374,36 @@ impl AppSessionStore {
             .and_then(|v| v.as_i64())
             .unwrap_or(0))
     }
+
+    /// Physically delete every row whose idle or absolute deadline has passed.
+    ///
+    /// The owner of the `app_session` table holds this, because it is the only
+    /// place that needs to know the expiry columns. It replaces two
+    /// hand-written copies of the same DELETE — one in the app-session cleanup
+    /// scheduler, one in the account-deletion recovery path — which had drifted
+    /// apart: the scheduler matched "does not exist" on the message text and
+    /// swallowed it, while recovery matched a narrower set of phrasings
+    /// entirely. Both now get the same behaviour, and the missing-table case is
+    /// handled by the store-wide `BoundDbClient::query_rows` recipe instead of
+    /// by string matching, so a new SurrealDB phrasing cannot silently turn
+    /// into a failed deletion pass.
+    ///
+    /// Returns the number of rows deleted. A tenant that never opened an app
+    /// session may have no `app_session` table at all; that degrades to zero
+    /// rather than failing the caller, which is what lets the deletion-recovery
+    /// path run this unconditionally.
+    pub async fn delete_expired(&self) -> Result<u64, MemoryError> {
+        let rows = self
+            .db
+            .query_rows(
+                "DELETE FROM app_session \
+                 WHERE idle_expiry <= time::now() OR absolute_expiry <= time::now() \
+                 RETURN id;",
+                None,
+            )
+            .await?;
+        Ok(rows.len() as u64)
+    }
 }
 
 /// Generate an opaque 32-byte URL-safe handle. The

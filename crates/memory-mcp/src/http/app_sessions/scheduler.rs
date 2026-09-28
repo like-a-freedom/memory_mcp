@@ -3,21 +3,21 @@
 //! The job is a process-level bounded pass, not a
 //! per-tenant loop. It walks up to 100 ready tenants
 //! per cycle, binds each namespace through the
-//! privileged maintenance factory, and issues a
-//! parameterized DELETE on the `app_session` table for
-//! rows whose `idle_expiry` or `absolute_expiry` has
-//! passed. The DELETE is the only physical delete the
-//! job is allowed to issue; it never touches facts or
-//! registry history.
+//! privileged maintenance factory, and asks
+//! [`AppSessionStore`] to delete rows whose `idle_expiry`
+//! or `absolute_expiry` has passed. The DELETE lives in the
+//! store that owns the table, so the account-deletion
+//! recovery path runs the identical statement and the two
+//! cannot drift. The job never touches facts or registry
+//! history.
 
 use std::sync::Arc;
 
 use crate::error::MemoryError;
+use crate::http::app_sessions::store::AppSessionStore;
 use crate::http::leases::scheduler::SchedulerJob;
 use crate::http::registry::RegistryHandle;
-#[allow(unused_imports)]
-use crate::http::registry::RegistryStore;
-use crate::storage::client::DbClient;
+use crate::storage::client::BoundDbClient;
 
 /// The cleanup job. Registers itself with
 /// `SchedulerHooks::with_additional_job`.
@@ -27,10 +27,9 @@ pub fn scheduler_job() -> SchedulerJob {
 
 /// Walk at most 100 ready tenants per cycle, binding
 /// each namespace through the privileged maintenance
-/// factory, and issue a parameterized DELETE on
-/// `app_session` for expired rows. The job is
-/// short-lived; it does not hold a per-tenant runtime
-/// pin while iterating.
+/// factory, and delete expired `app_session` rows.
+/// The job is short-lived; it does not hold a per-tenant
+/// runtime pin while iterating.
 pub async fn cleanup_expired_for_all(registry: &RegistryHandle) -> Result<(), MemoryError> {
     let store = registry.store_clone();
     let due = store.list_ready_tenants(None, 100).await?;
@@ -55,23 +54,17 @@ pub async fn cleanup_expired_for_all(registry: &RegistryHandle) -> Result<(), Me
                 continue;
             }
         };
-        if let Err(error) = db
-            .query(
-                "DELETE FROM app_session WHERE idle_expiry <= time::now() OR absolute_expiry <= time::now()",
-                None,
-                &tenant.namespace_binding.namespace,
-            )
-            .await
-        {
-            if error.to_string().contains("app_session")
-                && error.to_string().contains("does not exist")
-            {
-                continue;
-            }
-            return Err(MemoryError::Storage(format!(
-                "expired app-session cleanup failed: {error}"
-            )));
-        }
+        // `BoundDbClient` pins the namespace as an invariant rather than a
+        // per-call argument, so this store physically cannot reach another
+        // tenant's rows. `delete_expired` owns the statement and the
+        // missing-table handling.
+        let sessions = AppSessionStore::new(Arc::new(BoundDbClient::new(
+            db,
+            tenant.namespace_binding.namespace.clone(),
+        )));
+        sessions.delete_expired().await.map_err(|error| {
+            MemoryError::Storage(format!("expired app-session cleanup failed: {error}"))
+        })?;
     }
     Ok(())
 }

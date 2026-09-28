@@ -346,7 +346,7 @@ impl HttpState {
         );
         #[cfg(feature = "control-plane")]
         let account_deletion_port: Arc<dyn crate::operations::api::AccountDeletionPort> = Arc::new(
-            crate::bootstrap::integration::legacy_registry_operations::RegistryAccountDeletionAdapter::from_registry(
+            crate::bootstrap::integration::registry_operations::RegistryAccountDeletionAdapter::from_registry(
                 registry.store_clone(),
             ),
         );

@@ -140,6 +140,27 @@ impl PrivilegedEngine {
         &self,
         tenant: &super::registry::models::Tenant,
     ) -> Result<Arc<crate::storage::client::SurrealDbClient>, crate::error::MemoryError> {
+        self.bind_namespace(
+            &tenant.namespace_binding.namespace,
+            &tenant.namespace_binding.database,
+        )
+        .await
+    }
+
+    /// Bind a namespace by name, for a caller that holds the binding rather
+    /// than the whole tenant record.
+    ///
+    /// The maintenance workers — the deletion-recovery pass, the App Session
+    /// sweeper — are given a tenant's namespace binding without the rest of
+    /// the record, because that is all their work needs. Reconstructing a
+    /// `Tenant` to call [`Self::bind`] would mean fabricating fields the
+    /// caller does not have, and for a deleting tenant the status it would
+    /// have to invent is the one field that must not be guessed.
+    pub async fn bind_namespace(
+        &self,
+        namespace: &str,
+        database: &str,
+    ) -> Result<Arc<crate::storage::client::SurrealDbClient>, crate::error::MemoryError> {
         use crate::storage::client::SurrealDbClient;
         // `use_ns/use_db` is a connection-session mutation. Surreal clones
         // isolate the resulting bound adapter, but concurrent binds on the
@@ -155,46 +176,40 @@ impl PrivilegedEngine {
             PrivilegedEngine::Remote(privileged) => {
                 let ns_client = (**privileged).clone();
                 ns_client
-                    .use_ns(&tenant.namespace_binding.namespace)
-                    .use_db(&tenant.namespace_binding.database)
+                    .use_ns(namespace)
+                    .use_db(database)
                     .await
                     .map_err(|err| {
                         crate::error::MemoryError::Storage(format!("tenant bind failed: {err}"))
                     })?;
                 Ok(Arc::new(SurrealDbClient::from_prebound_remote(
-                    ns_client,
-                    &tenant.namespace_binding.namespace,
-                    "info",
+                    ns_client, namespace, "info",
                 )))
             }
             PrivilegedEngine::Local(privileged) => {
                 let ns_client = (**privileged).clone();
                 ns_client
-                    .use_ns(&tenant.namespace_binding.namespace)
-                    .use_db(&tenant.namespace_binding.database)
+                    .use_ns(namespace)
+                    .use_db(database)
                     .await
                     .map_err(|err| {
                         crate::error::MemoryError::Storage(format!("tenant bind failed: {err}"))
                     })?;
                 Ok(Arc::new(SurrealDbClient::from_prebound(
-                    ns_client,
-                    &tenant.namespace_binding.namespace,
-                    "info",
+                    ns_client, namespace, "info",
                 )))
             }
             PrivilegedEngine::LocalMem(privileged) => {
                 let ns_client = (**privileged).clone();
                 ns_client
-                    .use_ns(&tenant.namespace_binding.namespace)
-                    .use_db(&tenant.namespace_binding.database)
+                    .use_ns(namespace)
+                    .use_db(database)
                     .await
                     .map_err(|err| {
                         crate::error::MemoryError::Storage(format!("tenant bind failed: {err}"))
                     })?;
                 Ok(Arc::new(SurrealDbClient::from_prebound_mem(
-                    ns_client,
-                    &tenant.namespace_binding.namespace,
-                    "info",
+                    ns_client, namespace, "info",
                 )))
             }
         }

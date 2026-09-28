@@ -333,6 +333,12 @@ impl Pool {
                 database: tenant.namespace_binding.database.clone(),
                 plan_version: tenant.plan_version,
                 schema_version: tenant.schema_version,
+                // A caller that reached this method already proved the tenant
+                // is `Ready`; the request path refuses every other status
+                // before it gets here. A maintenance caller wanting to bind a
+                // deleting tenant goes through `acquire_spec_with_limit` with
+                // a spec that states the status itself.
+                status: crate::tenancy::api::TenantLifecycleStatus::Ready,
             },
             per_tenant_concurrency,
         )

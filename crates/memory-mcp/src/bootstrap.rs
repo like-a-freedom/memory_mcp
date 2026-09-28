@@ -15,11 +15,18 @@ pub async fn run_deletion_recovery_pass(
     registry: crate::http::registry::RegistryHandle,
     fault_injector: Arc<dyn crate::platform::fault_injection::FaultInjector>,
 ) -> Result<(), crate::MemoryError> {
-    let adapter = integration::legacy_registry_operations::LegacyDeletionRecoveryAdapter::new(
+    let adapter = integration::registry_operations::RegistryDeletionRecoveryAdapter::new(
         registry,
         fault_injector,
     );
-    crate::operations::api::run_deletion_recovery(&adapter, chrono::Utc::now()).await
+    let owner_id = crate::http::leases::scheduler::replica_id();
+    crate::operations::api::run_deletion_recovery(
+        &adapter,
+        &integration::registry_operations::TenantRetainedWork,
+        &owner_id,
+        chrono::Utc::now(),
+    )
+    .await
 }
 
 #[cfg(feature = "control-plane")]

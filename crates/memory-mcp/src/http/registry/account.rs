@@ -47,6 +47,22 @@ impl AccountResolver {
             other => ResolvedTenant::Provisioning(other, tenant.id),
         })
     }
+
+    /// Bind a tenant by its own id for maintenance work.
+    ///
+    /// The counterpart to [`Self::resolve_ready_tenant`], and deliberately not
+    /// a relaxation of it: this returns a tenant in any maintenance-visible
+    /// status, including one being deleted, because the workers that sweep
+    /// expired App Sessions and finish a deletion need exactly those namespaces
+    /// and must not be refused them. It never grants request access — only the
+    /// namespace binding, which the caller already proved it may have by
+    /// holding the tenant record.
+    pub async fn resolve_tenant_for_maintenance(
+        &self,
+        tenant_id: &str,
+    ) -> Result<Option<Tenant>, MemoryError> {
+        self.store.find_tenant_by_id(tenant_id).await
+    }
 }
 
 #[cfg(test)]

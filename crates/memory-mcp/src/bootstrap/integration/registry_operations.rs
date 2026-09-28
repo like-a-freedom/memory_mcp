@@ -6,9 +6,13 @@ use crate::MemoryError;
 use crate::http::registry::RegistryHandle;
 use crate::http::registry::models::TenantStatus;
 use crate::http::registry::storage::RegistryStore;
-use crate::operations::api::{AccountDeletionPort, DeletionRecoveryPort, RecoveryOutcome};
+use crate::operations::api::{
+    AccountDeletionPort, DeletionLease, DeletionRecoveryPort, RetainedTenantWork,
+    TenantUnderDeletion,
+};
 use crate::platform::fault_injection::FaultInjector;
 use crate::platform::persistence::control::AccountDeletionTx;
+use crate::storage::client::BoundDbClient;
 
 pub(crate) struct RegistryAccountDeletionAdapter {
     tx: Arc<dyn AccountDeletionTx>,
@@ -40,19 +44,19 @@ impl AccountDeletionPort for RegistryAccountDeletionAdapter {
     }
 }
 
-const DELETION_LEASE_TTL_SECS: i64 = 60;
-const APP_SESSION_CLEANUP_SQL: &str =
-    "DELETE FROM app_session WHERE idle_expiry <= time::now() OR absolute_expiry <= time::now();";
-const TASK_CLEANUP_SQL: &str = "DELETE FROM tenant_task WHERE retention_expiry <= time::now() AND state IN ['completed', 'completed_before_cancel', 'cancelled', 'cancelled_before_commit', 'failed'];";
-
-pub(crate) struct LegacyDeletionRecoveryAdapter {
+/// Durable steps of the deletion-recovery workflow.
+///
+/// The workflow itself lives in [`crate::operations::api::recover_tenant`]: the
+/// order of these calls, the fencing rules and the failure policy are that
+/// module's, not this file's. What is here is the SQL and the handle each step
+/// needs, so the workflow can be read without a registry in the room.
+pub(crate) struct RegistryDeletionRecoveryAdapter {
     registry: RegistryHandle,
     tx: Arc<dyn AccountDeletionTx>,
     fault_injector: Arc<dyn FaultInjector>,
-    owner_id: String,
 }
 
-impl LegacyDeletionRecoveryAdapter {
+impl RegistryDeletionRecoveryAdapter {
     pub(crate) fn new(registry: RegistryHandle, fault_injector: Arc<dyn FaultInjector>) -> Self {
         let tx: Arc<dyn AccountDeletionTx> =
             Arc::new(registry.store_clone()) as Arc<dyn AccountDeletionTx>;
@@ -60,13 +64,12 @@ impl LegacyDeletionRecoveryAdapter {
             registry,
             tx,
             fault_injector,
-            owner_id: crate::http::leases::scheduler::replica_id(),
         }
     }
 }
 
 #[async_trait::async_trait]
-impl DeletionRecoveryPort for LegacyDeletionRecoveryAdapter {
+impl DeletionRecoveryPort for RegistryDeletionRecoveryAdapter {
     async fn list_deleting_tenants(
         &self,
         limit: usize,
@@ -82,102 +85,150 @@ impl DeletionRecoveryPort for LegacyDeletionRecoveryAdapter {
             .collect())
     }
 
-    async fn recover_tenant(
+    async fn find_tenant_for_recovery(
         &self,
         tenant_id: &str,
-        _now: DateTime<Utc>,
-    ) -> Result<RecoveryOutcome, MemoryError> {
-        let store = self.registry.store_clone();
-        let Some(tenant) = store.find_tenant_by_id(tenant_id).await? else {
-            return Ok(RecoveryOutcome::Purged);
-        };
-        if tenant.status == TenantStatus::Purged {
-            return Ok(RecoveryOutcome::Purged);
-        }
-        let engine = self.registry.tenant_engine()?;
-        let lease_id = uuid::Uuid::new_v4().to_string();
-        let Some(lease) = store
-            .claim_provisioning(
-                &tenant.id,
-                &self.owner_id,
-                &lease_id,
-                DELETION_LEASE_TTL_SECS,
-            )
+    ) -> Result<Option<TenantUnderDeletion>, MemoryError> {
+        let Some(tenant) = self
+            .registry
+            .store_clone()
+            .find_tenant_by_id(tenant_id)
             .await?
         else {
-            return Ok(RecoveryOutcome::Finalized);
+            return Ok(None);
         };
-        let namespace = tenant.namespace_binding.namespace.clone();
-        let tx_for_work = Arc::clone(&self.tx);
-        let engine_for_work = engine.clone();
-        let lease_for_work = lease.clone();
-        let tenant_id = tenant_id.to_string();
-        let tenant_id_for_work = tenant_id.clone();
-        let injector = Arc::clone(&self.fault_injector);
-        let result = lease
-            .run_with_heartbeat(self.registry.clone(), &tenant_id, async move {
-                let client = engine_for_work.bind(&tenant).await?;
-                match client
-                    .execute_migration_script(APP_SESSION_CLEANUP_SQL, &namespace)
-                    .await
-                {
-                    Ok(()) => {}
-                    Err(error) if missing_table(&error, "app_session") => {}
-                    Err(error) => return Err(error),
-                }
-                match client
-                    .execute_migration_script(TASK_CLEANUP_SQL, &namespace)
-                    .await
-                {
-                    Ok(()) => {}
-                    Err(error) if missing_table(&error, "tenant_task") => {}
-                    Err(error) => return Err(error),
-                }
-                tx_for_work
-                    .finalize_account_deletion(
-                        &tenant_id_for_work,
-                        &lease_for_work.owner_id,
-                        &lease_for_work.lease_id,
-                        lease_for_work.fencing_generation,
-                        Utc::now(),
-                    )
-                    .await?;
-                injector.hit(crate::platform::fault_injection::FaultPoint::AccountDeletionFinalized)
-            })
+        Ok(Some(TenantUnderDeletion {
+            tenant_id: tenant.id,
+            namespace: tenant.namespace_binding.namespace,
+            database: tenant.namespace_binding.database,
+            purged: tenant.status == TenantStatus::Purged,
+        }))
+    }
+
+    async fn claim_deletion_lease(
+        &self,
+        tenant_id: &str,
+        owner_id: &str,
+        lease_id: &str,
+        ttl_secs: i64,
+    ) -> Result<Option<DeletionLease>, MemoryError> {
+        let Some(lease) = self
+            .registry
+            .store_clone()
+            .claim_provisioning(tenant_id, owner_id, lease_id, ttl_secs)
+            .await?
+        else {
+            return Ok(None);
+        };
+        Ok(Some(DeletionLease {
+            owner_id: lease.owner_id,
+            lease_id: lease.lease_id,
+            fencing_generation: lease.fencing_generation,
+        }))
+    }
+
+    async fn bind_tenant_namespace(
+        &self,
+        tenant: &TenantUnderDeletion,
+    ) -> Result<Arc<BoundDbClient>, MemoryError> {
+        // A maintenance bind, not the request path. The tenant is being
+        // deleted, so the authenticated resolution pipeline deliberately
+        // refuses it; this is the privileged maintenance binding the other
+        // schedulers use. Wrapping the raw client in `BoundDbClient` pins the
+        // namespace as an invariant of the handle, so the sweep that follows
+        // cannot be re-pointed at a different tenant.
+        let engine = self.registry.tenant_engine()?;
+        let handle = engine
+            .bind_namespace(&tenant.namespace, &tenant.database)
+            .await?;
+        Ok(Arc::new(BoundDbClient::new(
+            handle,
+            tenant.namespace.clone(),
+        )))
+    }
+
+    async fn write_deletion_tombstone(
+        &self,
+        tenant_id: &str,
+        lease: &DeletionLease,
+        now: DateTime<Utc>,
+    ) -> Result<(), MemoryError> {
+        self.tx
+            .finalize_account_deletion(
+                tenant_id,
+                &lease.owner_id,
+                &lease.lease_id,
+                lease.fencing_generation,
+                now,
+            )
+            .await?;
+        self.fault_injector
+            .hit(crate::platform::fault_injection::FaultPoint::AccountDeletionFinalized)
+    }
+
+    async fn is_tenant_purged(&self, tenant_id: &str) -> Result<bool, MemoryError> {
+        Ok(self
+            .registry
+            .store_clone()
+            .find_tenant_by_id(tenant_id)
+            .await?
+            .is_some_and(|tenant| tenant.status == TenantStatus::Purged))
+    }
+
+    async fn release_deletion_lease(
+        &self,
+        tenant_id: &str,
+        lease: &DeletionLease,
+    ) -> Result<(), MemoryError> {
+        let store = self.registry.store_clone();
+        let _ = store
+            .release_provisioning_lease(
+                tenant_id,
+                &lease.owner_id,
+                &lease.lease_id,
+                lease.fencing_generation,
+            )
             .await;
-        match result {
-            Ok(()) => Ok(RecoveryOutcome::Finalized),
-            Err(error) => {
-                if deletion_is_purged(store.as_ref(), &tenant_id).await? {
-                    Ok(RecoveryOutcome::Purged)
-                } else {
-                    let _ = lease.release(store.as_ref(), &tenant_id).await;
-                    Err(error)
-                }
-            }
-        }
+        Ok(())
     }
 }
 
-async fn deletion_is_purged(
-    store: &dyn RegistryStore,
-    tenant_id: &str,
-) -> Result<bool, MemoryError> {
-    Ok(store
-        .find_tenant_by_id(tenant_id)
-        .await?
-        .is_some_and(|tenant| tenant.status == TenantStatus::Purged))
-}
+/// Sweeps the tenant-namespace work a deletion must not leave behind.
+///
+/// The two deletes belong to the stores that own those tables —
+/// [`crate::http::app_sessions::store::AppSessionStore`] for `app_session` and
+/// [`crate::http::tasks::worker::DurableTaskStore`] for `tenant_task`. This
+/// path used to carry hand-written copies of both statements, which is how they
+/// came to disagree with the stores about tenant scoping and missing-table
+/// handling. It now calls the owners.
+pub(crate) struct TenantRetainedWork;
 
-fn missing_table(error: &MemoryError, table: &str) -> bool {
-    let MemoryError::Storage(message) = error else {
-        return false;
-    };
-    let lower = message.to_ascii_lowercase();
-    lower.contains(table)
-        && ((lower.contains("does not exist") && lower.contains("table"))
-            || lower.contains("unknown table")
-            || lower.contains("table not found"))
+#[async_trait::async_trait]
+impl RetainedTenantWork for TenantRetainedWork {
+    async fn purge_retained_work(
+        &self,
+        tenant_id: &str,
+        bound_db: Arc<BoundDbClient>,
+    ) -> Result<(), MemoryError> {
+        use crate::http::tasks::state::TaskStore;
+
+        // `BoundDbClient::query_rows` degrades a missing table to an empty
+        // result, so a tenant that never opened an App Session and has no
+        // `app_session` table sweeps cleanly.
+        #[cfg(feature = "mcp-apps")]
+        crate::http::app_sessions::store::AppSessionStore::new(Arc::clone(&bound_db))
+            .delete_expired()
+            .await?;
+
+        // The store that owns `tenant_task`, with its own retention rule. The
+        // copy this path used to carry omitted the `tenant_id` guard, so it
+        // deleted every tenant's rows in the namespace rather than this
+        // tenant's.
+        crate::http::tasks::worker::DurableTaskStore::new(bound_db, tenant_id.to_string())
+            .delete_expired()
+            .await?;
+        Ok(())
+    }
 }
 
 #[cfg(test)]
@@ -191,7 +242,7 @@ mod tests {
     //! direct one, so the type is what carries that guarantee.
     use super::*;
     use crate::http::registry::models::{
-        Account, AccountStatus, DeletionChallengeRecord, NamespaceBinding, Tenant, TenantStatus,
+        Account, AccountStatus, DeletionChallengeRecord, NamespaceBinding, Tenant,
     };
     use crate::http::registry::storage::{
         AccountStore, InMemoryStore, RegistryStore, SessionStore, TenantStore,

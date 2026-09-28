@@ -203,7 +203,7 @@ not under the canonical set. Phase 3 removes both by deleting the import they na
 `operations/api.rs` is 124 lines: two free functions (a 14-line loop; 22 lines of two guards plus a
 delegate) and data shapes. The recovery state machine — tenant lookup, provisioning-lease claim with
 heartbeat, two cleanup scripts, tombstone finalization, fault injection, purge detection, lease release,
-~75 lines at `src/bootstrap/integration/legacy_registry_operations.rs:85` — still lives in
+~75 lines in what was then `src/bootstrap/integration/legacy_registry_operations.rs` — still lived in
 `LegacyDeletionRecoveryAdapter`. The module fails the deletion test: delete it and the guards move, nothing
 concentrates.
 
@@ -248,8 +248,8 @@ method set, in the order `recover_tenant` calls it, with the proposal noted wher
 | 3 | `claim_provisioning` | a deletion-scoped claim |
 | 4 | `Lease::run_with_heartbeat` | a deletion-scoped heartbeat |
 | 5 | `finalize_account_deletion` | a deletion-scoped tombstone write |
-| 6 | `deletion_is_purged` (private helper) | promoted onto the port |
-| 7 | `Lease::release` | a deletion-scoped release |
+| 6 | the module-private purge-detection helper | promoted onto the port |
+| 7 | the lease release call | a deletion-scoped release |
 
 Only names 2-7 are new. The right-hand column is a proposal, not a citation: none of those names exist yet,
 and Phase 2 introduces them. The behaviour each must preserve is the current behaviour exactly.
@@ -409,7 +409,7 @@ Default to delete (YAGNI/ISP). Do not keep a trait that adds no restriction over
 
 ### Explicitly not in scope
 
-- **The modules themselves.** `tenancy/api.rs:124-262` (single-flight, eviction, immutable binding),
+- **The modules themselves.** the single-flight, eviction and immutable-binding state machine in `src/tenancy/api.rs`,
   identity's recent-auth window and last-link guard, and provisioning's idempotency fingerprint and redacting
   `CreatedApiKey` Debug are genuine policy. Deleting any concentrates complexity. They are *interface-only*,
   which is the honest hexagonal shape the DDD spec describes.

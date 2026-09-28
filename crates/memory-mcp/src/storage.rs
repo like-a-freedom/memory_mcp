@@ -41,10 +41,12 @@ pub use crate::memory::agent_memory::{
 pub use crate::memory::inbox_revision_store;
 pub use crate::memory::inbox_revision_store::InboxRevisionStoreClient;
 pub use access_log_store::ContextAccessLogClient;
-#[cfg(any(test, feature = "test-fixtures"))]
+// `BoundDbClient` appears in `operations::api::RetainedTenantWork`, so an
+// external implementor of that trait must be able to name the type. It is the
+// namespace-pinned adapter: its methods take no namespace, which is exactly
+// the property the operations workflow is relying on when it hands one to the
+// sweep.
 pub use client::BoundDbClient;
-#[cfg(not(any(test, feature = "test-fixtures")))]
-pub(crate) use client::BoundDbClient;
 pub(crate) use client::is_record_already_exists_error;
 pub use client::{ContextFactQuery, DbClient, SurrealDbClient};
 pub use event_log_store::EventLogStoreClient;
