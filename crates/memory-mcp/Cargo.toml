@@ -119,6 +119,14 @@ name = "memory_mcp_http"
 path = "src/bin/memory_mcp_http.rs"
 required-features = ["streamable-http"]
 
+# Cargo never compiles a build script's `#[cfg(test)]` module, so the tests
+# guarding how a bundle asset is named and classified did not run. The pure
+# decisions live in `build_support.rs` — a file Cargo compiles like any other —
+# so this target is an ordinary integration test rather than a trick.
+[[test]]
+name = "build_support"
+path = "build_support.rs"
+
 [build-dependencies]
 flate2.workspace = true
 
