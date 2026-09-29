@@ -78,6 +78,48 @@ fn rejection_event(
     event
 }
 
+/// Build the event for one measured stage of the callback.
+///
+/// A stage is a name and an elapsed time, nothing else. The stages are what
+/// make a slow sign-in explicable — which step took the time — and they are
+/// recorded at `debug` so they cost nothing until an operator turns the
+/// subsystem up to investigate.
+fn stage_event(
+    stage: &'static str,
+    elapsed_ms: f64,
+    request_id: Option<uuid::Uuid>,
+) -> std::collections::HashMap<String, serde_json::Value> {
+    let mut event = std::collections::HashMap::new();
+    event.insert("op".into(), "oidc.callback_stage".into());
+    event.insert("stage".into(), stage.into());
+    event.insert("duration_ms".into(), elapsed_ms.into());
+    if let Some(id) = request_id {
+        event.insert("request_id".into(), id.to_string().into());
+    }
+    event
+}
+
+/// Measure one stage of the callback and record how long it took.
+///
+/// Sub-millisecond steps are kept: a stage that reports `0ms` is
+/// indistinguishable from one that was never measured, and telling a cache
+/// hit from a query is the reason to measure at all.
+async fn timed<T, F, Fut>(stage: &'static str, request_id: Option<uuid::Uuid>, body: F) -> T
+where
+    F: FnOnce() -> Fut,
+    Fut: std::future::Future<Output = T>,
+{
+    let started = std::time::Instant::now();
+    let outcome = body().await;
+    log_stage(stage, started.elapsed().as_secs_f64() * 1000.0, request_id);
+    outcome
+}
+
+fn log_stage(stage: &'static str, elapsed_ms: f64, request_id: Option<uuid::Uuid>) {
+    use crate::logging::{LogLevel, StdoutLogger};
+    StdoutLogger::from_env().log(stage_event(stage, elapsed_ms, request_id), LogLevel::Debug);
+}
+
 /// Record one refusal through the deployment's logger.
 ///
 /// The logger is the process-wide one configured from `RUST_LOG`, so a refused
@@ -267,7 +309,7 @@ pub async fn callback(
     // reports an id nothing can be found under.
     axum::Extension(request_id): axum::Extension<Option<crate::http::logging::RequestId>>,
 ) -> Result<(axum::http::header::HeaderMap, axum::response::Redirect), ApiError> {
-    callback_inner(&state, params, request_headers)
+    callback_inner(&state, params, request_headers, request_id)
         .await
         .map_err(|error| match request_id {
             Some(crate::http::logging::RequestId(id)) => error.at_request(id),
@@ -281,7 +323,11 @@ async fn callback_inner(
     state: &std::sync::Arc<HttpState>,
     params: OidcCallback,
     request_headers: axum::http::HeaderMap,
+    request_id: Option<crate::http::logging::RequestId>,
 ) -> Result<(axum::http::header::HeaderMap, axum::response::Redirect), ApiError> {
+    let request_uuid = request_id
+        .as_ref()
+        .map(crate::http::logging::RequestId::as_uuid);
     // Reject if the provider reported an error.
     if params.error.is_some() {
         return Err(reject("provider_error"));
@@ -313,7 +359,16 @@ async fn callback_inner(
         return Err(ApiError::Unavailable);
     }
 
-    let stored = unseal_oidc_payload(&state.config.keys.oidc_state, &sealed, &aead_nonce)?;
+    // The unseal is synchronous, so it is measured around the call rather than
+    // around a future: the point is the work, not the await.
+    let unseal_started = std::time::Instant::now();
+    let stored = unseal_oidc_payload(&state.config.keys.oidc_state, &sealed, &aead_nonce);
+    log_stage(
+        "unseal",
+        unseal_started.elapsed().as_secs_f64() * 1000.0,
+        request_uuid,
+    );
+    let stored = stored?;
     if stored.state.as_str() != params.state {
         return Err(reject("state_mismatch"));
     }
@@ -340,12 +395,23 @@ async fn callback_inner(
 
     let oidc = state.oidc_client.as_ref().ok_or(ApiError::Unavailable)?;
 
-    let tokens = oidc.exchange_code(code, stored.pkce).await?;
+    // The exchange is the one stage that leaves the process, so its duration
+    // is the number that separates "the provider answered" from "the provider
+    // never answered" — the difference a support conversation asks about
+    // first, and previously the only way to get was to time requests by hand.
+    let tokens = timed("exchange", request_uuid, || async {
+        oidc.exchange_code(code, stored.pkce).await
+    })
+    .await?;
     // The one branch worth reading first: `DisallowedAlgorithm` means our
     // configuration and the provider disagree, while `Jwt` means the token
     // itself failed. `reason` is a stable token to grep and to alert on; the
     // `AuthError` display names the same distinction in prose.
-    let claims = match oidc.validate_id_token(&tokens.id_token).await {
+    let claims = match timed("validate", request_uuid, || async {
+        oidc.validate_id_token(&tokens.id_token).await
+    })
+    .await
+    {
         Ok(claims) => claims,
         Err(error) => {
             let detail = format!("reason={} kind={error}", id_token_reason(&error));
@@ -1239,6 +1305,113 @@ mod tests {
                 .expect("list")
                 .is_empty(),
             "the refusal must not leave a partial link"
+        );
+    }
+
+    /// A stage's duration has to reach the log under the same request id as
+    /// the refusal it might explain. Without it, narrowing a sign-in failure
+    /// means timing requests against a live provider — which is what the
+    /// refusal branches exist to avoid — and a stage measured under a
+    /// different id cannot be joined to the request that took that long.
+    #[test]
+    fn a_stage_duration_is_recorded_under_the_requests_own_id() {
+        let request_id = uuid::Uuid::parse_str("11111111-2222-3333-4444-555555555555").unwrap();
+
+        let line = render(&stage_event("exchange", 189.4, Some(request_id)));
+
+        assert!(line.contains("op=oidc.callback_stage"), "{line}");
+        assert!(line.contains("stage=exchange"), "{line}");
+        assert!(line.contains("duration_ms=189.4"), "{line}");
+        assert!(line.contains("req=11111111"), "{line}");
+    }
+
+    /// A stage is measured, not narrated: only its name and the elapsed time
+    /// are recorded. Anything a stage touches — the code, the token, the
+    /// provider's response — must not reach the log through this path.
+    #[test]
+    fn a_stage_event_carries_only_its_name_and_elapsed() {
+        let line = render(&stage_event("exchange", 189.4, None));
+
+        assert!(!line.contains("code="), "{line}");
+        assert!(!line.contains("token="), "{line}");
+        assert!(!line.contains("sub="), "{line}");
+    }
+
+    /// `timed` is the only thing that measures, so it is what the callback uses
+    /// and what the test drives: an event built by hand proves the shape but
+    /// not that a stage is ever recorded. Here the stage is measured and the
+    /// body still runs, so a change that stopped measuring — or stopped
+    /// running the body — fails here.
+    #[tokio::test]
+    async fn measuring_a_stage_returns_its_result_and_records_the_stage() {
+        let request_id = uuid::Uuid::parse_str("11111111-2222-3333-4444-555555555555").unwrap();
+        let sink = crate::logging::capture::install();
+        // A stage is recorded at `debug`, so it reaches the log only when its
+        // subsystem is turned up — the same thing an operator does to
+        // investigate. The test turns it up for them.
+        crate::logging::capture::with_level("oidc=debug", || async {
+            let outcome = timed("exchange", Some(request_id), || async { 7usize }).await;
+            assert_eq!(outcome, 7, "measuring must not change the result");
+        })
+        .await;
+
+        let recorded = sink.lines();
+        assert!(
+            recorded.iter().any(|line| {
+                line.contains("op=oidc.callback_stage")
+                    && line.contains("stage=exchange")
+                    && line.contains("req=11111111")
+            }),
+            "the measured stage must reach the log: {recorded:?}"
+        );
+    }
+
+    /// A stage that fails is still measured. The stage that failed is the one
+    /// an operator needs the duration of — a refused exchange is exactly when
+    /// knowing it took four seconds matters — so measuring only successes
+    /// would drop the half of the log that gets read.
+    #[tokio::test]
+    async fn a_failing_stage_is_measured_too() {
+        let sink = crate::logging::capture::install();
+
+        let outcome: Result<(), &str> =
+            crate::logging::capture::with_level("oidc=debug", || async {
+                timed("exchange", None, || async { Err("refused") }).await
+            })
+            .await;
+
+        assert_eq!(outcome, Err("refused"), "the failure must still propagate");
+        assert!(
+            sink.lines()
+                .iter()
+                .any(|line| line.contains("stage=exchange")),
+            "a failed stage must still be measured: {:?}",
+            sink.lines()
+        );
+    }
+
+    /// Stages are what an operator turns up to investigate, so they must not
+    /// appear at the default level. A callback emits four or five of them, and
+    /// a deployment logging them by default drowns the refusals that matter
+    /// more than the timings do.
+    #[test]
+    fn a_stage_is_below_the_default_level() {
+        let logger = StdoutLogger::from_env_with(|key| match key {
+            "RUST_LOG" => Some("info".to_string()),
+            _ => None,
+        });
+
+        assert!(
+            !logger.is_event_enabled(LogLevel::Debug, "oidc.callback_stage"),
+            "a stage must not be reported at the default level"
+        );
+        assert!(
+            StdoutLogger::from_env_with(|key| match key {
+                "RUST_LOG" => Some("oidc=debug".to_string()),
+                _ => None,
+            })
+            .is_event_enabled(LogLevel::Debug, "oidc.callback_stage"),
+            "a stage appears when its subsystem is turned up"
         );
     }
 }

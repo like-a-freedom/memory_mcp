@@ -146,6 +146,14 @@ impl StdoutLogger {
     /// one branch.
     #[must_use]
     pub fn from_env() -> Self {
+        // A test override wins over the environment, so a test can observe an
+        // event the deployment's level filters out without touching the
+        // process environment. The `cfg!` keeps the override out of a
+        // production build's behaviour: it is read, and only a test can set it.
+        #[cfg(test)]
+        if let Some(level) = capture::override_level() {
+            return Self::from_directives(&level);
+        }
         Self::from_env_with(|key| std::env::var(key).ok())
     }
 
@@ -158,8 +166,16 @@ impl StdoutLogger {
         F: Fn(&str) -> Option<String>,
     {
         let configured = lookup(Self::LEVEL_ENV).unwrap_or_default();
-        let mut logger = Self::new(first_directive(&configured));
-        for directive in configured.split(',').skip(1) {
+        Self::from_directives(&configured)
+    }
+
+    /// Build a logger from a directive list.
+    fn from_directives(configured: &str) -> Self {
+        let mut logger = Self::new(first_directive(configured));
+        // Every segment is examined, not every one after the first: a list may
+        // lead with a directive (`oidc=debug,info`), and skipping the first
+        // would silently drop the only rule in it.
+        for directive in configured.split(',') {
             if let Some((prefix, level)) = directive.split_once('=') {
                 let prefix = prefix.trim();
                 if prefix.is_empty() {
@@ -268,6 +284,11 @@ impl StdoutLogger {
             return;
         }
 
+        // A test observing the rendered line reads it here. This is compiled
+        // only under `cfg(test)`, so production output is unchanged.
+        #[cfg(test)]
+        capture::record(&line);
+
         let mut stderr = io::stderr();
         write_line(&mut stderr, &line);
     }
@@ -302,7 +323,11 @@ impl StdoutLogger {
             .get("request_id")
             .and_then(|v| v.as_str())
             .unwrap_or("-");
-        let duration_ms = event.get("duration_ms").and_then(|v| v.as_u64());
+        // A duration may be fractional. `as_u64` would drop the fraction, and
+        // a sub-millisecond stage — the ones worth timing, since a fast cache
+        // hit and a query are otherwise indistinguishable — would read as
+        // zero, the same as a stage that was never measured.
+        let duration_ms = event.get("duration_ms").and_then(render_duration);
 
         let mut parts = Vec::with_capacity(event.len() + 4);
         // Header: [ts] LEVEL  req=XXXX
@@ -423,6 +448,132 @@ fn quote_if_needed(s: &str) -> String {
     } else {
         s.to_string()
     }
+}
+
+/// Render a `duration_ms` value for the line.
+///
+/// Whole numbers keep their integral form so an existing whole-millisecond line
+/// reads the same as before; a fractional one keeps its fraction, which is the
+/// only part that distinguishes a sub-millisecond stage from an unmeasured one.
+fn render_duration(value: &Value) -> Option<String> {
+    match value {
+        Value::Number(number) => {
+            if let Some(whole) = number.as_u64() {
+                Some(whole.to_string())
+            } else {
+                number.as_f64().map(|fractional| format!("{fractional}"))
+            }
+        }
+        _ => None,
+    }
+}
+
+/// Capture what the logger writes, for a test that has to observe a line
+/// rather than an event.
+///
+/// The logger writes to stderr or to the process-wide file sink, neither of
+/// which a test can read back. This records every rendered line in a buffer
+/// while a capture is installed, so a test can assert on the line an operator
+/// actually reads — which is where a formatting bug is invisible when the
+/// assertion is made against a structure instead.
+///
+/// The buffer is process-wide, and the test harness runs tests in parallel, so
+/// the guard counts holders rather than clearing the buffer: a second test
+/// that installs a capture while the first is running would otherwise erase
+/// the lines the first is about to assert on. Two tests running at once still
+/// see each other's lines, so a test that installs a capture should assert
+/// only on lines it can attribute to itself.
+#[cfg(test)]
+pub mod capture {
+    use std::sync::atomic::{AtomicUsize, Ordering};
+    use std::sync::{Mutex, OnceLock};
+
+    static CAPTURED: OnceLock<Mutex<Vec<String>>> = OnceLock::new();
+    static HOLDERS: AtomicUsize = AtomicUsize::new(0);
+
+    /// Ends the capture when dropped.
+    pub struct CaptureGuard;
+
+    impl CaptureGuard {
+        /// The lines written since a capture was installed.
+        #[must_use]
+        pub fn lines(&self) -> Vec<String> {
+            CAPTURED
+                .get()
+                .and_then(|lines| lines.lock().ok().map(|lines| lines.clone()))
+                .unwrap_or_default()
+        }
+    }
+
+    impl Drop for CaptureGuard {
+        fn drop(&mut self) {
+            // Only the last holder ends the capture, so a test that installs
+            // one while another is running does not cut it short.
+            if HOLDERS.fetch_sub(1, Ordering::SeqCst) == 1
+                && let Some(lines) = CAPTURED.get()
+                && let Ok(mut lines) = lines.lock()
+            {
+                lines.clear();
+            }
+        }
+    }
+
+    /// Starts capturing log output.
+    pub fn install() -> CaptureGuard {
+        let lines = CAPTURED.get_or_init(|| Mutex::new(Vec::new()));
+        if HOLDERS.fetch_add(1, Ordering::SeqCst) == 0
+            && let Ok(mut captured) = lines.lock()
+        {
+            captured.clear();
+        }
+        CaptureGuard
+    }
+
+    /// Record a rendered line, if a capture is installed.
+    pub(crate) fn record(line: &str) {
+        if let Some(captured) = CAPTURED.get()
+            && let Ok(mut lines) = captured.lock()
+        {
+            lines.push(line.to_owned());
+        }
+    }
+
+    /// Run `body` with a level override in effect, then restore.
+    ///
+    /// The logger reads `RUST_LOG` per call rather than caching it, so this is
+    /// what lets a test observe an event that the default level filters out
+    /// without mutating the process environment — which is global state the
+    /// parallel test harness shares, and which other tests read.
+    pub async fn with_level<F, Fut, T>(level: &str, body: F) -> T
+    where
+        F: FnOnce() -> Fut,
+        Fut: std::future::Future<Output = T>,
+    {
+        let previous = OVERRIDE_LEVEL.get_or_init(|| Mutex::new(None));
+        let prior = match previous.lock() {
+            Ok(mut slot) => {
+                let prior = slot.take();
+                *slot = Some(level.to_string());
+                prior
+            }
+            Err(_) => None,
+        };
+        let outcome = body().await;
+        if let Ok(mut slot) = previous.lock() {
+            *slot = prior;
+        }
+        outcome
+    }
+
+    /// The level a test has in force, if any, taking precedence over
+    /// `RUST_LOG`.
+    pub(crate) fn override_level() -> Option<String> {
+        OVERRIDE_LEVEL
+            .get()
+            .and_then(|slot| slot.lock().ok().and_then(|slot| slot.clone()))
+    }
+
+    static OVERRIDE_LEVEL: OnceLock<Mutex<Option<String>>> = OnceLock::new();
 }
 
 #[cfg(test)]
@@ -752,5 +903,45 @@ mod tests {
             "a valid directive after a malformed one still applies"
         );
         assert!(logger.is_event_enabled(LogLevel::Info, "http.request"));
+    }
+
+    /// Sub-millisecond steps are the ones worth timing. The stages of an
+    /// identity callback — unseal, exchange, validate — are often under a
+    /// millisecond, and truncating each to `0ms` reports every one of them as
+    /// zero, which is indistinguishable from a stage that was never measured.
+    /// That is exactly the signal needed to tell a cache hit from a query.
+    #[test]
+    fn a_sub_millisecond_duration_is_still_reported() {
+        let event = serde_json::json!({
+            "op": "oidc.callback_stage",
+            "stage": "unseal",
+            "duration_ms": 0.42,
+        });
+        let event: std::collections::HashMap<String, Value> = event
+            .as_object()
+            .expect("object")
+            .iter()
+            .map(|(k, v)| (k.clone(), v.clone()))
+            .collect();
+
+        let line = StdoutLogger::format_event_line(&event, LogLevel::Debug);
+
+        assert!(
+            line.contains("duration_ms=0.42"),
+            "a sub-millisecond step must not be reported as zero: {line}"
+        );
+    }
+
+    /// A duration given as a whole number still renders as a whole number:
+    /// the sub-millisecond support must not add a decimal to every line.
+    #[test]
+    fn a_whole_duration_is_unchanged() {
+        let mut event = std::collections::HashMap::new();
+        event.insert("op".to_string(), Value::from("oidc.callback_stage"));
+        event.insert("duration_ms".to_string(), Value::from(271u64));
+
+        let line = StdoutLogger::format_event_line(&event, LogLevel::Info);
+
+        assert!(line.contains("duration_ms=271"), "{line}");
     }
 }
