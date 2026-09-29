@@ -180,7 +180,7 @@ impl OidcClient {
         // echo request content.
         let status = resp.status();
         if !status.is_success() {
-            eprintln!("memory_mcp::control::oidc: code exchange rejected status={status}");
+            log_exchange_rejection(status.as_u16(), None);
             return Err(AuthError::Provider(format!(
                 "token endpoint returned {status}"
             )));
@@ -195,10 +195,7 @@ impl OidcClient {
             .get("id_token")
             .and_then(|v| v.as_str())
             .ok_or_else(|| {
-                eprintln!(
-                    "memory_mcp::control::oidc: code exchange rejected status={status} \
-                     reason=no_id_token"
-                );
+                log_exchange_rejection(status.as_u16(), Some("no_id_token"));
                 AuthError::MalformedToken
             })?
             .to_string();
@@ -360,6 +357,23 @@ fn form_urlencode_component(value: &str) -> String {
         }
     }
     encoded
+}
+
+/// Record that the provider refused a code exchange, through the deployment's
+/// logger.
+///
+/// The status is the whole signal — a refused exchange answers 503,
+/// indistinguishable from a JWKS or transport failure without it — and the
+/// response body is deliberately not read, because a provider's
+/// `error_description` can echo request content back.
+fn log_exchange_rejection(status: u16, reason: Option<&str>) {
+    let mut event = std::collections::HashMap::new();
+    event.insert("op".into(), "oidc.code_exchange_rejected".into());
+    event.insert("provider_status".into(), status.to_string().into());
+    if let Some(reason) = reason {
+        event.insert("reason".into(), reason.to_string().into());
+    }
+    crate::logging::StdoutLogger::from_env().log(event, crate::logging::LogLevel::Warn);
 }
 
 #[cfg(test)]

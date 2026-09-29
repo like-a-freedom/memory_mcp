@@ -37,25 +37,64 @@ use super::sealing::{identity_subject_verifier, seal_oidc_payload, unseal_oidc_p
 /// these branches took latency measurements against a live provider instead of
 /// a log line.
 ///
+/// Build the structured event for one refusal on this path.
+///
+/// An event rather than a rendered line, so it carries what every other log
+/// line in the process carries: a timestamp, a level, and the request id. The
+/// id is what makes a refusal joinable to its access-log entry, which is the
+/// only way to tell one refused sign-in from another.
+///
 /// Bounded by construction: callers pass a static branch tag and a detail built
 /// from labels, lengths and `AuthError`'s display. Never the ID token, the
 /// authorization code, the code verifier, the nonce value, or `sub`.
-fn rejection_line(branch: &'static str, detail: &str) -> String {
-    let detail = detail.trim();
-    if detail.is_empty() {
-        format!("memory_mcp::control::oidc: callback rejected branch={branch}")
-    } else {
-        format!("memory_mcp::control::oidc: callback rejected branch={branch} {detail}")
+fn rejection_event(
+    branch: &'static str,
+    detail: &str,
+    request_id: Option<uuid::Uuid>,
+) -> std::collections::HashMap<String, serde_json::Value> {
+    let mut event = std::collections::HashMap::new();
+    event.insert("op".into(), "oidc.callback_rejected".into());
+    event.insert("branch".into(), branch.into());
+    if let Some(id) = request_id {
+        event.insert("request_id".into(), id.to_string().into());
     }
+    for field in detail.split_whitespace() {
+        if let Some((key, value)) = field.split_once('=') {
+            // A detail cannot relabel the event: the keys the event already
+            // sets are not overwritten, so `branch=` inside a detail is ignored
+            // rather than shadowing the real branch.
+            event
+                .entry(key.to_string())
+                .or_insert_with(|| value.to_string().into());
+        }
+    }
+    // `kind` quotes an `AuthError`, whose display is prose, so it runs past the
+    // space the loop splits on. It is taken whole: cutting it at the first
+    // space would report `kind=token` for a refusal that was actually about an
+    // algorithm, which is the diagnosis this field exists to give.
+    if let Some((_, prose)) = detail.split_once("kind=") {
+        event.insert("kind".into(), prose.trim().to_string().into());
+    }
+    event
 }
 
-/// Refuse the callback and say why on stderr.
+/// Record one refusal through the deployment's logger.
+///
+/// The logger is the process-wide one configured from `RUST_LOG`, so a refused
+/// sign-in is filtered by the same level as everything else and reaches
+/// `MEMORY_LOG_FILE` when one is installed.
+fn log_rejection(branch: &'static str, detail: &str, request_id: Option<uuid::Uuid>) {
+    use crate::logging::{LogLevel, StdoutLogger};
+    StdoutLogger::from_env().log(rejection_event(branch, detail, request_id), LogLevel::Warn);
+}
+
+/// Refuse the callback and say why.
 ///
 /// Only for refusals that really are the caller's fault. An error that must
 /// keep its own status — a JWKS or provider outage is 503, not 401 — goes
 /// through [`reject_erroring`] instead, so the log and the HTTP status agree.
 fn reject(branch: &'static str) -> ApiError {
-    eprintln!("{}", rejection_line(branch, ""));
+    log_rejection(branch, "", None);
     ApiError::Unauthorized
 }
 
@@ -65,7 +104,7 @@ fn reject(branch: &'static str) -> ApiError {
 /// own status — a JWKS or provider outage is 503, not 401 — goes through
 /// [`reject_erroring`] instead, so the log and the HTTP status agree.
 fn reject_with(branch: &'static str, detail: impl std::fmt::Display) -> ApiError {
-    eprintln!("{}", rejection_line(branch, &detail.to_string()));
+    log_rejection(branch, &detail.to_string(), None);
     ApiError::Unauthorized
 }
 
@@ -81,7 +120,7 @@ fn reject_erroring(
     detail: impl std::fmt::Display,
     error: ApiError,
 ) -> ApiError {
-    eprintln!("{}", rejection_line(branch, &detail.to_string()));
+    log_rejection(branch, &detail.to_string(), error.request_id());
     error
 }
 
@@ -645,6 +684,14 @@ async fn issue_session(
 mod tests {
     use super::super::flow_material::AuthError;
     use super::*;
+    use crate::logging::{LogLevel, StdoutLogger};
+
+    /// Render an event the way the process would, so a test asserts the line an
+    /// operator reads rather than the structure behind it.
+    fn render(event: &std::collections::HashMap<String, serde_json::Value>) -> String {
+        StdoutLogger::format_event_line(event, LogLevel::Warn)
+    }
+
     use crate::http::registry::models::{Account, AccountStatus};
     use crate::http::registry::storage::{AccountStore, InMemoryStore};
     use std::sync::Arc;
@@ -665,14 +712,20 @@ mod tests {
     /// disclosure.
     #[test]
     fn a_refusal_line_names_its_branch_and_leaks_nothing() {
-        assert_eq!(
-            rejection_line("state_mismatch", ""),
-            "memory_mcp::control::oidc: callback rejected branch=state_mismatch"
+        let minimal = render(&rejection_event("state_mismatch", "", None));
+        assert!(
+            minimal.contains("op=oidc.callback_rejected"),
+            "every refusal is one greppable operation: {minimal}"
         );
-        assert_eq!(
-            rejection_line("id_token", "kind=token algorithm is not allowed"),
-            "memory_mcp::control::oidc: callback rejected branch=id_token \
-             kind=token algorithm is not allowed"
+        assert!(minimal.contains("branch=state_mismatch"), "{minimal}");
+        assert!(
+            render(&rejection_event(
+                "id_token",
+                "kind=token algorithm is not allowed",
+                None
+            ))
+            .contains(r#"token algorithm is not allowed"#),
+            "the prose must not be cut at the first space"
         );
         // Every branch the callback can refuse on. A new refusal without a
         // tag here is a refusal an operator cannot tell apart from the rest.
@@ -685,10 +738,11 @@ mod tests {
             "id_token",
             "nonce",
         ] {
-            let line = rejection_line(branch, "");
-            assert!(
-                line.contains(&format!("branch={branch}")),
-                "the branch must survive into the line: {line}"
+            let event = rejection_event(branch, "", None);
+            assert_eq!(
+                event.get("branch").and_then(|v| v.as_str()),
+                Some(branch),
+                "the branch must survive into the event"
             );
         }
     }
@@ -699,7 +753,7 @@ mod tests {
     /// enough to tell them apart without ever recording the nonce itself.
     #[test]
     fn a_nonce_detail_reports_shape_rather_than_value() {
-        let line = rejection_line(
+        let line = render(&rejection_event(
             "nonce",
             &format!(
                 "token_present={} token_len={} stored_len={}",
@@ -707,7 +761,8 @@ mod tests {
                 OidcNonce::new().as_str().len(),
                 OidcNonce::new().as_str().len()
             ),
-        );
+            None,
+        ));
 
         assert!(line.contains("token_present=true"), "{line}");
         assert!(!line.contains("nonce="), "must not echo a nonce: {line}");
@@ -721,8 +776,11 @@ mod tests {
     /// working under `invite_only` were indistinguishable from the browser.
     #[test]
     fn the_signup_gate_records_its_own_branch() {
-        let line = rejection_line("signup_invite_only", "mode=invite_only");
-        assert!(line.contains("branch=signup_invite_only"), "{line}");
+        let event = rejection_event("signup_invite_only", "mode=invite_only", None);
+        assert_eq!(
+            event.get("branch").and_then(|v| v.as_str()),
+            Some("signup_invite_only")
+        );
     }
 
     /// The gate refuses with 403, not 401: the provider authenticated the
@@ -743,6 +801,58 @@ mod tests {
         );
     }
 
+    /// A refusal has to be findable the way every other log line is. These used
+    /// to go to stderr as free text with no timestamp, no level and no request
+    /// id, so the one class of event an operator most needs — a sign-in that
+    /// was refused — was the one that could not be joined to the access log or
+    /// filtered by level.
+    ///
+    /// The rendered line is the observable: it is what an operator greps.
+    #[test]
+    fn a_refusal_renders_as_a_structured_event() {
+        let line = StdoutLogger::format_event_line(
+            &rejection_event(
+                "take_oidc_request",
+                "reason=expired",
+                Some(uuid::Uuid::parse_str("11111111-2222-3333-4444-555555555555").unwrap()),
+            ),
+            crate::logging::LogLevel::Warn,
+        );
+
+        assert!(line.contains("WARN"), "the line must carry a level: {line}");
+        assert!(
+            line.contains("req=11111111"),
+            "the line must carry the request id: {line}"
+        );
+        assert!(
+            line.contains("op=oidc.callback_rejected"),
+            "the line must be greppable by operation: {line}"
+        );
+        assert!(line.contains("branch=take_oidc_request"), "{line}");
+        assert!(line.contains("reason=expired"), "{line}");
+        // A timestamp is what makes the line sortable against every other.
+        assert!(
+            line.starts_with('[') && line.contains('T'),
+            "the line must start with a timestamp: {line}"
+        );
+    }
+
+    /// The event must never carry the values the module documents as secret —
+    /// the token, the code, the nonce, the subject. A refusal line is the most
+    /// read line in a deployment, so it is the one most worth asserting.
+    #[test]
+    fn a_refusal_event_carries_no_secret() {
+        let event = rejection_event(
+            "id_token",
+            "token_present=1 token_len=0 stored_len=64",
+            None,
+        );
+        let line = StdoutLogger::format_event_line(&event, crate::logging::LogLevel::Warn);
+        assert!(!line.contains("token="), "{line}");
+        assert!(!line.contains("nonce="), "{line}");
+        assert!(!line.contains("code="), "{line}");
+    }
+
     /// The ID-token detail is the provider's error string. `AuthError` is
     /// already a bounded `thiserror` display — a variant label plus two public
     /// header values, never the token — so it can be logged verbatim.
@@ -751,7 +861,7 @@ mod tests {
     /// that does not name them has to be diagnosed from configuration alone.
     #[test]
     fn an_id_token_detail_names_the_algorithm_and_key_id() {
-        let line = rejection_line(
+        let line = render(&rejection_event(
             "id_token",
             &format!(
                 "kind={}",
@@ -760,11 +870,12 @@ mod tests {
                     kid: "key-7".into(),
                 }
             ),
-        );
+            None,
+        ));
 
         assert!(
-            line.contains("kind=token algorithm is not allowed"),
-            "{line}"
+            line.contains(r#"kind="token algorithm is not allowed: alg=RS384 kid=key-7""#),
+            "the prose must survive whole, quoted as one value: {line}"
         );
         assert!(line.contains("alg=RS384"), "{line}");
         assert!(line.contains("kid=key-7"), "{line}");

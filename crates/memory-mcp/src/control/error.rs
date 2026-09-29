@@ -60,6 +60,23 @@ impl ApiError {
     }
 }
 
+/// Record an internal error through the deployment's logger.
+///
+/// At `error` level and never below: this is the class of failure a support
+/// conversation starts from, and `RUST_LOG=error` is exactly the setting an
+/// operator reaches for when something is broken. It used to be an
+/// `eprintln!`, which that setting could not suppress and which carried no
+/// level, no timestamp and no request id.
+fn log_internal_error(detail: &str, request_id: Option<uuid::Uuid>) {
+    let mut event = std::collections::HashMap::new();
+    event.insert("op".into(), "control.internal_error".into());
+    event.insert("error".into(), detail.to_string().into());
+    if let Some(id) = request_id {
+        event.insert("request_id".into(), id.to_string().into());
+    }
+    crate::logging::StdoutLogger::from_env().log(event, crate::logging::LogLevel::Error);
+}
+
 impl IntoResponse for ApiError {
     fn into_response(self) -> Response {
         // Unwrap first: the `At` wrapper carries the id and nothing else, so
@@ -84,9 +101,13 @@ impl IntoResponse for ApiError {
                 "recent authentication required",
             ),
             // Internal details are logged server-side; the response body stays
-            // generic and carries only a correlation id for support.
+            // generic and carries only a correlation id for support. The log
+            // goes through the deployment's logger, so it carries the level,
+            // the timestamp and the request id — an internal error is the one
+            // event a support conversation starts from, and it used to be the
+            // one line that could not be joined to the request that caused it.
             ApiError::Internal(error) => {
-                eprintln!("memory_mcp::control: internal API error: {error}");
+                log_internal_error(&error.to_string(), request_id);
                 (
                     StatusCode::INTERNAL_SERVER_ERROR,
                     "internal_error",
@@ -96,7 +117,7 @@ impl IntoResponse for ApiError {
             // Unreachable: the wrapper was unwrapped above. Rendered as a 500
             // rather than panicking in a request path.
             ApiError::At { .. } => {
-                eprintln!("memory_mcp::control: internal API error: nested request binding");
+                log_internal_error("nested request binding", request_id);
                 (
                     StatusCode::INTERNAL_SERVER_ERROR,
                     "internal_error",
