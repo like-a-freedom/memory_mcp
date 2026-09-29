@@ -24,6 +24,10 @@ use sha2::{Digest, Sha256};
 /// The two programs a release ships.
 const PROGRAMS: [&str; 2] = ["memory_mcp", "memory_mcp_http"];
 
+/// Sidecar file name patterns, by the platform that produces them. `*.so*`
+/// covers both a bare library and its versioned variants (`libfoo.so.1`).
+const LIBRARY_PATTERNS: [&str; 3] = ["*.dll", "*.so*", "*.dylib"];
+
 /// Environment prefixes cleared before the binary under test runs. The smoke
 /// test drives a real server on a real embedded database, so any inherited
 /// deployment configuration would point it at someone else's instance.
@@ -82,21 +86,25 @@ impl From<std::io::Error> for PackError {
 
 type Result<T> = std::result::Result<T, PackError>;
 
-/// Package the binaries in `build_dir` for `target`, into `./dist`.
+/// Package the binaries in `build_dir` for `target`, writing the artifacts and
+/// their checksums into `dist`.
 ///
 /// `target` is the Rust target triple: it names the archive, decides the
 /// archive format (Windows gets a zip) and decides whether a standalone
 /// single-file download is possible.
-pub fn package(build_dir: &Path, target: &str) -> Result<Vec<PathBuf>> {
+///
+/// `dist` is a parameter rather than a hardcoded `./dist` so the packaging tests
+/// can assert on it without changing the process's working directory, which is
+/// global state the parallel test harness shares.
+pub fn package(build_dir: &Path, target: &str, dist: &Path) -> Result<Vec<PathBuf>> {
     let windows = target.contains("windows");
     let suffix = if windows { ".exe" } else { "" };
 
-    let dist = PathBuf::from("dist");
     if !dist.is_dir() {
-        fs::create_dir_all(&dist).map_err(|e| (dist.clone(), e))?;
+        fs::create_dir_all(dist).map_err(|e| (dist.to_path_buf(), e))?;
     }
 
-    let work = tempfile::tempdir().map_err(|e| (dist.clone(), e))?;
+    let work = tempfile::tempdir().map_err(|e| (dist.to_path_buf(), e))?;
     let bundle = work.path().join("bundle");
     fs::create_dir_all(&bundle).map_err(|e| (bundle.clone(), e))?;
 
@@ -110,21 +118,24 @@ pub fn package(build_dir: &Path, target: &str) -> Result<Vec<PathBuf>> {
 
     // Dynamic libraries the native dependency build produced ship next to the
     // executables: the bundled folder must be runnable on a machine that has
-    // none of this project's build dependencies.
+    // none of this project's build dependencies. The build directory is read
+    // once — the three patterns are alternatives, not three passes over it.
     let mut has_sidecar = false;
-    for pattern in ["*.dll", "*.so*", "*.dylib"] {
-        for entry in read_dir_sorted(build_dir)? {
-            let name = entry
-                .file_name()
-                .map(|name| name.to_string_lossy().into_owned())
-                .unwrap_or_default();
-            if !matches_pattern(&name, pattern) {
-                continue;
-            }
-            has_sidecar = true;
-            let destination = bundle.join(&name);
-            fs::copy(&entry, &destination).map_err(|e| (destination.clone(), e))?;
+    let build_entries = read_dir_sorted(build_dir)?;
+    for entry in &build_entries {
+        let name = entry
+            .file_name()
+            .map(|name| name.to_string_lossy().into_owned())
+            .unwrap_or_default();
+        if !LIBRARY_PATTERNS
+            .iter()
+            .any(|pattern| matches_pattern(&name, pattern))
+        {
+            continue;
         }
+        has_sidecar = true;
+        let destination = bundle.join(&name);
+        fs::copy(entry, &destination).map_err(|e| (destination.clone(), e))?;
     }
 
     let license = bundle.join("LICENSE");
@@ -304,6 +315,14 @@ fn smoke(programs: &[PathBuf], work: &Path) -> Result<()> {
 
     // A live HTTP deployment needs explicit databases and credentials, so the
     // configuration parser is where this binary has to be shown to reach.
+    //
+    // Both conditions are required, not just the exit code: `memory_mcp_http`
+    // exits `2` from three places — `config error:` for a missing deployment
+    // variable, `config invalid:` for a malformed one, and
+    // `validate_no_listener_env` for a listener variable set in a stdio-only
+    // context. An invalid bind reaches the third. The message is what proves
+    // the parser was reached and named the cause, so a binary that started and
+    // died for an unrelated reason cannot pass as a configuration check.
     let mut command = Command::new(http);
     command
         .env_clear()
@@ -315,10 +334,11 @@ fn smoke(programs: &[PathBuf], work: &Path) -> Result<()> {
     let output = command
         .output()
         .map_err(|error| PackError::Smoke(format!("the HTTP binary did not run: {error}")))?;
-    if output.status.code() != Some(2) {
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    if output.status.code() != Some(2) || !stderr.contains("config error:") {
         return Err(PackError::Smoke(format!(
-            "HTTP configuration smoke failed: {}",
-            String::from_utf8_lossy(&output.stderr)
+            "HTTP configuration smoke failed: status={:?}, stderr={stderr}",
+            output.status.code()
         )));
     }
 
@@ -657,16 +677,12 @@ mod tests {
             }
         }
         fs::write(dir.path().join("LICENSE"), "licence").expect("licence");
+        let dist = dir.path().join("dist");
 
-        // `package` writes into `./dist`, so the assertion is made against a
-        // scratch working directory rather than the repository's own.
-        let cwd = std::env::current_dir().expect("cwd");
-        std::env::set_current_dir(dir.path()).expect("enter scratch");
-        let outcome = package(&build, "x86_64-unknown-linux-gnu");
-        std::env::set_current_dir(cwd).expect("restore cwd");
+        let outcome = package(&build, "x86_64-unknown-linux-gnu", &dist);
 
         assert!(outcome.is_err(), "a stub binary must not be packaged");
-        let produced: Vec<_> = fs::read_dir(dir.path().join("dist"))
+        let produced: Vec<_> = fs::read_dir(&dist)
             .map(|entries| {
                 entries
                     .filter_map(|entry| entry.ok())

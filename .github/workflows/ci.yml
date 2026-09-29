@@ -226,14 +226,22 @@ jobs:
         run: |
           set -euo pipefail
           # The console is embedded at compile time, so the shipped image must
-          # not also carry the bundle as files: a sidecar that the binary never
-          # reads is dead weight, and a future reader would reasonably assume
-          # the one on disk is the one being served.
+          # not also carry the bundle as files: a sidecar the binary never reads
+          # is dead weight, and a future reader would reasonably assume the one
+          # on disk is the one being served.
+          #
+          # `grep -q` is deliberately avoided. It exits on the first match and
+          # closes the pipe, so `docker export` dies of SIGPIPE and `pipefail`
+          # turns a *found* sidecar into a passing check. Draining the stream
+          # and testing the captured text keeps the original semantics: the
+          # archive is read to EOF, and the answer comes from what was in it.
           container_id="$(docker create memory-mcp-http:local)"
           trap 'docker rm "${container_id}" >/dev/null' EXIT
-          if docker export "${container_id}" | tar -tf - \
-            | grep -qE '(^|/)src/ui-dist(/|$)'; then
-            echo 'the final image ships the UI bundle as a sidecar' >&2
+          sidecars="$(docker export "${container_id}" | tar -tf - \
+            | grep -E '(^|/)src/ui-dist(/|$)' || true)"
+          if [ -n "${sidecars}" ]; then
+            echo "the final image ships the UI bundle as a sidecar:" >&2
+            echo "${sidecars}" >&2
             exit 1
           fi
       - name: Start the HTTP service and probe liveness
@@ -315,18 +323,46 @@ jobs:
               exit 1
             }
           done
-          # The WebAssembly module is fetched by path from inside the loaded
-          # JavaScript, so its presence in the document's own references is not
-          # guaranteed.
-          wasm_path="$(printf '%s' "${document}" | grep -oE '/[^"]+\.wasm' | head -1)"
+          # The WebAssembly module is *not* referenced by the document: `dx
+          # bundle` emits a `<script type="module">` and `<link rel=preload>`,
+          # and the loader requests the `.wasm` by path from inside the
+          # JavaScript it has already loaded. So the document is followed into
+          # the script it names, and the module is read out of that — grepping
+          # the document alone would find nothing and pass for the wrong reason.
+          script_path="$(printf '%s' "${document}" \
+            | grep -oE 'src="[^"]+\.js"' | head -1 | sed -E 's/^src="//; s/"$//')"
+          test -n "${script_path}"
+          wasm_path="$(fetch "${base}${script_path}" | grep -oE '/[^"]+\.wasm' | head -1)"
           test -n "${wasm_path}"
           test "$(curl --fail --silent --show-error -H 'Host: localhost' \
             -o /dev/null --write-out '%{content_type}' "${base}${wasm_path}")" \
             = "application/wasm"
           # The security headers must hold on the image, not only in a test
-          # fixture, because the SPA cannot boot without the WASM token.
-          test "$(curl --fail --silent --show-error -I -H 'Host: localhost' \
-            "${base}/" | grep -ci "content-security-policy:.*wasm-unsafe-eval")" = "1"
+          # fixture, because the SPA cannot boot without the WASM token. The
+          # header is read as a value rather than counted, so a folded or
+          # duplicated header cannot pass by accident.
+          csp="$(curl --fail --silent --show-error -I -H 'Host: localhost' \
+            "${base}/" | tr -d '\r' \
+            | sed -n 's/^[Cc]ontent-[Ss]ecurity-[Pp]olicy: *//p')"
+          case "${csp}" in
+            *wasm-unsafe-eval*) ;;
+            *)
+              echo "the shipped image serves no CSP permitting WebAssembly: ${csp}" >&2
+              exit 1
+              ;;
+          esac
+          # The host allowlist is part of the contract, and the UI surface sits
+          # behind the same boundary as every other route: a Host the
+          # deployment does not list must be refused for the document and for
+          # the assets too, not only for the routes registered before the
+          # allowlist layer.
+          for path in / "${script_path}"; do
+            test "$(curl --silent --output /dev/null --write-out '%{http_code}' \
+              -H 'Host: not-allowlisted.example' "${base}${path}")" = "403" || {
+              echo "an unlisted Host was served ${path} instead of refused" >&2
+              exit 1
+            }
+          done
       - name: Log in to GitHub Container Registry
         if: ${{ github.ref == 'refs/heads/master' || inputs.release }}
         uses: docker/login-action@v3

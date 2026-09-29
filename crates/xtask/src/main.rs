@@ -41,13 +41,18 @@ enum Command {
         /// Directory holding the bundle, e.g. `/src/ui-dist/public`.
         dist: PathBuf,
     },
+    /// Require the image's Dioxus CLI version to match the UI crate's pin.
+    CheckDioxusPin,
 }
 
 fn main() -> std::process::ExitCode {
     let cli = Cli::parse();
     let result = match cli.command {
-        Command::Package { build_dir, target } => pack::package(&build_dir, &target).map(|_| ()),
+        Command::Package { build_dir, target } => {
+            pack::package(&build_dir, &target, &PathBuf::from("dist")).map(|_| ())
+        }
         Command::CheckUiBundle { dist } => bundle::check(&dist),
+        Command::CheckDioxusPin => bundle::check_cli_pin(),
     };
     match result {
         Ok(()) => std::process::ExitCode::SUCCESS,

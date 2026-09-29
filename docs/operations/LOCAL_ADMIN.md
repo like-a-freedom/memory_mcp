@@ -61,12 +61,13 @@ All of the following were executed in this repository and passed:
 | Provisioning crash recovery | `... --test http_crash_recovery` — 11 passed |
 | Whole conformance suite | `cargo test -p memory_mcp --features control-plane,test-fixtures --locked` and `cargo test -p memory_mcp --locked` — every target green |
 | UI crate | `cargo test -p ui --locked` — 87 passed; `cargo check -p ui --target wasm32-unknown-unknown` and the matching `cargo clippy … -D warnings` clean |
-| Static assets + CSP | `MEMORY_MCP_UI_DIST=<abs dist> cargo test -p memory_mcp --lib --features ui,test-fixtures --locked control::static_assets` — 7 passed |
+| Static assets + CSP | `MEMORY_MCP_UI_DIST=<abs dist> cargo test -p memory_mcp --lib --features streamable-http,test-fixtures --locked ui::assets` — 24 passed, plus the `ui_assets` integration test |
 | Format, lint, non-default builds | `cargo fmt --all --check`; `cargo clippy --workspace --all-targets --features … --locked -- -D warnings` for all four documented feature combinations; `cargo check -p memory_mcp --no-default-features --locked` and `--features streamable-http` |
 | End-to-end against the real binaries | `local_admin_cli.rs`, `http_local_admin.rs` and `http_crash_recovery.rs` — activation, session, client create/list/get, provisioning, restart persistence, and the negative route/CSRF/Origin checks, driven through the same CLI and HTTP surface an operator uses |
 | Packaged image over real TLS | `docker build --tag memory-mcp-http:test .` then the `docker` job's smoke configuration — the image serves `/` and every asset it references from the binary alone, the WASM comes back as `application/wasm`, and the CSP carries `'wasm-unsafe-eval'` |
 | Release artifact | `cargo run -p xtask -- package target/<triple>/debug <triple>` — stages both programs and the licence, smoke-tests the real binary (`--version`, `init`, `ingest` through both extractors, a real MCP `initialize` over stdin, clean shutdown), and writes the archive with its `.sha256`. Nothing is produced if any step fails |
 | Console bundle shape | `cargo run -p xtask -- check-ui-bundle <dist>` — one document, one script, one module, one stylesheet, and the base-path sentinel present so the bundle can be relocated to a deployment prefix |
+| Dioxus CLI matches the UI crate's pin | `cargo run -p xtask -- check-dioxus-pin` — the image's `DIOXUS_CLI_VERSION` equals the crate's `dioxus` requirement, because the CLI carries the framework it compiles against |
 | Compose file resolves | `docker compose --env-file <operator env> config --quiet` — the single runtime file resolves |
 
 ### What is NOT verified
@@ -176,7 +177,7 @@ Run from the repository root.
 | `cargo clippy --workspace --all-targets --features fs-watch,mcp-apps,streamable-http,control-plane,test-fixtures --locked -- -D warnings` | ✅ executed, clean |
 | `cargo clippy ... --features ...,ui,test-fixtures ...` | ✅ executed, clean (with `MEMORY_MCP_UI_DIST` set) |
 | `cargo test -p memory_mcp --lib --features control-plane,test-fixtures --locked local_admin_remote_replica_races -- --ignored` | ⚠️ not executed (needs an isolated remote SurrealDB 3.2.4 and the three `LOCAL_ADMIN_TEST_CONTROL_*` variables); the test is now an inline adapter test, so the command selects it, and running it without the variables **fails** rather than skipping |
-| `MEMORY_MCP_UI_DIST=<abs dist> cargo test -p memory_mcp --lib --features ui,test-fixtures --locked control::static_assets` | ✅ executed, 7 passed — the build script requires an absolute, non-symlink dist directory containing a non-empty `index.html` |
+| `MEMORY_MCP_UI_DIST=<abs dist> cargo test -p memory_mcp --lib --features streamable-http,test-fixtures --locked ui::assets` | ✅ executed, 24 passed — the build script requires an absolute, non-symlink dist directory containing a non-empty `index.html`. The module is `ui::assets`, not `control::static_assets`: the delivery adapter moved out of `control/` when the UI became a module of its own |
 | `MEMORY_MCP_UI_DIST=<abs dist> cargo test -p memory_mcp --features ui,test-fixtures --locked --test http_local_admin` | ✅ executed, 42 passed |
 | `docker compose --env-file <operator env> config --quiet` | ✅ executed, the single runtime file resolves. The browser method set is a runtime value, so the provider half resolves from the same file rather than from a second overlay. The file alone still fails by design: it refuses to default any secret |
 | `docker build --tag memory-mcp-local-admin:test .` | ✅ executed, `25/25 FINISHED`. A cold build is dominated by the `ui-builder` WASM cargo layer — one observed cold run was still at `17/24` after 30 minutes, with that layer alone at ~1596 s — while a warm-cache rebuild finished in ~193 s. Give the build a generous timeout; do not read a slow cold build as a failure |
@@ -421,7 +422,7 @@ violates the following Content Security policy directive because 'unsafe-eval' i
 not an allowed source of script … "script-src 'self'"
 ```
 
-`control::static_assets::CONTENT_SECURITY_POLICY` carries
+`ui::assets::CONTENT_SECURITY_POLICY` carries
 `script-src 'self' 'wasm-unsafe-eval'`. That token permits WebAssembly
 compilation only; JavaScript `eval`, `new Function` and inline script stay
 blocked, and the unit test asserts exactly that (present `'wasm-unsafe-eval'`,

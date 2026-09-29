@@ -20,14 +20,82 @@ use std::path::Path;
 use crate::pack::PackError;
 
 /// The literal `crates/ui` writes into every prefix-dependent URL. It must
-/// match `BASE_PATH_SENTINEL` in `crates/memory-mcp/src/control/static_assets.rs`
-/// and `crates/ui/src/base.rs`.
+/// match `BASE_PATH_SENTINEL` in `crates/memory-mcp/src/ui/assets.rs`, the
+/// favicon href in `crates/ui/index.html`, and the `--base-path` argument in the
+/// `Dockerfile`'s `dx bundle` invocation.
 pub const BASE_PATH_SENTINEL: &str = "/__memory_mcp_base__";
 
 /// One file per kind: a bundle carrying a second `.wasm` is carrying a
 /// previous build's.
 const SINGLETON_SUFFIXES: [(&str, &str); 3] =
     [("js", "script"), ("wasm", "module"), ("css", "stylesheet")];
+
+/// The console's framework pin, and the image's CLI pin. Neither file mentions
+/// the other, so nothing but this check relates them.
+const UI_MANIFEST: &str = "crates/ui/Cargo.toml";
+const DOCKERFILE: &str = "Dockerfile";
+
+/// Require the Dioxus CLI the image installs to be the version the UI crate
+/// compiles against.
+///
+/// The CLI bundles the framework it carries, so an image shipping one version
+/// while the crate pins another builds a bundle that pin never verified. The
+/// Python check that used to assert this was removed with the rest of
+/// `scripts/ci`; this is its replacement, and the reason the pin is still
+/// checked at all.
+pub fn check_cli_pin() -> Result<(), PackError> {
+    let dockerfile = read_repository_file(DOCKERFILE)?;
+    let pinned = dioxus_cli_arg(&dockerfile).ok_or_else(|| {
+        PackError::Bundle(format!("{DOCKERFILE} no longer pins DIOXUS_CLI_VERSION"))
+    })?;
+    let manifest = read_repository_file(UI_MANIFEST)?;
+    let required = dioxus_requirement(&manifest).ok_or_else(|| {
+        PackError::Bundle(format!("{UI_MANIFEST} no longer declares a dioxus version"))
+    })?;
+
+    if pinned != required {
+        return Err(PackError::Bundle(format!(
+            "the image would build the console with dioxus-cli {pinned}, but the UI \
+             crate pins dioxus ={required}. The CLI carries the framework it \
+             compiles against, so the two must be the same version."
+        )));
+    }
+    Ok(())
+}
+
+/// The `DIOXUS_CLI_VERSION` the `Dockerfile` installs.
+fn dioxus_cli_arg(dockerfile: &str) -> Option<String> {
+    dockerfile
+        .lines()
+        .filter_map(|line| line.trim().strip_prefix("ARG DIOXUS_CLI_VERSION="))
+        .find_map(|value| value.split_whitespace().next())
+        .map(str::to_owned)
+}
+
+/// The version the UI crate requires, without the `=` an exact requirement
+/// carries.
+fn dioxus_requirement(manifest: &str) -> Option<String> {
+    let line = manifest
+        .lines()
+        .find(|line| line.trim_start().starts_with("dioxus") && line.contains("version"))?;
+    let value = line.split_once("version")?.1;
+    let version = value.split('"').nth(1)?;
+    Some(version.trim_start_matches('=').to_owned())
+}
+
+/// Read a repository file, resolved from this crate's manifest directory so the
+/// command works from any working directory.
+fn read_repository_file(relative: &str) -> Result<String, PackError> {
+    let root = Path::new(env!("CARGO_MANIFEST_DIR"))
+        .parent()
+        .and_then(Path::parent)
+        .ok_or_else(|| {
+            PackError::Bundle("cannot locate the repository root from the manifest".into())
+        })?;
+    let path = root.join(relative);
+    fs::read_to_string(&path)
+        .map_err(|error| PackError::Bundle(format!("cannot read {}: {error}", path.display())))
+}
 
 /// Require `dist` to be a bundle `build.rs` can embed and a browser can boot.
 pub fn check(dist: &Path) -> Result<(), PackError> {
@@ -191,5 +259,31 @@ mod tests {
         ]);
         let error = check(dir.path()).expect_err("no wasm");
         assert!(error.to_string().contains("module"), "{error}");
+    }
+
+    /// The real repository: the CLI the image installs must be the framework
+    /// the UI crate pins. This is the check `test_ui_bundle_pin.py` used to
+    /// provide, and the only thing relating the two files.
+    #[test]
+    fn the_images_dioxus_cli_matches_the_ui_crates_pin() {
+        check_cli_pin().expect("the Dioxus CLI pin must equal the crate's dioxus requirement");
+    }
+
+    /// The parsers, so the check above cannot pass by finding nothing. A
+    /// `Dockerfile` with no `ARG` and a manifest with no `dioxus` requirement
+    /// must both read as absent rather than as a silent match.
+    #[test]
+    fn the_pin_is_read_from_both_files_and_absent_reads_as_absent() {
+        let dockerfile = "ARG DIOXUS_CLI_VERSION=0.7.10\nRUN cargo install dioxus-cli\n";
+        assert_eq!(dioxus_cli_arg(dockerfile).as_deref(), Some("0.7.10"));
+        assert_eq!(dioxus_cli_arg("ARG WASM_TARGET=wasm32"), None);
+        assert_eq!(dioxus_cli_arg("# ARG DIOXUS_CLI_VERSION=0.7.10"), None);
+
+        // An exact requirement carries the `=`; a caret one does not.
+        let manifest = "[dependencies]\ndioxus = { version = \"=0.7.10\", features = [\"web\"] }\n";
+        assert_eq!(dioxus_requirement(manifest).as_deref(), Some("0.7.10"));
+        let relaxed = "[dependencies]\ndioxus = { version = \"0.8.0\" }\n";
+        assert_eq!(dioxus_requirement(relaxed).as_deref(), Some("0.8.0"));
+        assert_eq!(dioxus_requirement("[dependencies]\nserde = \"1\""), None);
     }
 }

@@ -67,7 +67,7 @@ COPY . .
 # its DIOXUS_ASSET_ROOT meta carry the sentinel /__memory_mcp_base__, which
 # memory_mcp_http replaces with the deployed MEMORY_MCP_HTTP_PUBLIC_BASE_URL
 # path at startup. Never pass a deployment prefix here. The literal must match
-# BASE_PATH_SENTINEL in crates/memory-mcp/src/control/static_assets.rs and
+# BASE_PATH_SENTINEL in crates/memory-mcp/src/ui/assets.rs and
 # crates/ui/src/base.rs, and the favicon href in
 # crates/ui/index.html.
 RUN --mount=type=cache,id=memory-mcp-cargo-registry-ui,target=/usr/local/cargo/registry \
@@ -75,6 +75,10 @@ RUN --mount=type=cache,id=memory-mcp-cargo-registry-ui,target=/usr/local/cargo/r
     --mount=type=cache,id=memory-mcp-target-ui,target=/src/target \
     set -eux; \
     cd /src; \
+    # The CLI carries the framework it compiles against, so its version has to
+    # be the one the UI crate pins. This runs before the bundle is built
+    # because a mismatch is cheaper to report than a wrong bundle.
+    cargo run --locked -p xtask -- check-dioxus-pin; \
     rm -rf /src/target/dx/ui/release/web/public /src/ui-dist; \
     dx bundle --platform web --release --package ui --out-dir /src/ui-dist --base-path /__memory_mcp_base__; \
     cargo run --locked -p xtask -- check-ui-bundle /src/ui-dist/public

@@ -11,7 +11,8 @@ the workspace:
 | Was | Is now |
 |---|---|
 | `scripts/ci/package.py` | `cargo run -p xtask -- package` |
-| `test_ui_bundle_pin.py`, plus the `test`/`grep` lines in the `Dockerfile` | `cargo run -p xtask -- check-ui-bundle` |
+| `test_ui_bundle_pin.py`'s bundle-layout half, plus the `test`/`grep` lines in the `Dockerfile` | `cargo run -p xtask -- check-ui-bundle` |
+| `test_ui_bundle_pin.py`'s version-pin half | `cargo run -p xtask -- check-dioxus-pin` |
 | `assert_embedded_ui.py` against a live container | `crates/memory-mcp/tests/ui_assets.rs`, plus the `docker` job's own walk of the served document |
 | `audit_undeclared_sources.py` | removed; see [ADR-0063](0063-retire-the-undeclared-source-audit.md) |
 | `audit_doc_claims.py`, `test_doc_claims.py` | removed with the doc-claim citation check |
