@@ -120,10 +120,45 @@ jobs:
         run: |
           cargo test -p memory_mcp --lib --features fs-watch --locked
           cargo test -p memory_mcp --test fs_watch_process_enabled --features fs-watch --locked
+      - name: Build the control-plane UI bundle
+        # Verifies the release build path end to end: `ui` is implied by
+        # `streamable-http`, so the bundle is what turns the `ui` feature on,
+        # and `build.rs` is the only thing that can silently produce a
+        # console-less binary. This step exists so a regression in that path —
+        # a bundle that no longer carries the sentinel, an asset that stops
+        # being embedded, a stale `dx` staging directory — fails here rather
+        # than in the Docker job's much later curl walk.
+        #
+        # Only the Linux entry builds it: the console is byte-identical across
+        # targets, so rebuilding the wasm per target would multiply build time
+        # to assert the same thing five times.
+        if: ${{ matrix.target == 'x86_64-unknown-linux-gnu' && !inputs.release }}
+        run: |
+          set -euo pipefail
+          rustup target add wasm32-unknown-unknown
+          cargo install dioxus-cli --version 0.7.10 --locked
+          cargo run --locked -p xtask -- check-dioxus-pin
+          rm -rf target/dx/ui/release/web/public "$RUNNER_TEMP/ui-dist"
+          # Never pass a deployment prefix: the bundle is built against the
+          # relocatable sentinel and stamped at server startup.
+          dx bundle --platform web --release --package ui \
+            --base-path /__memory_mcp_base__ \
+            --out-dir "$RUNNER_TEMP/ui-dist"
+          cargo run --locked -p xtask -- check-ui-bundle "$RUNNER_TEMP/ui-dist/public"
       - name: Build CLI and HTTP server
         env:
           BUILD_PROFILE: ${{ inputs.release && 'release' || 'dev' }}
-        run: cargo build -p memory_mcp --bins --profile "$BUILD_PROFILE" --features fs-watch,mcp-apps,streamable-http --locked
+          # Exported here rather than through `env:` because an empty value is
+          # not an unset one: `build.rs` reads the variable's presence, so
+          # `MEMORY_MCP_UI_DIST=` would hand it an empty path and fail the
+          # build rather than compile without a console.
+        run: |
+          set -euo pipefail
+          if [ -d "$RUNNER_TEMP/ui-dist/public" ]; then
+            export MEMORY_MCP_UI_DIST="$RUNNER_TEMP/ui-dist/public"
+          fi
+          cargo build -p memory_mcp --bins --profile "$BUILD_PROFILE" \
+            --features fs-watch,mcp-apps,streamable-http --locked
       - name: Package and test the actual binaries
         env:
           BUILD_DIR: target/${{ matrix.target }}/${{ inputs.release && 'release' || 'debug' }}
@@ -337,6 +372,57 @@ jobs:
           test "$(curl --fail --silent --show-error -H 'Host: localhost' \
             -o /dev/null --write-out '%{content_type}' "${base}${wasm_path}")" \
             = "application/wasm"
+          # The console's first load is dominated by the WebAssembly module, so
+          # the shipped binary has to negotiate it: a client offering gzip must
+          # receive a compressed body with a matching `Content-Encoding`, and
+          # one that does not must receive the plain bytes. The header is read
+          # as a value rather than counted, so a folded or duplicated header
+          # cannot pass by accident.
+          #
+          # `curl --compressed` would hide this — it negotiates transparently
+          # and the caller never sees which representation arrived — so the
+          # two requests are made explicitly and compared by size.
+          compressed_bytes="$(curl --fail --silent --show-error \
+            -H 'Host: localhost' -H 'Accept-Encoding: gzip' \
+            --output "${RUNNER_TEMP}/wasm.gz" \
+            --write-out '%{size_download}' "${base}${wasm_path}")"
+          identity_bytes="$(curl --fail --silent --show-error \
+            -H 'Host: localhost' -H 'Accept-Encoding: identity' \
+            --output "${RUNNER_TEMP}/wasm.raw" \
+            --write-out '%{size_download}' "${base}${wasm_path}")"
+          encoding="$(curl --fail --silent --show-error -I \
+            -H 'Host: localhost' -H 'Accept-Encoding: gzip' \
+            "${base}${wasm_path}" | tr -d '\r' \
+            | sed -n 's/^[Cc]ontent-[Ee]ncoding: *//p')"
+          case "${encoding}" in
+            *gzip*) ;;
+            *)
+              echo "the shipped image does not compress the console wasm: ${encoding}" >&2
+              exit 1
+              ;;
+          esac
+          vary="$(curl --fail --silent --show-error -I \
+            -H 'Host: localhost' -H 'Accept-Encoding: gzip' \
+            "${base}${wasm_path}" | tr -d '\r' \
+            | sed -n 's/^[Vv]ary: *//p')"
+          case "${vary}" in
+            *[Aa]ccept-[Ee]ncoding*) ;;
+            *)
+              echo "a compressed response must vary by Accept-Encoding: ${vary}" >&2
+              exit 1
+              ;;
+          esac
+          if [ "${compressed_bytes}" -ge "${identity_bytes}" ]; then
+            echo "gzip did not shrink the console wasm: ${compressed_bytes} >= ${identity_bytes}" >&2
+            exit 1
+          fi
+          # `gunzip` is the check that matters: a `Content-Encoding: gzip` whose
+          # body is not valid gzip is a console that fails to boot, and the
+          # size comparison alone would pass it.
+          gunzip -c "${RUNNER_TEMP}/wasm.gz" | cmp -s - "${RUNNER_TEMP}/wasm.raw" || {
+            echo "the gzipped console wasm does not decode to the identity bytes" >&2
+            exit 1
+          }
           # The security headers must hold on the image, not only in a test
           # fixture, because the SPA cannot boot without the WASM token. The
           # header is read as a value rather than counted, so a folded or

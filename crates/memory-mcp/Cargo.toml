@@ -119,7 +119,11 @@ name = "memory_mcp_http"
 path = "src/bin/memory_mcp_http.rs"
 required-features = ["streamable-http"]
 
+[build-dependencies]
+flate2.workspace = true
+
 [dev-dependencies]
+flate2.workspace = true
 proptest.workspace = true
 serde_json.workspace = true
 tempfile.workspace = true

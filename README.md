@@ -1207,6 +1207,47 @@ rejected.
 
 Providing the bundle is **optional** for developer and test builds: if `MEMORY_MCP_UI_DIST` is absent, the `streamable-http` binary compiles with an empty UI catalog and does not serve a UI. Release images must provide a real bundle.
 
+#### Developing the console
+
+`dx serve` runs the console with hot reload and proxies its API calls to a
+`memory_mcp_http` you start yourself, so a UI change does not require a release
+bundle and a full server rebuild:
+
+```bash
+# terminal 1 — the backend, on the port crates/ui/Dioxus.toml proxies to
+cargo run --features streamable-http --bin memory_mcp_http
+
+# terminal 2 — the console
+dx serve --package ui
+```
+
+`crates/ui/Dioxus.toml` forwards `/api` and `/auth` to `127.0.0.1:8080`; change
+the `backend` there if the server runs elsewhere. RSX-only edits hot-reload in
+place without a rebuild; changes to Rust outside `rsx!` trigger a normal
+recompile. The backend must be running first — the dev server answers `/` from
+its own bundle, and the proxied prefixes return `500` when nothing is listening.
+
+`dx serve` is a development tool. It force-sends `Cache-Control: no-cache` on
+every response and serves loose CORS headers, so it must never face a real
+deployment; the console that ships is the embedded one described above.
+
+#### How the bundle is served
+
+`build.rs` embeds each asset twice: the bundle's own bytes, and their gzip
+encoding. An asset over 1 KiB whose type is not already compressed gets the
+second copy, so the server spends no CPU per request and no reverse proxy has
+to. A request offering gzip receives the compressed form with
+`Content-Encoding: gzip` and `Vary: Accept-Encoding`; one that does not (or that
+sets `gzip;q=0`) receives the identity bytes unchanged. On the current bundle
+this removes roughly 60% of the WebAssembly module from a first load.
+
+Assets whose served bytes are rewritten at startup — the document shell and the
+JS loader, which carry the base-path sentinel — are always served
+uncompressed: their embedded gzip copy was made from the pre-stamping bytes and
+would hand a client a document still carrying the build sentinel. The
+WebAssembly module, which is binary and never stamped, is the asset that
+matters and keeps the compressed path.
+
 ### One active namespace
 
 Each server process selects exactly one SurrealDB **namespace** at startup. The

@@ -282,27 +282,44 @@ pub fn build_router(
     // still deliberately serves the no-UI fallback.
     let stamped_assets = crate::ui::assets::build_stamped_assets(&state.config.base_path)?;
 
-    let router = router.fallback(move |uri: axum::http::Uri| {
-        let stamped_assets = stamped_assets.clone();
-        async move {
-            let path = uri.path();
-            if path.starts_with("/api/") || path == "/api" {
-                return axum::response::IntoResponse::into_response((
-                    axum::http::StatusCode::NOT_FOUND,
-                    [(axum::http::header::CONTENT_TYPE, "application/json")],
-                    "{\"error\":{\"code\":\"not_found\",\"message\":\"not found\"}}",
-                ));
+    let router = router.fallback(
+        move |uri: axum::http::Uri, headers: axum::http::HeaderMap| {
+            let stamped_assets = stamped_assets.clone();
+            async move {
+                let path = uri.path();
+                if path.starts_with("/api/") || path == "/api" {
+                    return axum::response::IntoResponse::into_response((
+                        axum::http::StatusCode::NOT_FOUND,
+                        [(axum::http::header::CONTENT_TYPE, "application/json")],
+                        "{\"error\":{\"code\":\"not_found\",\"message\":\"not found\"}}",
+                    ));
+                }
+                if path.starts_with("/auth/") || path == "/auth" {
+                    return axum::response::IntoResponse::into_response((
+                        axum::http::StatusCode::NOT_FOUND,
+                        [(axum::http::header::CONTENT_TYPE, "application/json")],
+                        "{\"error\":{\"code\":\"not_found\",\"message\":\"not found\"}}",
+                    ));
+                }
+                // The console's WebAssembly module is ~1 MB of compressible bytes,
+                // so the request's own `Accept-Encoding` decides which
+                // representation it gets. Read from the real request rather than
+                // assumed, or every client would be served the identity body.
+                //
+                // Every instance is joined: a request may legally carry several
+                // `Accept-Encoding` lines, and taking only the first would read a
+                // client's consent while ignoring a refusal in the next line.
+                let accepted = headers
+                    .get_all(axum::http::header::ACCEPT_ENCODING)
+                    .iter()
+                    .filter_map(|value| value.to_str().ok())
+                    .collect::<Vec<_>>()
+                    .join(", ");
+                let accepted_encoding = (!accepted.is_empty()).then_some(accepted.as_str());
+                crate::ui::assets::serve_asset(path, stamped_assets.as_deref(), accepted_encoding)
             }
-            if path.starts_with("/auth/") || path == "/auth" {
-                return axum::response::IntoResponse::into_response((
-                    axum::http::StatusCode::NOT_FOUND,
-                    [(axum::http::header::CONTENT_TYPE, "application/json")],
-                    "{\"error\":{\"code\":\"not_found\",\"message\":\"not found\"}}",
-                ));
-            }
-            crate::ui::assets::serve_asset(path, stamped_assets.as_deref())
-        }
-    });
+        },
+    );
 
     // The deployment boundary goes on last, and last is what makes it a
     // boundary: `Router::layer` wraps only the routes *and the fallback* that

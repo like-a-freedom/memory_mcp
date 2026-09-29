@@ -11,3 +11,24 @@ name = "memory-mcp-ui"
 # Overrides the CLI's default title. The same string is set in `index.html` so
 # the served bytes are correct whether or not the CLI substitutes this value.
 title = "Memory MCP control plane"
+
+# `dx serve` is a dev server for the console itself: it rebuilds the WASM on
+# change, applies RSX hot-reload, and serves the bundle from its own staging
+# directory. It knows nothing about `memory_mcp_http`, so every API call the
+# console makes — `/api/v1/*` for the control plane, `/auth/*` for the session
+# and login flows — would hit the dev server and 404, leaving a console that
+# renders but cannot load data.
+#
+# These two entries forward those prefixes to a `memory_mcp_http` the developer
+# started themselves, so one `dx serve` gives the full loop. The backend must be
+# started first, with `ALLOWED_HOSTS` covering whatever host `dx serve` presents
+# (it defaults to `localhost`).
+#
+# This affects `dx serve` only. The release bundle is built by `dx bundle` and
+# embedded in the binary, where the same routes are served by the Rust process
+# itself — see README, "Control-plane UI asset packaging".
+[[web.proxy]]
+backend = "http://127.0.0.1:8080/api"
+
+[[web.proxy]]
+backend = "http://127.0.0.1:8080/auth"

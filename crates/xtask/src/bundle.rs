@@ -21,9 +21,19 @@ use crate::pack::PackError;
 
 /// The literal `crates/ui` writes into every prefix-dependent URL. It must
 /// match `BASE_PATH_SENTINEL` in `crates/memory-mcp/src/ui/assets.rs`, the
-/// favicon href in `crates/ui/index.html`, and the `--base-path` argument in the
-/// `Dockerfile`'s `dx bundle` invocation.
+/// favicon href in `crates/ui/index.html`, and the `--base-path` argument in
+/// the `Dockerfile`'s `dx bundle` invocation.
 pub const BASE_PATH_SENTINEL: &str = "/__memory_mcp_base__";
+
+/// The prefix `crates/memory-mcp/build.rs` namespaces gzip sidecars under.
+///
+/// It is a prefix rather than a `.gz` suffix because a suffix collides: a
+/// bundle carrying both `app.wasm` and a file named `app.wasm.gz` would stage
+/// both onto one path, and the binary would serve one asset's bytes under the
+/// other's name. A bundle file that starts with this prefix would collide just
+/// as badly, so the bundle is refused here rather than discovered as a corrupt
+/// console at runtime.
+pub const GZIP_PREFIX: &str = "gzip__";
 
 /// One file per kind: a bundle carrying a second `.wasm` is carrying a
 /// previous build's.
@@ -130,6 +140,22 @@ pub fn check(dist: &Path) -> Result<(), PackError> {
     }
 
     let files = walk(dist)?;
+    // A bundle file squatting the gzip sidecar namespace would be staged onto
+    // the same path as the sidecar `build.rs` writes for its sibling, and the
+    // binary would serve one asset's bytes under the other's name. Nothing
+    // downstream can catch that — the catalog compiles and the console fails
+    // to boot at runtime — so it is refused here.
+    if let Some(squatted) = files.iter().map(|path| path.as_path()).find(|path| {
+        path.file_name()
+            .and_then(|name| name.to_str())
+            .is_some_and(|name| name.starts_with(GZIP_PREFIX))
+    }) {
+        return Err(PackError::Bundle(format!(
+            "the bundle contains {}, whose name starts with the reserved {GZIP_PREFIX} \
+             prefix that `build.rs` namespaces gzip sidecars under; rename it",
+            squatted.display()
+        )));
+    }
     for (suffix, kind) in SINGLETON_SUFFIXES {
         let matches: Vec<&std::path::Path> = files
             .iter()
@@ -200,6 +226,28 @@ mod tests {
             ("assets/app.wasm", "module"),
             ("assets/app.css", "body{}"),
         ])
+    }
+
+    /// A bundle file named like a gzip sidecar would be staged onto the same
+    /// path as the sidecar `build.rs` generates for its non-prefixed sibling,
+    /// so the binary would serve one asset's bytes under the other's name. The
+    /// bundle is refused here because nothing downstream can tell: the catalog
+    /// compiles, and the console fails to boot at runtime instead.
+    #[test]
+    fn a_bundle_claiming_the_gzip_sidecar_namespace_is_refused() {
+        let dir = bundle(&[
+            ("index.html", BASE_PATH_SENTINEL),
+            (
+                "gzip__app.wasm",
+                "not a sidecar, a bundle file that squats the name",
+            ),
+            ("app.wasm", "module"),
+            ("app.js", "j"),
+            ("app.css", "c"),
+        ]);
+
+        let error = check(dir.path()).expect_err("a squatted sidecar name");
+        assert!(error.to_string().contains(GZIP_PREFIX), "{error}");
     }
 
     #[test]

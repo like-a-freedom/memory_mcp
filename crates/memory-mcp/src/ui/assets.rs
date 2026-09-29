@@ -7,7 +7,10 @@
 use std::sync::Arc;
 
 use axum::body::Body;
-use axum::http::{HeaderValue, StatusCode, header::CACHE_CONTROL, header::CONTENT_TYPE};
+use axum::http::{
+    HeaderValue, StatusCode,
+    header::{CACHE_CONTROL, CONTENT_ENCODING, CONTENT_TYPE},
+};
 use axum::response::Response;
 
 use crate::error::MemoryError;
@@ -20,6 +23,15 @@ struct Asset {
     /// Computed by `build.rs`; the served binary never guesses at a hash format.
     immutable: bool,
     body: &'static [u8],
+    /// The gzip encoding of `body`, computed once at build time by `build.rs`.
+    ///
+    /// The console's first load is dominated by the WebAssembly module, which
+    /// is ~1 MB of highly compressible bytes. Compressing at build time rather
+    /// than per request means the shipped binary holds both forms, serving
+    /// costs one `Body::from` either way, and the CPU is never spent twice for
+    /// an asset whose bytes never change after the image is built. `None` when
+    /// the asset is not worth compressing — see [`compressible`].
+    gzip_body: Option<&'static [u8]>,
 }
 
 #[cfg(feature = "ui")]
@@ -188,23 +200,40 @@ fn stamped_entries(assets: &[Asset], base: &str) -> Result<Option<StampedAssets>
 /// Exact bundle paths win. Extensionless paths outside the asset directory use
 /// the compiled index for client-side SPA routes; missing files and malformed
 /// paths return 404.
-pub fn serve_asset(path: &str, stamped: Option<&StampedAssets>) -> Response {
-    serve_asset_from(path, ASSETS, stamped)
+pub fn serve_asset(
+    path: &str,
+    stamped: Option<&StampedAssets>,
+    accepted_encoding: Option<&str>,
+) -> Response {
+    serve_asset_from(path, ASSETS, stamped, accepted_encoding)
 }
 
-fn serve_asset_from(path: &str, assets: &[Asset], stamped: Option<&StampedAssets>) -> Response {
+fn serve_asset_from(
+    path: &str,
+    assets: &[Asset],
+    stamped: Option<&StampedAssets>,
+    accepted_encoding: Option<&str>,
+) -> Response {
     let Some(path) = request_path(path) else {
         return not_found_response();
     };
 
     if let Some(asset) = assets.iter().find(|asset| asset.path == path) {
-        return asset_response(asset, stamped.and_then(|s| s.get(asset.path)));
+        return asset_response(
+            asset,
+            stamped.and_then(|s| s.get(asset.path)),
+            accepted_encoding,
+        );
     }
 
     if is_spa_route(path)
         && let Some(index) = assets.iter().find(|asset| asset.path == INDEX_PATH)
     {
-        return asset_response(index, stamped.and_then(|s| s.get(index.path)));
+        return asset_response(
+            index,
+            stamped.and_then(|s| s.get(index.path)),
+            accepted_encoding,
+        );
     }
 
     not_found_response()
@@ -236,16 +265,94 @@ fn is_spa_route(path: &str) -> bool {
         .is_some_and(|segment| !segment.contains('.'))
 }
 
-fn asset_response(asset: &Asset, stamped: Option<&[u8]>) -> Response {
+/// Whether a client offering `accepted` would be able to decode a gzip body.
+///
+/// A bare token match is not enough, and getting it wrong is worse than not
+/// compressing at all: advertising `Content-Encoding: gzip` to a client that
+/// cannot decode it yields a corrupt WebAssembly module and a blank page. So
+/// `identity` disqualifies, `*` is not treated as consent, and a token that
+/// carries an explicit zero quality (`gzip;q=0`) is refused. gzip is the
+/// encoding every client that matters supports; `br` is deliberately not
+/// offered because the build pipeline has no brotli encoder.
+fn accepts_gzip(accepted: Option<&str>) -> bool {
+    let Some(accepted) = accepted else {
+        return false;
+    };
+    for token in accepted.split(',') {
+        let mut parts = token.split(';');
+        let name = parts.next().unwrap_or_default().trim();
+        if !name.eq_ignore_ascii_case("gzip") {
+            continue;
+        }
+        let refused = parts.any(|parameter| {
+            let (name, value) = parameter.split_once('=').unwrap_or((parameter, ""));
+            // Parameter names are case-insensitive, so `Q=0` is as explicit a
+            // refusal as `q=0`. An unparseable quality fails open, because the
+            // client still named `gzip` and a malformed parameter is not a
+            // statement that the encoding is unacceptable.
+            name.trim().eq_ignore_ascii_case("q")
+                && value
+                    .trim()
+                    .parse::<f32>()
+                    .is_ok_and(|quality| quality <= 0.0)
+        });
+        if !refused {
+            return true;
+        }
+    }
+    false
+}
+
+/// Negotiate the response body for `asset` against the client's
+/// `Accept-Encoding` header, which is `None` when the request carried none.
+///
+/// The header is consulted only to choose a representation, never to decide
+/// *whether* an asset is served: an unknown or absent encoding always yields
+/// the identity bytes, so every existing caller keeps working unchanged.
+fn negotiate<'a>(
+    asset: &'a Asset,
+    stamped: Option<&'a [u8]>,
+    accepted: Option<&'a str>,
+) -> Negotiated<'a> {
+    let identity = stamped.unwrap_or(asset.body);
+    // A stamped asset's served bytes are NOT the bytes `build.rs` compressed,
+    // so its pre-compressed form is stale and serving it would hand the client
+    // a document that still carries the build sentinel. Those assets stay
+    // uncompressed. The WebAssembly module — the one asset large enough to
+    // matter — is binary and therefore never stamped, so the expensive case
+    // keeps the compressed path.
+    let Some(gzipped) = asset.gzip_body else {
+        return Negotiated::Identity(identity);
+    };
+    if stamped.is_some() || !accepts_gzip(accepted) {
+        return Negotiated::Identity(identity);
+    }
+    Negotiated::Gzip(gzipped)
+}
+
+enum Negotiated<'a> {
+    Identity(&'a [u8]),
+    Gzip(&'a [u8]),
+}
+
+fn asset_response(asset: &Asset, stamped: Option<&[u8]>, accepted: Option<&str>) -> Response {
     // Stamped bytes win: the compiled asset still carries the build sentinel
     // and must never reach a client on a prefixed deployment.
-    let body = match stamped {
-        Some(bytes) => Body::from(bytes.to_vec()),
-        None => Body::from(asset.body),
+    let mut resp = match negotiate(asset, stamped, accepted) {
+        Negotiated::Identity(bytes) => Response::new(Body::from(bytes.to_vec())),
+        Negotiated::Gzip(bytes) => {
+            let mut resp = Response::new(Body::from(bytes.to_vec()));
+            resp.headers_mut()
+                .insert(CONTENT_ENCODING, HeaderValue::from_static("gzip"));
+            resp
+        }
     };
-    let mut resp = Response::new(body);
     resp.headers_mut()
         .insert(CONTENT_TYPE, HeaderValue::from_static(asset.content_type));
+    // A compressed body is a different representation of the same resource,
+    // so any cache holding it must key on the request's `Accept-Encoding`.
+    resp.headers_mut()
+        .insert("vary", HeaderValue::from_static("Accept-Encoding"));
     // Content-addressed bundle assets never change once published, so they can
     // be cached immutably. The index document and any stable-path asset (the
     // favicon) are revalidated, so a new deploy is picked up promptly.
@@ -275,21 +382,69 @@ mod tests {
             path: "/assets/app-dxh395eca31249da547.js",
             content_type: "text/javascript; charset=utf-8",
             immutable: true,
+            gzip_body: None,
             body: b"compiled-js-fixture",
         },
         Asset {
             path: "/assets/favicon.svg",
             content_type: "image/svg+xml",
             immutable: false,
+            gzip_body: None,
             body: b"<svg></svg>",
         },
         Asset {
             path: "/index.html",
             content_type: "text/html; charset=utf-8",
             immutable: false,
+            gzip_body: None,
             body: b"compiled-index-fixture",
         },
     ];
+
+    /// A fixture whose pre-compressed form is what the server would really
+    /// ship, so the negotiation tests exercise the gzip path rather than a
+    /// no-op.
+    const COMPRESSIBLE_ASSETS: &[Asset] = &[Asset {
+        path: "/assets/app-dxh395eca31249da547.js",
+        content_type: "text/javascript; charset=utf-8",
+        immutable: true,
+        gzip_body: None,
+        body: b"compiled-js-fixture",
+    }];
+
+    /// The same single asset, carrying the gzip form `build.rs` would stage.
+    ///
+    /// Built with the same encoder the build script uses, so the test
+    /// exercises a real pre-compressed body rather than a hand-written one that
+    /// could never appear in a shipped binary.
+    fn compressible_assets() -> Vec<Asset> {
+        vec![Asset {
+            gzip_body: Some(gzip(b"compiled-js-fixture")),
+            ..COMPRESSIBLE_ASSETS[0]
+        }]
+    }
+
+    /// The expected bytes for the gzip test, produced by an independent
+    /// encoder rather than by the code under test, so the assertion can
+    /// actually disagree with a broken implementation.
+    fn gzip(body: &[u8]) -> &'static [u8] {
+        use std::io::Write as _;
+        let mut encoder = flate2::write::GzEncoder::new(Vec::new(), flate2::Compression::best());
+        encoder.write_all(body).expect("gzip fixture");
+        let encoded = encoder.finish().expect("gzip fixture");
+        Box::leak(encoded.into_boxed_slice())
+    }
+
+    /// The bytes a client would see after decoding a gzip body, using a
+    /// decoder independent of the encoder under test.
+    fn gunzip(body: &[u8]) -> Vec<u8> {
+        use std::io::Read as _;
+        let mut decoded = Vec::new();
+        flate2::read::GzDecoder::new(body)
+            .read_to_end(&mut decoded)
+            .expect("body should be valid gzip");
+        decoded
+    }
 
     async fn response_body(response: Response) -> Vec<u8> {
         axum::body::to_bytes(response.into_body(), usize::MAX)
@@ -341,6 +496,7 @@ mod tests {
             "/assets/app-dxh395eca31249da547.js?cache=1",
             FIXTURE_ASSETS,
             None,
+            None,
         );
 
         assert_eq!(response.status(), StatusCode::OK);
@@ -365,7 +521,7 @@ mod tests {
     #[tokio::test]
     async fn root_and_extensionless_routes_return_revalidated_compiled_index() {
         for path in ["/", "/index.html", "/operator/settings"] {
-            let response = serve_asset_from(path, FIXTURE_ASSETS, None);
+            let response = serve_asset_from(path, FIXTURE_ASSETS, None, None);
 
             assert_eq!(response.status(), StatusCode::OK, "path: {path}");
             assert_eq!(
@@ -392,9 +548,110 @@ mod tests {
         }
     }
 
+    /// The first load of the console is dominated by the WebAssembly module.
+    /// A client that can accept gzip must not be handed ~1 MB of
+    /// already-compressible bytes when a third of that would serve the
+    /// identical module. This is the behavior at the response seam: what a real
+    /// `Accept-Encoding` header does to what actually goes over the wire.
+    #[tokio::test]
+    async fn a_client_asking_for_gzip_receives_gzipped_bytes() {
+        let assets = compressible_assets();
+        let response = serve_asset_from(
+            "/assets/app-dxh395eca31249da547.js",
+            &assets,
+            None,
+            Some("gzip, deflate, br"),
+        );
+
+        assert_eq!(response.status(), StatusCode::OK);
+        assert_eq!(
+            response
+                .headers()
+                .get(CONTENT_ENCODING)
+                .and_then(|value| value.to_str().ok()),
+            Some("gzip"),
+            "a client that asked for gzip must be told the body is gzip"
+        );
+        assert_eq!(
+            response.headers().get("vary").and_then(|v| v.to_str().ok()),
+            Some("Accept-Encoding"),
+            "the response varies by Accept-Encoding, so a cache must not reuse it blindly"
+        );
+        assert_eq!(
+            gunzip(&response_body(response).await),
+            b"compiled-js-fixture",
+            "the body must decode to exactly the identity bytes"
+        );
+    }
+
+    /// The compression header is only honoured if the bytes match it, so the
+    /// un-compressed path has to stay byte-for-byte what it always was. A
+    /// client that cannot decode must still get a working module.
+    #[tokio::test]
+    async fn a_client_that_cannot_decode_gets_the_identity_bytes() {
+        let assets = compressible_assets();
+        for accepted in [
+            None,
+            Some(""),
+            Some("identity"),
+            Some("deflate"),
+            Some("gzip;q=0"),
+        ] {
+            let response = serve_asset_from(
+                "/assets/app-dxh395eca31249da547.js",
+                &assets,
+                None,
+                accepted,
+            );
+
+            assert_eq!(response.status(), StatusCode::OK, "accepted: {accepted:?}");
+            assert_eq!(
+                response.headers().get(CONTENT_ENCODING),
+                None,
+                "accepted: {accepted:?}"
+            );
+            assert_eq!(
+                response_body(response).await,
+                b"compiled-js-fixture",
+                "accepted: {accepted:?}"
+            );
+        }
+    }
+
+    /// A stamped asset's served bytes are the mount-base-rewritten ones, which
+    /// are not what the build script compressed. Serving the pre-compressed
+    /// form there would hand the client a document still carrying the build
+    /// sentinel, so a stamped asset stays identity even when the client would
+    /// take gzip.
+    #[tokio::test]
+    async fn a_stamped_asset_is_served_uncompressed() {
+        let mut assets = compressible_assets();
+        assets[0].body = b"stamped body with /__memory_mcp_base__/inside";
+        let stamped = StampedAssets {
+            entries: vec![(
+                "/assets/app-dxh395eca31249da547.js",
+                b"stamped body with /memory/inside".to_vec(),
+            )],
+        };
+
+        let response = serve_asset_from(
+            "/assets/app-dxh395eca31249da547.js",
+            &assets,
+            Some(&stamped),
+            Some("gzip"),
+        );
+
+        assert_eq!(response.status(), StatusCode::OK);
+        assert_eq!(response.headers().get(CONTENT_ENCODING), None);
+        assert_eq!(
+            response_body(response).await,
+            b"stamped body with /memory/inside"
+        );
+    }
+
     #[test]
     fn stable_unhashed_assets_are_revalidated() {
-        let response = serve_asset_from("/assets/favicon.svg", FIXTURE_ASSETS, None);
+        let response = serve_asset_from("/assets/favicon.svg", FIXTURE_ASSETS, None, None);
         assert_eq!(
             response
                 .headers()
@@ -412,7 +669,7 @@ mod tests {
             "/assets/unknown.js",
             "/assets/unknown.wasm",
         ] {
-            let response = serve_asset_from(path, FIXTURE_ASSETS, None);
+            let response = serve_asset_from(path, FIXTURE_ASSETS, None, None);
             assert_eq!(response.status(), StatusCode::NOT_FOUND, "path: {path}");
             assert_security_headers(&response);
         }
@@ -428,7 +685,7 @@ mod tests {
             "/assets\\app.js",
         ] {
             assert_eq!(
-                serve_asset_from(path, FIXTURE_ASSETS, None).status(),
+                serve_asset_from(path, FIXTURE_ASSETS, None, None).status(),
                 StatusCode::NOT_FOUND,
                 "path: {path}"
             );
@@ -552,12 +809,14 @@ mod tests {
             path: "/assets/app-dxh.js",
             content_type: "text/javascript; charset=utf-8",
             immutable: true,
+            gzip_body: None,
             body: b"init(\"/__memory_mcp_base__/assets/app_bg-dxh.wasm\");",
         },
         Asset {
             path: "/index.html",
             content_type: "text/html; charset=utf-8",
             immutable: false,
+            gzip_body: None,
             body: b"<!DOCTYPE html><html><head></head><body><script src=\"/__memory_mcp_base__/assets/app-dxh.js\"></script></body></html>",
         },
     ];
@@ -566,6 +825,7 @@ mod tests {
         path: "/assets/app_bg-dxh.wasm",
         content_type: "application/wasm",
         immutable: true,
+        gzip_body: None,
         body: b"/__memory_mcp_base__\xff\xfe",
     }];
 
@@ -574,7 +834,7 @@ mod tests {
         let stamped = stamped_entries(PREFIXED_ASSETS, "/memory")
             .expect("stamps")
             .expect("entries");
-        let response = serve_asset_from("/admin/clients", PREFIXED_ASSETS, Some(&stamped));
+        let response = serve_asset_from("/admin/clients", PREFIXED_ASSETS, Some(&stamped), None);
         let body = response_body(response).await;
         let body = String::from_utf8(body).expect("utf-8");
         assert!(
@@ -589,7 +849,7 @@ mod tests {
         let stamped = stamped_entries(PREFIXED_ASSETS, "/memory")
             .expect("stamps")
             .expect("entries");
-        let response = serve_asset_from("/index.html", PREFIXED_ASSETS, Some(&stamped));
+        let response = serve_asset_from("/index.html", PREFIXED_ASSETS, Some(&stamped), None);
         let body = response_body(response).await;
         let body = String::from_utf8(body).expect("utf-8");
         assert!(
@@ -607,7 +867,8 @@ mod tests {
         let stamped = stamped_entries(PREFIXED_ASSETS, "/memory")
             .expect("stamps")
             .expect("entries");
-        let response = serve_asset_from("/assets/app-dxh.js", PREFIXED_ASSETS, Some(&stamped));
+        let response =
+            serve_asset_from("/assets/app-dxh.js", PREFIXED_ASSETS, Some(&stamped), None);
         assert_eq!(
             response_body(response).await,
             br#"init("/memory/assets/app_bg-dxh.wasm");"#
@@ -621,7 +882,12 @@ mod tests {
         // rewritten here.
         let stamped = stamped_entries(BINARY_ASSETS, "/memory").expect("walks the catalog");
         assert!(stamped.is_none(), "binary assets are never stamped");
-        let response = serve_asset_from("/assets/app_bg-dxh.wasm", BINARY_ASSETS, stamped.as_ref());
+        let response = serve_asset_from(
+            "/assets/app_bg-dxh.wasm",
+            BINARY_ASSETS,
+            stamped.as_ref(),
+            None,
+        );
         assert_eq!(
             response_body(response).await,
             b"/__memory_mcp_base__\xff\xfe"
@@ -660,7 +926,7 @@ mod tests {
     #[test]
     fn the_empty_catalog_404s_every_ui_path_with_security_headers() {
         for path in ["/", "/index.html", "/settings", "/assets/app-dx.js"] {
-            let response = serve_asset_from(path, &[], None);
+            let response = serve_asset_from(path, &[], None, None);
             assert_eq!(
                 response.status(),
                 StatusCode::NOT_FOUND,
