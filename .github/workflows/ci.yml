@@ -40,14 +40,6 @@ jobs:
           # dependency tree (rocksdb, ONNX, SurrealDB) per job.
           cache-shared-key: dev
       - run: cargo fmt --all --check
-      - name: Packaging regressions
-        run: python3 -m unittest discover -s scripts/ci -p 'test_*.py'
-      # A `.rs` file no `mod` declaration reaches is invisible to rustc, so no
-      # lint or test in the jobs above can report it. `test_undeclared_sources.py`
-      # runs in the discovery step above; this runs the audit on its own so the
-      # offending file is named in the job log, not only as a test failure.
-      - name: No undeclared source files
-        run: python3 scripts/ci/audit_undeclared_sources.py
       - run: cargo clippy --workspace --all-targets --features fs-watch,mcp-apps,streamable-http --locked -- -D warnings
       - name: Control-plane UI WASM lint
         run: |
@@ -135,7 +127,7 @@ jobs:
       - name: Package and test the actual binaries
         env:
           BUILD_DIR: target/${{ matrix.target }}/${{ inputs.release && 'release' || 'debug' }}
-        run: python3 scripts/ci/package.py "$BUILD_DIR" "${{ matrix.target }}"
+        run: cargo run -p xtask --locked -- package "$BUILD_DIR" "${{ matrix.target }}"
       - uses: actions/upload-artifact@v6
         with:
           name: binaries-${{ matrix.target }}
@@ -233,17 +225,17 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          # The console is embedded at compile time, so the shipped image must
+          # not also carry the bundle as files: a sidecar that the binary never
+          # reads is dead weight, and a future reader would reasonably assume
+          # the one on disk is the one being served.
           container_id="$(docker create memory-mcp-http:local)"
           trap 'docker rm "${container_id}" >/dev/null' EXIT
-          docker export "${container_id}" | python3 -c '
-          import sys
-          import tarfile
-
-          for member in tarfile.open(fileobj=sys.stdin.buffer, mode="r|"):
-              name = member.name.removeprefix("./")
-              if name == "src/ui-dist" or name.startswith("src/ui-dist/"):
-                  raise SystemExit(f"UI sidecar found in final image: {name}")
-          '
+          if docker export "${container_id}" | tar -tf - \
+            | grep -qE '(^|/)src/ui-dist(/|$)'; then
+            echo 'the final image ships the UI bundle as a sidecar' >&2
+            exit 1
+          fi
       - name: Start the HTTP service and probe liveness
         shell: bash
         run: |
@@ -286,16 +278,55 @@ jobs:
           # references with no file on disk, no sidecar process and no
           # third-party origin. Reading the document is not enough on its own:
           # the loader fetches the WebAssembly by path from inside the module it
-          # has already loaded, so the checker walks the served JavaScript too.
-          # It re-asserts the serving policy against the shipped image, because
-          # the crate's own unit tests run against a fixture instead.
+          # has already loaded, so the JavaScript is walked for the paths it
+          # asks for and each one is fetched.
           #
-          # `--host-header` is required: the host allowlist compares the raw
-          # `Host` header with no port stripping, so the loopback socket is
-          # refused (`403`) unless it presents an allowlisted name verbatim.
-          python3 scripts/ci/assert_embedded_ui.py \
-            --base-url http://127.0.0.1:8080 \
-            --host-header localhost
+          # This replaces `scripts/ci/assert_embedded_ui.py`, which made the
+          # same walk in Python. The crate's own `ui_assets` test covers the
+          # serving policy against a test fixture; this re-asserts it against
+          # the shipped image.
+          #
+          # The `Host` header is required: the allowlist compares the raw header
+          # with no port stripping, so the loopback socket is refused (`403`)
+          # unless it presents an allowlisted name verbatim.
+          fetch() {
+            curl --fail --silent --show-error -H 'Host: localhost' "$1"
+          }
+          base=http://127.0.0.1:8080
+          document="$(fetch "${base}/")"
+          test -n "${document}"
+          # Every asset the document references must come back. The URLs carry
+          # the mounted base, so they are read out of the served document
+          # rather than assumed.
+          for path in $(printf '%s' "${document}" \
+            | grep -oE '(src|href)="[^"]+"' \
+            | sed -E 's/^(src|href)="//; s/"$//' \
+            | sort -u); do
+            case "${path}" in
+              # An absolute URL is a third-party origin, which the single-binary
+              # deployment is not allowed to load anything from.
+              http://*|https://*|//*)
+                echo "the console references a third-party origin: ${path}" >&2
+                exit 1
+                ;;
+            esac
+            test -n "$(fetch "${base}${path}")" || {
+              echo "the console references an asset the binary does not serve: ${path}" >&2
+              exit 1
+            }
+          done
+          # The WebAssembly module is fetched by path from inside the loaded
+          # JavaScript, so its presence in the document's own references is not
+          # guaranteed.
+          wasm_path="$(printf '%s' "${document}" | grep -oE '/[^"]+\.wasm' | head -1)"
+          test -n "${wasm_path}"
+          test "$(curl --fail --silent --show-error -H 'Host: localhost' \
+            -o /dev/null --write-out '%{content_type}' "${base}${wasm_path}")" \
+            = "application/wasm"
+          # The security headers must hold on the image, not only in a test
+          # fixture, because the SPA cannot boot without the WASM token.
+          test "$(curl --fail --silent --show-error -I -H 'Host: localhost' \
+            "${base}/" | grep -ci "content-security-policy:.*wasm-unsafe-eval")" = "1"
       - name: Log in to GitHub Container Registry
         if: ${{ github.ref == 'refs/heads/master' || inputs.release }}
         uses: docker/login-action@v3

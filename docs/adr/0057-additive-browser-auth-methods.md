@@ -260,19 +260,20 @@ notes were added with the audit change that followed.
   it lacked, `target_method`. The row id is generated, not derived from the
   method: a derived id would collide when a method is removed, restored by
   configuration, and removed again.
-- **Discovery runs at startup, and the container run is what shows it.** The
-  acceptance harness added with this annotation
-  (`scripts/ci/local_admin_image.py --scenario removal`) has to run a stub
-  identity provider, because bringing up a provider-enabled server without a
-  reachable issuer fails as described under §Consequences: `docker logs` shows
+- **Discovery runs at startup, and a container run is what shows it.** Bringing
+  up a provider-enabled server without a reachable issuer fails as described
+  under §Consequences: the logs show
   `tenant runtime init error: config invalid: OIDC discovery failed…` and the
-  container exits `2`. The same run is the first container-level evidence for the
-  additive half of this decision: it starts on `local` alone, adds `oidc` beside
-  the door on one restart, removes `local` through the CLI, and asserts on a
-  second restart that the local routes answer `404` while the provider routes are
-  mounted. It also pins the third refusal the decision does not name: the store
-  refuses a removal that would leave the policy with no method at all, so the
-  provider has to be serving beside the door before the door can be removed.
+  process exits `2`. The acceptance harness that used to provide this evidence
+  has been removed; the property is pinned by
+  `crates/memory-mcp/tests/auth_upgrade.rs`, which asserts that every discovery
+  error maps to `ConfigInvalid` and that test composition never performs a
+  discovery round trip. No suite now observes an unreachable issuer failing a
+  real boot — see [ADR-0064](../adr/0064-run-ci-on-cargo-only.md) for what the
+  removal gave up.
+- **The store refuses a removal that would leave the policy with no method at
+  all**, so the provider has to be serving beside the door before the door can
+  be removed.
 - **The two methods that change an Account's identities audit the change.**
   `link_external_identity` and `unlink_external_identity` take the actor and the
   instant, and append the audit row inside the same guarded transaction as the

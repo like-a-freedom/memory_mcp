@@ -33,7 +33,7 @@
 //! | Origin/CSRF/content type/body/duplicate cookie/unknown fields | `http_local_admin.rs` (42 tests) |
 //! | Cookie/bearer privilege separation, unmounted APIs | `bearer_keys_cannot_authenticate_local_admin_routes`, `unmatched_api_and_auth_paths_are_json_404_not_html` |
 //! | Generated sentinel secrets through errors/Debug/logs/audit/metadata | `surreal_store/local_admin.rs::secret_hygiene_tests` — code, cookie and password absent from every table and from every `Debug`/`Display`; `http::router::tests::off_mode_mounts_no_browser_auth_route` for the unmounted off-mode surface |
-//! | Packaged UI/CLI over trusted TLS | `scripts/ci/local_admin_image.py --scenario all` (real browser) |
+//! | Console served from the binary, with the CSP the WASM client needs | `ui_assets.rs` (5 tests) |
 
 #[cfg(test)]
 mod tests {

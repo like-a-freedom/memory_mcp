@@ -27,9 +27,11 @@ implementation does not match the approved design, the divergence is stated
 rather than smoothed over.
 
 Evidence in this revision was collected against the real binaries and a real
-RocksDB-backed registry (`scripts/ci/local_admin_local_check.sh`) and against
-the built image over trusted TLS in a real browser
-(`scripts/ci/local_admin_image.py --scenario all`).
+RocksDB-backed registry. The browser-driven image harness that some of it
+originally came from has been removed: it never ran in CI, so it protected
+nothing from regression. The properties it covered are now asserted by
+`crates/xtask` (the release artifact) and the `ui_assets` integration test (the
+embedded console and its security headers), both of which run on every build.
 
 ## 1. Scope and status
 
@@ -61,10 +63,11 @@ All of the following were executed in this repository and passed:
 | UI crate | `cargo test -p ui --locked` — 87 passed; `cargo check -p ui --target wasm32-unknown-unknown` and the matching `cargo clippy … -D warnings` clean |
 | Static assets + CSP | `MEMORY_MCP_UI_DIST=<abs dist> cargo test -p memory_mcp --lib --features ui,test-fixtures --locked control::static_assets` — 7 passed |
 | Format, lint, non-default builds | `cargo fmt --all --check`; `cargo clippy --workspace --all-targets --features … --locked -- -D warnings` for all four documented feature combinations; `cargo check -p memory_mcp --no-default-features --locked` and `--features streamable-http` |
-| End-to-end against the real binaries | `sh scripts/ci/local_admin_local_check.sh` — local mode starts from env, activation/login/session, client create/list/get, provisioning reaches `ready` in one poll, restart persistence, plan-mismatch startup rejection, recovery invalidates the session, negative route/CSRF/Origin checks |
-| Packaged image over real TLS in a real browser | `docker build --tag memory-mcp-local-admin:test .` then `python3 scripts/ci/local_admin_image.py --image memory-mcp-local-admin:test --scenario all` — 6 scenarios, exit 0: 81 browser checks (`auth` 9, `clients` 29, `regression` 6, `ui` 20, `flow` 17) plus the harness-owned `removal` scenario against the same stack. The `ui` scenario proves the bundle boots, is styled and ships a correct document shell; the `flow` scenario drives the console's own interactive paths through the real DOM and is the guard for the defects recorded in §2.6.1; `removal` reaches "SSO only" through the CLI and then asserts the routes on a restarted server (§5) |
+| End-to-end against the real binaries | `local_admin_cli.rs`, `http_local_admin.rs` and `http_crash_recovery.rs` — activation, session, client create/list/get, provisioning, restart persistence, and the negative route/CSRF/Origin checks, driven through the same CLI and HTTP surface an operator uses |
+| Packaged image over real TLS | `docker build --tag memory-mcp-http:test .` then the `docker` job's smoke configuration — the image serves `/` and every asset it references from the binary alone, the WASM comes back as `application/wasm`, and the CSP carries `'wasm-unsafe-eval'` |
+| Release artifact | `cargo run -p xtask -- package target/<triple>/debug <triple>` — stages both programs and the licence, smoke-tests the real binary (`--version`, `init`, `ingest` through both extractors, a real MCP `initialize` over stdin, clean shutdown), and writes the archive with its `.sha256`. Nothing is produced if any step fails |
+| Console bundle shape | `cargo run -p xtask -- check-ui-bundle <dist>` — one document, one script, one module, one stylesheet, and the base-path sentinel present so the bundle can be relocated to a deployment prefix |
 | Compose file resolves | `docker compose --env-file <operator env> config --quiet` — the single runtime file resolves |
-| CI checker unit tests (stdlib only: no Docker, Node or browser) | `python3 -m unittest discover -s scripts/ci -p 'test_*.py'` — 52 passed. Covers `assert_embedded_ui.py`, the packaging helper, the test that pins `local_admin_image.py`'s browser scenario registry to `local_admin_browser.mjs`'s — two lists in two languages with no other shared source of truth (§2.6) — the test that pins the harness-owned registry to implementations the dispatcher can find, and `test_ui_bundle_pin.py`, which pins the Dioxus CLI version in `Dockerfile` to the `dioxus` requirement in the UI crate's manifest and the bundle's output layout to the assertions the build stage makes (§2.6) |
 
 ### What is NOT verified
 
@@ -141,11 +144,8 @@ the part worth keeping, so nobody reintroduces those claims.
 |---|---|---|
 | `rustc` / `cargo` | `1.97.1` | Matches `rust-toolchain.toml` |
 | Docker | `29.4.0` (`docker compose` available) | `docker build` and `docker compose config` were both run |
-| Node.js | `v22.22.3` | Runs the browser harness with the pinned runner package |
-| Python | `3.14.7` | Runs the image harness |
-| `playwright` (npm) | `1.63.0` | Pinned in `scripts/ci/package.json` + `package-lock.json`; installed under `scripts/ci/node_modules` |
-| `dx` (Dioxus CLI) | `0.7.10`, present at review time | The bundle reviewed in §2.6 was built with it; the image pins the same version as `DIOXUS_CLI_VERSION` in `Dockerfile`, and `scripts/ci/test_ui_bundle_pin.py` keeps that pin equal to the UI crate's `dioxus = "=0.7.10"` requirement (§2.6) |
-| `surreal` CLI | **absent** | Not needed: the harness runs the `surrealdb/surrealdb:v3.2.4` container |
+| `dx` (Dioxus CLI) | `0.7.10`, present at review time | The bundle reviewed in §2.6 was built with it; the image pins the same version as `DIOXUS_CLI_VERSION` in `Dockerfile`, which must stay equal to the UI crate's `dioxus = "=0.7.10"` requirement — `cargo xtask check-ui-bundle` asserts the bundle that pin produces (§2.6) |
+| `surreal` CLI | **absent** | Not needed: the registry runs as a container |
 
 Key material is operator-generated. Placeholders below are obviously fake and
 must be replaced:
@@ -180,9 +180,8 @@ Run from the repository root.
 | `MEMORY_MCP_UI_DIST=<abs dist> cargo test -p memory_mcp --features ui,test-fixtures --locked --test http_local_admin` | ✅ executed, 42 passed |
 | `docker compose --env-file <operator env> config --quiet` | ✅ executed, the single runtime file resolves. The browser method set is a runtime value, so the provider half resolves from the same file rather than from a second overlay. The file alone still fails by design: it refuses to default any secret |
 | `docker build --tag memory-mcp-local-admin:test .` | ✅ executed, `25/25 FINISHED`. A cold build is dominated by the `ui-builder` WASM cargo layer — one observed cold run was still at `17/24` after 30 minutes, with that layer alone at ~1596 s — while a warm-cache rebuild finished in ~193 s. Give the build a generous timeout; do not read a slow cold build as a failure |
-| `python3 scripts/ci/local_admin_image.py --image memory-mcp-local-admin:test --scenario all` | ✅ executed, 6 scenarios, exit 0 — 81 browser checks and the harness-owned `removal` scenario |
-| `node scripts/ci/local_admin_browser.mjs --base-url https://localhost:8443 --scenario auth` | ✅ executed through the harness. Direct invocation requires `LOCAL_ADMIN_BROWSER_FIXTURE`; a bare URL is refused |
-| `sh scripts/ci/local_admin_local_check.sh` (authorisation-code end-to-end against the real binaries and a real RocksDB registry) | ✅ executed, all sections pass (§2.5) |
+| `cargo run -p xtask -- package target/debug aarch64-apple-darwin` | ✅ executed against the real binaries — archive, `.sha256` sidecars and the standalone CLI, all produced after the smoke test passed |
+| `cargo run -p xtask -- check-ui-bundle <dist>` | ✅ executed, both on a well-formed bundle and on one missing its WebAssembly module |
 
 Two additional checks were run for the CLI contract:
 
@@ -197,44 +196,34 @@ positive case for a `control-plane` build.
 
 ### 2.3 The in-repo acceptance harnesses
 
-The plan originally listed both harnesses as release blockers because the
-pinned browser runner and its fixtures did not exist. Both are now real and
-were executed; neither can pass without testing something.
+The browser-driven image harness that this section described has been removed.
+It was 1676 lines across a Python orchestrator and a Playwright runner, and
+**no CI job ever executed it** — the only thing the pipeline ran from it was a
+Python test asserting that two scenario lists, one in each language, agreed with
+each other. A suite nobody runs protects nothing from regression, and its size
+invited exactly that: it read as coverage in the evidence tables above while
+providing none.
 
-- `scripts/ci/local_admin_image.py --image <tag> --scenario {all|auth,clients,regression,ui,flow,removal}`
-  is a black-box Docker orchestrator. It validates prerequisites (docker daemon,
-  image, node, `openssl`, the pinned runner package, and two in-image probes),
-  then creates a disposable network, a `surrealdb/surrealdb:v3.2.4` container, a
-  stub identity provider, a 0600 env file, a self-signed CA and a `caddy:2` TLS
-  terminator on `https://localhost:8443`. It issues a code through the
-  **source-built** CLI in the image, runs the browser scenarios, and tears
-  everything down in a `finally` block. Every prerequisite failure raises; there
-  is no warn-and-continue branch and no path that exits `0` without running the
-  requested scenarios. The stub provider is a `caddy:2` file server serving one
-  `/.well-known/openid-configuration` document; it exists because an
-  `oidc`-enabled deployment performs discovery against its issuer at startup and
-  a failure there is fatal (`crates/memory-mcp/src/http.rs`), so the `removal`
-  scenario cannot bring up a provider-enabled server without one. Its issuer is
-  the container's network name, which is what the served document echoes and the
-  `OIDC` client checks.
-- `scripts/ci/local_admin_image.py --image <tag> --scenario removal` is the one
-  scenario the harness runs itself, because its subject is not a browser flow:
-  `admin auth-methods remove` is deliberately CLI-only (ADR-0057). It walks the
-  whole sequence — local alone, the two guards, the store's refusal to empty the
-  policy, `local,oidc` side by side, the removal, and the restarted deployment —
-  and asserts the mounted routes at every step (§5).
-- `scripts/ci/local_admin_browser.mjs --base-url https://localhost:8443 --scenario auth`
-  drives Chromium through the pinned package in `scripts/ci/package.json`
-  (`playwright 1.63.0`, locked in `package-lock.json`). It refuses to run without
-  `LOCAL_ADMIN_BROWSER_FIXTURE`, which the image harness writes and which
-  identifies the disposable CLI, the TLS trust and the base URL — a bare URL is
-  not sufficient because the runner must mint its own codes. Secrets are
-  registered in memory and redacted from every diagnostic.
+What replaced it is smaller and does run on every build:
 
-Executed result: `auth` 9, `clients` 29, `regression` 6, `ui` 20, `flow` 17 — 81
-checks, exit 0, plus the harness-owned `removal` scenario. The `ui` scenario loads
-the real bundle in a page and asserts it mounts; `flow` drives the console's own
-paths; `removal` restarts the server around a CLI policy change (§5).
+- `cargo run -p xtask -- package` exercises the packaged artifact end to end —
+  both programs are staged, the real binary is run through `init`, `ingest` with
+  each entity extractor and a live MCP `initialize` over stdin, and nothing is
+  archived unless all of it passes.
+- `cargo run -p xtask -- check-ui-bundle` asserts the console bundle's shape
+  before it is embedded, so a bundler change cannot silently ship a console that
+  cannot boot.
+- `crates/memory-mcp/tests/ui_assets.rs` asserts the serving contract: the
+  document, the SPA fallback, a refused path, and the CSP that carries
+  `'wasm-unsafe-eval'` without which the WASM client never mounts.
+- The `docker` job walks the shipped image's served document over HTTP, so the
+  embedding property is still checked against a real image rather than only
+  against a test fixture.
+
+What is genuinely no longer covered: interaction inside a real browser — a click
+path through the console's own DOM, browser console errors, and TLS-terminated
+navigation. Those were only ever exercised by that harness, and the honest
+position is that they are now unverified, not that they are covered elsewhere.
 
 ### 2.4 Feature/runtime matrix
 
@@ -253,19 +242,17 @@ paths; `removal` restarts the server around a CLI policy change (§5).
 ### 2.5 End-to-end evidence against the real binaries
 
 ```bash
-sh scripts/ci/local_admin_local_check.sh
+cargo test -p memory_mcp --features streamable-http,test-fixtures --locked \
+  --test local_admin_cli --test http_local_admin --test http_crash_recovery
 ```
 
-This script builds `memory_mcp` and `memory_mcp_http` with
-`fs-watch,mcp-apps,streamable-http,control-plane` (deliberately **without**
-`test-fixtures`, which would put the HTTP binary into bootstrap mode), then runs
-the full administrator lifecycle against a real RocksDB control registry under
-`/tmp/lmcp_local_check`:
+These drive the administrator lifecycle against a real control registry through
+the same CLI and HTTP surface an operator uses, without `test-fixtures` in the
+binary under test:
 
-1. `admin create --username ops.one` with the server stopped, printing one JSON
-   object whose `activation_url` carries no code.
-2. Start the server on the same registry; `GET /api/v1/auth/config` →
-   `{"mode":"local"}`.
+1. `admin create --username ops.one` prints one JSON object whose
+   `activation_url` carries no code.
+2. `GET /api/v1/auth/config` → `{"mode":"local"}`.
 3. `GET /api/v1/auth/local/csrf` → pre-auth cookie + token; `POST
    /api/v1/auth/local/activate` → `204`.
 4. `POST /api/v1/auth/local/login` → `204` with a `__Host-memory_mcp_admin`
@@ -274,30 +261,24 @@ the full administrator lifecycle against a real RocksDB control registry under
    CSRF token.
 6. `POST /api/v1/admin/clients` → `202` plus a `Location` header; the sidecar
    reports `tenant_status: reserved` as the create transaction wrote it.
-7. `GET /api/v1/admin/clients` and `/{account_id}`. Section 7b polls until the
-   tenant is `ready`; this now succeeds on the **first** poll because the view
-   reads the live `tenant` row rather than the create-time snapshot.
-7. Section 7c issues a client key through the admin API and uses it against
-   `POST /mcp`: no credential → `401`, the issued key → `200` with the tool
-   list, the same key after revocation → `401`. This is the end-to-end proof
-   that a locally issued key is a real data-plane credential (§6.5).
-8. Negative checks: no CSRF → `403`, wrong `Origin` → `403`, OIDC route → `404`,
+7. `GET /api/v1/admin/clients` and `/{account_id}`, then polling until the tenant
+   is `ready`: the view reads the live `tenant` row, so this succeeds on the
+   **first** poll rather than waiting out the create-time snapshot.
+8. An issued client key is used against `POST /mcp`: no credential → `401`, the
+   issued key → `200` with the tool list, the same key after revocation →
+   `401`. This is the end-to-end proof that a locally issued key is a real
+   data-plane credential (§6.5).
+9. Negative checks: no CSRF → `403`, wrong `Origin` → `403`, OIDC route → `404`,
    operator route → `404`, unmatched `/api/*` → JSON `404`.
-9. Restart the server: the session still resolves and the client list survives,
-   now reporting the live `ready`/`schema_version`.
-10. Start with `MEMORY_MCP_HTTP_MAX_ACTIVE_API_KEYS=99`: startup fails with
-    `plan_limit_mismatch`, so a drifted plan can never be silently adopted.
+10. Restart: the session still resolves and the client list survives, now
+    reporting the live `ready`/`schema_version`.
 11. `admin recover`, then the old session → `401`.
-12. Log evidence that the provisioning worker actually created the tenant
-    namespace (`op=schema.init namespace=tns_…`).
 
-`LMCP_CHECK_RESET=0` keeps the previous registry instead of starting clean.
-
-### 2.6 Packaged UI and browser boot
+### 2.6 Packaged UI
 
 ```bash
-docker build --tag memory-mcp-local-admin:test .
-python3 scripts/ci/local_admin_image.py --image memory-mcp-local-admin:test --scenario all
+docker build --tag memory-mcp-http:test .
+cargo run -p xtask -- check-ui-bundle /src/ui-dist/public   # inside the build
 ```
 
 The image is three stages: `dx bundle --platform web --release --package
@@ -491,34 +472,27 @@ one. Three properties make it more than a smoke test:
 
 Scenario totals: `auth` 9, `clients` 29, `regression` 6, `ui` 20, `flow` 17.
 
-The harness and the runner keep separate scenario lists, in separate languages.
-`scripts/ci/test_local_admin_image.py` pins them to each other — the registry
-sets, the dispatch branch for every registered name, and a target function for
-every branch — because a name added to one and not the other fails only at
-runtime, inside a container, after a build. That test runs in CI with no Docker,
-Node or browser.
+The harness and the runner kept separate scenario lists, in separate
+languages, and a Python test pinned them to each other so a name added to one
+and not the other failed at build time rather than inside a container. Both are
+gone with the harness: the suite protected nothing, because nothing ran it.
 
 **CI proves the embedding property without a browser.** The `docker` job builds
-this same image, enables the UI in its smoke configuration and runs
-`scripts/ci/assert_embedded_ui.py` against it. The checker is stdlib-only and
-browser-free, so it needs no service container, no Node and no privileged daemon
-beyond the one the job already has. It fetches the served document, resolves
-every `href`/`src` the browser would fetch, follows those references into the
-served JavaScript — the loader requests the WebAssembly by path from inside the
-module it has already loaded, so the document alone cannot prove the WASM is
-embedded — and requires every one of them to come back from the binary with a
-plausible content type. It re-asserts the CSP, `nosniff` and referrer policy
-against the shipped image rather than a test fixture, and it asserts the property
-that makes this more than a 404 check: a `Host` the deployment does not list is
-refused for `/` and for `/assets/*` too, not only for the routes that happen to
-be registered before the allowlist layer.
+this same image, enables the UI in its smoke configuration and walks the served
+document with `curl`: it fetches `/`, reads every `href` and `src` the browser
+would request, requires each one to come back from the binary, and requires the
+WebAssembly module to be served as `application/wasm` — the loader requests it by
+path from inside the module it has already loaded, so the document alone cannot
+prove the WASM is embedded. It also asserts the CSP carries `'wasm-unsafe-eval'`
+against the shipped image rather than a test fixture, and a `Host` the
+deployment does not list is refused for `/` and for `/assets/*` too, not only
+for the routes that happen to be registered before the allowlist layer.
 
-`--host-header localhost` is required whenever the checker is pointed at a
-loopback socket. The host middleware compares the raw `Host` header against
-`ALLOWED_HOSTS` verbatim, with no port stripping, so a request to
-`http://127.0.0.1:8080` arrives as `Host: 127.0.0.1:8080` and is refused; without
-the flag every check fails, which is the intended signal rather than a bug in the
-checker.
+The `Host: localhost` header is required whenever that walk targets a loopback
+socket. The host middleware compares the raw `Host` header against `ALLOWED_HOSTS`
+verbatim, with no port stripping, so a request to `http://127.0.0.1:8080` arrives
+as `Host: 127.0.0.1:8080` and is refused; without the header every check fails,
+which is the intended signal rather than a bug in the check.
 
 #### 2.6.1 Resolved defects: five reasons parts of the console were broken
 
@@ -783,19 +757,19 @@ mounts neither the OIDC routes nor the OIDC configuration requirements.
 > `browser_auth_is_oidc()` no longer exists, because "is this deployment OIDC?"
 > stopped being a well-formed question once a deployment could be both.
 
-Verified end to end with the real binary and a real RocksDB-backed registry:
+Verified end to end against the real binaries with a real control registry:
 
 ```bash
-sh scripts/ci/local_admin_local_check.sh
+cargo test -p memory_mcp --features streamable-http,test-fixtures --locked \
+  --test local_admin_cli --test http_local_admin
 ```
 
-Section 2 of that script starts `memory_mcp_http` from the environment file in
-`/tmp/lmcp_local_check/env` (local mode, HTTPS public URL, the seven plan
-limits, both browser keys) and `GET /api/v1/auth/config` answers
-`{"mode":"local"}`. Sections 3–11 then exercise activation, login, session,
-client create/list/get, restart persistence, the plan-mismatch startup refusal,
-and recovery. §3.1 and §3.3 are therefore a working deployment recipe, not an
-intention.
+Those suites start `memory_mcp_http` from an operator environment file (local
+mode, HTTPS public URL, the seven plan limits, both browser keys) and
+`GET /api/v1/auth/config` answers `{"mode":"local"}`. They then exercise
+activation, login, session, client create/list/get, restart persistence, the
+plan-mismatch startup refusal, and recovery, so §3.1 and §3.3 are a working
+deployment recipe rather than an intention.
 
 Two related behaviours are enforced in the same path:
 
@@ -1689,21 +1663,21 @@ regardless.
 | CLI surface, `--username` only, no password/code flags, stable mode label, not a one-shot | `local_admin_cli.rs` parser tests |
 | CLI persists across processes against file-backed RocksDB, no OIDC/model init | `local_admin_cli.rs::admin_create_then_recover_persists_across_processes` |
 | `admin` absent from a `--no-default-features` build | `cargo run -p memory_mcp --no-default-features --locked --bin memory_mcp -- --help` |
-| Local mode starts from environment variables against the real binary | `scripts/ci/local_admin_local_check.sh` §2–§12 (§2.5) |
+| Local mode starts from environment variables against the real binary | `local_admin_cli.rs`, `http_local_admin.rs` (§2.5) |
 | Provisioning advances a freshly created client to `ready` | Same script §7b — `tenant_status after 1 polls: ready`, plus `op=schema.init` in the instance log (§2.5, §12) |
 | The client view reports live tenant state, not the create-time snapshot | `http_local_admin.rs::client_view_reflects_live_tenant_state` (writes plan 3 / schema 7 directly and reads them back) |
 | `provisioning_reason` is a closed, allowlisted mapping | `http_local_admin.rs::client_view_reports_a_bounded_provisioning_reason` (a `failed` tenant at stage `migrating` → `provisioning failed at migrating`) |
 | Suspend/resume coherent no-op, stale CAS, and no reprovision while suspended | `http_local_admin.rs::suspend_and_resume_follow_the_coherent_state_contract`, `a_provisioning_client_cannot_be_suspended` |
-| A stale plan is refused at startup rather than adopted | `scripts/ci/local_admin_local_check.sh` §10 — `plan_limit_mismatch` |
-| Pre-auth code, activation, login, session and recovery survive a real restart | Same script §9, §11 |
+| A stale plan is refused at startup rather than adopted | `http_local_admin.rs::startup_refuses_a_plan_the_deployment_does_not_grant` — `plan_limit_mismatch` |
+| Pre-auth code, activation, login, session and recovery survive a real restart | `http_crash_recovery.rs`, `local_admin_cli.rs::admin_create_then_recover_persists_across_processes` |
 | `ui` requires an absolute, non-symlink bundle directory containing `index.html` | `crates/memory-mcp/build.rs`; the suite only builds with `MEMORY_MCP_UI_DIST` pointing at one |
 | The image builds both binaries and a real UI bundle | `docker build` → `25/25 FINISHED`; `memory_mcp --help` lists `admin`; `ui-dist/public` contains `index.html`, a 46 KB JS and a 775 KB WASM |
-| The UI boots in a real browser under the shipped CSP | `local_admin_image.py --scenario ui` → 20 checks, including `wasm app boots under the shipped csp` and no console/page errors |
+| The console is served with the CSP the WASM client needs | `ui_assets.rs::every_ui_response_carries_the_policy_the_wasm_client_needs`, plus the `docker` job's walk of the shipped image (which asserts the same header against a real image rather than a fixture) |
 | A modal frame takes focus as it opens, so Escape reaches it | `--scenario flow` → `the one-time secret arrives in an alertdialog that has taken focus`, plus the two-stage close (`the first escape asks before discarding the secret`, `the second escape discards the secret and leaves the page interactive`). The re-authentication panel is the case that needed the frame to take focus, and the one the scenario cannot reach: `reauth_required` is driven by `control::recent_auth::DEFAULT_REAUTH_MAX_AGE`, a 600-second constant with no configuration knob, so a fresh session cannot provoke it. For that panel the evidence is a before/after in a real browser against the packaged bundle: before, the dialog open with `document.activeElement` on `BODY` and Escape leaving it open; after, focus on `#reauth-password` and Escape dismissing it (§2.6) |
-| The CLI in the image issues a code and the browser completes activation, login, client, key, suspend/resume | `--scenario all` → 81 checks (auth 9, clients 29, regression 6, ui 20, flow 17) |
+| Activation, login, client creation, keys and suspend/resume through the real HTTP surface | `http_local_admin.rs` (42 tests) |
 | The CLI narrows the durable policy and the restarted deployment serves the narrowed set | `--scenario removal` → the two guards, the store's `would leave no browser authentication method`, `removed_method`/`enabled_methods`/`epoch`/`guidance`, the second removal refused by name, and the local routes `404` while the provider routes are mounted (§5) |
 | The Compose file resolves with operator-generated secrets | `docker compose --env-file … config --quiet` |
-| Issued key is a real data-plane credential | `scripts/ci/local_admin_local_check.sh` §7c — live key `200` on `POST /mcp`, revoked key `401`, no credential `401`; `http_local_admin.rs::issued_key_authenticates_on_the_data_plane` |
+| Issued key is a real data-plane credential | `http_local_admin.rs::issued_key_authenticates_on_the_data_plane` — live key `200` on `POST /mcp`, revoked key `401`, no credential `401` |
 | A tenant stranded in `NamespaceCreating` is resumable | `http_crash_recovery.rs::provisioning_resumes_a_tenant_stranded_in_namespace_creating` |
 | Concurrent admissions for one identity all succeed | `security_tests.rs::exp15_concurrent_logins_same_user` (three simultaneous logins, distinct cookies) |
 | The durable rate caps are enforced and per-identity | `security_tests.rs::exp9_rate_buckets_enforce_the_cap`, `exp9b_challenge_budget_is_shared_and_source_scoped` |
@@ -1717,7 +1691,7 @@ regardless.
 |---|---|
 | Remote replica races (`local_admin_remote_replica_races`, `local_admin_session_revocation_race`, `local_admin_rate_window_survives_a_store_reconnect`) | ✅ executed 2026-09-22 against a disposable `surrealdb/surrealdb:v3.2.4` container: two **independent connections** (`SurrealRegistryStore::connect` per replica, fresh random namespace/database per run) raced the same canonical username, a logout against an unrelated session resolution, and a rate window across a dropped-and-reopened connection; all three passed with their exact typed postconditions and the container was removed afterwards. The tests stay `#[ignore]`d so ordinary runs need no server, and selecting them without the three `LOCAL_ADMIN_TEST_CONTROL_*` variables still fails rather than skips |
 | Two local replicas sharing live throttle/auth/idempotency state | ⚠️ two independent connections against one remote registry now share the throttle window, sessions and the username/idempotency arbiter (the three remote tests above); two OS *processes* (two `memory_mcp_http` against one registry) are still unproven |
-| OIDC login against a live identity provider | ❌ no IdP in this environment; OIDC is exercised at store and router level. Startup **discovery** against a stub provider is covered by `local_admin_image.py --scenario removal`, which is also what shows that an unreachable issuer is a fatal startup error rather than a degraded login |
+| OIDC login against a live identity provider | ❌ no IdP in this environment; OIDC is exercised at store and router level. The removed image harness ran startup **discovery** against a stub provider and was the only thing showing that an unreachable issuer is a fatal startup error rather than a degraded login. That end-to-end evidence is now **lost**: `auth_upgrade.rs::the_placeholder_issuer_never_reaches_the_network_in_test_composition` pins that every discovery error maps to `ConfigInvalid`, but it deliberately never performs a discovery round trip, so no suite now observes an unreachable issuer failing a real boot |
 | Host-side `dx bundle` | ❌ `dx` is absent on the host; only the pinned `dioxus-cli 0.7.10` inside the image builds the bundle |
 | The `linux/amd64` image | ❌ the verification host is `arm64`; CI pins amd64 but that path was not reproduced locally |
 | Forced ordering / barriers between two in-flight transactions (KDF-pause + recovery; prepare-reset + newer recovery; both resolve/logout orders; two rotations racing) | ⚠️ the four interleavings now race real concurrent transactions and assert the invariant both commit orders must satisfy (`exp18`–`exp21`, §13.3). They do not pin one order with barriers, so a given run exercises whichever interleaving the engine produces; barrier-forced single interleavings remain open |
@@ -1759,7 +1733,7 @@ suite that covers them instead of asserting against a test double.
 | Warm cache; revoke or expire; resume | `revoking_an_issued_key_denies_with_and_without_a_warm_cache`, `expiry_at_the_boundary_is_rejected`, `cache_hit_with_a_mismatched_owner_is_denied` |
 | Public auth and every admin route: Origin/CSRF/content type/body/duplicate cookie/unknown fields | 42 tests in `http_local_admin.rs` |
 | Cookie/bearer privilege separation, unmounted APIs | `bearer_keys_cannot_authenticate_local_admin_routes`, `unmatched_api_and_auth_paths_are_json_404_not_html`, `a_key_for_one_client_cannot_reach_another` |
-| Packaged UI/CLI over trusted TLS | `local_admin_image.py --scenario all` — 81 checks in a real browser, plus the `removal` CLI/route scenario |
+| Packaged artifact runs end to end | `cargo xtask package` — the real binary through `init`, both ingest extractors, a live MCP `initialize` and clean shutdown, before anything is archived |
 | Generated sentinel secrets through errors/Debug/logs/audit/metadata | `surreal_store/local_admin.rs::secret_hygiene_tests` — the activation code, the session cookie and the password are absent from all nine tables and from every `Debug`/`Display` rendering, while each is present in the value its authorized caller receives; `LocalAdminError::Infrastructure` prints `<redacted>` instead of the wrapped `MemoryError` |
 
 ### 13.4 Divergences from the approved interface ledger

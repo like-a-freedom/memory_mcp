@@ -32,9 +32,8 @@ const INDEX_PATH: &str = "/index.html";
 /// carries it in every prefix-dependent URL and in the `DIOXUS_ASSET_ROOT`
 /// meta; [`stamp_index_html`] replaces it with the deployed mount base at
 /// startup. The same literal lives in `crates/ui/src/base.rs`,
-/// `crates/ui/index.html`, the `Dockerfile`'s `dx bundle`
-/// invocation and `scripts/ci/local_admin_browser.mjs` — all five must change
-/// together.
+/// `crates/ui/index.html`, the `Dockerfile`'s `dx bundle` invocation and
+/// `crates/xtask/src/bundle.rs` — all five must change together.
 pub(crate) const BASE_PATH_SENTINEL: &str = "/__memory_mcp_base__";
 
 const META_PREFIX: &str = r#"<meta name="DIOXUS_ASSET_ROOT" content=""#;
@@ -114,9 +113,8 @@ fn with_meta(html: String, base: &str) -> Result<String, MemoryError> {
 /// eval-like sink, so `script-src 'self'` alone blocks
 /// `WebAssembly.instantiateStreaming` and the SPA never mounts. The token
 /// permits WebAssembly compilation only; it does not enable JavaScript `eval`
-/// or `new Function`, which stay blocked. Verified by the
-/// `scripts/ci/local_admin_browser.mjs` `ui` scenario, which loads the real
-/// bundle in a browser under this header.
+/// or `new Function`, which stay blocked. The `ui_assets` integration test
+/// asserts the header on a hit, an SPA route and a miss.
 const CONTENT_SECURITY_POLICY: &str = "default-src 'self'; \
      script-src 'self' 'wasm-unsafe-eval'; style-src 'self'; connect-src 'self'; \
      frame-ancestors 'none'; object-src 'none'; base-uri 'none'; form-action 'self'";

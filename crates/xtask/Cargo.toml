@@ -1,0 +1,29 @@
+[package]
+name = "xtask"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish = false
+
+# The repository's build automation: packaging release artifacts and
+# asserting the console bundle's shape. It replaces the Python tooling that
+# used to live in `scripts/ci`, so CI runs nothing outside cargo.
+[[bin]]
+name = "xtask"
+path = "src/main.rs"
+
+[dependencies]
+clap.workspace = true
+flate2 = { version = "1.1", default-features = false, features = ["rust_backend"] }
+hex.workspace = true
+serde_json.workspace = true
+sha2.workspace = true
+tar = { version = "0.4", default-features = false }
+# The smoke test needs a scratch directory for its embedded database and
+# ingestion inbox, exactly as the Python tooling used `tempfile`.
+tempfile.workspace = true
+zip.workspace = true
+
+[lints]
+workspace = true

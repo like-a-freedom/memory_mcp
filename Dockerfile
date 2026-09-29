@@ -77,11 +77,7 @@ RUN --mount=type=cache,id=memory-mcp-cargo-registry-ui,target=/usr/local/cargo/r
     cd /src; \
     rm -rf /src/target/dx/ui/release/web/public /src/ui-dist; \
     dx bundle --platform web --release --package ui --out-dir /src/ui-dist --base-path /__memory_mcp_base__; \
-    test -s /src/ui-dist/public/index.html; \
-    grep -q '__memory_mcp_base__' /src/ui-dist/public/index.html; \
-    test "$(find /src/ui-dist/public -type f -name '*.js'   | wc -l)" = "1"; \
-    test "$(find /src/ui-dist/public -type f -name '*.wasm' | wc -l)" = "1"; \
-    test "$(find /src/ui-dist/public -type f -name '*.css'  | wc -l)" = "1"
+    cargo run --locked -p xtask -- check-ui-bundle /src/ui-dist/public
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Stage 2 — Rust binaries. Consumes the UI bundle produced by stage 1 and

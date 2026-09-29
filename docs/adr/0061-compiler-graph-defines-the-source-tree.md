@@ -1,5 +1,14 @@
 # The compiler's dependency graph defines the source tree
 
+> **Superseded by [ADR-0063](0063-retire-the-undeclared-source-audit.md).** The
+> analysis below stands — the 137 files were real, and rustc structurally
+> cannot report them. The audit it produced has since been removed: it read
+> cargo's artifact layout, and on a runner that sets `CARGO_BUILD_TARGET` it
+> inspected nothing and reported "no compiled sources were found" — a confident
+> failure about a tree it never looked at. This record is kept because the
+> reasoning that produced both the retired manifest and the retired audit is
+> worth more than the machinery either of them became.
+
 A `.rs` file is part of the build only if some `mod` declaration, `#[path]`
 attribute, or `include!` reaches it. A file nothing reaches is invisible to
 the entire toolchain: rustc never reads it, so it cannot emit a `dead_code`

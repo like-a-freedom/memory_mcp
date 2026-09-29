@@ -39,9 +39,11 @@ in ADR-0016.
 > undeclared `.rs` file is invisible to rustc, so no lint, no warning and no
 > test reports it — the migration's reorganisation left 137 such files behind
 > while the build stayed green. The per-file manifest that used to track this
-> was retired with the migration record; `scripts/ci/audit_undeclared_sources.py`
-> now derives the same fact from rustc's own dependency graph
-> ([ADR-0061](docs/adr/0061-compiler-graph-defines-the-source-tree.md)).
+> was retired with the migration record, and the audit that replaced it has
+> since been removed: nothing now derives this fact from rustc's dependency
+> graph
+> ([ADR-0061](docs/adr/0061-compiler-graph-defines-the-source-tree.md),
+> [ADR-0063](docs/adr/0063-retire-the-undeclared-source-audit.md)).
 
 - `src/models/` — domain values and typed records.
 - `src/identity/api.rs` — identity use cases: unlink/last-link, verified link
@@ -76,7 +78,7 @@ in ADR-0016.
   local-administrator business logic, and one-way compatibility re-exports. It
   holds no business logic of its own; use cases belong to the owning context's
   `api.rs`. A file here that no `mod` declaration reaches is not part of the
-  build at all, and `scripts/ci/audit_undeclared_sources.py` fails on one.
+  build at all.
 - `src/storage/` — the technical persistence platform: `DbClient`, the
   query builders, migrations, row unwrapping and the platform's own
   access and event logs. No domain data; every canonical table's store

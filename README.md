@@ -1196,8 +1196,8 @@ URL (the `index.html` asset URLs, the JS loader's hashed WASM URL) and in its
 `DIOXUS_ASSET_ROOT` meta; `memory_mcp_http` replaces it with
 the path of `MEMORY_MCP_HTTP_PUBLIC_BASE_URL` at startup (see *Deploying under
 a path prefix*). The same literal lives in `crates/ui/index.html`, `crates/ui/src/base.rs` and `BASE_PATH_SENTINEL`
-(`crates/memory-mcp/src/control/static_assets.rs`), the `Dockerfile`, and
-`scripts/ci/local_admin_browser.mjs`; changing it means changing all five
+(`crates/memory-mcp/src/ui/assets.rs`), the `Dockerfile`, and
+`crates/xtask/src/bundle.rs`; changing it means changing all five
 sites together.
 
 The named directory must contain a non-empty `index.html`. All regular files are copied

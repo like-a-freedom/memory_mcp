@@ -97,17 +97,20 @@ The lightweight PR/release evaluation baselines remain mandatory in CI.
 cargo fmt --all --check
 cargo clippy --workspace --all-targets --features fs-watch,mcp-apps,streamable-http,control-plane --locked -- -D warnings
 cargo test --workspace --lib --bins --tests --locked
-python3 -m unittest discover -s scripts/ci -p 'test_*.py'
 actionlint
 ```
 
-The shared setup is `.github/actions/setup/action.yml`; packaging and smoke
-checks are in `scripts/ci/package.py`. No generated workflow files or custom
-CI framework are involved.
+The shared setup is `.github/actions/setup/action.yml`. Packaging and the
+console-bundle contract live in `crates/xtask` (`cargo run -p xtask -- package`
+and `cargo run -p xtask -- check-ui-bundle`). No generated workflow files or
+custom CI framework are involved.
 
-The `unittest` line above also pins two contracts that CI would otherwise leave
-to a comment: the image harness's scenario registry and the browser runner's
-(`test_local_admin_image.py`), and the Dioxus CLI version the console's bundle is
-built with against the `dioxus` requirement in the UI crate's manifest
-(`test_ui_bundle_pin.py`). Both are stdlib-only, so they run in the quality job
-without Docker, Node or a browser.
+Every check the pipeline runs is a cargo command. The Python tooling that
+previously lived under `scripts/ci` has been removed: `package.py` became
+`xtask package`, the Dioxus CLI pin and the bundle's output layout became
+`xtask check-ui-bundle`, the embedded-UI checker became the `ui_assets`
+integration test plus the `docker` job's own walk of the served document, and
+the rest guarded code that either no longer exists or is covered by cargo
+already. A guard that a job never executed was not protecting anything, and two
+of those scripts had in fact failed CI for reasons unrelated to the tree they
+were inspecting.
