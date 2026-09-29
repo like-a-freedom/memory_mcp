@@ -220,11 +220,22 @@ impl OidcClient {
             Algorithm::RS512 => "RS512",
             Algorithm::ES256 => "ES256",
             Algorithm::EdDSA => "EdDSA",
-            _ => return Err(AuthError::DisallowedAlgorithm),
+            // Named even on the way out: an algorithm this build does not know
+            // is exactly the case where the operator needs to see which one
+            // the provider used.
+            other => {
+                return Err(AuthError::DisallowedAlgorithm {
+                    alg: format!("{other:?}"),
+                    kid: kid.clone(),
+                });
+            }
         };
 
         if !self.allowed_algorithms.contains(&alg) {
-            return Err(AuthError::DisallowedAlgorithm);
+            return Err(AuthError::DisallowedAlgorithm {
+                alg: alg.to_owned(),
+                kid,
+            });
         }
 
         let key: DecodingKey = self.jwks.key_for(&kid).await?;
@@ -238,7 +249,12 @@ impl OidcClient {
             "RS512" => Algorithm::RS512,
             "ES256" => Algorithm::ES256,
             "EdDSA" => Algorithm::EdDSA,
-            _ => return Err(AuthError::DisallowedAlgorithm),
+            _ => {
+                return Err(AuthError::DisallowedAlgorithm {
+                    alg: alg.to_owned(),
+                    kid,
+                });
+            }
         };
         let mut validation = Validation::new(validation_algorithm);
         validation.set_audience(&[&self.audience]);

@@ -96,7 +96,7 @@ fn id_token_reason(error: &super::flow_material::AuthError) -> &'static str {
     match error {
         AuthError::MalformedToken => "malformed",
         AuthError::MissingKeyId => "missing_kid",
-        AuthError::DisallowedAlgorithm => "disallowed_alg",
+        AuthError::DisallowedAlgorithm { .. } => "disallowed_alg",
         AuthError::Jwt(_) => "jwt",
         AuthError::Jwks(_) => "jwks",
         AuthError::Provider(_) => "provider",
@@ -221,6 +221,26 @@ pub async fn logout(
 pub async fn callback(
     axum::extract::State(state): axum::extract::State<std::sync::Arc<HttpState>>,
     axum::extract::Query(params): axum::extract::Query<OidcCallback>,
+    request_headers: axum::http::HeaderMap,
+    // The id of this request, so a refusal names the same operation the access
+    // log records. This is the request an operator most needs to trace and the
+    // one that arrives without a session, so it must not be the case that
+    // reports an id nothing can be found under.
+    axum::Extension(request_id): axum::Extension<Option<crate::http::logging::RequestId>>,
+) -> Result<(axum::http::header::HeaderMap, axum::response::Redirect), ApiError> {
+    callback_inner(&state, params, request_headers)
+        .await
+        .map_err(|error| match request_id {
+            Some(crate::http::logging::RequestId(id)) => error.at_request(id),
+            None => error,
+        })
+}
+
+/// The callback's body, kept separate so every refusal passes back through the
+/// one place that binds the request's id.
+async fn callback_inner(
+    state: &std::sync::Arc<HttpState>,
+    params: OidcCallback,
     request_headers: axum::http::HeaderMap,
 ) -> Result<(axum::http::header::HeaderMap, axum::response::Redirect), ApiError> {
     // Reject if the provider reported an error.
@@ -353,7 +373,7 @@ pub async fn callback(
             replace,
         } => {
             return accept_invitation(
-                &state,
+                state,
                 &account_id,
                 &invited_by,
                 replace,
@@ -383,7 +403,19 @@ pub async fn callback(
             .await?
             .is_none()
         {
-            return Err(ApiError::Forbidden);
+            // Logged like every other refusal here, and still 403: the id
+            // provider authenticated the caller, so answering 401 would claim
+            // the credentials were bad. This branch used to answer silently,
+            // which made it the one refusal an operator could not tell from a
+            // working deployment — the browser said "forbidden" and the logs
+            // said nothing. Neither the issuer nor the subject is recorded;
+            // the pair identifies a person, and "not invited" is the whole
+            // diagnosis.
+            return Err(reject_erroring(
+                "signup_invite_only",
+                format_args!("mode=invite_only"),
+                ApiError::Forbidden,
+            ));
         }
     }
 
@@ -401,7 +433,7 @@ pub async fn callback(
         .await
         .map_err(ApiError::Internal)?;
 
-    let headers = issue_session(&state, &account, policy).await?;
+    let headers = issue_session(state, &account, policy).await?;
     Ok((
         headers,
         axum::response::Redirect::to(&console_home(&state.config.base_path)),
@@ -683,20 +715,59 @@ mod tests {
         assert_eq!(line.matches("nonce=").count(), 0, "{line}");
     }
 
-    /// The ID-token detail is the provider's error string. `AuthError` is
-    /// already a bounded `thiserror` display — a variant label, never the
-    /// token — so it can be logged verbatim.
+    /// Every refusal on this path records a branch tag, and the sign-up gate is
+    /// the one that used to be missing: it answered 403 with nothing in the
+    /// logs, so a deployment that looked broken and a deployment that was
+    /// working under `invite_only` were indistinguishable from the browser.
     #[test]
-    fn an_id_token_detail_carries_the_error_kind() {
+    fn the_signup_gate_records_its_own_branch() {
+        let line = rejection_line("signup_invite_only", "mode=invite_only");
+        assert!(line.contains("branch=signup_invite_only"), "{line}");
+    }
+
+    /// The gate refuses with 403, not 401: the provider authenticated the
+    /// caller, so a 401 would tell them to retry with credentials that are
+    /// already good.
+    #[test]
+    fn the_signup_gate_keeps_its_403() {
+        let refused = reject_erroring(
+            "signup_invite_only",
+            format_args!("mode=invite_only"),
+            ApiError::Forbidden,
+        );
+        let response = axum::response::IntoResponse::into_response(refused);
+        assert_eq!(
+            response.status(),
+            axum::http::StatusCode::FORBIDDEN,
+            "the gate must not relabel a policy refusal as a credential one"
+        );
+    }
+
+    /// The ID-token detail is the provider's error string. `AuthError` is
+    /// already a bounded `thiserror` display — a variant label plus two public
+    /// header values, never the token — so it can be logged verbatim.
+    ///
+    /// The algorithm and key id the token arrived with are the point: a refusal
+    /// that does not name them has to be diagnosed from configuration alone.
+    #[test]
+    fn an_id_token_detail_names_the_algorithm_and_key_id() {
         let line = rejection_line(
             "id_token",
-            &format!("kind={}", AuthError::DisallowedAlgorithm),
+            &format!(
+                "kind={}",
+                AuthError::DisallowedAlgorithm {
+                    alg: "RS384".into(),
+                    kid: "key-7".into(),
+                }
+            ),
         );
 
         assert!(
             line.contains("kind=token algorithm is not allowed"),
             "{line}"
         );
+        assert!(line.contains("alg=RS384"), "{line}");
+        assert!(line.contains("kid=key-7"), "{line}");
     }
 
     /// Each variant gets a token that does not move when the `thiserror` prose
@@ -706,7 +777,10 @@ mod tests {
         assert_eq!(id_token_reason(&AuthError::MalformedToken), "malformed");
         assert_eq!(id_token_reason(&AuthError::MissingKeyId), "missing_kid");
         assert_eq!(
-            id_token_reason(&AuthError::DisallowedAlgorithm),
+            id_token_reason(&AuthError::DisallowedAlgorithm {
+                alg: "RS384".into(),
+                kid: "k".into(),
+            }),
             "disallowed_alg"
         );
         assert_eq!(

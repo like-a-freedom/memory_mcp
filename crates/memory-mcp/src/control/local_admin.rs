@@ -147,14 +147,21 @@ pub fn parse_admin_cookie(
 /// response. The audit `RequestContext`, the `x-request-id` header and the
 /// error envelope's `correlation_id` all read this value, so one reported id
 /// identifies one request end to end (spec §10).
+///
+/// The id is read from the deployment-wide [`crate::http::logging::RequestId`]
+/// rather than minted here. This middleware used to create its own, which meant
+/// the header the access log wrote and the `correlation_id` a client read came
+/// from two different values — the header said one thing and the body another,
+/// and neither could be found in the logs. The deployment's outermost layer
+/// already mints one id per request for every surface.
 pub async fn attach_request_id(
     mut req: axum::extract::Request,
     next: axum::middleware::Next,
 ) -> axum::response::Response {
     let request_id = req
         .extensions()
-        .get::<uuid::Uuid>()
-        .copied()
+        .get::<crate::http::logging::RequestId>()
+        .map(crate::http::logging::RequestId::as_uuid)
         .unwrap_or_else(uuid::Uuid::new_v4);
     req.extensions_mut().insert(request_id);
     let mut response = next.run(req).await;

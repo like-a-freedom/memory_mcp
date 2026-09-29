@@ -18,11 +18,57 @@ pub enum ApiError {
     Unavailable,
     ReauthRequired,
     Internal(MemoryError),
+    /// The id of the request this error answers, taken from the request's
+    /// extensions so the envelope a client reads and the access-log line
+    /// describe one operation.
+    ///
+    /// Carried on the error rather than looked up at render time: `into_response`
+    /// has no request to read, and generating a second id here — as this
+    /// module used to — produced a `correlation_id` that named nothing in the
+    /// logs. `None` means the error was built outside a request, and rendering
+    /// mints an id so the field is never empty.
+    At {
+        error: Box<ApiError>,
+        request_id: uuid::Uuid,
+    },
+}
+
+impl ApiError {
+    /// Bind this error to the request it answers.
+    ///
+    /// A no-op when it is already bound, so a handler that stamps an error
+    /// twice does not wrap twice and `From` conversions still work through an
+    /// already-stamped error.
+    #[must_use]
+    pub fn at_request(self, request_id: uuid::Uuid) -> Self {
+        match self {
+            ApiError::At { error, .. } => ApiError::At { error, request_id },
+            error => ApiError::At {
+                error: Box::new(error),
+                request_id,
+            },
+        }
+    }
+
+    /// The request this error answers, if it was bound to one.
+    #[must_use]
+    pub fn request_id(&self) -> Option<uuid::Uuid> {
+        match self {
+            ApiError::At { request_id, .. } => Some(*request_id),
+            _ => None,
+        }
+    }
 }
 
 impl IntoResponse for ApiError {
     fn into_response(self) -> Response {
-        let (status, code, message) = match self {
+        // Unwrap first: the `At` wrapper carries the id and nothing else, so
+        // every branch below stays a statement about one error.
+        let (this, request_id) = match self {
+            ApiError::At { error, request_id } => (*error, Some(request_id)),
+            other => (other, None),
+        };
+        let (status, code, message) = match this {
             ApiError::Unauthorized => (StatusCode::UNAUTHORIZED, "unauthorized", "unauthorized"),
             ApiError::Forbidden => (StatusCode::FORBIDDEN, "forbidden", "forbidden"),
             ApiError::NotFound => (StatusCode::NOT_FOUND, "not_found", "not found"),
@@ -47,10 +93,24 @@ impl IntoResponse for ApiError {
                     "internal error",
                 )
             }
+            // Unreachable: the wrapper was unwrapped above. Rendered as a 500
+            // rather than panicking in a request path.
+            ApiError::At { .. } => {
+                eprintln!("memory_mcp::control: internal API error: nested request binding");
+                (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    "internal_error",
+                    "internal error",
+                )
+            }
         };
         let body = serde_json::json!({
             "error": {"code": code, "message": message},
-            "correlation_id": uuid::Uuid::new_v4().to_string(),
+            // The request's own id when the error was bound to one, so the
+            // value a client quotes matches the access-log line; a fresh id
+            // only when the error was built outside a request, where there is
+            // nothing to match against.
+            "correlation_id": request_id.unwrap_or_else(uuid::Uuid::new_v4).to_string(),
         });
         (
             status,
@@ -79,7 +139,7 @@ impl From<super::oidc::AuthError> for ApiError {
         match err {
             super::oidc::AuthError::MalformedToken
             | super::oidc::AuthError::MissingKeyId
-            | super::oidc::AuthError::DisallowedAlgorithm
+            | super::oidc::AuthError::DisallowedAlgorithm { .. }
             | super::oidc::AuthError::Jwt(_) => ApiError::Unauthorized,
             super::oidc::AuthError::Jwks(_) | super::oidc::AuthError::Provider(_) => {
                 ApiError::Unavailable
@@ -134,6 +194,38 @@ mod tests {
         let observed = runtime().block_on(status_of(ApiError::Forbidden));
 
         assert_eq!(observed, StatusCode::FORBIDDEN);
+    }
+
+    /// The `correlation_id` a client reads must be the one the server logged
+    /// under. It is minted once per request and reaches both places from the
+    /// request's extensions; a second, independent id in the error renderer
+    /// would make every support request — "what do you see in the logs for
+    /// this id?" — unanswerable.
+    #[test]
+    fn the_error_envelope_carries_the_requests_own_id() {
+        let request_id = uuid::Uuid::parse_str("11111111-2222-3333-4444-555555555555").unwrap();
+        let response = ApiError::Unauthorized
+            .at_request(request_id)
+            .into_response();
+        let bytes = runtime()
+            .block_on(axum::body::to_bytes(response.into_body(), usize::MAX))
+            .expect("body reads");
+        let value: serde_json::Value = serde_json::from_slice(&bytes).expect("JSON");
+        assert_eq!(value["correlation_id"], request_id.to_string());
+    }
+
+    /// Every branch carries an id, including the ones with no request behind
+    /// them: an error built outside a request still has to name itself.
+    #[test]
+    fn an_unstamped_error_still_reports_an_id() {
+        let response = ApiError::Forbidden.into_response();
+        let bytes = runtime()
+            .block_on(axum::body::to_bytes(response.into_body(), usize::MAX))
+            .expect("body reads");
+        let value: serde_json::Value = serde_json::from_slice(&bytes).expect("JSON");
+        let id = value["correlation_id"].as_str().expect("an id is present");
+        assert!(!id.is_empty(), "an unstamped error must still be traceable");
+        uuid::Uuid::parse_str(id).expect("the id is a uuid");
     }
 
     #[test]

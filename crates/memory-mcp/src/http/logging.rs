@@ -14,10 +14,118 @@ use axum::extract::Request;
 use axum::middleware::Next;
 use axum::response::Response;
 use serde::Serialize;
+use uuid::Uuid;
 
 use crate::logging::StdoutLogger;
 
 static LOGGER: OnceLock<StdoutLogger> = OnceLock::new();
+
+/// The header that carries a request's id in both directions: a client may
+/// supply one, and every response advertises the one it was given.
+///
+/// The same name `local_admin` uses, so a caller that already learns to send
+/// it for one surface learns nothing new for another.
+pub(crate) const REQUEST_ID_HEADER: &str = "x-request-id";
+
+/// The id of the request currently in flight, minted once by
+/// [`request_log`] and read by everything that has to name the same
+/// operation: the access log, the error envelope, and the audit trail.
+///
+/// A newtype rather than a bare `Uuid` so that a layer which wants an id has
+/// to say which id it means — the `Uuid` extension the local-admin handlers
+/// insert is a different value, minted for a different surface.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct RequestId(pub(crate) Uuid);
+
+impl RequestId {
+    /// The underlying value, for a surface that stores ids as `Uuid`.
+    #[must_use]
+    pub fn as_uuid(&self) -> Uuid {
+        self.0
+    }
+}
+
+impl std::fmt::Display for RequestId {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
+
+/// Give the request an id, advertise it on the response, and record the
+/// request in the bounded access log.
+///
+/// Minting the id here rather than at the point of failure is what lets a
+/// refusal name itself: an error raised by a handler already has the id in
+/// its request extensions, so the log line and the `correlation_id` a client
+/// reads are the same string instead of two unrelated ones.
+///
+/// A caller-supplied id is honoured, so a retry carrying the id from its
+/// previous response produces a second entry that reads as the same operation.
+///
+/// This is outermost, so it is the only layer guaranteed to see every request —
+/// including one the deployment boundary refuses before any inner layer runs.
+pub(crate) async fn request_log(mut req: Request, next: Next) -> Response {
+    let started = Instant::now();
+    let method_category = categorize(req.method().as_str());
+    let request_id = req
+        .headers()
+        .get(REQUEST_ID_HEADER)
+        .and_then(|value| value.to_str().ok())
+        .and_then(|value| Uuid::parse_str(value).ok())
+        .map(RequestId)
+        .unwrap_or_else(|| RequestId(Uuid::new_v4()));
+    req.extensions_mut().insert(request_id);
+
+    let mut response = next.run(req).await;
+    if let Ok(value) = axum::http::HeaderValue::from_str(&request_id.to_string()) {
+        response.headers_mut().insert(REQUEST_ID_HEADER, value);
+    }
+    // Inner middleware attaches the context to the response after it
+    // has resolved authentication and the tenant. Read it here rather
+    // than from the request, which is observed before inner layers run.
+    // The borrow ends before the mutable insert below.
+    let (credential_kind, tenant_fingerprint, inner_request_id) = {
+        let ctx = response.extensions().get::<TenantLogContext>();
+        (
+            ctx.map(|c| c.credential_kind.clone()).unwrap_or_default(),
+            ctx.map(|c| c.tenant_fingerprint.clone())
+                .unwrap_or_default(),
+            ctx.map(|c| c.request_id.clone()).unwrap_or_default(),
+        )
+    };
+    let request_id = request_id.to_string();
+    response.extensions_mut().insert(TenantLogContext {
+        request_id: if inner_request_id.is_empty() {
+            request_id.clone()
+        } else {
+            inner_request_id
+        },
+        credential_kind: credential_kind.clone(),
+        tenant_fingerprint: tenant_fingerprint.clone(),
+    });
+    let outcome = outcome_label(response.status().as_u16());
+    let event = RequestLog {
+        event: "http_request",
+        request_id: &request_id,
+        method_category,
+        credential_kind: &credential_kind,
+        outcome,
+        latency_ms: started.elapsed().as_millis() as u64,
+        tenant_fingerprint: &tenant_fingerprint,
+    };
+    if let Ok(json) = serde_json::to_string(&event) {
+        if let Some(logger) = LOGGER.get() {
+            let mut fields = std::collections::HashMap::new();
+            if let Ok(value) = serde_json::from_str::<serde_json::Value>(&json) {
+                fields.insert("payload".to_string(), value);
+            }
+            logger.log(fields, crate::logging::LogLevel::Info);
+        } else {
+            eprintln!("{json}");
+        }
+    }
+    response
+}
 
 /// Bounded request log event. The serialize order is the
 /// stdout order; don't add fields that would leak.
@@ -39,45 +147,6 @@ pub struct TenantLogContext {
     pub request_id: String,
     pub credential_kind: String,
     pub tenant_fingerprint: String,
-}
-
-/// Always-available middleware. Records latency and outcome but
-/// relies on the auth layer to populate `TenantLogContext`. If the
-/// extension is missing, fields are empty strings — never path/header
-/// values.
-pub async fn request_log(req: Request, next: Next) -> Response {
-    let started = Instant::now();
-    let method_category = categorize(req.method().as_str());
-    let response = next.run(req).await;
-    // Inner middleware attaches the context to the response after it
-    // has resolved authentication and the tenant. Read it here rather
-    // than from the request, which is observed before inner layers run.
-    let ctx = response.extensions().get::<TenantLogContext>();
-    let request_id = ctx.map(|c| c.request_id.as_str()).unwrap_or("");
-    let credential_kind = ctx.map(|c| c.credential_kind.as_str()).unwrap_or("");
-    let tenant_fingerprint = ctx.map(|c| c.tenant_fingerprint.as_str()).unwrap_or("");
-    let outcome = outcome_label(response.status().as_u16());
-    let event = RequestLog {
-        event: "http_request",
-        request_id,
-        method_category,
-        credential_kind,
-        outcome,
-        latency_ms: started.elapsed().as_millis() as u64,
-        tenant_fingerprint,
-    };
-    if let Ok(json) = serde_json::to_string(&event) {
-        if let Some(logger) = LOGGER.get() {
-            let mut fields = std::collections::HashMap::new();
-            if let Ok(value) = serde_json::from_str::<serde_json::Value>(&json) {
-                fields.insert("payload".to_string(), value);
-            }
-            logger.log(fields, crate::logging::LogLevel::Info);
-        } else {
-            eprintln!("{json}");
-        }
-    }
-    response
 }
 
 /// Method-category grouping. URIs and headers never reach the log.
@@ -141,5 +210,119 @@ mod tests {
         assert_eq!(outcome_label(200), "2xx");
         assert_eq!(outcome_label(404), "4xx");
         assert_eq!(outcome_label(503), "5xx");
+    }
+
+    /// The access log exists to correlate a response with a request, and a
+    /// request id that is never minted makes every entry unusable for that: an
+    /// operator reading `request_id=""` cannot tell which of a hundred
+    /// simultaneous logins this line describes.
+    ///
+    /// The id is read from the response extension the log reads, so this
+    /// asserts the value the log will actually emit is non-empty and matches
+    /// what the response returned to the client.
+    #[tokio::test]
+    async fn the_access_log_carries_the_id_the_client_sees() {
+        let mut svc = Router::new()
+            .route("/", get(echo))
+            .layer(axum::middleware::from_fn(request_log));
+        let req = Request::builder()
+            .method("GET")
+            .uri("/")
+            .body(Body::empty())
+            .unwrap();
+        let resp = svc.call(req).await.unwrap();
+        assert_eq!(resp.status(), StatusCode::OK);
+
+        let from_log = resp
+            .extensions()
+            .get::<TenantLogContext>()
+            .expect("the log context is populated for every request")
+            .request_id
+            .clone();
+        assert!(
+            !from_log.is_empty(),
+            "the access log must never emit an empty id"
+        );
+
+        let header = resp
+            .headers()
+            .get(REQUEST_ID_HEADER)
+            .and_then(|value| value.to_str().ok())
+            .expect("the response advertises its id");
+        assert_eq!(
+            header, from_log,
+            "the logged id and the client's id must match"
+        );
+    }
+
+    /// Two requests must not share an id, or the log would collapse them into
+    /// what looks like one operation.
+    #[tokio::test]
+    async fn each_request_gets_its_own_id() {
+        let svc = Router::new()
+            .route("/", get(echo))
+            .layer(axum::middleware::from_fn(request_log));
+        let send = || {
+            let mut svc = svc.clone();
+            async move {
+                let resp = svc
+                    .call(
+                        Request::builder()
+                            .method("GET")
+                            .uri("/")
+                            .body(Body::empty())
+                            .unwrap(),
+                    )
+                    .await
+                    .unwrap();
+                // The id is observable on the response in two places that must
+                // agree: the header the client reads and the context the log
+                // reads. They are the same value, so a reader can join them.
+                let header = resp
+                    .headers()
+                    .get(REQUEST_ID_HEADER)
+                    .and_then(|v| v.to_str().ok())
+                    .expect("response advertises its id")
+                    .to_owned();
+                let logged = resp
+                    .extensions()
+                    .get::<TenantLogContext>()
+                    .expect("log context is populated")
+                    .request_id
+                    .clone();
+                assert_eq!(header, logged, "the two must name the same request");
+                header
+            }
+        };
+        assert_ne!(
+            send().await,
+            send().await,
+            "two requests must not share an id, or the log collapses them"
+        );
+    }
+
+    /// A caller that supplies its own id keeps it: a client retrying with the
+    /// id from its previous response must produce a second entry that can be
+    /// read as the same operation, not as a new one.
+    #[tokio::test]
+    async fn a_caller_supplied_id_is_honoured() {
+        let supplied = Uuid::parse_str("6f1b2c3d-4e5a-4b6c-8d9e-0f1a2b3c4d5e").unwrap();
+        let mut svc = Router::new()
+            .route("/", get(echo))
+            .layer(axum::middleware::from_fn(request_log));
+        let req = Request::builder()
+            .method("GET")
+            .uri("/")
+            .header(REQUEST_ID_HEADER, supplied.to_string())
+            .body(Body::empty())
+            .unwrap();
+        let resp = svc.call(req).await.unwrap();
+        assert_eq!(
+            resp.headers()
+                .get(REQUEST_ID_HEADER)
+                .and_then(|v| v.to_str().ok()),
+            Some(supplied.to_string().as_str()),
+            "a caller-supplied id must survive the middleware"
+        );
     }
 }

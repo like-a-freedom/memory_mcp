@@ -161,8 +161,15 @@ pub enum AuthError {
     MalformedToken,
     #[error("token has no key id")]
     MissingKeyId,
-    #[error("token algorithm is not allowed")]
-    DisallowedAlgorithm,
+    /// The provider signed with an algorithm this deployment does not accept.
+    ///
+    /// Carries the algorithm and key id the token actually arrived with. Both
+    /// are public header values, and naming them is the whole difference
+    /// between a refusal an operator can act on — "our JWKS has this kid, the
+    /// token claims this alg" — and one that has to be guessed at from a
+    /// configuration file.
+    #[error("token algorithm is not allowed: alg={alg} kid={kid}")]
+    DisallowedAlgorithm { alg: String, kid: String },
     #[error("JWT validation failed: {0}")]
     Jwt(#[source] jsonwebtoken::errors::Error),
     #[error("JWKS lookup failed: {0}")]

@@ -138,11 +138,19 @@ pub async fn acquire_runtime(
     use sha2::Digest;
     let digest = sha2::Sha256::digest(tenant.tenant_id.as_bytes());
     let fingerprint = hex::encode(&digest[..8]);
+    // Preserve the id `request_log` already recorded: this layer only adds
+    // what it resolved, and a fresh id here would orphan the access-log entry
+    // that shares the request. Read before the mutable borrow.
+    let request_id = resp
+        .extensions()
+        .get::<crate::http::logging::TenantLogContext>()
+        .map(|ctx| ctx.request_id.clone())
+        .unwrap_or_default();
     resp.extensions_mut()
         .insert(crate::http::logging::TenantLogContext {
             credential_kind: principal.credential_kind().to_string(),
             tenant_fingerprint: fingerprint,
-            ..Default::default()
+            request_id,
         });
     resp
 }

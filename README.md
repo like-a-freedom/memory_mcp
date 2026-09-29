@@ -1095,6 +1095,34 @@ form startup fails — material is never invented.
 | `MEMORY_MCP_HTTP_OPERATOR_IDENTITIES` | comma-separated `issuer\|hex(subject_verifier)` list | unset | Immutable operator allowlist; requires the `oidc` method. Account APIs cannot grant operator status. The `issuer` component must spell the issuer exactly as the provider publishes it (the ID token's `iss`, trailing slash included where the provider emits one) |
 | `MEMORY_MCP_HTTP_LOCAL_DEFAULT_PLAN_VERSION` | positive `u32` | unset | Required when `local` is enabled: the version of the plan this deployment publishes for the clients the administrator provisions |
 
+#### Signing in under `invite_only`
+
+`invite_only` admits an identity that already belongs to an account and refuses
+one that does not. A refused first sign-in answers `403` with
+`code: forbidden`, and the callback log carries
+`branch=signup_invite_only`.
+
+That is the policy working, not a misconfiguration, but it reads as one: a
+provider that authenticated the caller correctly still lands the browser on a
+`forbidden`, and nothing on the page says which policy said so. Two ways out,
+in order of cost:
+
+- **A local administrator, then an invitation.** `memory_mcp admin create
+  --username ops` makes an account you can sign into with a password, and the
+  console issues an identity invitation from it. The identity that completes
+  the invitation is then one this policy admits.
+- **A single-tenant deployment can open sign-up once.** Set
+  `MEMORY_MCP_HTTP_SIGNUP_MODE=open` with the seven plan seed variables set,
+  sign in once so the account exists, then return to `invite_only` and
+  recreate the container. Note that `env_file` is read at container start, so a
+  changed `.env` needs `docker compose up -d --force-recreate`, not a restart.
+
+There is no in-code bootstrap for the first account: an invitation needs a
+session, and a session needs an account. `open` is the intended escape hatch,
+and it is explicit in configuration precisely because it is the one setting
+that would otherwise be unreachable.
+
+
 **Plan seed (required for `signup_mode=open` or the `local` method)**: if any one of these is set, all seven must parse as `u64`/`usize`. For open signup the values seed the `free` plan at version 1 when no plan exists; the `local` method instead creates `local_plan_v{version}` at `MEMORY_MCP_HTTP_LOCAL_DEFAULT_PLAN_VERSION` and compares every limit. An existing durable plan is never overwritten, and a stored plan whose limits differ fails startup.
 
 | Variable | Type | Description |
