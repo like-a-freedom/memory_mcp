@@ -39,6 +39,9 @@ pub use flow_material::{
     AccessClaims, Audience, AuthError, OidcCallback, OidcFlowIntent, OidcNonce, OidcState,
     OidcTokens, PkceCode, StoredOidcRequest,
 };
+// Re-exported so the HTTP config validator can accept a pin only from the list
+// the OIDC path actually implements, without duplicating it.
+pub(crate) use flow_material::SUPPORTED_ID_TOKEN_ALGORITHMS;
 pub use handlers::{authorize, callback, logout, start_invite_flow, start_link_flow};
 pub use jwks::JwksCache;
 pub use sealing::{identity_subject_verifier, seal_oidc_payload, unseal_oidc_payload};

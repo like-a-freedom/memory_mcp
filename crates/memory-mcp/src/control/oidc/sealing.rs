@@ -153,8 +153,5 @@ pub fn unseal_oidc_payload(
             challenge: String::new(),
         },
         intent,
-        // The registry enforces the authoritative expiry at consume time;
-        // this value is only the decrypted projection used by callers.
-        expires_at: chrono::Utc::now() + chrono::Duration::minutes(10),
     })
 }

@@ -28,6 +28,82 @@ use crate::http::registry::models::{ExternalIdentity, IdentityAudit, new_externa
 use super::flow_material::{OidcCallback, OidcFlowIntent, OidcNonce, OidcState, PkceCode};
 use super::sealing::{identity_subject_verifier, seal_oidc_payload, unseal_oidc_payload};
 
+/// The single line every callback refusal is recorded as.
+///
+/// A failed login used to be indistinguishable from any other 401: the request
+/// logger records only bounded labels, `request_id` and `tenant_fingerprint`
+/// are empty for an unauthenticated callback, and the `correlation_id` in the
+/// error envelope is never logged — so narrowing a bad login down to one of
+/// these branches took latency measurements against a live provider instead of
+/// a log line.
+///
+/// Bounded by construction: callers pass a static branch tag and a detail built
+/// from labels, lengths and `AuthError`'s display. Never the ID token, the
+/// authorization code, the code verifier, the nonce value, or `sub`.
+fn rejection_line(branch: &'static str, detail: &str) -> String {
+    let detail = detail.trim();
+    if detail.is_empty() {
+        format!("memory_mcp::control::oidc: callback rejected branch={branch}")
+    } else {
+        format!("memory_mcp::control::oidc: callback rejected branch={branch} {detail}")
+    }
+}
+
+/// Refuse the callback and say why on stderr.
+///
+/// Only for refusals that really are the caller's fault. An error that must
+/// keep its own status — a JWKS or provider outage is 503, not 401 — goes
+/// through [`reject_erroring`] instead, so the log and the HTTP status agree.
+fn reject(branch: &'static str) -> ApiError {
+    eprintln!("{}", rejection_line(branch, ""));
+    ApiError::Unauthorized
+}
+
+/// Record a refusal that carries a bounded detail, and answer 401.
+///
+/// For refusals that really are the caller's fault. An error that must keep its
+/// own status — a JWKS or provider outage is 503, not 401 — goes through
+/// [`reject_erroring`] instead, so the log and the HTTP status agree.
+fn reject_with(branch: &'static str, detail: impl std::fmt::Display) -> ApiError {
+    eprintln!("{}", rejection_line(branch, &detail.to_string()));
+    ApiError::Unauthorized
+}
+
+/// Record a refusal that carries a bounded detail, then return `error`
+/// unchanged.
+///
+/// The status stays whatever `error` already maps to. Collapsing every failure
+/// here into `Unauthorized` would relabel a server-side identity-provider
+/// outage as a client credential fault — the same masquerade the JWKS
+/// algorithm fix removed, reintroduced on the other side.
+fn reject_erroring(
+    branch: &'static str,
+    detail: impl std::fmt::Display,
+    error: ApiError,
+) -> ApiError {
+    eprintln!("{}", rejection_line(branch, &detail.to_string()));
+    error
+}
+
+/// A stable token for each way ID-token validation can fail.
+///
+/// The `thiserror` display strings are prose that a rename would silently
+/// change; these are what a log query or an alert rule should match on. The
+/// `jwks`/`provider` pair is a server-side fault and keeps its 503 — the split
+/// an operator acts on.
+fn id_token_reason(error: &super::flow_material::AuthError) -> &'static str {
+    use super::flow_material::AuthError;
+    match error {
+        AuthError::MalformedToken => "malformed",
+        AuthError::MissingKeyId => "missing_kid",
+        AuthError::DisallowedAlgorithm => "disallowed_alg",
+        AuthError::Jwt(_) => "jwt",
+        AuthError::Jwks(_) => "jwks",
+        AuthError::Provider(_) => "provider",
+        AuthError::Sealing => "sealing",
+    }
+}
+
 /// Seal a flow's material under `oidc_state`, store it, and return the provider
 /// URL to send the browser to.
 ///
@@ -149,7 +225,7 @@ pub async fn callback(
 ) -> Result<(axum::http::header::HeaderMap, axum::response::Redirect), ApiError> {
     // Reject if the provider reported an error.
     if params.error.is_some() {
-        return Err(ApiError::Unauthorized);
+        return Err(reject("provider_error"));
     }
 
     // The deployment joined the durable OIDC policy at startup; every
@@ -170,7 +246,7 @@ pub async fn callback(
         .sessions()
         .take_oidc_request(policy, &state_hash)
         .await?
-        .ok_or(ApiError::Unauthorized)?;
+        .ok_or_else(|| reject("take_oidc_request"))?;
 
     #[cfg(not(feature = "control-plane"))]
     {
@@ -180,13 +256,11 @@ pub async fn callback(
 
     let stored = unseal_oidc_payload(&state.config.keys.oidc_state, &sealed, &aead_nonce)?;
     if stored.state.as_str() != params.state {
-        return Err(ApiError::Unauthorized);
+        return Err(reject("state_mismatch"));
     }
 
-    // Reject expired requests (TTL 10 minutes).
-    if stored.expires_at < Utc::now() {
-        return Err(ApiError::Unauthorized);
-    }
+    // No TTL check here — the registry enforces the deadline on consume; see
+    // `StoredOidcRequest`.
 
     // RFC 9207 issuer check. Opportunistic defense-in-depth: the `iss`
     // parameter is optional and some providers never send it (Rauthy does
@@ -200,19 +274,39 @@ pub async fn callback(
         .as_deref()
         .is_some_and(|issuer| !super::client::issuers_match(issuer, &state.config.oidc_issuer))
     {
-        return Err(ApiError::Unauthorized);
+        return Err(reject("rfc9207_issuer_mismatch"));
     }
 
-    let code = params.code.ok_or(ApiError::Unauthorized)?;
+    let code = params.code.ok_or_else(|| reject("missing_code"))?;
 
     let oidc = state.oidc_client.as_ref().ok_or(ApiError::Unavailable)?;
 
     let tokens = oidc.exchange_code(code, stored.pkce).await?;
-    let claims = oidc.validate_id_token(&tokens.id_token).await?;
+    // The one branch worth reading first: `DisallowedAlgorithm` means our
+    // configuration and the provider disagree, while `Jwt` means the token
+    // itself failed. `reason` is a stable token to grep and to alert on; the
+    // `AuthError` display names the same distinction in prose.
+    let claims = match oidc.validate_id_token(&tokens.id_token).await {
+        Ok(claims) => claims,
+        Err(error) => {
+            let detail = format!("reason={} kind={error}", id_token_reason(&error));
+            return Err(reject_erroring("id_token", detail, ApiError::from(error)));
+        }
+    };
 
     // Validate nonce matches the one we generated for this request.
     if claims.nonce.as_deref() != Some(stored.nonce.as_str()) {
-        return Err(ApiError::Unauthorized);
+        // Shape, never content: the nonce is a secret, but whether one arrived
+        // and whether its length matches is the whole diagnosis.
+        return Err(reject_with(
+            "nonce",
+            format_args!(
+                "token_present={} token_len={} stored_len={}",
+                claims.nonce.is_some(),
+                claims.nonce.as_deref().map(str::len).unwrap_or(0),
+                stored.nonce.as_str().len()
+            ),
+        ));
     }
 
     let subject_verifier_bytes =
@@ -517,6 +611,7 @@ async fn issue_session(
 
 #[cfg(all(test, feature = "control-plane"))]
 mod tests {
+    use super::super::flow_material::AuthError;
     use super::*;
     use crate::http::registry::models::{Account, AccountStatus};
     use crate::http::registry::storage::{AccountStore, InMemoryStore};
@@ -529,6 +624,131 @@ mod tests {
     fn console_home_lands_inside_the_mount_base() {
         assert_eq!(console_home(""), "/");
         assert_eq!(console_home("/memory"), "/memory");
+    }
+
+    /// The refusal line is the only signal a failed login leaves, so it has to
+    /// be greppable and stable, and it has to carry nothing secret. Both
+    /// halves matter: a branch tag that drifts makes the log useless, and a
+    /// detail that leaks the token or the nonce would turn a diagnostic into a
+    /// disclosure.
+    #[test]
+    fn a_refusal_line_names_its_branch_and_leaks_nothing() {
+        assert_eq!(
+            rejection_line("state_mismatch", ""),
+            "memory_mcp::control::oidc: callback rejected branch=state_mismatch"
+        );
+        assert_eq!(
+            rejection_line("id_token", "kind=token algorithm is not allowed"),
+            "memory_mcp::control::oidc: callback rejected branch=id_token \
+             kind=token algorithm is not allowed"
+        );
+        // Every branch the callback can refuse on. A new refusal without a
+        // tag here is a refusal an operator cannot tell apart from the rest.
+        for branch in [
+            "provider_error",
+            "take_oidc_request",
+            "state_mismatch",
+            "rfc9207_issuer_mismatch",
+            "missing_code",
+            "id_token",
+            "nonce",
+        ] {
+            let line = rejection_line(branch, "");
+            assert!(
+                line.contains(&format!("branch={branch}")),
+                "the branch must survive into the line: {line}"
+            );
+        }
+    }
+
+    /// The nonce detail is the one place a real value exists, so it reports
+    /// shape and never content: `present` separates "the provider sent no
+    /// nonce" from "the provider sent a different one", and the lengths are
+    /// enough to tell them apart without ever recording the nonce itself.
+    #[test]
+    fn a_nonce_detail_reports_shape_rather_than_value() {
+        let line = rejection_line(
+            "nonce",
+            &format!(
+                "token_present={} token_len={} stored_len={}",
+                true,
+                OidcNonce::new().as_str().len(),
+                OidcNonce::new().as_str().len()
+            ),
+        );
+
+        assert!(line.contains("token_present=true"), "{line}");
+        assert!(!line.contains("nonce="), "must not echo a nonce: {line}");
+        // `branch=nonce` is the tag; a `nonce=<value>` field would be the leak.
+        assert_eq!(line.matches("nonce=").count(), 0, "{line}");
+    }
+
+    /// The ID-token detail is the provider's error string. `AuthError` is
+    /// already a bounded `thiserror` display — a variant label, never the
+    /// token — so it can be logged verbatim.
+    #[test]
+    fn an_id_token_detail_carries_the_error_kind() {
+        let line = rejection_line(
+            "id_token",
+            &format!("kind={}", AuthError::DisallowedAlgorithm),
+        );
+
+        assert!(
+            line.contains("kind=token algorithm is not allowed"),
+            "{line}"
+        );
+    }
+
+    /// Each variant gets a token that does not move when the `thiserror` prose
+    /// is reworded — a log rule or an alert has to survive that.
+    #[test]
+    fn every_id_token_failure_has_a_stable_reason_token() {
+        assert_eq!(id_token_reason(&AuthError::MalformedToken), "malformed");
+        assert_eq!(id_token_reason(&AuthError::MissingKeyId), "missing_kid");
+        assert_eq!(
+            id_token_reason(&AuthError::DisallowedAlgorithm),
+            "disallowed_alg"
+        );
+        assert_eq!(
+            id_token_reason(&AuthError::Jwks("unknown key id".into())),
+            "jwks"
+        );
+        assert_eq!(
+            id_token_reason(&AuthError::Provider("boom".into())),
+            "provider"
+        );
+    }
+
+    /// A JWKS or provider outage is server-side and must keep its 503. Logging
+    /// a rejection must not flatten it into a 401: that would relabel an
+    /// identity-provider failure as a bad credential and send an operator
+    /// hunting the wrong thing — the exact masquerade unifying the algorithm
+    /// lists was meant to remove.
+    #[test]
+    fn a_logged_rejection_keeps_the_status_its_error_maps_to() {
+        let outage = reject_erroring(
+            "id_token",
+            "reason=jwks",
+            ApiError::from(AuthError::Jwks("unknown key id".into())),
+        );
+        let refused = reject_erroring(
+            "id_token",
+            "reason=jwt",
+            ApiError::from(AuthError::Jwt(
+                jsonwebtoken::errors::ErrorKind::InvalidToken.into(),
+            )),
+        );
+
+        assert!(
+            matches!(outage, ApiError::Unavailable),
+            "a JWKS outage must stay 503, not become 401"
+        );
+        assert!(
+            matches!(refused, ApiError::Unauthorized),
+            "an invalid token is still 401"
+        );
+        // And a plain caller-fault refusal is still 401.
+        assert!(matches!(reject("state_mismatch"), ApiError::Unauthorized));
     }
 
     const ISSUER: &str = "https://idp.example.com";

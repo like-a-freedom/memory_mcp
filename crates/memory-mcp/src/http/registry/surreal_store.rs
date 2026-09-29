@@ -3796,6 +3796,54 @@ mod tests {
         );
     }
 
+    /// The callback carried its own `expires_at` check against a value stamped
+    /// at *unseal* time, which could never fail — the real deadline has always
+    /// been this predicate, inside the same DELETE that consumes the row. Pin
+    /// it: a request whose deadline has passed must not come back, since nothing
+    /// above the store checks the clock.
+    #[cfg(feature = "control-plane")]
+    #[tokio::test]
+    async fn an_expired_oidc_request_is_not_returned_by_take() {
+        use crate::http::config::BrowserAuthMethod;
+
+        let namespace = format!("oidc_ttl_{}", uuid::Uuid::new_v4().simple());
+        let store = SurrealRegistryStore::connect_in_memory(&namespace, "registry")
+            .await
+            .expect("migrated in-memory registry");
+        let policy = store
+            .reconcile_browser_policy(&[BrowserAuthMethod::Oidc], None)
+            .await
+            .expect("reconcile browser policy");
+
+        // Planted with raw SQL because `store_oidc_request` always writes a
+        // live deadline; only this way can the row already be expired. The
+        // column shapes mirror `store_oidc_request`: a byte array for the AEAD
+        // nonce, an explicit `type::datetime` for the deadline.
+        store
+            .handle()
+            .query_json(
+                "CREATE type::record('oidc_request', $id) SET id = $id, state_hash = $hash, sealed_payload = 'c2VhbGVk', aead_nonce = $nonce, expires_at = type::datetime($expiry), created_at = time::now()",
+                Some(json!({
+                    "id": "state_expired",
+                    "hash": "state_expired",
+                    "nonce": vec![7u8; 12],
+                    "expiry": (Utc::now() - chrono::Duration::hours(1)).to_rfc3339(),
+                })),
+            )
+            .await
+            .expect("seed an expired request");
+
+        assert!(
+            store
+                .take_oidc_request(&policy, "state_expired")
+                .await
+                .expect("take expired")
+                .is_none(),
+            "an expired request must not be consumable — the callback relies \
+             on this predicate for the entire TTL"
+        );
+    }
+
     /// The deliberate OIDC compatibility break: a session written before
     /// the epoch column existed decodes as `None`, and a session carrying
     /// a stale epoch is excluded, so neither can authenticate. Both rows

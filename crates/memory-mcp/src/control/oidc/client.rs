@@ -3,7 +3,10 @@
 
 use crate::error::MemoryError;
 
-use super::flow_material::{AccessClaims, AuthError, OidcNonce, OidcState, OidcTokens, PkceCode};
+use super::flow_material::{
+    AccessClaims, AuthError, OidcNonce, OidcState, OidcTokens, PkceCode,
+    SUPPORTED_ID_TOKEN_ALGORITHMS,
+};
 use super::jwks::JwksCache;
 
 #[derive(Clone)]
@@ -169,9 +172,19 @@ impl OidcClient {
             .body(form_body)
             .send()
             .await
-            .map_err(|e| AuthError::Provider(e.to_string()))?
-            .error_for_status()
             .map_err(|e| AuthError::Provider(e.to_string()))?;
+
+        // A refused exchange answers 503, indistinguishable from a JWKS or
+        // transport failure without this. The status is the whole signal; the
+        // body is deliberately not read — a provider's `error_description` can
+        // echo request content.
+        let status = resp.status();
+        if !status.is_success() {
+            eprintln!("memory_mcp::control::oidc: code exchange rejected status={status}");
+            return Err(AuthError::Provider(format!(
+                "token endpoint returned {status}"
+            )));
+        }
 
         let body: serde_json::Value = resp
             .json()
@@ -181,7 +194,13 @@ impl OidcClient {
         let id_token = body
             .get("id_token")
             .and_then(|v| v.as_str())
-            .ok_or(AuthError::MalformedToken)?
+            .ok_or_else(|| {
+                eprintln!(
+                    "memory_mcp::control::oidc: code exchange rejected status={status} \
+                     reason=no_id_token"
+                );
+                AuthError::MalformedToken
+            })?
             .to_string();
 
         Ok(OidcTokens { id_token })
@@ -210,7 +229,9 @@ impl OidcClient {
 
         let key: DecodingKey = self.jwks.key_for(&kid).await?;
 
-        // Keep in lockstep with the allowlist in `http::config::validate`.
+        // A type-level conversion, not a policy list: every algorithm in
+        // `SUPPORTED_ID_TOKEN_ALGORITHMS` maps to a `jsonwebtoken` one, and a
+        // name outside it can only reach here as `DisallowedAlgorithm` above.
         let validation_algorithm = match alg {
             "RS256" => Algorithm::RS256,
             "RS384" => Algorithm::RS384,
@@ -277,9 +298,8 @@ fn resolve_allowed_algorithms(
     configured: &str,
     discovery: &serde_json::Value,
 ) -> Result<Vec<&'static str>, MemoryError> {
-    const SUPPORTED: [&str; 5] = ["RS256", "RS384", "RS512", "ES256", "EdDSA"];
     if configured != crate::http::config::AUTO_OIDC_ALG {
-        let pinned = SUPPORTED
+        let pinned = SUPPORTED_ID_TOKEN_ALGORITHMS
             .iter()
             .copied()
             .find(|name| *name == configured)
@@ -292,9 +312,9 @@ fn resolve_allowed_algorithms(
         .get("id_token_signing_alg_values_supported")
         .and_then(serde_json::Value::as_array)
     else {
-        return Ok(SUPPORTED.to_vec());
+        return Ok(SUPPORTED_ID_TOKEN_ALGORITHMS.to_vec());
     };
-    let resolved: Vec<&'static str> = SUPPORTED
+    let resolved: Vec<&'static str> = SUPPORTED_ID_TOKEN_ALGORITHMS
         .iter()
         .copied()
         .filter(|name| advertised.iter().any(|value| value.as_str() == Some(name)))

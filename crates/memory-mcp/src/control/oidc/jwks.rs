@@ -12,7 +12,7 @@ use std::time::{Duration, Instant};
 use jsonwebtoken::DecodingKey;
 use tokio::sync::Mutex;
 
-use super::flow_material::AuthError;
+use super::flow_material::{AuthError, SUPPORTED_ID_TOKEN_ALGORITHMS};
 
 #[derive(Clone)]
 pub struct JwksCache {
@@ -133,10 +133,16 @@ impl JwksCache {
                 _ => continue,
             }
             .map_err(|error| AuthError::Jwks(error.to_string()))?;
+            // A key the provider pins to an algorithm we accept has to
+            // survive. EC entries stay limited to P-256 above because no other
+            // curve is decoded — so adding an ES* algorithm to
+            // `SUPPORTED_ID_TOKEN_ALGORITHMS` needs a matching curve arm here,
+            // or its key will drop out exactly as this filter used to drop
+            // RS384's.
             if jwk
                 .alg
                 .as_deref()
-                .is_none_or(|alg| alg == "RS256" || alg == "ES256" || alg == "EdDSA")
+                .is_none_or(|alg| SUPPORTED_ID_TOKEN_ALGORITHMS.contains(&alg))
             {
                 keys.insert(jwk.kid, key);
             }
@@ -436,6 +442,110 @@ mod tests {
             cache.find_key("key-a").expect("cache read").is_none(),
             "an algorithm outside the allowlist must be skipped"
         );
+    }
+
+    /// A provider that signs an ID token with RS384 or RS512 is *allowed* to
+    /// do so: `resolve_allowed_algorithms` accepts those under both an explicit
+    /// pin and `auto` (Rauthy advertises all four). The cache used to filter
+    /// keys down to `{RS256, ES256, EdDSA}` alone, so such a key was dropped
+    /// and `key_for` reported `unknown key id` — surfacing as 503 rather than
+    /// as the authorization failure it actually was. The filter has to accept
+    /// every algorithm the resolver can accept.
+    #[tokio::test]
+    async fn refresh_keeps_a_key_pinned_to_a_non_default_rsa_algorithm() {
+        let server = StubJwksServer::serving(200, rsa_document("key-a", Some("RS384")));
+        let cache = cache_for(&server, Duration::ZERO);
+
+        cache.refresh().await.expect("refresh");
+
+        assert!(
+            cache.find_key("key-a").expect("cache read").is_some(),
+            "RS384 is in the allowed set, so its key must survive the filter"
+        );
+    }
+
+    /// The regression guard for the three lists that used to disagree
+    /// (`client::SUPPORTED`, the config validator's literal, and this filter):
+    /// whatever the resolver accepts, the cache must be able to load.
+    #[tokio::test]
+    async fn refresh_keeps_a_key_for_every_allowed_algorithm() {
+        for alg in SUPPORTED_ID_TOKEN_ALGORITHMS {
+            let server = StubJwksServer::serving(200, rsa_document("key-a", Some(alg)));
+            let cache = cache_for(&server, Duration::ZERO);
+
+            cache.refresh().await.expect("refresh");
+
+            assert!(
+                cache.find_key("key-a").expect("cache read").is_some(),
+                "{alg} is in SUPPORTED_ID_TOKEN_ALGORITHMS, so the JWKS filter \
+                 must not drop its key"
+            );
+        }
+    }
+
+    /// The guard above is RSA-shaped, so on its own it would happily go green
+    /// for an `ES384` entry whose key the *curve* arm still drops — the same
+    /// silent loss this change removed, one level up. Each EC/OKP entry is
+    /// therefore published as the key type a provider would really use, and
+    /// must come back. An algorithm added to the constant without a matching
+    /// `kty`/`crv` arm fails here rather than in production.
+    #[tokio::test]
+    async fn refresh_keeps_a_key_of_the_right_type_for_every_ec_algorithm() {
+        // The curve each allowed EC/OKP algorithm implies. Every `ES*` entry in
+        // the constant must have one: an algorithm with no curve here cannot
+        // be published as a real key, and `refresh` would drop it at the
+        // `kty`/`crv` arm while the `alg` filter above happily passed it —
+        // precisely the silent loss this change removed, one level up. So an
+        // unmapped curve is a failure here, not a skipped case.
+        let curve_for = |alg: &str| -> Option<&'static str> {
+            match alg {
+                "ES256" => Some("P-256"),
+                "EdDSA" => Some("Ed25519"),
+                _ => None,
+            }
+        };
+        for alg in SUPPORTED_ID_TOKEN_ALGORITHMS {
+            if alg.starts_with("ES") {
+                assert!(
+                    curve_for(alg).is_some(),
+                    "{alg} is allowed but no EC curve is decoded for it: add the \
+                     `kty`/`crv` arm in `refresh`, or drop {alg} from \
+                     SUPPORTED_ID_TOKEN_ALGORITHMS"
+                );
+            }
+        }
+
+        for alg in SUPPORTED_ID_TOKEN_ALGORITHMS {
+            let Some(crv) = curve_for(alg) else {
+                // An RSA entry; the sibling test covers its filter behaviour.
+                continue;
+            };
+            let (kty, x, y) = match crv {
+                "P-256" => ("EC", EC_X, Some(EC_Y)),
+                "Ed25519" => ("OKP", ED_X, None),
+                other => unreachable!("unhandled curve {other}"),
+            };
+            let y_field = y
+                .map(|value| format!(r#","y":"{value}""#))
+                .unwrap_or_default();
+            let body = format!(
+                r#"{{"keys":[{{"kid":"key-{alg}","kty":"{kty}","crv":"{crv}","x":"{x}"{y_field}}}]}}"#
+            );
+            let server = StubJwksServer::serving(200, body);
+            let cache = cache_for(&server, Duration::ZERO);
+
+            cache.refresh().await.expect("refresh");
+
+            assert!(
+                cache
+                    .find_key(&format!("key-{alg}"))
+                    .expect("cache read")
+                    .is_some(),
+                "{alg} is allowed, so its {crv} key must load — a JWKS \
+                 `alg` filter that passes is not enough; the curve arm must \
+                 decode it too"
+            );
+        }
     }
 
     #[tokio::test]

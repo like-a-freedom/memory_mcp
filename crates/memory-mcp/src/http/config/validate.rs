@@ -174,19 +174,22 @@ pub(super) fn validate(cfg: &HttpConfig) -> Result<(), MemoryError> {
                 .into(),
         ));
     }
-    // Keep in lockstep with the algorithm mapping in `control::oidc::client`.
+    // An explicit pin must name an algorithm the whole OIDC path accepts, which
+    // `SUPPORTED_ID_TOKEN_ALGORITHMS` is the single definition of — the JWKS
+    // cache filters its keys through the same list, so a pin the validator
+    // accepts but the cache rejects would resolve no key and fail as 503.
     // Checked unconditionally: the pin is inert policy without the `oidc`
     // method (the Compose file injects one by default), but a garbage value
     // is refused early either way.
     if cfg.oidc_allowed_alg != super::parse::AUTO_OIDC_ALG
-        && !matches!(
-            cfg.oidc_allowed_alg.as_str(),
-            "RS256" | "RS384" | "RS512" | "ES256" | "EdDSA"
-        )
+        && !crate::control::oidc::SUPPORTED_ID_TOKEN_ALGORITHMS
+            .contains(&cfg.oidc_allowed_alg.as_str())
     {
-        return Err(MemoryError::ConfigInvalid(
-            "OIDC allowed algorithm must be 'auto', RS256, RS384, RS512, ES256, or EdDSA".into(),
-        ));
+        return Err(MemoryError::ConfigInvalid(format!(
+            "OIDC allowed algorithm must be '{}' or one of {}",
+            super::parse::AUTO_OIDC_ALG,
+            crate::control::oidc::SUPPORTED_ID_TOKEN_ALGORITHMS.join(", ")
+        )));
     }
     if cfg.control_db.url == cfg.tenant_db.url
         && cfg.control_db.namespace == cfg.tenant_db.namespace

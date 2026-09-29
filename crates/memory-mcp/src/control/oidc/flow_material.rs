@@ -11,6 +11,22 @@
 
 use serde::Deserialize;
 
+/// The ID-token signing algorithms this build accepts — asymmetric only, so a
+/// provider can never pick the HMAC path and reach the public key as a secret.
+///
+/// This is the single source of truth for that decision. `client::resolve_allowed_algorithms`
+/// intersects it with what the provider advertises, the JWKS cache filters keys
+/// through it, and the HTTP config validator accepts a pin only from it. The
+/// three used to be written out separately and had already drifted apart: the
+/// cache accepted `{RS256, ES256, EdDSA}` while the resolver and the validator
+/// also allowed RS384/RS512, so a legitimately pinned provider had its signing
+/// key silently dropped and login failed as 503. Adding an algorithm here is
+/// the only edit needed to make the whole path accept it — and the JWKS curves
+/// below are the second half of that, so EC entries stay limited to P-256
+/// because no other curve is decoded.
+pub(crate) const SUPPORTED_ID_TOKEN_ALGORITHMS: [&str; 5] =
+    ["RS256", "RS384", "RS512", "ES256", "EdDSA"];
+
 /// Random state token for CSRF protection in the OIDC flow.
 #[derive(Debug, Clone)]
 pub struct OidcState(pub(crate) String);
@@ -106,6 +122,10 @@ pub enum OidcFlowIntent {
 }
 
 /// Stored OIDC request — decrypted projection from the registry.
+///
+/// Carries no expiry: the registry rejects a consumed request under its own
+/// `expires_at` in the same transaction as the read, so nothing re-derives a
+/// deadline here.
 #[derive(Debug, Clone)]
 pub struct StoredOidcRequest {
     pub state: OidcState,
@@ -115,10 +135,6 @@ pub struct StoredOidcRequest {
     /// decodes as [`OidcFlowIntent::SignIn`], so an upgrade does not strand an
     /// in-flight login.
     pub intent: OidcFlowIntent,
-    /// Authoritative expiry enforced by the registry at consume
-    /// time; this value is only the decrypted projection used by
-    /// callers.
-    pub expires_at: chrono::DateTime<chrono::Utc>,
 }
 
 /// OIDC tokens — only the ID token is retained.
