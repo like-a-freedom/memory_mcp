@@ -79,16 +79,32 @@ def run_matrix():
     return result.returncode == 0, result.stdout + result.stderr
 
 
+def deps_dir():
+    """The directory rustc wrote this run's dep-info files into.
+
+    Cargo nests the profile under the target triple whenever
+    `CARGO_BUILD_TARGET` is set, which every CI job does — the audit then
+    read an empty `target/debug/deps` and reported "no compiled sources",
+    a failure that had nothing to do with the tree it inspects. Without
+    that variable Cargo omits the triple entirely, which is the case this
+    function has to keep working for too.
+    """
+    target = os.environ.get("CARGO_BUILD_TARGET", "").strip()
+    if not target:
+        return os.path.join(ROOT, "target", "debug", "deps")
+    return os.path.join(ROOT, "target", target, "debug", "deps")
+
+
 def compiled_sources():
     """Every source path rustc recorded reading, as paths relative to ROOT."""
-    deps_dir = os.path.join(ROOT, "target", "debug", "deps")
-    if not os.path.isdir(deps_dir):
+    deps = deps_dir()
+    if not os.path.isdir(deps):
         return set()
     found = set()
-    for name in sorted(os.listdir(deps_dir)):
+    for name in sorted(os.listdir(deps)):
         if not name.endswith(".d"):
             continue
-        with open(os.path.join(deps_dir, name), encoding="utf-8", errors="ignore") as handle:
+        with open(os.path.join(deps, name), encoding="utf-8", errors="ignore") as handle:
             text = handle.read()
         # A dep-info file is a target line, a blank line, then the sources it
         # read. Splitting on the blank line keeps us off the target path, which
