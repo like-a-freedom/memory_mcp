@@ -103,4 +103,120 @@ mod tests {
         assert_eq!(result.message, "done");
         assert!(!result.refresh_required);
     }
+
+    #[test]
+    fn app_command_result_honours_an_explicit_failure() {
+        let observed = app_command_result_from_details(
+            "diff",
+            "ses:2",
+            "export_diff",
+            None,
+            serde_json::json!({"ok": false, "message": "nothing to export"}),
+        )
+        .ok;
+
+        assert!(!observed, "the service's verdict must not be overridden");
+    }
+
+    #[test]
+    fn app_command_result_honours_an_explicit_message() {
+        let observed = app_command_result_from_details(
+            "diff",
+            "ses:2",
+            "export_diff",
+            None,
+            serde_json::json!({"message": "exported 3 changes"}),
+        )
+        .message;
+
+        assert_eq!(observed, "exported 3 changes");
+    }
+
+    #[test]
+    fn app_command_result_honours_an_explicit_refresh_request() {
+        let observed = app_command_result_from_details(
+            "diff",
+            "ses:2",
+            "export_diff",
+            None,
+            serde_json::json!({"refresh_required": true}),
+        )
+        .refresh_required;
+
+        assert!(observed);
+    }
+
+    #[test]
+    fn app_command_result_carries_the_resource_uri_through() {
+        let observed = app_command_result_from_details(
+            "diff",
+            "ses:2",
+            "export_diff",
+            Some("ui://memory/app/diff/ses:2".to_string()),
+            serde_json::json!({}),
+        )
+        .resource_uri;
+
+        assert_eq!(observed.as_deref(), Some("ui://memory/app/diff/ses:2"));
+    }
+
+    #[test]
+    fn app_command_result_keeps_the_raw_details() {
+        let observed = app_command_result_from_details(
+            "diff",
+            "ses:2",
+            "export_diff",
+            None,
+            serde_json::json!({"added": 2}),
+        )
+        .details;
+
+        assert_eq!(observed.expect("details are retained")["added"], 2);
+    }
+
+    #[test]
+    fn invalid_params_carries_retry_guidance() {
+        let observed = invalid_params("bad input").data.expect("data is attached");
+
+        assert!(observed["guidance"].is_string());
+    }
+
+    #[test]
+    fn missing_app_field_names_the_field_in_its_message() {
+        let observed = missing_app_field("diff", "session_id").message;
+
+        assert!(
+            observed.contains("session_id"),
+            "the caller must be told which argument is missing: {observed}"
+        );
+    }
+
+    #[test]
+    fn missing_app_field_names_the_field_in_its_guidance() {
+        let observed = missing_app_field("diff", "session_id")
+            .data
+            .expect("data is attached");
+
+        assert_eq!(
+            observed["guidance"],
+            "Supply the `session_id` parameter and retry."
+        );
+    }
+
+    #[test]
+    fn internal_error_carries_retry_guidance() {
+        let observed = internal_error("storage offline")
+            .data
+            .expect("data is attached");
+
+        assert!(observed["guidance"].is_string());
+    }
+
+    #[test]
+    fn open_app_result_carries_the_supplied_fallback() {
+        let observed =
+            open_app_result("inspector", "ses:1", serde_json::json!({"rows": []})).fallback;
+
+        assert_eq!(observed["rows"].as_array().map(Vec::len), Some(0));
+    }
 }

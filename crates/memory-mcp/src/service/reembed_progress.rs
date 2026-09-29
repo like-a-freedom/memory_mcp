@@ -177,6 +177,9 @@ impl ReembedProgressReporter for IndicatifProgressReporter {
     }
 }
 
+/// A structured log event, keyed by field name.
+type Event = std::collections::HashMap<String, serde_json::Value>;
+
 /// Non-TTY fallback: emits structured log events (existing behavior + new init events).
 ///
 /// Used when stderr is not a TTY (pipes, CI, scripts).
@@ -192,8 +195,7 @@ impl LogProgressReporter {
     }
 
     fn log(&self, op: &str, fields: Vec<(&str, serde_json::Value)>) {
-        let mut event: std::collections::HashMap<String, serde_json::Value> =
-            std::collections::HashMap::from([("op".to_string(), serde_json::json!(op))]);
+        let mut event: Event = Event::from([("op".to_string(), serde_json::json!(op))]);
         for (k, v) in fields {
             event.insert(k.to_string(), v);
         }
@@ -323,27 +325,174 @@ impl ReembedProgressReporter for NoopProgressReporter {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::service::reembed_options::ReembedOutcome;
 
-    #[test]
-    fn noop_reporter_compiles_and_runs() {
-        let reporter = NoopProgressReporter;
-        let summary = ReembedSummary {
+    /// A summary with a fixed, non-zero shape so every field is observable.
+    fn summary() -> ReembedSummary {
+        ReembedSummary {
             total_facts: 100,
             processed_facts: 50,
             succeeded_facts: 45,
             failed_facts: 5,
-            ..ReembedSummary::default()
-        };
+            failed_fact_ids: vec!["fact-1".to_string()],
+        }
+    }
+
+    /// The log reporter under test. Its logger is set to `error`, so the
+    /// progress events it emits at `info` are dropped by the level filter
+    /// rather than written to the process-wide stderr stream; the tests assert
+    /// the callbacks are safe to run, not on the rendered output.
+    fn log_reporter() -> LogProgressReporter {
+        LogProgressReporter::new(crate::logging::StdoutLogger::new("error"))
+    }
+
+    #[test]
+    fn log_job_started_emits_for_a_fresh_run() {
+        let reporter = log_reporter();
+
         reporter.on_job_started(100, false, 0);
-        reporter.on_namespace_started("org", 100);
-        reporter.on_fact_processed("org", &summary, Duration::from_secs(10));
-        reporter.on_namespace_completed("org", 45, 5, Duration::from_secs(10));
-        reporter.on_index_recreating("org");
-        reporter.on_index_recreated("org");
-        reporter.on_interrupted(&summary, Duration::from_secs(10));
+    }
+
+    #[test]
+    fn log_job_started_emits_for_a_resumed_run() {
+        let reporter = log_reporter();
+
+        reporter.on_job_started(100, true, 30);
+    }
+
+    #[test]
+    fn log_namespace_started_emits() {
+        let reporter = log_reporter();
+
+        reporter.on_namespace_started("acme", 100);
+    }
+
+    #[test]
+    fn log_fact_processed_stays_silent_in_non_tty_mode() {
+        let reporter = log_reporter();
+
+        // Non-TTY mode deliberately drops per-fact events; batch progress is
+        // logged by the caller. The callback must be a no-op, not a per-fact flood.
+        reporter.on_fact_processed("acme", &summary(), Duration::from_secs(1));
+    }
+
+    #[test]
+    fn log_namespace_completed_emits() {
+        let reporter = log_reporter();
+
+        reporter.on_namespace_completed("acme", 45, 5, Duration::from_secs(10));
+    }
+
+    #[test]
+    fn log_namespace_completed_emits_with_a_zero_duration() {
+        let reporter = log_reporter();
+
+        reporter.on_namespace_completed("acme", 0, 0, Duration::ZERO);
+    }
+
+    #[test]
+    fn log_index_recreating_emits() {
+        let reporter = log_reporter();
+
+        reporter.on_index_recreating("acme");
+    }
+
+    #[test]
+    fn log_index_recreated_emits() {
+        let reporter = log_reporter();
+
+        reporter.on_index_recreated("acme");
+    }
+
+    #[test]
+    fn log_interrupted_emits() {
+        let reporter = log_reporter();
+
+        reporter.on_interrupted(&summary(), Duration::from_secs(10));
+    }
+
+    #[test]
+    fn log_job_completed_emits() {
+        let reporter = log_reporter();
+
         reporter.on_job_completed(
             &ReembedOutcome::Completed,
-            &summary,
+            &summary(),
+            Duration::from_secs(10),
+        );
+    }
+
+    #[test]
+    fn log_job_completed_emits_for_a_failed_outcome() {
+        let reporter = log_reporter();
+
+        reporter.on_job_completed(&ReembedOutcome::Failed, &summary(), Duration::from_secs(10));
+    }
+
+    #[test]
+    fn indicatif_reporter_tolerates_every_callback() {
+        // Under a non-TTY stderr (the test harness) `indicatif` renders nothing;
+        // this asserts the callbacks stay side-effect free in that mode.
+        let reporter = IndicatifProgressReporter::new();
+
+        reporter.on_job_started(100, false, 0);
+        reporter.on_namespace_started("acme", 100);
+        reporter.on_fact_processed("acme", &summary(), Duration::from_secs(1));
+        reporter.on_namespace_completed("acme", 45, 5, Duration::from_secs(10));
+        reporter.on_index_recreating("acme");
+        reporter.on_index_recreated("acme");
+        reporter.on_interrupted(&summary(), Duration::from_secs(10));
+        reporter.on_job_completed(
+            &ReembedOutcome::Completed,
+            &summary(),
+            Duration::from_secs(10),
+        );
+    }
+
+    #[test]
+    fn indicatif_reporter_tolerates_a_resumed_run() {
+        let reporter = IndicatifProgressReporter::new();
+
+        reporter.on_job_started(100, true, 30);
+    }
+
+    #[test]
+    fn indicatif_reporter_tolerates_an_interruption_with_no_facts() {
+        // The interruption message divides by total_facts, so zero must not panic.
+        let reporter = IndicatifProgressReporter::new();
+
+        reporter.on_interrupted(&ReembedSummary::default(), Duration::from_secs(1));
+    }
+
+    #[test]
+    fn indicatif_reporter_tolerates_a_completion_with_failures() {
+        // A failed-fact summary takes the other arm of the message formatter.
+        let reporter = IndicatifProgressReporter::new();
+
+        reporter.on_fact_processed("acme", &summary(), Duration::from_secs(1));
+    }
+
+    #[test]
+    fn indicatif_reporter_tolerates_the_init_spinner() {
+        let reporter = IndicatifProgressReporter::new();
+
+        reporter.start_init_spinner("loading models");
+    }
+
+    #[test]
+    fn noop_reporter_tolerates_every_callback() {
+        let reporter = NoopProgressReporter;
+
+        reporter.on_job_started(100, false, 0);
+        reporter.on_namespace_started("acme", 100);
+        reporter.on_fact_processed("acme", &summary(), Duration::from_secs(1));
+        reporter.on_namespace_completed("acme", 45, 5, Duration::from_secs(10));
+        reporter.on_index_recreating("acme");
+        reporter.on_index_recreated("acme");
+        reporter.on_interrupted(&summary(), Duration::from_secs(10));
+        reporter.on_job_completed(
+            &ReembedOutcome::Completed,
+            &summary(),
             Duration::from_secs(10),
         );
     }

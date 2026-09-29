@@ -231,6 +231,49 @@ pub async fn recovery_status() -> Result<axum::response::Response, super::error:
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::http::registry::models::{NamespaceBinding, Tenant, TenantStatus};
+    use axum::extract::{Extension, Path, State};
+    use std::sync::Arc;
+
+    /// A fresh in-memory `HttpState` for the operator handlers.
+    async fn state() -> Arc<crate::http::HttpState> {
+        crate::http::HttpState::default_for_test().await
+    }
+
+    /// An operator principal authenticated now, inside the ten-minute window.
+    fn operator() -> OperatorPrincipal {
+        OperatorPrincipal {
+            authenticated_at: chrono::Utc::now(),
+        }
+    }
+
+    /// A tenant in `status`, bound to its own namespace.
+    fn tenant(id: &str, status: TenantStatus) -> Tenant {
+        Tenant {
+            id: id.to_string(),
+            status,
+            namespace_binding: NamespaceBinding {
+                namespace: format!("tns_{id}"),
+                database: "memory".into(),
+            },
+            plan_version: 1,
+            schema_version: 0,
+            retry_stage: None,
+            provisioning_lease: None,
+            created_at: chrono::Utc::now(),
+            version: 0,
+        }
+    }
+
+    /// Persist `tenant` into the state under test.
+    async fn seed(state: &Arc<crate::http::HttpState>, tenant: &Tenant) {
+        state
+            .registry
+            .tenants()
+            .write_tenant(tenant)
+            .await
+            .expect("seed tenant");
+    }
 
     #[test]
     fn recent_operator_auth_is_accepted() {
@@ -249,5 +292,234 @@ mod tests {
             principal.require_recent_auth(),
             Err(ApiError::ReauthRequired)
         ));
+    }
+
+    #[test]
+    fn an_operator_authenticated_in_the_future_is_rejected() {
+        // A clock skew must not extend the reauth window indefinitely.
+        let principal = OperatorPrincipal {
+            authenticated_at: chrono::Utc::now() + chrono::Duration::minutes(1),
+        };
+
+        assert!(matches!(
+            principal.require_recent_auth(),
+            Err(ApiError::ReauthRequired)
+        ));
+    }
+
+    #[tokio::test]
+    async fn reading_an_unknown_tenant_is_a_not_found() {
+        let state = state().await;
+
+        let observed = get_tenant(
+            State(state),
+            Extension(operator()),
+            Path("ten_missing".to_string()),
+        )
+        .await;
+
+        assert!(matches!(observed, Err(ApiError::NotFound)));
+    }
+
+    #[tokio::test]
+    async fn reading_a_known_tenant_succeeds() {
+        let state = state().await;
+        seed(&state, &tenant("ten_ok", TenantStatus::Ready)).await;
+
+        let observed = get_tenant(
+            State(state),
+            Extension(operator()),
+            Path("ten_ok".to_string()),
+        )
+        .await;
+
+        assert!(observed.is_ok());
+    }
+
+    #[tokio::test]
+    async fn reading_a_tenant_returns_ok_status() {
+        let state = state().await;
+        seed(&state, &tenant("ten_ok", TenantStatus::Ready)).await;
+
+        let observed = get_tenant(
+            State(state),
+            Extension(operator()),
+            Path("ten_ok".to_string()),
+        )
+        .await
+        .ok()
+        .expect("tenant reads");
+
+        assert_eq!(observed.status(), axum::http::StatusCode::OK);
+    }
+
+    #[tokio::test]
+    async fn reading_a_tenant_with_stale_operator_auth_is_refused() {
+        let state = state().await;
+        seed(&state, &tenant("ten_ok", TenantStatus::Ready)).await;
+        let stale = OperatorPrincipal {
+            authenticated_at: chrono::Utc::now() - chrono::Duration::hours(1),
+        };
+
+        let observed = get_tenant(State(state), Extension(stale), Path("ten_ok".to_string())).await;
+
+        assert!(matches!(observed, Err(ApiError::ReauthRequired)));
+    }
+
+    #[tokio::test]
+    async fn retrying_a_healthy_tenant_is_a_conflict() {
+        let state = state().await;
+        seed(&state, &tenant("ten_ok", TenantStatus::Ready)).await;
+
+        let observed = retry_tenant(
+            State(state),
+            Extension(operator()),
+            Path("ten_ok".to_string()),
+        )
+        .await;
+
+        assert!(
+            matches!(observed, Err(ApiError::Conflict)),
+            "only a failed tenant can be retried"
+        );
+    }
+
+    #[tokio::test]
+    async fn retrying_a_failed_tenant_is_accepted() {
+        let state = state().await;
+        seed(&state, &tenant("ten_fail", TenantStatus::Failed)).await;
+
+        let observed = retry_tenant(
+            State(state),
+            Extension(operator()),
+            Path("ten_fail".to_string()),
+        )
+        .await;
+
+        assert_eq!(observed.ok(), Some(axum::http::StatusCode::ACCEPTED));
+    }
+
+    #[tokio::test]
+    async fn retrying_an_unknown_tenant_is_a_not_found() {
+        let state = state().await;
+
+        let observed = retry_tenant(
+            State(state),
+            Extension(operator()),
+            Path("ten_missing".to_string()),
+        )
+        .await;
+
+        assert!(matches!(observed, Err(ApiError::NotFound)));
+    }
+
+    #[tokio::test]
+    async fn suspending_a_ready_tenant_succeeds() {
+        let state = state().await;
+        seed(&state, &tenant("ten_s", TenantStatus::Ready)).await;
+
+        let observed = suspend_tenant(
+            State(state),
+            Extension(operator()),
+            Path("ten_s".to_string()),
+        )
+        .await;
+
+        assert_eq!(observed.ok(), Some(axum::http::StatusCode::NO_CONTENT));
+    }
+
+    #[tokio::test]
+    async fn suspending_an_already_suspended_tenant_is_a_no_op() {
+        let state = state().await;
+        seed(&state, &tenant("ten_s", TenantStatus::Suspended)).await;
+
+        let observed = suspend_tenant(
+            State(state),
+            Extension(operator()),
+            Path("ten_s".to_string()),
+        )
+        .await;
+
+        assert_eq!(observed.ok(), Some(axum::http::StatusCode::NO_CONTENT));
+    }
+
+    #[tokio::test]
+    async fn suspending_a_purged_tenant_is_a_conflict() {
+        let state = state().await;
+        seed(&state, &tenant("ten_p", TenantStatus::Purged)).await;
+
+        let observed = suspend_tenant(
+            State(state),
+            Extension(operator()),
+            Path("ten_p".to_string()),
+        )
+        .await;
+
+        assert!(matches!(observed, Err(ApiError::Conflict)));
+    }
+
+    #[tokio::test]
+    async fn resuming_a_suspended_tenant_succeeds() {
+        let state = state().await;
+        seed(&state, &tenant("ten_r", TenantStatus::Suspended)).await;
+
+        let observed = resume_tenant(
+            State(state),
+            Extension(operator()),
+            Path("ten_r".to_string()),
+        )
+        .await;
+
+        assert_eq!(observed.ok(), Some(axum::http::StatusCode::NO_CONTENT));
+    }
+
+    #[tokio::test]
+    async fn resuming_an_unknown_tenant_is_a_not_found() {
+        let state = state().await;
+
+        let observed = resume_tenant(
+            State(state),
+            Extension(operator()),
+            Path("ten_missing".to_string()),
+        )
+        .await;
+
+        assert!(matches!(observed, Err(ApiError::NotFound)));
+    }
+
+    #[tokio::test]
+    async fn purging_an_unknown_tenant_is_a_not_found() {
+        let state = state().await;
+
+        let observed = purge_tenant(
+            State(state),
+            Extension(operator()),
+            Path("ten_missing".to_string()),
+        )
+        .await;
+
+        assert!(matches!(observed, Err(ApiError::NotFound)));
+    }
+
+    #[tokio::test]
+    async fn purging_an_already_purged_tenant_is_a_no_op() {
+        let state = state().await;
+        seed(&state, &tenant("ten_p", TenantStatus::Purged)).await;
+
+        let observed = purge_tenant(
+            State(state),
+            Extension(operator()),
+            Path("ten_p".to_string()),
+        )
+        .await;
+
+        assert_eq!(observed.ok(), Some(axum::http::StatusCode::NO_CONTENT));
+    }
+
+    #[tokio::test]
+    async fn the_recovery_status_endpoint_reports_ok() {
+        let observed = recovery_status().await.ok().expect("recovery status");
+
+        assert_eq!(observed.status(), axum::http::StatusCode::OK);
     }
 }

@@ -709,4 +709,271 @@ mod tests {
             "0.8999999999999999 should round to 0.9"
         );
     }
+
+    // --- IngestRequestBuilder ---
+
+    /// A fully-populated ingest builder; individual tests override one field.
+    fn ingest_builder() -> IngestRequestBuilder {
+        IngestRequest::builder()
+            .source_type("chat")
+            .source_id("s-1")
+            .content("hello")
+            .t_ref(Utc::now())
+    }
+
+    #[test]
+    fn ingest_builds_with_every_required_field() {
+        let observed = ingest_builder().build();
+
+        assert!(observed.is_ok());
+    }
+
+    #[test]
+    fn ingest_rejects_a_missing_source_type() {
+        let observed = IngestRequest::builder()
+            .source_id("s-1")
+            .content("hello")
+            .t_ref(Utc::now())
+            .build();
+
+        assert!(observed.is_err());
+    }
+
+    #[test]
+    fn ingest_names_the_missing_source_type_in_the_error() {
+        let observed = IngestRequestBuilder::default()
+            .source_id("s-1")
+            .content("hello")
+            .t_ref(Utc::now())
+            .build();
+
+        assert_eq!(observed.unwrap_err(), "source_type is required");
+    }
+
+    #[test]
+    fn ingest_names_the_missing_source_id_in_the_error() {
+        let observed = IngestRequest::builder()
+            .source_type("chat")
+            .content("hello")
+            .t_ref(Utc::now())
+            .build();
+
+        assert_eq!(observed.unwrap_err(), "source_id is required");
+    }
+
+    #[test]
+    fn ingest_names_the_missing_content_in_the_error() {
+        let observed = IngestRequest::builder()
+            .source_type("chat")
+            .source_id("s-1")
+            .t_ref(Utc::now())
+            .build();
+
+        assert_eq!(observed.unwrap_err(), "content is required");
+    }
+
+    #[test]
+    fn ingest_names_the_missing_t_ref_in_the_error() {
+        let observed = IngestRequest::builder()
+            .source_type("chat")
+            .source_id("s-1")
+            .content("hello")
+            .build();
+
+        assert_eq!(observed.unwrap_err(), "t_ref is required");
+    }
+
+    #[test]
+    fn ingest_carries_the_configured_policy_tags() {
+        let observed = ingest_builder()
+            .policy_tags(vec!["pii".to_string()])
+            .build()
+            .expect("builds");
+
+        assert_eq!(observed.policy_tags, vec!["pii".to_string()]);
+    }
+
+    #[test]
+    fn ingest_defaults_policy_tags_to_empty() {
+        let observed = ingest_builder().build().expect("builds");
+
+        assert!(observed.policy_tags.is_empty());
+    }
+
+    #[test]
+    fn ingest_leaves_t_ingested_unset_when_not_supplied() {
+        let observed = ingest_builder().build().expect("builds");
+
+        assert!(observed.t_ingested.is_none());
+    }
+
+    #[test]
+    fn ingest_carries_an_explicit_t_ingested() {
+        let ingested = Utc::now();
+        let observed = ingest_builder()
+            .t_ingested(ingested)
+            .build()
+            .expect("builds");
+
+        assert_eq!(observed.t_ingested, Some(ingested));
+    }
+
+    // --- InvalidateRequestBuilder ---
+
+    #[test]
+    fn invalidate_builds_with_every_required_field() {
+        let observed = InvalidateRequest::builder()
+            .fact_id("f-1")
+            .reason("superseded")
+            .t_invalid(Utc::now())
+            .build();
+
+        assert!(observed.is_ok());
+    }
+
+    #[test]
+    fn invalidate_names_the_missing_fact_id_in_the_error() {
+        let observed = InvalidateRequest::builder()
+            .reason("superseded")
+            .t_invalid(Utc::now())
+            .build();
+
+        assert_eq!(observed.unwrap_err(), "fact_id is required");
+    }
+
+    #[test]
+    fn invalidate_names_the_missing_reason_in_the_error() {
+        let observed = InvalidateRequest::builder()
+            .fact_id("f-1")
+            .t_invalid(Utc::now())
+            .build();
+
+        assert_eq!(observed.unwrap_err(), "reason is required");
+    }
+
+    #[test]
+    fn invalidate_names_the_missing_t_invalid_in_the_error() {
+        let observed = InvalidateRequest::builder()
+            .fact_id("f-1")
+            .reason("superseded")
+            .build();
+
+        assert_eq!(observed.unwrap_err(), "t_invalid is required");
+    }
+
+    // --- AssembleContextRequestBuilder ---
+
+    #[test]
+    fn assemble_context_builds_with_only_a_query() {
+        let observed = AssembleContextRequest::builder()
+            .query("what changed")
+            .build();
+
+        assert!(observed.is_ok());
+    }
+
+    #[test]
+    fn assemble_context_requires_a_query() {
+        let observed = AssembleContextRequest::builder().build();
+
+        assert_eq!(observed.unwrap_err(), "query is required");
+    }
+
+    #[test]
+    fn assemble_context_defaults_the_budget_to_five() {
+        let observed = AssembleContextRequest::builder()
+            .query("what changed")
+            .build()
+            .expect("builds");
+
+        assert_eq!(observed.budget, 5);
+    }
+
+    #[test]
+    fn assemble_context_carries_an_explicit_budget() {
+        let observed = AssembleContextRequest::builder()
+            .query("what changed")
+            .budget(20)
+            .build()
+            .expect("builds");
+
+        assert_eq!(observed.budget, 20);
+    }
+
+    #[test]
+    fn assemble_context_carries_the_requested_fact_types() {
+        let observed = AssembleContextRequest::builder()
+            .query("what changed")
+            .fact_types(vec!["decision".to_string()])
+            .build()
+            .expect("builds");
+
+        assert_eq!(observed.fact_types, vec!["decision".to_string()]);
+    }
+
+    #[test]
+    fn assemble_context_carries_the_requested_view_mode() {
+        let observed = AssembleContextRequest::builder()
+            .query("what changed")
+            .view_mode("timeline")
+            .build()
+            .expect("builds");
+
+        assert_eq!(observed.view_mode.as_deref(), Some("timeline"));
+    }
+
+    #[test]
+    fn assemble_context_leaves_the_window_unset_by_default() {
+        let observed = AssembleContextRequest::builder()
+            .query("what changed")
+            .build()
+            .expect("builds");
+
+        assert!(observed.window_start.is_none());
+    }
+
+    #[test]
+    fn assemble_context_carries_an_explicit_window() {
+        let start = Utc::now();
+        let end = start + chrono::Duration::days(1);
+        let observed = AssembleContextRequest::builder()
+            .query("what changed")
+            .window_start(start)
+            .window_end(end)
+            .build()
+            .expect("builds");
+
+        assert_eq!(observed.window_start, Some(start));
+    }
+
+    #[test]
+    fn assemble_context_defaults_to_compact() {
+        let observed = AssembleContextRequest::builder()
+            .query("what changed")
+            .build()
+            .expect("builds");
+
+        assert!(observed.compact);
+    }
+
+    #[test]
+    fn extract_result_empty_has_no_entities() {
+        let observed = ExtractResult::empty();
+
+        assert!(observed.entities.is_empty());
+    }
+
+    #[test]
+    fn extract_result_empty_has_no_facts() {
+        let observed = ExtractResult::empty();
+
+        assert!(observed.facts.is_empty());
+    }
+
+    #[test]
+    fn extract_result_empty_has_no_links() {
+        let observed = ExtractResult::empty();
+
+        assert!(observed.links.is_empty());
+    }
 }

@@ -113,3 +113,62 @@ impl HttpTestComposition {
         self
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn the_test_composition_uses_an_in_memory_registry() {
+        let composition = HttpTestComposition::in_memory().await;
+
+        // A ready-tenant listing against an in-memory registry is a cheap
+        // proof the engine is actually wired, not just constructed.
+        let observed = composition
+            .registry
+            .tenants()
+            .list_ready_tenants(None, 10)
+            .await;
+
+        assert!(observed.is_ok());
+    }
+
+    #[tokio::test]
+    async fn the_test_composition_starts_with_no_faults_injected() {
+        let composition = HttpTestComposition::in_memory().await;
+
+        let observed = composition
+            .fault_injector
+            .hit(crate::platform::fault_injection::FaultPoint::TaskClaimed);
+
+        assert!(observed.is_ok(), "the default injector must never fire");
+    }
+
+    #[tokio::test]
+    async fn a_substituted_fault_injector_is_installed() {
+        let composition = HttpTestComposition::in_memory()
+            .await
+            .with_fault_injector(Arc::new(crate::platform::fault_injection::FailOnceAt::new(
+                crate::platform::fault_injection::FaultPoint::TaskClaimed,
+            )));
+
+        let observed = composition
+            .fault_injector
+            .hit(crate::platform::fault_injection::FaultPoint::TaskClaimed);
+
+        assert!(observed.is_err(), "the substituted injector must fire");
+    }
+
+    #[tokio::test]
+    async fn the_test_composition_applies_its_tenant_migrations() {
+        let composition = HttpTestComposition::in_memory().await;
+        let namespace = format!("composition_{}", uuid::Uuid::new_v4().simple());
+
+        let observed = composition
+            .tenant_migrations
+            .apply_migrations(&namespace, "memory")
+            .await;
+
+        assert!(observed.is_ok());
+    }
+}

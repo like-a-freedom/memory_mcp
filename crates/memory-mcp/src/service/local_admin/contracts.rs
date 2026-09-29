@@ -679,3 +679,316 @@ pub trait LocalAdminStore: Send + Sync + 'static {
         action: ClientStateAction,
     ) -> LocalResult<()>;
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// A `BrowserPolicyFence` at a fixed epoch, so fence-carrying debug
+    /// output is comparable across tests.
+    fn fence() -> BrowserPolicyFence {
+        BrowserPolicyFence {
+            methods: vec![crate::models::auth::BrowserAuthMethod::Local],
+            epoch: 7,
+        }
+    }
+
+    fn request_context() -> RequestContext {
+        RequestContext {
+            request_id: uuid::Uuid::nil(),
+        }
+    }
+
+    /// A `CredentialSnapshot` carrying a PHC string, for redaction tests.
+    fn credential_with_phc() -> CredentialSnapshot {
+        CredentialSnapshot {
+            admin_id: "admin-1".to_string(),
+            username: "root".to_string(),
+            state: AdminState::Active,
+            credential_generation: 3,
+            password_phc: Some("$argon2id$v=19$m=19456$hunter2".to_string()),
+        }
+    }
+
+    /// Render any value's `Debug` output.
+    fn debug_of<T: std::fmt::Debug>(value: &T) -> String {
+        format!("{value:?}")
+    }
+
+    #[test]
+    fn debug_redacts_the_input_error_payload() {
+        let observed = debug_of(&LocalAdminError::InvalidInput("root cause: db down".into()));
+
+        assert_eq!(observed, "InvalidInput(<redacted>)");
+    }
+
+    #[test]
+    fn debug_redacts_the_infrastructure_error_payload() {
+        let observed = debug_of(&LocalAdminError::Infrastructure(MemoryError::Storage(
+            "postgres://root:toor@10.0.0.5/memory".into(),
+        )));
+
+        assert_eq!(observed, "Infrastructure(<redacted>)");
+    }
+
+    #[test]
+    fn debug_names_the_unauthenticated_variant_without_a_payload() {
+        let observed = debug_of(&LocalAdminError::Unauthenticated);
+
+        assert_eq!(observed, "Unauthenticated");
+    }
+
+    #[test]
+    fn debug_names_the_throttled_variant_with_its_retry_hint() {
+        let observed = debug_of(&LocalAdminError::Throttled {
+            retry_after_seconds: 30,
+        });
+
+        assert_eq!(observed, "Throttled { retry_after_seconds: 30 }");
+    }
+
+    #[test]
+    fn debug_shows_the_key_id_because_it_is_not_a_secret() {
+        let observed = debug_of(&LocalAdminError::SecretAlreadyIssued {
+            key_id: "key-42".to_string(),
+        });
+
+        assert_eq!(observed, "SecretAlreadyIssued { key_id: key-42 }");
+    }
+
+    #[test]
+    fn display_keeps_the_operator_facing_detail_that_debug_withholds() {
+        let observed = LocalAdminError::InvalidInput("root cause: db down".into()).to_string();
+
+        assert_eq!(observed, "invalid input: root cause: db down");
+    }
+
+    #[test]
+    fn debug_redacts_both_key_fingerprints() {
+        let observed = debug_of(&LocalKeyFingerprints {
+            session: [0xaa; 32],
+            csrf: [0xbb; 32],
+        });
+
+        assert!(
+            !observed.contains("170"),
+            "session fingerprint must be redacted"
+        );
+    }
+
+    #[test]
+    fn debug_redacts_the_session_id_but_keeps_the_admin_id() {
+        let observed = debug_of(&AdminFence {
+            admin_id: "admin-1".to_string(),
+            session_id: "deadbeef".to_string(),
+            credential_generation: 3,
+            policy: fence(),
+        });
+
+        assert!(
+            !observed.contains("deadbeef"),
+            "session id is the credential"
+        );
+    }
+
+    #[test]
+    fn debug_redacts_the_password_hash_but_keeps_the_username() {
+        let observed = debug_of(&credential_with_phc());
+
+        assert!(
+            !observed.contains("argon2"),
+            "the PHC string must be redacted"
+        );
+    }
+
+    #[test]
+    fn debug_redacts_the_challenge_verifier() {
+        let observed = debug_of(&ChallengeIssue {
+            username: "root".to_string(),
+            kind: ChallengeKind::Activate,
+            verifier: [0xcc; 32],
+            policy: fence(),
+            request: request_context(),
+        });
+
+        assert!(!observed.contains("204"), "the verifier equals the code");
+    }
+
+    #[test]
+    fn debug_redacts_the_challenge_finish_credentials() {
+        let observed = debug_of(&ChallengeFinish {
+            verifier: [0xdd; 32],
+            kind: ChallengeKind::Reset,
+            password_phc: "$argon2id$v=19$m=1$abc".to_string(),
+            policy: fence(),
+            request: request_context(),
+        });
+
+        assert!(
+            !observed.contains("argon2"),
+            "the new hash must be redacted"
+        );
+    }
+
+    #[test]
+    fn debug_redacts_the_session_cookie_verifier() {
+        let observed = debug_of(&SessionOpen {
+            credential: credential_with_phc(),
+            cookie_verifier: [0xee; 32],
+            policy: fence(),
+            request: request_context(),
+        });
+
+        assert!(
+            !observed.contains("238"),
+            "the cookie verifier is a credential"
+        );
+    }
+
+    #[test]
+    fn debug_redacts_the_rotated_cookie_verifier() {
+        let observed = debug_of(&SessionRotate {
+            fence: AdminFence {
+                admin_id: "admin-1".to_string(),
+                session_id: "cafe".to_string(),
+                credential_generation: 3,
+                policy: fence(),
+            },
+            credential: credential_with_phc(),
+            cookie_verifier: [0xff; 32],
+            request: request_context(),
+        });
+
+        assert!(
+            !observed.contains("cafe"),
+            "the prior session id is a credential"
+        );
+    }
+
+    #[test]
+    fn debug_redacts_the_issued_client_key_secret() {
+        let observed = debug_of(&IssuedClientKey {
+            id: "key-42".to_string(),
+            name: "laptop".to_string(),
+            secret: "mem_sk_key-42_supersecret".to_string(),
+            expires_at: None,
+        });
+
+        assert!(
+            !observed.contains("supersecret"),
+            "the secret is revealed once only"
+        );
+    }
+
+    #[test]
+    fn debug_redacts_the_one_time_challenge_code() {
+        let observed = debug_of(&OneTimeChallenge {
+            issued: IssuedChallenge {
+                admin_id: "admin-1".to_string(),
+                username: "root".to_string(),
+                expires_at: chrono::Utc::now(),
+            },
+            code: "123456".to_string(),
+        });
+
+        assert!(
+            !observed.contains("123456"),
+            "the code is credential-equivalent"
+        );
+    }
+
+    #[test]
+    fn debug_redacts_the_login_cookie_value() {
+        let observed = debug_of(&AdminLogin {
+            principal: AdminPrincipal {
+                fence: AdminFence {
+                    admin_id: "admin-1".to_string(),
+                    session_id: "bead".to_string(),
+                    credential_generation: 3,
+                    policy: fence(),
+                },
+                username: "root".to_string(),
+                auth_time: chrono::Utc::now(),
+                absolute_expiry: chrono::Utc::now(),
+            },
+            cookie_value: "0123456789abcdef".to_string(),
+        });
+
+        assert!(
+            !observed.contains("0123456789abcdef"),
+            "the cookie is the session"
+        );
+    }
+
+    #[test]
+    fn key_expiry_deserializes_a_never_expiring_key() {
+        let observed: KeyExpiry = serde_json::from_str(r#"{"kind":"never"}"#).expect("decodes");
+
+        assert!(matches!(observed, KeyExpiry::Never));
+    }
+
+    #[test]
+    fn key_expiry_deserializes_a_day_count_expiry() {
+        let observed: KeyExpiry =
+            serde_json::from_str(r#"{"kind":"days","days":30}"#).expect("decodes");
+
+        assert!(matches!(observed, KeyExpiry::Days { days: 30 }));
+    }
+
+    #[test]
+    fn key_expiry_accepts_zero_days() {
+        let observed: KeyExpiry =
+            serde_json::from_str(r#"{"kind":"days","days":0}"#).expect("decodes");
+
+        assert!(matches!(observed, KeyExpiry::Days { days: 0 }));
+    }
+
+    #[test]
+    fn key_expiry_rejects_a_days_expiry_with_no_count() {
+        let observed = serde_json::from_str::<KeyExpiry>(r#"{"kind":"days"}"#);
+
+        assert!(observed.is_err(), "a day-count expiry requires `days`");
+    }
+
+    #[test]
+    fn key_expiry_rejects_a_never_expiry_that_carries_a_count() {
+        let observed = serde_json::from_str::<KeyExpiry>(r#"{"kind":"never","days":30}"#);
+
+        assert!(
+            observed.is_err(),
+            "`days` is not valid for a never-expiring key"
+        );
+    }
+
+    #[test]
+    fn key_expiry_rejects_an_unknown_kind() {
+        let observed = serde_json::from_str::<KeyExpiry>(r#"{"kind":"forever"}"#);
+
+        assert!(
+            observed.is_err(),
+            "an unknown kind must not become a valid key"
+        );
+    }
+
+    #[test]
+    fn key_expiry_rejects_a_misspelled_days_field() {
+        // The strictness that stops `"dayz":30` silently becoming a
+        // non-expiring key.
+        let observed = serde_json::from_str::<KeyExpiry>(r#"{"kind":"days","dayz":30}"#);
+
+        assert!(observed.is_err(), "a misspelled field must not be ignored");
+    }
+
+    #[test]
+    fn admin_key_create_serializes_its_name_and_operation() {
+        let create = AdminKeyCreate {
+            name: "laptop".to_string(),
+            expiry: KeyExpiry::Never,
+            operation_id: uuid::Uuid::nil(),
+        };
+
+        let observed = debug_of(&create);
+
+        assert!(observed.contains("laptop"));
+    }
+}

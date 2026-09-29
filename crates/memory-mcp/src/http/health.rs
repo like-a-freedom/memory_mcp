@@ -70,4 +70,77 @@ mod tests {
         let resp = svc.call(req).await.unwrap();
         assert_eq!(resp.status(), StatusCode::OK);
     }
+
+    /// A test state whose registry always reports reachable, so the readiness
+    /// verdict depends only on the shutdown and admission flags.
+    async fn live_registry_state() -> Arc<HttpState> {
+        let mut state = super::super::HttpState::default_for_test().await;
+        let inner = Arc::get_mut(&mut state).expect("single owner");
+        inner.registry = super::super::registry::RegistryHandle::in_memory();
+        state
+    }
+
+    /// Render `ready` through `IntoResponse` and return its status.
+    async fn ready_status(state: Arc<HttpState>) -> StatusCode {
+        ready(State(state)).await.into_response().status()
+    }
+
+    #[tokio::test]
+    async fn live_reports_ok() {
+        assert_eq!(live().await, "ok");
+    }
+
+    #[tokio::test]
+    async fn ready_reports_200_when_nothing_is_blocking() {
+        let state = live_registry_state().await;
+
+        assert_eq!(ready_status(state).await, StatusCode::OK);
+    }
+
+    #[tokio::test]
+    async fn ready_reports_503_while_shutting_down() {
+        let state = live_registry_state().await;
+        state.shutdown.begin();
+
+        assert_eq!(ready_status(state).await, StatusCode::SERVICE_UNAVAILABLE);
+    }
+
+    #[tokio::test]
+    async fn ready_reports_503_once_admission_is_closed() {
+        let state = live_registry_state().await;
+        state.admission.close();
+
+        assert_eq!(ready_status(state).await, StatusCode::SERVICE_UNAVAILABLE);
+    }
+
+    #[tokio::test]
+    async fn the_shutdown_state_wins_over_the_admission_state() {
+        // Both are 503; the body names the first condition, so the ordering
+        // has to be pinned rather than inferred from the status alone.
+        let state = live_registry_state().await;
+        state.admission.close();
+        state.shutdown.begin();
+
+        let response = ready(State(state)).await.into_response();
+        let bytes = axum::body::to_bytes(response.into_body(), usize::MAX)
+            .await
+            .expect("body reads");
+        let value: serde_json::Value = serde_json::from_slice(&bytes).expect("json body");
+
+        assert_eq!(value["status"], "shutting_down");
+    }
+
+    #[tokio::test]
+    async fn the_admission_state_is_reported_when_not_shutting_down() {
+        let state = live_registry_state().await;
+        state.admission.close();
+
+        let response = ready(State(state)).await.into_response();
+        let bytes = axum::body::to_bytes(response.into_body(), usize::MAX)
+            .await
+            .expect("body reads");
+        let value: serde_json::Value = serde_json::from_slice(&bytes).expect("json body");
+
+        assert_eq!(value["status"], "admission_closed");
+    }
 }

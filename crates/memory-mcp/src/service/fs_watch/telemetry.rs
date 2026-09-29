@@ -150,3 +150,200 @@ impl RevisionTimer {
         self.started.elapsed()
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn a_processed_revision_is_labelled_processed() {
+        assert_eq!(
+            revision_outcome_label(ProcessOutcome::Processed),
+            "processed"
+        );
+    }
+
+    #[test]
+    fn a_non_retryable_failure_is_labelled_failed() {
+        let observed = revision_outcome_label(ProcessOutcome::FailedNonRetryable);
+
+        assert_eq!(observed, "failed");
+    }
+
+    #[test]
+    fn an_exhausted_retry_budget_is_labelled_failed() {
+        let observed = revision_outcome_label(ProcessOutcome::FailedRetriesExhausted);
+
+        assert_eq!(observed, "failed");
+    }
+
+    #[test]
+    fn an_interrupted_revision_is_labelled_interrupted() {
+        assert_eq!(
+            revision_outcome_label(ProcessOutcome::Interrupted),
+            "interrupted"
+        );
+    }
+
+    #[test]
+    fn a_known_retry_stage_is_passed_through() {
+        assert_eq!(retry_stage_label("backend"), "backend");
+    }
+
+    #[test]
+    fn an_unknown_retry_stage_maps_to_other() {
+        // A caller-supplied stage must never become a new label value.
+        assert_eq!(retry_stage_label("/etc/passwd"), "other");
+    }
+
+    #[test]
+    fn an_empty_retry_stage_maps_to_other() {
+        assert_eq!(retry_stage_label(""), "other");
+    }
+
+    #[test]
+    fn a_validation_failure_is_labelled_validation() {
+        assert_eq!(
+            retry_reason_label(InboxFailureClass::Validation),
+            "validation"
+        );
+    }
+
+    #[test]
+    fn an_io_failure_is_labelled_io() {
+        assert_eq!(retry_reason_label(InboxFailureClass::Io), "io");
+    }
+
+    #[test]
+    fn a_storage_failure_is_labelled_storage() {
+        assert_eq!(retry_reason_label(InboxFailureClass::Storage), "storage");
+    }
+
+    #[test]
+    fn a_model_failure_is_labelled_model() {
+        assert_eq!(retry_reason_label(InboxFailureClass::Model), "model");
+    }
+
+    #[test]
+    fn a_timeout_failure_is_labelled_timeout() {
+        assert_eq!(retry_reason_label(InboxFailureClass::Timeout), "timeout");
+    }
+
+    #[test]
+    fn a_channel_failure_is_labelled_channel() {
+        assert_eq!(retry_reason_label(InboxFailureClass::Channel), "channel");
+    }
+
+    #[test]
+    fn a_corrupt_failure_is_labelled_corrupt() {
+        assert_eq!(retry_reason_label(InboxFailureClass::Corrupt), "corrupt");
+    }
+
+    #[test]
+    fn an_unclassified_transient_failure_is_labelled_other_transient() {
+        assert_eq!(
+            retry_reason_label(InboxFailureClass::OtherTransient),
+            "other_transient"
+        );
+    }
+
+    #[test]
+    fn a_known_scan_outcome_is_passed_through() {
+        assert_eq!(scan_outcome_label("enqueued"), "enqueued");
+    }
+
+    #[test]
+    fn a_symlink_skip_is_labelled_skipped_symlink() {
+        assert_eq!(scan_outcome_label("skipped_symlink"), "skipped_symlink");
+    }
+
+    #[test]
+    fn an_unsupported_skip_is_labelled_skipped_unsupported() {
+        assert_eq!(
+            scan_outcome_label("skipped_unsupported"),
+            "skipped_unsupported"
+        );
+    }
+
+    #[test]
+    fn a_read_failure_is_labelled_failed_read() {
+        assert_eq!(scan_outcome_label("failed_read"), "failed_read");
+    }
+
+    #[test]
+    fn an_unknown_scan_outcome_maps_to_other() {
+        // A file name or path must never become a metric label.
+        assert_eq!(scan_outcome_label("/home/user/secret.txt"), "other");
+    }
+
+    #[test]
+    fn an_empty_scan_outcome_maps_to_other() {
+        assert_eq!(scan_outcome_label(""), "other");
+    }
+
+    #[test]
+    fn recording_a_revision_does_not_panic() {
+        let telemetry = FsWatchTelemetry::new();
+
+        telemetry.record_revision(ProcessOutcome::Processed);
+    }
+
+    #[test]
+    fn recording_a_retry_does_not_panic() {
+        let telemetry = FsWatchTelemetry::new();
+
+        telemetry.record_retry("backend", InboxFailureClass::Storage);
+    }
+
+    #[test]
+    fn recording_an_unknown_retry_stage_does_not_panic() {
+        let telemetry = FsWatchTelemetry::new();
+
+        telemetry.record_retry("/etc/passwd", InboxFailureClass::OtherTransient);
+    }
+
+    #[test]
+    fn recording_a_scan_file_does_not_panic() {
+        let telemetry = FsWatchTelemetry::new();
+
+        telemetry.record_scan_file("enqueued");
+    }
+
+    #[test]
+    fn setting_the_queue_depth_does_not_panic() {
+        let telemetry = FsWatchTelemetry::new();
+
+        telemetry.set_queue_depth(7);
+    }
+
+    #[test]
+    fn setting_the_inflight_count_does_not_panic() {
+        let telemetry = FsWatchTelemetry::new();
+
+        telemetry.set_inflight(3);
+    }
+
+    #[test]
+    fn setting_the_degraded_flag_does_not_panic() {
+        let telemetry = FsWatchTelemetry::new();
+
+        telemetry.set_degraded(true);
+    }
+
+    #[test]
+    fn recording_a_revision_duration_does_not_panic() {
+        let telemetry = FsWatchTelemetry::new();
+
+        telemetry.record_revision_duration(
+            ProcessOutcome::Processed,
+            std::time::Duration::from_millis(5),
+        );
+    }
+
+    #[test]
+    fn a_fresh_revision_timer_reports_a_non_negative_elapsed() {
+        let timer = RevisionTimer::start();
+
+        assert!(timer.elapsed() < std::time::Duration::from_secs(60));
+    }
+}

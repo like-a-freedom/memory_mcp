@@ -125,3 +125,138 @@ impl Default for TenantRuntimeSlot {
         Self::new()
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::time::Duration;
+
+    #[test]
+    fn a_fresh_slot_has_no_runtime() {
+        assert!(TenantRuntimeSlot::new().runtime.is_none());
+    }
+
+    #[test]
+    fn a_fresh_slot_is_absent() {
+        assert_eq!(TenantRuntimeSlot::new().phase, RuntimePhase::Absent);
+    }
+
+    #[test]
+    fn a_fresh_slot_has_no_pins() {
+        assert_eq!(TenantRuntimeSlot::new().pin_count.load(Ordering::SeqCst), 0);
+    }
+
+    #[test]
+    fn a_fresh_slot_has_no_active_operations() {
+        assert_eq!(
+            TenantRuntimeSlot::new()
+                .active_operations
+                .load(Ordering::SeqCst),
+            0
+        );
+    }
+
+    #[test]
+    fn pinning_increments_the_pin_count() {
+        let mut slot = TenantRuntimeSlot::new();
+
+        assert_eq!(slot.pin(), 1);
+    }
+
+    #[test]
+    fn pinning_twice_reports_two_pins() {
+        let mut slot = TenantRuntimeSlot::new();
+        slot.pin();
+
+        assert_eq!(slot.pin(), 2);
+    }
+
+    #[test]
+    fn unpinning_decrements_the_pin_count() {
+        let mut slot = TenantRuntimeSlot::new();
+        slot.pin();
+
+        assert_eq!(slot.unpin(), 0);
+    }
+
+    #[test]
+    fn a_zero_concurrency_limit_is_raised_to_one() {
+        let slot = TenantRuntimeSlot::new_with_limit(0);
+
+        assert_eq!(slot.concurrency.available_permits(), 1);
+    }
+
+    #[test]
+    fn the_default_slot_allows_four_concurrent_operations() {
+        assert_eq!(TenantRuntimeSlot::new().concurrency.available_permits(), 4);
+    }
+
+    #[test]
+    fn an_explicit_concurrency_limit_is_honoured() {
+        assert_eq!(
+            TenantRuntimeSlot::new_with_limit(7)
+                .concurrency
+                .available_permits(),
+            7
+        );
+    }
+
+    #[test]
+    fn a_fresh_activation_slot_is_absent() {
+        assert_eq!(ActivationSlot::new().state, RuntimePhase::Absent);
+    }
+
+    #[test]
+    fn a_fresh_activation_slot_starts_at_generation_zero() {
+        assert_eq!(ActivationSlot::new().generation.load(Ordering::SeqCst), 0);
+    }
+
+    #[test]
+    fn beginning_an_activation_increments_the_generation() {
+        let mut slot = ActivationSlot::new();
+
+        slot.begin();
+
+        assert_eq!(slot.generation.load(Ordering::SeqCst), 1);
+    }
+
+    #[test]
+    fn beginning_a_second_activation_increments_the_generation_again() {
+        let mut slot = ActivationSlot::new();
+        slot.begin();
+
+        slot.begin();
+
+        assert_eq!(slot.generation.load(Ordering::SeqCst), 2);
+    }
+
+    #[test]
+    fn beginning_an_activation_records_the_broadcast_sender() {
+        let mut slot = ActivationSlot::new();
+
+        slot.begin();
+
+        assert!(slot.in_flight.is_some());
+    }
+
+    #[test]
+    fn a_fresh_slot_is_not_in_negative_backoff() {
+        assert!(!ActivationSlot::new().in_negative_backoff());
+    }
+
+    #[test]
+    fn a_slot_with_a_future_backoff_is_in_negative_backoff() {
+        let mut slot = ActivationSlot::new();
+        slot.negative_backoff_until = Some(Instant::now() + Duration::from_secs(60));
+
+        assert!(slot.in_negative_backoff());
+    }
+
+    #[test]
+    fn a_slot_whose_backoff_has_passed_is_no_longer_backed_off() {
+        let mut slot = ActivationSlot::new();
+        slot.negative_backoff_until = Some(Instant::now() - Duration::from_secs(1));
+
+        assert!(!slot.in_negative_backoff());
+    }
+}

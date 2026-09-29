@@ -199,20 +199,125 @@ fn rand_u8_below(upper: u8) -> u8 {
 
 #[cfg(test)]
 mod heartbeat_tests {
-    use super::await_body_or_lease_loss;
+    use super::*;
+    use chrono::{Duration, Utc};
+
+    use crate::error::MemoryError;
+
+    /// A lease owned by `owner`, expiring `seconds` from `now`.
+    fn lease_expiring_at(now: chrono::DateTime<Utc>, seconds: i64) -> ProvisioningLease {
+        ProvisioningLease {
+            owner_id: "replica-1".to_string(),
+            lease_id: "lease-1".to_string(),
+            fencing_generation: 4,
+            expires_at: now + Duration::seconds(seconds),
+            heartbeat_at: now,
+        }
+    }
 
     #[tokio::test]
     async fn completed_body_wins_over_simultaneous_lease_loss() {
         let (lost_tx, mut lost_rx) = tokio::sync::oneshot::channel();
         lost_tx.send(()).expect("receiver is still alive");
 
+        let result =
+            await_body_or_lease_loss(async { Ok::<_, MemoryError>(42) }, &mut lost_rx).await;
+
+        assert_eq!(result.unwrap(), 42);
+    }
+
+    #[tokio::test]
+    async fn a_completed_body_error_is_returned_unchanged() {
+        let (lost_tx, mut lost_rx) = tokio::sync::oneshot::channel();
+        lost_tx.send(()).expect("receiver is still alive");
+
         let result = await_body_or_lease_loss(
-            async { Ok::<_, crate::error::MemoryError>(42) },
+            async { Err::<u32, _>(MemoryError::Storage("index down".into())) },
             &mut lost_rx,
         )
         .await;
 
-        assert_eq!(result.unwrap(), 42);
+        assert!(matches!(result, Err(MemoryError::Storage(_))));
+    }
+
+    #[tokio::test]
+    async fn a_lease_loss_before_the_body_completes_is_a_conflict() {
+        let (_lost_tx, mut lost_rx) = tokio::sync::oneshot::channel::<()>();
+        // The sender is dropped, so the receiver resolves immediately and the
+        // lease-loss arm wins before the (never-ready) body can complete.
+        drop(_lost_tx);
+
+        let result = await_body_or_lease_loss(
+            async {
+                tokio::time::sleep(std::time::Duration::from_secs(60)).await;
+                Ok::<_, MemoryError>(42)
+            },
+            &mut lost_rx,
+        )
+        .await;
+
+        assert!(matches!(result, Err(MemoryError::Conflict(_))));
+    }
+
+    #[tokio::test]
+    async fn a_pending_lease_does_not_block_the_body() {
+        // The sender is held, so the lease-loss arm can never fire and the body
+        // is the only way this select can resolve.
+        let (lost_tx, mut lost_rx) = tokio::sync::oneshot::channel::<()>();
+
+        let result =
+            await_body_or_lease_loss(async { Ok::<_, MemoryError>(7) }, &mut lost_rx).await;
+
+        assert_eq!(result.unwrap(), 7);
+        drop(lost_tx);
+    }
+
+    #[test]
+    fn a_lease_with_future_expiry_is_not_expired() {
+        let now = Utc::now();
+
+        assert!(!lease_expiring_at(now, 60).is_expired(now));
+    }
+
+    #[test]
+    fn a_lease_expiring_now_is_expired() {
+        let now = Utc::now();
+
+        assert!(lease_expiring_at(now, 0).is_expired(now));
+    }
+
+    #[test]
+    fn a_lease_with_past_expiry_is_expired() {
+        let now = Utc::now();
+
+        assert!(lease_expiring_at(now, -1).is_expired(now));
+    }
+
+    #[test]
+    fn a_future_lease_reports_a_positive_ttl() {
+        let now = Utc::now();
+
+        assert_eq!(lease_expiring_at(now, 60).ttl_secs(now), 60);
+    }
+
+    #[test]
+    fn a_past_lease_reports_a_negative_ttl() {
+        let now = Utc::now();
+
+        assert_eq!(lease_expiring_at(now, -30).ttl_secs(now), -30);
+    }
+
+    #[test]
+    fn rand_u8_below_one_always_returns_zero() {
+        assert_eq!(rand_u8_below(1), 0);
+    }
+
+    #[cfg(feature = "streamable-http")]
+    #[test]
+    fn rand_u8_below_stays_under_its_upper_bound() {
+        let observed = rand_u8_below(5);
+
+        assert!(observed < 5, "jitter must land inside the requested range");
     }
 }
 

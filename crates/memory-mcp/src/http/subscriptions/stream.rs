@@ -166,4 +166,91 @@ mod tests {
         );
         assert_eq!(queue.len(), 1);
     }
+
+    #[test]
+    fn an_equal_revision_replaces_when_the_sequence_is_higher() {
+        let mut queue = CoalescingQueue::new(2);
+        queue
+            .push(event(1, "ui://memory/apps/graph", 5))
+            .expect("enqueue");
+
+        queue
+            .push(event(2, "ui://memory/apps/graph", 5))
+            .expect("coalesce");
+
+        assert_eq!(queue.pop_front().map(|item| item.sequence), Some(2));
+    }
+
+    #[test]
+    fn an_equal_revision_and_sequence_does_not_replace() {
+        // Identical (sequence, revision) carries no newer information, so the
+        // queued event is kept rather than rewritten.
+        let mut queue = CoalescingQueue::new(2);
+        queue
+            .push(event(1, "ui://memory/apps/graph", 5))
+            .expect("enqueue");
+
+        let observed = queue.push(event(1, "ui://memory/apps/graph", 5));
+
+        assert_eq!(observed, Ok(QueuePush::Coalesced));
+    }
+
+    #[test]
+    fn a_full_queue_still_coalesces_an_already_queued_resource() {
+        // Capacity bounds distinct resources; coalescing an existing one must
+        // still work when the queue is at its limit.
+        let mut queue = CoalescingQueue::new(1);
+        queue
+            .push(event(1, "ui://memory/apps/graph", 1))
+            .expect("enqueue");
+
+        let observed = queue.push(event(2, "ui://memory/apps/graph", 2));
+
+        assert_eq!(observed, Ok(QueuePush::Coalesced));
+    }
+
+    #[test]
+    fn a_zero_capacity_queue_is_raised_to_one_slot() {
+        let mut queue = CoalescingQueue::new(0);
+
+        let observed = queue.push(event(1, "ui://memory/apps/graph", 1));
+
+        assert_eq!(observed, Ok(QueuePush::Enqueued));
+    }
+
+    #[test]
+    fn a_new_queue_is_empty() {
+        let observed = CoalescingQueue::new(4);
+
+        assert!(observed.is_empty());
+    }
+
+    #[test]
+    fn popping_an_empty_queue_yields_nothing() {
+        let mut queue = CoalescingQueue::new(4);
+
+        assert!(queue.pop_front().is_none());
+    }
+
+    #[test]
+    fn distinct_resources_are_bounded_by_capacity() {
+        let mut queue = CoalescingQueue::new(2);
+        queue
+            .push(event(1, "ui://memory/apps/graph", 1))
+            .expect("enqueue");
+        queue
+            .push(event(2, "ui://memory/apps/inspector", 1))
+            .expect("enqueue");
+
+        let observed = queue.push(event(3, "ui://memory/apps/diff", 1));
+
+        assert_eq!(observed, Err(QueueError::Full));
+    }
+
+    #[test]
+    fn the_full_queue_error_names_the_condition() {
+        let observed = QueueError::Full.to_string();
+
+        assert_eq!(observed, "subscription queue is full");
+    }
 }

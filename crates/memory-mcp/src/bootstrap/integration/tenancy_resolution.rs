@@ -117,3 +117,209 @@ impl ResolveTenantPort for RegistryTenantResolver {
         })
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::http::registry::models::{
+        Account, AccountStatus, NamespaceBinding, Tenant, TenantStatus,
+    };
+    use crate::http::registry::storage::{AccountStore, InMemoryStore, TenantStore};
+
+    /// A resolver over a store holding `acc_1` and its tenant in `status`.
+    async fn resolver_with(status: TenantStatus) -> RegistryTenantResolver {
+        let store = Arc::new(InMemoryStore::default());
+        store
+            .write_account(&Account {
+                id: "acc_1".to_string(),
+                status: AccountStatus::Active,
+                tenant_id: "ten_1".to_string(),
+                created_at: chrono::Utc::now(),
+            })
+            .await
+            .expect("seed account");
+        store
+            .write_tenant(&Tenant {
+                id: "ten_1".to_string(),
+                status,
+                namespace_binding: NamespaceBinding {
+                    namespace: "tns_1".to_string(),
+                    database: "memory".to_string(),
+                },
+                plan_version: 1,
+                schema_version: 2,
+                retry_stage: None,
+                provisioning_lease: None,
+                created_at: chrono::Utc::now(),
+                version: 0,
+            })
+            .await
+            .expect("seed tenant");
+        RegistryTenantResolver::new(Arc::new(AccountResolver::new(store)))
+    }
+
+    /// A resolver over a store that holds no tenants at all.
+    fn resolver() -> RegistryTenantResolver {
+        RegistryTenantResolver::new(Arc::new(AccountResolver::new(Arc::new(
+            InMemoryStore::default(),
+        ))))
+    }
+
+    #[tokio::test]
+    async fn a_ready_tenant_resolves_for_the_request_path() {
+        let resolution = resolve_with(TenantStatus::Ready).await;
+
+        assert!(matches!(resolution, TenantResolution::Ready(_)));
+    }
+
+    #[tokio::test]
+    async fn a_reserved_tenant_resolves_as_reserved() {
+        let resolution = resolve_with(TenantStatus::Reserved).await;
+
+        assert!(matches!(
+            resolution,
+            TenantResolution::Provisioning(TenantResolutionStatus::Reserved)
+        ));
+    }
+
+    #[tokio::test]
+    async fn a_namespace_creating_tenant_resolves_as_namespace_creating() {
+        let resolution = resolve_with(TenantStatus::NamespaceCreating).await;
+
+        assert!(matches!(
+            resolution,
+            TenantResolution::Provisioning(TenantResolutionStatus::NamespaceCreating)
+        ));
+    }
+
+    #[tokio::test]
+    async fn a_migrating_tenant_resolves_as_migrating() {
+        let resolution = resolve_with(TenantStatus::Migrating).await;
+
+        assert!(matches!(
+            resolution,
+            TenantResolution::Provisioning(TenantResolutionStatus::Migrating)
+        ));
+    }
+
+    #[tokio::test]
+    async fn a_suspended_tenant_resolves_as_suspended() {
+        let resolution = resolve_with(TenantStatus::Suspended).await;
+
+        assert!(matches!(resolution, TenantResolution::Suspended));
+    }
+
+    #[tokio::test]
+    async fn a_failed_tenant_resolves_as_failed_with_its_id() {
+        let observed = resolve_with(TenantStatus::Failed).await;
+
+        match observed {
+            TenantResolution::Failed(tenant_id) => assert_eq!(tenant_id, "ten_1"),
+            other => panic!("expected a failed resolution, got {other:?}"),
+        }
+    }
+
+    #[tokio::test]
+    async fn a_deleting_tenant_is_refused_on_the_request_path() {
+        // Deleting is not a provisioning status, so the request path refuses it
+        // rather than resolving it — a request must not reach a tenant that is
+        // mid-deletion.
+        let resolver = resolver_with(TenantStatus::Deleting).await;
+
+        let observed = resolver.resolve_tenant("acc_1").await;
+
+        assert!(
+            observed.is_err(),
+            "a deleting tenant must not resolve for a request"
+        );
+    }
+
+    #[tokio::test]
+    async fn an_account_with_no_tenant_resolves_as_not_found() {
+        let resolver = resolver();
+
+        let observed = resolver.resolve_tenant("acc_missing").await;
+
+        assert!(matches!(
+            observed.expect("resolution succeeds"),
+            TenantResolution::NotFound
+        ));
+    }
+
+    #[tokio::test]
+    async fn a_ready_tenant_is_visible_to_the_maintenance_path() {
+        let resolver = resolver_with(TenantStatus::Ready).await;
+
+        let observed = resolver
+            .resolve_tenant_for_maintenance("ten_1")
+            .await
+            .expect("maintenance resolves");
+
+        assert_eq!(observed.status, TenantLifecycleStatus::Ready);
+    }
+
+    #[tokio::test]
+    async fn a_deleting_tenant_is_visible_to_the_maintenance_path() {
+        let resolver = resolver_with(TenantStatus::Deleting).await;
+
+        let observed = resolver
+            .resolve_tenant_for_maintenance("ten_1")
+            .await
+            .expect("deletion recovery must be able to see the tenant");
+
+        assert_eq!(observed.status, TenantLifecycleStatus::Deleting);
+    }
+
+    #[tokio::test]
+    async fn a_purged_tenant_is_visible_to_the_maintenance_path() {
+        let resolver = resolver_with(TenantStatus::Purged).await;
+
+        let observed = resolver
+            .resolve_tenant_for_maintenance("ten_1")
+            .await
+            .expect("maintenance resolves");
+
+        assert_eq!(observed.status, TenantLifecycleStatus::Purged);
+    }
+
+    #[tokio::test]
+    async fn a_suspended_tenant_is_not_visible_to_the_maintenance_path() {
+        // The split exists so a suspended tenant cannot be reached by
+        // inventing a maintenance reading; it must be refused outright.
+        let resolver = resolver_with(TenantStatus::Suspended).await;
+
+        let observed = resolver.resolve_tenant_for_maintenance("ten_1").await;
+
+        assert!(observed.is_err());
+    }
+
+    #[tokio::test]
+    async fn a_reserved_tenant_is_not_visible_to_the_maintenance_path() {
+        let resolver = resolver_with(TenantStatus::Reserved).await;
+
+        let observed = resolver.resolve_tenant_for_maintenance("ten_1").await;
+
+        assert!(
+            observed.is_err(),
+            "a tenant with no data to sweep is refused"
+        );
+    }
+
+    #[tokio::test]
+    async fn maintenance_resolution_of_an_unknown_tenant_is_a_not_found() {
+        let resolver = resolver();
+
+        let observed = resolver.resolve_tenant_for_maintenance("ten_missing").await;
+
+        assert!(matches!(observed, Err(MemoryError::NotFound(_))));
+    }
+
+    /// Resolve the account that owns a tenant in `status` on the request path.
+    async fn resolve_with(status: TenantStatus) -> TenantResolution {
+        resolver_with(status)
+            .await
+            .resolve_tenant("acc_1")
+            .await
+            .expect("resolution succeeds")
+    }
+}

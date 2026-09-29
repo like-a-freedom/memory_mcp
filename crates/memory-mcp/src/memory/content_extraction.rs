@@ -766,6 +766,239 @@ mod tests {
         }
     }
 
+    #[test]
+    fn carrier_grade_nat_addresses_are_not_fetchable() {
+        // 100.64.0.0/10 is shared address space, not public routing.
+        let observed = is_public_ip(&"100.64.0.1".parse().expect("valid test address"));
+
+        assert!(!observed, "CGNAT space must not be fetchable");
+    }
+
+    #[test]
+    fn the_last_address_of_the_cgnat_block_is_not_fetchable() {
+        let observed = is_public_ip(&"100.127.255.254".parse().expect("valid test address"));
+
+        assert!(!observed, "the CGNAT range is inclusive of its upper bound");
+    }
+
+    #[test]
+    fn the_first_address_after_the_cgnat_block_is_fetchable() {
+        let observed = is_public_ip(&"100.128.0.1".parse().expect("valid test address"));
+
+        assert!(observed, "100.128.0.0/10 is outside the CGNAT block");
+    }
+
+    #[test]
+    fn benchmarking_addresses_are_not_fetchable() {
+        let observed = is_public_ip(&"198.18.0.1".parse().expect("valid test address"));
+
+        assert!(!observed, "the 198.18.0.0/15 benchmark range is not public");
+    }
+
+    #[test]
+    fn ietf_protocol_assignments_are_not_fetchable() {
+        let observed = is_public_ip(&"192.0.0.1".parse().expect("valid test address"));
+
+        assert!(!observed, "192.0.0.0/24 is reserved, not public");
+    }
+
+    #[test]
+    fn a_documentation_address_is_not_fetchable() {
+        let observed = is_public_ip(&"203.0.113.9".parse().expect("valid test address"));
+
+        assert!(!observed, "the TEST-NET-3 range is documentation-only");
+    }
+
+    #[test]
+    fn an_ipv4_mapped_loopback_is_not_fetchable() {
+        // ::ffff:127.0.0.1 reaches the same host as 127.0.0.1.
+        let observed = is_public_ip(&"::ffff:127.0.0.1".parse().expect("valid test address"));
+
+        assert!(!observed, "a v4-mapped loopback must not be fetchable");
+    }
+
+    #[test]
+    fn an_ipv4_mapped_private_address_is_not_fetchable() {
+        let observed = is_public_ip(&"::ffff:10.0.0.1".parse().expect("valid test address"));
+
+        assert!(
+            !observed,
+            "a v4-mapped private address must not be fetchable"
+        );
+    }
+
+    #[test]
+    fn an_ipv4_mapped_public_address_is_fetchable() {
+        let observed = is_public_ip(&"::ffff:1.1.1.1".parse().expect("valid test address"));
+
+        assert!(observed, "a v4-mapped public address inherits its verdict");
+    }
+
+    #[test]
+    fn a_pdf_is_detected_from_its_magic_bytes() {
+        // The name deliberately carries no extension: content wins over naming.
+        let observed = detect_format(Path::new("report"), b"%PDF-1.7\nbody");
+
+        assert_eq!(observed.expect("sniffs as a PDF"), FileFormat::Pdf);
+    }
+
+    #[test]
+    fn a_markdown_file_is_detected_from_its_extension() {
+        let observed = detect_format(Path::new("notes.md"), b"# heading\n");
+
+        assert_eq!(observed.expect("sniffs as markdown"), FileFormat::Markdown);
+    }
+
+    #[test]
+    fn a_plain_text_file_is_detected_from_its_extension() {
+        let observed = detect_format(Path::new("notes.txt"), b"just words\n");
+
+        assert_eq!(observed.expect("sniffs as text"), FileFormat::Text);
+    }
+
+    #[test]
+    fn an_unknown_extension_is_rejected() {
+        let observed = detect_format(Path::new("archive.tar.zst"), b"\x00\x01\x02");
+
+        assert!(observed.is_err(), "an unparseable format must be refused");
+    }
+
+    #[test]
+    fn a_file_with_no_extension_and_no_magic_bytes_is_rejected() {
+        let observed = detect_format(Path::new("LICENSE"), b"MIT License\n");
+
+        assert!(observed.is_err(), "naming alone must not pick a parser");
+    }
+
+    #[test]
+    fn a_remote_url_is_recognized() {
+        assert!(looks_like_remote_url("https://example.com/doc"));
+    }
+
+    #[test]
+    fn a_bare_host_is_not_a_remote_url() {
+        assert!(!looks_like_remote_url("example.com/doc"));
+    }
+
+    #[test]
+    fn an_ftp_url_is_not_a_remote_url() {
+        assert!(!looks_like_remote_url("ftp://example.com/file"));
+    }
+
+    #[test]
+    fn normalize_drops_blank_lines_and_trims_the_rest() {
+        let observed = normalize_extracted_text("  alpha  \n\n   \n  beta  \n");
+
+        assert_eq!(observed, "alpha\nbeta");
+    }
+
+    #[test]
+    fn normalize_of_only_whitespace_is_empty() {
+        let observed = normalize_extracted_text("  \n\n\t\n");
+
+        assert!(observed.is_empty());
+    }
+
+    #[test]
+    fn finalize_yields_an_empty_document_for_whitespace_only_content() {
+        let observed =
+            finalize_text_chunks(vec![TextChunk::new("   \n\n  ".to_string())]).expect("finalizes");
+
+        assert!(observed.is_empty());
+    }
+
+    #[test]
+    fn finalize_labels_a_single_chunk_with_its_position() {
+        let observed =
+            finalize_text_chunks(vec![TextChunk::new("alpha".to_string())]).expect("finalizes");
+
+        assert_eq!(observed, "Chunk 1/1\nalpha");
+    }
+
+    #[test]
+    fn finalize_labels_each_chunk_of_a_multi_chunk_document() {
+        let observed = finalize_text_chunks(vec![
+            TextChunk::new("alpha".to_string()),
+            TextChunk::new("beta".to_string()),
+        ])
+        .expect("finalizes");
+
+        assert_eq!(observed, "Chunk 1/2\nalpha\n\nChunk 2/2\nbeta");
+    }
+
+    #[test]
+    fn finalize_drops_an_empty_chunk_and_keeps_the_rest() {
+        let observed = finalize_text_chunks(vec![
+            TextChunk::new("   ".to_string()),
+            TextChunk::new("beta".to_string()),
+        ])
+        .expect("finalizes");
+
+        assert_eq!(
+            observed, "Chunk 1/1\nbeta",
+            "an empty chunk must not consume a numbered position"
+        );
+    }
+
+    #[test]
+    fn a_stable_source_id_is_the_same_for_the_same_seed() {
+        let observed = stable_transport_source_id("/tmp/report.pdf");
+
+        assert_eq!(observed, stable_transport_source_id("/tmp/report.pdf"));
+    }
+
+    #[test]
+    fn a_stable_source_id_differs_between_paths() {
+        let observed = stable_transport_source_id("/tmp/a.pdf");
+
+        assert_ne!(
+            observed,
+            stable_transport_source_id("/tmp/b.pdf"),
+            "two paths must not share a source id"
+        );
+    }
+
+    #[test]
+    fn a_stable_source_id_is_a_sha256_hex_digest() {
+        let observed = stable_transport_source_id("/tmp/report.pdf");
+
+        assert_eq!(observed.len(), 64, "sha256 renders as 64 hex characters");
+    }
+
+    #[test]
+    fn html_tags_are_stripped_from_extracted_text() {
+        let observed = strip_html_to_text("<p>hello <b>world</b></p>");
+
+        assert!(!observed.contains('<'), "no markup may survive stripping");
+    }
+
+    #[test]
+    fn html_text_content_survives_stripping() {
+        let observed = strip_html_to_text("<p>hello <b>world</b></p>");
+
+        assert!(
+            observed.contains("world"),
+            "text nodes must survive stripping"
+        );
+    }
+
+    #[test]
+    fn script_contents_are_dropped_from_extracted_text() {
+        let observed = strip_html_to_text("<p>keep</p><script>steal()</script>");
+
+        assert!(
+            !observed.contains("steal"),
+            "script bodies are code, not document text"
+        );
+    }
+
+    #[test]
+    fn style_contents_are_dropped_from_extracted_text() {
+        let observed = strip_html_to_text("<style>body{color:red}</style><p>keep</p>");
+
+        assert!(!observed.contains("color"), "style bodies are not text");
+    }
+
     #[tokio::test]
     async fn remote_url_validation_rejects_credentials_and_non_http_schemes() {
         for url in [

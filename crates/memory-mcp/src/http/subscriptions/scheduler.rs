@@ -77,3 +77,31 @@ pub async fn poll_and_repair_all(registry: &RegistryHandle) -> Result<(), Memory
     }
     Ok(())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// An in-memory registry with no ready tenants.
+    async fn empty_registry() -> RegistryHandle {
+        RegistryHandle::in_memory_with_default_mem_engine().await
+    }
+
+    #[tokio::test]
+    async fn polling_with_no_ready_tenants_succeeds() {
+        let registry = empty_registry().await;
+
+        let observed = poll_and_repair_all(&registry).await;
+
+        assert!(observed.is_ok(), "an empty repair pass is a valid pass");
+    }
+
+    #[tokio::test]
+    async fn the_job_entry_point_runs_against_an_empty_registry() {
+        let registry = empty_registry().await;
+
+        let observed = (scheduler_job())(registry).await;
+
+        assert!(observed.is_ok());
+    }
+}

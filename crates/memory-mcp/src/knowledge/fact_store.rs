@@ -79,3 +79,92 @@ impl FactStoreClient {
         .await
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// A store bound to a fresh in-memory namespace with migrations applied.
+    async fn store() -> FactStoreClient {
+        let client =
+            crate::storage::SurrealDbClient::connect_in_memory("fact_store", "org", "warn")
+                .await
+                .expect("in-memory client");
+        let store = FactStoreClient::new(Arc::new(client), "org");
+        store.db.apply_migrations().await.expect("apply migrations");
+        store
+    }
+
+    #[tokio::test]
+    async fn selecting_a_fact_that_does_not_exist_returns_none() {
+        let store = store().await;
+
+        let observed = store.select_fact("fact:missing").await;
+
+        assert!(observed.expect("lookup succeeds").is_none());
+    }
+
+    /// A fact record that satisfies the SCHEMAFULL `fact` table.
+    fn valid_fact(content: &str) -> Value {
+        serde_json::json!({
+            "fact_id": "fact:1",
+            "fact_type": "decision",
+            "content": content,
+            "quote": content,
+            "source_episode": "episode:1",
+            "t_valid": "2026-01-01T00:00:00Z",
+            "t_ingested": "2026-01-01T00:00:00Z",
+            "confidence": 0.9,
+            "entity_links": [],
+            "scope": "org",
+            "policy_tags": [],
+            "provenance": {},
+        })
+    }
+
+    #[tokio::test]
+    async fn selecting_a_fact_returns_its_record() {
+        let store = store().await;
+        store
+            .create("fact:1", valid_fact("the API moved to v2"))
+            .await
+            .expect("create fact");
+
+        let observed = store.select_fact("fact:1").await;
+
+        assert_eq!(
+            observed.expect("lookup succeeds").expect("fact present")["content"],
+            "the API moved to v2"
+        );
+    }
+
+    #[tokio::test]
+    async fn select_fact_refuses_an_id_that_is_not_a_fact() {
+        let store = store().await;
+
+        let observed = store.select_fact("episode:1").await;
+
+        assert!(
+            observed.is_err(),
+            "the owner-scoped accessor must not cross record kinds"
+        );
+    }
+
+    #[tokio::test]
+    async fn select_fact_refuses_a_bare_hex_id() {
+        let store = store().await;
+
+        let observed = store.select_fact("deadbeef").await;
+
+        assert!(observed.is_err(), "an unprefixed id names no record kind");
+    }
+
+    #[tokio::test]
+    async fn select_fact_refuses_an_empty_id() {
+        let store = store().await;
+
+        let observed = store.select_fact("").await;
+
+        assert!(observed.is_err());
+    }
+}

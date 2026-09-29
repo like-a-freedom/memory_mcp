@@ -164,3 +164,97 @@ where
         self.inner.size_hint()
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::http::runtime::pool::AdmissionGate;
+    use http_body_util::BodyExt;
+
+    /// A gate with a single request slot, so a second acquire must fail while
+    /// the first permit is alive.
+    fn single_slot_gate() -> Arc<AdmissionGate> {
+        Arc::new(AdmissionGate::new(1))
+    }
+
+    /// A `ResponseLease` backed by `permit`, with no operation pin.
+    fn lease_for(permit: AdmissionPermit) -> ResponseLease {
+        ResponseLease::new(None, Arc::new(permit))
+    }
+
+    #[tokio::test]
+    async fn a_leased_body_still_delivers_its_frames() {
+        let gate = single_slot_gate();
+        let permit = gate.try_acquire().expect("permit acquires");
+        let body = LeasedBody::new(axum::body::Body::from("ok"), lease_for(permit));
+
+        let collected = body.collect().await.expect("body completes");
+
+        assert_eq!(&collected.to_bytes()[..], b"ok");
+    }
+
+    #[tokio::test]
+    async fn a_leased_body_releases_its_permit_when_the_stream_ends() {
+        let gate = single_slot_gate();
+        let permit = gate.try_acquire().expect("permit acquires");
+        let body = LeasedBody::new(axum::body::Body::from("ok"), lease_for(permit));
+        body.collect().await.expect("body completes");
+
+        let observed = gate.try_acquire().is_ok();
+
+        assert!(observed, "the permit must be returned once the body ends");
+    }
+
+    #[tokio::test]
+    async fn a_leased_body_keeps_its_permit_while_frames_are_pending() {
+        // The body has not been polled, so the lease must still be held.
+        let gate = single_slot_gate();
+        let permit = gate.try_acquire().expect("permit acquires");
+        let _body = LeasedBody::new(axum::body::Body::from("ok"), lease_for(permit));
+
+        let observed = gate.try_acquire().is_ok();
+
+        assert!(!observed, "an unconsumed body must hold its permit");
+    }
+
+    #[tokio::test]
+    async fn a_leased_body_reports_the_inner_size_hint() {
+        let gate = single_slot_gate();
+        let permit = gate.try_acquire().expect("permit acquires");
+        let body = LeasedBody::new(axum::body::Body::from("ok"), lease_for(permit));
+
+        assert_eq!(body.size_hint().exact(), Some(2));
+    }
+
+    #[tokio::test]
+    async fn a_permit_ref_keeps_its_permit_alive() {
+        // The wrapper is handed to request extensions and to the response
+        // body as separate `Arc` clones, so both views must see the same
+        // permit; dropping one must not release it.
+        let gate = single_slot_gate();
+        let permit = gate.try_acquire().expect("permit acquires");
+        let permit_ref = AdmissionPermitRef(Arc::new(permit));
+
+        let other_view = permit_ref.clone();
+        drop(permit_ref);
+
+        assert!(
+            gate.try_acquire().is_err(),
+            "the surviving clone still holds the permit"
+        );
+        drop(other_view);
+        assert!(gate.try_acquire().is_ok());
+    }
+
+    #[tokio::test]
+    async fn dropping_a_permit_ref_returns_the_slot() {
+        let gate = single_slot_gate();
+        let permit = gate.try_acquire().expect("permit acquires");
+
+        {
+            let _permit_ref = AdmissionPermitRef(Arc::new(permit));
+        }
+
+        assert!(gate.try_acquire().is_ok());
+    }
+}

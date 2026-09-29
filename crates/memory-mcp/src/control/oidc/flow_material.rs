@@ -179,3 +179,152 @@ pub struct AccessClaims {
     pub exp: u64,
     pub nonce: Option<String>,
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Decode a single-string `aud` claim.
+    fn one_audience(json: &str) -> Audience {
+        serde_json::from_str::<AccessClaims>(json)
+            .expect("claims decode")
+            .aud
+    }
+
+    /// Decode a list `aud` claim.
+    fn many_audience(json: &str) -> Audience {
+        serde_json::from_str::<AccessClaims>(json)
+            .expect("claims decode")
+            .aud
+    }
+
+    #[test]
+    fn a_new_state_is_hex_encoded_32_bytes() {
+        let observed = OidcState::new().as_str().to_string();
+
+        assert_eq!(observed.len(), 64, "32 bytes render as 64 hex characters");
+    }
+
+    #[test]
+    fn two_states_never_collide() {
+        let observed = OidcState::new().as_str() == OidcState::new().as_str();
+
+        assert!(!observed, "CSRF state must be unpredictable");
+    }
+
+    #[test]
+    fn a_default_state_is_fresh() {
+        let observed = OidcState::default().as_str().len();
+
+        assert_eq!(observed, 64);
+    }
+
+    #[test]
+    fn a_new_nonce_is_hex_encoded_32_bytes() {
+        let observed = OidcNonce::new().as_str().to_string();
+
+        assert_eq!(observed.len(), 64);
+    }
+
+    #[test]
+    fn two_nonces_never_collide() {
+        let observed = OidcNonce::new().as_str() == OidcNonce::new().as_str();
+
+        assert!(!observed, "a replayed nonce must not be accepted");
+    }
+
+    #[test]
+    fn a_default_nonce_is_fresh() {
+        let observed = OidcNonce::default().as_str().len();
+
+        assert_eq!(observed, 64);
+    }
+
+    #[test]
+    fn a_pkce_verifier_is_43_base64url_characters() {
+        // 32 random bytes in unpadded base64url.
+        let observed = PkceCode::new().verifier;
+
+        assert_eq!(observed.len(), 43);
+    }
+
+    #[test]
+    fn a_pkce_verifier_carries_no_padding() {
+        let observed = PkceCode::new().verifier;
+
+        assert!(!observed.contains('='), "PKCE uses unpadded base64url");
+    }
+
+    #[test]
+    fn a_pkce_challenge_is_the_sha256_of_the_verifier() {
+        use base64::{Engine as _, engine::general_purpose::URL_SAFE_NO_PAD};
+        use sha2::{Digest, Sha256};
+
+        let code = PkceCode::new();
+        let expected = URL_SAFE_NO_PAD.encode(Sha256::digest(code.verifier.as_bytes()));
+
+        assert_eq!(code.challenge, expected);
+    }
+
+    #[test]
+    fn two_pkce_codes_never_share_a_verifier() {
+        let observed = PkceCode::new().verifier == PkceCode::new().verifier;
+
+        assert!(!observed, "the verifier is the flow's secret");
+    }
+
+    #[test]
+    fn a_default_pkce_code_is_fresh() {
+        let observed = PkceCode::default().verifier.len();
+
+        assert_eq!(observed, 43);
+    }
+
+    #[test]
+    fn the_default_flow_intent_is_sign_in() {
+        assert_eq!(OidcFlowIntent::default(), OidcFlowIntent::SignIn);
+    }
+
+    #[test]
+    fn a_single_string_audience_decodes_to_one() {
+        let observed = one_audience(r#"{"iss":"i","sub":"s","aud":"a","exp":1}"#);
+
+        assert!(matches!(observed, Audience::One(ref value) if value == "a"));
+    }
+
+    #[test]
+    fn a_list_audience_decodes_to_many() {
+        let observed = many_audience(r#"{"iss":"i","sub":"s","aud":["a","b"],"exp":1}"#);
+
+        assert!(matches!(observed, Audience::Many(ref values) if values == &["a", "b"]));
+    }
+
+    #[test]
+    fn a_claims_payload_without_a_nonce_decodes() {
+        let observed =
+            serde_json::from_str::<AccessClaims>(r#"{"iss":"i","sub":"s","aud":"a","exp":1}"#)
+                .expect("claims decode");
+
+        assert!(observed.nonce.is_none());
+    }
+
+    #[test]
+    fn a_claims_payload_carries_its_nonce() {
+        let observed = serde_json::from_str::<AccessClaims>(
+            r#"{"iss":"i","sub":"s","aud":"a","exp":1,"nonce":"n1"}"#,
+        )
+        .expect("claims decode");
+
+        assert_eq!(observed.nonce.as_deref(), Some("n1"));
+    }
+
+    #[test]
+    fn an_auth_error_becomes_a_config_invalid_memory_error() {
+        let observed = crate::error::MemoryError::from(AuthError::Sealing);
+
+        assert!(
+            observed.to_string().contains("could not be sealed"),
+            "the operator-facing message must survive the conversion"
+        );
+    }
+}

@@ -40,6 +40,11 @@ fn init_targets_are_json_and_non_mutating() {
 
     for target in targets {
         let test_dir = TempDir::new().expect("temporary init test directory");
+        // `env_clear()` drops LLVM_PROFILE_FILE, so an instrumented child would
+        // drop `default_<pid>_*.profraw` into its cwd and break the unchanged-tree
+        // assertion below. Point it at a sibling directory instead: the observed
+        // tree stays clean and the child's coverage is still collected.
+        let profile_dir = TempDir::new().expect("temporary profile output directory");
         let home = test_dir.path().join("home");
         let xdg_data_home = test_dir.path().join("xdg");
         let current_dir = test_dir.path().join("cwd");
@@ -53,6 +58,10 @@ fn init_targets_are_json_and_non_mutating() {
             .env_clear()
             .env("HOME", &home)
             .env("XDG_DATA_HOME", &xdg_data_home)
+            .env(
+                "LLVM_PROFILE_FILE",
+                profile_dir.path().join("init-%p-%m.profraw"),
+            )
             .current_dir(&current_dir)
             .args(["init", "--target", target])
             .output()

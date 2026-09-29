@@ -81,3 +81,198 @@ pub fn resolve_key_slot(
         },
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// A 32-byte root secret, exactly the documented strength floor.
+    const STRONG_ROOT: &str = "0123456789abcdef0123456789abcdef";
+    /// 31 bytes: one below the floor, so validation must refuse it.
+    const WEAK_ROOT: &str = "0123456789abcdef0123456789abcde";
+
+    /// Run `body` with `MEMORY_MCP_HTTP_SECRET_KEY` set to `value`, restoring
+    /// the ambient environment afterwards. Every test that touches the root
+    /// secret must go through here: the process environment is shared, so the
+    /// `config::env_lock` serializes these against every other env-reading
+    /// test in the crate.
+    fn with_root_secret<R>(value: Option<&str>, body: impl FnOnce() -> R) -> R {
+        let _guard = crate::config::env_lock().lock().expect("secrets env lock");
+        let saved = std::env::var(ROOT_SECRET_ENV).ok();
+        unsafe {
+            match value {
+                Some(value) => std::env::set_var(ROOT_SECRET_ENV, value),
+                None => std::env::remove_var(ROOT_SECRET_ENV),
+            }
+        }
+        let outcome = std::panic::catch_unwind(std::panic::AssertUnwindSafe(body));
+        unsafe {
+            match saved {
+                Some(saved) => std::env::set_var(ROOT_SECRET_ENV, saved),
+                None => std::env::remove_var(ROOT_SECRET_ENV),
+            }
+        }
+        outcome.expect("secrets test body")
+    }
+
+    #[test]
+    fn read_root_secret_returns_none_when_unset() {
+        let observed = with_root_secret(None, read_root_secret);
+
+        assert_eq!(observed.expect("unset root secret reads cleanly"), None);
+    }
+
+    #[test]
+    fn read_root_secret_returns_none_when_blank() {
+        let observed = with_root_secret(Some("   "), read_root_secret);
+
+        assert_eq!(observed.expect("blank root secret reads cleanly"), None);
+    }
+
+    #[test]
+    fn read_root_secret_trims_surrounding_whitespace() {
+        let padded = format!("  {STRONG_ROOT}  ");
+
+        let observed = with_root_secret(Some(&padded), read_root_secret);
+
+        assert_eq!(
+            observed.expect("padded strong root secret reads cleanly"),
+            Some(STRONG_ROOT.to_string())
+        );
+    }
+
+    #[test]
+    fn read_root_secret_rejects_a_root_shorter_than_the_floor_after_trimming() {
+        let observed = with_root_secret(Some("  abc  "), read_root_secret);
+
+        assert!(
+            observed.is_err(),
+            "whitespace must not pad a root up to the strength floor"
+        );
+    }
+
+    #[test]
+    fn validate_root_secret_accepts_exactly_the_strength_floor() {
+        let observed = validate_root_secret(STRONG_ROOT);
+
+        assert!(observed.is_ok(), "32 bytes must satisfy the floor");
+    }
+
+    #[test]
+    fn validate_root_secret_rejects_one_byte_below_the_floor() {
+        let observed = validate_root_secret(WEAK_ROOT);
+
+        assert!(observed.is_err(), "31 bytes must be refused");
+    }
+
+    #[test]
+    fn validate_root_secret_rejects_the_empty_string() {
+        let observed = validate_root_secret("");
+
+        assert!(observed.is_err(), "an empty root must be refused");
+    }
+
+    #[test]
+    fn read_root_secret_rejects_a_weak_root() {
+        let observed = with_root_secret(Some(WEAK_ROOT), read_root_secret);
+
+        assert!(observed.is_err(), "a weak root must surface as an error");
+    }
+
+    #[test]
+    fn read_root_secret_accepts_a_strong_root() {
+        let observed = with_root_secret(Some(STRONG_ROOT), read_root_secret);
+
+        assert_eq!(
+            observed.expect("strong root secret reads cleanly"),
+            Some(STRONG_ROOT.to_string())
+        );
+    }
+
+    #[test]
+    #[cfg(feature = "streamable-http")]
+    fn derive_key_from_root_secret_is_deterministic() {
+        let first =
+            derive_key_from_root_secret(STRONG_ROOT, "SLOT_A").expect("derivation succeeds");
+        let second =
+            derive_key_from_root_secret(STRONG_ROOT, "SLOT_A").expect("derivation succeeds");
+
+        assert_eq!(
+            first, second,
+            "the same root and label must derive the same key"
+        );
+    }
+
+    #[test]
+    #[cfg(feature = "streamable-http")]
+    fn derive_key_from_root_secret_differs_per_label() {
+        let first =
+            derive_key_from_root_secret(STRONG_ROOT, "SLOT_A").expect("derivation succeeds");
+        let second =
+            derive_key_from_root_secret(STRONG_ROOT, "SLOT_B").expect("derivation succeeds");
+
+        assert_ne!(first, second, "a sibling slot must never equal another");
+    }
+
+    #[test]
+    #[cfg(feature = "streamable-http")]
+    fn derive_key_from_root_secret_rejects_a_weak_root() {
+        let observed = derive_key_from_root_secret(WEAK_ROOT, "SLOT_A");
+
+        assert!(observed.is_err(), "a weak root must not be expanded");
+    }
+
+    #[test]
+    #[cfg(feature = "streamable-http")]
+    fn resolve_key_slot_prefers_an_explicit_value_over_the_root() {
+        let supplied = "aa".repeat(32);
+        let expected: [u8; 32] = [0xaa; 32];
+
+        let observed = resolve_key_slot(Some(supplied), "SLOT_A", Some(STRONG_ROOT), || {
+            panic!("an explicit value must never reach the fallback")
+        })
+        .expect("explicit slot resolves");
+
+        assert_eq!(observed, expected);
+    }
+
+    #[test]
+    #[cfg(feature = "streamable-http")]
+    fn resolve_key_slot_rejects_an_explicit_value_of_the_wrong_width() {
+        let supplied = "aabbcc".to_string();
+
+        let observed = resolve_key_slot(Some(supplied), "SLOT_A", None, || {
+            panic!("fallback must not run")
+        });
+
+        assert!(
+            observed.is_err(),
+            "a short slot must be refused, not padded"
+        );
+    }
+
+    #[test]
+    #[cfg(feature = "streamable-http")]
+    fn resolve_key_slot_derives_from_the_root_when_no_value_is_supplied() {
+        let expected =
+            derive_key_from_root_secret(STRONG_ROOT, "SLOT_A").expect("derivation succeeds");
+
+        let observed = resolve_key_slot(None, "SLOT_A", Some(STRONG_ROOT), || {
+            panic!("a present root must never reach the fallback")
+        })
+        .expect("derived slot resolves");
+
+        assert_eq!(observed, expected);
+    }
+
+    #[test]
+    #[cfg(feature = "streamable-http")]
+    fn resolve_key_slot_falls_back_when_neither_value_nor_root_is_present() {
+        let expected = [0x5a; 32];
+
+        let observed =
+            resolve_key_slot(None, "SLOT_A", None, || Ok(expected)).expect("slot resolves");
+
+        assert_eq!(observed, expected);
+    }
+}

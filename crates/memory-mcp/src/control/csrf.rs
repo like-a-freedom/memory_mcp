@@ -114,4 +114,106 @@ mod tests {
         let token = compute_csrf(&key, "acc1", "sess1").unwrap();
         assert!(!verify_csrf(&key, "acc2", "sess1", &token).unwrap());
     }
+
+    #[test]
+    fn verify_csrf_rejects_a_token_signed_with_another_key() {
+        let token = compute_csrf(&[0xABu8; 32], "acc1", "sess1").unwrap();
+
+        let observed = verify_csrf(&[0xCDu8; 32], "acc1", "sess1", &token);
+
+        assert!(
+            !observed.unwrap(),
+            "the key is part of the token's identity"
+        );
+    }
+
+    #[test]
+    fn verify_csrf_rejects_a_token_that_is_not_hex() {
+        let observed = verify_csrf(&[0xABu8; 32], "acc1", "sess1", "not hex");
+
+        assert!(observed.is_err());
+    }
+
+    #[test]
+    fn verify_csrf_rejects_an_empty_token() {
+        let observed = verify_csrf(&[0xABu8; 32], "acc1", "sess1", "");
+
+        assert!(!observed.unwrap());
+    }
+
+    #[test]
+    fn a_token_is_hex_encoded_hmac_sha256() {
+        let observed = compute_csrf(&[0xABu8; 32], "acc1", "sess1").expect("token computes");
+
+        assert_eq!(observed.len(), 64, "sha256 renders as 64 hex characters");
+    }
+
+    #[test]
+    fn the_account_and_session_names_are_separated_by_a_nul_byte() {
+        // Without the separator, ("ab","c") and ("a","bc") would collide.
+        let observed = compute_csrf(&[0xABu8; 32], "ab", "c").expect("token computes");
+
+        assert_ne!(observed, compute_csrf(&[0xABu8; 32], "a", "bc").unwrap());
+    }
+
+    #[test]
+    fn the_token_is_read_from_the_csrf_header() {
+        let mut headers = axum::http::HeaderMap::new();
+        headers.insert(
+            "x-csrf-token",
+            axum::http::HeaderValue::from_static("from-header"),
+        );
+
+        let observed = extract_csrf_token(&headers, None);
+
+        assert_eq!(observed.as_deref(), Some("from-header"));
+    }
+
+    #[test]
+    fn the_header_wins_over_the_form_field() {
+        let mut headers = axum::http::HeaderMap::new();
+        headers.insert(
+            "x-csrf-token",
+            axum::http::HeaderValue::from_static("from-header"),
+        );
+
+        let observed = extract_csrf_token(&headers, Some("csrf_token=from-form"));
+
+        assert_eq!(
+            observed.as_deref(),
+            Some("from-header"),
+            "a forged form field must not override the header"
+        );
+    }
+
+    #[test]
+    fn the_token_falls_back_to_the_form_field() {
+        let observed = extract_csrf_token(&axum::http::HeaderMap::new(), Some("csrf_token=abc123"));
+
+        assert_eq!(observed.as_deref(), Some("abc123"));
+    }
+
+    #[test]
+    fn the_form_field_is_found_among_other_fields() {
+        let observed = extract_csrf_token(
+            &axum::http::HeaderMap::new(),
+            Some("first=1&csrf_token=abc123&last=2"),
+        );
+
+        assert_eq!(observed.as_deref(), Some("abc123"));
+    }
+
+    #[test]
+    fn a_form_without_a_csrf_field_yields_no_token() {
+        let observed = extract_csrf_token(&axum::http::HeaderMap::new(), Some("first=1&last=2"));
+
+        assert!(observed.is_none());
+    }
+
+    #[test]
+    fn an_absent_header_and_form_yield_no_token() {
+        let observed = extract_csrf_token(&axum::http::HeaderMap::new(), None);
+
+        assert!(observed.is_none());
+    }
 }

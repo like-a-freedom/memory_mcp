@@ -524,12 +524,14 @@ pub async fn create_account(
 mod tests {
     use super::*;
     use crate::control::operator;
+    use crate::control::session::ControlPlaneSession;
     use crate::http::registry::models::{
         Account, AccountStatus, ExternalIdentity, SubjectVerifier,
     };
     use crate::http::registry::storage::{AccountStore, IdentityStore, InMemoryStore};
     use axum::Router;
     use axum::body::Body;
+    use axum::extract::{Extension, State};
     use axum::http::{Request, StatusCode};
     use axum::routing::post;
     use tower_service::Service;
@@ -718,5 +720,161 @@ mod tests {
         let (tid, stage) = &events[0];
         assert_eq!(tid, &account.tenant_id);
         assert_eq!(stage, "reserved");
+    }
+
+    /// A fresh in-memory `HttpState` for the session-scoped handlers.
+    async fn state() -> Arc<crate::http::HttpState> {
+        crate::http::HttpState::default_for_test().await
+    }
+
+    /// A control-plane session bound to `account_id`.
+    fn session_for(account_id: &str) -> ControlPlaneSession {
+        let now = chrono::Utc::now();
+        ControlPlaneSession {
+            id: "sess-1".to_owned(),
+            cookie_hash: "hash".to_owned(),
+            account_id: account_id.to_owned(),
+            browser_policy_epoch: Some(1),
+            auth_time: now,
+            idle_expiry: now + chrono::Duration::minutes(30),
+            absolute_expiry: now + chrono::Duration::hours(24),
+        }
+    }
+
+    /// Seed an active account into the state's registry.
+    async fn seed_account(state: &Arc<crate::http::HttpState>, account_id: &str) {
+        state
+            .registry
+            .accounts()
+            .write_account(&Account {
+                id: account_id.to_owned(),
+                status: AccountStatus::Active,
+                tenant_id: "ten_1".to_owned(),
+                created_at: chrono::Utc::now(),
+            })
+            .await
+            .expect("write account");
+    }
+
+    /// Read a JSON response body.
+    async fn json_of(response: Response) -> serde_json::Value {
+        let bytes = axum::body::to_bytes(response.into_body(), 64 * 1024)
+            .await
+            .expect("body reads");
+        serde_json::from_slice(&bytes).expect("json body")
+    }
+
+    #[tokio::test]
+    async fn reading_an_unknown_account_is_a_not_found() {
+        let state = state().await;
+
+        let observed = get_account(State(state), Extension(session_for("acc_missing"))).await;
+
+        assert!(matches!(observed, Err(ApiError::NotFound)));
+    }
+
+    #[tokio::test]
+    async fn reading_a_known_account_succeeds() {
+        let state = state().await;
+        seed_account(&state, "acc_1").await;
+
+        let observed = get_account(State(state), Extension(session_for("acc_1"))).await;
+
+        assert!(observed.is_ok());
+    }
+
+    #[tokio::test]
+    async fn the_account_response_carries_the_account_id() {
+        let state = state().await;
+        seed_account(&state, "acc_1").await;
+
+        let observed = get_account(State(state), Extension(session_for("acc_1")))
+            .await
+            .ok()
+            .expect("account reads");
+
+        assert_eq!(json_of(observed).await["account"]["id"], "acc_1");
+    }
+
+    #[tokio::test]
+    async fn an_account_with_no_tenant_reports_a_null_tenant_status() {
+        // The account exists but provisioning has not produced a tenant yet, so
+        // the response must say "none" rather than inventing a status.
+        let state = state().await;
+        seed_account(&state, "acc_1").await;
+
+        let observed = get_account(State(state), Extension(session_for("acc_1")))
+            .await
+            .ok()
+            .expect("account reads");
+
+        assert!(json_of(observed).await["tenant_status"].is_null());
+    }
+
+    #[tokio::test]
+    async fn the_csrf_endpoint_returns_a_token() {
+        let state = state().await;
+
+        let observed = csrf_token(State(state), Extension(session_for("acc_1"))).await;
+
+        assert!(observed.is_ok());
+    }
+
+    #[tokio::test]
+    async fn the_csrf_response_carries_the_token() {
+        let state = state().await;
+
+        let observed = csrf_token(State(state), Extension(session_for("acc_1")))
+            .await
+            .ok()
+            .expect("csrf reads");
+
+        let token = json_of(observed).await["csrf_token"]
+            .as_str()
+            .expect("token is a string")
+            .to_string();
+
+        assert_eq!(token.len(), 64, "a CSRF token is 32 hex-encoded bytes");
+    }
+
+    #[tokio::test]
+    async fn the_csrf_response_is_not_cacheable() {
+        let state = state().await;
+
+        let observed = csrf_token(State(state), Extension(session_for("acc_1")))
+            .await
+            .ok()
+            .expect("csrf reads");
+
+        assert_eq!(
+            observed
+                .headers()
+                .get(axum::http::header::CACHE_CONTROL)
+                .expect("cache-control is set"),
+            "no-store",
+            "a per-session capability must not be cached by intermediaries"
+        );
+    }
+
+    #[tokio::test]
+    async fn two_sessions_receive_different_csrf_tokens() {
+        let state = state().await;
+        let mut other = session_for("acc_1");
+        other.id = "sess-2".to_owned();
+
+        let first = csrf_token(State(state.clone()), Extension(session_for("acc_1")))
+            .await
+            .ok()
+            .expect("csrf reads");
+        let second = csrf_token(State(state), Extension(other))
+            .await
+            .ok()
+            .expect("csrf reads");
+
+        assert_ne!(
+            json_of(first).await["csrf_token"],
+            json_of(second).await["csrf_token"],
+            "a CSRF token is bound to its session"
+        );
     }
 }
