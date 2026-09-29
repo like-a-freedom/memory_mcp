@@ -22,6 +22,7 @@ use tokio_util::sync::CancellationToken;
 
 use crate::error::MemoryError;
 use crate::http::registry::RegistryHandle;
+use crate::logging::{LogLevel, StdoutLogger};
 
 pub type JobFuture = Pin<Box<dyn Future<Output = Result<(), MemoryError>> + Send>>;
 pub type SchedulerJob = Arc<dyn Fn(RegistryHandle) -> JobFuture + Send + Sync>;
@@ -121,7 +122,16 @@ pub fn start(
 impl SchedulerHandle {
     pub async fn join(self) {
         if let Err(error) = self.join.await {
-            eprintln!("memory_mcp::http::scheduler: scheduler task failed: {error}");
+            // The scheduler task itself failed — not one of its jobs, the loop
+            // that runs them. Nothing else will report it: there is no request,
+            // and a job that never ran is indistinguishable from one that was
+            // never scheduled.
+            log_scheduler(
+                "scheduler.failed",
+                "error",
+                &error.to_string(),
+                LogLevel::Error,
+            );
         }
     }
 }
@@ -150,23 +160,66 @@ async fn run_cycle(registry: RegistryHandle, hooks: &SchedulerHooks, shutdown: C
         let shutdown = shutdown.clone();
         jobs.spawn(async move {
             let permit = tokio::select! {
-                _ = shutdown.cancelled() => return,
+                // Shutdown wins, deterministically. Without `biased` this
+                // picks a ready branch at random, and after the token is
+                // cancelled *both* branches are ready — so a job would
+                // sometimes acquire a permit and run during shutdown while
+                // the log said it had not. The line has to state a fact the
+                // code establishes, not one it merely allows.
+                biased;
+                _ = shutdown.cancelled() => {
+                    // Both ways a job can be scheduled and then not run were
+                    // silent. "It ran" and "it did not" are different facts,
+                    // and only the second one was missing: a job that was
+                    // scheduled, then skipped on shutdown, looked exactly like
+                    // a job that was never scheduled.
+                    log_scheduler("http.job.not_run", "reason", "runtime_shutdown", LogLevel::Debug);
+                    return;
+                }
                 permit = semaphore.acquire_owned() => match permit {
                     Ok(permit) => permit,
-                    Err(_) => return,
+                    Err(_) => {
+                        // The semaphore is closed, which happens on shutdown.
+                        log_scheduler("http.job.not_run", "reason", "runtime_shutdown", LogLevel::Debug);
+                        return;
+                    }
                 },
             };
             let _permit = permit;
             if let Err(error) = job(registry).await {
-                eprintln!("memory_mcp::http::scheduler: scheduled job failed: {error}");
+                // A scheduled job that fails is the one failure class with
+                // nobody watching: no request, no status, no response to point
+                // at. It went to stderr as free text, so it carried no level and
+                // no timestamp and could not be joined to the run it belonged
+                // to.
+                log_scheduler("http.job.failed", "error", &error.to_string(), LogLevel::Error);
             }
         });
     }
     while let Some(result) = jobs.join_next().await {
         if let Err(error) = result {
-            eprintln!("memory_mcp::http::scheduler: scheduled job panicked: {error}");
+            log_scheduler(
+                "http.job.panicked",
+                "error",
+                &error.to_string(),
+                LogLevel::Error,
+            );
         }
     }
+}
+
+/// Record a scheduler event through the deployment's logger.
+///
+/// `detail` goes in as one value rather than being split into fields: a
+/// `MemoryError` is prose, and splitting it on spaces would report a fragment
+/// as though it were the whole failure. The field is named `error` for a
+/// failure and `reason` for a job that never ran, which is not one — so the
+/// caller says which it is reporting.
+fn log_scheduler(op: &'static str, field: &'static str, detail: &str, level: LogLevel) {
+    let mut event = std::collections::HashMap::new();
+    event.insert("op".into(), op.into());
+    event.insert(field.into(), detail.to_string().into());
+    StdoutLogger::from_env().log(event, level);
 }
 
 #[cfg(test)]
@@ -180,6 +233,95 @@ mod tests {
         let db = Surreal::new::<Mem>(()).await.unwrap();
         db.use_ns("control").use_db("control").await.unwrap();
         RegistryHandle::in_memory_with_mem_engine(Arc::new(db))
+    }
+
+    /// A scheduled job that fails is the one failure nobody is watching: no
+    /// request, no status, no response to point at. It went to stderr as free
+    /// text, so it carried no level, no timestamp, and could not be joined to
+    /// the run it belonged to — and `RUST_LOG` could not raise or lower it.
+    ///
+    /// The rendered line is asserted, not the event: the level is what an
+    /// operator filters on, and reading it back out of a structure would not
+    /// prove the line carries it.
+    #[tokio::test]
+    async fn a_failing_job_is_logged_with_its_level() {
+        let registry = test_registry().await;
+        let sink = crate::logging::capture::install();
+        let hooks = SchedulerHooks::new(
+            vec![Arc::new(|_registry| {
+                Box::pin(async { Err(MemoryError::Storage("disk is gone".into())) })
+            })],
+            1,
+        )
+        .expect("non-empty hooks");
+        let shutdown = CancellationToken::new();
+
+        run_cycle(registry, &hooks, shutdown).await;
+
+        let recorded = sink.lines();
+        assert!(
+            recorded.iter().any(|line| {
+                line.contains("op=http.job.failed")
+                    // Quoted as one value: a `MemoryError` is prose, and the
+                    // line must not break it into a first word and noise.
+                    && line.contains(r#"error="storage error: disk is gone""#)
+                    && line.contains("ERROR")
+            }),
+            "a failed job must be logged at error level: {recorded:?}"
+        );
+    }
+
+    /// A job that does not run because the runtime is shutting down is not a
+    /// failure, so it stays at `debug` — but it is recorded, because "the job
+    /// was scheduled and then nothing" is otherwise indistinguishable from a
+    /// job that was never scheduled at all.
+    ///
+    /// Run repeatedly: the two branches of that `select!` are both ready once
+    /// the token is cancelled, and only `biased` makes shutdown win every time.
+    /// A single run passes about half the time without it, so the count is
+    /// what proves the guarantee rather than one lucky outcome.
+    #[tokio::test]
+    async fn a_job_that_did_not_run_says_so() {
+        const ROUNDS: usize = 32;
+        for _ in 0..ROUNDS {
+            let registry = test_registry().await;
+            let sink = crate::logging::capture::install();
+            let ran = Arc::new(AtomicUsize::new(0));
+            let ran_for_job = ran.clone();
+            let hooks = SchedulerHooks::new(
+                vec![Arc::new(move |_registry| {
+                    let ran = ran_for_job.clone();
+                    Box::pin(async move {
+                        ran.fetch_add(1, Ordering::SeqCst);
+                        Ok(())
+                    })
+                })],
+                1,
+            )
+            .expect("non-empty hooks");
+            // Already cancelled: the job is scheduled and then never acquires a
+            // permit, which is the path with no output at all.
+            let shutdown = CancellationToken::new();
+            shutdown.cancel();
+
+            crate::logging::capture::with_level("http=debug", || async {
+                run_cycle(registry, &hooks, shutdown).await;
+            })
+            .await;
+
+            assert_eq!(
+                ran.load(Ordering::SeqCst),
+                0,
+                "a job must not run once the runtime is shutting down"
+            );
+            assert!(
+                sink.lines()
+                    .iter()
+                    .any(|line| line.contains("op=http.job.not_run")),
+                "a job that did not run must say so: {:?}",
+                sink.lines()
+            );
+        }
     }
 
     #[tokio::test]

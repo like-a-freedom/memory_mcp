@@ -7,7 +7,6 @@
 //! plus a request_id and tenant_fingerprint that the auth layer
 //! supplies.
 
-use std::sync::OnceLock;
 use std::time::Instant;
 
 use axum::extract::Request;
@@ -15,10 +14,6 @@ use axum::middleware::Next;
 use axum::response::Response;
 use serde::Serialize;
 use uuid::Uuid;
-
-use crate::logging::StdoutLogger;
-
-static LOGGER: OnceLock<StdoutLogger> = OnceLock::new();
 
 /// The header that carries a request's id in both directions: a client may
 /// supply one, and every response advertises the one it was given.
@@ -114,15 +109,16 @@ pub(crate) async fn request_log(mut req: Request, next: Next) -> Response {
         tenant_fingerprint: &tenant_fingerprint,
     };
     if let Ok(json) = serde_json::to_string(&event) {
-        if let Some(logger) = LOGGER.get() {
-            let mut fields = std::collections::HashMap::new();
-            if let Ok(value) = serde_json::from_str::<serde_json::Value>(&json) {
-                fields.insert("payload".to_string(), value);
-            }
-            logger.log(fields, crate::logging::LogLevel::Info);
-        } else {
-            eprintln!("{json}");
+        let mut fields = std::collections::HashMap::new();
+        if let Ok(value) = serde_json::from_str::<serde_json::Value>(&json) {
+            fields.insert("payload".to_string(), value);
         }
+        // The operation name is the filter key, so it has to be a field rather
+        // than part of the payload. Without it the access log takes no part in
+        // `RUST_LOG=<prefix>=<level>` — the one stream an operator most wants
+        // to turn up or down, and the only one with a request id.
+        fields.insert("op".to_string(), crate::logging::OP_HTTP_REQUEST.into());
+        crate::logging::StdoutLogger::from_env().log(fields, crate::logging::LogLevel::Info);
     }
     response
 }
@@ -301,9 +297,9 @@ mod tests {
         );
     }
 
-    /// A caller that supplies its own id keeps it: a client retrying with the
-    /// id from its previous response must produce a second entry that can be
-    /// read as the same operation, not as a new one.
+    /// A caller-supplied id is honoured: a client retrying with the id from its
+    /// previous response must produce a second entry that can be read as the
+    /// same operation, not as a new one.
     #[tokio::test]
     async fn a_caller_supplied_id_is_honoured() {
         let supplied = Uuid::parse_str("6f1b2c3d-4e5a-4b6c-8d9e-0f1a2b3c4d5e").unwrap();
@@ -323,6 +319,39 @@ mod tests {
                 .and_then(|v| v.to_str().ok()),
             Some(supplied.to_string().as_str()),
             "a caller-supplied id must survive the middleware"
+        );
+    }
+
+    /// The access log takes part in the per-subsystem filter. It is the one
+    /// stream an operator most wants to raise or lower — it is the only one
+    /// with a request id, so it is the one they follow — and it took no part
+    /// while it carried its operation name inside a payload rather than as the
+    /// `op` the filter matches on.
+    ///
+    /// Asserted on the emitted line, not on the constant: asserting that the
+    /// name is selectable proves nothing about whether the access log uses it,
+    /// which is the part that was missing.
+    #[tokio::test]
+    async fn the_access_log_is_reachable_by_its_subsystem() {
+        let sink = crate::logging::capture::install();
+        let mut svc = Router::new()
+            .route("/", get(echo))
+            .layer(axum::middleware::from_fn(request_log));
+        let req = Request::builder()
+            .method("GET")
+            .uri("/")
+            .body(Body::empty())
+            .unwrap();
+
+        crate::logging::capture::with_level("http=info", || async { svc.call(req).await.unwrap() })
+            .await;
+
+        let recorded = sink.lines();
+        assert!(
+            recorded
+                .iter()
+                .any(|line| line.contains(&format!("op={}", crate::logging::OP_HTTP_REQUEST))),
+            "the access log must carry the `op` the filter matches on: {recorded:?}"
         );
     }
 }

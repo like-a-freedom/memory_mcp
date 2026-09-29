@@ -278,12 +278,14 @@ fn accepts_gzip(accepted: Option<&str>) -> bool {
     let Some(accepted) = accepted else {
         return false;
     };
+    let mut named_gzip = false;
     for token in accepted.split(',') {
         let mut parts = token.split(';');
         let name = parts.next().unwrap_or_default().trim();
         if !name.eq_ignore_ascii_case("gzip") {
             continue;
         }
+        named_gzip = true;
         let refused = parts.any(|parameter| {
             let (name, value) = parameter.split_once('=').unwrap_or((parameter, ""));
             // Parameter names are case-insensitive, so `Q=0` is as explicit a
@@ -296,11 +298,16 @@ fn accepts_gzip(accepted: Option<&str>) -> bool {
                     .parse::<f32>()
                     .is_ok_and(|quality| quality <= 0.0)
         });
-        if !refused {
-            return true;
+        // A refusal ends the question, wherever it appears. Returning on the
+        // first unrefused token instead would let `gzip, gzip;q=0` — a shape
+        // real clients produce, since curl appends rather than replaces and
+        // some HTTP/2 stacks merge per-connection lists — have its refusal
+        // overridden by the sibling that omits one.
+        if refused {
+            return false;
         }
     }
-    false
+    named_gzip
 }
 
 /// Negotiate the response body for `asset` against the client's
@@ -596,6 +603,15 @@ mod tests {
             Some("identity"),
             Some("deflate"),
             Some("gzip;q=0"),
+            // A refusal is a refusal wherever it appears. A client that lists
+            // gzip twice — curl appends rather than replaces, and some HTTP/2
+            // stacks merge per-connection lists — must not have its `q=0`
+            // overridden by a sibling that omits one. Advertising gzip to a
+            // client that said no is the worst thing this code can do: the
+            // module it receives does not decode, and the console never mounts.
+            Some("gzip, gzip;q=0"),
+            Some("gzip;q=0, gzip"),
+            Some("gzip;q=0, deflate, gzip"),
         ] {
             let response = serve_asset_from(
                 "/assets/app-dxh395eca31249da547.js",

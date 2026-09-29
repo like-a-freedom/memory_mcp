@@ -57,6 +57,13 @@ impl std::fmt::Display for LogLevel {
     }
 }
 
+/// The operation name of the HTTP access log.
+///
+/// Named as a constant because it is the filter key: `RUST_LOG=http=error`
+/// selects it, and a test asserting on the literal would otherwise be
+/// asserting on a string no code emits.
+pub const OP_HTTP_REQUEST: &str = "http.request";
+
 /// Writes one line to a sink, best-effort. Logging must never panic or
 /// propagate I/O failures (a broken sink should not take down callers).
 fn write_line<W: Write>(writer: &mut W, line: &str) {
@@ -181,12 +188,22 @@ impl StdoutLogger {
                 if prefix.is_empty() {
                     continue;
                 }
+                // The same prefix twice is one directive written twice, so the
+                // later replaces the earlier. Replacing rather than appending
+                // means precedence cannot depend on written order, which is the
+                // invariant `is_event_enabled`'s tie-break would otherwise
+                // break.
+                logger.remove_override(prefix);
                 logger
                     .overrides
                     .push((prefix.to_string(), LogLevel::parse(level)));
             }
         }
         logger
+    }
+
+    fn remove_override(&mut self, prefix: &str) {
+        self.overrides.retain(|(existing, _)| existing != prefix);
     }
 
     /// Creates a new logger with the specified minimum log level.
