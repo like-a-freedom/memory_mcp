@@ -106,7 +106,25 @@ pub fn install_log_file(path: &str) -> Result<(), io::Error> {
 #[derive(Clone)]
 pub struct StdoutLogger {
     level: LogLevel,
+    /// Per-subsystem levels from `RUST_LOG` directives, in the order written.
+    /// [`is_event_enabled`] picks the most specific match, so order does not
+    /// decide precedence.
+    overrides: Vec<(String, LogLevel)>,
     warn_tracker: std::sync::Arc<WarnTracker>,
+}
+
+/// The default level from a directive list: the first segment that names a bare
+/// level, ignoring `prefix=level` segments.
+///
+/// A list may lead with a directive rather than a level (`oidc=debug,info`),
+/// and taking the whole string would parse it as an unknown level and fall
+/// back to `info` by accident rather than by choice.
+fn first_directive(configured: &str) -> &str {
+    configured
+        .split(',')
+        .map(str::trim)
+        .find(|directive| !directive.is_empty() && !directive.contains('='))
+        .unwrap_or("")
 }
 
 impl StdoutLogger {
@@ -120,6 +138,12 @@ impl StdoutLogger {
     /// unparseable value leaves the logger at `info`: a deployment that cannot
     /// be diagnosed because it said nothing is worse than one that is slightly
     /// too chatty.
+    ///
+    /// The value is a comma-separated list of directives: a bare level sets the
+    /// default, and `prefix=level` sets it for the events whose `op` starts
+    /// with `prefix` at a segment boundary. The most specific prefix wins, so
+    /// `oidc=error,oidc.callback_rejected=debug` quiets sign-ins except the
+    /// one branch.
     #[must_use]
     pub fn from_env() -> Self {
         Self::from_env_with(|key| std::env::var(key).ok())
@@ -134,7 +158,19 @@ impl StdoutLogger {
         F: Fn(&str) -> Option<String>,
     {
         let configured = lookup(Self::LEVEL_ENV).unwrap_or_default();
-        Self::new(&configured)
+        let mut logger = Self::new(first_directive(&configured));
+        for directive in configured.split(',').skip(1) {
+            if let Some((prefix, level)) = directive.split_once('=') {
+                let prefix = prefix.trim();
+                if prefix.is_empty() {
+                    continue;
+                }
+                logger
+                    .overrides
+                    .push((prefix.to_string(), LogLevel::parse(level)));
+            }
+        }
+        logger
     }
 
     /// Creates a new logger with the specified minimum log level.
@@ -142,14 +178,31 @@ impl StdoutLogger {
     pub fn new(level: &str) -> Self {
         Self {
             level: LogLevel::parse(level),
+            overrides: Vec::new(),
             warn_tracker: std::sync::Arc::new(WarnTracker::default()),
         }
     }
 
-    /// The level this logger emits at and above.
+    /// The level this logger emits at and above, for events no directive names.
     #[must_use]
     pub fn level(&self) -> LogLevel {
         self.level
+    }
+
+    /// Whether an event with this `op` and level would be emitted.
+    ///
+    /// The most specific matching directive decides, so a broad one can be
+    /// narrowed without repeating it. An event with no `op` uses the default
+    /// level: it names no subsystem, so no subsystem rule can be about it.
+    #[must_use]
+    pub fn is_event_enabled(&self, level: LogLevel, op: &str) -> bool {
+        let applicable = self
+            .overrides
+            .iter()
+            .filter(|(prefix, _)| op == prefix || op.starts_with(&format!("{prefix}.")))
+            .max_by_key(|(prefix, _)| prefix.len());
+        let threshold = applicable.map_or(self.level, |(_, level)| *level);
+        level >= threshold
     }
 
     /// Logs a warning with deduplication. The `dedup_key` identifies
@@ -192,8 +245,17 @@ impl StdoutLogger {
     /// severity lower than the configured level are dropped. `debug` and
     /// `trace` messages are emitted only when the logger is configured to
     /// `debug`/`trace` respectively (no global unconditional suppression).
+    ///
+    /// An event carrying an `op` is filtered by its own subsystem's level, so
+    /// a directive can turn one subsystem up without turning up the hot paths
+    /// that would drown it.
     pub fn log(&self, event: HashMap<String, Value>, level: LogLevel) {
-        if level < self.level {
+        let op = event.get("op").and_then(Value::as_str);
+        let enabled = match op {
+            Some(op) => self.is_event_enabled(level, op),
+            None => level >= self.level,
+        };
+        if !enabled {
             return;
         }
 
@@ -602,5 +664,93 @@ mod tests {
                 "a deployment with no usable RUST_LOG must still report info"
             );
         }
+    }
+
+    /// One level for the whole process means a subsystem that needs detail —
+    /// an identity provider callback, a cache — cannot be turned up without
+    /// turning up everything, including the hot paths. Turning those up to
+    /// diagnose one sign-in is how a deployment ends up logging at `trace` and
+    /// filling its disk.
+    ///
+    /// The selector is the `op` prefix, which every event already carries
+    /// (`ner.artifact_refresh.failed`, `oidc.callback_rejected`), so nothing
+    /// has to be annotated to become filterable.
+    #[test]
+    fn a_subsystem_can_be_turned_up_without_turning_up_the_rest() {
+        let logger = StdoutLogger::from_env_with(|key| match key {
+            "RUST_LOG" => Some("info,oidc=debug,ner=warn".to_string()),
+            _ => None,
+        });
+
+        assert!(
+            logger.is_event_enabled(LogLevel::Debug, "oidc.callback_rejected"),
+            "the named subsystem takes its own level"
+        );
+        assert!(
+            !logger.is_event_enabled(LogLevel::Debug, "ner.extract.done"),
+            "a subsystem named at a lower level must not inherit the global one"
+        );
+        assert!(
+            logger.is_event_enabled(LogLevel::Info, "http.request"),
+            "an unnamed subsystem keeps the global level"
+        );
+        assert!(
+            !logger.is_event_enabled(LogLevel::Debug, "http.request"),
+            "an unnamed subsystem must not inherit a named subsystem's level"
+        );
+    }
+
+    /// A subsystem name matches whole segments. `ner` selects `ner.extract` and
+    /// not a subsystem whose name merely starts the same way: a bare prefix
+    /// match would quietly capture events from a subsystem nobody named, and
+    /// the level meant for one would then apply to the other.
+    ///
+    /// `nerdb` is given no directive of its own, so the only thing that can
+    /// let a `trace` event through is `ner` matching a name it does not own.
+    #[test]
+    fn a_subsystem_name_matches_whole_segments() {
+        let logger = StdoutLogger::from_env_with(|key| match key {
+            "RUST_LOG" => Some("error,ner=trace".to_string()),
+            _ => None,
+        });
+
+        assert!(logger.is_event_enabled(LogLevel::Trace, "ner.extract.done"));
+        assert!(
+            !logger.is_event_enabled(LogLevel::Trace, "nerdb.query.run"),
+            "`ner` must not select `nerdb`: the segments differ"
+        );
+    }
+
+    /// The most specific rule wins, so a specific directive can override a
+    /// broad one: `oidc=error,oidc.callback=debug` is the difference between
+    /// silencing sign-ins and reading them.
+    #[test]
+    fn the_most_specific_rule_wins() {
+        let logger = StdoutLogger::from_env_with(|key| match key {
+            "RUST_LOG" => Some("error,oidc=error,oidc.callback_rejected=debug".to_string()),
+            _ => None,
+        });
+
+        assert!(logger.is_event_enabled(LogLevel::Debug, "oidc.callback_rejected"));
+        assert!(
+            !logger.is_event_enabled(LogLevel::Info, "oidc.authorize"),
+            "a sibling op must keep the broader rule"
+        );
+    }
+
+    /// A malformed directive must not take the rest of the string down with it:
+    /// an operator who mistypes one segment still needs the others honoured.
+    #[test]
+    fn a_malformed_directive_does_not_disable_the_rest() {
+        let logger = StdoutLogger::from_env_with(|key| match key {
+            "RUST_LOG" => Some("info,=nonsense,oidc=debug,,=also-nonsense".to_string()),
+            _ => None,
+        });
+
+        assert!(
+            logger.is_event_enabled(LogLevel::Debug, "oidc.callback_rejected"),
+            "a valid directive after a malformed one still applies"
+        );
+        assert!(logger.is_event_enabled(LogLevel::Info, "http.request"));
     }
 }

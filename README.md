@@ -994,7 +994,7 @@ The following settings are optional for power users. They are read by the same e
 
 | Variable | Type | Default | Description |
 | --- | --- | --- | --- |
-| `RUST_LOG` | string | `info` | Logging level; canonical values are `trace`, `debug`, `info`, `warn`, and `error`; `warning` aliases `warn`, and unknown values fall back to `info` |
+| `RUST_LOG` | string | `info` | Logging level. A comma-separated list of directives: a bare level (`trace`, `debug`, `info`, `warn`, `error`; `warning` aliases `warn`) sets the default, and `prefix=level` sets it for the events whose `op` starts with that prefix at a dot boundary. The most specific prefix wins, and an unparseable directive is ignored rather than taking the rest of the list with it. An unknown level falls back to `info`. Example: `RUST_LOG=info,oidc=debug,ner=warn` turns the OIDC callback up without turning up the extraction pipeline |
 | `MEMORY_LOG_FILE` | path | unset | Write structured log events to this file instead of stderr; the file is created if missing (parent directory must exist), opened in append mode, and flushed after every line; on open failure the process falls back to stderr with a warning |
 | `MEMORY_PROMETHEUS_LISTEN_ADDR` | socket address (`IP:port`) | unset | Prometheus HTTP listener address; active only when the `streamable-http` profile is compiled and this variable is set |
 | `QUERY_LOGGING_ENABLED` | boolean | `false` | Persist `assemble_context` analytics rows into `query_log` when `true` |
