@@ -110,6 +110,33 @@ pub struct StdoutLogger {
 }
 
 impl StdoutLogger {
+    /// The environment variable that sets how much this process reports.
+    pub const LEVEL_ENV: &'static str = "RUST_LOG";
+
+    /// Creates a logger at the level `RUST_LOG` names.
+    ///
+    /// Every binary builds its logger here, so the documented setting has one
+    /// place it is read and no entry point can quietly bypass it. An unset or
+    /// unparseable value leaves the logger at `info`: a deployment that cannot
+    /// be diagnosed because it said nothing is worse than one that is slightly
+    /// too chatty.
+    #[must_use]
+    pub fn from_env() -> Self {
+        Self::from_env_with(|key| std::env::var(key).ok())
+    }
+
+    /// [`from_env`] with the environment read through `lookup`, so the
+    /// behaviour can be exercised without mutating the process environment,
+    /// which is global state the parallel test harness shares.
+    #[must_use]
+    pub fn from_env_with<F>(lookup: F) -> Self
+    where
+        F: Fn(&str) -> Option<String>,
+    {
+        let configured = lookup(Self::LEVEL_ENV).unwrap_or_default();
+        Self::new(&configured)
+    }
+
     /// Creates a new logger with the specified minimum log level.
     #[must_use]
     pub fn new(level: &str) -> Self {
@@ -117,6 +144,12 @@ impl StdoutLogger {
             level: LogLevel::parse(level),
             warn_tracker: std::sync::Arc::new(WarnTracker::default()),
         }
+    }
+
+    /// The level this logger emits at and above.
+    #[must_use]
+    pub fn level(&self) -> LogLevel {
+        self.level
     }
 
     /// Logs a warning with deduplication. The `dedup_key` identifies
@@ -531,5 +564,43 @@ mod tests {
 
         let err_nested = json!({"Err": {"code": 404}});
         assert_eq!(value_to_string(&err_nested), "Err({code=404})");
+    }
+
+    /// `RUST_LOG` is the deployment's only dial for how much it says, and the
+    /// README documents it as taking effect. It used not to: the HTTP binary
+    /// built its logger from a literal `"info"`, so an operator who set
+    /// `RUST_LOG=error` to quiet a deployment was ignored, and one who set
+    /// `RUST_LOG=debug` to see more saw nothing extra. Reading the variable
+    /// here — once, in the constructor every binary goes through — is what
+    /// makes the documented setting real.
+    #[test]
+    fn the_configured_level_comes_from_the_environment() {
+        let logger = StdoutLogger::from_env_with(|key| match key {
+            "RUST_LOG" => Some("warn".to_string()),
+            _ => None,
+        });
+        assert!(
+            !logger.is_enabled(LogLevel::Info),
+            "info must be below warn"
+        );
+        assert!(logger.is_enabled(LogLevel::Warn));
+    }
+
+    /// An unset or unreadable variable must not silence the process. A
+    /// deployment that cannot be diagnosed because its log level defaulted to
+    /// nothing is worse than one that is slightly too chatty.
+    #[test]
+    fn an_unset_level_falls_back_to_info() {
+        for absent in [
+            |_key: &str| None,
+            |_key: &str| Some("nonsense".to_string()),
+            |_key: &str| Some(String::new()),
+        ] {
+            let logger = StdoutLogger::from_env_with(absent);
+            assert!(
+                logger.is_enabled(LogLevel::Info),
+                "a deployment with no usable RUST_LOG must still report info"
+            );
+        }
     }
 }

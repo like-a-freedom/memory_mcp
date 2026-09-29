@@ -40,8 +40,7 @@ fn resolve_log_file_path(raw: &str) -> Option<String> {
 /// Internal panics and boxable startup errors are mapped to `ExitCode::FAILURE`
 /// after a structured error object is written to stderr.
 pub async fn run() -> Result<(), ExitCode> {
-    let log_level = std::env::var("RUST_LOG").unwrap_or_else(|_| "info".into());
-    let logger = StdoutLogger::new(&log_level);
+    let logger = StdoutLogger::from_env();
 
     // Install file log sink if configured. Must happen before log_startup
     // so the very first event goes to the file.

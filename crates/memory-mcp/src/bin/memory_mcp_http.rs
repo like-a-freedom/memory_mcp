@@ -12,7 +12,7 @@ use memory_mcp::logging::StdoutLogger;
 
 #[tokio::main]
 async fn main() -> ExitCode {
-    let logger = StdoutLogger::new("info");
+    let logger = StdoutLogger::from_env();
     let cfg = match HttpConfig::from_env() {
         Ok(c) => c,
         Err(err) => {
