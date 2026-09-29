@@ -5,8 +5,15 @@
 //! side allowed to know the container; the memory context keeps the
 //! port-based implementation they delegate to.
 
+// The module compiles without `mcp-apps` — `service::apps::dispatch` is what
+// calls into it, and that is gated — so the imports belong to the gate too.
+// Ungated, every build without the feature paid three unused-import warnings
+// for types the gated function is the only user of.
+#[cfg(feature = "mcp-apps")]
 use crate::memory::lifecycle_types::LifecycleOperation;
+#[cfg(feature = "mcp-apps")]
 use crate::memory::lifecycle_types::{LifecycleCommand, LifecycleCommandOutcome};
+#[cfg(feature = "mcp-apps")]
 use crate::service::MemoryError;
 
 #[cfg(feature = "mcp-apps")]
