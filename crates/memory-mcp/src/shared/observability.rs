@@ -178,3 +178,255 @@ pub const DECLARED_REFUSAL_BRANCHES: &[&str] = &[
     "nonce",
     "signup_invite_only",
 ];
+
+/// One metric's kind, for the exposition's `# TYPE` and `# HELP` lines.
+///
+/// The kind is here rather than inferred from the name because the name
+/// cannot be trusted to carry it: a family called `..._total` is not
+/// necessarily a counter, and one that is a gauge says nothing about whether
+/// it can fall.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum MetricKind {
+    /// Monotonically increasing.
+    Counter,
+    /// A level that goes up and down.
+    Gauge,
+    /// A distribution. Rendered as a summary, not as buckets: the recorder is
+    /// built without `set_buckets`, so quantile lines and `_sum` are what a
+    /// scrape carries.
+    Histogram,
+}
+
+/// What a metric family is and what it means, registered at install time.
+///
+/// Without this, `/metrics` served bare `name{labels} value` lines. A panel
+/// author had only the name to go on — no unit, no meaning, no type — so every
+/// dashboard was written against someone's memory of a name, and a mistake in
+/// that memory is a panel that is quietly wrong rather than visibly broken.
+///
+/// Lives beside the names, not in the recorder: what a measurement *means* is
+/// domain knowledge, and ADR-0058 asks that a bounded context be able to say so
+/// without acquiring the metrics facade.
+pub struct MetricDescription {
+    /// The metric name this describes.
+    pub name: &'static str,
+    /// Counter, gauge or histogram.
+    pub kind: MetricKind,
+    /// The unit of the value, or `None` for a dimensionless count.
+    ///
+    /// `metrics::Unit` rather than a string, because the exporter matches on
+    /// the enum to render the unit and would ignore a name it did not
+    /// recognise — so a typo here would be a silently missing unit.
+    pub unit: Option<metrics::Unit>,
+    /// The `# HELP` text. One line: the exposition has no continuation.
+    pub help: &'static str,
+}
+
+/// Every family this crate exports, in the order a reader meets them.
+pub const DESCRIPTIONS: &[MetricDescription] = &[
+    MetricDescription {
+        name: METRIC_OPERATIONS_TOTAL,
+        kind: MetricKind::Counter,
+        unit: None,
+        help: "Logical memory operations invoked, by operation and outcome. \
+               The outcome is error unless the operation reported success, so \
+               every early return and unexpected failure is counted without a \
+               match arm at the call site.",
+    },
+    MetricDescription {
+        name: METRIC_OPERATION_DURATION_SECONDS,
+        kind: MetricKind::Histogram,
+        unit: Some(metrics::Unit::Seconds),
+        help: "Wall-clock duration of a memory operation, by operation and \
+               outcome. Exported as a summary: read the quantile lines.",
+    },
+    MetricDescription {
+        name: METRIC_OPERATION_RESULTS_TOTAL,
+        kind: MetricKind::Counter,
+        unit: None,
+        help: "Work produced by an operation, by result kind — entities \
+               extracted, rows archived, context items returned. A flow, not a \
+               level: use increase() over a window, never rate().",
+    },
+    MetricDescription {
+        name: METRIC_OPERATION_STOCK,
+        kind: MetricKind::Gauge,
+        unit: None,
+        help: "How much exists right now, by operation and result kind — \
+               active facts, communities. A level, so it is set rather than \
+               accumulated: reading the inventory twice reports it twice over \
+               the same value, not twice as much.",
+    },
+    MetricDescription {
+        name: METRIC_PIPELINE_STAGE_DURATION_SECONDS,
+        kind: MetricKind::Histogram,
+        unit: Some(metrics::Unit::Seconds),
+        help: "One named stage inside a pipeline, by operation. An operation's \
+               total says that something is slow; its stages say which part.",
+    },
+    MetricDescription {
+        name: METRIC_BACKGROUND_JOBS_TOTAL,
+        kind: MetricKind::Counter,
+        unit: None,
+        help: "Background scheduler passes, by job and outcome. Timed from \
+               when the job started running, not when it was scheduled, so \
+               queue wait is not counted as work.",
+    },
+    MetricDescription {
+        name: METRIC_BACKGROUND_JOB_DURATION_SECONDS,
+        kind: MetricKind::Histogram,
+        unit: Some(metrics::Unit::Seconds),
+        help: "Duration of a background job pass, by job and outcome.",
+    },
+    MetricDescription {
+        name: METRIC_AUTH_REFUSALS_TOTAL,
+        kind: MetricKind::Counter,
+        unit: None,
+        help: "Authentication refusals on the identity callback, by bounded \
+               branch. Refusals only: a successful sign-in is not counted, so \
+               this cannot be read as a success ratio.",
+    },
+    MetricDescription {
+        name: METRIC_RUNTIME_REFUSALS_TOTAL,
+        kind: MetricKind::Counter,
+        unit: None,
+        help: "HTTP runtime refusals, by operation — quota, lease, task and \
+               registry failures. Counted at the single point every warning \
+               passes through, so both entry points are counted once.",
+    },
+    MetricDescription {
+        name: METRIC_HTTP_REQUESTS_TOTAL,
+        kind: MetricKind::Counter,
+        unit: None,
+        help: "HTTP requests served, by method class, status class and the \
+               route matched. Route is a router pattern with parameters \
+               collapsed, so the label set is bounded; a request matching no \
+               route reads 'unmatched'.",
+    },
+    MetricDescription {
+        name: METRIC_HTTP_REQUEST_DURATION_SECONDS,
+        kind: MetricKind::Histogram,
+        unit: Some(metrics::Unit::Seconds),
+        help: "HTTP request duration in seconds, by method class, status \
+               class and route. Exported as a summary: read the quantile lines.",
+    },
+    MetricDescription {
+        name: METRIC_HTTP_REQUESTS_INFLIGHT,
+        kind: MetricKind::Gauge,
+        unit: None,
+        help: "Requests currently in flight. The saturation signal: a scrape \
+               only sees a non-zero value when it lands inside a request, so a \
+               flat zero is the normal case and not evidence of an idle \
+               server.",
+    },
+    // The families below are declared in their own modules but described here,
+    // with the rest of the vocabulary: a panel author reading `/metrics` has no
+    // way to tell which file a family came from, and the description is the only
+    // place that says what a number means. Their names are written out rather
+    // than imported because `claims_policy` and `fs_watch` sit behind different
+    // feature gates, and a shared constant would have to be gated to match both
+    // — putting a claim metric behind `fs-watch` to satisfy a constant is the
+    // kind of coupling the split exists to prevent.
+    MetricDescription {
+        name: "memory_http_registry_reconciliation_total",
+        kind: MetricKind::Counter,
+        unit: None,
+        help: "Tenant namespaces registry reconciliation found wrong — \
+               registered but unbound, or bound to nothing. One increment per \
+               affected namespace per pass, and a pass runs at most once a \
+               minute, so a non-zero rate is a standing inconsistency.",
+    },
+    MetricDescription {
+        name: "memory_claim_pipeline_total",
+        kind: MetricKind::Counter,
+        unit: None,
+        help: "Claim pipeline events by stage, schema, outcome and reason. \
+               The labels are bounded and carry no claim, subject or project \
+               identifier: those are the values that would turn a counter into \
+               a disclosure.",
+    },
+    MetricDescription {
+        name: "memory_claim_pipeline_duration_seconds",
+        kind: MetricKind::Histogram,
+        unit: Some(metrics::Unit::Seconds),
+        help: "Claim reconciliation duration, by stage and schema.",
+    },
+    MetricDescription {
+        name: "memory_claim_candidate_count",
+        kind: MetricKind::Histogram,
+        unit: None,
+        help: "Candidates considered for one claim slot, by schema. A count, \
+               not a duration: read it as _sum over the bare count line. A \
+               quantile is useless here — every observation below the first \
+               reported quantile collapses to zero, so 'no candidates' becomes \
+               indistinguishable from 'a handful'.",
+    },
+    MetricDescription {
+        name: "memory_claim_relations_active",
+        kind: MetricKind::Gauge,
+        unit: None,
+        help: "Claim relations currently stored, by schema and outcome. A \
+               series appears only after its first set, so an absent series \
+               means 'never written', not zero.",
+    },
+    MetricDescription {
+        name: "memory_claim_backfill_facts_total",
+        kind: MetricKind::Counter,
+        unit: None,
+        help: "Facts backfilled into the claim store, by outcome and reason.",
+    },
+    MetricDescription {
+        name: "memory_fs_watch_revisions_total",
+        kind: MetricKind::Counter,
+        unit: None,
+        help: "Inbox revisions processed, by outcome. This is the product's \
+               automatic ingestion path: a rising failed count is knowledge \
+               that stopped arriving without anything saying so.",
+    },
+    MetricDescription {
+        name: "memory_fs_watch_retries_total",
+        kind: MetricKind::Counter,
+        unit: None,
+        help: "Inbox revision retries, by pipeline stage and failure class.",
+    },
+    MetricDescription {
+        name: "memory_fs_watch_scan_files_total",
+        kind: MetricKind::Counter,
+        unit: None,
+        help: "Files seen by the startup scan, by outcome. Emitted once at \
+               startup and then flat for the process lifetime, so a window \
+               longer than a boot shows no movement at all.",
+    },
+    MetricDescription {
+        name: "memory_fs_watch_queue_depth",
+        kind: MetricKind::Gauge,
+        unit: None,
+        help: "Inbox queue depth at the moment of startup recovery, never \
+               updated again. A snapshot, not a live backlog: a growing queue is \
+               invisible here, so do not alert on it.",
+    },
+    MetricDescription {
+        name: "memory_fs_watch_inflight",
+        kind: MetricKind::Gauge,
+        unit: None,
+        help: "Whether a revision is being processed. Boolean rather than a \
+               count: the processor is sequential, so this is only ever 0 or 1 \
+               and cannot show concurrency.",
+    },
+    MetricDescription {
+        name: "memory_fs_watch_degraded",
+        kind: MetricKind::Gauge,
+        unit: None,
+        help: "Whether the watcher backend has exhausted its retries. A \
+               one-way latch for the process lifetime — once 1 it stays 1, so \
+               read it with max_over_time rather than avg.",
+    },
+    MetricDescription {
+        name: "memory_fs_watch_revision_duration_seconds",
+        kind: MetricKind::Histogram,
+        unit: Some(metrics::Unit::Seconds),
+        help: "Inbox revision duration, by outcome. A single revision may run \
+               to its attempt timeout, so the upper quantiles can sit well past \
+               the last reported bucket.",
+    },
+];

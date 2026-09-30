@@ -356,6 +356,46 @@ pub fn install() -> Result<(), MemoryError> {
     Ok(())
 }
 
+/// Register every family's description with the installed recorder.
+///
+/// Called once per profile, right after the recorder is installed. Registering
+/// is separate from recording because the recorder is global: by the time the
+/// first metric is emitted the description is already needed, and a description
+/// registered after a series exists only fills in for the next render.
+#[cfg(feature = "prometheus")]
+pub fn describe_metrics() {
+    use crate::shared::observability::{DESCRIPTIONS, MetricKind};
+
+    for described in DESCRIPTIONS {
+        // Typed explicitly: `.into()` alone is ambiguous here, because the
+        // two macro forms below each accept a different concrete type.
+        let help: metrics::SharedString = described.help.into();
+        // Two macro forms: the three-argument one takes a `Unit` outright, the
+        // two-argument one means "dimensionless". There is no `Option<Unit>`
+        // form, so the choice is made here rather than by the dictionary.
+        match (described.kind, described.unit) {
+            (MetricKind::Counter, Some(unit)) => {
+                metrics::describe_counter!(described.name, unit, help);
+            }
+            (MetricKind::Counter, None) => {
+                metrics::describe_counter!(described.name, help);
+            }
+            (MetricKind::Gauge, Some(unit)) => {
+                metrics::describe_gauge!(described.name, unit, help);
+            }
+            (MetricKind::Gauge, None) => {
+                metrics::describe_gauge!(described.name, help);
+            }
+            (MetricKind::Histogram, Some(unit)) => {
+                metrics::describe_histogram!(described.name, unit, help);
+            }
+            (MetricKind::Histogram, None) => {
+                metrics::describe_histogram!(described.name, help);
+            }
+        }
+    }
+}
+
 /// Process-wide handle to the installed Prometheus recorder.
 /// First call installs the recorder; subsequent calls return the
 /// same handle. Returns `None` when the `prometheus` feature is off.
@@ -369,9 +409,13 @@ pub fn shared_test_handle() -> Option<metrics_exporter_prometheus::PrometheusHan
         OnceLock::new();
     HANDLE
         .get_or_init(|| {
-            metrics_exporter_prometheus::PrometheusBuilder::new()
+            let handle = metrics_exporter_prometheus::PrometheusBuilder::new()
                 .install_recorder()
-                .ok()
+                .ok();
+            if handle.is_some() {
+                describe_metrics();
+            }
+            handle
         })
         .clone()
 }
@@ -405,6 +449,7 @@ fn install_with_addr(addr: SocketAddr) -> Result<(), MemoryError> {
                 "failed to install Prometheus exporter on {addr}: {err}"
             ))
         })?;
+    describe_metrics();
     Ok(())
 }
 
@@ -671,6 +716,153 @@ pub(crate) mod tests {
             dashboard.contains("record_stock"),
             "and it must still report its inventory, or the panel goes blank"
         );
+    }
+
+    /// An exported family has to describe itself.
+    ///
+    /// A dashboard author opening `/metrics` saw bare
+    /// `memory_http_requests_total{method="read",outcome="2xx"} 42` and nothing
+    /// else: no unit, no meaning, no type. Grafana cannot infer any of it, so
+    /// every panel had to be written against a name someone remembered, and a
+    /// mistake in that memory is a panel that is silently wrong rather than
+    /// visibly broken. The `# HELP` line is what the description becomes.
+    #[tokio::test]
+    #[cfg(feature = "prometheus")]
+    async fn every_exported_family_carries_a_description() {
+        let exposition = exposed(|| async {
+            let mut metrics = OperationMetrics::new("ingest");
+            metrics.record_result("episodes", 1);
+            metrics.record_stock("active_facts", 1);
+            metrics.success();
+            drop(metrics);
+            render()
+        })
+        .await;
+
+        // A family reaches the exposition only once something has recorded into
+        // it, so each is emitted above; a description for a family no series
+        // exists for would be invisible to a scrape anyway.
+        for family in [
+            METRIC_OPERATIONS_TOTAL,
+            METRIC_OPERATION_DURATION_SECONDS,
+            METRIC_OPERATION_RESULTS_TOTAL,
+            METRIC_OPERATION_STOCK,
+        ] {
+            assert!(
+                exposition.contains(&format!("# HELP {family} ")),
+                "`{family}` is exported without a description, so a panel \
+                 author has nothing but the name to go on: {exposition}"
+            );
+        }
+    }
+
+    /// Every family the crate exports has to be in the dictionary.
+    ///
+    /// A metric constant with no description is the failure this prevents, and
+    /// it fails quietly: the series appears, the name looks self-explanatory,
+    /// and nobody notices there was prose to write. Adding a name without an
+    /// entry is the only way that happens.
+    ///
+    /// The list is scanned out of the sources rather than written by hand,
+    /// because a hand-written list is the same kind of thing that goes stale:
+    /// a family added last week is simply not in it, and the test still passes.
+    #[test]
+    fn every_named_family_is_described() {
+        const SOURCES: &[&str] = &[
+            include_str!("shared/observability.rs"),
+            include_str!("observability.rs"),
+            include_str!("knowledge/claims_policy/telemetry.rs"),
+            include_str!("http/registry/provisioning.rs"),
+            include_str!("service/fs_watch/telemetry.rs"),
+        ];
+
+        let mut exported: std::collections::BTreeSet<&'static str> =
+            std::collections::BTreeSet::new();
+        for source in SOURCES {
+            for line in source.lines() {
+                let code = line.trim_start();
+                if code.starts_with("//") {
+                    continue;
+                }
+                for quote in code.split('"').skip(1).step_by(2) {
+                    // A family name is a bare snake-case identifier. The guards
+                    // reject what a naive scan also picks up: a prefix someone
+                    // assembles (`memory_claim_`), and a name glued to a label
+                    // list by concatenation in a test (`…_total{`).
+                    let is_family = quote.starts_with("memory_")
+                        && quote
+                            .chars()
+                            .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '_')
+                        && quote.len() > "memory_".len() + 3
+                        && !quote.ends_with('_');
+                    if is_family {
+                        // `line` borrows from the `include_str!` source, which
+                        // is `'static`, so the copied substring outlives it.
+                        exported.insert(quote.to_string().leak());
+                    }
+                }
+            }
+        }
+
+        let undescribed: Vec<_> = exported
+            .iter()
+            .filter(|name| {
+                !crate::shared::observability::DESCRIPTIONS
+                    .iter()
+                    .any(|described| described.name == **name)
+            })
+            .collect();
+        assert!(
+            undescribed.is_empty(),
+            "these families are exported but nothing describes them, so a panel \
+             author gets a name and nothing else: {undescribed:?}"
+        );
+    }
+
+    /// A description is a single line.
+    ///
+    /// The text exposition has no continuation for `# HELP`, so a newline in
+    /// the middle yields a line that is neither a comment nor a series — a
+    /// scrape error rather than a formatting quirk.
+    #[test]
+    fn no_description_spans_two_lines() {
+        for described in crate::shared::observability::DESCRIPTIONS {
+            assert!(
+                !described.help.contains('\n'),
+                "`{}` has a multi-line description; the exposition has no \
+                 continuation for `# HELP`",
+                described.name
+            );
+        }
+    }
+
+    /// The descriptions are the vocabulary's to carry, not the recorder's.
+    ///
+    /// What a family means is knowledge about the domain; where it is recorded
+    /// is an infrastructure detail. The split is ADR-0058's: a bounded context
+    /// must be able to name and describe its own measurements without acquiring
+    /// the Prometheus facade. So the prose lives beside the metric-name
+    /// constants in `shared`, and the recorder only registers what it is told.
+    ///
+    /// Asserted structurally rather than by behaviour: the dictionary is a
+    /// constant, so a description in the wrong module is a compile error for
+    /// every caller and needs no test. What this pins is that the type carries
+    /// the prose at all — a `MetricDescription` without a `help` field would
+    /// make the whole arrangement impossible and is the regression worth
+    /// naming.
+    #[test]
+    fn a_description_carries_its_prose_and_its_unit() {
+        let described = crate::shared::observability::DESCRIPTIONS
+            .iter()
+            .find(|described| described.name == METRIC_OPERATION_STOCK)
+            .expect("every family is in the dictionary");
+        assert!(
+            described.help.contains("level"),
+            "the prose has to say what the number means, not restate the name: \
+             {:?}",
+            described.help
+        );
+        assert_eq!(described.unit, None, "a count of things is dimensionless");
     }
 
     /// A stock is a level; a flow is a total. The two are the same number at

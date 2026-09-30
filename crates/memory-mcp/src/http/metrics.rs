@@ -17,13 +17,18 @@ use crate::error::MemoryError;
 /// error, never a panic.
 #[cfg(feature = "prometheus")]
 pub fn install_recorder() -> Result<metrics_exporter_prometheus::PrometheusHandle, MemoryError> {
-    metrics_exporter_prometheus::PrometheusBuilder::new()
+    let handle = metrics_exporter_prometheus::PrometheusBuilder::new()
         .install_recorder()
         .map_err(|err| {
             MemoryError::ConfigInvalid(format!(
                 "failed to install Prometheus recorder for /metrics: {err}"
             ))
-        })
+        })?;
+    // Described here, not only through the test handle: a deployment installs
+    // the recorder through this function, and a description registered
+    // elsewhere would leave `/metrics` bare in exactly the build that ships.
+    crate::observability::describe_metrics();
+    Ok(handle)
 }
 
 /// Reject the stdio-profile listener env var in HTTP mode: the HTTP
