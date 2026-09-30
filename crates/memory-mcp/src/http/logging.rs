@@ -235,15 +235,24 @@ pub(crate) async fn capture_route(req: Request, next: Next) -> Response {
     if let Some(cell) = req.extensions().get::<RouteCell>() {
         let _ = cell.0.set(route);
     }
-    let counted = route != METRICS_ROUTE;
-    if counted {
+    // A guard, not a call after the `await`: a handler that unwinds past a
+    // plain decrement leaves the gauge up for the rest of the process, and a
+    // saturation signal reading "one request permanently in flight" on an idle
+    // service is worse than one reading zero — it looks like load.
+    if route != METRICS_ROUTE {
         inflight_requests(1);
+        let _guard = InflightGuard;
     }
-    let response = next.run(req).await;
-    if counted {
+    next.run(req).await
+}
+
+/// Lowers the in-flight gauge when dropped, including on unwind.
+struct InflightGuard;
+
+impl Drop for InflightGuard {
+    fn drop(&mut self) {
         inflight_requests(-1);
     }
-    response
 }
 
 /// Stands in for the *name* of a path parameter, never for its value.
@@ -661,6 +670,62 @@ mod tests {
         );
     }
 
+    /// The gauge is lowered on the panic path too.
+    ///
+    /// A handler that unwinds past a plain decrement leaves the gauge up for
+    /// the rest of the process: a saturation signal reading "one request
+    /// permanently in flight" on an idle service is worse than one reading
+    /// zero, because it looks like load. It is also the one failure this
+    /// metric cannot report about itself — a gauge stuck high is exactly what
+    /// a gauge is for, and nothing in the process notices.
+    ///
+    /// So the decrement is a guard dropped on unwind. The assertion is on the
+    /// value *after* the panic, which is where the difference is: the sibling
+    /// test already proves the gauge rises while a handler is in flight, and
+    /// reading it mid-panic only races the unwind.
+    #[tokio::test]
+    async fn a_panicking_handler_does_not_leave_the_gauge_raised() {
+        use crate::observability::tests::{exposed, sample_bare};
+
+        let after = exposed(|| async {
+            let mut svc = Router::new()
+                .route(
+                    "/boom",
+                    get(|| async {
+                        panic!("handler failed");
+                        #[allow(unreachable_code)]
+                        "unreachable"
+                    }),
+                )
+                .route_layer(axum::middleware::from_fn(capture_route))
+                .layer(axum::middleware::from_fn(request_log));
+
+            let req = Request::builder()
+                .method("GET")
+                .uri("/boom")
+                .body(Body::empty())
+                .unwrap();
+            // In a spawned task, so the unwind is the handler's and not this
+            // test's; joined, because the panic is the point.
+            let outcome = tokio::spawn(async move { svc.call(req).await }).await;
+            assert!(
+                outcome.is_err() || outcome.is_ok(),
+                "the request task must finish either way"
+            );
+            sample_bare(
+                &crate::observability::tests::render(),
+                crate::observability::METRIC_HTTP_REQUESTS_INFLIGHT,
+            )
+        })
+        .await;
+
+        assert!(
+            after.is_none_or(|value| value == 0.0),
+            "a panicking handler left the gauge at {after:?}; it would read as a \
+             permanently stuck request for the rest of the process, which is the \
+             one thing this metric cannot warn about"
+        );
+    }
     /// The same half of the defect, observed at the only moment it exists.
     ///
     /// A gauge raised and lowered around a request nets to zero, so reading it
