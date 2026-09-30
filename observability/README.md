@@ -271,6 +271,29 @@ In order of likelihood:
    should return an exposition. If it does not, nothing downstream of it works
    and the dashboards are the least of it.
 
+## Verified against a running server
+
+Every claim above was checked against `memory_mcp_http` on an embedded
+RocksDB store, serving real requests, rather than reasoned about:
+
+- `route="/health/live"`, `route="/health/ready"`, `route="/mcp"` and
+  `route="unmatched"` all appear — the last from a request to a path that does
+  not exist, which is the case that has to stay visible.
+- **A scrape is not counted.** After a full scrape of the exposition,
+  `route="/metrics"` is absent from `memory_http_requests_total`, and
+  `memory_http_requests_inflight` reads `0`.
+- **Histograms really are summaries**: the duration family carries
+  `quantile="0"` … `"1"` lines including the `0.95` the latency panels select,
+  plus `_sum` and `_count` — and no `le` label anywhere.
+- **`memory_operation_results_total` has no `result="active_facts"`**: the
+  lifecycle inventory is a gauge (`memory_operation_stock`), so opening a
+  dashboard cannot inflate a counter.
+- Every family that appeared carried its `# HELP` line.
+
+The claim families need traffic that exercises claim reconciliation before
+they appear, which is why a fresh server's exposition carries the HTTP and
+background-job families only.
+
 ## Checking the configuration
 
 ```
