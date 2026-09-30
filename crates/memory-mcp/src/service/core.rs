@@ -3,7 +3,7 @@
 use std::sync::Arc;
 
 use chrono::{DateTime, Utc};
-use serde_json::{Value, json};
+use serde_json::Value;
 
 use crate::logging::LogLevel;
 
@@ -361,13 +361,6 @@ impl MemoryService {
         let now_secs = chrono::Utc::now().timestamp().max(0) as u64;
         let result = recall.execute(&pipeline, event, context, now_secs).await?;
         Ok(Some(result))
-    }
-
-    /// Retrieves the bound SurrealDB storage context.
-    pub async fn get_surrealdb_config(&self) -> Result<Value, MemoryError> {
-        Ok(json!({
-            "namespace": self.active_namespace,
-        }))
     }
 
     async fn check_surrealdb_connection(&self) -> Result<(), MemoryError> {
@@ -921,21 +914,6 @@ mod tests {
         assert!(serialized.get("content_type").is_some());
         assert!(serialized.get("allowed_scopes").is_none());
         assert!(serialized.get("cross_scope_allow").is_none());
-    }
-
-    #[tokio::test]
-    async fn get_surrealdb_config_returns_active_namespace() {
-        let namespaces = vec!["org".to_string()];
-        let db_client = Arc::new(
-            SurrealDbClient::connect_in_memory_with_namespaces("config_test", &namespaces, "warn")
-                .await
-                .expect("connect in-memory test db"),
-        );
-        let service = MemoryService::new(db_client, "org".to_string(), "warn".to_string(), 50, 100)
-            .expect("create test service");
-
-        let config = service.get_surrealdb_config().await.expect("get config");
-        assert_eq!(config["namespace"], "org");
     }
 
     // -----------------------------------------------------------------------

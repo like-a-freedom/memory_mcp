@@ -99,29 +99,17 @@ mod constants {
     pub const TRIPLE_EXTRACTION_MAX_CONCURRENCY: usize = 4;
 }
 
-/// Re-export fact decay constants for backwards compatibility.
-pub use crate::models::Fact;
-
 pub(crate) use crate::memory::episode::build_extract_log_result;
-pub use crate::memory::episode::{episode_from_record, fact_from_record};
-/// Re-export the deterministic-id module for direct access.
-pub use crate::shared::ids;
+pub use crate::memory::episode::fact_from_record;
+pub use crate::shared::ids::{
+    deterministic_edge_id, deterministic_entity_id, deterministic_episode_id_v2,
+};
 // The decay and archival passes themselves take `LifecycleHandles`, a
 // crate-private port, so they cannot leave the crate. The public
 // `decay_pass` and `archival_pass` wrappers are the service-shaped
 // entry points; `spawn_workers_from_config` starts the background
 // workers.
-pub use crate::shared::ids::{
-    deterministic_community_id, deterministic_edge_id, deterministic_entity_id,
-    deterministic_episode_id, deterministic_episode_id_v2, deterministic_fact_id, hash_prefix,
-};
-pub use crate::shared::validation::{
-    validate_entity_candidate, validate_fact_input, validate_ingest_request,
-};
-pub use query::{
-    bucket_to_five_minutes, bucket_to_hour, decayed_confidence, normalize_dt, normalize_text, now,
-    parse_iso, preprocess_search_query,
-};
+pub use query::{normalize_dt, normalize_text, now};
 pub use reembed::ReembedSummary;
 
 pub(crate) use crate::embedding::runtime::{

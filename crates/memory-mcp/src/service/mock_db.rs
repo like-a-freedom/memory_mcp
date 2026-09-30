@@ -5,7 +5,7 @@
 //! let db = MockDbClient::new()
 //!     .expect_select_one("episode:test", Some(json!({"episode_id": "episode:test", "content": "hello"})))
 //!     .expect_create("fact:1", json!({"status": "ok"}));
-//! let service = MemoryService::new(Arc::new(db), vec!["org".into()], "warn".into(), 50, 100).unwrap();
+//! let service = MemoryService::new(Arc::new(db), "org".to_string(), "warn".to_string(), 50, 100).unwrap();
 //! ```
 
 use std::collections::HashMap;

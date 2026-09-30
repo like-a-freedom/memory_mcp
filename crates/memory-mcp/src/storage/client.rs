@@ -432,42 +432,6 @@ impl SurrealDbClient {
         }
     }
 
-    #[allow(dead_code)] // Used by the query-dispatch arms in Task 5.6.
-    fn local_db(&self) -> Result<Arc<Surreal<Db>>, MemoryError> {
-        match &self.engine {
-            DbEngine::Local(db) => Ok(db.clone()),
-            DbEngine::Remote(_) | DbEngine::Mem(_) => {
-                Err(MemoryError::Storage("expected local engine".into()))
-            }
-        }
-    }
-
-    #[allow(dead_code)] // Future use: provisioning worker selects the engine.
-    fn mem_db(&self) -> Result<Arc<Surreal<Db>>, MemoryError> {
-        match &self.engine {
-            DbEngine::Mem(db) => Ok(db.clone()),
-            DbEngine::Local(_) | DbEngine::Remote(_) => {
-                Err(MemoryError::Storage("expected mem engine".into()))
-            }
-        }
-    }
-
-    #[allow(dead_code)] // Future use: provisioning worker selects the engine.
-    fn remote_db(&self) -> Result<Arc<Surreal<Client>>, MemoryError> {
-        match &self.engine {
-            DbEngine::Remote(db) => Ok(db.clone()),
-            DbEngine::Local(_) | DbEngine::Mem(_) => {
-                Err(MemoryError::Storage("expected remote engine".into()))
-            }
-        }
-    }
-
-    /// Checks if using local embedded engine (RocksDB or Mem).
-    #[allow(dead_code)] // Kept for the future engine-dispatch helper.
-    fn is_local(&self) -> bool {
-        matches!(self.engine, DbEngine::Local(_) | DbEngine::Mem(_))
-    }
-
     /// Ask the connected SurrealDB instance for a server version string.
     /// Returns Ok(None) if the information cannot be retrieved.
     pub async fn server_version(&self, namespace: &str) -> Result<Option<String>, MemoryError> {

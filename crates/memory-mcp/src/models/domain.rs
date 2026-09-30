@@ -137,6 +137,74 @@ impl Fact {
     }
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use chrono::{TimeZone, Utc};
+
+    fn a_fact_of_type(fact_type: &str, t_valid: DateTime<Utc>) -> Fact {
+        Fact {
+            fact_id: "fact:1".to_string(),
+            fact_type: fact_type.to_string(),
+            content: "test".to_string(),
+            quote: "test".to_string(),
+            source_episode: "episode:1".to_string(),
+            t_valid,
+            t_ingested: Utc::now(),
+            t_invalid: None,
+            t_invalid_ingested: None,
+            confidence: 1.0,
+            index_keys: vec![],
+            access_count: 0,
+            last_accessed: None,
+            entity_links: vec![],
+            scope: "org".to_string(),
+            policy_tags: vec![],
+            provenance: crate::models::Provenance::manual(),
+            ft_score: 0.0,
+        }
+    }
+
+    /// These four cases moved here from `service::query`, which held a
+    /// one-line wrapper over this method and nothing else. They always
+    /// tested this function; deleting the wrapper did not delete the
+    /// coverage, and leaving them behind a removed name would not have
+    /// tested anything.
+    #[test]
+    fn decayed_confidence_metric_uses_longer_half_life() {
+        let fact = a_fact_of_type("metric", Utc.with_ymd_and_hms(2023, 1, 1, 0, 0, 0).unwrap());
+        let now = Utc.with_ymd_and_hms(2024, 1, 1, 0, 0, 0).unwrap();
+        let confidence = fact.decayed_confidence(now);
+        assert!(confidence > 0.4 && confidence < 0.6);
+    }
+
+    #[test]
+    fn decayed_confidence_decision_uses_longer_half_life() {
+        let fact = a_fact_of_type(
+            "decision",
+            Utc.with_ymd_and_hms(2023, 1, 1, 0, 0, 0).unwrap(),
+        );
+        let now = Utc.with_ymd_and_hms(2024, 1, 1, 0, 0, 0).unwrap();
+        let confidence = fact.decayed_confidence(now);
+        assert!(confidence > 0.4 && confidence < 0.6);
+    }
+
+    #[test]
+    fn decayed_confidence_general_uses_shorter_half_life() {
+        let fact = a_fact_of_type("note", Utc.with_ymd_and_hms(2023, 7, 1, 0, 0, 0).unwrap());
+        let now = Utc.with_ymd_and_hms(2024, 1, 1, 0, 0, 0).unwrap();
+        let confidence = fact.decayed_confidence(now);
+        assert!(confidence > 0.4 && confidence < 0.6);
+    }
+
+    #[test]
+    fn decayed_confidence_fresh_fact_has_high_confidence() {
+        let fact = a_fact_of_type("note", Utc::now());
+        let confidence = fact.decayed_confidence(Utc::now());
+        assert!(confidence > 0.99);
+    }
+}
+
 /// Origin of an edge (relationship between entities or facts).
 #[derive(Debug, Clone, Copy, Default, Serialize, Deserialize, JsonSchema, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
