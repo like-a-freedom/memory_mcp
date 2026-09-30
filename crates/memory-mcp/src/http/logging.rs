@@ -481,28 +481,36 @@ mod tests {
     /// the filter and the line are asserted together.
     #[test]
     fn a_runtime_warning_is_reachable_and_silenceable_by_its_subsystem() {
-        let raised = crate::logging::capture::install();
+        let sink = crate::logging::capture::install();
+        const OP: &str = "http.runtime.activation_failed";
+        let reported =
+            |lines: &[String]| lines.iter().any(|line| line.contains(&format!("op={OP}")));
+
         event_for_warning().log_into(&StdoutLogger::from_env_with(|key| match key {
             "RUST_LOG" => Some("http=warn".to_string()),
             _ => None,
         }));
         assert!(
-            !raised.lines().is_empty(),
+            reported(&sink.lines()),
             "`http=warn` must report it: {:?}",
-            raised.lines()
+            sink.lines()
         );
 
         // Clear rather than reinstall: a second capture swaps the buffer, and
         // the point of this phase is that the first one's lines are gone.
-        raised.clear();
+        sink.clear();
         event_for_warning().log_into(&StdoutLogger::from_env_with(|key| match key {
             "RUST_LOG" => Some("http=error".to_string()),
             _ => None,
         }));
+        // Asserted on this event's absence rather than on an empty buffer: the
+        // harness runs tests in parallel, and every live capture receives every
+        // line, so an empty buffer would also be satisfied by no test having
+        // logged anything.
         assert!(
-            raised.lines().is_empty(),
+            !reported(&sink.lines()),
             "`http=error` must silence it: {:?}",
-            raised.lines()
+            sink.lines()
         );
     }
 
@@ -559,5 +567,106 @@ mod tests {
                 .any(|line| line.contains("op=http.quota.plan_load_failed")),
             "the warning must still be recorded: {recorded:?}"
         );
+    }
+
+    /// An operation name in the HTTP runtime has to start with `http`, or the
+    /// subsystem directives cannot reach it. `RUST_LOG=http=error` is how an
+    /// operator quiets this surface, and an event named `scheduler.failed`
+    /// reads like it belongs to it while not being silenced by it — the same
+    /// dishonesty as a function called `tracing_warn` that prints.
+    ///
+    /// The names come from [`HTTP_OPERATIONS`], which the call sites are
+    /// checked against separately, so this proves the property and the other
+    /// test proves the inventory.
+    #[test]
+    fn every_http_operation_is_reachable_by_the_http_directive() {
+        let logger = StdoutLogger::from_env_with(|key| match key {
+            "RUST_LOG" => Some("http=error".to_string()),
+            _ => None,
+        });
+        for op in crate::logging::HTTP_OPERATIONS {
+            assert!(
+                op.starts_with("http."),
+                "`{op}` is outside the namespace `http=` selects"
+            );
+            assert!(
+                !logger.is_event_enabled(crate::logging::LogLevel::Warn, op),
+                "`{op}` must be silenceable by `http=error`"
+            );
+            assert!(
+                logger.is_event_enabled(crate::logging::LogLevel::Error, op),
+                "`{op}` must keep its errors at `http=error`"
+            );
+        }
+    }
+
+    /// The inventory is only useful if it matches the code. An operation
+    /// added to a call site and not listed here would pass the property check
+    /// above while being unlistened-for, so the two are compared directly.
+    #[test]
+    fn the_http_operation_inventory_matches_what_the_code_emits() {
+        let emitted: std::collections::BTreeSet<&str> = emitted_http_operations();
+        let listed: std::collections::BTreeSet<&str> =
+            crate::logging::HTTP_OPERATIONS.iter().copied().collect();
+
+        let unlisted: Vec<_> = emitted.difference(&listed).copied().collect();
+        assert!(
+            unlisted.is_empty(),
+            "these operations are emitted but not in HTTP_OPERATIONS, so nothing \
+             checks them: {unlisted:?}"
+        );
+        let stale: Vec<_> = listed.difference(&emitted).copied().collect();
+        assert!(
+            stale.is_empty(),
+            "HTTP_OPERATIONS lists operations the code no longer emits: {stale:?}"
+        );
+    }
+
+    /// Every `http.*` operation name that appears as a string literal in the
+    /// HTTP runtime, read from the source so the inventory cannot drift from
+    /// what the code actually logs.
+    fn emitted_http_operations() -> std::collections::BTreeSet<&'static str> {
+        static NAMES: std::sync::OnceLock<std::collections::BTreeSet<&'static str>> =
+            std::sync::OnceLock::new();
+        NAMES
+            .get_or_init(|| {
+                let mut names = std::collections::BTreeSet::new();
+                // The access log emits the constant, not a literal, so it is
+                // seeded here rather than found by the scan.
+                names.insert(crate::logging::OP_HTTP_REQUEST);
+                for source in [
+                    include_str!("leases/scheduler.rs"),
+                    include_str!("leases/migration.rs"),
+                    include_str!("runtime/pool.rs"),
+                    include_str!("tasks/scheduler.rs"),
+                    include_str!("app_sessions/scheduler.rs"),
+                    include_str!("registry/provisioning.rs"),
+                    include_str!("config/validate.rs"),
+                    include_str!("middleware/acquire_runtime.rs"),
+                    include_str!("logging.rs"),
+                ] {
+                    for line in source.lines() {
+                        // A line that is a comment is documentation, not an emit.
+                        let code = line.trim_start();
+                        if code.starts_with("//") {
+                            continue;
+                        }
+                        let Some(start) = code.find("\"http.") else {
+                            continue;
+                        };
+                        let rest = &code[start + 1..];
+                        let Some(end) = rest.find('"') else { continue };
+                        let name = &rest[..end];
+                        // A bare namespace is this file's own prefix check, and a
+                        // name with a space is prose rather than an operation.
+                        if name.contains(' ') || name.ends_with('.') {
+                            continue;
+                        }
+                        names.insert(name);
+                    }
+                }
+                names
+            })
+            .clone()
     }
 }

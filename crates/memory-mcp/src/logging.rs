@@ -64,6 +64,38 @@ impl std::fmt::Display for LogLevel {
 /// asserting on a string no code emits.
 pub const OP_HTTP_REQUEST: &str = "http.request";
 
+/// Every operation name the HTTP runtime emits.
+///
+/// The inventory of what `RUST_LOG=http=…` is able to reach. An operation
+/// name outside the `http` namespace reads as though the directive applies to
+/// it and is not affected by it — the same dishonesty as a function named
+/// `tracing_warn` that prints. Keeping the list next to the rule it encodes
+/// means the check and the names cannot drift apart silently.
+pub const HTTP_OPERATIONS: &[&str] = &[
+    OP_HTTP_REQUEST,
+    "http.scheduler.failed",
+    "http.job.failed",
+    "http.job.panicked",
+    "http.job.not_run",
+    "http.lease.claim_conflict",
+    "http.lease.claim_failed",
+    "http.lease.claim_terminal",
+    "http.lease.provision_failed",
+    "http.lease.release_failed",
+    "http.runtime.activation_failed",
+    "http.quota.plan_load_failed",
+    "http.quota.reserve_failed",
+    "http.task.bind_failed",
+    "http.task.requeue_failed",
+    "http.task.reconcile_failed",
+    "http.task.execution_failed",
+    "http.task.delete_expired_failed",
+    "http.app_session.bind_failed",
+    "http.registry.missing_namespace_binding",
+    "http.registry.orphan_namespace",
+    "http.config.bind_unspecified",
+];
+
 /// Writes one line to a sink, best-effort. Logging must never panic or
 /// propagate I/O failures (a broken sink should not take down callers).
 fn write_line<W: Write>(writer: &mut W, line: &str) {

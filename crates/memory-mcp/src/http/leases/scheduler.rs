@@ -127,7 +127,7 @@ impl SchedulerHandle {
             // and a job that never ran is indistinguishable from one that was
             // never scheduled.
             log_scheduler(
-                "scheduler.failed",
+                "http.scheduler.failed",
                 "error",
                 &error.to_string(),
                 LogLevel::Error,
