@@ -1,0 +1,394 @@
+# Alerting rules for the memory_mcp HTTP profile.
+#
+# The method is the one the SRE Workbook's "Alerting on SLOs" chapter settles
+# on, and it is worth saying why the obvious alternative is wrong.
+#
+# Alerting when the recent error rate exceeds the SLO looks right and is not.
+# At a 99.9% SLO, alerting on a ten-minute error rate above 0.1% fires up to 144
+# times a day, nearly all of them noise: a 0.1% error rate sustained for ten
+# minutes consumes 0.02% of a thirty-day budget. An on-call engineer who learns
+# that page is noise stops reading pages, and the one that mattered is the one
+# they do not read.
+#
+# So these rules alert on **burn rate**: how fast the error budget is being
+# spent relative to the rate that would exhaust it exactly at the end of the
+# window. A burn rate of 1 is on pace to use the whole budget in thirty days;
+# 14.4 exhausts a 30-day budget in a day. Each rule pairs a **long window**,
+# which decides whether to fire at all, with a **short window**, which decides
+# whether to stay fired. The short window is what makes the alert clear quickly
+# instead of hanging for the length of the long one: a single-window alert at
+# 14.4× keeps firing for over an hour after the incident is over, and an alert
+# that stays on is an alert people learn to ignore.
+#
+# The Workbook's starting points, for a 99.9% SLO over 30 days:
+#
+#   page   14.4× burn,  1h long /  5m short —  2% of budget
+#   page    6×   burn,  6h long / 30m short —  5% of budget
+#   ticket  1×   burn,  3d long /  6h short — 10% of budget
+#
+# Every rule carries a `severity` label so routing is explicit rather than
+# "everything to the same channel", and every rule points at the panel that
+# answers the question it raised.
+#
+# The SLO is stated in the README beside this file. It is a number someone
+# agreed to, not one this file derives: a burn rate is meaningless without the
+# error budget it is a fraction of, and an SLO nobody negotiated is an SLO
+# nobody defends.
+#
+# Verify with:
+#
+#   promtool check rules observability/alerts.yml
+
+groups:
+  # ─── Availability ───────────────────────────────────────────────────────────
+  #
+  # The SLO itself. If a service has one SLO it is this one, and everything
+  # below is either a faster signal on the same thing or a different question.
+  - name: memory-slo-availability
+    interval: 30s
+    rules:
+      # 2% of the 30-day budget in an hour. Paged.
+      #
+      # Two windows, and they are genuinely different queries. The long one
+      # decides whether the spend is real; the short one decides whether it is
+      # still happening. Without the short one this fires on a spike and then
+      # hangs for the length of the long window, and an alert that outlives its
+      # incident is an alert people learn to wait out.
+      #
+      # Both ratios are computed from raw counters rather than from
+      # `memory:http_requests:error_ratio5m`, because that recording rule
+      # already has a five-minute window baked in — reusing it for the long
+      # side would make a one-hour rule a five-minute one wearing a longer
+      # name, which is the same mistake as naming a quantile `p95_15m` over a
+      # one-minute window.
+      - alert: HighErrorRate
+        expr: |
+          (
+            (
+              sum(rate(memory_http_requests_total{outcome="5xx"}[1h])) or vector(0)
+            )
+            /
+            clamp_min(sum(rate(memory_http_requests_total[1h])) or vector(0), 0.001)
+            > (14.4 * 0.001)
+          )
+          and
+          (
+            (
+              sum(rate(memory_http_requests_total{outcome="5xx"}[5m])) or vector(0)
+            )
+            /
+            clamp_min(sum(rate(memory_http_requests_total[5m])) or vector(0), 0.001)
+            > (14.4 * 0.001)
+          )
+        for: 2m
+        labels:
+          severity: page
+          slo: availability
+        annotations:
+          summary: Server errors are burning the availability budget 14× too fast
+          description: >-
+            2% of the 30-day error budget would be spent in an hour, and the
+            spend is still under way over the last five minutes. The SLO is
+            99.9% over 30 days; at this rate it is gone in about two days.
+          dashboard: /d/memory_mcp-technical/traffic-and-errors
+          runbook: docs/operations/LIMITATIONS.md
+
+      # 5% of the budget in six hours. Paged, and the slower of the two page
+      # rules: a burn that is under way but not yet urgent.
+      - alert: SustainedErrorRate
+        expr: |
+          (
+            (
+              sum(rate(memory_http_requests_total{outcome="5xx"}[6h])) or vector(0)
+            )
+            /
+            clamp_min(sum(rate(memory_http_requests_total[6h])) or vector(0), 0.001)
+            > (6 * 0.001)
+          )
+          and
+          (
+            (
+              sum(rate(memory_http_requests_total{outcome="5xx"}[30m])) or vector(0)
+            )
+            /
+            clamp_min(sum(rate(memory_http_requests_total[30m])) or vector(0), 0.001)
+            > (6 * 0.001)
+          )
+        for: 5m
+        labels:
+          severity: page
+          slo: availability
+        annotations:
+          summary: Server errors are burning the availability budget 6× too fast
+          description: >-
+            5% of the 30-day error budget would be spent in six hours, and the
+            spend continues over the last half hour.
+          dashboard: /d/memory_mcp-technical/traffic-and-errors
+          runbook: docs/operations/LIMITATIONS.md
+
+      # 10% of the budget in three days. A ticket, not a page: the spend is
+      # real and will have to be dealt with, but nothing is on fire and a person
+      # can look at it during working hours.
+      - alert: ErrorBudgetBurn
+        expr: |
+          (
+            (
+              sum(rate(memory_http_requests_total{outcome="5xx"}[3d])) or vector(0)
+            )
+            /
+            clamp_min(sum(rate(memory_http_requests_total[3d])) or vector(0), 0.001)
+            > 0.001
+          )
+          and
+          (
+            (
+              sum(rate(memory_http_requests_total{outcome="5xx"}[6h])) or vector(0)
+            )
+            /
+            clamp_min(sum(rate(memory_http_requests_total[6h])) or vector(0), 0.001)
+            > 0.001
+          )
+        for: 30m
+        labels:
+          severity: ticket
+          slo: availability
+        annotations:
+          summary: The service is spending its error budget faster than the SLO allows
+          description: >-
+            Sustained at or above the 99.9% SLO threshold: 10% of the 30-day
+            budget is on track to be spent in three days. This is not an outage;
+            it is a trend that will become one if nothing changes.
+          dashboard: /d/memory_mcp-technical/overview-the-four-golden-signals
+          runbook: docs/operations/LIMITATIONS.md
+
+  # ─── Liveness ───────────────────────────────────────────────────────────────
+  #
+  # There is no `up` series in this project: Prometheus generates that, not the
+  # application, and no scrape configuration ships here. The traffic counter is
+  # the honest substitute — if nothing is arriving and nothing is failing,
+  # either the service is down or nobody is using it, and both are worth a look.
+  - name: memory-liveness
+    interval: 30s
+    rules:
+      - alert: NoTraffic
+        expr: |
+          (
+            sum(rate(memory_http_requests_total[10m])) or vector(0)
+          ) == 0
+        for: 15m
+        labels:
+          severity: ticket
+        annotations:
+          summary: The service has served no requests for 15 minutes
+          description: >-
+            No HTTP traffic and no errors. Either the deployment is idle, which
+            is fine, or it is not receiving traffic it should be, which is not.
+            The error-ratio panels are empty in both cases, so this is the only
+            signal that distinguishes them.
+          dashboard: /d/memory_mcp-technical/overview-the-four-golden-signals
+
+  # ─── Latency ────────────────────────────────────────────────────────────────
+  #
+  # Read from a recording rule over a five-minute window, which is the window
+  # the exporter is configured to keep. The rule is on the whole service rather
+  # than per route: a single slow route is a panel question, and paging about
+  # one endpoint when the service as a whole answers quickly would be noise.
+  - name: memory-latency
+    interval: 30s
+    rules:
+      - alert: HighLatency
+        expr: |
+          memory:http_request_duration:p95_5m_total > 2
+        for: 10m
+        labels:
+          severity: page
+          slo: latency
+        annotations:
+          summary: p95 request latency has been above 2s for ten minutes
+          description: >-
+            The worst route's p95 is {{ $value | humanizeDuration }}. Two
+            seconds is past the point where an interactive request feels broken
+            to a person waiting on it. Which route is the cause is on the
+            technical dashboard's latency row.
+          dashboard: /d/memory_mcp-technical/http-latency
+          runbook: docs/operations/LIMITATIONS.md
+
+      - alert: LatencyDegraded
+        expr: |
+          memory:http_request_duration:p95_5m_total > 1
+          and
+          memory:http_request_duration:p95_5m_total <= 2
+        for: 15m
+        labels:
+          severity: ticket
+          slo: latency
+        annotations:
+          summary: p95 request latency has been above 1s for fifteen minutes
+          description: >-
+            Degrading rather than broken — the service is answering, and slowly.
+            Worth a look before it becomes the page above.
+          dashboard: /d/memory_mcp-technical/http-latency
+
+  # ─── Ingestion ──────────────────────────────────────────────────────────────
+  #
+  # The product's own signals. An ingest that has stopped is invisible to a
+  # user — nobody asked for anything, so nobody sees a failure — and knowledge
+  # that stops accumulating is the failure nobody notices until they need it.
+  - name: memory-ingestion
+    interval: 30s
+    rules:
+      - alert: IngestFailureRate
+        expr: |
+          memory:operation_calls:error_ratio15m{operation="ingest"} > 0.1
+        for: 10m
+        labels:
+          severity: page
+        annotations:
+          summary: More than 10% of ingest calls are failing
+          description: >-
+            Ingest is the door knowledge comes through. A tenth of it failing
+            means a tenth of what was offered is being silently dropped, and the
+            caller may not be retrying.
+          dashboard: /d/memory_mcp-product/is-the-knowledge-any-good
+
+      - alert: NoIngestActivity
+        expr: |
+          (
+            sum(rate(memory_operation_calls_total{operation="ingest"}[2h])) or vector(0)
+          ) == 0
+        for: 30m
+        labels:
+          severity: ticket
+        annotations:
+          summary: No ingest calls for two hours
+          description: >-
+            Nothing has been ingested for two hours. A deployment that is not
+            meant to be ingesting will alert on this and the alert should be
+            silenced; a deployment that is will have quietly stopped learning.
+          dashboard: /d/memory_mcp-product/what-people-are-doing
+
+      - alert: FilesystemIngestionStalled
+        expr: |
+          (
+            sum(rate(memory_fs_watch_revisions_total{outcome="processed"}[1h])) or vector(0)
+          ) == 0
+          and
+          (max(memory_fs_watch_inflight) or vector(0)) == 0
+        for: 30m
+        labels:
+          severity: ticket
+        feature: fs-watch
+        annotations:
+          summary: Filesystem ingestion has processed nothing for an hour
+          description: >-
+            The inbox watcher is running — something is inflating it — but no
+            revision has completed in an hour. The second condition excludes a
+            service that is simply idle with an empty queue. Only fires when the
+            build carries `fs-watch` and the deployment set
+            `MEMORY_INGESTION_INBOX`; otherwise these series do not exist and
+            the rule evaluates to empty.
+          dashboard: /d/memory_mcp-technical/filesystem-ingestion
+
+      - alert: WatcherDegraded
+        expr: |
+          max(max_over_time(memory_fs_watch_degraded[1h])) == 1
+        labels:
+          severity: page
+          feature: fs-watch
+        annotations:
+          summary: The filesystem watcher has given up
+          description: >-
+            The backend exhausted its retries and the event bridge exited. This
+            is a one-way latch: nothing resets it, so filesystem ingestion is
+            off until the process restarts. Read with `max_over_time` rather
+            than `avg` — averaging a step function reports a fraction of a
+            broken deployment.
+          dashboard: /d/memory_mcp-technical/filesystem-ingestion
+          runbook: docs/operations/LIMITATIONS.md
+
+  # ─── Subsystems ─────────────────────────────────────────────────────────────
+  - name: memory-subsystems
+    interval: 30s
+    rules:
+      - alert: BackgroundJobsFailing
+        expr: |
+          memory:background_jobs:unhealthy_rate15m{job="lease"} > 0
+        for: 15m
+        labels:
+          severity: ticket
+        annotations:
+          summary: The lease scheduler has failed or degraded every pass for 15 minutes
+          description: >-
+            A lease that is neither taken nor released is a tenant runtime that
+            is not being cleaned up. Nothing user-visible fails immediately;
+            this accrues.
+          dashboard: /d/memory_mcp-technical/background-jobs
+
+      - alert: RuntimeRefusals
+        expr: |
+          sum(rate(memory_runtime_refusals_total[15m])) > 0.1
+        for: 10m
+        labels:
+          severity: page
+        annotations:
+          summary: The HTTP runtime is refusing requests it cannot serve
+          description: >-
+            Quota, lease, task or registry failures, above 0.1 per second. These
+            answer 5xx with a generic body, so the client is told nothing and a
+            report from them carries only a request id.
+          dashboard: /d/memory_mcp-technical/runtime-refusals
+
+      - alert: RegistryInconsistent
+        expr: |
+          (
+            sum(rate(memory_http_registry_reconciliation_total[30m])) or vector(0)
+          ) > 0
+        for: 30m
+        labels:
+          severity: ticket
+        annotations:
+          summary: Tenant namespaces are inconsistent with the registry
+          description: >-
+            Registered but unbound, or bound to nothing. Reconciliation runs at
+            most once a minute, so a sustained rate means a standing
+            inconsistency rather than a transient one — a tenant exists that
+            cannot be served.
+          dashboard: /d/memory_mcp-technical/runtime-refusals
+
+      - alert: ClaimReconciliationFailing
+        expr: |
+          sum(rate(memory_claim_pipeline_total{stage="reconcile",outcome="error"}[15m])) > 0
+        for: 15m
+        labels:
+          severity: ticket
+        annotations:
+          summary: Claim reconciliation is erroring
+          description: >-
+            Claims are the structured layer over facts. Failures here do not stop
+            facts being stored, but the contradictions between them stop being
+            resolved, and the graph degrades quietly.
+          dashboard: /d/memory_mcp-technical/claims
+
+  # ─── Access ─────────────────────────────────────────────────────────────────
+  - name: memory-access
+    interval: 30s
+    rules:
+      # Deliberately not a page. A closed sign-up policy refuses every
+      # self-service attempt, correctly and indefinitely, and paging an operator
+      # about a configured setting is how a page channel stops being read.
+      - alert: SignupsRefused
+        expr: |
+          (
+            sum(rate(memory_auth_refusals_total{branch="signup_invite_only"}[1h])) or vector(0)
+          ) > 0
+        for: 30m
+        labels:
+          severity: ticket
+        annotations:
+          summary: Sign-ups are being refused by the invite-only policy
+          description: >-
+            Expected on a deployment closed to self-service sign-up. Included
+            because it is also what a *user* sees, and "nobody can sign up" is
+            worth knowing about before they say so. If this is intentional,
+            silence it — the branch is a configuration fact, not a fault.
+          dashboard: /d/memory_mcp-technical/authentication
