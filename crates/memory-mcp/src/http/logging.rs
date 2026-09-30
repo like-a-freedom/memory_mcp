@@ -265,6 +265,13 @@ impl RequestWarning {
 /// Shorthand for [`RequestWarning::new`] followed by
 /// [`RequestWarning::log_into`].
 pub fn log_warn_at(op: &'static str, detail: &str, request_id: Option<RequestId>) {
+    // Counted here rather than at each call site: every request-scoped warning
+    // in the HTTP runtime goes through this one function, so counting here
+    // covers the whole surface. A refusal here answers `503` with a generic
+    // body, which tells a client nothing and would tell an operator nothing
+    // either without a rate to alert on — a deployment whose quota registry is
+    // unreachable looks exactly like a quiet one.
+    crate::observability::record_runtime_refusal(op);
     if let Some(request_id) = request_id {
         RequestWarning::new(op, detail, request_id).log_into(&StdoutLogger::from_env());
     } else {
@@ -661,6 +668,51 @@ mod tests {
     /// be exercised without the process-global level override.
     fn event_for_warning() -> WarningEvent {
         WarningEvent::new("http.runtime.activation_failed", "tenant t1: disk is gone")
+    }
+
+    /// A request-scoped refusal answers with a generic body, so the metric is
+    /// the only signal: a deployment whose quota registry is unreachable looks
+    /// exactly like a quiet one. Counted in the one function every such
+    /// warning goes through, so the count covers the surface rather than the
+    /// call sites somebody remembered.
+    #[tokio::test]
+    #[cfg(feature = "prometheus")]
+    async fn a_runtime_refusal_is_counted_for_the_exporter() {
+        let Some(exposition) = crate::observability::tests::exposed(|| async {
+            log_warn_at("http.quota.plan_load_failed", "registry unreachable", None);
+            log_warn_at("http.quota.reserve_failed", "reserve refused", None);
+        })
+        .await
+        else {
+            return;
+        };
+
+        assert!(
+            exposition.contains(crate::observability::METRIC_RUNTIME_REFUSALS_TOTAL),
+            "a runtime refusal must be countable: {exposition}"
+        );
+        for op in ["http.quota.plan_load_failed", "http.quota.reserve_failed"] {
+            assert!(
+                exposition.contains(&format!(r#"op="{op}""#)),
+                "each refusal must be attributable to what refused: {op}"
+            );
+        }
+    }
+
+    /// A refusal label is the static operation tag, never anything derived from
+    /// the request: a tenant id or an error string as a label would be an
+    /// unbounded series and a disclosure of the value it holds.
+    #[test]
+    fn a_runtime_refusal_label_is_a_static_tag() {
+        for op in [
+            "http.quota.plan_load_failed",
+            "http.config.bind_unspecified",
+        ] {
+            assert!(
+                op.starts_with("http.") && !op.contains(' '),
+                "a refusal label must be a static dotted tag: {op}"
+            );
+        }
     }
 
     /// A request-scoped warning has to carry the request's id. The quota paths

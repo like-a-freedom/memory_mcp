@@ -1235,6 +1235,22 @@ test reads the sources and fails if a stage is declared and never measured,
 because such a metric always reads zero and looks on a dashboard exactly
 like a fast pipeline.
 
+#### Failures that look like silence
+
+Two kinds of failure answer a client with a generic body, so neither shows
+up in the request metrics and neither is something a human is watching a
+screen for. Both are counted, because a deployment that is refusing every
+sign-in looks exactly like a quiet one.
+
+| Metric | Labels | Meaning |
+| --- | --- | --- |
+| `memory_auth_refusals_total` | `surface`, `branch` | A refused sign-in. `branch` is why — `state_mismatch`, `nonce`, `take_oidc_request`, `signup_invite_only` and the rest of the callback's refusals |
+| `memory_runtime_refusals_total` | `op` | A request-scoped refusal inside the HTTP runtime: a quota registry that could not be read or reserved, a configuration that binds wider than it should |
+
+Neither label is ever a username, an issuer, a subject or an error string.
+Those are the identifiers that turn a metrics backend into a disclosure, and
+the audit trail already carries them under a keyed fingerprint.
+
 ### Build features
 
 The package ships two coarse build profiles plus a few orthogonal opt-in axes.

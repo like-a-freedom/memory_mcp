@@ -68,6 +68,47 @@ pub const METRIC_BACKGROUND_JOBS_TOTAL: &str = "memory_background_jobs_total";
 /// Histogram: background job duration in seconds, by job family.
 pub const METRIC_BACKGROUND_JOB_DURATION_SECONDS: &str = "memory_background_job_duration_seconds";
 
+/// Counter: authentication refusals, by surface and branch.
+///
+/// A refused sign-in is the one incident that has no alert: it is a 401 or a
+/// 403 among thousands of legitimate ones, it belongs to no request a human
+/// reads, and a deployment in a sign-in loop looks exactly like a quiet one
+/// from every other signal. The branch is the reason it failed, which is
+/// already a closed set of static words on the OIDC path — that is what keeps
+/// the series bounded and aggregatable.
+pub const METRIC_AUTH_REFUSALS_TOTAL: &str = "memory_auth_refusals_total";
+
+/// Record one authentication refusal on the OIDC path.
+///
+/// `branch` is the reason and must be a fixed word — the call sites pass
+/// static tags. It is never a username, an issuer or a subject: those are the
+/// identifiers that turn a metric into a disclosure, and the audit trail
+/// already carries them under a keyed fingerprint.
+pub(crate) fn record_auth_refusal(branch: &'static str) {
+    const REFUSALS: &str = METRIC_AUTH_REFUSALS_TOTAL;
+    metrics::counter!(
+        REFUSALS,
+        "surface" => "oidc",
+        "branch" => branch,
+    )
+    .increment(1);
+}
+
+/// Counter: refusals by the HTTP runtime's own request-scoped warnings.
+///
+/// A refusal here answers `503` or `403` with a generic body. The body tells
+/// a client nothing, and without a rate it tells an operator nothing either:
+/// a deployment whose quota registry is unreachable, or whose configuration
+/// binds wider than it should, looks exactly like a quiet one. `op` is the
+/// static operation tag, so the series stays bounded.
+pub const METRIC_RUNTIME_REFUSALS_TOTAL: &str = "memory_runtime_refusals_total";
+
+/// Record one request-scoped refusal from the HTTP runtime.
+pub(crate) fn record_runtime_refusal(op: &'static str) {
+    const REFUSALS: &str = METRIC_RUNTIME_REFUSALS_TOTAL;
+    metrics::counter!(REFUSALS, "op" => op).increment(1);
+}
+
 /// Histogram: a named stage inside a pipeline, in seconds.
 ///
 /// An operation's total latency says *that* something is slow. Only the stages
@@ -92,6 +133,7 @@ const DECLARED_STAGES: &[&str] = &[
     "ann_search",
     "extraction",
     "embedding_provider",
+    "store_write",
 ];
 
 const KNOWN_OPERATIONS: &[&str] = &[
@@ -486,6 +528,7 @@ pub(crate) mod tests {
         const SOURCES: &[&str] = &[
             include_str!("memory/retrieval/semantic.rs"),
             include_str!("tools/extract.rs"),
+            include_str!("tools/ingest.rs"),
             include_str!("embedding/service.rs"),
         ];
         for stage in DECLARED_STAGES {

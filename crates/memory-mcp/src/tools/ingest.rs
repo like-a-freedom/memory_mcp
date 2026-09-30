@@ -54,7 +54,15 @@ pub async fn ingest<T: ToolContext>(
         duration: None,
     });
 
-    match ctx.ingest(request, Some(access)).await {
+    // The write is the whole cost of this tool, so it is the stage worth
+    // naming: an `ingest` that got slower can be traced to this histogram
+    // rather than to the operation total, which moves for any reason at all.
+    let outcome = {
+        let _stage = crate::observability::StageTimer::new("ingest", "store_write");
+        ctx.ingest(request, Some(access)).await
+    };
+
+    match outcome {
         Ok(episode_id) => {
             operation_metrics.record_result("episodes", 1);
             operation_metrics.success();
