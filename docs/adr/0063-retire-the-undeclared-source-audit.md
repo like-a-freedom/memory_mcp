@@ -1,10 +1,20 @@
 # Retire the undeclared-source audit
 
-The audit this supersedes caught a real defect once and has no replacement.
+The audit this supersedes caught a real defect once. It had no replacement when
+it was removed; [ADR-0065](0065-reinstate-the-source-tree-and-doc-claim-guards.md)
+later supplied one.
 
 ## Status
 
 Supersedes [ADR-0061](0061-compiler-graph-defines-the-source-tree.md).
+
+Partly reversed by
+[ADR-0065](0065-reinstate-the-source-tree-and-doc-claim-guards.md): the gap
+below is closed again, by the mechanism this record asked for — a check that
+walks the module tree itself instead of reading cargo's artifact layout. It is
+written, as a cargo test, because ADR-0064 requires CI to run nothing outside
+cargo. Everything this record says about *why the Python audit had to go* still
+stands; the conclusion it drew — that no check reports an orphan file — does not.
 
 ## What ADR-0061 decided, and what it caught
 

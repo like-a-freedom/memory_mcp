@@ -8,6 +8,15 @@
 > failure about a tree it never looked at. This record is kept because the
 > reasoning that produced both the retired manifest and the retired audit is
 > worth more than the machinery either of them became.
+>
+> **Partly reinstated by [ADR-0065](0065-reinstate-the-source-tree-and-doc-claim-guards.md).**
+> The *decision* below — derive the fact from the compiler graph, never from a
+> hand-maintained manifest — still holds. The *mechanism* did not survive: the
+> script read cargo's artifact layout and needed a feature matrix, and
+> ADR-0064 requires CI to run nothing outside cargo, so there was no way to
+> keep it honest. The check is now a cargo test that walks the `mod`
+> declarations directly, which is the same fact read from a source the guard
+> itself can see.
 
 A `.rs` file is part of the build only if some `mod` declaration, `#[path]`
 attribute, or `include!` reaches it. A file nothing reaches is invisible to
