@@ -37,6 +37,15 @@ pub const METRIC_OPERATION_DURATION_SECONDS: &str = "memory_operation_duration_s
 /// Bounded domain result counts by operation and result kind.
 pub const METRIC_OPERATION_RESULTS_TOTAL: &str = "memory_operation_results_total";
 
+/// How much a thing exists right now, by operation and result kind.
+///
+/// A gauge, and not another `results_total`. That counter answers "how much
+/// work did this operation produce", so a level belongs nowhere in it: a
+/// stock added to a counter reports the sum of every snapshot ever taken, a
+/// dashboard that reads its own inventory grows every time it is opened, and
+/// its derivative reports dashboard traffic rather than growth in the data.
+pub const METRIC_OPERATION_STOCK: &str = "memory_operation_stock";
+
 /// Histogram: a named stage inside a pipeline, in seconds.
 ///
 /// An operation's total latency says *that* something is slow. Only its stages

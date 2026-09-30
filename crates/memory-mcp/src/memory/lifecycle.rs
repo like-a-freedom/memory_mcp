@@ -42,9 +42,14 @@ impl crate::memory::lifecycle_workers::LifecycleHandles<'_> {
             .await?;
         let communities = service.knowledge_graph_store().select_communities().await?;
 
-        operation_metrics.record_result("active_facts", active_facts.len());
-        operation_metrics.record_result("archival_candidates", archival_candidates.len());
-        operation_metrics.record_result("communities", communities.len());
+        // A stock, not a flow: these are levels read from the store, so they are
+        // set rather than added. Counting them made the metric the sum of
+        // every inventory ever read — opening this dashboard grew the counter
+        // by the size of the store, and its rate reported dashboard traffic
+        // instead of growth in the data.
+        operation_metrics.record_stock("active_facts", active_facts.len());
+        operation_metrics.record_stock("archival_candidates", archival_candidates.len());
+        operation_metrics.record_stock("communities", communities.len());
         operation_metrics.success();
         Ok(LifecycleDashboard {
             active_facts: active_facts.len(),

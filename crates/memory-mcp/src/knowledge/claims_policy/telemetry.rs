@@ -160,6 +160,17 @@ pub(crate) fn record_pipeline_duration(
 }
 
 /// Record `memory_claim_candidate_count{schema,match_mode}`.
+///
+/// The value is a *count*, but it is recorded into a histogram family, and
+/// the recorder exports histograms as Prometheus summaries — quantiles over a
+/// rolling window, plus `_sum` and a bare count line. So read this family as
+/// `rate(_sum) / rate(<bare count>)`, never as a quantile: every observation
+/// below the first reported quantile collapses to 0, which makes "no
+/// candidates" and "a handful" the same number — exactly the distinction this
+/// family exists to show.
+///
+/// Configuring buckets instead would fix the units and cost every duration
+/// metric in the process its quantile series, so it is not done.
 pub(crate) fn record_candidate_count(
     schema: ClaimSchemaFamily,
     match_mode: ClaimMatchMode,

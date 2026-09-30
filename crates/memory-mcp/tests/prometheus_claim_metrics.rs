@@ -179,3 +179,63 @@ fn no_forbidden_identifier_appears_as_label() {
         );
     }
 }
+
+/// A count of candidates is recorded into the histogram family, and the
+/// recorder renders every histogram as a Prometheus **summary** — quantiles
+/// over a rolling window, with `_sum` and a bare count series beside them.
+/// That is the only shape available here: the exporter switches to bucket
+/// exposition process-wide when buckets are configured, which would cost
+/// every duration metric its quantile series.
+///
+/// So the count is recoverable exactly, from `_sum / _count`, and a panel must
+/// use that rather than a quantile. A quantile cannot answer the question this
+/// family exists for: every observation below the first reported quantile
+/// collapses to 0, so "no candidates" and "a handful" are the same number.
+#[test]
+fn candidate_count_is_recoverable_as_a_mean() {
+    let handle = render_handle();
+
+    let read = |output: &str, suffix: &str| {
+        let series = r#"schema="commitment",match_mode="exact""#;
+        output
+            .lines()
+            .find(|line| line.starts_with(&format!("{METRIC_CANDIDATE_COUNT}{suffix}{{{series}}}")))
+            .and_then(|line| line.split_whitespace().last())
+            .and_then(|value| value.parse::<f64>().ok())
+    };
+
+    // A schema no other test in this file emits, so the numbers below are
+    // this test's alone rather than a sum with a neighbour's.
+    let before = handle.render();
+    for _ in 0..3 {
+        histogram!(
+            METRIC_CANDIDATE_COUNT,
+            "schema" => "commitment",
+            "match_mode" => "exact",
+        )
+        .record(0.0);
+    }
+    for _ in 0..2 {
+        histogram!(
+            METRIC_CANDIDATE_COUNT,
+            "schema" => "commitment",
+            "match_mode" => "exact",
+        )
+        .record(4.0);
+    }
+    let after = handle.render();
+
+    assert_eq!(
+        read(&after, "").unwrap_or(0.0) - read(&before, "").unwrap_or(0.0),
+        5.0,
+        "every observation must be counted, and a summary exposes its count as \
+         the bare series with no `_count` suffix: {after}"
+    );
+    // 3 zeros and 2 fours: a mean of 1.6 keeps the zeros visible, which is
+    // what a quantile cannot do.
+    assert_eq!(
+        read(&after, "_sum").unwrap_or(0.0) - read(&before, "_sum").unwrap_or(0.0),
+        8.0,
+        "the values must be preserved exactly, so the mean is real: {after}"
+    );
+}

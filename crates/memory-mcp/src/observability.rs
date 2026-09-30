@@ -19,7 +19,7 @@ pub use crate::shared::observability::{
     METRIC_AUTH_REFUSALS_TOTAL, METRIC_BACKGROUND_JOB_DURATION_SECONDS,
     METRIC_BACKGROUND_JOBS_TOTAL, METRIC_HTTP_REQUEST_DURATION_SECONDS,
     METRIC_HTTP_REQUESTS_INFLIGHT, METRIC_HTTP_REQUESTS_TOTAL, METRIC_OPERATION_DURATION_SECONDS,
-    METRIC_OPERATION_RESULTS_TOTAL, METRIC_OPERATIONS_TOTAL,
+    METRIC_OPERATION_RESULTS_TOTAL, METRIC_OPERATION_STOCK, METRIC_OPERATIONS_TOTAL,
     METRIC_PIPELINE_STAGE_DURATION_SECONDS, METRIC_RUNTIME_REFUSALS_TOTAL, StageTimer,
 };
 
@@ -253,6 +253,16 @@ impl OperationMetrics {
         self.outcome = "success";
     }
 
+    /// Record work *produced* by this operation: a flow.
+    ///
+    /// The value is added to a counter, so it answers "how much did this
+    /// operation produce" — bytes written, entities extracted, rows
+    /// archived. A `rate()` over it is meaningless, and its value grows with
+    /// the process lifetime by design.
+    ///
+    /// For a *stock* — how much exists, which goes up and down — use
+    /// [`Self::record_stock`]. A stock added to a counter is a metric that
+    /// cannot be read: see that method.
     pub(crate) fn record_result(&self, result: &str, count: usize) {
         metrics::counter!(
             METRIC_OPERATION_RESULTS_TOTAL,
@@ -260,6 +270,27 @@ impl OperationMetrics {
             "result" => result_label(result),
         )
         .increment(count as u64);
+    }
+
+    /// Record how much *exists*: a stock.
+    ///
+    /// Set, not incremented. A stock is a level — ten thousand active facts
+    /// is ten thousand whether nobody has looked in a week or a thousand
+    /// people have. Adding it to a counter means the metric reports the sum of
+    /// every snapshot ever taken: opening the lifecycle dashboard once would
+    /// add its whole inventory, and the value would grow with every read
+    /// rather than with the data. Its derivative — the only thing anyone would
+    /// plot — would report dashboard traffic, not growth.
+    ///
+    /// The same shape as `claim_relations_active`, which was already a gauge
+    /// for exactly this reason.
+    pub(crate) fn record_stock(&self, stock: &str, count: usize) {
+        metrics::gauge!(
+            METRIC_OPERATION_STOCK,
+            "operation" => self.operation,
+            "result" => result_label(stock),
+        )
+        .set(count as f64);
     }
 }
 
@@ -591,7 +622,108 @@ pub(crate) mod tests {
         assert!(output.contains("result=\"episodes\""));
     }
 
-    /// An operation that returns early is recorded as `error` without any call
+    /// A stock reported as a flow again is the original defect, and nothing
+    /// about it is visible at the call site: `record_stock(name, x.len())`
+    /// and `record_result(name, x.len())` read the same at the line. The
+    /// inventory read is what makes it a stock — the counts are bounded by
+    /// page limits, not produced by the work.
+    #[test]
+    fn an_inventory_read_is_never_counted_as_work_produced() {
+        const LIFECYCLE: &str = include_str!("memory/lifecycle.rs");
+        // The dashboard reads three levels and performs no work. A counter
+        // entry there is the defect; the archive, restore, decay and rebuild
+        // paths below it do produce work and are left alone.
+        let dashboard = LIFECYCLE
+            .split("pub async fn archive_candidates")
+            .next()
+            .expect("the dashboard precedes archive_candidates");
+        assert!(
+            !dashboard.contains("record_result"),
+            "the lifecycle dashboard reports levels, not work produced; \
+             a `record_result` in it re-accumulates the whole inventory on \
+             every read: {dashboard}"
+        );
+        assert!(
+            dashboard.contains("record_stock"),
+            "and it must still report its inventory, or the panel goes blank"
+        );
+    }
+
+    /// A stock is a level; a flow is a total. The two are the same number at
+    /// first glance and behave nothing alike afterwards.
+    ///
+    /// `lifecycle_dashboard` reported its inventory — active facts, archival
+    /// candidates, communities — through `record_result`, which increments. So
+    /// the counter held the sum of every inventory ever read: opening the
+    /// dashboard added ~5 000 to it, and its derivative reported dashboard
+    /// traffic rather than growth in the data. A panel reading "how much is
+    /// stored" from that counter is wrong, and wrong in the direction that
+    /// looks like success.
+    #[tokio::test]
+    #[cfg(feature = "prometheus")]
+    async fn a_stock_is_set_rather_than_accumulated() {
+        let (first, second, exposition) = exposed(|| async {
+            let metrics = OperationMetrics::new("lifecycle_dashboard");
+            metrics.record_stock("active_facts", 10_000);
+            let first = sample_series(
+                &render(),
+                METRIC_OPERATION_STOCK,
+                r#"operation="lifecycle_dashboard",result="active_facts""#,
+            );
+            // A second read of an unchanged store reports the same level.
+            metrics.record_stock("active_facts", 10_000);
+            let second = sample_series(
+                &render(),
+                METRIC_OPERATION_STOCK,
+                r#"operation="lifecycle_dashboard",result="active_facts""#,
+            );
+            (first, second, render())
+        })
+        .await;
+
+        assert_eq!(
+            first,
+            Some(10_000.0),
+            "a stock must be reported at its level: {exposition}"
+        );
+        assert_eq!(
+            second, first,
+            "reading the same inventory twice must not add it twice: {exposition}"
+        );
+    }
+
+    /// The counterpart: a flow really does accumulate. Without this, the test
+    /// above would also pass if `record_result` had been turned into a
+    /// `set` — the two must be told apart, not merely both made small.
+    #[tokio::test]
+    #[cfg(feature = "prometheus")]
+    async fn a_flow_accumulates_across_calls() {
+        let (first, second) = exposed(|| async {
+            let metrics = OperationMetrics::new("lifecycle_rebuild_communities");
+            metrics.record_result("communities", 40);
+            let first = sample_series(
+                &render(),
+                METRIC_OPERATION_RESULTS_TOTAL,
+                r#"operation="lifecycle_rebuild_communities",result="communities""#,
+            );
+            metrics.record_result("communities", 40);
+            let second = sample_series(
+                &render(),
+                METRIC_OPERATION_RESULTS_TOTAL,
+                r#"operation="lifecycle_rebuild_communities",result="communities""#,
+            );
+            (first, second)
+        })
+        .await;
+
+        assert_eq!(first, Some(40.0));
+        assert_eq!(
+            second,
+            Some(80.0),
+            "work produced must add up; a flow that reports a level reports \
+             only the last call"
+        );
+    }
     /// site saying so — that default is the whole point of the guard, since
     /// every early return and every unexpected failure becomes visible without
     /// a `match` arm written for it.
