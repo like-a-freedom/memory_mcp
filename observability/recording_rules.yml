@@ -135,7 +135,13 @@ groups:
             memory_http_request_duration_seconds{quantile="0.99"}
           )
 
-      # Service-wide, for the headline stat panel.
+      # Service-wide, for the headline stat panel. `p50` is here for the same
+      # reason as p95 and p99: the gap between them is the signal, and a panel
+      # that can only show p95 makes the reader go and look up the median.
+      - record: memory:http_request_duration:p50_5m_total
+        expr: |
+          max(memory_http_request_duration_seconds{quantile="0.5"})
+
       - record: memory:http_request_duration:p95_5m_total
         expr: |
           max(memory_http_request_duration_seconds{quantile="0.95"})

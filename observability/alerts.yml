@@ -6,7 +6,8 @@
 # Alerting when the recent error rate exceeds the SLO looks right and is not.
 # At a 99.9% SLO, alerting on a ten-minute error rate above 0.1% fires up to 144
 # times a day, nearly all of them noise: a 0.1% error rate sustained for ten
-# minutes consumes 0.02% of a thirty-day budget. An on-call engineer who learns
+# minutes consumes 0.000023% of a thirty-day budget — about one
+# forty-thousandth of what there is to spend. An on-call engineer who learns
 # that page is noise stops reading pages, and the one that mattered is the one
 # they do not read.
 #
@@ -178,6 +179,7 @@ groups:
         for: 15m
         labels:
           severity: ticket
+          note: unconditional
         annotations:
           summary: The service has served no requests for 15 minutes
           description: >-
@@ -259,6 +261,7 @@ groups:
         for: 30m
         labels:
           severity: ticket
+          note: unconditional
         annotations:
           summary: No ingest calls for two hours
           description: >-
@@ -267,26 +270,35 @@ groups:
             silenced; a deployment that is will have quietly stopped learning.
           dashboard: /d/memory_mcp-product/what-people-are-doing
 
+      # No `or vector(0)` anywhere in this rule, and that is the whole design.
+      #
+      # `or vector(0)` turns an absent series into a literal `0`, so
+      # `… or vector(0) == 0` is `0 == 0` — true — and the alert fires on every
+      # deployment where the feature is off. That is the worst shape an alert
+      # can have: it is guaranteed to fire where there is nothing to report, and
+      # it is silenced in exactly the deployment that should not need it.
+      #
+      # Without the guard an absent series leaves the whole expression empty,
+      # `empty == 0` is empty, and the rule stays quiet — which is correct: a
+      # build without `fs-watch` has no inbox to have stalled. A test in the
+      # crate's own checker asserts the guard is absent for the same reason.
       - alert: FilesystemIngestionStalled
         expr: |
-          (
-            sum(rate(memory_fs_watch_revisions_total{outcome="processed"}[1h])) or vector(0)
-          ) == 0
+          sum(rate(memory_fs_watch_revisions_total{outcome="processed"}[1h])) == 0
           and
-          (max(memory_fs_watch_inflight) or vector(0)) == 0
+          max(memory_fs_watch_inflight) == 0
         for: 30m
         labels:
           severity: ticket
-        feature: fs-watch
+          feature: fs-watch
         annotations:
           summary: Filesystem ingestion has processed nothing for an hour
           description: >-
-            The inbox watcher is running — something is inflating it — but no
-            revision has completed in an hour. The second condition excludes a
-            service that is simply idle with an empty queue. Only fires when the
-            build carries `fs-watch` and the deployment set
-            `MEMORY_INGESTION_INBOX`; otherwise these series do not exist and
-            the rule evaluates to empty.
+            The inbox watcher is running — the in-flight gauge says something
+            is inflating it — but no revision has completed in an hour. The
+            second condition excludes a service that is simply idle with an
+            empty queue. Fires only when the build carries `fs-watch` and the
+            deployment set `MEMORY_INGESTION_INBOX`.
           dashboard: /d/memory_mcp-technical/filesystem-ingestion
 
       - alert: WatcherDegraded
@@ -355,18 +367,28 @@ groups:
             cannot be served.
           dashboard: /d/memory_mcp-technical/runtime-refusals
 
-      - alert: ClaimReconciliationFailing
+      # Selected by `reason_code`, not by `outcome`. The outcome vocabulary is
+      # the reconciliation outcomes — duplicate, supersession, correction,
+      # contradiction, temporal_ambiguity — and anything else collapses to
+      # `other`. There is no `outcome="error"`, so a rule selecting one matches
+      # an empty vector and can never fire: the label value does not exist, and
+      # nothing reports that a well-formed rule is dead. The reason a projection
+      # failed is in `reason_code`, which is where the bounded error buckets are.
+      - alert: ClaimProjectionFailing
         expr: |
-          sum(rate(memory_claim_pipeline_total{stage="reconcile",outcome="error"}[15m])) > 0
+          (
+            sum(rate(memory_claim_pipeline_total{reason_code="internal"}[15m])) or vector(0)
+          ) > 0
         for: 15m
         labels:
           severity: ticket
         annotations:
-          summary: Claim reconciliation is erroring
+          summary: Claim projection is failing
           description: >-
-            Claims are the structured layer over facts. Failures here do not stop
-            facts being stored, but the contradictions between them stop being
-            resolved, and the graph degrades quietly.
+            A post-fact projection step failed. Claims are the structured layer
+            over facts, so this does not stop facts being stored — but the claim
+            derived from a failing projection is missing, and the graph is
+            quietly less complete than the facts it was built from.
           dashboard: /d/memory_mcp-technical/claims
 
   # ─── Access ─────────────────────────────────────────────────────────────────

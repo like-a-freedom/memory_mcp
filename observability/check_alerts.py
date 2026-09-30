@@ -110,6 +110,36 @@ def main() -> int:
                     f"closed to sign-ups would page forever"
                 )
 
+            # `or vector(0)` next to a `== 0` test is an always-true rule —
+            # unless the metric is guaranteed to exist.
+            #
+            # The guard exists to make an absent series read as zero, which is
+            # right for a *division* and wrong for an *equality against zero*:
+            # `… or vector(0) == 0` is `0 == 0`, so the alert fires on every
+            # deployment that does not have the series at all. The one real
+            # instance of this shipped as a feature-gated rule that fired
+            # everywhere the feature was off — the worst shape an alert can
+            # have, guaranteed to fire where there is nothing to report.
+            #
+            # An alert may opt out where its metrics are always present in the
+            # scope this file governs. These rules are the HTTP profile's, and
+            # the families they read are emitted by that profile's own
+            # middleware, so an absent series means "no traffic" rather than
+            # "the feature is off" — which is the distinction the guard exists
+            # to express. The marker is not a claim that the metric exists in
+            # every build.
+            if re.search(r"==\s*0", expr) and "or vector(0)" in expr and "unconditional" not in (
+                rule.get("labels", {}).get("note", "")
+            ):
+                failures.append(
+                    f"{name}: `or vector(0)` turns an absent series into a "
+                    f"literal 0, so testing it `== 0` is true wherever the "
+                    f"series does not exist — the alert fires on every "
+                    f"deployment without the feature. Drop the guard, or mark "
+                    f"the rule `note: unconditional` if the metric is always "
+                    f"present wherever this rules file applies"
+                )
+
     print(f"{alerts} alerts across {len(document['groups'])} groups")
     print(f"{len(families)} families, {len(known & set(recorded_series()))} recorded series")
     for failure in failures:

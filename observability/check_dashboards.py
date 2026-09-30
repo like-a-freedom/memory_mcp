@@ -57,6 +57,77 @@ def panel_titles(panel: dict) -> list[tuple[str, str]]:
     ]
 
 
+def check_layout(path: pathlib.Path, document: dict, failures: list[str]) -> None:
+    """Panels must not overlap, and rows must be stacked.
+
+    Grafana attributes a panel to a row by *grid position*, not by the JSON
+    nesting, and it sorts the top level by `(y, x)`. So an expanded row whose
+    panels all carry `y: 0` — which is what the generator produced before this
+    check existed — imports cleanly and renders as thirty panels stacked on one
+    grid cell. Nothing in Grafana reports it.
+
+    Collapsed rows avoid the whole problem: the row takes one grid line and its
+    panels are drawn from the row's own list. That is what is asserted here.
+    """
+    top = document["panels"]
+    non_rows = [panel for panel in top if panel["type"] != "row"]
+    if non_rows:
+        failures.append(
+            f"{path.name}: {len(non_rows)} panel(s) sit at the top level rather "
+            f"than inside a row; Grafana sorts by gridPos, so an expanded row's "
+            f"panels have to be positioned below it and the generator would "
+            f"have to track a running y — use a collapsed row instead"
+        )
+
+    positions: list[tuple[int, int]] = []
+    for index, panel in enumerate(top):
+        if panel["type"] != "row":
+            continue
+        grid = panel["gridPos"]
+        if not panel.get("collapsed"):
+            failures.append(
+                f"{path.name} / {panel['title']}: row is not collapsed, so its "
+                f"panels are positioned on the shared grid where they can "
+                f"collide with the next row's"
+            )
+        if grid["y"] != index:
+            failures.append(
+                f"{path.name} / {panel['title']}: row y={grid['y']} at position "
+                f"{index}; rows must be one grid line apart in document order"
+            )
+        positions.append((grid["y"], grid["x"]))
+
+        occupied: dict[tuple[int, int], str] = {}
+        for child in panel.get("panels", []):
+            child_grid = child["gridPos"]
+            if child_grid["x"] + child_grid["w"] > 24:
+                failures.append(
+                    f"{path.name} / {panel['title']} / {child['title']}: "
+                    f"x+w={child_grid['x'] + child_grid['w']} exceeds the "
+                    f"24-column grid"
+                )
+            # A cell is (row, column) within the section: a collapsed row is
+            # drawn in its own coordinate space, so two panels collide only if
+            # they share a row *and* a column. Comparing the raw `y` of two
+            # panels at different heights is not a collision, which is exactly
+            # the mistake that made this check report the fixed layout as
+            # broken.
+            for row_offset in range(child_grid["h"]):
+                for column in range(child_grid["x"], child_grid["x"] + child_grid["w"]):
+                    cell = (child_grid["y"] + row_offset, column)
+                    if cell in occupied:
+                        failures.append(
+                            f"{path.name} / {panel['title']}: "
+                            f"{child['title']!r} overlaps {occupied[cell]!r} "
+                            f"at x={column} y={cell[0]}"
+                        )
+                        break
+                    occupied[cell] = child["title"]
+
+    if positions != sorted(positions):
+        failures.append(f"{path.name}: rows are not in ascending y order")
+
+
 def main() -> int:
     recorded = recorded_series()
     families = exported_families()
@@ -67,6 +138,7 @@ def main() -> int:
 
     for path in sorted(DASHBOARDS.glob("*.json")):
         document = json.loads(path.read_text())
+        check_layout(path, document, failures)
         for panel in document["panels"]:
             for expr in panel_expressions(panel):
                 if not expr:
@@ -79,6 +151,18 @@ def main() -> int:
                             f"{path.name} / {title}: reads `{name}`, which is "
                             f"neither a recorded series nor an exported metric"
                         )
+                for metric in re.findall(r"\b(memory_[a-z0-9_]+)", expr):
+                    base = metric
+                    for suffix in ("_sum", "_count"):
+                        if metric.endswith(suffix) and metric[: -len(suffix)] in known:
+                            base = metric[: -len(suffix)]
+                            break
+                    if base not in known:
+                        title = panel.get("title", "<untitled>")
+                        failures.append(
+                            f"{path.name} / {title}: reads `{metric}`, which is "
+                            f"neither a recorded series nor an exported metric"
+                        )
 
     print(f"{len(recorded)} recorded series, {len(families)} exported families")
     print(f"{panels_checked} panel expressions checked")
@@ -86,7 +170,7 @@ def main() -> int:
         print(f"  FAIL {failure}")
     if failures:
         return 1
-    print("  every panel reads a series that exists")
+    print("  every panel reads a series that exists, and nothing overlaps")
     return 0
 
 

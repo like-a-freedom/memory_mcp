@@ -199,6 +199,18 @@ impl StdoutLogger {
     /// [`from_env`] with the environment read through `lookup`, so the
     /// behaviour can be exercised without mutating the process environment,
     /// which is global state the parallel test harness shares.
+    ///
+    /// A logger built this way is **bound** to `lookup`: it never consults the
+    /// process-global level override.
+    ///
+    /// That distinction is not cosmetic. A test that supplies its own
+    /// directives and then calls production code — which builds its logger
+    /// from the environment — is asserting against production behaviour, and
+    /// the level that code sees must be the one the test configured. Before
+    /// this, `from_env_with` returned a logger whose `is_event_enabled` was
+    /// still decided by `from_env`'s override check, so a parallel test in
+    /// `with_level` could change this test's result: it failed roughly one run
+    /// in eight, in a test that was correct.
     #[must_use]
     pub fn from_env_with<F>(lookup: F) -> Self
     where

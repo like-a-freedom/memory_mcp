@@ -120,7 +120,19 @@ pub(crate) async fn request_log(mut req: Request, next: Next) -> Response {
     // latency distribution, and — through `outcome` — the error ratio. Taken
     // from the same values, so a graph and a log line can never disagree about
     // one request.
-    record_request_metric(method_category, outcome, route, elapsed.as_secs_f64());
+    //
+    // A scrape is the one request not counted. This layer wraps the whole
+    // router, so `/metrics` arrives here like anything else, and counting it
+    // makes the service observe its own observation of itself: four extra
+    // requests a minute at a 15-second interval, forever, in the counter every
+    // traffic figure and error ratio is computed from. The in-flight gauge is
+    // affected too — pinned at or above one whenever a scrape is in flight,
+    // which is the one signal the dashboard explains is *mostly zero,
+    // correctly*. The line is still logged, so a scrape is visible as a request
+    // and only absent as a metric.
+    if route != METRICS_ROUTE {
+        record_request_metric(method_category, outcome, route, elapsed.as_secs_f64());
+    }
     let event = RequestLog {
         event: "http_request",
         request_id: &request_id,
@@ -184,6 +196,11 @@ fn record_request_metric(
 /// Its own series, because "nothing here served this" is a fact worth reading
 /// rather than an absence to be inferred.
 const UNMATCHED_ROUTE: &str = "unmatched";
+
+/// The scrape route, which is recorded in the access log but not counted as
+/// traffic. See the call site for why: counting it makes the service observe
+/// its own observation of itself.
+const METRICS_ROUTE: &str = "/metrics";
 
 /// Where `capture_route` leaves the route for `request_log` to read.
 ///
@@ -554,6 +571,63 @@ mod tests {
         );
     }
 
+    /// A scrape must not be counted as traffic.
+    ///
+    /// `/metrics` is mounted on the same router, and `request_log` wraps the
+    /// whole router, so a scrape arrives here like any other request. Counting
+    /// it means the deployment measures its own observation of itself: at a
+    /// 15-second scrape interval that is four requests a minute, forever, into
+    /// the counter every traffic figure, error ratio and burn-rate alert is
+    /// computed from.
+    ///
+    /// The consequences are not subtle. A completely idle deployment never
+    /// reads zero traffic, so an alert for "nothing is arriving" can never
+    /// fire. Every error ratio is divided by a denominator inflated by a
+    /// constant, so it under-reports by exactly that constant. And the
+    /// in-flight gauge is pinned at or above one whenever a scrape is in
+    /// flight — which is the one gauge a text panel on the technical dashboard
+    /// spends a paragraph explaining is *mostly zero, correctly*.
+    ///
+    /// The metrics route is excluded rather than the whole of its label set,
+    /// because a path that does not exist is still traffic worth counting; only
+    /// this route is instrumentation observing the observer.
+    #[tokio::test]
+    async fn a_scrape_is_not_counted_as_traffic() {
+        use crate::observability::tests::{exposed, sample_series};
+
+        let (before, exposition) = exposed(|| async {
+            let before = sample_series(
+                &crate::observability::tests::render(),
+                crate::observability::METRIC_HTTP_REQUESTS_TOTAL,
+                r#"method="read",outcome="2xx",route="/metrics""#,
+            );
+            let mut svc = Router::new()
+                .route("/metrics", get(echo))
+                .route_layer(axum::middleware::from_fn(capture_route))
+                .layer(axum::middleware::from_fn(request_log));
+            let req = Request::builder()
+                .method("GET")
+                .uri("/metrics")
+                .body(Body::empty())
+                .unwrap();
+            svc.call(req).await.expect("served");
+            (before, crate::observability::tests::render())
+        })
+        .await;
+        let after = sample_series(
+            &exposition,
+            crate::observability::METRIC_HTTP_REQUESTS_TOTAL,
+            r#"method="read",outcome="2xx",route="/metrics""#,
+        );
+
+        assert_eq!(
+            after, before,
+            "a scrape is instrumentation observing the service, not traffic it \
+             served: counting it inflates every traffic figure and pins the \
+             in-flight gauge above zero. Exposition: {exposition}"
+        );
+    }
+
     /// Which endpoint served a request is the label a dashboard needs and the
     /// one this family was missing.
     ///
@@ -821,23 +895,27 @@ mod tests {
         let heard = reported(&sink.lines());
         assert!(heard > 0, "`http=warn` must report it: {:?}", sink.lines());
 
-        // Clear rather than reinstall: a second capture swaps the buffer, and
-        // the point of this phase is that the first one's lines are gone.
+        // A second capture rather than `clear()`. The capture buffer is
+        // process-wide and every live one receives every line, so `clear()`
+        // empties *this* guard's buffer while a parallel test's log_into can
+        // write into it again before the assertion reads it — the line that
+        // arrived was one this test's own first phase had already written, and
+        // the test failed on roughly one run in eight while being correct.
         //
-        // The operation name is test-only, so a line carrying it is
-        // unambiguously this test's: every live capture receives every line, and
-        // a parallel test's output cannot be mistaken for this one.
-        sink.clear();
+        // A fresh buffer is empty by construction, so the only line that can be
+        // in it afterwards is one written after this point. That is what the
+        // second phase is testing: whether *this* logger emits.
+        let quiet = crate::logging::capture::install();
         event_for_warning().log_into(&StdoutLogger::from_env_with(|key| match key {
             "RUST_LOG" => Some("http=error".to_string()),
             _ => None,
         }));
         assert!(
-            reported(&sink.lines()) == 0,
+            reported(&quiet.lines()) == 0,
             "`http=error` must silence this event: heard={heard}, \
              still reported={} in {:?}",
-            reported(&sink.lines()),
-            sink.lines()
+            reported(&quiet.lines()),
+            quiet.lines()
         );
     }
 

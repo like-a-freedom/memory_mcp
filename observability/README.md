@@ -74,6 +74,7 @@ python3 observability/check_alerts.py
 | What is the service refusing, and why? | technical → *Runtime refusals*, *Authentication* |
 | Are background jobs keeping up? | technical → *Background jobs* |
 | Is knowledge accumulating? | product → *What exists*, *What was learned* |
+| Where is the product dashboard from here? | the dashboard header links to `/d/memory_mcp-product` |
 | What are people asking it for? | product → *What people are doing* |
 | Is what it learned any good? | product → *Is the knowledge any good* |
 | Why can nobody sign in? | product → *Access and automation* |
@@ -106,8 +107,8 @@ They use the multiwindow multi-burn-rate method from the SRE Workbook's
 
 The obvious alternative does not work. Alerting when the recent error rate
 exceeds the SLO fires **up to 144 times a day** at 99.9%, almost all of it
-noise: 0.1% errors sustained for ten minutes consumes 0.02% of a thirty-day
-budget. An on-call engineer who learns that page is noise stops reading pages,
+noise: 0.1% errors sustained for ten minutes consumes 0.000023% of a
+thirty-day budget — about one forty-thousandth of what there is to spend. An on-call engineer who learns that page is noise stops reading pages,
 including the one that mattered.
 
 So each SLO alert pairs a long window, which decides whether to fire, with a
@@ -196,7 +197,15 @@ correctly: an unauthenticated request, a client sending a bad id. Folding it
 into one "error" number makes a healthy service look broken, which is why the
 traffic panel splits the two and the error ratio counts `5xx` alone.
 
-**6. `memory_http_requests_inflight` is mostly zero, correctly.** It is raised
+**6. A scrape is not traffic.** `/metrics` is on the same router and the access
+log wraps the whole router, so a scrape arrives there like any other request. It
+is logged and *not counted*: at a 15-second interval that is four requests a
+minute, forever, in the counter every traffic figure and error ratio is
+computed from — which would mean an idle deployment never reads zero and
+`NoTraffic` could never fire, and the in-flight gauge would be pinned at or
+above one whenever a scrape is in flight.
+
+**7. `memory_http_requests_inflight` is mostly zero, correctly.** It is raised
 when a request enters a handler and lowered when it leaves, with no `await` in
 between, so a scrape only sees a value when it happened to land inside one. A
 flat zero means "no request was in flight at that instant", not "the server is

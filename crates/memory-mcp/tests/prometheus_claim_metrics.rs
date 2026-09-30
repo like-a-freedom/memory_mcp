@@ -180,6 +180,47 @@ fn no_forbidden_identifier_appears_as_label() {
     }
 }
 
+/// A failure on the claim pipeline has to be selectable, or an alert for it
+/// matches an empty vector and never fires.
+///
+/// The recorded `outcome` is a *reconciliation outcome* — duplicate,
+/// supersession, contradiction — and `outcome_label` collapses anything else
+/// to `other`. So a post-projection failure, which is recorded as
+/// `outcome="failed"`, reaches the exposition as `outcome="other"` like every
+/// other non-reconciliation value. The reason it was a failure is in
+/// `reason_code`, which is where the bounded error buckets live.
+///
+/// An alert written against `outcome="error"` therefore matches nothing at
+/// all: the label value does not exist, `sum()` of empty is empty, and
+/// `empty > 0` never fires. Nothing reports that — a rule on a metric that
+/// resolves can be perfectly well-formed and completely dead.
+#[test]
+fn a_claim_pipeline_failure_is_selectable_by_its_reason_code() {
+    let handle = render_handle();
+
+    // The shape production actually emits for a non-fatal projection failure.
+    counter!(
+        METRIC_PIPELINE_TOTAL,
+        "stage" => "project",
+        "schema" => "attribute",
+        "outcome" => "other",
+        "reason_code" => "internal",
+    )
+    .increment(1);
+
+    let output = handle.render();
+    assert!(
+        output.contains(r#"outcome="other""#) && output.contains(r#"reason_code="internal""#),
+        "a projection failure must be reachable by its reason code, since `error` \
+         is not a value the outcome vocabulary has: {output}"
+    );
+    assert!(
+        !output.contains(r#"outcome="error""#),
+        "`outcome=\"error\"` must not appear: it is not in the vocabulary, so a \
+         rule selecting it is dead code that looks alive"
+    );
+}
+
 /// The family's name must not end in the suffix the exporter would otherwise
 /// append, because that is what makes its count series ambiguous.
 ///

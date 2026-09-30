@@ -54,6 +54,7 @@ def stat(
     unit: str,
     grid: tuple[int, int, int, int],
     description: str,
+    y: int = 0,
     thresholds: list[dict] | None = None,
     decimals: int | None = None,
     links: list[dict] | None = None,
@@ -117,6 +118,7 @@ def timeseries(
     targets: list[dict],
     grid: tuple[int, int, int, int],
     description: str,
+    y: int = 0,
     unit: str = "short",
     stack: bool = False,
     min_: float | None = 0,
@@ -166,7 +168,7 @@ def timeseries(
             },
             "overrides": [],
         },
-        "gridPos": {"h": grid[1], "w": grid[2], "x": grid[0], "y": 0},
+        "gridPos": {"h": grid[1], "w": grid[2], "x": grid[0], "y": y},
         "id": 0,
         "options": {
             "legend": {
@@ -187,31 +189,47 @@ def timeseries(
     return panel
 
 
-def row(title: str, y: int, panels: list[dict], collapsed: bool = False) -> list[dict]:
-    """A row and the panels inside it.
+def row(title: str, panels: list[dict]) -> dict:
+    """A collapsed row owning the panels beneath it.
 
-    A Grafana row owns the panels below it, so they are nested rather than laid
-    out at the top level. Panels inside a row are positioned relative to it.
+    Collapsed, and the panels nested. This is the only arrangement that lays out
+    correctly without tracking a running `y` across the whole file:
+
+    - Grafana derives a panel's row from its position on the grid, not from the
+      JSON nesting, so an expanded row's panels have to sit *below* it in
+      `gridPos` — which means every panel's `y` depends on the height of every
+      row before it.
+    - Collapsing removes that dependency: the row occupies one grid line and
+      its panels are drawn from the row's own `panels` list, wherever they are
+      positioned inside it.
+
+    Both files import either way — the JSON is valid either way. The difference
+    is that an expanded arrangement with a stale `y` renders as overlapping
+    panels, which is exactly what happened before this was collapsed.
     """
-    row_panel = {
-        "collapsed": collapsed,
-        "gridPos": {"h": 1, "w": W_FULL, "x": 0, "y": y},
+    return {
+        "collapsed": True,
+        "gridPos": {"h": 1, "w": W_FULL, "x": 0, "y": 0},
         "id": 0,
         "panels": panels,
         "title": title,
         "type": "row",
     }
-    if not collapsed:
-        # An expanded row's panels live at the top level, directly beneath it.
-        return [row_panel, *panels]
-    return [row_panel]
 
 
-def text(title: str, body: str, grid: tuple[int, int, int, int]) -> dict:
+def rows(titles: list[tuple[str, list[dict]]]) -> list[dict]:
+    """Stack collapsed rows, each one grid line apart."""
+    return [
+        {**row(title, panels), "gridPos": {"h": 1, "w": W_FULL, "x": 0, "y": index}}
+        for index, (title, panels) in enumerate(titles)
+    ]
+
+
+def text(title: str, body: str, grid: tuple[int, int, int, int], y: int = 0) -> dict:
     return {
         "datasource": DATASOURCE,
         "description": "",
-        "gridPos": {"h": grid[1], "w": grid[2], "x": grid[0], "y": 0},
+        "gridPos": {"h": grid[1], "w": grid[2], "x": grid[0], "y": y},
         "id": 0,
         "options": {
             "code": {"language": "plaintext", "showLineNumbers": False, "showMiniMap": False},
@@ -225,11 +243,18 @@ def text(title: str, body: str, grid: tuple[int, int, int, int]) -> dict:
 
 
 def link(title: str, url_path: str) -> dict:
-    """A cross-dashboard link, so neither dashboard is a dead end."""
+    """A panel link — to a row on this dashboard, or to the other one."""
     return {"targetBlank": False, "title": title, "url": url_path}
 
 
-DASH_OTHER = "dashboards/technical.json".rsplit("/", 1)[0] + "/product.json"
+# A link from one dashboard to the other, so neither is a dead end. The
+# README claims the pair cross-reference, so it is part of the deliverable
+# rather than a nicety.
+# (url, title) — in that order, matching Grafana's own field names.
+CROSS_LINK = {
+    "technical": ("/d/memory_mcp-product", "Product metrics"),
+    "product": ("/d/memory_mcp-technical", "Technical metrics"),
+}
 
 
 def technical() -> dict:
@@ -240,8 +265,7 @@ def technical() -> dict:
     dashboard ordered by subsystem forces the reader to know which subsystem is
     responsible before they know whether anything is.
     """
-    panels: list[dict] = []
-    y = 0
+    sections: list[tuple[str, list[dict]]] = []
 
     overview = [
         stat(
@@ -325,8 +349,7 @@ def technical() -> dict:
             (16, 5, 8, 5),
         ),
     ]
-    panels += row("Overview — the four golden signals", y, overview)
-    y += 6
+    sections.append(("Overview — the four golden signals", overview))
 
     traffic = [
         timeseries(
@@ -334,7 +357,7 @@ def technical() -> dict:
             [
                 target(
                     "memory:http_requests:rate5m",
-                    "{{route}}",
+                    "{{route}} · {{method}}",
                 )
             ],
             (0, 8, 12, 8),
@@ -362,17 +385,15 @@ def technical() -> dict:
             legend_calcs=["mean", "max"],
         ),
     ]
-    panels += row("Traffic and errors", y, traffic)
-    y += 9
+    sections.append(("Traffic and errors", traffic))
 
     latency = [
         timeseries(
             "Latency percentiles over time",
             [
-                target("memory:http_request_duration:p50_5m", "p50"),
-                target("memory:http_request_duration:p95_5m", "p95"),
-                target("memory:http_request_duration:p99_5m", "p99"),
-                target("memory:http_request_duration:p95_5m_total", "p95 (worst route)"),
+                target("memory:http_request_duration:p50_5m_total", "p50"),
+                target("memory:http_request_duration:p95_5m_total", "p95"),
+                target("memory:http_request_duration:p99_5m_total", "p99"),
             ],
             (0, 8, 12, 8),
             "p50, p95 and p99 per route, plus the service-wide worst. Read the "
@@ -384,7 +405,7 @@ def technical() -> dict:
         ),
         timeseries(
             "p95 by route",
-            [target("memory:http_request_duration:p95_5m", "{{route}}")],
+            [target("memory:http_request_duration:p95_5m", "{{route}} · {{outcome}}")],
             (12, 8, 12, 8),
             "The same percentile, one line per route. This is the panel that "
             "answers *which* endpoint — every line here is a router pattern, so "
@@ -393,8 +414,7 @@ def technical() -> dict:
             legend_calcs=["max", "lastNotNull"],
         ),
     ]
-    panels += row("HTTP latency", y, latency)
-    y += 9
+    sections.append(("HTTP latency", latency))
 
     saturation = [
         timeseries(
@@ -429,8 +449,7 @@ def technical() -> dict:
             (12, 7, 12, 7),
         ),
     ]
-    panels += row("Saturation", y, saturation)
-    y += 8
+    sections.append(("Saturation", saturation))
 
     jobs = [
         timeseries(
@@ -463,8 +482,7 @@ def technical() -> dict:
             legend_calcs=["max", "lastNotNull"],
         ),
     ]
-    panels += row("Background jobs", y, jobs)
-    y += 9
+    sections.append(("Background jobs", jobs))
 
     refusals = [
         timeseries(
@@ -498,8 +516,7 @@ def technical() -> dict:
             legend_calcs=["mean", "max"],
         ),
     ]
-    panels += row("Runtime refusals", y, refusals)
-    y += 9
+    sections.append(("Runtime refusals", refusals))
 
     auth = [
         timeseries(
@@ -530,8 +547,7 @@ def technical() -> dict:
             (12, 8, 12, 8),
         ),
     ]
-    panels += row("Authentication", y, auth)
-    y += 9
+    sections.append(("Authentication", auth))
 
     stages = [
         timeseries(
@@ -560,8 +576,7 @@ def technical() -> dict:
             legend_calcs=["max", "lastNotNull"],
         ),
     ]
-    panels += row("Pipeline stages", y, stages)
-    y += 9
+    sections.append(("Pipeline stages", stages))
 
     claims = [
         timeseries(
@@ -615,8 +630,7 @@ def technical() -> dict:
             legend_calcs=["max", "lastNotNull"],
         ),
     ]
-    panels += row("Claims", y, claims)
-    y += 9
+    sections.append(("Claims", claims))
 
     fswatch = [
         stat(
@@ -665,6 +679,9 @@ def technical() -> dict:
             "attempt timeout, so the upper percentiles can sit well past the "
             "last reported bucket — a high number here is often a timeout, not "
             "a slow success.",
+            # Second line of the section: the first three panels occupy y=0
+            # through y=4, so these start below them rather than on top.
+            y=4,
             unit="s",
             legend_calcs=["max", "lastNotNull"],
         ),
@@ -683,14 +700,14 @@ def technical() -> dict:
             "the deployment set `MEMORY_INGESTION_INBOX`. Without both, the "
             "panels are empty — which reads as 'off', not 'broken'.*",
             (12, 4, 12, 4),
+            # Second line of the section, beside the latency panel.
+            y=4,
         ),
     ]
-    panels += row("Filesystem ingestion", y, fswatch)
-    y += 5
+    sections.append(("Filesystem ingestion", fswatch))
 
-    panels += row(
+    sections.append((
         "Reference",
-        y,
         [
             text(
                 "Metric families on this dashboard",
@@ -727,15 +744,18 @@ def technical() -> dict:
                 (0, 12, 24, 12),
             )
         ],
-    )
+    ))
 
     return dashboard(
         "memory_mcp — technical",
         "RED, from symptom to cause. Starts with the four golden signals and "
         "descends into the subsystem explaining each one. Everything is read "
-        "from recording rules, not recomputed per panel.",
-        panels,
+        "from recording rules, not recomputed per panel. For what the system "
+        "holds rather than how it is behaving, see the product dashboard: "
+        f"{CROSS_LINK['technical'][0]}.",
+        rows(sections),
         tags=["memory_mcp", "technical", "red"],
+        cross_link=(CROSS_LINK["technical"][0], CROSS_LINK["technical"][1]),
     )
 
 
@@ -748,8 +768,7 @@ def product() -> dict:
     makes its reader wade through p99 to reach "how much did we learn this week"
     is a dashboard that gets skimmed.
     """
-    panels: list[dict] = []
-    y = 0
+    sections: list[tuple[str, list[dict]]] = []
 
     stock = [
         stat(
@@ -810,8 +829,7 @@ def product() -> dict:
             (16, 5, 8, 5),
         ),
     ]
-    panels += row("What exists", y, stock)
-    y += 6
+    sections.append(("What exists", stock))
 
     activity = [
         timeseries(
@@ -845,8 +863,7 @@ def product() -> dict:
             legend_calcs=["mean", "max"],
         ),
     ]
-    panels += row("What people are doing", y, activity)
-    y += 9
+    sections.append(("What people are doing", activity))
 
     learned = [
         timeseries(
@@ -875,8 +892,7 @@ def product() -> dict:
             legend_calcs=["sum"],
         ),
     ]
-    panels += row("What was learned", y, learned)
-    y += 9
+    sections.append(("What was learned", learned))
 
     quality = [
         timeseries(
@@ -925,8 +941,7 @@ def product() -> dict:
             legend_calcs=["mean", "max"],
         ),
     ]
-    panels += row("Is the knowledge any good", y, quality)
-    y += 9
+    sections.append(("Is the knowledge any good", quality))
 
     access = [
         timeseries(
@@ -958,12 +973,10 @@ def product() -> dict:
             legend_calcs=["mean", "max"],
         ),
     ]
-    panels += row("Access and automation", y, access)
-    y += 9
+    sections.append(("Access and automation", access))
 
-    panels += row(
+    sections.append((
         "Reference",
-        y,
         [
             text(
                 "How to read this dashboard",
@@ -998,19 +1011,27 @@ def product() -> dict:
                 (0, 12, 24, 12),
             )
         ],
-    )
+    ))
 
     return dashboard(
         "memory_mcp — product",
         "What the system holds, what people ask it for, and what it learns. No "
         "latency percentiles: those answer an operational question, not a "
-        "product one.",
-        panels,
+        f"product one. For latency, saturation and failures, see the technical "
+        f"dashboard: {CROSS_LINK['product'][0]}.",
+        rows(sections),
         tags=["memory_mcp", "product"],
+        cross_link=(CROSS_LINK["product"][0], CROSS_LINK["product"][1]),
     )
 
 
-def dashboard(title: str, description: str, panels: list[dict], tags: list[str]) -> dict:
+def dashboard(
+    title: str,
+    description: str,
+    panels: list[dict],
+    tags: list[str],
+    cross_link: tuple[str, str] | None = None,
+) -> dict:
     """Wrap panels with the template variables and a text header.
 
     Grafana's guide is explicit that a dashboard should answer a question, and
@@ -1025,7 +1046,13 @@ def dashboard(title: str, description: str, panels: list[dict], tags: list[str])
         "editable": True,
         "fiscalYearStartMonth": 0,
         "graphTooltip": 1,
-        "links": [],
+        "links": (
+            [{"asDropdown": False, "icon": "external link", "includeVars": False,
+              "keepTime": True, "tags": [], "targetBlank": False,
+              "title": cross_link[1], "type": "link", "url": cross_link[0]}]
+            if cross_link
+            else []
+        ),
         "panels": panels,
         "preload": False,
         "refresh": "1m",
