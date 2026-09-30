@@ -494,64 +494,87 @@ fn render_duration(value: &Value) -> Option<String> {
 /// actually reads — which is where a formatting bug is invisible when the
 /// assertion is made against a structure instead.
 ///
-/// The buffer is process-wide, and the test harness runs tests in parallel, so
-/// the guard counts holders rather than clearing the buffer: a second test
-/// that installs a capture while the first is running would otherwise erase
-/// the lines the first is about to assert on. Two tests running at once still
-/// see each other's lines, so a test that installs a capture should assert
-/// only on lines it can attribute to itself.
+/// Each guard owns its buffer. An earlier version shared one and counted
+/// holders, which made two tests running in parallel see each other's lines and
+/// made a two-phase assertion in one test read the first phase twice. Here the
+/// installed buffer is swapped per guard, so a test reads only what it caused —
+/// at the cost of a test that captures twice needing to read the first
+/// capture's lines before installing the second.
 #[cfg(test)]
 pub mod capture {
-    use std::sync::atomic::{AtomicUsize, Ordering};
-    use std::sync::{Mutex, OnceLock};
+    use std::sync::{Arc, Mutex, OnceLock};
 
-    static CAPTURED: OnceLock<Mutex<Vec<String>>> = OnceLock::new();
-    static HOLDERS: AtomicUsize = AtomicUsize::new(0);
+    /// One test's captured lines, shared between the guard that owns it and
+    /// the logger that writes into it.
+    type Buffer = Arc<Mutex<Vec<String>>>;
+
+    /// Every buffer currently capturing.
+    ///
+    /// A list, not one slot: the harness runs tests in parallel, and a single
+    /// slot meant a test that installed a capture while another was running
+    /// silently stole its output — the other asserted on an empty buffer and
+    /// failed for a reason that had nothing to do with its own code. Every live
+    /// capture receives every line, so a parallel test cannot take another's
+    /// output away. A test asserts only on what it can attribute to itself,
+    /// which is what `clear` is for between phases of one test.
+    static ACTIVE: OnceLock<Mutex<Vec<Buffer>>> = OnceLock::new();
 
     /// Ends the capture when dropped.
-    pub struct CaptureGuard;
+    pub struct CaptureGuard {
+        lines: Buffer,
+    }
 
     impl CaptureGuard {
-        /// The lines written since a capture was installed.
+        /// The lines written since this guard was installed.
         #[must_use]
         pub fn lines(&self) -> Vec<String> {
-            CAPTURED
-                .get()
-                .and_then(|lines| lines.lock().ok().map(|lines| lines.clone()))
+            self.lines
+                .lock()
+                .map(|lines| lines.clone())
                 .unwrap_or_default()
+        }
+
+        /// Forget the lines written so far, keeping the capture installed.
+        ///
+        /// For a test that checks two phases of one event: the second phase
+        /// must not read the first one's lines.
+        pub fn clear(&self) {
+            self.lines
+                .lock()
+                .unwrap_or_else(|poison| poison.into_inner())
+                .clear();
         }
     }
 
     impl Drop for CaptureGuard {
         fn drop(&mut self) {
-            // Only the last holder ends the capture, so a test that installs
-            // one while another is running does not cut it short.
-            if HOLDERS.fetch_sub(1, Ordering::SeqCst) == 1
-                && let Some(lines) = CAPTURED.get()
-                && let Ok(mut lines) = lines.lock()
+            let id = Arc::as_ptr(&self.lines);
+            if let Some(slot) = ACTIVE.get()
+                && let Ok(mut active) = slot.lock()
             {
-                lines.clear();
+                active.retain(|buffer| Arc::as_ptr(buffer) != id);
             }
         }
     }
 
-    /// Starts capturing log output.
+    /// Starts capturing log output into a buffer of its own.
     pub fn install() -> CaptureGuard {
-        let lines = CAPTURED.get_or_init(|| Mutex::new(Vec::new()));
-        if HOLDERS.fetch_add(1, Ordering::SeqCst) == 0
-            && let Ok(mut captured) = lines.lock()
-        {
-            captured.clear();
+        let lines = Arc::new(Mutex::new(Vec::new()));
+        let slot = ACTIVE.get_or_init(|| Mutex::new(Vec::new()));
+        if let Ok(mut active) = slot.lock() {
+            active.push(lines.clone());
         }
-        CaptureGuard
+        CaptureGuard { lines }
     }
 
-    /// Record a rendered line, if a capture is installed.
+    /// Record a rendered line into every buffer currently capturing.
     pub(crate) fn record(line: &str) {
-        if let Some(captured) = CAPTURED.get()
-            && let Ok(mut lines) = captured.lock()
-        {
-            lines.push(line.to_owned());
+        let Some(slot) = ACTIVE.get() else { return };
+        let Ok(active) = slot.lock() else { return };
+        for buffer in active.iter() {
+            if let Ok(mut lines) = buffer.lock() {
+                lines.push(line.to_owned());
+            }
         }
     }
 
@@ -561,25 +584,41 @@ pub mod capture {
     /// what lets a test observe an event that the default level filters out
     /// without mutating the process environment — which is global state the
     /// parallel test harness shares, and which other tests read.
+    ///
+    /// The override is held for the whole `await`, so a test that logs
+    /// outside `with_level` sees the deployment's own level, and a body that
+    /// panics restores it on the way out rather than leaking a level into
+    /// every later test in the process.
     pub async fn with_level<F, Fut, T>(level: &str, body: F) -> T
     where
         F: FnOnce() -> Fut,
         Fut: std::future::Future<Output = T>,
     {
-        let previous = OVERRIDE_LEVEL.get_or_init(|| Mutex::new(None));
-        let prior = match previous.lock() {
-            Ok(mut slot) => {
-                let prior = slot.take();
-                *slot = Some(level.to_string());
-                prior
+        let _guard = LevelOverride::install(level);
+        body().await
+    }
+
+    /// Restores the previous override when dropped, including on unwind.
+    struct LevelOverride;
+
+    impl LevelOverride {
+        fn install(level: &str) -> Self {
+            let slot = OVERRIDE_LEVEL.get_or_init(|| Mutex::new(None));
+            if let Ok(mut current) = slot.lock() {
+                *current = Some(level.to_string());
             }
-            Err(_) => None,
-        };
-        let outcome = body().await;
-        if let Ok(mut slot) = previous.lock() {
-            *slot = prior;
+            LevelOverride
         }
-        outcome
+    }
+
+    impl Drop for LevelOverride {
+        fn drop(&mut self) {
+            if let Some(slot) = OVERRIDE_LEVEL.get()
+                && let Ok(mut current) = slot.lock()
+            {
+                *current = None;
+            }
+        }
     }
 
     /// The level a test has in force, if any, taking precedence over

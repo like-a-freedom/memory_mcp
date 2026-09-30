@@ -15,6 +15,8 @@ use axum::response::Response;
 use serde::Serialize;
 use uuid::Uuid;
 
+use crate::logging::{LogLevel, StdoutLogger};
+
 /// The header that carries a request's id in both directions: a client may
 /// supply one, and every response advertises the one it was given.
 ///
@@ -143,6 +145,47 @@ pub struct TenantLogContext {
     pub request_id: String,
     pub credential_kind: String,
     pub tenant_fingerprint: String,
+}
+
+/// A bounded warning from the HTTP runtime, with no request in scope.
+///
+/// Two copies of this existed — one in the runtime pool, one in the lease
+/// migration — each named `tracing_warn`, each an `eprintln!`. The name said
+/// the event was filtered; it was not, and it carried no level, no timestamp
+/// and no operation, so `RUST_LOG` could neither raise nor lower it and no
+/// subsystem directive could reach it. One type here ends that.
+///
+/// `op` is required: a warning with no operation name is one no directive can
+/// select and no log query can find.
+pub struct WarningEvent {
+    event: std::collections::HashMap<String, serde_json::Value>,
+}
+
+impl WarningEvent {
+    /// Build the event. `detail` is kept as one value because it is prose —
+    /// an error's `Display` — and splitting it on spaces would report a
+    /// fragment as though it were the whole failure.
+    #[must_use]
+    pub fn new(op: &'static str, detail: &str) -> Self {
+        let mut event = std::collections::HashMap::new();
+        event.insert("op".into(), op.into());
+        event.insert("detail".into(), detail.to_string().into());
+        Self { event }
+    }
+
+    /// Emit it through the deployment's logger.
+    pub fn log_into(self, logger: &StdoutLogger) {
+        logger.log(self.event, LogLevel::Warn);
+    }
+}
+
+/// Record a bounded warning from the HTTP runtime, with no request in scope.
+///
+/// Shorthand for [`WarningEvent::new`] followed by [`WarningEvent::log_into`]
+/// on the deployment's logger, for the common case where the caller has no
+/// logger of its own to pass.
+pub fn log_warn(op: &'static str, detail: &str) {
+    WarningEvent::new(op, detail).log_into(&StdoutLogger::from_env());
 }
 
 /// Method-category grouping. URIs and headers never reach the log.
@@ -353,5 +396,74 @@ mod tests {
                 .any(|line| line.contains(&format!("op={}", crate::logging::OP_HTTP_REQUEST))),
             "the access log must carry the `op` the filter matches on: {recorded:?}"
         );
+    }
+
+    /// A runtime warning with no request behind it — a tenant runtime that
+    /// failed to activate, a lease that could not be released — is the one
+    /// event with nothing else pointing at it. These were `eprintln!` behind a
+    /// function named `tracing_warn`, so the name promised a filter that did
+    /// not exist: the line carried no level, no timestamp and no operation, so
+    /// `RUST_LOG` could not silence it and no subsystem directive could reach
+    /// it. The rendered line is asserted, because that is what an operator
+    /// reads and where the missing level would show.
+    ///
+    /// Both `log_warn` and the logger's filtering are exercised directly here
+    /// rather than through a level override: the override is process-global,
+    /// so a test that set one would change the level every other test in the
+    /// process sees.
+    #[test]
+    fn a_runtime_warning_reaches_the_log_with_its_level_and_operation() {
+        let sink = crate::logging::capture::install();
+
+        event_for_warning().log_into(&StdoutLogger::from_env_with(|key| match key {
+            "RUST_LOG" => Some("warn".to_string()),
+            _ => None,
+        }));
+
+        let recorded = sink.lines();
+        assert!(
+            recorded.iter().any(|line| {
+                line.contains("op=http.runtime.activation_failed")
+                    && line.contains("WARN")
+                    && line.contains(r#"detail="tenant t1: disk is gone""#)
+            }),
+            "a runtime warning must be a filterable, levelled line: {recorded:?}"
+        );
+    }
+
+    /// The operation name is the whole point: it is what makes a subsystem
+    /// directive able to reach the event. Rendered through the real logger so
+    /// the filter and the line are asserted together.
+    #[test]
+    fn a_runtime_warning_is_reachable_and_silenceable_by_its_subsystem() {
+        let raised = crate::logging::capture::install();
+        event_for_warning().log_into(&StdoutLogger::from_env_with(|key| match key {
+            "RUST_LOG" => Some("http=warn".to_string()),
+            _ => None,
+        }));
+        assert!(
+            !raised.lines().is_empty(),
+            "`http=warn` must report it: {:?}",
+            raised.lines()
+        );
+
+        // Clear rather than reinstall: a second capture swaps the buffer, and
+        // the point of this phase is that the first one's lines are gone.
+        raised.clear();
+        event_for_warning().log_into(&StdoutLogger::from_env_with(|key| match key {
+            "RUST_LOG" => Some("http=error".to_string()),
+            _ => None,
+        }));
+        assert!(
+            raised.lines().is_empty(),
+            "`http=error` must silence it: {:?}",
+            raised.lines()
+        );
+    }
+
+    /// The event `log_warn` builds, built directly so the filtering above can
+    /// be exercised without the process-global level override.
+    fn event_for_warning() -> WarningEvent {
+        WarningEvent::new("http.runtime.activation_failed", "tenant t1: disk is gone")
     }
 }

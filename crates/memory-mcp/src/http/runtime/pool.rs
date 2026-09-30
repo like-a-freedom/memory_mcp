@@ -8,11 +8,6 @@ use tokio::sync::Mutex;
 
 use lru::LruCache;
 
-/// Emit a bounded runtime warning without adding a logging dependency.
-fn tracing_warn(message: &str) {
-    eprintln!("memory_mcp::http::runtime: {message}");
-}
-
 use crate::error::MemoryError;
 use crate::http::registry::models::Tenant;
 
@@ -443,9 +438,10 @@ impl Pool {
                 guard.activation.in_flight = None;
                 guard.activation.negative_backoff_until =
                     Some(Instant::now() + Duration::from_secs(5));
-                tracing_warn(&format!(
-                    "tenant runtime activation failed for {tenant_id}: {error}"
-                ));
+                crate::http::logging::log_warn(
+                    "http.runtime.activation_failed",
+                    &format!("tenant {tenant_id}: {error}"),
+                );
                 Err(PoolError::ActivationFailed)
             }
         }

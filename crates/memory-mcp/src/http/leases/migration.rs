@@ -73,12 +73,6 @@ pub const CURRENT_SCHEMA_VERSION: u32 = 44;
 pub const REPLICA_SCHEMA_RANGE: std::ops::RangeInclusive<u32> =
     CURRENT_SCHEMA_VERSION.saturating_sub(1)..=CURRENT_SCHEMA_VERSION;
 
-/// Emit bounded scheduler warnings without adding a logging dependency to the
-/// HTTP profile.
-fn tracing_warn(message: &str) {
-    eprintln!("memory_mcp::http::leases: {message}");
-}
-
 /// What `provision_one` needs from a privileged SurrealDB
 /// engine: `ensure_namespace` plus the ability to apply the
 /// versioned migrations in `storage/migrations.rs` to the bound
@@ -479,9 +473,10 @@ pub async fn provision_one(
         )
         .await
     {
-        tracing_warn(&format!(
-            "post-Ready lease release failed for {tenant_id}: {error}"
-        ));
+        crate::http::logging::log_warn(
+            "http.lease.release_failed",
+            &format!("tenant {tenant_id}: {error}"),
+        );
     }
     Ok(())
 }
@@ -539,24 +534,24 @@ pub async fn run_due_provisioning_for(
         {
             Ok(Some(l)) => l,
             Ok(None) => {
-                tracing_warn(&format!(
-                    "scheduler: claim returned None for {} (terminal state)",
-                    tenant.id
-                ));
+                crate::http::logging::log_warn(
+                    "http.lease.claim_terminal",
+                    &format!("tenant {}: no lease to claim", tenant.id),
+                );
                 continue;
             }
             Err(MemoryError::Conflict(reason)) => {
-                tracing_warn(&format!(
-                    "scheduler: claim conflict for {}: {reason}",
-                    tenant.id
-                ));
+                crate::http::logging::log_warn(
+                    "http.lease.claim_conflict",
+                    &format!("tenant {}: {reason}", tenant.id),
+                );
                 continue;
             }
             Err(other) => {
-                tracing_warn(&format!(
-                    "scheduler: claim failed for {}: {other}",
-                    tenant.id
-                ));
+                crate::http::logging::log_warn(
+                    "http.lease.claim_failed",
+                    &format!("tenant {}: {other}", tenant.id),
+                );
                 continue;
             }
         };
@@ -606,10 +601,10 @@ pub async fn run_due_provisioning_for(
         )
         .await;
         if let Err(error) = migration_result {
-            tracing_warn(&format!(
-                "scheduler: provision_one failed for {}: {error}",
-                tenant.id
-            ));
+            crate::http::logging::log_warn(
+                "http.lease.provision_failed",
+                &format!("tenant {}: {error}", tenant.id),
+            );
             // The tenant is in a failed state; the next
             // scheduler tick will skip it (no longer in
             // Reserved/Migrating/Suspended).
