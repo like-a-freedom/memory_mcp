@@ -304,10 +304,10 @@ mod tests {
 
         let exposition = crate::observability::tests::exposed(|| async {
             run_cycle(registry, &hooks, shutdown).await;
+            crate::observability::tests::render()
         })
         .await;
 
-        let Some(exposition) = exposition else { return };
         assert!(
             exposition.contains(crate::observability::METRIC_BACKGROUND_JOBS_TOTAL),
             "a background failure must be countable: {exposition}"

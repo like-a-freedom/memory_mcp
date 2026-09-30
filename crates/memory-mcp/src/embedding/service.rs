@@ -159,9 +159,17 @@ impl EmbeddingService {
         // someone else's inference. Everything above it is bookkeeping, so
         // this is the duration that separates "our code got slower" from
         // "the thing we call got slower".
-        let _provider_stage =
-            crate::shared::observability::StageTimer::new("extract", "embedding_provider");
-        match self.embedding_provider.embed(&effective_input).await {
+        // Scoped to the call. Bound at function scope the guard would stay
+        // alive through the logging below, so `embedding_provider` would
+        // measure the call plus the bookkeeping that follows it — the exact
+        // split between "the thing we call" and "our own code" that the stage
+        // exists to provide.
+        let embedded = {
+            let _provider_stage =
+                crate::shared::observability::StageTimer::new("extract", "embedding_provider");
+            self.embedding_provider.embed(&effective_input).await
+        };
+        match embedded {
             Ok(embedding) => {
                 self.logger.log(
                     crate::platform::log_event::log_event(

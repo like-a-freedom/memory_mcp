@@ -617,10 +617,12 @@ pub mod capture {
     /// without mutating the process environment — which is global state the
     /// parallel test harness shares, and which other tests read.
     ///
-    /// The override is held for the whole `await`, so a test that logs
-    /// outside `with_level` sees the deployment's own level, and a body that
-    /// panics restores it on the way out rather than leaking a level into
-    /// every later test in the process.
+    /// Overrides are a stack, not a single slot. A single slot meant one test's
+    /// `with_level` overwrote another's, and the test that lost it saw the
+    /// deployment's level instead of its own — which is how a lease-scheduler
+    /// test asserting on its own log line failed intermittently while passing
+    /// on its own. Last override wins, and it is restored on the way out
+    /// including on unwind.
     pub async fn with_level<F, Fut, T>(level: &str, body: F) -> T
     where
         F: FnOnce() -> Fut,
@@ -631,24 +633,24 @@ pub mod capture {
     }
 
     /// Restores the previous override when dropped, including on unwind.
-    struct LevelOverride;
+    struct LevelOverride {
+        slot: &'static Mutex<Vec<String>>,
+    }
 
     impl LevelOverride {
         fn install(level: &str) -> Self {
-            let slot = OVERRIDE_LEVEL.get_or_init(|| Mutex::new(None));
+            let slot = OVERRIDE_LEVEL.get_or_init(|| Mutex::new(Vec::new()));
             if let Ok(mut current) = slot.lock() {
-                *current = Some(level.to_string());
+                current.push(level.to_string());
             }
-            LevelOverride
+            LevelOverride { slot }
         }
     }
 
     impl Drop for LevelOverride {
         fn drop(&mut self) {
-            if let Some(slot) = OVERRIDE_LEVEL.get()
-                && let Ok(mut current) = slot.lock()
-            {
-                *current = None;
+            if let Ok(mut current) = self.slot.lock() {
+                current.pop();
             }
         }
     }
@@ -658,10 +660,12 @@ pub mod capture {
     pub(crate) fn override_level() -> Option<String> {
         OVERRIDE_LEVEL
             .get()
-            .and_then(|slot| slot.lock().ok().and_then(|slot| slot.clone()))
+            .and_then(|slot| slot.lock().ok().and_then(|stack| stack.last().cloned()))
     }
 
-    static OVERRIDE_LEVEL: OnceLock<Mutex<Option<String>>> = OnceLock::new();
+    /// A stack, not a single slot: overrides nest, and the innermost one is
+    /// the level in force. See `with_level`.
+    static OVERRIDE_LEVEL: OnceLock<Mutex<Vec<String>>> = OnceLock::new();
 }
 
 #[cfg(test)]

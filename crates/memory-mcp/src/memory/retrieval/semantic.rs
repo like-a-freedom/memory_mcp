@@ -26,36 +26,44 @@ pub(crate) async fn collect_semantic_facts(
     // only number is the total, and a query that is slow could be waiting on
     // the embedding provider or on the vector index — two problems with
     // nothing in common.
-    let _embedding_stage =
-        crate::shared::observability::StageTimer::new("assemble_context", "query_embedding");
-    let query_embedding = match service
-        .embedding_service
-        .generate_query_embedding_with_background(request.query)
-        .await
-    {
-        Ok(Some(embedding)) => embedding,
-        Ok(None) => return Ok(Vec::new()),
-        Err(err) => {
-            service.logger.log(
-                std::collections::HashMap::from([
-                    (
-                        "op".to_string(),
-                        serde_json::json!("embedding.query_skipped"),
-                    ),
-                    (
-                        "provider".to_string(),
-                        serde_json::json!(
-                            service
-                                .embedding_service
-                                .embedding_provider()
-                                .provider_name()
+    //
+    // Scoped to the call, not to the function: bound at function scope the
+    // guard would still be alive when the search below runs, so
+    // `query_embedding` would measure the whole retrieval and double-count
+    // `ann_search` — and a dashboard subtracting one from the other would read
+    // zero, which is the discrimination these exist to provide.
+    let query_embedding = {
+        let _embedding_stage =
+            crate::shared::observability::StageTimer::new("assemble_context", "query_embedding");
+        match service
+            .embedding_service
+            .generate_query_embedding_with_background(request.query)
+            .await
+        {
+            Ok(Some(embedding)) => embedding,
+            Ok(None) => return Ok(Vec::new()),
+            Err(err) => {
+                service.logger.log(
+                    std::collections::HashMap::from([
+                        (
+                            "op".to_string(),
+                            serde_json::json!("embedding.query_skipped"),
                         ),
-                    ),
-                    ("error".to_string(), serde_json::json!(err.to_string())),
-                ]),
-                crate::logging::LogLevel::Warn,
-            );
-            return Ok(Vec::new());
+                        (
+                            "provider".to_string(),
+                            serde_json::json!(
+                                service
+                                    .embedding_service
+                                    .embedding_provider()
+                                    .provider_name()
+                            ),
+                        ),
+                        ("error".to_string(), serde_json::json!(err.to_string())),
+                    ]),
+                    crate::logging::LogLevel::Warn,
+                );
+                return Ok(Vec::new());
+            }
         }
     };
 

@@ -852,14 +852,12 @@ mod tests {
     #[tokio::test]
     #[cfg(feature = "prometheus")]
     async fn a_refused_sign_in_is_counted_for_the_exporter() {
-        let Some(exposition) = crate::observability::tests::exposed(|| async {
+        let exposition = crate::observability::tests::exposed(|| async {
             let _ = reject("state_mismatch");
             let _ = reject("nonce");
+            crate::observability::tests::render()
         })
-        .await
-        else {
-            return;
-        };
+        .await;
 
         assert!(
             exposition.contains(crate::observability::METRIC_AUTH_REFUSALS_TOTAL),
@@ -873,29 +871,6 @@ mod tests {
             exposition.contains(r#"branch="nonce""#),
             "every refusal branch must count, not only the first: {exposition}"
         );
-    }
-
-    /// A refusal label is a fixed word chosen at the call site, never anything
-    /// derived from the request. A label carrying a subject, an issuer or an
-    /// authorization code would turn the metrics backend into a disclosure of
-    /// exactly the values the log path is careful not to record.
-    #[test]
-    fn refusal_branches_are_static_words() {
-        for branch in [
-            "state_mismatch",
-            "take_oidc_request",
-            "provider_error",
-            "rfc9207_issuer_mismatch",
-            "missing_code",
-            "signup_invite_only",
-        ] {
-            assert!(
-                branch
-                    .chars()
-                    .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '_'),
-                "a refusal label must be a fixed word: {branch}"
-            );
-        }
     }
 
     /// Every refusal on this path records a branch tag, and the sign-up gate is

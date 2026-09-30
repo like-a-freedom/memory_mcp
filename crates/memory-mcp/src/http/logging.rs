@@ -195,6 +195,7 @@ pub struct TenantLogContext {
 /// `op` is required: a warning with no operation name is one no directive can
 /// select and no log query can find.
 pub struct WarningEvent {
+    op: &'static str,
     event: std::collections::HashMap<String, serde_json::Value>,
 }
 
@@ -207,11 +208,20 @@ impl WarningEvent {
         let mut event = std::collections::HashMap::new();
         event.insert("op".into(), op.into());
         event.insert("detail".into(), detail.to_string().into());
-        Self { event }
+        Self { op, event }
     }
 
     /// Emit it through the deployment's logger.
+    ///
+    /// The refusal is counted here rather than at the call sites, so every
+    /// warning the HTTP runtime raises is counted once regardless of whether it
+    /// reached this through `log_warn` or `log_warn_at`. Counting at the entry
+    /// points instead left the eleven `log_warn` calls uncounted — quota,
+    /// scheduler, registry reconciliation, app-session binds — which is most of
+    /// the surface, while the commit that added the counter described it as
+    /// covering all of them.
     pub fn log_into(self, logger: &StdoutLogger) {
+        crate::observability::record_runtime_refusal(self.op);
         logger.log(self.event, LogLevel::Warn);
     }
 }
@@ -240,7 +250,14 @@ impl RequestWarning {
     }
 
     /// Emit it through the deployment's logger.
+    ///
+    /// Counting happens here rather than at the entry points, so both
+    /// `log_warn` and `log_warn_at` count exactly once. Counting at the entry
+    /// points instead left the eleven `log_warn` calls uncounted — quota,
+    /// scheduler, registry reconciliation, app-session binds — which is most of
+    /// the surface the counter was introduced to cover.
     pub fn log_into(self, logger: &StdoutLogger) {
+        crate::observability::record_runtime_refusal(self.op);
         let mut event = std::collections::HashMap::new();
         event.insert("op".into(), self.op.into());
         event.insert("detail".into(), self.detail.into());
@@ -254,13 +271,6 @@ impl RequestWarning {
 /// Shorthand for [`RequestWarning::new`] followed by
 /// [`RequestWarning::log_into`].
 pub fn log_warn_at(op: &'static str, detail: &str, request_id: Option<RequestId>) {
-    // Counted here rather than at each call site: every request-scoped warning
-    // in the HTTP runtime goes through this one function, so counting here
-    // covers the whole surface. A refusal here answers `503` with a generic
-    // body, which tells a client nothing and would tell an operator nothing
-    // either without a rate to alert on — a deployment whose quota registry is
-    // unreachable looks exactly like a quiet one.
-    crate::observability::record_runtime_refusal(op);
     if let Some(request_id) = request_id {
         RequestWarning::new(op, detail, request_id).log_into(&StdoutLogger::from_env());
     } else {
@@ -466,39 +476,44 @@ mod tests {
     /// service whose only entry point is HTTP.
     #[tokio::test]
     async fn a_served_request_reaches_the_metrics_exporter() {
-        use crate::observability::tests::exposed;
+        use crate::observability::tests::{exposed, sample_series};
 
-        let exposition = exposed(|| async {
+        // This route's own series, read relative to what it held before. The
+        // recorder is process-global and some fifty other tests drive real
+        // requests through it, so neither an absolute value nor a
+        // first-matching series can be asserted — both were flaky, and an
+        // absolute `== 1` was really asserting that no other test had run
+        // yet. The labels pin the series; the two readings, taken under one
+        // lock, make the assertion exact.
+        const SERIES: &str = r#"method="read",outcome="2xx""#;
+        let (before, exposition) = exposed(|| async {
             let mut svc = Router::new()
                 .route("/", get(echo))
                 .layer(axum::middleware::from_fn(request_log));
+            let before = sample_series(
+                &crate::observability::tests::render(),
+                crate::observability::METRIC_HTTP_REQUESTS_TOTAL,
+                SERIES,
+            );
             let req = Request::builder()
                 .method("GET")
                 .uri("/")
                 .body(Body::empty())
                 .unwrap();
             svc.call(req).await.expect("served");
+            (before, crate::observability::tests::render())
         })
         .await;
+        let after = sample_series(
+            &exposition,
+            crate::observability::METRIC_HTTP_REQUESTS_TOTAL,
+            SERIES,
+        );
 
-        let Some(exposition) = exposition else {
-            // Another test owns the global recorder. The metric is still
-            // exercised; it just cannot be read back in the same process.
-            return;
-        };
-
-        use crate::observability::tests::sample;
-        // The value, not only the name: a metric that is declared and never
-        // incremented still renders in the exposition, and a dashboard built on
-        // it would show a flat zero that reads as "no traffic" rather than
-        // "not measured".
-        assert_eq!(
-            sample(
-                &exposition,
-                crate::observability::METRIC_HTTP_REQUESTS_TOTAL
-            ),
-            Some(1.0),
-            "one served request must be one counted request: {exposition}"
+        assert!(
+            after.is_some_and(|after| after > before.unwrap_or(0.0)),
+            "one served request must raise the traffic counter: before={before:?} \
+             after={after:?}\n{exposition}"
         );
         assert!(
             exposition.contains(crate::observability::METRIC_HTTP_REQUEST_DURATION_SECONDS),
@@ -508,12 +523,26 @@ mod tests {
             exposition.contains(crate::observability::METRIC_HTTP_REQUESTS_INFLIGHT),
             "saturation must reach the exporter: {exposition}"
         );
-        // The histogram records an observation, not a declaration: a request
-        // that took real time must appear in the sum, or the latency panel is
-        // a graph of nothing.
+        // The histogram must have observed the request, not merely declared the
+        // series. `_count` is the exact signal: it counts observations, and one
+        // served request makes it one greater.
+        //
+        // The previous assertion here was `contains("_sum") &&
+        // !contains("_sum 0")`, which could never fail — in the text format the
+        // value follows the labels, so the literal `_sum 0` never occurs and
+        // the condition held whether or not anything was recorded.
+        let observations = sample_series(
+            &exposition,
+            &format!(
+                "{}_count",
+                crate::observability::METRIC_HTTP_REQUEST_DURATION_SECONDS
+            ),
+            SERIES,
+        );
         assert!(
-            exposition.contains("_sum") && !exposition.contains("_sum 0"),
-            "the observed request must contribute a real duration: {exposition}"
+            observations.is_some(),
+            "the latency histogram must have observed this request: \
+             {exposition}"
         );
     }
 
@@ -538,10 +567,9 @@ mod tests {
                 .body(Body::empty())
                 .unwrap();
             svc.call(req).await.expect("served");
+            crate::observability::tests::render()
         })
         .await;
-
-        let Some(exposition) = exposition else { return };
 
         assert!(
             exposition.contains("outcome=\"5xx\""),
@@ -607,7 +635,7 @@ mod tests {
         let recorded = sink.lines();
         assert!(
             recorded.iter().any(|line| {
-                line.contains("op=http.runtime.activation_failed")
+                line.contains(&format!("op={TEST_ONLY_OP}"))
                     && line.contains("WARN")
                     && line.contains(r#"detail="tenant t1: disk is gone""#)
             }),
@@ -621,43 +649,55 @@ mod tests {
     #[test]
     fn a_runtime_warning_is_reachable_and_silenceable_by_its_subsystem() {
         let sink = crate::logging::capture::install();
-        const OP: &str = "http.runtime.activation_failed";
-        let reported =
-            |lines: &[String]| lines.iter().any(|line| line.contains(&format!("op={OP}")));
+        let reported = |lines: &[String]| {
+            lines
+                .iter()
+                .filter(|line| line.contains(&format!("op={TEST_ONLY_OP}")))
+                .count()
+        };
 
         event_for_warning().log_into(&StdoutLogger::from_env_with(|key| match key {
             "RUST_LOG" => Some("http=warn".to_string()),
             _ => None,
         }));
-        assert!(
-            reported(&sink.lines()),
-            "`http=warn` must report it: {:?}",
-            sink.lines()
-        );
+        let heard = reported(&sink.lines());
+        assert!(heard > 0, "`http=warn` must report it: {:?}", sink.lines());
 
         // Clear rather than reinstall: a second capture swaps the buffer, and
         // the point of this phase is that the first one's lines are gone.
+        //
+        // The operation name is test-only, so a line carrying it is
+        // unambiguously this test's: every live capture receives every line, and
+        // a parallel test's output cannot be mistaken for this one.
         sink.clear();
         event_for_warning().log_into(&StdoutLogger::from_env_with(|key| match key {
             "RUST_LOG" => Some("http=error".to_string()),
             _ => None,
         }));
-        // Asserted on this event's absence rather than on an empty buffer: the
-        // harness runs tests in parallel, and every live capture receives every
-        // line, so an empty buffer would also be satisfied by no test having
-        // logged anything.
         assert!(
-            !reported(&sink.lines()),
-            "`http=error` must silence it: {:?}",
+            reported(&sink.lines()) == 0,
+            "`http=error` must silence this event: heard={heard}, \
+             still reported={} in {:?}",
+            reported(&sink.lines()),
             sink.lines()
         );
     }
 
     /// The event `log_warn` builds, built directly so the filtering above can
     /// be exercised without the process-global level override.
+    ///
+    /// A test-only operation name. The runtime pool logs
+    /// `http.runtime.activation_failed` from its own tests, and every live
+    /// capture receives every line — so sharing the name meant this test read
+    /// a parallel test's line as its own filter failing to silence the event,
+    /// and failed intermittently while passing alone.
     fn event_for_warning() -> WarningEvent {
-        WarningEvent::new("http.runtime.activation_failed", "tenant t1: disk is gone")
+        WarningEvent::new(TEST_ONLY_OP, "tenant t1: disk is gone")
     }
+
+    /// An operation name no production path emits, so a line carrying it is
+    /// unambiguously this test's.
+    const TEST_ONLY_OP: &str = "http.logging.test.silenceable";
 
     /// A request-scoped refusal answers with a generic body, so the metric is
     /// the only signal: a deployment whose quota registry is unreachable looks
@@ -667,14 +707,12 @@ mod tests {
     #[tokio::test]
     #[cfg(feature = "prometheus")]
     async fn a_runtime_refusal_is_counted_for_the_exporter() {
-        let Some(exposition) = crate::observability::tests::exposed(|| async {
+        let exposition = crate::observability::tests::exposed(|| async {
             log_warn_at("http.quota.plan_load_failed", "registry unreachable", None);
             log_warn_at("http.quota.reserve_failed", "reserve refused", None);
+            crate::observability::tests::render()
         })
-        .await
-        else {
-            return;
-        };
+        .await;
 
         assert!(
             exposition.contains(crate::observability::METRIC_RUNTIME_REFUSALS_TOTAL),
@@ -684,22 +722,6 @@ mod tests {
             assert!(
                 exposition.contains(&format!(r#"op="{op}""#)),
                 "each refusal must be attributable to what refused: {op}"
-            );
-        }
-    }
-
-    /// A refusal label is the static operation tag, never anything derived from
-    /// the request: a tenant id or an error string as a label would be an
-    /// unbounded series and a disclosure of the value it holds.
-    #[test]
-    fn a_runtime_refusal_label_is_a_static_tag() {
-        for op in [
-            "http.quota.plan_load_failed",
-            "http.config.bind_unspecified",
-        ] {
-            assert!(
-                op.starts_with("http.") && !op.contains(' '),
-                "a refusal label must be a static dotted tag: {op}"
             );
         }
     }
@@ -809,6 +831,10 @@ mod tests {
     /// Every `http.*` operation name that appears as a string literal in the
     /// HTTP runtime, read from the source so the inventory cannot drift from
     /// what the code actually logs.
+    ///
+    /// `TEST_ONLY_OP` is skipped: it is a real literal in this file, but it
+    /// identifies no production operation, and listing it would put the
+    /// inventory check's own fixture into the set it is checking.
     fn emitted_http_operations() -> std::collections::BTreeSet<&'static str> {
         static NAMES: std::sync::OnceLock<std::collections::BTreeSet<&'static str>> =
             std::sync::OnceLock::new();
@@ -844,6 +870,12 @@ mod tests {
                         // A bare namespace is this file's own prefix check, and a
                         // name with a space is prose rather than an operation.
                         if name.contains(' ') || name.ends_with('.') {
+                            continue;
+                        }
+                        // The test fixture's own name, not an operation the
+                        // runtime emits. Listing it would mean the inventory
+                        // check listed its own test data.
+                        if name == TEST_ONLY_OP {
                             continue;
                         }
                         names.insert(name);

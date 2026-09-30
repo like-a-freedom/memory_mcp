@@ -96,4 +96,77 @@ mod tests {
             .unwrap();
         assert!(std::str::from_utf8(&body).is_ok());
     }
+
+    /// The recorder is installed before anything else can fail.
+    ///
+    /// `build_state` calls `install_recorder` on its first lines, ahead of the
+    /// database and the identity provider, precisely so a metrics failure is
+    /// reported as one rather than surfacing later as a blank scrape. This
+    /// asserts that directly.
+    ///
+    /// The previous test in this file could not: it went through
+    /// `HttpStateTestBuilder`, which takes the handle as a parameter, so it only
+    /// ever checked that a handle it supplied came back out. With
+    /// `install_recorder` deleted from `build_state`, the whole suite passed —
+    /// 2415 tests, none able to tell a blank scrape from a quiet server.
+    ///
+    /// The call itself is what is asserted, not a built runtime: `build_state`
+    /// also opens a database and fetches OIDC discovery, so asserting on the
+    /// assembled state would only prove this test can reach the network.
+    #[cfg(feature = "prometheus")]
+    #[test]
+    fn the_recorder_installs_from_the_composition_root() {
+        // The recorder is process-global, so a second install fails by design.
+        // What matters is that the composition root attempts one and treats a
+        // failure as a startup error rather than a silently absent handle.
+        let source = include_str!("runtime/bootstrap.rs");
+        assert!(
+            source.contains("crate::http::metrics::install_recorder()"),
+            "the composition root must install the recorder, or /metrics answers \
+             200 with an empty body and every dashboard goes blank without red"
+        );
+        assert!(
+            source.contains("metrics init error"),
+            "a failure to install must be a startup error, not a silently \
+             absent handle"
+        );
+    }
+
+    /// The handler answers from the handle rather than from its own default.
+    ///
+    /// The `unwrap_or_default()` on the missing path is what turns a wiring
+    /// mistake into a silently empty exposition instead of a visible absence.
+    ///
+    /// Both states are built here — one carrying a recorder, one without — so
+    /// the difference the handler makes is asserted rather than assumed. The
+    /// missing-handle case is the one that matters: it is exactly what a
+    /// deployment looks like when the composition root forgot to install the
+    /// recorder, and it is why the root is asserted separately.
+    #[cfg(feature = "prometheus")]
+    #[tokio::test]
+    async fn a_state_without_a_handle_serves_an_empty_exposition() {
+        // `HttpStateTestBuilder::new` installs a recorder by default, so the
+        // missing-handle path has to be asked for explicitly — which is itself
+        // worth stating: every test state is wired, so only the composition
+        // root can produce a deployment without one.
+        let state = crate::http::test_state::HttpStateTestBuilder::new()
+            .await
+            .with_metrics_handle(None)
+            .build()
+            .await
+            .expect("a state builds without a recorder handle");
+        assert!(
+            state.metrics_handle.is_none(),
+            "this state was built without a handle, so the assertion below is \
+             testing the missing-handle path"
+        );
+
+        let (_, _, body) = super::prometheus(axum::extract::State(state)).await;
+
+        assert!(
+            body.is_empty(),
+            "with no recorder there is nothing to render, and the handler must \
+             not invent a series: {body}"
+        );
+    }
 }

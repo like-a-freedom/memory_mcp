@@ -13,7 +13,7 @@ use crate::error::MemoryError;
 // at `crate::shared::observability`; this module is the implementation that
 // records it. Domain modules import from `shared`, so they never acquire the
 // Prometheus recorder and everything it drags. See ADR-0058.
-#[cfg(test)]
+#[cfg(all(test, feature = "prometheus"))]
 pub(crate) use crate::shared::observability::{DECLARED_REFUSAL_BRANCHES, DECLARED_STAGES};
 pub use crate::shared::observability::{
     METRIC_AUTH_REFUSALS_TOTAL, METRIC_BACKGROUND_JOB_DURATION_SECONDS,
@@ -63,6 +63,13 @@ macro_rules! count_and_time {
 /// Shared by every scheduler so a failing job is counted the same way wherever
 /// it runs, and so adding a scheduler cannot introduce a third spelling of
 /// "this failed".
+#[cfg_attr(
+    not(feature = "prometheus"),
+    allow(
+        dead_code,
+        reason = "recorders have no caller without the HTTP profile"
+    )
+)]
 pub(crate) fn record_job_metric(job: &'static str, outcome: &'static str, seconds: f64) {
     count_and_time!(
         METRIC_BACKGROUND_JOBS_TOTAL,
@@ -79,6 +86,13 @@ pub(crate) fn record_job_metric(job: &'static str, outcome: &'static str, second
 /// tags. It is never a username, an issuer or a subject: those are the
 /// identifiers that turn a metric into a disclosure, and the audit trail
 /// already carries them under a keyed fingerprint.
+#[cfg_attr(
+    not(feature = "prometheus"),
+    allow(
+        dead_code,
+        reason = "recorders have no caller without the HTTP profile"
+    )
+)]
 pub(crate) fn record_auth_refusal(branch: &'static str) {
     metrics::counter!(
         METRIC_AUTH_REFUSALS_TOTAL,
@@ -89,6 +103,13 @@ pub(crate) fn record_auth_refusal(branch: &'static str) {
 }
 
 /// Record one request-scoped refusal from the HTTP runtime.
+#[cfg_attr(
+    not(feature = "prometheus"),
+    allow(
+        dead_code,
+        reason = "recorders have no caller without the HTTP profile"
+    )
+)]
 pub(crate) fn record_runtime_refusal(op: &'static str) {
     metrics::counter!(METRIC_RUNTIME_REFUSALS_TOTAL, "op" => op).increment(1);
 }
@@ -98,6 +119,13 @@ pub(crate) fn record_runtime_refusal(op: &'static str) {
 /// Additive rather than a read-modify-write of a shared counter: two requests
 /// completing at once must not lose each other's update, and a gauge that
 /// undercounts is worse than one that is slightly late.
+#[cfg_attr(
+    not(feature = "prometheus"),
+    allow(
+        dead_code,
+        reason = "recorders have no caller without the HTTP profile"
+    )
+)]
 pub(crate) fn shift_gauge(metric: &'static str, delta: f64) {
     metrics::gauge!(metric).increment(delta);
 }
@@ -132,6 +160,13 @@ pub(crate) fn observe(
 /// reached from exactly one place outside [`record_job_metric`] — a caller
 /// cannot grow a second, slightly different emission path that drifts from
 /// this one.
+#[cfg_attr(
+    not(feature = "prometheus"),
+    allow(
+        dead_code,
+        reason = "recorders have no caller without the HTTP profile"
+    )
+)]
 pub(crate) fn count_timed(
     counter: &'static str,
     histogram: &'static str,
@@ -337,62 +372,52 @@ fn install_with_addr(_addr: SocketAddr) -> Result<(), MemoryError> {
 pub(crate) mod tests {
     use super::*;
 
-    /// A recorder installed into a fresh registry, and the exposition text it
-    /// renders.
+    /// Run `body` under the shared recorder lock and return what it produced.
     ///
-    /// The `metrics` facade is process-global, so a test that installs a
-    /// recorder cannot do it twice. Every caller goes through [`Recorder`]
-    /// instead, which reports clearly when another test already owns it rather
-    /// than silently recording into a recorder nobody reads — a failure mode
-    /// that would make every metric assertion below vacuously true.
-    pub(crate) struct Recorder {
-        handle: metrics_exporter_prometheus::PrometheusHandle,
-    }
-
-    impl Recorder {
-        pub(crate) fn install() -> Option<Self> {
-            // The exporter crate, not the `metrics` facade: the handle that can
-            // render an exposition is the exporter crate's type, and the facade
-            // does not re-export it. The helper is therefore gated on the same
-            // feature as the exporter it reads, which is also the only
-            // configuration in which a metric is scrapeable at all.
-            let exporter = metrics_exporter_prometheus::PrometheusBuilder::new().build_recorder();
-            let handle = exporter.handle().clone();
-            metrics::set_global_recorder(exporter).ok()?;
-            Some(Self { handle })
-        }
-
-        /// The current exposition, as a scrape would see it.
-        pub(crate) fn render(&self) -> String {
-            self.handle.render()
-        }
-    }
-
-    /// Install a recorder, run `body`, and return the exposition it produced.
+    /// One recorder, one lock. `metrics::set_global_recorder` succeeds once per
+    /// process, so six tests each installing their own returned nothing on
+    /// every run but one, and which one won was a race. Taking the lock across
+    /// the body also stops two tests interleaving their metrics into one
+    /// exposition and reading each other's series.
     ///
-    /// `None` when another test holds the global recorder, which is not a
-    /// failure: the metric is still exercised, it simply cannot be read back
-    /// in the same process.
-    pub(crate) async fn exposed<F, Fut>(body: F) -> Option<String>
+    /// Generic in what the body returns so a test can take a reading on each
+    /// side of the work it does, which is what makes a counter assertion exact
+    /// without depending on what sibling tests have already recorded.
+    pub(crate) async fn exposed<F, Fut, T>(body: F) -> T
     where
         F: FnOnce() -> Fut,
-        Fut: std::future::Future<Output = ()>,
+        Fut: std::future::Future<Output = T>,
     {
-        let recorder = Recorder::install()?;
-        body().await;
-        Some(recorder.render())
+        static LOCK: std::sync::OnceLock<
+            tokio::sync::Mutex<metrics_exporter_prometheus::PrometheusHandle>,
+        > = std::sync::OnceLock::new();
+        let handle = shared_test_handle().expect("prometheus enabled");
+        let lock = LOCK.get_or_init(|| tokio::sync::Mutex::new(handle));
+        let _guard = lock.lock().await;
+        body().await
     }
 
-    /// The value of a counter or gauge in the exposition, by metric name.
-    pub(crate) fn sample(exposition: &str, metric: &str) -> Option<f64> {
+    /// The exposition as it stands. Read it *inside* [`exposed`] when the test
+    /// also writes to the recorder — outside the lock, a sibling test can move
+    /// a counter between the two readings.
+    pub(crate) fn render() -> String {
+        shared_test_handle().expect("prometheus enabled").render()
+    }
+
+    /// The value of one labelled series, by metric name and the labels it must
+    /// carry.
+    ///
+    /// Filtering by the labels is not optional. The recorder is process-global, so
+    /// `memory_http_requests_total` carries a series per method-and-outcome
+    /// combination; taking the first match returns whichever one another test
+    /// happened to record first, and an assertion against it is a coin flip. The
+    /// metric name is also matched on a boundary — `foo` must not match `foo_bar` —
+    /// so a sibling name cannot be read by accident.
+    pub(crate) fn sample_series(exposition: &str, metric: &str, labels: &str) -> Option<f64> {
+        let prefix = format!("{metric}{{{labels}}}");
         exposition
             .lines()
-            .find(|line| {
-                line.starts_with(metric)
-                    && !line.starts_with(&format!("{metric}_bucket"))
-                    && !line.starts_with(&format!("{metric}_sum"))
-                    && !line.starts_with(&format!("{metric}_count"))
-            })
+            .find(|line| line.starts_with(&prefix))
             .and_then(|line| line.split_whitespace().last())
             .and_then(|value| value.parse().ok())
     }
@@ -421,16 +446,14 @@ pub(crate) mod tests {
     #[tokio::test]
     #[cfg(feature = "prometheus")]
     async fn a_stage_measurement_reaches_the_exporter() {
-        let Some(exposition) = tests::exposed(|| async {
+        let exposition = tests::exposed(|| async {
             {
                 let _stage =
                     crate::observability::StageTimer::new("assemble_context", "query_embedding");
             }
+            tests::render()
         })
-        .await
-        else {
-            return;
-        };
+        .await;
 
         assert!(
             exposition.contains(crate::observability::METRIC_PIPELINE_STAGE_DURATION_SECONDS),
@@ -446,20 +469,62 @@ pub(crate) mod tests {
         );
     }
 
-    /// The stages a pipeline reports are a closed set of words. An unbounded
-    /// one — a stage named after a record, a tenant, a query string — is how a
-    /// metrics backend falls over, and the bounded vocabulary is what makes the
-    /// series aggregatable.
+    /// A stage timer must live in a block that closes before the work it names
+    /// ends — otherwise it measures everything after it.
+    ///
+    /// Bound at function scope, a guard stays alive until the function returns.
+    /// That is not a subtle drift: `query_embedding` came to measure the whole
+    /// retrieval including the vector search, and two stages ended up nested, so
+    /// a dashboard subtracting one from the other read zero — which is the
+    /// discrimination the stages exist to provide.
+    ///
+    /// The check is that the guard's own line opens no block, so the statement
+    /// holding it cannot be scoped: a scoped timer is always the *first* thing
+    /// inside a `let … = {`, and the line above it ends in `{`. An unscoped one
+    /// is a plain `let _stage = …` and the line above it is unrelated.
     #[test]
-    fn stage_labels_are_bounded_words() {
-        for stage in ["query_embedding", "ann_search", "rank", "serialize"] {
-            assert!(
-                stage
-                    .chars()
-                    .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '_'),
-                "a stage label must be a fixed word: {stage}"
-            );
-            assert!(stage.len() < 32, "a stage label must be short: {stage}");
+    fn every_stage_timer_is_scoped_to_its_block() {
+        const SOURCES: &[&str] = &[
+            include_str!("memory/retrieval/semantic.rs"),
+            include_str!("tools/extract.rs"),
+            include_str!("tools/ingest.rs"),
+            include_str!("embedding/service.rs"),
+        ];
+        for source in SOURCES {
+            let lines: Vec<&str> = source.lines().collect();
+            for (index, line) in lines.iter().enumerate() {
+                if !line.trim_start().starts_with("let _") {
+                    continue;
+                }
+                // The statement runs to its terminating `;`, inclusive. The
+                // length is found rather than collected with `take_while`,
+                // which drops the line that satisfied the predicate — and that
+                // line is the one carrying the call, so the statement came out
+                // as a bare `let _stage =` and the test never fired.
+                let length = lines[index..]
+                    .iter()
+                    .position(|candidate| candidate.trim_end().ends_with(';'))
+                    .map_or(1, |offset| offset + 1);
+                let statement: String = lines[index..index + length].concat();
+                if !statement.contains("StageTimer::new") {
+                    continue;
+                }
+                // Scoped: the block opening the guard is on the line above and
+                // its brace is what the formatter left at the end of that line.
+                let line_above = index
+                    .checked_sub(1)
+                    .and_then(|up| lines.get(up))
+                    .copied()
+                    .unwrap_or_default();
+                let scoped = line_above.trim_end().ends_with('{');
+                assert!(
+                    scoped,
+                    "{}: `{}` opens no block, so it measures everything after it \
+                     rather than the call it names",
+                    index + 1,
+                    line.trim(),
+                );
+            }
         }
     }
 
@@ -468,6 +533,11 @@ pub(crate) mod tests {
     /// vocabulary without measuring it — the failure this guards — fails here
     /// rather than showing up as a permanently flat histogram, which reads on a
     /// dashboard exactly like a fast pipeline.
+    ///
+    /// The match is on the constructed call rather than on the stage name as a
+    /// substring: a bare `contains("ann_search")` is satisfied by the same word
+    /// in a doc comment or a string literal, so the check passed for the right
+    /// answer and would keep passing for the wrong one.
     #[test]
     fn every_declared_stage_is_measured_somewhere_in_the_pipeline() {
         const SOURCES: &[&str] = &[
@@ -477,10 +547,16 @@ pub(crate) mod tests {
             include_str!("embedding/service.rs"),
         ];
         for stage in DECLARED_STAGES {
+            let attached = SOURCES.iter().any(|source| {
+                source.contains(&format!(
+                    "StageTimer::new(\"assemble_context\", \"{stage}\")"
+                )) || source.contains(&format!("StageTimer::new(\"extract\", \"{stage}\")"))
+                    || source.contains(&format!("StageTimer::new(\"ingest\", \"{stage}\")"))
+            });
             assert!(
-                SOURCES.iter().any(|source| source.contains(stage)),
-                "stage `{stage}` is declared but never measured; a stage nobody \
-                 attaches is a metric that always reads zero"
+                attached,
+                "stage `{stage}` is declared but no `StageTimer::new` constructs it; \
+                 a stage nobody attaches is a metric that always reads zero"
             );
         }
     }
@@ -492,25 +568,64 @@ pub(crate) mod tests {
         metrics.success();
     }
 
-    #[test]
+    #[tokio::test]
     #[cfg(feature = "prometheus")]
-    fn operation_metrics_emit_expected_families() {
-        // Shares the OnceLock with `http::HttpState::test_metrics_handle`
-        // so the recorder installs at most once per process.
-        let handle = super::shared_test_handle().expect("prometheus enabled");
+    async fn operation_metrics_emit_expected_families() {
+        // Through `exposed`, so this holds the same lock as every other metric
+        // test. Reading the shared recorder directly while another test writes to
+        // it is a race, and the operation counts below would drift.
+        let output = exposed(|| async {
+            let mut metrics = OperationMetrics::new("ingest");
+            metrics.record_result("episodes", 2);
+            metrics.success();
+            drop(metrics);
+            render()
+        })
+        .await;
 
-        let mut metrics = OperationMetrics::new("ingest");
-        metrics.record_result("episodes", 2);
-        metrics.success();
-        drop(metrics);
-
-        let output = handle.render();
         assert!(output.contains("memory_operation_calls_total{"));
         assert!(output.contains("operation=\"ingest\""));
         assert!(output.contains("outcome=\"success\""));
         assert!(output.contains("memory_operation_duration_seconds"));
         assert!(output.contains("memory_operation_results_total{"));
         assert!(output.contains("result=\"episodes\""));
+    }
+
+    /// An operation that returns early is recorded as `error` without any call
+    /// site saying so — that default is the whole point of the guard, since
+    /// every early return and every unexpected failure becomes visible without
+    /// a `match` arm written for it.
+    ///
+    /// Only the success branch was tested, so the default could be changed to
+    /// `success` and every failure would be reported as a success — the exact
+    /// inversion that makes an error rate meaningless.
+    #[tokio::test]
+    #[cfg(feature = "prometheus")]
+    async fn an_operation_that_returns_early_is_recorded_as_an_error() {
+        // Through `exposed`, so this takes the same lock as every other metric
+        // test. Writing to the shared recorder directly and then reading the
+        // counter as `1` is a race: another test's operation lands in the same
+        // exposition, and this failed on roughly one run in three.
+        let exposition = exposed(|| async {
+            // No `success()` call: this is what an early return looks like.
+            let metrics = OperationMetrics::new("resolve");
+            drop(metrics);
+            render()
+        })
+        .await;
+
+        let failures = exposition
+            .lines()
+            .filter(|line| {
+                line.starts_with("memory_operation_calls_total")
+                    && line.contains("operation=\"resolve\"")
+                    && line.contains("outcome=\"error\"")
+            })
+            .count();
+        assert_eq!(
+            failures, 1,
+            "an early return must be counted as an error: {exposition}"
+        );
     }
 
     #[test]
