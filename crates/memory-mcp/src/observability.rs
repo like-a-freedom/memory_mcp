@@ -9,12 +9,19 @@ use std::time::Instant;
 
 use crate::error::MemoryError;
 
-/// Total logical operations by bounded operation and outcome.
-pub const METRIC_OPERATIONS_TOTAL: &str = "memory_operation_calls_total";
-/// Logical operation duration in seconds by bounded operation and outcome.
-pub const METRIC_OPERATION_DURATION_SECONDS: &str = "memory_operation_duration_seconds";
-/// Bounded domain result counts by operation and result kind.
-pub const METRIC_OPERATION_RESULTS_TOTAL: &str = "memory_operation_results_total";
+// The vocabulary — what a measurement is *called* — lives in the pure kernel
+// at `crate::shared::observability`; this module is the implementation that
+// records it. Domain modules import from `shared`, so they never acquire the
+// Prometheus recorder and everything it drags. See ADR-0058.
+#[cfg(test)]
+pub(crate) use crate::shared::observability::{DECLARED_REFUSAL_BRANCHES, DECLARED_STAGES};
+pub use crate::shared::observability::{
+    METRIC_AUTH_REFUSALS_TOTAL, METRIC_BACKGROUND_JOB_DURATION_SECONDS,
+    METRIC_BACKGROUND_JOBS_TOTAL, METRIC_HTTP_REQUEST_DURATION_SECONDS,
+    METRIC_HTTP_REQUESTS_INFLIGHT, METRIC_HTTP_REQUESTS_TOTAL, METRIC_OPERATION_DURATION_SECONDS,
+    METRIC_OPERATION_RESULTS_TOTAL, METRIC_OPERATIONS_TOTAL,
+    METRIC_PIPELINE_STAGE_DURATION_SECONDS, METRIC_RUNTIME_REFUSALS_TOTAL, StageTimer,
+};
 
 /// Filesystem-watch metric family: revision outcomes.
 pub const METRIC_FS_WATCH_REVISIONS_TOTAL: &str = "memory_fs_watch_revisions_total";
@@ -32,110 +39,114 @@ pub const METRIC_FS_WATCH_DEGRADED: &str = "memory_fs_watch_degraded";
 pub const METRIC_FS_WATCH_REVISION_DURATION_SECONDS: &str =
     "memory_fs_watch_revision_duration_seconds";
 
-/// HTTP counter: requests served, by method class and status class.
+/// The one place a count and a duration are emitted together.
 ///
-/// The first golden signal for a service whose only entry point is HTTP. It is
-/// a counter rather than something derived from the access log because a log
-/// line is sampled and unstructured: answering "how much traffic did this
-/// deployment serve" from logs means parsing them, and the answer is wrong the
-/// moment a line is dropped.
-pub const METRIC_HTTP_REQUESTS_TOTAL: &str = "memory_http_requests_total";
-
-/// HTTP histogram: request duration in seconds, by method and status class.
+/// Every timed thing here is a counter and a histogram carrying the same
+/// labels, so they are emitted as a pair: a count without a duration, or a
+/// duration without its count, is half a measurement, and it is the pair that
+/// makes a rate or a quantile answerable.
 ///
-/// Prometheus's own convention is that the latency histogram carries a
-/// `le` label; the buckets this recorder installs are the default set, which
-/// spans 5 ms to 10 s and covers everything from an in-memory hit to a
-/// database round trip.
-pub const METRIC_HTTP_REQUEST_DURATION_SECONDS: &str = "memory_http_request_duration_seconds";
+/// Labels are written out at the call site rather than taken as a slice
+/// because the `metrics` macros take them as macro arguments; a `&[(k, v)]`
+/// built by the caller would be a temporary the macro borrows past its
+/// lifetime. Concentrating that in one function is what stops every caller
+/// from solving it again, and from growing a second emission path that drifts.
+macro_rules! count_and_time {
+    ($counter:expr, $histogram:expr, $seconds:expr, $($name:literal => $value:expr),+ $(,)?) => {{
+        metrics::counter!($counter, $($name => $value),+).increment(1);
+        metrics::histogram!($histogram, $($name => $value),+).record($seconds);
+    }};
+}
 
-/// HTTP gauge: requests currently in flight.
+/// Record one background job: its outcome and how long it ran.
 ///
-/// The saturation signal for this service. A count that only rises and falls
-/// between scrapes is invisible, and "the queue is growing" is the question an
-/// on-call engineer asks before anything else when latency climbs.
-pub const METRIC_HTTP_REQUESTS_INFLIGHT: &str = "memory_http_requests_inflight";
+/// Shared by every scheduler so a failing job is counted the same way wherever
+/// it runs, and so adding a scheduler cannot introduce a third spelling of
+/// "this failed".
+pub(crate) fn record_job_metric(job: &'static str, outcome: &'static str, seconds: f64) {
+    count_and_time!(
+        METRIC_BACKGROUND_JOBS_TOTAL,
+        METRIC_BACKGROUND_JOB_DURATION_SECONDS,
+        seconds,
+        "job" => job,
+        "outcome" => outcome,
+    );
+}
 
-/// Counter: background job outcomes, by job family and outcome.
+/// Record one authentication refusal on the identity callback.
 ///
-/// A background job is the one failure class with no request attached: it
-/// cannot be seen in a status code, and it does not appear in the request
-/// metrics because it is not a request. Logged alone, a failing job is a line
-/// somebody has to be reading the right log to notice. Counted, it is an alert
-/// on a rate, which is how it should be found.
-pub const METRIC_BACKGROUND_JOBS_TOTAL: &str = "memory_background_jobs_total";
-
-/// Histogram: background job duration in seconds, by job family.
-pub const METRIC_BACKGROUND_JOB_DURATION_SECONDS: &str = "memory_background_job_duration_seconds";
-
-/// Counter: authentication refusals, by surface and branch.
-///
-/// A refused sign-in is the one incident that has no alert: it is a 401 or a
-/// 403 among thousands of legitimate ones, it belongs to no request a human
-/// reads, and a deployment in a sign-in loop looks exactly like a quiet one
-/// from every other signal. The branch is the reason it failed, which is
-/// already a closed set of static words on the OIDC path — that is what keeps
-/// the series bounded and aggregatable.
-pub const METRIC_AUTH_REFUSALS_TOTAL: &str = "memory_auth_refusals_total";
-
-/// Record one authentication refusal on the OIDC path.
-///
-/// `branch` is the reason and must be a fixed word — the call sites pass
-/// static tags. It is never a username, an issuer or a subject: those are the
+/// `branch` is the reason and must be a fixed word — the call sites pass static
+/// tags. It is never a username, an issuer or a subject: those are the
 /// identifiers that turn a metric into a disclosure, and the audit trail
 /// already carries them under a keyed fingerprint.
 pub(crate) fn record_auth_refusal(branch: &'static str) {
-    const REFUSALS: &str = METRIC_AUTH_REFUSALS_TOTAL;
     metrics::counter!(
-        REFUSALS,
+        METRIC_AUTH_REFUSALS_TOTAL,
         "surface" => "oidc",
         "branch" => branch,
     )
     .increment(1);
 }
 
-/// Counter: refusals by the HTTP runtime's own request-scoped warnings.
-///
-/// A refusal here answers `503` or `403` with a generic body. The body tells
-/// a client nothing, and without a rate it tells an operator nothing either:
-/// a deployment whose quota registry is unreachable, or whose configuration
-/// binds wider than it should, looks exactly like a quiet one. `op` is the
-/// static operation tag, so the series stays bounded.
-pub const METRIC_RUNTIME_REFUSALS_TOTAL: &str = "memory_runtime_refusals_total";
-
 /// Record one request-scoped refusal from the HTTP runtime.
 pub(crate) fn record_runtime_refusal(op: &'static str) {
-    const REFUSALS: &str = METRIC_RUNTIME_REFUSALS_TOTAL;
-    metrics::counter!(REFUSALS, "op" => op).increment(1);
+    metrics::counter!(METRIC_RUNTIME_REFUSALS_TOTAL, "op" => op).increment(1);
 }
 
-/// Histogram: a named stage inside a pipeline, in seconds.
+/// Move a gauge by `delta`.
 ///
-/// An operation's total latency says *that* something is slow. Only the stages
-/// say *which* part: a query that takes two seconds might be waiting on an
-/// embedding provider, on the vector index, or on its own post-processing, and
-/// the three need different fixes. A stage is a fixed word for that, so this is
-/// what a bottleneck is identified from.
-///
-/// `operation` is the tool that owns the stage and `stage` the step within it,
-/// so a dashboard reads down the pipeline rather than across it.
-pub const METRIC_PIPELINE_STAGE_DURATION_SECONDS: &str = "memory_pipeline_stage_duration_seconds";
+/// Additive rather than a read-modify-write of a shared counter: two requests
+/// completing at once must not lose each other's update, and a gauge that
+/// undercounts is worse than one that is slightly late.
+pub(crate) fn shift_gauge(metric: &'static str, delta: f64) {
+    metrics::gauge!(metric).increment(delta);
+}
 
-/// The stages the pipelines report, as a closed vocabulary.
+/// Observe a duration into a histogram under two labels, for a path that
+/// measured the stage itself.
 ///
-/// A test reads the sources and asserts each one is actually measured, so a
-/// stage that is declared and never attached — which produces a metric that
-/// always reads zero, indistinguishable from a fast pipeline — fails here
-/// rather than being noticed by somebody staring at a flat histogram.
-#[cfg(test)]
-const DECLARED_STAGES: &[&str] = &[
-    "query_embedding",
-    "ann_search",
-    "extraction",
-    "embedding_provider",
-    "store_write",
-];
+/// Every label half is `&'static str`: a metrics registry outlives the request
+/// that produced the observation, so a value borrowed from a request would
+/// dangle the moment it returned. That is why callers pass fixed words rather
+/// than formatted ones, and why anything needing per-item attribution belongs
+/// in the structured log.
+///
+/// Two pairs, because a pipeline stage is identified by both the operation that
+/// owns it and the step within it — and a stage without its operation cannot be
+/// read down a pipeline at all.
+pub(crate) fn observe(
+    metric: &'static str,
+    seconds: f64,
+    k0: &'static str,
+    v0: &'static str,
+    k1: &'static str,
+    v1: &'static str,
+) {
+    metrics::histogram!(metric, k0 => v0, k1 => v1).record(seconds);
+}
 
+/// Increment a counter and observe a histogram, for a caller outside this
+/// module.
+///
+/// It is the one export that carries labels, so the `metrics` macros are
+/// reached from exactly one place outside [`record_job_metric`] — a caller
+/// cannot grow a second, slightly different emission path that drifts from
+/// this one.
+pub(crate) fn count_timed(
+    counter: &'static str,
+    histogram: &'static str,
+    seconds: f64,
+    k0: &'static str,
+    v0: &'static str,
+    k1: &'static str,
+    v1: &'static str,
+) {
+    metrics::counter!(counter, k0 => v0, k1 => v1).increment(1);
+    metrics::histogram!(histogram, k0 => v0, k1 => v1).record(seconds);
+}
+
+/// The bounded operation vocabulary. A name outside it becomes `other`, so a
+/// caller cannot introduce an unbounded series by passing a formatted string.
 const KNOWN_OPERATIONS: &[&str] = &[
     "ingest",
     "extract",
@@ -181,72 +192,6 @@ fn result_label(result: &str) -> &'static str {
         .copied()
         .find(|known| *known == result)
         .unwrap_or("other")
-}
-
-/// Measures one named stage of a pipeline.
-///
-/// A guard rather than a pair of calls around a block, for the same reason
-/// [`OperationMetrics`] is one: a stage is often left early — a skipped
-/// embedding, a cache hit, an error — and a duration written only on the
-/// success path would be missing exactly the cases worth seeing.
-pub(crate) struct StageTimer {
-    operation: &'static str,
-    stage: &'static str,
-    started_at: Instant,
-}
-
-impl StageTimer {
-    /// Begin measuring `stage` inside `operation`.
-    pub(crate) fn new(operation: &'static str, stage: &'static str) -> Self {
-        Self {
-            operation,
-            stage,
-            started_at: Instant::now(),
-        }
-    }
-}
-
-impl Drop for StageTimer {
-    fn drop(&mut self) {
-        record_stage_metric(
-            self.operation,
-            self.stage,
-            self.started_at.elapsed().as_secs_f64(),
-        );
-    }
-}
-
-/// Record one stage observation, for a path that measured it some other way.
-pub(crate) fn record_stage_metric(operation: &'static str, stage: &'static str, seconds: f64) {
-    const STAGE: &str = METRIC_PIPELINE_STAGE_DURATION_SECONDS;
-    metrics::histogram!(
-        STAGE,
-        "operation" => operation,
-        "stage" => stage,
-    )
-    .record(seconds);
-}
-
-/// Record one background job: its outcome and how long it ran.
-///
-/// Shared by every scheduler so a failing job is counted the same way
-/// wherever it runs, and so adding a scheduler cannot introduce a third
-/// spelling of "this failed".
-pub(crate) fn record_job_metric(job: &'static str, outcome: &'static str, seconds: f64) {
-    const JOBS: &str = METRIC_BACKGROUND_JOBS_TOTAL;
-    const DURATION: &str = METRIC_BACKGROUND_JOB_DURATION_SECONDS;
-    metrics::counter!(
-        JOBS,
-        "job" => job,
-        "outcome" => outcome,
-    )
-    .increment(1);
-    metrics::histogram!(
-        DURATION,
-        "job" => job,
-        "outcome" => outcome,
-    )
-    .record(seconds);
 }
 
 /// Records one logical operation when dropped.
@@ -573,5 +518,37 @@ pub(crate) mod tests {
     fn install_is_noop_without_feature() {
         // Without the feature, install always succeeds and never opens a socket.
         install().expect("install succeeds without prometheus feature");
+    }
+
+    /// A refusal branch is a fixed word. One carrying a subject, an issuer or
+    /// an authorization code would be a disclosure, and a metrics backend
+    /// outlives every request that could have supplied one.
+    #[test]
+    fn every_declared_refusal_branch_is_a_bounded_word() {
+        for branch in DECLARED_REFUSAL_BRANCHES {
+            assert!(
+                branch
+                    .chars()
+                    .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '_'),
+                "a refusal label must be a fixed word: {branch}"
+            );
+            assert!(branch.len() < 32, "a refusal label must be short: {branch}");
+        }
+    }
+
+    /// Every branch the identity callback can refuse on must be in the
+    /// vocabulary, and every declared branch must still be emitted. The call
+    /// sites are read rather than trusted: a new branch that skips the list
+    /// escapes the bounded-label check, and a stale entry is a series that
+    /// reads zero forever.
+    #[test]
+    fn every_emitted_refusal_branch_is_declared() {
+        const SOURCE: &str = include_str!("control/oidc/handlers.rs");
+        for branch in DECLARED_REFUSAL_BRANCHES {
+            assert!(
+                SOURCE.contains(&format!("\"{branch}\"")),
+                "branch `{branch}` is declared but no call site emits it"
+            );
+        }
     }
 }

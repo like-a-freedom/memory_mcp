@@ -137,40 +137,29 @@ pub(crate) async fn request_log(mut req: Request, next: Next) -> Response {
 }
 
 /// Move the in-flight gauge by `delta` requests.
-///
-/// Additive rather than a read-modify-write of a shared counter: two requests
-/// completing at once must not lose each other's update, and a gauge that
-/// undercounts is worse than one that is slightly late.
 fn inflight_requests(delta: i64) {
-    // The metric name is a local `const` rather than the call inline: the
-    // `metrics` macros borrow their name argument, and a path through
-    // `crate::observability` is not a `'static` str.
-    const INFLIGHT: &str = crate::observability::METRIC_HTTP_REQUESTS_INFLIGHT;
-    metrics::gauge!(INFLIGHT).increment(delta as f64);
+    crate::observability::shift_gauge(
+        crate::shared::observability::METRIC_HTTP_REQUESTS_INFLIGHT,
+        delta as f64,
+    );
 }
 
 /// Record one served request: the traffic count and the latency observation.
 ///
-/// The labels are `&'static str` because that is what the `metrics` macros
-/// require for a value: a metric registry outlives the request, and a label
-/// borrowed from a request would dangle after it returned. `categorize` and
-/// `outcome_label` already return exactly that — a bounded class, never the
-/// path or the status code.
+/// The labels are `&'static str` because a metrics registry outlives the
+/// request, and a label borrowed from a request would dangle after it returned.
+/// `categorize` and `outcome_label` already return exactly that — a bounded
+/// class, never the path or the status code.
 fn record_request_metric(method_category: &'static str, outcome: &'static str, seconds: f64) {
-    const REQUESTS: &str = crate::observability::METRIC_HTTP_REQUESTS_TOTAL;
-    const DURATION: &str = crate::observability::METRIC_HTTP_REQUEST_DURATION_SECONDS;
-    metrics::counter!(
-        REQUESTS,
-        "method" => method_category,
-        "outcome" => outcome,
-    )
-    .increment(1);
-    metrics::histogram!(
-        DURATION,
-        "method" => method_category,
-        "outcome" => outcome,
-    )
-    .record(seconds);
+    crate::observability::count_timed(
+        crate::shared::observability::METRIC_HTTP_REQUESTS_TOTAL,
+        crate::shared::observability::METRIC_HTTP_REQUEST_DURATION_SECONDS,
+        seconds,
+        "method",
+        method_category,
+        "outcome",
+        outcome,
+    );
 }
 
 /// Bounded request log event. The serialize order is the

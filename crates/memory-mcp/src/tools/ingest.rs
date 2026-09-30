@@ -58,7 +58,7 @@ pub async fn ingest<T: ToolContext>(
     // naming: an `ingest` that got slower can be traced to this histogram
     // rather than to the operation total, which moves for any reason at all.
     let outcome = {
-        let _stage = crate::observability::StageTimer::new("ingest", "store_write");
+        let _stage = crate::shared::observability::StageTimer::new("ingest", "store_write");
         ctx.ingest(request, Some(access)).await
     };
 

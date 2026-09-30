@@ -166,7 +166,7 @@ pub async fn extract<T: ToolContext>(
             // traced to this histogram rather than to the operation total,
             // which would move for any reason at all.
             let extraction = {
-                let _stage = crate::observability::StageTimer::new("extract", "extraction");
+                let _stage = crate::shared::observability::StageTimer::new("extract", "extraction");
                 ctx.extract(&episode_id, Some(access), zero_shot_labels.as_deref())
                     .await
             };

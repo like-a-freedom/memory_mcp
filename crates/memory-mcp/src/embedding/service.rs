@@ -160,7 +160,7 @@ impl EmbeddingService {
         // this is the duration that separates "our code got slower" from
         // "the thing we call got slower".
         let _provider_stage =
-            crate::observability::StageTimer::new("extract", "embedding_provider");
+            crate::shared::observability::StageTimer::new("extract", "embedding_provider");
         match self.embedding_provider.embed(&effective_input).await {
             Ok(embedding) => {
                 self.logger.log(

@@ -16,6 +16,7 @@
 
 pub mod error;
 pub mod ids;
+pub mod observability;
 pub mod search;
 pub mod search_lexical;
 pub mod temporal;

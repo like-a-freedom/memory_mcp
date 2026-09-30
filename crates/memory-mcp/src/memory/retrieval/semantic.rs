@@ -27,7 +27,7 @@ pub(crate) async fn collect_semantic_facts(
     // the embedding provider or on the vector index — two problems with
     // nothing in common.
     let _embedding_stage =
-        crate::observability::StageTimer::new("assemble_context", "query_embedding");
+        crate::shared::observability::StageTimer::new("assemble_context", "query_embedding");
     let query_embedding = match service
         .embedding_service
         .generate_query_embedding_with_background(request.query)
@@ -66,7 +66,8 @@ pub(crate) async fn collect_semantic_facts(
     let search_limit = request.budget.max(1) * 4;
 
     let fact_records = {
-        let _search_stage = crate::observability::StageTimer::new("assemble_context", "ann_search");
+        let _search_stage =
+            crate::shared::observability::StageTimer::new("assemble_context", "ann_search");
         service
             .knowledge_store()
             .select_facts_ann(
