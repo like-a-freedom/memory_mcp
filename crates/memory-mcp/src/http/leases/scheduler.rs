@@ -23,6 +23,7 @@ use tokio_util::sync::CancellationToken;
 use crate::error::MemoryError;
 use crate::http::registry::RegistryHandle;
 use crate::logging::{LogLevel, StdoutLogger};
+use crate::observability::record_job_metric;
 
 pub type JobFuture = Pin<Box<dyn Future<Output = Result<(), MemoryError>> + Send>>;
 pub type SchedulerJob = Arc<dyn Fn(RegistryHandle) -> JobFuture + Send + Sync>;
@@ -186,14 +187,27 @@ async fn run_cycle(registry: RegistryHandle, hooks: &SchedulerHooks, shutdown: C
                 },
             };
             let _permit = permit;
-            if let Err(error) = job(registry).await {
+            // Measured from the moment the job actually starts running, not
+            // from when it was scheduled: a job that waited on the semaphore
+            // would otherwise report the queue's delay as its own work.
+            let started = std::time::Instant::now();
+            let outcome = match job(registry).await {
+                Ok(()) => "ok",
                 // A scheduled job that fails is the one failure class with
                 // nobody watching: no request, no status, no response to point
-                // at. It went to stderr as free text, so it carried no level and
-                // no timestamp and could not be joined to the run it belonged
-                // to.
-                log_scheduler("http.job.failed", "error", &error.to_string(), LogLevel::Error);
-            }
+                // at. Logged, it is a line somebody has to be watching for;
+                // counted, it is an alert on a rate.
+                Err(error) => {
+                    log_scheduler(
+                        "http.job.failed",
+                        "error",
+                        &error.to_string(),
+                        LogLevel::Error,
+                    );
+                    "error"
+                }
+            };
+            record_job_metric("lease", outcome, started.elapsed().as_secs_f64());
         });
     }
     while let Some(result) = jobs.join_next().await {
@@ -268,6 +282,39 @@ mod tests {
                     && line.contains("ERROR")
             }),
             "a failed job must be logged at error level: {recorded:?}"
+        );
+    }
+
+    /// A failing background job is invisible to every other signal: it has no
+    /// request, no status code, and never appears in the request metrics. The
+    /// log line is how somebody finds it by reading; the counter is how they
+    /// find it without reading — a rate that can be alerted on, which is the
+    /// difference between noticing and not.
+    #[tokio::test]
+    async fn a_failing_job_is_counted_for_the_exporter() {
+        let registry = test_registry().await;
+        let hooks = SchedulerHooks::new(
+            vec![Arc::new(|_registry| {
+                Box::pin(async { Err(MemoryError::Storage("disk is gone".into())) })
+            })],
+            1,
+        )
+        .expect("non-empty hooks");
+        let shutdown = CancellationToken::new();
+
+        let exposition = crate::observability::tests::exposed(|| async {
+            run_cycle(registry, &hooks, shutdown).await;
+        })
+        .await;
+
+        let Some(exposition) = exposition else { return };
+        assert!(
+            exposition.contains(crate::observability::METRIC_BACKGROUND_JOBS_TOTAL),
+            "a background failure must be countable: {exposition}"
+        );
+        assert!(
+            exposition.contains(r#"outcome="error""#),
+            "and labelled as the failure it is: {exposition}"
         );
     }
 

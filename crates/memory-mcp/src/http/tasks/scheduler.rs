@@ -80,10 +80,18 @@ async fn retry_reconcile_and_retain_with_options(
         return Ok(());
     };
 
+    // Measured around the whole pass rather than each step inside it: a tenant
+    // loop that grows slow shows up here as one rising series, and the per-step
+    // refusals below already say which step refused. A timer per step would add
+    // five histograms to say the same thing with less legibility.
+    let started = std::time::Instant::now();
+    let mut degraded = false;
+
     for tenant in tenants {
         let db = match engine.bind(&tenant).await {
             Ok(db) => db,
             Err(error) => {
+                degraded = true;
                 crate::http::logging::log_warn(
                     "http.task.bind_failed",
                     &format!("tenant {}: {error}", tenant.id),
@@ -107,12 +115,14 @@ async fn retry_reconcile_and_retain_with_options(
             {
                 continue;
             }
+            degraded = true;
             crate::http::logging::log_warn(
                 "http.task.requeue_failed",
                 &format!("tenant {}: {error}", tenant.id),
             );
         }
         if let Err(error) = task_store.reconcile_artifacts().await {
+            degraded = true;
             crate::http::logging::log_warn(
                 "http.task.reconcile_failed",
                 &format!("tenant {}: {error}", tenant.id),
@@ -131,6 +141,7 @@ async fn retry_reconcile_and_retain_with_options(
                 if error.to_string().contains("tenant_task")
                     && error.to_string().contains("does not exist") => {}
             Err(error) => {
+                degraded = true;
                 crate::http::logging::log_warn(
                     "http.task.execution_failed",
                     &format!("tenant {}: {error}", tenant.id),
@@ -138,12 +149,18 @@ async fn retry_reconcile_and_retain_with_options(
             }
         }
         if let Err(error) = task_store.delete_expired().await {
+            degraded = true;
             crate::http::logging::log_warn(
                 "http.task.delete_expired_failed",
                 &format!("tenant {}: {error}", tenant.id),
             );
         }
     }
+    crate::observability::record_job_metric(
+        "task",
+        if degraded { "degraded" } else { "ok" },
+        started.elapsed().as_secs_f64(),
+    );
     Ok(())
 }
 

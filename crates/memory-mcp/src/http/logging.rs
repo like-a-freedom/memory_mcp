@@ -73,7 +73,12 @@ pub(crate) async fn request_log(mut req: Request, next: Next) -> Response {
         .unwrap_or_else(|| RequestId(Uuid::new_v4()));
     req.extensions_mut().insert(request_id);
 
+    // Saturation: raised before the handler runs and lowered once it returns,
+    // so a scrape taken during a slow request sees it. Both halves are on every
+    // exit path, including the ones where a handler refuses.
+    inflight_requests(1);
     let mut response = next.run(req).await;
+    inflight_requests(-1);
     if let Ok(value) = axum::http::HeaderValue::from_str(&request_id.to_string()) {
         response.headers_mut().insert(REQUEST_ID_HEADER, value);
     }
@@ -101,13 +106,19 @@ pub(crate) async fn request_log(mut req: Request, next: Next) -> Response {
         tenant_fingerprint: tenant_fingerprint.clone(),
     });
     let outcome = outcome_label(response.status().as_u16());
+    let elapsed = started.elapsed();
+    // The same three facts the log line carries, as metrics: the traffic
+    // count, the latency distribution, and — through `outcome` — the error
+    // ratio. Taken from the same values, so a graph and a log line can never
+    // disagree about one request.
+    record_request_metric(method_category, outcome, elapsed.as_secs_f64());
     let event = RequestLog {
         event: "http_request",
         request_id: &request_id,
         method_category,
         credential_kind: &credential_kind,
         outcome,
-        latency_ms: started.elapsed().as_millis() as u64,
+        latency_ms: elapsed.as_millis() as u64,
         tenant_fingerprint: &tenant_fingerprint,
     };
     if let Ok(json) = serde_json::to_string(&event) {
@@ -123,6 +134,43 @@ pub(crate) async fn request_log(mut req: Request, next: Next) -> Response {
         crate::logging::StdoutLogger::from_env().log(fields, crate::logging::LogLevel::Info);
     }
     response
+}
+
+/// Move the in-flight gauge by `delta` requests.
+///
+/// Additive rather than a read-modify-write of a shared counter: two requests
+/// completing at once must not lose each other's update, and a gauge that
+/// undercounts is worse than one that is slightly late.
+fn inflight_requests(delta: i64) {
+    // The metric name is a local `const` rather than the call inline: the
+    // `metrics` macros borrow their name argument, and a path through
+    // `crate::observability` is not a `'static` str.
+    const INFLIGHT: &str = crate::observability::METRIC_HTTP_REQUESTS_INFLIGHT;
+    metrics::gauge!(INFLIGHT).increment(delta as f64);
+}
+
+/// Record one served request: the traffic count and the latency observation.
+///
+/// The labels are `&'static str` because that is what the `metrics` macros
+/// require for a value: a metric registry outlives the request, and a label
+/// borrowed from a request would dangle after it returned. `categorize` and
+/// `outcome_label` already return exactly that — a bounded class, never the
+/// path or the status code.
+fn record_request_metric(method_category: &'static str, outcome: &'static str, seconds: f64) {
+    const REQUESTS: &str = crate::observability::METRIC_HTTP_REQUESTS_TOTAL;
+    const DURATION: &str = crate::observability::METRIC_HTTP_REQUEST_DURATION_SECONDS;
+    metrics::counter!(
+        REQUESTS,
+        "method" => method_category,
+        "outcome" => outcome,
+    )
+    .increment(1);
+    metrics::histogram!(
+        DURATION,
+        "method" => method_category,
+        "outcome" => outcome,
+    )
+    .record(seconds);
 }
 
 /// Bounded request log event. The serialize order is the
@@ -407,6 +455,101 @@ mod tests {
                 .and_then(|v| v.to_str().ok()),
             Some(supplied.to_string().as_str()),
             "a caller-supplied id must survive the middleware"
+        );
+    }
+
+    /// A served request has to be visible as a metric, not only as a log line.
+    ///
+    /// The access log is the right place — it is the outermost layer, it
+    /// already classifies the method, the status and the duration, and it runs
+    /// for every request including the ones refused before any inner layer. But
+    /// a log line is not a metric: it is sampled, not aggregated, and the only
+    /// way to answer "how many requests did this deployment serve, and how slow
+    /// were they" from logs is to parse them. `/metrics` rendered nothing about
+    /// HTTP traffic at all, which is the first golden signal missing from a
+    /// service whose only entry point is HTTP.
+    #[tokio::test]
+    async fn a_served_request_reaches_the_metrics_exporter() {
+        use crate::observability::tests::exposed;
+
+        let exposition = exposed(|| async {
+            let mut svc = Router::new()
+                .route("/", get(echo))
+                .layer(axum::middleware::from_fn(request_log));
+            let req = Request::builder()
+                .method("GET")
+                .uri("/")
+                .body(Body::empty())
+                .unwrap();
+            svc.call(req).await.expect("served");
+        })
+        .await;
+
+        let Some(exposition) = exposition else {
+            // Another test owns the global recorder. The metric is still
+            // exercised; it just cannot be read back in the same process.
+            return;
+        };
+
+        use crate::observability::tests::sample;
+        // The value, not only the name: a metric that is declared and never
+        // incremented still renders in the exposition, and a dashboard built on
+        // it would show a flat zero that reads as "no traffic" rather than
+        // "not measured".
+        assert_eq!(
+            sample(
+                &exposition,
+                crate::observability::METRIC_HTTP_REQUESTS_TOTAL
+            ),
+            Some(1.0),
+            "one served request must be one counted request: {exposition}"
+        );
+        assert!(
+            exposition.contains(crate::observability::METRIC_HTTP_REQUEST_DURATION_SECONDS),
+            "latency must reach the exporter: {exposition}"
+        );
+        assert!(
+            exposition.contains(crate::observability::METRIC_HTTP_REQUESTS_INFLIGHT),
+            "saturation must reach the exporter: {exposition}"
+        );
+        // The histogram records an observation, not a declaration: a request
+        // that took real time must appear in the sum, or the latency panel is
+        // a graph of nothing.
+        assert!(
+            exposition.contains("_sum") && !exposition.contains("_sum 0"),
+            "the observed request must contribute a real duration: {exposition}"
+        );
+    }
+
+    /// A request that failed is counted under its status class, and one in
+    /// flight is visible as a gauge that returns to zero. Together they answer
+    /// the two questions an on-call engineer asks first: is anything broken,
+    /// and is anything stuck.
+    #[tokio::test]
+    async fn a_failed_request_is_counted_under_its_status() {
+        use crate::observability::tests::exposed;
+
+        let exposition = exposed(|| async {
+            let mut svc = Router::new()
+                .route(
+                    "/boom",
+                    get(|| async { axum::http::StatusCode::INTERNAL_SERVER_ERROR }),
+                )
+                .layer(axum::middleware::from_fn(request_log));
+            let req = Request::builder()
+                .method("GET")
+                .uri("/boom")
+                .body(Body::empty())
+                .unwrap();
+            svc.call(req).await.expect("served");
+        })
+        .await;
+
+        let Some(exposition) = exposition else { return };
+
+        assert!(
+            exposition.contains("outcome=\"5xx\""),
+            "a 5xx must be countable without reading a log: {exposition}"
         );
     }
 

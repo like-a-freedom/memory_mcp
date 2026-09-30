@@ -1182,6 +1182,34 @@ retrieval quality, gates, and case outcomes. Individual record identifiers are
 never metric labels; use structured logs for per-request diagnosis. See
 [ADR-0048](docs/adr/0048-bounded-runtime-observability.md).
 
+#### Golden signals
+
+Four questions, four signals. The HTTP surface had none of them before
+`1.19.0`: `/metrics` rendered nothing about traffic, so "how busy is this
+deployment and is it slow" was answerable only by parsing logs.
+
+| Signal | Metric | Labels | Meaning |
+| --- | --- | --- | --- |
+| Traffic | `memory_http_requests_total` | `method`, `outcome` | Every request the outermost layer served, including the ones it refused before any inner layer ran |
+| Latency | `memory_http_request_duration_seconds` | `method`, `outcome` | Request duration histogram; `outcome` separates success from failure latency |
+| Errors | `memory_http_requests_total{outcome="5xx"}` | — | The 5xx share of traffic, the only error rate that matters for availability |
+| Saturation | `memory_http_requests_inflight` | — | Requests in flight. A count that only appears between scrapes is invisible, and "the queue is growing" is asked before anything else when latency climbs |
+
+Background work is the one failure class with no request attached: it cannot be
+seen in a status code and never appears in the request metrics. It is counted
+separately, by the same helper every scheduler uses, so a failing job is a
+rate to alert on rather than a line to notice.
+
+| Metric | Labels | Meaning |
+| --- | --- | --- |
+| `memory_background_jobs_total` | `job`, `outcome` | One per scheduler pass. `outcome` is `ok`, `error`, or `degraded` — the task scheduler reports `degraded` when any tenant step refused, since a pass with one broken tenant is not a failed pass |
+| `memory_background_job_duration_seconds` | `job`, `outcome` | How long a pass took |
+
+`job` is a fixed family (`lease`, `task`), never a tenant or record id: an
+unbounded label is how a metrics backend falls over, and per-tenant
+attribution belongs in logs, which carry `tenant_fingerprint` for exactly
+that.
+
 ### Build features
 
 The package ships two coarse build profiles plus a few orthogonal opt-in axes.
