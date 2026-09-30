@@ -95,37 +95,53 @@ def check_layout(path: pathlib.Path, document: dict, failures: list[str]) -> Non
                 f"{path.name} / {panel['title']}: row y={grid['y']} at position "
                 f"{index}; rows must be one grid line apart in document order"
             )
+        if grid["x"] + grid["w"] > 24:
+            failures.append(
+                f"{path.name} / {panel['title']}: x+w={grid['x'] + grid['w']} "
+                f"exceeds the 24-column grid"
+            )
         positions.append((grid["y"], grid["x"]))
-
-        occupied: dict[tuple[int, int], str] = {}
-        for child in panel.get("panels", []):
-            child_grid = child["gridPos"]
-            if child_grid["x"] + child_grid["w"] > 24:
-                failures.append(
-                    f"{path.name} / {panel['title']} / {child['title']}: "
-                    f"x+w={child_grid['x'] + child_grid['w']} exceeds the "
-                    f"24-column grid"
-                )
-            # A cell is (row, column) within the section: a collapsed row is
-            # drawn in its own coordinate space, so two panels collide only if
-            # they share a row *and* a column. Comparing the raw `y` of two
-            # panels at different heights is not a collision, which is exactly
-            # the mistake that made this check report the fixed layout as
-            # broken.
-            for row_offset in range(child_grid["h"]):
-                for column in range(child_grid["x"], child_grid["x"] + child_grid["w"]):
-                    cell = (child_grid["y"] + row_offset, column)
-                    if cell in occupied:
-                        failures.append(
-                            f"{path.name} / {panel['title']}: "
-                            f"{child['title']!r} overlaps {occupied[cell]!r} "
-                            f"at x={column} y={cell[0]}"
-                        )
-                        break
-                    occupied[cell] = child["title"]
+        check_row_contents(path, panel, failures)
 
     if positions != sorted(positions):
         failures.append(f"{path.name}: rows are not in ascending y order")
+
+
+def check_row_contents(path: pathlib.Path, row: dict, failures: list[str]) -> None:
+    """No two children of a row may share a cell, and a nested row is a row.
+
+    Grafana allows a row inside a row. The first version of this check treated
+    a nested row as a panel, so its children were never visited at all: a
+    layout with two overlapping panels inside a nested row reported nothing,
+    and a row pushed off the right edge of the grid reported nothing. Both are
+    silent — an unchecked layout is one nobody can trust.
+    """
+    occupied: dict[tuple[int, int], str] = {}
+    for child in row.get("panels", []):
+        child_grid = child["gridPos"]
+        if child["type"] == "row":
+            check_row_contents(path, child, failures)
+            continue
+        if child_grid["x"] + child_grid["w"] > 24:
+            failures.append(
+                f"{path.name} / {row['title']} / {child['title']}: "
+                f"x+w={child_grid['x'] + child_grid['w']} exceeds the "
+                f"24-column grid"
+            )
+        # A cell is (row, column) within the section: a collapsed row is
+        # drawn in its own coordinate space, so two panels collide only if they
+        # share a row *and* a column.
+        for row_offset in range(child_grid["h"]):
+            for column in range(child_grid["x"], child_grid["x"] + child_grid["w"]):
+                cell = (child_grid["y"] + row_offset, column)
+                if cell in occupied:
+                    failures.append(
+                        f"{path.name} / {row['title']}: "
+                        f"{child['title']!r} overlaps {occupied[cell]!r} "
+                        f"at x={column} y={cell[0]}"
+                    )
+                    break
+                occupied[cell] = child["title"]
 
 
 def main() -> int:

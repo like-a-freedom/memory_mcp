@@ -1,6 +1,6 @@
 # Observability
 
-Two Grafana dashboards, thirty recording rules and fifteen alerts over the
+Two Grafana dashboards, thirty-one recording rules and fifteen alerts over the
 metrics the `streamable-http` profile exports on `/metrics`.
 
 Everything here is generated or checked. The dashboards are built by
@@ -11,7 +11,7 @@ rather than keeping its own copy.
 
 ```
 observability/
-├── recording_rules.yml     30 rules in 9 groups
+├── recording_rules.yml     31 rules in 9 groups
 ├── alerts.yml              15 alerts in 6 groups
 ├── dashboards/
 │   ├── technical.json      RED, for whoever is on call
@@ -130,7 +130,7 @@ an alert outliving its incident by the length of the long window.
 | `BackgroundJobsFailing` | ticket | lease passes unhealthy 15m | — |
 | `RuntimeRefusals` | page | >0.1/s for 10m | — |
 | `RegistryInconsistent` | ticket | 30m of drift | — |
-| `ClaimReconciliationFailing` | ticket | 15m of errors | — |
+| `ClaimProjectionFailing` | ticket | 15m of errors | — |
 | `SignupsRefused` | ticket | 1h of refusals | — |
 
 Three decisions worth stating, because each could reasonably have gone the
@@ -148,7 +148,7 @@ other way:
   one-way latch, and averaging a step function reports a fraction of a broken
   deployment.
 
-## Six figures that mislead if read naively
+## Seven figures that mislead if read naively
 
 Each of these is a place where the obvious query returns a number that is
 plausible and wrong. Every one is also stated in the metric's own `# HELP`

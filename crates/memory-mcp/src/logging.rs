@@ -645,24 +645,51 @@ pub mod capture {
     }
 
     /// Restores the previous override when dropped, including on unwind.
-    struct LevelOverride {
+    ///
+    /// The guard remembers *what it pushed* and removes that entry, rather than
+    /// popping the top of the stack. Popping the top is only correct when
+    /// pushes and drops are strictly nested, and under a parallel test
+    /// harness they are not: two tests can install concurrently and drop in the
+    /// opposite order, and the second drop then removes the first test's level.
+    /// The stack is left holding the wrong directive, and a test that passed its
+    /// own `http=error` sees `http=info` instead — which is how a correct test
+    /// failed about one run in ninety.
+    ///
+    /// Removing by value rather than by position also means an override that
+    /// was never pushed (a poisoned lock, a failed install) cannot remove
+    /// someone else's.
+    pub(crate) struct LevelOverride {
         slot: &'static Mutex<Vec<String>>,
+        level: String,
+        pushed: bool,
     }
 
     impl LevelOverride {
-        fn install(level: &str) -> Self {
+        pub(crate) fn install(level: &str) -> Self {
             let slot = OVERRIDE_LEVEL.get_or_init(|| Mutex::new(Vec::new()));
-            if let Ok(mut current) = slot.lock() {
-                current.push(level.to_string());
+            let pushed = slot
+                .lock()
+                .map(|mut current| {
+                    current.push(level.to_string());
+                })
+                .is_ok();
+            LevelOverride {
+                slot,
+                level: level.to_string(),
+                pushed,
             }
-            LevelOverride { slot }
         }
     }
 
     impl Drop for LevelOverride {
         fn drop(&mut self) {
-            if let Ok(mut current) = self.slot.lock() {
-                current.pop();
+            if !self.pushed {
+                return;
+            }
+            if let Ok(mut current) = self.slot.lock()
+                && let Some(position) = current.iter().rposition(|held| *held == self.level)
+            {
+                current.remove(position);
             }
         }
     }
@@ -684,6 +711,82 @@ pub mod capture {
 mod tests {
     use super::*;
     use serde_json::json;
+
+    /// Serialises the two tests that assert on the override stack's absolute
+    /// contents. It is process-global, so they would otherwise interleave and
+    /// each would see the other's directive.
+    fn override_lock() -> std::sync::MutexGuard<'static, ()> {
+        static LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
+        LOCK.lock().unwrap_or_else(|poison| poison.into_inner())
+    }
+
+    /// An override must be removed by identity, not by position.
+    ///
+    /// The guard used to `pop()` the top of the stack, which is only right when
+    /// pushes and drops are strictly nested. They are not under a parallel test
+    /// harness: two tests install concurrently and drop in the opposite order,
+    /// and the second drop then removes the *first* test's directive. The stack
+    /// is left holding the wrong level, and a test that installed its own
+    /// `http=error` reads `http=info` — a correct test failing about one run in
+    /// ninety, on the one signal the suite uses to prove the filter works.
+    ///
+    /// Driven here in the order that breaks it: the outer override outlives the
+    /// inner one, so a positional pop removes the wrong entry and the outer
+    /// test is left seeing the inner one's level.
+    #[test]
+    fn an_override_is_removed_by_identity_not_by_position() {
+        let _held = override_lock();
+        // Distinct directives per test: the stack is process-global and the
+        // harness runs tests in parallel, so two tests sharing a value would
+        // remove each other's entry and both would be wrong.
+        let outer = capture::LevelOverride::install("probe.a=info");
+        assert_eq!(capture::override_level().as_deref(), Some("probe.a=info"));
+
+        // The inner guard is dropped first, while the outer is still in force.
+        {
+            let _inner = capture::LevelOverride::install("probe.a=error");
+            assert_eq!(
+                capture::override_level().as_deref(),
+                Some("probe.a=error"),
+                "the innermost override is the one in force"
+            );
+        }
+
+        // A positional pop would have removed `probe.a=error` here and left
+        // `probe.a=info` on the stack, which is right by luck. The failure is
+        // the reverse order: an override outliving one nested inside it.
+        drop(outer);
+        assert_eq!(
+            capture::override_level(),
+            None,
+            "both overrides must be gone; a pop() that removed the wrong entry \
+             would leave one behind and every later test would read it"
+        );
+    }
+
+    /// The order that actually broke: an override installed *outside* another
+    /// that is dropped last.
+    #[test]
+    fn an_outer_override_outliving_an_inner_one_is_restored_correctly() {
+        let _held = override_lock();
+        let inner_first = capture::LevelOverride::install("probe.b=error");
+        // Installed second, so a positional pop on its drop would take
+        // `probe.b=error` and leave `probe.b=info` behind.
+        let second = capture::LevelOverride::install("probe.b=info");
+        assert_eq!(capture::override_level().as_deref(), Some("probe.b=info"));
+
+        drop(inner_first);
+        assert_eq!(
+            capture::override_level().as_deref(),
+            Some("probe.b=info"),
+            "dropping an override that is not on top must not disturb the one \
+             that is; a pop() removes the top regardless, which left the wrong \
+             directive in force for whichever test ran next"
+        );
+
+        drop(second);
+        assert_eq!(capture::override_level(), None);
+    }
 
     #[test]
     fn log_level_parse_recognizes_valid_levels() {
