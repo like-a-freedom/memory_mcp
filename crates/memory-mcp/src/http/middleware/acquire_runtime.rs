@@ -26,6 +26,13 @@ pub async fn acquire_runtime(
     mut req: axum::extract::Request,
     next: Next,
 ) -> Response {
+    // Read once, here: the quota failures below answer 503 with no body, so
+    // the request id is the only thing that ties the operator's report to a
+    // line in the log.
+    let request_id = req
+        .extensions()
+        .get::<crate::http::logging::RequestId>()
+        .copied();
     let principal = match req.extensions().get::<AuthenticatedPrincipal>().cloned() {
         Some(p) => p,
         None => {
@@ -67,7 +74,11 @@ pub async fn acquire_runtime(
     let registry_plan = match state.registry.usage().load_plan(tenant.plan_version).await {
         Ok(plan) => plan,
         Err(error) => {
-            eprintln!("memory_mcp::http: quota plan load failed: {error}");
+            crate::http::logging::log_warn_at(
+                "http.quota.plan_load_failed",
+                &format!("{error}"),
+                request_id,
+            );
             return (
                 axum::http::StatusCode::SERVICE_UNAVAILABLE,
                 "quota registry unavailable",
@@ -85,7 +96,11 @@ pub async fn acquire_runtime(
         {
             Ok(decision) => decision,
             Err(error) => {
-                eprintln!("memory_mcp::http: ingest quota reserve failed: {error}");
+                crate::http::logging::log_warn_at(
+                    "http.quota.reserve_failed",
+                    &format!("{error}"),
+                    request_id,
+                );
                 return (
                     axum::http::StatusCode::SERVICE_UNAVAILABLE,
                     "quota registry unavailable",

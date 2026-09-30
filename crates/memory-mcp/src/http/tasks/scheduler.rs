@@ -84,7 +84,10 @@ async fn retry_reconcile_and_retain_with_options(
         let db = match engine.bind(&tenant).await {
             Ok(db) => db,
             Err(error) => {
-                eprintln!("memory_mcp::tasks: bind failed for {}: {error}", tenant.id);
+                crate::http::logging::log_warn(
+                    "http.task.bind_failed",
+                    &format!("tenant {}: {error}", tenant.id),
+                );
                 continue;
             }
         };
@@ -104,15 +107,15 @@ async fn retry_reconcile_and_retain_with_options(
             {
                 continue;
             }
-            eprintln!(
-                "memory_mcp::tasks: requeue failed for {}: {error}",
-                tenant.id
+            crate::http::logging::log_warn(
+                "http.task.requeue_failed",
+                &format!("tenant {}: {error}", tenant.id),
             );
         }
         if let Err(error) = task_store.reconcile_artifacts().await {
-            eprintln!(
-                "memory_mcp::tasks: reconcile failed for {}: {error}",
-                tenant.id
+            crate::http::logging::log_warn(
+                "http.task.reconcile_failed",
+                &format!("tenant {}: {error}", tenant.id),
             );
         }
         match execute_one_task(
@@ -128,16 +131,16 @@ async fn retry_reconcile_and_retain_with_options(
                 if error.to_string().contains("tenant_task")
                     && error.to_string().contains("does not exist") => {}
             Err(error) => {
-                eprintln!(
-                    "memory_mcp::tasks: execution failed for {}: {error}",
-                    tenant.id
+                crate::http::logging::log_warn(
+                    "http.task.execution_failed",
+                    &format!("tenant {}: {error}", tenant.id),
                 );
             }
         }
         if let Err(error) = task_store.delete_expired().await {
-            eprintln!(
-                "memory_mcp::tasks: delete_expired failed for {}: {error}",
-                tenant.id
+            crate::http::logging::log_warn(
+                "http.task.delete_expired_failed",
+                &format!("tenant {}: {error}", tenant.id),
             );
         }
     }

@@ -78,8 +78,14 @@ pub(super) fn validate(cfg: &HttpConfig) -> Result<(), MemoryError> {
         ));
     }
     if cfg.bind.ip().is_unspecified() && !cfg.public_base_url.contains("localhost") {
-        eprintln!(
-            "memory_mcp::http::config: binding to unspecified address; production must run behind a reverse proxy"
+        // A warning, not an error: binding wide is legitimate in a container
+        // behind a reverse proxy, which is how this deployment is meant to run.
+        // It reached stderr as free text, so `RUST_LOG=error` could not silence
+        // a startup that is in fact correct, and a log query could not select
+        // it.
+        crate::http::logging::log_warn(
+            "http.config.bind_unspecified",
+            "binding to an unspecified address; production must run behind a reverse proxy",
         );
     }
     if cfg.body_limit_bytes == 0 {

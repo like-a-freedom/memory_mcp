@@ -179,6 +179,51 @@ impl WarningEvent {
     }
 }
 
+/// A warning that belongs to a specific request.
+///
+/// The same event as [`WarningEvent`], plus the request's id. A failure that
+/// answers `5xx` with no body gives a client nothing to quote, so the id in
+/// the log is the only way their report reaches a line — and this is why the
+/// quota paths pass one rather than logging a bare warning.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RequestWarning {
+    op: &'static str,
+    detail: String,
+    request_id: RequestId,
+}
+
+impl RequestWarning {
+    #[must_use]
+    pub fn new(op: &'static str, detail: &str, request_id: RequestId) -> Self {
+        Self {
+            op,
+            detail: detail.to_string(),
+            request_id,
+        }
+    }
+
+    /// Emit it through the deployment's logger.
+    pub fn log_into(self, logger: &StdoutLogger) {
+        let mut event = std::collections::HashMap::new();
+        event.insert("op".into(), self.op.into());
+        event.insert("detail".into(), self.detail.into());
+        event.insert("request_id".into(), self.request_id.to_string().into());
+        logger.log(event, LogLevel::Warn);
+    }
+}
+
+/// Record a warning about a specific request.
+///
+/// Shorthand for [`RequestWarning::new`] followed by
+/// [`RequestWarning::log_into`].
+pub fn log_warn_at(op: &'static str, detail: &str, request_id: Option<RequestId>) {
+    if let Some(request_id) = request_id {
+        RequestWarning::new(op, detail, request_id).log_into(&StdoutLogger::from_env());
+    } else {
+        log_warn(op, detail);
+    }
+}
+
 /// Record a bounded warning from the HTTP runtime, with no request in scope.
 ///
 /// Shorthand for [`WarningEvent::new`] followed by [`WarningEvent::log_into`]
@@ -465,5 +510,54 @@ mod tests {
     /// be exercised without the process-global level override.
     fn event_for_warning() -> WarningEvent {
         WarningEvent::new("http.runtime.activation_failed", "tenant t1: disk is gone")
+    }
+
+    /// A request-scoped warning has to carry the request's id. The quota paths
+    /// answer `503` with no body, so the client is handed nothing to quote; the
+    /// id in the log is the only thing their report can be matched against.
+    /// Without it, "my ingest failed" and the log line about a quota registry
+    /// are two unrelated facts.
+    #[test]
+    fn a_request_warning_carries_the_request_id() {
+        let sink = crate::logging::capture::install();
+        let id = Uuid::parse_str("11111111-2222-3333-4444-555555555555").unwrap();
+
+        RequestWarning::new(
+            "http.quota.plan_load_failed",
+            "registry unreachable",
+            RequestId(id),
+        )
+        .log_into(&StdoutLogger::from_env_with(|key| match key {
+            "RUST_LOG" => Some("warn".to_string()),
+            _ => None,
+        }));
+
+        let recorded = sink.lines();
+        assert!(
+            recorded
+                .iter()
+                .any(|line| line.contains("op=http.quota.plan_load_failed")
+                    && line.contains("req=11111111")
+                    && line.contains("WARN")),
+            "a request warning must name its request: {recorded:?}"
+        );
+    }
+
+    /// A request warning with no request behind it degrades to the plain one
+    /// rather than logging a blank id, so a line never carries `req=-` for
+    /// something that should have named a request.
+    #[test]
+    fn a_request_warning_without_a_request_falls_back_to_the_plain_one() {
+        let sink = crate::logging::capture::install();
+
+        log_warn_at("http.quota.plan_load_failed", "registry unreachable", None);
+
+        let recorded = sink.lines();
+        assert!(
+            recorded
+                .iter()
+                .any(|line| line.contains("op=http.quota.plan_load_failed")),
+            "the warning must still be recorded: {recorded:?}"
+        );
     }
 }

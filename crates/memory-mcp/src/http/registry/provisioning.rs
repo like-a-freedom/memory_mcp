@@ -188,10 +188,13 @@ async fn reconcile_namespaces(
             "kind" => "missing_namespace"
         )
         .increment(1);
-        eprintln!(
-            "memory_mcp::http::registry: missing namespace binding tenant_fingerprint={} namespace_fingerprint={}",
-            identifier_fingerprint(&tenant.id),
-            identifier_fingerprint(&tenant.namespace_binding.namespace)
+        crate::http::logging::log_warn(
+            "http.registry.missing_namespace_binding",
+            &format!(
+                "tenant_fingerprint={} namespace_fingerprint={}",
+                identifier_fingerprint(&tenant.id),
+                identifier_fingerprint(&tenant.namespace_binding.namespace)
+            ),
         );
     }
     for namespace in diff.orphan {
@@ -200,9 +203,12 @@ async fn reconcile_namespaces(
             "kind" => "orphan_namespace"
         )
         .increment(1);
-        eprintln!(
-            "memory_mcp::http::registry: orphan namespace namespace_fingerprint={}",
-            identifier_fingerprint(namespace)
+        crate::http::logging::log_warn(
+            "http.registry.orphan_namespace",
+            &format!(
+                "namespace_fingerprint={}",
+                identifier_fingerprint(namespace)
+            ),
         );
     }
     Ok(())

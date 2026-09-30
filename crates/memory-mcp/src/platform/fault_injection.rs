@@ -89,6 +89,22 @@ impl FaultInjector for NoFaults {
     }
 }
 
+#[cfg(any(test, feature = "test-fixtures"))]
+fn log_unknown_fault_point(name: &str) {
+    let mut event = std::collections::HashMap::new();
+    event.insert(
+        "op".to_string(),
+        "http.fault_injection.unknown_point".to_string().into(),
+    );
+    event.insert(
+        "detail".to_string(),
+        format!("MEMORY_MCP_HTTP_TEST_FAULT_POINT={name} names no known point").into(),
+    );
+    // `crate::logging` rather than `crate::http::logging`: this module is not
+    // gated on `streamable-http`, and the HTTP module does not exist without it.
+    crate::logging::StdoutLogger::from_env().log(event, crate::logging::LogLevel::Warn);
+}
+
 /// A `FaultInjector` that returns `MemoryError::Transient` exactly once at
 /// the configured point, then passes through. Used by the crash-recovery
 /// test suite to prove the next worker advances the partial state.
@@ -137,7 +153,11 @@ impl FailOnceAt {
             return Arc::new(NoFaults);
         };
         let Some(point) = FaultPoint::from_env_name(&name) else {
-            eprintln!("memory_mcp::http::fault_injection: unknown fault point {name}");
+            // A misconfigured fault point means a test meant to inject a
+            // failure will not, and the test then fails for an unrelated
+            // reason. A warning rather than a startup error: the variable is
+            // inert outside a test deployment.
+            log_unknown_fault_point(&name);
             return Arc::new(NoFaults);
         };
         let n: usize = std::env::var("MEMORY_MCP_HTTP_TEST_FAULT_AT")

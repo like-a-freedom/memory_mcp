@@ -47,9 +47,9 @@ pub async fn cleanup_expired_for_all(registry: &RegistryHandle) -> Result<(), Me
         let db = match engine.bind(&tenant).await {
             Ok(db) => db,
             Err(error) => {
-                eprintln!(
-                    "memory_mcp::app_sessions: bind failed for {}: {error}",
-                    tenant.id
+                crate::http::logging::log_warn(
+                    "http.app_session.bind_failed",
+                    &format!("tenant {}: {error}", tenant.id),
                 );
                 continue;
             }

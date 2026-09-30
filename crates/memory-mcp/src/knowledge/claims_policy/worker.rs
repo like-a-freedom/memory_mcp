@@ -41,7 +41,11 @@ impl ClaimWorkerRuntime {
                             Ok(true) => continue,
                             Ok(false) => {}
                             Err(e) => {
-                                eprintln!("[claim] worker error: {e}");
+                                super::projection::log_claim_event(
+                                    "knowledge.claim.worker_error",
+                                    &[],
+                                    &e.to_string(),
+                                );
                             }
                         }
                     }

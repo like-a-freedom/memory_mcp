@@ -8,6 +8,7 @@ use crate::knowledge::claims::{ClaimStore, PersistProjectionRequest};
 use crate::models::ClaimJobId;
 use crate::models::EpisodeId;
 use crate::models::FactId;
+
 use crate::models::claim::{
     ClaimBuildInput, ClaimDraft, ClaimIdentityVersion, ClaimJob, ClaimJobKind, ClaimJobState,
     ClaimSlot, ComparisonKeyHash, ExtractorFingerprint, PolicyFingerprint, QualifierHash,
@@ -16,6 +17,39 @@ use crate::models::claim::{
 
 use super::extract::project_fact;
 use super::schema::{ClaimProjectionInput, ClaimSchemaRegistry};
+
+/// Record a claim-pipeline event through the deployment's logger.
+///
+/// These were `eprintln!` with hand-built `key=value` text: no level, so
+/// `RUST_LOG=error` could not silence a failed projection; no operation, so no
+/// subsystem directive could reach one; and the values ran together in a
+/// single string, so a log query could not address `namespace` on its own.
+///
+/// A successful projection is `debug` — it fires once per fact and a busy
+/// deployment would drown the failures it sits next to.
+///
+/// The fields are rendered by the caller, so a slice of them can be built
+/// without a type annotation at every call site — `impl Display` in the element
+/// position would need one, since the slice's type is inferred from the first
+/// element alone.
+pub(super) fn log_claim_event(op: &'static str, fields: &[(&str, String)], error: &str) {
+    use crate::logging::{LogLevel, StdoutLogger};
+
+    let level = if op.ends_with("projected") {
+        LogLevel::Debug
+    } else {
+        LogLevel::Warn
+    };
+    let mut event = std::collections::HashMap::new();
+    event.insert("op".into(), op.into());
+    for (key, value) in fields {
+        event.insert((*key).to_string(), value.clone().into());
+    }
+    if !error.is_empty() {
+        event.insert("error".into(), error.to_string().into());
+    }
+    StdoutLogger::from_env().log(event, level);
+}
 
 /// Projection summary for a single fact.
 #[derive(Debug, Clone)]
@@ -233,9 +267,13 @@ impl ClaimService {
                 )
                 .await
                 {
-                    eprintln!(
-                        "[claim] inline reconcile failed (non-fatal): namespace={} claim_id={} error={}",
-                        params.namespace, claim_id, err
+                    log_claim_event(
+                        "knowledge.claim.inline_reconcile_failed",
+                        &[
+                            ("namespace", params.namespace.to_string()),
+                            ("claim_id", claim_id.to_string()),
+                        ],
+                        &err.to_string(),
                     );
                 }
             }
@@ -268,8 +306,13 @@ impl ClaimService {
 
     /// Record a non-fatal failure from post-fact projection.
     pub fn record_post_fact_failure(&self, namespace: &str, fact_id: &FactId, error: &MemoryError) {
-        eprintln!(
-            "[claim] projection failed after fact persistence (non-fatal): namespace={namespace} fact_id={fact_id} error={error}"
+        log_claim_event(
+            "knowledge.claim.projection_failed",
+            &[
+                ("namespace", namespace.to_string()),
+                ("fact_id", fact_id.to_string()),
+            ],
+            &error.to_string(),
         );
         super::telemetry::record_pipeline_event(
             super::telemetry::ClaimMetricStage::Project,
@@ -287,8 +330,15 @@ impl ClaimService {
         claims_projected: usize,
         claims_skipped: usize,
     ) {
-        eprintln!(
-            "[claim] projection ok: namespace={namespace} fact_id={fact_id} projected={claims_projected} skipped={claims_skipped}"
+        log_claim_event(
+            "knowledge.claim.projected",
+            &[
+                ("namespace", namespace.to_string()),
+                ("fact_id", fact_id.to_string()),
+                ("projected", claims_projected.to_string()),
+                ("skipped", claims_skipped.to_string()),
+            ],
+            "",
         );
     }
 }

@@ -20,6 +20,12 @@ pub async fn serve(
 ) -> std::io::Result<()> {
     let listener = TcpListener::bind(cfg.bind).await?;
     let local_addr = listener.local_addr()?;
+    // Deliberately not the structured logger. The bound address is a startup
+    // fact a supervisor reads — the `println!` on stdout is the readiness line
+    // a container runtime or an orchestrator greps for, and it has to be there
+    // before a request can be served. The stderr copy is the same fact for a
+    // human reading the log; neither is a filtered event, so neither pretends
+    // to be one.
     eprintln!("memory_mcp::http: listener bound at {local_addr}");
     println!("memory_mcp_http bound={local_addr}");
     let token = shutdown.token();
