@@ -81,3 +81,7 @@ perf.data
 perf.data.old
 lcov.info
 .grepai/
+
+# Python bytecode from the observability checkers
+__pycache__/
+*.pyc
