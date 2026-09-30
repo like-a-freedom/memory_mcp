@@ -53,6 +53,16 @@ jobs:
         run: |
           rustup target add wasm32-unknown-unknown
           cargo clippy -p ui --target wasm32-unknown-unknown --all-targets --locked -- -D warnings
+      - name: Observability rules, alerts and dashboards
+        run: |
+          # 31 recording rules, 15 alerts and 4 panels groups that nothing
+          # reached: a rule reading a metric the crate no longer exports
+          # evaluates to empty and never fires, and a panel naming a deleted
+          # series renders empty, which is indistinguishable from a subsystem
+          # that is off. The checkers are Python; this step is a cargo
+          # invocation, which is what ADR-0064 requires of CI.
+          python3 -m pip install --quiet pyyaml
+          cargo run --locked -p xtask -- check-observability
       - name: Default workspace tests
         run: cargo test --workspace --lib --bins --tests --locked
       - name: Optional feature tests

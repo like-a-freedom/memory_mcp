@@ -54,6 +54,10 @@ pub enum PackError {
     },
     Smoke(String),
     Bundle(String),
+    /// A checker under `observability/` failed, or is missing. The detail
+    /// carries the checker's own output, because the checker's message names
+    /// the rule and that is the part worth reading.
+    Observability(String),
 }
 
 impl std::fmt::Display for PackError {
@@ -62,6 +66,7 @@ impl std::fmt::Display for PackError {
             PackError::Io { path, source } => write!(f, "{}: {source}", path.display()),
             PackError::Smoke(detail) => write!(f, "{detail}"),
             PackError::Bundle(detail) => write!(f, "{detail}"),
+            PackError::Observability(detail) => write!(f, "{detail}"),
         }
     }
 }

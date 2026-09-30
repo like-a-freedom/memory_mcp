@@ -1,19 +1,28 @@
 # Python dev tooling for memory-mcp.
 #
-# Only used by the standalone dev script `gen_anno_onnx_parity.py`
-# (generates the anno-onnx release-parity reference). The Rust workspace
-# is unaffected by this file. Create the environment with:
+# Two consumers, deliberately kept separate:
+#
+#   * `observability/check_*.py` — the recording-rule, alert and dashboard
+#     checkers, run in CI through `cargo run -p xtask -- check-observability`.
+#     They need PyYAML and nothing else. This is why they are declared: three
+#     of the four import `yaml`, and without it they resolved by accident
+#     through the onnxruntime chain, which is not a thing to rely on.
+#   * `gen_anno_onnx_parity.py` — the standalone NER release-parity generator,
+#     which needs the numeric stack below and takes no part in any check.
+#
+# The Rust workspace is unaffected by this file. Create the environment with:
 #
 #   uv sync --python 3.11
 [project]
 name = "memory-mcp-scripts"
 version = "0.1.0"
-description = "Python dev tooling for memory-mcp (NER parity reference generation)"
+description = "Python dev tooling for memory-mcp (NER parity reference generation, observability checks)"
 requires-python = ">=3.11"
 dependencies = [
     "numpy>=2",
     "onnxruntime>=1.19",
     "tokenizers>=0.20",
+    "pyyaml>=6",
 ]
 
 [tool.uv]

@@ -9,11 +9,17 @@
 //!   * `check-ui-bundle` asserts the console bundle's shape before it is
 //!     embedded, so a bundler that changes its output fails the build instead
 //!     of shipping a UI that cannot boot.
+//!   * `check-observability` runs the recording-rule, alert and dashboard
+//!     checkers, so 31 rules, 15 alerts and 4 dashboards cannot drift away
+//!     from the metrics the crate exports without anything noticing.
 //!
-//! Both replaced Python tooling under `scripts/ci`; the repository now runs
-//! nothing outside cargo.
+//! Two of the three replaced Python tooling under `scripts/ci`; the
+//! repository runs nothing outside cargo. The observability checkers are still
+//! Python, and this subcommand is the cargo entry point that makes them
+//! reachable from a cargo-only CI.
 
 mod bundle;
+mod observability;
 mod pack;
 
 use std::path::PathBuf;
@@ -43,6 +49,9 @@ enum Command {
     },
     /// Require the image's Dioxus CLI version to match the UI crate's pin.
     CheckDioxusPin,
+    /// Regenerate the dashboards and check the rules, alerts and panels
+    /// against the metrics the crate actually exports.
+    CheckObservability,
 }
 
 fn main() -> std::process::ExitCode {
@@ -53,6 +62,7 @@ fn main() -> std::process::ExitCode {
         }
         Command::CheckUiBundle { dist } => bundle::check(&dist),
         Command::CheckDioxusPin => bundle::check_cli_pin(),
+        Command::CheckObservability => observability::run(&observability::scripts_dir()),
     };
     match result {
         Ok(()) => std::process::ExitCode::SUCCESS,
