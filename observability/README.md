@@ -202,14 +202,18 @@ log wraps the whole router, so a scrape arrives there like any other request. It
 is logged and *not counted*: at a 15-second interval that is four requests a
 minute, forever, in the counter every traffic figure and error ratio is
 computed from — which would mean an idle deployment never reads zero and
-`NoTraffic` could never fire, and the in-flight gauge would be pinned at or
-above one whenever a scrape is in flight.
+`NoTraffic` could never fire. The in-flight gauge is excluded for the same
+reason and by the same route check: a scrape is fast enough to be over before
+a scrape interval, so a gauge it held at one would be the scrape rate wearing a
+load signal's name.
 
 **7. `memory_http_requests_inflight` is mostly zero, correctly.** It is raised
-when a request enters a handler and lowered when it leaves, with no `await` in
-between, so a scrape only sees a value when it happened to land inside one. A
-flat zero means "no request was in flight at that instant", not "the server is
-idle". Read the trend across scrapes, never one sample.
+when a request enters a handler and lowered when it leaves, so a scrape only
+sees a value when it happened to land inside one — and `/metrics` itself never
+raises it, for the reason above. A flat zero means "no request was in flight at
+that instant", not "the server is idle". Read the trend across scrapes, never
+one sample: a single non-zero is one request caught mid-flight, and a value that
+*sticks* across consecutive scrapes is how many were in flight at once.
 
 ## Deliberate gaps
 

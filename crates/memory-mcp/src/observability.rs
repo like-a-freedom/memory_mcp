@@ -587,6 +587,23 @@ pub(crate) mod tests {
     /// happened to record first, and an assertion against it is a coin flip. The
     /// metric name is also matched on a boundary — `foo` must not match `foo_bar` —
     /// so a sibling name cannot be read by accident.
+    /// The value of a series that carries no labels at all.
+    ///
+    /// A separate reader from [`sample_series`] because a label-less line is
+    /// rendered `name 1`, with no braces — so asking `sample_series` for it
+    /// with an empty label set builds the prefix `name{}` and matches nothing.
+    /// That returned `None` rather than an error, which made a test asserting
+    /// "the gauge was never raised" pass on a gauge that was raised on every
+    /// single request: an assertion that could not fail, on the exact signal
+    /// the dashboard tells the reader to distrust.
+    pub(crate) fn sample_bare(exposition: &str, metric: &str) -> Option<f64> {
+        exposition
+            .lines()
+            .find(|line| line.starts_with(metric) && line[metric.len()..].starts_with(' '))
+            .and_then(|line| line.split_whitespace().last())
+            .and_then(|value| value.parse().ok())
+    }
+
     pub(crate) fn sample_series(exposition: &str, metric: &str, labels: &str) -> Option<f64> {
         let prefix = format!("{metric}{{{labels}}}");
         exposition
@@ -830,6 +847,42 @@ pub(crate) mod tests {
         }
     }
 
+    /// A label-less series has to be readable, and reading it must not be a
+    /// silent miss.
+    ///
+    /// `sample_series` builds the prefix `name{labels}`, so asking it for a
+    /// series that has no labels at all produces `name{}` and matches nothing.
+    /// It returns `None` for that, indistinguishable from a series that was
+    /// never written — which is how a test asserting "the in-flight gauge was
+    /// never raised" came to pass on a gauge raised on every request.
+    #[test]
+    fn a_series_without_labels_is_read_by_its_own_reader() {
+        const EXPOSITION: &str = concat!(
+            "# TYPE memory_http_requests_inflight gauge\n",
+            "memory_http_requests_inflight 3\n",
+            "memory_http_requests_total{method=\"read\"} 7\n",
+        );
+
+        assert_eq!(
+            sample_bare(EXPOSITION, "memory_http_requests_inflight"),
+            Some(3.0)
+        );
+        // The prefixed reader must not claim it, and must not silently return
+        // a *neighbouring* series either.
+        assert_eq!(
+            sample_series(EXPOSITION, "memory_http_requests_inflight", ""),
+            None,
+            "the prefixed reader must not pretend to read a label-less series"
+        );
+        // A name that is a prefix of another must not read the longer one.
+        assert_eq!(
+            sample_bare(EXPOSITION, "memory_http_requests"),
+            None,
+            "a bare reader must respect the name boundary, or `memory_http_requests` \
+             reads `memory_http_requests_total`"
+        );
+    }
+
     /// Every family the crate exports has to be in the dictionary.
     ///
     /// A metric constant with no description is the failure this prevents, and
@@ -868,7 +921,20 @@ pub(crate) mod tests {
                             .chars()
                             .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '_')
                         && quote.len() > "memory_".len() + 3
-                        && !quote.ends_with('_');
+                        && !quote.ends_with('_')
+                        // A family name carries its own shape: a namespace, at
+                        // least one underscore-separated word, and a suffix
+                        // that says what it is. Without this, a name a *test*
+                        // writes — a prefix it is checking the boundary of, say
+                        // — is read as a family nobody described.
+                        && (quote.ends_with("_total")
+                            || quote.contains("_seconds")
+                            || quote.ends_with("_count")
+                            || quote.ends_with("_active")
+                            || quote.ends_with("_depth")
+                            || quote.ends_with("_inflight")
+                            || quote.ends_with("_degraded")
+                            || quote.ends_with("_considered"));
                     if is_family {
                         // `line` borrows from the `include_str!` source, which
                         // is `'static`, so the copied substring outlives it.

@@ -78,12 +78,12 @@ pub(crate) async fn request_log(mut req: Request, next: Next) -> Response {
     let route_cell = RouteCell::default();
     req.extensions_mut().insert(route_cell.clone());
 
-    // Saturation: raised before the handler runs and lowered once it returns,
-    // so a scrape taken during a slow request sees it. Both halves are on every
-    // exit path, including the ones where a handler refuses.
-    inflight_requests(1);
+    // Saturation is raised by `capture_route`, not here: this layer runs before
+    // the router has matched, so it cannot tell a request from a scrape, and a
+    // scrape would pin the gauge at one for the whole time it took to render an
+    // exposition — which is exactly the signal the dashboard describes as
+    // meaningful only when it is caught across several scrapes.
     let mut response = next.run(req).await;
-    inflight_requests(-1);
     if let Ok(value) = axum::http::HeaderValue::from_str(&request_id.to_string()) {
         response.headers_mut().insert(REQUEST_ID_HEADER, value);
     }
@@ -218,19 +218,32 @@ const METRICS_ROUTE: &str = "/metrics";
 #[derive(Clone, Default)]
 struct RouteCell(std::sync::Arc<std::sync::OnceLock<&'static str>>);
 
-/// Capture the matched route before the handler runs.
+/// Capture the matched route, and raise the saturation gauge around the handler.
 ///
 /// Added with [`axum::Router::route_layer`], not `layer`: only `route_layer`
 /// runs after the router has matched. A request matching no route never
 /// reaches it — axum's fallback answers those — so the cell stays unset and
 /// the outer layer reports `unmatched`, which is the truth for them.
+///
+/// The in-flight gauge is raised here rather than in `request_log` for the same
+/// reason: this is the first place the route is known, and a scrape is not
+/// traffic. A gauge pinned at one for the duration of every exposition is not a
+/// saturation signal — it is a constant, and it would be the only thing the
+/// dashboard's saturation panel ever showed.
 pub(crate) async fn capture_route(req: Request, next: Next) -> Response {
+    let route = route_label(req.extensions().get::<axum::extract::MatchedPath>());
     if let Some(cell) = req.extensions().get::<RouteCell>() {
-        let _ = cell.0.set(route_label(
-            req.extensions().get::<axum::extract::MatchedPath>(),
-        ));
+        let _ = cell.0.set(route);
     }
-    next.run(req).await
+    let counted = route != METRICS_ROUTE;
+    if counted {
+        inflight_requests(1);
+    }
+    let response = next.run(req).await;
+    if counted {
+        inflight_requests(-1);
+    }
+    response
 }
 
 /// Stands in for the *name* of a path parameter, never for its value.
@@ -593,7 +606,7 @@ mod tests {
     /// this route is instrumentation observing the observer.
     #[tokio::test]
     async fn a_scrape_is_not_counted_as_traffic() {
-        use crate::observability::tests::{exposed, sample_series};
+        use crate::observability::tests::{exposed, sample_bare, sample_series};
 
         let (before, exposition) = exposed(|| async {
             let before = sample_series(
@@ -619,6 +632,10 @@ mod tests {
             crate::observability::METRIC_HTTP_REQUESTS_TOTAL,
             r#"method="read",outcome="2xx",route="/metrics""#,
         );
+        let inflight = sample_bare(
+            &exposition,
+            crate::observability::METRIC_HTTP_REQUESTS_INFLIGHT,
+        );
 
         assert_eq!(
             after, before,
@@ -626,8 +643,98 @@ mod tests {
              served: counting it inflates every traffic figure and pins the \
              in-flight gauge above zero. Exposition: {exposition}"
         );
+        // The gauge is the second half of the same defect. It is raised and
+        // lowered around the handler, so a scrape that raises it holds it at
+        // one for the whole time the exposition takes to render — and the
+        // technical dashboard dedicates a panel to explaining that this gauge
+        // is only meaningful when it is caught across several scrapes. A
+        // constant one is worse than a constant zero: it reads as load.
+        // A scrape that raised and lowered the gauge nets to zero, so the
+        // series may not exist at all — `None` is the honest reading for a
+        // request this code never counted. What it must never be is a
+        // non-zero: that would be a gauge held up for the duration of an
+        // exposition, which is the constant the saturation panel cannot use.
+        assert!(
+            inflight.is_none_or(|value| value == 0.0),
+            "a scrape must not occupy the in-flight gauge, or the saturation \
+             signal is a constant: {exposition}"
+        );
     }
 
+    /// The same half of the defect, observed at the only moment it exists.
+    ///
+    /// A gauge raised and lowered around a request nets to zero, so reading it
+    /// after the request cannot tell a scrape that was counted from one that
+    /// was not — both leave nothing behind. The difference is visible only
+    /// *during* the handler, which is where a real scrape spends its time:
+    /// rendering several hundred series takes long enough to be caught by the
+    /// next one.
+    ///
+    /// So the handler parks until the gauge has been read, and the test reads
+    /// it while a request is genuinely in flight. That is also the only reading
+    /// the saturation panel can ever show, which is why the dashboard says the
+    /// gauge means something only when a scrape lands inside a request.
+    #[tokio::test]
+    async fn a_scrape_does_not_hold_the_in_flight_gauge() {
+        use crate::observability::tests::{exposed, sample_bare};
+        use std::sync::Arc;
+        use tokio::sync::Notify;
+
+        // Under `exposed`, so the recorder lock is held for the whole
+        // observation. Reading it outside the lock is a race with every other
+        // metric test in the process: one of them emitting while this reads
+        // produces a value that belongs to neither, and the assertion below is
+        // about a single number.
+        let during = exposed(|| async {
+            let parked = Arc::new(Notify::new());
+            let in_flight = Arc::new(Notify::new());
+            let (parked_for, in_flight_for) = (parked.clone(), in_flight.clone());
+
+            let mut svc = Router::new()
+                .route(
+                    "/metrics",
+                    get(move || {
+                        let parked = parked_for.clone();
+                        let in_flight = in_flight_for.clone();
+                        async move {
+                            parked.notify_waiters();
+                            in_flight.notified().await;
+                            "exposition"
+                        }
+                    }),
+                )
+                .route_layer(axum::middleware::from_fn(capture_route))
+                .layer(axum::middleware::from_fn(request_log));
+
+            let request = tokio::spawn(async move {
+                let req = Request::builder()
+                    .method("GET")
+                    .uri("/metrics")
+                    .body(Body::empty())
+                    .unwrap();
+                let _ = svc.call(req).await;
+            });
+
+            // The handler is parked, so the request is genuinely in flight and
+            // the gauge is whatever the access log left it at.
+            parked.notified().await;
+            let observed = sample_bare(
+                &crate::observability::tests::render(),
+                crate::observability::METRIC_HTTP_REQUESTS_INFLIGHT,
+            );
+            in_flight.notify_waiters();
+            request.await.expect("the scrape finishes");
+            observed
+        })
+        .await;
+
+        assert!(
+            during.is_none_or(|value| value == 0.0),
+            "a scrape held the in-flight gauge at {during:?} while it ran; the \
+             gauge would then track the scrape interval rather than the load, \
+             which is worse than a constant zero because it reads as load"
+        );
+    }
     /// Which endpoint served a request is the label a dashboard needs and the
     /// one this family was missing.
     ///
