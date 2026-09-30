@@ -140,8 +140,10 @@ in `docs/performance/NER_PERFORMANCE.md`.
 
 ## Verification record
 
-The implementation plan is
-`docs/superpowers/plans/2026-08-06-allocator-accelerator-defaults.md`.
+The implementation is verified by the `accelerate` and `mimalloc` feature
+definitions in `crates/memory-mcp/Cargo.toml` — both absent from `default` —
+and by the CI lint row that builds them. The measured footprint is in
+[NER_PERFORMANCE.md](../performance/NER_PERFORMANCE.md).
 The external contracts consulted for this decision were the pinned Candle
 `candle-core/Cargo.toml`, the `mimalloc` docs on docs.rs, and Cargo's official
 feature/platform-dependency documentation, retrieved through Keenable.

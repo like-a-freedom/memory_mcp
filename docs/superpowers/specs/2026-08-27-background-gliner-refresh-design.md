@@ -1,6 +1,8 @@
 # Background Classic GLiNER Artifact Refresh Design
 
-**Status:** Approved direction; strengthened after adversarial review  
+**Status:** Implemented  
+> Shipped as [ADR-0051](../../adr/0051-background-classic-gliner-refresh.md). The status line read
+> `Approved direction; strengthened after adversarial review` until 2026-09-30.
 **Date:** 2026-08-27
 
 ## Problem

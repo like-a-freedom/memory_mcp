@@ -1,6 +1,8 @@
 # Architecture Audit Remediation Design
 
-**Status:** Approved in design review on 2026-09-02
+**Status:** Implemented  
+> Approved in design review on 2026-09-02, and implemented. The status line carried that
+> free-text sentence until 2026-09-30.
 
 ## Goal
 

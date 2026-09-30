@@ -3,7 +3,7 @@
 > Status: Accepted
 > Date: 2026-08-06
 > Related: ADR-0016 (public surface freeze), ADR-0029, ADR-0036
-> Amends: ADR-0016 AD-2 and the frozen public-surface wording in `CONTEXT.md` and `docs/agent_integration/CONTRACT.md`.
+> Amends: ADR-0016 AD-2 and the frozen public-surface wording in `CONTEXT.md`.
 
 ## Context
 
@@ -27,7 +27,7 @@ one output-only onboarding command.
 
 ## Consequences
 
-ADR-0016, `CONTEXT.md`, and `docs/agent_integration/CONTRACT.md` must say that the
+ADR-0016 and `CONTEXT.md` must say that the
 ordinary CLI freeze is amended by this one exception. The command is safe to run
 repeatedly and can be used in install documentation. Host configuration schemas
 may evolve independently, so each target has a dedicated renderer fixture based

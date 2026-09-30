@@ -1,6 +1,8 @@
 # Truthful Evaluation System Design
 
-Status: Implemented — see ADR-0019, ADR-0020, and the current eval-harness profiles
+**Status:** Implemented  
+> The design shipped as ADR-0019 and ADR-0020; the current eval-harness
+> profiles are the evidence.
 Date: 2026-07-28  
 Scope: evaluation architecture and migration planning; no production API changes
 

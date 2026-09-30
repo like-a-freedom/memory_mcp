@@ -124,8 +124,8 @@ Nothing else can be verified until the tree and the documentation have a check. 
 
 The spec records: the nine candidates, the audit method, the decision to wire rather than delete where a consumer exists, and the five ADRs. It is a problem statement, not a second copy of this plan.
 
-- [ ] **Step 1: Write the spec** with sections `Problem`, `Audit method`, `Candidates` (nine, each with the evidence and the file:line list from this plan), `Decisions` (the rulings: cut the 32 re-exports, cut the 4 engine accessors but leave the engine dispatch matches alone, cut `get_surrealdb_config`, cut 2 test helpers, wire `tenant_of`, cut `update_progress_fenced`, move the allowlist to the owning contexts, consolidate the retrieval fakes onto `MockDbClient`, do not narrow the store traits beyond what the policy move requires, cut the unreachable introduction chain), `Non-goals` (no new MCP tool, no new dependency, no behavioural change in Wave 1).
-- [ ] **Step 2: Commit the spec and this plan together**
+- [x] **Step 1: Write the spec** with sections `Problem`, `Audit method`, `Candidates` (nine, each with the evidence and the file:line list from this plan), `Decisions` (the rulings: cut the 32 re-exports, cut the 4 engine accessors but leave the engine dispatch matches alone, cut `get_surrealdb_config`, cut 2 test helpers, wire `tenant_of`, cut `update_progress_fenced`, move the allowlist to the owning contexts, consolidate the retrieval fakes onto `MockDbClient`, do not narrow the store traits beyond what the policy move requires, cut the unreachable introduction chain), `Non-goals` (no new MCP tool, no new dependency, no behavioural change in Wave 1).
+- [x] **Step 2: Commit the spec and this plan together**
 
 ```bash
 git add docs/superpowers/specs/2026-09-30-architecture-audit-remediation.md \
@@ -150,7 +150,7 @@ ADR-0063 retired this check and ADR-0061 recorded that the compiler graph is the
 
 The test walks `crates/memory-mcp/src` recursively for `.rs` files, then reads every source file in the crate and extracts module declarations: `mod x;`, `pub mod x;`, `pub(crate) mod x;`, and `#[path = "..."] mod x;`. A file is reachable if some declaration's resolved path is it. A declaration whose body is `{` is an inline module, not a file reference, and is skipped — this is the case that produces false positives today (`embedding/model_artifacts.rs:35` `pub mod runtime { … }` has no file on disk).
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 ```rust
 #[test]
@@ -172,21 +172,21 @@ fn every_source_file_is_reachable_from_a_mod_declaration() {
 
 `module_declarations(text) -> Vec<Decl { is_path: bool, name: String }>` skips any `mod` line whose following non-comment token is `{`. `resolve` maps a name to `parent_dir/name.rs` and, when the parent is a file stem like `foo.rs`, to `foo/name.rs`, matching Rust 2018 module layout. Write the helpers as private functions in the test file.
 
-- [ ] **Step 2: Run it to verify it passes** (the tree is clean today — this is the one guard whose failing state we must manufacture)
+- [x] **Step 2: Run it to verify it passes** (the tree is clean today — this is the one guard whose failing state we must manufacture)
 
 Run: `cargo test -p memory_mcp --test source_tree_integrity`
 Expected: PASS. A failure here means the tree already has an orphan; stop and report it.
 
-- [ ] **Step 3: Prove the test can fail** — create `crates/memory-mcp/src/never_declared.rs` containing `pub fn probe() -> i32 { 0 }`, do not declare it.
+- [x] **Step 3: Prove the test can fail** — create `crates/memory-mcp/src/never_declared.rs` containing `pub fn probe() -> i32 { 0 }`, do not declare it.
 
 Run: `cargo test -p memory_mcp --test source_tree_integrity`
 Expected: FAIL with the orphan path in the message. This is the proof the guard works; a guard never observed failing is not a guard.
 
-- [ ] **Step 4: Remove the probe file** and re-run.
+- [x] **Step 4: Remove the probe file** and re-run.
 
 Expected: PASS.
 
-- [ ] **Step 5: Commit the test**
+- [x] **Step 5: Commit the test**
 
 ```bash
 git add crates/memory-mcp/tests/source_tree_integrity.rs
@@ -205,12 +205,12 @@ ADR-0064 removed this because `docs/superpowers/plans` was empty and the audit e
 - Consumes: `CARGO_MANIFEST_DIR/../..` = the workspace root.
 - Produces: three test fns: `every_relative_markdown_link_resolves`, `every_spec_status_line_matches_the_code`, `every_adr_cites_an_existing_file`.
 
-- [ ] **Step 1: Write the failing test** `every_relative_markdown_link_resolves`: for every `*.md` under `docs/` and `AGENTS.md`/`README.md`/`CONTEXT.md` at the root, extract markdown links `[text](target)`; skip `http://`, `https://`, `#`, and `mailto:`; for the rest, resolve relative to the file's directory and assert the path exists.
+- [x] **Step 1: Write the failing test** `every_relative_markdown_link_resolves`: for every `*.md` under `docs/` and `AGENTS.md`/`README.md`/`CONTEXT.md` at the root, extract markdown links `[text](target)`; skip `http://`, `https://`, `#`, and `mailto:`; for the rest, resolve relative to the file's directory and assert the path exists.
 
 Run: `cargo test -p memory_mcp --test doc_claims every_relative_markdown_link_resolves`
 Expected: FAIL, listing the 19 `plans/` citations. If it passes, the extraction is wrong — check the regex against a known-dangling line, `docs/adr/0058-bounded-contexts-modular-monolith.md:7`.
 
-- [ ] **Step 2: Repoint the citations.** Grouped by what is honest:
+- [x] **Step 2: Repoint the citations.** Grouped by what is honest:
 
   *Point at the spec, where the spec is the surviving record* — `docs/adr/0016:28`, `0017:7`, `0036:5`, `0051:5`, `0055:54` (both targets), `docs/superpowers/specs/2026-09-18-local-admin-auth.md:5`, `docs/superpowers/specs/2026-09-23-path-prefix-deployment.md:9-10`, `crates/memory-mcp/src/memory/procedures_service.rs:8`. Replace the `plans/` target with the `specs/` sibling and adjust the surrounding words from "plan" to "spec" where the sentence refers to a design record.
 
@@ -220,9 +220,9 @@ Expected: FAIL, listing the 19 `plans/` citations. If it passes, the extraction 
 
   *Reword the two directory references* — `AGENTS.md:126` (keep the entry, point at `docs/superpowers/plans/`, which now exists) and `docs/adr/0064:38` (historical prose about why an audit exited; leave the sentence, it is a true record of a past event, but the guard must not treat prose inside backticks as a link — verify the extractor only matches `](...)`).
 
-- [ ] **Step 3: Run the test.** Expected: PASS.
+- [x] **Step 3: Run the test.** Expected: PASS.
 
-- [ ] **Step 4: Write `every_spec_status_line_matches_the_code`.** For each of the 8 files in `docs/superpowers/specs/`, read the `**Status:**` line and assert one of three exact values: `Implemented`, `Accepted direction`, `Superseded`. Maintain the expected value in a table in the test keyed by filename. Then write the second assertion, which is the one that catches drift: a spec declaring `Implemented` must name at least one ADR in its `**Architecture decision:**` line or its body, and that ADR file must exist. Update the two inverted specs:
+- [x] **Step 4: Write `every_spec_status_line_matches_the_code`.** For each of the 8 files in `docs/superpowers/specs/`, read the `**Status:**` line and assert one of three exact values: `Implemented`, `Accepted direction`, `Superseded`. Maintain the expected value in a table in the test keyed by filename. Then write the second assertion, which is the one that catches drift: a spec declaring `Implemented` must name at least one ADR in its `**Architecture decision:**` line or its body, and that ADR file must exist. Update the two inverted specs:
 
   * `2026-09-18-local-admin-auth.md:4` — status becomes `Implemented`, with the shipping ADRs named. Also correct lines 49, 63, 90, 91, which reference the removed `control-plane-ui` crate and the removed `MEMORY_MCP_HTTP_ENABLE_CONTROL_PLANE*` variables. `docs/adr/0055-local-admin-authentication-for-remote-deployment.md` and `0057-additive-browser-auth-methods.md` are the shipping decisions.
   * `2026-09-23-path-prefix-deployment.md:4` — status becomes `Implemented`. The four decisions are verified in code: `http/router.rs:346` `Router::nest`, `http/config/parse.rs:215,277`, `ui/assets.rs:49-909` (12 tests), `control/session.rs:82-253` and `control/local_admin/csrf.rs:36-359`.
@@ -232,9 +232,9 @@ Expected: FAIL, listing the 19 `plans/` citations. If it passes, the extraction 
   Run: `cargo test -p memory_mcp --test doc_claims every_spec_status_line_matches_the_code`
   Expected: FAIL before the status edits (both files inverted), PASS after.
 
-- [ ] **Step 5: Write `every_adr_cites_an_existing_file`.** For each of the 64 ADRs, extract markdown links and `docs/...` path references in backticks; assert each resolves. Run: expect PASS, or fix what it finds.
+- [x] **Step 5: Write `every_adr_cites_an_existing_file`.** For each of the 64 ADRs, extract markdown links and `docs/...` path references in backticks; assert each resolves. Run: expect PASS, or fix what it finds.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add crates/memory-mcp/tests/doc_claims.rs docs/ Cargo.toml AGENTS.md
@@ -252,9 +252,9 @@ git commit -m "fix(docs): repoint the plan citations, and guard them, as ADR-006
 
 Use the ADR-FORMAT sections: Status, Context, Decision, Consequences, Alternatives considered. The Context records the concrete failure that motivated the guard: the bounded-context migration left 137 undeclared files and 54,502 lines invisible to rustc while the build stayed green (ADR-0061:35). The Decision records that both checks are cargo tests because ADR-0064 requires CI to run nothing outside cargo, and that a test is the only shape that survives that constraint. Consequences: two tests that must be updated when the tree layout changes; CI gains two integration test binaries.
 
-- [ ] **Step 1: Write the ADR.** Status `Accepted`.
-- [ ] **Step 2: Add it to `CONTEXT.md`'s module-seam note**, replacing the current text at lines 38-46 that says nothing derives the fact from the compiler graph.
-- [ ] **Step 3: Commit**
+- [x] **Step 1: Write the ADR.** Status `Accepted`.
+- [x] **Step 2: Add it to `CONTEXT.md`'s module-seam note**, replacing the current text at lines 38-46 that says nothing derives the fact from the compiler graph.
+- [x] **Step 3: Commit**
 
 ```bash
 git add docs/adr/0065-*.md CONTEXT.md

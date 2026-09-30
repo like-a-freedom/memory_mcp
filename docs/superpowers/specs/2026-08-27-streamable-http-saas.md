@@ -1,6 +1,9 @@
 # Streamable HTTP SaaS design specification
 
-**Status:** Approved design, 2026-08-27
+**Status:** Implemented  
+> Shipped as [ADR-0052](../../adr/0052-streamable-http-saas-profile.md). The status line read
+> `Approved design, 2026-08-27` until 2026-09-30; the open operational evidence
+> is listed under **Implementation status** below.
 **Decision:** [ADR-0052](../../adr/0052-streamable-http-saas-profile.md)
 **Protocol target:** MCP `2026-07-28`
 **SDK baseline:** `rmcp` 3.1.2

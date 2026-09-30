@@ -2,8 +2,8 @@
 
 ## Status
 
-Accepted — 2026-08-19. Implementation is task T10 of the
-[architecture deepening round-2 plan](../superpowers/plans/2026-08-19-architecture-deepening.md).
+Accepted — 2026-08-19. Implemented; ADR-0060 records the last edges this
+narrowing left behind, and what replaced them.
 
 ## Context
 

@@ -46,10 +46,12 @@ passes because it checked nothing is worse than no guard.
 
 ## Why not a manifest
 
-The tree previously carried `docs/architecture/ddd-migration-manifest.csv`: 361
-rows, one disposition per source file, kept in step with the tree by hand. It
-was retired with the migration record in `6bf227a`, on the grounds that its
-remaining rows described an architecture that no longer needed describing.
+The tree previously carried a per-file manifest, `ddd-migration-manifest.csv`:
+361 rows, one disposition per source file, kept in step with the tree by hand.
+It was retired with the migration record in `6bf227a`, on the grounds that its
+remaining rows described an architecture that no longer needed describing. The
+file itself is gone, so this is a record of what it was rather than a pointer
+to it.
 
 That reasoning was sound about the manifest's *contents* and wrong about its
 *function*. A per-file manifest is the only artefact that can state something

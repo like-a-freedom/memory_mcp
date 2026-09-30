@@ -19,8 +19,9 @@ materially different subsets of `RegistryStore` operations, or a concrete
 test cannot be written without implementing unrelated methods.
 
 The modular-monolith migration (see
-[ADR-0058](0058-bounded-contexts-modular-monolith.md) and
-`docs/superpowers/plans/2026-09-23-ddd-modular-monolith.md`) is what
+[ADR-0058](0058-bounded-contexts-modular-monolith.md) and the
+[design contract](../superpowers/specs/2026-09-23-ddd-modular-monolith.md))
+is what
 satisfied that condition, and it did so for the first reason, not the
 second. The bounded contexts `tenancy`, `provisioning`, `identity` and
 `operations` each own a different canonical table set, and each now

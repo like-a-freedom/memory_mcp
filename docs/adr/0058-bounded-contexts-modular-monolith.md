@@ -1,10 +1,16 @@
 # ADR-0058: Bounded contexts and clean architecture inside the modular monolith
 
 **Date:** 2026-09-23; clarified after architecture review 2026-09-24
-**Status:** Accepted design direction; implementation tracked by the plan
+**Status:** Accepted; implemented. The follow-up ADRs are ADR-0059
+(per-context control-plane stores), ADR-0060 (the last
+context-to-service edges) and ADR-0061 (the compiler graph defines the
+source tree).
 **Supersedes:** Module organization after implementation, not current runtime behavior
 **Spec:** [design contract](../superpowers/specs/2026-09-23-ddd-modular-monolith.md)
-**Plan:** [execution and evidence](../superpowers/plans/2026-09-23-ddd-modular-monolith.md)
+**Execution:** this ADR, with ADR-0059, ADR-0060 and the bounded-context
+revision of ADR-0058 itself. The implementation plan that carried the
+execution was not retained; the evidence is the tree and the follow-up
+ADRs.
 
 ## Context
 

@@ -1,13 +1,22 @@
 # Path-Prefix Deployment — design spec
 
 **Date:** 2026-09-23
-**Status:** Approved for planning
+**Status:** Implemented
 **Amended:** 2026-09-23 — Decision 3 is replaced: the UI bundle no longer bakes
 the mount prefix at build time. It is built relocatable (sentinel base) and the
 server stamps the deployed base into the served shell at startup. The non-goal
 "Runtime-variable base for the UI bundle" is removed accordingly.
-Implementation: `docs/superpowers/plans/2026-09-23-relocatable-ui-bundle.md`.
-**Plan:** `docs/superpowers/plans/2026-09-23-path-prefix-deployment.md`
+**Architecture decision:** ADR-0069 records where the base path comes from, why
+`BASE_PATH_SENTINEL` must be stamped at build time rather than discovered at
+runtime, and why the session cookie name moves from `__Host-` to `__Secure-`.
+ADR-0052 records the profile this deploys under.
+
+> decisions below are implemented and verified in code — `Router::nest` in
+> `http/router.rs`, base-path parsing in `http/config/parse.rs`, the relocatable
+> bundle in `ui/assets.rs`, and the cookie/CSRF handling in `control/session.rs`
+> and `control/local_admin/csrf.rs`. This spec had no ADR at all until
+> ADR-0069, which is the gap `every_spec_status_line_matches_the_code` reports:
+> a feature with no record cannot be audited or reversed.
 
 ## Context
 

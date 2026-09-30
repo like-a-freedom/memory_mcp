@@ -392,7 +392,7 @@ fn edge_origin_is_introduced_by_followup_migration() {
 // Regression tests for the 2026-06-29 plan-review fix-up.
 //
 // These guard two gaps found while reviewing the implementation against the
-// plan (see docs/superpowers/plans/2026-06-29-plan-review-critical-analysis.md):
+// plan of record:
 //
 //   1. `EntityService::find_entity_id_by_alias` used the FTS operator `@1@`
 //      against a non-FULLTEXT index on `entity.aliases`, so the fuzzy resolver

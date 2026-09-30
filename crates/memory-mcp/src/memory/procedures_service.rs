@@ -5,8 +5,9 @@
 //! posterior from counts, and never auto-promote. The procedure gate must
 //! pass before promotion is enabled.
 //!
-//! See `docs/superpowers/plans/2026-07-23-agent-memory-lifecycle-integration.md`
-//! Tasks 10-11.
+//! See the Agent Memory Lifecycle section of
+//! [`hooks/README.md`](../../../../hooks/README.md) for the recall-then-capture
+//! loop this procedure gate serves.
 
 pub mod ranking;
 pub mod review;

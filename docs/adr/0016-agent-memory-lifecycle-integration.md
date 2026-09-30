@@ -24,9 +24,9 @@ ordinary lifecycle CLI subcommand, or any caller-controlled trust argument. The
 separate output-only onboarding exception, `memory_mcp init`, is authorized by
 ADR-0030 and is not part of lifecycle integration.
 
-The decision is grounded in the implementation plan
-`docs/superpowers/plans/2026-07-23-agent-memory-lifecycle-integration.md`,
-which is the single active implementation plan for this scope.
+The decision is grounded in the lifecycle contract in
+[hooks/README.md](../../hooks/README.md), which is where the recall-then-capture
+loop, the transport, and the editor-by-editor hook matrix are now documented.
 
 ## Decision
 

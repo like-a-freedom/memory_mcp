@@ -39,11 +39,22 @@ in ADR-0016.
 > undeclared `.rs` file is invisible to rustc, so no lint, no warning and no
 > test reports it — the migration's reorganisation left 137 such files behind
 > while the build stayed green. The per-file manifest that used to track this
-> was retired with the migration record, and the audit that replaced it has
-> since been removed: nothing now derives this fact from rustc's dependency
-> graph
+> was retired with the migration record, and the audit that replaced it was
+> removed because it read cargo's artifact layout and reported on a tree it had
+> never inspected. The fact is now derived from the `mod` declarations
+> themselves, by `crates/memory-mcp/tests/source_tree_integrity.rs`; nothing
+> maintains it by hand
 > ([ADR-0061](docs/adr/0061-compiler-graph-defines-the-source-tree.md),
-> [ADR-0063](docs/adr/0063-retire-the-undeclared-source-audit.md)).
+> [ADR-0063](docs/adr/0063-retire-the-undeclared-source-audit.md),
+> [ADR-0065](docs/adr/0065-reinstate-the-source-tree-and-doc-claim-guards.md)).
+>
+> **A document that cites a file is making a claim that a reader can check.**
+> `crates/memory-mcp/tests/doc_claims.rs` asserts that every relative markdown
+> link and every ADR reference resolves, and that each spec's `**Status:**` is
+> one of `Implemented`, `Accepted direction`, or `Superseded` — with the
+> expected value written by hand, because the question is whether the document
+> matches the code. A spec claiming `Implemented` must name ADRs that exist
+> ([ADR-0065](docs/adr/0065-reinstate-the-source-tree-and-doc-claim-guards.md)).
 
 - `src/models/` — domain values and typed records.
 - `src/identity/api.rs` — identity use cases: unlink/last-link, verified link

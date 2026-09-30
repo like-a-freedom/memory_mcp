@@ -2,8 +2,7 @@
 
 ## Status
 
-Accepted — 2026-08-12. Implemented incrementally under the
-[one-active-namespace implementation plan](../superpowers/plans/2026-08-12-one-active-namespace.md).
+Accepted — 2026-08-12. Implemented incrementally.
 The compatibility contract and completion checklist remain the source of truth
 for any unfinished hard-break surface.
 

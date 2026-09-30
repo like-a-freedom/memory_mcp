@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted (implemented 2026-08-27; see `docs/superpowers/plans/2026-08-27-background-gliner-refresh.md`).
+Accepted (implemented 2026-08-27; see the [design record](../superpowers/specs/2026-08-27-background-gliner-refresh-design.md)).
 
 ## Context
 

@@ -1869,7 +1869,6 @@ and the supporting ADRs under `docs/adr/`.
 - [`docs/operations/`](docs/operations/): operator runbooks, including the [local administrator runbook](docs/operations/LOCAL_ADMIN.md), protocol conformance, credential rotation, known limitations, and the SurrealDB restore drill
 - [`docs/performance/`](docs/performance/): memory profile and NER performance measurements
 - [`docs/evals/`](docs/evals/): evaluation results, benchmark reports, claim reconciliation baselines, and procedural memory evidence
-- [`docs/BACKLOG.md`](docs/BACKLOG.md): open engineering backlog
 - [`hooks/README.md`](hooks/README.md): lifecycle hooks contract and editor-by-editor configuration
 
 ## Contributing

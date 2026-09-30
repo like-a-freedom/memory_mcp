@@ -1,6 +1,7 @@
 # Token-Efficient MCP Responses — Design Spec
 
-**Status:** Implemented — validation recorded in ADR-0022
+**Status:** Implemented  
+> Validation is recorded in ADR-0022.
 **Date:** 2026-07-30
 **Scope:** Presentation-layer change on `assemble_context` and `explain` responses; no pipeline, ingestion, or storage changes.
 

@@ -2,8 +2,7 @@
 
 ## Status
 
-Accepted — 2026-08-19. Implemented under task T2 of the
-[architecture deepening round-2 plan](../superpowers/plans/2026-08-19-architecture-deepening.md).
+Accepted — 2026-08-19. Implemented.
 
 ## Context
 

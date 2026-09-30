@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted (implemented 2026-08-08; see `docs/superpowers/plans/2026-08-07-unified-ner-extractors-and-vago-lfm2.md`)
+Accepted (implemented 2026-08-08)
 
 ## Context
 

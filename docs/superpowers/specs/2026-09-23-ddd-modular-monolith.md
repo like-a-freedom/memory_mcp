@@ -1,7 +1,8 @@
 # DDD Modular Monolith — design spec
 
 **Date:** 2026-09-23; architecture review: 2026-09-24
-**Status:** Accepted direction; strengthened design contract. Phase 0 evidence is required before structural extraction.
+**Status:** Implemented  
+> The extraction this design describes is delivered by [ADR-0058](../../adr/0058-bounded-contexts-modular-monolith.md), [ADR-0059](../../adr/0059-capability-specific-control-registry-split.md) and [ADR-0060](../../adr/0060-last-context-to-service-edges.md).
 **Original review baseline:** `5bcb2bf3309ecebf71417c5ab2576e6cca0ca4ee` (`ddd-refactorings`).
 **Post-review source baseline:** `791f903fb453f5d40e4bcea9ff8e5e9b4fbeb261` (`origin/master`, merged as `b11c12c77e86f135364006437526db9a061791dc`); the identity-invitation and OIDC signature-provider changes introduced after the original review are included in the compatibility baseline.
 **ADR:** [ADR-0058](../../adr/0058-bounded-contexts-modular-monolith.md)

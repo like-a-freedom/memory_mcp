@@ -49,9 +49,9 @@ Local deployments can onboard clients without an external identity provider. The
 
 The local UI is an administrator interface, not a client portal. Operators must deliver issued credentials securely. Equal administrator privileges include the ability to issue credentials for client data, not merely manage account metadata.
 
-The [specification](../superpowers/specs/2026-09-18-local-admin-auth.md) separates approved requirements from proposed mechanisms. Dependency selection, password parameters, session and throttle limits, schema, offline mode transitions, legacy OIDC-session handling, key-response loss semantics and image packaging still require technical approval. None becomes accepted solely through this ADR. Where the shipped implementation diverges from the proposed mechanisms, the divergence is recorded in the [runbook](../operations/LOCAL_ADMIN.md) §13.4 rather than left implicit.
+The [design record](../superpowers/specs/2026-09-18-local-admin-auth.md) separates approved requirements from proposed mechanisms, and it is where the pending evidence is defined. Dependency selection, password parameters, session and throttle limits, schema, offline mode transitions, legacy OIDC-session handling, key-response loss semantics and image packaging still require technical approval. None becomes accepted solely through this ADR. Where the shipped implementation diverges from the proposed mechanisms, the divergence is recorded in the [runbook](../operations/LOCAL_ADMIN.md) §13.4 rather than left implicit.
 
-The [implementation plan](../superpowers/plans/2026-09-18-local-admin-auth.md) and [review findings](../superpowers/plans/2026-09-18-local-admin-auth-review.md) define the pending evidence. Still untested: the replica race tests against an isolated remote SurrealDB, a live identity provider, the `linux/amd64` image, and forced-order transaction interleavings. The [runbook](../operations/LOCAL_ADMIN.md) §13.2 lists every outstanding claim and what does cover it. This ADR does not claim those checks have passed.
+Still untested: the replica race tests against an isolated remote SurrealDB, a live identity provider, the `linux/amd64` image, and forced-order transaction interleavings. The runbook §13.2 lists every outstanding claim and what does cover it. This ADR does not claim those checks have passed.
 
 ## Relationships
 

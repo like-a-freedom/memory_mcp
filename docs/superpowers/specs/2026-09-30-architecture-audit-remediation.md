@@ -3,7 +3,7 @@
 **Date:** 2026-09-30
 **Status:** Accepted direction
 **Plan:** `docs/superpowers/plans/2026-09-30-architecture-audit-remediation.md`
-**Architecture decision:** ADR-0065, ADR-0066, ADR-0067, ADR-0068, ADR-0069 — five records this work produces. None is written yet; they are named here as the decisions the work settles, so that the guard in Wave 0 can require an implemented spec to name ADRs that exist.
+**Architecture decision:** ADR-0065 and ADR-0069 are written, in Wave 0. ADR-0066, ADR-0067 and ADR-0068 are written at the point each decision is made, in Waves 3 and 5. All five are named here so the guard in Wave 0 can require an implemented spec to name ADRs that exist.
 
 ## Problem
 

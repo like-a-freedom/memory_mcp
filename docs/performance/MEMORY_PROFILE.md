@@ -71,9 +71,8 @@ summarized as “mimalloc lowers RSS” on this platform.
 ### Historical pre-change evidence
 
 The original long-lived process observed before the memory-reduction work was
-recorded in
-`docs/superpowers/plans/2026-08-03-gliner-memory-reduction.baseline.txt` on
-2026-08-05:
+recorded on 2026-08-05. The figures are reproduced here; the measurement run
+itself was not retained.
 
 ```text
 RSS:               6,700,576 KB (about 6.7 GB decimal)

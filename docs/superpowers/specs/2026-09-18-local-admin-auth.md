@@ -1,9 +1,14 @@
 # Local administrator authentication and client provisioning
 
 **Date:** 2026-09-18  
-**Status:** Approved product requirements; proposed technical design awaiting review. This document does not approve dependency changes, migrations, implementation, or commits.  
-**Companion:** [Implementation plan](../plans/2026-09-18-local-admin-auth.md)
-**Architecture decision:** [ADR-0055](../../adr/0055-local-admin-authentication-for-remote-deployment.md) records the approved product direction; technical proposals below remain subject to review.
+**Status:** Implemented  
+**Companion:** [Design record](../../adr/0055-local-admin-authentication-for-remote-deployment.md)  
+**Architecture decision:** [ADR-0055](../../adr/0055-local-admin-authentication-for-remote-deployment.md) records the approved product direction and [ADR-0057](../../adr/0057-additive-browser-auth-methods.md) the additive browser methods that shipped with it. Both are implemented: the local-admin auth methods, the session store, and the CSRF protection are in the tree, and the outstanding evidence is tracked in [LOCAL_ADMIN.md §13.2](../../operations/LOCAL_ADMIN.md).
+
+> The status line was `Approved product requirements; proposed technical design
+> awaiting review` until 2026-09-30. The work shipped; the document did not
+> follow. `every_spec_status_line_matches_the_code` in
+> `crates/memory-mcp/tests/doc_claims.rs` is what caught it.
 
 ## 1. Approval boundary
 
@@ -41,6 +46,16 @@ The user approved the requirements in §2. Everything marked **Proposal**, inclu
 Proposal: the operator supplies the username to the CLI; activation displays that username and lets the browser set only the password. Username allocation was not separately decided during requirements approval. Administrators are separate from client Accounts/Tenants.
 
 ## 3. Verified repository baseline
+
+> **This section is a 2026-09-18 snapshot, and is preserved as one.** It records
+> what the repository looked like when the design was proposed, which is what
+> made the design reviewable: the proposal is only meaningful against the
+> baseline it was argued from. Several rows are now historical — the
+> `control-plane-ui` crate became the internal `ui` feature, and
+> `MEMORY_MCP_HTTP_ENABLE_CONTROL_PLANE*` became a build-time feature split
+> (ADR-0056, ADR-0058). The *current* state is the code and ADR-0056; this
+> table is not a claim about it. Read a row below as "this was true on
+> 2026-09-18", never as "this is true now".
 
 Paths below are repository-relative. Navigation used the live graph, semantic search, structural search, signature views, then targeted reads. Search summaries can lag live files; source bodies take precedence. No claim here means that the current test suite was executed.
 
