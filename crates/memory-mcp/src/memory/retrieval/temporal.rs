@@ -586,6 +586,18 @@ pub(crate) async fn collect_temporal_facts(
     Ok(facts)
 }
 
+/// Order the facts that fall inside a temporal window.
+///
+/// This is a third ranking path, not a second copy of the first. `retrieval/
+/// ranking.rs` fuses the per-signal candidate lists with RRF for the assembled
+/// context; this orders candidates that are already inside a window, by lexical
+/// overlap against the residual query terms and then by recency. The objective
+/// is different — "what matches, most recent first" rather than "which signal
+/// should win" — and merging the two would change what `assemble_context`
+/// returns, with every unit test still green.
+///
+/// The three paths, for the record: this one, `retrieval/ranking.rs`, and
+/// `procedures_service/ranking.rs` (posterior mean over procedure candidates).
 fn rank_temporal_candidate_facts(
     facts: &mut Vec<crate::models::Fact>,
     residual_query_terms: &[String],

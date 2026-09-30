@@ -10,7 +10,7 @@ use crate::shared::search::{
     query_hard_anchor_terms, query_term_rarity_weight, query_term_should_be_soft_anchor,
     search_query_terms, unique_query_terms,
 };
-use crate::shared::search_lexical::is_four_digit_year;
+use crate::shared::search_lexical::{is_four_digit_year, record_query_overlap, record_term_set};
 use crate::storage::ContextFactQuery;
 use crate::storage::value_helpers::{json_f64, json_string};
 
@@ -275,7 +275,7 @@ async fn scan_fact_records_by_query_terms(
                 .is_none_or(|value| value > params.cutoff_iso)
         })
         .filter(|record| fact_record_matches_type(record, params.fact_types))
-        .filter(|record| lexical_query_overlap(record, query_terms) > 0)
+        .filter(|record| record_query_overlap(record, query_terms) > 0)
         .map(|mut record| {
             let score = lexical_query_score(&record, query_terms) as f64;
             if let Some(object) = record.as_object_mut() {
@@ -366,7 +366,7 @@ fn build_lexical_anchor_profile(records: &[Value], query_terms: &[String]) -> Le
     let mut doc_freq = HashMap::<String, usize>::new();
 
     for record in records {
-        let record_terms = lexical_record_term_set(record);
+        let record_terms = record_term_set(record);
         for term in &unique_terms {
             if record_terms.contains(term) {
                 *doc_freq.entry(term.clone()).or_default() += 1;
@@ -435,28 +435,6 @@ fn lexical_record_metrics(
     }
 }
 
-fn lexical_record_term_set(record: &Value) -> HashSet<String> {
-    let mut record_terms = HashSet::<String>::new();
-    if let Some(content) = raw_object(record)
-        .and_then(|map: &serde_json::Map<String, Value>| map.get("content"))
-        .and_then(json_string)
-    {
-        record_terms.extend(search_query_terms(content));
-    }
-    if let Some(index_keys) = raw_object(record)
-        .and_then(|map: &serde_json::Map<String, Value>| map.get("index_keys"))
-        .and_then(raw_array)
-    {
-        for value in index_keys {
-            if let Some(index_key) = json_string(value) {
-                record_terms.extend(search_query_terms(index_key));
-            }
-        }
-    }
-
-    record_terms
-}
-
 fn matched_query_terms_for_record(record: &Value, query_terms: &[String]) -> Vec<String> {
     if query_terms.is_empty() {
         return Vec::new();
@@ -503,35 +481,6 @@ fn top_phrase_overlap(records: &[Value], query_terms: &[String]) -> usize {
         .map(|record| lexical_phrase_overlap(record, query_terms))
         .max()
         .unwrap_or(0)
-}
-
-fn lexical_query_overlap(record: &Value, query_terms: &[String]) -> usize {
-    if query_terms.is_empty() {
-        return 0;
-    }
-
-    let mut record_terms = HashSet::<String>::new();
-    if let Some(content) = raw_object(record)
-        .and_then(|map: &serde_json::Map<String, Value>| map.get("content"))
-        .and_then(json_string)
-    {
-        record_terms.extend(search_query_terms(content));
-    }
-    if let Some(index_keys) = raw_object(record)
-        .and_then(|map: &serde_json::Map<String, Value>| map.get("index_keys"))
-        .and_then(raw_array)
-    {
-        for value in index_keys {
-            if let Some(index_key) = json_string(value) {
-                record_terms.extend(search_query_terms(index_key));
-            }
-        }
-    }
-
-    query_terms
-        .iter()
-        .filter(|term| record_terms.contains(term.as_str()))
-        .count()
 }
 
 fn lexical_query_score(record: &Value, query_terms: &[String]) -> usize {

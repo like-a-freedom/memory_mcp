@@ -2,6 +2,7 @@
 
 use serde_json::{Value, json};
 
+use super::helpers::normalize_surreal_json;
 use super::types::GraphDirection;
 
 const ACTIVE_EDGE_SCAN_BATCH_SIZE: i32 = 10_000;
@@ -530,58 +531,6 @@ fn build_set_assignments(
     }
 
     (assignments, vars)
-}
-
-fn normalize_surreal_json(v: &Value) -> Value {
-    use serde_json::Value as J;
-
-    match v {
-        J::Object(map) if map.len() == 1 => {
-            let Some((k, val)) = map.iter().next() else {
-                return J::Object(map.clone());
-            };
-            match k.as_str() {
-                "None" => v.clone(),
-                "Array" => val
-                    .as_array()
-                    .map(|items| J::Array(items.iter().map(normalize_surreal_json).collect()))
-                    .unwrap_or_else(|| val.clone()),
-                "Object" => val
-                    .as_object()
-                    .map(|inner| {
-                        J::Object(
-                            inner
-                                .iter()
-                                .map(|(ik, iv)| (ik.clone(), normalize_surreal_json(iv)))
-                                .collect(),
-                        )
-                    })
-                    .unwrap_or_else(|| val.clone()),
-                "Strand" | "String" => val
-                    .as_object()
-                    .and_then(|inner| inner.get("String").cloned())
-                    .unwrap_or_else(|| val.clone()),
-                "Datetime" => val
-                    .as_object()
-                    .and_then(|inner| inner.get("String").cloned())
-                    .unwrap_or_else(|| val.clone()),
-                "Number" | "Float" | "Int" | "Decimal" => normalize_surreal_json(val),
-                _ => J::Object(
-                    map.iter()
-                        .map(|(ik, iv)| (ik.clone(), normalize_surreal_json(iv)))
-                        .collect(),
-                ),
-            }
-        }
-        J::Object(map) => J::Object(
-            map.iter()
-                .map(|(k, v)| (k.clone(), normalize_surreal_json(v)))
-                .collect(),
-        ),
-        J::Null => J::Null,
-        J::Array(arr) => J::Array(arr.iter().map(normalize_surreal_json).collect()),
-        _ => v.clone(),
-    }
 }
 
 #[cfg(test)]

@@ -69,6 +69,14 @@ pub fn rank_candidates(
 }
 
 /// Compute normalized task overlap (0.0–1.0) using token-based Jaccard.
+///
+/// The raw `split_whitespace()` here is deliberate and must not become
+/// `shared::search::search_query_terms`. That function lowercases and filters,
+/// which is right for a free-text query and wrong here: a procedure task
+/// carries identifiers and file paths whose case is part of the match, and
+/// normalising them would change which candidates rank higher. It would do so
+/// silently — every unit test here would still pass, because the tests feed
+/// already-lowercased inputs.
 fn normalized_task_overlap(candidate_task: &str, query_task: &str) -> f64 {
     let candidate_tokens: std::collections::HashSet<&str> =
         candidate_task.split_whitespace().collect();

@@ -150,7 +150,15 @@ fn unwrap_object_wrapper(value: Value) -> Value {
     }
 }
 
-fn normalize_surreal_json(v: &Value) -> Value {
+/// Unwrap SurrealDB's tagged JSON representation into plain values.
+///
+/// SurrealDB serialises `None`, `Strand` and `Decimal` as single-key objects
+/// (`{"None": {}}`, `{"Strand": {"String": "…"}}`). Code that reads a record
+/// back has to see the value itself, not the tag. This lives in one place
+/// because a partial fix here is worse than no fix: the two copies were
+/// byte-identical, and a caller routed to one while another was routed to the
+/// other would get different values for the same stored record.
+pub(crate) fn normalize_surreal_json(v: &Value) -> Value {
     use serde_json::Value as J;
 
     match v {

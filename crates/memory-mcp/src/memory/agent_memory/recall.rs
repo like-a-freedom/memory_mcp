@@ -38,7 +38,7 @@ impl RecallKey {
         task_fingerprint: &str,
         policy_tags: &[String],
     ) -> Self {
-        let policy_fingerprint = policy_fingerprint(policy_tags);
+        let policy_fingerprint = policy_tag_set_key(policy_tags);
         Self {
             host: host.to_string(),
             session_id: session_id.map(str::to_string),
@@ -60,8 +60,16 @@ impl RecallKey {
     }
 }
 
-/// Compute a stable fingerprint for policy tags.
-fn policy_fingerprint(tags: &[String]) -> String {
+/// A stable key for a set of policy tags.
+///
+/// Named `policy_tag_set_key` rather than `policy_fingerprint` on purpose.
+/// `models::PolicyFingerprint` is a hash of a scope, a project and a tag set,
+/// and it is the right thing for an access-policy identity. This is not that:
+/// the recall cache keys on the tag *set*, and the result is written verbatim
+/// into `ExposureTrace.policy_fingerprint` and into the `RecallKey` string a
+/// reader sees in a trace. Hashing it would make the stored trace unreadable
+/// and would key the cache on a digest instead of on what it means.
+fn policy_tag_set_key(tags: &[String]) -> String {
     let mut sorted: Vec<String> = tags.to_vec();
     sorted.sort_unstable();
     sorted.join(",")

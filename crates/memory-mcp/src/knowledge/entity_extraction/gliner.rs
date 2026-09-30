@@ -13,6 +13,7 @@ use tokenizers::{AddedToken, Encoding, Tokenizer};
 
 use crate::models::EntityCandidate;
 
+use super::lfm2_gliner::decode::{ScoredEntity, apply_nms};
 use super::{EntityExtractor, ExtractorFingerprint, MemoryError};
 
 mod batching;
@@ -105,15 +106,6 @@ fn prepare_tokenizer_with_marker_tokens(
     }
 
     Ok(tokenizer)
-}
-
-#[derive(Debug, Clone)]
-struct ScoredSpan {
-    start: usize,
-    end: usize,
-    text: String,
-    label: String,
-    score: f32,
 }
 
 /// A fully loaded GLiNER model with all inference state.
@@ -1209,7 +1201,7 @@ impl LoadedGliner {
         prompt_word_count: usize,
         window: &batching::EncodedWindow,
         hidden: &Tensor,
-        all_spans: &mut Vec<ScoredSpan>,
+        all_spans: &mut Vec<ScoredEntity>,
     ) -> Result<(), MemoryError> {
         let entity_token_positions = self.collect_prompt_entity_positions(
             &window.input_ids,
@@ -1333,14 +1325,12 @@ impl LoadedGliner {
     }
 }
 
-/// IOU threshold above which same-label overlapping spans are suppressed by NMS.
-const NMS_IOU_THRESHOLD: f32 = 0.5;
-
 /// Span post-processing: map raw span scores to candidate spans, then prune
 /// overlaps.
 ///
-/// These are free functions (they only need the extractor threshold and the IOU
-/// constant) so they can be unit-tested without a loaded model.
+/// These are free functions — they take the extractor threshold and read the
+/// shared `decode::apply_nms`, which owns the IOU constant — so they can be
+/// unit-tested without a loaded model.
 fn is_valid_span_text(span_text: &str) -> bool {
     !span_text.trim().is_empty()
 }
@@ -1351,7 +1341,7 @@ fn extract_spans(
     spans_data: &[(usize, usize, Vec<f32>)],
     offsets: &[(usize, usize)],
     labels: &[String],
-) -> Vec<ScoredSpan> {
+) -> Vec<ScoredEntity> {
     let mut spans = Vec::new();
 
     for &(start, end, ref scores) in spans_data {
@@ -1376,7 +1366,7 @@ fn extract_spans(
             }
             let probability = 1.0_f32 / (1.0_f32 + (-score).exp());
             if probability >= threshold as f32 {
-                spans.push(ScoredSpan {
+                spans.push(ScoredEntity {
                     start: start_char,
                     end: end_char,
                     text: span_text.to_string(),
@@ -1388,39 +1378,6 @@ fn extract_spans(
     }
 
     spans
-}
-
-fn apply_nms(mut spans: Vec<ScoredSpan>) -> Vec<ScoredSpan> {
-    spans.sort_by(|left, right| {
-        right
-            .score
-            .partial_cmp(&left.score)
-            .unwrap_or(std::cmp::Ordering::Equal)
-    });
-
-    let mut kept = Vec::new();
-    for span in spans {
-        let dominated = kept.iter().any(|kept_span: &ScoredSpan| {
-            if kept_span.label != span.label {
-                return false;
-            }
-            let inter_start = span.start.max(kept_span.start);
-            let inter_end = span.end.min(kept_span.end);
-            if inter_start >= inter_end {
-                return false;
-            }
-            let intersection = (inter_end - inter_start) as f32;
-            let union =
-                (span.end - span.start + kept_span.end - kept_span.start) as f32 - intersection;
-            intersection / union > NMS_IOU_THRESHOLD
-        });
-
-        if !dominated {
-            kept.push(span);
-        }
-    }
-
-    kept
 }
 
 impl LoadedGliner {
@@ -2084,8 +2041,8 @@ mod tests {
 
     // ── Span extraction + NMS (pure, no model) ───────────────────────────────
 
-    fn span(start: usize, end: usize, text: &str, label: &str, score: f32) -> ScoredSpan {
-        ScoredSpan {
+    fn span(start: usize, end: usize, text: &str, label: &str, score: f32) -> ScoredEntity {
+        ScoredEntity {
             start,
             end,
             text: text.to_string(),

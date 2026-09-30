@@ -53,6 +53,69 @@ pub fn matched_query_terms_for_fact(fact: &Fact, query_terms: &[String]) -> Hash
         .collect()
 }
 
+/// Normalized term set of a record's `content` plus its `index_keys`.
+///
+/// This is `fact_term_set` for a raw SurrealDB row, and it exists separately
+/// because the row cannot always be decoded into a [`Fact`]:
+/// `knowledge::fact_parsing::fact_from_record` requires `fact_id`,
+/// `fact_type`, `content`, `quote`, `source_episode` and `t_valid`, and a
+/// partial record — which a lexical scan does encounter — would be dropped.
+/// Dropping a record from a lexical scan is worse than reading two fields
+/// from it, so the row-shaped path reads the fields it needs and nothing
+/// else.
+pub fn record_term_set(record: &serde_json::Value) -> HashSet<String> {
+    let mut terms = HashSet::new();
+    if let Some(content) = string_field(record, "content") {
+        terms.extend(search_query_terms(&content));
+    }
+    for index_key in string_array_field(record, "index_keys") {
+        terms.extend(search_query_terms(&index_key));
+    }
+    terms
+}
+
+/// How many of `query_terms` a raw record contains.
+///
+/// The `Value`-typed counterpart of the `Fact`-typed overlap, for the same
+/// reason `record_term_set` exists: the row may not decode.
+pub fn record_query_overlap(record: &serde_json::Value, query_terms: &[String]) -> usize {
+    if query_terms.is_empty() {
+        return 0;
+    }
+    let record_terms = record_term_set(record);
+    query_terms
+        .iter()
+        .filter(|term| record_terms.contains(term.as_str()))
+        .count()
+}
+
+fn string_field(record: &serde_json::Value, field: &str) -> Option<String> {
+    let value = record.get(field)?;
+    if value.is_string() {
+        return value.as_str().map(str::to_string);
+    }
+    // SurrealDB serialises a `Strand` as `{"Strand": {"String": "…"}}`, and a
+    // lexical scan reads rows straight out of the driver.
+    value
+        .get("String")
+        .or_else(|| value.get("Strand").and_then(|s| s.get("String")))
+        .and_then(serde_json::Value::as_str)
+        .map(str::to_string)
+}
+
+fn string_array_field(record: &serde_json::Value, field: &str) -> Vec<String> {
+    let Some(values) = record.get(field).and_then(serde_json::Value::as_array) else {
+        return Vec::new();
+    };
+    values
+        .iter()
+        .filter_map(|value| match value {
+            serde_json::Value::String(text) => Some(text.clone()),
+            other => string_field(other, "String"),
+        })
+        .collect()
+}
+
 /// True if `term` is exactly four ASCII digits (a year token like `2026`).
 pub fn is_four_digit_year(term: &str) -> bool {
     term.len() == 4 && term.chars().all(|character| character.is_ascii_digit())
