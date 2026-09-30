@@ -21,6 +21,26 @@ runs:
     - name: Configure native build
       shell: bash
       run: echo "CARGO_BUILD_TARGET=${{ inputs.target }}" >> "$GITHUB_ENV"
+    - name: Free disk space on Linux
+      # GitHub guarantees 14 GB on every standard runner, and this build writes
+      # a RocksDB target directory well past it. rust-lang's own CI clears
+      # space on every hosted Linux job for the same reason, and a build killed
+      # at the disk limit fails with `ENOSPC` from whichever `-sys` crate
+      # happened to be writing — which looks like a compile error in a
+      # dependency rather than a runner that ran out of room.
+      #
+      # `swap-storage` is deliberately not removed: the action can reclaim the
+      # swap file, and a job that then dies under memory pressure gives no
+      # diagnostic at all. Leaving the swap in place is what makes a
+      # memory-bound build slow rather than silent.
+      if: runner.os == 'Linux'
+      shell: bash
+      run: |
+        set -euo pipefail
+        echo "before: $(df -h --output=avail / | tail -1 | tr -s ' ')"
+        sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL
+        sudo docker image prune --all --force
+        echo "after:  $(df -h --output=avail / | tail -1 | tr -s ' ')"
     - name: Linux dependencies
       if: runner.os == 'Linux'
       shell: bash

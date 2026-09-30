@@ -16,6 +16,14 @@ permissions:
 
 concurrency:
   group: ci-${{ github.event_name }}-${{ github.event.pull_request.number || github.ref }}
+  # A new push to a branch supersedes the run already in flight for it, and a
+  # release must not be cancelled by a later push.
+  #
+  # This is also the documented cause of `exit code 143` in a Rust CI: a
+  # superseded run is sent SIGTERM, and the killed job's log ends mid-build
+  # with no compiler diagnostic. That is the signature to recognise before
+  # concluding a build was OOM-killed — 143 is SIGTERM, so a cancellation or a
+  # timeout; the OOM killer sends SIGKILL, which surfaces as 137.
   cancel-in-progress: ${{ !inputs.release }}
 
 env:
@@ -120,45 +128,38 @@ jobs:
         run: |
           cargo test -p memory_mcp --lib --features fs-watch --locked
           cargo test -p memory_mcp --test fs_watch_process_enabled --features fs-watch --locked
-      - name: Build the control-plane UI bundle
-        # Verifies the release build path end to end: `ui` is implied by
-        # `streamable-http`, so the bundle is what turns the `ui` feature on,
-        # and `build.rs` is the only thing that can silently produce a
-        # console-less binary. This step exists so a regression in that path —
-        # a bundle that no longer carries the sentinel, an asset that stops
-        # being embedded, a stale `dx` staging directory — fails here rather
-        # than in the Docker job's much later curl walk.
+      - name: Require the console pin to agree
+        # The console is built by the Dockerfile's `ui-builder` stage and
+        # embedded in the image, and the `docker` job below proves the whole
+        # path: it builds the image, starts it, and walks the document, the
+        # loader and the WebAssembly module over HTTP. So this matrix entry
+        # has nothing to add — and adding it cost a killed job.
         #
-        # Only the Linux entry builds it: the console is byte-identical across
-        # targets, so rebuilding the wasm per target would multiply build time
-        # to assert the same thing five times.
-        if: ${{ matrix.target == 'x86_64-unknown-linux-gnu' && !inputs.release }}
-        run: |
-          set -euo pipefail
-          rustup target add wasm32-unknown-unknown
-          cargo install dioxus-cli --version 0.7.10 --locked
-          cargo run --locked -p xtask -- check-dioxus-pin
-          rm -rf target/dx/ui/release/web/public "$RUNNER_TEMP/ui-dist"
-          # Never pass a deployment prefix: the bundle is built against the
-          # relocatable sentinel and stamped at server startup.
-          dx bundle --platform web --release --package ui \
-            --base-path /__memory_mcp_base__ \
-            --out-dir "$RUNNER_TEMP/ui-dist"
-          cargo run --locked -p xtask -- check-ui-bundle "$RUNNER_TEMP/ui-dist/public"
+        # It used to build the bundle here, which meant `cargo install
+        # dioxus-cli --locked`: a second dependency graph to compile, ~600
+        # crates on top of the RocksDB/ONNX build already in flight, and on
+        # the 7 GB runner that was enough to be OOM-killed — exit 143, with no
+        # compiler diagnostic to read. It failed on this target alone because
+        # this was the only entry that ran it.
+        #
+        # What it uniquely checked was the pin, and that check does not need
+        # the bundler: `check-dioxus-pin` reads the Dockerfile and the UI
+        # manifest, and the same rule is asserted as a unit test in xtask
+        # (`the_images_dioxus_cli_matches_the_ui_crates_pin`) in the `quality`
+        # job. So the guarantee survives at a fraction of the cost, and the
+        # expensive proof of it runs where the artefact is actually built.
+        run: cargo run --locked -p xtask -- check-dioxus-pin
       - name: Build CLI and HTTP server
+        # No `MEMORY_MCP_UI_DIST` here: this matrix entry builds no console
+        # bundle, so the `ui` feature compiles an empty catalog and these
+        # binaries serve no UI. That is the documented developer fallback, not
+        # a defect — the console these release artefacts would carry is built
+        # and proved by the `docker` job, which is where a bundle is actually
+        # embedded. This also means the shipped `.tar.gz` archives match the
+        # README: the CLI has no console, the image does.
         env:
           BUILD_PROFILE: ${{ inputs.release && 'release' || 'dev' }}
-          # Exported here rather than through `env:` because an empty value is
-          # not an unset one: `build.rs` reads the variable's presence, so
-          # `MEMORY_MCP_UI_DIST=` would hand it an empty path and fail the
-          # build rather than compile without a console.
-        run: |
-          set -euo pipefail
-          if [ -d "$RUNNER_TEMP/ui-dist/public" ]; then
-            export MEMORY_MCP_UI_DIST="$RUNNER_TEMP/ui-dist/public"
-          fi
-          cargo build -p memory_mcp --bins --profile "$BUILD_PROFILE" \
-            --features fs-watch,mcp-apps,streamable-http --locked
+        run: cargo build -p memory_mcp --bins --profile "$BUILD_PROFILE" --features fs-watch,mcp-apps,streamable-http --locked
       - name: Package and test the actual binaries
         env:
           BUILD_DIR: target/${{ matrix.target }}/${{ inputs.release && 'release' || 'debug' }}

@@ -50,6 +50,16 @@ RUN apt-get update \
 ARG DIOXUS_CLI_VERSION=0.7.10
 ARG WASM_TARGET=wasm32-unknown-unknown
 
+# Compiled rather than downloaded, deliberately. The prebuilt artefact would
+# need a checksum pinned here, and a wrong one is worse than a slow build: it
+# either fails every image build or, worse, ships a bundler nobody verified.
+# This stage is a cached Docker layer, so the cost is paid once per version
+# bump rather than per run, and it is the only place the console is built —
+# the CI matrix deliberately does not repeat it.
+#
+# The version here is checked against `crates/ui/Cargo.toml` by
+# `xtask check-dioxus-pin`, in this stage and as a unit test in CI, so the two
+# cannot drift without failing a build.
 RUN rustup target add "${WASM_TARGET}" \
     && cargo install dioxus-cli --version "${DIOXUS_CLI_VERSION}" --locked
 
