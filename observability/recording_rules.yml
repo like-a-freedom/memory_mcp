@@ -1,0 +1,367 @@
+# Recording rules for the memory_mcp HTTP profile.
+#
+# The dashboards and the alerts both read these, so a derived figure is
+# computed once per interval instead of once per panel pixel. Two reasons that
+# matters here: a dashboard with a dozen panels over a rolling window re-runs
+# the same `rate()` sum dozens of times per refresh, and the alert rules run
+# whether or not anyone has a dashboard open.
+#
+# Naming follows the Prometheus convention: `level:metric:operations`. A colon
+# in a name is what tells a recording rule's output apart from a scraped one,
+# and `level` is chosen per series — there is no single right level for a file.
+#
+# The metrics they read are described at their source, in
+# `crates/memory-mcp/src/shared/observability.rs`. Three shapes matter here and
+# are easy to get wrong:
+#
+#   * Every histogram is exported as a **summary**, not as buckets. The
+#     Prometheus exporter switches to bucket exposition process-wide when
+#     buckets are configured, which would cost every duration metric its
+#     quantile lines; so there is no `le` label to filter on, and a latency
+#     panel reads the `quantile="…"` lines directly.
+#   * `memory_operation_results_total` counts work produced. `rate()` on it is
+#     meaningless; `increase()` over a window is the question being asked.
+#   * `memory_operation_stock` and `memory_claim_relations_active` are levels.
+#     They are set, not accumulated, so they are read as they stand.
+#
+# Apply with:
+#
+#   promtool check config observability/recording_rules.yml
+#   # or point a Prometheus `rule_files:` at this path
+
+groups:
+  # ─── HTTP traffic and errors ────────────────────────────────────────────────
+  #
+  # The RED method's rate and errors. Grouped by method and route so a panel can
+  # either show the whole service or one endpoint, and an alert can watch the
+  # service without being drowned by one slow route.
+  - name: memory-http-traffic
+    interval: 30s
+    rules:
+      # Requests per second, by method class and route.
+      #
+      # `route` is the router's own pattern with path parameters collapsed, so
+      # this is bounded by the routes the server declares.
+      - record: memory:http_requests:rate5m
+        expr: |
+          sum by (method, route) (
+            rate(memory_http_requests_total[5m])
+          )
+
+      # The same, for the whole service, with no label at all. A dashboard's
+      # headline number and most alerts want this rather than a `sum()` written
+      # out again in each query.
+      - record: memory:http_requests:rate5m_total
+        expr: |
+          sum(rate(memory_http_requests_total[5m]))
+
+      # Failed requests per second, by status class and route.
+      #
+      # `4xx` and `5xx` are kept apart deliberately. `4xx` includes refusals the
+      # service is behaving correctly about — an unauthenticated request, a
+      # client sending a bad id — and folding them into one "error" number makes
+      # a working service look broken.
+      - record: memory:http_requests:rate5m_errors
+        expr: |
+          sum by (outcome, route) (
+            rate(memory_http_requests_total{outcome=~"4xx|5xx"}[5m])
+          )
+
+      # Server errors alone, service-wide. The availability signal: 5xx is a
+      # request the service failed to serve, whatever the client sent.
+      #
+      # `or vector(0)`: series are created lazily per label set, so on a
+      # healthy service `outcome="5xx"` does not exist at all. `sum()` of an
+      # empty vector is empty, the rule records nothing, and the panel shows a
+      # gap — which reads as "no data" rather than "no errors", and is the one
+      # reading that would be most misleading here.
+      - record: memory:http_requests:server_error_rate5m
+        expr: |
+          sum(rate(memory_http_requests_total{outcome="5xx"}[5m])) or vector(0)
+
+      # The error ratio an SLO is written against: bad requests over all
+      # requests. Recorded rather than left to each panel because the division
+      # needs a guard — a quiet window has no requests at all, and a bare
+      # `errors / requests` is `0/0` there rather than zero.
+      #
+      # Both halves need `or vector(0)`, for the reason above: a series that
+      # has never been written does not exist, and an empty `sum()` is empty
+      # rather than zero. `clamp_min` then covers the remaining case — a real
+      # zero in the denominator, which a quiet window produces.
+      - record: memory:http_requests:error_ratio5m
+        expr: |
+          (
+            sum(rate(memory_http_requests_total{outcome="5xx"}[5m])) or vector(0)
+          )
+          /
+          clamp_min(
+            sum(rate(memory_http_requests_total[5m])) or vector(0),
+            0.001
+          )
+
+  # ─── HTTP latency ───────────────────────────────────────────────────────────
+  #
+  # Read from the summary's quantile lines. The exporter is configured without
+  # buckets, so there is no `_bucket` series and no `le` to filter on.
+  - name: memory-http-latency
+    interval: 30s
+    rules:
+      # p50 / p95 / p99 in seconds, by route and status class.
+      #
+      # `max by (route, outcome)`, not by route alone: a summary's quantile
+      # line is per `(method, outcome, route)`, so collapsing `outcome` would
+      # record the max of several percentiles and present it as the route's
+      # user-facing latency. A route whose 2xx path answers in 20 ms and whose
+      # 5xx path takes two seconds is a broken error path, not a slow route,
+      # and the label is what tells the two apart.
+      #
+      # `max` rather than `sum` because these are already percentiles, and a
+      # sum of percentiles is not a percentile of anything.
+      - record: memory:http_request_duration:p95_5m
+        expr: |
+          max by (route, outcome) (
+            memory_http_request_duration_seconds{quantile="0.95"}
+          )
+
+      - record: memory:http_request_duration:p50_5m
+        expr: |
+          max by (route, outcome) (
+            memory_http_request_duration_seconds{quantile="0.5"}
+          )
+
+      - record: memory:http_request_duration:p99_5m
+        expr: |
+          max by (route, outcome) (
+            memory_http_request_duration_seconds{quantile="0.99"}
+          )
+
+      # Service-wide, for the headline stat panel.
+      - record: memory:http_request_duration:p95_5m_total
+        expr: |
+          max(memory_http_request_duration_seconds{quantile="0.95"})
+
+      - record: memory:http_request_duration:p99_5m_total
+        expr: |
+          max(memory_http_request_duration_seconds{quantile="0.99"})
+
+  # ─── Saturation ─────────────────────────────────────────────────────────────
+  - name: memory-http-saturation
+    interval: 30s
+    rules:
+      # Requests in flight.
+      #
+      # Recorded as a plain value, but read it as what it is: the gauge is only
+      # non-zero when a scrape lands between a request's `+1` and its `-1`, so
+      # most scrapes see zero and that zero is correct. It is a saturation
+      # signal for the moment it catches, not a load average.
+      - record: memory:http_requests:inflight
+        expr: |
+          max(memory_http_requests_inflight)
+
+  # ─── Memory operations ──────────────────────────────────────────────────────
+  #
+  # The product's own vocabulary: ingest, extract, resolve, assemble_context and
+  # the lifecycle operations. Not HTTP — these are the MCP tools, reachable over
+  # the data plane, and they are what a product owner actually asks about.
+  - name: memory-operations
+    interval: 30s
+    rules:
+      - record: memory:operation_calls:rate15m
+        expr: |
+          sum by (operation) (
+            rate(memory_operation_calls_total[15m])
+          )
+
+      # Failures per operation.
+      #
+      # The default outcome is `error` and it is set on every early return, so
+      # this is the whole failure surface, not only the ones somebody wrote an
+      # explicit arm for.
+      - record: memory:operation_calls:error_rate15m
+        expr: |
+          sum by (operation) (
+            rate(memory_operation_calls_total{outcome="error"}[15m])
+          )
+
+      # The ratio, guarded the same way as the HTTP one.
+      - record: memory:operation_calls:error_ratio15m
+        expr: |
+          sum by (operation) (
+            rate(memory_operation_calls_total{outcome="error"}[15m])
+          )
+          /
+          clamp_min(
+            sum by (operation) (
+              rate(memory_operation_calls_total[15m])
+            ),
+            0.001
+          )
+
+      # Operation latency, by operation.
+      - record: memory:operation_duration:p95_5m
+        expr: |
+          max by (operation) (
+            memory_operation_duration_seconds{quantile="0.95"}
+          )
+
+      # Work produced over a day, by result kind.
+      #
+      # `increase()` and a 1d window, not `rate()`: this family counts things
+      # produced, so a rate of "facts per second" is a number nobody asks for.
+      # "How much knowledge did this deployment extract today" is.
+      - record: memory:operation_results:increase1d
+        expr: |
+          sum by (result) (
+            increase(memory_operation_results_total[1d])
+          )
+
+      # And over an hour, for a shorter window on the same dashboard.
+      - record: memory:operation_results:increase1h
+        expr: |
+          sum by (result) (
+            increase(memory_operation_results_total[1h])
+          )
+
+  # ─── Pipeline stages ────────────────────────────────────────────────────────
+  #
+  # The stages inside an operation. An operation's total says that something is
+  # slow; its stages say which part, and the three candidates — the embedding
+  # provider, the vector index, the store — need different fixes.
+  - name: memory-pipeline-stages
+    interval: 30s
+    rules:
+      - record: memory:pipeline_stage_duration:p95_5m
+        expr: |
+          max by (operation, stage) (
+            memory_pipeline_stage_duration_seconds{quantile="0.95"}
+          )
+
+      - record: memory:pipeline_stage_duration:p99_5m
+        expr: |
+          max by (operation, stage) (
+            memory_pipeline_stage_duration_seconds{quantile="0.99"}
+          )
+
+  # ─── Background jobs ────────────────────────────────────────────────────────
+  #
+  # The lease and task schedulers. `outcome` is `ok`, `error`, or `degraded` —
+  # the last meaning the pass itself succeeded while some tenant's step was
+  # refused, which is not the same as a failed pass and not the same as a
+  # healthy one.
+  - name: memory-background-jobs
+    interval: 30s
+    rules:
+      - record: memory:background_jobs:rate15m
+        expr: |
+          sum by (job, outcome) (
+            rate(memory_background_jobs_total[15m])
+          )
+
+      # Passes that failed or degraded. Both are "this pass did not fully do
+      # its job"; separating them is a panel choice, not an alert one.
+      - record: memory:background_jobs:unhealthy_rate15m
+        expr: |
+          sum by (job) (
+            rate(memory_background_jobs_total{outcome=~"error|degraded"}[15m])
+          )
+
+      - record: memory:background_job_duration:p95_5m
+        expr: |
+          max by (job) (
+            memory_background_job_duration_seconds{quantile="0.95"}
+          )
+
+  # ─── Refusals ───────────────────────────────────────────────────────────────
+  #
+  # Two different things, deliberately not combined. A runtime refusal is a
+  # dependency the service could not reach — a quota registry, a lease store; a
+  # user is waiting and nothing will say why. An auth refusal is a request the
+  # service correctly declined, and a rise in it is usually a client problem or,
+  # at `signup_invite_only`, a deployment whose sign-up policy is closed.
+  - name: memory-refusals
+    interval: 30s
+    rules:
+      - record: memory:runtime_refusals:rate15m
+        expr: |
+          sum by (op) (
+            rate(memory_runtime_refusals_total[15m])
+          )
+
+      # `surface` is kept in the key even though it has one value today. It is
+      # emitted as a label, and dropping it here would merge a second surface
+      # into the first without any signal that it had happened.
+      - record: memory:auth_refusals:rate15m
+        expr: |
+          sum by (surface, branch) (
+            rate(memory_auth_refusals_total[15m])
+          )
+
+  # ─── Claims ─────────────────────────────────────────────────────────────────
+  - name: memory-claims
+    interval: 30s
+    rules:
+      - record: memory:claim_pipeline:rate15m
+        expr: |
+          sum by (stage, outcome) (
+            rate(memory_claim_pipeline_total[15m])
+          )
+
+      # Active relations, summed across schema and outcome.
+      #
+      # A level, so it is read as it stands rather than by rate. Note that the
+      # sum under-reports: a series only exists once it has been set at least
+      # once, so a schema with no relations of some outcome is absent rather
+      # than zero. The gauge's own description says so.
+      - record: memory:claim_relations:active
+        expr: |
+          sum(memory_claim_relations_active)
+
+      # Mean candidates per claim slot.
+      #
+      # A histogram over counts, exported as a summary: the mean is `_sum`
+      # divided by the observation count, and there is no quantile worth
+      # reading — everything below the first reported quantile collapses to
+      # zero, which would make "no candidates" and "a handful" the same
+      # number. The family's own description says the same.
+      #
+      # The denominator names `_count` explicitly, and the family's name is
+      # chosen so the exporter appends it. A family whose name already ends in
+      # `_count` keeps its count on the *bare* name — the name its seven
+      # quantile lines share — so a selector for the bare name sums all eight
+      # series and divides by the quantiles as well. A test in the crate pins
+      # that name for exactly this reason.
+      - record: memory:claim_candidates:mean15m
+        expr: |
+          sum(rate(memory_claim_candidates_considered_sum[15m]))
+          /
+          clamp_min(
+            sum(rate(memory_claim_candidates_considered_count[15m])),
+            0.000001
+          )
+
+  # ─── Filesystem ingestion ───────────────────────────────────────────────────
+  #
+  # Only present when the build carries `fs-watch` and the deployment set
+  # `MEMORY_INGESTION_INBOX`. A profile without them has no such series at all,
+  # so every rule here evaluates to empty rather than to zero — which is the
+  # right reading: the feature is off, not broken.
+  - name: memory-fs-watch
+    interval: 30s
+    rules:
+      - record: memory:fs_watch_revisions:rate15m
+        expr: |
+          sum by (outcome) (
+            rate(memory_fs_watch_revisions_total[15m])
+          )
+
+      - record: memory:fs_watch_retries:rate15m
+        expr: |
+          sum by (stage, reason) (
+            rate(memory_fs_watch_retries_total[15m])
+          )
+
+      - record: memory:fs_watch_revision_duration:p95_5m
+        expr: |
+          max by (outcome) (
+            memory_fs_watch_revision_duration_seconds{quantile="0.95"}
+          )

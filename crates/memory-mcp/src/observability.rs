@@ -356,6 +356,74 @@ pub fn install() -> Result<(), MemoryError> {
     Ok(())
 }
 
+/// How much history a summary's quantiles are computed over.
+///
+/// The exporter's default is three buckets of twenty seconds — about a minute.
+/// That is short enough that a percentile decays to nothing within a minute of
+/// the last request, which makes it useless for alerting: a rule reading
+/// "p95 above two seconds" would fire on a spike and clear before anyone could
+/// look, and a long window cannot be reconstructed from it because the
+/// observations behind it are gone.
+///
+/// Five minutes is chosen to match the shortest window the recording rules and
+/// alerts claim. A quantile can only be as old as the window the exporter was
+/// given; naming a recording rule `p95_5m` over a one-minute quantile would be
+/// a lie the panel cannot detect.
+///
+/// Buckets are *not* configured, which is what would switch the exporter from
+/// summaries to `_bucket` exposition process-wide and cost every duration
+/// metric its quantile series.
+#[cfg(feature = "prometheus")]
+pub const SUMMARY_WINDOW: std::time::Duration = std::time::Duration::from_secs(5 * 60);
+
+/// Number of buckets the summary window is divided into.
+///
+/// Together with [`SUMMARY_WINDOW`] this fixes the rolling width at one minute
+/// per bucket: observations roll out a minute at a time rather than all at
+/// once, so a percentile degrades gradually instead of falling off a cliff.
+///
+/// A function rather than a `const` because `NonZeroU32::new` is not const on
+/// this toolchain. The value is fixed at compile time either way, and the
+/// call inlines to the same thing.
+#[cfg(feature = "prometheus")]
+pub fn summary_buckets() -> std::num::NonZeroU32 {
+    std::num::NonZeroU32::new(5).expect("5 is non-zero")
+}
+
+/// A quantile can only be as old as the window the recorder was given, so the
+/// window has to cover the shortest window any rule or panel claims.
+///
+/// The exporter's own default is three buckets of twenty seconds — about a
+/// minute. The recording rules name their latency series `p95_5m`, and
+/// alerting on a one-minute quantile under a five-minute name is a lie the
+/// panel cannot detect: the percentile decays to nothing a minute after the
+/// last request, so a sustained regression reads as a series of spikes, and a
+/// long one cannot be reconstructed at all because the observations behind it
+/// are already gone.
+///
+/// Asserted here rather than at the call sites, because there are three
+/// `PrometheusBuilder`s in two files and a fourth added later would silently
+/// keep the default.
+#[test]
+#[cfg(feature = "prometheus")]
+fn the_summary_window_covers_the_windows_the_rules_claim() {
+    assert_eq!(
+        SUMMARY_WINDOW,
+        std::time::Duration::from_secs(5 * 60),
+        "the shortest latency window any recording rule names is 5m"
+    );
+    assert!(
+        summary_buckets().get() >= 2,
+        "more than one bucket, or the window is a single step rather than a \
+         rolling one: a percentile would fall off a cliff instead of degrading"
+    );
+    assert!(
+        SUMMARY_WINDOW.as_secs() / u64::from(summary_buckets().get()) <= 60,
+        "a bucket should roll out in about a minute: wider and a percentile \
+         lingers on stale observations, narrower and it is noise"
+    );
+}
+
 /// Register every family's description with the installed recorder.
 ///
 /// Called once per profile, right after the recorder is installed. Registering
@@ -410,6 +478,9 @@ pub fn shared_test_handle() -> Option<metrics_exporter_prometheus::PrometheusHan
     HANDLE
         .get_or_init(|| {
             let handle = metrics_exporter_prometheus::PrometheusBuilder::new()
+                .set_bucket_duration(SUMMARY_WINDOW)
+                .expect("SUMMARY_WINDOW is non-zero")
+                .set_bucket_count(summary_buckets())
                 .install_recorder()
                 .ok();
             if handle.is_some() {
@@ -442,6 +513,9 @@ fn parse_listen_addr() -> Result<Option<SocketAddr>, MemoryError> {
 #[cfg(feature = "prometheus")]
 fn install_with_addr(addr: SocketAddr) -> Result<(), MemoryError> {
     metrics_exporter_prometheus::PrometheusBuilder::new()
+        .set_bucket_duration(SUMMARY_WINDOW)
+        .expect("SUMMARY_WINDOW is non-zero")
+        .set_bucket_count(summary_buckets())
         .with_http_listener(addr)
         .install()
         .map_err(|err| {

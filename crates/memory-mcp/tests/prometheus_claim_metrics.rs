@@ -58,7 +58,7 @@ fn all_five_metric_families_appear() {
     )
     .record(0.123);
 
-    // Family 3: memory_claim_candidate_count{schema,match_mode}
+    // Family 3: memory_claim_candidates_considered{schema,match_mode}
     histogram!(
         METRIC_CANDIDATE_COUNT,
         "schema" => "relation",
@@ -117,7 +117,7 @@ fn all_five_metric_families_appear() {
 
     // candidate count
     assert!(
-        output.contains("memory_claim_candidate_count"),
+        output.contains("memory_claim_candidates_considered"),
         "candidate count histogram: {output}"
     );
 
@@ -180,6 +180,38 @@ fn no_forbidden_identifier_appears_as_label() {
     }
 }
 
+/// The family's name must not end in the suffix the exporter would otherwise
+/// append, because that is what makes its count series ambiguous.
+///
+/// `metrics_exporter_prometheus` appends `_count` to a summary's count line
+/// only when the name does not already end in `count`
+/// (`add_suffix_if_missing`). A family called `…_candidate_count` therefore
+/// keeps its count on the *bare* name — the same name its seven quantile lines
+/// carry. A PromQL selector matches by metric name, so
+/// `rate(memory_claim_candidates_considered[…])` selects the count **and** every
+/// quantile, and a mean computed from it divides by eight series instead of
+/// one.
+///
+/// The name is a fixed decision either way, so this pins it: a name ending in
+/// `_count` does not merely read untidy, it silently changes what a query
+/// selects.
+#[test]
+fn the_candidate_count_name_leaves_room_for_an_explicit_count_series() {
+    assert!(
+        !METRIC_CANDIDATE_COUNT.ends_with("count"),
+        "`{}` ends in `count`, so the exporter leaves its observation count on \
+         the bare name — shared with the quantile lines — and every selector \
+         for it matches those too. Rename the family so `_count` is appended \
+         explicitly.",
+        METRIC_CANDIDATE_COUNT
+    );
+    assert!(
+        METRIC_CANDIDATE_COUNT.contains("candidates"),
+        "and the name should say what is counted: {:?}",
+        METRIC_CANDIDATE_COUNT
+    );
+}
+
 /// A count of candidates is recorded into the histogram family, and the
 /// recorder renders every histogram as a Prometheus **summary** — quantiles
 /// over a rolling window, with `_sum` and a bare count series beside them.
@@ -226,10 +258,12 @@ fn candidate_count_is_recoverable_as_a_mean() {
     let after = handle.render();
 
     assert_eq!(
-        read(&after, "").unwrap_or(0.0) - read(&before, "").unwrap_or(0.0),
+        // `_count`, explicitly. The family's name is chosen so the exporter
+        // appends it, which is what keeps the count off the bare name its
+        // quantile lines share — see the naming test above.
+        read(&after, "_count").unwrap_or(0.0) - read(&before, "_count").unwrap_or(0.0),
         5.0,
-        "every observation must be counted, and a summary exposes its count as \
-         the bare series with no `_count` suffix: {after}"
+        "every observation must be counted, on its own `_count` series: {after}"
     );
     // 3 zeros and 2 fours: a mean of 1.6 keeps the zeros visible, which is
     // what a quantile cannot do.

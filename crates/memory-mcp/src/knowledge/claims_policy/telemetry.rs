@@ -118,7 +118,7 @@ pub const METRIC_PIPELINE_TOTAL: &str = "memory_claim_pipeline_total";
 /// Pipeline stage duration in seconds.
 pub const METRIC_PIPELINE_DURATION_SECONDS: &str = "memory_claim_pipeline_duration_seconds";
 /// Number of candidates considered for a claim slot.
-pub const METRIC_CANDIDATE_COUNT: &str = "memory_claim_candidate_count";
+pub const METRIC_CANDIDATE_COUNT: &str = "memory_claim_candidates_considered";
 /// Currently active claim relations by schema and outcome.
 pub const METRIC_RELATIONS_ACTIVE: &str = "memory_claim_relations_active";
 /// Total backfilled facts by outcome and reason.
@@ -159,7 +159,7 @@ pub(crate) fn record_pipeline_duration(
     .record(duration.as_secs_f64());
 }
 
-/// Record `memory_claim_candidate_count{schema,match_mode}`.
+/// Record `memory_claim_candidates_considered{schema,match_mode}`.
 ///
 /// The value is a *count*, but it is recorded into a histogram family, and
 /// the recorder exports histograms as Prometheus summaries — quantiles over a

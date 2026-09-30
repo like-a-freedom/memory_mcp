@@ -18,6 +18,13 @@ use crate::error::MemoryError;
 #[cfg(feature = "prometheus")]
 pub fn install_recorder() -> Result<metrics_exporter_prometheus::PrometheusHandle, MemoryError> {
     let handle = metrics_exporter_prometheus::PrometheusBuilder::new()
+        .set_bucket_duration(crate::observability::SUMMARY_WINDOW)
+        .map_err(|err| {
+            MemoryError::ConfigInvalid(format!(
+                "failed to set the summary window for /metrics: {err}"
+            ))
+        })?
+        .set_bucket_count(crate::observability::summary_buckets())
         .install_recorder()
         .map_err(|err| {
             MemoryError::ConfigInvalid(format!(

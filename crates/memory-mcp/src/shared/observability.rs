@@ -352,14 +352,17 @@ pub const DESCRIPTIONS: &[MetricDescription] = &[
         help: "Claim reconciliation duration, by stage and schema.",
     },
     MetricDescription {
-        name: "memory_claim_candidate_count",
+        name: "memory_claim_candidates_considered",
         kind: MetricKind::Histogram,
         unit: None,
         help: "Candidates considered for one claim slot, by schema. A count, \
-               not a duration: read it as _sum over the bare count line. A \
-               quantile is useless here — every observation below the first \
-               reported quantile collapses to zero, so 'no candidates' becomes \
-               indistinguishable from 'a handful'.",
+               not a duration: read the mean as _sum over _count. A quantile \
+               is useless here — every observation below the first reported \
+               quantile collapses to zero, so 'no candidates' becomes \
+               indistinguishable from 'a handful'. The name deliberately does \
+               not end in _count, so the exporter appends that suffix to the \
+               observation count and keeps it off the bare name the quantile \
+               lines share.",
     },
     MetricDescription {
         name: "memory_claim_relations_active",
