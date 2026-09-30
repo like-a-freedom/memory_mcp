@@ -2305,7 +2305,7 @@
   "timepicker": {},
   "timezone": "browser",
   "title": "memory_mcp \u2014 product",
-  "uid": "memory_mcp--product",
+  "uid": "memory_mcp-product",
   "version": 1,
   "weekStart": ""
 }

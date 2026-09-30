@@ -93,7 +93,7 @@
             {
               "targetBlank": false,
               "title": "Errors over time \u2193",
-              "url": "#row-http-errors"
+              "url": "#traffic-and-errors"
             }
           ]
         },
@@ -172,7 +172,7 @@
             {
               "targetBlank": false,
               "title": "Latency by route \u2193",
-              "url": "#row-http-latency"
+              "url": "#http-latency"
             }
           ]
         },
@@ -417,7 +417,7 @@
         {
           "targetBlank": false,
           "title": "Errors over time \u2193",
-          "url": "#row-http-errors"
+          "url": "#traffic-and-errors"
         }
       ]
     },
@@ -496,7 +496,7 @@
         {
           "targetBlank": false,
           "title": "Latency by route \u2193",
-          "url": "#row-http-latency"
+          "url": "#http-latency"
         }
       ]
     },
@@ -4640,7 +4640,7 @@
   "timepicker": {},
   "timezone": "browser",
   "title": "memory_mcp \u2014 technical",
-  "uid": "memory_mcp--technical",
+  "uid": "memory_mcp-technical",
   "version": 1,
   "weekStart": ""
 }

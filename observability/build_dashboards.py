@@ -17,6 +17,7 @@ recorded series name in `recording_rules.yml`.
 
 import json
 import pathlib
+import re
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 OUT = ROOT / "observability/dashboards"
@@ -258,7 +259,7 @@ def technical() -> dict:
                 {"color": "red", "value": 0.1},
             ],
             decimals= 3,
-            links=[link("Errors over time ↓", "#row-http-errors")],
+            links=[link("Errors over time ↓", "#traffic-and-errors")],
         ),
         stat(
             "p95 latency",
@@ -275,7 +276,7 @@ def technical() -> dict:
                 {"color": "red", "value": 2},
             ],
             decimals= 3,
-            links=[link("Latency by route ↓", "#row-http-latency")],
+            links=[link("Latency by route ↓", "#http-latency")],
         ),
         stat(
             "Traffic",
@@ -1052,7 +1053,10 @@ def dashboard(title: str, description: str, panels: list[dict], tags: list[str])
         "timepicker": {},
         "timezone": "browser",
         "title": title,
-        "uid": title.lower().replace(" ", "-").replace("—", ""),
+        # A UID is a URL path segment, so it is restricted to Grafana's
+        # allowed characters. Collapsing runs of separators keeps the em dash
+        # from leaving a double hyphen behind.
+        "uid": re.sub(r"-+", "-", title.lower().replace(" ", "-").replace("—", "")).strip("-"),
         "version": VERSION,
         "weekStart": "",
     }
