@@ -1210,6 +1210,31 @@ unbounded label is how a metrics backend falls over, and per-tenant
 attribution belongs in logs, which carry `tenant_fingerprint` for exactly
 that.
 
+#### Finding a bottleneck
+
+An operation's total latency says *that* something is slow. Only its stages
+say which part, and a slow query has at least three candidates that need
+three different fixes: the embedding provider, the vector index, and the
+process's own work.
+
+| Metric | Labels | Meaning |
+| --- | --- | --- |
+| `memory_pipeline_stage_duration_seconds` | `operation`, `stage` | One stage of one pipeline |
+
+| Operation | Stage | What it covers |
+| --- | --- | --- |
+| `assemble_context` | `query_embedding` | Turning the query into a vector, including any provider round trip |
+| `assemble_context` | `ann_search` | The approximate-nearest-neighbour query against the fact index |
+| `extract` | `extraction` | Everything the tool does for one episode |
+| `extract` | `embedding_provider` | The provider call itself, which is the one stage that can be slow for reasons outside this process |
+
+`stage` is a closed vocabulary of fixed words. An unbounded one — a stage
+named after a record, a tenant or a query string — is how a metrics backend
+falls over, so anything that needs per-item attribution belongs in logs. A
+test reads the sources and fails if a stage is declared and never measured,
+because such a metric always reads zero and looks on a dashboard exactly
+like a fast pipeline.
+
 ### Build features
 
 The package ships two coarse build profiles plus a few orthogonal opt-in axes.

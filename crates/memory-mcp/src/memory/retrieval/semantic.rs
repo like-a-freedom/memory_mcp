@@ -22,6 +22,12 @@ pub(crate) async fn collect_semantic_facts(
     service: &crate::memory::retrieval::RetrievalContext,
     request: CollectSemanticFactsRequest<'_>,
 ) -> Result<Vec<(Fact, String)>, MemoryError> {
+    // The two stages a semantic retrieval spends its time in. Without them the
+    // only number is the total, and a query that is slow could be waiting on
+    // the embedding provider or on the vector index — two problems with
+    // nothing in common.
+    let _embedding_stage =
+        crate::observability::StageTimer::new("assemble_context", "query_embedding");
     let query_embedding = match service
         .embedding_service
         .generate_query_embedding_with_background(request.query)
@@ -59,15 +65,18 @@ pub(crate) async fn collect_semantic_facts(
 
     let search_limit = request.budget.max(1) * 4;
 
-    let fact_records = service
-        .knowledge_store()
-        .select_facts_ann(
-            &crate::shared::temporal::normalize_dt(request.cutoff),
-            &query_embedding,
-            search_limit,
-        )
-        .await
-        .map_err(|err| MemoryError::Storage(format!("SurrealDB query error: {err}")))?;
+    let fact_records = {
+        let _search_stage = crate::observability::StageTimer::new("assemble_context", "ann_search");
+        service
+            .knowledge_store()
+            .select_facts_ann(
+                &crate::shared::temporal::normalize_dt(request.cutoff),
+                &query_embedding,
+                search_limit,
+            )
+            .await
+    }
+    .map_err(|err| MemoryError::Storage(format!("SurrealDB query error: {err}")))?;
 
     let mut ranked_facts = Vec::new();
     for record in fact_records {

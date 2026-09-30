@@ -154,6 +154,13 @@ impl EmbeddingService {
             return Ok(None);
         }
 
+        // The provider call is the one stage here that can be slow for reasons
+        // outside this process — a model server, a network hop, a queue behind
+        // someone else's inference. Everything above it is bookkeeping, so
+        // this is the duration that separates "our code got slower" from
+        // "the thing we call got slower".
+        let _provider_stage =
+            crate::observability::StageTimer::new("extract", "embedding_provider");
         match self.embedding_provider.embed(&effective_input).await {
             Ok(embedding) => {
                 self.logger.log(

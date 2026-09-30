@@ -68,6 +68,32 @@ pub const METRIC_BACKGROUND_JOBS_TOTAL: &str = "memory_background_jobs_total";
 /// Histogram: background job duration in seconds, by job family.
 pub const METRIC_BACKGROUND_JOB_DURATION_SECONDS: &str = "memory_background_job_duration_seconds";
 
+/// Histogram: a named stage inside a pipeline, in seconds.
+///
+/// An operation's total latency says *that* something is slow. Only the stages
+/// say *which* part: a query that takes two seconds might be waiting on an
+/// embedding provider, on the vector index, or on its own post-processing, and
+/// the three need different fixes. A stage is a fixed word for that, so this is
+/// what a bottleneck is identified from.
+///
+/// `operation` is the tool that owns the stage and `stage` the step within it,
+/// so a dashboard reads down the pipeline rather than across it.
+pub const METRIC_PIPELINE_STAGE_DURATION_SECONDS: &str = "memory_pipeline_stage_duration_seconds";
+
+/// The stages the pipelines report, as a closed vocabulary.
+///
+/// A test reads the sources and asserts each one is actually measured, so a
+/// stage that is declared and never attached — which produces a metric that
+/// always reads zero, indistinguishable from a fast pipeline — fails here
+/// rather than being noticed by somebody staring at a flat histogram.
+#[cfg(test)]
+const DECLARED_STAGES: &[&str] = &[
+    "query_embedding",
+    "ann_search",
+    "extraction",
+    "embedding_provider",
+];
+
 const KNOWN_OPERATIONS: &[&str] = &[
     "ingest",
     "extract",
@@ -113,6 +139,50 @@ fn result_label(result: &str) -> &'static str {
         .copied()
         .find(|known| *known == result)
         .unwrap_or("other")
+}
+
+/// Measures one named stage of a pipeline.
+///
+/// A guard rather than a pair of calls around a block, for the same reason
+/// [`OperationMetrics`] is one: a stage is often left early — a skipped
+/// embedding, a cache hit, an error — and a duration written only on the
+/// success path would be missing exactly the cases worth seeing.
+pub(crate) struct StageTimer {
+    operation: &'static str,
+    stage: &'static str,
+    started_at: Instant,
+}
+
+impl StageTimer {
+    /// Begin measuring `stage` inside `operation`.
+    pub(crate) fn new(operation: &'static str, stage: &'static str) -> Self {
+        Self {
+            operation,
+            stage,
+            started_at: Instant::now(),
+        }
+    }
+}
+
+impl Drop for StageTimer {
+    fn drop(&mut self) {
+        record_stage_metric(
+            self.operation,
+            self.stage,
+            self.started_at.elapsed().as_secs_f64(),
+        );
+    }
+}
+
+/// Record one stage observation, for a path that measured it some other way.
+pub(crate) fn record_stage_metric(operation: &'static str, stage: &'static str, seconds: f64) {
+    const STAGE: &str = METRIC_PIPELINE_STAGE_DURATION_SECONDS;
+    metrics::histogram!(
+        STAGE,
+        "operation" => operation,
+        "stage" => stage,
+    )
+    .record(seconds);
 }
 
 /// Record one background job: its outcome and how long it ran.
@@ -355,6 +425,76 @@ pub(crate) mod tests {
     fn result_labels_are_bounded() {
         assert_eq!(result_label("facts"), "facts");
         assert_eq!(result_label("fact:abc"), "other");
+    }
+
+    /// A stage is only useful if it reaches the exporter, and it is only
+    /// reachable if the guard records on the paths that leave early — a
+    /// skipped embedding, a cache hit, an error. A timer written only on the
+    /// success path would be missing exactly the cases worth seeing.
+    #[tokio::test]
+    #[cfg(feature = "prometheus")]
+    async fn a_stage_measurement_reaches_the_exporter() {
+        let Some(exposition) = tests::exposed(|| async {
+            {
+                let _stage =
+                    crate::observability::StageTimer::new("assemble_context", "query_embedding");
+            }
+        })
+        .await
+        else {
+            return;
+        };
+
+        assert!(
+            exposition.contains(crate::observability::METRIC_PIPELINE_STAGE_DURATION_SECONDS),
+            "a pipeline stage must reach the exporter: {exposition}"
+        );
+        assert!(
+            exposition.contains(r#"stage="query_embedding""#),
+            "and be named, or it cannot be attributed: {exposition}"
+        );
+        assert!(
+            exposition.contains(r#"operation="assemble_context""#),
+            "and owned by an operation, so a dashboard reads down the pipeline: {exposition}"
+        );
+    }
+
+    /// The stages a pipeline reports are a closed set of words. An unbounded
+    /// one — a stage named after a record, a tenant, a query string — is how a
+    /// metrics backend falls over, and the bounded vocabulary is what makes the
+    /// series aggregatable.
+    #[test]
+    fn stage_labels_are_bounded_words() {
+        for stage in ["query_embedding", "ann_search", "rank", "serialize"] {
+            assert!(
+                stage
+                    .chars()
+                    .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '_'),
+                "a stage label must be a fixed word: {stage}"
+            );
+            assert!(stage.len() < 32, "a stage label must be short: {stage}");
+        }
+    }
+
+    /// A stage that is declared but never attached to a pipeline measures
+    /// nothing. The sources are read and compared, so adding a stage to the
+    /// vocabulary without measuring it — the failure this guards — fails here
+    /// rather than showing up as a permanently flat histogram, which reads on a
+    /// dashboard exactly like a fast pipeline.
+    #[test]
+    fn every_declared_stage_is_measured_somewhere_in_the_pipeline() {
+        const SOURCES: &[&str] = &[
+            include_str!("memory/retrieval/semantic.rs"),
+            include_str!("tools/extract.rs"),
+            include_str!("embedding/service.rs"),
+        ];
+        for stage in DECLARED_STAGES {
+            assert!(
+                SOURCES.iter().any(|source| source.contains(stage)),
+                "stage `{stage}` is declared but never measured; a stage nobody \
+                 attaches is a metric that always reads zero"
+            );
+        }
     }
 
     #[test]

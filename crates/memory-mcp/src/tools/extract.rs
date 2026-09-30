@@ -161,10 +161,16 @@ pub async fn extract<T: ToolContext>(
         .await
     {
         Ok(episode_id) => {
-            match ctx
-                .extract(&episode_id, Some(access), zero_shot_labels.as_deref())
-                .await
-            {
+            // The extraction itself is the whole cost of this tool, so it is
+            // the only stage worth naming: an `extract` that got slower can be
+            // traced to this histogram rather than to the operation total,
+            // which would move for any reason at all.
+            let extraction = {
+                let _stage = crate::observability::StageTimer::new("extract", "extraction");
+                ctx.extract(&episode_id, Some(access), zero_shot_labels.as_deref())
+                    .await
+            };
+            match extraction {
                 Ok(result) => {
                     record_extract_results(&operation_metrics, &result);
                     operation_metrics.success();
