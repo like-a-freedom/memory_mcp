@@ -160,6 +160,13 @@ pub(crate) fn observe(
 /// reached from exactly one place outside [`record_job_metric`] — a caller
 /// cannot grow a second, slightly different emission path that drifts from
 /// this one.
+///
+/// Takes a slice of alternating key and value rather than positional
+/// parameters: the `metrics` macros take labels as token pairs, so a variable
+/// count would otherwise need one macro per arity and a nine-argument
+/// function that clippy rightly refuses. Every side is `&'static str`, so no
+/// label borrows from a request — a registry outlives the request that
+/// produced it.
 #[cfg_attr(
     not(feature = "prometheus"),
     allow(
@@ -171,13 +178,30 @@ pub(crate) fn count_timed(
     counter: &'static str,
     histogram: &'static str,
     seconds: f64,
-    k0: &'static str,
-    v0: &'static str,
-    k1: &'static str,
-    v1: &'static str,
+    labels: &[(&'static str, &'static str)],
 ) {
-    metrics::counter!(counter, k0 => v0, k1 => v1).increment(1);
-    metrics::histogram!(histogram, k0 => v0, k1 => v1).record(seconds);
+    // The slice is iterated by reference, so the arms bind references to
+    // references; the macros want the values.
+    match *labels {
+        [(k0, v0), (k1, v1)] => {
+            metrics::counter!(counter, k0 => v0, k1 => v1).increment(1);
+            metrics::histogram!(histogram, k0 => v0, k1 => v1).record(seconds);
+        }
+        [(k0, v0), (k1, v1), (k2, v2)] => {
+            metrics::counter!(counter, k0 => v0, k1 => v1, k2 => v2).increment(1);
+            metrics::histogram!(histogram, k0 => v0, k1 => v1, k2 => v2).record(seconds);
+        }
+        _ => {
+            // A label set this function does not know. Failing loudly beats
+            // recording a series with the wrong labels: the two families would
+            // drift apart and a panel would read one of them as missing.
+            debug_assert!(
+                false,
+                "a counter and histogram pair needs a known label arity, got {}",
+                labels.len()
+            );
+        }
+    }
 }
 
 /// The bounded operation vocabulary. A name outside it becomes `other`, so a

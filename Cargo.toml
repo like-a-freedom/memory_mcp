@@ -11,7 +11,10 @@ license = "MIT"
 [workspace.dependencies]
 anno = { version = "0.13.0", default-features = false, features = ["onnx"] }
 async-trait = "0.1.92"
-axum = { version = "0.8.9", default-features = false, features = ["http1", "tokio", "query"] }
+# `matched-path` is what lets the access log name the endpoint a request
+# matched, so the traffic and latency metrics can be read per route instead of
+# only per method class. Without it `MatchedPath` does not exist.
+axum = { version = "0.8.9", default-features = false, features = ["http1", "tokio", "query", "matched-path"] }
 base64 = "0.23"
 bytes = "1.12.1"
 candle-core = "0.11"

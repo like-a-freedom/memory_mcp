@@ -366,6 +366,12 @@ pub fn build_router(
             })
     };
     Ok(app
+        // A `route_layer`, not a `layer`: only it runs after the router has
+        // matched, which is the only place `MatchedPath` exists. The order
+        // relative to the `layer` calls below does not matter — both orders
+        // were run, and the attribution is identical — so it is written first
+        // to keep it next to the comment explaining what it is for.
+        .route_layer(axum::middleware::from_fn(super::logging::capture_route))
         .layer(axum::middleware::from_fn_with_state(
             state,
             super::middleware::host_origin,
@@ -395,6 +401,55 @@ mod tests {
 
     fn request(method: Method, uri: &str) -> Request<Body> {
         request_with_host(method, uri, "localhost")
+    }
+
+    /// The production router must attribute a request to the route that served
+    /// it.
+    ///
+    /// The unit test in `logging` builds its own two-route router, so it can
+    /// only see that the mechanism works. It cannot see whether the production
+    /// wiring calls it at all: with `capture_route` removed from this function,
+    /// every request would be reported as `unmatched` and that test would still
+    /// pass. This one goes through `build_router`.
+    #[cfg(all(feature = "prometheus", feature = "control-plane"))]
+    #[tokio::test]
+    async fn the_production_router_attributes_requests_to_their_route() {
+        use crate::observability::tests::{exposed, render};
+
+        let (builder, _store) = HttpStateTestBuilder::local_admin().await;
+        let state = builder.build().await.expect("local admin HTTP state");
+
+        let exposition = exposed(|| async {
+            let mut router = build_router(state, None).expect("router builds in tests");
+            for uri in ["/health/live", "/health/ready", "/no-such-route"] {
+                let resp = router
+                    .call(request(Method::GET, uri))
+                    .await
+                    .expect("router answers");
+                assert_eq!(
+                    resp.status(),
+                    if uri == "/no-such-route" {
+                        StatusCode::NOT_FOUND
+                    } else {
+                        StatusCode::OK
+                    },
+                    "{uri} answered as expected"
+                );
+            }
+            render()
+        })
+        .await;
+
+        assert!(
+            exposition.contains(r#"route="/health/live""#),
+            "the production router must attribute a request to its route, and \
+             only the wiring in this function can do that: {exposition}"
+        );
+        assert!(
+            exposition.contains(r#"route="unmatched""#),
+            "and a request matching nothing is still counted, under its own \
+             name: {exposition}"
+        );
     }
 
     /// The mode disclosure is mounted in the supported control-plane profile

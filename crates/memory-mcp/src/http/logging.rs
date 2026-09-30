@@ -72,6 +72,11 @@ pub(crate) async fn request_log(mut req: Request, next: Next) -> Response {
         .map(RequestId)
         .unwrap_or_else(|| RequestId(Uuid::new_v4()));
     req.extensions_mut().insert(request_id);
+    // The cell the inner `capture_route` layer writes the matched path into, and
+    // this layer's own handle to read it back. Created here because this is the
+    // only layer that spans the whole request.
+    let route_cell = RouteCell::default();
+    req.extensions_mut().insert(route_cell.clone());
 
     // Saturation: raised before the handler runs and lowered once it returns,
     // so a scrape taken during a slow request sees it. Both halves are on every
@@ -107,11 +112,15 @@ pub(crate) async fn request_log(mut req: Request, next: Next) -> Response {
     });
     let outcome = outcome_label(response.status().as_u16());
     let elapsed = started.elapsed();
-    // The same three facts the log line carries, as metrics: the traffic
-    // count, the latency distribution, and — through `outcome` — the error
-    // ratio. Taken from the same values, so a graph and a log line can never
-    // disagree about one request.
-    record_request_metric(method_category, outcome, elapsed.as_secs_f64());
+    // The route arrives from `capture_route`, which runs inside the router where
+    // the match exists. Unset means the request matched nothing and axum's
+    // fallback answered it — a fact worth its own series, not a gap.
+    let route = route_cell.0.get().copied().unwrap_or(UNMATCHED_ROUTE);
+    // The same facts the log line carries, as metrics: the traffic count, the
+    // latency distribution, and — through `outcome` — the error ratio. Taken
+    // from the same values, so a graph and a log line can never disagree about
+    // one request.
+    record_request_metric(method_category, outcome, route, elapsed.as_secs_f64());
     let event = RequestLog {
         event: "http_request",
         request_id: &request_id,
@@ -148,18 +157,99 @@ fn inflight_requests(delta: i64) {
 ///
 /// The labels are `&'static str` because a metrics registry outlives the
 /// request, and a label borrowed from a request would dangle after it returned.
-/// `categorize` and `outcome_label` already return exactly that — a bounded
-/// class, never the path or the status code.
-fn record_request_metric(method_category: &'static str, outcome: &'static str, seconds: f64) {
+/// `route_label` returns exactly that, and for a more important reason: it is
+/// read from the router's own match, so the label set is bounded by the routes
+/// the server declares. A raw URI would put tenant ids and episode ids into
+/// label values — unbounded, and a disclosure.
+fn record_request_metric(
+    method_category: &'static str,
+    outcome: &'static str,
+    route: &'static str,
+    seconds: f64,
+) {
     crate::observability::count_timed(
         crate::shared::observability::METRIC_HTTP_REQUESTS_TOTAL,
         crate::shared::observability::METRIC_HTTP_REQUEST_DURATION_SECONDS,
         seconds,
-        "method",
-        method_category,
-        "outcome",
-        outcome,
+        &[
+            ("method", method_category),
+            ("outcome", outcome),
+            ("route", route),
+        ],
     );
+}
+
+/// A request that matched no route: a stale client, a scanner, a mistyped path.
+///
+/// Its own series, because "nothing here served this" is a fact worth reading
+/// rather than an absence to be inferred.
+const UNMATCHED_ROUTE: &str = "unmatched";
+
+/// Where `capture_route` leaves the route for `request_log` to read.
+///
+/// The two layers cannot meet through the request alone: `request_log` is
+/// outermost, so it runs before the router matches and the `MatchedPath` in
+/// the request it holds is absent — a probe confirmed it. Nor through the
+/// response: by the time the inner layer inserts there, the outer layer's
+/// `next.run` has already returned that response.
+///
+/// So `request_log` creates this cell, puts it in the request's extensions
+/// where the inner layer finds it, and keeps its own handle. Per request by
+/// construction, which a `thread_local` would not be: tokio moves a task
+/// between threads at every `await`, so a thread-local could be read by a
+/// different request than the one that wrote it.
+#[derive(Clone, Default)]
+struct RouteCell(std::sync::Arc<std::sync::OnceLock<&'static str>>);
+
+/// Capture the matched route before the handler runs.
+///
+/// Added with [`axum::Router::route_layer`], not `layer`: only `route_layer`
+/// runs after the router has matched. A request matching no route never
+/// reaches it — axum's fallback answers those — so the cell stays unset and
+/// the outer layer reports `unmatched`, which is the truth for them.
+pub(crate) async fn capture_route(req: Request, next: Next) -> Response {
+    if let Some(cell) = req.extensions().get::<RouteCell>() {
+        let _ = cell.0.set(route_label(
+            req.extensions().get::<axum::extract::MatchedPath>(),
+        ));
+    }
+    next.run(req).await
+}
+
+/// Stands in for the *name* of a path parameter, never for its value.
+const PARAMETER_SEGMENT: &str = "{param}";
+
+/// The matched route as a bounded label value.
+///
+/// Each path parameter collapses to one segment, so `/api/v1/facts/{id}` is a
+/// single series instead of one per fact. The result is interned with `leak`
+/// because a metrics label outlives the request while `MatchedPath` borrows
+/// from it; in practice the router serves a fixed set, so the leak saturates
+/// on the first few requests and then costs one copy per distinct route.
+fn route_label(matched: Option<&axum::extract::MatchedPath>) -> &'static str {
+    let Some(matched) = matched else {
+        return UNMATCHED_ROUTE;
+    };
+    let pattern = matched.as_str();
+    if !pattern.contains('{') && !pattern.contains(':') {
+        return pattern.to_string().leak();
+    }
+    let mut normalized = String::with_capacity(pattern.len());
+    for (index, segment) in pattern.split('/').enumerate() {
+        if index > 0 {
+            normalized.push('/');
+        }
+        // `{id}`, `{*rest}` and `:id` all name a parameter; none carries a
+        // value into the label.
+        let is_parameter =
+            (segment.starts_with('{') && segment.ends_with('}')) || segment.starts_with(':');
+        normalized.push_str(if is_parameter {
+            PARAMETER_SEGMENT
+        } else {
+            segment
+        });
+    }
+    normalized.leak()
 }
 
 /// Bounded request log event. The serialize order is the
@@ -464,6 +554,69 @@ mod tests {
         );
     }
 
+    /// Which endpoint served a request is the label a dashboard needs and the
+    /// one this family was missing.
+    ///
+    /// `method` is a *class* — `read`, `write`, `update`, `delete`, `other` —
+    /// not a route. With thirty-eight routes in the HTTP surface, an operator
+    /// whose p95 climbed could not tell which endpoint was responsible: every
+    /// read was one series. Latency per endpoint is the standard panel, and it
+    /// was not reachable from these metrics at all.
+    ///
+    /// The route comes from axum's matched path, never the request URI, so the
+    /// label set is bounded by the router. A raw URI would put tenant ids and
+    /// episode ids into a label value, which is both unbounded and a
+    /// disclosure.
+    #[tokio::test]
+    async fn a_served_request_is_attributed_to_its_route() {
+        use crate::observability::tests::exposed;
+
+        let exposition = exposed(|| async {
+            let mut svc = Router::new()
+                .route("/api/v1/facts", get(echo))
+                .route("/api/v1/ingest/{id}", get(echo))
+                .route_layer(axum::middleware::from_fn(capture_route))
+                .layer(axum::middleware::from_fn(request_log));
+            for uri in [
+                "/api/v1/facts",
+                // A path parameter must collapse to one series, not one per id.
+                "/api/v1/ingest/abc",
+                "/api/v1/ingest/xyz",
+                "/api/v1/nothing-here",
+            ] {
+                let req = Request::builder()
+                    .method("GET")
+                    .uri(uri)
+                    .body(Body::empty())
+                    .unwrap();
+                let _ = svc.call(req).await;
+            }
+            crate::observability::tests::render()
+        })
+        .await;
+
+        assert!(
+            exposition.contains(r#"route="/api/v1/facts""#),
+            "a matched route must be named, or latency cannot be attributed to \
+             an endpoint: {exposition}"
+        );
+        assert!(
+            exposition.contains(r#"route="/api/v1/ingest/{param}""#),
+            "a path parameter must collapse to its name: two ids are one \
+             endpoint, and one series per id is unbounded: {exposition}"
+        );
+        assert!(
+            !exposition.contains(r#"route="/api/v1/ingest/abc""#),
+            "and the value must never reach the label: it is a disclosure as \
+             well as unbounded: {exposition}"
+        );
+        assert!(
+            exposition.contains(r#"route="unmatched""#),
+            "a request that matched nothing is a signal of its own — a stale \
+             client or a probe — and must not be invisible: {exposition}"
+        );
+    }
+
     /// A served request has to be visible as a metric, not only as a log line.
     ///
     /// The access log is the right place — it is the outermost layer, it
@@ -485,10 +638,15 @@ mod tests {
         // absolute `== 1` was really asserting that no other test had run
         // yet. The labels pin the series; the two readings, taken under one
         // lock, make the assertion exact.
-        const SERIES: &str = r#"method="read",outcome="2xx""#;
+        // The route is part of the series. `route_layer` is what fills it, so
+        // the test's router carries the same two layers the production one
+        // does — otherwise every series here would read `unmatched` and the
+        // assertion would pass without proving anything about a real route.
+        const SERIES: &str = r#"method="read",outcome="2xx",route="/""#;
         let (before, exposition) = exposed(|| async {
             let mut svc = Router::new()
                 .route("/", get(echo))
+                .route_layer(axum::middleware::from_fn(capture_route))
                 .layer(axum::middleware::from_fn(request_log));
             let before = sample_series(
                 &crate::observability::tests::render(),
