@@ -129,6 +129,12 @@ jobs:
       - name: macOS feature lint
         if: matrix.target == 'aarch64-apple-darwin'
         run: cargo clippy --workspace --all-targets --features fs-watch,mcp-apps,streamable-http,metal --locked -- -D warnings
+      - name: Apple accelerator and allocator lint
+        if: matrix.target == 'aarch64-apple-darwin'
+        # ADR-0034 requires both to stay out of `default`. Nothing else
+        # builds them, so without this row a change to either would not be
+        # noticed until somebody opted in locally.
+        run: cargo clippy --workspace --all-targets --features fs-watch,mcp-apps,streamable-http,accelerate,mimalloc --locked -- -D warnings
       - name: Native unit and filesystem tests (Unix)
         # Hosted Windows runners consistently terminate the Rust test harness
         # with exit 101 after a long native dependency setup. Windows still

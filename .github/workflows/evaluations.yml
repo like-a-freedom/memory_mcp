@@ -83,3 +83,36 @@ jobs:
         path: target/criterion
         if-no-files-found: warn
         retention-days: 30
+
+  benchmark-metal:
+    name: Metal NER benchmark
+    runs-on: macos-15
+    timeout-minutes: 120
+    # A separate job from `benchmark-nightly`, not a matrix row: that one runs
+    # on ubuntu-24.04 and cannot execute a Metal bench at all, so a matrix
+    # would compile the target on Linux and report success without measuring
+    # anything. The `ner_metal` bench was therefore reachable from no
+    # workflow, though `make bench-check` compiled it every week.
+    steps:
+    - uses: actions/checkout@v7.0.0
+    - uses: ./.github/actions/setup
+      with:
+        target: aarch64-apple-darwin
+        cache-key: benchmark-metal
+    - name: Run the Metal NER benchmark
+      run: |
+        if test -d crates/memory-mcp/tests/models/ner; then
+          MEMORY_MCP_BENCH_REQUIRE_FIXTURES=1 cargo bench -p eval-harness \
+            --features memory_mcp/metal,eval-harness/bench --bench ner_metal --locked
+        else
+          echo "Metal NER benchmark not executed: model fixtures are not provisioned in CI"
+          echo "Run MEMORY_MCP_BENCH_REQUIRE_FIXTURES=1 make bench-metal on a fixture-equipped Apple-silicon host"
+        fi
+    - name: Upload Criterion reports
+      if: always()
+      uses: actions/upload-artifact@v6
+      with:
+        name: criterion-metal-nightly
+        path: target/criterion
+        if-no-files-found: warn
+        retention-days: 30

@@ -61,19 +61,12 @@ impl TestMemory {
 
 #[allow(dead_code)]
 pub async fn make_service() -> MemoryService {
-    make_service_with_query_logging(false).await
+    make_service_with_client_and_query_logging(false).await.0
 }
 
 #[allow(dead_code)]
 pub async fn make_service_with_client() -> (MemoryService, Arc<SurrealDbClient>) {
     make_service_with_client_and_query_logging(false).await
-}
-
-#[allow(dead_code)]
-pub async fn make_service_with_query_logging(query_logging_enabled: bool) -> MemoryService {
-    make_service_with_client_and_query_logging(query_logging_enabled)
-        .await
-        .0
 }
 
 #[allow(dead_code)]
@@ -193,63 +186,6 @@ pub async fn seed_episode_backed_fact_with_source_id(
         )
         .await
         .expect("seed note fact should succeed")
-}
-
-#[allow(dead_code)]
-pub async fn seed_fact_with_links_and_project(
-    service: &MemoryService,
-    scope: &str,
-    content: &str,
-    t_valid: DateTime<Utc>,
-    entity_links: Vec<String>,
-    project: Option<&str>,
-    source_id: Option<&str>,
-) -> String {
-    let normalized_project = project.filter(|project| !project.trim().is_empty());
-    let normalized_source_id = source_id.filter(|source_id| !source_id.trim().is_empty());
-
-    if normalized_project.is_none() && normalized_source_id.is_none() {
-        return seed_fact_with_links(service, scope, content, t_valid, entity_links).await;
-    }
-
-    let source_id = normalized_source_id.map(str::to_string).unwrap_or_else(|| {
-        format!(
-            "seed:{}:{}:{}",
-            scope,
-            normalized_project.unwrap_or("default"),
-            normalize_text(content)
-        )
-    });
-
-    let episode_id = IngestCapability::ingest_from_service(
-        service,
-        IngestRequest {
-            source_type: "seed".to_string(),
-            source_id,
-            content: format!("seed source for {content}"),
-            t_ref: t_valid,
-            t_ingested: None,
-            policy_tags: vec![],
-        },
-        None,
-    )
-    .await
-    .expect("seed project episode should succeed");
-
-    service
-        .add_fact(
-            "note",
-            content,
-            content,
-            &episode_id,
-            t_valid,
-            0.9,
-            entity_links,
-            vec![],
-            Provenance::agent_observation(&episode_id),
-        )
-        .await
-        .expect("seed project fact should succeed")
 }
 
 #[allow(dead_code)]

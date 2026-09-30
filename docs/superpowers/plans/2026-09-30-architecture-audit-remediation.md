@@ -385,11 +385,11 @@ Four facts drive this task. `accelerate` has 0 source sites and 0 CI builds. `mi
 
 Ruling recap: cut the two dead helpers, keep `seed_fact_with_links` (2 external callers), cut `update_progress_fenced` (Task 1.5).
 
-- [ ] **Step 1: Cut the two dead test helpers.** `make_service_with_query_logging` is called only by `make_service` at `mod.rs:64`, which passes `false` — and every real query-log consumer already uses `make_service_with_client_and_query_logging(true)`, verified at `service_integration.rs:943,1019,1077,1142,1205,2249`. `seed_fact_with_links_and_project` has zero callers; its 55 lines exist to cover a `project`/`source_id` combination no test exercises. Remove both and their `#[allow(dead_code)]`.
+- [x] **Step 1: Cut the two dead test helpers.** `make_service_with_query_logging` is called only by `make_service` at `mod.rs:64`, which passes `false` — and every real query-log consumer already uses `make_service_with_client_and_query_logging(true)`, verified at `service_integration.rs:943,1019,1077,1142,1205,2249`. `seed_fact_with_links_and_project` has zero callers; its 55 lines exist to cover a `project`/`source_id` combination no test exercises. Remove both and their `#[allow(dead_code)]`.
 
-- [ ] **Step 2: Write the test that fails when a test helper is dead.** In `crates/memory-mcp/tests/common/mod.rs`, add a `#[cfg(test)] mod helper_audit` that cannot see its own crate's other test binaries. Instead add `crates/memory-mcp/tests/common_surface.rs`: for every `pub async fn` in `common/mod.rs`, grep `crates/memory-mcp/tests/*.rs` and this file for `common::<name>` and assert at least one hit. Run it, expect FAIL listing the two names removed in Step 1 if you skipped that step, PASS after.
+- [x] **Step 2: Write the test that fails when a test helper is dead.** In `crates/memory-mcp/tests/common/mod.rs`, add a `#[cfg(test)] mod helper_audit` that cannot see its own crate's other test binaries. Instead add `crates/memory-mcp/tests/common_surface.rs`: for every `pub async fn` in `common/mod.rs`, grep `crates/memory-mcp/tests/*.rs` and this file for `common::<name>` and assert at least one hit. Run it, expect FAIL listing the two names removed in Step 1 if you skipped that step, PASS after.
 
-- [ ] **Step 3: Add the feature lint row.** In `ci.yml` job `native`, immediately after the macOS feature lint at lines 119-121, add:
+- [x] **Step 3: Add the feature lint row.** In `ci.yml` job `native`, immediately after the macOS feature lint at lines 119-121, add:
 
 ```yaml
 - name: Apple accelerator and allocator lint
@@ -399,9 +399,9 @@ Ruling recap: cut the two dead helpers, keep `seed_fact_with_links` (2 external 
 
 ADR-0034 requires both to stay out of `default`; this row proves they still build without making them default.
 
-- [ ] **Step 4: Prove the row can fail.** Temporarily add `use nonexistent_crate as _;` to `src/lib.rs`, run the command, confirm it fails, revert.
+- [x] **Step 4: Prove the row can fail.** Temporarily add `use nonexistent_crate as _;` to `src/lib.rs`, run the command, confirm it fails, revert.
 
-- [ ] **Step 5: Make `ner_metal` runnable.** `benchmark-nightly` in `evaluations.yml` has no `matrix:` key. Add one, or add a sibling job. The Metal bench needs `memory_mcp/metal` in `--features` and a Darwin-arm64 host (per `Makefile:72-75`). Add to `evaluations.yml`:
+- [x] **Step 5: Make `ner_metal` runnable.** `benchmark-nightly` in `evaluations.yml` has no `matrix:` key. Add one, or add a sibling job. The Metal bench needs `memory_mcp/metal` in `--features` and a Darwin-arm64 host (per `Makefile:72-75`). Add to `evaluations.yml`:
 
 ```yaml
   benchmark-metal:
@@ -420,9 +420,9 @@ ADR-0034 requires both to stay out of `default`; this row proves they still buil
 
 The `test -d` guard mirrors the existing CPU bench at `evaluations.yml:71-77`, which skips when fixtures are absent. The `runs-on: macos-15` matches the existing Apple-Silicon row in `ci.yml:103-104`.
 
-- [ ] **Step 6: Delete the dead Makefile targets.** Keep `eval-response-size`, `eval-ner-quality`, `bench-check`, `bench-cpu-core` — the four CI actually invokes (`ci.yml:78`, `evaluations.yml:38,41,68,71`). Delete the other twelve entries and their recipes. `eval-pr`, `eval-release`, `eval-nightly` are one-line `cargo run` invocations that `evaluations.yml:34-36` already inlines; `bench-metal`'s recipe moves into the new CI step.
+- [x] **Step 6: Delete the dead Makefile targets.** Keep `eval-response-size`, `eval-ner-quality`, `bench-check`, `bench-cpu-core` — the four CI actually invokes (`ci.yml:78`, `evaluations.yml:38,41,68,71`). Delete the other twelve entries and their recipes. `eval-pr`, `eval-release`, `eval-nightly` are one-line `cargo run` invocations that `evaluations.yml:34-36` already inlines; `bench-metal`'s recipe moves into the new CI step.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git commit -m "ci: build the accelerator and allocator features, and run the Metal benchmark"
