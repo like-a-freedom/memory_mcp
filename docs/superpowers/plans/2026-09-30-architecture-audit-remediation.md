@@ -1051,8 +1051,8 @@ pub async fn build_memory_service_from_env(
 
 `MemoryService::new`, `new_with_embedding_provider`, and the `with_*` builder methods stay in `service/core/builder.rs` — they construct the type, which is the container's job. Only the environment-reading orchestration moves.
 
-- [x] **Step 1: Write ADR-0067.** Status `Accepted`. Context: the container file holds startup policy; `bootstrap/` is HTTP-only and feature-gated. Decision: `bootstrap/` is the composition root for both profiles; the container constructs and holds, it does not start. Consequences: `bootstrap.rs` is no longer `cfg(control-plane)`, so every profile compiles it; `service/core/builder.rs` drops from 496 to ~200 lines. Alternatives considered: (a) keep a `service/startup.rs` — rejected, because it leaves a second place that knows how to build a service, and that is the confusion this change exists to remove; (b) move it into `runner.rs` — rejected, `main.rs` and `runner.rs` must stay thin per AGENTS.md.
-- [x] **Step 2: Write the failing test** in `crates/memory-mcp/tests/zero_config_embedded.rs`:
+- [ ] **Step 1: Write ADR-0067.** Status `Accepted`. Context: the container file holds startup policy; `bootstrap/` is HTTP-only and feature-gated. Decision: `bootstrap/` is the composition root for both profiles; the container constructs and holds, it does not start. Consequences: `bootstrap.rs` is no longer `cfg(control-plane)`, so every profile compiles it; `service/core/builder.rs` drops from 496 to ~200 lines. Alternatives considered: (a) keep a `service/startup.rs` — rejected, because it leaves a second place that knows how to build a service, and that is the confusion this change exists to remove; (b) move it into `runner.rs` — rejected, `main.rs` and `runner.rs` must stay thin per AGENTS.md.
+- [ ] **Step 2: Write the failing test** in `crates/memory-mcp/tests/zero_config_embedded.rs`:
 
 ```rust
 #[tokio::test]
@@ -1065,10 +1065,10 @@ async fn zero_configuration_starts_without_any_environment_variable() {
 
 There is an existing zero-config test; read it first and extend it rather than duplicating. Run: expect FAIL — the function does not exist.
 
-- [x] **Step 3: Move the function.** Cut `builder.rs:196-474` and paste into `bootstrap/stdio.rs`, renaming the function. The three `EmbeddingActivationMode` arms at 272-342 move with it, as do the `ner_progress` and `CliProgressSink` wiring. Un-gate `bootstrap.rs:6`.
-- [x] **Step 4: Repoint the two callers.** `cli/runtime.rs:60` `build_memory_service` and `runner.rs`. The local `serve` path in `runner.rs` also builds a service; find it and repoint it too.
-- [x] **Step 5: Run the test.** Expected: PASS, and the existing zero-config, fs-watch, and lifecycle tests must all still pass — they exercise this path.
-- [x] **Step 6: Commit**
+- [ ] **Step 3: Move the function.** Cut `builder.rs:196-474` and paste into `bootstrap/stdio.rs`, renaming the function. The three `EmbeddingActivationMode` arms at 272-342 move with it, as do the `ner_progress` and `CliProgressSink` wiring. Un-gate `bootstrap.rs:6`.
+- [ ] **Step 4: Repoint the two callers.** `cli/runtime.rs:60` `build_memory_service` and `runner.rs`. The local `serve` path in `runner.rs` also builds a service; find it and repoint it too.
+- [ ] **Step 5: Run the test.** Expected: PASS, and the existing zero-config, fs-watch, and lifecycle tests must all still pass — they exercise this path.
+- [ ] **Step 6: Commit**
 
 ```bash
 git commit -m "refactor(bootstrap): the stdio composition root leaves the container"
