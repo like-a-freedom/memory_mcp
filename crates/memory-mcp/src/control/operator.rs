@@ -8,6 +8,7 @@
 //! OIDC replaces this with derived operator
 //! identity; the accessor name (`require_recent_auth`) stays.
 
+use crate::provisioning::api::transition_tenant;
 use std::sync::Arc;
 
 #[cfg(any(test, feature = "test-fixtures"))]
@@ -120,14 +121,19 @@ pub async fn retry_tenant(
     let stage = tenant
         .retry_stage
         .unwrap_or(crate::http::registry::models::TenantStatus::Reserved);
-    store
-        .update_tenant_state(
-            &tenant.id,
-            tenant.version,
-            crate::http::registry::models::TenantStatus::Failed,
-            stage,
-        )
-        .await?;
+    // Through the table like the other two. `Failed -> NamespaceCreating` and
+    // `Failed -> Migrating` are both legal, and a `retry_stage` outside them
+    // is now refused rather than written — before, any stage the record
+    // happened to carry was accepted.
+    transition_tenant(
+        &crate::provisioning::api::TenantLifecycle::new(store.as_ref()),
+        &tenant.id,
+        tenant.version,
+        crate::http::registry::models::TenantStatus::Failed,
+        stage,
+    )
+    .await
+    .map_err(|_| super::error::ApiError::Conflict)?;
     Ok(axum::http::StatusCode::ACCEPTED)
 }
 
@@ -156,14 +162,20 @@ pub async fn suspend_tenant(
     ) {
         return Err(super::error::ApiError::Conflict);
     }
-    store
-        .update_tenant_state(
-            &tenant.id,
-            tenant.version,
-            tenant.status,
-            crate::http::registry::models::TenantStatus::Suspended,
-        )
-        .await?;
+    // From here the table decides. The two checks above were already
+    // consequences of it — `Suspended -> Suspended` and the two terminal
+    // states are not in the table — and are kept because they answer with a
+    // shape the API has always used: 204 for an idempotent re-suspend, 409
+    // for a terminal tenant. The table alone would give 409 for both.
+    transition_tenant(
+        &crate::provisioning::api::TenantLifecycle::new(store.as_ref()),
+        &tenant.id,
+        tenant.version,
+        tenant.status,
+        crate::http::registry::models::TenantStatus::Suspended,
+    )
+    .await
+    .map_err(|_| super::error::ApiError::Conflict)?;
     Ok(axum::http::StatusCode::NO_CONTENT)
 }
 
@@ -179,14 +191,31 @@ pub async fn resume_tenant(
         .find_tenant_by_id(&tenant_id)
         .await?
         .ok_or(super::error::ApiError::NotFound)?;
-    store
-        .update_tenant_state(
-            &tenant.id,
-            tenant.version,
-            crate::http::registry::models::TenantStatus::Suspended,
-            crate::http::registry::models::TenantStatus::Ready,
-        )
-        .await?;
+    // Only a suspended tenant is resumable. This precondition is the
+    // handler's own, and it is load-bearing for a pair the table cannot
+    // refuse: a `Migrating` tenant may legally become `Ready`, because that is
+    // how a provisioning worker finishes — but it was never suspended, so an
+    // operator has nothing to resume and must not get that far. Asking the
+    // table alone would let `Migrating -> Ready` through, and the tenant would
+    // then report ready while a worker still holds its lease.
+    if tenant.status != crate::http::registry::models::TenantStatus::Suspended {
+        return Err(super::error::ApiError::Conflict);
+    }
+    // The status the tenant is actually in, as `from`. This handler used to
+    // write `Suspended -> Ready` without reading it, and because the store's
+    // CAS is on `expected_version` and not on `from`, resuming a tenant that
+    // was never suspended issued `Migrating -> Ready` — after which the
+    // operator and the provisioning loop both believed the tenant was ready,
+    // while a worker still held a lease on it. The table refuses that pair.
+    transition_tenant(
+        &crate::provisioning::api::TenantLifecycle::new(store.as_ref()),
+        &tenant.id,
+        tenant.version,
+        tenant.status,
+        crate::http::registry::models::TenantStatus::Ready,
+    )
+    .await
+    .map_err(|_| super::error::ApiError::Conflict)?;
     Ok(axum::http::StatusCode::NO_CONTENT)
 }
 
@@ -514,6 +543,142 @@ mod tests {
         .await;
 
         assert_eq!(observed.ok(), Some(axum::http::StatusCode::NO_CONTENT));
+    }
+
+    /// Read back a tenant's status, so a test can assert a refused transition
+    /// left it alone.
+    async fn status_of(state: &Arc<crate::http::HttpState>, id: &str) -> TenantStatus {
+        state
+            .registry
+            .tenants()
+            .find_tenant_by_id(id)
+            .await
+            .expect("read tenant")
+            .expect("tenant exists")
+            .status
+    }
+
+    /// Operator transitions obey the Tenant transition table.
+    ///
+    /// These three handlers reached `store.update_tenant_state` directly, so
+    /// `can_transition` was consulted by no operator path at all. Two of the
+    /// three had a real hole:
+    ///
+    ///  * `suspend_tenant` rejected only `Deleting` and `Purged`, so it
+    ///    accepted `Migrating -> Suspended`. A tenant mid-provisioning holds a
+    ///    lease, and suspending it strands the worker that owns it.
+    ///  * `resume_tenant` never read `tenant.status` at all. It loaded the
+    ///    tenant and wrote `Suspended -> Ready` regardless. Because the store's
+    ///    CAS is on `expected_version` and not on `from`, resuming a
+    ///    `Migrating` tenant issued `Migrating -> Ready`, and both the
+    ///    operator and the provisioning loop then believed the tenant was ready.
+    ///
+    /// The HTTP contract is unchanged for every existing case: a refused status
+    /// was already a 409. What changes is the third case, which was 204 and
+    /// becomes 409 — that is the fix, not a regression.
+    #[tokio::test]
+    async fn operator_transitions_obey_the_transition_table() {
+        use crate::provisioning::api::can_transition;
+
+        // Case 1: Ready -> Suspended and back, both legal.
+        let ctx = state().await;
+        seed(&ctx, &tenant("ten_ok", TenantStatus::Ready)).await;
+        assert_eq!(
+            suspend_tenant(
+                State(ctx.clone()),
+                Extension(operator()),
+                Path("ten_ok".to_string()),
+            )
+            .await
+            .ok(),
+            Some(axum::http::StatusCode::NO_CONTENT)
+        );
+        assert_eq!(status_of(&ctx, "ten_ok").await, TenantStatus::Suspended);
+        assert_eq!(
+            resume_tenant(
+                State(ctx.clone()),
+                Extension(operator()),
+                Path("ten_ok".to_string()),
+            )
+            .await
+            .ok(),
+            Some(axum::http::StatusCode::NO_CONTENT)
+        );
+        assert_eq!(status_of(&ctx, "ten_ok").await, TenantStatus::Ready);
+
+        // Case 2: a tenant mid-provisioning cannot be suspended. The premise
+        // is the table's, and it is asserted so a table change cannot quietly
+        // make this case vacuous.
+        assert!(
+            !can_transition(TenantStatus::Migrating, TenantStatus::Suspended),
+            "the table must forbid this pair, or case 2 is testing nothing"
+        );
+        let ctx = state().await;
+        seed(&ctx, &tenant("ten_mig", TenantStatus::Migrating)).await;
+        assert!(
+            suspend_tenant(
+                State(ctx.clone()),
+                Extension(operator()),
+                Path("ten_mig".to_string()),
+            )
+            .await
+            .is_err(),
+            "Migrating -> Suspended is not in the table and must be refused"
+        );
+        assert_eq!(
+            status_of(&ctx, "ten_mig").await,
+            TenantStatus::Migrating,
+            "a refused suspend must not move the tenant"
+        );
+
+        // Case 3: the worst one, and a different hole than the plan said.
+        // `Migrating -> Ready` *is* in the table — it is how a provisioning
+        // worker finishes — so the pair is legal in general and the table alone
+        // cannot refuse it here. What is wrong is that an operator reaches it
+        // at all: `resume_tenant` is for a tenant that was suspended, and a
+        // `Migrating` tenant was never suspended. Before this change the handler
+        // wrote `Suspended -> Ready` without reading the status, so it issued
+        // `Migrating -> Ready` and both the operator and the provisioning loop
+        // then believed the tenant was ready while a worker still held a lease.
+        let ctx = state().await;
+        seed(&ctx, &tenant("ten_mig2", TenantStatus::Migrating)).await;
+        assert!(
+            resume_tenant(
+                State(ctx.clone()),
+                Extension(operator()),
+                Path("ten_mig2".to_string()),
+            )
+            .await
+            .is_err(),
+            "resuming a tenant that was never suspended must be refused, even \
+             though Migrating -> Ready is a legal edge for the worker"
+        );
+        assert_eq!(
+            status_of(&ctx, "ten_mig2").await,
+            TenantStatus::Migrating,
+            "a refused resume must not report the tenant ready"
+        );
+
+        // Case 4: retry still works, so the fix is not over-broad.
+        let ctx = state().await;
+        let mut failed = tenant("ten_fail", TenantStatus::Failed);
+        failed.retry_stage = Some(TenantStatus::NamespaceCreating);
+        seed(&ctx, &failed).await;
+        assert_eq!(
+            retry_tenant(
+                State(ctx.clone()),
+                Extension(operator()),
+                Path("ten_fail".to_string()),
+            )
+            .await
+            .ok(),
+            Some(axum::http::StatusCode::ACCEPTED)
+        );
+        assert_eq!(
+            status_of(&ctx, "ten_fail").await,
+            TenantStatus::NamespaceCreating,
+            "Failed -> retry_stage is in the table and must still apply"
+        );
     }
 
     #[tokio::test]

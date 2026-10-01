@@ -830,7 +830,7 @@ git commit -m "test(quota): the SQL predicate and the context policy cannot drif
 - Consumes: `provisioning::api::{can_transition, transition_tenant, TenantLifecyclePort}`.
 - Produces: no new production interface. The operator handlers gain the same validation the scheduler path has.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 ```rust
 #[tokio::test]
@@ -849,9 +849,9 @@ async fn operator_transitions_obey_the_transition_table() {
 
 Run: expect FAIL on cases 2 and 3 — today the direct `update_tenant_state` succeeds, so the status changes and the assertion fails. Cases 1 and 4 must already pass; if they do not, the handler is broken in a way this task did not predict, and stop and report it.
 
-- [ ] **Step 2: Repoint the three handlers** through `transition_tenant`. `transition_tenant` returns `MemoryError::Validation` for an illegal pair; map that to `ApiError::Conflict` (409), which is what both handlers already return for a status they refuse, so the HTTP contract does not change for any existing case. Note that `resume_tenant`'s current behaviour — ignoring the actual status — means case 3 changes an API response from 204 to 409. That is the fix, not a regression; record it in the commit message.
-- [ ] **Step 3: Run the test.** Expected: PASS on all four cases.
-- [ ] **Step 4: Commit**
+- [x] **Step 2: Repoint the three handlers** through `transition_tenant`. `transition_tenant` returns `MemoryError::Validation` for an illegal pair; map that to `ApiError::Conflict` (409), which is what both handlers already return for a status they refuse, so the HTTP contract does not change for any existing case. Note that `resume_tenant`'s current behaviour — ignoring the actual status — means case 3 changes an API response from 204 to 409. That is the fix, not a regression; record it in the commit message.
+- [x] **Step 3: Run the test.** Expected: PASS on all four cases.
+- [x] **Step 4: Commit**
 
 ```bash
 git commit -m "fix(control): an operator transition cannot skip the Tenant transition table"
