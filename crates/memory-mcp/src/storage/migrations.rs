@@ -339,7 +339,13 @@ const MIGRATION_LEASE_SECS: i64 = 30;
 const MIGRATION_WAIT_SECS: u64 = 5;
 const MIGRATION_POLL_INTERVAL_MS: u64 = 100;
 
-const EXPECTED_SCHEMA_TABLES: &[&str] = &[
+/// Every table the migration sequence creates.
+///
+/// Exposed so a test can require the selectable set to equal it. That is the
+/// whole point of publishing it: the list was private, which is why the
+/// allowlist in `client.rs` could name ten of these twenty-three and nothing
+/// would say so.
+pub const EXPECTED_SCHEMA_TABLES: &[&str] = &[
     "episode",
     "entity",
     "fact",

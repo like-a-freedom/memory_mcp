@@ -5,6 +5,7 @@ use memory_mcp::models::{AssembleContextRequest, InvalidateRequest, Provenance};
 use memory_mcp::service::memory_container_shims::memory_capabilities_assemble_context::AssembleContextCapability;
 use memory_mcp::service::memory_container_shims::memory_capabilities_invalidate::InvalidateCapability;
 use memory_mcp::storage::DbClient;
+use memory_mcp::storage::table_scope::{KnowledgeTables, ReleaseOwnedTable};
 
 #[tokio::test]
 async fn embedded_invalidate_removes_fact_from_context() -> Result<(), Box<dyn std::error::Error>> {
@@ -142,7 +143,9 @@ async fn embedded_relate_invalidates_previous_active_edge_version()
     tokio::time::sleep(std::time::Duration::from_millis(2)).await;
     service.relate(&alice, "knows", &bob).await?;
 
-    let edges = db_client.select_table("edge", "org").await?;
+    let edges = db_client
+        .select_table(KnowledgeTables::table("edge"), "org")
+        .await?;
     let to_record_id = |record_id: &str| {
         let (table, key) = record_id
             .split_once(':')

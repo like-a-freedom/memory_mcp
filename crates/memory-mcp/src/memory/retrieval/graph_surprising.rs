@@ -279,10 +279,10 @@ mod tests {
 
             async fn select_table(
                 &self,
-                table: &str,
+                table: crate::storage::table_scope::OwnedTable,
                 _namespace: &str,
             ) -> Result<Vec<Value>, MemoryError> {
-                if table == "community" {
+                if table.as_str() == "community" {
                     return Ok((0..256)
                         .map(|idx| {
                             json!({

@@ -9,6 +9,7 @@ use memory_mcp::service::memory_container_shims::memory_capabilities_ingest::Ing
 use memory_mcp::service::memory_container_shims::memory_capabilities_invalidate::InvalidateCapability;
 use memory_mcp::service::memory_container_shims::memory_capabilities_resolve::ResolveCapability;
 use memory_mcp::storage::DbClient;
+use memory_mcp::storage::table_scope::{KnowledgeTables, ReleaseOwnedTable};
 
 mod common;
 
@@ -541,7 +542,10 @@ async fn test_relate_repeated_write_invalidates_previous_edge_version() {
         .await
         .expect("relate 2");
 
-    let edges = db_client.select_table("edge", "org").await.expect("edges");
+    let edges = db_client
+        .select_table(KnowledgeTables::table("edge"), "org")
+        .await
+        .expect("edges");
     let to_record_id = |record_id: &str| {
         let (table, key) = record_id
             .split_once(':')
@@ -620,7 +624,7 @@ async fn test_assemble_context_uses_matching_community_summary() {
         .expect("add fact");
 
     let communities = db_client
-        .select_table("community", "org")
+        .select_table(KnowledgeTables::table("community"), "org")
         .await
         .expect("communities");
     assert!(!communities.is_empty());
@@ -631,7 +635,10 @@ async fn test_assemble_context_uses_matching_community_summary() {
             .is_some_and(|summary| summary.contains("Bob Jones"))
     }));
 
-    let facts = db_client.select_table("fact", "org").await.expect("facts");
+    let facts = db_client
+        .select_table(KnowledgeTables::table("fact"), "org")
+        .await
+        .expect("facts");
     assert!(facts.iter().any(|fact| {
         fact.get("fact_id").and_then(|value| value.as_str()) == Some(fact_id.as_str())
     }));

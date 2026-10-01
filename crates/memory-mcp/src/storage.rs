@@ -26,6 +26,7 @@ pub mod event_log_store;
 mod helpers;
 pub(crate) mod migrations;
 mod queries;
+pub mod table_scope;
 mod types;
 pub(crate) mod value_helpers;
 
@@ -71,6 +72,20 @@ pub(crate) use queries::{
     build_select_facts_filtered_query, build_upsert_query, surreal_string_literal,
     validate_record_id,
 };
+pub use table_scope::{
+    EmbeddingTables, KnowledgeTables, MemoryTables, OwnedTable, PlatformTables, ReleaseOwnedTable,
+    TableOwner, table_owners,
+};
+
+/// Every table the migration sequence creates.
+///
+/// Re-exported so a test can require the selectable set to equal it. The list
+/// being private is why the allowlist this replaced could name ten of these
+/// twenty-three without anything noticing.
+pub fn expected_schema_tables() -> &'static [&'static str] {
+    migrations::EXPECTED_SCHEMA_TABLES
+}
+
 pub use types::GraphDirection;
 
 /// Compatibility aliases for external Rust callers (integration tests,

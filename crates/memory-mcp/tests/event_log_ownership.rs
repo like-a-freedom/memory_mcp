@@ -51,10 +51,10 @@ impl DbClient for RecordingDb {
 
     async fn select_table(
         &self,
-        table: &str,
+        table: memory_mcp::storage::table_scope::OwnedTable,
         _namespace: &str,
     ) -> Result<Vec<serde_json::Value>, MemoryError> {
-        if table != "event_log" {
+        if table.as_str() != "event_log" {
             return Err(MemoryError::Storage(format!("select_table: {table}")));
         }
         Ok(Vec::new())

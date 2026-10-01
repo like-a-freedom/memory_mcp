@@ -6,6 +6,7 @@
 //! table: it offers no generic table selector, so a caller cannot
 //! reach another owner's table through it.
 
+use crate::storage::table_scope::{PlatformTables, ReleaseOwnedTable};
 use std::sync::Arc;
 
 use serde_json::Value;
@@ -26,6 +27,8 @@ impl EventLogStoreClient {
 
     /// Every event recorded in the bound Active Namespace.
     pub async fn select_event_log(&self) -> Result<Vec<Value>, MemoryError> {
-        self.db.select_table("event_log").await
+        self.db
+            .select_table(PlatformTables::table("event_log"))
+            .await
     }
 }

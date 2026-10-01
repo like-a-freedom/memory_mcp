@@ -40,8 +40,19 @@ pub trait DbClient: Send + Sync {
         namespace: &str,
     ) -> Result<Option<Value>, MemoryError>;
 
-    /// Selects all records from a table.
-    async fn select_table(&self, table: &str, namespace: &str) -> Result<Vec<Value>, MemoryError>;
+    /// Selects all records from a table the caller's context owns.
+    ///
+    /// Takes an [`OwnedTable`] rather than a `&str`, so a table name can only
+    /// be produced by the bounded context that claims it. The previous
+    /// allowlist named ten of the twenty-three tables the migrations create,
+    /// and the thirteen it missed were reachable by no caller at all — a
+    /// `triple` query met `ConfigInvalid`, phrased as a configuration problem
+    /// for what is really a missing list entry.
+    async fn select_table(
+        &self,
+        table: crate::storage::table_scope::OwnedTable,
+        namespace: &str,
+    ) -> Result<Vec<Value>, MemoryError>;
 
     /// Creates a new record.
     async fn create(
@@ -166,7 +177,10 @@ impl BoundDbClient {
         Ok(rows.into_iter().next())
     }
 
-    pub(crate) async fn select_table(&self, table: &str) -> Result<Vec<Value>, MemoryError> {
+    pub(crate) async fn select_table(
+        &self,
+        table: crate::storage::table_scope::OwnedTable,
+    ) -> Result<Vec<Value>, MemoryError> {
         self.db.select_table(table, &self.namespace).await
     }
 
@@ -771,12 +785,17 @@ impl DbClient for SurrealDbClient {
         Ok(result)
     }
 
-    async fn select_table(&self, table: &str, namespace: &str) -> Result<Vec<Value>, MemoryError> {
-        validate_table_name(table)?;
+    async fn select_table(
+        &self,
+        table: crate::storage::table_scope::OwnedTable,
+        namespace: &str,
+    ) -> Result<Vec<Value>, MemoryError> {
+        // No allowlist to consult: the table can only be an `OwnedTable`, and
+        // only the context that declares it can produce one.
         self.log_op(
             "db.select_table",
             vec![
-                ("table", Value::String(table.to_string())),
+                ("table", Value::String(table.as_str().to_string())),
                 ("namespace", Value::String(namespace.to_string())),
             ],
         );
@@ -899,34 +918,12 @@ impl DbClient for SurrealDbClient {
     }
 }
 
-fn validate_table_name(table: &str) -> Result<(), MemoryError> {
-    const ALLOWED_TABLES: &[&str] = &[
-        "community",
-        "edge",
-        "entity",
-        "episode",
-        "event_log",
-        "fact",
-        "inbox_revision",
-        "query_log",
-        "script_migration",
-        "task",
-    ];
-
-    if ALLOWED_TABLES.contains(&table) {
-        Ok(())
-    } else {
-        Err(MemoryError::ConfigInvalid(format!(
-            "table `{table}` is not an allowed query target"
-        )))
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use std::sync::{Arc, Mutex};
 
     use super::*;
+    use crate::storage::table_scope::ReleaseOwnedTable;
 
     #[test]
     fn embedded_init_error_translates_lock_signatures_actionably() {
@@ -1003,7 +1000,7 @@ mod tests {
 
         async fn select_table(
             &self,
-            _table: &str,
+            _table: crate::storage::table_scope::OwnedTable,
             namespace: &str,
         ) -> Result<Vec<Value>, MemoryError> {
             self.record(namespace);
@@ -1056,7 +1053,7 @@ mod tests {
             .await
             .expect("bound select_one should succeed");
         bound
-            .select_table("episode")
+            .select_table(crate::storage::table_scope::MemoryTables::table("episode"))
             .await
             .expect("bound select_table should succeed");
         bound
@@ -1102,7 +1099,7 @@ mod tests {
 
         async fn select_table(
             &self,
-            _table: &str,
+            _table: crate::storage::table_scope::OwnedTable,
             _namespace: &str,
         ) -> Result<Vec<Value>, MemoryError> {
             Ok(Vec::new())

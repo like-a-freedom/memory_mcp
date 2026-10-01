@@ -610,10 +610,10 @@ mod tests {
 
             async fn select_table(
                 &self,
-                table: &str,
+                table: crate::storage::table_scope::OwnedTable,
                 _namespace: &str,
             ) -> Result<Vec<Value>, MemoryError> {
-                assert_eq!(table, "fact");
+                assert_eq!(table.as_str(), "fact");
                 Ok(vec![])
             }
 

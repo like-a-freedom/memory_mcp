@@ -9,6 +9,7 @@
 use memory_mcp::storage::EventProjectionJobRecord;
 use memory_mcp::storage::MemoryCaptureAuditRecord;
 use memory_mcp::storage::MemoryEventRecord;
+use memory_mcp::storage::table_scope::{PlatformTables, ReleaseOwnedTable};
 use memory_mcp::storage::{AgentMemoryStore, DbClient, SurrealDbClient};
 
 async fn setup_client() -> SurrealDbClient {
@@ -154,7 +155,7 @@ async fn fresh_db_migration_passes() {
         .expect("migrations on fresh db");
 
     let migration_rows = client
-        .select_table("script_migration", "test")
+        .select_table(PlatformTables::table("script_migration"), "test")
         .await
         .expect("migration ledger should be queryable");
     assert!(

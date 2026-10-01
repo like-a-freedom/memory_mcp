@@ -16,6 +16,7 @@ use serde_json::Value;
 
 use crate::error::MemoryError;
 use crate::storage::DbClient;
+use crate::storage::table_scope::ReleaseOwnedTable;
 
 type SelectOneFn = dyn Fn(&str) -> Result<Option<Value>, MemoryError> + Send + Sync;
 type SelectTableFn = dyn Fn(&str) -> Result<Vec<Value>, MemoryError> + Send + Sync;
@@ -222,7 +223,12 @@ impl DbClient for MockDbClient {
         Ok(None)
     }
 
-    async fn select_table(&self, table: &str, _namespace: &str) -> Result<Vec<Value>, MemoryError> {
+    async fn select_table(
+        &self,
+        table: crate::storage::table_scope::OwnedTable,
+        _namespace: &str,
+    ) -> Result<Vec<Value>, MemoryError> {
+        let table = table.as_str();
         if let Some(resp) = self
             .select_table_responses
             .lock()
@@ -330,7 +336,19 @@ mod tests {
     async fn mock_db_client_defaults_to_empty() {
         let db = MockDbClient::new();
         assert_eq!(db.select_one("test", "org").await.unwrap(), None);
-        assert!(db.select_table("test", "org").await.unwrap().is_empty());
+        // `query_log`, not a made-up name: `ReleaseOwnedTable::table`
+        // carries a `debug_assert` that the context declared the table, and a
+        // test that spelled a table nobody owns trips it — which is what
+        // happened the first time.
+        assert!(
+            db.select_table(
+                crate::storage::table_scope::PlatformTables::table("query_log"),
+                "org",
+            )
+            .await
+            .unwrap()
+            .is_empty()
+        );
     }
 
     #[tokio::test]

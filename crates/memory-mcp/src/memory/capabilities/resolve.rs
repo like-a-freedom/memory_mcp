@@ -144,7 +144,7 @@ mod tests {
 
         async fn select_table(
             &self,
-            table: &str,
+            table: crate::storage::table_scope::OwnedTable,
             namespace: &str,
         ) -> Result<Vec<Value>, MemoryError> {
             self.select_table_calls

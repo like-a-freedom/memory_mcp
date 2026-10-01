@@ -8,6 +8,7 @@
 //! The method bodies are unchanged from that store, so this is a
 //! split rather than a rewrite.
 
+use crate::storage::table_scope::{KnowledgeTables, ReleaseOwnedTable};
 use std::sync::Arc;
 
 use serde_json::{Value, json};
@@ -38,7 +39,7 @@ impl KnowledgeGraphStore {
     }
 
     pub async fn select_entities(&self) -> Result<Vec<Value>, MemoryError> {
-        self.db.select_table("entity").await
+        self.db.select_table(KnowledgeTables::table("entity")).await
     }
 
     pub async fn select_entity(&self, entity_id: &str) -> Result<Option<Value>, MemoryError> {
@@ -59,7 +60,9 @@ impl KnowledgeGraphStore {
     }
 
     pub async fn select_communities(&self) -> Result<Vec<Value>, MemoryError> {
-        self.db.select_table("community").await
+        self.db
+            .select_table(KnowledgeTables::table("community"))
+            .await
     }
 
     pub async fn upsert_community(

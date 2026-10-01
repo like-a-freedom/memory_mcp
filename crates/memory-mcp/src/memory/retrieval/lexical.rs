@@ -1073,7 +1073,7 @@ mod tests {
 
             async fn select_table(
                 &self,
-                _table: &str,
+                _table: crate::storage::table_scope::OwnedTable,
                 _namespace: &str,
             ) -> Result<Vec<Value>, MemoryError> {
                 Ok(vec![])
@@ -1229,7 +1229,7 @@ mod tests {
 
             async fn select_table(
                 &self,
-                _table: &str,
+                _table: crate::storage::table_scope::OwnedTable,
                 _namespace: &str,
             ) -> Result<Vec<Value>, MemoryError> {
                 Ok(vec![])
@@ -1367,7 +1367,7 @@ mod tests {
 
             async fn select_table(
                 &self,
-                _table: &str,
+                _table: crate::storage::table_scope::OwnedTable,
                 _namespace: &str,
             ) -> Result<Vec<Value>, MemoryError> {
                 Ok(vec![])

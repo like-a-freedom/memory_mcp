@@ -9,6 +9,7 @@
 //! The method bodies are unchanged from the single store this split
 //! came from, so this is a move rather than a rewrite.
 
+use crate::storage::table_scope::{KnowledgeTables, ReleaseOwnedTable};
 use std::sync::Arc;
 
 use serde_json::{Value, json};
@@ -149,7 +150,7 @@ impl KnowledgeStoreClient {
     /// escape hatch: an application-facing read names the scope
     /// it wants, never a table string.
     pub async fn scan_facts(&self) -> Result<Vec<Value>, MemoryError> {
-        self.db.select_table("fact").await
+        self.db.select_table(KnowledgeTables::table("fact")).await
     }
 
     /// Active (not-yet-invalidated) facts in the bound Active Namespace.

@@ -1,5 +1,6 @@
 use crate::embedding::providers::embedding_from_value;
 use crate::error::MemoryError;
+use crate::storage::table_scope::{KnowledgeTables, ReleaseOwnedTable};
 use crate::storage::{BoundDbClient, DbClient};
 use std::sync::Arc;
 
@@ -59,7 +60,7 @@ pub(crate) async fn load_embedding_state(
 }
 
 async fn count_facts(db: &BoundDbClient) -> Result<usize, MemoryError> {
-    Ok(db.select_table("fact").await?.len())
+    Ok(db.select_table(KnowledgeTables::table("fact")).await?.len())
 }
 
 async fn count_facts_missing_embeddings(db: &BoundDbClient) -> Result<usize, MemoryError> {
@@ -73,7 +74,7 @@ async fn sample_stored_embedding_dimensions(
     sample_size: usize,
 ) -> Result<Vec<usize>, MemoryError> {
     Ok(db
-        .select_table("fact")
+        .select_table(KnowledgeTables::table("fact"))
         .await?
         .into_iter()
         .filter_map(|record| record.get("embedding").and_then(embedding_from_value))
@@ -339,7 +340,7 @@ mod tests {
             }
             async fn select_table(
                 &self,
-                _table: &str,
+                _table: crate::storage::table_scope::OwnedTable,
                 _namespace: &str,
             ) -> Result<Vec<Value>, MemoryError> {
                 Ok(vec![])

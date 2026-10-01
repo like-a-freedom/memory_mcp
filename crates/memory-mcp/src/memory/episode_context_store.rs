@@ -11,6 +11,7 @@
 //! boundary that would be arbitrary. See
 //! `docs/architecture/decisions/0001-typed-record-accessors.md`.
 
+use crate::storage::table_scope::{MemoryTables, ReleaseOwnedTable};
 use std::sync::Arc;
 
 use serde_json::{Value, json};
@@ -39,7 +40,7 @@ impl EpisodeContextStore {
     ///
     /// Owner-named, so a caller cannot name a table.
     pub async fn scan_episodes(&self) -> Result<Vec<Value>, MemoryError> {
-        self.db.select_table("episode").await
+        self.db.select_table(MemoryTables::table("episode")).await
     }
 
     /// Episode contents matching a query, bi-temporally scoped.

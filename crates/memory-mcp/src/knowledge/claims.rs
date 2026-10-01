@@ -636,7 +636,7 @@ mod tests {
 
         async fn select_table(
             &self,
-            _table: &str,
+            _table: crate::storage::table_scope::OwnedTable,
             namespace: &str,
         ) -> Result<Vec<Value>, MemoryError> {
             self.namespaces

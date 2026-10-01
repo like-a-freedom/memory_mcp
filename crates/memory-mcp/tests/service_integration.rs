@@ -11,6 +11,7 @@ use memory_mcp::service::memory_container_shims::memory_capabilities_extract::Ex
 use memory_mcp::service::memory_container_shims::memory_capabilities_ingest::IngestCapability;
 use memory_mcp::service::memory_container_shims::memory_capabilities_invalidate::InvalidateCapability;
 use memory_mcp::storage::DbClient;
+use memory_mcp::storage::table_scope::{KnowledgeTables, PlatformTables, ReleaseOwnedTable};
 use serde_json::{Value, json};
 
 mod common;
@@ -210,7 +211,10 @@ async fn test_service_relate_persists_native_edge_endpoints_and_inferred_origin(
 
     service.relate(&alice_id, "knows", &bob_id).await.unwrap();
 
-    let edges = db_client.select_table("edge", "org").await.unwrap();
+    let edges = db_client
+        .select_table(KnowledgeTables::table("edge"), "org")
+        .await
+        .unwrap();
     let edge = edges.first().expect("stored edge");
 
     let to_record_id = |record_id: &str| {
@@ -331,7 +335,10 @@ async fn test_service_extract_persists_edge_provenance_and_extracted_origin() {
         .unwrap();
     assert!(!extraction.links.is_empty());
 
-    let edges = db_client.select_table("edge", "org").await.unwrap();
+    let edges = db_client
+        .select_table(KnowledgeTables::table("edge"), "org")
+        .await
+        .unwrap();
     assert!(!edges.is_empty());
     assert!(edges.iter().all(|edge| {
         edge.get("provenance")
@@ -443,7 +450,10 @@ async fn test_service_extract_persists_index_keys_for_entities_and_temporal_mark
     )
     .await;
 
-    let facts = db_client.select_table("fact", "org").await.unwrap();
+    let facts = db_client
+        .select_table(KnowledgeTables::table("fact"), "org")
+        .await
+        .unwrap();
     let fact = facts
         .iter()
         .find(|record| {
@@ -636,7 +646,10 @@ async fn test_service_merges_overlapping_entity_cohorts_into_one_community() {
             .unwrap();
     }
 
-    let communities = db_client.select_table("community", "org").await.unwrap();
+    let communities = db_client
+        .select_table(KnowledgeTables::table("community"), "org")
+        .await
+        .unwrap();
     let merged = communities.iter().find(|community| {
         let Some(members) = community
             .get("member_entities")
@@ -931,7 +944,10 @@ async fn test_service_assemble_context_does_not_record_query_log_when_disabled_b
 
     assert!(!items.is_empty());
 
-    let query_logs = db_client.select_table("query_log", "org").await.unwrap();
+    let query_logs = db_client
+        .select_table(PlatformTables::table("query_log"), "org")
+        .await
+        .unwrap();
     assert!(
         query_logs.is_empty(),
         "query logging should stay disabled by default, got: {query_logs:?}"
@@ -976,7 +992,10 @@ async fn test_service_assemble_context_records_query_log_with_tier_latency_and_r
 
     assert!(items.iter().any(|item| item.fact_id == fact_id));
 
-    let query_logs = db_client.select_table("query_log", "org").await.unwrap();
+    let query_logs = db_client
+        .select_table(PlatformTables::table("query_log"), "org")
+        .await
+        .unwrap();
     assert_eq!(
         query_logs.len(),
         1,
@@ -1051,7 +1070,10 @@ async fn test_service_assemble_context_records_query_log_with_resolved_view_mode
     .await
     .expect("assemble context");
 
-    let query_logs = db_client.select_table("query_log", "org").await.unwrap();
+    let query_logs = db_client
+        .select_table(PlatformTables::table("query_log"), "org")
+        .await
+        .unwrap();
     let row = query_logs.first().expect("query_log row should exist");
 
     assert_eq!(
@@ -1113,7 +1135,10 @@ async fn test_service_assemble_context_records_query_log_for_cache_hit_queries()
     assert!(!first.is_empty());
     assert!(!second.is_empty());
 
-    let query_logs = db_client.select_table("query_log", "org").await.unwrap();
+    let query_logs = db_client
+        .select_table(PlatformTables::table("query_log"), "org")
+        .await
+        .unwrap();
     assert_eq!(
         query_logs.len(),
         2,
@@ -1192,7 +1217,10 @@ async fn test_service_assemble_context_prunes_query_logs_older_than_default_rete
         "stale query_log row should be pruned by the default 90-day retention"
     );
 
-    let query_logs = db_client.select_table("query_log", "org").await.unwrap();
+    let query_logs = db_client
+        .select_table(PlatformTables::table("query_log"), "org")
+        .await
+        .unwrap();
     assert_eq!(
         query_logs.len(),
         1,
@@ -1272,7 +1300,10 @@ async fn test_service_assemble_context_honors_custom_query_log_retention_days() 
         "row inside custom retention window should be preserved"
     );
 
-    let query_logs = db_client.select_table("query_log", "org").await.unwrap();
+    let query_logs = db_client
+        .select_table(PlatformTables::table("query_log"), "org")
+        .await
+        .unwrap();
     assert_eq!(
         query_logs.len(),
         2,
@@ -2282,7 +2313,10 @@ async fn test_service_assemble_context_records_query_log_when_enabled() {
 
     assert!(!items.is_empty());
 
-    let query_logs = db_client.select_table("query_log", "org").await.unwrap();
+    let query_logs = db_client
+        .select_table(PlatformTables::table("query_log"), "org")
+        .await
+        .unwrap();
     assert!(
         !query_logs.is_empty(),
         "query logging should create a row when enabled"

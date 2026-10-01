@@ -2,6 +2,10 @@
 //! cannot reach another owner's table through it, and the generic
 //! table-deriving accessor is gone.
 
+use memory_mcp::storage::table_scope::{
+    EmbeddingTables, KnowledgeTables, MemoryTables, PlatformTables, ReleaseOwnedTable,
+};
+use std::collections::BTreeMap;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
@@ -44,7 +48,7 @@ impl DbClient for TableCheckingDb {
 
     async fn select_table(
         &self,
-        table: &str,
+        table: memory_mcp::storage::OwnedTable,
         _namespace: &str,
     ) -> Result<Vec<serde_json::Value>, MemoryError> {
         Err(MemoryError::Storage(format!("select_table: {table}")))
@@ -178,4 +182,127 @@ async fn a_cross_kind_id_is_refused_without_reaching_the_database() {
         !db.was_reached(),
         "the cross-kind refusal must happen before any database read"
     );
+}
+
+/// Every table the schema creates must be selectable.
+///
+/// The allowlist in `storage/client.rs` named ten tables while the schema
+/// creates twenty-three. The thirteen it omitted were `claim`, `claim_job`,
+/// `claim_key_alias`, `claim_policy`, `claim_relation`, `embedding_job`,
+/// `embedding_state`, `entity_extraction_projection`, `event_projection_job`,
+/// `memory_capture_audit`, `memory_event`, `procedure_candidate` and
+/// `triple` — and a caller that added one of those and forgot the allowlist
+/// got `ConfigInvalid` at runtime, phrased as a configuration problem, for
+/// what is really a missing table in a list.
+///
+/// This asserts the shape the fix needs: the set of selectable tables equals
+/// the set the schema creates. Reading the schema list rather than restating
+/// it is what keeps the test from going stale when a migration adds a table.
+#[tokio::test]
+async fn every_expected_schema_table_is_selectable() {
+    let schema_tables = memory_mcp::storage::expected_schema_tables();
+
+    let client = memory_mcp::storage::SurrealDbClient::connect_in_memory_with_namespaces(
+        "table_coverage",
+        &["org".to_string()],
+        "warn",
+    )
+    .await
+    .expect("connect in-memory");
+    client
+        .apply_migrations("org")
+        .await
+        .expect("migrations apply");
+
+    // Each table is released by the context that claims it. A table no context
+    // claims cannot be produced at all, which is why the "nobody owns it" half
+    // is a separate assertion below rather than an error here.
+    let owners: BTreeMap<&'static str, &'static str> = memory_mcp::storage::table_owners()
+        .into_iter()
+        .flat_map(|(context, tables)| tables.iter().map(move |t| (*t, context)))
+        .collect();
+
+    let mut not_selectable = Vec::new();
+    for &table in schema_tables {
+        let owned = match owners.get(table) {
+            Some(context) => *context,
+            None => {
+                not_selectable.push(format!("{table}: no context owns it"));
+                continue;
+            }
+        };
+        let released = release_for(owned, table);
+        if let Err(error) = client.select_table(released, "org").await {
+            not_selectable.push(format!("{table} ({owned}): {error}"));
+        }
+    }
+
+    assert!(
+        not_selectable.is_empty(),
+        "{} table(s) the schema creates cannot be selected. Every table the \
+         migrations build must be reachable, or a caller that adds one meets a \
+         configuration error instead:\n\n{}",
+        not_selectable.len(),
+        not_selectable.join("\n")
+    );
+}
+
+/// Each table has exactly one owner.
+///
+/// Two owners for one table means two places to update when its shape changes
+/// and no way to tell which is right. Zero owners is the gap the test above
+/// reports, so this one covers the other half.
+#[test]
+fn every_expected_schema_table_has_exactly_one_owner() {
+    let mut owners: BTreeMap<&str, Vec<&str>> = BTreeMap::new();
+    for (context, tables) in memory_mcp::storage::table_owners() {
+        for table in tables {
+            owners.entry(table).or_default().push(context);
+        }
+    }
+
+    let schema_tables = memory_mcp::storage::expected_schema_tables();
+    let mut problems = Vec::new();
+    for table in schema_tables {
+        match owners.get(table) {
+            None => problems.push(format!(
+                "{table}: no context owns it. A table nobody claims is a table \
+                 whose shape has no owner to change it."
+            )),
+            Some(holders) if holders.len() > 1 => problems.push(format!(
+                "{table}: owned by {holders:?}. Two owners means two places to \
+                 update when the shape changes."
+            )),
+            Some(_) => {}
+        }
+    }
+    for (table, holders) in &owners {
+        if !schema_tables.contains(table) {
+            problems.push(format!(
+                "{table}: owned by {holders:?} but no migration creates it. An \
+                 owner for a table that does not exist is a list that drifts."
+            ));
+        }
+    }
+
+    assert!(
+        problems.is_empty(),
+        "{} ownership problem(s):\n\n{}",
+        problems.len(),
+        problems.join("\n")
+    );
+}
+
+/// Release `table` through the context that owns it.
+///
+/// Written as a match rather than a lookup so that a new owner is a compile
+/// error here, not a runtime "no context owns it" from the test above.
+fn release_for(context: &str, table: &'static str) -> memory_mcp::storage::OwnedTable {
+    match context {
+        "knowledge" => KnowledgeTables::table(table),
+        "memory" => MemoryTables::table(table),
+        "embedding" => EmbeddingTables::table(table),
+        "storage" => PlatformTables::table(table),
+        other => panic!("{other} owns a table but has no release path in this test"),
+    }
 }

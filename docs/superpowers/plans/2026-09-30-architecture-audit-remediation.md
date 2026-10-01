@@ -919,7 +919,7 @@ pub trait ReleaseOwnedTable: TableOwner {
 
 The shape above fixes that in two ways. `OwnedTable`'s field is `pub(crate)`, so only this crate can build one by field access. And construction goes through `ReleaseOwnedTable::table`, an associated function on the `TableOwner` impl, which each context implements once as a `debug_assert!(Self::OWNED_TABLES.contains(&name))` plus the wrap. In a debug build the assertion catches a context reaching for a table it never claimed; in release it is elided, and the test in Step 1 is the real gate. That is the honest division: the type prevents *outside* callers, the `debug_assert` catches *inside* mistakes during development, and the test is the invariant that holds in CI.
 
-- [ ] **Step 1: Write the failing test** (Review Focus item 1) in `crates/memory-mcp/tests/typed_record_accessors.rs`:
+- [x] **Step 1: Write the failing test** (Review Focus item 1) in `crates/memory-mcp/tests/typed_record_accessors.rs`:
 
 ```rust
 #[test]
@@ -937,7 +937,7 @@ async fn every_expected_schema_table_is_selectable() {
 
 Run: expect FAIL — `OwnedTable` does not exist, and the second test would fail today on 13 tables.
 
-- [ ] **Step 2: Add `OwnedTable`, `TableOwner` and `ReleaseOwnedTable`** to `storage/client.rs`, exactly as specified above. Each context's `ReleaseOwnedTable` impl is three lines:
+- [x] **Step 2: Add `OwnedTable`, `TableOwner` and `ReleaseOwnedTable`** to `storage/client.rs`, exactly as specified above. Each context's `ReleaseOwnedTable` impl is three lines:
 
 ```rust
 impl ReleaseOwnedTable for KnowledgeTables {
@@ -951,11 +951,11 @@ impl ReleaseOwnedTable for KnowledgeTables {
 }
 ```
 
-- [ ] **Step 3: Implement `TableOwner`** for `knowledge` and `memory`, listing their tables. `storage` keeps the platform tables (`event_log`, `query_log`, `script_migration`, `task`) behind a third impl in `storage.rs` — the platform owns its own access log and migration bookkeeping, per CONTEXT.md:82-85. The partition is: knowledge `entity, fact, edge, community, claim, claim_job, claim_key_alias, claim_policy, claim_relation, triple, entity_extraction_projection, event_projection_job, procedure_candidate, memory_capture_audit`; memory `episode, inbox_revision, memory_event`; storage `event_log, query_log, script_migration, task`. That is 14 + 3 + 4 = 21, and the test will tell you the 2 missing names — the audit's 23-table count includes tables whose owner this task must place. Do not guess; let the equality assertion name them.
-- [ ] **Step 4: Repoint the 4 `select_table` call sites** to pass an `OwnedTable` instead of a `&str`. The three `knowledge` ones (`graph_store.rs:41` `"entity"`, `:62` `"community"`, `knowledge_store.rs:152` `"fact"`) and the `memory` one (`episode_context_store.rs:42` `"episode"`). Each becomes `KnowledgeTables::table("entity")` or `MemoryTables::table("episode")`.
-- [ ] **Step 5: Delete `validate_table_name` and `ALLOWED_TABLES`.**
-- [ ] **Step 6: Run the test.** Expected: PASS, with every schema table owned exactly once. If `every_expected_schema_table_is_selectable` fails on a table no owner claims, that is the 13-table gap made visible — place the table with its real owner rather than adding it to `storage`'s list to make the test green.
-- [ ] **Step 7: Commit**
+- [x] **Step 3: Implement `TableOwner`** for `knowledge` and `memory`, listing their tables. `storage` keeps the platform tables (`event_log`, `query_log`, `script_migration`, `task`) behind a third impl in `storage.rs` — the platform owns its own access log and migration bookkeeping, per CONTEXT.md:82-85. The partition is: knowledge `entity, fact, edge, community, claim, claim_job, claim_key_alias, claim_policy, claim_relation, triple, entity_extraction_projection, event_projection_job, procedure_candidate, memory_capture_audit`; memory `episode, inbox_revision, memory_event`; storage `event_log, query_log, script_migration, task`. That is 14 + 3 + 4 = 21, and the test will tell you the 2 missing names — the audit's 23-table count includes tables whose owner this task must place. Do not guess; let the equality assertion name them.
+- [x] **Step 4: Repoint the 4 `select_table` call sites** to pass an `OwnedTable` instead of a `&str`. The three `knowledge` ones (`graph_store.rs:41` `"entity"`, `:62` `"community"`, `knowledge_store.rs:152` `"fact"`) and the `memory` one (`episode_context_store.rs:42` `"episode"`). Each becomes `KnowledgeTables::table("entity")` or `MemoryTables::table("episode")`.
+- [x] **Step 5: Delete `validate_table_name` and `ALLOWED_TABLES`.**
+- [x] **Step 6: Run the test.** Expected: PASS, with every schema table owned exactly once. If `every_expected_schema_table_is_selectable` fails on a table no owner claims, that is the 13-table gap made visible — place the table with its real owner rather than adding it to `storage`'s list to make the test green.
+- [x] **Step 7: Commit**
 
 ```bash
 git commit -m "fix(storage): one allowlist owner per table, closing the 13-table gap"

@@ -1,5 +1,6 @@
 //! Integration tests for periodic community recomputation.
 
+use memory_mcp::storage::table_scope::{KnowledgeTables, ReleaseOwnedTable};
 use std::sync::Arc;
 
 use chrono::{TimeZone, Utc};
@@ -92,7 +93,10 @@ async fn community_rebuild_pass_creates_component_community_with_condensed_summa
 
     assert_eq!(rebuilt, 1, "expected one rebuilt community in org");
 
-    let communities = db_client.select_table("community", "org").await.unwrap();
+    let communities = db_client
+        .select_table(KnowledgeTables::table("community"), "org")
+        .await
+        .unwrap();
     let rebuilt = communities
         .iter()
         .find(|community| {
@@ -148,7 +152,7 @@ async fn community_rebuild_pass_prunes_stale_communities_without_active_edges() 
     assert_eq!(rebuilt, 0, "no active edges means no rebuilt communities");
     assert!(
         db_client
-            .select_table("community", "org")
+            .select_table(KnowledgeTables::table("community"), "org")
             .await
             .unwrap()
             .is_empty(),
@@ -188,7 +192,10 @@ async fn community_rebuild_pass_processes_only_active_namespace() {
         "expected one rebuilt community in the active namespace"
     );
 
-    let communities = db_client.select_table("community", "org").await.unwrap();
+    let communities = db_client
+        .select_table(KnowledgeTables::table("community"), "org")
+        .await
+        .unwrap();
     assert!(
         communities.iter().any(|community| {
             let Some(members) = community
