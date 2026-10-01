@@ -2430,7 +2430,7 @@ impl UsageStore for SurrealRegistryStore {
     async fn load_usage(
         &self,
         tenant_id: &str,
-    ) -> Result<crate::http::registry::plan::UsageCounter, MemoryError> {
+    ) -> Result<crate::operations::quota::UsageCounter, MemoryError> {
         let rows = self
             .handle()
             .query_json(
@@ -2440,9 +2440,9 @@ impl UsageStore for SurrealRegistryStore {
             .await
             .map_err(|error| map_storage_error("load usage", error))?;
         let Some(row) = rows.into_iter().next() else {
-            return Ok(crate::http::registry::plan::UsageCounter::default());
+            return Ok(crate::operations::quota::UsageCounter::default());
         };
-        Ok(crate::http::registry::plan::UsageCounter {
+        Ok(crate::operations::quota::UsageCounter {
             ingest_current_minute: required_u32(&row, "ingest_current_minute")?,
             window_start: required_datetime(&row, "ingest_window_start")?,
             ingested_bytes: required_u64(&row, "ingested_bytes")?,
@@ -2454,9 +2454,9 @@ impl UsageStore for SurrealRegistryStore {
         &self,
         tenant_id: &str,
         source_bytes: u64,
-        plan: &crate::http::registry::plan::Plan,
+        plan: &crate::operations::quota::QuotaPlan,
         now: DateTime<Utc>,
-    ) -> Result<crate::http::registry::plan::QuotaDecision, MemoryError> {
+    ) -> Result<crate::operations::quota::QuotaDecision, MemoryError> {
         // One hot usage row per Tenant; allow enough attempts that
         // a burst of concurrent ingests each lands one clean write.
         for _attempt in 0..8 {
@@ -2504,12 +2504,12 @@ impl UsageStore for SurrealRegistryStore {
                 }
             };
             if !rows.is_empty() {
-                return Ok(crate::http::registry::plan::QuotaDecision::Allow);
+                return Ok(crate::operations::quota::QuotaDecision::Allow);
             }
             let current = self.load_usage(tenant_id).await?;
             let mut probe = current;
             let decision =
-                crate::http::registry::plan::enforce_ingest(plan, &mut probe, source_bytes, now);
+                crate::operations::quota::enforce_ingest(plan, &mut probe, source_bytes, now);
             if decision.is_deny() {
                 return Ok(decision);
             }
@@ -2522,7 +2522,7 @@ impl UsageStore for SurrealRegistryStore {
     async fn reconcile_usage(
         &self,
         tenant_id: &str,
-        expected: crate::http::registry::plan::UsageCounter,
+        expected: crate::operations::quota::UsageCounter,
     ) -> Result<(), MemoryError> {
         self.handle()
             .query_json(

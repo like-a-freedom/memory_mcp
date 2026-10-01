@@ -424,7 +424,7 @@ pub trait UsageStore: Send + Sync + 'static {
     async fn load_usage(
         &self,
         tenant_id: &str,
-    ) -> Result<crate::http::registry::plan::UsageCounter, MemoryError>;
+    ) -> Result<crate::operations::quota::UsageCounter, MemoryError>;
 
     /// Reserve ingest usage against the tenant's plan. Returns
     /// `Allow`/`Deny` and atomically increments the counter
@@ -433,15 +433,15 @@ pub trait UsageStore: Send + Sync + 'static {
         &self,
         tenant_id: &str,
         source_bytes: u64,
-        plan: &crate::http::registry::plan::Plan,
+        plan: &crate::operations::quota::QuotaPlan,
         now: chrono::DateTime<chrono::Utc>,
-    ) -> Result<crate::http::registry::plan::QuotaDecision, MemoryError>;
+    ) -> Result<crate::operations::quota::QuotaDecision, MemoryError>;
 
     /// Reconcile usage counters after drift detection.
     async fn reconcile_usage(
         &self,
         tenant_id: &str,
-        expected: crate::http::registry::plan::UsageCounter,
+        expected: crate::operations::quota::UsageCounter,
     ) -> Result<(), MemoryError>;
 
     /// Create the named local plan when absent; if present, verify every
@@ -619,9 +619,8 @@ pub struct InMemoryStore {
     identities: std::sync::Mutex<Vec<ExternalIdentity>>,
     events: std::sync::Mutex<Vec<(String, String)>>,
     audit_events: std::sync::Mutex<Vec<ControlAuditEvent>>,
-    usage: std::sync::Mutex<
-        std::collections::HashMap<String, crate::http::registry::plan::UsageCounter>,
-    >,
+    usage:
+        std::sync::Mutex<std::collections::HashMap<String, crate::operations::quota::UsageCounter>>,
     plans: std::sync::Mutex<std::collections::HashMap<u32, Plan>>,
     #[cfg(feature = "control-plane")]
     oidc_requests: std::sync::Mutex<std::collections::HashMap<String, SealedOidcPayload>>,
@@ -698,7 +697,7 @@ impl InMemoryStore {
         &self,
     ) -> std::sync::MutexGuard<
         '_,
-        std::collections::HashMap<String, crate::http::registry::plan::UsageCounter>,
+        std::collections::HashMap<String, crate::operations::quota::UsageCounter>,
     > {
         self.usage.lock().expect("poisoned")
     }
@@ -1872,7 +1871,7 @@ impl UsageStore for InMemoryStore {
     async fn load_usage(
         &self,
         tenant_id: &str,
-    ) -> Result<crate::http::registry::plan::UsageCounter, MemoryError> {
+    ) -> Result<crate::operations::quota::UsageCounter, MemoryError> {
         Ok(self
             .usage
             .lock()
@@ -1886,12 +1885,12 @@ impl UsageStore for InMemoryStore {
         &self,
         tenant_id: &str,
         source_bytes: u64,
-        plan: &crate::http::registry::plan::Plan,
+        plan: &crate::operations::quota::QuotaPlan,
         now: chrono::DateTime<chrono::Utc>,
-    ) -> Result<crate::http::registry::plan::QuotaDecision, MemoryError> {
+    ) -> Result<crate::operations::quota::QuotaDecision, MemoryError> {
         let mut usage = self.lock_usage();
         let counter = usage.entry(tenant_id.to_owned()).or_default();
-        Ok(crate::http::registry::plan::enforce_ingest(
+        Ok(crate::operations::quota::enforce_ingest(
             plan,
             counter,
             source_bytes,
@@ -1902,7 +1901,7 @@ impl UsageStore for InMemoryStore {
     async fn reconcile_usage(
         &self,
         tenant_id: &str,
-        expected: crate::http::registry::plan::UsageCounter,
+        expected: crate::operations::quota::UsageCounter,
     ) -> Result<(), MemoryError> {
         self.usage
             .lock()

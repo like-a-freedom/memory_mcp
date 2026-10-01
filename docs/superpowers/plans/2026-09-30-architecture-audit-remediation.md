@@ -687,9 +687,9 @@ pub fn usage_drift_report(
 
 `QuotaPlan` is the old `Plan` renamed — the name `Plan` collides with `models::registry::Plan` and forces a `From` import at every call site. `reconcile_usage` is renamed `usage_drift_report` because the `UsageStore` trait method already owns the bare name (Review Focus item 5).
 
-- [ ] **Step 1: Write ADR-0066** with Status `Accepted`. Context: the four policies and where each lives today. Decision: policy lives in the owning context; the store adapter supplies state and performs the write. Consequences, stated honestly: the quota predicate now exists in two places — a SQL `WHERE` clause at `surreal_store.rs:2482` for atomicity, and the Rust function for the typed denial reason — and the two must agree; ADR-0066 requires a test that pins them together (Task 3.3). Alternative considered and rejected: keep the policy in the store trait, which would make each new adapter re-implement it.
+- [x] **Step 1: Write ADR-0066** with Status `Accepted`. Context: the four policies and where each lives today. Decision: policy lives in the owning context; the store adapter supplies state and performs the write. Consequences, stated honestly: the quota predicate now exists in two places — a SQL `WHERE` clause at `surreal_store.rs:2482` for atomicity, and the Rust function for the typed denial reason — and the two must agree; ADR-0066 requires a test that pins them together (Task 3.3). Alternative considered and rejected: keep the policy in the store trait, which would make each new adapter re-implement it.
 
-- [ ] **Step 2: Write the failing test** in `crates/memory-mcp/tests/quota_policy.rs`, moving the 6 existing cases from `plan.rs:320-430` verbatim (same names: `ingest_allows_under_limit`, `quota_exceeded_rejects_ingest_with_retry_guidance`, `zero_per_minute_disables_ingest`, `window_rolls_after_60s`, plus the two reconciler cases), retargeted at `operations::quota`. Add one new case per DoD:
+- [x] **Step 2: Write the failing test** in `crates/memory-mcp/tests/quota_policy.rs`, moving the 6 existing cases from `plan.rs:320-430` verbatim (same names: `ingest_allows_under_limit`, `quota_exceeded_rejects_ingest_with_retry_guidance`, `zero_per_minute_disables_ingest`, `window_rolls_after_60s`, plus the two reconciler cases), retargeted at `operations::quota`. Add one new case per DoD:
 
 ```rust
 #[test]
@@ -708,11 +708,11 @@ fn every_denial_reason_is_a_bounded_token() {
 
 Run: `cargo test -p memory_mcp --test quota_policy`. Expected: FAIL — module does not exist.
 
-- [ ] **Step 3: Create `operations/quota.rs`** with the moved types and functions, plus the `From<&models::registry::Plan>` conversion. `QuotaDecision::is_deny` comes with it.
-- [ ] **Step 4: Repoint the two adapters.** `storage.rs:1894` and `surreal_store.rs:2512` call `operations::quota::enforce_ingest`. In `InMemoryStore` the counter increment **is** the store write, so the call stays inside the lock exactly as it is; in `SurrealRegistryStore` the call stays on a discarded local copy, producing the denial reason. Do not "clean up" the second one into a shared code path — the two adapters genuinely differ here, and that difference is ADR-0066's stated consequence.
-- [ ] **Step 5: Delete the moved code from `plan.rs`.** Keep `scheduler_job` and `reconcile_all` there; they are HTTP scheduler wiring, not policy. Retarget their imports.
-- [ ] **Step 6: Run the test.** Expected: PASS, all 8 cases.
-- [ ] **Step 7: Commit**
+- [x] **Step 3: Create `operations/quota.rs`** with the moved types and functions, plus the `From<&models::registry::Plan>` conversion. `QuotaDecision::is_deny` comes with it.
+- [x] **Step 4: Repoint the two adapters.** `storage.rs:1894` and `surreal_store.rs:2512` call `operations::quota::enforce_ingest`. In `InMemoryStore` the counter increment **is** the store write, so the call stays inside the lock exactly as it is; in `SurrealRegistryStore` the call stays on a discarded local copy, producing the denial reason. Do not "clean up" the second one into a shared code path — the two adapters genuinely differ here, and that difference is ADR-0066's stated consequence.
+- [x] **Step 5: Delete the moved code from `plan.rs`.** Keep `scheduler_job` and `reconcile_all` there; they are HTTP scheduler wiring, not policy. Retarget their imports.
+- [x] **Step 6: Run the test.** Expected: PASS, all 8 cases.
+- [x] **Step 7: Commit**
 
 ```bash
 git commit -m "refactor(operations): the quota policy lives with the context that owns usage"

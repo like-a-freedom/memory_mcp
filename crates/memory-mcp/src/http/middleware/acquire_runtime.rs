@@ -13,8 +13,8 @@ use std::sync::Arc;
 
 use crate::http::HttpState;
 use crate::http::principal::AuthenticatedPrincipal;
-use crate::http::registry::plan::{Plan, QuotaDecision};
 use crate::http::runtime::guard::{AdmissionPermitRef, OperationGuardRef};
+use crate::operations::quota::{QuotaDecision, QuotaPlan};
 
 use super::preflight::{ValidatedMcpRequest, quota_denied_response};
 
@@ -86,7 +86,7 @@ pub async fn acquire_runtime(
                 .into_response();
         }
     };
-    let plan = Plan::from(&registry_plan);
+    let plan = QuotaPlan::from(&registry_plan);
     if let Some(source_bytes) = source_bytes {
         let decision = match state
             .registry

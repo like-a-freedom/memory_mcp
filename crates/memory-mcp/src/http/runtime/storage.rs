@@ -107,7 +107,7 @@ impl TenantRuntime {
         Self::from_bound_client_with_runtime_options(
             tenant,
             tenant_db,
-            crate::http::registry::plan::Plan::default(),
+            crate::operations::quota::QuotaPlan::default(),
             RuntimeOptions::default(),
         )
     }
@@ -118,7 +118,7 @@ impl TenantRuntime {
     pub fn from_bound_client_with_plan(
         tenant: &Tenant,
         tenant_db: Arc<SurrealDbClient>,
-        plan: crate::http::registry::plan::Plan,
+        plan: crate::operations::quota::QuotaPlan,
     ) -> Result<Self, MemoryError> {
         Self::from_bound_client_with_runtime_options(
             tenant,
@@ -131,7 +131,7 @@ impl TenantRuntime {
     pub fn from_bound_client_with_runtime_options(
         tenant: &Tenant,
         tenant_db: Arc<SurrealDbClient>,
-        plan: crate::http::registry::plan::Plan,
+        plan: crate::operations::quota::QuotaPlan,
         options: RuntimeOptions,
     ) -> Result<Self, MemoryError> {
         let namespace = tenant.namespace_binding.namespace.clone();
@@ -234,7 +234,7 @@ pub async fn build_runtime_with_options(
     tenant: &Tenant,
     options: RuntimeOptions,
 ) -> Result<TenantRuntime, MemoryError> {
-    let plan = crate::http::registry::plan::Plan::from(
+    let plan = crate::operations::quota::QuotaPlan::from(
         &registry.usage().load_plan(tenant.plan_version).await?,
     );
     let tenant_db = match registry.tenant_engine()? {

@@ -109,7 +109,7 @@ pub struct MemoryMcp {
     /// Durable plan loaded from the control Registry for this tenant. It is
     /// attached by the runtime builder and never comes from MCP arguments.
     #[cfg(feature = "streamable-http")]
-    tenant_plan: Option<crate::http::registry::plan::Plan>,
+    tenant_plan: Option<crate::operations::quota::QuotaPlan>,
     /// Tenant-scoped extraction concurrency for synchronous tool calls.
     #[cfg(feature = "streamable-http")]
     extraction_semaphore: Option<Arc<tokio::sync::Semaphore>>,
@@ -243,7 +243,7 @@ impl MemoryMcp {
     /// Attach the durable plan selected by the control Registry. The setter is
     /// HTTP-only; stdio never carries a tenant plan.
     #[cfg(feature = "streamable-http")]
-    pub fn with_tenant_plan(mut self, plan: crate::http::registry::plan::Plan) -> Self {
+    pub fn with_tenant_plan(mut self, plan: crate::operations::quota::QuotaPlan) -> Self {
         let permits = match usize::try_from(plan.extraction_concurrency) {
             Ok(value) => value.max(1),
             Err(_) => usize::MAX,
