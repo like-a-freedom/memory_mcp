@@ -791,7 +791,7 @@ The durable store enforces the quota in SQL at `surreal_store.rs:2482`; the move
 - Consumes: `operations::quota::{QuotaPlan, UsageCounter, QuotaDecision}`.
 - Produces: no new production code. This task is a test.
 
-- [ ] **Step 1: Write the failing test** (Review Focus item 3):
+- [x] **Step 1: Write the failing test** (Review Focus item 3):
 
 ```rust
 #[tokio::test]
@@ -807,8 +807,8 @@ async fn quota_predicate_matches_the_context_policy() {
 
 Build the durable store with the existing helper at `http_registry_storage.rs:206` (`HttpProductionComposition::connect` with `mem://` targets). Run: expect FAIL if any reason string diverges; PASS if they already agree — and if it passes on the first run, say so in the commit, because a test that has never failed has not been shown to test anything. Then mutate one reason string in `operations/quota.rs`, confirm it fails, revert.
 
-- [ ] **Step 2: Also assert the byte drift threshold.** `reconcile_all` at `plan.rs:291` compares byte drift against `plan.reconciler_drift_threshold` inline, while `usage_drift_report` compares episode-count drift. Add a case pinning both to the same constant.
-- [ ] **Step 3: Commit**
+- [x] **Step 2: Also assert the byte drift threshold.** `reconcile_all` at `plan.rs:291` compares byte drift against `plan.reconciler_drift_threshold` inline, while `usage_drift_report` compares episode-count drift. Add a case pinning both to the same constant.
+- [x] **Step 3: Commit**
 
 ```bash
 git commit -m "test(quota): the SQL predicate and the context policy cannot drift"

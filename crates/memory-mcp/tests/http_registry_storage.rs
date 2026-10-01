@@ -246,7 +246,7 @@ async fn real_registry_store_admits_ingest_on_mem_engine() {
         .await
         .expect("load_plan must succeed");
     assert_eq!(registry_plan.version, 1);
-    let plan_contract = memory_mcp::http::registry::plan::Plan::from(&registry_plan);
+    let plan_contract = memory_mcp::operations::quota::QuotaPlan::from(&registry_plan);
     let decision = comp
         .registry
         .usage()
@@ -256,8 +256,153 @@ async fn real_registry_store_admits_ingest_on_mem_engine() {
     assert!(
         matches!(
             decision,
-            memory_mcp::http::registry::plan::QuotaDecision::Allow
+            memory_mcp::operations::quota::QuotaDecision::Allow
         ),
         "fresh usage row must admit ingest within quota, got {decision:?}"
     );
+}
+
+/// The durable quota predicate and the context policy cannot drift.
+///
+/// ADR-0066 requires this test, and it exists because the two genuinely
+/// differ in language. The admission gate is a SQL `WHERE` — it has to be,
+/// because the counter increment is conditional on it and a check-then-write
+/// would let two racing requests both through. The Rust function exists only
+/// to name the refusal, because SQL cannot produce a typed reason carrying a
+/// `retry_after_secs`.
+///
+/// A first version of this test compared the two by *calling* them, and it
+/// passed against a deliberately corrupted reason string — because the
+/// durable path names its refusal by calling the same function, so the two
+/// sides agreed on a corrupted string. That is a tautology: it asserted that
+/// a function equals itself. This version reads the SQL predicate's text out
+/// of the store's source and requires every reason the policy can produce to
+/// have a predicate in it, and every predicate in it to have a reason in the
+/// policy. The two can now only agree by actually agreeing.
+#[test]
+fn the_sql_predicate_covers_every_reason_the_policy_can_produce() {
+    use memory_mcp::operations::quota::{QuotaDecision, QuotaPlan, enforce_ingest};
+
+    let store_source = std::fs::read_to_string(
+        std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("src/http/registry/surreal_store.rs"),
+    )
+    .expect("the durable store source is readable");
+
+    // The admission statement, isolated from the UPSERT that initialises the
+    // row and from the loop around it.
+    let predicate = store_source
+        .split("UPDATE type::record($table, $tenant_id) SET ingest_window_start")
+        .nth(1)
+        .expect("the conditional UPDATE is still in the durable store")
+        .split("RETURN AFTER")
+        .next()
+        .expect("the UPDATE ends with RETURN AFTER");
+
+    // Every reason the policy can produce, discovered by driving it rather
+    // than by reading its source: a reason the policy stops being able to
+    // produce does not need a predicate, and this way the test cannot go
+    // stale when the policy changes.
+    let mut expected: Vec<String> = Vec::new();
+    for (limits, counter, bytes) in reasons_to_try() {
+        let quota = QuotaPlan {
+            ingest_per_minute: limits.0,
+            max_ingested_bytes: limits.1,
+            max_episode_count: limits.2,
+            ..QuotaPlan::default()
+        };
+        let now = chrono::Utc::now();
+        let mut probe = counter;
+        if let QuotaDecision::Deny { reason, .. } = enforce_ingest(&quota, &mut probe, bytes, now) {
+            expected.push(reason);
+        }
+    }
+    expected.sort();
+    expected.dedup();
+    assert!(
+        expected.len() >= 4,
+        "expected the policy to produce at least its four ceilings, got {expected:?}"
+    );
+
+    // Only the `WHERE` clause is the predicate. The `SET` half of the same
+    // statement mentions the columns too — it increments them — and a search
+    // over the whole statement would find every reason's column there and pass
+    // against a `WHERE` that checks nothing. That is not a hypothetical: the
+    // first version of this test searched the whole statement and passed with
+    // `episode_count < $max_episodes` renamed in the `WHERE` clause only.
+    let predicate = predicate
+        .split_once(" WHERE ")
+        .map(|(_, tail)| tail)
+        .expect("the conditional UPDATE has a WHERE clause — it is the admission gate");
+
+    for reason in &expected {
+        let needle = match reason.as_str() {
+            "ingest_disabled" => "ingest_current_minute < $per_minute",
+            "ingested_bytes_exceeded" => "ingested_bytes + $bytes <= $max_bytes",
+            "episode_count_exceeded" => "episode_count < $max_episodes",
+            "ingest_rate_exceeded" => "ingest_window_start <= type::datetime($cutoff)",
+            other => panic!(
+                "the policy produced `{other}`, which this test does not know how \
+                 to look for in the SQL. Add it to the mapping — a reason the test \
+                 cannot pin is a reason the two expressions can drift on silently."
+            ),
+        };
+        assert!(
+            predicate.contains(needle),
+            "the policy can refuse with `{reason}` but the durable predicate has \
+             no `{needle}`. The SQL is the admission gate, so a reason the SQL \
+             cannot produce is one a tenant receives as a refusal for some other \
+             reason entirely. Predicate was:\n{predicate}"
+        );
+    }
+
+    // And the rate limit has two clauses in the SQL — the count within the
+    // window, or a window that has expired. Both must be present, because a
+    // SQL with only one of them refuses after a window rolls and admits a
+    // burst at the boundary.
+    assert!(
+        predicate.contains(
+            "ingest_current_minute < $per_minute OR ingest_window_start <= type::datetime($cutoff)"
+        ),
+        "the SQL must admit either an under-limit minute or an expired window. \
+         With only the first clause a tenant is refused forever after a window \
+         rolls; with only the second a burst inside one window is admitted \
+         without limit. Predicate was:\n{predicate}"
+    );
+}
+
+/// The states that make each ceiling fire: (per_minute, max_bytes, max_episodes),
+/// counter, bytes to reserve.
+#[allow(clippy::type_complexity)]
+fn reasons_to_try() -> Vec<(
+    (u32, u64, u64),
+    memory_mcp::operations::quota::UsageCounter,
+    u64,
+)> {
+    use memory_mcp::operations::quota::UsageCounter;
+    let now = chrono::Utc::now();
+    let fresh = || UsageCounter {
+        ingest_current_minute: 0,
+        window_start: now,
+        ingested_bytes: 0,
+        episode_count: 0,
+    };
+    vec![
+        // ingest disabled
+        ((0, 1000, 1000), fresh(), 1),
+        // byte ceiling
+        ((10, 0, 1000), fresh(), 1),
+        // episode ceiling
+        ((10, 1000, 0), fresh(), 1),
+        // rate ceiling: a minute already at its limit
+        (
+            (1, 1000, 1000),
+            UsageCounter {
+                ingest_current_minute: 1,
+                window_start: now,
+                ingested_bytes: 0,
+                episode_count: 0,
+            },
+            1,
+        ),
+    ]
 }
