@@ -760,7 +760,7 @@ pub async fn transition_tenant_fenced(
 
 `TenantLifecyclePort` is a **real** seam: `TenantStore` satisfies it today, and `InMemoryStore` in tests is the second adapter. The two methods are exactly what the two use cases need, which is the point — `TenantStore` has 11 methods and these use cases need 2.
 
-- [ ] **Step 1: Move the 8 table tests** from `provisioning.rs:307-365` to `tests/registry_store_behaviour.rs`, same names, retargeted. Add:
+- [x] **Step 1: Move the 8 table tests** from `provisioning.rs:307-365` to `tests/registry_store_behaviour.rs`, same names, retargeted. Add:
 
 ```rust
 #[tokio::test]
@@ -769,12 +769,12 @@ async fn an_illegal_transition_is_refused_before_the_store_is_touched() { /* ...
 
 Run: expect FAIL, module does not exist.
 
-- [ ] **Step 2: Add the port and the two use cases** to `provisioning/api.rs`, following the file's existing style: `pub async fn use_case(port: &(impl XPort + ?Sized), ...) -> Result<u64, MemoryError>`, doc comment stating the invariant ("the transition is validated before the compare-and-set, so an illegal pair never reaches storage").
-- [ ] **Step 3: Implement `TenantLifecyclePort for TenantStore`** — a blanket impl, so both store adapters get it without a second declaration.
-- [ ] **Step 4: Repoint `migration.rs`.** Its 5 `transition_fenced` calls (288, 300, 316, 399, 448) become `transition_tenant_fenced`. Its import at line 23 changes.
-- [ ] **Step 5: Delete the old functions** from `http/registry/provisioning.rs`. Note that `transition` (the unfenced one) has **zero production callers** — only 3 tests at `provisioning.rs:373,391,405`. Task 3.4 wires it to the operator handlers, which is what makes it earn its place; until then it is ported, not deleted.
-- [ ] **Step 6: Run the test.** Expected: PASS.
-- [ ] **Step 7: Commit**
+- [x] **Step 2: Add the port and the two use cases** to `provisioning/api.rs`, following the file's existing style: `pub async fn use_case(port: &(impl XPort + ?Sized), ...) -> Result<u64, MemoryError>`, doc comment stating the invariant ("the transition is validated before the compare-and-set, so an illegal pair never reaches storage").
+- [x] **Step 3: Implement `TenantLifecyclePort for TenantStore`** — a blanket impl, so both store adapters get it without a second declaration.
+- [x] **Step 4: Repoint `migration.rs`.** Its 5 `transition_fenced` calls (288, 300, 316, 399, 448) become `transition_tenant_fenced`. Its import at line 23 changes.
+- [x] **Step 5: Delete the old functions** from `http/registry/provisioning.rs`. Note that `transition` (the unfenced one) has **zero production callers** — only 3 tests at `provisioning.rs:373,391,405`. Task 3.4 wires it to the operator handlers, which is what makes it earn its place; until then it is ported, not deleted.
+- [x] **Step 6: Run the test.** Expected: PASS.
+- [x] **Step 7: Commit**
 
 ```bash
 git commit -m "refactor(provisioning): the Tenant transition table lives with the context that owns Tenant"

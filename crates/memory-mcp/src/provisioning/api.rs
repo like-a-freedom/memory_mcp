@@ -2,7 +2,9 @@ use chrono::{DateTime, Utc};
 use sha2::{Digest, Sha256};
 
 use crate::MemoryError;
+use crate::http::leases::ProvisioningLease;
 use crate::identity::api::AuthMethod;
+use crate::models::registry::TenantStatus;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ClientAuthority {
@@ -397,6 +399,176 @@ fn random_token() -> String {
 
 fn new_api_key_id() -> String {
     format!("ak_{}", hex::encode(rand::random::<[u8; 12]>()))
+}
+
+/// The Tenant lifecycle transition table.
+///
+/// Which moves between Tenant statuses are legal is a fact about a Tenant, not
+/// about HTTP, so it lives here rather than in the transport adapter that used
+/// to hold it. ADR-0066 is the general statement; this is its second instance.
+///
+/// Anything outside the table is a programmer error and surfaces as
+/// [`MemoryError::Validation`] with both ends named, because that message is
+/// how an operator finds the offending pair.
+pub fn can_transition(from: TenantStatus, to: TenantStatus) -> bool {
+    use TenantStatus::{
+        Deleting, Failed, Migrating, NamespaceCreating, Purged, Ready, Reserved, Suspended,
+    };
+    match (from, to) {
+        (Reserved, NamespaceCreating) => true,
+        (NamespaceCreating, Migrating) => true,
+        (NamespaceCreating, Failed) => true,
+        (Migrating, Ready) => true,
+        (Migrating, Failed) => true,
+        (Ready, Suspended) => true,
+        (Suspended, Ready) => true,
+        // `Deleting` is reachable from every non-terminal state, and `Purged`
+        // only from `Deleting`. Purged is the one edge that destroys records,
+        // so a `Purged -> X` edge would bring back a tenant whose rows are
+        // gone. `tests/tenant_lifecycle.rs` asserts the table's shape rather
+        // than its cases: a blanket rule is the kind that grows when a variant
+        // is added, and a shape assertion catches that.
+        (Reserved | NamespaceCreating | Migrating | Ready | Suspended | Failed, Deleting) => true,
+        (Deleting, Purged) => true,
+        // Retry from Failed: a worker may re-enter either working stage.
+        (Failed, NamespaceCreating) => true,
+        (Failed, Migrating) => true,
+        _ => false,
+    }
+}
+
+/// The error a refused pair produces.
+fn refuse(from: TenantStatus, to: TenantStatus) -> MemoryError {
+    MemoryError::Validation(format!("provisioning transition {from:?}->{to:?}"))
+}
+
+/// The two operations a Tenant's lifecycle needs from a store.
+///
+/// Narrower than `TenantStore`, which has eleven methods and answers questions
+/// about tenancy that a transition does not ask. Two is what the use cases
+/// need, and a use case taking the whole trait could reach account and session
+/// state through a status change.
+#[async_trait::async_trait]
+pub trait TenantLifecyclePort: Send + Sync {
+    /// Compare-and-set the Tenant's status on `expected_version`.
+    async fn update_tenant_state(
+        &self,
+        tenant_id: &str,
+        expected_version: u64,
+        from: TenantStatus,
+        to: TenantStatus,
+    ) -> Result<u64, MemoryError>;
+
+    /// The same, fenced: the predicate also carries owner, lease and
+    /// generation, so a worker whose lease was reassigned cannot advance the
+    /// Tenant it no longer owns.
+    async fn update_tenant_state_fenced(
+        &self,
+        tenant_id: &str,
+        expected_version: u64,
+        from: TenantStatus,
+        to: TenantStatus,
+        lease: &ProvisioningLease,
+    ) -> Result<u64, MemoryError>;
+}
+
+/// Adapts the registry's `TenantStore` to the two methods a transition needs.
+///
+/// A struct rather than a blanket impl, for a specific reason rather than a
+/// general one: `TenantStore` requires `+ 'static`, and its fenced method
+/// borrows through `LeaseFence<'a>`, which `async_trait` cannot lift into a
+/// `Box<dyn Future + 'static>` when the lease is a borrowed parameter of the
+/// caller's trait. Owning the borrow inside an adapter struct puts it in the
+/// same scope as the future that uses it.
+///
+/// It is a struct rather than an impl on the store because `TenantStore` lives
+/// under `http/`, which is the direction ADR-0058 forbids a bounded context
+/// from importing. Here the edge runs from `provisioning` to an `http` *type*
+/// the caller supplies, which is the composition root's job.
+pub struct TenantLifecycle<'a> {
+    store: &'a dyn crate::http::registry::storage::TenantStore,
+}
+
+impl<'a> TenantLifecycle<'a> {
+    /// Borrow a store as the narrow port the transitions take.
+    pub fn new(store: &'a dyn crate::http::registry::storage::TenantStore) -> Self {
+        Self { store }
+    }
+}
+
+#[async_trait::async_trait]
+impl TenantLifecyclePort for TenantLifecycle<'_> {
+    async fn update_tenant_state(
+        &self,
+        tenant_id: &str,
+        expected_version: u64,
+        from: TenantStatus,
+        to: TenantStatus,
+    ) -> Result<u64, MemoryError> {
+        self.store
+            .update_tenant_state(tenant_id, expected_version, from, to)
+            .await
+    }
+
+    async fn update_tenant_state_fenced(
+        &self,
+        tenant_id: &str,
+        expected_version: u64,
+        from: TenantStatus,
+        to: TenantStatus,
+        lease: &ProvisioningLease,
+    ) -> Result<u64, MemoryError> {
+        self.store
+            .update_tenant_state_fenced(
+                tenant_id,
+                expected_version,
+                from,
+                to,
+                &crate::http::registry::storage::LeaseFence::from_lease(lease),
+            )
+            .await
+    }
+}
+
+/// Move a Tenant from one status to another.
+///
+/// The pair is validated **before** the compare-and-set, so an illegal pair
+/// never reaches storage and never consumes a version. That ordering is the
+/// point of the function existing: the store's CAS is on `expected_version`,
+/// not on `from`, so a caller that skips this check can write
+/// `Migrating -> Ready` and leave a provisioning worker believing it still
+/// holds a lease on a tenant it has lost.
+pub async fn transition_tenant(
+    port: &(impl TenantLifecyclePort + ?Sized),
+    tenant_id: &str,
+    expected_version: u64,
+    from: TenantStatus,
+    to: TenantStatus,
+) -> Result<u64, MemoryError> {
+    if !can_transition(from, to) {
+        return Err(refuse(from, to));
+    }
+    port.update_tenant_state(tenant_id, expected_version, from, to)
+        .await
+}
+
+/// Move a Tenant under a provisioning lease.
+///
+/// Same validation, same ordering; the lease travels to the store, which
+/// applies it inside its own predicate rather than as a second round trip.
+pub async fn transition_tenant_fenced(
+    port: &(impl TenantLifecyclePort + ?Sized),
+    tenant_id: &str,
+    expected_version: u64,
+    from: TenantStatus,
+    to: TenantStatus,
+    lease: &ProvisioningLease,
+) -> Result<u64, MemoryError> {
+    if !can_transition(from, to) {
+        return Err(refuse(from, to));
+    }
+    port.update_tenant_state_fenced(tenant_id, expected_version, from, to, lease)
+        .await
 }
 
 #[cfg(test)]

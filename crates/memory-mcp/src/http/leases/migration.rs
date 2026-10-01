@@ -20,10 +20,10 @@ use std::sync::Arc;
 use crate::error::MemoryError;
 use crate::http::leases::ProvisioningLease;
 use crate::http::registry::models::TenantStatus;
-use crate::http::registry::provisioning::transition_fenced;
 use crate::http::registry::storage::LeaseFence;
 use crate::http::registry::storage::{ProvisioningStore, TenantStore};
 use crate::platform::fault_injection::{FaultInjector, FaultPoint};
+use crate::provisioning::api::transition_tenant_fenced;
 
 /// The two owner traits the provisioning worker crosses.
 ///
@@ -283,10 +283,14 @@ pub async fn provision_one(
         )));
     }
 
+    // The transition table lives in the provisioning context; this is the
+    // narrow port it takes. One adapter for every transition below — the
+    // store does not change under them.
+    let lifecycle = crate::provisioning::api::TenantLifecycle::new(&*store);
     let retry_from = tenant.retry_stage;
     if tenant.status == TenantStatus::Reserved {
-        transition_fenced(
-            &*store,
+        transition_tenant_fenced(
+            &lifecycle,
             tenant_id,
             tenant.version,
             TenantStatus::Reserved,
@@ -297,8 +301,8 @@ pub async fn provision_one(
     } else if tenant.status == TenantStatus::Failed {
         let stage = retry_from
             .ok_or_else(|| MemoryError::Validation("failed tenant has no retry stage".into()))?;
-        transition_fenced(
-            &*store,
+        transition_tenant_fenced(
+            &lifecycle,
             tenant_id,
             tenant.version,
             TenantStatus::Failed,
@@ -313,8 +317,8 @@ pub async fn provision_one(
         .await?
         .ok_or_else(|| MemoryError::NotFound(format!("tenant {tenant_id}")))?;
     if tenant.status == TenantStatus::NamespaceCreating {
-        transition_fenced(
-            &*store,
+        transition_tenant_fenced(
+            &lifecycle,
             tenant_id,
             tenant.version,
             TenantStatus::NamespaceCreating,
@@ -396,8 +400,8 @@ pub async fn provision_one(
                     TenantStatus::NamespaceCreating | TenantStatus::Migrating
                 )
             {
-                let _ = transition_fenced(
-                    &*store,
+                let _ = transition_tenant_fenced(
+                    &crate::provisioning::api::TenantLifecycle::new(&*store),
                     tenant_id,
                     failed.version,
                     failed.status,
@@ -445,8 +449,8 @@ pub async fn provision_one(
             lease.fencing_generation,
         )
         .await?;
-    transition_fenced(
-        &*store,
+    transition_tenant_fenced(
+        &lifecycle,
         tenant_id,
         new_version,
         TenantStatus::Migrating,
@@ -751,7 +755,7 @@ mod tests {
     }
 
     /// Seed a tenant with the supplied lease already attached
-    /// (so `transition_fenced` does not see a missing lease).
+    /// (so `transition_tenant_fenced` does not see a missing lease).
     async fn seed_with_lease(store: &InMemoryStore, tenant_id: &str, lease: &ProvisioningLease) {
         let mut t = store.find_tenant_by_id(tenant_id).await.unwrap().unwrap();
         t.provisioning_lease = Some(ProvisioningLeaseState {
