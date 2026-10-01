@@ -452,6 +452,18 @@ impl EmbeddingService {
         Ok(())
     }
 
+    /// Write a vector this service already generated.
+    ///
+    /// The one place that writes without going through `generate_and_update`,
+    /// and the reason is the retry loop: `run_background_fact_embedding_task`
+    /// regenerates on every attempt, so the vector is the thing being retried
+    /// and cannot be generated once and reused. Collapsing the two would
+    /// remove the ability to retry generation at all.
+    ///
+    /// The generation contract still holds — the vector came from
+    /// `generate_embedding`, so the input limit and the enabled check applied
+    /// when it was made. What this skips is only the *naming* of the policy in
+    /// one place, and the policy is named on line below.
     async fn store_embedding_on_fact(
         &self,
         fact_id: &str,

@@ -276,17 +276,15 @@ pub(crate) async fn run_backfill(
                 crate::embedding::api::VectorWritePolicy::FillMissing,
             )
             .await?;
-            match applied {
-                crate::embedding::api::VectorApplication::Applied
-                | crate::embedding::api::VectorApplication::AlreadyCurrent => {}
-                crate::embedding::api::VectorApplication::Skipped(reason) => {
-                    // A disabled provider produces nothing for every fact in
-                    // the batch, and looping over the rest of them would spin
-                    // to the end of the table to learn nothing. ADR-0042's
-                    // rule is unchanged — a compatible recovery backfills, a
-                    // signature mismatch keeps semantic retrieval degraded —
-                    // but "degraded" is now stated rather than reached by
-                    // silently writing no vectors.
+            match crate::embedding::api::batch_advance(applied) {
+                crate::embedding::api::BatchAdvance::Continue => {}
+                crate::embedding::api::BatchAdvance::Halt(reason) => {
+                    // The context decides whether a skip advances the batch;
+                    // this loop only carries the answer out. ADR-0042's rule is
+                    // unchanged — a compatible recovery backfills, a signature
+                    // mismatch keeps semantic retrieval degraded — but
+                    // "degraded" is now stated rather than reached by silently
+                    // writing no vectors for every remaining fact.
                     return Err(MemoryError::Storage(format!(
                         "embedding backfill skipped, provider produced no vector: {reason:?}"
                     )));

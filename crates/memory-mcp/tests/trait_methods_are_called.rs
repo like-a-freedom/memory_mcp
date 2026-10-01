@@ -23,7 +23,233 @@ use std::path::{Path, PathBuf};
 /// deleting the method makes this test stop covering it, so the table and the
 /// trait have to be changed together.
 const METHODS: &[(&str, &str)] = &[
-    // http/tasks/state.rs — TaskStore
+    // Every method of every store trait in the crate, extracted from the trait
+    // bodies rather than listed from memory: 79 methods across 11 traits. A
+    // spot check of 13 would have left 66 uncovered, and a table that claims
+    // more coverage than it has is worse than no table at all.
+    //
+    // Adding a method to a trait means adding a row here, and
+    // `every_trait_method_named_in_the_table_still_exists` is what catches it
+    // in the other direction: a row cannot outlive the method it names.
+    (
+        "http/registry/storage.rs",
+        "AccountStore::find_account_by_id",
+    ),
+    (
+        "http/registry/storage.rs",
+        "AccountStore::find_account_by_identity",
+    ),
+    ("http/registry/storage.rs", "AccountStore::write_account"),
+    (
+        "http/registry/storage.rs",
+        "AccountStore::transition_account_state",
+    ),
+    (
+        "http/registry/storage.rs",
+        "AccountStore::create_account_bundle",
+    ),
+    (
+        "http/registry/storage.rs",
+        "AccountStore::create_oidc_account_bundle",
+    ),
+    (
+        "http/registry/storage.rs",
+        "AccountStore::begin_account_deletion",
+    ),
+    (
+        "http/registry/storage.rs",
+        "IdentityStore::find_external_identities",
+    ),
+    (
+        "http/registry/storage.rs",
+        "IdentityStore::link_external_identity",
+    ),
+    (
+        "http/registry/storage.rs",
+        "IdentityStore::unlink_external_identity",
+    ),
+    (
+        "http/registry/storage.rs",
+        "IdentityStore::replace_external_identity",
+    ),
+    (
+        "http/registry/storage.rs",
+        "TenantStore::find_tenant_by_account",
+    ),
+    ("http/registry/storage.rs", "TenantStore::find_tenant_by_id"),
+    ("http/registry/storage.rs", "TenantStore::write_tenant"),
+    (
+        "http/registry/storage.rs",
+        "TenantStore::update_tenant_state",
+    ),
+    (
+        "http/registry/storage.rs",
+        "TenantStore::update_tenant_state_fenced",
+    ),
+    (
+        "http/registry/storage.rs",
+        "TenantStore::update_tenant_schema_version_fenced",
+    ),
+    ("http/registry/storage.rs", "TenantStore::list_tenants"),
+    (
+        "http/registry/storage.rs",
+        "TenantStore::list_ready_tenants",
+    ),
+    (
+        "http/registry/storage.rs",
+        "TenantStore::list_deleting_tenants",
+    ),
+    (
+        "http/registry/storage.rs",
+        "TenantStore::begin_operator_deletion",
+    ),
+    (
+        "http/registry/storage.rs",
+        "TenantStore::finalize_account_deletion",
+    ),
+    ("http/registry/storage.rs", "ApiKeyStore::find_api_key"),
+    ("http/registry/storage.rs", "ApiKeyStore::write_api_key"),
+    ("http/registry/storage.rs", "ApiKeyStore::list_api_keys"),
+    ("http/registry/storage.rs", "ApiKeyStore::revoke_api_key"),
+    ("http/registry/storage.rs", "ApiKeyStore::touch_api_key"),
+    (
+        "http/registry/storage.rs",
+        "ApiKeyStore::create_api_key_if_below_limit",
+    ),
+    (
+        "http/registry/storage.rs",
+        "ApiKeyStore::revoke_all_api_keys",
+    ),
+    (
+        "http/registry/storage.rs",
+        "ProvisioningStore::claim_provisioning",
+    ),
+    (
+        "http/registry/storage.rs",
+        "ProvisioningStore::release_provisioning_lease",
+    ),
+    (
+        "http/registry/storage.rs",
+        "ProvisioningStore::heartbeat_provisioning",
+    ),
+    (
+        "http/registry/storage.rs",
+        "ProvisioningStore::list_due_provisioning",
+    ),
+    (
+        "http/registry/storage.rs",
+        "ProvisioningStore::append_provisioning_event",
+    ),
+    ("http/registry/storage.rs", "UsageStore::load_plan"),
+    ("http/registry/storage.rs", "UsageStore::ensure_plan"),
+    ("http/registry/storage.rs", "UsageStore::load_usage"),
+    (
+        "http/registry/storage.rs",
+        "UsageStore::reserve_ingest_usage",
+    ),
+    ("http/registry/storage.rs", "UsageStore::reconcile_usage"),
+    ("http/registry/storage.rs", "UsageStore::ensure_local_plan"),
+    ("http/registry/storage.rs", "SessionStore::store_session"),
+    ("http/registry/storage.rs", "SessionStore::find_session"),
+    ("http/registry/storage.rs", "SessionStore::touch_session"),
+    ("http/registry/storage.rs", "SessionStore::delete_session"),
+    (
+        "http/registry/storage.rs",
+        "SessionStore::store_oidc_request",
+    ),
+    (
+        "http/registry/storage.rs",
+        "SessionStore::take_oidc_request",
+    ),
+    (
+        "http/registry/storage.rs",
+        "SessionStore::create_deletion_challenge",
+    ),
+    (
+        "http/registry/storage.rs",
+        "SessionStore::consume_deletion_challenge",
+    ),
+    (
+        "http/registry/storage.rs",
+        "BrowserPolicyStore::reconcile_browser_policy",
+    ),
+    (
+        "http/registry/storage.rs",
+        "BrowserPolicyStore::remove_browser_auth_method",
+    ),
+    ("http/registry/storage.rs", "StoreHealth::ping"),
+    (
+        "service/local_admin/contracts.rs",
+        "LocalAdminStore::issue_challenge",
+    ),
+    (
+        "service/local_admin/contracts.rs",
+        "LocalAdminStore::inspect_challenge",
+    ),
+    (
+        "service/local_admin/contracts.rs",
+        "LocalAdminStore::finish_challenge",
+    ),
+    (
+        "service/local_admin/contracts.rs",
+        "LocalAdminStore::credential",
+    ),
+    (
+        "service/local_admin/contracts.rs",
+        "LocalAdminStore::open_session",
+    ),
+    (
+        "service/local_admin/contracts.rs",
+        "LocalAdminStore::resolve_session",
+    ),
+    (
+        "service/local_admin/contracts.rs",
+        "LocalAdminStore::rotate_session",
+    ),
+    (
+        "service/local_admin/contracts.rs",
+        "LocalAdminStore::revoke_session",
+    ),
+    (
+        "service/local_admin/contracts.rs",
+        "LocalAdminStore::reserve_attempt",
+    ),
+    (
+        "service/local_admin/contracts.rs",
+        "LocalAdminStore::cleanup_rate_buckets",
+    ),
+    (
+        "service/local_admin/contracts.rs",
+        "LocalAdminStore::record_failure",
+    ),
+    (
+        "service/local_admin/contracts.rs",
+        "LocalAdminStore::create_client",
+    ),
+    (
+        "service/local_admin/contracts.rs",
+        "LocalAdminStore::list_clients",
+    ),
+    (
+        "service/local_admin/contracts.rs",
+        "LocalAdminStore::client",
+    ),
+    (
+        "service/local_admin/contracts.rs",
+        "LocalAdminStore::list_client_keys",
+    ),
+    (
+        "service/local_admin/contracts.rs",
+        "LocalAdminStore::insert_client_key",
+    ),
+    (
+        "service/local_admin/contracts.rs",
+        "LocalAdminStore::revoke_client_key",
+    ),
+    (
+        "service/local_admin/contracts.rs",
+        "LocalAdminStore::set_client_state",
+    ),
     ("http/tasks/state.rs", "TaskStore::enqueue"),
     ("http/tasks/state.rs", "TaskStore::load"),
     ("http/tasks/state.rs", "TaskStore::set_cancellation_intent"),
@@ -37,24 +263,6 @@ const METHODS: &[(&str, &str)] = &[
     ("http/tasks/state.rs", "TaskStore::requeue_expired_running"),
     ("http/tasks/state.rs", "TaskStore::reconcile_artifacts"),
     ("http/tasks/state.rs", "TaskStore::delete_expired"),
-    // service/local_admin/contracts.rs — LocalAdminStore. Three of its
-    // nineteen methods, covering the operator path end to end: issue a
-    // challenge, read the credential it belongs to, open the session. The
-    // table is a spot check with a known answer, not an inventory — every
-    // method of a nineteen-method trait cannot be asserted by a grep, and a
-    // table that pretends otherwise is a table that goes stale silently.
-    (
-        "service/local_admin/contracts.rs",
-        "LocalAdminStore::issue_challenge",
-    ),
-    (
-        "service/local_admin/contracts.rs",
-        "LocalAdminStore::credential",
-    ),
-    (
-        "service/local_admin/contracts.rs",
-        "LocalAdminStore::open_session",
-    ),
 ];
 
 fn source_files() -> Vec<PathBuf> {

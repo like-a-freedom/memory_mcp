@@ -28,13 +28,27 @@ pub fn matched_query_terms_for_text(text: &str, query_terms: &[String]) -> HashS
 
 /// Normalized term set of a fact: its content plus all index keys.
 pub fn fact_term_set(fact: &Fact) -> HashSet<String> {
-    let mut fact_terms = search_query_terms(&fact.content)
+    term_set_of(&fact.content, &fact.index_keys)
+}
+
+/// The one term-set implementation, over the two fields every searchable row
+/// has.
+///
+/// `fact_term_set` and `record_term_set` were separate functions in this
+/// module once, which is the exact duplication this module exists to prevent —
+/// and worse than duplication in two files, because a reader would reasonably
+/// assume the two were interchangeable and pick the wrong one. They are not
+/// interchangeable in *shape* (a `Fact` and a raw `Value` are different
+/// things to read) but they are the same operation, so the operation lives
+/// here once and each caller reads its own two fields.
+fn term_set_of(content: &str, index_keys: &[String]) -> HashSet<String> {
+    let mut terms = search_query_terms(content)
         .into_iter()
         .collect::<HashSet<_>>();
-    for index_key in &fact.index_keys {
-        fact_terms.extend(search_query_terms(index_key));
+    for index_key in index_keys {
+        terms.extend(search_query_terms(index_key));
     }
-    fact_terms
+    terms
 }
 
 /// Subset of `query_terms` matched by a fact's content and index keys.
@@ -64,14 +78,10 @@ pub fn matched_query_terms_for_fact(fact: &Fact, query_terms: &[String]) -> Hash
 /// from it, so the row-shaped path reads the fields it needs and nothing
 /// else.
 pub fn record_term_set(record: &serde_json::Value) -> HashSet<String> {
-    let mut terms = HashSet::new();
-    if let Some(content) = string_field(record, "content") {
-        terms.extend(search_query_terms(&content));
-    }
-    for index_key in string_array_field(record, "index_keys") {
-        terms.extend(search_query_terms(&index_key));
-    }
-    terms
+    term_set_of(
+        &string_field(record, "content").unwrap_or_default(),
+        &string_array_field(record, "index_keys"),
+    )
 }
 
 /// How many of `query_terms` a raw record contains.

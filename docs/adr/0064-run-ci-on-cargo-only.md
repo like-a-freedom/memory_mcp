@@ -1,6 +1,14 @@
 # Run CI on cargo only
 
-No Python, no Node, no browser runner in the pipeline.
+No Node, no browser runner, and no second toolchain in the pipeline.
+
+> **Qualified by [ADR-0070](0070-observability-checkers-through-cargo.md).**
+> The four observability checkers under `observability/` are Python and are
+> reached through `cargo run -p xtask -- check-observability`. They were
+> written after this record, which does not mention them. The decision here is
+> unchanged in what it was about — one toolchain to install and keep in step —
+> and the exception is recorded rather than left as a contradiction between two
+> documents.
 
 ## Decision
 
@@ -17,6 +25,7 @@ the workspace:
 | `audit_undeclared_sources.py` | removed; see [ADR-0063](0063-retire-the-undeclared-source-audit.md) |
 | `audit_doc_claims.py`, `test_doc_claims.py` | removed with the doc-claim citation check |
 | `local_admin_image.py`, `local_admin_browser.mjs` (1676 lines) | removed; nothing ran them |
+| — | `cargo run -p xtask -- check-observability`, which runs the four `observability/check_*.py` scripts. See [ADR-0070](0070-observability-checkers-through-cargo.md). |
 
 `release.yml` is unchanged: it consumes `dist/*`, which `xtask package` still
 produces in the same shape, with the same `.sha256` sidecars and the same

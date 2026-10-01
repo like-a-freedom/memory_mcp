@@ -244,6 +244,37 @@ async fn a_mis_dimensioned_vector_is_refused_before_the_write() {
     );
 }
 
+/// Whether a backfill loop may keep going.
+///
+/// The policy lives in `embedding::api` because "what does a loop do with an
+/// outcome" is the embedding context's question, and the loop in
+/// `service/embedding_recovery.rs` is a transport adapter that should not be
+/// deciding it. This test is the evidence that the decision is testable at
+/// all: it needs no embedded database and no provider, because the decision is
+/// a pure function over an outcome.
+#[test]
+fn a_backfill_continues_on_a_write_and_halts_on_a_skip() {
+    use memory_mcp::embedding::api::{BatchAdvance, batch_advance};
+
+    assert_eq!(
+        batch_advance(VectorApplication::Applied),
+        BatchAdvance::Continue,
+        "a written row advances the batch"
+    );
+    assert_eq!(
+        batch_advance(VectorApplication::AlreadyCurrent),
+        BatchAdvance::Continue,
+        "a row that was already current has advanced the batch by not needing to"
+    );
+    assert_eq!(
+        batch_advance(VectorApplication::Skipped(SkipReason::ProviderDisabled)),
+        BatchAdvance::Halt(SkipReason::ProviderDisabled),
+        "a skip advances nothing, and a disabled provider will skip every \
+         remaining row too — so the loop must stop rather than walk the table \
+         learning the same thing once per fact"
+    );
+}
+
 /// Every generation reaches the provider through the port.
 ///
 /// The four call sites this ratchets are the ones the audit found: recovery
@@ -282,6 +313,11 @@ fn no_caller_outside_embedding_bypasses_the_generation_port() {
                 .unwrap_or(&path)
                 .display()
                 .to_string();
+            // `src/embedding/` is exempt, and the exemption is the point
+            // rather than a loophole: the port's adapters live there, and the
+            // input limit, the enabled check and the stage timer are all in
+            // the same module. A scan that also rejected the adapters would be
+            // a scan nobody could satisfy.
             if relative.starts_with("src/embedding/") {
                 continue;
             }

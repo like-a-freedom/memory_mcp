@@ -2,12 +2,18 @@
 # equivalent of one. A target nothing runs is a target that rots: the profile
 # it names stops matching what CI executes, and nothing notices.
 #
+# Invoked by a workflow:
+#
 #   eval-response-size   ci.yml `quality`, evaluations.yml
 #   eval-ner-quality     evaluations.yml
 #   bench-check          evaluations.yml (compiles every bench target)
 #   bench-cpu-core       evaluations.yml (the Criterion run)
-#   bench-cpu            the local form of `bench-cpu-core` plus `ner_cpu`
-#   bench-metal          evaluations.yml `benchmark-metal`
+#
+# Named in a workflow's skip message, so a person following the message runs
+# the same command on a fixture-equipped host:
+#
+#   bench-cpu            bench-cpu-core plus the NER CPU bench
+#   bench-metal          the NER Metal bench, macOS arm64 only
 #
 # `eval-pr`, `eval-release`, `eval-nightly` and the four `eval-external-*`
 # targets were one-line `cargo run` invocations that `evaluations.yml` already

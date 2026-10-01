@@ -328,27 +328,6 @@ impl AppSessionStore {
         Ok(())
     }
 
-    /// Look up the handle's tenant binding. A handle
-    /// from another tenant returns `None` without
-    /// revealing ownership. Resource reads use this
-    /// to confirm the principal still owns the handle.
-    pub async fn tenant_of(
-        &self,
-        tenant_id: &str,
-        handle: &str,
-    ) -> Result<Option<String>, MemoryError> {
-        let result = self
-            .db
-            .query(
-                "SELECT VALUE tenant_id FROM app_session WHERE tenant_id = $tenant_id AND handle = $handle LIMIT 1;",
-                Some(serde_json::json!({ "tenant_id": tenant_id, "handle": handle })),
-            )
-            .await?;
-        let rows: Vec<serde_json::Value> = serde_json::from_value(result)
-            .map_err(|e| MemoryError::Storage(format!("app_session tenant_of: {e}")))?;
-        Ok(rows.first().and_then(|v| v.as_str().map(String::from)))
-    }
-
     /// Count non-expired sessions for a tenant. Used by
     /// unit tests to inspect the cap boundary.
     #[cfg(test)]

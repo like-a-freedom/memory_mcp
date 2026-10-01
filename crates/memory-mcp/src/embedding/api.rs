@@ -213,6 +213,39 @@ pub async fn update_canonical_vector(
     Ok(VectorApplication::Applied)
 }
 
+/// Whether a backfill may keep going after one outcome.
+///
+/// This is a policy question, so it is answered here rather than at the call
+/// site. `service/embedding_recovery.rs` holds the loop; what a loop does with
+/// an outcome is the embedding context's decision, and the loop is a transport
+/// adapter that should not be making it.
+///
+/// The distinction matters for one case only. `Applied` and `AlreadyCurrent`
+/// both mean the batch advanced. `Skipped` means it did not — and a skip
+/// produced by a disabled provider will be produced again for every remaining
+/// fact, so continuing would walk the whole table to learn nothing on each
+/// row. Stopping is the honest response, and it is also the one a caller can
+/// act on: the caller gets to decide whether to retry later or to record that
+/// semantic retrieval is degraded, and it can only do that if the loop stops.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum BatchAdvance {
+    /// The row was written, or was already current. Keep going.
+    Continue,
+    /// Nothing was produced. Stop, and tell the caller why.
+    Halt(SkipReason),
+}
+
+/// Whether an outcome advances a backfill loop.
+///
+/// A pure function over the outcome, so the decision can be tested without an
+/// embedded database and without a provider.
+pub fn batch_advance(application: VectorApplication) -> BatchAdvance {
+    match application {
+        VectorApplication::Applied | VectorApplication::AlreadyCurrent => BatchAdvance::Continue,
+        VectorApplication::Skipped(reason) => BatchAdvance::Halt(reason),
+    }
+}
+
 /// Generate a vector for `fact_id` and write it under `policy`.
 ///
 /// Every vector the system writes goes through this one function, so the

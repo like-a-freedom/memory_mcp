@@ -69,9 +69,13 @@ in ADR-0016.
   caller-supplied table selectors.
 - `src/memory/api.rs` — consumer-owned ports for ingestion, extraction,
   recall, explanation, invalidation and the shared rate-limit policy.
-- `src/embedding/api.rs` — canonical vector updates with named write policies
-  (`FillMissing` for backfill, `ReplaceStale` for re-embedding and retry), so
-  a vector endpoint never calls generation again.
+- `src/embedding/api.rs` — the one path a vector is generated and the one path
+  it is written. `generate_and_update` closes over two ports:
+  `EmbeddingGeneration` (every vector the system produces, so the input limit
+  and the disabled-provider check cannot be skipped by a caller holding a
+  provider) and `CanonicalVectorPort` (the write, under a named
+  `VectorWritePolicy` — `FillMissing` for backfill, `ReplaceStale` for
+  re-embedding and retry). A skip is a bounded `SkipReason`, never a string.
 - `src/service/agent_memory/{projection,worker}.rs` — the lifecycle projection
   worker. The policy, recall and capture use cases it runs live in
   `src/memory/agent_memory/`. Not registered in `tools/list`.
