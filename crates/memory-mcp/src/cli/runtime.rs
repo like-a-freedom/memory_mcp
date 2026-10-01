@@ -77,7 +77,7 @@ pub(crate) async fn build_memory_service_with_progress(
 ) -> Result<MemoryService, Box<dyn std::error::Error>> {
     crate::observability::install()
         .map_err(|err| log_and_return_error(logger, "main.observability_failed", err))?;
-    MemoryService::new_from_env_with_mode_and_progress(mode, ner_progress)
+    crate::bootstrap::stdio::build_memory_service_from_env(mode, ner_progress)
         .await
         .map_err(|err| log_and_return_error(logger, "main.startup_failed", err))
 }

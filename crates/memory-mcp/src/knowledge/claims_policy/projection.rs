@@ -97,7 +97,8 @@ impl ClaimService {
 
     /// Create with a custom config.
     ///
-    /// Used by `MemoryService::new_from_env_with_mode` to inject `ClaimConfig::from_env()`.
+    /// Used by `bootstrap::stdio::build_memory_service_from_env` to inject
+    /// `ClaimConfig::from_env()`.
     pub fn with_config(self, config: ClaimConfig) -> Self {
         Self {
             config,

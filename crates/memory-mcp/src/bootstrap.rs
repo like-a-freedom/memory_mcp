@@ -4,6 +4,7 @@ use std::sync::Arc;
 
 #[cfg(feature = "control-plane")]
 pub mod integration;
+pub mod stdio;
 
 /// Run one crash-safe account-deletion recovery pass.
 ///

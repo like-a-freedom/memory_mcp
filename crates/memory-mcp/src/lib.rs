@@ -25,7 +25,9 @@
 //!
 //! #[tokio::main]
 //! async fn main() -> Result<(), Box<dyn std::error::Error>> {
-//!     let service = MemoryService::new_from_env().await?;
+//!     let service = bootstrap::stdio::build_memory_service_from_env(
+//!     EmbeddingActivationMode::Standard, Arc::new(NoopProgressSink),
+//! ).await?;
 //!     // Use the service...
 //!     Ok(())
 //! }
@@ -78,7 +80,6 @@ pub mod http;
 #[cfg(feature = "ui")]
 pub mod ui;
 
-#[cfg(feature = "streamable-http")]
 pub mod bootstrap;
 #[cfg(feature = "streamable-http")]
 pub mod tenancy;

@@ -610,9 +610,12 @@ async fn memory_service_uses_local_gliner_zero_shot_labels() {
     let labels = zero_shot_gliner_labels();
     let _env = local_gliner_env(&temp_dir, Some(&labels), 0.2);
 
-    let service = MemoryService::new_from_env()
-        .await
-        .expect("service should bootstrap with local GLiNER zero-shot labels");
+    let service = memory_mcp::bootstrap::stdio::build_memory_service_from_env(
+        memory_mcp::bootstrap::stdio::EmbeddingActivationMode::Standard,
+        std::sync::Arc::new(memory_mcp::bootstrap::stdio::NoopProgressSink),
+    )
+    .await
+    .expect("service should bootstrap with local GLiNER zero-shot labels");
 
     for (case_name, text, expected_entities) in zero_shot_gliner_coverage_cases() {
         let episode_id = ingest_episode(&service, text).await;
@@ -643,9 +646,12 @@ async fn mcp_gliner_ingest_then_extract_completes_end_to_end() {
     let _env_lock = ENV_LOCK.lock().await;
     let temp_dir = TempDir::new().expect("temp dir should be created");
     let _env = local_gliner_env(&temp_dir, None, 0.2);
-    let service = MemoryService::new_from_env()
-        .await
-        .expect("service should bootstrap with local GLiNER");
+    let service = memory_mcp::bootstrap::stdio::build_memory_service_from_env(
+        memory_mcp::bootstrap::stdio::EmbeddingActivationMode::Standard,
+        std::sync::Arc::new(memory_mcp::bootstrap::stdio::NoopProgressSink),
+    )
+    .await
+    .expect("service should bootstrap with local GLiNER");
     let mcp = MemoryMcp::new(service);
 
     let ingest = mcp
@@ -760,9 +766,12 @@ async fn memory_service_uses_local_gliner_defaults_across_diverse_texts() {
     let cases = gliner_diverse_coverage_cases();
     assert_gliner_case_matrix_covers_supported_labels(&cases);
 
-    let service = MemoryService::new_from_env()
-        .await
-        .expect("service should bootstrap with local GLiNER");
+    let service = memory_mcp::bootstrap::stdio::build_memory_service_from_env(
+        memory_mcp::bootstrap::stdio::EmbeddingActivationMode::Standard,
+        std::sync::Arc::new(memory_mcp::bootstrap::stdio::NoopProgressSink),
+    )
+    .await
+    .expect("service should bootstrap with local GLiNER");
 
     for (case_name, text, expected_entities) in cases {
         let episode_id = ingest_episode(&service, text).await;
@@ -790,9 +799,12 @@ async fn memory_service_persists_real_local_candle_embeddings() {
     let temp_dir = TempDir::new().expect("temp dir should be created");
     let _env = local_candle_env(&temp_dir, 0.0);
 
-    let service = MemoryService::new_from_env()
-        .await
-        .expect("service should bootstrap with local Candle embeddings");
+    let service = memory_mcp::bootstrap::stdio::build_memory_service_from_env(
+        memory_mcp::bootstrap::stdio::EmbeddingActivationMode::Standard,
+        std::sync::Arc::new(memory_mcp::bootstrap::stdio::NoopProgressSink),
+    )
+    .await
+    .expect("service should bootstrap with local Candle embeddings");
     let source_episode =
         ingest_episode(&service, "The compensation committee finished its review.").await;
 
@@ -873,9 +885,12 @@ async fn memory_service_assemble_context_uses_real_local_candle_embeddings() {
     let temp_dir = TempDir::new().expect("temp dir should be created");
     let _env = local_candle_env(&temp_dir, 0.0);
 
-    let service = MemoryService::new_from_env()
-        .await
-        .expect("service should bootstrap with local Candle embeddings");
+    let service = memory_mcp::bootstrap::stdio::build_memory_service_from_env(
+        memory_mcp::bootstrap::stdio::EmbeddingActivationMode::Standard,
+        std::sync::Arc::new(memory_mcp::bootstrap::stdio::NoopProgressSink),
+    )
+    .await
+    .expect("service should bootstrap with local Candle embeddings");
     let target_episode = ingest_episode(&service, "Compensation decisions were published.").await;
     let distractor_episode = ingest_episode(&service, "Facilities updates were published.").await;
 

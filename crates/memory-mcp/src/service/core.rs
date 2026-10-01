@@ -9,7 +9,7 @@ use crate::logging::LogLevel;
 
 use crate::error::MemoryError;
 
-mod builder;
+pub(crate) mod builder;
 use crate::platform::log_event::log_event;
 pub use builder::MemoryService;
 
@@ -363,7 +363,7 @@ impl MemoryService {
         Ok(Some(result))
     }
 
-    async fn check_surrealdb_connection(&self) -> Result<(), MemoryError> {
+    pub(crate) async fn check_surrealdb_connection(&self) -> Result<(), MemoryError> {
         let _ = self.event_log_store().select_event_log().await?;
         Ok(())
     }

@@ -58,8 +58,8 @@ pub use crate::memory::procedures_service as procedures;
 pub mod claims {
     pub use crate::knowledge::claims_policy::telemetry;
 }
-mod core;
-mod embedding_recovery;
+pub(crate) mod core;
+pub(crate) mod embedding_recovery;
 pub(crate) mod fact_orchestration;
 #[cfg(feature = "fs-watch")]
 pub mod fs_watch;
@@ -70,7 +70,7 @@ mod reembed;
 pub mod reembed_options;
 pub mod reembed_progress;
 pub mod retrieval_deps_from_container;
-mod startup;
+pub(crate) mod startup;
 
 #[cfg(feature = "control-plane")]
 pub mod credential_material;

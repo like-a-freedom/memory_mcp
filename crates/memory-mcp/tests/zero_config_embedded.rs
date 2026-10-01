@@ -115,9 +115,12 @@ async fn zero_config_anno_creates_no_model_cache_and_round_trips() {
     let data_dir = temp_dir.path().join("data");
     let _env = EnvGuard::zero_config_embedded(&data_dir);
 
-    let service = memory_mcp::MemoryService::new_from_env()
-        .await
-        .expect("service bootstraps with zero-config defaults");
+    let service = memory_mcp::bootstrap::stdio::build_memory_service_from_env(
+        memory_mcp::bootstrap::stdio::EmbeddingActivationMode::Standard,
+        std::sync::Arc::new(memory_mcp::bootstrap::stdio::NoopProgressSink),
+    )
+    .await
+    .expect("service bootstraps with zero-config defaults");
 
     // Lightweight Anno is selected and no model artifacts are created.
     assert!(

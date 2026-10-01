@@ -56,7 +56,9 @@ mod apps;
 ///
 /// #[tokio::main]
 /// async fn main() -> Result<(), Box<dyn std::error::Error>> {
-///     let service = MemoryService::new_from_env().await?;
+///     let service = bootstrap::stdio::build_memory_service_from_env(
+///     EmbeddingActivationMode::Standard, Arc::new(NoopProgressSink),
+/// ).await?;
 ///     let server = MemoryMcp::new(service);
 ///     // Start the MCP server...
 ///     Ok(())
