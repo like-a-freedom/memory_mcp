@@ -68,6 +68,18 @@ enum BatchOutcome {
 }
 
 impl MemoryService {
+    /// Read-side store for the batch reembed worker.
+    ///
+    /// Constructed per call because it binds the Active Namespace at
+    /// construction; it holds no state and is cheap. This lived on the
+    /// container until Task 5.2, but only the reembed worker uses it.
+    fn reembed_store_ctor(&self) -> crate::embedding::reembed_store::ReembedStoreClient {
+        crate::embedding::reembed_store::ReembedStoreClient::new(
+            self.db_client.clone(),
+            self.active_namespace.clone(),
+        )
+    }
+
     /// Drops the embedding HNSW index in the active namespace.
     ///
     /// The DDL and its idempotency rule live in [`ReembedStoreClient`];
@@ -83,7 +95,7 @@ impl MemoryService {
             LogLevel::Info,
         );
 
-        match self.reembed_store().remove_embedding_index().await {
+        match self.reembed_store_ctor().remove_embedding_index().await {
             Ok(IndexRemoval::Removed) => {
                 self.logger.log(
                     std::collections::HashMap::from([
@@ -139,7 +151,9 @@ impl MemoryService {
             LogLevel::Info,
         );
 
-        self.reembed_store().define_embedding_index(dimension).await
+        self.reembed_store_ctor()
+            .define_embedding_index(dimension)
+            .await
     }
 
     async fn restore_semantic_readiness(
@@ -367,7 +381,7 @@ impl MemoryService {
             }
 
             let batch = self
-                .reembed_store()
+                .reembed_store_ctor()
                 .select_facts_needing_reembed(
                     &pass.target_signature,
                     ns_state.last_completed_fact_id.as_deref(),
@@ -802,14 +816,14 @@ impl MemoryService {
     }
 
     async fn load_reembed_job(&self) -> Result<Option<Value>, MemoryError> {
-        self.reembed_store().load_record(REEMBED_JOB_ID).await
+        self.reembed_store_ctor().load_record(REEMBED_JOB_ID).await
     }
 
     async fn count_facts_needing_reembed(
         &self,
         target_signature: &str,
     ) -> Result<usize, MemoryError> {
-        self.reembed_store()
+        self.reembed_store_ctor()
             .count_facts_needing_reembed(target_signature)
             .await
     }
@@ -957,7 +971,7 @@ impl MemoryService {
             "finished_at": finished_at,
         });
 
-        self.reembed_store()
+        self.reembed_store_ctor()
             .upsert_job(REEMBED_JOB_ID, payload)
             .await
     }

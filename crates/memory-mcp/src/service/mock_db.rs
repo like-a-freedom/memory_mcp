@@ -57,6 +57,11 @@ pub struct MockDbClient {
 
     fallback_create: Mutex<Option<Box<CreateFn>>>,
     fallback_update: Mutex<Option<Box<UpdateFn>>>,
+
+    /// The namespaces every read and write was issued against, in order.
+    /// A store binds the Active Namespace at construction, so this is how a
+    /// test observes that binding without a real database.
+    seen_namespaces: Mutex<Vec<String>>,
 }
 
 impl MockDbClient {
@@ -75,6 +80,7 @@ impl MockDbClient {
 
             fallback_create: Mutex::new(None),
             fallback_update: Mutex::new(None),
+            seen_namespaces: Mutex::new(Vec::new()),
         }
     }
 
@@ -127,6 +133,21 @@ impl MockDbClient {
     /// dispatches on. Rules are tried in the order they were added and the
     /// first match wins; a SQL that matches none returns `Ok(Value::Null)`,
     /// which is the same default an unconfigured client gives.
+    /// Every namespace a read or write was issued against, in order.
+    pub fn seen_namespaces(&self) -> Vec<String> {
+        self.seen_namespaces
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner())
+            .clone()
+    }
+
+    fn record_namespace(&self, namespace: &str) {
+        self.seen_namespaces
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner())
+            .push(namespace.to_string());
+    }
+
     pub fn expect_query_with(
         self,
         matches: impl Fn(&str) -> bool + Send + Sync + 'static,
@@ -202,8 +223,9 @@ impl DbClient for MockDbClient {
     async fn select_one(
         &self,
         record_id: &str,
-        _namespace: &str,
+        namespace: &str,
     ) -> Result<Option<Value>, MemoryError> {
+        self.record_namespace(namespace);
         if let Some(resp) = self
             .select_one_responses
             .lock()
@@ -226,8 +248,9 @@ impl DbClient for MockDbClient {
     async fn select_table(
         &self,
         table: crate::storage::table_scope::OwnedTable,
-        _namespace: &str,
+        namespace: &str,
     ) -> Result<Vec<Value>, MemoryError> {
+        self.record_namespace(namespace);
         let table = table.as_str();
         if let Some(resp) = self
             .select_table_responses
@@ -253,9 +276,10 @@ impl DbClient for MockDbClient {
         &self,
         record_id: &str,
         _content: Value,
-        _namespace: &str,
+        namespace: &str,
         _temporal_fields: &[&str],
     ) -> Result<Value, MemoryError> {
+        self.record_namespace(namespace);
         if let Some(resp) = self
             .create_responses
             .lock()
@@ -279,9 +303,10 @@ impl DbClient for MockDbClient {
         &self,
         record_id: &str,
         _content: Value,
-        _namespace: &str,
+        namespace: &str,
         _temporal_fields: &[&str],
     ) -> Result<Value, MemoryError> {
+        self.record_namespace(namespace);
         if let Some(resp) = self
             .update_responses
             .lock()
@@ -305,8 +330,9 @@ impl DbClient for MockDbClient {
         &self,
         sql: &str,
         vars: Option<Value>,
-        _namespace: &str,
+        namespace: &str,
     ) -> Result<Value, MemoryError> {
+        self.record_namespace(namespace);
         if *self.no_query.lock().unwrap_or_else(|p| p.into_inner()) {
             panic!("query should not be called, got {sql}");
         }

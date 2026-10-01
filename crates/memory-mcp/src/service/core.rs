@@ -40,23 +40,6 @@ impl MemoryService {
         )
     }
 
-    /// Read-side store for the batch reembed worker.
-    pub(crate) fn reembed_store(&self) -> crate::embedding::reembed_store::ReembedStoreClient {
-        crate::embedding::reembed_store::ReembedStoreClient::new(
-            self.db_client.clone(),
-            self.active_namespace.clone(),
-        )
-    }
-
-    /// Platform-owned event log store, used for the startup
-    /// connectivity check.
-    pub(crate) fn event_log_store(&self) -> crate::storage::EventLogStoreClient {
-        crate::storage::EventLogStoreClient::new(
-            self.db_client.clone(),
-            self.active_namespace.clone(),
-        )
-    }
-
     pub(crate) fn embedding_runtime_snapshot(
         &self,
     ) -> crate::embedding::runtime::EmbeddingRuntimeState {
@@ -364,7 +347,11 @@ impl MemoryService {
     }
 
     pub(crate) async fn check_surrealdb_connection(&self) -> Result<(), MemoryError> {
-        let _ = self.event_log_store().select_event_log().await?;
+        let store = crate::storage::EventLogStoreClient::new(
+            self.db_client.clone(),
+            self.active_namespace.clone(),
+        );
+        let _ = store.select_event_log().await?;
         Ok(())
     }
 
@@ -439,6 +426,42 @@ mod tests {
     use serde_json::json;
     use std::sync::atomic::{AtomicUsize, Ordering};
     use std::time::Duration;
+
+    /// The container's store constructors bind the Active Namespace, not a
+    /// default. This is a characterisation test: it pins the binding so
+    /// moving the constructors to their call sites cannot silently change
+    /// which namespace a store reads.
+    #[tokio::test]
+    async fn the_containers_store_constructors_bind_the_active_namespace() {
+        let db = Arc::new(crate::service::mock_db::MockDbClient::new());
+        let svc = MemoryService::new(
+            db.clone(),
+            "tenant-a".to_string(),
+            "warn".to_string(),
+            50,
+            100,
+        )
+        .expect("container");
+
+        // Two different stores, so the assertion covers both constructors
+        // rather than one twice.
+        let reembed = crate::embedding::reembed_store::ReembedStoreClient::new(
+            db.clone(),
+            svc.active_namespace.clone(),
+        );
+        reembed.remove_embedding_index().await.ok();
+        let _ = svc.check_surrealdb_connection().await;
+
+        let seen = db.seen_namespaces();
+        assert!(
+            !seen.is_empty(),
+            "expected the stores to have issued at least one read"
+        );
+        assert!(
+            seen.iter().all(|ns| ns == "tenant-a"),
+            "every store read must target the Active Namespace, saw {seen:?}"
+        );
+    }
 
     #[test]
     fn log_event_creates_expected_structure() {

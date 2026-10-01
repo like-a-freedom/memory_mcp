@@ -1096,12 +1096,12 @@ impl MemoryService {
 
 This task is deliberately small. The container's interface does not shrink here — the store constructors move to where they are called, but the methods stay, because 24 call sites across four bounded contexts need a short path to a store bound to the Active Namespace, and inventing a dependency-injection mechanism for them would be a larger change than the problem warrants (KISS).
 
-- [ ] **Step 1: Confirm with a measurement before acting.** Run `grep -rn "knowledge_graph_store()\|reembed_store()\|event_log_store()\|episode_store()" crates/memory-mcp/src | grep -v "src/service/core.rs" | wc -l`. If the count is under 20, this task is not worth a wave entry — record the finding in the Wave 5 commit message and stop. If it is 20 or more, continue.
+- [x] **Step 1: Confirm with a measurement before acting.** Run `grep -rn "knowledge_graph_store()\|reembed_store()\|event_log_store()\|episode_store()" crates/memory-mcp/src | grep -v "src/service/core.rs" | wc -l`. If the count is under 20, this task is not worth a wave entry — record the finding in the Wave 5 commit message and stop. If it is 20 or more, continue.
 
   Expected: 24+ (the audit counted 20+ for `knowledge_graph_store` alone). Either way, record the number in the commit.
-- [ ] **Step 2: Add a `#[cfg(test)]` test** in `core.rs` that each of the four constructors returns a store bound to `self.active_namespace`, by calling the store's own read method against a seeded namespace. The existing tests at `core.rs:438+` partly cover this; extend rather than duplicate.
-- [ ] **Step 3: Verify the test passes before and after.** If it passes before, it is a characterisation test, and that is its purpose: it pins the behaviour so the move cannot break it.
-- [ ] **Step 4: Commit** — or, per Step 1, record the measurement and skip.
+- [x] **Step 2: Add a `#[cfg(test)]` test** in `core.rs` that each of the four constructors returns a store bound to `self.active_namespace`, by calling the store's own read method against a seeded namespace. The existing tests at `core.rs:438+` partly cover this; extend rather than duplicate.
+- [x] **Step 3: Verify the test passes before and after.** If it passes before, it is a characterisation test, and that is its purpose: it pins the behaviour so the move cannot break it.
+- [x] **Step 4: Commit** — or, per Step 1, record the measurement and skip.
 
 ## Task 5.3: Move the reachable graph traversal out of the container
 
