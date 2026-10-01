@@ -459,80 +459,35 @@ mod tests {
 
     #[tokio::test]
     async fn assemble_context_marks_term_fallback_results_with_fallback_tier() {
-        struct FallbackTierDbClient;
-
-        #[async_trait::async_trait]
-        impl DbClient for FallbackTierDbClient {
-            async fn select_one(
-                &self,
-                _record_id: &str,
-                _namespace: &str,
-            ) -> Result<Option<Value>, MemoryError> {
-                Ok(None)
-            }
-
-            async fn select_table(
-                &self,
-                _table: &str,
-                _namespace: &str,
-            ) -> Result<Vec<Value>, MemoryError> {
-                Ok(vec![])
-            }
-
-            #[allow(clippy::too_many_arguments)]
-            async fn create(
-                &self,
-                _record_id: &str,
-                _content: Value,
-                _namespace: &str,
-            ) -> Result<Value, MemoryError> {
-                Ok(Value::Null)
-            }
-
-            async fn update(
-                &self,
-                _record_id: &str,
-                _content: Value,
-                _namespace: &str,
-            ) -> Result<Value, MemoryError> {
-                Ok(Value::Null)
-            }
-
-            async fn query(
-                &self,
-                sql: &str,
-                vars: Option<Value>,
-                _namespace: &str,
-            ) -> Result<Value, MemoryError> {
-                // The context store now runs the full-text fact retrieval through
-                // the core `query` op; serve the canned per-term records here.
-                if sql.contains("search::score") {
-                    let query = vars.and_then(|vars| vars["query"].as_str().map(str::to_string));
-                    return Ok(Value::Array(match query.as_deref() {
-                        Some("atlas launch checklist") => vec![],
-                        Some("atlas") | Some("launch") | Some("checklist") => vec![json!({
-                            "fact_id": "fact:fallback",
-                            "fact_type": "note",
-                            "content": "Atlas launch is scheduled.",
-                            "quote": "Atlas launch is scheduled.",
-                            "source_episode": "episode:1",
-                            "t_valid": "2026-01-10T10:30:00Z",
-                            "t_ingested": "2026-01-10T10:30:00Z",
-                            "scope": "org"
-                        })],
-                        _ => vec![],
-                    }));
-                }
-                Ok(Value::Null)
-            }
-
-            async fn apply_migrations(&self, _namespace: &str) -> Result<(), MemoryError> {
-                Ok(())
-            }
-        }
-
         let service = crate::service::MemoryService::new(
-            Arc::new(FallbackTierDbClient),
+            Arc::new(
+                crate::service::mock_db::MockDbClient::new().expect_query_with(
+                    // The context store runs the full-text fact retrieval
+                    // through the core `query` op, and dispatches per term, so
+                    // the responder keys on `vars["query"]` — which is exactly
+                    // what the old fake did, in its `query` body.
+                    |sql| sql.contains("search::score"),
+                    |_sql, vars| {
+                        let query = vars
+                            .and_then(|vars| vars.get("query").cloned())
+                            .and_then(|v| v.as_str().map(str::to_string));
+                        Ok(Value::Array(match query.as_deref() {
+                            Some("atlas launch checklist") => vec![],
+                            Some("atlas") | Some("launch") | Some("checklist") => vec![json!({
+                                "fact_id": "fact:fallback",
+                                "fact_type": "note",
+                                "content": "Atlas launch is scheduled.",
+                                "quote": "Atlas launch is scheduled.",
+                                "source_episode": "episode:1",
+                                "t_valid": "2026-01-10T10:30:00Z",
+                                "t_ingested": "2026-01-10T10:30:00Z",
+                                "scope": "org"
+                            })],
+                            _ => vec![],
+                        }))
+                    },
+                ),
+            ),
             "org".to_string(),
             "warn".to_string(),
             50,
@@ -564,79 +519,34 @@ mod tests {
 
     #[tokio::test]
     async fn assemble_context_falls_back_to_episode_content_when_no_facts_match() {
-        struct EpisodeContentFallbackDbClient;
-
-        #[async_trait::async_trait]
-        impl DbClient for EpisodeContentFallbackDbClient {
-            async fn select_one(
-                &self,
-                _record_id: &str,
-                _namespace: &str,
-            ) -> Result<Option<Value>, MemoryError> {
-                Ok(None)
-            }
-
-            async fn select_table(
-                &self,
-                _table: &str,
-                _namespace: &str,
-            ) -> Result<Vec<Value>, MemoryError> {
-                Ok(vec![])
-            }
-
-            #[allow(clippy::too_many_arguments)]
-            async fn create(
-                &self,
-                _record_id: &str,
-                _content: Value,
-                _namespace: &str,
-            ) -> Result<Value, MemoryError> {
-                Ok(Value::Null)
-            }
-
-            async fn update(
-                &self,
-                _record_id: &str,
-                _content: Value,
-                _namespace: &str,
-            ) -> Result<Value, MemoryError> {
-                Ok(Value::Null)
-            }
-
-            async fn query(
-                &self,
-                sql: &str,
-                vars: Option<Value>,
-                _namespace: &str,
-            ) -> Result<Value, MemoryError> {
-                // The context store now runs the episode-content fallback through
-                // the core `query` op; serve the canned episode here.
-                if sql.contains("FROM episode") {
-                    if let Some(vars) = vars {
-                        assert_eq!(vars["query"], json!("hello world"));
-                    }
-                    return Ok(json!([{
-                        "episode_id": "episode:doc",
-                        "source_type": "document",
-                        "source_id": "fixture:pdf",
-                        "content": "Hello World from episode fallback.",
-                        "t_ref": "2026-04-07T10:00:00Z",
-                        "t_ingested": "2026-04-07T10:00:00Z",
-                        "scope": "org",
-                        "visibility_scope": "org",
-                        "policy_tags": [],
-                    }]));
-                }
-                Ok(Value::Null)
-            }
-
-            async fn apply_migrations(&self, _namespace: &str) -> Result<(), MemoryError> {
-                Ok(())
-            }
-        }
-
         let service = crate::service::MemoryService::new(
-            Arc::new(EpisodeContentFallbackDbClient),
+            Arc::new(
+                crate::service::mock_db::MockDbClient::new().expect_query_with(
+                    |sql| sql.contains("FROM episode"),
+                    // The context store runs the episode-content fallback
+                    // through the core `query` op, so the assertion the old
+                    // fake made inline — that the query carries the user's
+                    // words — moves here rather than disappearing with it.
+                    |_sql, vars| {
+                        assert_eq!(
+                            vars.and_then(|v| v.get("query")).cloned(),
+                            Some(json!("hello world")),
+                            "the episode fallback query must carry the user's words"
+                        );
+                        Ok(json!([{
+                            "episode_id": "episode:doc",
+                            "source_type": "document",
+                            "source_id": "fixture:pdf",
+                            "content": "Hello World from episode fallback.",
+                            "t_ref": "2026-04-07T10:00:00Z",
+                            "t_ingested": "2026-04-07T10:00:00Z",
+                            "scope": "org",
+                            "visibility_scope": "org",
+                            "policy_tags": [],
+                        }]))
+                    },
+                ),
+            ),
             "org".to_string(),
             "warn".to_string(),
             50,
@@ -669,6 +579,20 @@ mod tests {
 
     #[tokio::test]
     async fn assemble_context_uses_db_side_community_lookup_for_summary_matches() {
+        /// Stays a hand-written `DbClient`, deliberately.
+        ///
+        /// This is the one retrieval fake the consolidation does not absorb,
+        /// and the reason is the assertion rather than the responses: the test
+        /// counts how many times each query shape is issued and asserts both
+        /// counts, which is how it proves the summary path goes through the
+        /// indexed community lookup and not through a per-fact fallback.
+        /// `MockDbClient`'s responders are stateless — they see a SQL and
+        /// answer — and a stateless responder has nowhere to record that it was
+        /// called.
+        ///
+        /// Making it expressible would mean giving a responder a shared
+        /// counter, which is a capability with no second user today. When one
+        /// arrives, migrate this fake then; do not build the counter earlier.
         struct CommunityLookupDbClient {
             community_lookup_calls: AtomicUsize,
             entity_link_fact_calls: AtomicUsize,
@@ -856,102 +780,63 @@ mod tests {
 
     #[tokio::test]
     async fn assemble_context_prefers_direct_lexical_matches_over_newer_community_expansion() {
-        struct FusionDbClient;
-
-        #[async_trait::async_trait]
-        impl DbClient for FusionDbClient {
-            async fn select_one(
-                &self,
-                _record_id: &str,
-                _namespace: &str,
-            ) -> Result<Option<Value>, MemoryError> {
-                Ok(None)
-            }
-
-            async fn select_table(
-                &self,
-                _table: &str,
-                _namespace: &str,
-            ) -> Result<Vec<Value>, MemoryError> {
-                Ok(vec![])
-            }
-
-            #[allow(clippy::too_many_arguments)]
-            async fn create(
-                &self,
-                _record_id: &str,
-                _content: Value,
-                _namespace: &str,
-            ) -> Result<Value, MemoryError> {
-                Ok(Value::Null)
-            }
-
-            async fn update(
-                &self,
-                _record_id: &str,
-                _content: Value,
-                _namespace: &str,
-            ) -> Result<Value, MemoryError> {
-                Ok(Value::Null)
-            }
-
-            async fn query(
-                &self,
-                sql: &str,
-                vars: Option<Value>,
-                _namespace: &str,
-            ) -> Result<Value, MemoryError> {
-                // The context store now runs the entity-link fact expansion through
-                // the core `query` op; serve the community-linked fact here.
-                if sql.contains("search::score") {
-                    let query = vars.and_then(|vars| vars["query"].as_str().map(str::to_string));
-                    return Ok(Value::Array(match query.as_deref() {
-                        Some("atlas launch") => vec![json!({
-                            "fact_id": "fact:direct",
-                            "fact_type": "note",
-                            "content": "Atlas launch checklist is blocked on DNS cutover.",
-                            "quote": "Atlas launch checklist is blocked on DNS cutover.",
-                            "source_episode": "episode:direct",
-                            "t_valid": "2026-01-10T10:30:00Z",
-                            "t_ingested": "2026-01-10T10:30:00Z",
-                            "scope": "org",
-                            "entity_links": ["entity:atlas"],
-                            "policy_tags": [],
-                            "provenance": {"source_episode": "episode:direct"},
-                            "ft_score": 100.0
-                        })],
-                        Some("atlas") | Some("launch") => vec![],
-                        other => panic!("unexpected fallback query: {other:?}"),
-                    }));
-                }
-                if sql.contains("FROM fact") && sql.contains("CONTAINSANY") {
-                    if let Some(vars) = vars {
-                        assert_eq!(vars["entity_links"], json!(["entity:atlas"]));
-                    }
-                    return Ok(json!([{
-                        "fact_id": "fact:community",
-                        "fact_type": "note",
-                        "content": "Atlas team sync moved to Friday.",
-                        "quote": "Atlas team sync moved to Friday.",
-                        "source_episode": "episode:community",
-                        "t_valid": "2026-01-15T10:30:00Z",
-                        "t_ingested": "2026-01-15T10:30:00Z",
-                        "scope": "org",
-                        "entity_links": ["entity:atlas"],
-                        "policy_tags": [],
-                        "provenance": {"source_episode": "episode:community"}
-                    }]));
-                }
-                Ok(Value::Null)
-            }
-
-            async fn apply_migrations(&self, _namespace: &str) -> Result<(), MemoryError> {
-                Ok(())
-            }
-        }
-
         let service = crate::service::MemoryService::new(
-            Arc::new(FusionDbClient),
+            Arc::new(
+                crate::service::mock_db::MockDbClient::new()
+                    // The entity-link fact expansion runs through the core
+                    // `query` op; serve the community-linked fact here. The
+                    // `entity_links` assertion moves into the responder, which
+                    // is the part of the old `query` body that had teeth.
+                    .expect_query_with(
+                        |sql| sql.contains("FROM fact") && sql.contains("CONTAINSANY"),
+                        |_sql, vars| {
+                            assert_eq!(
+                                vars.and_then(|v| v.get("entity_links")).cloned(),
+                                Some(json!(["entity:atlas"])),
+                                "the entity-link expansion must be bound to the anchor entity"
+                            );
+                            Ok(json!([{
+                                "fact_id": "fact:community",
+                                "fact_type": "note",
+                                "content": "Atlas team sync moved to Friday.",
+                                "quote": "Atlas team sync moved to Friday.",
+                                "source_episode": "episode:community",
+                                "t_valid": "2026-01-15T10:30:00Z",
+                                "t_ingested": "2026-01-15T10:30:00Z",
+                                "scope": "org",
+                                "entity_links": ["entity:atlas"],
+                                "policy_tags": [],
+                                "provenance": {"source_episode": "episode:community"}
+                            }]))
+                        },
+                    )
+                    .expect_query_with(
+                        |sql| sql.contains("search::score"),
+                        |_sql, vars| {
+                            let query = vars
+                                .and_then(|vars| vars.get("query").cloned())
+                                .and_then(|v| v.as_str().map(str::to_string));
+                            Ok(Value::Array(match query.as_deref() {
+                                Some("atlas launch") => vec![json!({
+                                    "fact_id": "fact:direct",
+                                    "fact_type": "note",
+                                    "content": "Atlas launch checklist is blocked on DNS cutover.",
+                                    "quote": "Atlas launch checklist is blocked on DNS cutover.",
+                                    "source_episode": "episode:direct",
+                                    "t_valid": "2026-01-10T10:30:00Z",
+                                    "t_ingested": "2026-01-10T10:30:00Z",
+                                    "scope": "org",
+                                    "entity_links": ["entity:atlas"],
+                                    "policy_tags": [],
+                                    "provenance": {"source_episode": "episode:direct"},
+                                    "ft_score": 100.0
+                                })],
+                                Some("atlas") | Some("launch") => vec![],
+                                other => panic!("unexpected fallback query: {other:?}"),
+                            }))
+                        },
+                    ),
+            ),
             "org".to_string(),
             "warn".to_string(),
             50,
@@ -995,113 +880,73 @@ mod tests {
 
     #[tokio::test]
     async fn assemble_context_orders_community_facts_by_matching_summary_relevance() {
-        struct CommunityRankingDbClient;
-
-        #[async_trait::async_trait]
-        impl DbClient for CommunityRankingDbClient {
-            async fn select_one(
-                &self,
-                _record_id: &str,
-                _namespace: &str,
-            ) -> Result<Option<Value>, MemoryError> {
-                Ok(None)
-            }
-
-            async fn select_table(
-                &self,
-                _table: &str,
-                _namespace: &str,
-            ) -> Result<Vec<Value>, MemoryError> {
-                Ok(vec![])
-            }
-
-            #[allow(clippy::too_many_arguments)]
-            async fn create(
-                &self,
-                _record_id: &str,
-                _content: Value,
-                _namespace: &str,
-            ) -> Result<Value, MemoryError> {
-                Ok(Value::Null)
-            }
-
-            async fn update(
-                &self,
-                _record_id: &str,
-                _content: Value,
-                _namespace: &str,
-            ) -> Result<Value, MemoryError> {
-                Ok(Value::Null)
-            }
-
-            async fn query(
-                &self,
-                sql: &str,
-                vars: Option<Value>,
-                _namespace: &str,
-            ) -> Result<Value, MemoryError> {
-                // The context store runs the indexed community lookup through the
-                // core `query` op; serve ranked communities here so the ranking
-                // pipeline can order their member facts by summary relevance.
-                if sql.contains("FROM community") {
-                    return Ok(json!([
-                        {
-                            "community_id": "community:alpha",
-                            "summary": "Alpha launch workstream",
-                            "member_entities": ["entity:alpha"],
-                            "ft_score": 20.0
-                        },
-                        {
-                            "community_id": "community:beta",
-                            "summary": "Beta launch workstream",
-                            "member_entities": ["entity:beta"],
-                            "ft_score": 10.0
-                        }
-                    ]));
-                }
-                if sql.contains("FROM fact") && sql.contains("CONTAINSANY") {
-                    if let Some(vars) = vars {
-                        assert_eq!(vars["entity_links"], json!(["entity:alpha", "entity:beta"]));
-                    }
-                    return Ok(json!([
-                        {
-                            "fact_id": "fact:beta",
-                            "fact_type": "note",
-                            "content": "Beta launch note.",
-                            "quote": "Beta launch note.",
-                            "source_episode": "episode:beta",
-                            "t_valid": "2026-01-20T10:30:00Z",
-                            "t_ingested": "2026-01-20T10:30:00Z",
-                            "scope": "org",
-                            "entity_links": ["entity:beta"],
-                            "policy_tags": [],
-                            "provenance": {"source_episode": "episode:beta"}
-                        },
-                        {
-                            "fact_id": "fact:alpha",
-                            "fact_type": "note",
-                            "content": "Alpha launch note.",
-                            "quote": "Alpha launch note.",
-                            "source_episode": "episode:alpha",
-                            "t_valid": "2026-01-10T10:30:00Z",
-                            "t_ingested": "2026-01-10T10:30:00Z",
-                            "scope": "org",
-                            "entity_links": ["entity:alpha"],
-                            "policy_tags": [],
-                            "provenance": {"source_episode": "episode:alpha"}
-                        }
-                    ]));
-                }
-                Ok(Value::Null)
-            }
-
-            async fn apply_migrations(&self, _namespace: &str) -> Result<(), MemoryError> {
-                Ok(())
-            }
-        }
-
         let service = crate::service::MemoryService::new(
-            Arc::new(CommunityRankingDbClient),
+            Arc::new(
+                crate::service::mock_db::MockDbClient::new()
+                    // The indexed community lookup runs through the core
+                    // `query` op; serve ranked communities so the ranking
+                    // pipeline can order their member facts by summary
+                    // relevance. The `entity_links` assertion the old fake
+                    // made inline is now inside the responder, so it still
+                    // fails the test rather than disappearing with the body.
+                    .expect_query_with(
+                        |sql| sql.contains("FROM fact") && sql.contains("CONTAINSANY"),
+                        |_sql, vars| {
+                            assert_eq!(
+                                vars.and_then(|v| v.get("entity_links")).cloned(),
+                                Some(json!(["entity:alpha", "entity:beta"])),
+                                "the member-fact expansion must be bound to both anchors"
+                            );
+                            Ok(json!([
+                                {
+                                    "fact_id": "fact:beta",
+                                    "fact_type": "note",
+                                    "content": "Beta launch note.",
+                                    "quote": "Beta launch note.",
+                                    "source_episode": "episode:beta",
+                                    "t_valid": "2026-01-20T10:30:00Z",
+                                    "t_ingested": "2026-01-20T10:30:00Z",
+                                    "scope": "org",
+                                    "entity_links": ["entity:beta"],
+                                    "policy_tags": [],
+                                    "provenance": {"source_episode": "episode:beta"}
+                                },
+                                {
+                                    "fact_id": "fact:alpha",
+                                    "fact_type": "note",
+                                    "content": "Alpha launch note.",
+                                    "quote": "Alpha launch note.",
+                                    "source_episode": "episode:alpha",
+                                    "t_valid": "2026-01-10T10:30:00Z",
+                                    "t_ingested": "2026-01-10T10:30:00Z",
+                                    "scope": "org",
+                                    "entity_links": ["entity:alpha"],
+                                    "policy_tags": [],
+                                    "provenance": {"source_episode": "episode:alpha"}
+                                }
+                            ]))
+                        },
+                    )
+                    .expect_query_with(
+                        |sql| sql.contains("FROM community"),
+                        |_sql, _| {
+                            Ok(json!([
+                                {
+                                    "community_id": "community:alpha",
+                                    "summary": "Alpha launch workstream",
+                                    "member_entities": ["entity:alpha"],
+                                    "ft_score": 20.0
+                                },
+                                {
+                                    "community_id": "community:beta",
+                                    "summary": "Beta launch workstream",
+                                    "member_entities": ["entity:beta"],
+                                    "ft_score": 10.0
+                                }
+                            ]))
+                        },
+                    ),
+            ),
             "org".to_string(),
             "warn".to_string(),
             50,
@@ -1134,143 +979,108 @@ mod tests {
 
     #[tokio::test]
     async fn assemble_context_prefers_extracted_community_paths_over_higher_ranked_inferred_ones() {
-        struct CommunityOriginWeightDbClient;
-
-        #[async_trait::async_trait]
-        impl DbClient for CommunityOriginWeightDbClient {
-            async fn select_one(
-                &self,
-                _record_id: &str,
-                _namespace: &str,
-            ) -> Result<Option<Value>, MemoryError> {
-                Ok(None)
-            }
-
-            async fn select_table(
-                &self,
-                _table: &str,
-                _namespace: &str,
-            ) -> Result<Vec<Value>, MemoryError> {
-                Ok(vec![])
-            }
-
-            #[allow(clippy::too_many_arguments)]
-            async fn create(
-                &self,
-                _record_id: &str,
-                _content: Value,
-                _namespace: &str,
-            ) -> Result<Value, MemoryError> {
-                Ok(Value::Null)
-            }
-
-            async fn update(
-                &self,
-                _record_id: &str,
-                _content: Value,
-                _namespace: &str,
-            ) -> Result<Value, MemoryError> {
-                Ok(Value::Null)
-            }
-
-            async fn query(
-                &self,
-                sql: &str,
-                vars: Option<Value>,
-                _namespace: &str,
-            ) -> Result<Value, MemoryError> {
-                // The context store runs the indexed community lookup through the
-                // core `query` op; serve the communities with the inferred one
-                // ranked first so the origin-weighting can flip the order.
-                if sql.contains("FROM community") {
-                    return Ok(json!([
-                        {
-                            "community_id": "community:beta",
-                            "summary": "Beta launch workstream",
-                            "member_entities": ["entity:beta"],
-                            "ft_score": 20.0
-                        },
-                        {
-                            "community_id": "community:alpha",
-                            "summary": "Alpha launch workstream",
-                            "member_entities": ["entity:alpha"],
-                            "ft_score": 10.0
-                        }
-                    ]));
-                }
-                if sql.contains("FROM fact") && sql.contains("CONTAINSANY") {
-                    if let Some(vars) = vars {
-                        assert_eq!(vars["entity_links"], json!(["entity:alpha", "entity:beta"]));
-                    }
-                    return Ok(json!([
-                        {
-                            "fact_id": "fact:beta",
-                            "fact_type": "note",
-                            "content": "Beta launch note.",
-                            "quote": "Beta launch note.",
-                            "source_episode": "episode:beta",
-                            "t_valid": "2026-01-15T10:30:00Z",
-                            "t_ingested": "2026-01-15T10:30:00Z",
-                            "scope": "org",
-                            "entity_links": ["entity:beta"],
-                            "policy_tags": [],
-                            "confidence": 1.0,
-                            "provenance": {"source_episode": "episode:beta"}
-                        },
-                        {
-                            "fact_id": "fact:alpha",
-                            "fact_type": "note",
-                            "content": "Alpha launch note.",
-                            "quote": "Alpha launch note.",
-                            "source_episode": "episode:alpha",
-                            "t_valid": "2026-01-15T10:30:00Z",
-                            "t_ingested": "2026-01-15T10:30:00Z",
-                            "scope": "org",
-                            "entity_links": ["entity:alpha"],
-                            "policy_tags": [],
-                            "confidence": 1.0,
-                            "provenance": {"source_episode": "episode:alpha"}
-                        }
-                    ]));
-                }
-                if sql.contains("FROM edge") {
-                    let node_id = vars
-                        .and_then(|vars| vars["node_id"].as_str().map(str::to_string))
-                        .unwrap_or_default();
-                    return Ok(Value::Array(match node_id.as_str() {
-                        "entity:alpha" => vec![json!({
-                            "edge_id": "edge:alpha-extracted",
-                            "in": "entity:alpha",
-                            "relation": "knows",
-                            "out": "entity:anchor_alpha",
-                            "origin": "extracted",
-                            "confidence": 0.9,
-                            "t_valid": "2026-01-10T10:30:00Z",
-                            "t_ingested": "2026-01-10T10:30:00Z"
-                        })],
-                        "entity:beta" => vec![json!({
-                            "edge_id": "edge:beta-inferred",
-                            "in": "entity:beta",
-                            "relation": "knows",
-                            "out": "entity:anchor_beta",
-                            "origin": "inferred",
-                            "confidence": 0.2,
-                            "t_valid": "2026-01-10T10:30:00Z",
-                            "t_ingested": "2026-01-10T10:30:00Z"
-                        })],
-                        _ => vec![],
-                    }));
-                }
-                Ok(Value::Null)
-            }
-
-            async fn apply_migrations(&self, _namespace: &str) -> Result<(), MemoryError> {
-                Ok(())
-            }
-        }
-
         let service = crate::service::MemoryService::new(
-            Arc::new(CommunityOriginWeightDbClient),
+            Arc::new(
+                crate::service::mock_db::MockDbClient::new()
+                    .expect_query_with(
+                        |sql| sql.contains("FROM fact") && sql.contains("CONTAINSANY"),
+                        |_sql, vars| {
+                            assert_eq!(
+                                vars.and_then(|v| v.get("entity_links")).cloned(),
+                                Some(json!(["entity:alpha", "entity:beta"])),
+                                "the member-fact expansion must be bound to both anchors"
+                            );
+                            Ok(json!([
+                                {
+                                    "fact_id": "fact:beta",
+                                    "fact_type": "note",
+                                    "content": "Beta launch note.",
+                                    "quote": "Beta launch note.",
+                                    "source_episode": "episode:beta",
+                                    "t_valid": "2026-01-15T10:30:00Z",
+                                    "t_ingested": "2026-01-15T10:30:00Z",
+                                    "scope": "org",
+                                    "entity_links": ["entity:beta"],
+                                    "policy_tags": [],
+                                    "confidence": 1.0,
+                                    "provenance": {"source_episode": "episode:beta"}
+                                },
+                                {
+                                    "fact_id": "fact:alpha",
+                                    "fact_type": "note",
+                                    "content": "Alpha launch note.",
+                                    "quote": "Alpha launch note.",
+                                    "source_episode": "episode:alpha",
+                                    "t_valid": "2026-01-15T10:30:00Z",
+                                    "t_ingested": "2026-01-15T10:30:00Z",
+                                    "scope": "org",
+                                    "entity_links": ["entity:alpha"],
+                                    "policy_tags": [],
+                                    "confidence": 1.0,
+                                    "provenance": {"source_episode": "episode:alpha"}
+                                }
+                            ]))
+                        },
+                    )
+                    // The inferred edge is served for `entity:beta` and the
+                    // extracted one for `entity:alpha`, keyed on
+                    // `vars["node_id"]` — the variable the traversal binds, not
+                    // the table. This is the one fake that needed the
+                    // responder to see the bound variables, which is why
+                    // `expect_query_with` takes a predicate and a responder
+                    // rather than one closure with an internal match.
+                    .expect_query_with(
+                        |sql| sql.contains("FROM edge"),
+                        |_sql, vars| {
+                            let node_id = vars
+                                .and_then(|v| v.get("node_id").cloned())
+                                .and_then(|v| v.as_str().map(str::to_string))
+                                .unwrap_or_default();
+                            Ok(Value::Array(match node_id.as_str() {
+                                "entity:alpha" => vec![json!({
+                                    "edge_id": "edge:alpha-extracted",
+                                    "in": "entity:alpha",
+                                    "relation": "knows",
+                                    "out": "entity:anchor_alpha",
+                                    "origin": "extracted",
+                                    "confidence": 0.9,
+                                    "t_valid": "2026-01-10T10:30:00Z",
+                                    "t_ingested": "2026-01-10T10:30:00Z"
+                                })],
+                                "entity:beta" => vec![json!({
+                                    "edge_id": "edge:beta-inferred",
+                                    "in": "entity:beta",
+                                    "relation": "knows",
+                                    "out": "entity:anchor_beta",
+                                    "origin": "inferred",
+                                    "confidence": 0.2,
+                                    "t_valid": "2026-01-10T10:30:00Z",
+                                    "t_ingested": "2026-01-10T10:30:00Z"
+                                })],
+                                _ => vec![],
+                            }))
+                        },
+                    )
+                    .expect_query_with(
+                        |sql| sql.contains("FROM community"),
+                        |_sql, _| {
+                            Ok(json!([
+                                {
+                                    "community_id": "community:beta",
+                                    "summary": "Beta launch workstream",
+                                    "member_entities": ["entity:beta"],
+                                    "ft_score": 20.0
+                                },
+                                {
+                                    "community_id": "community:alpha",
+                                    "summary": "Alpha launch workstream",
+                                    "member_entities": ["entity:alpha"],
+                                    "ft_score": 10.0
+                                }
+                            ]))
+                        },
+                    ),
+            ),
             "org".to_string(),
             "warn".to_string(),
             50,
@@ -1302,58 +1112,19 @@ mod tests {
 
     #[tokio::test]
     async fn assemble_context_uses_provider_backed_semantic_similarity() {
-        struct SemanticDbClient;
-
-        #[async_trait::async_trait]
-        impl DbClient for SemanticDbClient {
-            async fn select_one(
-                &self,
-                _record_id: &str,
-                _namespace: &str,
-            ) -> Result<Option<Value>, MemoryError> {
-                Ok(None)
-            }
-
-            async fn select_table(
-                &self,
-                _table: &str,
-                _namespace: &str,
-            ) -> Result<Vec<Value>, MemoryError> {
-                panic!("semantic retrieval should not scan the full fact table")
-            }
-
-            #[allow(clippy::too_many_arguments)]
-            async fn create(
-                &self,
-                _record_id: &str,
-                _content: Value,
-                _namespace: &str,
-            ) -> Result<Value, MemoryError> {
-                Ok(Value::Null)
-            }
-
-            async fn update(
-                &self,
-                _record_id: &str,
-                _content: Value,
-                _namespace: &str,
-            ) -> Result<Value, MemoryError> {
-                Ok(Value::Null)
-            }
-
-            async fn query(
-                &self,
-                sql: &str,
-                _vars: Option<Value>,
-                _namespace: &str,
-            ) -> Result<Value, MemoryError> {
-                // The context store now runs the ANN retrieval through the core
-                // `query` op; serve the semantically-similar fact here so the
-                // provider-backed path can be exercised end to end.
-                if sql.contains("vector::similarity") {
+        // The ANN retrieval runs through the core `query` op; serve the
+        // semantically-similar fact so the provider-backed path is exercised
+        // end to end. `expect_select_table_panic` carries the second half of
+        // the old fake's contract: semantic retrieval must not fall back to
+        // scanning the whole `fact` table.
+        let semantic_db = crate::service::mock_db::MockDbClient::new()
+            .expect_select_table_panic("fact")
+            .expect_query_with(
+                |sql| sql.contains("vector::similarity"),
+                |_sql, _| {
                     let mut embedding = vec![0.0; DEFAULT_EMBEDDING_DIMENSION];
                     embedding[0] = 1.0;
-                    return Ok(json!([{
+                    Ok(json!([{
                         "fact_id": "fact:semantic",
                         "fact_type": "note",
                         "content": "Compensation increase approved for the engineering team",
@@ -1368,15 +1139,9 @@ mod tests {
                         "provenance": {},
                         "embedding": embedding,
                         "sem_score": 0.99,
-                    }]));
-                }
-                Ok(Value::Null)
-            }
-
-            async fn apply_migrations(&self, _namespace: &str) -> Result<(), MemoryError> {
-                Ok(())
-            }
-        }
+                    }]))
+                },
+            );
 
         struct SemanticEmbeddingProvider;
 
@@ -1402,7 +1167,7 @@ mod tests {
         }
 
         let service = crate::service::MemoryService::new_with_embedding_provider(
-            Arc::new(SemanticDbClient),
+            Arc::new(semantic_db),
             "org".to_string(),
             "warn".to_string(),
             50,
@@ -1437,61 +1202,12 @@ mod tests {
 
     #[tokio::test]
     async fn community_expansion_returns_empty_when_no_entity_links_match() {
-        struct EmptyCommunityFactDbClient;
-
-        #[async_trait::async_trait]
-        impl DbClient for EmptyCommunityFactDbClient {
-            async fn select_one(
-                &self,
-                _record_id: &str,
-                _namespace: &str,
-            ) -> Result<Option<Value>, MemoryError> {
-                Ok(None)
-            }
-
-            async fn select_table(
-                &self,
-                _table: &str,
-                _namespace: &str,
-            ) -> Result<Vec<Value>, MemoryError> {
-                Ok(vec![])
-            }
-
-            #[allow(clippy::too_many_arguments)]
-            async fn create(
-                &self,
-                _record_id: &str,
-                _content: Value,
-                _namespace: &str,
-            ) -> Result<Value, MemoryError> {
-                Ok(Value::Null)
-            }
-
-            async fn update(
-                &self,
-                _record_id: &str,
-                _content: Value,
-                _namespace: &str,
-            ) -> Result<Value, MemoryError> {
-                Ok(Value::Null)
-            }
-
-            async fn query(
-                &self,
-                _sql: &str,
-                _vars: Option<Value>,
-                _namespace: &str,
-            ) -> Result<Value, MemoryError> {
-                Ok(Value::Null)
-            }
-
-            async fn apply_migrations(&self, _namespace: &str) -> Result<(), MemoryError> {
-                Ok(())
-            }
-        }
-
+        // Every method of the old hand-written fake returned the default a
+        // bare `MockDbClient` returns — `None`, `vec![]`, `Value::Null`, `Ok(())`
+        // — so it carried no behaviour at all. `MockDbClient` is now that
+        // zero-configuration default, and the struct is gone.
         let service = crate::service::MemoryService::new(
-            Arc::new(EmptyCommunityFactDbClient),
+            Arc::new(crate::service::mock_db::MockDbClient::new()),
             "org".to_string(),
             "warn".to_string(),
             50,
