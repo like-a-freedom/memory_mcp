@@ -51,7 +51,7 @@ impl EpisodeContextStore {
         limit: i32,
     ) -> Result<Vec<Value>, MemoryError> {
         let (sql, vars) =
-            crate::storage::build_select_episodes_by_content_query(cutoff, query, limit);
+            crate::memory::queries::build_select_episodes_by_content_query(cutoff, query, limit);
         self.db.query_rows(&sql, Some(vars)).await
     }
 

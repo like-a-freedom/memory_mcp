@@ -328,6 +328,7 @@ mod tests {
                     "aliases": [],
                 }),
                 "org",
+                crate::knowledge::queries::ENTITY_TEMPORAL_FIELDS,
             )
             .await
             .expect("seed alice");
@@ -342,6 +343,7 @@ mod tests {
                     "aliases": [],
                 }),
                 "org",
+                crate::knowledge::queries::ENTITY_TEMPORAL_FIELDS,
             )
             .await
             .expect("seed bob");

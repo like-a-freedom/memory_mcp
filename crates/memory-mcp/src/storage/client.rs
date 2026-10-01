@@ -55,19 +55,31 @@ pub trait DbClient: Send + Sync {
     ) -> Result<Vec<Value>, MemoryError>;
 
     /// Creates a new record.
+    /// `temporal_fields` names the record's datetime columns, so they are
+    /// written as Surreal `datetime` values rather than as the RFC-3339
+    /// strings they arrive as. The caller is the only thing that knows which
+    /// columns those are for the table it is writing, and the port used to
+    /// guess — which is how a claim's `observed_at` came back from the driver
+    /// as a string and was refused.
     async fn create(
         &self,
         record_id: &str,
         content: Value,
         namespace: &str,
+        temporal_fields: &[&str],
     ) -> Result<Value, MemoryError>;
 
     /// Updates an existing record.
+    ///
+    /// `temporal_fields` is the caller's table's datetime columns, for the
+    /// same reason `create` takes it: which columns are datetimes is a
+    /// property of the table, and the table belongs to a context.
     async fn update(
         &self,
         record_id: &str,
         content: Value,
         namespace: &str,
+        temporal_fields: &[&str],
     ) -> Result<Value, MemoryError>;
 
     /// Executes a raw SQL query and returns JSON results.
@@ -188,16 +200,22 @@ impl BoundDbClient {
         &self,
         record_id: &str,
         content: Value,
+        temporal_fields: &[&str],
     ) -> Result<Value, MemoryError> {
-        self.db.create(record_id, content, &self.namespace).await
+        self.db
+            .create(record_id, content, &self.namespace, temporal_fields)
+            .await
     }
 
     pub(crate) async fn update(
         &self,
         record_id: &str,
         content: Value,
+        temporal_fields: &[&str],
     ) -> Result<Value, MemoryError> {
-        self.db.update(record_id, content, &self.namespace).await
+        self.db
+            .update(record_id, content, &self.namespace, temporal_fields)
+            .await
     }
 
     pub(crate) fn namespace(&self) -> &str {
@@ -828,6 +846,7 @@ impl DbClient for SurrealDbClient {
         record_id: &str,
         content: Value,
         namespace: &str,
+        temporal_fields: &[&str],
     ) -> Result<Value, MemoryError> {
         self.log_op(
             "db.create",
@@ -837,7 +856,7 @@ impl DbClient for SurrealDbClient {
             ],
         );
 
-        let (sql, vars) = build_create_query(record_id, content);
+        let (sql, vars) = build_create_query(record_id, content, temporal_fields);
         let surreal_val = self.execute_query(&sql, Some(vars), namespace).await?;
         let normalized = surreal_to_json(surreal_val);
         let result = extract_first_record(normalized).unwrap_or(Value::Null);
@@ -855,6 +874,7 @@ impl DbClient for SurrealDbClient {
         record_id: &str,
         content: Value,
         namespace: &str,
+        temporal_fields: &[&str],
     ) -> Result<Value, MemoryError> {
         self.log_op(
             "db.update",
@@ -864,7 +884,7 @@ impl DbClient for SurrealDbClient {
             ],
         );
 
-        let (sql, vars) = build_update_query(record_id, content)?;
+        let (sql, vars) = build_update_query(record_id, content, temporal_fields)?;
         let surreal_val = self.execute_query(&sql, Some(vars), namespace).await?;
         let normalized = surreal_to_json(surreal_val);
         let result = extract_first_record(normalized).unwrap_or(Value::Null);
@@ -1012,6 +1032,7 @@ mod tests {
             _record_id: &str,
             _content: Value,
             namespace: &str,
+            _temporal_fields: &[&str],
         ) -> Result<Value, MemoryError> {
             self.record(namespace);
             Ok(Value::Null)
@@ -1022,6 +1043,7 @@ mod tests {
             _record_id: &str,
             _content: Value,
             namespace: &str,
+            _temporal_fields: &[&str],
         ) -> Result<Value, MemoryError> {
             self.record(namespace);
             Ok(Value::Null)
@@ -1057,11 +1079,19 @@ mod tests {
             .await
             .expect("bound select_table should succeed");
         bound
-            .create("episode:test", serde_json::json!({"content": "test"}))
+            .create(
+                "episode:test",
+                serde_json::json!({"content": "test"}),
+                crate::memory::queries::EPISODE_TEMPORAL_FIELDS,
+            )
             .await
             .expect("bound create should succeed");
         bound
-            .update("episode:test", serde_json::json!({"status": "active"}))
+            .update(
+                "episode:test",
+                serde_json::json!({"status": "active"}),
+                crate::memory::queries::EPISODE_TEMPORAL_FIELDS,
+            )
             .await
             .expect("bound update should succeed");
         bound
@@ -1110,6 +1140,7 @@ mod tests {
             _record_id: &str,
             _content: Value,
             _namespace: &str,
+            _temporal_fields: &[&str],
         ) -> Result<Value, MemoryError> {
             Ok(Value::Null)
         }
@@ -1119,6 +1150,7 @@ mod tests {
             _record_id: &str,
             _content: Value,
             _namespace: &str,
+            _temporal_fields: &[&str],
         ) -> Result<Value, MemoryError> {
             Ok(Value::Null)
         }
@@ -1316,6 +1348,7 @@ mod tests {
                     "policy_tags": []
                 }),
                 "main",
+                crate::memory::queries::EPISODE_TEMPORAL_FIELDS,
             )
             .await
             .expect("episode without scope or visibility_scope should be accepted");
@@ -1337,6 +1370,7 @@ mod tests {
                     "provenance": {}
                 }),
                 "main",
+                crate::knowledge::queries::FACT_TEMPORAL_FIELDS,
             )
             .await
             .expect("fact without scope should be accepted");

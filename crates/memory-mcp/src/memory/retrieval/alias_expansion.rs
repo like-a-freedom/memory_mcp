@@ -149,6 +149,7 @@ mod tests {
                     "aliases": ["alice s."],
                 }),
                 "org",
+                crate::knowledge::queries::ENTITY_TEMPORAL_FIELDS,
             )
             .await
             .expect("seed entity");

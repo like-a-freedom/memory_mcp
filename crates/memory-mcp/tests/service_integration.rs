@@ -43,6 +43,7 @@ async fn seed_query_log_row(
                 "cache_hit": false,
             }),
             namespace,
+            &[],
         )
         .await
         .expect("seed query_log row should succeed");

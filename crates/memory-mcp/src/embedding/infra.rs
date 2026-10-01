@@ -110,7 +110,15 @@ impl CanonicalVectorPort for FactVectorAdapter {
                     .update_embedding_fields(fact_id, Value::Object(fields))
                     .await
             }
-            VectorWritePolicy::ReplaceStale => self.db.update(fact_id, payload).await.map(|_| ()),
+            VectorWritePolicy::ReplaceStale => self
+                .db
+                .update(
+                    fact_id,
+                    payload,
+                    crate::knowledge::queries::FACT_TEMPORAL_FIELDS,
+                )
+                .await
+                .map(|_| ()),
         }
     }
 }

@@ -1085,6 +1085,7 @@ mod tests {
                 _record_id: &str,
                 _content: Value,
                 _namespace: &str,
+                _temporal_fields: &[&str],
             ) -> Result<Value, MemoryError> {
                 Ok(Value::Null)
             }
@@ -1094,6 +1095,7 @@ mod tests {
                 _record_id: &str,
                 _content: Value,
                 _namespace: &str,
+                _temporal_fields: &[&str],
             ) -> Result<Value, MemoryError> {
                 Ok(Value::Null)
             }
@@ -1241,6 +1243,7 @@ mod tests {
                 _record_id: &str,
                 _content: Value,
                 _namespace: &str,
+                _temporal_fields: &[&str],
             ) -> Result<Value, MemoryError> {
                 Ok(Value::Null)
             }
@@ -1250,6 +1253,7 @@ mod tests {
                 _record_id: &str,
                 _content: Value,
                 _namespace: &str,
+                _temporal_fields: &[&str],
             ) -> Result<Value, MemoryError> {
                 Ok(Value::Null)
             }
@@ -1379,6 +1383,7 @@ mod tests {
                 _record_id: &str,
                 _content: Value,
                 _namespace: &str,
+                _temporal_fields: &[&str],
             ) -> Result<Value, MemoryError> {
                 Ok(Value::Null)
             }
@@ -1388,6 +1393,7 @@ mod tests {
                 _record_id: &str,
                 _content: Value,
                 _namespace: &str,
+                _temporal_fields: &[&str],
             ) -> Result<Value, MemoryError> {
                 Ok(Value::Null)
             }

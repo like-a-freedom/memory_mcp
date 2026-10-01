@@ -254,6 +254,7 @@ impl DbClient for MockDbClient {
         record_id: &str,
         _content: Value,
         _namespace: &str,
+        _temporal_fields: &[&str],
     ) -> Result<Value, MemoryError> {
         if let Some(resp) = self
             .create_responses
@@ -279,6 +280,7 @@ impl DbClient for MockDbClient {
         record_id: &str,
         _content: Value,
         _namespace: &str,
+        _temporal_fields: &[&str],
     ) -> Result<Value, MemoryError> {
         if let Some(resp) = self
             .update_responses
@@ -361,7 +363,7 @@ mod tests {
         assert!(result.is_some());
         assert_eq!(result.unwrap()["episode_id"], "episode:1");
 
-        let result = db.create("fact:1", json!({}), "org").await.unwrap();
+        let result = db.create("fact:1", json!({}), "org", &[]).await.unwrap();
         assert_eq!(result["status"], "ok");
     }
 

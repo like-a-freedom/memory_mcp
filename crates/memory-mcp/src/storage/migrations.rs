@@ -17,6 +17,13 @@ use crate::logging::LogLevel;
 use crate::storage::DbClient;
 use crate::storage::client::SurrealDbClient;
 
+/// The datetime columns a migration-state row carries.
+///
+/// A migration row is the platform's own bookkeeping, so it names its own
+/// columns here rather than borrowing a domain's list.
+const MIGRATION_STATE_TEMPORAL_FIELDS: &[&str] =
+    &["lease_expires_at", "started_at", "completed_at"];
+
 #[derive(Debug, Clone, Copy)]
 pub struct MigrationScript {
     pub file_name: &'static str,
@@ -666,6 +673,7 @@ async fn mark_migration_failed(
                 "last_error": error,
             }),
             namespace,
+            MIGRATION_STATE_TEMPORAL_FIELDS,
         )
         .await
         .map(|_| ())

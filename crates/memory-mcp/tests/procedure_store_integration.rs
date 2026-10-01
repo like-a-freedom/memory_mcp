@@ -96,6 +96,7 @@ async fn load_legacy_candidate_without_identity_version_preserves_metadata() {
                 "updated_at": "2026-07-01T00:00:00Z"
             }),
             "org",
+            memory_mcp::knowledge::queries::FACT_TEMPORAL_FIELDS,
         )
         .await
         .expect("create legacy candidate");

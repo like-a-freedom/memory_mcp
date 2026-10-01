@@ -23,9 +23,9 @@
 pub mod access_log_store;
 pub(crate) mod client;
 pub mod event_log_store;
-mod helpers;
+pub(crate) mod helpers;
 pub(crate) mod migrations;
-mod queries;
+pub(crate) mod queries;
 pub mod table_scope;
 mod types;
 pub(crate) mod value_helpers;
@@ -55,23 +55,21 @@ pub use helpers::{
     RecordLookup, is_missing_index_error, owner_scoped_read, record_id_from_json_value,
     require_record_kind,
 };
+// What stays re-exported from `queries` is what is genuinely table-generic.
+// The domain builders moved to `knowledge::queries` and `memory::queries`, and
+// `BI_TEMPORAL_WHERE` to `shared::temporal`, where the three modules that
+// filter on it can import it without going through the platform.
 pub use queries::{
-    BI_TEMPORAL_WHERE, active_edge_scan_batch_size, active_edge_scan_limit,
-    fact_embedding_dimension_placeholder,
+    active_edge_scan_batch_size, active_edge_scan_limit, fact_embedding_dimension_placeholder,
 };
+pub(crate) use queries::{build_upsert_query, validate_record_id};
+
 // `build_create_query` is called from `knowledge/fact_store.rs` under
 // `streamable-http`; without that feature the re-export has no user,
 // which the compiler reports. Gated to match its one caller.
 #[cfg(feature = "streamable-http")]
 pub(crate) use queries::build_create_query;
-pub(crate) use queries::{
-    build_fact_visibility_clause, build_relate_edge_query, build_select_active_facts_query,
-    build_select_communities_by_member_entities_query, build_select_edge_neighbors_query,
-    build_select_edges_filtered_page_query, build_select_episodes_by_content_query,
-    build_select_facts_ann_query, build_select_facts_by_entity_links_query,
-    build_select_facts_filtered_query, build_upsert_query, surreal_string_literal,
-    validate_record_id,
-};
+
 pub use table_scope::{
     EmbeddingTables, KnowledgeTables, MemoryTables, OwnedTable, PlatformTables, ReleaseOwnedTable,
     TableOwner, table_owners,

@@ -28,6 +28,7 @@ mod fact_store;
 pub mod graph_store;
 pub mod infra;
 mod knowledge_store;
+pub mod queries;
 mod triple_store;
 
 pub(crate) use close_store::{CloseStoreClient, CloseTimestamps};

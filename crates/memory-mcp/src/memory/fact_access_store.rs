@@ -54,7 +54,13 @@ impl FactAccessStore {
             )),
         );
 
-        self.db.update(fact_id, Value::Object(record)).await?;
+        self.db
+            .update(
+                fact_id,
+                Value::Object(record),
+                crate::knowledge::queries::FACT_TEMPORAL_FIELDS,
+            )
+            .await?;
         Ok(())
     }
 

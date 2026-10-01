@@ -355,6 +355,7 @@ mod tests {
                     "provenance": {"source_episode": "episode:seed"},
                 }),
                 "org",
+                crate::knowledge::queries::FACT_TEMPORAL_FIELDS,
             )
             .await
             .expect("seed fact should succeed");

@@ -15,7 +15,7 @@ use std::sync::Arc;
 use serde_json::{Value, json};
 
 use crate::error::MemoryError;
-use crate::storage::BI_TEMPORAL_WHERE;
+use crate::shared::temporal::BI_TEMPORAL_WHERE;
 use crate::storage::{BoundDbClient, ContextFactQuery, DbClient, GraphDirection};
 
 /// Read-side store for the knowledge-owned tables consulted during
@@ -44,7 +44,7 @@ impl KnowledgeStoreClient {
             limit,
             fact_types,
         } = query;
-        let (sql, vars) = crate::storage::build_select_facts_filtered_query(
+        let (sql, vars) = crate::knowledge::queries::build_select_facts_filtered_query(
             cutoff,
             query_contains,
             limit,
@@ -60,8 +60,11 @@ impl KnowledgeStoreClient {
         entity_links: &[String],
         limit: i32,
     ) -> Result<Vec<Value>, MemoryError> {
-        let (sql, vars) =
-            crate::storage::build_select_facts_by_entity_links_query(cutoff, entity_links, limit);
+        let (sql, vars) = crate::knowledge::queries::build_select_facts_by_entity_links_query(
+            cutoff,
+            entity_links,
+            limit,
+        );
         self.db.query_rows(&sql, Some(vars)).await
     }
 
@@ -99,7 +102,8 @@ impl KnowledgeStoreClient {
         query_vec: &[f64],
         limit: i32,
     ) -> Result<Vec<Value>, MemoryError> {
-        let (sql, vars) = crate::storage::build_select_facts_ann_query(cutoff, query_vec, limit);
+        let (sql, vars) =
+            crate::knowledge::queries::build_select_facts_ann_query(cutoff, query_vec, limit);
         self.db.query_rows(&sql, Some(vars)).await
     }
 
@@ -111,8 +115,9 @@ impl KnowledgeStoreClient {
         cutoff: &str,
         direction: GraphDirection,
     ) -> Result<Vec<Value>, MemoryError> {
-        let (sql, vars) =
-            crate::storage::build_select_edge_neighbors_query(node_id, cutoff, direction);
+        let (sql, vars) = crate::knowledge::queries::build_select_edge_neighbors_query(
+            node_id, cutoff, direction,
+        );
         self.db.query_rows(&sql, Some(vars)).await
     }
 
@@ -135,7 +140,7 @@ impl KnowledgeStoreClient {
         &self,
         query: &str,
     ) -> Result<Vec<Value>, MemoryError> {
-        let query_literal = crate::storage::surreal_string_literal(query);
+        let query_literal = crate::knowledge::queries::surreal_string_literal(query);
         let sql = format!(
             "SELECT *, search::score(1) AS ft_score FROM community WHERE summary @1@ {query_literal} \
              ORDER BY ft_score DESC, summary ASC LIMIT 25"
@@ -155,7 +160,7 @@ impl KnowledgeStoreClient {
 
     /// Active (not-yet-invalidated) facts in the bound Active Namespace.
     pub async fn select_active_facts(&self, limit: i32) -> Result<Vec<Value>, MemoryError> {
-        let (sql, vars) = crate::storage::build_select_active_facts_query(
+        let (sql, vars) = crate::knowledge::queries::build_select_active_facts_query(
             &crate::shared::temporal::normalize_dt(crate::shared::temporal::now()),
             limit,
         );

@@ -159,12 +159,20 @@ mod tests {
             record_id: &str,
             content: Value,
             namespace: &str,
+            _temporal_fields: &[&str],
         ) -> Result<Value, MemoryError> {
             self.create_calls
                 .lock()
                 .unwrap_or_else(|poisoned| poisoned.into_inner())
                 .push(record_id.to_string());
-            self.inner.create(record_id, content, namespace).await
+            self.inner
+                .create(
+                    record_id,
+                    content,
+                    namespace,
+                    crate::memory::queries::EPISODE_TEMPORAL_FIELDS,
+                )
+                .await
         }
 
         async fn update(
@@ -172,8 +180,11 @@ mod tests {
             record_id: &str,
             content: Value,
             namespace: &str,
+            temporal_fields: &[&str],
         ) -> Result<Value, MemoryError> {
-            self.inner.update(record_id, content, namespace).await
+            self.inner
+                .update(record_id, content, namespace, temporal_fields)
+                .await
         }
 
         async fn query(
@@ -212,6 +223,7 @@ mod tests {
                 "aliases": [],
             }),
             "org",
+            crate::knowledge::queries::ENTITY_TEMPORAL_FIELDS,
         )
         .await
         .unwrap();

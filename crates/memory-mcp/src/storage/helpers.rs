@@ -80,7 +80,7 @@ pub fn owner_scoped_read(
 /// read and write goes through this, so the rule has one
 /// definition rather than one per store.
 pub fn require_record_kind(record_id: &str, table: &str) -> Result<(), crate::error::MemoryError> {
-    crate::storage::queries::validate_record_id(record_id)?;
+    super::queries::validate_record_id(record_id)?;
     let actual = record_id
         .split_once(':')
         .map(|(kind, _)| kind)

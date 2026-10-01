@@ -129,7 +129,15 @@ impl EntityService {
                 Err(error) => return Err(error),
             }
         }
-        match self.db.create(&entity_id, payload).await {
+        match self
+            .db
+            .create(
+                &entity_id,
+                payload,
+                crate::knowledge::queries::ENTITY_TEMPORAL_FIELDS,
+            )
+            .await
+        {
             Ok(_) => Ok(entity_id),
             Err(MemoryError::Storage(msg)) if msg.contains("already exists") => {
                 // Race condition — return the existing entity.

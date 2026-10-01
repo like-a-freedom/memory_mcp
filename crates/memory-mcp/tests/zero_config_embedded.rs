@@ -94,7 +94,7 @@ async fn embedded_rocksdb_root_root_round_trip() {
         .await
         .expect("embedded RocksDB connection with root/root");
     client
-        .create("zero_config_smoke", json!({"value": "ok"}), "main")
+        .create("zero_config_smoke", json!({"value": "ok"}), "main", &[])
         .await
         .expect("create record");
     let record = client

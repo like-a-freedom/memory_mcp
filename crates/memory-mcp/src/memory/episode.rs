@@ -632,6 +632,7 @@ mod tests {
                 _record_id: &str,
                 _content: Value,
                 _namespace: &str,
+                _temporal_fields: &[&str],
             ) -> Result<Value, MemoryError> {
                 Ok(Value::Null)
             }
@@ -641,6 +642,7 @@ mod tests {
                 _record_id: &str,
                 _content: Value,
                 _namespace: &str,
+                _temporal_fields: &[&str],
             ) -> Result<Value, MemoryError> {
                 Ok(Value::Null)
             }
@@ -760,6 +762,7 @@ mod tests {
                 _record_id: &str,
                 _content: serde_json::Value,
                 _namespace: &str,
+                _temporal_fields: &[&str],
             ) -> Result<serde_json::Value, MemoryError> {
                 Ok(serde_json::Value::Null)
             }
@@ -769,6 +772,7 @@ mod tests {
                 _record_id: &str,
                 _content: serde_json::Value,
                 _namespace: &str,
+                _temporal_fields: &[&str],
             ) -> Result<serde_json::Value, MemoryError> {
                 Ok(serde_json::Value::Null)
             }

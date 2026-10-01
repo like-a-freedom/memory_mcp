@@ -28,6 +28,7 @@ impl DbClient for RecordingDb {
         _record_id: &str,
         _content: serde_json::Value,
         _namespace: &str,
+        _temporal_fields: &[&str],
     ) -> Result<serde_json::Value, MemoryError> {
         Ok(serde_json::json!({}))
     }
@@ -37,6 +38,7 @@ impl DbClient for RecordingDb {
         record_id: &str,
         _content: serde_json::Value,
         _namespace: &str,
+        _temporal_fields: &[&str],
     ) -> Result<serde_json::Value, MemoryError> {
         Err(MemoryError::Storage(format!("update: {record_id}")))
     }

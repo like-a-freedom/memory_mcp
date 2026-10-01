@@ -67,12 +67,16 @@ impl ReembedStoreClient {
         self.db.select_one(record_id).await
     }
 
-    /// Create or update a reembed-owned record without exposing routing.
-    pub async fn upsert_record(&self, record_id: &str, payload: Value) -> Result<(), MemoryError> {
+    /// Create or update a reembed job row without exposing routing.
+    ///
+    /// The temporal columns are the job table's, so they are named here
+    /// rather than left to the client to guess from the record id.
+    pub async fn upsert_job(&self, record_id: &str, payload: Value) -> Result<(), MemoryError> {
+        let fields = crate::embedding::queries::EMBEDDING_JOB_TEMPORAL_FIELDS;
         if self.db.select_one(record_id).await?.is_some() {
-            self.db.update(record_id, payload).await?;
+            self.db.update(record_id, payload, fields).await?;
         } else {
-            self.db.create(record_id, payload).await?;
+            self.db.create(record_id, payload, fields).await?;
         }
         Ok(())
     }
@@ -194,6 +198,7 @@ mod tests {
                     "embedding_updated_at": now,
                 }),
                 "org",
+                crate::knowledge::queries::FACT_TEMPORAL_FIELDS,
             )
             .await
             .expect("seed fact should succeed");

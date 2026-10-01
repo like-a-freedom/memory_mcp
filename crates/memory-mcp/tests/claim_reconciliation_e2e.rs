@@ -353,6 +353,7 @@ async fn ingest_episode_with_lineage(
                 "source_lineage": lineage,
             }),
             "org",
+            memory_mcp::memory::queries::EPISODE_TEMPORAL_FIELDS,
         )
         .await
         .expect("create episode with lineage");

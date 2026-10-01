@@ -195,7 +195,11 @@ impl ClaimStore for SurrealClaimStore {
         // SurrealDB's `UPDATE` silently no-ops on a missing record and
         // `CONTENT`-style writes reject JSON nulls on SCHEMAFULL `option<>`
         // fields, so the SET-assignment builder is used instead.
-        let (sql, vars) = crate::storage::build_upsert_query(job.job_id.as_ref(), content)?;
+        let (sql, vars) = crate::storage::build_upsert_query(
+            job.job_id.as_ref(),
+            content,
+            crate::knowledge::queries::CLAIM_JOB_TEMPORAL_FIELDS,
+        )?;
         self.db.query(&sql, Some(vars)).await?;
         Ok(())
     }
@@ -238,7 +242,15 @@ impl ClaimStore for SurrealClaimStore {
         for claim in &request.claims {
             let content = serde_json::to_value(claim)
                 .map_err(|e| MemoryError::Storage(format!("serialize claim: {e}")))?;
-            if let Err(err) = self.db.create(claim.claim_id.as_ref(), content).await {
+            if let Err(err) = self
+                .db
+                .create(
+                    claim.claim_id.as_ref(),
+                    content,
+                    crate::knowledge::queries::CLAIM_TEMPORAL_FIELDS,
+                )
+                .await
+            {
                 // CREATE never overwrites, so a collision is an idempotent
                 // no-op (repeat projection of a deterministic claim), not a
                 // failure — and an invalidated claim stays invalidated.
@@ -250,7 +262,14 @@ impl ClaimStore for SurrealClaimStore {
         for job in &request.jobs {
             let content = serde_json::to_value(job)
                 .map_err(|e| MemoryError::Storage(format!("serialize job: {e}")))?;
-            if let Err(err) = self.db.create(job.job_id.as_ref(), content).await
+            if let Err(err) = self
+                .db
+                .create(
+                    job.job_id.as_ref(),
+                    content,
+                    crate::knowledge::queries::CLAIM_JOB_TEMPORAL_FIELDS,
+                )
+                .await
                 && !is_already_exists_error(&err)
             {
                 return Err(MemoryError::Storage(format!("persist job: {err}")));
@@ -410,7 +429,11 @@ impl ClaimStore for SurrealClaimStore {
             let record_id = relation.claim_relation_id.as_ref();
             let content = Self::serialize(relation)?;
             self.db
-                .create(record_id, content)
+                .create(
+                    record_id,
+                    content,
+                    crate::knowledge::queries::CLAIM_RELATION_TEMPORAL_FIELDS,
+                )
                 .await
                 .map_err(|e| MemoryError::Storage(format!("persist relation: {e}")))?;
         }
@@ -651,6 +674,7 @@ mod tests {
             _record_id: &str,
             _content: Value,
             namespace: &str,
+            _temporal_fields: &[&str],
         ) -> Result<Value, MemoryError> {
             self.namespaces
                 .lock()
@@ -664,6 +688,7 @@ mod tests {
             _record_id: &str,
             _content: Value,
             namespace: &str,
+            _temporal_fields: &[&str],
         ) -> Result<Value, MemoryError> {
             self.namespaces
                 .lock()

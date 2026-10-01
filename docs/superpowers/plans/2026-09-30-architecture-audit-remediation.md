@@ -988,7 +988,7 @@ pub const BI_TEMPORAL_WHERE: &str = "...";
 
 `temporal_field_names_for_table` splits the same way: the `fact`, `edge`, `episode`, `community` arms go to their owners; `claim`, `claim_job`, `claim_relation` go to `knowledge/claims.rs`; `embedding_state`, `embedding_job` to `embedding/`; `inbox_revision` to `memory/`; `event_log`, `task`, `script_migration` stay in the platform. The dispatch itself becomes a per-owner call rather than a string switch.
 
-- [ ] **Step 1: Write the failing test** in `crates/memory-mcp/tests/knowledge_read_scopes.rs`:
+- [x] **Step 1: Write the failing test** in `crates/memory-mcp/tests/knowledge_read_scopes.rs`:
 
 ```rust
 #[test]
@@ -1002,17 +1002,17 @@ fn the_storage_platform_names_no_domain_table() {
 
 Run: expect FAIL — `queries.rs` names 13 of them and `client.rs:939` named 10 (now deleted by Task 4.1).
 
-- [ ] **Step 2: Move `BI_TEMPORAL_WHERE` and `build_fact_visibility_clause`** to `shared/temporal.rs`. Repoint the importers: `knowledge/knowledge_store.rs:17,83`, `knowledge/graph_store.rs:169`, and the fact/edge builders.
-- [ ] **Step 3: Move the fact and graph builders** to `knowledge/queries.rs`: `build_select_facts_filtered_query` (228), `build_select_facts_by_entity_links_query` (292), `build_select_facts_ann_query` (309), `build_select_active_facts_query` (338), `build_select_edges_filtered_page_query` (376), `build_select_communities_by_member_entities_query` (389), `build_select_edge_neighbors_query` (398), `build_relate_edge_query` (418), `surreal_string_literal` (269), `active_edge_scan_batch_size` (25).
+- [x] **Step 2: Move `BI_TEMPORAL_WHERE` and `build_fact_visibility_clause`** to `shared/temporal.rs`. Repoint the importers: `knowledge/knowledge_store.rs:17,83`, `knowledge/graph_store.rs:169`, and the fact/edge builders.
+- [x] **Step 3: Move the fact and graph builders** to `knowledge/queries.rs`: `build_select_facts_filtered_query` (228), `build_select_facts_by_entity_links_query` (292), `build_select_facts_ann_query` (309), `build_select_active_facts_query` (338), `build_select_edges_filtered_page_query` (376), `build_select_communities_by_member_entities_query` (389), `build_select_edge_neighbors_query` (398), `build_relate_edge_query` (418), `surreal_string_literal` (269), `active_edge_scan_batch_size` (25).
 
   `active_edge_scan_batch_size` is called from `memory/lifecycle_workers/communities.rs:123` — a memory module reading a knowledge constant. Make it `pub` in `knowledge/queries.rs` and import it there. That is a memory→knowledge edge, which CONTEXT.md's dependency direction permits; the alternative, a third copy in memory, is worse.
-- [ ] **Step 4: Move `build_select_episodes_by_content_query`** (346) to `memory/queries.rs`.
-- [ ] **Step 5: Split `temporal_field_names_for_table`** as described. Repoint `build_set_assignments` (507) to take the field list from the caller.
-- [ ] **Step 6: Delete the moved code** from `storage/queries.rs` and the re-exports from `storage.rs:57-73`. What remains: `build_select_one_query`, `build_create_query`, `build_update_query`, `build_upsert_query`, `validate_record_id`, `build_create_query` — all table-generic, which is genuinely the platform's job.
-- [ ] **Step 7: Move the 21 tests** in `storage/queries.rs:587-782` to the new modules, split by which builder they cover.
-- [ ] **Step 8: Update the `storage.rs` module doc** to say what the module now actually contains.
-- [ ] **Step 9: Run the test.** Expected: PASS. Then the full suite — this touches a lot of query construction, and a mistake shows up as a failing retrieval test.
-- [ ] **Step 10: Commit**
+- [x] **Step 4: Move `build_select_episodes_by_content_query`** (346) to `memory/queries.rs`.
+- [x] **Step 5: Split `temporal_field_names_for_table`** as described. Repoint `build_set_assignments` (507) to take the field list from the caller.
+- [x] **Step 6: Delete the moved code** from `storage/queries.rs` and the re-exports from `storage.rs:57-73`. What remains: `build_select_one_query`, `build_create_query`, `build_update_query`, `build_upsert_query`, `validate_record_id`, `build_create_query` — all table-generic, which is genuinely the platform's job.
+- [x] **Step 7: Move the 21 tests** in `storage/queries.rs:587-782` to the new modules, split by which builder they cover.
+- [x] **Step 8: Update the `storage.rs` module doc** to say what the module now actually contains.
+- [x] **Step 9: Run the test.** Expected: PASS. Then the full suite — this touches a lot of query construction, and a mistake shows up as a failing retrieval test.
+- [x] **Step 10: Commit**
 
 ```bash
 git commit -m "refactor(storage): the platform keeps the connection, the domains keep their SQL"
@@ -1051,8 +1051,8 @@ pub async fn build_memory_service_from_env(
 
 `MemoryService::new`, `new_with_embedding_provider`, and the `with_*` builder methods stay in `service/core/builder.rs` — they construct the type, which is the container's job. Only the environment-reading orchestration moves.
 
-- [ ] **Step 1: Write ADR-0067.** Status `Accepted`. Context: the container file holds startup policy; `bootstrap/` is HTTP-only and feature-gated. Decision: `bootstrap/` is the composition root for both profiles; the container constructs and holds, it does not start. Consequences: `bootstrap.rs` is no longer `cfg(control-plane)`, so every profile compiles it; `service/core/builder.rs` drops from 496 to ~200 lines. Alternatives considered: (a) keep a `service/startup.rs` — rejected, because it leaves a second place that knows how to build a service, and that is the confusion this change exists to remove; (b) move it into `runner.rs` — rejected, `main.rs` and `runner.rs` must stay thin per AGENTS.md.
-- [ ] **Step 2: Write the failing test** in `crates/memory-mcp/tests/zero_config_embedded.rs`:
+- [x] **Step 1: Write ADR-0067.** Status `Accepted`. Context: the container file holds startup policy; `bootstrap/` is HTTP-only and feature-gated. Decision: `bootstrap/` is the composition root for both profiles; the container constructs and holds, it does not start. Consequences: `bootstrap.rs` is no longer `cfg(control-plane)`, so every profile compiles it; `service/core/builder.rs` drops from 496 to ~200 lines. Alternatives considered: (a) keep a `service/startup.rs` — rejected, because it leaves a second place that knows how to build a service, and that is the confusion this change exists to remove; (b) move it into `runner.rs` — rejected, `main.rs` and `runner.rs` must stay thin per AGENTS.md.
+- [x] **Step 2: Write the failing test** in `crates/memory-mcp/tests/zero_config_embedded.rs`:
 
 ```rust
 #[tokio::test]
@@ -1065,10 +1065,10 @@ async fn zero_configuration_starts_without_any_environment_variable() {
 
 There is an existing zero-config test; read it first and extend it rather than duplicating. Run: expect FAIL — the function does not exist.
 
-- [ ] **Step 3: Move the function.** Cut `builder.rs:196-474` and paste into `bootstrap/stdio.rs`, renaming the function. The three `EmbeddingActivationMode` arms at 272-342 move with it, as do the `ner_progress` and `CliProgressSink` wiring. Un-gate `bootstrap.rs:6`.
-- [ ] **Step 4: Repoint the two callers.** `cli/runtime.rs:60` `build_memory_service` and `runner.rs`. The local `serve` path in `runner.rs` also builds a service; find it and repoint it too.
-- [ ] **Step 5: Run the test.** Expected: PASS, and the existing zero-config, fs-watch, and lifecycle tests must all still pass — they exercise this path.
-- [ ] **Step 6: Commit**
+- [x] **Step 3: Move the function.** Cut `builder.rs:196-474` and paste into `bootstrap/stdio.rs`, renaming the function. The three `EmbeddingActivationMode` arms at 272-342 move with it, as do the `ner_progress` and `CliProgressSink` wiring. Un-gate `bootstrap.rs:6`.
+- [x] **Step 4: Repoint the two callers.** `cli/runtime.rs:60` `build_memory_service` and `runner.rs`. The local `serve` path in `runner.rs` also builds a service; find it and repoint it too.
+- [x] **Step 5: Run the test.** Expected: PASS, and the existing zero-config, fs-watch, and lifecycle tests must all still pass — they exercise this path.
+- [x] **Step 6: Commit**
 
 ```bash
 git commit -m "refactor(bootstrap): the stdio composition root leaves the container"
@@ -1303,6 +1303,8 @@ Recommend **subagent-driven execution**. Six waves, twenty-four tasks, and Tasks
 | 4 | "Unify the two `apply_nms` into one function over a shared type." | The duplication is in the *type*, not the function: `ScoredSpan` (private) and `ScoredEntity` (`pub`) are field-for-field identical. | Task 1.4 Step 3 now unifies the type first and points both call sites at the existing `pub(crate) decode::apply_nms`, with a documented fallback. |
 | 5 | "Replace `split_whitespace()` in `procedures_service/ranking.rs:72` with `search_query_terms`." | They are different operations. `search_query_terms` lowercases and filters; the ranker wants raw tokens. The change would silently alter which candidates match. | Task 1.4 Step 5 records it as a deliberate non-merge with a comment, not a change. |
 | 6 | "`OwnedTable::new` as a `pub const fn`." | A `const fn` cannot look anything up, so it validates nothing — the `ALLOWED_TABLES` problem in a type-safe costume. | Task 4.1 now uses a `pub(crate)` field plus a `ReleaseOwnedTable` trait with a `debug_assert`, and says plainly that the test is the real gate. |
+
+| 7 | "Split `temporal_field_names_for_table` into per-owner lists." | Splitting the switch would have left 13 arms, one per table, each owned by a context but dispatched from the platform — the platform would still know every table's columns. | The dispatch is deleted, not moved. `DbClient::create`, `DbClient::update` and `build_upsert_query` take `temporal_fields: &[&str]` from the caller, so each context names its own table's datetime columns as a constant next to the SQL that writes them. A missing list is a compile error at the call site, where the writer is. |
 
 Two more findings the second pass surfaced, both additions rather than corrections:
 

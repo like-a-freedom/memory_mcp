@@ -452,6 +452,7 @@ mod tests {
                     "embedding_updated_at": now,
                 }),
                 "org",
+                crate::knowledge::queries::FACT_TEMPORAL_FIELDS,
             )
             .await
             .expect("seed context fact");
@@ -623,6 +624,7 @@ mod tests {
                 _record_id: &str,
                 _content: Value,
                 _namespace: &str,
+                _temporal_fields: &[&str],
             ) -> Result<Value, MemoryError> {
                 Ok(Value::Null)
             }
@@ -632,6 +634,7 @@ mod tests {
                 _record_id: &str,
                 _content: Value,
                 _namespace: &str,
+                _temporal_fields: &[&str],
             ) -> Result<Value, MemoryError> {
                 Ok(Value::Null)
             }

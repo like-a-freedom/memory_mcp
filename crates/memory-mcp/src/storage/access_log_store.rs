@@ -30,8 +30,13 @@ impl ContextAccessLogClient {
         }
     }
 
-    pub async fn create(&self, record_id: &str, content: Value) -> Result<Value, MemoryError> {
-        self.db.create(record_id, content).await
+    pub async fn create(
+        &self,
+        record_id: &str,
+        content: Value,
+        temporal_fields: &[&str],
+    ) -> Result<Value, MemoryError> {
+        self.db.create(record_id, content, temporal_fields).await
     }
 
     /// Deletes query-log rows older than `cutoff` and returns how many were

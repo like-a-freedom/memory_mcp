@@ -40,6 +40,30 @@ pub fn bucket_to_five_minutes(dt: DateTime<Utc>) -> String {
     format!("{}:{minute:02}:00Z", dt.format("%Y-%m-%dT%H"))
 }
 
+/// The bi-temporal visibility clause: a row is visible as of `$cutoff` when its
+/// validity interval contains the cutoff and its invalidation has not yet been
+/// ingested.
+///
+/// This is ADR-0002's central invariant, and it lived in
+/// `storage::queries` — the module that builds SQL — which meant three
+/// modules imported a domain invariant from the module that executes queries.
+/// It is here because it is shared: `knowledge`, `memory` and the claim
+/// policies all filter on it, and a fourth copy of the predicate would be a
+/// fourth thing to keep in step.
+pub const BI_TEMPORAL_WHERE: &str = "t_valid <= type::datetime($cutoff) \
+     AND (t_ingested IS NONE OR t_ingested <= type::datetime($cutoff)) \
+     AND (t_invalid IS NONE OR t_invalid > type::datetime($cutoff) OR t_invalid_ingested > type::datetime($cutoff))";
+
+/// The same clause against a named variable, for a query that binds its cutoff
+/// under something other than `$cutoff`.
+pub fn visibility_clause(cutoff_var: &str) -> String {
+    format!(
+        "t_valid <= type::datetime({cutoff_var}) \
+         AND (t_ingested IS NONE OR t_ingested <= type::datetime({cutoff_var})) \
+         AND (t_invalid IS NONE OR t_invalid > type::datetime({cutoff_var}) OR t_invalid_ingested > type::datetime({cutoff_var}))",
+    )
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

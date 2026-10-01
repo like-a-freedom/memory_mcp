@@ -14,6 +14,7 @@ pub mod infra;
 pub mod model_artifacts;
 pub(crate) mod model_loader;
 pub mod providers;
+pub mod queries;
 pub(crate) mod reembed_store;
 pub mod runtime;
 pub mod service;

@@ -25,6 +25,7 @@ pub mod ingestion_review;
 pub mod lifecycle;
 pub mod lifecycle_types;
 pub mod lifecycle_workers;
+pub mod queries;
 pub mod record_parsing;
 pub mod retrieval;
 pub mod retrieval_deps;

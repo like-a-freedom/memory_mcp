@@ -50,6 +50,7 @@ impl TripleStoreClient {
                     "confidence": confidence,
                     "source_fact_id": source_fact_id,
                 }),
+                crate::knowledge::queries::TRIPLE_TEMPORAL_FIELDS,
             )
             .await?;
         row.get("id")

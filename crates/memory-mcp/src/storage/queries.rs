@@ -3,25 +3,16 @@
 use serde_json::{Value, json};
 
 use super::helpers::normalize_surreal_json;
-use super::types::GraphDirection;
 
 const ACTIVE_EDGE_SCAN_BATCH_SIZE: i32 = 10_000;
 const FACT_EMBEDDING_DIMENSION_PLACEHOLDER: &str = "__FACT_EMBEDDING_DIMENSION__";
 
-/// Bi-temporal visibility filter: selects records visible as of a given cutoff timestamp.
-/// Applied to both `fact` and `edge` tables with the same temporal semantics.
-pub const BI_TEMPORAL_WHERE: &str = "t_valid <= type::datetime($cutoff) \
-     AND (t_ingested IS NONE OR t_ingested <= type::datetime($cutoff)) \
-     AND (t_invalid IS NONE OR t_invalid > type::datetime($cutoff) OR t_invalid_ingested > type::datetime($cutoff))";
-
-pub(crate) fn build_fact_visibility_clause(cutoff_var: &str) -> String {
-    format!(
-        "t_valid <= type::datetime({cutoff}) \
-         AND (t_ingested IS NONE OR t_ingested <= type::datetime({cutoff})) \
-         AND (t_invalid IS NONE OR t_invalid > type::datetime({cutoff}) OR t_invalid_ingested > type::datetime({cutoff}))",
-        cutoff = cutoff_var
-    )
-}
+// The SQL for a domain lives in the context that owns that domain:
+// `knowledge/src/queries.rs` for fact, edge, community and triple;
+// `memory/src/queries.rs` for episode. What stays here is table-generic —
+// `select_one`, `create`, `update`, `upsert`, and the record-id and
+// scan-size helpers — which is genuinely the platform's job, because it is
+// the only part that has no domain in it.
 
 pub fn active_edge_scan_batch_size() -> i32 {
     ACTIVE_EDGE_SCAN_BATCH_SIZE
@@ -83,7 +74,39 @@ pub fn validate_record_id(record_id: &str) -> Result<(), crate::error::MemoryErr
     }
 }
 
-/// Build SQL query for selecting a single record.
+/// Assemble the `SET` half of an update from a record map.
+///
+/// `temporal_fields` is passed in rather than looked up, and that is the point
+/// of the split: which columns are temporal is a property of the table, and the
+/// table belongs to a bounded context. The caller — the context — names them;
+/// this function only knows how to turn a map plus a list into assignments.
+pub(crate) fn build_set_assignments(
+    temporal_fields: &[&str],
+    map: serde_json::Map<String, Value>,
+) -> (Vec<String>, serde_json::Map<String, Value>) {
+    let mut entries: Vec<(String, Value)> = map.into_iter().collect();
+    entries.sort_by(|(left, _), (right, _)| left.cmp(right));
+
+    let mut assignments = Vec::with_capacity(entries.len());
+    let mut vars = serde_json::Map::new();
+
+    for (key, value) in entries {
+        match value {
+            Value::Null => assignments.push(format!("{key} = NONE")),
+            Value::String(raw) if temporal_fields.contains(&key.as_str()) => {
+                vars.insert(key.clone(), Value::String(raw));
+                assignments.push(format!("{key} = type::datetime(${key})"));
+            }
+            other => {
+                vars.insert(key.clone(), other);
+                assignments.push(format!("{key} = ${key}"));
+            }
+        }
+    }
+
+    (assignments, vars)
+}
+
 pub fn build_select_one_query(record_id: &str) -> (String, Option<Value>) {
     let record_id = record_id.trim();
     if record_id.is_empty() {
@@ -112,7 +135,11 @@ fn is_valid_table_name(s: &str) -> bool {
 }
 
 /// Build SQL query for creating a record.
-pub fn build_create_query(record_id: &str, content: Value) -> (String, Value) {
+pub fn build_create_query(
+    record_id: &str,
+    content: Value,
+    temporal_fields: &[&str],
+) -> (String, Value) {
     let (table, id) = if let Some(idx) = record_id.find(':') {
         (&record_id[..idx], Some(&record_id[idx + 1..]))
     } else {
@@ -127,7 +154,7 @@ pub fn build_create_query(record_id: &str, content: Value) -> (String, Value) {
 
     let normalized = normalize_surreal_json(&content);
     if let Value::Object(map) = normalized {
-        let (assignments, vars) = build_set_assignments(table, map);
+        let (assignments, vars) = build_set_assignments(temporal_fields, map);
         let sql = if assignments.is_empty() {
             format!("CREATE {target} RETURN *")
         } else {
@@ -146,6 +173,7 @@ pub fn build_create_query(record_id: &str, content: Value) -> (String, Value) {
 pub fn build_update_query(
     record_id: &str,
     content: Value,
+    temporal_fields: &[&str],
 ) -> Result<(String, Value), crate::error::MemoryError> {
     use crate::error::MemoryError;
 
@@ -166,7 +194,7 @@ pub fn build_update_query(
 
     let normalized = normalize_surreal_json(&content_for_update);
     if let Value::Object(map) = normalized {
-        let (assignments, vars) = build_set_assignments(table, map);
+        let (assignments, vars) = build_set_assignments(temporal_fields, map);
         let sql = if assignments.is_empty() {
             format!("UPDATE {table}:⟨{id}⟩ RETURN *")
         } else {
@@ -187,9 +215,18 @@ pub fn build_update_query(
 /// SurrealDB's `UPDATE` does not create a record that does not exist;
 /// `UPSERT` with a record ID inserts the record or replaces its fields,
 /// which is the idempotent write used by deterministic job records.
+/// Build the `UPSERT` for a record the caller names.
+///
+/// `temporal_fields` is passed in because which columns are temporal is a
+/// property of the table, and the table belongs to a bounded context. It used
+/// to be a switch over every table in the schema, inside the platform — which
+/// is what `the_storage_platform_names_no_domain_table` in
+/// `tests/knowledge_read_scopes.rs` reports, and what cost this function the
+/// ability to serve a table the switch had not heard of.
 pub fn build_upsert_query(
     record_id: &str,
     content: Value,
+    temporal_fields: &[&str],
 ) -> Result<(String, Value), crate::error::MemoryError> {
     use crate::error::MemoryError;
 
@@ -210,7 +247,7 @@ pub fn build_upsert_query(
 
     let normalized = normalize_surreal_json(&content_for_upsert);
     if let Value::Object(map) = normalized {
-        let (assignments, vars) = build_set_assignments(table, map);
+        let (assignments, vars) = build_set_assignments(temporal_fields, map);
         let sql = if assignments.is_empty() {
             format!("UPSERT {table}:⟨{id}⟩ RETURN *")
         } else {
@@ -226,321 +263,10 @@ pub fn build_upsert_query(
     }
 }
 
-pub fn build_select_facts_filtered_query(
-    cutoff: &str,
-    query_contains: Option<&str>,
-    limit: i32,
-    fact_types: &[String],
-) -> (String, Value) {
-    let mut where_clauses = vec![BI_TEMPORAL_WHERE.to_string()];
-
-    let mut vars = serde_json::Map::from_iter([
-        ("cutoff".to_string(), json!(cutoff)),
-        ("limit".to_string(), json!(limit)),
-    ]);
-
-    if !fact_types.is_empty() {
-        vars.insert("fact_types".to_string(), json!(fact_types));
-        where_clauses.push("fact_type IN $fact_types".to_string());
-    }
-
-    let base_where = where_clauses.join(" AND ");
-
-    let sql = if let Some(query) = query_contains.filter(|query| !query.trim().is_empty()) {
-        let query_literal = surreal_string_literal(query);
-        // Keep the query in the vars object for instrumentation and test
-        // doubles; SurrealDB 3.0 uses the escaped literal in MATCHES above.
-        vars.insert("query".to_string(), json!(query));
-        format!(
-            "SELECT *, search::score(1) AS ft_score FROM fact WHERE {base_where} AND (content @1@ {query_literal} OR index_keys @1@ {query_literal}) ORDER BY ft_score DESC, t_valid DESC, fact_id ASC LIMIT $limit"
-        )
-    } else {
-        format!(
-            "SELECT * FROM fact WHERE {base_where} ORDER BY t_valid DESC, fact_id ASC LIMIT $limit"
-        )
-    };
-
-    (sql, Value::Object(vars))
-}
-
-/// Escapes a user-provided value as a SurrealQL double-quoted string literal.
-///
-/// SurrealDB 3.0 does not evaluate bound variables as MATCHES operands, so
-/// full-text queries must use a literal while all ordinary filters remain bound.
-pub(crate) fn surreal_string_literal(value: &str) -> String {
-    let mut escaped = String::with_capacity(value.len() + 2);
-    escaped.push('"');
-    for character in value.chars() {
-        match character {
-            '"' => escaped.push_str("\\\""),
-            '\\' => escaped.push_str("\\\\"),
-            '\n' => escaped.push_str("\\n"),
-            '\r' => escaped.push_str("\\r"),
-            '\t' => escaped.push_str("\\t"),
-            '\u{08}' => escaped.push_str("\\b"),
-            '\u{0C}' => escaped.push_str("\\f"),
-            character if character.is_control() => {
-                use std::fmt::Write;
-                let _ = write!(escaped, "\\u{:04x}", character as u32);
-            }
-            character => escaped.push(character),
-        }
-    }
-    escaped.push('"');
-    escaped
-}
-
-pub fn build_select_facts_by_entity_links_query(
-    cutoff: &str,
-    entity_links: &[String],
-    limit: i32,
-) -> (String, Value) {
-    (
-        format!(
-            "SELECT * FROM fact WHERE {BI_TEMPORAL_WHERE} AND entity_links CONTAINSANY $entity_links ORDER BY t_valid DESC LIMIT $limit"
-        ),
-        json!({
-            "cutoff": cutoff,
-            "entity_links": entity_links,
-            "limit": limit,
-        }),
-    )
-}
-
-/// Build a query to find nearest-neighbor facts via vector similarity (ANN).
-pub fn build_select_facts_ann_query(
-    cutoff: &str,
-    query_vec: &[f64],
-    limit: i32,
-) -> (String, Value) {
-    let ann_limit = limit.max(1);
-    // HNSW ef_search defaults to 4 * K for better recall
-    let ef_search = (ann_limit * 4).max(16);
-    let sql = format!(
-        "SELECT *, vector::similarity::cosine(embedding, $query_vec) AS sem_score \
-         FROM fact \
-         WHERE embedding IS NOT NONE \
-           AND embedding IS NOT NULL \
-           AND {BI_TEMPORAL_WHERE} \
-           AND embedding <|{ann_limit}, {ef_search}|> $query_vec \
-         ORDER BY sem_score DESC \
-         LIMIT $limit"
-    );
-    (
-        sql,
-        json!({
-            "cutoff": cutoff,
-            "query_vec": query_vec,
-            "limit": limit,
-        }),
-    )
-}
-
-pub fn build_select_active_facts_query(cutoff: &str, limit: i32) -> (String, Value) {
-    let visibility = build_fact_visibility_clause("$cutoff");
-    (
-        format!("SELECT * FROM fact WHERE {visibility} ORDER BY t_valid ASC LIMIT $limit"),
-        json!({"cutoff": cutoff, "limit": limit}),
-    )
-}
-
-pub fn build_select_episodes_by_content_query(
-    cutoff: &str,
-    query_contains: Option<&str>,
-    limit: i32,
-) -> (String, Value) {
-    let where_clauses = [
-        "t_ref <= type::datetime($cutoff) AND (t_ingested IS NONE OR t_ingested <= type::datetime($cutoff))".to_string(),
-    ];
-
-    let mut vars = serde_json::Map::from_iter([
-        ("cutoff".to_string(), json!(cutoff)),
-        ("limit".to_string(), json!(limit)),
-    ]);
-
-    let base_where = where_clauses.join(" AND ");
-
-    let sql = if let Some(query) = query_contains.filter(|query| !query.trim().is_empty()) {
-        vars.insert("query".to_string(), json!(query.to_lowercase()));
-        format!(
-            "SELECT * FROM episode WHERE {base_where} AND string::contains(string::lowercase(content), $query) ORDER BY t_ref DESC, episode_id ASC LIMIT $limit"
-        )
-    } else {
-        format!(
-            "SELECT * FROM episode WHERE {base_where} ORDER BY t_ref DESC, episode_id ASC LIMIT $limit"
-        )
-    };
-
-    (sql, Value::Object(vars))
-}
-
-pub fn build_select_edges_filtered_page_query(
-    cutoff: &str,
-    limit: usize,
-    start: usize,
-) -> (String, Value) {
-    (
-        format!(
-            "SELECT * FROM edge WHERE {BI_TEMPORAL_WHERE} ORDER BY in ASC, out ASC, t_valid DESC LIMIT $limit START $start"
-        ),
-        json!({ "cutoff": cutoff, "limit": limit, "start": start }),
-    )
-}
-
-pub fn build_select_communities_by_member_entities_query(
-    member_entities: &[String],
-) -> (String, Value) {
-    (
-        "SELECT * FROM community WHERE member_entities CONTAINSANY $members ORDER BY community_id ASC".to_string(),
-        json!({"members": member_entities}),
-    )
-}
-
-pub fn build_select_edge_neighbors_query(
-    node_id: &str,
-    cutoff: &str,
-    direction: GraphDirection,
-) -> (String, Value) {
-    let node_field = match direction {
-        // For `RELATE from -> edge -> to`, incoming edges to `node_id` place the
-        // node on the `out` side, while outgoing edges place it on `in`.
-        GraphDirection::Incoming => "out",
-        GraphDirection::Outgoing => "in",
-    };
-
-    (
-        format!(
-            "SELECT * FROM edge WHERE {node_field} = <record> $node_id AND {BI_TEMPORAL_WHERE} ORDER BY in ASC, out ASC, t_valid DESC"
-        ),
-        json!({"node_id": node_id, "cutoff": cutoff}),
-    )
-}
-
-pub fn build_relate_edge_query(
-    edge_id: &str,
-    from_id: &str,
-    to_id: &str,
-    content: Value,
-) -> (String, Value) {
-    let normalized = normalize_surreal_json(&content);
-    let edge_record_literal = record_literal(edge_id);
-
-    if let Value::Object(map) = normalized {
-        let (assignments, mut vars) = build_set_assignments("edge", map);
-        let all_assignments = assignments;
-        vars.insert("edge_id".to_string(), json!(edge_id));
-        vars.insert("in_id".to_string(), json!(from_id));
-        vars.insert("out_id".to_string(), json!(to_id));
-
-        (
-            format!(
-                "LET $in = <record> $in_id; LET $out = <record> $out_id; RELATE $in -> {edge_record_literal} -> $out SET {} RETURN *",
-                all_assignments.join(", ")
-            ),
-            Value::Object(vars),
-        )
-    } else {
-        (
-            format!(
-                "LET $in = <record> $in_id; LET $out = <record> $out_id; RELATE $in -> {edge_record_literal} -> $out SET content = $content RETURN *"
-            ),
-            json!({
-                "edge_id": edge_id,
-                "in_id": from_id,
-                "out_id": to_id,
-                "content": normalized,
-            }),
-        )
-    }
-}
-
-fn record_literal(record_id: &str) -> String {
-    record_id.split_once(':').map_or_else(
-        || record_id.to_string(),
-        |(table, key)| format!("{table}:⟨{key}⟩"),
-    )
-}
-
-fn temporal_field_names_for_table(table: &str) -> &'static [&'static str] {
-    match table {
-        "episode" => &["t_ref", "t_ingested", "archived_at"],
-        "fact" | "edge" => &[
-            "t_valid",
-            "t_ingested",
-            "t_invalid",
-            "t_invalid_ingested",
-            "last_accessed",
-            "embedding_updated_at",
-        ],
-        "claim" => &[
-            "observed_at",
-            "valid_from",
-            "valid_to",
-            "t_ingested",
-            "t_invalid_ingested",
-        ],
-        "claim_job" => &[
-            "lease_expires_at",
-            "created_at",
-            "started_at",
-            "updated_at",
-            "completed_at",
-            "finished_at",
-        ],
-        "claim_relation" => &["evaluated_at", "t_ingested", "t_invalid_ingested"],
-        "community" => &["updated_at"],
-        "event_log" => &["ts"],
-        "task" => &["due_date"],
-        "script_migration" => &["executed_at"],
-        "embedding_state" => &["updated_at"],
-        "embedding_job" => &["requested_at", "started_at", "updated_at", "finished_at"],
-        "inbox_revision" => &[
-            "t_ref",
-            "lease_expires_at",
-            "discovered_at",
-            "updated_at",
-            "processed_at",
-        ],
-        _ => &[],
-    }
-}
-
-fn build_set_assignments(
-    table: &str,
-    map: serde_json::Map<String, Value>,
-) -> (Vec<String>, serde_json::Map<String, Value>) {
-    let temporal_fields = temporal_field_names_for_table(table);
-    let mut entries: Vec<(String, Value)> = map.into_iter().collect();
-    entries.sort_by(|(left, _), (right, _)| left.cmp(right));
-
-    let mut assignments = Vec::with_capacity(entries.len());
-    let mut vars = serde_json::Map::new();
-
-    for (key, value) in entries {
-        match value {
-            Value::Null => assignments.push(format!("{key} = NONE")),
-            Value::String(raw) if temporal_fields.contains(&key.as_str()) => {
-                vars.insert(key.clone(), Value::String(raw));
-                assignments.push(format!("{key} = type::datetime(${key})"));
-            }
-            other => {
-                vars.insert(key.clone(), other);
-                assignments.push(format!("{key} = ${key}"));
-            }
-        }
-    }
-
-    (assignments, vars)
-}
-
 #[cfg(test)]
-mod tests {
+mod platform_tests {
     use super::*;
     use crate::error::MemoryError;
-
-    // -----------------------------------------------------------------------
-    // validate_record_id tests
-    // -----------------------------------------------------------------------
 
     #[test]
     fn validate_record_id_accepts_episode_with_id() {
@@ -629,10 +355,6 @@ mod tests {
         assert!(matches!(err, MemoryError::Validation(_)));
     }
 
-    // -----------------------------------------------------------------------
-    // Existing build_select_one_query tests (unchanged behavior contract)
-    // -----------------------------------------------------------------------
-
     #[test]
     fn build_select_one_query_empty_string_returns_safe_noop() {
         let (sql, bind) = build_select_one_query("");
@@ -680,53 +402,5 @@ mod tests {
         let (sql, bind) = build_select_one_query("fact:52f9d92d20d829840f24294f");
         assert_eq!(sql, "SELECT * FROM fact:⟨52f9d92d20d829840f24294f⟩");
         assert!(bind.is_none());
-    }
-
-    #[test]
-    fn build_select_facts_filtered_query_uses_safe_literal_for_fts_operand() {
-        let (sql, vars) = build_select_facts_filtered_query(
-            "2026-05-13T00:00:00Z",
-            Some("Alice \"launch\""),
-            10,
-            &[],
-        );
-
-        assert!(sql.contains("search::score(1) AS ft_score"));
-        assert!(sql.contains("content @1@ \"Alice \\\"launch\\\"\""));
-        assert!(sql.contains("index_keys @1@ \"Alice \\\"launch\\\"\""));
-        assert!(!sql.contains("@1@ $query"));
-        assert!(!sql.contains("scope"));
-        assert!(!sql.contains("project"));
-        assert_eq!(vars["limit"], 10);
-    }
-
-    #[test]
-    fn surreal_string_literal_escapes_surrealql_control_characters() {
-        assert_eq!(
-            surreal_string_literal("quote\" slash\\ newline\n"),
-            "\"quote\\\" slash\\\\ newline\\n\""
-        );
-    }
-
-    #[test]
-    fn build_select_edges_filtered_page_query_uses_limit_and_start_bindings() {
-        let (sql, vars) = build_select_edges_filtered_page_query("2026-05-13T00:00:00Z", 250, 500);
-
-        assert!(sql.contains("LIMIT $limit START $start"));
-        assert!(sql.contains("ORDER BY in ASC, out ASC, t_valid DESC"));
-        assert_eq!(vars["cutoff"], json!("2026-05-13T00:00:00Z"));
-        assert_eq!(vars["limit"], json!(250));
-        assert_eq!(vars["start"], json!(500));
-    }
-
-    #[test]
-    fn build_select_active_facts_query_uses_full_bitemporal_visibility() {
-        let (sql, vars) = build_select_active_facts_query("2026-05-13T00:00:00Z", 5);
-
-        assert!(sql.contains("t_valid <= type::datetime($cutoff)"));
-        assert!(sql.contains("t_ingested IS NONE OR t_ingested <= type::datetime($cutoff)"));
-        assert!(sql.contains("t_invalid_ingested > type::datetime($cutoff)"));
-        assert_eq!(vars["cutoff"], "2026-05-13T00:00:00Z");
-        assert_eq!(vars["limit"], 5);
     }
 }

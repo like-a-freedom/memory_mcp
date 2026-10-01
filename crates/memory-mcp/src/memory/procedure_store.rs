@@ -52,7 +52,14 @@ impl ProcedureStore {
         let value = serde_json::to_value(record).map_err(|e| {
             MemoryError::Storage(format!("failed to serialize procedure_candidate: {e}"))
         })?;
-        self.client.create(&record_id, value).await.map(|_| ())
+        self.client
+            .create(
+                &record_id,
+                value,
+                crate::memory::queries::EPISODE_TEMPORAL_FIELDS,
+            )
+            .await
+            .map(|_| ())
     }
 
     /// Update an existing candidate (e.g., append evidence, change status).
@@ -64,7 +71,14 @@ impl ProcedureStore {
         let value = serde_json::to_value(record).map_err(|e| {
             MemoryError::Storage(format!("failed to serialize procedure_candidate: {e}"))
         })?;
-        self.client.update(&record_id, value).await.map(|_| ())
+        self.client
+            .update(
+                &record_id,
+                value,
+                crate::knowledge::queries::FACT_TEMPORAL_FIELDS,
+            )
+            .await
+            .map(|_| ())
     }
 
     /// List candidates in the active namespace, optionally filtered by status.

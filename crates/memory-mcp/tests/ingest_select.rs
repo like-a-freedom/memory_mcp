@@ -32,6 +32,7 @@ async fn seed_legacy_episode(
                 "policy_tags": [],
             }),
             "org",
+            memory_mcp::memory::queries::EPISODE_TEMPORAL_FIELDS,
         )
         .await?;
     Ok(())

@@ -52,7 +52,13 @@ impl FactStoreClient {
 
     /// Persists a new fact record. Returns `Value::Null` on success.
     pub(crate) async fn create(&self, fact_id: &str, content: Value) -> Result<Value, MemoryError> {
-        self.db.create(fact_id, content).await
+        self.db
+            .create(
+                fact_id,
+                content,
+                crate::knowledge::queries::FACT_TEMPORAL_FIELDS,
+            )
+            .await
     }
 
     #[cfg(feature = "streamable-http")]
@@ -62,7 +68,11 @@ impl FactStoreClient {
         content: Value,
     ) -> Result<(), MemoryError> {
         crate::storage::validate_record_id(fact_id)?;
-        let (sql, vars) = crate::storage::build_create_query(fact_id, content);
+        let (sql, vars) = crate::storage::build_create_query(
+            fact_id,
+            content,
+            crate::knowledge::queries::FACT_TEMPORAL_FIELDS,
+        );
         let mutation = crate::platform::persistence::outbox::TenantMutation::new(sql, vars)?;
         crate::platform::persistence::outbox::commit_tenant_mutation_with_event(
             &self.db,

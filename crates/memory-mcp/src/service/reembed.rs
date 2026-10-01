@@ -958,7 +958,7 @@ impl MemoryService {
         });
 
         self.reembed_store()
-            .upsert_record(REEMBED_JOB_ID, payload)
+            .upsert_job(REEMBED_JOB_ID, payload)
             .await
     }
 
@@ -1234,6 +1234,7 @@ mod tests {
                     "embedding_updated_at": now,
                 }),
                 namespace,
+                crate::knowledge::queries::FACT_TEMPORAL_FIELDS,
             )
             .await
             .expect("seed fact should succeed");
@@ -2287,6 +2288,7 @@ mod tests {
                 "updated_at": normalize_dt(Utc::now()),
             }),
             "org",
+            crate::embedding::queries::EMBEDDING_STATE_TEMPORAL_FIELDS,
         )
         .await
         .expect("seed stale embedding state");

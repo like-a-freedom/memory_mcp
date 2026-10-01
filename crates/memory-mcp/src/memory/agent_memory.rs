@@ -194,7 +194,14 @@ impl AgentMemoryStore {
         let record_id = format!("memory_event:{}", record.event_id);
         let value = serde_json::to_value(record)
             .map_err(|e| MemoryError::Storage(format!("failed to serialize memory_event: {e}")))?;
-        self.client.create(&record_id, value).await.map(|_| ())
+        self.client
+            .create(
+                &record_id,
+                value,
+                crate::memory::queries::EPISODE_TEMPORAL_FIELDS,
+            )
+            .await
+            .map(|_| ())
     }
 
     /// Load pending jobs or jobs whose lease has expired.
@@ -219,7 +226,14 @@ impl AgentMemoryStore {
     /// Update a projection job through the process-bound namespace.
     pub async fn update_job(&self, job_id: &str, payload: Value) -> Result<(), MemoryError> {
         let record_id = format!("event_projection_job:{job_id}");
-        self.client.update(&record_id, payload).await.map(|_| ())
+        self.client
+            .update(
+                &record_id,
+                payload,
+                crate::memory::queries::EPISODE_TEMPORAL_FIELDS,
+            )
+            .await
+            .map(|_| ())
     }
 
     /// Load a projection job by its job ID.
@@ -244,7 +258,14 @@ impl AgentMemoryStore {
         let value = serde_json::to_value(record).map_err(|e| {
             MemoryError::Storage(format!("failed to serialize event_projection_job: {e}"))
         })?;
-        self.client.create(&record_id, value).await.map(|_| ())
+        self.client
+            .create(
+                &record_id,
+                value,
+                crate::memory::queries::EPISODE_TEMPORAL_FIELDS,
+            )
+            .await
+            .map(|_| ())
     }
 
     /// Persist a rejection audit.
@@ -253,7 +274,14 @@ impl AgentMemoryStore {
         let value = serde_json::to_value(record).map_err(|e| {
             MemoryError::Storage(format!("failed to serialize memory_capture_audit: {e}"))
         })?;
-        self.client.create(&record_id, value).await.map(|_| ())
+        self.client
+            .create(
+                &record_id,
+                value,
+                crate::memory::queries::EPISODE_TEMPORAL_FIELDS,
+            )
+            .await
+            .map(|_| ())
     }
 
     /// Load a rejection audit by event ID.

@@ -202,7 +202,15 @@ impl InboxRevisionStoreClient {
     ) -> Result<(InboxRevisionRecord, bool), MemoryError> {
         let revision_id = record.revision_id.as_str();
         let content = record_to_json(record);
-        match self.db.create(revision_id, content).await {
+        match self
+            .db
+            .create(
+                revision_id,
+                content,
+                crate::memory::queries::INBOX_REVISION_TEMPORAL_FIELDS,
+            )
+            .await
+        {
             Ok(created) => {
                 let parsed = record_from_json(&created).ok_or_else(|| {
                     MemoryError::Storage("failed to parse created inbox revision".to_string())

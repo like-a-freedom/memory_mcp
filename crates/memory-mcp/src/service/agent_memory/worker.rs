@@ -199,7 +199,12 @@ mod tests {
         });
         service
             .db_client
-            .create(episode_id, episode_payload, namespace)
+            .create(
+                episode_id,
+                episode_payload,
+                namespace,
+                crate::memory::queries::EPISODE_TEMPORAL_FIELDS,
+            )
             .await
             .expect("create episode");
 
@@ -225,7 +230,12 @@ mod tests {
         });
         service
             .db_client
-            .create("memory_event:evt-e2e-1", event_payload, namespace)
+            .create(
+                "memory_event:evt-e2e-1",
+                event_payload,
+                namespace,
+                crate::memory::queries::EPISODE_TEMPORAL_FIELDS,
+            )
             .await
             .expect("create event");
 
@@ -243,7 +253,12 @@ mod tests {
         });
         service
             .db_client
-            .create("event_projection_job:job-e2e-1", job_payload, namespace)
+            .create(
+                "event_projection_job:job-e2e-1",
+                job_payload,
+                namespace,
+                crate::memory::queries::EPISODE_TEMPORAL_FIELDS,
+            )
             .await
             .expect("create job");
 
@@ -283,7 +298,12 @@ mod tests {
         });
         service
             .db_client
-            .create("event_projection_job:job-expired", job_payload, namespace)
+            .create(
+                "event_projection_job:job-expired",
+                job_payload,
+                namespace,
+                crate::memory::queries::EPISODE_TEMPORAL_FIELDS,
+            )
             .await
             .expect("create job");
 
@@ -322,6 +342,7 @@ mod tests {
                 "event_projection_job:job-deadletter",
                 job_payload,
                 namespace,
+                crate::memory::queries::EPISODE_TEMPORAL_FIELDS,
             )
             .await
             .expect("create job");
@@ -343,7 +364,12 @@ mod tests {
         });
         service
             .db_client
-            .create("memory_event:evt-deadletter", event_payload, namespace)
+            .create(
+                "memory_event:evt-deadletter",
+                event_payload,
+                namespace,
+                crate::memory::queries::EPISODE_TEMPORAL_FIELDS,
+            )
             .await
             .expect("create event");
 

@@ -132,6 +132,7 @@ async fn archival_pass_when_episode_fact_was_recently_accessed_then_skips_archiv
                 "last_accessed": memory_mcp::service::normalize_dt(Utc::now()),
             }),
             "org",
+            memory_mcp::knowledge::queries::FACT_TEMPORAL_FIELDS,
         )
         .await
         .expect("touch fact");

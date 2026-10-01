@@ -59,6 +59,7 @@ impl DbClient for TableCheckingDb {
         _record_id: &str,
         _content: serde_json::Value,
         _namespace: &str,
+        _temporal_fields: &[&str],
     ) -> Result<serde_json::Value, MemoryError> {
         Ok(serde_json::json!({}))
     }
@@ -68,6 +69,7 @@ impl DbClient for TableCheckingDb {
         _record_id: &str,
         _content: serde_json::Value,
         _namespace: &str,
+        _temporal_fields: &[&str],
     ) -> Result<serde_json::Value, MemoryError> {
         Ok(serde_json::json!({}))
     }

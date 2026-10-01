@@ -126,9 +126,21 @@ impl EmbeddingStateStoreClient {
             .await?
             .is_some()
         {
-            self.db.update(EMBEDDING_STATE_RECORD_ID, payload).await?;
+            self.db
+                .update(
+                    EMBEDDING_STATE_RECORD_ID,
+                    payload,
+                    crate::embedding::queries::EMBEDDING_STATE_TEMPORAL_FIELDS,
+                )
+                .await?;
         } else {
-            self.db.create(EMBEDDING_STATE_RECORD_ID, payload).await?;
+            self.db
+                .create(
+                    EMBEDDING_STATE_RECORD_ID,
+                    payload,
+                    crate::embedding::queries::EMBEDDING_STATE_TEMPORAL_FIELDS,
+                )
+                .await?;
         }
         Ok(())
     }

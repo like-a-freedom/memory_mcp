@@ -708,6 +708,7 @@ async fn crash_before_record_episode_recovers_through_expected_episode_id() {
             "source_lineage": "fs:crash2",
         }),
         "org",
+        memory_mcp::memory::queries::EPISODE_TEMPORAL_FIELDS,
     )
     .await
     .expect("create episode");

@@ -121,7 +121,7 @@ pub(crate) async fn record_query_log(
 
     service
         .context_access_log()
-        .create(&record_id, Value::Object(payload))
+        .create(&record_id, Value::Object(payload), &[])
         .await?;
 
     Ok(())

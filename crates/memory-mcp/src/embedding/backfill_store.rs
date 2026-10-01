@@ -155,6 +155,7 @@ mod tests {
                 "provenance": {"source_episode": "episode:seed"}
             }),
             "org",
+            crate::knowledge::queries::FACT_TEMPORAL_FIELDS,
         )
         .await
         .expect("missing fact should be created");
@@ -186,6 +187,7 @@ mod tests {
                 "embedding_updated_at": now
             }),
             "org",
+            crate::knowledge::queries::FACT_TEMPORAL_FIELDS,
         )
         .await
         .expect("stored fact should be created");

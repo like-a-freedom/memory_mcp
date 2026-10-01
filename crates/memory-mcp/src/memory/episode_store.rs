@@ -62,7 +62,13 @@ impl EpisodeStoreClient {
     }
 
     pub async fn create(&self, record_id: &str, content: Value) -> Result<Value, MemoryError> {
-        self.db.create(record_id, content).await
+        self.db
+            .create(
+                record_id,
+                content,
+                crate::memory::queries::EPISODE_TEMPORAL_FIELDS,
+            )
+            .await
     }
 
     /// Create an episode and publish its app invalidation in the same tenant
@@ -147,7 +153,13 @@ impl EpisodeStoreClient {
     }
 
     pub async fn update(&self, record_id: &str, content: Value) -> Result<Value, MemoryError> {
-        self.db.update(record_id, content).await
+        self.db
+            .update(
+                record_id,
+                content,
+                crate::memory::queries::EPISODE_TEMPORAL_FIELDS,
+            )
+            .await
     }
 
     /// Update an episode, refusing any record id that is not
@@ -163,7 +175,13 @@ impl EpisodeStoreClient {
         content: Value,
     ) -> Result<Value, MemoryError> {
         crate::storage::require_record_kind(record_id, "episode")?;
-        self.db.update(record_id, content).await
+        self.db
+            .update(
+                record_id,
+                content,
+                crate::memory::queries::EPISODE_TEMPORAL_FIELDS,
+            )
+            .await
     }
 
     /// Episodes that are old enough to archive and are not
@@ -300,6 +318,7 @@ mod tests {
                     },
                 }),
                 "org",
+                crate::knowledge::queries::FACT_TEMPORAL_FIELDS,
             )
             .await
             .expect("seed fact should succeed");

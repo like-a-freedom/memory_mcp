@@ -71,9 +71,21 @@ impl KnowledgeGraphStore {
         content: Value,
     ) -> Result<(), MemoryError> {
         if self.db.select_one(community_id).await?.is_some() {
-            self.db.update(community_id, content).await?;
+            self.db
+                .update(
+                    community_id,
+                    content,
+                    crate::knowledge::queries::COMMUNITY_TEMPORAL_FIELDS,
+                )
+                .await?;
         } else {
-            self.db.create(community_id, content).await?;
+            self.db
+                .create(
+                    community_id,
+                    content,
+                    crate::knowledge::queries::COMMUNITY_TEMPORAL_FIELDS,
+                )
+                .await?;
         }
         Ok(())
     }
@@ -110,7 +122,7 @@ impl KnowledgeGraphStore {
         limit: usize,
     ) -> Result<Vec<Value>, MemoryError> {
         let (sql, vars) =
-            crate::storage::build_select_edges_filtered_page_query(cutoff, limit, start);
+            crate::knowledge::queries::build_select_edges_filtered_page_query(cutoff, limit, start);
         self.db.query_rows(&sql, Some(vars)).await
     }
 
@@ -136,7 +148,7 @@ impl KnowledgeGraphStore {
     }
 
     pub async fn select_active_facts(&self, limit: i32) -> Result<Vec<Value>, MemoryError> {
-        let (sql, vars) = crate::storage::build_select_active_facts_query(
+        let (sql, vars) = crate::knowledge::queries::build_select_active_facts_query(
             &crate::shared::temporal::normalize_dt(crate::shared::temporal::now()),
             limit,
         );
@@ -154,8 +166,9 @@ impl KnowledgeGraphStore {
         cutoff: &str,
         direction: GraphDirection,
     ) -> Result<Vec<Value>, MemoryError> {
-        let (sql, vars) =
-            crate::storage::build_select_edge_neighbors_query(node_id, cutoff, direction);
+        let (sql, vars) = crate::knowledge::queries::build_select_edge_neighbors_query(
+            node_id, cutoff, direction,
+        );
         self.db.query_rows(&sql, Some(vars)).await
     }
 
@@ -169,7 +182,7 @@ impl KnowledgeGraphStore {
         cutoff: &str,
         limit: i32,
     ) -> Result<Vec<Value>, MemoryError> {
-        let visibility = crate::storage::build_fact_visibility_clause("$cutoff");
+        let visibility = crate::shared::temporal::visibility_clause("$cutoff");
         let sql = format!(
             "SELECT * FROM fact WHERE source_episode = $episode_id AND {visibility} LIMIT $limit"
         );
@@ -186,7 +199,9 @@ impl KnowledgeGraphStore {
         member_entities: &[String],
     ) -> Result<Vec<Value>, MemoryError> {
         let (sql, vars) =
-            crate::storage::build_select_communities_by_member_entities_query(member_entities);
+            crate::knowledge::queries::build_select_communities_by_member_entities_query(
+                member_entities,
+            );
         self.db.query_rows(&sql, Some(vars)).await
     }
 
@@ -217,7 +232,8 @@ impl KnowledgeGraphStore {
         to_id: &str,
         content: Value,
     ) -> Result<Value, MemoryError> {
-        let (sql, vars) = crate::storage::build_relate_edge_query(edge_id, from_id, to_id, content);
+        let (sql, vars) =
+            crate::knowledge::queries::build_relate_edge_query(edge_id, from_id, to_id, content);
         match self.db.query(&sql, Some(vars)).await {
             Ok(value) => Ok(value
                 .as_array()

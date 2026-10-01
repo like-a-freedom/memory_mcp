@@ -208,6 +208,7 @@ pub async fn seed_entity(
                 "aliases": aliases,
             }),
             TEST_ACTIVE_NAMESPACE,
+            memory_mcp::knowledge::queries::ENTITY_TEMPORAL_FIELDS,
         )
         .await
         .expect("seed entity should succeed");
@@ -232,6 +233,7 @@ pub async fn seed_community(
                 "updated_at": normalize_dt(updated_at),
             }),
             TEST_ACTIVE_NAMESPACE,
+            memory_mcp::knowledge::queries::COMMUNITY_TEMPORAL_FIELDS,
         )
         .await
         .expect("seed community should succeed");

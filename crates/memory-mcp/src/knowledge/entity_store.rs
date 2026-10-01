@@ -219,6 +219,7 @@ mod tests {
                 "aliases": aliases,
             }),
             "org",
+            crate::knowledge::queries::FACT_TEMPORAL_FIELDS,
         )
         .await
         .expect("seed entity");

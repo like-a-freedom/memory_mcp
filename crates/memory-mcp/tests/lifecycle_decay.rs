@@ -111,6 +111,7 @@ async fn decay_pass_when_fact_was_recently_accessed_then_skips_invalidation() {
                 "last_accessed": memory_mcp::service::normalize_dt(Utc::now()),
             }),
             "org",
+            memory_mcp::knowledge::queries::FACT_TEMPORAL_FIELDS,
         )
         .await
         .expect("touch fact");

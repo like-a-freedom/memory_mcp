@@ -763,6 +763,7 @@ mod tests {
                 "provenance": {"source_episode": "episode:seed"}
             }),
             "org",
+            crate::knowledge::queries::FACT_TEMPORAL_FIELDS,
         )
         .await
         .expect("missing fact");
@@ -794,6 +795,7 @@ mod tests {
                 "embedding_updated_at": now
             }),
             "org",
+            crate::knowledge::queries::FACT_TEMPORAL_FIELDS,
         )
         .await
         .expect("existing fact");
@@ -964,6 +966,7 @@ mod tests {
                 "updated_at": normalize_dt(Utc::now()),
             }),
             "org",
+            crate::embedding::queries::EMBEDDING_STATE_TEMPORAL_FIELDS,
         )
         .await
         .expect("pending embedding state");
@@ -1012,6 +1015,7 @@ mod tests {
                 "updated_at": normalize_dt(Utc::now()),
             }),
             "org",
+            crate::embedding::queries::EMBEDDING_STATE_TEMPORAL_FIELDS,
         )
         .await
         .expect("legacy embedding state");
