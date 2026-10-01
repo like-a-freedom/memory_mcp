@@ -106,14 +106,6 @@ pub trait TaskStore: Send + Sync + 'static {
     /// creates a second task for the same fingerprint.
     async fn claim_next_due(&self, replica_id: &str) -> Result<Option<TaskHandle>, MemoryError>;
 
-    /// Update progress with a `lease_generation = current`
-    /// CAS.
-    async fn update_progress_fenced(
-        &self,
-        handle: &TaskHandle,
-        progress: serde_json::Value,
-    ) -> Result<(), MemoryError>;
-
     /// Mark the task completed with a CAS. When
     /// `completed_before_cancel` is true the task had
     /// already committed facts before the intent arrived;

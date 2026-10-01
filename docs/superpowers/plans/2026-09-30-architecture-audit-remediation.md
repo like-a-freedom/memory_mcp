@@ -489,12 +489,12 @@ git commit -m "refactor(search): one lexical-overlap loop, in the module that al
 
 `update_progress_fenced` has zero call sites — not in production, not in a test, not in the test driver at `http/tasks.rs`. Every other one of the 11 methods has at least one. Removing it is not narrowing the trait by a choice; it removes a method whose behaviour was never specified by a caller.
 
-- [ ] **Step 1: Write the test that fails when a trait method is uncalled.** Create `crates/memory-mcp/tests/trait_methods_are_called.rs`: for each method named in a table `(trait_path, method_name)`, grep `crates/memory-mcp/src` and `crates/memory-mcp/tests` for `.method_name(` and assert at least one hit that is not the trait declaration and not the impl body. Table entries: the 11 `TaskStore` methods, the 19 `LocalAdminStore` methods, the 8 registry owner traits' 51 methods.
+- [x] **Step 1: Write the test that fails when a trait method is uncalled.** Create `crates/memory-mcp/tests/trait_methods_are_called.rs`: for each method named in a table `(trait_path, method_name)`, grep `crates/memory-mcp/src` and `crates/memory-mcp/tests` for `.method_name(` and assert at least one hit that is not the trait declaration and not the impl body. Table entries: the 11 `TaskStore` methods, the 19 `LocalAdminStore` methods, the 8 registry owner traits' 51 methods.
 
   Run: expect FAIL listing `update_progress_fenced`. Every other entry must PASS — if another fails, that is a new finding: record it and cut it too, or wire it, per the ruling.
-- [ ] **Step 2: Remove the declaration and the impl.**
-- [ ] **Step 3: Run the test.** Expected: PASS.
-- [ ] **Step 4: Commit**
+- [x] **Step 2: Remove the declaration and the impl.**
+- [x] **Step 3: Run the test.** Expected: PASS.
+- [x] **Step 4: Commit**
 
 ```bash
 git commit -m "refactor(tasks): drop update_progress_fenced, which no caller ever asked for"

@@ -313,22 +313,6 @@ impl TaskStore for DurableTaskStore {
         }
     }
 
-    async fn update_progress_fenced(
-        &self,
-        handle: &TaskHandle,
-        progress: Value,
-    ) -> Result<(), MemoryError> {
-        self.fenced_update(
-            handle,
-            "UPDATE tenant_task SET progress = $progress, version = version + 1, updated_at = type::datetime($now) WHERE id = type::record('tenant_task', $id) AND tenant_id = $tenant_id AND lease_owner = $owner AND lease_generation = $gen AND state IN ['running', 'cancel_requested']",
-            Some(json!({
-                "progress": progress,
-                "now": Self::to_datetime(Utc::now()),
-            })),
-        )
-        .await
-    }
-
     async fn complete_fenced(
         &self,
         handle: &TaskHandle,
