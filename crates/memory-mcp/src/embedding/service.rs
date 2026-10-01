@@ -106,106 +106,7 @@ impl EmbeddingService {
         &self,
         input: &str,
     ) -> Result<Option<Vec<f64>>, MemoryError> {
-        let effective_input: String = if input.len() > MAX_EMBEDDING_INPUT_CHARS {
-            let truncated: String = input.chars().take(MAX_EMBEDDING_INPUT_CHARS).collect();
-            self.logger.log(
-                crate::platform::log_event::log_event(
-                    "embedding.input_truncated",
-                    json!({
-                        "original_chars": input.chars().count(),
-                        "truncated_chars": truncated.chars().count(),
-                        "limit": MAX_EMBEDDING_INPUT_CHARS,
-                    }),
-                    json!({}),
-                    None,
-                    None,
-                    None,
-                ),
-                LogLevel::Warn,
-            );
-            truncated
-        } else {
-            input.to_string()
-        };
-
-        let timer = Instant::now();
-        let provider = self.embedding_provider.provider_name();
-        let args = json!({
-            "provider": provider,
-            "input_chars": effective_input.chars().count(),
-        });
-
-        if !self.embedding_provider.is_enabled() {
-            let mut result = crate::platform::log_event::build_embedding_log_result(0, None);
-            if let Some(map) = result.as_object_mut() {
-                map.insert("status".to_string(), json!("disabled"));
-            }
-            self.logger.log(
-                crate::platform::log_event::log_event(
-                    "embedding.generate.skipped",
-                    crate::platform::log_event::log_args_with_duration(args, timer.elapsed()),
-                    result,
-                    None,
-                    None,
-                    None,
-                ),
-                LogLevel::Debug,
-            );
-            return Ok(None);
-        }
-
-        // The provider call is the one stage here that can be slow for reasons
-        // outside this process — a model server, a network hop, a queue behind
-        // someone else's inference. Everything above it is bookkeeping, so
-        // this is the duration that separates "our code got slower" from
-        // "the thing we call got slower".
-        // Scoped to the call. Bound at function scope the guard would stay
-        // alive through the logging below, so `embedding_provider` would
-        // measure the call plus the bookkeeping that follows it — the exact
-        // split between "the thing we call" and "our own code" that the stage
-        // exists to provide.
-        let embedded = {
-            let _provider_stage =
-                crate::shared::observability::StageTimer::new("extract", "embedding_provider");
-            self.embedding_provider.embed(&effective_input).await
-        };
-        match embedded {
-            Ok(embedding) => {
-                self.logger.log(
-                    crate::platform::log_event::log_event(
-                        "embedding.generate.done",
-                        crate::platform::log_event::log_args_with_duration(args, timer.elapsed()),
-                        crate::platform::log_event::build_embedding_log_result(
-                            1,
-                            Some(embedding.len()),
-                        ),
-                        None,
-                        None,
-                        None,
-                    ),
-                    LogLevel::Info,
-                );
-                Ok(Some(embedding))
-            }
-            Err(err) => {
-                let mut result = crate::platform::log_event::build_embedding_log_result(0, None);
-                if let Some(map) = result.as_object_mut() {
-                    map.insert("error".to_string(), json!(err.to_string()));
-                }
-                self.logger.log(
-                    crate::platform::log_event::log_event(
-                        "embedding.generate.error",
-                        crate::platform::log_event::log_args_with_duration(args, timer.elapsed()),
-                        result,
-                        None,
-                        None,
-                        None,
-                    ),
-                    LogLevel::Warn,
-                );
-                Err(err)
-            }
-        }
+        generate_with_provider(&self.embedding_provider, &self.logger, input).await
     }
 
     pub(crate) async fn generate_query_embedding_with_background(
@@ -600,6 +501,185 @@ impl EmbeddingService {
     }
 }
 
+/// Generate one vector, or `None` when the provider is disabled.
+///
+/// Free rather than only a method on [`EmbeddingService`] because two
+/// adapters need it and only one of them is the service. The input limit,
+/// the enabled check, the stage timer and the four log events all live
+/// here, and a second implementation of any of them would be a second
+/// place to forget one — which is what `service/embedding_recovery.rs`
+/// was doing when it called `provider.embed()` directly.
+async fn generate_with_provider(
+    embedding_provider: &Arc<dyn EmbeddingProvider>,
+    logger: &StdoutLogger,
+    input: &str,
+) -> Result<Option<Vec<f64>>, MemoryError> {
+    let effective_input: String = if input.len() > MAX_EMBEDDING_INPUT_CHARS {
+        let truncated: String = input.chars().take(MAX_EMBEDDING_INPUT_CHARS).collect();
+        logger.log(
+            crate::platform::log_event::log_event(
+                "embedding.input_truncated",
+                json!({
+                    "original_chars": input.chars().count(),
+                    "truncated_chars": truncated.chars().count(),
+                    "limit": MAX_EMBEDDING_INPUT_CHARS,
+                }),
+                json!({}),
+                None,
+                None,
+                None,
+            ),
+            LogLevel::Warn,
+        );
+        truncated
+    } else {
+        input.to_string()
+    };
+
+    let timer = Instant::now();
+    let provider = embedding_provider.provider_name();
+    let args = json!({
+        "provider": provider,
+        "input_chars": effective_input.chars().count(),
+    });
+
+    if !embedding_provider.is_enabled() {
+        let mut result = crate::platform::log_event::build_embedding_log_result(0, None);
+        if let Some(map) = result.as_object_mut() {
+            map.insert("status".to_string(), json!("disabled"));
+        }
+        logger.log(
+            crate::platform::log_event::log_event(
+                "embedding.generate.skipped",
+                crate::platform::log_event::log_args_with_duration(args, timer.elapsed()),
+                result,
+                None,
+                None,
+                None,
+            ),
+            LogLevel::Debug,
+        );
+        return Ok(None);
+    }
+
+    // The provider call is the one stage here that can be slow for reasons
+    // outside this process — a model server, a network hop, a queue behind
+    // someone else's inference. Everything above it is bookkeeping, so
+    // this is the duration that separates "our code got slower" from
+    // "the thing we call got slower".
+    // Scoped to the call. Bound at function scope the guard would stay
+    // alive through the logging below, so `embedding_provider` would
+    // measure the call plus the bookkeeping that follows it — the exact
+    // split between "the thing we call" and "our own code" that the stage
+    // exists to provide.
+    let embedded = {
+        let _provider_stage =
+            crate::shared::observability::StageTimer::new("extract", "embedding_provider");
+        embedding_provider.embed(&effective_input).await
+    };
+    match embedded {
+        Ok(embedding) => {
+            logger.log(
+                crate::platform::log_event::log_event(
+                    "embedding.generate.done",
+                    crate::platform::log_event::log_args_with_duration(args, timer.elapsed()),
+                    crate::platform::log_event::build_embedding_log_result(
+                        1,
+                        Some(embedding.len()),
+                    ),
+                    None,
+                    None,
+                    None,
+                ),
+                LogLevel::Info,
+            );
+            Ok(Some(embedding))
+        }
+        Err(err) => {
+            let mut result = crate::platform::log_event::build_embedding_log_result(0, None);
+            if let Some(map) = result.as_object_mut() {
+                map.insert("error".to_string(), json!(err.to_string()));
+            }
+            logger.log(
+                crate::platform::log_event::log_event(
+                    "embedding.generate.error",
+                    crate::platform::log_event::log_args_with_duration(args, timer.elapsed()),
+                    result,
+                    None,
+                    None,
+                    None,
+                ),
+                LogLevel::Warn,
+            );
+            Err(err)
+        }
+    }
+}
+
+/// Generation over one provider, for a caller that holds a provider rather
+/// than a whole service.
+///
+/// Recovery is that caller: it is handed a provider that may differ from the
+/// one the service was built with — a re-probed remote target, or a local
+/// model that swapped in while the service was running. This wrapper exists so
+/// that holding a provider is not the same as being allowed to skip the
+/// generation contract.
+///
+/// It is a separate type from the [`EmbeddingService`] adapter because the two
+/// carry different state, not because the contract differs. This one has a
+/// provider and a logger; the service adapter has those plus a resolved
+/// identity and two caches, none of which generation reads.
+pub(crate) struct ProviderGeneration {
+    provider: Arc<dyn EmbeddingProvider>,
+    logger: StdoutLogger,
+}
+
+impl ProviderGeneration {
+    pub(crate) fn new(provider: Arc<dyn EmbeddingProvider>, logger: StdoutLogger) -> Self {
+        Self { provider, logger }
+    }
+}
+
+/// The production adapter of [`crate::embedding::api::EmbeddingGeneration`],
+/// and the reason the trait exists: a caller that generates through a port
+/// cannot skip the input limit or the disabled check, because both live in
+/// `generate_with_provider` and there is no other way in.
+#[async_trait::async_trait]
+impl crate::embedding::api::EmbeddingGeneration for EmbeddingService {
+    async fn generate(
+        &self,
+        input: &str,
+    ) -> Result<crate::embedding::api::GenerationOutcome, MemoryError> {
+        Ok(to_generation_outcome(self.generate_embedding(input).await?))
+    }
+}
+
+#[async_trait::async_trait]
+impl crate::embedding::api::EmbeddingGeneration for ProviderGeneration {
+    async fn generate(
+        &self,
+        input: &str,
+    ) -> Result<crate::embedding::api::GenerationOutcome, MemoryError> {
+        Ok(to_generation_outcome(
+            generate_with_provider(&self.provider, &self.logger, input).await?,
+        ))
+    }
+}
+
+/// Say that "no vector" is a reason rather than an absence.
+///
+/// `generate_with_provider` returns `None` in exactly one case — the provider
+/// is configured but disabled — and has no other way to decline. That is what
+/// makes this mapping total rather than a guess: there is no second `None` for
+/// a future change to fall through.
+fn to_generation_outcome(generated: Option<Vec<f64>>) -> crate::embedding::api::GenerationOutcome {
+    use crate::embedding::api::{GenerationOutcome, SkipReason};
+    match generated {
+        Some(vector) => GenerationOutcome::Generated(vector),
+        None => GenerationOutcome::Skipped(SkipReason::ProviderDisabled),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use std::sync::Arc;
@@ -843,6 +923,93 @@ mod tests {
         );
         let result = service.generate_embedding("hello").await.unwrap();
         assert!(result.is_none());
+    }
+
+    /// The two adapters of `EmbeddingGeneration` both carry the input limit,
+    /// because both call one function. This test is the proof, and it is the
+    /// evidence that the seam closed the hole `service/embedding_recovery.rs`
+    /// was carrying when it called `provider.embed()` directly: a direct call
+    /// sends the caller's text, and this asserts the provider does not
+    /// receive it.
+    #[tokio::test]
+    async fn the_generation_port_truncates_before_the_provider_sees_the_text() {
+        struct RecordingProvider {
+            seen: std::sync::Mutex<Vec<String>>,
+        }
+
+        #[async_trait]
+        impl EmbeddingProvider for RecordingProvider {
+            fn is_enabled(&self) -> bool {
+                true
+            }
+            fn provider_name(&self) -> &'static str {
+                "recording"
+            }
+            fn dimension(&self) -> usize {
+                4
+            }
+            async fn embed(&self, input: &str) -> Result<Vec<f64>, MemoryError> {
+                self.seen.lock().expect("seen lock").push(input.to_owned());
+                Ok(vec![0.0; 4])
+            }
+        }
+
+        let provider = Arc::new(RecordingProvider {
+            seen: std::sync::Mutex::new(Vec::new()),
+        });
+        let long = "\u{e9}".repeat(MAX_EMBEDDING_INPUT_CHARS + 500);
+
+        // Adapter one: the provider-only port recovery uses.
+        let port = ProviderGeneration::new(provider.clone(), StdoutLogger::new("warn"));
+        assert!(
+            matches!(
+                crate::embedding::api::EmbeddingGeneration::generate(&port, &long)
+                    .await
+                    .expect("generation completes"),
+                crate::embedding::api::GenerationOutcome::Generated(_)
+            ),
+            "an enabled provider produces a vector, whatever the input length"
+        );
+
+        // Adapter two: the service, which the other three callers use.
+        let service = make_service(
+            provider.clone(),
+            None,
+            Arc::new(BackgroundTaskRunner::new()),
+        );
+        let _ = crate::embedding::api::EmbeddingGeneration::generate(&service, &long)
+            .await
+            .expect("generation completes");
+
+        let seen = provider.seen.lock().expect("seen lock").clone();
+        assert_eq!(seen.len(), 2, "both adapters reached the provider");
+        for (index, received) in seen.iter().enumerate() {
+            assert_eq!(
+                received.chars().count(),
+                MAX_EMBEDDING_INPUT_CHARS,
+                "adapter {index} sent the caller's text instead of the truncated one"
+            );
+        }
+    }
+
+    /// The other half of the port's contract: a disabled provider is a
+    /// configuration, not a failure, and it is reported as a reason a metric
+    /// can label rather than as an absent value.
+    #[tokio::test]
+    async fn the_generation_port_reports_a_disabled_provider_as_a_skip() {
+        let service = make_service(
+            Arc::new(ScriptedProvider::disabled(4)),
+            None,
+            Arc::new(BackgroundTaskRunner::new()),
+        );
+        assert_eq!(
+            crate::embedding::api::EmbeddingGeneration::generate(&service, "hello")
+                .await
+                .expect("a disabled provider is not an error"),
+            crate::embedding::api::GenerationOutcome::Skipped(
+                crate::embedding::api::SkipReason::ProviderDisabled
+            )
+        );
     }
 
     #[tokio::test]

@@ -843,40 +843,44 @@ impl MemoryService {
             crate::knowledge::fact_service::FactService::build_fact_embedding_input(
                 fact_type, content, quote,
             );
-        let embedding = self
-            .embedding_service()
-            .generate_embedding(&embedding_input)
-            .await?
-            .ok_or_else(|| {
-                MemoryError::Validation(
-                    "reembed requires an enabled embedding provider".to_string(),
-                )
-            })?;
-
         let port = crate::embedding::infra::FactVectorAdapter::new(
             self.db_client.clone(),
             self.active_namespace.clone(),
             embedding_state.model.clone(),
             Some(target_dimension),
         );
-        crate::embedding::api::update_canonical_vector(
+        // Generate and write as one call. Before this, the two were separate
+        // and the caller had to hold the vector in between — which is what let
+        // a future edit generate a vector and then write it under a different
+        // policy, or skip the write. A disabled provider is still refused here,
+        // because re-embedding with nothing to re-embed from is a caller
+        // error rather than a state to tolerate: the operator asked for a
+        // re-embed and there is no provider to do it with.
+        let applied = crate::embedding::api::generate_and_update(
+            &self.embedding_service(),
             &port,
             &fact_id,
-            embedding,
+            &embedding_input,
             &crate::embedding::api::VectorIdentity {
                 provider: embedding_state.provider.provider_name().to_owned(),
                 model: embedding_state.model.clone(),
                 dimension: target_dimension,
                 signature: target_signature.to_owned(),
             },
-            chrono::Utc::now(),
             // Re-embedding exists to replace a stale signature,
             // so a mismatched vector is overwritten; a fact that
             // is already current is left alone.
             crate::embedding::api::VectorWritePolicy::ReplaceStale,
         )
         .await?;
-        Ok(fact_id)
+        match applied {
+            crate::embedding::api::VectorApplication::Skipped(reason) => {
+                Err(MemoryError::Validation(format!(
+                    "reembed requires an enabled embedding provider, got: {reason:?}"
+                )))
+            }
+            _ => Ok(fact_id),
+        }
     }
 
     async fn write_embedding_state(

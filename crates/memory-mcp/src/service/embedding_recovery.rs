@@ -250,24 +250,48 @@ pub(crate) async fn run_backfill(
             let content = required_fact_string(&fact, "content")?;
             let quote = required_fact_string(&fact, "quote")?;
             let input = FactService::build_fact_embedding_input(&fact_type, &content, &quote);
-            let embedding = provider.embed(&input).await?;
-            crate::embedding::api::update_canonical_vector(
+            // Generation goes through the capability's own port rather than
+            // `provider.embed()`. The provider is still the argument — it is
+            // the one recovery was handed, and it may differ from the service's
+            // — but reaching past the port is what made this loop skip the
+            // 8,000-character input limit and the disabled-provider check.
+            let generation = crate::embedding::service::ProviderGeneration::new(
+                provider.clone(),
+                service.logger.clone(),
+            );
+            let applied = crate::embedding::api::generate_and_update(
+                &generation,
                 &vector_port,
                 &fact_id,
-                embedding,
+                &input,
                 &crate::embedding::api::VectorIdentity {
                     provider: provider.provider_name().to_owned(),
                     model: model.map(str::to_owned),
                     dimension,
                     signature: signature.to_owned(),
                 },
-                chrono::Utc::now(),
                 // Backfill only fills gaps: a fact selected here
                 // had no vector, and a concurrent pass that
                 // already wrote one keeps it.
                 crate::embedding::api::VectorWritePolicy::FillMissing,
             )
             .await?;
+            match applied {
+                crate::embedding::api::VectorApplication::Applied
+                | crate::embedding::api::VectorApplication::AlreadyCurrent => {}
+                crate::embedding::api::VectorApplication::Skipped(reason) => {
+                    // A disabled provider produces nothing for every fact in
+                    // the batch, and looping over the rest of them would spin
+                    // to the end of the table to learn nothing. ADR-0042's
+                    // rule is unchanged — a compatible recovery backfills, a
+                    // signature mismatch keeps semantic retrieval degraded —
+                    // but "degraded" is now stated rather than reached by
+                    // silently writing no vectors.
+                    return Err(MemoryError::Storage(format!(
+                        "embedding backfill skipped, provider produced no vector: {reason:?}"
+                    )));
+                }
+            }
             crate::memory::context_cache::invalidate_cache(service.context_cache).await;
             cursor = Some(fact_id);
             processed += 1;

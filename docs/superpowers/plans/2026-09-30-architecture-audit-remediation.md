@@ -609,7 +609,7 @@ pub async fn generate_and_update(
 
 `EmbeddingGeneration` is a port declared in `embedding/api.rs` with one method `generate_embedding(&self, input: &EmbeddingInput) -> Result<Vec<f32>, MemoryError>` — satisfied by `EmbeddingService` (its existing method, unchanged) and by an in-memory fake in tests. `EmbeddingOutcome` is a new enum: `Written { dimension: usize }` or `Skipped { reason: SkipReason }`, where `SkipReason` is a bounded enum (`ProviderDisabled`, `AlreadyPresent`, `NotEmbeddable`) so it can become a metric label without an unbounded string.
 
-- [ ] **Step 1: Write the failing test** in `crates/memory-mcp/tests/embedding_vector_policies.rs`:
+- [x] **Step 1: Write the failing test** in `crates/memory-mcp/tests/embedding_vector_policies.rs`:
 
 ```rust
 #[tokio::test]
@@ -632,12 +632,12 @@ async fn long_content_is_truncated_before_generation() {
 
 `InMemoryVectorStore` is a second adapter for `VectorWritePort`, which is what makes this seam real. Run: `cargo test -p memory_mcp --test embedding_vector_policies`. Expected: FAIL — `generate_and_update` does not exist.
 
-- [ ] **Step 2: Declare the two ports and the outcome enum** in `embedding/api.rs`. Follow the house style in `operations/api.rs`: `#[async_trait::async_trait]`, `Send + Sync`, doc comment stating why.
-- [ ] **Step 3: Implement `generate_and_update`**: call `embedding.generate_embedding(input)`, then `store.update_canonical_vector(fact_id, vector, policy)`. Translate the existing disabled-check and truncation into the `SkipReason` and the `EmbeddingInput` respectively, so both live inside this function.
-- [ ] **Step 4: Run the test.** Expected: PASS.
-- [ ] **Step 5: Migrate the four callers**, one commit each. `embedding_recovery.rs` is the important one: delete the direct `provider.embed()` at line 253 and the inlined `build_embedding_payload` at 252, and call `generate_and_update` with `VectorWritePolicy::FillMissing` — preserving ADR-0042's rule that a compatible recovery uses `backfill_pending` and a signature-mismatch recovery keeps semantic retrieval degraded.
-- [ ] **Step 6: Write the test that fails when a caller bypasses the path.** Add to `crates/memory-mcp/tests/embedding_vector_policies.rs`: scan `crates/memory-mcp/src` for `.generate_embedding(` and `.embed(` and assert every hit is inside `crates/memory-mcp/src/embedding/`. Run, expect it to fail on the two pre-migration callers, pass after Step 5.
-- [ ] **Step 7: Commit**
+- [x] **Step 2: Declare the two ports and the outcome enum** in `embedding/api.rs`. Follow the house style in `operations/api.rs`: `#[async_trait::async_trait]`, `Send + Sync`, doc comment stating why.
+- [x] **Step 3: Implement `generate_and_update`**: call `embedding.generate_embedding(input)`, then `store.update_canonical_vector(fact_id, vector, policy)`. Translate the existing disabled-check and truncation into the `SkipReason` and the `EmbeddingInput` respectively, so both live inside this function.
+- [x] **Step 4: Run the test.** Expected: PASS.
+- [x] **Step 5: Migrate the four callers**, one commit each. `embedding_recovery.rs` is the important one: delete the direct `provider.embed()` at line 253 and the inlined `build_embedding_payload` at 252, and call `generate_and_update` with `VectorWritePolicy::FillMissing` — preserving ADR-0042's rule that a compatible recovery uses `backfill_pending` and a signature-mismatch recovery keeps semantic retrieval degraded.
+- [x] **Step 6: Write the test that fails when a caller bypasses the path.** Add to `crates/memory-mcp/tests/embedding_vector_policies.rs`: scan `crates/memory-mcp/src` for `.generate_embedding(` and `.embed(` and assert every hit is inside `crates/memory-mcp/src/embedding/`. Run, expect it to fail on the two pre-migration callers, pass after Step 5.
+- [x] **Step 7: Commit**
 
 ```bash
 git commit -m "refactor(embedding): one generation interface, so truncation and logging stop being optional"

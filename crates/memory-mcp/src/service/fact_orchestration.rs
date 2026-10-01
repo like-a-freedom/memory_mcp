@@ -90,12 +90,17 @@ impl FactService {
         // Prepare embedding input and generate or defer.
         let embedding_input = Self::build_fact_embedding_input(fact_type, content, quote);
         let mut deferred_embedding_input = None;
-        let embedding_fields = match ctx
-            .embedding_service
-            .generate_embedding(&embedding_input)
-            .await
-        {
-            Ok(Some(embedding)) => {
+        // Through the port, so the input limit and the disabled check apply
+        // here as they do everywhere else. `generate_embedding` was called
+        // directly before, which left this one caller responsible for knowing
+        // that the limit exists.
+        let generated = crate::embedding::api::EmbeddingGeneration::generate(
+            &ctx.embedding_service,
+            &embedding_input,
+        )
+        .await;
+        let embedding_fields = match generated {
+            Ok(crate::embedding::api::GenerationOutcome::Generated(embedding)) => {
                 ctx.logger.log(
                     std::collections::HashMap::from([
                         ("op".to_string(), json!("embedding.generate.success")),
@@ -109,7 +114,18 @@ impl FactService {
                 );
                 Some(self.build_embedding_payload(ctx, embedding)?)
             }
-            Ok(None) => None,
+            // A disabled provider is a configuration, not a failure: the fact is
+            // created without a vector and the pipeline moves on.
+            Ok(crate::embedding::api::GenerationOutcome::Skipped(reason)) => {
+                ctx.logger.log(
+                    std::collections::HashMap::from([
+                        ("op".to_string(), json!("embedding.write_skipped")),
+                        ("reason".to_string(), json!(format!("{reason:?}"))),
+                    ]),
+                    LogLevel::Info,
+                );
+                None
+            }
             Err(err) => {
                 ctx.logger.log(
                     std::collections::HashMap::from([
@@ -202,8 +218,21 @@ impl FactService {
         Ok(fact_id)
     }
 
-    /// Builds the embedding payload for a fact from the embedding provider
-    /// state held on the context.
+    /// The dimension check, before the payload is assembled.
+    ///
+    /// This is not a second copy of the check in
+    /// `embedding::api::prepare_canonical_vector`, and the duplication is
+    /// deliberate. That check guards a write to a fact that already exists;
+    /// this one guards a fact that is about to be created, where the vector
+    /// goes into the creation payload rather than through the write port —
+    /// there is no stored record yet to compare a signature against, so
+    /// `VectorWritePolicy` has nothing to decide and routing through
+    /// `update_canonical_vector` would be a write to a row that does not
+    /// exist.
+    ///
+    /// What this does share is the generation contract: the embedding arrives
+    /// through `EmbeddingGeneration`, so the input limit and the
+    /// disabled-provider check apply here exactly as they do in recovery.
     fn build_embedding_payload(
         &self,
         ctx: &crate::memory::capabilities::deps::ExtractDeps,

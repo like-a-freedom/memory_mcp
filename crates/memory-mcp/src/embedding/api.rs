@@ -36,6 +36,47 @@ pub struct PreparedVector {
     pub at: DateTime<Utc>,
 }
 
+/// Why a generation produced no vector.
+///
+/// A bounded enum, not a string: the reason ends up as a metric label, and an
+/// unbounded one would let a caller invent a new time series. The set is
+/// closed on purpose — a reason nobody can enumerate is a reason nobody will
+/// ever add an alert for.
+///
+/// There is one variant and not three. "The record is already current" and "a
+/// backfill pass is not allowed to replace this vector" are both
+/// [`VectorApplication::AlreadyCurrent`], and splitting them here would mean
+/// two outcomes for one fact, which is what this module exists to prevent.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SkipReason {
+    /// The provider is configured but disabled, so no vector could exist.
+    ProviderDisabled,
+}
+
+/// What generation produced, or why it produced nothing.
+#[derive(Debug, Clone, PartialEq)]
+pub enum GenerationOutcome {
+    Generated(Vec<f64>),
+    Skipped(SkipReason),
+}
+
+/// Generation, behind a port the capability itself declares.
+///
+/// `EmbeddingService` is the production adapter; a test's recording generator
+/// is the second. The trait exists so `generate_and_update` can be observed
+/// from outside the crate — `EmbeddingService::generate_embedding` is
+/// `pub(crate)`, and a seam that cannot be reached from a test is not a seam.
+///
+/// Implementations carry the input limit and the disabled check, so a caller
+/// cannot skip either by holding a provider directly. That was the whole
+/// defect: `service/embedding_recovery.rs` called `provider.embed()` and
+/// therefore skipped truncation, the enabled check, and every log line.
+#[async_trait::async_trait]
+pub trait EmbeddingGeneration: Send + Sync {
+    /// Generate a vector for `input`, or say why none was produced.
+    async fn generate(&self, input: &str) -> Result<GenerationOutcome, MemoryError>;
+}
+
 /// Outcome of an attempted canonical vector update.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum VectorApplication {
@@ -44,6 +85,10 @@ pub enum VectorApplication {
     /// The record already carried the target signature, so
     /// no write was issued.
     AlreadyCurrent,
+    /// Nothing was generated, or the policy refused the write. The
+    /// reason travels with the outcome so a caller can label a
+    /// metric without string-matching an error.
+    Skipped(SkipReason),
 }
 
 /// What the owner record currently carries for its vector.
@@ -166,4 +211,33 @@ pub async fn update_canonical_vector(
     )
     .await?;
     Ok(VectorApplication::Applied)
+}
+
+/// Generate a vector for `fact_id` and write it under `policy`.
+///
+/// Every vector the system writes goes through this one function, so the
+/// input limit, the disabled-provider check and the generation logging inside
+/// an [`EmbeddingGeneration`] adapter cannot be skipped by a caller that
+/// already holds a provider. That is the defect this closes:
+/// `service/embedding_recovery.rs` called `provider.embed()` directly and so
+/// bypassed all three, and `service/fact_orchestration.rs` inlined its own
+/// payload build and never consulted the write policy.
+///
+/// A generation that yields nothing is a [`VectorApplication::Skipped`] with
+/// its reason attached, not an error: a server started without an embedding
+/// provider is a supported configuration, and it must ingest facts rather
+/// than refuse to.
+pub async fn generate_and_update(
+    generation: &(impl EmbeddingGeneration + ?Sized),
+    port: &(impl CanonicalVectorPort + ?Sized),
+    fact_id: &str,
+    input: &str,
+    identity: &VectorIdentity,
+    policy: VectorWritePolicy,
+) -> Result<VectorApplication, MemoryError> {
+    let vector = match generation.generate(input).await? {
+        GenerationOutcome::Generated(vector) => vector,
+        GenerationOutcome::Skipped(reason) => return Ok(VectorApplication::Skipped(reason)),
+    };
+    update_canonical_vector(port, fact_id, vector, identity, Utc::now(), policy).await
 }
