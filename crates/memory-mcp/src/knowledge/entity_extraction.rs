@@ -56,19 +56,10 @@ pub trait EntityExtractor: Send + Sync {
     /// labels, threshold, and validation status. Persisted with new
     /// extraction projections so historical outputs stay attributable.
     fn fingerprint(&self) -> ExtractorFingerprint {
-        ExtractorFingerprint {
-            selector: self.provider_name().to_string(),
-            backend: self.provider_name().to_string(),
-            repository: None,
-            revision: None,
-            artifact_identity: None,
-            labels: Vec::new(),
-            threshold: None,
-            revision_status: None,
-            validation_status: None,
-            runtime_version: env!("CARGO_PKG_VERSION").to_string(),
-            effective_device: None,
-        }
+        // The default implementation cannot know what is loaded, so the
+        // token says only that. An adapter with a real checkpoint overrides
+        // this and names it.
+        ExtractorFingerprint::new(self.provider_name())
     }
 
     /// Returns normalized entity candidates discovered in the supplied content.
@@ -146,36 +137,38 @@ impl EntityExtractor for LlmEntityExtractor {
     }
 }
 
-/// Durable identity of the extractor that produced an entity projection.
+/// Identifies the Model Checkpoint an extractor is running, as an opaque
+/// token. A caller compares tokens for equality and nothing else; the status,
+/// the device, and the artifact identity live in the model-artifact module,
+/// which is the only place that can interpret them.
 ///
-/// Persisted alongside new extraction projections so historical outputs stay
-/// attributable to the exact selector, backend, revision, and validation state.
-/// Lightweight extractors leave model fields `None`; model-backed extractors
-/// fill repository/revision/identity/validation/device.
-#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+/// This used to carry `RevisionStatus`, `ValidationStatus` and
+/// `effective_device`, which put checkpoint state in the capability's public
+/// interface — see ADR-0068.
+/// Serialised as `{"token": "..."}` rather than as a bare string: the
+/// `entity_extraction_projection.fingerprint` column is declared as an
+/// object, and a bare string would be rejected by SurrealDB as a coercion
+/// error on every extraction. The wrapper also leaves room for a field to
+/// be added without a second migration.
+#[derive(Debug, Clone, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 pub struct ExtractorFingerprint {
-    /// Public selector (`NER_EXTRACTOR` value), e.g. `VAGOsolutions/SauerkrautLM-LFM2.5-GLiNER`.
-    pub selector: String,
-    /// Stable backend name, e.g. `sauerkraut-lfm2.5-gliner`.
-    pub backend: String,
-    /// Artifact repository for model-backed extractors.
-    pub repository: Option<String>,
-    /// Resolved upstream revision (commit hash) when applicable.
-    pub revision: Option<String>,
-    /// Stable content identity over sorted `path:size:sha256` entries.
-    pub artifact_identity: Option<String>,
-    /// Normalized ordered labels.
-    pub labels: Vec<String>,
-    /// Effective confidence threshold.
-    pub threshold: Option<f64>,
-    /// How the revision was resolved at activation.
-    pub revision_status: Option<crate::embedding::model_artifacts::RevisionStatus>,
-    /// How the revision was validated.
-    pub validation_status: Option<crate::embedding::model_artifacts::ValidationStatus>,
-    /// Runtime/model-family version.
-    pub runtime_version: String,
-    /// Effective device (`cpu`/`metal`) — never the requested device alone.
-    pub effective_device: Option<String>,
+    token: String,
+}
+
+impl ExtractorFingerprint {
+    /// The stable token. Two extractors with the same token behave
+    /// identically.
+    #[must_use]
+    pub fn new(token: impl Into<String>) -> Self {
+        Self {
+            token: token.into(),
+        }
+    }
+
+    #[must_use]
+    pub fn as_str(&self) -> &str {
+        &self.token
+    }
 }
 
 /// Future returned by every backend `build` hook.

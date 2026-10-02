@@ -1346,3 +1346,90 @@ fn refresh_cancellation_releases_lease() {
         lease_path.display()
     );
 }
+
+/// ADR-0068: the extractor's fingerprint is an opaque token. The format is
+/// pinned so a change to it is a deliberate cache invalidation — the token is
+/// stored alongside every extracted entity, and a silent format change would
+/// look like a different extractor having produced the same entities.
+#[test]
+fn the_fingerprint_token_format_is_pinned() {
+    use memory_mcp::embedding::model_artifacts::{NerArtifactSpec, RevisionStatus};
+
+    let token = NerArtifactSpec::revision_token(
+        "VAGOsolutions/SauerkrautLM-LFM2.5-GLiNER",
+        "a1b2c3d",
+        RevisionStatus::Latest,
+    );
+
+    assert_eq!(
+        token, "VAGOsolutions/SauerkrautLM-LFM2.5-GLiNER@a1b2c3d:latest",
+        "the token format is part of the stored contract; changing it \
+         invalidates every fingerprint already written"
+    );
+}
+
+/// The fingerprint is the one thing the Entity Extractor's public interface
+/// used to leak: `ExtractorFingerprint` carried `RevisionStatus`,
+/// `ValidationStatus` and `effective_device`, so a caller holding one could
+/// branch on checkpoint state that is the model-artifact module's to interpret.
+///
+/// `knowledge` still names `model_artifacts` elsewhere — `ModelProgressSink`,
+/// `NerArtifactSpec`, `PreparedCheckpoint` — and that is a separate question;
+/// this guard is about the fingerprint, because that is what ADR-0068 rules
+/// out and what it can prove without a judgement call about each site.
+#[test]
+fn knowledge_does_not_name_a_model_artifact_type() {
+    use std::fs;
+    use std::path::Path;
+
+    let knowledge = Path::new(env!("CARGO_MANIFEST_DIR")).join("src/knowledge");
+    let mut stack = vec![knowledge];
+    let mut offenders = Vec::new();
+    while let Some(dir) = stack.pop() {
+        let Ok(entries) = fs::read_dir(&dir) else {
+            continue;
+        };
+        for entry in entries.flatten() {
+            let path = entry.path();
+            if path.is_dir() {
+                stack.push(path);
+                continue;
+            }
+            if path.extension().and_then(|e| e.to_str()) != Some("rs") {
+                continue;
+            }
+            let text = fs::read_to_string(&path).expect("readable source");
+            for (n, line) in text.lines().enumerate() {
+                let trimmed = line.trim();
+                if trimmed.starts_with("//") || trimmed.starts_with("use ") {
+                    continue;
+                }
+                // The two status enums are what the fingerprint leaked.
+                // A `ModelProgressSink` in the same signature is a
+                // different seam and a different decision.
+                // A private field or a `pub(crate)` constructor parameter
+                // is internal: knowledge still has to know what it loaded
+                // in order to decide whether to promote it. Only a `pub`
+                // name crosses the capability's interface.
+                let is_public = trimmed.starts_with("pub ")
+                    || trimmed.contains(" pub ")
+                    || trimmed.contains("&dyn ");
+                let names_status = line.contains("model_artifacts::RevisionStatus")
+                    || line.contains("model_artifacts::ValidationStatus");
+                if is_public && names_status {
+                    offenders.push(format!("  {}:{}: {trimmed}", path.display(), n + 1));
+                }
+            }
+        }
+    }
+
+    assert!(
+        offenders.is_empty(),
+        "knowledge/ names a checkpoint-status type in {} place(s):\n\n{}\n\n\
+         The status of a revision is the model-artifact module's to interpret. \
+         Anything that needs it calls that module; nothing in knowledge/ \
+         reads it off a fingerprint.",
+        offenders.len(),
+        offenders.join("\n")
+    );
+}

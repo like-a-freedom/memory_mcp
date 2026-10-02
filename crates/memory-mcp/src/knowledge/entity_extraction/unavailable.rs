@@ -19,7 +19,6 @@ pub struct UnavailableEntityExtractor {
     selector: String,
     labels: Vec<String>,
     threshold: f64,
-    runtime_version: String,
 }
 
 impl UnavailableEntityExtractor {
@@ -38,7 +37,6 @@ impl UnavailableEntityExtractor {
             selector: crate::config::SELECTOR_CLASSIC_GLINER.to_string(),
             labels,
             threshold,
-            runtime_version: env!("CARGO_PKG_VERSION").to_string(),
         }
     }
 }
@@ -64,19 +62,12 @@ impl EntityExtractor for UnavailableEntityExtractor {
     }
 
     fn fingerprint(&self) -> ExtractorFingerprint {
-        ExtractorFingerprint {
-            selector: self.selector.clone(),
-            backend: "gliner".to_string(),
-            repository: Some(self.selector.clone()),
-            revision: None,
-            artifact_identity: None,
-            labels: self.labels.clone(),
-            threshold: Some(self.threshold),
-            revision_status: None,
-            validation_status: None,
-            runtime_version: self.runtime_version.clone(),
-            effective_device: None,
-        }
+        ExtractorFingerprint::new(format!(
+            "gliner:{}:{}:{}",
+            self.selector,
+            self.labels.join(","),
+            self.threshold
+        ))
     }
 
     async fn extract_candidates(
@@ -130,35 +121,33 @@ mod tests {
         assert_eq!(extractor.scheduling(), NerScheduling::BlockingPool);
     }
 
+    /// An unavailable extractor must be distinguishable from the real one
+    /// it stands in for, and its token must name the configuration it was
+    /// asked for — labels and threshold are what a caller varies (ADR-0068).
     #[test]
-    fn unavailable_fingerprint_preserves_selector_labels_threshold_and_runtime() {
+    fn unavailable_fingerprint_names_the_selector_labels_and_threshold() {
         let extractor = UnavailableEntityExtractor::classic_gliner(&config(
             vec![" Person ".into(), "COMPANY".into()],
             Some(0.3),
         ));
-        let fp = extractor.fingerprint();
-        assert_eq!(fp.selector, crate::config::SELECTOR_CLASSIC_GLINER);
-        assert_eq!(fp.backend, "gliner");
         assert_eq!(
-            fp.repository.as_deref(),
-            Some(crate::config::SELECTOR_CLASSIC_GLINER)
+            extractor.fingerprint().as_str(),
+            format!(
+                "gliner:{}:person,company:0.3",
+                crate::config::SELECTOR_CLASSIC_GLINER
+            )
         );
-        assert_eq!(fp.labels, vec!["person", "company"]);
-        assert_eq!(fp.threshold, Some(0.3));
-        assert_eq!(fp.revision, None);
-        assert_eq!(fp.artifact_identity, None);
-        assert_eq!(fp.revision_status, None);
-        assert_eq!(fp.validation_status, None);
-        assert_eq!(fp.effective_device, None);
-        assert_eq!(fp.runtime_version, env!("CARGO_PKG_VERSION"));
     }
 
     #[test]
     fn unavailable_fingerprint_uses_default_threshold_when_unset() {
         let extractor = UnavailableEntityExtractor::classic_gliner(&config(vec![], None));
-        assert_eq!(
-            extractor.fingerprint().threshold,
-            Some(crate::config::DEFAULT_NER_THRESHOLD)
+        assert!(
+            extractor
+                .fingerprint()
+                .as_str()
+                .ends_with(&format!(":{}", crate::config::DEFAULT_NER_THRESHOLD)),
+            "an unset threshold must still produce a distinguishing token"
         );
     }
 

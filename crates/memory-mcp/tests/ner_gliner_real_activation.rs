@@ -116,11 +116,15 @@ async fn candidate_is_promoted_only_after_real_construction_and_smoke_probe() {
     let extractor = gliner::build_from_store(&native, &context, &store)
         .await
         .expect("build");
+    // ADR-0068: the fingerprint is an opaque token. That it names the
+    // promoted revision is what this test can still say; *that* the revision
+    // was validated is a question for the model-artifact module, and the
+    // test below reads it from the persisted state instead.
     let fp = extractor.fingerprint();
-    assert_eq!(fp.revision.as_deref(), Some(SEEDED_REVISION));
-    assert_eq!(
-        fp.validation_status,
-        Some(ValidationStatus::RuntimeRegressionVerified)
+    assert!(
+        fp.as_str().contains(SEEDED_REVISION),
+        "the token must name the promoted revision, got {}",
+        fp.as_str()
     );
     // A trivial extract must work after promotion.
     let _ = extractor

@@ -169,7 +169,7 @@ pub(super) async fn persist_extraction_projection(
     let projection_suffix = crate::shared::ids::hash_prefix(&format!(
         "{episode_id}|{}|{}",
         crate::shared::temporal::normalize_dt(ingested_at),
-        fingerprint.selector,
+        fingerprint.as_str(),
     ));
     // `⟨...⟩` keeps the two-part record body a single id string.
     let record_body = format!("{episode_key}:{projection_suffix}");

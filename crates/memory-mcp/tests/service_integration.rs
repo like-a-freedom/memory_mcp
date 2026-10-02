@@ -138,9 +138,9 @@ async fn extractor_fingerprint_projection() {
         "projection row must carry its ingestion timestamp"
     );
     assert_eq!(
-        row["fingerprint"]["selector"].as_str(),
+        row["fingerprint"]["token"].as_str(),
         Some("anno"),
-        "projection must record the extractor selector"
+        "the projection must record the extractor token; the fingerprint          is an opaque token now (ADR-0068)"
     );
     let entity_ids = row["entity_ids"].as_array().expect("entity_ids array");
     assert!(

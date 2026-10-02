@@ -42,11 +42,40 @@ pub struct NerArtifactSpec {
 }
 
 impl NerArtifactSpec {
+    /// The identity of one resolved checkpoint of this spec, as an opaque
+    /// token. See [`revision_token`]; this is the call form.
+    #[must_use]
+    pub fn revision_token(repository: &str, revision: &str, status: RevisionStatus) -> String {
+        revision_token(repository, revision, status)
+    }
+
     /// All required files: primary plus companion. Used for completeness and
     /// identity checks so a staged checkpoint cannot activate missing pieces.
     pub fn all_requirements(&self) -> impl Iterator<Item = &ArtifactRequirement> {
         self.files.iter().chain(self.companion_files.iter())
     }
+}
+
+/// The identity of one resolved checkpoint, as an opaque token.
+///
+/// This is the only form of "which checkpoint is this" that crosses the
+/// Entity Extractor's seam. Knowledge compares tokens; it does not get to
+/// ask what `Latest` means or which device the backend landed on — ADR-0068
+/// is about that, and the module that owns the question owns the format.
+///
+/// The format is part of the stored contract: the token is written
+/// alongside every extracted entity, so changing it invalidates every
+/// fingerprint already recorded. `the_fingerprint_token_format_is_pinned`
+/// is what makes that a deliberate act.
+#[must_use]
+pub fn revision_token(repository: &str, revision: &str, status: RevisionStatus) -> String {
+    format!(
+        "{repository}@{revision}:{}",
+        serde_json::to_value(status)
+            .ok()
+            .and_then(|v| v.as_str().map(str::to_owned))
+            .unwrap_or_else(|| format!("{status:?}"))
+    )
 }
 
 /// How trustworthy the resolved upstream revision is.

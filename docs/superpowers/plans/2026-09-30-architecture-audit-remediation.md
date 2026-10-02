@@ -1211,8 +1211,8 @@ impl ExtractorFingerprint {
 
 The adapter's current fingerprint is built by formatting repository, revision, artifact identity and status into a string. That formatting moves into `embedding/model_artifacts` as `pub fn revision_token(&self) -> String`, and each adapter calls it. `knowledge` no longer names a `model_artifacts` type in its public interface.
 
-- [ ] **Step 1: Write ADR-0068.** Status `Accepted`. Context: seven adapters justify the seam; the fingerprint is what leaks through it. Decision: the token is opaque, the format is owned by the model-artifact module. Consequences: any consumer that wanted to branch on `revision_status` must call the model-artifact module instead; a token change is a cache-invalidation event, so the format string is pinned by a test. Alternatives considered: (a) keep the rich fingerprint — rejected, it makes the capability's interface a function of the checkpoint format, which is exactly what CONTEXT.md forbids; (b) move the whole trait into `embedding` — rejected, extraction is a knowledge capability and five backends are not embedding providers.
-- [ ] **Step 2: Write the failing test** in `crates/memory-mcp/tests/ner_model_lifecycle.rs`:
+- [x] **Step 1: Write ADR-0068.** Status `Accepted`. Context: seven adapters justify the seam; the fingerprint is what leaks through it. Decision: the token is opaque, the format is owned by the model-artifact module. Consequences: any consumer that wanted to branch on `revision_status` must call the model-artifact module instead; a token change is a cache-invalidation event, so the format string is pinned by a test. Alternatives considered: (a) keep the rich fingerprint — rejected, it makes the capability's interface a function of the checkpoint format, which is exactly what CONTEXT.md forbids; (b) move the whole trait into `embedding` — rejected, extraction is a knowledge capability and five backends are not embedding providers.
+- [x] **Step 2: Write the failing test** in `crates/memory-mcp/tests/ner_model_lifecycle.rs`:
 
 ```rust
 #[test]
@@ -1230,10 +1230,10 @@ fn knowledge_does_not_name_a_model_artifact_type() {
 ```
 
 Run: expect FAIL on both.
-- [ ] **Step 3: Add `revision_token`** to `embedding/model_artifacts`, with the formatting logic moved out of the adapters.
-- [ ] **Step 4: Replace `ExtractorFingerprint`** with the opaque newtype. Update all 7 adapters. Update the 2 out-of-crate consumers — find them with `grep -rn "ExtractorFingerprint" crates/eval-harness crates/memory-mcp/tests`.
-- [ ] **Step 5: Run the tests.** Expected: PASS.
-- [ ] **Step 6: Commit**
+- [x] **Step 3: Add `revision_token`** to `embedding/model_artifacts`, with the formatting logic moved out of the adapters.
+- [x] **Step 4: Replace `ExtractorFingerprint`** with the opaque newtype. Update all 7 adapters. Update the 2 out-of-crate consumers — find them with `grep -rn "ExtractorFingerprint" crates/eval-harness crates/memory-mcp/tests`.
+- [x] **Step 5: Run the tests.** Expected: PASS.
+- [x] **Step 6: Commit**
 
 ```bash
 git commit -m "refactor(knowledge): the extractor fingerprint is an opaque token, not checkpoint state"
@@ -1311,6 +1311,8 @@ Recommend **subagent-driven execution**. Six waves, twenty-four tasks, and Tasks
 | 9 | "Write `relate_records_an_operator_originated_edge` — call `relate` with `EdgeOrigin::Operator`." | There is no `EdgeOrigin::Operator`. The enum has exactly three variants: `Extracted` (the default), `Inferred` and `Ambiguous`, and `Operator` would be a fourth meaning — a relationship a human asserted, which is genuinely absent from the model. | The test uses `Ambiguous` with a non-default confidence of 0.13 and a non-default strength of 0.42. That proves the same thing the plan wanted: the helper no longer decides. `Inferred` could not be used, because `Inferred` *was* the hardcoded value, and a test asserting the hardcoded value round-trips would pass before the signature changed. |
 
 | 10 | "For each method the test flags, move it into the test file as a free function." | Two of the four flagged methods cannot move. `relate` is the crate's only public edge-write path — `store_edge` in `memory/episode/edges.rs` is `pub(crate)` — so moving it out of the container would close the graph-write surface for the eval harness entirely. `with_lifecycle_enabled` exists because `MemoryService::new` takes the lifecycle configuration from its caller rather than reading the environment; the composition root sets the same field from `LifecycleConfig::from_env`, but a caller that constructs a container directly has no other door. | Both are in the ratchet's allowlist with the reason recorded inline, so the next reader sees why they stay. `episode_count` and `resolve_entity` did move — the former to a test helper over `owned_episode_scan`, the latter to `common::resolve_entity` and a crate-internal twin for the unit tests. |
+
+| 11 | "Scan `crates/memory-mcp/src/knowledge/` for `model_artifacts::` in any pub signature. Assert none." | 32 sites, not 3. `ModelProgressSink`, `NerArtifactSpec`, `PreparedCheckpoint` and `CliProgressSink` all appear in `pub` signatures for reasons unrelated to the fingerprint — progress reporting and artifact specification are legitimate uses of a model-artifact type at the seam. The first version of the guard failed on all 32, which meant it was measuring something other than what ADR-0068 rules out. | The guard matches only `RevisionStatus` and `ValidationStatus` — the two types the fingerprint actually leaked — and only in a public position. Knowledge still names the other types, and that is a different question for a different day. The fingerprint itself collapsed from eleven fields to an opaque `String`. |
 
 Two more findings the second pass surfaced, both additions rather than corrections:
 

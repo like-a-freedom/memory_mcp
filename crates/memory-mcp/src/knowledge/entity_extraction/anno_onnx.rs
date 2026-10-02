@@ -104,19 +104,14 @@ pub(crate) fn provider_name() -> &'static str {
 /// Builds the durable fingerprint for the configured labels and threshold.
 #[must_use]
 pub(crate) fn fingerprint_for(labels: &[String], threshold: f64) -> ExtractorFingerprint {
-    ExtractorFingerprint {
-        selector: provider_name().to_string(),
-        backend: provider_name().to_string(),
-        repository: Some("deepanwa/NuNerZero_onnx".to_string()),
-        revision: None,
-        artifact_identity: None,
-        labels: labels.to_vec(),
-        threshold: Some(threshold),
-        revision_status: None,
-        validation_status: None,
-        runtime_version: env!("CARGO_PKG_VERSION").to_string(),
-        effective_device: Some("cpu".to_string()),
-    }
+    // A lightweight extractor has no resolved revision, so the token names
+    // what it does have: the backend, the labels, and the threshold. Two
+    // lightweight extractors with different labels are different extractors.
+    ExtractorFingerprint::new(format!(
+        "anno-onnx:{}:{}:{threshold}",
+        provider_name(),
+        labels.join(",")
+    ))
 }
 
 /// Trims, lowercases, and deduplicates labels in first-declared order
@@ -757,20 +752,22 @@ mod tests {
         assert_eq!(provider_name(), "anno-onnx");
     }
 
+    /// The token names the backend, the labels and the threshold, because
+    /// those are what make one lightweight extractor a different one. The
+    /// repository and version live in `ANN_ONNX_SPEC`, which is the
+    /// model-artifact module's business (ADR-0068).
     #[test]
-    fn fingerprint_carries_onnx_identity_fields() {
+    fn fingerprint_token_names_the_backend_labels_and_threshold() {
         let fp = fingerprint_for(&["person".to_string(), "company".to_string()], 0.5);
-        assert_eq!(fp.selector, "anno-onnx");
-        assert_eq!(fp.backend, "anno-onnx");
-        assert_eq!(fp.repository.as_deref(), Some("deepanwa/NuNerZero_onnx"));
-        assert_eq!(fp.revision, None);
-        assert_eq!(fp.artifact_identity, None);
-        assert_eq!(fp.labels, vec!["person", "company"]);
-        assert_eq!(fp.threshold, Some(0.5));
-        assert_eq!(fp.revision_status, None);
-        assert_eq!(fp.validation_status, None);
-        assert_eq!(fp.effective_device.as_deref(), Some("cpu"));
-        assert_eq!(fp.runtime_version, env!("CARGO_PKG_VERSION"));
+        assert_eq!(fp.as_str(), "anno-onnx:anno-onnx:person,company:0.5");
+
+        // Different labels are a different extractor, so the token differs.
+        let other = fingerprint_for(&["person".to_string()], 0.5);
+        assert_ne!(fp, other);
+        assert_ne!(
+            fp,
+            fingerprint_for(&["person".to_string(), "company".to_string()], 0.7)
+        );
     }
 
     #[test]

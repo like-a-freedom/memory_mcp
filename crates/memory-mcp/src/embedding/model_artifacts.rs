@@ -18,6 +18,7 @@ pub use lease::{Lease, LeaseRecord};
 pub use manifest::{
     ArtifactRequirement, CandidateRefreshOutcome, LocalCheckpointIssue, LocalCheckpointSet,
     NerArtifactSpec, PreparedCheckpoint, RevisionStatus, ValidationStatus, artifact_identity,
+    revision_token,
 };
 pub use progress::{
     CapturingSink, CliProgressSink, JsonLineProgressSink, ModelProgressEvent, ModelProgressPhase,

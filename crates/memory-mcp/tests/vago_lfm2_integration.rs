@@ -110,40 +110,26 @@ async fn vago_lfm2_fingerprint_carries_revision_and_device() {
         .expect("vago extractor builds from a prepared checkpoint");
 
     let fingerprint = extractor.fingerprint();
-    assert_eq!(
-        fingerprint.selector,
-        "VAGOsolutions/SauerkrautLM-LFM2.5-GLiNER"
-    );
-    assert_eq!(fingerprint.backend, "sauerkraut-lfm2.5-gliner");
-    assert_eq!(
-        fingerprint.repository.as_deref(),
-        Some("VAGOsolutions/SauerkrautLM-LFM2.5-GLiNER")
+    // ADR-0068: the fingerprint is an opaque token, so a test cannot read
+    // the selector or the device off it. What it can do is check that the
+    // token names the backend, the checkpoint and the labels — those are
+    // the things that make one extractor a different extractor.
+    let token = fingerprint.as_str();
+    assert!(
+        token.contains("sauerkraut-lfm2.5-gliner"),
+        "the token must name the backend, got {token}"
     );
     assert!(
-        fingerprint
-            .revision
-            .as_deref()
-            .is_some_and(|revision| !revision.is_empty()),
-        "fingerprint must carry the resolved revision"
+        token.contains("VAGOsolutions/SauerkrautLM-LFM2.5-GLiNER"),
+        "the token must name the checkpoint repository, got {token}"
     );
     assert!(
-        fingerprint
-            .artifact_identity
-            .as_deref()
-            .is_some_and(|identity| !identity.is_empty()),
-        "fingerprint must carry the artifact identity"
-    );
-    assert_eq!(fingerprint.threshold, Some(0.5));
-    assert!(fingerprint.labels.contains(&"person".to_string()));
-    assert_eq!(fingerprint.runtime_version, "lfm2.5-gliner");
-    assert_eq!(fingerprint.effective_device.as_deref(), Some("cpu"));
-    assert!(
-        fingerprint.revision_status.is_some(),
-        "fingerprint must carry the revision status"
+        token.contains("person"),
+        "the token must carry the labels, got {token}"
     );
     assert!(
-        fingerprint.validation_status.is_some(),
-        "fingerprint must carry the validation status"
+        token.contains('@') && token.contains(':'),
+        "the token must carry a resolved revision, got {token}"
     );
 }
 

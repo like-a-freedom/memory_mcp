@@ -1516,19 +1516,27 @@ impl EntityExtractor for GlinerEntityExtractor {
     }
 
     fn fingerprint(&self) -> ExtractorFingerprint {
-        ExtractorFingerprint {
-            selector: crate::config::SELECTOR_CLASSIC_GLINER.to_string(),
-            backend: "gliner".to_string(),
-            repository: Some(crate::config::SELECTOR_CLASSIC_GLINER.to_string()),
-            revision: self.revision.clone(),
-            artifact_identity: self.artifact_identity.clone(),
-            labels: super::anno_onnx::normalize_labels(&self.loader.labels),
-            threshold: Some(self.loader.threshold),
-            revision_status: self.revision_status,
-            validation_status: self.validation_status,
-            runtime_version: env!("CARGO_PKG_VERSION").to_string(),
-            effective_device: self.effective_device.clone(),
+        // The token names what was actually loaded, so two extractors that
+        // differ in revision or labels do not share one. `revision_token`
+        // supplies the `<repo>@<rev>:<status>` segment when there is one.
+        let mut token = format!(
+            "gliner:{}@{}:{}",
+            crate::config::SELECTOR_CLASSIC_GLINER,
+            self.revision.as_deref().unwrap_or("unresolved"),
+            super::anno_onnx::normalize_labels(&self.loader.labels).join(",")
+        );
+        if let (Some(status), Some(identity)) =
+            (self.revision_status, self.artifact_identity.as_deref())
+        {
+            token = format!(
+                "{token}:{}:{identity}",
+                serde_json::to_value(status)
+                    .ok()
+                    .and_then(|v| v.as_str().map(str::to_owned))
+                    .unwrap_or_default()
+            );
         }
+        ExtractorFingerprint::new(token)
     }
 
     async fn extract_candidates(&self, content: &str) -> Result<Vec<EntityCandidate>, MemoryError> {

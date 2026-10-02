@@ -429,19 +429,25 @@ impl EntityExtractor for VagoLfm2EntityExtractor {
     }
 
     fn fingerprint(&self) -> ExtractorFingerprint {
-        ExtractorFingerprint {
-            selector: SELECTOR_SAUKRAUT_LFM25.to_string(),
-            backend: "sauerkraut-lfm2.5-gliner".to_string(),
-            repository: Some(self.repository.clone()),
-            revision: Some(self.revision.clone()),
-            artifact_identity: Some(self.artifact_identity.clone()),
-            labels: super::anno_onnx::normalize_labels(&self.loader.labels),
-            threshold: Some(self.loader.threshold),
-            revision_status: Some(self.revision_status),
-            validation_status: Some(self.validation_status),
-            runtime_version: "lfm2.5-gliner".to_string(),
-            effective_device: Some(self.effective_device.clone()),
-        }
+        let mut token = format!(
+            "sauerkraut-lfm2.5-gliner:{}:{}:{}",
+            self.repository,
+            crate::embedding::model_artifacts::revision_token(
+                &self.repository,
+                &self.revision,
+                self.revision_status,
+            ),
+            super::anno_onnx::normalize_labels(&self.loader.labels).join(",")
+        );
+        // The device is part of the token, not a field beside it: the same
+        // checkpoint on `cpu` and on `metal` does not produce byte-identical
+        // vectors, so two extractors that differ only in device are two
+        // extractors.
+        token.push_str(&format!(
+            ":{}:{}",
+            self.artifact_identity, self.effective_device
+        ));
+        ExtractorFingerprint::new(token)
     }
 
     async fn extract_candidates(&self, content: &str) -> Result<Vec<EntityCandidate>, MemoryError> {
