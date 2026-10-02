@@ -286,12 +286,12 @@ Behaviour-preserving. Nothing here changes what the server does; it changes what
 
 Ruling: cut the block, keep no alias. `memory-mcp` is a library crate, but `eval-harness` is the only external consumer and it imports from `crate::knowledge::` and `crate::models::` paths directly. The `service::` prefix is a naming convention with zero callers.
 
-- [ ] **Step 1: Record the baseline**
+- [x] **Step 1: Record the baseline**
 
 Run: `grep -rn "#\[allow(dead_code" crates/*/src | sort`
 Expected: exactly these — `storage/client.rs` ×4, `memory/inbox_revision_store.rs:27,35`, `http/registry/migrations.rs:40`, `embedding/model_artifacts/state.rs:114`, `service/apps/dispatch.rs:92`, `models/inbox_revision.rs:142,151`, `knowledge/claims_policy/telemetry.rs:20,96`, `knowledge/entity_extraction/gliner.rs:147,1128`, plus the `tests/common/mod.rs` ones handled in Task 1.3 and the module-level `#![allow(dead_code)]` headers on feature-gated modules. Paste the list into the commit message.
 
-- [ ] **Step 2: Write the test that fails when a re-export has no consumer**
+- [x] **Step 2: Write the test that fails when a re-export has no consumer**
 
 Create `crates/memory-mcp/tests/public_surface_audit.rs`:
 
@@ -308,14 +308,14 @@ fn no_service_module_re_export_has_no_consumer() {
 
 This is a ratchet: it prevents the block from regrowing while allowing the handful of names that do have consumers (`build_extract_log_result` is `pub(crate)`; check the current set before writing the allowlist).
 
-- [ ] **Step 3: Run it.** Expected: FAIL, listing the 32 re-exported names.
-- [ ] **Step 4: Remove `service.rs` lines 102-124.** Also remove `episode_from_record` from line 106's re-export — `fact_from_record` has one consumer (`tests/apps_ingestion_review.rs:2,68`) and must stay; `episode_from_record` has none and every caller uses `crate::memory::episode::episode_from_record`.
-- [ ] **Step 5: Remove `decayed_confidence` from `service/query.rs`.** Its only callers are its own 4 tests. `memory/retrieval.rs:23` `fact_decayed_confidence` is the live function — 13 call sites, passed as a function pointer into `pipeline.rs:521,537,681`, `rescue.rs:224,681,754,837,866`, `experience.rs:165`, `scoring.rs`. Keep that one. It is not a redundant wrapper around `models::Fact::decayed_confidence`: it is the injection point that makes decay substitutable in tests, so removing it would remove the only seam.
-- [ ] **Step 6: Remove `get_surrealdb_config` from `core.rs`** and its test at 927-939.
-- [ ] **Step 7: Cut the 4 engine accessors — and stop there.** `local_db` (436), `mem_db` (446), `remote_db` (456), `is_local` (467) are `#[allow(dead_code)]` with "Future use" comments and zero callers. **Do not touch `server_version` (477-479) or `sql_query_take` (688-690).** The first draft of this plan said to collapse their three identical arms onto `run_query_take`; that was wrong, and the reason matters. `DbEngine::Local` and `DbEngine::Mem` are both `Arc<Surreal<Db>>` while `DbEngine::Remote` is `Arc<Surreal<Client>>`, so the arms are identical in body but not in type — they exist because the compiler cannot unify `Surreal<Db>` with `Surreal<Client>` behind one binding. Collapsing them would need a `DbEngine::as_connection(&self) -> &Surreal<impl Connection>`, which Rust cannot express without boxing to a trait object, and SurrealDB's `query` requires the concrete `Connection`. The three-arm match is the idiomatic way to say "same operation, three connection types", and `run_query_take`'s `impl Connection` parameter is already what keeps each arm a one-liner. Cutting the 4 accessors is the whole of this step.
-- [ ] **Step 8: Fix the `mock_db.rs` doc example.** It passes `vec!["org".into()]` where `MemoryService::new` (`core/builder.rs:477`) takes `active_namespace: String`. The block is `rust,no_run`, which compiles — so this is a compile error the moment the file is built as a doctest. Change to `TEST_ACTIVE_NAMESPACE.to_string()`-equivalent: `"org".to_string()`.
-- [ ] **Step 9: Run everything.** `cargo test -p memory_mcp --doc --lib` to confirm the doctest now compiles, then the full suite.
-- [ ] **Step 10: Commit**
+- [x] **Step 3: Run it.** Expected: FAIL, listing the 32 re-exported names.
+- [x] **Step 4: Remove `service.rs` lines 102-124.** Also remove `episode_from_record` from line 106's re-export — `fact_from_record` has one consumer (`tests/apps_ingestion_review.rs:2,68`) and must stay; `episode_from_record` has none and every caller uses `crate::memory::episode::episode_from_record`.
+- [x] **Step 5: Remove `decayed_confidence` from `service/query.rs`.** Its only callers are its own 4 tests. `memory/retrieval.rs:23` `fact_decayed_confidence` is the live function — 13 call sites, passed as a function pointer into `pipeline.rs:521,537,681`, `rescue.rs:224,681,754,837,866`, `experience.rs:165`, `scoring.rs`. Keep that one. It is not a redundant wrapper around `models::Fact::decayed_confidence`: it is the injection point that makes decay substitutable in tests, so removing it would remove the only seam.
+- [x] **Step 6: Remove `get_surrealdb_config` from `core.rs`** and its test at 927-939.
+- [x] **Step 7: Cut the 4 engine accessors — and stop there.** `local_db` (436), `mem_db` (446), `remote_db` (456), `is_local` (467) are `#[allow(dead_code)]` with "Future use" comments and zero callers. **Do not touch `server_version` (477-479) or `sql_query_take` (688-690).** The first draft of this plan said to collapse their three identical arms onto `run_query_take`; that was wrong, and the reason matters. `DbEngine::Local` and `DbEngine::Mem` are both `Arc<Surreal<Db>>` while `DbEngine::Remote` is `Arc<Surreal<Client>>`, so the arms are identical in body but not in type — they exist because the compiler cannot unify `Surreal<Db>` with `Surreal<Client>` behind one binding. Collapsing them would need a `DbEngine::as_connection(&self) -> &Surreal<impl Connection>`, which Rust cannot express without boxing to a trait object, and SurrealDB's `query` requires the concrete `Connection`. The three-arm match is the idiomatic way to say "same operation, three connection types", and `run_query_take`'s `impl Connection` parameter is already what keeps each arm a one-liner. Cutting the 4 accessors is the whole of this step.
+- [x] **Step 8: Fix the `mock_db.rs` doc example.** It passes `vec!["org".into()]` where `MemoryService::new` (`core/builder.rs:477`) takes `active_namespace: String`. The block is `rust,no_run`, which compiles — so this is a compile error the moment the file is built as a doctest. Change to `TEST_ACTIVE_NAMESPACE.to_string()`-equivalent: `"org".to_string()`.
+- [x] **Step 9: Run everything.** `cargo test -p memory_mcp --doc --lib` to confirm the doctest now compiles, then the full suite.
+- [x] **Step 10: Commit**
 
 ```bash
 git commit -m "refactor(service): cut the re-export block nothing reads, and the four suppressed engine futures"
@@ -337,7 +337,7 @@ git commit -m "refactor(service): cut the re-export block nothing reads, and the
 - Consumes: `observability/{check_rules,check_alerts,check_dashboards,build_dashboards}.py`.
 - Produces: `xtask check-observability`, which runs all four in order and exits nonzero if any fails.
 
-- [ ] **Step 1: Write `crates/xtask/src/observability.rs`** with `pub fn run() -> Result<(), String>`. It locates the workspace root from `CARGO_MANIFEST_DIR` (`crates/xtask` → `../..`), then for each of the four scripts runs `python3 <path>`, in this order:
+- [x] **Step 1: Write `crates/xtask/src/observability.rs`** with `pub fn run() -> Result<(), String>`. It locates the workspace root from `CARGO_MANIFEST_DIR` (`crates/xtask` → `../..`), then for each of the four scripts runs `python3 <path>`, in this order:
 
   1. `build_dashboards.py` — regenerates the two dashboard JSONs, so the committed dashboards are provably current.
   2. `check_rules.py` — every recording rule reads a metric family the crate actually exports.
@@ -346,12 +346,12 @@ git commit -m "refactor(service): cut the re-export block nothing reads, and the
 
   Capture stdout and stderr; on nonzero exit return `Err(format!("{name} failed:\n{stdout}\n{stderr}"))`.
 
-- [ ] **Step 2: Write the failing test** for the xtask subcommand in `crates/xtask/src/observability.rs` as a `#[cfg(test)] mod tests` with a test `run_reports_the_first_failing_script`: point the runner at a temp directory containing a `check_rules.py` that exits 1, assert `run()` returns `Err` naming that script. The runner must take the scripts directory as a parameter so the test can inject it; `main.rs` passes the real one.
-- [ ] **Step 3: Run it.** `cargo test -p xtask`. Expected: FAIL (the parameterisation does not exist), PASS after the signature is `run(scripts_dir: &Path) -> Result<(), String>`.
-- [ ] **Step 4: Wire the subcommand.** Add to `enum Command` in `main.rs` after line 45: `CheckObservability`, and a match arm that calls `observability::run(...)` and maps `Err` to the existing `eprintln!` + `ExitCode::FAILURE` at lines 60-61.
-- [ ] **Step 5: Add `pyyaml>=6` to `pyproject.toml`** dependencies, next to numpy/onnxruntime/tokenizers, with a comment that the observability checkers need it and `gen_anno_onnx_parity.py` needs the rest.
-- [ ] **Step 6: Run it locally.** `cargo run -p xtask -- check-observability`. Expected: exit 0 and the four scripts' success lines. If `check_rules.py` fails, it has found a rule reading a metric the crate no longer exports — fix the rule, not the check.
-- [ ] **Step 7: Add the CI step** in job `quality` after the clippy step at `ci.yml:51`:
+- [x] **Step 2: Write the failing test** for the xtask subcommand in `crates/xtask/src/observability.rs` as a `#[cfg(test)] mod tests` with a test `run_reports_the_first_failing_script`: point the runner at a temp directory containing a `check_rules.py` that exits 1, assert `run()` returns `Err` naming that script. The runner must take the scripts directory as a parameter so the test can inject it; `main.rs` passes the real one.
+- [x] **Step 3: Run it.** `cargo test -p xtask`. Expected: FAIL (the parameterisation does not exist), PASS after the signature is `run(scripts_dir: &Path) -> Result<(), String>`.
+- [x] **Step 4: Wire the subcommand.** Add to `enum Command` in `main.rs` after line 45: `CheckObservability`, and a match arm that calls `observability::run(...)` and maps `Err` to the existing `eprintln!` + `ExitCode::FAILURE` at lines 60-61.
+- [x] **Step 5: Add `pyyaml>=6` to `pyproject.toml`** dependencies, next to numpy/onnxruntime/tokenizers, with a comment that the observability checkers need it and `gen_anno_onnx_parity.py` needs the rest.
+- [x] **Step 6: Run it locally.** `cargo run -p xtask -- check-observability`. Expected: exit 0 and the four scripts' success lines. If `check_rules.py` fails, it has found a rule reading a metric the crate no longer exports — fix the rule, not the check.
+- [x] **Step 7: Add the CI step** in job `quality` after the clippy step at `ci.yml:51`:
 
 ```yaml
 - name: Observability rules, alerts and dashboards
@@ -360,8 +360,8 @@ git commit -m "refactor(service): cut the re-export block nothing reads, and the
     cargo run --locked -p xtask -- check-observability
 ```
 
-- [ ] **Step 8: Prove the CI step can fail.** Temporarily add a recording rule to `observability/recording_rules.yml` that reads `memory_nonexistent_metric_total`, run the xtask command, confirm it exits 1 with the rule named, then revert.
-- [ ] **Step 9: Commit**
+- [x] **Step 8: Prove the CI step can fail.** Temporarily add a recording rule to `observability/recording_rules.yml` that reads `memory_nonexistent_metric_total`, run the xtask command, confirm it exits 1 with the rule named, then revert.
+- [x] **Step 9: Commit**
 
 ```bash
 git commit -m "ci(observability): check the rules, alerts and dashboards, so they stop drifting"
