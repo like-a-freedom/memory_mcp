@@ -76,9 +76,10 @@ pub async fn create_client(
     command: CreateClientCommand,
     now: DateTime<Utc>,
 ) -> Result<ClientView, ClientCreationError> {
-    let account_id = format!("acct_{}", uuid::Uuid::new_v4());
-    let tenant_id = format!("ten_{}", uuid::Uuid::new_v4());
-    let namespace = format!("tns_{}", uuid::Uuid::new_v4().simple());
+    use crate::models::registry::{new_account_id, new_namespace_name, new_tenant_id};
+    let account_id = new_account_id();
+    let tenant_id = new_tenant_id();
+    let namespace = new_namespace_name();
     let request_fingerprint = client_fingerprint(command.operation_id, &command.display_name);
     port.create_client(ClientCreation {
         authority: command.authority,
@@ -371,7 +372,7 @@ pub async fn create_api_key(
         .active_key_cap(&owner.tenant_id, owner.plan_version)
         .await?;
     let secret = random_token();
-    let id = new_api_key_id();
+    let id = crate::models::registry::new_api_key_id();
     let expires_at = command
         .expires_in_days
         .map(|days| now + chrono::Duration::days(i64::from(days)));
@@ -395,10 +396,6 @@ pub async fn create_api_key(
 
 fn random_token() -> String {
     hex::encode(rand::random::<[u8; 32]>())
-}
-
-fn new_api_key_id() -> String {
-    format!("ak_{}", hex::encode(rand::random::<[u8; 12]>()))
 }
 
 /// The Tenant lifecycle transition table.

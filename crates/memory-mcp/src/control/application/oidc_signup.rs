@@ -156,10 +156,12 @@ fn build_bundle(
     crate::http::registry::models::Tenant,
     crate::http::registry::models::ExternalIdentity,
 ) {
-    use crate::http::registry::models::{ExternalIdentity, new_reserved_bundle};
+    use crate::http::registry::models::{
+        ExternalIdentity, new_external_identity_id, new_reserved_bundle,
+    };
     let (account, tenant) = new_reserved_bundle(1, now);
     let identity_record = ExternalIdentity {
-        id: format!("id_{}", uuid::Uuid::new_v4()),
+        id: new_external_identity_id(),
         account_id: account.id.clone(),
         issuer,
         subject_verifier,

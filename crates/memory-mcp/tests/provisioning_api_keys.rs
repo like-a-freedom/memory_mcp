@@ -3,6 +3,7 @@
 use std::sync::{Arc, Mutex};
 
 use memory_mcp::MemoryError;
+use memory_mcp::http::principal::api_keys::ApiKeyCredential;
 use memory_mcp::provisioning::api::{
     ApiKeyIssuancePort, ApiKeyOwner, CreateApiKeyCommand, NewApiKeyRecord, create_api_key,
 };
@@ -135,4 +136,47 @@ async fn created_api_key_debug_redacts_the_one_time_secret() {
     // The non-secret fields stay useful for diagnosis.
     assert!(rendered.contains(&created.id));
     assert_eq!(created.secret.len(), 64, "the secret itself is intact");
+}
+
+/// A key this workflow issues must be one the data plane accepts.
+///
+/// The credential the console copies is assembled here as
+/// `mem_sk_<key_id>_<secret>` — the same shape the local-admin
+/// workflow emits — and handed to the same parser
+/// `authenticate_bearer` runs. An id that this parser rejects is a key
+/// the operator copies, stores, and can never use: the failure is silent
+/// because the secret is shown exactly once, so the only symptom is a
+/// credential that never authenticates. The id must therefore be a
+/// canonical UUID, which is what the grammar above requires.
+#[tokio::test]
+async fn issued_credential_is_accepted_by_the_data_plane_parser() {
+    let port = Arc::new(RecordingIssuance::default());
+    *port.owner.lock().expect("owner lock") = Some(ApiKeyOwner {
+        tenant_id: "ten_1".into(),
+        plan_version: 1,
+    });
+    *port.cap.lock().expect("cap lock") = 5;
+    *port.expect_expiry.lock().expect("expect_expiry lock") = Some(false);
+
+    let created = create_api_key(
+        port.as_ref(),
+        CreateApiKeyCommand {
+            account_id: "acct_1".into(),
+            name: "agent".into(),
+            expires_in_days: None,
+        },
+        chrono::Utc::now(),
+    )
+    .await
+    .expect("issue key");
+
+    let credential = format!("mem_sk_{}_{}", created.id, created.secret);
+    let parsed = ApiKeyCredential::parse(&credential).unwrap_or_else(|error| {
+        panic!("an issued key must be usable: {credential} was refused ({error:?})")
+    });
+    assert_eq!(
+        parsed.key_id(),
+        created.id,
+        "the credential must resolve back to the id that was stored"
+    );
 }
