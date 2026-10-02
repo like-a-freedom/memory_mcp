@@ -3,6 +3,7 @@
 //! These tests verify that different service components work together correctly.
 
 use chrono::{TimeZone, Utc};
+use memory_mcp::models::EdgeAttributes;
 use memory_mcp::models::Provenance;
 use memory_mcp::service::EntityExtractor;
 use memory_mcp::service::memory_container_shims::memory_capabilities_assemble_context::AssembleContextCapability;
@@ -197,7 +198,10 @@ async fn test_service_resolve_and_relate_entities() {
         .unwrap();
     assert_eq!(alice_id, alice_id_2);
 
-    service.relate(&alice_id, "knows", &bob_id).await.unwrap();
+    service
+        .relate(&alice_id, "knows", &bob_id, EdgeAttributes::inferred())
+        .await
+        .unwrap();
 }
 
 #[tokio::test]
@@ -210,7 +214,10 @@ async fn test_service_relate_persists_native_edge_endpoints_and_inferred_origin(
         .unwrap();
     let bob_id = service.resolve_entity("person", "Bob Jones").await.unwrap();
 
-    service.relate(&alice_id, "knows", &bob_id).await.unwrap();
+    service
+        .relate(&alice_id, "knows", &bob_id, EdgeAttributes::inferred())
+        .await
+        .unwrap();
 
     let edges = db_client
         .select_table(KnowledgeTables::table("edge"), "org")
@@ -1486,7 +1493,12 @@ async fn assemble_context_graph_expansion_returns_anchor_neighbor_fact() {
     common::seed_entity(&db_client, "org", "entity:bob", "person", "Bob Chen", &[]).await;
 
     service
-        .relate("entity:alice", "knows", "entity:bob")
+        .relate(
+            "entity:alice",
+            "knows",
+            "entity:bob",
+            EdgeAttributes::inferred(),
+        )
         .await
         .expect("seed edge");
 
@@ -1901,9 +1913,18 @@ async fn test_service_assemble_context_map_view_returns_hub_entities_sorted_by_d
         .await
         .unwrap();
 
-    service.relate(&alice_id, "knows", &bob_id).await.unwrap();
-    service.relate(&bob_id, "knows", &carol_id).await.unwrap();
-    service.relate(&bob_id, "knows", &diana_id).await.unwrap();
+    service
+        .relate(&alice_id, "knows", &bob_id, EdgeAttributes::inferred())
+        .await
+        .unwrap();
+    service
+        .relate(&bob_id, "knows", &carol_id, EdgeAttributes::inferred())
+        .await
+        .unwrap();
+    service
+        .relate(&bob_id, "knows", &diana_id, EdgeAttributes::inferred())
+        .await
+        .unwrap();
 
     let items = AssembleContextCapability::assemble_context_from_service(
         &service,
@@ -2133,7 +2154,10 @@ async fn test_service_assemble_context_does_not_track_access_for_synthetic_view_
         .await
         .unwrap();
     let bob = service.resolve_entity("person", "Bob Jones").await.unwrap();
-    service.relate(&alice, "knows", &bob).await.unwrap();
+    service
+        .relate(&alice, "knows", &bob, EdgeAttributes::inferred())
+        .await
+        .unwrap();
 
     let items = AssembleContextCapability::assemble_context_from_service(
         &service,
@@ -2480,9 +2504,18 @@ async fn test_service_explain_with_graph_insights_returns_hub_and_connections() 
         .await
         .unwrap();
 
-    service.relate(&alice_id, "knows", &bob_id).await.unwrap();
-    service.relate(&bob_id, "knows", &carol_id).await.unwrap();
-    service.relate(&bob_id, "knows", &alice_id).await.unwrap();
+    service
+        .relate(&alice_id, "knows", &bob_id, EdgeAttributes::inferred())
+        .await
+        .unwrap();
+    service
+        .relate(&bob_id, "knows", &carol_id, EdgeAttributes::inferred())
+        .await
+        .unwrap();
+    service
+        .relate(&bob_id, "knows", &alice_id, EdgeAttributes::inferred())
+        .await
+        .unwrap();
 
     // Seed a community so Bob shows up as a hub.
     common::seed_community(

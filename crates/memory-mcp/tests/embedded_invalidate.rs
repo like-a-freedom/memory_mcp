@@ -1,6 +1,7 @@
 mod common;
 
 use chrono::{Duration, Utc};
+use memory_mcp::models::EdgeAttributes;
 use memory_mcp::models::{AssembleContextRequest, InvalidateRequest, Provenance};
 use memory_mcp::service::memory_container_shims::memory_capabilities_assemble_context::AssembleContextCapability;
 use memory_mcp::service::memory_container_shims::memory_capabilities_invalidate::InvalidateCapability;
@@ -139,9 +140,13 @@ async fn embedded_relate_invalidates_previous_active_edge_version()
     let alice = service.resolve_entity("person", "Alice").await?;
     let bob = service.resolve_entity("person", "Bob").await?;
 
-    service.relate(&alice, "knows", &bob).await?;
+    service
+        .relate(&alice, "knows", &bob, EdgeAttributes::inferred())
+        .await?;
     tokio::time::sleep(std::time::Duration::from_millis(2)).await;
-    service.relate(&alice, "knows", &bob).await?;
+    service
+        .relate(&alice, "knows", &bob, EdgeAttributes::inferred())
+        .await?;
 
     let edges = db_client
         .select_table(KnowledgeTables::table("edge"), "org")

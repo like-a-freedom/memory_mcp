@@ -3,11 +3,15 @@
 
 use std::sync::Mutex;
 
+use chrono::Utc;
+
 use memory_mcp::MemoryError;
 use memory_mcp::knowledge::api::{
     KnowledgeReadPort, KnowledgeReadScope, owned_episode_scan, owned_fact_scan,
     read_through_knowledge_port,
 };
+
+mod common;
 
 /// Records what was asked for so the test can prove the
 /// application layer cannot express an arbitrary table.
@@ -206,5 +210,95 @@ fn the_storage_platform_names_no_domain_table() {
          domain:\n\n{}",
         offenders.len(),
         offenders.join("\n")
+    );
+}
+
+/// `relate` used to hardcode `EdgeOrigin::Inferred`, strength `1.0`,
+/// confidence `0.8` and `Provenance::manual()` — a business decision hidden
+/// in a fixture helper, with no way for a caller to state anything else.
+///
+/// This asserts an explicitly-originated edge round-trips with the values it
+/// was given. It cannot be written before the signature changed, which is
+/// the proof the hardcoding was a real constraint rather than a default.
+#[tokio::test]
+async fn relate_records_an_operator_originated_edge() {
+    use memory_mcp::models::{EdgeOrigin, Provenance};
+    use memory_mcp::service::memory_container_shims::memory_capabilities_ingest::IngestCapability;
+
+    let (service, db_client) = common::make_service_with_client().await;
+
+    let episode_id = IngestCapability::ingest_from_service(
+        &service,
+        memory_mcp::models::IngestRequest {
+            source_type: "test".to_string(),
+            source_id: "relate-origin".to_string(),
+            content: "Alice Smith and Bob Jones presented at a conference".to_string(),
+            t_ref: Utc::now(),
+            t_ingested: None,
+            policy_tags: Vec::new(),
+        },
+        None,
+    )
+    .await
+    .expect("ingest");
+
+    let extracted = memory_mcp::service::memory_container_shims::memory_capabilities_extract::ExtractCapability::extract_from_service(
+        &service, &episode_id, None, None,
+    )
+    .await
+    .expect("extract");
+
+    let alice = extracted
+        .entities
+        .iter()
+        .find(|e| e.canonical_name.to_lowercase().contains("alice"))
+        .map(|e| e.entity_id.clone())
+        .expect("alice entity");
+    let bob = extracted
+        .entities
+        .iter()
+        .find(|e| e.canonical_name.to_lowercase().contains("bob"))
+        .map(|e| e.entity_id.clone())
+        .expect("bob entity");
+
+    let attributes = memory_mcp::models::EdgeAttributes {
+        origin: EdgeOrigin::Ambiguous,
+        strength: 0.42,
+        confidence: 0.13,
+        provenance: Provenance::manual(),
+    };
+    service
+        .relate(&alice, "attended_with", &bob, attributes)
+        .await
+        .expect("relate");
+
+    let store =
+        memory_mcp::knowledge::KnowledgeGraphStore::new(db_client.clone(), "org".to_string());
+    let edges = store
+        .select_edges_filtered_page(&Utc::now().to_rfc3339(), 0, 50)
+        .await
+        .expect("read edges");
+
+    let edge = edges
+        .iter()
+        .find(|row| {
+            row.get("relation")
+                .and_then(serde_json::Value::as_str)
+                .is_some_and(|r| r == "attended_with")
+        })
+        .expect("the edge just written");
+
+    assert_eq!(
+        edge.get("origin").and_then(serde_json::Value::as_str),
+        Some("ambiguous")
+    );
+    assert_eq!(
+        edge.get("confidence").and_then(serde_json::Value::as_f64),
+        Some(0.13),
+        "the caller stated the confidence; the helper must not overwrite it"
+    );
+    assert_eq!(
+        edge.get("strength").and_then(serde_json::Value::as_f64),
+        Some(0.42)
     );
 }

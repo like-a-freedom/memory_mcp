@@ -26,6 +26,7 @@ pub mod fact_parsing;
 pub mod fact_service;
 mod fact_store;
 pub mod graph_store;
+pub mod graph_traversal;
 pub mod infra;
 mod knowledge_store;
 pub mod queries;

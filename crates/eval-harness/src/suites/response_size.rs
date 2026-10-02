@@ -79,7 +79,12 @@ impl EvalSuite for ResponseSizeSuite {
             // Seed edges
             for edge in &case.edges {
                 if service
-                    .relate(&edge.from_id, &edge.relation, &edge.to_id)
+                    .relate(
+                        &edge.from_id,
+                        &edge.relation,
+                        &edge.to_id,
+                        EdgeAttributes::inferred(),
+                    )
                     .await
                     .is_err()
                 {
@@ -256,6 +261,7 @@ use std::collections::BTreeMap;
 
 use crate::artifact::SuiteSummary;
 use crate::reducer::SuiteReducer;
+use memory_mcp::models::EdgeAttributes;
 
 pub(crate) struct ResponseSizeReducer {
     suite_id: SuiteId,

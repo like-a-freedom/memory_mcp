@@ -8,6 +8,9 @@ pub(crate) mod session_lifecycle;
 mod workflow;
 
 pub mod graph;
+#[cfg(test)]
+pub use crate::knowledge::graph_traversal::edge_neighbor;
+pub use crate::knowledge::graph_traversal::{graph_neighbor_expansion, graph_payload};
 pub(crate) use crate::memory::lifecycle_types::LifecycleOperation;
 pub use crate::memory::lifecycle_types::{
     ArchiveCandidatesOutcome, CommitIngestionReviewOutcome, CommitIngestionReviewRequest,
@@ -18,8 +21,5 @@ pub use crate::memory::lifecycle_types::{
     RestoreArchivedOutcome,
 };
 pub use crate::platform::traversal_budget::GraphTraversalBudget;
-#[cfg(test)]
-pub use graph::edge_neighbor;
-pub use graph::{graph_neighbor_expansion, graph_payload};
 #[cfg(feature = "mcp-apps")]
 pub(crate) use workflow::AppCommandInput;

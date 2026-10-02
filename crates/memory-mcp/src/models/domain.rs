@@ -215,6 +215,37 @@ pub enum EdgeOrigin {
     Ambiguous,
 }
 
+/// The attributes of an edge that say *how we know it*, separated from the
+/// identity fields and the bi-temporal ones.
+///
+/// `Edge::relate` used to hardcode these four — `Inferred`, `1.0`, `0.8`,
+/// `Provenance::manual()` — so no caller could record that a relationship
+/// was stated by an operator rather than inferred, or that confidence was
+/// anything other than 0.8. A business decision was hiding in a fixture
+/// helper.
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+pub struct EdgeAttributes {
+    pub origin: EdgeOrigin,
+    pub strength: f64,
+    pub confidence: f64,
+    pub provenance: Provenance,
+}
+
+impl EdgeAttributes {
+    /// The attributes `MemoryService::relate` used to hardcode.
+    ///
+    /// Kept so a caller that genuinely has nothing to say can say so
+    /// explicitly, rather than the helper deciding on its behalf.
+    pub fn inferred() -> Self {
+        Self {
+            origin: EdgeOrigin::Inferred,
+            strength: 1.0,
+            confidence: 0.8,
+            provenance: Provenance::manual(),
+        }
+    }
+}
+
 /// An edge represents a relationship between entities or facts.
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct Edge {

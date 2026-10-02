@@ -232,6 +232,7 @@ pub(crate) async fn collect_graph_facts(
 
 #[cfg(test)]
 mod tests {
+    use crate::models::EdgeAttributes;
     use std::collections::HashMap;
     use std::sync::Arc;
 
@@ -348,7 +349,12 @@ mod tests {
             .await
             .expect("seed bob");
         service
-            .relate("entity:alice", "knows", "entity:bob")
+            .relate(
+                "entity:alice",
+                "knows",
+                "entity:bob",
+                EdgeAttributes::inferred(),
+            )
             .await
             .expect("seed edge");
 

@@ -7,6 +7,7 @@ use crate::domain::*;
 use crate::error::EvalError;
 use crate::runner::{EvalSuite, RunContext};
 use crate::test_support;
+use memory_mcp::models::EdgeAttributes;
 
 pub struct LocalRetrievalSuite {
     expected_ids: Vec<EvalCaseId>,
@@ -44,7 +45,12 @@ impl LocalRetrievalSuite {
         }
         for edge in &case.edges {
             if let Err(err) = service
-                .relate(&edge.from_id, &edge.relation, &edge.to_id)
+                .relate(
+                    &edge.from_id,
+                    &edge.relation,
+                    &edge.to_id,
+                    EdgeAttributes::inferred(),
+                )
                 .await
             {
                 return EvalCaseOutcome {

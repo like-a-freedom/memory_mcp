@@ -247,3 +247,34 @@ fn the_live_decay_function_is_not_the_cut_one() {
          second name for it and had no caller but its own tests."
     );
 }
+
+/// The introduction-chain BFS is unreachable from any registered app
+/// action, so Task 5.3 cut it rather than moving it into a bounded context
+/// where it would acquire a fresh, respectable-looking home.
+///
+/// This asserts the absence, so it passes now and fails if anyone re-adds a
+/// path to it. The reachability argument: the `graph` app registers exactly
+/// `expand_neighbors`, `open_edge_details` and `use_path_as_context` in
+/// `service/apps/dispatch.rs`, and none of them reaches the chain. The only
+/// callers were five assertions in `tests/service_acceptance.rs`.
+#[test]
+fn the_introduction_chain_is_not_reintroduced_into_the_graph_app() {
+    let path = Path::new(env!("CARGO_MANIFEST_DIR")).join("src/service/apps/graph.rs");
+    let text = fs::read_to_string(&path)
+        .unwrap_or_else(|e| panic!("{} is not readable: {e}", path.display()));
+    for name in [
+        "fn find_intro_chain",
+        "fn intro_chain_from_start",
+        "fn find_entity_id_by_name",
+    ] {
+        assert!(
+            !text.contains(name),
+            "`{name}` is back in `service/apps/graph.rs`. No registered app \
+             action reaches the introduction chain: the `graph` app offers \
+             `expand_neighbors`, `open_edge_details` and \
+             `use_path_as_context`, and none of them calls it. If a new action \
+             genuinely needs it, it needs a traversal that takes \
+             `&KnowledgeGraphStore` — the one this code cannot reach."
+        );
+    }
+}

@@ -1,4 +1,5 @@
 use chrono::{TimeZone, Utc};
+use memory_mcp::models::EdgeAttributes;
 use memory_mcp::models::{
     AccessPayload, EntityCandidate, IngestRequest, InvalidateRequest, Provenance,
 };
@@ -239,162 +240,6 @@ async fn test_policy_tag_filtering() {
 }
 
 #[tokio::test]
-async fn test_graph_intro_chain() {
-    let service = common::make_service().await;
-    let alice = service
-        .resolve_entity("person", "Alice")
-        .await
-        .expect("alice");
-    let bob = service.resolve_entity("person", "Bob").await.expect("bob");
-    let openai = service
-        .resolve_entity("company", "OpenAI")
-        .await
-        .expect("openai");
-
-    service.relate(&alice, "knows", &bob).await.expect("relate");
-    service
-        .relate(&bob, "knows", &openai)
-        .await
-        .expect("relate");
-
-    let chain = service
-        .find_intro_chain("OpenAI", 3, None)
-        .await
-        .expect("chain");
-    assert_eq!(chain, vec![alice, bob, openai]);
-}
-
-#[tokio::test]
-async fn test_graph_intro_chain_as_of_filters_edges() {
-    let service = common::make_service().await;
-    let alice = service
-        .resolve_entity("person", "Alice")
-        .await
-        .expect("alice");
-    let bob = service.resolve_entity("person", "Bob").await.expect("bob");
-    let openai = service
-        .resolve_entity("company", "OpenAI")
-        .await
-        .expect("openai");
-
-    service.relate(&alice, "knows", &bob).await.expect("relate");
-    service
-        .relate(&bob, "knows", &openai)
-        .await
-        .expect("relate");
-
-    let past = Utc::now() - chrono::Duration::days(1);
-    let chain_past = service
-        .find_intro_chain("OpenAI", 3, Some(past))
-        .await
-        .expect("chain past");
-    assert!(chain_past.is_empty());
-
-    let future = Utc::now() + chrono::Duration::seconds(1);
-    let chain_future = service
-        .find_intro_chain("OpenAI", 3, Some(future))
-        .await
-        .expect("chain future");
-    assert_eq!(chain_future, vec![alice, bob, openai]);
-}
-
-#[tokio::test]
-async fn test_graph_intro_chain_prefers_shortest_path_over_lexicographic_candidate() {
-    let service = common::make_service().await;
-    let alice = service
-        .resolve_entity("person", "Alice")
-        .await
-        .expect("alice");
-    let bob = service.resolve_entity("person", "Bob").await.expect("bob");
-    let carol = service
-        .resolve_entity("person", "Carol")
-        .await
-        .expect("carol");
-    let openai = service
-        .resolve_entity("company", "OpenAI")
-        .await
-        .expect("openai");
-
-    service.relate(&alice, "knows", &bob).await.expect("relate");
-    service
-        .relate(&bob, "knows", &openai)
-        .await
-        .expect("relate");
-    service
-        .relate(&carol, "knows", &openai)
-        .await
-        .expect("relate");
-
-    let future = Utc.with_ymd_and_hms(2099, 1, 1, 0, 0, 0).unwrap();
-    let chain = service
-        .find_intro_chain("OpenAI", 3, Some(future))
-        .await
-        .expect("chain");
-
-    assert_eq!(
-        chain,
-        vec![carol, openai],
-        "the shortest discovered introduction path should win even if a longer path starts with a lexicographically earlier id"
-    );
-}
-
-#[tokio::test]
-async fn test_graph_intro_chain_prefers_shortest_path_in_multi_hop_diamond() {
-    let service = common::make_service().await;
-    let alice = service
-        .resolve_entity("person", "Alice")
-        .await
-        .expect("alice");
-    let bob = service.resolve_entity("person", "Bob").await.expect("bob");
-    let carol = service
-        .resolve_entity("person", "Carol")
-        .await
-        .expect("carol");
-    let diana = service
-        .resolve_entity("person", "Diana")
-        .await
-        .expect("diana");
-    let erin = service
-        .resolve_entity("person", "Erin")
-        .await
-        .expect("erin");
-    let openai = service
-        .resolve_entity("company", "OpenAI")
-        .await
-        .expect("openai");
-
-    service.relate(&alice, "knows", &bob).await.expect("relate");
-    service
-        .relate(&bob, "knows", &openai)
-        .await
-        .expect("relate");
-    service
-        .relate(&diana, "knows", &carol)
-        .await
-        .expect("relate");
-    service
-        .relate(&carol, "knows", &openai)
-        .await
-        .expect("relate");
-    service
-        .relate(&erin, "knows", &alice)
-        .await
-        .expect("relate");
-
-    let future = Utc.with_ymd_and_hms(2099, 1, 1, 0, 0, 0).unwrap();
-    let chain = service
-        .find_intro_chain("OpenAI", 4, Some(future))
-        .await
-        .expect("chain");
-
-    assert_eq!(
-        chain,
-        vec![diana, carol, openai],
-        "the traversal should keep the shorter diamond branch instead of returning the deeper alternative"
-    );
-}
-
-#[tokio::test]
 async fn test_explain_exposes_graph_insights_for_cross_community_connection() {
     let (service, db_client) = common::make_service_with_client().await;
     let t_ref = Utc.with_ymd_and_hms(2026, 4, 8, 10, 0, 0).unwrap();
@@ -417,11 +262,11 @@ async fn test_explain_exposes_graph_insights_for_cross_community_connection() {
         .expect("diana");
 
     service
-        .relate(&alice_id, "knows", &bob_id)
+        .relate(&alice_id, "knows", &bob_id, EdgeAttributes::inferred())
         .await
         .expect("alice->bob");
     service
-        .relate(&bob_id, "knows", &carol_id)
+        .relate(&bob_id, "knows", &carol_id, EdgeAttributes::inferred())
         .await
         .expect("bob->carol");
 
@@ -533,12 +378,12 @@ async fn test_relate_repeated_write_invalidates_previous_edge_version() {
     let bob = service.resolve_entity("person", "Bob").await.expect("bob");
 
     service
-        .relate(&alice, "knows", &bob)
+        .relate(&alice, "knows", &bob, EdgeAttributes::inferred())
         .await
         .expect("relate 1");
     tokio::time::sleep(std::time::Duration::from_millis(2)).await;
     service
-        .relate(&alice, "knows", &bob)
+        .relate(&alice, "knows", &bob, EdgeAttributes::inferred())
         .await
         .expect("relate 2");
 
@@ -1035,7 +880,12 @@ async fn test_assemble_context_graph_results_include_anchor_and_hop_trace() {
     .await;
     common::seed_entity(&db_client, "org", "entity:bob", "person", "Bob Chen", &[]).await;
     service
-        .relate("entity:alice", "knows", "entity:bob")
+        .relate(
+            "entity:alice",
+            "knows",
+            "entity:bob",
+            EdgeAttributes::inferred(),
+        )
         .await
         .expect("seed edge");
     common::seed_fact_with_links(

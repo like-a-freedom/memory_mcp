@@ -1,5 +1,6 @@
 //! Application composition and integration adapters.
 
+#[cfg(feature = "control-plane")]
 use std::sync::Arc;
 
 #[cfg(feature = "control-plane")]

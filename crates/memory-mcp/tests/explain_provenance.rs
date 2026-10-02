@@ -15,6 +15,7 @@ use memory_mcp::service::memory_container_shims::memory_capabilities_explain::Ex
 use memory_mcp::service::memory_container_shims::memory_capabilities_ingest::IngestCapability;
 
 use chrono::Utc;
+use memory_mcp::models::EdgeAttributes;
 use memory_mcp::models::{ExplainItem, ExplainRequest, IngestRequest, Provenance};
 use memory_mcp::storage::DbClient;
 use serde_json::json;
@@ -523,7 +524,7 @@ async fn explain_batch_shares_graph_insights() {
         .await
         .expect("bob");
     service
-        .relate(&alice_id, "knows", &bob_id)
+        .relate(&alice_id, "knows", &bob_id, EdgeAttributes::inferred())
         .await
         .expect("edge");
 
