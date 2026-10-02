@@ -194,7 +194,10 @@ pub(super) fn KeysPanel(
                 }
             } else if page.error().is_none() {
                 if page.is_loaded() {
-                    p { class: "empty", "No keys have been issued for this client." }
+                    // Names the control above it, the way the client list's own
+                    // empty state does: an empty panel that only states the fact
+                    // leaves the operator looking for what to press.
+                    p { class: "empty", "No keys have been issued for this client. Issue one above." }
                 } else {
                     Alert { tone: AlertTone::Status, message: Some("Loading keys…".to_owned()) }
                 }

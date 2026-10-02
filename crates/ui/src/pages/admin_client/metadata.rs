@@ -24,22 +24,31 @@ pub fn ClientMetadata(view: ClientView) -> Element {
     rsx! {
         section { class: "client-metadata",
             h2 { "Client" }
-            table {
-                caption { class: "visually-hidden", "Client metadata" }
-                tbody {
-                    tr { th { scope: "row", "Client id" } td { code { "{view.account_id}" } } }
-                    tr { th { scope: "row", "Tenant id" } td { code { "{view.tenant_id}" } } }
-                    tr {
-                        th { scope: "row", "Account status" }
-                        td { StatusBadge { value: view.account_status.clone() } }
+            // The identifiers keep their own line, so this table can exceed a
+            // 320px viewport. It scrolls here for the same reason every other
+            // table in the console does, rather than widening its panel.
+            div {
+                class: "table-scroll",
+                role: "region",
+                "aria-label": "Client metadata table",
+                tabindex: "0",
+                table {
+                    caption { class: "visually-hidden", "Client metadata" }
+                    tbody {
+                        tr { th { scope: "row", "Client id" } td { code { "{view.account_id}" } } }
+                        tr { th { scope: "row", "Tenant id" } td { code { "{view.tenant_id}" } } }
+                        tr {
+                            th { scope: "row", "Account status" }
+                            td { StatusBadge { value: view.account_status.clone() } }
+                        }
+                        tr {
+                            th { scope: "row", "Tenant status" }
+                            td { StatusBadge { value: view.tenant_status.clone() } }
+                        }
+                        tr { th { scope: "row", "Plan version" } td { "{view.plan_version}" } }
+                        tr { th { scope: "row", "Schema version" } td { "{view.schema_version}" } }
+                        tr { th { scope: "row", "Version" } td { "{view.version}" } }
                     }
-                    tr {
-                        th { scope: "row", "Tenant status" }
-                        td { StatusBadge { value: view.tenant_status.clone() } }
-                    }
-                    tr { th { scope: "row", "Plan version" } td { "{view.plan_version}" } }
-                    tr { th { scope: "row", "Schema version" } td { "{view.schema_version}" } }
-                    tr { th { scope: "row", "Version" } td { "{view.version}" } }
                 }
             }
             p { class: "readiness", "{readiness}" }

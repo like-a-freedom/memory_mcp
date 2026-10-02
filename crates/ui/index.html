@@ -2,7 +2,14 @@
 <html lang="en">
     <head>
         <meta charset="UTF-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <!-- `viewport-fit=cover` lets the console draw into the display's safe
+             area; `assets/main.css` pads the gutters back out with
+             `env(safe-area-inset-*)`, so a notched or rounded-corner device keeps
+             its content clear of the cutout instead of losing it. -->
+        <meta
+            name="viewport"
+            content="width=device-width, initial-scale=1, viewport-fit=cover"
+        >
         <!-- The CLI owns this element and appends the configured application
              title from `Dioxus.toml` ([web.app] title) into it, so the text
              stays in exactly one place: leave it empty here. -->

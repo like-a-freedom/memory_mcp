@@ -57,6 +57,47 @@
     --radius-panel: 12px;
     --radius-control: 8px;
 
+    /* Spacing scale. Every gap, padding and margin in this file is one of these
+       steps, so two blocks that should touch agree on where they touch. The
+       values are the ones the console already used, so publishing them changed
+       no rendered dimension — it made the existing decisions checkable. */
+    --space-1: 0.25rem;  /*  4px — inside a control, between a label and its field */
+    --space-2: 0.5rem;   /*  8px — between controls in one row */
+    --space-3: 0.75rem;  /* 12px — inside a panel, between panel members */
+    --space-4: 1rem;     /* 16px — between fields, between panels */
+    --space-5: 1.25rem;  /* 20px — page rhythm, the gap every page-level block sits at */
+    --space-6: 1.5rem;   /* 24px — container gutters, the page's side padding */
+    --space-8: 2rem;     /* 32px — above the page's first block */
+    --space-10: 4rem;    /* 64px — below the page's last block */
+
+    /* Type scale. Every step is at least 1.2× the one below it, so a heading
+       reads as a heading on size alone before colour or weight is consulted —
+       a flat scale is what makes a panel look like a paragraph in a box.
+
+       Two entries are deliberately out of the size ladder:
+       `--text-md` is the body/control size and `--text-sm` is micro-copy, which
+       sits between the table size and the body so a hint can be read in a form
+       without competing with the value beside it. */
+    --text-xs: 0.75rem;    /* 12px — table headers, status badges */
+    --text-sm: 0.8125rem;  /* 13px — field labels, hints, inline code */
+    --text-base: 0.875rem; /* 14px — tables, buttons, secondary copy */
+    --text-md: 1rem;       /* 16px — body copy and form controls (also the
+                              iOS no-zoom floor; see the input rule below) */
+    --text-lg: 1.25rem;    /* 20px — panel headings */
+    --text-xl: 1.75rem;    /* 28px — page titles */
+
+    /* The page title steps down one notch at phone widths. It is the one entry
+       that leaves the scale: a 28px title is the desktop reading distance, and
+       the same title on a phone held 30cm away is a banner rather than a name. */
+    --text-xl-sm: 1.5rem;  /* 24px — page titles below the tablet breakpoint */
+
+    /* Leading, by role. Unitless, so it scales with the size it is paired with
+       rather than freezing at one pixel value. */
+    --leading-tight: 1.25; /* headings, badges, buttons: one or two lines */
+    --leading-snug: 1.4;   /* table cells, inputs */
+    --leading-normal: 1.55; /* body copy and everything that wraps */
+    --leading-relaxed: 1.65; /* a value set in mono, read character by character */
+
     --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto,
         "Helvetica Neue", Arial, sans-serif;
     --font-mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas,
@@ -86,8 +127,13 @@ body {
     background-color: var(--bg);
     color: var(--fg);
     font-family: var(--font-sans);
-    font-size: 0.9375rem;
-    line-height: 1.55;
+    font-size: var(--text-md);
+    line-height: var(--leading-normal);
+    /* One place, once: the per-element rule is for font rendering, not layout,
+       and repeating it per component is how a surface ends up with two
+       different weights for the same text. */
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
 }
 
 h1,
@@ -95,65 +141,97 @@ h2,
 h3 {
     margin: 0;
     font-weight: 600;
-    letter-spacing: -0.011em;
-    line-height: 1.25;
+    /* Display type on a dark surface needs its tracking opened slightly, not
+       tightened: a negative track that flatters large type on white makes the
+       same type look loose and grey here. */
+    line-height: var(--leading-tight);
 }
 
 h1 {
-    font-size: 1.5rem;
+    font-size: var(--text-xl);
+    letter-spacing: -0.014em;
+    /* A page title is one or two lines. Balancing evens them out, so a client
+       name that wraps does not leave one orphan word under it. */
+    text-wrap: balance;
 }
 
 h2 {
-    font-size: 1.0625rem;
+    font-size: var(--text-lg);
+    letter-spacing: -0.008em;
+    text-wrap: balance;
 }
 
+/* No page renders an `h3` today: a panel has one heading and it is an `h2`. The
+   rule stays so a third level has to be chosen from the scale rather than
+   invented, and `.secret > h3` below stays valid if one is ever added. */
 h3 {
-    font-size: 0.9375rem;
+    font-size: var(--text-md);
+    font-weight: 600;
+    letter-spacing: -0.004em;
 }
 
+/* The measure. `ch` is measured against this element's own size, so the cap is
+   only correct where the cap is applied — a 13px hint inherits it and gets a
+   557px line it never needed, which is why the hints below opt out. */
 p {
     margin: 0;
     max-width: 68ch;
+    /* Avoids the single-word last line an operator reads as a stray. Not
+       `balance`: that is for headings, and evening out a whole paragraph
+       wastes the measure it is supposed to protect. */
+    text-wrap: pretty;
 }
 
 ul,
 ol {
     margin: 0;
-    padding-left: 1.25rem;
+    padding-left: var(--space-5);
 }
 
 a {
     color: var(--accent);
-    text-decoration-thickness: 1px;
-    text-underline-offset: 2px;
+    /* Position and thickness come from the font rather than from a guess, so a
+       link underlines under the descender instead of through it. The skip link
+       carries its own decoration reset below. */
+    text-decoration: underline;
+    text-decoration-thickness: from-font;
+    text-underline-offset: from-font;
+    text-decoration-skip-ink: auto;
 }
 
 a:hover {
     color: var(--accent-hover);
 }
 
+/* The separator takes its spacing from the parent's `gap` like every other
+   block-level sibling, so it cannot add a second rhythm on top of the page's. */
 hr {
     border: 0;
     border-top: 1px solid var(--border);
     width: 100%;
-    margin: 0.25rem 0;
+    margin: 0;
 }
 
+/* An identifier is one token: it is copied, compared and read aloud, and none
+   of those survive it being split. `overflow-wrap: anywhere` below is right for
+   a secret — a long value must wrap rather than widen its panel — and wrong
+   for an id, so the nowrap is scoped to the two places an id is rendered. */
 code {
     font-family: var(--font-mono);
-    font-size: 0.8125rem;
+    font-size: var(--text-sm);
     color: var(--fg);
     background-color: var(--surface-sunken);
     border: 1px solid var(--border);
     border-radius: var(--radius-control);
-    padding: 0.0625rem 0.375rem;
-    overflow-wrap: anywhere;
+    padding: 0.0625rem var(--space-2);
+    overflow-wrap: break-word;
 }
 
 /* Table id chips are copied far more often than they are read: one click
    selects the whole id. Inline `code` in prose keeps ordinary selection. */
 td > code {
     user-select: all;
+    white-space: nowrap;
 }
 
 :focus-visible {
@@ -181,6 +259,15 @@ td > code {
 
 /* ═══ shell: skip link, header, main ═══════════════════════════════════ */
 
+/* The console opts into `viewport-fit=cover` (see index.html), so the page may
+   draw under a notch or a rounded corner. These two tokens put the content back
+   inside the safe area. `env()` resolves to 0 on a device with no inset, so a
+   desktop browser and a flat phone render exactly as before. */
+:root {
+    --safe-inline-start: env(safe-area-inset-left, 0px);
+    --safe-inline-end: env(safe-area-inset-right, 0px);
+}
+
 .skip-link {
     position: absolute;
     top: 0.5rem;
@@ -191,7 +278,7 @@ td > code {
     color: var(--accent-text);
     font-weight: 600;
     text-decoration: none;
-    padding: 0.5rem 0.875rem;
+    padding: var(--space-2) var(--space-3);
     border-radius: var(--radius-control);
 }
 
@@ -212,10 +299,15 @@ main:focus {
 .app-header-inner {
     display: flex;
     align-items: baseline;
-    gap: 0.5rem;
+    gap: var(--space-2);
     max-width: 1120px;
     margin: 0 auto;
-    padding: 0.875rem 1.5rem;
+    /* The side gutters carry the display's safe-area inset, so a notched device
+       keeps the brand clear of the cutout. */
+    padding: var(--space-3)
+        calc(var(--space-6) + var(--safe-inline-end))
+        var(--space-3)
+        calc(var(--space-6) + var(--safe-inline-start));
 }
 
 .app-brand {
@@ -225,7 +317,7 @@ main:focus {
 
 .app-brand-suffix {
     color: var(--fg-subtle);
-    font-size: 0.8125rem;
+    font-size: var(--text-sm);
 }
 
 /* ═══ layout ═══════════════════════════════════════════════════════════ */
@@ -233,10 +325,15 @@ main:focus {
 .container {
     display: flex;
     flex-direction: column;
-    gap: 1.25rem;
+    gap: var(--space-5);
     max-width: 1120px;
     margin: 0 auto;
-    padding: 2rem 1.5rem 4rem;
+    /* Same safe-area gutter as the header, so the two share one left edge on a
+       notched device instead of the header sitting 24px outside the page. */
+    padding: var(--space-8)
+        calc(var(--space-6) + var(--safe-inline-end))
+        var(--space-10)
+        calc(var(--space-6) + var(--safe-inline-start));
 }
 
 /* Form-centric pages — sign-in, activation, account self-service, the 404 —
@@ -257,12 +354,20 @@ main:focus {
     align-items: center;
     justify-content: space-between;
     flex-wrap: wrap;
-    gap: 0.75rem;
+    gap: var(--space-3);
 }
 
 .page-header > button,
 .page-header > a.button {
     flex: 0 0 auto;
+}
+
+/* A column flex stretches its children. A button is as wide as its label
+   everywhere else in this console, and the sign-in page is no exception: the
+   OIDC control stretched the full 544px column beside a 66px "Sign in" with no
+   visible reason for the difference. */
+.container > a.button {
+    align-self: flex-start;
 }
 
 /* `page-surface` marks the region a modal takes out of the tab order and
@@ -277,7 +382,7 @@ main:focus {
 .page-surface {
     display: flex;
     flex-direction: column;
-    gap: 1.25rem;
+    gap: var(--space-5);
 }
 
 /* ═══ session bar ══════════════════════════════════════════════════════ */
@@ -286,13 +391,13 @@ main:focus {
     display: flex;
     flex-wrap: wrap;
     align-items: center;
-    gap: 0.5rem 0.75rem;
+    gap: var(--space-2) var(--space-3);
     background-color: var(--surface);
     border: 1px solid var(--border);
     border-radius: var(--radius-panel);
-    padding: 0.625rem 0.875rem;
+    padding: 0.625rem var(--space-3);
     color: var(--fg-muted);
-    font-size: 0.875rem;
+    font-size: var(--text-base);
 }
 
 .session-bar > :first-child {
@@ -307,7 +412,7 @@ main:focus {
 
 .session-expiry {
     color: var(--fg-subtle);
-    font-size: 0.8125rem;
+    font-size: var(--text-sm);
 }
 
 /* ═══ forms ════════════════════════════════════════════════════════════ */
@@ -315,7 +420,7 @@ main:focus {
 form {
     display: flex;
     flex-direction: column;
-    gap: 1rem;
+    gap: var(--space-4);
     max-width: 34rem;
 }
 
@@ -330,14 +435,19 @@ form > button[type="submit"] {
 .field {
     display: flex;
     flex-direction: column;
-    gap: 0.375rem;
+    gap: var(--space-1);
 }
 
+/* One label size and weight for every label in a form, whichever element
+   carries it. `.field > label` alone would have left the expiry fieldset's own
+   labels a step larger and a step lighter, so the two groups in the key-issuance
+   form did not read as one form. */
 .field > label,
 .expiry > legend,
+.expiry > div > label,
 .field > span {
     color: var(--fg-muted);
-    font-size: 0.8125rem;
+    font-size: var(--text-sm);
     font-weight: 500;
 }
 
@@ -356,11 +466,14 @@ input[type="email"] {
     background-color: var(--surface-sunken);
     color: var(--fg);
     font-family: inherit;
-    font-size: 0.9375rem;
-    line-height: 1.4;
+    /* At or above 16px, so iOS Safari does not zoom the viewport on focus and
+       strand the operator below the field they just tapped. The mobile
+       breakpoint keeps this value; only the box grows there. */
+    font-size: var(--text-md);
+    line-height: var(--leading-snug);
     border: 1px solid var(--border-strong);
     border-radius: var(--radius-control);
-    padding: 0.5rem 0.6875rem;
+    padding: var(--space-2) 0.6875rem;
     transition: border-color 120ms ease, background-color 120ms ease;
 }
 
@@ -398,41 +511,49 @@ input[type="checkbox"] {
     height: 1rem;
     margin: 0;
     accent-color: var(--accent);
+    /* A checkbox has no text of its own, but it is still a focusable form
+       control: below the iOS zoom floor it zooms the viewport when it takes
+       focus, which on the expiry fieldset would strand the operator mid-form. */
+    font-size: var(--text-md);
 }
 
 .expiry {
     display: flex;
     flex-direction: column;
-    gap: 0.625rem;
+    gap: var(--space-3);
     margin: 0;
-    padding: 0.875rem;
+    padding: var(--space-3);
     border: 1px solid var(--border);
     border-radius: var(--radius-panel);
     background-color: var(--surface);
 }
 
+/* The legend sits on the fieldset's left line with its labels. A horizontal
+   padding here would push it 6px right of the rows it heads, which is the one
+   misregistration the field's own alignment cannot excuse. */
 .expiry > legend {
-    padding: 0 0.375rem;
+    padding: 0;
 }
 
 .expiry > div {
     display: flex;
     align-items: center;
-    gap: 0.5rem;
+    gap: var(--space-2);
 }
 
 .expiry > div > label {
-    font-size: 0.875rem;
     white-space: nowrap;
+}
+
+/* The range hint beside the day count is an example, not a label, so it keeps
+   the dimmer colour and is exempt from the label scale above. */
+.expiry > div > span {
+    color: var(--fg-subtle);
+    font-size: var(--text-sm);
 }
 
 .expiry > div > input[type="number"] {
     width: 7rem;
-}
-
-.expiry > div > span {
-    color: var(--fg-subtle);
-    font-size: 0.8125rem;
 }
 
 /* ═══ buttons ══════════════════════════════════════════════════════════ */
@@ -442,18 +563,18 @@ a.button {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    gap: 0.375rem;
+    gap: var(--space-1);
     min-height: 2.5rem;
     background-color: var(--surface-raised);
     color: var(--fg);
     font-family: inherit;
-    font-size: 0.875rem;
+    font-size: var(--text-base);
     font-weight: 500;
-    line-height: 1.2;
+    line-height: var(--leading-tight);
     white-space: nowrap;
     border: 1px solid var(--border-strong);
     border-radius: var(--radius-control);
-    padding: 0.5rem 0.875rem;
+    padding: var(--space-2) var(--space-3);
     cursor: pointer;
     text-decoration: none;
     transition: background-color 120ms ease, border-color 120ms ease,
@@ -560,13 +681,23 @@ a.button.button--danger:hover {
 .actions {
     display: flex;
     flex-wrap: wrap;
-    gap: 0.5rem;
+    gap: var(--space-2);
 }
 
 .actions > p {
     flex-basis: 100%;
     color: var(--warning);
-    font-size: 0.875rem;
+    font-size: var(--text-base);
+}
+
+/* Standing copy that is not a message about something that just happened, and
+   not a field hint either. The sign-in page labels its second door with this;
+   it is the only label on that page and it was rendering at body size and
+   weight, which read as a sentence rather than as a heading. */
+.muted {
+    color: var(--fg-muted);
+    font-size: var(--text-sm);
+    font-weight: 500;
 }
 
 /* ═══ messages ═════════════════════════════════════════════════════════ */
@@ -590,8 +721,8 @@ a.button.button--danger:hover {
 .warning,
 .status {
     border-radius: var(--radius-panel);
-    padding: 0.625rem 0.875rem;
-    font-size: 0.875rem;
+    padding: 0.625rem var(--space-3);
+    font-size: var(--text-base);
 }
 
 .error {
@@ -616,7 +747,7 @@ p.error {
 }
 
 .success > p {
-    margin: 0 0 0.25rem;
+    margin: 0 0 var(--space-1);
 }
 
 .warning {
@@ -631,34 +762,44 @@ p.error {
     border: 1px solid var(--border);
 }
 
+/* Standing micro-copy beside a control, and the page's closing footnote. It
+   sits next to what it describes rather than in a reading column, so the prose
+   measure does not apply — but a footnote that wraps to two lines reads as two
+   notes, so it is given enough width to hold one sentence. */
 .hint {
     color: var(--fg-muted);
-    font-size: 0.8125rem;
+    font-size: var(--text-sm);
+    max-width: 60ch;
 }
 
 .empty {
     color: var(--fg-muted);
-    font-size: 0.875rem;
+    font-size: var(--text-base);
     background-color: var(--surface);
     border: 1px dashed var(--border-strong);
     border-radius: var(--radius-panel);
-    padding: 1.5rem 1rem;
+    padding: var(--space-6) var(--space-4);
     text-align: center;
     max-width: none;
 }
 
+/* The panel's closing rule. It is a structural divider, not prose, so it
+   ignores the measure `p` carries: capped at 68ch it stopped 472px short of
+   the rule above it, and two rules of different lengths in one panel read as a
+   mistake rather than as a paragraph. */
 .readiness {
     color: var(--fg-muted);
-    font-size: 0.875rem;
+    font-size: var(--text-base);
     border-top: 1px solid var(--border);
-    padding-top: 0.75rem;
+    padding-top: var(--space-3);
+    max-width: none;
 }
 
 .status-stack {
     display: flex;
     flex-direction: column;
     align-items: flex-start;
-    gap: 0.25rem;
+    gap: var(--space-1);
 }
 
 .status-badge {
@@ -666,12 +807,12 @@ p.error {
     align-items: center;
     gap: 0.4rem;
     min-height: 1.75rem;
-    padding: 0.2rem 0.5rem;
+    padding: 0.2rem var(--space-2);
     border: 1px solid var(--border-strong);
     border-radius: var(--radius-control);
-    font-size: 0.75rem;
+    font-size: var(--text-xs);
     font-weight: 600;
-    line-height: 1.2;
+    line-height: var(--leading-tight);
     white-space: nowrap;
 }
 
@@ -708,7 +849,7 @@ p.error {
 
 .status-detail {
     color: var(--fg-muted);
-    font-size: 0.8125rem;
+    font-size: var(--text-sm);
     overflow-wrap: anywhere;
 }
 
@@ -718,11 +859,17 @@ p.error {
 
 .privilege-note {
     color: var(--fg-muted);
-    font-size: 0.8125rem;
+    font-size: var(--text-sm);
     background-color: var(--surface);
     border: 1px solid var(--border);
     border-radius: var(--radius-panel);
-    padding: 0.5rem 0.75rem;
+    padding: var(--space-2) var(--space-3);
+    /* One sentence an operator reads once, beside what it governs. The prose
+       measure above would cap it on the same 13px and strand the second clause
+       on a line of its own; `balance` evens the two lines so neither carries a
+       single orphan word. */
+    max-width: 70ch;
+    text-wrap: balance;
 }
 
 /* ═══ panels ═══════════════════════════════════════════════════════════ */
@@ -732,16 +879,16 @@ section.client-state,
 section.keys {
     display: flex;
     flex-direction: column;
-    gap: 1rem;
+    gap: var(--space-4);
     background-color: var(--surface);
     border: 1px solid var(--border);
     border-radius: var(--radius-panel);
     box-shadow: var(--shadow-panel);
-    padding: 1.25rem;
+    padding: var(--space-5);
 }
 
 section.client-state {
-    gap: 0.75rem;
+    gap: var(--space-3);
 }
 
 /* A column flex stretches its children; a decision button is not a banner. */
@@ -750,7 +897,7 @@ section.client-state > button {
 }
 
 section > h2 {
-    padding-bottom: 0.75rem;
+    padding-bottom: var(--space-3);
     border-bottom: 1px solid var(--border);
 }
 
@@ -781,11 +928,21 @@ table {
     background-color: var(--surface);
     border: 1px solid var(--border);
     border-radius: var(--radius-panel);
-    font-size: 0.875rem;
+    font-size: var(--text-base);
 }
 
-/* The key/value tables inside a panel are not separately framed. */
-section > table {
+/* The key/value tables inside a panel are not separately framed — they sit in a
+   `.table-scroll` like every other table, and it is the wrapper that would
+   otherwise draw a second border inside the panel's own. The wrapper keeps the
+   scroll behaviour and loses the frame. */
+section > table,
+section > .table-scroll > table {
+    border: 0;
+    border-radius: 0;
+    background-color: transparent;
+}
+
+section > .table-scroll {
     border: 0;
     border-radius: 0;
     background-color: transparent;
@@ -794,21 +951,37 @@ section > table {
 thead th {
     text-align: left;
     color: var(--fg-subtle);
-    font-size: 0.75rem;
+    font-size: var(--text-xs);
     font-weight: 600;
-    letter-spacing: 0.04em;
+    /* A column header sits over the numbers it names; tabular figures keep the
+       header and its column on the same rhythm as the cells below. */
+    font-variant-numeric: tabular-nums;
+    /* Short all-caps labels need their tracking opened, or the caps run
+       together at 12px. */
+    letter-spacing: 0.06em;
     text-transform: uppercase;
     white-space: nowrap;
     background-color: var(--surface-raised);
     border-bottom: 1px solid var(--border-strong);
-    padding: 0.625rem 0.875rem;
+    padding: 0.625rem var(--space-3);
 }
 
-tbody td {
+/* One cell padding for every cell in a body row. `tbody th[scope="row"]` had its
+   own, two pixels lighter, which put the label's text 2px above the value's in
+   the same row — both cells are top-aligned, so the offset was pure drift. */
+tbody td,
+tbody th[scope="row"] {
     border-top: 1px solid var(--border);
-    padding: 0.625rem 0.875rem;
+    padding: 0.625rem var(--space-3);
     vertical-align: top;
     font-variant-numeric: tabular-nums;
+}
+
+tbody th[scope="row"] {
+    text-align: left;
+    font-weight: 500;
+    color: var(--fg-subtle);
+    white-space: nowrap;
 }
 
 /* A highlight on a row that cannot be acted on is a promise the page does not
@@ -854,21 +1027,11 @@ section.client-state .confirm {
     flex-wrap: wrap;
     align-items: center;
     justify-content: space-between;
-    gap: 0.5rem 1rem;
+    gap: var(--space-2) var(--space-4);
 }
 
 .table-footer > p {
     flex: 1 1 18rem;
-}
-
-tbody th[scope="row"] {
-    text-align: left;
-    font-weight: 500;
-    color: var(--fg-subtle);
-    white-space: nowrap;
-    border-top: 1px solid var(--border);
-    padding: 0.5rem 0.875rem;
-    vertical-align: top;
 }
 
 /* The client list is wide; below the tablet breakpoint it scrolls rather than
@@ -922,7 +1085,7 @@ dialog.modal-layer {
     height: 100%;
     max-height: none;
     margin: 0;
-    padding: 1rem;
+    padding: var(--space-4);
     background-color: rgb(11 14 19 / 82%);
     border: 0;
     color: var(--fg);
@@ -933,14 +1096,14 @@ dialog.modal-layer {
 .secret {
     display: flex;
     flex-direction: column;
-    gap: 0.75rem;
+    gap: var(--space-3);
     background-color: var(--surface-raised);
     border: 1px solid var(--border-strong);
     border-radius: var(--radius-panel);
     width: min(100%, 34rem);
     max-height: calc(100dvh - 2rem);
     overflow-y: auto;
-    padding: 1.25rem;
+    padding: var(--space-5);
 }
 
 .dialog > h2 {
@@ -952,7 +1115,7 @@ dialog.modal-layer {
 .dialog > p,
 .secret > p {
     margin: 0;
-    font-size: 0.875rem;
+    font-size: var(--text-base);
     color: var(--fg-muted);
 }
 
@@ -966,12 +1129,24 @@ dialog.modal-layer {
     flex-direction: row;
     flex-wrap: wrap;
     align-items: center;
+    /* A row of two: the question above, the controls beside each other under
+       it. The 12px row gap was the column gap, which in a row left the pair
+       adrift at the trailing edge with a full gutter of nothing beside it. */
+    gap: var(--space-3) var(--space-2);
     border-color: var(--warning-border);
     background-color: var(--warning-bg);
 }
 
+/* The question takes the row the buttons leave it. It also sheds the shared 68ch
+   measure: capped there it stopped 470px short of the panel while its two
+   controls sat at the trailing edge, so the row read as a question and a
+   separate pair of buttons rather than as one answer.
+
+   The basis stops at 28rem rather than growing freely, so the pair of controls
+   keeps its place beside the question instead of being pushed past the panel. */
 .confirm > p {
-    flex-basis: 100%;
+    flex: 1 1 22rem;
+    max-width: 28rem;
     color: var(--warning);
 }
 
@@ -992,13 +1167,15 @@ dialog.modal-layer {
 .confirm-phrase {
     display: block;
     font-family: var(--font-mono);
-    font-size: 0.8125rem;
-    line-height: 1.6;
+    font-size: var(--text-sm);
+    /* Set in mono and read character by character, so it leads more open than
+       body copy at the same size. */
+    line-height: var(--leading-relaxed);
     color: var(--fg);
     background-color: var(--surface-sunken);
     border: 1px solid var(--border-strong);
     border-radius: var(--radius-control);
-    padding: 0.75rem;
+    padding: var(--space-3);
     overflow-wrap: anywhere;
     user-select: all;
 }
@@ -1022,7 +1199,7 @@ dialog.modal-layer {
    will never be shown again. */
 .modal-description {
     margin: 0;
-    font-size: 0.875rem;
+    font-size: var(--text-base);
     color: var(--fg-muted);
 }
 
@@ -1042,7 +1219,7 @@ dialog.modal-layer {
     background-color: var(--surface);
     border: 1px solid var(--border);
     border-radius: var(--radius-panel);
-    padding: 1.25rem;
+    padding: var(--space-5);
 }
 
 /* The OIDC key page and the local admin pages stack no more than one column,
@@ -1056,27 +1233,44 @@ dialog.modal-layer {
     flex: 1 1 18rem;
 }
 
+/* `form > button[type="submit"] { align-self: flex-start }` is right for a
+   column form, where the control takes the width of its label. This row is the
+   one place the button must line up with the *bottom* of the field beside it,
+   so it opts back in: inheriting the column rule put the control level with
+   the field's label and left the panel's lower half empty. */
+.create-key > button[type="submit"] {
+    align-self: flex-end;
+}
+
 .admin-login > p,
 .challenge-inspect > p {
     margin: 0;
     color: var(--fg-muted);
-    font-size: 0.875rem;
+    font-size: var(--text-base);
 }
 
 /* ═══ responsive ═══════════════════════════════════════════════════════ */
 
 @media (max-width: 767px) {
     .app-header-inner {
-        padding: 0.75rem 1rem;
+        padding: var(--space-3)
+            calc(var(--space-4) + var(--safe-inline-end))
+            var(--space-3)
+            calc(var(--space-4) + var(--safe-inline-start));
     }
 
     .container {
-        padding: 1.25rem 1rem 3rem;
-        gap: 1rem;
+        /* The safe-area inset is added, not replaced: a narrow gutter that
+           ignored the notch would put the content back under it. */
+        padding: var(--space-5)
+            calc(var(--space-4) + var(--safe-inline-end))
+            var(--space-8)
+            calc(var(--space-4) + var(--safe-inline-start));
+        gap: var(--space-4);
     }
 
     h1 {
-        font-size: 1.3125rem;
+        font-size: var(--text-xl-sm);
     }
 
     form {
@@ -1115,6 +1309,11 @@ dialog.modal-layer {
     input[type="number"],
     input[type="email"] {
         min-height: 2.75rem;
+        /* The type size above is load-bearing here, not a desktop default: below
+           the iOS zoom floor the viewport zooms on focus and leaves the operator
+           looking at the wrong part of the form. Only the box grows at this
+           width — the type size must not come back down. */
+        font-size: var(--text-md);
     }
 
     /* A checkbox is its own target: the label beside it is clickable too, but at
