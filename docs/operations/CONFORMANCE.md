@@ -14,8 +14,16 @@ spec section it covers.
 | `health_live_returns_ok` | §17 | GET /health/live returns 200 OK |
 | `health_ready_returns_json` | §17 | GET /health/ready returns JSON with status field |
 | `no_mcp_session_id_header_is_set` | §3.1 | Response does not include an Mcp-Session-Id header |
-| `server_discover_advertises_only_2026_07_28` | §3.1 | Server discover endpoint advertises only 2026-07-28 protocol |
-| `unsupported_legacy_version_returns_400` | §3.1 | Request with unsupported protocol version returns 400 |
+| `server_discover_advertises_every_known_revision` | §3.1 | Discovery advertises both the modern and legacy revisions the endpoint serves |
+| `legacy_initialize_negotiates_a_legacy_revision_without_a_session` | §3.1 | A legacy `initialize` is served, negotiates a handshake-era revision, and mints no session |
+| `legacy_ping_is_served_on_the_legacy_era` | §3.1 | A legacy-shaped request carrying no per-request `_meta` is served |
+| `both_eras_reach_the_same_tools` | §3.1 | Legacy and modern clients receive the same eight-tool surface |
+| `legacy_tools_call_succeeds_without_the_modern_mirrored_headers` | §3.1 | A legacy `tools/call` executes without `Mcp-Method` or `Mcp-Name`, which are 2026-07-28 headers |
+| `legacy_era_never_mints_a_session` | §3.1 | No legacy request sets a session or resume header |
+| `legacy_forged_mcp_method_header_is_still_rejected` | §3.1 | A legacy body with a contradicting `Mcp-Method` is rejected |
+| `legacy_request_cannot_claim_a_modern_revision` | §3.1 | A legacy-shaped body may not claim a revision that has no handshake |
+| `unknown_modern_version_is_refused_with_the_supported_list` | §3.1 | An unknown `_meta` revision returns -32022 listing supported revisions |
+| `modern_envelope_initialize_is_refused_without_naming_supported_versions` | §3.1 | Known diagnostic gap: a modern-envelope `initialize` returns -32601 with no supported list |
 | `body_over_limit_returns_413` | §3.1 | Request body exceeding limit returns 413 |
 | `missing_accept_returns_406` | §3.1 | Request without Accept header returns 406 |
 | `header_body_mismatch_returns_header_mismatch_error` | §3.1 | Content-Type header/body mismatch returns error |

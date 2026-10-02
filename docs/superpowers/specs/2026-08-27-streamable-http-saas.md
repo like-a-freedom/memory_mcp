@@ -4,9 +4,11 @@
 > Shipped as [ADR-0052](../../adr/0052-streamable-http-saas-profile.md). The status line read
 > `Approved design, 2026-08-27` until 2026-09-30; the open operational evidence
 > is listed under **Implementation status** below.
-**Decision:** [ADR-0052](../../adr/0052-streamable-http-saas-profile.md)
-**Protocol target:** MCP `2026-07-28`
-**SDK baseline:** `rmcp` 3.1.2
+**Decision:** [ADR-0052](../../adr/0052-streamable-http-saas-profile.md), as
+amended by [ADR-0071](../../adr/0071-dual-era-mcp-http-profile.md)
+**Protocol target:** MCP `2026-07-28` (modern) and `2025-11-25` and earlier
+(legacy), served on one route
+**SDK baseline:** `rmcp` 3.5.0
 **Implementation status:** Implemented in the `streamable-http-mcp` branch. Transport, durable Registry/runtime, quota admission, HTTP test bootstrap, control-plane deletion flow, subscription outbox, and Dioxus asset packaging are wired and covered by the repository test gates. Production open-signup launch remains gated by §20.5 operational evidence (remote restore, credential rotation, load/cost measurements, and a real Dioxus bundle).
 
 ## 1. Purpose and non-goals
@@ -18,7 +20,8 @@ operational behavior, and release gates.
 
 V1 does not provide:
 
-- legacy MCP sessions or pre-`2026-07-28` HTTP compatibility;
+- protocol-level sessions, `Mcp-Session-Id`, standalone GET streaming, DELETE
+  session termination, or `Last-Event-ID` recovery — in either era;
 - request-selected namespaces;
 - shared memory between Accounts;
 - filesystem or URL ingestion in the SaaS profile;
@@ -176,15 +179,21 @@ filesystem fallback for UI assets and no HTTP binary CLI administration path.
 
 ### 4.1 Discovery and metadata
 
-The HTTP profile is modern-only. It does not implement protocol-level sessions,
-`initialize`, `notifications/initialized`, `ping`, standalone GET streaming,
-DELETE session termination, `Mcp-Session-Id`, `Last-Event-ID`, or legacy
-`resources/subscribe`/`resources/unsubscribe` methods. Legacy-only clients receive
-the stable unsupported-version response rather than an implicit compatibility mode.
+The HTTP profile is **dual-era**, amended by
+[ADR-0071](../../adr/0071-dual-era-mcp-http-profile.md): one `POST /mcp` route
+serves both eras, selected per request, with no configuration switch. In neither
+era does it implement protocol-level sessions, standalone GET streaming, DELETE
+session termination, `Mcp-Session-Id`, or `Last-Event-ID`.
 
-`server/discover` advertises only:
+A request carrying modern per-request `_meta` is served per `2026-07-28`. An
+`initialize` request is served under a negotiated legacy revision. Capability
+gating follows the era: `ping` and `resources/subscribe` are legacy-only,
+`subscriptions/listen` is modern-only, `initialize` is ungated. `server/discover`
+is modern-only, as its required `_meta` envelope implies.
 
-- protocol version `2026-07-28`;
+`server/discover` advertises:
+
+- every protocol revision the endpoint serves, modern and legacy alike;
 - the frozen tool surface;
 - resources/Apps only when enabled;
 - App/resource subscriptions when enabled;
@@ -195,11 +204,19 @@ the stable unsupported-version response rather than an implicit compatibility mo
 Every modern result uses the required result envelope. Ordinary results use
 `resultType: "complete"`. The server never returns `input_required`.
 
-For every POST, `Mcp-Method` is required and must match the JSON-RPC method. The
-`MCP-Protocol-Version` header is required and must match
+For every modern POST, `Mcp-Method` is required and must match the JSON-RPC
+method. The `MCP-Protocol-Version` header is required and must match
 `_meta.io.modelcontextprotocol/protocolVersion`. `Mcp-Name` is required for
 `tools/call`, `resources/read`, and `prompts/get`; it is not required for other
-methods. These mirrored headers are validated before any routing or authorization
+methods.
+
+A legacy request carries no per-request `_meta` and need not send the mirrored
+headers. A mirrored header that is present must agree with the body, and a
+header-only claim of a revision that has no handshake is rejected. The era is
+always determined from the body, never from a header, so a client cannot
+present a header that disagrees with the request being dispatched.
+
+These mirrored headers are validated before any routing or authorization
 decision depends on them.
 
 A successful request may return either the standard JSON response or an SSE
@@ -833,7 +850,8 @@ Existing stdio tests remain unchanged and prove:
 - the frozen eight-tool snapshot remains stable.
 
 A non-normative interop matrix exercises current official SDK clients and selected
-real clients. Client incompatibility does not enable legacy sessions.
+real clients, in both protocol eras. No client compatibility gap enables
+protocol-level sessions.
 
 ### 20.5 Operations
 

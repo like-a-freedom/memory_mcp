@@ -1,11 +1,10 @@
 //! HTTP SaaS transport.
 //!
-//! # rmcp API surface (verified 2026-08-28)
+//! # rmcp API surface (verified 2026-10-02 against `rmcp 3.5.0`)
 //!
 //! The following types and methods are confirmed against the version resolved
-//! by `Cargo.lock` (currently `rmcp 3.1.4`; the workspace requirement starts
-//! at `3.1.2`). Line numbers are intentionally not treated as an API contract.
-//! workspace entry in `Cargo.toml`).
+//! by `Cargo.lock` (currently `rmcp 3.5.0`; the workspace requirement starts
+//! at `3.4.0`). Line numbers are intentionally not treated as an API contract.
 //!
 //! - `rmcp::transport::streamable_http_server::StreamableHttpServerConfig`.
 //! - `rmcp::transport::streamable_http_server::StreamableHttpService<S, M>`.
@@ -15,15 +14,37 @@
 //! host/origin policy, SSE framing, stateless metadata, cancellation, and
 //! bounded request bodies.
 //!
+//! # Dual-era serving
+//!
 //! `ServerHandler::supported_protocol_versions` has a default impl that
-//! returns `Cow::Borrowed(ProtocolVersion::KNOWN_VERSIONS)`. The HTTP
-//! profile overrides it to advertise only `V_2026_07_28`.
+//! returns `Cow::Borrowed(ProtocolVersion::KNOWN_VERSIONS)`, and this profile
+//! keeps that default. The returned list is **not** only advertisement: rmcp
+//! uses it as a hard membership check against every per-request
+//! `_meta.protocolVersion` before dispatch, with no fallback. Narrowing it
+//! would reject modern requests rather than legacy ones. Version narrowing for
+//! the `initialize` handshake happens inside rmcp's
+//! `negotiate_protocol_version`, which never answers a handshake with a
+//! revision that has no handshake.
+//!
+//! # The two transport flags are not what they look like
+//!
+//! `with_legacy_session_mode` selects **sessions, not legacy support**.
+//! `is_legacy_request` returns `true` for any `initialize` regardless of the
+//! version it names, and `use_session = legacy_session_mode && is_legacy_request`.
+//! Setting this flag to `true` therefore routes every legacy handshake into the
+//! session path, which `NeverSessionManager` cannot serve. We keep it `false`,
+//! which serves `initialize` through the same stateless path as modern
+//! requests and emits no `Mcp-Session-Id`.
+//!
+//! `with_stateless_protocol_metadata_required` is `false` so that legacy
+//! requests, which carry no per-request `_meta`, are not rejected. It does not
+//! affect routing.
 //!
 //! `rmcp::model::ProtocolVersion` is a newtype struct with associated
 //! constants `V_2024_11_05`, `V_2025_03_26`, `V_2025_06_18`,
-//! `V_2025_11_25`, `V_2026_07_28`. `LATEST == V_2025_11_25`. The HTTP
-//! profile pins both `supported_protocol_versions` and the `get_info()`
-//! `protocol_version` fallback to `V_2026_07_28`.
+//! `V_2025_11_25`, `V_2026_07_28`. `LATEST == V_2026_07_28`, while
+//! `LATEST_WITH_INITIALIZE == V_2025_11_25` is the newest revision that still
+//! has an `initialize` handshake.
 
 use std::sync::Arc;
 use std::time::Duration;
@@ -38,11 +59,11 @@ use tokio_util::sync::CancellationToken;
 use super::config::HttpConfig;
 use super::validation::with_body_deadline;
 
-/// The single protocol version advertised and accepted by the HTTP
-/// profile. Any other value comes back as 400 from rmcp's header
-/// check; the `supported_protocol_versions` override removes any
-/// fallback ambiguity. Aliased to the crate-level constant so the
-/// literal value is declared in exactly one place.
+/// The modern protocol revision, and the revision named in the per-request
+/// `_meta` a modern client must send. The profile is dual-era and does not
+/// restrict clients to it: `supported_protocol_versions` advertises every known
+/// revision, and rmcp refuses anything outside that set. Aliased to the
+/// crate-level constant so the literal is declared in exactly one place.
 pub use crate::mcp::handlers::PROTOCOL_VERSION_2026_07_28 as PROTOCOL_VERSION;
 
 /// Subscriptions listen methods that produce a long-lived SSE
@@ -59,7 +80,7 @@ pub fn build_server_config(
         .with_allowed_hosts(http.allowed_hosts.iter().cloned())
         .with_allowed_origins(http.allowed_origins.iter().cloned())
         .with_legacy_session_mode(false)
-        .with_stateless_protocol_metadata_required(true)
+        .with_stateless_protocol_metadata_required(false)
         .with_max_request_body_bytes(http.body_limit_bytes)
         .with_cancellation_token(cancellation_token)
         .with_sse_keep_alive(Some(Duration::from_secs(15)))
@@ -182,9 +203,10 @@ mod tests {
     use super::*;
     use rmcp::model::ProtocolVersion;
 
-    // Verifies the rmcp 3.1.2 StreamableHttpServerConfig shape
-    // we hand to the service builder: stateless, no legacy
-    // session mode, single allowed protocol version, etc.
+    // Verifies the rmcp StreamableHttpServerConfig shape we hand to the
+    // service builder: stateless, no legacy session mode, and no requirement
+    // for per-request protocol metadata, which is what lets a legacy request
+    // through. The profile is dual-era, so no version is pinned here.
     #[test]
     fn build_server_config_sets_required_knobs() {
         let cfg = HttpConfig::default_for_test();
@@ -193,6 +215,19 @@ mod tests {
         // Touch the field through Debug so the test fails if the
         // rmcp API renames anything we depend on.
         assert!(!format!("{out:?}").is_empty());
+        // Dual-era serving depends on exactly these two: a legacy request is
+        // admitted because per-request metadata is not required, and is
+        // served without a session because legacy session mode stays off.
+        // Flipping either one silently breaks every legacy client.
+        assert!(
+            !out.stateless_protocol_metadata_required,
+            "legacy requests carry no per-request _meta and must not be required to"
+        );
+        assert!(
+            !out.legacy_session_mode,
+            "legacy session mode would route every initialize into a session \
+             path that NeverSessionManager cannot serve"
+        );
     }
 
     #[test]

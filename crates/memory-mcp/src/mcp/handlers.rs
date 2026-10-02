@@ -132,9 +132,11 @@ pub struct MemoryMcp {
     task_sync_max_bytes: usize,
     tasks: TaskManager,
     tool_router: ToolRouter<Self>,
-    /// When true, advertise and negotiate only MCP 2026-07-28. Stdio
+    /// Selects the HTTP capability set and pins the `initialize` negotiation
+    /// fallback. It no longer narrows `supported_protocol_versions`: the HTTP
+    /// profile is dual-era and advertises every known revision. Stdio
     /// constructors leave this false, preserving the frozen stdio
-    /// behavior regardless of feature flags.
+    /// behavior regardless of feature flags. See ADR-0071.
     modern_protocol_only: bool,
 }
 
@@ -178,7 +180,9 @@ impl MemoryMcp {
         }
     }
 
-    /// HTTP SaaS profile constructor: modern protocol only.
+    /// HTTP SaaS profile constructor: the HTTP capability set and
+    /// negotiation fallback. The profile is dual-era, so this does not
+    /// restrict which revisions are advertised. See ADR-0071.
     pub fn new_modern(service: MemoryService) -> Self {
         Self {
             modern_protocol_only: true,
@@ -422,14 +426,18 @@ impl ServerHandler for MemoryMcp {
         info
     }
 
+    /// Advertise every revision this server can serve.
+    ///
+    /// Deliberately the rmcp default (`KNOWN_VERSIONS`): the list is also the
+    /// hard membership check rmcp applies to every per-request
+    /// `_meta.protocolVersion` before dispatch, so narrowing it here would
+    /// reject modern requests instead of legacy ones. The `initialize`
+    /// handshake is narrowed separately by rmcp, which never answers one with
+    /// a revision that has no handshake. See ADR-0071.
     fn supported_protocol_versions(
         &self,
     ) -> std::borrow::Cow<'static, [rmcp::model::ProtocolVersion]> {
-        if self.modern_protocol_only {
-            std::borrow::Cow::Owned(vec![PROTOCOL_VERSION_2026_07_28])
-        } else {
-            std::borrow::Cow::Borrowed(rmcp::model::ProtocolVersion::KNOWN_VERSIONS)
-        }
+        std::borrow::Cow::Borrowed(rmcp::model::ProtocolVersion::KNOWN_VERSIONS)
     }
 
     async fn call_tool(

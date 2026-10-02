@@ -282,6 +282,56 @@ pub fn modern_meta() -> Value {
     })
 }
 
+/// A legacy-era call: no per-request `_meta`, and the revision named in the
+/// header alone. Mirrors what a 2025-era client sends, and deliberately omits
+/// the mirrored `Mcp-Method`/`Mcp-Name` headers, which that era does not send.
+/// See ADR-0071.
+pub async fn legacy_mcp_call(
+    client: &reqwest::Client,
+    base_url: &str,
+    api_key: &str,
+    method: &str,
+    params: Value,
+    protocol_version: &str,
+) -> Value {
+    let body = serde_json::json!({
+        "jsonrpc": "2.0",
+        "id": 1,
+        "method": method,
+        "params": params,
+    });
+    let resp = client
+        .post(format!("{base_url}/mcp"))
+        .header("content-type", "application/json")
+        .header("accept", "application/json, text/event-stream")
+        .header("host", "localhost")
+        .header("authorization", format!("Bearer {api_key}"))
+        .header("mcp-protocol-version", protocol_version)
+        .body(serde_json::to_string(&body).unwrap())
+        .send()
+        .await
+        .expect("send legacy request");
+    let status = resp.status();
+    let text = resp.text().await.unwrap();
+    if text.starts_with("event:") || text.starts_with("data:") {
+        for line in text.lines() {
+            if let Some(data) = line.strip_prefix("data: ")
+                && let Ok(val) = serde_json::from_str::<Value>(data)
+            {
+                return serde_json::json!({
+                    "http_status": status.as_u16(),
+                    "payload": val
+                });
+            }
+        }
+    }
+    let payload = serde_json::from_str(&text).unwrap_or(serde_json::json!({"raw": text}));
+    serde_json::json!({
+        "http_status": status.as_u16(),
+        "payload": payload
+    })
+}
+
 pub async fn mcp_call(
     client: &reqwest::Client,
     base_url: &str,

@@ -783,7 +783,7 @@ MEMORY_MCP_HTTP_REPLICA_ID=node-a \
 
 | Route | Auth | Use |
 |---|---|---|
-| `POST /mcp` | Bearer API key | Modern MCP Streamable HTTP (`2026-07-28`). Only `POST` is accepted; `GET`/`DELETE` return `405`. |
+| `POST /mcp` | Bearer API key | MCP Streamable HTTP, dual-era: modern `2026-07-28` and legacy `2025-11-25` and earlier, selected per request on one route. Stateless — no `Mcp-Session-Id`, no configuration switch. Only `POST` is accepted; `GET`/`DELETE` return `405`. See [ADR-0071](docs/adr/0071-dual-era-mcp-http-profile.md). |
 | `/api/v1/account/*` | Browser session + CSRF | Self-service: API keys, linked identities, profile, account deletion |
 | `/api/v1/operator/*` | OIDC operator + CSRF + recent-auth | Operator-only: provisioning retry, suspend, purge, recovery |
 | `/auth/oidc/*` | OIDC flow | Login, callback, logout |

@@ -157,7 +157,58 @@ async fn no_mcp_session_id_header_is_set() {
 }
 
 #[tokio::test]
-async fn server_discover_advertises_only_2026_07_28() {
+async fn legacy_initialize_negotiates_a_legacy_revision_without_a_session() {
+    // The dual-era transport assumption: a legacy `initialize` opens with no
+    // per-request `_meta` and no mirrored headers, is answered under a
+    // negotiated legacy revision, and is still served statelessly.
+    let fixture =
+        HttpServerFixture::spawn(HttpServerConfig::default().with_tenant(conformance_tenant()))
+            .await;
+    let body = json!({
+        "jsonrpc": "2.0",
+        "id": 1,
+        "method": "initialize",
+        "params": {
+            "protocolVersion": "2025-11-25",
+            "capabilities": {},
+            "clientInfo": {"name": "legacy-test", "version": "0.0.0"},
+        },
+    });
+    let resp = fixture
+        .client()
+        .post(format!("{}/mcp", fixture.base_url))
+        .header("host", "localhost")
+        .header("content-type", "application/json")
+        .header("accept", "application/json, text/event-stream")
+        .header("authorization", format!("Bearer {BOOTSTRAP_KEY}"))
+        .body(body.to_string())
+        .send()
+        .await
+        .expect("send");
+    let status = resp.status();
+    assert_eq!(
+        status,
+        200,
+        "a legacy initialize must be served, not refused; body: {}",
+        resp.text().await.unwrap_or_default()
+    );
+    assert!(
+        resp.headers().get("mcp-session-id").is_none(),
+        "the profile stays stateless: no Mcp-Session-Id may be minted for a legacy handshake"
+    );
+    let text = resp.text().await.expect("initialize body");
+    assert!(
+        text.contains("2025-11-25"),
+        "the handshake must be answered under a legacy revision: {text}"
+    );
+    assert!(
+        !text.contains("2026-07-28"),
+        "a revision without an initialize handshake must never answer one: {text}"
+    );
+}
+
+#[tokio::test]
+async fn server_discover_advertises_every_known_revision() {
     let fixture =
         HttpServerFixture::spawn(HttpServerConfig::default().with_tenant(conformance_tenant()))
             .await;
@@ -193,7 +244,11 @@ async fn server_discover_advertises_only_2026_07_28() {
     let text = resp.text().await.expect("discovery body");
     assert!(
         text.contains("2026-07-28"),
-        "discovery omitted protocol version: {text}"
+        "discovery omitted the modern revision: {text}"
+    );
+    assert!(
+        text.contains("2025-11-25"),
+        "a dual-era server must advertise the revisions it serves: {text}"
     );
 }
 
@@ -229,12 +284,10 @@ async fn removed_ping_method_is_not_available() {
 }
 
 #[tokio::test]
-async fn unsupported_legacy_version_returns_400() {
-    // 2025-03-26 is a KNOWN version, so the header check alone
-    // would pass it. The 400 below comes from
-    // stateless_protocol_metadata_required = true: legacy
-    // requests carry no per-request _meta protocol version, and
-    // rmcp rejects them.
+async fn legacy_ping_is_served_on_the_legacy_era() {
+    // A legacy-shaped request carries no per-request `_meta` and names its
+    // revision in the header alone. `ping` belongs to the legacy era, so this
+    // must be served rather than refused. See ADR-0071.
     let fixture =
         HttpServerFixture::spawn(HttpServerConfig::default().with_tenant(conformance_tenant()))
             .await;
@@ -252,7 +305,13 @@ async fn unsupported_legacy_version_returns_400() {
         .send()
         .await
         .expect("send");
-    assert_eq!(resp.status(), 400);
+    let status = resp.status();
+    assert_eq!(
+        status,
+        200,
+        "a legacy ping must be served, not refused; body: {}",
+        resp.text().await.unwrap_or_default()
+    );
 }
 
 #[tokio::test]
@@ -869,19 +928,285 @@ async fn no_mcp_session_resume_headers_are_emitted() {
 }
 
 #[tokio::test]
-async fn capability_gating_rejects_unknown_methods() {
-    // The HTTP profile's discover response advertises the tool +
-    // tasks capabilities. Methods that fall outside that surface
-    // (e.g. `initialize` from the legacy 2025-03-26 lifecycle, or
-    // `ping`) MUST be rejected with a -32601 method-not-found
-    // error rather than a 200 with an empty body. This proves
-    // capability gating is enforced, not just advertised.
+async fn both_eras_reach_the_same_tools() {
+    // The point of dual-era: a legacy client and a modern client get the same
+    // tools and the same results. Only the envelope differs.
+    let fixture =
+        HttpServerFixture::spawn(HttpServerConfig::default().with_tenant(conformance_tenant()))
+            .await;
+    let modern = common::http_server::mcp_call(
+        &fixture.client(),
+        &fixture.base_url,
+        BOOTSTRAP_KEY,
+        "tools/list",
+        serde_json::json!({}),
+    )
+    .await;
+    let legacy = common::http_server::legacy_mcp_call(
+        &fixture.client(),
+        &fixture.base_url,
+        BOOTSTRAP_KEY,
+        "tools/list",
+        serde_json::json!({}),
+        "2025-11-25",
+    )
+    .await;
+    assert_eq!(modern["http_status"], 200, "modern tools/list: {modern}");
+    assert_eq!(legacy["http_status"], 200, "legacy tools/list: {legacy}");
+
+    let modern_tools: Vec<&str> = modern["payload"]["result"]["tools"]
+        .as_array()
+        .expect("modern tools array")
+        .iter()
+        .filter_map(|tool| tool["name"].as_str())
+        .collect();
+    let legacy_tools: Vec<&str> = legacy["payload"]["result"]["tools"]
+        .as_array()
+        .expect("legacy tools array")
+        .iter()
+        .filter_map(|tool| tool["name"].as_str())
+        .collect();
+    assert_eq!(
+        modern_tools, legacy_tools,
+        "both eras must expose the same tool surface"
+    );
+    assert_eq!(
+        modern_tools.len(),
+        8,
+        "the public surface is eight tools: {modern_tools:?}"
+    );
+}
+
+#[tokio::test]
+async fn legacy_tools_call_succeeds_without_the_modern_mirrored_headers() {
+    // The regression that matters most. A legacy client has never heard of
+    // `Mcp-Name` or `Mcp-Method` — those are 2026-07-28 headers — so a
+    // `tools/call` carrying `params.name` must still be served. Requiring the
+    // mirrored name here would refuse every tool call from a legacy client
+    // with the same pre-authentication `HeaderMismatch` the dual-era work
+    // exists to remove. See ADR-0071.
+    let fixture =
+        HttpServerFixture::spawn(HttpServerConfig::default().with_tenant(conformance_tenant()))
+            .await;
+    let params = serde_json::json!({
+        "name": "ingest",
+        "arguments": {
+            "source_type": "inline",
+            "source_id": "legacy-era-tools-call",
+            "content": "Legacy era clients must be able to call tools.",
+            "t_ref": "2026-01-01T00:00:00Z",
+        },
+    });
+    let legacy = common::http_server::legacy_mcp_call(
+        &fixture.client(),
+        &fixture.base_url,
+        BOOTSTRAP_KEY,
+        "tools/call",
+        params.clone(),
+        "2025-11-25",
+    )
+    .await;
+    assert_eq!(
+        legacy["http_status"], 200,
+        "a legacy tools/call must be served: {legacy}"
+    );
+    let legacy_result = legacy["payload"]["result"].clone();
+    assert_eq!(
+        legacy_result["isError"], false,
+        "a legacy tool call must execute, not return an error envelope: {legacy_result}"
+    );
+    assert!(
+        legacy_result.get("structuredContent").is_some(),
+        "a legacy tool call must return a result envelope: {legacy_result}"
+    );
+
+    // The same call in the modern era must succeed too. Both eras reach the
+    // same tools.
+    let modern = common::http_server::mcp_call(
+        &fixture.client(),
+        &fixture.base_url,
+        BOOTSTRAP_KEY,
+        "tools/call",
+        params,
+    )
+    .await;
+    assert_eq!(
+        modern["http_status"], 200,
+        "a modern tools/call must be served: {modern}"
+    );
+    let modern_result = modern["payload"]["result"].clone();
+    assert_eq!(
+        modern_result["isError"], false,
+        "a modern tool call must execute: {modern_result}"
+    );
+    assert!(
+        modern_result.get("structuredContent").is_some(),
+        "a modern tool call must return a result envelope: {modern_result}"
+    );
+}
+
+#[tokio::test]
+async fn unknown_modern_version_is_refused_with_the_supported_list() {
+    // rmcp owns version membership and answers with -32022 naming every
+    // revision this endpoint serves. Preflight must not duplicate that rule.
+    let fixture =
+        HttpServerFixture::spawn(HttpServerConfig::default().with_tenant(conformance_tenant()))
+            .await;
+    let body = json!({
+        "jsonrpc": "2.0",
+        "id": 1,
+        "method": "server/discover",
+        "params": {"_meta": {
+            "io.modelcontextprotocol/protocolVersion": "2099-01-01",
+            "io.modelcontextprotocol/clientCapabilities": {},
+        }},
+    });
+    let resp = fixture
+        .client()
+        .post(format!("{}/mcp", fixture.base_url))
+        .header("host", "localhost")
+        .header("content-type", "application/json")
+        .header("accept", "application/json, text/event-stream")
+        .header("MCP-Protocol-Version", "2099-01-01")
+        .header("Mcp-Method", "server/discover")
+        .header("authorization", format!("Bearer {BOOTSTRAP_KEY}"))
+        .body(body.to_string())
+        .send()
+        .await
+        .expect("send");
+    let status = resp.status();
+    let text = resp.text().await.expect("body");
+    assert_eq!(status, 400, "an unknown revision must be refused: {text}");
+    assert!(
+        text.contains("-32022"),
+        "the refusal must use the unsupported-protocol-version code: {text}"
+    );
+    assert!(
+        text.contains("2026-07-28") && text.contains("2025-11-25"),
+        "the refusal must list the revisions this endpoint serves, since it may \
+         be the only diagnostic a client surfaces: {text}"
+    );
+}
+
+#[tokio::test]
+async fn legacy_era_never_mints_a_session() {
+    let fixture =
+        HttpServerFixture::spawn(HttpServerConfig::default().with_tenant(conformance_tenant()))
+            .await;
+    for method in ["tools/list", "ping"] {
+        let resp = fixture
+            .client()
+            .post(format!("{}/mcp", fixture.base_url))
+            .header("host", "localhost")
+            .header("content-type", "application/json")
+            .header("accept", "application/json, text/event-stream")
+            .header("MCP-Protocol-Version", "2025-11-25")
+            .header("authorization", format!("Bearer {BOOTSTRAP_KEY}"))
+            .body(
+                json!({
+                    "jsonrpc": "2.0",
+                    "id": 1,
+                    "method": method,
+                    "params": {},
+                })
+                .to_string(),
+            )
+            .send()
+            .await
+            .expect("send");
+        assert_eq!(resp.status(), 200, "legacy {method} must be served");
+        for header_name in ["mcp-session-id", "x-mcp-session-id", "mcp-resume-token"] {
+            assert!(
+                resp.headers().get(header_name).is_none(),
+                "a stateless dual-era server must not set {header_name} on {method}"
+            );
+        }
+    }
+}
+
+#[tokio::test]
+async fn legacy_forged_mcp_method_header_is_still_rejected() {
+    // A legacy client need not send the mirrored headers, but one that does
+    // must not contradict the body. The admission class is derived from the
+    // body, so a forged header must never buy a different class.
+    let fixture =
+        HttpServerFixture::spawn(HttpServerConfig::default().with_tenant(conformance_tenant()))
+            .await;
+    let body = json!({
+        "jsonrpc": "2.0",
+        "id": 1,
+        "method": "tools/list",
+        "params": {},
+    });
+    let resp = fixture
+        .client()
+        .post(format!("{}/mcp", fixture.base_url))
+        .header("host", "localhost")
+        .header("content-type", "application/json")
+        .header("accept", "application/json, text/event-stream")
+        .header("MCP-Protocol-Version", "2025-11-25")
+        .header("Mcp-Method", "subscriptions/listen")
+        .header("authorization", format!("Bearer {BOOTSTRAP_KEY}"))
+        .body(body.to_string())
+        .send()
+        .await
+        .expect("send");
+    assert_eq!(resp.status(), 400);
+    let text = resp.text().await.expect("body");
+    assert!(
+        text.contains("HeaderMismatch") || text.contains("-32600"),
+        "a legacy-shaped body with a contradicting Mcp-Method must be rejected: {text}"
+    );
+}
+
+#[tokio::test]
+async fn legacy_request_cannot_claim_a_modern_revision() {
+    // A body with no per-request metadata cannot claim 2026-07-28 in the
+    // header: that revision has no handshake, and accepting the claim would
+    // let a client describe itself in a revision the request shape cannot
+    // satisfy.
+    let fixture =
+        HttpServerFixture::spawn(HttpServerConfig::default().with_tenant(conformance_tenant()))
+            .await;
+    let body = json!({ "jsonrpc": "2.0", "id": 1, "method": "ping" });
+    let resp = fixture
+        .client()
+        .post(format!("{}/mcp", fixture.base_url))
+        .header("host", "localhost")
+        .header("content-type", "application/json")
+        .header("accept", "application/json, text/event-stream")
+        .header("MCP-Protocol-Version", "2026-07-28")
+        .header("authorization", format!("Bearer {BOOTSTRAP_KEY}"))
+        .body(body.to_string())
+        .send()
+        .await
+        .expect("send");
+    assert_eq!(resp.status(), 400);
+    let text = resp.text().await.expect("body");
+    assert!(
+        text.contains("HeaderMismatch") || text.contains("-32600"),
+        "a header-only modern claim on a legacy body must be rejected: {text}"
+    );
+}
+
+#[tokio::test]
+async fn modern_envelope_initialize_is_refused_without_naming_supported_versions() {
+    // An `initialize` carrying a modern per-request envelope has no
+    // `params.protocolVersion`, so rmcp rejects it as a method outside the
+    // modern surface. It answers -32601 and names nothing.
+    //
+    // This is a known diagnostic gap, not a desired contract: the spec asks a
+    // modern-only server to name the versions it supports in any error it
+    // returns to `initialize`, because that message may be the only diagnostic
+    // a legacy client can surface. rmcp gates the method before version
+    // negotiation, so no list reaches the client. Dual-era closes the gap for
+    // real clients, since a legacy `initialize` is now served rather than
+    // refused; this test pins the residue so a change in rmcp is noticed.
+    // See ADR-0071.
     let fixture =
         HttpServerFixture::spawn(HttpServerConfig::default().with_tenant(conformance_tenant()))
             .await;
 
-    // initialize was removed for 2026-07-28 (the modern profile
-    // replaces it with `server/discover`).
     let body = json!({
         "jsonrpc": "2.0",
         "id": 1,
@@ -903,9 +1228,12 @@ async fn capability_gating_rejects_unknown_methods() {
         .expect("send");
     let text = resp.text().await.expect("body");
     assert!(
-        text.contains("-32601")
-            || text.to_ascii_lowercase().contains("method not found")
-            || text.to_ascii_lowercase().contains("not implemented"),
-        "initialize must be rejected as method-not-found under 2026-07-28: {text}"
+        text.contains("-32601") || text.contains("-32022"),
+        "a modern-envelope initialize must be refused, not silently accepted: {text}"
+    );
+    assert!(
+        !text.contains("2025-11-25"),
+        "if this refusal starts naming supported versions, update this test and \
+         ADR-0071: the diagnostic gap is closed: {text}"
     );
 }

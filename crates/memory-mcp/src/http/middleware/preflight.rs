@@ -1,9 +1,16 @@
 //! Pre-MCP request validation.
 //!
-//! Runs before any auth or admission decision. Validates the modern
-//! MCP envelope (mirrored headers, JSON-RPC 2.0, version, method
-//! classification) and attaches a [`ValidatedMcpRequest`] extension
-//! that downstream middleware and the handler consume.
+//! Runs before any auth or admission decision. Validates the MCP envelope
+//! (JSON-RPC 2.0, protocol revision, mirrored-header agreement) and attaches a
+//! [`ValidatedMcpRequest`] extension that downstream middleware and the
+//! handler consume.
+//!
+//! The profile is dual-era (see ADR-0071). The era is decided by the request
+//! body: a request carrying modern per-request `_meta` is modern-shaped and its
+//! mirrored headers are required to agree; anything else is legacy-shaped,
+//! where those headers are absent by design and tolerated when present. Either
+//! way the extension is built from the body, never from a header, so admission
+//! can never be steered by a header that disagrees with the dispatched request.
 
 use axum::http::{StatusCode, header};
 use axum::middleware::Next;
@@ -14,7 +21,16 @@ use std::sync::Arc;
 
 use crate::http::HttpState;
 
-const MODERN_PROTOCOL_VERSION: &str = "2026-07-28";
+/// Whether a revision belongs to the legacy era: a known revision that still
+/// has an `initialize` handshake. Membership is tested against rmcp's own list
+/// rather than by comparing dates, so a malformed or near-miss string is not
+/// mistaken for a revision, and the set stays correct as revisions are added.
+fn is_legacy_revision(version: &str) -> bool {
+    rmcp::model::ProtocolVersion::KNOWN_VERSIONS
+        .iter()
+        .filter(|known| known.has_initialize())
+        .any(|known| known.as_str() == version)
+}
 
 /// Classification produced only after the mirrored MCP headers and the
 /// JSON-RPC envelope have been checked against each other. Admission and
@@ -206,46 +222,89 @@ pub async fn prevalidate_mcp(
     let Some(body_method) = value.get("method").and_then(Value::as_str) else {
         return bad_request("JSON-RPC method is required");
     };
-    let Some(params) = json_params(&value) else {
-        return bad_request("modern MCP metadata is required");
-    };
-    let Some(metadata) = params.get("_meta").and_then(Value::as_object) else {
-        return bad_request("modern MCP metadata is required");
-    };
-    let metadata_version = metadata
-        .get("io.modelcontextprotocol/protocolVersion")
-        .and_then(Value::as_str);
+    let params = json_params(&value);
     let protocol_header = headers
         .get("mcp-protocol-version")
         .and_then(|value| value.to_str().ok());
-    if protocol_header != Some(MODERN_PROTOCOL_VERSION)
-        || metadata_version != Some(MODERN_PROTOCOL_VERSION)
-        || protocol_header != metadata_version
-    {
-        return bad_request("HeaderMismatch: protocol version");
+    let modern_version = params
+        .and_then(|params| params.get("_meta"))
+        .and_then(|meta| {
+            meta.get("io.modelcontextprotocol/protocolVersion")
+                .and_then(Value::as_str)
+        });
+
+    // The era is read from the body, never from a header, so no client can
+    // present a header that disagrees with the request rmcp dispatches on.
+    // See ADR-0071.
+    match modern_version {
+        // Modern era: the revision is declared per request in `_meta` and
+        // mirrored in the header. SEP-2243 requires both to agree.
+        Some(modern_version) => {
+            if protocol_header != Some(modern_version) {
+                return bad_request("HeaderMismatch: protocol version");
+            }
+        }
+        // Legacy era: no per-request metadata. `initialize` names its revision
+        // in `params.protocolVersion`; later requests may carry it in the
+        // header alone. Neither may name a revision that has no handshake, and
+        // where both are present they must agree.
+        None => {
+            let declared = params
+                .and_then(|params| params.get("protocolVersion"))
+                .and_then(Value::as_str);
+            if let Some(declared) = declared
+                && !is_legacy_revision(declared)
+            {
+                return bad_request("HeaderMismatch: protocol version");
+            }
+            if let Some(protocol_header) = protocol_header {
+                if !is_legacy_revision(protocol_header) {
+                    return bad_request("HeaderMismatch: protocol version");
+                }
+                if declared.is_some_and(|declared| declared != protocol_header) {
+                    return bad_request("HeaderMismatch: protocol version");
+                }
+            }
+        }
     }
 
     let method_header = headers
         .get("mcp-method")
         .and_then(|value| value.to_str().ok());
-    if method_header != Some(body_method) {
+    if modern_version.is_some() {
+        if method_header != Some(body_method) {
+            return bad_request("HeaderMismatch: MCP method");
+        }
+    } else if method_header.is_some_and(|method_header| method_header != body_method) {
+        // A legacy client need not send the mirrored header, but one that does
+        // must not contradict the body.
         return bad_request("HeaderMismatch: MCP method");
     }
 
-    let expected_name = match body_method {
+    let expected_name = params.and_then(|params| match body_method {
         "tools/call" | "prompts/get" => params.get("name").and_then(Value::as_str),
         "resources/read" => params.get("uri").and_then(Value::as_str),
         _ => None,
-    };
-    if let Some(expected_name) = expected_name {
-        if headers
-            .get("mcp-name")
-            .and_then(|value| value.to_str().ok())
-            != Some(expected_name)
-        {
+    });
+    let name_header = headers
+        .get("mcp-name")
+        .and_then(|value| value.to_str().ok());
+    if modern_version.is_some() {
+        // Modern era: the mirrored name is required and must agree.
+        if let Some(expected_name) = expected_name {
+            if name_header != Some(expected_name) {
+                return bad_request("HeaderMismatch: MCP name");
+            }
+        } else if matches!(body_method, "tools/call" | "resources/read" | "prompts/get") {
             return bad_request("HeaderMismatch: MCP name");
         }
-    } else if matches!(body_method, "tools/call" | "resources/read" | "prompts/get") {
+    } else if name_header
+        .zip(expected_name)
+        .is_some_and(|(name_header, expected_name)| name_header != expected_name)
+    {
+        // Legacy era: `Mcp-Name` is a modern-era header a legacy client has
+        // never heard of, so its absence is normal. One that is present must
+        // still agree with the body.
         return bad_request("HeaderMismatch: MCP name");
     }
 
@@ -268,6 +327,9 @@ mod tests {
     use axum::routing::{get, post};
     use http_body_util::BodyExt;
     use serde_json::{Value, json};
+
+    /// The modern revision, for the helpers that build modern-shaped requests.
+    use super::super::super::transport::PROTOCOL_VERSION;
     use tower_service::Service;
 
     async fn mcp_stub() -> &'static str {
@@ -327,7 +389,7 @@ mod tests {
 
     fn metadata() -> Value {
         json!({
-            "io.modelcontextprotocol/protocolVersion": MODERN_PROTOCOL_VERSION,
+            "io.modelcontextprotocol/protocolVersion": PROTOCOL_VERSION,
             "io.modelcontextprotocol/clientInfo": {
                 "name": "preflight-test",
                 "version": "0.0.0"
@@ -348,8 +410,28 @@ mod tests {
             .uri("/")
             .header(header::CONTENT_TYPE, "application/json")
             .header(header::ACCEPT, "application/json, text/event-stream")
-            .header("MCP-Protocol-Version", MODERN_PROTOCOL_VERSION)
+            .header("MCP-Protocol-Version", PROTOCOL_VERSION.as_str())
             .header("Mcp-Method", method)
+            .body(Body::from(body.to_string()))
+            .expect("valid test request")
+    }
+
+    /// A legacy-shaped request: no per-request `_meta`, no mirrored headers,
+    /// and the revision named in the header alone. This is what a `2025-11-25`
+    /// client actually sends. See ADR-0071.
+    fn legacy_request(method: &str, params: Value) -> Request<Body> {
+        let body = json!({
+            "jsonrpc": "2.0",
+            "id": 1,
+            "method": method,
+            "params": params
+        });
+        Request::builder()
+            .method(axum::http::Method::POST)
+            .uri("/")
+            .header(header::CONTENT_TYPE, "application/json")
+            .header(header::ACCEPT, "application/json, text/event-stream")
+            .header("MCP-Protocol-Version", "2025-11-25")
             .body(Body::from(body.to_string()))
             .expect("valid test request")
     }
@@ -489,6 +571,71 @@ mod tests {
         let response = dispatch(request).await;
         assert_eq!(response.status(), StatusCode::OK);
         assert!(response_body(response).await.contains("bytes=None"));
+    }
+
+    #[tokio::test]
+    async fn legacy_ingest_reserves_quota_without_mirrored_headers() {
+        // A legacy-shaped request must still populate `ValidatedMcpRequest`
+        // from the body. If it did not, the extension would be absent and
+        // `acquire_runtime` would skip the ingest quota pre-reservation
+        // entirely, with no error anywhere. See ADR-0071.
+        let body = json!({
+            "jsonrpc": "2.0",
+            "id": 1,
+            "method": "tools/call",
+            "params": {
+                "name": "ingest",
+                "arguments": {
+                    "source_type": "inline",
+                    "source_id": "legacy-quota-test",
+                    "content": "ёж",
+                    "t_ref": "2026-01-01T00:00:00Z"
+                }
+            }
+        });
+        let request = Request::builder()
+            .method(axum::http::Method::POST)
+            .uri("/")
+            .header(header::CONTENT_TYPE, "application/json")
+            .header(header::ACCEPT, "application/json, text/event-stream")
+            .header("MCP-Protocol-Version", "2025-11-25")
+            .body(Body::from(body.to_string()))
+            .expect("valid test request");
+        let response = dispatch(request).await;
+        assert_eq!(response.status(), StatusCode::OK);
+        // `echo_body` renders as `<subscription>:bytes=<n>:<body>`.
+        let echoed = response_body(response).await;
+        assert!(
+            echoed.starts_with("false:bytes=Some(4):"),
+            "a legacy ingest must still be classified and must still reserve \
+             its quota: {echoed}"
+        );
+    }
+
+    #[tokio::test]
+    async fn legacy_request_need_not_send_mirrored_headers() {
+        // `Mcp-Method` and `Mcp-Name` are 2026-07-28 headers. A legacy client
+        // has never heard of them, so requiring either would refuse every
+        // legacy tool call.
+        let response = dispatch(legacy_request("tools/call", json!({"name": "ingest"}))).await;
+        assert_eq!(
+            response.status(),
+            StatusCode::OK,
+            "a legacy tools/call must not require the modern mirrored headers"
+        );
+    }
+
+    #[tokio::test]
+    async fn legacy_request_with_contradicting_mcp_name_is_rejected() {
+        // Absence is tolerated on the legacy path; a present-and-wrong value
+        // is not.
+        let mut request = legacy_request("tools/call", json!({"name": "ingest"}));
+        request
+            .headers_mut()
+            .insert("Mcp-Name", "other".parse().expect("header"));
+        let response = dispatch(request).await;
+        assert_eq!(response.status(), StatusCode::BAD_REQUEST);
+        assert!(response_body(response).await.contains("MCP name"));
     }
 
     #[tokio::test]

@@ -17,9 +17,13 @@ lifecycle management, and standard MCP Streamable HTTP.
 
 The target protocol is MCP `2026-07-28`. That revision is stateless at the core:
 it removes `initialize`, protocol sessions, `Mcp-Session-Id`, the GET stream,
-DELETE session termination, and `Last-Event-ID` recovery. This profile deliberately
-implements only that modern path; `rmcp` 3.1.2 also provides optional compatibility
-paths, but they are not enabled here.
+DELETE session termination, and `Last-Event-ID` recovery. This profile
+originally implemented only that modern path; `rmcp` also provides optional
+compatibility paths.
+
+> **Superseded in part by [ADR-0071](0071-dual-era-mcp-http-profile.md).** The
+> `rmcp` compatibility paths are now enabled. The profile remains stateless and
+> session-free; it additionally serves the legacy revisions on the same route.
 
 SurrealDB namespaces provide a native administrative isolation boundary. The
 SaaS design must use that boundary without reintroducing namespace as an MCP
@@ -63,10 +67,17 @@ The HTTP profile supports only MCP `2026-07-28`:
   ID, or `Last-Event-ID` behavior exists;
 - legacy-only clients receive a stable unsupported-version response.
 
-The implemented `rmcp` configuration uses a no-session manager, disables legacy
-session mode, requires stateless protocol metadata, and pins supported protocol
-versions. The workspace requests `rmcp` 3.1.2 compatibility and the lockfile
-currently resolves the compatible 3.1.4 release.
+> **Superseded in part by [ADR-0071](0071-dual-era-mcp-http-profile.md).** The
+> profile is now dual-era: it also serves `2025-11-25` and earlier on the same
+> `POST /mcp` route, still statelessly, with no session store. The items above
+> that describe sessions, GET/DELETE, and request-scoped SSE responses still
+> hold for both eras. The last bullet no longer applies to clients that name a
+> supported revision; a client naming an unknown revision receives
+> `-32022` naming the supported set.
+
+The implemented `rmcp` configuration uses a no-session manager and disables
+legacy session mode. The workspace requests `rmcp` 3.4.0 compatibility and the
+lockfile currently resolves the 3.5.0 release.
 
 ### Identity and tenancy
 
@@ -387,6 +398,15 @@ subscriptions would duplicate capabilities already available through native
 Rejected. Dual-era behavior is optional, not required by the deprecation policy,
 and would add session ownership, storage, lifecycle, and security complexity to a
 new service.
+
+> **This rejection was wrong on both counts, and
+> [ADR-0071](0071-dual-era-mcp-http-profile.md) reverses it.** The deprecation
+> policy does not cover protocol revisions — it guarantees twelve months for
+> deprecated *features* (Roots, Sampling, Logging, DCR, HTTP+SSE), not for an
+> entire revision. And the session complexity was never required: the legacy
+> revisions let a server omit `Mcp-Session-Id` entirely, and `rmcp` serves a
+> legacy `initialize` statelessly when legacy session mode is off. The rejection
+> was also made with no client measurements recorded.
 
 ### Put Tenant in the URL or MCP arguments
 
