@@ -47,15 +47,21 @@ pub const CLAIM_JOB_TEMPORAL_FIELDS: &[&str] = &[
     "started_at",
     "updated_at",
     "completed_at",
-    "finished_at",
+    "processed",
 ];
 pub const CLAIM_RELATION_TEMPORAL_FIELDS: &[&str] =
     &["evaluated_at", "t_ingested", "t_invalid_ingested"];
 
-/// The temporal columns a triple and an entity carry.
-pub const TRIPLE_TEMPORAL_FIELDS: &[&str] =
-    &["t_valid", "t_ingested", "t_invalid", "t_invalid_ingested"];
-pub const ENTITY_TEMPORAL_FIELDS: &[&str] = &["t_valid", "t_ingested", "updated_at"];
+/// The temporal columns a triple carries. Not the fact set: `triple` has no
+/// `t_valid` and is not queried by validity interval.
+pub const TRIPLE_TEMPORAL_FIELDS: &[&str] = &["t_ingested", "t_invalid", "t_invalid_ingested"];
+
+/// The entity table has no datetime columns: an id, a type, a canonical name
+/// and its aliases. Empty rather than a copy of the fact set, because a name
+/// that is not a column is inert while a missing one is not — an entity
+/// payload carrying `updated_at` would be written as a string into a column
+/// SurrealDB would have to coerce.
+pub const ENTITY_TEMPORAL_FIELDS: &[&str] = &[];
 
 /// The temporal columns a community carries.
 pub const COMMUNITY_TEMPORAL_FIELDS: &[&str] = &["updated_at"];

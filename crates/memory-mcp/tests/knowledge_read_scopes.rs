@@ -302,3 +302,147 @@ async fn relate_records_an_operator_originated_edge() {
         Some(0.42)
     );
 }
+
+/// Task 4.2 deleted `temporal_field_names_for_table` and gave each context a
+/// `*_TEMPORAL_FIELDS` constant. That moves the answer, it does not answer the
+/// question: a constant can name a column the table does not have, and a
+/// missing entry silently stops coercing a datetime to a `datetime`.
+///
+/// `started_at` was in `INBOX_REVISION_TEMPORAL_FIELDS` and `inbox_revision`
+/// has no such column; `processed_at`, which the table does have, was
+/// missing. Nothing caught it — the wrong name is inert, so the write only
+/// failed where the column is actually written.
+///
+/// This test parses the migrations — the only place the schema is declared —
+/// and asserts every named column exists on the table the constant belongs
+/// to.
+#[test]
+fn every_temporal_field_list_names_only_real_columns() {
+    use std::collections::{BTreeMap, BTreeSet};
+    use std::fs;
+    use std::path::Path;
+
+    let manifest = Path::new(env!("CARGO_MANIFEST_DIR"));
+
+    // Schema: `DEFINE FIELD <col> ON <table>` across every migration, plus the
+    // Rust-side column lists the postconditions check.
+    let mut schema: BTreeMap<String, BTreeSet<String>> = BTreeMap::new();
+    let mut migrations: Vec<_> = fs::read_dir(manifest.join("migrations"))
+        .expect("migrations directory")
+        .flatten()
+        .map(|entry| entry.path())
+        .filter(|path| path.extension().and_then(|e| e.to_str()) == Some("surql"))
+        .collect();
+    migrations.sort();
+    for path in migrations {
+        let text = fs::read_to_string(&path).expect("readable migration");
+        for line in text.lines() {
+            let line = line.trim();
+            let Some(rest) = line.strip_prefix("DEFINE FIELD ") else {
+                continue;
+            };
+            let rest = rest.strip_prefix("OVERWRITE ").unwrap_or(rest);
+            // `DEFINE FIELD <col> ON [TABLE] <table> TYPE …`
+            let mut parts = rest.split_whitespace();
+            let Some(column) = parts.next() else {
+                continue;
+            };
+            let Some(on) = parts.next() else {
+                continue;
+            };
+            if on != "ON" {
+                continue;
+            }
+            let mut next = parts.next();
+            if next == Some("TABLE") {
+                next = parts.next();
+            }
+            let Some(table) = next else {
+                continue;
+            };
+            schema
+                .entry(table.to_ascii_lowercase())
+                .or_default()
+                .insert(column.to_string());
+        }
+    }
+
+    assert!(
+        schema.len() >= 20,
+        "expected the migrations to declare at least twenty tables, parsed {}",
+        schema.len()
+    );
+
+    let query_files = [
+        "src/knowledge/queries.rs",
+        "src/memory/queries.rs",
+        "src/embedding/queries.rs",
+    ];
+    let mut checked = 0usize;
+    let mut problems: Vec<String> = Vec::new();
+    for file in query_files {
+        let text = fs::read_to_string(manifest.join(file)).expect("readable queries module");
+        for (index, line) in text.lines().enumerate() {
+            let trimmed = line.trim();
+            if !trimmed.starts_with("pub const ") || !trimmed.contains("TEMPORAL_FIELDS") {
+                continue;
+            }
+            let name = trimmed
+                .trim_start_matches("pub const ")
+                .split(':')
+                .next()
+                .expect("constant name")
+                .to_string();
+            // The table is the constant name minus its
+            // `*_TEMPORAL_FIELDS` suffix: `FACT_…` → `fact`,
+            // `INBOX_REVISION_…` → `inbox_revision`.
+            let table = name
+                .strip_suffix("_TEMPORAL_FIELDS")
+                .expect("suffix")
+                .to_ascii_lowercase();
+            // Read the list body, which may span lines.
+            let mut body = String::new();
+            let mut cursor = index;
+            while cursor < text.lines().count() {
+                let l = text.lines().nth(cursor).unwrap_or_default();
+                body.push_str(l);
+                if l.trim_end().ends_with(';') {
+                    break;
+                }
+                cursor += 1;
+            }
+            let columns = schema.get(&table).unwrap_or_else(|| {
+                panic!("{name} names a table the schema does not define: {table}")
+            });
+            for column in body
+                .split('"')
+                .skip(1)
+                .step_by(2)
+                .filter(|s| s.contains('_') || s.starts_with('t'))
+            {
+                checked += 1;
+                if !columns.contains(column) {
+                    problems.push(format!(
+                        "  {file}:{} {name} names `{column}`, which table `{table}` does not have",
+                        index + 1
+                    ));
+                }
+            }
+        }
+    }
+
+    assert!(
+        checked > 20,
+        "expected to check more columns, checked {checked}"
+    );
+    assert!(
+        problems.is_empty(),
+        "{} temporal-field name(s) do not exist in the schema:\n\n{}\n\n\
+         These lists are copied from each other when a table is added, and a \
+         name carried over from a neighbour is how `started_at` ended up in \
+         `INBOX_REVISION_TEMPORAL_FIELDS` for a table with no such column. \
+         Check the migration for the table before adding a column here.",
+        problems.len(),
+        problems.join("\n")
+    );
+}

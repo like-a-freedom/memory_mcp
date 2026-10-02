@@ -47,7 +47,7 @@ pub const INBOX_REVISION_TEMPORAL_FIELDS: &[&str] = &[
     "discovered_at",
     "updated_at",
     "lease_expires_at",
-    "started_at",
+    "processed_at",
 ];
 
 pub const EPISODE_TEMPORAL_FIELDS: &[&str] = &["t_ref", "t_ingested", "archived_at"];

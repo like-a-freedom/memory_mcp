@@ -442,13 +442,9 @@ impl InboxRevisionStoreClient {
                 "cas update fields must be an object".to_string(),
             ));
         };
-        const TEMPORAL: &[&str] = &[
-            "t_ref",
-            "lease_expires_at",
-            "discovered_at",
-            "updated_at",
-            "processed_at",
-        ];
+        // The same list the `create` path uses. A third copy here is how
+        // `started_at` ended up in a table that has no such column.
+        const TEMPORAL: &[&str] = crate::memory::queries::INBOX_REVISION_TEMPORAL_FIELDS;
         let mut vars = serde_json::Map::new();
         let assignments = map
             .iter()
