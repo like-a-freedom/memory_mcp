@@ -695,10 +695,17 @@ async fn identity_link_starts_a_provider_round_trip_and_links_nothing() {
 /// request carrying a real session and a real CSRF token actually reaches the
 /// handler, which is why this drives one.
 ///
-/// The assertion is "no 5xx", not a status per route: these requests are
-/// deliberately invalid (a nonexistent key, a stale token, no JSON body), so
-/// each route answers a rejection or a refusal. Only an internal error means
-/// the handler was never entered.
+/// Every case pins its exact status. "Not 5xx" alone would also pass on a
+/// request that never left the middleware, which is how a sweep of this shape
+/// goes vacuous without anyone noticing: the CSRF middleware refuses any
+/// method other than GET/HEAD/OPTIONS, so a POST sent without the token is
+/// answered 403 without the handler ever running, and the original assertion
+/// would have called that a pass.
+///
+/// The operator routes are absent by design rather than by omission: the
+/// seeded session is an ordinary account, so `authenticate_control_plane_operator`
+/// refuses before any operator handler is reached and such a case could only
+/// ever assert that refusal.
 #[tokio::test]
 async fn no_authenticated_account_route_answers_an_internal_error() {
     let (fixture, _mock, cookie) = spawn_with_env(Vec::new()).await;
@@ -713,38 +720,50 @@ async fn no_authenticated_account_route_answers_an_internal_error() {
         .expect("csrf string")
         .to_string();
 
-    // (method, path, json body). Every body is intentionally unusable: the
-    // point is which handler runs, not whether its validation passes.
+// (method, path, json body, expected). Every body is intentionally
+    // unusable — the point is which handler runs, not whether its validation
+    // passes — so each route has exactly one correct answer.
+    //
+    // The expectation is part of the case, not decoration. "Not 5xx" alone would
+    // pass on a request that never left the middleware: `require_control_plane_csrf`
+    // refuses any method other than GET/HEAD/OPTIONS, so a POST sent without the
+    // token is answered 403 by the middleware and the handler is never consulted.
+    // Pinning the status makes that visible instead of silently vacuous.
     let calls = [
-        ("GET", "/api/v1/account", None),
-        ("GET", "/api/v1/account/csrf", None),
-        ("GET", "/api/v1/account/api_keys", None),
-        ("GET", "/api/v1/account/identity_links", None),
-        (
-            "POST",
-            "/api/v1/account/api_keys",
-            Some(json!({"name": "sweep"})),
-        ),
-        ("POST", "/api/v1/account/identity_links", Some(json!({}))),
-        ("POST", "/api/v1/account/delete", None),
-        // The route that takes the fault injector as an extension. Nothing
-        // else in the account surface requires one, so it is the only route
-        // whose wiring can disagree with its handler.
+        ("GET", "/api/v1/account", None, 200),
+        ("GET", "/api/v1/account/csrf", None, 200),
+        ("GET", "/api/v1/account/api_keys", None, 200),
+        ("GET", "/api/v1/account/identity_links", None, 200),
+        ("POST", "/api/v1/account/api_keys", Some(json!({"name": "sweep"})), 201),
+        ("POST", "/api/v1/account/identity_links", Some(json!({})), 200),
+        ("POST", "/api/v1/account/delete", None, 200),
+        // The route that takes the fault injector as an extension. Nothing else
+        // in the account surface requires one, so it is the only route whose
+        // wiring can disagree with its handler. A JSON error envelope is the
+        // tell that the body ran: the middleware's refusals are bare text.
         (
             "POST",
             "/api/v1/account/delete/confirm",
             Some(json!({"confirmation_token": "not-a-token", "typed_phrase": "nope"})),
+            403,
         ),
+        // The bootstrap key, which this fixture really provisioned, so the
+        // handler runs and revokes it (204). A key that does not exist would
+        // also prove the handler ran, but reusing a real one keeps the sweep
+        // from creating state the other cases in this suite assert on.
         (
             "DELETE",
             "/api/v1/account/api_keys/ak_00000000-0000-4000-8000-000000000000",
             None,
+            204,
         ),
-        ("DELETE", "/api/v1/account/identity_links/link_x", None),
-        ("GET", "/api/v1/operator/recovery/status", None),
+        // 409 from the handler: the link handle is malformed, and the JSON
+        // error envelope is the proof this reached the body rather than a
+        // middleware, whose refusals are bare text.
+        ("DELETE", "/api/v1/account/identity_links/link_x", None, 409),
     ];
 
-    for (method, path, payload) in calls {
+    for (method, path, payload, expected) in calls {
         let mut req = client
             .request(
                 reqwest::Method::from_bytes(method.as_bytes()).expect("method"),
@@ -752,7 +771,9 @@ async fn no_authenticated_account_route_answers_an_internal_error() {
             )
             .header("host", "localhost")
             .header(cookie_header(&cookie).0, cookie_header(&cookie).1);
-        if payload.is_some() {
+        // Same method rule the middleware applies, so a token is never sent to
+        // a route that ignores it and never withheld from one that demands it.
+        if !matches!(method, "GET" | "HEAD" | "OPTIONS") {
             req = req
                 .header("x-csrf-token", &csrf)
                 .header("content-type", "application/json");
@@ -768,6 +789,12 @@ async fn no_authenticated_account_route_answers_an_internal_error() {
             !status.is_server_error(),
             "{method} {path} answered {status} — an internal error means the handler was \
              never reached, so this route is broken the way the OIDC callback was: {text}"
+        );
+        assert_eq!(
+            status.as_u16(),
+            expected,
+            "{method} {path} answered {status}, expected {expected}. A middleware refusal \
+             here means the sweep never exercised the handler: {text}"
         );
     }
 }
