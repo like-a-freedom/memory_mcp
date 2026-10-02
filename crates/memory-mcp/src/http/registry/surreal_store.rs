@@ -264,9 +264,46 @@ fn is_unique_violation_message(message: &str) -> bool {
         || lower.contains("unique")
 }
 
+/// Strip a quoted value out of a storage error message.
+///
+/// SurrealDB quotes the offending value in coercion and assertion failures
+/// ("Found 'xxx' for field `display_name`"). That message becomes a
+/// [`MemoryError`], whose `Display` is written to the error log by
+/// `control::error::log_internal_error` — and `http::logging` forbids unbounded
+/// identifiers there. A rejected display name is user-supplied free text, so it
+/// must not survive into the message.
+///
+/// Only the span between the "found '" marker and the next `'` is removed.
+/// Pairing quotes naively would be wrong: these messages contain apostrophes of
+/// their own ("Couldn't"), and pairing the first two quotes would redact nothing
+/// while still leaving the value. Anchoring on the marker SurrealDB actually
+/// emits avoids depending on quote parity: the marker is matched
+/// case-insensitively because the engine has spelled it both ways ("Found 'x'"
+/// in an assertion failure, "found 'x'" in a coercion failure).
+///
+/// The surrounding diagnosis — which field, which expectation — is what makes
+/// the error useful, and it is bounded.
+fn redact_quoted_value(message: &str) -> String {
+    const MARKER: &str = "ound '";
+    let mut out = String::with_capacity(message.len());
+    let mut rest = message;
+    while let Some(start) = rest.to_ascii_lowercase().find(MARKER) {
+        let (before, after) = rest.split_at(start);
+        out.push_str(before);
+        let Some(end) = after[MARKER.len()..].find('\'') else {
+            out.push_str(after);
+            return out;
+        };
+        out.push_str("found '<redacted>'");
+        rest = &after[MARKER.len() + end + 1..];
+    }
+    out.push_str(rest);
+    out
+}
+
 /// Convert a SurrealDB error string into a typed MemoryError.
 fn map_storage_error(context: &str, err: impl std::fmt::Display) -> MemoryError {
-    let msg = err.to_string();
+    let msg = redact_quoted_value(&err.to_string());
     let lower = msg.to_ascii_lowercase();
     if is_unique_violation_message(&lower) {
         MemoryError::Conflict(format!("{context}: {msg}"))
@@ -1285,7 +1322,10 @@ impl AccountStore for SurrealRegistryStore {
         let rows = self
             .handle()
             .query_json(
-                "SELECT id, status, tenant_id, created_at FROM type::table($table) WHERE id = type::record($table, $id) LIMIT 1",
+                // `display_name` must be projected here: the projection names
+                // the columns the decoder ever sees, so omitting it would store
+                // the name and still read `None` back for every account.
+                "SELECT id, status, tenant_id, created_at, display_name FROM type::table($table) WHERE id = type::record($table, $id) LIMIT 1",
                 Some(json!({"table": "account", "id": account_id})),
             )
             .await
@@ -3324,6 +3364,56 @@ mod tests {
 
     use crate::http::registry::models::{AccountStatus, NamespaceBinding, TenantStatus};
     use surrealdb::engine::local::Mem;
+
+    #[test]
+    fn a_rejected_value_is_not_echoed_into_the_error_message() {
+        // SurrealDB's ASSERT failures quote the offending value ("Found 'xxx'
+        // for field `display_name`"). That message becomes a MemoryError, whose
+        // Display is written to the error log by `log_internal_error`, and
+        // `http::logging` forbids unbounded identifiers there. So the value must
+        // be stripped from the message before it can travel any further.
+        let secret = "Ada Lovelace";
+        let raw = format!(
+            "Couldn't coerce value for field `display_name` of `account:acct_1`: \
+             Expected `none | string` but found '{secret}'"
+        );
+        let mapped = map_storage_error("write account", raw.as_str());
+        let rendered = mapped.to_string();
+        assert!(
+            !rendered.contains(secret),
+            "an error message must not carry a display name: {rendered}"
+        );
+        assert!(
+            !rendered.contains("Found 'Ada"),
+            "the quoted value must be stripped whole, not partially: {rendered}"
+        );
+        assert!(
+            rendered.contains("Couldn't"),
+            "an apostrophe in the diagnosis is not a quote and must survive: {rendered}"
+        );
+        assert!(
+            rendered.contains("write account"),
+            "the operation context must survive redaction: {rendered}"
+        );
+    }
+
+    #[test]
+    fn a_uniqueness_failure_still_classifies_as_a_conflict() {
+        // Redaction must not swallow the classification that retry logic
+        // depends on.
+        let mapped = map_storage_error(
+            "write account",
+            "Database index `idx_x` already contains a record",
+        );
+        assert!(is_conflict_error(&mapped));
+    }
+
+    #[test]
+    fn an_error_with_no_quoted_value_is_left_alone() {
+        // Ordinary failures carry no payload, so they must not be mangled.
+        let mapped = map_storage_error("find account", "connection closed");
+        assert!(mapped.to_string().contains("connection closed"));
+    }
 
     fn account() -> Account {
         Account {

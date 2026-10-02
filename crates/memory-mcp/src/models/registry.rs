@@ -460,6 +460,10 @@ pub fn new_namespace_name() -> String {
 /// used only for display. It is never an identity key, never logged, and is
 /// bounded so a careless or hostile provider cannot put unbounded text in a
 /// durable record that outlives the account.
+///
+/// Only the browser-auth workflow has an identity provider to name a person, so
+/// this is gated the same way the neighbouring id helpers are.
+#[cfg(feature = "streamable-http")]
 pub(crate) fn account_display_name(value: Option<&str>) -> Option<String> {
     let trimmed = value?.trim();
     if trimmed.is_empty() || trimmed.chars().count() > 200 {

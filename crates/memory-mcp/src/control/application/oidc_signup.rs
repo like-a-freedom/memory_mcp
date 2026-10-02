@@ -169,7 +169,11 @@ fn build_bundle(
         ExternalIdentity, new_external_identity_id, new_reserved_bundle,
     };
     let (mut account, tenant) = new_reserved_bundle(1, now);
-    account.display_name = display_name;
+    // Re-apply the boundary here rather than trusting the caller: this is the
+    // single funnel every new Account passes through, and the schema ASSERT
+    // behind it would otherwise turn an over-long provider claim into a 500 for
+    // the whole login rather than a missing name.
+    account.display_name = crate::models::registry::account_display_name(display_name.as_deref());
     let identity_record = ExternalIdentity {
         id: new_external_identity_id(),
         account_id: account.id.clone(),
@@ -228,6 +232,55 @@ mod tests {
         )
         .await
         .expect("reconcile browser policy")
+    }
+
+    #[tokio::test]
+    async fn an_over_long_provider_name_does_not_fail_the_whole_signup() {
+        // The schema ASSERT rejects a name beyond the boundary, and a write failure
+        // surfaces as a 500. So the boundary has to be applied on the way in, not
+        // only where the OIDC callback happens to call it — otherwise a cosmetic
+        // provider claim takes down a user's login. A name too long to keep must
+        // simply not be stored.
+        let store = Arc::new(InMemoryStore::default());
+        let now = chrono::Utc::now();
+        let fence = join_fence(&store).await;
+        let workflow = OidcSignup::new(
+            store.clone() as Arc<dyn AccountStore>,
+            store.clone() as Arc<dyn ProvisioningStore>,
+        );
+        let too_long = "x".repeat(201);
+        let account = workflow
+            .resolve_or_create(
+                &fence,
+                verified_named("https://issuer.example.com", 0xE3, &too_long),
+                now,
+            )
+            .await
+            .expect("an over-long name must not fail signup");
+        assert_eq!(
+            account.display_name, None,
+            "a name beyond the boundary is dropped, not stored and not fatal"
+        );
+    }
+
+    #[tokio::test]
+    async fn a_blank_provider_name_is_stored_as_no_name() {
+        let store = Arc::new(InMemoryStore::default());
+        let now = chrono::Utc::now();
+        let fence = join_fence(&store).await;
+        let workflow = OidcSignup::new(
+            store.clone() as Arc<dyn AccountStore>,
+            store.clone() as Arc<dyn ProvisioningStore>,
+        );
+        let account = workflow
+            .resolve_or_create(
+                &fence,
+                verified_named("https://issuer.example.com", 0xE4, "   "),
+                now,
+            )
+            .await
+            .expect("a blank name must not fail signup");
+        assert_eq!(account.display_name, None);
     }
 
     #[tokio::test]

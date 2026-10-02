@@ -57,6 +57,62 @@ fn active_account(id: &str, tenant_id: &str) -> Account {
 }
 
 #[tokio::test]
+async fn a_display_name_survives_a_real_write_and_read() {
+    // The in-memory store clones the whole `Account`, so it cannot catch a
+    // write that is persisted but never projected back. This drives the real
+    // `mem://` registry, where a missing column in the `find_account_by_id`
+    // projection is invisible everywhere else: the column is written, and the
+    // decoder would still read `None` for every account.
+    let store = store().await;
+    let mut account = active_account("acc_named", "ten_1");
+    account.display_name = Some("Ada Lovelace".to_string());
+    store.write_account(&account).await.expect("write account");
+
+    let observed = store
+        .find_account_by_id("acc_named")
+        .await
+        .expect("lookup account")
+        .expect("account present");
+    assert_eq!(
+        observed.display_name.as_deref(),
+        Some("Ada Lovelace"),
+        "a stored display name must read back, not project away to None"
+    );
+}
+
+#[tokio::test]
+async fn an_absent_display_name_reads_back_as_none_against_the_real_store() {
+    // The other half: rows written before migration 052 carry no value, and
+    // that must decode as `None` rather than failing or yielding an empty
+    // string.
+    let store = store().await;
+    let account = active_account("acc_unnamed", "ten_1");
+    store.write_account(&account).await.expect("write account");
+
+    let observed = store
+        .find_account_by_id("acc_unnamed")
+        .await
+        .expect("lookup account")
+        .expect("account present");
+    assert_eq!(observed.display_name, None);
+}
+
+#[tokio::test]
+async fn a_name_beyond_the_boundary_is_rejected_by_the_schema_not_stored() {
+    // `account_display_name` is the intended boundary, but it is applied at one
+    // call site, so the schema ASSERT is the real backstop. Prove it holds:
+    // an over-long value must fail the write rather than silently truncate.
+    let store = store().await;
+    let mut account = active_account("acc_long", "ten_1");
+    account.display_name = Some("x".repeat(201));
+    let outcome = store.write_account(&account).await;
+    assert!(
+        outcome.is_err(),
+        "a 201-character name must be refused by the schema ASSERT"
+    );
+}
+
+#[tokio::test]
 async fn writes_an_account_and_reads_it_back() {
     let store = store().await;
     let account = active_account("acc_1", "ten_1");
