@@ -297,6 +297,26 @@ mod tests {
     use std::sync::Arc;
 
     use crate::service::MemoryService;
+
+    /// `MemoryService::resolve_entity` used to provide this inside the crate.
+    /// No production caller reached it, so the container's copy went and the
+    /// tests call the capability directly.
+    async fn resolve_entity_for_test(
+        service: &MemoryService,
+        entity_type: &str,
+        name: &str,
+    ) -> Result<String, crate::MemoryError> {
+        crate::service::memory_container_shims::memory_capabilities_resolve::ResolveCapability::resolve_from_service(
+            service,
+            crate::models::EntityCandidate {
+                entity_type: entity_type.to_string(),
+                canonical_name: name.to_string(),
+                aliases: Vec::new(),
+            },
+            None,
+        )
+        .await
+    }
     use crate::storage::{DbClient, SurrealDbClient};
 
     #[test]
@@ -362,18 +382,15 @@ mod tests {
             .expect("create test service");
 
         // Resolve the same entity via different typed methods
-        let id1 = service
-            .resolve_entity("person", "Alice Smith")
+        let id1 = resolve_entity_for_test(&service, "person", "Alice Smith")
             .await
             .expect("resolve person");
-        let id2 = service
-            .resolve_entity("person", "Alice Smith")
+        let id2 = resolve_entity_for_test(&service, "person", "Alice Smith")
             .await
             .expect("resolve person again");
         assert_eq!(id1, id2);
 
-        let id3 = service
-            .resolve_entity("company", "Acme Corp")
+        let id3 = resolve_entity_for_test(&service, "company", "Acme Corp")
             .await
             .expect("resolve company");
         assert_ne!(id1, id3);
@@ -396,12 +413,10 @@ mod tests {
         let service = MemoryService::new(db_client, "org".to_string(), "warn".to_string(), 50, 100)
             .expect("create test service");
 
-        let from_id = service
-            .resolve_entity("person", "Alice Relate")
+        let from_id = resolve_entity_for_test(&service, "person", "Alice Relate")
             .await
             .expect("resolve alice");
-        let to_id = service
-            .resolve_entity("company", "Acme Relate")
+        let to_id = resolve_entity_for_test(&service, "company", "Acme Relate")
             .await
             .expect("resolve acme");
 

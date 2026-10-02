@@ -244,20 +244,16 @@ async fn test_explain_exposes_graph_insights_for_cross_community_connection() {
     let (service, db_client) = common::make_service_with_client().await;
     let t_ref = Utc.with_ymd_and_hms(2026, 4, 8, 10, 0, 0).unwrap();
 
-    let alice_id = service
-        .resolve_entity("person", "Alice Smith")
+    let alice_id = common::resolve_entity(&service, "person", "Alice Smith")
         .await
         .expect("alice");
-    let bob_id = service
-        .resolve_entity("person", "Bob Jones")
+    let bob_id = common::resolve_entity(&service, "person", "Bob Jones")
         .await
         .expect("bob");
-    let carol_id = service
-        .resolve_entity("person", "Carol White")
+    let carol_id = common::resolve_entity(&service, "person", "Carol White")
         .await
         .expect("carol");
-    let diana_id = service
-        .resolve_entity("person", "Diana Prince")
+    let diana_id = common::resolve_entity(&service, "person", "Diana Prince")
         .await
         .expect("diana");
 
@@ -371,11 +367,12 @@ async fn test_explain_exposes_graph_insights_for_cross_community_connection() {
 #[tokio::test]
 async fn test_relate_repeated_write_invalidates_previous_edge_version() {
     let (service, db_client) = common::make_service_with_client().await;
-    let alice = service
-        .resolve_entity("person", "Alice")
+    let alice = common::resolve_entity(&service, "person", "Alice")
         .await
         .expect("alice");
-    let bob = service.resolve_entity("person", "Bob").await.expect("bob");
+    let bob = common::resolve_entity(&service, "person", "Bob")
+        .await
+        .expect("bob");
 
     service
         .relate(&alice, "knows", &bob, EdgeAttributes::inferred())

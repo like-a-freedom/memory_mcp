@@ -22,7 +22,6 @@ use memory_mcp::service::MemoryService;
 /// Build a lifecycle-enabled service with an in-memory DB.
 async fn lifecycle_service() -> MemoryService {
     let mut service = common::make_service().await;
-    // Enable lifecycle integration (disabled by default in test config).
     service = service.with_lifecycle_enabled(true);
     service
 }

@@ -2,9 +2,10 @@ use std::sync::Arc;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
 use chrono::{DateTime, Utc};
-use memory_mcp::models::{IngestRequest, Provenance};
+use memory_mcp::models::{EntityCandidate, IngestRequest, Provenance};
 use memory_mcp::service::memory_container_shims::memory_capabilities_extract::ExtractCapability;
 use memory_mcp::service::memory_container_shims::memory_capabilities_ingest::IngestCapability;
+use memory_mcp::service::memory_container_shims::memory_capabilities_resolve::ResolveCapability;
 use memory_mcp::service::{MemoryService, normalize_dt, normalize_text};
 use memory_mcp::storage::{DbClient, SurrealDbClient};
 use serde_json::json;
@@ -62,6 +63,30 @@ impl TestMemory {
 #[allow(dead_code)]
 pub async fn make_service() -> MemoryService {
     make_service_with_client_and_query_logging(false).await.0
+}
+
+/// Resolves an entity by its type and canonical name.
+///
+/// `MemoryService::resolve_entity` used to provide this. No production
+/// caller reached it — `memory/capabilities/resolve.rs` reaches
+/// `memory::api::resolve_entity` instead — so the container's copy was a
+/// second name for a capability the crate already exposes.
+#[allow(dead_code)]
+pub async fn resolve_entity(
+    service: &MemoryService,
+    entity_type: &str,
+    name: &str,
+) -> Result<String, memory_mcp::MemoryError> {
+    ResolveCapability::resolve_from_service(
+        service,
+        EntityCandidate {
+            entity_type: entity_type.to_string(),
+            canonical_name: name.to_string(),
+            aliases: Vec::new(),
+        },
+        None,
+    )
+    .await
 }
 
 #[allow(dead_code)]

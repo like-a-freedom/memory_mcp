@@ -343,6 +343,12 @@ impl MemoryService {
     /// Returns a copy of the service with lifecycle integration enabled or
     /// disabled. This controls whether `lifecycle_capture` returns `Some` and
     /// whether the projection worker is started.
+    ///
+    /// `MemoryService::new` takes the lifecycle configuration from its
+    /// caller rather than from the environment, so a caller that builds a
+    /// container directly — the eval harness, a test — has no other way to
+    /// turn it on. The composition root sets the same field from
+    /// `LifecycleConfig::from_env`.
     #[must_use]
     pub fn with_lifecycle_enabled(mut self, enabled: bool) -> Self {
         self.lifecycle_config.enabled = enabled;

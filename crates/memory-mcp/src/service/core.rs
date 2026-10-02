@@ -59,14 +59,6 @@ impl MemoryService {
             .unwrap_or_else(std::sync::PoisonError::into_inner) = state;
     }
 
-    /// Episode-domain store.
-    pub(crate) fn episode_store(&self) -> crate::memory::episode_store::EpisodeStoreClient {
-        crate::memory::episode_store::EpisodeStoreClient::new(
-            self.db_client.clone(),
-            self.active_namespace.clone(),
-        )
-    }
-
     /// The embedding service bound to the current runtime state.
     ///
     /// The provider, signature and dimension are read from the live
@@ -133,10 +125,6 @@ impl MemoryService {
     }
 
     /// Returns the total count of episodes through the owning episode store.
-    pub async fn episode_count(&self) -> Result<i32, MemoryError> {
-        self.episode_store().count_episodes().await
-    }
-
     /// Adds a new fact.
     ///
     /// Thin delegator to `FactService::add_fact`. Kept for backward

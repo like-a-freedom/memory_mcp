@@ -515,12 +515,10 @@ async fn explain_batch_shares_graph_insights() {
     let (service, _db_client) = common::make_service_with_client().await;
     let t_ref = Utc::now();
 
-    let alice_id = service
-        .resolve_entity("person", "Alice Shared")
+    let alice_id = common::resolve_entity(&service, "person", "Alice Shared")
         .await
         .expect("alice");
-    let bob_id = service
-        .resolve_entity("person", "Bob Shared")
+    let bob_id = common::resolve_entity(&service, "person", "Bob Shared")
         .await
         .expect("bob");
     service
@@ -654,8 +652,7 @@ async fn explain_batch_mixed_with_and_without_fact_ids() {
     )
     .await
     .expect("ingest");
-    let alice_id = service
-        .resolve_entity("person", "Alice Mixed")
+    let alice_id = common::resolve_entity(&service, "person", "Alice Mixed")
         .await
         .expect("alice");
     let fact_id = service

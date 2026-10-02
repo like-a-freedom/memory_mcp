@@ -183,17 +183,17 @@ async fn extractor_fingerprint_projection() {
 async fn test_service_resolve_and_relate_entities() {
     let service = common::make_service().await;
 
-    let alice_id = service
-        .resolve_entity("person", "Alice Smith")
+    let alice_id = common::resolve_entity(&service, "person", "Alice Smith")
         .await
         .unwrap();
     assert!(alice_id.starts_with("entity:"));
 
-    let bob_id = service.resolve_entity("person", "Bob Jones").await.unwrap();
+    let bob_id = common::resolve_entity(&service, "person", "Bob Jones")
+        .await
+        .unwrap();
     assert!(bob_id.starts_with("entity:"));
 
-    let alice_id_2 = service
-        .resolve_entity("person", "Alice Smith")
+    let alice_id_2 = common::resolve_entity(&service, "person", "Alice Smith")
         .await
         .unwrap();
     assert_eq!(alice_id, alice_id_2);
@@ -208,11 +208,12 @@ async fn test_service_resolve_and_relate_entities() {
 async fn test_service_relate_persists_native_edge_endpoints_and_inferred_origin() {
     let (service, db_client) = common::make_service_with_client().await;
 
-    let alice_id = service
-        .resolve_entity("person", "Alice Smith")
+    let alice_id = common::resolve_entity(&service, "person", "Alice Smith")
         .await
         .unwrap();
-    let bob_id = service.resolve_entity("person", "Bob Jones").await.unwrap();
+    let bob_id = common::resolve_entity(&service, "person", "Bob Jones")
+        .await
+        .unwrap();
 
     service
         .relate(&alice_id, "knows", &bob_id, EdgeAttributes::inferred())
@@ -536,8 +537,7 @@ async fn test_service_does_not_persist_fact_embeddings_without_provider() {
     .await
     .unwrap();
 
-    let entity_id = service
-        .resolve_entity("person", "Alice Smith")
+    let entity_id = common::resolve_entity(&service, "person", "Alice Smith")
         .await
         .unwrap();
     let fact_id = service
@@ -621,13 +621,13 @@ async fn test_service_assemble_context_without_provider_skips_semantic_similarit
 #[tokio::test]
 async fn test_service_merges_overlapping_entity_cohorts_into_one_community() {
     let (service, db_client) = common::make_service_with_client().await;
-    let alice_id = service
-        .resolve_entity("person", "Alice Smith")
+    let alice_id = common::resolve_entity(&service, "person", "Alice Smith")
         .await
         .unwrap();
-    let bob_id = service.resolve_entity("person", "Bob Jones").await.unwrap();
-    let carol_id = service
-        .resolve_entity("person", "Carol White")
+    let bob_id = common::resolve_entity(&service, "person", "Bob Jones")
+        .await
+        .unwrap();
+    let carol_id = common::resolve_entity(&service, "person", "Carol White")
         .await
         .unwrap();
 
@@ -1899,17 +1899,16 @@ async fn test_service_assemble_context_wake_up_prioritizes_persona_then_recent()
 async fn test_service_assemble_context_map_view_returns_hub_entities_sorted_by_degree() {
     let (service, _db_client) = common::make_service_with_client().await;
 
-    let alice_id = service
-        .resolve_entity("person", "Alice Smith")
+    let alice_id = common::resolve_entity(&service, "person", "Alice Smith")
         .await
         .unwrap();
-    let bob_id = service.resolve_entity("person", "Bob Jones").await.unwrap();
-    let carol_id = service
-        .resolve_entity("person", "Carol White")
+    let bob_id = common::resolve_entity(&service, "person", "Bob Jones")
         .await
         .unwrap();
-    let diana_id = service
-        .resolve_entity("person", "Diana Prince")
+    let carol_id = common::resolve_entity(&service, "person", "Carol White")
+        .await
+        .unwrap();
+    let diana_id = common::resolve_entity(&service, "person", "Diana Prince")
         .await
         .unwrap();
 
@@ -1966,13 +1965,13 @@ async fn test_service_assemble_context_map_view_returns_hub_entities_sorted_by_d
 async fn test_service_assemble_context_map_view_includes_communities() {
     let (service, db_client) = common::make_service_with_client().await;
 
-    let alice_id = service
-        .resolve_entity("person", "Alice Smith")
+    let alice_id = common::resolve_entity(&service, "person", "Alice Smith")
         .await
         .unwrap();
-    let bob_id = service.resolve_entity("person", "Bob Jones").await.unwrap();
-    let carol_id = service
-        .resolve_entity("person", "Carol White")
+    let bob_id = common::resolve_entity(&service, "person", "Bob Jones")
+        .await
+        .unwrap();
+    let carol_id = common::resolve_entity(&service, "person", "Carol White")
         .await
         .unwrap();
 
@@ -2149,11 +2148,12 @@ async fn test_service_assemble_context_does_not_track_access_for_synthetic_view_
     // observable as a new `fact`-table row or a logged refusal.
     let (service, db_client) = common::make_service_with_client().await;
 
-    let alice = service
-        .resolve_entity("person", "Alice Smith")
+    let alice = common::resolve_entity(&service, "person", "Alice Smith")
         .await
         .unwrap();
-    let bob = service.resolve_entity("person", "Bob Jones").await.unwrap();
+    let bob = common::resolve_entity(&service, "person", "Bob Jones")
+        .await
+        .unwrap();
     service
         .relate(&alice, "knows", &bob, EdgeAttributes::inferred())
         .await
@@ -2366,8 +2366,8 @@ async fn test_service_resolve_handles_concurrent_duplicate_gracefully() {
     let service = common::make_service().await;
 
     let (id1, id2) = tokio::join!(
-        service.resolve_entity("person", "Concurrent Alice"),
-        service.resolve_entity("person", "Concurrent Alice"),
+        common::resolve_entity(&service, "person", "Concurrent Alice"),
+        common::resolve_entity(&service, "person", "Concurrent Alice"),
     );
 
     let id1 = id1.expect("first resolve should succeed");
@@ -2491,16 +2491,13 @@ async fn test_service_explain_with_graph_insights_returns_hub_and_connections() 
     let t_ref = Utc.with_ymd_and_hms(2026, 4, 8, 10, 0, 0).unwrap();
 
     // Build a small graph: Alice -> Bob -> Carol, with Bob as the hub.
-    let alice_id = service
-        .resolve_entity("person", "Alice Explain")
+    let alice_id = common::resolve_entity(&service, "person", "Alice Explain")
         .await
         .unwrap();
-    let bob_id = service
-        .resolve_entity("person", "Bob Explain")
+    let bob_id = common::resolve_entity(&service, "person", "Bob Explain")
         .await
         .unwrap();
-    let carol_id = service
-        .resolve_entity("person", "Carol Explain")
+    let carol_id = common::resolve_entity(&service, "person", "Carol Explain")
         .await
         .unwrap();
 

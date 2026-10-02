@@ -137,8 +137,8 @@ async fn embedded_relate_invalidates_previous_active_edge_version()
 -> Result<(), Box<dyn std::error::Error>> {
     let (service, db_client) = common::make_service_with_client_result().await?;
 
-    let alice = service.resolve_entity("person", "Alice").await?;
-    let bob = service.resolve_entity("person", "Bob").await?;
+    let alice = common::resolve_entity(&service, "person", "Alice").await?;
+    let bob = common::resolve_entity(&service, "person", "Bob").await?;
 
     service
         .relate(&alice, "knows", &bob, EdgeAttributes::inferred())

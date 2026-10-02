@@ -1151,10 +1151,10 @@ git commit -m "refactor(knowledge): move the reachable graph traversal, and cut 
 
 `find_intro_chain` is not in this group: after Task 5.3 it is the moved function, and the `mcp/handlers/apps.rs` call sites are the real consumers. Only `resolve_entity` and `episode_count` qualify.
 
-- [ ] **Step 1: Write the failing test** in `crates/memory-mcp/tests/public_surface_audit.rs`: extend the ratchet from Task 1.1 to assert that every `pub` method on `MemoryService` has at least one non-test caller. Expect FAIL listing `resolve_entity`, `episode_count`, and anything else the audit surfaced.
-- [ ] **Step 2: For each method the test flags, choose honestly.** If a test genuinely needs the convenience, move it into the test file as a free function over the same store — `tests/explain_provenance.rs` and `tests/embedded_invalidate.rs` can each have their own, and a duplicated three-line test helper costs less than a production method with no production caller (KISS, and the duplication is in test code where it is visible and cheap).
-- [ ] **Step 3: Run the test.** Expected: PASS.
-- [ ] **Step 4: Commit**
+- [x] **Step 1: Write the failing test** in `crates/memory-mcp/tests/public_surface_audit.rs`: extend the ratchet from Task 1.1 to assert that every `pub` method on `MemoryService` has at least one non-test caller. Expect FAIL listing `resolve_entity`, `episode_count`, and anything else the audit surfaced.
+- [x] **Step 2: For each method the test flags, choose honestly.** If a test genuinely needs the convenience, move it into the test file as a free function over the same store — `tests/explain_provenance.rs` and `tests/embedded_invalidate.rs` can each have their own, and a duplicated three-line test helper costs less than a production method with no production caller (KISS, and the duplication is in test code where it is visible and cheap).
+- [x] **Step 3: Run the test.** Expected: PASS.
+- [x] **Step 4: Commit**
 
 ```bash
 git commit -m "refactor(service): a container method with no production caller moves into the test that wanted it"
@@ -1309,6 +1309,8 @@ Recommend **subagent-driven execution**. Six waves, twenty-four tasks, and Tasks
 | 8 | "`bootstrap/` is currently `cfg(control-plane)`; un-gate `bootstrap.rs:6`." | `bootstrap.rs` was already unconditional; what carried the gate was `lib.rs:81`, and the gate was `streamable-http`, not `control-plane`. `streamable-http` implies `control-plane`, so the plan's version would have left the stdio profile without a composition root — exactly what the task exists to fix. | Un-gated `lib.rs` so `pub mod bootstrap;` is unconditional. The plan's file-and-line pointers are stale wherever an earlier task moved code; `bootstrap.rs:6` is the `pub mod integration;` line, which stays behind `control-plane` because those are HTTP's adapters. |
 
 | 9 | "Write `relate_records_an_operator_originated_edge` — call `relate` with `EdgeOrigin::Operator`." | There is no `EdgeOrigin::Operator`. The enum has exactly three variants: `Extracted` (the default), `Inferred` and `Ambiguous`, and `Operator` would be a fourth meaning — a relationship a human asserted, which is genuinely absent from the model. | The test uses `Ambiguous` with a non-default confidence of 0.13 and a non-default strength of 0.42. That proves the same thing the plan wanted: the helper no longer decides. `Inferred` could not be used, because `Inferred` *was* the hardcoded value, and a test asserting the hardcoded value round-trips would pass before the signature changed. |
+
+| 10 | "For each method the test flags, move it into the test file as a free function." | Two of the four flagged methods cannot move. `relate` is the crate's only public edge-write path — `store_edge` in `memory/episode/edges.rs` is `pub(crate)` — so moving it out of the container would close the graph-write surface for the eval harness entirely. `with_lifecycle_enabled` exists because `MemoryService::new` takes the lifecycle configuration from its caller rather than reading the environment; the composition root sets the same field from `LifecycleConfig::from_env`, but a caller that constructs a container directly has no other door. | Both are in the ratchet's allowlist with the reason recorded inline, so the next reader sees why they stay. `episode_count` and `resolve_entity` did move — the former to a test helper over `owned_episode_scan`, the latter to `common::resolve_entity` and a crate-internal twin for the unit tests. |
 
 Two more findings the second pass surfaced, both additions rather than corrections:
 

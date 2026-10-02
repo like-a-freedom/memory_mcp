@@ -21,27 +21,6 @@ impl GraphContext for MemoryService {
 }
 
 impl MemoryService {
-    /// Resolves an entity by its type and canonical name.
-    ///
-    /// Graph/entity convenience built on [`ResolveCapability`]; lives here with
-    /// the other graph conveniences.
-    pub async fn resolve_entity(
-        &self,
-        entity_type: &str,
-        name: &str,
-    ) -> Result<String, MemoryError> {
-        crate::service::memory_container_shims::memory_capabilities_resolve::ResolveCapability::resolve_from_service(
-            self,
-            crate::models::EntityCandidate {
-                entity_type: entity_type.to_string(),
-                canonical_name: name.to_string(),
-                aliases: Vec::new(),
-            },
-            None,
-        )
-        .await
-    }
-
     /// Creates a relationship edge between two entities.
     ///
     /// `attributes` says how we know the edge. This used to be hardcoded to

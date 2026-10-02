@@ -3,12 +3,26 @@ mod common;
 use std::sync::Arc;
 
 use chrono::{DateTime, TimeZone, Utc};
+use memory_mcp::knowledge::api::owned_episode_scan;
 use memory_mcp::models::IngestRequest;
 use memory_mcp::service::memory_container_shims::memory_capabilities_extract::ExtractCapability;
 use memory_mcp::service::memory_container_shims::memory_capabilities_ingest::IngestCapability;
 use memory_mcp::service::{MemoryError, normalize_dt};
 use memory_mcp::storage::{DbClient, SurrealDbClient};
 use serde_json::json;
+
+/// How many episodes the service can see.
+///
+/// `MemoryService::episode_count` used to provide this. No production
+/// caller reached it, and the owner-named read is the seam this test
+/// actually wants: the same rows a caller would enumerate.
+async fn episode_count(service: &memory_mcp::MemoryService) -> Result<i32, MemoryError> {
+    let port = memory_mcp::knowledge::infra::KnowledgeReadAdapter::new(
+        service.db_client_for_port(),
+        service.namespace_for_port(),
+    );
+    Ok(owned_episode_scan(&port).await?.len() as i32)
+}
 
 async fn seed_legacy_episode(
     db_client: &Arc<SurrealDbClient>,
@@ -60,7 +74,7 @@ async fn ingest_then_extract_roundtrip() -> Result<(), Box<dyn std::error::Error
     assert!(!payload.entities.is_empty());
     assert!(!payload.facts.is_empty());
 
-    let count = svc.episode_count().await?;
+    let count = episode_count(&svc).await?;
     assert!(count >= 1, "expected at least one episode in DB");
 
     Ok(())
@@ -96,7 +110,7 @@ async fn ingest_reuses_one_legacy_episode_by_source_identity()
     .await?;
 
     assert_eq!(episode_id, "episode:legacy-reused");
-    assert_eq!(service.episode_count().await?, 1);
+    assert_eq!(episode_count(&service).await?, 1);
     Ok(())
 }
 
@@ -139,6 +153,6 @@ async fn ingest_rejects_ambiguous_legacy_episode_identity_without_writing()
         Err(MemoryError::Conflict(message))
             if message.contains("ambiguous legacy episode identity")
     ));
-    assert_eq!(service.episode_count().await?, 2);
+    assert_eq!(episode_count(&service).await?, 2);
     Ok(())
 }

@@ -278,3 +278,238 @@ fn the_introduction_chain_is_not_reintroduced_into_the_graph_app() {
         );
     }
 }
+
+/// Every `pub` method on `MemoryService` should have a caller outside the
+/// test tree. `MemoryService` is the crate's most public type, so a method
+/// on it reads as an affordance the crate offers; when the only callers are
+/// tests, it is a fixture convenience wearing a production interface.
+///
+/// This is a ratchet in the other direction from the re-export guard: it
+/// lists what a `pub` method is allowed to be, and a new `pub` method that
+/// only tests call has to be added here with a reason, or moved into the
+/// test that wanted it.
+#[test]
+fn every_public_container_method_has_a_production_caller() {
+    let manifest = Path::new(env!("CARGO_MANIFEST_DIR"));
+    let src = manifest.join("src");
+
+    // The methods, and why each one is allowed to exist without a
+    // production caller. Empty today; the list exists so an entry is a
+    // deliberate act rather than an oversight.
+    const TEST_ONLY: &[(&str, &str)] = &[
+        // The constructors. `new` and `new_with_embedding_provider` are how a
+        // caller obtains a container at all, so having no caller *of their
+        // own* inside the crate is the point.
+        ("new", "constructs the container"),
+        ("new_with_embedding_provider", "constructs the container"),
+        // The only public way to record an edge. `store_edge` in
+        // `memory/episode/edges.rs` is `pub(crate)`, so an out-of-crate
+        // caller — the eval harness, an embedding — has exactly one door, and
+        // this is it. It delegates to `relate_edge`, which two production
+        // paths (`lifecycle_workers::communities`, `episode::edges`) do
+        // reach. Removing it would close the crate's graph-write surface
+        // entirely rather than narrow it.
+        (
+            "relate",
+            "the only public edge-write path; store_edge is pub(crate)",
+        ),
+        // `MemoryService::new` takes the lifecycle configuration from its
+        // caller rather than reading the environment, so a caller that
+        // builds a container directly has no other way to turn the
+        // integration on. The composition root sets the same field from
+        // `LifecycleConfig::from_env`; this is the constructor-path
+        // equivalent. Removing it would make the lifecycle integration
+        // reachable only through `bootstrap::stdio`.
+        (
+            "with_lifecycle_enabled",
+            "the constructor-path equivalent of the composition root's LifecycleConfig::from_env",
+        ),
+    ];
+
+    let declared = collect_public_methods(&src);
+    assert!(
+        !declared.is_empty(),
+        "no `pub` methods found on MemoryService — the scan is broken, not the code"
+    );
+
+    let mut test_text = String::new();
+    collect_rust_text(&manifest.join("tests"), &mut test_text);
+    for path in &declared {
+        if let Ok(text) = std::fs::read_to_string(&path.file) {
+            test_text.push_str(&text);
+        }
+    }
+
+    let mut orphans = Vec::new();
+    for method in &declared {
+        let name = &method.name;
+        if TEST_ONLY.iter().any(|(allowed, _)| allowed == name) {
+            continue;
+        }
+        let callers = count_production_callers(&src, name);
+        if callers > 0 {
+            continue;
+        }
+        let test_only = test_text.contains(&format!(".{name}("));
+        orphans.push(format!(
+            "  {name} — {}{}",
+            method.file.display(),
+            if test_only {
+                " (tests call it; no production caller)"
+            } else {
+                " (no caller at all)"
+            }
+        ));
+    }
+
+    assert!(
+        orphans.is_empty(),
+        "{} pub method(s) on MemoryService have neither a production caller \
+         nor a test:\n\n{}\n\nMove each into the test that wanted it, or add it to \
+         TEST_ONLY with a reason.",
+        orphans.len(),
+        orphans.join("\n")
+    );
+}
+
+struct DeclaredMethod {
+    name: String,
+    file: PathBuf,
+}
+
+fn collect_public_methods(src: &Path) -> Vec<DeclaredMethod> {
+    // The container's `pub` methods live in `service/core.rs`,
+    // `service/core/builder.rs` and `service/apps/graph.rs`. Walking the
+    // whole tree and keeping `pub async fn` / `pub fn` on an `impl
+    // MemoryService` block would be more general; the file list is explicit
+    // so a moved method cannot silently fall out of the scan.
+    let files = [
+        src.join("service/core.rs"),
+        src.join("service/core/builder.rs"),
+        src.join("service/apps/graph.rs"),
+    ];
+    let mut found = Vec::new();
+    for file in files {
+        let Ok(text) = std::fs::read_to_string(&file) else {
+            continue;
+        };
+        let mut in_impl = false;
+        for line in text.lines() {
+            if line.starts_with("impl MemoryService") {
+                in_impl = true;
+                continue;
+            }
+            if in_impl && line == "}" {
+                in_impl = false;
+                continue;
+            }
+            if !in_impl {
+                continue;
+            }
+            let body = line.trim_start();
+            for prefix in ["pub async fn ", "pub fn "] {
+                if let Some(rest) = body
+                    .strip_prefix(prefix)
+                    .and_then(|rest| rest.split('(').next())
+                {
+                    found.push(DeclaredMethod {
+                        name: rest.to_string(),
+                        file: file.clone(),
+                    });
+                }
+            }
+        }
+    }
+    found
+}
+
+fn count_production_callers(src: &Path, name: &str) -> usize {
+    let needle = format!(".{name}(");
+    // A `#[cfg(test)] mod tests` inside `src/` is still a test. Counting
+    // those as production callers is how a method with no production
+    // caller passes the ratchet, so the in-file test module is skipped.
+    let mut count = 0;
+    let mut stack = vec![src.to_path_buf()];
+    while let Some(dir) = stack.pop() {
+        let Ok(entries) = std::fs::read_dir(&dir) else {
+            continue;
+        };
+        for entry in entries.flatten() {
+            let path = entry.path();
+            if path.is_dir() {
+                stack.push(path);
+                continue;
+            }
+            if path.extension().and_then(|e| e.to_str()) != Some("rs") {
+                continue;
+            }
+            let Ok(text) = std::fs::read_to_string(&path) else {
+                continue;
+            };
+            // Only a `#[cfg(test)] mod ... { }` block is a test module. A
+            // bare `#[cfg(test)] fn` is a helper for the module further
+            // down, and truncating the file at the first marker would
+            // discard every production call site after it.
+            let lines: Vec<&str> = text.lines().collect();
+            let mut skip_until = None;
+            let mut idx = 0;
+            while idx < lines.len() {
+                let trimmed = lines[idx].trim();
+                if trimmed == "#[cfg(test)]"
+                    && lines[idx + 1..]
+                        .iter()
+                        .any(|l| l.trim_start().starts_with("mod "))
+                {
+                    // A test module: skip to the line that closes it at
+                    // brace depth zero. Counting braces from the `mod` line
+                    // is more reliable than looking for a marker, because
+                    // `#[cfg(test)] fn` helpers must *not* trigger this.
+                    let mut j = idx + 1;
+                    let mut depth = 0usize;
+                    while j < lines.len() {
+                        depth += lines[j].matches('{').count();
+                        depth = depth.saturating_sub(lines[j].matches('}').count());
+                        if depth == 0 && lines[j].contains('{') {
+                            break;
+                        }
+                        if depth == 0 && j > idx + 1 {
+                            break;
+                        }
+                        j += 1;
+                    }
+                    skip_until = Some(j);
+                    idx = j + 1;
+                    continue;
+                }
+                if let Some(limit) = skip_until {
+                    if idx <= limit {
+                        idx += 1;
+                        continue;
+                    }
+                    skip_until = None;
+                }
+                if lines[idx].contains(&needle) && !trimmed.starts_with("//") {
+                    count += 1;
+                }
+                idx += 1;
+            }
+        }
+    }
+    count
+}
+
+fn collect_rust_text(dir: &Path, out: &mut String) {
+    let Ok(entries) = std::fs::read_dir(dir) else {
+        return;
+    };
+    for entry in entries.flatten() {
+        let path = entry.path();
+        if path.is_dir() {
+            collect_rust_text(&path, out);
+        } else if path.extension().and_then(|e| e.to_str()) == Some("rs")
+            && let Ok(text) = std::fs::read_to_string(&path)
+        {
+            out.push_str(&text);
+        }
+    }
+}
