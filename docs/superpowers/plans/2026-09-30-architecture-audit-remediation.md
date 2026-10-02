@@ -423,7 +423,7 @@ ADR-0034 requires both to stay out of `default`; this row proves they still buil
 
 The `test -d` guard mirrors the existing CPU bench at `evaluations.yml:71-77`, which skips when fixtures are absent. The `runs-on: macos-15` matches the existing Apple-Silicon row in `ci.yml:103-104`.
 
-- [x] **Step 6: Delete the dead Makefile targets.** Keep `eval-response-size`, `eval-ner-quality`, `bench-check`, `bench-cpu-core` — the four CI actually invokes (`ci.yml:78`, `evaluations.yml:38,41,68,71`). Delete the other twelve entries and their recipes. `eval-pr`, `eval-release`, `eval-nightly` are one-line `cargo run` invocations that `evaluations.yml:34-36` already inlines; `bench-metal`'s recipe moves into the new CI step.
+- [x] **Step 6: Delete the dead Makefile targets.** Keep `eval-response-size`, `eval-ner-quality`, `bench-check`, `bench-cpu-core` — the four CI actually invokes — plus `bench-cpu` and `bench-metal`, which the first cut removed and which the whole-branch review reinstated because `evaluations.yml` names them in its skip messages. The four CI invokes (`ci.yml:78`, `evaluations.yml:38,41,68,71`). Delete the other twelve entries and their recipes. `eval-pr`, `eval-release`, `eval-nightly` are one-line `cargo run` invocations that `evaluations.yml:34-36` already inlines; `bench-metal`'s recipe moves into the new CI step.
 
 - [x] **Step 7: Commit**
 
@@ -1013,8 +1013,11 @@ Run: expect FAIL — `queries.rs` names 13 of them and `client.rs:939` named 10 
 - [x] **Step 2: Move `BI_TEMPORAL_WHERE` and `build_fact_visibility_clause`** to `shared/temporal.rs`. Repoint the importers: `knowledge/knowledge_store.rs:17,83`, `knowledge/graph_store.rs:169`, and the fact/edge builders.
 - [x] **Step 3: Move the fact and graph builders** to `knowledge/queries.rs`: `build_select_facts_filtered_query` (228), `build_select_facts_by_entity_links_query` (292), `build_select_facts_ann_query` (309), `build_select_active_facts_query` (338), `build_select_edges_filtered_page_query` (376), `build_select_communities_by_member_entities_query` (389), `build_select_edge_neighbors_query` (398), `build_relate_edge_query` (418), `surreal_string_literal` (269), `active_edge_scan_batch_size` (25).
 
-  `active_edge_scan_batch_size` is called from `memory/lifecycle_workers/communities.rs:123` — a memory module reading a knowledge constant. Make it `pub` in `knowledge/queries.rs` and import it there. That is a memory→knowledge edge, which CONTEXT.md's dependency direction permits; the alternative, a third copy in memory, is worse.
-- [x] **Step 4: Move `build_select_episodes_by_content_query`** (346) to `memory/queries.rs`.
+  `active_edge_scan_batch_size` is called from `memory/lifecycle_workers/communities.rs:123`. This step originally copied
+  the constant into `knowledge/queries.rs` as `pub`, on the reasoning that a memory module reading a
+  knowledge constant is a permitted edge. The whole-branch review found that copy had no readers — the
+  copy *was* the third copy, and `communities.rs` kept reading the storage one. It is deleted; see commit
+  `654faba`.
 - [x] **Step 5: Split `temporal_field_names_for_table`** as described. Repoint `build_set_assignments` (507) to take the field list from the caller.
 - [x] **Step 6: Delete the moved code** from `storage/queries.rs` and the re-exports from `storage.rs:57-73`. What remains: `build_select_one_query`, `build_create_query`, `build_update_query`, `build_upsert_query`, `validate_record_id`, `build_create_query` — all table-generic, which is genuinely the platform's job.
 - [x] **Step 7: Move the 21 tests** in `storage/queries.rs:587-782` to the new modules, split by which builder they cover.

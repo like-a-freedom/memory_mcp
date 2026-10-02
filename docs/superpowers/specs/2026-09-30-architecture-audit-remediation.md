@@ -116,4 +116,4 @@ Seven pairs, of three kinds. **A module that has no home for something it owns t
 
 ## Completion
 
-Every candidate closed with a named commit; every guard observed failing before it is believed; five ADRs whose every claim is checkable against the tree; `CONTEXT.md` matching the seams and the vocabulary this work produced; and the working tree clean.
+Every candidate closed with a named commit; every guard observed failing before it is believed; six ADRs (five planned, plus ADR-0070 added when Task 1.3 found ADR-0064 contradicted by its own implementation) whose every claim is checkable against the tree; `CONTEXT.md` matching the seams and the vocabulary this work produced; and the working tree clean.

@@ -1391,22 +1391,112 @@ fn the_fingerprint_token_format_is_pinned() {
 /// the same reason. What this cannot see is a `pub` field reached through a
 /// type alias; nothing in the tree does that today, and a hand-written
 /// parser would be a worse trade than the gap.
-/// Does a `pub` *signature* name one of the two enums the fingerprint
-/// leaked?
+/// Does this text name one of the two enums the fingerprint leaked?
+fn names_a_status(text: &str) -> bool {
+    text.contains("model_artifacts::RevisionStatus")
+        || text.contains("model_artifacts::ValidationStatus")
+        || text.contains("model_artifacts::{")
+}
+
+/// Is this `pub` real, or scoped to the crate?
+fn is_unrestricted_pub(trimmed: &str) -> bool {
+    trimmed.starts_with("pub ")
+        && !trimmed.starts_with("pub(crate)")
+        && !trimmed.starts_with("pub(super)")
+        && !trimmed.starts_with("pub(in ")
+}
+
+/// The lines of a file that are part of its *public* interface, as
+/// `(line number, line)` pairs.
 ///
-/// Only the signature counts. An adapter that constructs a `RevisionStatus`
-/// inside its own body is filling a private field, which is knowledge's
-/// bookkeeping and does not cross the seam — what would cross it is the type
-/// appearing in a `pub` field or parameter, where a caller could name it.
-fn names_a_status(signature: &str) -> bool {
-    // Take everything up to the opening brace: that is the signature.
-    let sig = match signature.find('{') {
-        Some(at) => &signature[..at],
-        None => signature,
-    };
-    sig.contains("model_artifacts::RevisionStatus")
-        || sig.contains("model_artifacts::ValidationStatus")
-        || sig.contains("model_artifacts::{")
+/// Three shapes, and getting the third right is why this is a function and
+/// not a regex:
+///
+/// * `pub fn f(<newline>  x: RevisionStatus,<newline>)` — the whole
+///   signature, however many lines the parameter list takes. A line-at-a-time
+///   check misses the type when it lands on the second line, which is exactly
+///   what happens when someone wraps a long parameter list.
+/// * `pub struct S { pub x: RevisionStatus }` — the `pub` fields, but not the
+///   private ones. Knowledge keeps `revision_status` on its adapters as a
+///   private field, and that is correct: the adapter needs to know what it
+///   loaded in order to decide whether to promote a candidate, and that
+///   knowledge does not leave the adapter.
+/// * `pub const X: T = …;` — the declaration up to the `;`. A brace-less
+///   item must not leave the scan open, or every later item in the file goes
+///   unread.
+///
+/// What this cannot see is a public name reached through a type alias.
+/// Nothing in the tree does that, and a hand-written parser would be a worse
+/// trade than the gap.
+fn public_interface_lines(text: &str) -> Vec<(usize, String)> {
+    let lines: Vec<&str> = text.lines().collect();
+    let mut out = Vec::new();
+    let mut idx = 0usize;
+
+    while idx < lines.len() {
+        let trimmed = lines[idx].trim();
+        if trimmed.starts_with("//") || !is_unrestricted_pub(trimmed) {
+            idx += 1;
+            continue;
+        }
+        let start = idx;
+
+        if trimmed.starts_with("pub struct")
+            || trimmed.starts_with("pub enum")
+            || trimmed.starts_with("pub union")
+        {
+            // Field list: everything up to the matching closing brace, but
+            // only the `pub` lines inside it.
+            let mut depth = 0usize;
+            let mut opened = false;
+            let mut j = idx;
+            while j < lines.len() {
+                let line = lines[j].trim();
+                if !opened && line.contains('{') {
+                    opened = true;
+                    j += 1;
+                    continue;
+                }
+                depth += line.matches('{').count();
+                depth = depth.saturating_sub(line.matches('}').count());
+                if depth == 0 && opened {
+                    break;
+                }
+                if depth == 0 && line.contains('}') {
+                    break;
+                }
+                if line.starts_with("pub ") && names_a_status(line) {
+                    out.push((j + 1, line.to_string()));
+                }
+                j += 1;
+            }
+            idx = j + 1;
+            continue;
+        }
+
+        // Everything else: the declaration up to its body or its `;`.
+        let mut signature = String::new();
+        let mut j = idx;
+        while j < lines.len() {
+            let line = lines[j];
+            if line.trim_start().starts_with("//") {
+                j += 1;
+                continue;
+            }
+            signature.push_str(line);
+            signature.push('\n');
+            if line.contains('{') || line.trim_end().ends_with(';') {
+                break;
+            }
+            j += 1;
+        }
+        if names_a_status(&signature) {
+            out.push((start + 1, lines[start].trim().to_string()));
+        }
+        idx = j + 1;
+    }
+
+    out
 }
 
 #[test]
@@ -1431,61 +1521,8 @@ fn knowledge_does_not_name_a_model_artifact_type() {
                 continue;
             }
             let text = fs::read_to_string(&path).expect("readable source");
-
-            // Walk the file tracking whether the cursor is inside a `pub`
-            // item, and collect that item's full text. A line-at-a-time
-            // check misses `pub fn f(\n  x: RevisionStatus\n)`, which is
-            // exactly the shape a change would take when someone wraps a
-            // parameter list.
-            let mut in_pub_item = false;
-            let mut in_pub_struct = false;
-            let mut depth = 0usize;
-            let mut item_text = String::new();
-            let mut item_start = 0usize;
-            for (n, line) in text.lines().enumerate() {
-                let trimmed = line.trim();
-                if !in_pub_item {
-                    if trimmed.starts_with("//") || trimmed.starts_with("use ") {
-                        continue;
-                    }
-                    // `pub ` and not `pub(crate)`, `pub(super)`, `pub(in …)`.
-                    let opens_public_item = trimmed.starts_with("pub ")
-                        && !trimmed.starts_with("pub(crate)")
-                        && !trimmed.starts_with("pub(super)")
-                        && !trimmed.starts_with("pub(in");
-                    if !opens_public_item {
-                        continue;
-                    }
-                    in_pub_item = true;
-                    depth = 0;
-                    item_text.clear();
-                    item_start = n + 1;
-                    // A `pub struct`'s interface is its `pub` fields; its
-                    // private ones are the adapter's own bookkeeping.
-                    in_pub_struct = trimmed.starts_with("pub struct")
-                        || trimmed.starts_with("pub enum")
-                        || trimmed.starts_with("pub union");
-                }
-                // Inside a `pub struct`, a private field is the adapter's
-                // own bookkeeping, not the capability's interface. Skip it
-                // unless the field itself is `pub`.
-                let private_struct_field = in_pub_struct
-                    && !trimmed.starts_with("pub ")
-                    && !trimmed.starts_with("#[")
-                    && !trimmed.starts_with("//");
-                if !private_struct_field {
-                    item_text.push_str(line);
-                    item_text.push('\n');
-                }
-                depth += line.matches('{').count();
-                let closed = depth > 0 && line.matches('}').count() >= depth;
-                depth = depth.saturating_sub(line.matches('}').count());
-                if depth == 0 && (closed || item_text.contains('{')) {
-                    if names_a_status(&item_text) {
-                        offenders.push(format!("  {}:{item_start}", path.display()));
-                    }
-                    in_pub_item = false;
-                }
+            for (line_no, line) in public_interface_lines(&text) {
+                offenders.push(format!("  {}:{line_no}: {line}", path.display()));
             }
         }
     }

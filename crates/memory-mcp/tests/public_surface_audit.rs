@@ -294,8 +294,10 @@ fn every_public_container_method_has_a_production_caller() {
     let src = manifest.join("src");
 
     // The methods, and why each one is allowed to exist without a
-    // production caller. Empty today; the list exists so an entry is a
-    // deliberate act rather than an oversight.
+    // production caller. The list exists so an entry is a deliberate act
+    // with a reason attached, rather than an oversight — and it is not
+    // empty: Task 5.4 put two names in it, each of which turned out to be
+    // the only public door to something.
     const TEST_ONLY: &[(&str, &str)] = &[
         // The constructors. `new` and `new_with_embedding_provider` are how a
         // caller obtains a container at all, so having no caller *of their
