@@ -200,6 +200,40 @@ async fn fetch_csrf(
     (status, body)
 }
 
+/// The callback is the one control-plane route that must work without a session,
+/// so a broken extractor on it takes sign-in down entirely while every other
+/// route keeps answering. `request_log` mints the request id for every request
+/// and inserts it as a `RequestId`, so a handler asking for any other type
+/// never finds it and the route 500s before its body runs.
+#[tokio::test]
+async fn oidc_callback_answers_a_refusal_instead_of_panicking() {
+    let (fixture, _mock, _cookie) = spawn_with_env(Vec::new()).await;
+    let client = reqwest::Client::builder()
+        .timeout(Duration::from_secs(5))
+        .build()
+        .expect("client");
+
+    let unknown_state = "0".repeat(64);
+    let resp = client
+        .get(format!("{}/auth/oidc/callback", fixture.base_url))
+        .header("host", "localhost")
+        .query(&[("state", unknown_state.as_str()), ("code", "x")])
+        .send()
+        .await
+        .expect("callback request");
+
+    // An unknown state is refused with 401, which is the point: the refusal is
+    // produced by the handler's own body. A 500 here means the request never
+    // reached it.
+    assert_eq!(
+        resp.status(),
+        reqwest::StatusCode::UNAUTHORIZED,
+        "callback returned {:?}: {}",
+        resp.status(),
+        resp.text().await.unwrap_or_default()
+    );
+}
+
 /// Providers disagree about a trailing slash on the issuer path: Rauthy >=
 /// 0.35 always publishes `.../auth/v1/` and cannot be configured otherwise.
 /// Both spellings of `MEMORY_MCP_HTTP_OIDC_ISSUER` must boot against the same
@@ -648,6 +682,94 @@ async fn identity_link_starts_a_provider_round_trip_and_links_nothing() {
         body.as_array().expect("array of identities").is_empty(),
         "a started flow must not link anything: {body}"
     );
+}
+
+/// Every authenticated account route must be answerable by the wiring it is
+/// mounted with, and must reach its own handler to say so.
+///
+/// This is the sweep that catches the extraction-time 500. An `Extension<T>`
+/// that nothing inserted is rejected by axum before the handler body runs, so
+/// the route answers 500 whatever the request says — and because the account
+/// surface sits behind the session middleware, an unauthenticated probe is
+/// refused with 401 *before* the bad extractor is ever consulted. Only a
+/// request carrying a real session and a real CSRF token actually reaches the
+/// handler, which is why this drives one.
+///
+/// The assertion is "no 5xx", not a status per route: these requests are
+/// deliberately invalid (a nonexistent key, a stale token, no JSON body), so
+/// each route answers a rejection or a refusal. Only an internal error means
+/// the handler was never entered.
+#[tokio::test]
+async fn no_authenticated_account_route_answers_an_internal_error() {
+    let (fixture, _mock, cookie) = spawn_with_env(Vec::new()).await;
+    let client = reqwest::Client::builder()
+        .timeout(Duration::from_secs(5))
+        .build()
+        .expect("client");
+    let (status, body) = fetch_csrf(&client, &fixture.base_url, &cookie).await;
+    assert_eq!(status, 200);
+    let csrf = body["csrf_token"]
+        .as_str()
+        .expect("csrf string")
+        .to_string();
+
+    // (method, path, json body). Every body is intentionally unusable: the
+    // point is which handler runs, not whether its validation passes.
+    let calls = [
+        ("GET", "/api/v1/account", None),
+        ("GET", "/api/v1/account/csrf", None),
+        ("GET", "/api/v1/account/api_keys", None),
+        ("GET", "/api/v1/account/identity_links", None),
+        (
+            "POST",
+            "/api/v1/account/api_keys",
+            Some(json!({"name": "sweep"})),
+        ),
+        ("POST", "/api/v1/account/identity_links", Some(json!({}))),
+        ("POST", "/api/v1/account/delete", None),
+        // The route that takes the fault injector as an extension. Nothing
+        // else in the account surface requires one, so it is the only route
+        // whose wiring can disagree with its handler.
+        (
+            "POST",
+            "/api/v1/account/delete/confirm",
+            Some(json!({"confirmation_token": "not-a-token", "typed_phrase": "nope"})),
+        ),
+        (
+            "DELETE",
+            "/api/v1/account/api_keys/ak_00000000-0000-4000-8000-000000000000",
+            None,
+        ),
+        ("DELETE", "/api/v1/account/identity_links/link_x", None),
+        ("GET", "/api/v1/operator/recovery/status", None),
+    ];
+
+    for (method, path, payload) in calls {
+        let mut req = client
+            .request(
+                reqwest::Method::from_bytes(method.as_bytes()).expect("method"),
+                format!("{base_url}{path}", base_url = fixture.base_url),
+            )
+            .header("host", "localhost")
+            .header(cookie_header(&cookie).0, cookie_header(&cookie).1);
+        if payload.is_some() {
+            req = req
+                .header("x-csrf-token", &csrf)
+                .header("content-type", "application/json");
+        }
+        let resp = req
+            .body(payload.map(|p| p.to_string()).unwrap_or_default())
+            .send()
+            .await
+            .unwrap_or_else(|error| panic!("{method} {path} could not be sent: {error}"));
+        let status = resp.status();
+        let text = resp.text().await.unwrap_or_default();
+        assert!(
+            !status.is_server_error(),
+            "{method} {path} answered {status} — an internal error means the handler was \
+             never reached, so this route is broken the way the OIDC callback was: {text}"
+        );
+    }
 }
 
 #[tokio::test]

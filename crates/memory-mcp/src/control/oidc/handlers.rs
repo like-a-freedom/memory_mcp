@@ -314,14 +314,19 @@ pub async fn callback(
     // log records. This is the request an operator most needs to trace and the
     // one that arrives without a session, so it must not be the case that
     // reports an id nothing can be found under.
-    axum::Extension(request_id): axum::Extension<Option<crate::http::logging::RequestId>>,
+    //
+    // The type here is what `request_log` actually inserts. It asks for
+    // `Option<RequestId>` on the belief that axum treats the `Option` as an
+    // optional extractor — it does not: `Extension` looks the exact type up in
+    // the extensions map and finds `RequestId`, not `Option<RequestId>`, so the
+    // extractor is rejected and this route 500s before its body runs. The id
+    // cannot be absent: `request_log` is the outermost layer and mints one for
+    // every request that reaches a route.
+    axum::Extension(request_id): axum::Extension<crate::http::logging::RequestId>,
 ) -> Result<(axum::http::header::HeaderMap, axum::response::Redirect), ApiError> {
-    callback_inner(&state, params, request_headers, request_id)
+    callback_inner(&state, params, request_headers, Some(request_id))
         .await
-        .map_err(|error| match request_id {
-            Some(crate::http::logging::RequestId(id)) => error.at_request(id),
-            None => error,
-        })
+        .map_err(|error| error.at_request(request_id.as_uuid()))
 }
 
 /// The callback's body, kept separate so every refusal passes back through the

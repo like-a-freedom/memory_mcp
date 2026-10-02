@@ -72,9 +72,22 @@ pub fn build_router(
         get(crate::control::local_admin::handlers::auth_config),
     );
 
+    // The fault injector is installed unconditionally, never conditionally.
+    //
+    // `confirm_account_deletion` takes it as an `Extension`, and axum rejects
+    // an extension nothing inserted *before the handler body runs* — so making
+    // this layer conditional silently turned the deletion route into a 500 for
+    // every caller the moment a caller passed `None`. The route and the wiring
+    // that satisfies it are one thing; they are not allowed to disagree.
+    //
+    // `None` is not an error state to represent but the absence of a
+    // substitution, and the documented behaviour without one is that every
+    // fault point passes through. So `None` installs exactly that, and no
+    // handler can observe whether a test substituted an injector.
     #[cfg(feature = "control-plane")]
-    let control_extension: Option<axum::Extension<Arc<dyn FaultInjector>>> =
-        control_plane_injector.map(axum::Extension);
+    let control_extension: axum::Extension<Arc<dyn FaultInjector>> = control_plane_injector
+        .map(axum::Extension)
+        .unwrap_or_else(|| axum::Extension(Arc::new(crate::platform::fault_injection::NoFaults)));
     // Each enabled browser authentication method mounts its own surface, and a
     // method that is not enabled mounts nothing at all — not even an
     // unauthenticated route (ADR-0057). A deployment with no identity provider
@@ -127,11 +140,7 @@ pub fn build_router(
                 state.clone(),
                 super::middleware::authenticate_control_plane_session,
             ));
-        let account = if let Some(ext) = control_extension {
-            account.layer(ext)
-        } else {
-            account
-        };
+        let account = account.layer(control_extension.clone());
         let operator = Router::new()
             .route(
                 "/api/v1/operator/tenants/{id}",
@@ -734,6 +743,52 @@ mod tests {
             .await
             .expect("dispatch");
         assert_eq!(response.status(), StatusCode::METHOD_NOT_ALLOWED);
+    }
+
+    /// Every route a deployment mounts must be answerable by the wiring it is
+    /// mounted with. An extractor that asks for a request extension nothing
+    /// inserts is rejected by axum *before the handler body runs*, so the route
+    /// answers 500 whatever the request says. The OIDC callback hit exactly
+    /// this: `Extension<Option<RequestId>>` instead of `Extension<RequestId>`,
+    /// and sign-in was dead while every other route kept answering.
+    ///
+    /// The check is "no mounted route answers an internal error", not a list of
+    /// statuses. An unauthenticated request is refused (401), a malformed one is
+    /// rejected (400) — both are correct answers; only 5xx is this bug.
+    ///
+    /// This one is deliberately scoped to the routes that have no
+    /// authentication in front of them. A route behind
+    /// `authenticate_control_plane_session` is refused before its handler's
+    /// extractors are ever consulted, so sweeping it here would pass on the
+    /// middleware rather than on the handler and would protect nothing.
+    /// `tests/http_control_plane.rs` drives the authenticated surface against a
+    /// live server with a real session; that is the sweep that reaches those
+    /// handlers.
+    #[cfg(feature = "control-plane")]
+    #[tokio::test]
+    async fn no_unauthenticated_control_plane_route_answers_an_internal_error() {
+        let (builder, _store) = HttpStateTestBuilder::local_admin().await;
+        let state = builder.build().await.expect("local admin HTTP state");
+
+        let routes = [
+            (Method::GET, "/api/v1/auth/config"),
+            (Method::GET, "/api/v1/admin/session"),
+        ];
+
+        for (method, uri) in routes {
+            let mut router = build_router(state.clone(), None).expect("router builds in tests");
+            let response = router
+                .call(request(method.clone(), uri))
+                .await
+                .expect("dispatch");
+            let status = response.status();
+            let body = body_text(response).await;
+            assert!(
+                !status.is_server_error(),
+                "{method} {uri} answered {status}, which is an internal error rather than \
+                 the refusal or rejection the route is mounted to answer: {body}"
+            );
+        }
     }
 }
 
