@@ -8,6 +8,7 @@
 use hmac::{Hmac, KeyInit, Mac};
 use sha2::Sha256;
 
+use crate::http::principal::api_keys::assemble_credential;
 use crate::http::registry::models::{KeyedVerifier, new_api_key_id};
 
 type HmacSha256 = Hmac<Sha256>;
@@ -60,7 +61,7 @@ pub fn generate_api_key_material(pepper: &[u8]) -> (String, KeyedVerifier, Strin
     let key_id = new_api_key_id();
     let secret = random_token_hex();
     let verifier = KeyedVerifier::compute(pepper, secret.as_bytes());
-    let full_credential = format!("mem_sk_{key_id}_{secret}");
+    let full_credential = assemble_credential(&key_id, &secret);
     (key_id, verifier, full_credential)
 }
 
