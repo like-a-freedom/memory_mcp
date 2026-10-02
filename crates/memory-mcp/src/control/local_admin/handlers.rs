@@ -116,8 +116,17 @@ impl Rejection {
 
     /// Stamp the request's id (minted once per request by
     /// [`super::attach_request_id`]) before rendering.
+    ///
+    /// Reads the deployment-wide [`crate::http::logging::RequestId`] rather
+    /// than a second request-id type of this module's own: two extensions
+    /// holding the same value under different types is how a reader ends up
+    /// asking for one that nothing inserts, which axum answers by refusing
+    /// the extractor.
     pub(crate) fn at(mut self, parts: &Parts) -> Self {
-        self.request_id = parts.extensions.get::<uuid::Uuid>().copied();
+        self.request_id = parts
+            .extensions
+            .get::<crate::http::logging::RequestId>()
+            .map(crate::http::logging::RequestId::as_uuid);
         self
     }
 }

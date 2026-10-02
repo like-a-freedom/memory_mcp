@@ -720,7 +720,7 @@ async fn no_authenticated_account_route_answers_an_internal_error() {
         .expect("csrf string")
         .to_string();
 
-// (method, path, json body, expected). Every body is intentionally
+    // (method, path, json body, expected). Every body is intentionally
     // unusable — the point is which handler runs, not whether its validation
     // passes — so each route has exactly one correct answer.
     //
@@ -734,8 +734,18 @@ async fn no_authenticated_account_route_answers_an_internal_error() {
         ("GET", "/api/v1/account/csrf", None, 200),
         ("GET", "/api/v1/account/api_keys", None, 200),
         ("GET", "/api/v1/account/identity_links", None, 200),
-        ("POST", "/api/v1/account/api_keys", Some(json!({"name": "sweep"})), 201),
-        ("POST", "/api/v1/account/identity_links", Some(json!({})), 200),
+        (
+            "POST",
+            "/api/v1/account/api_keys",
+            Some(json!({"name": "sweep"})),
+            201,
+        ),
+        (
+            "POST",
+            "/api/v1/account/identity_links",
+            Some(json!({})),
+            200,
+        ),
         ("POST", "/api/v1/account/delete", None, 200),
         // The route that takes the fault injector as an extension. Nothing else
         // in the account surface requires one, so it is the only route whose

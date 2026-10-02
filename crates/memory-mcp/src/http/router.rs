@@ -140,7 +140,7 @@ pub fn build_router(
                 state.clone(),
                 super::middleware::authenticate_control_plane_session,
             ));
-        let account = account.layer(control_extension.clone());
+        let account = account.layer(control_extension);
         let operator = Router::new()
             .route(
                 "/api/v1/operator/tenants/{id}",

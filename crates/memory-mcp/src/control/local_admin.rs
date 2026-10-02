@@ -155,15 +155,20 @@ pub fn parse_admin_cookie(
 /// and neither could be found in the logs. The deployment's outermost layer
 /// already mints one id per request for every surface.
 pub async fn attach_request_id(
-    mut req: axum::extract::Request,
+    req: axum::extract::Request,
     next: axum::middleware::Next,
 ) -> axum::response::Response {
+    // Nothing is inserted here any more. The deployment's outermost layer
+    // already put the id in the extensions, and this module used to add a
+    // second one under a different type — so a reader asking for either type
+    // found exactly one of them, and which was a matter of which layer it
+    // happened to run behind. Re-reading the id the deployment minted and
+    // advertising it on the response is all this layer has left to do.
     let request_id = req
         .extensions()
         .get::<crate::http::logging::RequestId>()
         .map(crate::http::logging::RequestId::as_uuid)
         .unwrap_or_else(uuid::Uuid::new_v4);
-    req.extensions_mut().insert(request_id);
     let mut response = next.run(req).await;
     if !response.headers().contains_key(REQUEST_ID_HEADER)
         && let Ok(value) = axum::http::HeaderValue::from_str(&request_id.to_string())
@@ -177,8 +182,8 @@ pub async fn attach_request_id(
 pub fn request_context_from_parts(parts: &Parts) -> RequestContext {
     let request_id = parts
         .extensions
-        .get::<uuid::Uuid>()
-        .copied()
+        .get::<crate::http::logging::RequestId>()
+        .map(crate::http::logging::RequestId::as_uuid)
         .unwrap_or_else(uuid::Uuid::new_v4);
     RequestContext { request_id }
 }

@@ -324,22 +324,25 @@ pub async fn callback(
     // every request that reaches a route.
     axum::Extension(request_id): axum::Extension<crate::http::logging::RequestId>,
 ) -> Result<(axum::http::header::HeaderMap, axum::response::Redirect), ApiError> {
-    callback_inner(&state, params, request_headers, Some(request_id))
+    callback_inner(&state, params, request_headers, request_id)
         .await
         .map_err(|error| error.at_request(request_id.as_uuid()))
 }
 
 /// The callback's body, kept separate so every refusal passes back through the
 /// one place that binds the request's id.
+///
+/// The id is a value, not an `Option`, and that is deliberate: the body cannot
+/// be reached without one, so an optional parameter here would only invite a
+/// caller to pass `None` and produce the same "refusal names no operation"
+/// problem this route was fixed for.
 async fn callback_inner(
     state: &std::sync::Arc<HttpState>,
     params: OidcCallback,
     request_headers: axum::http::HeaderMap,
-    request_id: Option<crate::http::logging::RequestId>,
+    request_id: crate::http::logging::RequestId,
 ) -> Result<(axum::http::header::HeaderMap, axum::response::Redirect), ApiError> {
-    let request_uuid = request_id
-        .as_ref()
-        .map(crate::http::logging::RequestId::as_uuid);
+    let request_uuid = Some(request_id.as_uuid());
     // Reject if the provider reported an error.
     if params.error.is_some() {
         return Err(reject("provider_error"));

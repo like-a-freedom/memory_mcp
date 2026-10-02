@@ -557,6 +557,41 @@ fn encoded_status<T: serde::Serialize>(status: T, field: &str) -> Result<String,
         .ok_or_else(|| MemoryError::Storage(format!("encode {field} did not produce a string")))
 }
 
+/// What a transition writes to `retry_stage`, given the pair it moves between.
+///
+/// A `Failed` tenant is only retryable if it remembers the stage it failed in:
+/// both retry paths re-enter that stage, and the table admits `Failed` only to
+/// `NamespaceCreating` and `Migrating`. Recording it in the same compare-and-set
+/// that performs the transition is what makes the two agree — a worker that
+/// fails between the stages and an operator who retries later both leave and
+/// read a record that names the same stage.
+///
+/// Only the move *into* `Failed` records one, and only from a working stage.
+/// Every other transition clears it, so the column never carries a stage from a
+/// failure the tenant has since moved past.
+///
+/// The SQL fragment and bound value a transition writes to `retry_stage`.
+///
+/// The fragment is text rather than a bound value because the column is
+/// `Option<TenantStatus>` and SurrealDB will not coerce a bound `NULL` into
+/// it — it wants the literal `NONE`, which no `$parameter` can carry. The
+/// tenant writes above build the same two-valued pair.
+fn retry_stage_value(from: TenantStatus, to: TenantStatus) -> (String, String) {
+    let records_the_stage = to == TenantStatus::Failed
+        && matches!(
+            from,
+            TenantStatus::NamespaceCreating | TenantStatus::Migrating
+        );
+    if records_the_stage {
+        (
+            "retry_stage = $retry_stage".to_owned(),
+            encoded_status(from, "tenant retry stage").unwrap_or_default(),
+        )
+    } else {
+        ("retry_stage = NONE".to_owned(), String::new())
+    }
+}
+
 fn returned_version(rows: &[Value], operation: &str) -> Result<u64, MemoryError> {
     rows.first()
         .and_then(|row| row.get("version"))
@@ -1765,17 +1800,22 @@ impl TenantStore for SurrealRegistryStore {
     ) -> Result<u64, MemoryError> {
         let from_str = encoded_status(from, "tenant state")?;
         let to_str = encoded_status(to, "tenant state")?;
+        let (retry_stage, retry_stage_value) = retry_stage_value(from, to);
         let rows = self
             .handle()
             .query_json(
-                "UPDATE type::record($table, $id) SET status = $to, version = version + 1 \
-                 WHERE version = $expected AND status = $from RETURN AFTER",
+                &format!(
+                    "UPDATE type::record($table, $id) SET status = $to, version = version + 1, \
+                     {retry_stage} \
+                     WHERE version = $expected AND status = $from RETURN AFTER"
+                ),
                 Some(json!({
                     "table": "tenant",
                     "id": tenant_id,
                     "to": to_str,
                     "expected": expected_version,
                     "from": from_str,
+                    "retry_stage": retry_stage_value,
                 })),
             )
             .await
@@ -1799,22 +1839,27 @@ impl TenantStore for SurrealRegistryStore {
     ) -> Result<u64, MemoryError> {
         let from_str = encoded_status(from, "tenant state")?;
         let to_str = encoded_status(to, "tenant state")?;
+        let (retry_stage, retry_stage_value) = retry_stage_value(from, to);
         let rows = self
             .handle()
             .query_json(
-                "UPDATE type::record($table, $id) SET status = $to, version = version + 1 \
-                 WHERE version = $expected AND status = $from \
-                 AND provisioning_lease.owner_id = $owner \
-                 AND provisioning_lease.lease_id = $lease \
-                 AND provisioning_lease.fencing_generation = $gen \
-                 AND provisioning_lease.expires_at > time::now() \
-                 RETURN AFTER",
+                &format!(
+                    "UPDATE type::record($table, $id) SET status = $to, version = version + 1, \
+                     {retry_stage} \
+                     WHERE version = $expected AND status = $from \
+                     AND provisioning_lease.owner_id = $owner \
+                     AND provisioning_lease.lease_id = $lease \
+                     AND provisioning_lease.fencing_generation = $gen \
+                     AND provisioning_lease.expires_at > time::now() \
+                     RETURN AFTER"
+                ),
                 Some(json!({
                     "table": "tenant",
                     "id": tenant_id,
                     "to": to_str,
                     "expected": expected_version,
                     "from": from_str,
+                    "retry_stage": retry_stage_value,
                     "owner": lease.owner_id,
                     "lease": lease.lease_id,
                     "gen": lease.fencing_generation,
@@ -3428,6 +3473,111 @@ mod tests {
             .begin_account_deletion("verifier_delete", "acct_delete", "session_delete", now)
             .await;
         assert!(matches!(replay, Err(MemoryError::Conflict(_))));
+    }
+
+    /// A tenant that fails provisioning must remember which stage it failed in.
+    ///
+    /// This is the whole point of `retry_stage`. Both retry paths re-enter that
+    /// stage — the worker reads it directly, and the operator's retry moves the
+    /// tenant back to it — and the transition table admits `Failed` only to
+    /// `NamespaceCreating` and `Migrating`. A record that said `Failed` and
+    /// nothing else could not be retried by either, and every retry was answered
+    /// with an indistinguishable 409.
+    #[tokio::test]
+    async fn failing_a_tenant_records_the_stage_it_failed_in() {
+        let db = Arc::new(Surreal::new::<Mem>(()).await.expect("mem engine"));
+        let store = SurrealRegistryStore::from_local_db(db, "control", "registry")
+            .await
+            .expect("bind store");
+        store
+            .apply_migrations()
+            .await
+            .expect("apply registry schema");
+        store.write_tenant(&tenant()).await.expect("seed tenant");
+
+        // Walk it to a working stage, then fail it, the way a worker does.
+        for (from, to) in [
+            (TenantStatus::Reserved, TenantStatus::NamespaceCreating),
+            (TenantStatus::NamespaceCreating, TenantStatus::Migrating),
+        ] {
+            advance(&store, "ten_shared", from, to).await;
+        }
+        advance(
+            &store,
+            "ten_shared",
+            TenantStatus::Migrating,
+            TenantStatus::Failed,
+        )
+        .await;
+
+        let failed = store
+            .find_tenant_by_id("ten_shared")
+            .await
+            .expect("read failed tenant")
+            .expect("tenant exists");
+        assert_eq!(failed.status, TenantStatus::Failed);
+        assert_eq!(
+            failed.retry_stage,
+            Some(TenantStatus::Migrating),
+            "a failed tenant must record the stage it failed in, or neither retry path can \
+         re-enter it"
+        );
+    }
+
+    /// A tenant that has not failed must carry no stage from a failure it has
+    /// already moved past — otherwise a retry would re-enter a stage that has
+    /// nothing to do with the work that failed.
+    #[tokio::test]
+    async fn a_tenant_that_has_not_failed_carries_no_retry_stage() {
+        let db = Arc::new(Surreal::new::<Mem>(()).await.expect("mem engine"));
+        let store = SurrealRegistryStore::from_local_db(db, "control", "registry")
+            .await
+            .expect("bind store");
+        store
+            .apply_migrations()
+            .await
+            .expect("apply registry schema");
+        store.write_tenant(&tenant()).await.expect("seed tenant");
+
+        advance(
+            &store,
+            "ten_shared",
+            TenantStatus::Reserved,
+            TenantStatus::NamespaceCreating,
+        )
+        .await;
+
+        let advanced = store
+            .find_tenant_by_id("ten_shared")
+            .await
+            .expect("read tenant")
+            .expect("tenant exists");
+        assert_eq!(advanced.status, TenantStatus::NamespaceCreating);
+        assert_eq!(
+            advanced.retry_stage, None,
+            "only a move into Failed may record a stage"
+        );
+    }
+
+    /// Move a tenant one step, reading the version the previous step left behind.
+    async fn advance(
+        store: &SurrealRegistryStore,
+        tenant_id: &str,
+        from: TenantStatus,
+        to: TenantStatus,
+    ) {
+        let version = store
+            .find_tenant_by_id(tenant_id)
+            .await
+            .expect("read tenant")
+            .expect("tenant exists")
+            .version;
+        let lifecycle = crate::provisioning::api::TenantLifecycle::new(store);
+        crate::provisioning::api::transition_tenant(&lifecycle, tenant_id, version, from, to)
+            .await
+            .unwrap_or_else(|error| {
+                panic!("{from:?} -> {to:?} should be a legal transition: {error}")
+            });
     }
 
     #[cfg(feature = "control-plane")]

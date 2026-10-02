@@ -118,9 +118,17 @@ pub async fn retry_tenant(
     if tenant.status != crate::http::registry::models::TenantStatus::Failed {
         return Err(super::error::ApiError::Conflict);
     }
-    let stage = tenant
-        .retry_stage
-        .unwrap_or(crate::http::registry::models::TenantStatus::Reserved);
+    // A retry re-enters the stage the tenant failed in, which is why that
+    // stage is recorded when the tenant transitions into `Failed`. There is
+    // no safe substitute for a missing one: `Reserved` is not an edge out of
+    // `Failed` in the table, so guessing one produced a transition that was
+    // refused and reported as 409 forever. Refusing here says what is true —
+    // this tenant cannot be retried, because nothing recorded where it
+    // stopped — which is a condition an operator can act on, where the
+    // invented stage looked like an ordinary conflict.
+    let Some(stage) = tenant.retry_stage else {
+        return Err(super::error::ApiError::Conflict);
+    };
     // Through the table like the other two. `Failed -> NamespaceCreating` and
     // `Failed -> Migrating` are both legal, and a `retry_stage` outside them
     // is now refused rather than written — before, any stage the record
@@ -413,19 +421,62 @@ mod tests {
         );
     }
 
+    /// A retryable tenant is one that remembers the stage it failed in.
+    ///
+    /// The stage is what the retry re-enters, and it is recorded by the transition
+    /// into `Failed` rather than chosen by the caller — a tenant that failed in
+    /// `Migrating` re-enters `Migrating`, because re-entering `NamespaceCreating`
+    /// would redo work that already succeeded.
     #[tokio::test]
     async fn retrying_a_failed_tenant_is_accepted() {
         let state = state().await;
-        seed(&state, &tenant("ten_fail", TenantStatus::Failed)).await;
+        let mut failed = tenant("ten_fail", TenantStatus::Failed);
+        failed.retry_stage = Some(TenantStatus::Migrating);
+        seed(&state, &failed).await;
 
         let observed = retry_tenant(
-            State(state),
+            State(state.clone()),
             Extension(operator()),
             Path("ten_fail".to_string()),
         )
         .await;
 
         assert_eq!(observed.ok(), Some(axum::http::StatusCode::ACCEPTED));
+
+        // The retry re-enters the recorded stage rather than restarting the tenant.
+        let reloaded = state
+            .registry
+            .tenants()
+            .find_tenant_by_id("ten_fail")
+            .await
+            .expect("read tenant")
+            .expect("tenant exists");
+        assert_eq!(reloaded.status, TenantStatus::Migrating);
+    }
+
+    /// A `Failed` tenant with no recorded stage cannot be retried, and says so.
+    ///
+    /// This is the state a record was in before the failure transition started
+    /// recording the stage: `Failed` with nothing to re-enter. Substituting a
+    /// stage would have produced a `Failed -> Reserved` pair the table refuses,
+    /// which surfaced as a conflict indistinguishable from "this tenant is not
+    /// failed" — so the refusal is stated rather than faked.
+    #[tokio::test]
+    async fn retrying_a_failed_tenant_with_no_recorded_stage_is_a_conflict() {
+        let state = state().await;
+        seed(&state, &tenant("ten_unstaged", TenantStatus::Failed)).await;
+
+        let observed = retry_tenant(
+            State(state),
+            Extension(operator()),
+            Path("ten_unstaged".to_string()),
+        )
+        .await;
+
+        assert!(
+            matches!(observed, Err(crate::control::error::ApiError::Conflict)),
+            "a failed tenant that never recorded where it stopped cannot be retried"
+        );
     }
 
     #[tokio::test]
