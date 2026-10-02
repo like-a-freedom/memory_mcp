@@ -21,8 +21,14 @@ use crate::storage::client::SurrealDbClient;
 ///
 /// A migration row is the platform's own bookkeeping, so it names its own
 /// columns here rather than borrowing a domain's list.
-const MIGRATION_STATE_TEMPORAL_FIELDS: &[&str] =
-    &["lease_expires_at", "started_at", "completed_at"];
+///
+/// Empty, and that is the accurate answer: `script_migration` is
+/// `SCHEMAFULL` over `script_name`, `executed_at` and `checksum`, and every
+/// value `mark_migration_failed` writes is either `Value::Null` — which
+/// `build_update_query` turns into `= NONE` before the temporal list is
+/// consulted — or a plain string. The list earns its keep only when a
+/// datetime string is written, and no such write exists here.
+const MIGRATION_STATE_TEMPORAL_FIELDS: &[&str] = &[];
 
 #[derive(Debug, Clone, Copy)]
 pub struct MigrationScript {

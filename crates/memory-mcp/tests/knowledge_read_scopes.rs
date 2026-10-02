@@ -431,6 +431,43 @@ fn every_temporal_field_list_names_only_real_columns() {
         }
     }
 
+    // The platform's own constant, against the table it names. It is the same
+    // kind of list and it went wrong the same way: `lease_expires_at`,
+    // `started_at` and `completed_at` are not columns of `script_migration`,
+    // which is SCHEMAFULL over three fields.
+    {
+        let file = "src/storage/migrations.rs";
+        let table = "script_migration";
+        let text = fs::read_to_string(manifest.join(file)).expect("readable migrations module");
+        let lines: Vec<&str> = text.lines().collect();
+        for (index, line) in lines.iter().enumerate() {
+            if !line.contains("TEMPORAL_FIELDS: &[&str]") {
+                continue;
+            }
+            let columns = schema.get(table).unwrap_or_else(|| {
+                panic!("{file} names a table the schema does not define: {table}")
+            });
+            let mut body = String::new();
+            let mut cursor = index;
+            while cursor < lines.len() {
+                body.push_str(lines[cursor]);
+                if lines[cursor].trim_end().ends_with(';') {
+                    break;
+                }
+                cursor += 1;
+            }
+            for column in body.split('"').skip(1).step_by(2) {
+                checked += 1;
+                if !columns.contains(column) {
+                    problems.push(format!(
+                        "  {file}:{} names `{column}`, which table `{table}` does not have",
+                        index + 1
+                    ));
+                }
+            }
+        }
+    }
+
     assert!(
         checked > 20,
         "expected to check more columns, checked {checked}"
