@@ -18,11 +18,6 @@ pub fn active_edge_scan_batch_size() -> i32 {
     ACTIVE_EDGE_SCAN_BATCH_SIZE
 }
 
-/// Backward-compatible alias for the active edge scan batch size.
-pub fn active_edge_scan_limit() -> i32 {
-    active_edge_scan_batch_size()
-}
-
 pub fn fact_embedding_dimension_placeholder() -> &'static str {
     FACT_EMBEDDING_DIMENSION_PLACEHOLDER
 }

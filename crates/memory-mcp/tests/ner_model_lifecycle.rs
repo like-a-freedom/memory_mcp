@@ -1375,8 +1375,40 @@ fn the_fingerprint_token_format_is_pinned() {
 ///
 /// `knowledge` still names `model_artifacts` elsewhere — `ModelProgressSink`,
 /// `NerArtifactSpec`, `PreparedCheckpoint` — and that is a separate question;
-/// this guard is about the fingerprint, because that is what ADR-0068 rules
-/// out and what it can prove without a judgement call about each site.
+/// this guard is about the two status enums the fingerprint leaked, because
+/// that is what ADR-0068 rules out.
+///
+/// The scan reads a whole `pub` item rather than one line at a time, so a
+/// signature split across lines cannot hide a status type in its second
+/// half — that is the case the first version of this guard missed, and the
+/// fix is why it is written this way.
+///
+/// Inside a `pub struct` only a `pub` field is part of the interface. The
+/// adapters keep `revision_status` and `validation_status` as private
+/// fields, which is correct: knowledge must know what it loaded in order to
+/// decide whether to promote a candidate, but that knowledge does not leave
+/// the adapter. `pub(crate)`, `pub(super)` and `pub(in …)` are skipped for
+/// the same reason. What this cannot see is a `pub` field reached through a
+/// type alias; nothing in the tree does that today, and a hand-written
+/// parser would be a worse trade than the gap.
+/// Does a `pub` *signature* name one of the two enums the fingerprint
+/// leaked?
+///
+/// Only the signature counts. An adapter that constructs a `RevisionStatus`
+/// inside its own body is filling a private field, which is knowledge's
+/// bookkeeping and does not cross the seam — what would cross it is the type
+/// appearing in a `pub` field or parameter, where a caller could name it.
+fn names_a_status(signature: &str) -> bool {
+    // Take everything up to the opening brace: that is the signature.
+    let sig = match signature.find('{') {
+        Some(at) => &signature[..at],
+        None => signature,
+    };
+    sig.contains("model_artifacts::RevisionStatus")
+        || sig.contains("model_artifacts::ValidationStatus")
+        || sig.contains("model_artifacts::{")
+}
+
 #[test]
 fn knowledge_does_not_name_a_model_artifact_type() {
     use std::fs;
@@ -1399,25 +1431,60 @@ fn knowledge_does_not_name_a_model_artifact_type() {
                 continue;
             }
             let text = fs::read_to_string(&path).expect("readable source");
+
+            // Walk the file tracking whether the cursor is inside a `pub`
+            // item, and collect that item's full text. A line-at-a-time
+            // check misses `pub fn f(\n  x: RevisionStatus\n)`, which is
+            // exactly the shape a change would take when someone wraps a
+            // parameter list.
+            let mut in_pub_item = false;
+            let mut in_pub_struct = false;
+            let mut depth = 0usize;
+            let mut item_text = String::new();
+            let mut item_start = 0usize;
             for (n, line) in text.lines().enumerate() {
                 let trimmed = line.trim();
-                if trimmed.starts_with("//") || trimmed.starts_with("use ") {
-                    continue;
+                if !in_pub_item {
+                    if trimmed.starts_with("//") || trimmed.starts_with("use ") {
+                        continue;
+                    }
+                    // `pub ` and not `pub(crate)`, `pub(super)`, `pub(in …)`.
+                    let opens_public_item = trimmed.starts_with("pub ")
+                        && !trimmed.starts_with("pub(crate)")
+                        && !trimmed.starts_with("pub(super)")
+                        && !trimmed.starts_with("pub(in");
+                    if !opens_public_item {
+                        continue;
+                    }
+                    in_pub_item = true;
+                    depth = 0;
+                    item_text.clear();
+                    item_start = n + 1;
+                    // A `pub struct`'s interface is its `pub` fields; its
+                    // private ones are the adapter's own bookkeeping.
+                    in_pub_struct = trimmed.starts_with("pub struct")
+                        || trimmed.starts_with("pub enum")
+                        || trimmed.starts_with("pub union");
                 }
-                // The two status enums are what the fingerprint leaked.
-                // A `ModelProgressSink` in the same signature is a
-                // different seam and a different decision.
-                // A private field or a `pub(crate)` constructor parameter
-                // is internal: knowledge still has to know what it loaded
-                // in order to decide whether to promote it. Only a `pub`
-                // name crosses the capability's interface.
-                let is_public = trimmed.starts_with("pub ")
-                    || trimmed.contains(" pub ")
-                    || trimmed.contains("&dyn ");
-                let names_status = line.contains("model_artifacts::RevisionStatus")
-                    || line.contains("model_artifacts::ValidationStatus");
-                if is_public && names_status {
-                    offenders.push(format!("  {}:{}: {trimmed}", path.display(), n + 1));
+                // Inside a `pub struct`, a private field is the adapter's
+                // own bookkeeping, not the capability's interface. Skip it
+                // unless the field itself is `pub`.
+                let private_struct_field = in_pub_struct
+                    && !trimmed.starts_with("pub ")
+                    && !trimmed.starts_with("#[")
+                    && !trimmed.starts_with("//");
+                if !private_struct_field {
+                    item_text.push_str(line);
+                    item_text.push('\n');
+                }
+                depth += line.matches('{').count();
+                let closed = depth > 0 && line.matches('}').count() >= depth;
+                depth = depth.saturating_sub(line.matches('}').count());
+                if depth == 0 && (closed || item_text.contains('{')) {
+                    if names_a_status(&item_text) {
+                        offenders.push(format!("  {}:{item_start}", path.display()));
+                    }
+                    in_pub_item = false;
                 }
             }
         }

@@ -59,9 +59,7 @@ pub use helpers::{
 // The domain builders moved to `knowledge::queries` and `memory::queries`, and
 // `BI_TEMPORAL_WHERE` to `shared::temporal`, where the three modules that
 // filter on it can import it without going through the platform.
-pub use queries::{
-    active_edge_scan_batch_size, active_edge_scan_limit, fact_embedding_dimension_placeholder,
-};
+pub use queries::{active_edge_scan_batch_size, fact_embedding_dimension_placeholder};
 pub(crate) use queries::{build_upsert_query, validate_record_id};
 
 // `build_create_query` is called from `knowledge/fact_store.rs` under

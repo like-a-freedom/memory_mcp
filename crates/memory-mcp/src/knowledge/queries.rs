@@ -18,12 +18,6 @@ use crate::storage::GraphDirection;
 use crate::storage::helpers::normalize_surreal_json;
 use crate::storage::queries::build_set_assignments;
 
-/// Batch size for the active-edge scan. `pub` because
-/// `memory::lifecycle_workers::communities` reads it when walking
-/// communities — a memory module reading a knowledge constant is a permitted
-/// edge, and the alternative was a third copy of the number.
-pub const ACTIVE_EDGE_SCAN_BATCH_SIZE: i32 = 10_000;
-
 /// The temporal columns a fact carries, and an edge's, which are the same.
 pub const FACT_TEMPORAL_FIELDS: &[&str] = &[
     "t_valid",
@@ -33,7 +27,6 @@ pub const FACT_TEMPORAL_FIELDS: &[&str] = &[
     "last_accessed",
     "embedding_updated_at",
 ];
-pub const EDGE_TEMPORAL_FIELDS: &[&str] = FACT_TEMPORAL_FIELDS;
 
 /// The temporal columns the claim tables carry.
 ///
@@ -237,7 +230,7 @@ pub fn build_relate_edge_query(
     let edge_record_literal = record_literal(edge_id);
 
     if let Value::Object(map) = normalized {
-        let (assignments, mut vars) = build_set_assignments(EDGE_TEMPORAL_FIELDS, map);
+        let (assignments, mut vars) = build_set_assignments(FACT_TEMPORAL_FIELDS, map);
         let all_assignments = assignments;
         vars.insert("edge_id".to_string(), json!(edge_id));
         vars.insert("in_id".to_string(), json!(from_id));

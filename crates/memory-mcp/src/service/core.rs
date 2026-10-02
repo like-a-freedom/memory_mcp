@@ -124,7 +124,6 @@ impl MemoryService {
         super::LifecyclePolicy::from(&self.lifecycle_config)
     }
 
-    /// Returns the total count of episodes through the owning episode store.
     /// Adds a new fact.
     ///
     /// Thin delegator to `FactService::add_fact`. Kept for backward
