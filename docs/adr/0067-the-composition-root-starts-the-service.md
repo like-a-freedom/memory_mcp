@@ -58,8 +58,8 @@ holds; the composition root starts.
 those adapters are HTTP's. Every profile compiles the composition root, so a
 second caller can start a service without the CLI.
 
-`service/core/builder.rs` drops from 810 lines to roughly 500. The remainder
-is construction and the `with_*` surface, which is the container's.
+`service/core/builder.rs` drops from 810 lines to 510. The remainder is
+construction and the `with_*` surface, which is the container's.
 
 The startup sequence becomes testable as a unit: `bootstrap/stdio.rs` takes
 its two inputs as arguments, so a test can exercise the zero-configuration

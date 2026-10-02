@@ -82,7 +82,10 @@ A fresh reviewer who did not see the tasks reads the whole wave's diff range. Pe
 
 ## ADR allocation
 
-Five ADRs, at the point the decision is made rather than up front. Per domain-modeling: an ADR is written only when a decision is hard to reverse, surprising without context, and the result of a real trade-off.
+Six ADRs, at the point the decision is made rather than up front. (Five were
+planned; ADR-0070 was added when Task 1.3 found ADR-0064 contradicted by its own
+implementation, and correcting a contradiction is the decision the ADR exists
+to record.) Per domain-modeling: an ADR is written only when a decision is hard to reverse, surprising without context, and the result of a real trade-off.
 
 | ADR | Written in | Decision | Why it earns a record |
 |---|---|---|---|
@@ -428,7 +431,12 @@ The `test -d` guard mirrors the existing CPU bench at `evaluations.yml:71-77`, w
 git commit -m "ci: build the accelerator and allocator features, and run the Metal benchmark"
 ```
 
-**DoD:** the accelerator/allocator lint row exists and was observed failing; `ner_metal` is executed by a workflow; the Makefile has four targets and all four are CI-invoked; the helper audit test passes; the only `#[allow(dead_code)]` left in `tests/common/mod.rs` are for helpers with real consumers.
+**DoD:** the accelerator/allocator lint row exists and was observed failing; `ner_metal` is executed by a workflow; the Makefile has six targets: the four CI invokes, plus `bench-cpu` and
+`bench-metal`, which are named in `evaluations.yml`'s skip messages so a person
+following the message runs the command CI would have run. The first
+implementation cut them; the whole-branch review pointed out that a target a
+skip message names is not dead — it is the documentation a skipped job leaves
+behind. the helper audit test passes; the only `#[allow(dead_code)]` left in `tests/common/mod.rs` are for helpers with real consumers.
 
 ## Task 1.4: Collapse the duplicated logic
 
@@ -1239,7 +1247,7 @@ Run: expect FAIL on both.
 git commit -m "refactor(knowledge): the extractor fingerprint is an opaque token, not checkpoint state"
 ```
 
-**Wave 5 DoD:** the composition root is in `bootstrap/`; the reachable graph traversal is in `knowledge/` and the unreachable introduction chain is gone; the container has no test-only public method; CONTEXT.md matches the tree; the fingerprint is opaque. Gate: full suite, clippy, fmt, both guards.
+**Wave 5 DoD:** the composition root is in `bootstrap/`; the reachable graph traversal is in `knowledge/` and the unreachable introduction chain is gone; the container's test-only public methods are down to two, `relate` and `with_lifecycle_enabled`, each recorded with its reason in the `every_public_container_method_has_a_production_caller` ratchet (the first draft of this DoD said *none*, which Task 5.4's own findings made false: `relate` is the only public edge-write path because `store_edge` is `pub(crate)`, and `with_lifecycle_enabled` exists because `MemoryService::new` takes the lifecycle config from its caller while only the composition root reads the environment); CONTEXT.md matches the tree; the fingerprint is opaque. Gate: full suite, clippy, fmt, both guards.
 
 **Wave 5 review:** the reviewer checks that moving the composition root did not change startup order. The specific risk is the embedding startup decision at old `builder.rs:272-342` — a five-arm match whose arm order matters, because a `BootstrapReady` decision must be evaluated after the version probe and before the provider is built. The reviewer must verify each arm still sees the same state it saw before the move. Second risk: the reviewer confirms `grep -rn "find_intro_chain" crates/` returns nothing, since relocating unreachable code into a bounded context would satisfy the letter of "move the traversal" while making the problem worse.
 
@@ -1272,7 +1280,8 @@ git status --porcelain   # expect empty
 A fresh reviewer reads the full diff from the audit commit to HEAD. This is the only pass that can see a decision that was right in isolation and wrong in combination.
 
 - [ ] **The nine candidates are all closed.** For each, name the commit that closed it.
-- [ ] **No ADR was written for a non-decision.** Five ADRs, and each one answers all three of: hard to reverse, surprising without context, real trade-off.
+- [ ] **No ADR was written for a non-decision.** Six ADRs — five planned, plus ADR-0070 added
+when Task 1.3 found ADR-0064 contradicted by its own implementation — and each one answers all three of: hard to reverse, surprising without context, real trade-off.
 - [ ] **Every ADR's claim is true of the code.** Read ADR-0065 through 0069 and check each assertion against the tree.
 - [ ] **The guards are not theatre.** Break each invariant deliberately and confirm the corresponding test fails. A guard that has never failed is a comment.
 - [ ] **Wiring did not become a fake.** For each of the five items wired in Wave 1 (observability, `accelerate`, `mimalloc`, `ner_metal`, the MockDbClient builders), confirm the consumer is real: CI runs it, or a test calls it. A CI step that runs a checker which always passes is worse than no step.
