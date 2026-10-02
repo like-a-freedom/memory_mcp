@@ -21,13 +21,19 @@
 //! # Quick Start
 //!
 //! ```rust,no_run
-//! use memory_mcp::MemoryService;
+//! use std::sync::Arc;
+//!
+//! use memory_mcp::bootstrap::stdio::EmbeddingActivationMode;
+//! use memory_mcp::bootstrap::stdio::NoopProgressSink;
+//! use memory_mcp::bootstrap::stdio::build_memory_service_from_env;
 //!
 //! #[tokio::main]
 //! async fn main() -> Result<(), Box<dyn std::error::Error>> {
-//!     let service = bootstrap::stdio::build_memory_service_from_env(
-//!     EmbeddingActivationMode::Standard, Arc::new(NoopProgressSink),
-//! ).await?;
+//!     let service = build_memory_service_from_env(
+//!         EmbeddingActivationMode::Standard,
+//!         Arc::new(NoopProgressSink),
+//!     )
+//!     .await?;
 //!     // Use the service...
 //!     Ok(())
 //! }
