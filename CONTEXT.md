@@ -63,8 +63,11 @@ in ADR-0016.
 - `src/tenancy/api.rs` — Account→Tenant resolution to a server-owned
   `TenantRuntimeSpec`, plus a single-flight runtime factory with eviction.
 - `src/provisioning/api.rs` — client creation, API-key issuance, durable-task
-  request surface, and App Session open/read/write/close.
-- `src/operations/api.rs` — account deletion and deletion recovery loops.
+  request surface, App Session open/read/write/close, and the Tenant status
+  transition table (`can_transition`, `transition_tenant`).
+- `src/operations/api.rs` — account deletion, deletion recovery loops, and
+  the ingest quota policy (`operations/quota.rs`): the decision to admit or
+  deny one ingest against a plan and its counter.
 - `src/knowledge/api.rs` — owner-named read scopes, replacing the previous
   caller-supplied table selectors.
 - `src/memory/api.rs` — consumer-owned ports for ingestion, extraction,
@@ -95,9 +98,26 @@ in ADR-0016.
   `api.rs`. A file here that no `mod` declaration reaches is not part of the
   build at all.
 - `src/storage/` — the technical persistence platform: `DbClient`, the
-  query builders, migrations, row unwrapping and the platform's own
-  access and event logs. No domain data; every canonical table's store
-  lives with the context that owns it.
+  table-generic `select_one`/`create`/`update` query builders, migrations,
+  row unwrapping and the platform's own access and event logs. No domain
+  data and no domain table names: every canonical table's store and SQL
+  lives with the context that owns it. `storage/queries.rs` is generic
+  because `create` and `update` take the table's temporal columns from the
+  caller — a knowledge fact and an inbox revision carry different ones, and
+  the platform does not know which is which.
+- `src/knowledge/queries.rs`, `src/memory/queries.rs`,
+  `src/embedding/queries.rs` — each context's own SQL, plus the temporal
+  column lists for its own tables (`FACT_TEMPORAL_FIELDS`,
+  `EPISODE_TEMPORAL_FIELDS`, `INBOX_REVISION_TEMPORAL_FIELDS`,
+  `EMBEDDING_STATE_TEMPORAL_FIELDS`, …). A forgotten list is a compile
+  error at the write site.
+- `src/knowledge/graph_traversal.rs` — the `graph` app's BFS and its two
+  snapshot types, parameterised on `&KnowledgeGraphStore`.
+- `src/bootstrap/` — the composition root for both profiles.
+  `bootstrap/stdio.rs::build_memory_service_from_env` reads the environment
+  and starts the service; `bootstrap/integration.rs` holds the HTTP
+  integration adapters. The container constructs and holds, it does not
+  start — see ADR-0067.
 - `src/memory/agent_memory.rs` — narrow store for lifecycle events and
   durable projection jobs.
 - `src/knowledge/claims.rs` — narrow store for the claim reconciliation
@@ -135,6 +155,20 @@ _Avoid_: NER provider, generic model
 **Model Checkpoint**:
 A versioned set of model artifacts used by one NER Backend. A checkpoint is not assumed to be interchangeable with another checkpoint in the same model family.
 _Avoid_: Generic model, provider
+
+**Quota Admission**:
+The decision to admit or deny one ingest, taken against a tenant's plan and its current counter, and naming the reason when it is denied. It is a business policy in `operations`, not a property of the transport or of the rate limiter.
+_Avoid_: rate limit, quota check, throttle
+
+## Tenancy vocabulary
+
+**Tenant Lifecycle Transition**:
+A legal move between Tenant statuses. The transition table in `provisioning/api.rs` decides which moves exist and which of them an operator may perform; a status update that the table does not list is rejected, not coerced.
+_Avoid_: status update, state change, status patch
+
+**Owned Table**:
+A canonical table whose name is released only by the bounded context that owns it. A caller reads through an owner-named operation rather than naming the table, so an application-facing read cannot reach a table its context does not own.
+_Avoid_: allowed table, table allowlist, permitted table
 
 ## Lifecycle vocabulary
 
@@ -339,6 +373,10 @@ _Avoid_: feature flag, module, deployment mode
 
 - Production code uses `MemoryError` and `Result`; no production `unwrap`,
   `expect`, or `panic`.
+- `MemoryService` constructs and holds; `bootstrap/` starts it. Startup
+  policy — reading the environment, connecting, migrating, resolving the
+  embedding decision, spawning workers — lives in the composition root, not
+  on the container. See ADR-0067.
 - No lock guard lives across `.await`.
 - Metrics labels use bounded enums only.
 - Migration files are append-only.

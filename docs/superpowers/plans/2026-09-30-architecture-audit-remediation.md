@@ -1169,11 +1169,11 @@ git commit -m "refactor(service): a container method with no production caller m
 - Consumes: everything Waves 3-5 changed.
 - Produces: a CONTEXT.md that matches the tree, which the doc-claim guard in Task 0.3 will keep matching.
 
-- [ ] **Step 1: Update the module seam list.** `src/storage/` — the entry at lines 82-85 now describes what the module contains after Task 4.2. `src/bootstrap/` — add an entry; CONTEXT.md has none today, and after Task 5.1 it is the composition root for both profiles. `src/operations/api.rs` — add the quota policy to the existing entry (line 56). `src/provisioning/api.rs` — add the transition table to the existing entry (line 54).
-- [ ] **Step 2: Add the new vocabulary terms** that the changes introduced, in the glossary's existing style — a bold term, a one-to-two-sentence definition, and an `_Avoid_:` line. Candidates: **Quota Admission** (the decision to admit or deny one ingest against a plan and counter; `_Avoid_: rate limit, quota check`), **Tenant Lifecycle Transition** (a legal move between Tenant statuses; `_Avoid_: status update, state change`), **Owned Table** (a table name released only by the bounded context that owns it; `_Avoid_: allowed table, table allowlist`).
-- [ ] **Step 3: Update the constraints section** if any changed. None should have: the eight-tool surface, no-`unwrap`, bi-temporal, one-Active-Namespace all still hold.
-- [ ] **Step 4: Run the doc-claim guard.** `cargo test -p memory_mcp --test doc_claims`. Expected: PASS.
-- [ ] **Step 5: Commit**
+- [x] **Step 1: Update the module seam list.** `src/storage/` — the entry at lines 82-85 now describes what the module contains after Task 4.2. `src/bootstrap/` — add an entry; CONTEXT.md has none today, and after Task 5.1 it is the composition root for both profiles. `src/operations/api.rs` — add the quota policy to the existing entry (line 56). `src/provisioning/api.rs` — add the transition table to the existing entry (line 54).
+- [x] **Step 2: Add the new vocabulary terms** that the changes introduced, in the glossary's existing style — a bold term, a one-to-two-sentence definition, and an `_Avoid_:` line. Candidates: **Quota Admission** (the decision to admit or deny one ingest against a plan and counter; `_Avoid_: rate limit, quota check`), **Tenant Lifecycle Transition** (a legal move between Tenant statuses; `_Avoid_: status update, state change`), **Owned Table** (a table name released only by the bounded context that owns it; `_Avoid_: allowed table, table allowlist`).
+- [x] **Step 3: Update the constraints section** if any changed. None should have: the eight-tool surface, no-`unwrap`, bi-temporal, one-Active-Namespace all still hold.
+- [x] **Step 4: Run the doc-claim guard.** `cargo test -p memory_mcp --test doc_claims`. Expected: PASS.
+- [x] **Step 5: Commit**
 
 ```bash
 git commit -m "docs(context): record the seams and vocabulary the audit produced"
