@@ -107,6 +107,7 @@ mod tests {
                 status: AccountStatus::Active,
                 tenant_id: "ten_1".into(),
                 created_at: chrono::Utc::now(),
+                display_name: None,
             })
             .await
             .unwrap();

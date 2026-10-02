@@ -125,6 +125,10 @@ impl OidcClient {
         let (mut url, _csrf) = client
             .authorize_url(|| CsrfToken::new(state.as_str().to_string()))
             .add_scope(Scope::new("openid".to_string()))
+            // `profile` carries the optional `name` / `preferred_username`
+            // claims an Account's display name comes from. Both are optional:
+            // a provider that issues neither still authenticates.
+            .add_scope(Scope::new("profile".to_string()))
             .set_pkce_challenge(pkce_challenge)
             .url();
 

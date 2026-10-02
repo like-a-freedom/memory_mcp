@@ -2270,6 +2270,7 @@ mod tests {
             status: AccountStatus::Active,
             tenant_id: "ten_1".into(),
             created_at: chrono::Utc::now(),
+            display_name: None,
         };
         let tenant = Tenant {
             id: "ten_1".into(),
@@ -2294,6 +2295,44 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn rewriting_an_account_keeps_its_display_name() {
+        // `write_account` names an explicit field list rather than merging, so a
+        // write that omits `display_name` would silently blank a stored name.
+        // This is the guard for that: seed a name, write the same account back,
+        // and require the name to survive.
+        let s = InMemoryStore::default();
+        let account = Account {
+            id: "acct_1".into(),
+            status: AccountStatus::Active,
+            tenant_id: "ten_1".into(),
+            created_at: chrono::Utc::now(),
+            display_name: Some("Ada Lovelace".into()),
+        };
+        s.write_account(&account).await.unwrap();
+        s.write_account(&account).await.unwrap();
+        let reread = s.find_account_by_id("acct_1").await.unwrap().unwrap();
+        assert_eq!(reread.display_name.as_deref(), Some("Ada Lovelace"));
+    }
+
+    #[tokio::test]
+    async fn an_account_written_without_a_display_name_reads_back_as_none() {
+        // Rows written before the migration, and providers that assert no name,
+        // both land here: absence must round-trip as `None`, not as an error or
+        // an empty string.
+        let s = InMemoryStore::default();
+        let account = Account {
+            id: "acct_1".into(),
+            status: AccountStatus::Active,
+            tenant_id: "ten_1".into(),
+            created_at: chrono::Utc::now(),
+            display_name: None,
+        };
+        s.write_account(&account).await.unwrap();
+        let reread = s.find_account_by_id("acct_1").await.unwrap().unwrap();
+        assert_eq!(reread.display_name, None);
+    }
+
+    #[tokio::test]
     async fn create_account_bundle_persists_all_three_records() {
         let s = InMemoryStore::default();
         let account = Account {
@@ -2301,6 +2340,7 @@ mod tests {
             status: AccountStatus::Active,
             tenant_id: "ten_bundle_1".into(),
             created_at: chrono::Utc::now(),
+            display_name: None,
         };
         let tenant = Tenant {
             id: "ten_bundle_1".into(),
@@ -2345,6 +2385,7 @@ mod tests {
             status: AccountStatus::Active,
             tenant_id: "ten_other".into(),
             created_at: chrono::Utc::now(),
+            display_name: None,
         };
         let tenant = Tenant {
             id: "ten_2".into(),
@@ -2376,6 +2417,7 @@ mod tests {
             status: AccountStatus::Active,
             tenant_id: "ten_a".into(),
             created_at: chrono::Utc::now(),
+            display_name: None,
         })
         .await
         .unwrap();
@@ -2419,6 +2461,7 @@ mod tests {
             status: AccountStatus::Active,
             tenant_id: "ten_a".into(),
             created_at: chrono::Utc::now(),
+            display_name: None,
         })
         .await
         .unwrap();
@@ -2472,6 +2515,7 @@ mod tests {
                 status: AccountStatus::Active,
                 tenant_id: tenant_id.into(),
                 created_at: chrono::Utc::now(),
+                display_name: None,
             })
             .await
             .unwrap();
@@ -2514,6 +2558,7 @@ mod tests {
             status: AccountStatus::Active,
             tenant_id: "ten_a".into(),
             created_at: chrono::Utc::now(),
+            display_name: None,
         })
         .await
         .unwrap();
@@ -2558,6 +2603,7 @@ mod tests {
                 status: AccountStatus::Active,
                 tenant_id: tenant_id.into(),
                 created_at: chrono::Utc::now(),
+                display_name: None,
             })
             .await
             .unwrap();
@@ -2693,6 +2739,7 @@ mod tests {
             status: AccountStatus::Active,
             tenant_id: "ten_t".into(),
             created_at: chrono::Utc::now(),
+            display_name: None,
         };
         s.write_account(&account).await.unwrap();
         let res = s
@@ -2766,6 +2813,7 @@ mod tests {
                 status: AccountStatus::Active,
                 tenant_id: t.id.clone(),
                 created_at: chrono::Utc::now(),
+                display_name: None,
             };
             s.write_account(&a).await.unwrap();
             s.write_tenant(&t).await.unwrap();
@@ -2857,6 +2905,7 @@ mod tests {
             status: AccountStatus::Active,
             tenant_id: "ten_delete".into(),
             created_at: now,
+            display_name: None,
         };
         let tenant = Tenant {
             id: "ten_delete".into(),
@@ -3010,6 +3059,7 @@ mod tests {
             status: AccountStatus::Deleting,
             tenant_id: "ten_finalize".into(),
             created_at: now,
+            display_name: None,
         })
         .await
         .unwrap();

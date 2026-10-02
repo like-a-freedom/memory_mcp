@@ -69,6 +69,7 @@ mod tests {
             status: AccountStatus::Active,
             tenant_id: "ten-1".to_string(),
             created_at: chrono::Utc::now(),
+            display_name: None,
         })
     }
 

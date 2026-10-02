@@ -510,6 +510,7 @@ pub async fn create_account(
         status: AccountStatus::Active,
         tenant_id: new_tenant_id(),
         created_at: chrono::Utc::now(),
+        display_name: None,
     };
     let tenant = Tenant {
         id: account.tenant_id.clone(),
@@ -559,6 +560,7 @@ mod tests {
                 status: AccountStatus::Active,
                 tenant_id: "ten_links".to_owned(),
                 created_at: chrono::Utc::now(),
+                display_name: None,
             })
             .await
             .expect("write account");
@@ -764,6 +766,7 @@ mod tests {
                 status: AccountStatus::Active,
                 tenant_id: "ten_1".to_owned(),
                 created_at: chrono::Utc::now(),
+                display_name: None,
             })
             .await
             .expect("write account");

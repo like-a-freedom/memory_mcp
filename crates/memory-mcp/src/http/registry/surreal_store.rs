@@ -609,6 +609,12 @@ fn decode_account(row: &Value) -> Result<Account, MemoryError> {
             .unwrap_or_default()
             .to_owned(),
         created_at: required_datetime(row, "created_at")?,
+        // Absent on rows written before migration 052, which is the same shape
+        // as "this account has no display name".
+        display_name: row
+            .get("display_name")
+            .and_then(Value::as_str)
+            .map(str::to_owned),
     })
 }
 
@@ -1316,15 +1322,25 @@ impl AccountStore for SurrealRegistryStore {
     async fn write_account(&self, account: &Account) -> Result<(), MemoryError> {
         let status = serde_json::to_value(account.status)
             .map_err(|error| MemoryError::Storage(format!("encode account status: {error}")))?;
+        // An absent display name binds NONE explicitly rather than null, which
+        // SurrealDB refuses to coerce into an `option<string>`.
+        let display_name_assignment = if account.display_name.is_some() {
+            "display_name = $display_name"
+        } else {
+            "display_name = NONE"
+        };
         self.handle()
             .query_json(
-                "UPSERT type::record($table, $id) SET id = $id, status = IF status = 'deleting' AND $status != 'deleting' THEN status ELSE $status END, tenant_id = $tenant_id, created_at = type::datetime($created_at)",
+                &format!(
+                    "UPSERT type::record($table, $id) SET id = $id, status = IF status = 'deleting' AND $status != 'deleting' THEN status ELSE $status END, tenant_id = $tenant_id, created_at = type::datetime($created_at), {display_name_assignment}"
+                ),
                 Some(json!({
                     "table": "account",
                     "id": account.id,
                     "status": status,
                     "tenant_id": account.tenant_id,
                     "created_at": account.created_at.to_rfc3339(),
+                    "display_name": account.display_name.clone(),
                 })),
             )
             .await
@@ -1385,8 +1401,17 @@ impl AccountStore for SurrealRegistryStore {
         } else {
             "retry_stage = NONE"
         };
+        // SurrealDB will not coerce a JSON null into an `option<string>`
+        // ("Expected `none | string` but found `NULL`"), so an absent name
+        // binds NONE explicitly rather than null — the same shape
+        // `retry_stage_assignment` uses for the same reason.
+        let display_name_assignment = if account.display_name.is_some() {
+            "display_name = $display_name"
+        } else {
+            "display_name = NONE"
+        };
         let mut script = format!(
-            "BEGIN TRANSACTION; LET $existing_namespace = SELECT VALUE id FROM tenant WHERE namespace_binding.namespace = $namespace LIMIT 1; IF array::len($existing_namespace) > 0 {{ THROW 'namespace binding already exists'; }}; CREATE type::record('account', $account_id) SET id = $account_id, status = $account_status, tenant_id = $tenant_id, created_at = type::datetime($account_created_at); CREATE type::record('tenant', $tenant_record_id) SET id = $tenant_record_id, status = $tenant_status, namespace_binding = $binding, plan_version = $plan_version, schema_version = $schema_version, {retry_stage_assignment}, {lease_assignment}, created_at = type::datetime($tenant_created_at), version = $version;",
+            "BEGIN TRANSACTION; LET $existing_namespace = SELECT VALUE id FROM tenant WHERE namespace_binding.namespace = $namespace LIMIT 1; IF array::len($existing_namespace) > 0 {{ THROW 'namespace binding already exists'; }}; CREATE type::record('account', $account_id) SET id = $account_id, status = $account_status, tenant_id = $tenant_id, created_at = type::datetime($account_created_at), {display_name_assignment}; CREATE type::record('tenant', $tenant_record_id) SET id = $tenant_record_id, status = $tenant_status, namespace_binding = $binding, plan_version = $plan_version, schema_version = $schema_version, {retry_stage_assignment}, {lease_assignment}, created_at = type::datetime($tenant_created_at), version = $version;",
         );
         if identity.is_some() {
             script.push_str(" CREATE type::record('external_identity', $identity_id) SET id = $identity_id, issuer = $issuer, subject_verifier = $subject_verifier, account_id = $identity_account_id, created_at = type::datetime($identity_created_at);");
@@ -1404,6 +1429,10 @@ impl AccountStore for SurrealRegistryStore {
             "schema_version": tenant.schema_version,
             "retry_stage": tenant.retry_stage,
             "account_created_at": account.created_at.to_rfc3339(),
+            // SurrealDB will not coerce JSON `null` into an `option<string>`
+            // ("Expected `none | string` but found `NULL`"), so an absent name
+            // must bind as a NONE value rather than a null.
+            "display_name": account.display_name.clone(),
             "tenant_created_at": tenant.created_at.to_rfc3339(),
             "version": tenant.version,
         });
@@ -1454,13 +1483,20 @@ impl AccountStore for SurrealRegistryStore {
         } else {
             "retry_stage = NONE"
         };
+        // An absent display name binds NONE explicitly: SurrealDB will not
+        // coerce a JSON null into an `option<string>`.
+        let display_name_assignment = if account.display_name.is_some() {
+            "display_name = $display_name"
+        } else {
+            "display_name = NONE"
+        };
         let script = format!(
             "BEGIN TRANSACTION;
             LET $policy = (SELECT mode, epoch, methods FROM browser_auth_policy LIMIT 2);
             IF array::len($policy) != 1 {{ THROW 'no_policy'; }};
             IF NOT ('oidc' IN $policy[0].methods ?? [$policy[0].mode]) {{ THROW 'mode_mismatch'; }};
             IF $policy[0].epoch != $expected_epoch {{ THROW 'epoch_mismatch'; }};
-            CREATE type::record('account', $account_id) SET id = $account_id, status = $account_status, tenant_id = $tenant_id, created_at = type::datetime($account_created_at);
+            CREATE type::record('account', $account_id) SET id = $account_id, status = $account_status, tenant_id = $tenant_id, created_at = type::datetime($account_created_at), {display_name_assignment};
             CREATE type::record('tenant', $tenant_record_id) SET id = $tenant_record_id, status = $tenant_status, namespace_binding = $binding, plan_version = $plan_version, schema_version = $schema_version, {retry_stage_assignment}, {lease_assignment}, created_at = type::datetime($tenant_created_at), version = $version;
             CREATE type::record('external_identity', $identity_id) SET id = $identity_id, issuer = $issuer, subject_verifier = $subject_verifier, account_id = $identity_account_id, created_at = type::datetime($identity_created_at);
             COMMIT TRANSACTION;",
@@ -1478,6 +1514,10 @@ impl AccountStore for SurrealRegistryStore {
             "schema_version": tenant.schema_version,
             "retry_stage": tenant.retry_stage,
             "account_created_at": account.created_at.to_rfc3339(),
+            // SurrealDB will not coerce JSON `null` into an `option<string>`
+            // ("Expected `none | string` but found `NULL`"), so an absent name
+            // must bind as a NONE value rather than a null.
+            "display_name": account.display_name.clone(),
             "tenant_created_at": tenant.created_at.to_rfc3339(),
             "version": tenant.version,
             "identity_id": identity.id,
@@ -3291,6 +3331,7 @@ mod tests {
             status: AccountStatus::Active,
             tenant_id: "ten_shared".into(),
             created_at: Utc::now(),
+            display_name: None,
         }
     }
 
@@ -3426,6 +3467,7 @@ mod tests {
             status: AccountStatus::Active,
             tenant_id: "ten_delete".into(),
             created_at: now,
+            display_name: None,
         };
         let tenant_delete = Tenant {
             id: "ten_delete".into(),

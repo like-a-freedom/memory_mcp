@@ -135,6 +135,7 @@ mod tests {
                 status: AccountStatus::Active,
                 tenant_id: "ten_1".to_string(),
                 created_at: chrono::Utc::now(),
+                display_name: None,
             })
             .await
             .expect("seed account");

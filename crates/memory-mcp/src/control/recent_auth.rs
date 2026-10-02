@@ -38,6 +38,7 @@ mod tests {
             status: crate::http::registry::models::AccountStatus::Active,
             tenant_id: "t1".to_string(),
             created_at: Utc::now(),
+            display_name: None,
         };
         let cfg = crate::http::config::HttpConfig::default_for_test();
         let mut session = ControlPlaneSession::new(&account, "raw-cookie", 1, &cfg).unwrap();

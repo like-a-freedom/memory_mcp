@@ -146,6 +146,7 @@ mod tests {
                     status: AccountStatus::Active,
                     tenant_id: "ten_1".into(),
                     created_at: now,
+                    display_name: None,
                 },
                 &Tenant {
                     id: "ten_1".into(),

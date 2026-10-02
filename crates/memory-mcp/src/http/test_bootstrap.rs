@@ -164,6 +164,7 @@ async fn bootstrap_one(
         status: AccountStatus::Active,
         tenant_id: tenant_id.clone(),
         created_at: now,
+        display_name: None,
     };
     let mut tenant = Tenant {
         id: tenant_id.clone(),
@@ -270,6 +271,7 @@ async fn seed_reserved_one(
         status: AccountStatus::Active,
         tenant_id: tenant_id.clone(),
         created_at: now,
+        display_name: None,
     };
     let tenant = Tenant {
         id: tenant_id.clone(),

@@ -22,6 +22,10 @@ use crate::http::registry::storage::{AccountStore, ProvisioningStore};
 pub(crate) struct VerifiedExternalIdentity {
     pub issuer: String,
     pub subject_verifier: SubjectVerifier,
+    /// A human label the provider asserted, already trimmed and bounded by
+    /// `registry::account_display_name`. Display only: it is set once when the
+    /// Account is created and never participates in identity lookup.
+    pub display_name: Option<String>,
 }
 
 /// The application-layer OIDC signup workflow.
@@ -106,8 +110,12 @@ impl OidcSignup {
         // has consumed its own copy.
         let issuer = identity.issuer.clone();
         let subject_verifier = identity.subject_verifier.clone();
-        let (account, tenant, identity_record) =
-            build_bundle(identity.issuer, identity.subject_verifier, now);
+        let (account, tenant, identity_record) = build_bundle(
+            identity.issuer,
+            identity.subject_verifier,
+            identity.display_name,
+            now,
+        );
         match self
             .accounts
             .create_oidc_account_bundle(policy, &account, &tenant, &identity_record)
@@ -150,6 +158,7 @@ impl OidcSignup {
 fn build_bundle(
     issuer: String,
     subject_verifier: crate::http::registry::models::SubjectVerifier,
+    display_name: Option<String>,
     now: chrono::DateTime<chrono::Utc>,
 ) -> (
     crate::http::registry::models::Account,
@@ -159,7 +168,8 @@ fn build_bundle(
     use crate::http::registry::models::{
         ExternalIdentity, new_external_identity_id, new_reserved_bundle,
     };
-    let (account, tenant) = new_reserved_bundle(1, now);
+    let (mut account, tenant) = new_reserved_bundle(1, now);
+    account.display_name = display_name;
     let identity_record = ExternalIdentity {
         id: new_external_identity_id(),
         account_id: account.id.clone(),
@@ -193,6 +203,16 @@ mod tests {
         VerifiedExternalIdentity {
             issuer: issuer.to_string(),
             subject_verifier: verifier(byte),
+            display_name: None,
+        }
+    }
+
+    /// The same identity, carrying a provider-asserted display name.
+    fn verified_named(issuer: &str, byte: u8, name: &str) -> VerifiedExternalIdentity {
+        VerifiedExternalIdentity {
+            issuer: issuer.to_string(),
+            subject_verifier: verifier(byte),
+            display_name: Some(name.to_string()),
         }
     }
 
@@ -208,6 +228,51 @@ mod tests {
         )
         .await
         .expect("reconcile browser policy")
+    }
+
+    #[tokio::test]
+    async fn a_new_account_carries_the_display_name_from_the_provider() {
+        let store = Arc::new(InMemoryStore::default());
+        let now = chrono::Utc::now();
+        let fence = join_fence(&store).await;
+        let workflow = OidcSignup::new(
+            store.clone() as Arc<dyn AccountStore>,
+            store.clone() as Arc<dyn ProvisioningStore>,
+        );
+        let account = workflow
+            .resolve_or_create(
+                &fence,
+                verified_named("https://issuer.example.com", 0xE1, "Ada Lovelace"),
+                now,
+            )
+            .await
+            .expect("first signup succeeds");
+        assert_eq!(account.display_name.as_deref(), Some("Ada Lovelace"));
+
+        // It must be durable, not merely returned: a re-read is what the account
+        // page will do.
+        let reread = store
+            .find_account_by_id(&account.id)
+            .await
+            .expect("account lookup")
+            .expect("the account exists");
+        assert_eq!(reread.display_name.as_deref(), Some("Ada Lovelace"));
+    }
+
+    #[tokio::test]
+    async fn a_provider_that_asserts_no_name_still_creates_an_account() {
+        let store = Arc::new(InMemoryStore::default());
+        let now = chrono::Utc::now();
+        let fence = join_fence(&store).await;
+        let workflow = OidcSignup::new(
+            store.clone() as Arc<dyn AccountStore>,
+            store.clone() as Arc<dyn ProvisioningStore>,
+        );
+        let account = workflow
+            .resolve_or_create(&fence, verified("https://issuer.example.com", 0xE2), now)
+            .await
+            .expect("first signup succeeds");
+        assert_eq!(account.display_name, None);
     }
 
     /// A first call to `resolve_or_create` for a brand-new
@@ -294,6 +359,7 @@ mod tests {
             status: AccountStatus::Active,
             tenant_id: "ten_existing".to_string(),
             created_at: now,
+            display_name: None,
         };
         let existing_identity = ExternalIdentity {
             id: "id_existing".to_string(),
@@ -333,8 +399,12 @@ mod tests {
     async fn create_conflict_rereads_the_concurrent_winner() {
         let store = Arc::new(InMemoryStore::default());
         let now = chrono::Utc::now();
-        let (winner, winner_tenant, winner_identity) =
-            build_bundle("https://issuer.example.com".into(), verifier(0xCD), now);
+        let (winner, winner_tenant, winner_identity) = build_bundle(
+            "https://issuer.example.com".into(),
+            verifier(0xCD),
+            None,
+            now,
+        );
         let winner_id = winner.id.clone();
         store.inject_oidc_conflict(Some((winner, winner_tenant, winner_identity)));
 

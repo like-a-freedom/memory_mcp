@@ -52,6 +52,7 @@ fn active_account(id: &str, tenant_id: &str) -> Account {
         status: AccountStatus::Active,
         tenant_id: tenant_id.to_string(),
         created_at: chrono::Utc::now(),
+        display_name: None,
     }
 }
 

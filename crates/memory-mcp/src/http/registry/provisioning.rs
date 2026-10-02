@@ -214,6 +214,7 @@ mod reconcile_tests {
             status: AccountStatus::Active,
             tenant_id: tenant.id.clone(),
             created_at: Utc::now(),
+            display_name: None,
         };
         s.write_account(&account).await.unwrap();
         s.write_tenant(&tenant).await.unwrap();

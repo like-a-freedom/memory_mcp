@@ -728,6 +728,7 @@ mod tests {
             status: AccountStatus::Active,
             tenant_id: tenant.id.clone(),
             created_at: Utc::now(),
+            display_name: None,
         };
         store.write_account(&account).await.unwrap();
         store.write_tenant(tenant).await.unwrap();
@@ -972,6 +973,7 @@ mod tests {
             status: AccountStatus::Active,
             tenant_id: "ten_durable_provision".into(),
             created_at: Utc::now(),
+            display_name: None,
         };
         let tenant = Tenant {
             id: account.tenant_id.clone(),
