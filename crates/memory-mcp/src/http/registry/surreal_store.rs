@@ -264,38 +264,51 @@ fn is_unique_violation_message(message: &str) -> bool {
         || lower.contains("unique")
 }
 
-/// Strip a quoted value out of a storage error message.
+/// Strip an offending value out of a storage error message.
 ///
-/// SurrealDB quotes the offending value in coercion and assertion failures
-/// ("Found 'xxx' for field `display_name`"). That message becomes a
+/// SurrealDB reports a rejected value in coercion and assertion failures
+/// ("found 'xxx'", "Found 42", "but found `x`"). That message becomes a
 /// [`MemoryError`], whose `Display` is written to the error log by
 /// `control::error::log_internal_error` — and `http::logging` forbids unbounded
 /// identifiers there. A rejected display name is user-supplied free text, so it
 /// must not survive into the message.
 ///
-/// Only the span between the "found '" marker and the next `'` is removed.
-/// Pairing quotes naively would be wrong: these messages contain apostrophes of
-/// their own ("Couldn't"), and pairing the first two quotes would redact nothing
-/// while still leaving the value. Anchoring on the marker SurrealDB actually
-/// emits avoids depending on quote parity: the marker is matched
-/// case-insensitively because the engine has spelled it both ways ("Found 'x'"
-/// in an assertion failure, "found 'x'" in a coercion failure).
+/// Two things this deliberately does not depend on, because both vary:
 ///
-/// The surrounding diagnosis — which field, which expectation — is what makes
-/// the error useful, and it is bounded.
+/// **Quote pairing.** These messages contain apostrophes of their own
+/// ("Couldn't"), so pairing the first two quotes would redact nothing while
+/// still leaving the value. The span is taken from the marker instead.
+///
+/// **How the value is quoted.** A string renders inside quotes
+/// (`QuoteStr`), but any other value renders as bare SQL with no quote
+/// characters at all, and one engine shape uses backticks. So the span runs
+/// from the marker to the next *closing delimiter* — a single quote, a
+/// backtick, or whitespace — rather than to the next `'` specifically.
+///
+/// The surrounding diagnosis — which field, which record, which expectation —
+/// is what makes the error useful, and it is bounded.
 fn redact_quoted_value(message: &str) -> String {
-    const MARKER: &str = "ound '";
+    const MARKER: &str = "ound ";
     let mut out = String::with_capacity(message.len());
     let mut rest = message;
     while let Some(start) = rest.to_ascii_lowercase().find(MARKER) {
         let (before, after) = rest.split_at(start);
-        out.push_str(before);
-        let Some(end) = after[MARKER.len()..].find('\'') else {
-            out.push_str(after);
-            return out;
+        let value_start = &after[MARKER.len()..];
+        // Skip the opening delimiter if the value is quoted, then take
+        // everything up to the matching close — or, for a bare value, up to
+        // the first space.
+        let (lead, body) = match value_start.as_bytes().first() {
+            Some(b'\'') | Some(b'`') => value_start.split_at(1),
+            _ => ("", value_start),
         };
-        out.push_str("found '<redacted>'");
-        rest = &after[MARKER.len() + end + 1..];
+        let end = body
+            .find(|c: char| c == '\'' || c == '`' || c.is_whitespace())
+            .unwrap_or(body.len());
+        out.push_str(before);
+        out.push_str("found ");
+        out.push_str(lead);
+        out.push_str("<redacted>");
+        rest = &body[end..];
     }
     out.push_str(rest);
     out
@@ -3364,6 +3377,44 @@ mod tests {
 
     use crate::http::registry::models::{AccountStatus, NamespaceBinding, TenantStatus};
     use surrealdb::engine::local::Mem;
+
+    #[test]
+    fn a_non_string_value_is_redacted_even_though_it_is_unquoted() {
+        // SurrealDB renders a non-string value as bare SQL, with no quote
+        // characters at all: "Found 42 for field `n` …". A redaction that
+        // anchors on a quoted span finds nothing and returns the message
+        // whole — so the value would reach the error log. `display_name` cannot
+        // be non-string today, but this function is applied to every storage
+        // error from every table, so it must not depend on the value's type.
+        let mapped = map_storage_error(
+            "write account",
+            "Found 4242 for field `display_name`, with record `account:acct_1`, \
+             but field must conform to: a string",
+        );
+        let rendered = mapped.to_string();
+        assert!(
+            !rendered.contains("4242"),
+            "an unquoted value must still be stripped: {rendered}"
+        );
+        assert!(
+            rendered.contains("field must conform to"),
+            "the diagnosis must survive redaction: {rendered}"
+        );
+    }
+
+    #[test]
+    fn a_value_quoted_with_backticks_is_redacted() {
+        // One engine message shape quotes with backticks rather than single
+        // quotes ("… but found `x`"). Anchoring only on `'` would miss it.
+        let mapped = map_storage_error(
+            "write account",
+            "Expected a record ID during recursive graph traversal, but found `acct_secret`",
+        );
+        assert!(
+            !mapped.to_string().contains("acct_secret"),
+            "a backtick-quoted value must be stripped too: {mapped}"
+        );
+    }
 
     #[test]
     fn a_rejected_value_is_not_echoed_into_the_error_message() {
