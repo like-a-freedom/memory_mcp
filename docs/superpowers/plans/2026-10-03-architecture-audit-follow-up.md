@@ -28,19 +28,30 @@ original step plan; this table is what actually happened.
 | 9 Vector conditional writes | Done | `replace_stale_preserves_concurrent_fact_access` fails against the previous write and passes with the fix; commit `b3fd349` |
 | 10 Access writer | Done | `fact_access_preserves_concurrent_vector_write`, same red/green evidence |
 | 11 Initialize negotiation | Done | `unsupported_initialize_proposal_negotiates_legacy_revision`; commit `6881141` |
-| 12 Rooted source guard | **Not started** | |
-| 13 Public-surface scope | **Not started** | |
+| 12 Rooted source guard | **Not started** | The walk still counts incoming declarations instead of reaching files from Cargo roots |
+| 13 Public-surface scope | **Partly done** | Grouped/aliased `use` trees are read and the ratchet fires on them; the split-`impl` scope and the trait-caller claim are not done |
 | 14 No-default CI row | Done | `2 passed` under `--no-default-features`; commit `afee2b8` |
-| 15 Integrated verification | **Partly done** | Per-lane gates run; the whole-gate command list has not been run end to end |
+| 15 Integrated verification | **Partly done** | Per-lane gates and the workspace gate run; the whole-gate list was not run end to end |
+
+### Second pass, 2026-10-03
+
+Commit `d453a6f` closed the reproduced grouped-export bypass in
+`tests/public_surface_audit.rs`: `pub use crate::types::{Fact, ids};` used to
+enumerate no names at all, so the live ratchet could not fire on it however a
+name regrew. Proven end to end by temporarily adding
+`pub use crate::shared::ids::{hash_prefix};` to `src/service.rs`, which now fails
+`no_cut_name_is_re_exported_again` naming `hash_prefix`; the line was removed
+again before the commit.
 
 Gates actually run: `cargo fmt --all --check` clean; the repo's required Clippy
-command clean; `cargo test -p memory_mcp --lib --bins --features
-streamable-http,test-fixtures` 2395 passed, 0 failed; `http_control_plane`,
-`http_load_concurrency`, `http_crash_recovery`, `http_isolation`,
-`http_proto_conformance`, `tenancy_runtime`, `tenancy_resolution`,
-`tenant_lifecycle`, `embedding_vector_policies`, `embedding_canonical_vectors`,
-`memory_recall` all pass; `--no-default-features --test
-fs_watch_process_disabled` runs 2 tests.
+command clean; `cargo test --workspace --lib --bins --tests --locked` green
+across 103 test targets with 0 failures; `cargo test -p memory_mcp --lib --bins
+--features streamable-http,test-fixtures` 2395 passed, 0 failed;
+`http_control_plane`, `http_load_concurrency`, `http_crash_recovery`,
+`http_isolation`, `http_proto_conformance`, `tenancy_runtime`,
+`tenancy_resolution`, `tenant_lifecycle`, `embedding_vector_policies`,
+`embedding_canonical_vectors` and `memory_recall` all pass;
+`--no-default-features --test fs_watch_process_disabled` runs 2 tests.
 
 ### Why Task 8's HTTP-level test is not done
 
