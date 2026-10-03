@@ -82,12 +82,18 @@ pub trait EmbeddingGeneration: Send + Sync {
 pub enum VectorApplication {
     /// The owner record was updated.
     Applied,
-    /// The record already carried the target signature, so
-    /// no write was issued.
+    /// The write predicate refused: the record already carried the target
+    /// signature, or the policy does not permit replacing what it carries.
+    /// No write was issued.
     AlreadyCurrent,
     /// Nothing was generated, or the policy refused the write. The
     /// reason travels with the outcome so a caller can label a
     /// metric without string-matching an error.
+    ///
+    /// This is a *generation* result. Persistence never returns it: a storage
+    /// adapter that cannot write says `AlreadyCurrent` (a predicate that
+    /// refused) or an error, so `Applied` can no longer be manufactured from a
+    /// successful round-trip that changed nothing.
     Skipped(SkipReason),
 }
 
@@ -128,14 +134,20 @@ pub enum VectorWritePolicy {
 #[async_trait::async_trait]
 pub trait CanonicalVectorPort: Send + Sync {
     /// Vector state currently stored on the fact.
+    ///
+    /// A fact that does not exist is [`MemoryError::NotFound`], not `Absent`:
+    /// "no vector yet" and "no record at all" are different answers, and
+    /// collapsing them is how a write for a deleted fact reports success.
     async fn stored_fact_vector(&self, fact_id: &str) -> Result<StoredVector, MemoryError>;
 
-    /// Apply a validated vector to the fact record.
+    /// Apply a validated vector to the fact record, and report what storage
+    /// actually did.
     ///
-    /// `policy` is carried through so the owner can keep a
-    /// conditional write atomic: a gap fill must still be a
-    /// compare-and-set in storage, not a read-then-write that
-    /// a concurrent pass could interleave with.
+    /// The implementation owns the write predicate, so the decision is made by
+    /// the statement rather than by a read the caller did earlier. `policy` is
+    /// carried through so the owner can keep the write atomic: a gap fill must
+    /// still be a compare-and-set in storage, not a read-then-write that a
+    /// concurrent pass could interleave with.
     async fn apply_fact_vector(
         &self,
         fact_id: &str,
@@ -143,7 +155,7 @@ pub trait CanonicalVectorPort: Send + Sync {
         identity: VectorIdentity,
         at: DateTime<Utc>,
         policy: VectorWritePolicy,
-    ) -> Result<(), MemoryError>;
+    ) -> Result<VectorApplication, MemoryError>;
 }
 
 /// Validate a generated vector against the target identity.
@@ -176,11 +188,14 @@ pub fn prepare_canonical_vector(
 /// Apply a generated vector to a canonical fact through the
 /// owner-approved port.
 ///
-/// [`VectorWritePolicy`] decides what happens when the record
-/// already carries a vector: backfill only fills gaps, while
-/// re-embedding rewrites a stale signature. Either way a record
-/// that is already current is left untouched, so a repeated
-/// job pass is a no-op rather than a redundant write.
+/// The read below is an advisory fast path only: it saves a write when the
+/// caller already knows the answer, and it turns a missing record into
+/// `NotFound` before any vector is built. It is *not* what makes the write
+/// safe — the port's own predicate is, because a read here and a write there
+/// are two statements and another writer can land between them.
+///
+/// The returned outcome is the port's, so a refused predicate is reported as
+/// [`VectorApplication::AlreadyCurrent`] rather than as a successful write.
 pub async fn update_canonical_vector(
     port: &(impl CanonicalVectorPort + ?Sized),
     fact_id: &str,
@@ -193,10 +208,7 @@ pub async fn update_canonical_vector(
     match port.stored_fact_vector(fact_id).await? {
         StoredVector::Present { signature } => {
             let is_current = signature == prepared.identity.signature;
-            if is_current {
-                return Ok(VectorApplication::AlreadyCurrent);
-            }
-            if policy == VectorWritePolicy::FillMissing {
+            if is_current || policy == VectorWritePolicy::FillMissing {
                 return Ok(VectorApplication::AlreadyCurrent);
             }
         }
@@ -209,8 +221,7 @@ pub async fn update_canonical_vector(
         prepared.at,
         policy,
     )
-    .await?;
-    Ok(VectorApplication::Applied)
+    .await
 }
 
 /// Whether a backfill may keep going after one outcome.

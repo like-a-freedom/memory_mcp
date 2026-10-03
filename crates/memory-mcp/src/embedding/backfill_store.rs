@@ -70,36 +70,60 @@ impl EmbeddingBackfillStoreClient {
             .await
     }
 
-    pub(crate) async fn update_embedding_fields(
+    /// Conditionally write embedding fields on one fact, and report whether a
+    /// row was written.
+    ///
+    /// The predicate decides whether an existing vector may be touched, and the
+    /// statement evaluates it: a read here and a write there are two statements,
+    /// and a concurrent writer can land between them. This used to build the
+    /// whole record and hand it to `DbClient::update`, which wrote every field
+    /// it was given — so a vector write could restore a `access_count` or a
+    /// temporal field a concurrent writer had already changed.
+    ///
+    /// The record is targeted as a value, `type::record('fact', $fact_id)`,
+    /// rather than interpolated into a quoted identifier: an id containing `⟩`
+    /// would otherwise escape it.
+    pub(crate) async fn apply_embedding_fields(
         &self,
         fact_id: &str,
         fields: Value,
-    ) -> Result<(), MemoryError> {
+        predicate: &str,
+    ) -> Result<bool, MemoryError> {
         let record_id = fact_id.strip_prefix("fact:").ok_or_else(|| {
-            MemoryError::Validation(format!("invalid fact id for backfill: {fact_id}"))
+            MemoryError::Validation(format!("invalid fact id for embedding write: {fact_id}"))
         })?;
+        if record_id.is_empty() {
+            return Err(MemoryError::Validation(format!(
+                "fact id carries no record id for embedding write: {fact_id}"
+            )));
+        }
         let Value::Object(fields) = fields else {
             return Err(MemoryError::Validation(
-                "backfill embedding fields must be an object".to_string(),
+                "embedding write fields must be an object".to_string(),
             ));
         };
-        let model_assignment = if fields.contains_key("embedding_model") {
-            ", embedding_model = $embedding_model"
-        } else {
-            ""
-        };
-        let sql = format!(
-            "UPDATE fact:⟨{record_id}⟩ SET embedding = $embedding, \
-             embedding_provider = $embedding_provider, \
-             embedding_dimension = $embedding_dimension, \
-             embedding_signature = $embedding_signature, \
-             embedding_updated_at = type::datetime($embedding_updated_at){model_assignment} \
-             WHERE embedding IS NONE RETURN AFTER"
+        let (assignments, mut vars) = crate::storage::queries::build_set_assignments(
+            crate::knowledge::queries::FACT_TEMPORAL_FIELDS,
+            fields,
         );
-        self.db
-            .query(&sql, Some(Value::Object(fields)))
-            .await
-            .map(|_| ())
+        if assignments.is_empty() {
+            return Err(MemoryError::Validation(
+                "embedding write carries no fields".to_string(),
+            ));
+        }
+        vars.insert("fact_id".to_string(), Value::from(record_id));
+        let sql = format!(
+            "UPDATE type::record('fact', $fact_id) SET {} WHERE {predicate} RETURN AFTER",
+            assignments.join(", ")
+        );
+        let rows = self.db.query(&sql, Some(Value::Object(vars))).await?;
+        match rows.as_array().map(Vec::len) {
+            Some(0) => Ok(false),
+            Some(1) => Ok(true),
+            other => Err(MemoryError::Storage(format!(
+                "embedding write for {fact_id} returned {other:?} rows, expected at most one"
+            ))),
+        }
     }
 }
 

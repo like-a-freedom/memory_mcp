@@ -81,7 +81,7 @@ impl CanonicalVectorPort for RecordingPort {
         identity: VectorIdentity,
         _at: DateTime<Utc>,
         policy: VectorWritePolicy,
-    ) -> Result<(), MemoryError> {
+    ) -> Result<VectorApplication, MemoryError> {
         self.calls.lock().expect("calls lock").push(WriteCall {
             fact_id: fact_id.to_owned(),
             vector,
@@ -94,7 +94,7 @@ impl CanonicalVectorPort for RecordingPort {
             .lock()
             .expect("stored lock")
             .insert(fact_id.to_owned(), Some(identity.signature));
-        Ok(())
+        Ok(VectorApplication::Applied)
     }
 }
 
