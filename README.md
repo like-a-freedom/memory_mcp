@@ -968,17 +968,155 @@ and the §20.5 release evidence for open signup.
 
 ## Configuration
 
-Configuration is loaded from environment variables.
+Configuration is loaded from environment variables. There is no config file and no
+`.env` is loaded automatically — the process reads the environment it was started
+with, so a variable must be exported into it (or placed in the container's
+`environment:` block, as `docker-compose.yml` does).
+
+### Environment variable index
+
+Every operator-facing variable in one alphabetical list. `Required` is one of:
+
+- **Yes** — startup fails without it.
+- **Conditional** — required only under the condition named in the row.
+- **No** — a default always exists.
+
+The **Details** column links to the section carrying the full description, accepted
+values, and failure behavior. Test-only, benchmark, and CI variables are not
+operator configuration and are listed under
+[Not operator configuration](#not-operator-configuration).
+
+| Variable | Group | Required | Details |
+| --- | --- | --- | --- |
+| `ALLOWED_HOSTS` | HTTP ingress | Yes | [Streamable HTTP](#streamable-http-environment-variables) |
+| `ALLOWED_ORIGINS` | HTTP ingress | Yes | [Streamable HTTP](#streamable-http-environment-variables) |
+| `EMBEDDINGS_API_KEY` | Embeddings | No | [Advanced runtime overrides](#advanced-runtime-overrides) |
+| `EMBEDDINGS_AUTO_RECOVERY` | Embeddings | No | [Advanced runtime overrides](#advanced-runtime-overrides) |
+| `EMBEDDINGS_BASE_URL` | Embeddings | No | [Advanced runtime overrides](#advanced-runtime-overrides) |
+| `EMBEDDINGS_ENABLED` | Embeddings | No | [Advanced runtime overrides](#advanced-runtime-overrides) |
+| `EMBEDDINGS_MAX_TOKENS` | Embeddings | No | [Advanced runtime overrides](#advanced-runtime-overrides) |
+| `EMBEDDINGS_MODEL` | Embeddings | Conditional | [Advanced runtime overrides](#advanced-runtime-overrides) |
+| `EMBEDDINGS_MODEL_DIR` | Embeddings | No | [Advanced runtime overrides](#advanced-runtime-overrides) |
+| `EMBEDDINGS_PROVIDER` | Embeddings | No | [Advanced runtime overrides](#advanced-runtime-overrides) |
+| `EMBEDDINGS_RECOVERY_INTERVAL_SECS` | Embeddings | No | [Advanced runtime overrides](#advanced-runtime-overrides) |
+| `EMBEDDINGS_SIMILARITY_THRESHOLD` | Embeddings | No | [Advanced runtime overrides](#advanced-runtime-overrides) |
+| `EMBEDDINGS_TIMEOUT_SECS` | Embeddings | No | [Advanced runtime overrides](#advanced-runtime-overrides) |
+| `ENTITY_FUZZY_THRESHOLD` | Entity resolution | No | [Advanced runtime overrides](#advanced-runtime-overrides) |
+| `GLINER_BATCH_SIZE` | NER | No | [Advanced runtime overrides](#advanced-runtime-overrides) |
+| `GLINER_DEVICE` | NER | No | [Advanced runtime overrides](#advanced-runtime-overrides) |
+| `GLINER_MAX_BATCH_TOKENS` | NER | No | [Advanced runtime overrides](#advanced-runtime-overrides) |
+| `LIFECYCLE_ARCHIVAL_AGE_DAYS` | Lifecycle | No | [Advanced runtime overrides](#advanced-runtime-overrides) |
+| `LIFECYCLE_ARCHIVAL_INTERVAL_SECS` | Lifecycle | No | [Advanced runtime overrides](#advanced-runtime-overrides) |
+| `LIFECYCLE_DECAY_HALF_LIFE_DAYS` | Lifecycle | No | [Advanced runtime overrides](#advanced-runtime-overrides) |
+| `LIFECYCLE_DECAY_INTERVAL_SECS` | Lifecycle | No | [Advanced runtime overrides](#advanced-runtime-overrides) |
+| `LIFECYCLE_DECAY_THRESHOLD` | Lifecycle | No | [Advanced runtime overrides](#advanced-runtime-overrides) |
+| `LIFECYCLE_ENABLED` | Lifecycle | No | [Advanced runtime overrides](#advanced-runtime-overrides) |
+| `MEMORY_CLAIM_CANDIDATE_PAGE_SIZE` | Claim reconciliation | No | [Advanced runtime overrides](#advanced-runtime-overrides) |
+| `MEMORY_CLAIM_INLINE_BUDGET_MS` | Claim reconciliation | No | [Advanced runtime overrides](#advanced-runtime-overrides) |
+| `MEMORY_CLAIM_INLINE_CANDIDATE_LIMIT` | Claim reconciliation | No | [Advanced runtime overrides](#advanced-runtime-overrides) |
+| `MEMORY_CLAIM_ROLLOUT_STAGE` | Claim reconciliation | No | [Advanced runtime overrides](#advanced-runtime-overrides) |
+| `MEMORY_HOOK_CONTENT` | Hooks | No | [Agent memory lifecycle hooks](#agent-memory-lifecycle-hooks) |
+| `MEMORY_HOOK_MAX_TRANSCRIPT_LINES` | Hooks | No | [Agent memory lifecycle hooks](#agent-memory-lifecycle-hooks) |
+| `MEMORY_HOOK_POLICY_TAGS` | Hooks | No | [Agent memory lifecycle hooks](#agent-memory-lifecycle-hooks) |
+| `MEMORY_HOOK_SOURCE_TYPE` | Hooks | No | [Agent memory lifecycle hooks](#agent-memory-lifecycle-hooks) |
+| `MEMORY_HOOK_VERBOSE` | Hooks | No | [Agent memory lifecycle hooks](#agent-memory-lifecycle-hooks) |
+| `MEMORY_INGESTION_INBOX` | Filesystem ingestion | No | [Filesystem ingestion](#filesystem-ingestion) |
+| `MEMORY_LOG_FILE` | Logging | No | [Advanced runtime overrides](#advanced-runtime-overrides) |
+| `MEMORY_MCP_API_KEY_PEPPER` | HTTP secrets | Conditional | [Streamable HTTP](#streamable-http-environment-variables) |
+| `MEMORY_MCP_HTTP_AUTH_METHODS` | HTTP auth | No | [Streamable HTTP](#streamable-http-environment-variables) |
+| `MEMORY_MCP_HTTP_AUTH_MODE` | HTTP auth | No | [Streamable HTTP](#streamable-http-environment-variables) |
+| `MEMORY_MCP_HTTP_BIND` | HTTP ingress | No | [Streamable HTTP](#streamable-http-environment-variables) |
+| `MEMORY_MCP_HTTP_BODY_LIMIT` | HTTP limits | No | [Streamable HTTP](#streamable-http-environment-variables) |
+| `MEMORY_MCP_HTTP_CSRF_KEY` | HTTP secrets | Conditional | [Streamable HTTP](#streamable-http-environment-variables) |
+| `MEMORY_MCP_HTTP_EXTRACTION_CONCURRENCY` | Plan limits | Conditional | [Streamable HTTP](#streamable-http-environment-variables) |
+| `MEMORY_MCP_HTTP_GLOBAL_REQUEST_LIMIT` | HTTP limits | No | [Streamable HTTP](#streamable-http-environment-variables) |
+| `MEMORY_MCP_HTTP_IDENTITY_INDEX_KEY` | HTTP secrets | Conditional | [Streamable HTTP](#streamable-http-environment-variables) |
+| `MEMORY_MCP_HTTP_INGEST_PER_MINUTE` | Plan limits | Conditional | [Streamable HTTP](#streamable-http-environment-variables) |
+| `MEMORY_MCP_HTTP_LOCAL_DEFAULT_PLAN_VERSION` | HTTP auth | Conditional | [Streamable HTTP](#streamable-http-environment-variables) |
+| `MEMORY_MCP_HTTP_MAINTENANCE_PARALLELISM` | HTTP limits | No | [Streamable HTTP](#streamable-http-environment-variables) |
+| `MEMORY_MCP_HTTP_MAX_ACTIVE_API_KEYS` | Plan limits | Conditional | [Streamable HTTP](#streamable-http-environment-variables) |
+| `MEMORY_MCP_HTTP_MAX_EPISODE_COUNT` | Plan limits | Conditional | [Streamable HTTP](#streamable-http-environment-variables) |
+| `MEMORY_MCP_HTTP_MAX_INGESTED_BYTES` | Plan limits | Conditional | [Streamable HTTP](#streamable-http-environment-variables) |
+| `MEMORY_MCP_HTTP_MAX_OPEN_APP_SESSIONS` | Plan limits | Conditional | [Streamable HTTP](#streamable-http-environment-variables) |
+| `MEMORY_MCP_HTTP_OIDC_ALLOWED_ALG` | HTTP auth | No | [Streamable HTTP](#streamable-http-environment-variables) |
+| `MEMORY_MCP_HTTP_OIDC_AUDIENCE` | HTTP auth | Conditional | [Streamable HTTP](#streamable-http-environment-variables) |
+| `MEMORY_MCP_HTTP_OIDC_CLIENT_ID` | HTTP auth | Conditional | [Streamable HTTP](#streamable-http-environment-variables) |
+| `MEMORY_MCP_HTTP_OIDC_ISSUER` | HTTP auth | Conditional | [Streamable HTTP](#streamable-http-environment-variables) |
+| `MEMORY_MCP_HTTP_OIDC_NONCE_KEY` | HTTP secrets | Conditional | [Streamable HTTP](#streamable-http-environment-variables) |
+| `MEMORY_MCP_HTTP_OIDC_REDIRECT_URI` | HTTP auth | No | [Streamable HTTP](#streamable-http-environment-variables) |
+| `MEMORY_MCP_HTTP_OIDC_STATE_KEY` | HTTP secrets | Conditional | [Streamable HTTP](#streamable-http-environment-variables) |
+| `MEMORY_MCP_HTTP_OPERATOR_IDENTITIES` | HTTP auth | No | [Streamable HTTP](#streamable-http-environment-variables) |
+| `MEMORY_MCP_HTTP_PER_TENANT_REQUEST_CONCURRENCY` | Plan limits | Conditional | [Streamable HTTP](#streamable-http-environment-variables) |
+| `MEMORY_MCP_HTTP_POOL_CAP` | HTTP limits | No | [Streamable HTTP](#streamable-http-environment-variables) |
+| `MEMORY_MCP_HTTP_PUBLIC_BASE_URL` | HTTP ingress | Yes | [Streamable HTTP](#streamable-http-environment-variables) |
+| `MEMORY_MCP_HTTP_REQUEST_DEADLINE_SECS` | HTTP limits | No | [Streamable HTTP](#streamable-http-environment-variables) |
+| `MEMORY_MCP_HTTP_REPLICA_ID` | HTTP limits | No | [Streamable HTTP](#streamable-http-environment-variables) |
+| `MEMORY_MCP_HTTP_RUNTIME_ACTIVATION_TIMEOUT_SECS` | HTTP limits | No | [Streamable HTTP](#streamable-http-environment-variables) |
+| `MEMORY_MCP_HTTP_RUNTIME_CAPACITY_WAIT_MS` | HTTP limits | No | [Streamable HTTP](#streamable-http-environment-variables) |
+| `MEMORY_MCP_HTTP_RUNTIME_IDLE_TTL_SECS` | HTTP limits | No | [Streamable HTTP](#streamable-http-environment-variables) |
+| `MEMORY_MCP_HTTP_SECRET_KEY` | HTTP secrets | Conditional | [Streamable HTTP](#streamable-http-environment-variables) |
+| `MEMORY_MCP_HTTP_SESSION_KEY` | HTTP secrets | Conditional | [Streamable HTTP](#streamable-http-environment-variables) |
+| `MEMORY_MCP_HTTP_SHUTDOWN_GRACE_SECS` | HTTP limits | No | [Streamable HTTP](#streamable-http-environment-variables) |
+| `MEMORY_MCP_HTTP_SIGNUP_MODE` | HTTP auth | No | [Streamable HTTP](#streamable-http-environment-variables) |
+| `MEMORY_MCP_HTTP_SUBSCRIPTION_AUTH_RECHECK_SECS` | HTTP limits | No | [Streamable HTTP](#streamable-http-environment-variables) |
+| `MEMORY_MCP_HTTP_SUBSCRIPTION_LIMIT` | HTTP limits | No | [Streamable HTTP](#streamable-http-environment-variables) |
+| `MEMORY_MCP_HTTP_SUBSCRIPTION_QUEUE_CAPACITY` | HTTP limits | No | [Streamable HTTP](#streamable-http-environment-variables) |
+| `MEMORY_MCP_HTTP_TASK_QUEUE_CAPACITY` | HTTP limits | No | [Streamable HTTP](#streamable-http-environment-variables) |
+| `MEMORY_MCP_HTTP_TASK_RETENTION_SECS` | HTTP limits | No | [Streamable HTTP](#streamable-http-environment-variables) |
+| `MEMORY_MCP_HTTP_TASK_SYNC_MAX_BYTES` | HTTP limits | No | [Streamable HTTP](#streamable-http-environment-variables) |
+| `MEMORY_MCP_HTTP_TRUSTED_PROXY_CIDRS` | HTTP ingress | No | [Streamable HTTP](#streamable-http-environment-variables) |
+| `MEMORY_MCP_IMAGE` | Docker Compose | No | [Docker Compose](#docker-compose-streamable-http-linux-x64) |
+| `MEMORY_MCP_SERVER_CMD` | Hooks | No | [Agent memory lifecycle hooks](#agent-memory-lifecycle-hooks) |
+| `MEMORY_MCP_SERVER_CWD` | Hooks | No | [Agent memory lifecycle hooks](#agent-memory-lifecycle-hooks) |
+| `MEMORY_MCP_TEST_PROXY_BIN` | Tests | No | [Not operator configuration](#not-operator-configuration) |
+| `MEMORY_PROMETHEUS_LISTEN_ADDR` | Metrics | No | [Advanced runtime overrides](#advanced-runtime-overrides) |
+| `NER_CACHE_DIR` | NER | No | [Advanced runtime overrides](#advanced-runtime-overrides) |
+| `NER_EXTRACTOR` | NER | No | [Advanced runtime overrides](#advanced-runtime-overrides) |
+| `NER_IDLE_UNLOAD_SECS` | NER | No | [Advanced runtime overrides](#advanced-runtime-overrides) |
+| `NER_LABELS` | NER | No | [Advanced runtime overrides](#advanced-runtime-overrides) |
+| `NER_MAX_CONCURRENCY` | NER | No | [Advanced runtime overrides](#advanced-runtime-overrides) |
+| `NER_THRESHOLD` | NER | No | [Advanced runtime overrides](#advanced-runtime-overrides) |
+| `QUERY_LOG_RETENTION_DAYS` | Query analytics | No | [Advanced runtime overrides](#advanced-runtime-overrides) |
+| `QUERY_LOGGING_ENABLED` | Query analytics | No | [Advanced runtime overrides](#advanced-runtime-overrides) |
+| `RUST_LOG` | Logging | No | [Advanced runtime overrides](#advanced-runtime-overrides) |
+| `SURREALDB_CONTROL_DB` | HTTP storage | Yes | [Streamable HTTP](#streamable-http-environment-variables) |
+| `SURREALDB_CONTROL_NAMESPACE` | HTTP storage | Yes | [Streamable HTTP](#streamable-http-environment-variables) |
+| `SURREALDB_CONTROL_PASSWORD` | HTTP storage | Yes | [Streamable HTTP](#streamable-http-environment-variables) |
+| `SURREALDB_CONTROL_URL` | HTTP storage | Yes | [Streamable HTTP](#streamable-http-environment-variables) |
+| `SURREALDB_CONTROL_USERNAME` | HTTP storage | Yes | [Streamable HTTP](#streamable-http-environment-variables) |
+| `SURREALDB_DATA_DIR` | Storage | No | [Storage variables and defaults](#storage-variables-and-defaults) |
+| `SURREALDB_DB_NAME` | Storage | No | [Storage variables and defaults](#storage-variables-and-defaults) |
+| `SURREALDB_EMBEDDED` | Storage | No | [Storage variables and defaults](#storage-variables-and-defaults) |
+| `SURREALDB_EMBEDDING_DIMENSION` | Embeddings | No | [Storage variables and defaults](#storage-variables-and-defaults) |
+| `SURREALDB_NAMESPACE` | Storage | No | [Storage variables and defaults](#storage-variables-and-defaults) |
+| `SURREALDB_PASSWORD` | Storage | Conditional | [Storage variables and defaults](#storage-variables-and-defaults) |
+| `SURREALDB_TENANT_DB` | HTTP storage | Yes | [Streamable HTTP](#streamable-http-environment-variables) |
+| `SURREALDB_TENANT_NAMESPACE` | HTTP storage | Yes | [Streamable HTTP](#streamable-http-environment-variables) |
+| `SURREALDB_TENANT_PASSWORD` | HTTP storage | Yes | [Streamable HTTP](#streamable-http-environment-variables) |
+| `SURREALDB_TENANT_URL` | HTTP storage | Yes | [Streamable HTTP](#streamable-http-environment-variables) |
+| `SURREALDB_TENANT_USERNAME` | HTTP storage | Yes | [Streamable HTTP](#streamable-http-environment-variables) |
+| `SURREALDB_URL` | Storage | Conditional | [Storage variables and defaults](#storage-variables-and-defaults) |
+| `SURREALDB_USERNAME` | Storage | Conditional | [Storage variables and defaults](#storage-variables-and-defaults) |
+
+Variables that are retired, removed, or ignored are collected under
+[Removed and ignored variables](#removed-and-ignored-variables).
 
 ### Storage variables and defaults
+
+These are read by the stdio/local profile (`memory_mcp serve`). The HTTP profile
+ignores them in favour of the `SURREALDB_CONTROL_*` and `SURREALDB_TENANT_*`
+pair; see [Streamable HTTP environment variables](#streamable-http-environment-variables).
+`RUST_LOG`, `QUERY_LOGGING_ENABLED`, `QUERY_LOG_RETENTION_DAYS`, and every
+`LIFECYCLE_*` variable are read through the same stdio config path even in an
+HTTP build, so they still apply there.
 
 | Variable | Type | Default | Required | Description |
 | --- | --- | --- | --- | --- |
 | `SURREALDB_DB_NAME` | string | `memory` | No | Database name |
 | `SURREALDB_NAMESPACE` | string | `main` | No | One namespace; changing it takes effect after restart and never moves data |
-| `SURREALDB_USERNAME` | string | `root` (embedded); explicit value required (remote) | Remote only | Database username |
-| `SURREALDB_PASSWORD` | string | `root` (embedded); explicit value required (remote) | Remote only | Database password |
-| `SURREALDB_URL` | URL | unset (embedded) | Remote only | Remote connection URL using `ws`, `wss`, `http`, or `https` |
+| `SURREALDB_USERNAME` | string | `root` (embedded); explicit value required (remote) | Conditional | Database username. Required in remote mode |
+| `SURREALDB_PASSWORD` | string | `root` (embedded); explicit value required (remote) | Conditional | Database password. Required in remote mode |
+| `SURREALDB_URL` | URL | unset (embedded) | Conditional | Remote connection URL using `ws`, `wss`, `http`, or `https`. Required in remote mode |
 | `SURREALDB_EMBEDDED` | boolean | inferred from `SURREALDB_URL` | No | Explicit `true`/`false`; remote URLs select remote mode and all other URLs select embedded mode when unset |
 | `SURREALDB_DATA_DIR` | path | `$XDG_DATA_HOME/memory_mcp`; else `$HOME/.local/share/memory_mcp`; else `./.memory_mcp` (embedded); unset (remote config) | No | Custom embedded data directory; an existing executable-relative `data/surrealdb` directory may be reused for compatibility, and the effective default root also backs local model caches |
 | `SURREALDB_EMBEDDING_DIMENSION` | unsigned integer | unset | No | Existing vector dimension override; the provider fallback is `384` for `local-candle` and `1536` for other embedding providers |
@@ -988,6 +1126,32 @@ or model download required to start storage. Remote mode requires a valid URL an
 non-empty explicit username and password. NER defaults to the in-process Anno
 backend; `zero-config` does not mean the binary has no dependencies.
 
+### Filesystem ingestion
+
+| Variable | Type | Default | Required | Description |
+| --- | --- | --- | --- | --- |
+| `MEMORY_INGESTION_INBOX` | absolute directory path | unset (ingestion disabled) | No | Enables filesystem ingestion inside `serve`. Requires the `fs-watch` feature, which is on by default |
+
+The path is validated strictly at startup, and each rule has its own error so a
+misconfiguration names itself: it must be non-empty, **absolute**, point to an
+**existing** directory, **not be a symlink**, and be **readable** (the directory
+must list). `~` and `$HOME` are never expanded and the path is never
+canonicalized — pass the literal path you want ingested, and let your shell do
+the expansion:
+
+```bash
+MEMORY_INGESTION_INBOX="$HOME/notes" memory_mcp serve
+```
+
+Leaving it unset is the normal case and changes nothing at startup. Setting it on
+a binary built **without** the `fs-watch` feature is a startup error rather than a
+silent no-op. The HTTP profile never reads this variable at all — it is a
+stdio-only ingestion path, so a value set there has no effect rather than being
+rejected. The revision and deduplication behavior, supported file types, and MCP
+host examples are covered under
+[Filesystem ingestion](#filesystem-ingestion-optional-inside-serve) in the Quick
+start section above.
+
 ### Advanced runtime overrides
 
 The following settings are optional for power users. They are read by the same executable used by the no-configuration quick start.
@@ -996,7 +1160,7 @@ The following settings are optional for power users. They are read by the same e
 | --- | --- | --- | --- |
 | `RUST_LOG` | string | `info` | Logging level. A comma-separated list of directives: a bare level (`trace`, `debug`, `info`, `warn`, `error`; `warning` aliases `warn`) sets the default, and `prefix=level` sets it for the events whose `op` starts with that prefix at a dot boundary. The most specific prefix wins, and an unparseable directive is ignored rather than taking the rest of the list with it. An unknown level falls back to `info`. Example: `RUST_LOG=info,oidc=debug,ner=warn` turns the OIDC callback up without turning up the extraction pipeline |
 | `MEMORY_LOG_FILE` | path | unset | Write structured log events to this file instead of stderr; the file is created if missing (parent directory must exist), opened in append mode, and flushed after every line; on open failure the process falls back to stderr with a warning |
-| `MEMORY_PROMETHEUS_LISTEN_ADDR` | socket address (`IP:port`) | unset | Prometheus HTTP listener address; active only when the `streamable-http` profile is compiled and this variable is set |
+| `MEMORY_PROMETHEUS_LISTEN_ADDR` | socket address (`IP:port`) | unset | Prometheus listener for the **stdio/local** profile, active when the `prometheus` feature is compiled in and this variable is set. The HTTP profile **rejects it** — `memory_mcp_http` serves metrics on its own `/metrics` route, and two scrape surfaces for one recorder is a configuration error |
 | `QUERY_LOGGING_ENABLED` | boolean | `false` | Persist `assemble_context` analytics rows into `query_log` when `true` |
 | `QUERY_LOG_RETENTION_DAYS` | unsigned integer | `90` | Days to retain persisted `query_log` analytics before best-effort pruning |
 | `LIFECYCLE_ENABLED` | boolean | `false` | Enable background lifecycle jobs |
@@ -1006,13 +1170,13 @@ The following settings are optional for power users. They are read by the same e
 | `LIFECYCLE_ARCHIVAL_AGE_DAYS` | unsigned integer | `90` | Days before archiving episodes |
 | `LIFECYCLE_DECAY_HALF_LIFE_DAYS` | floating-point number | `365` | Half-life in days for decay computation |
 | `EMBEDDINGS_ENABLED` | boolean | `false` when unset and no provider is set; `true` when a provider is set and this variable is unset | Enable semantic retrieval; explicit `false` takes precedence over provider selection |
-| `EMBEDDINGS_PROVIDER` | string enum | `disabled` when both variables are unset; `local-candle` when `EMBEDDINGS_ENABLED=true` without a provider | Embedding backend: `local-candle`, `openai-compatible`, or `ollama`; when `EMBEDDINGS_ENABLED` is unset, setting a provider enables embeddings, while explicit `false` disables them and explicit `true` enables the selected/default provider |
+| `EMBEDDINGS_PROVIDER` | string enum | `disabled` when both variables are unset; `local-candle` when `EMBEDDINGS_ENABLED=true` without a provider | Embedding backend: `local-candle`, `openai-compatible`, or `ollama`; when `EMBEDDINGS_ENABLED` is unset, setting a provider enables embeddings, while explicit `false` disables them and explicit `true` enables the selected/default provider. Matching is case-insensitive and accepts the aliases `local_candle` and `localcandle` for `local-candle`, and `openai` and `openai_compatible` for `openai-compatible`; any other value is a startup error |
 | `EMBEDDINGS_MODEL` | string | `intfloat/multilingual-e5-small` for `local-candle`; required for external providers when enabled | Model identifier for the selected embedding provider |
 | `EMBEDDINGS_MODEL_DIR` | path | unset (derived under the effective data/cache root for `local-candle`) | Optional local cache directory for `local-candle` |
 | `EMBEDDINGS_BASE_URL` | URL | unset for `local-candle`; `https://api.openai.com/v1` for `openai-compatible`; `http://127.0.0.1:11434` for `ollama` | Base URL for remote embedding providers |
 | `EMBEDDINGS_MAX_TOKENS` | unsigned integer | `384` | Max token budget before `local-candle` chunks long inputs |
 | `EMBEDDINGS_TIMEOUT_SECS` | unsigned integer | `15` | Timeout for remote embedding calls |
-| `EMBEDDINGS_RECOVERY_INTERVAL_SECS` | positive unsigned integer | `60` | Initial delay before the in-process recovery worker probes a remote provider after degraded startup; failed probes use exponential backoff |
+| `EMBEDDINGS_RECOVERY_INTERVAL_SECS` | positive unsigned integer | `60` | Initial delay before the in-process recovery worker probes a remote provider after degraded startup; failed probes use exponential backoff. Must be greater than zero — `0` is a startup error, not a way to disable the interval (use `EMBEDDINGS_AUTO_RECOVERY=false`) |
 | `EMBEDDINGS_AUTO_RECOVERY` | boolean | `true` | Enable automatic in-process recovery after a failed remote startup preflight; set `false` for explicit opt-out |
 | `EMBEDDINGS_SIMILARITY_THRESHOLD` | floating-point number | `0.7` | Minimum cosine similarity for semantic matches |
 | `EMBEDDINGS_API_KEY` | string | unset | Optional bearer token for OpenAI-compatible providers |
@@ -1020,16 +1184,16 @@ The following settings are optional for power users. They are read by the same e
 | `NER_CACHE_DIR` | path | `<data>/models/ner` | Artifact store root for model-backed extractors (Anno ONNX, classic GLiNER, VAGO LFM2) |
 | `NER_LABELS` | comma-separated list | `person`, `company`, `location`, `product`, `event`, `technology` | Runtime labels for model-backed extractors; trimmed, lowercased, deduplicated in first-declared order |
 | `NER_THRESHOLD` | floating-point number | `0.5` | Confidence threshold for model-backed extractors (each backend owns an evaluated default; explicit in-range values override it) |
-| `NER_MAX_CONCURRENCY` | positive integer | `1` | Concurrent local NER inference limit |
+| `NER_MAX_CONCURRENCY` | positive integer | `1` | Concurrent local NER inference limit. `0` is a startup error |
 | `NER_IDLE_UNLOAD_SECS` | unsigned integer | `0` | Seconds of inactivity before any model-backed extractor unloads its model; `0` keeps it loaded for the process lifetime |
-| `GLINER_BATCH_SIZE` | positive integer | `1` | Max windows per transformer forward pass; increase only after workload-specific benchmarking |
-| `GLINER_MAX_BATCH_TOKENS` | positive integer | `1536` | Max padded tokens per batch |
+| `GLINER_BATCH_SIZE` | positive integer | `1` | Max windows per transformer forward pass; `0` is a startup error. Increase only after workload-specific benchmarking |
+| `GLINER_MAX_BATCH_TOKENS` | positive integer | `1536` | Max padded tokens per batch; `0` is a startup error |
 | `GLINER_DEVICE` | string enum | `cpu` | Device for the native Candle GLiNER backends: `cpu`, `metal`, or `auto`; `metal` requires `--features metal`, while `auto` uses Metal when available and otherwise falls back to CPU (with an event) |
 | `MEMORY_CLAIM_ROLLOUT_STAGE` | string enum | `shadow` | Claim reconciliation rollout stage: `disabled`, `shadow`, `relations`, or `evidence` |
-| `MEMORY_CLAIM_CANDIDATE_PAGE_SIZE` | unsigned integer | `256` | Candidate page size for claim reconciliation |
-| `MEMORY_CLAIM_INLINE_CANDIDATE_LIMIT` | unsigned integer | `1024` | Inline claim candidate limit |
-| `MEMORY_CLAIM_INLINE_BUDGET_MS` | unsigned integer | `50` | Inline claim reconciliation budget in milliseconds |
-| `ENTITY_FUZZY_THRESHOLD` | floating-point number | `0.85` | Entity fuzzy-match threshold |
+| `MEMORY_CLAIM_CANDIDATE_PAGE_SIZE` | unsigned integer | `256` | Candidate page size for claim reconciliation. A non-numeric value is a startup error |
+| `MEMORY_CLAIM_INLINE_CANDIDATE_LIMIT` | unsigned integer | `1024` | Inline claim candidate limit. A non-numeric value is a startup error |
+| `MEMORY_CLAIM_INLINE_BUDGET_MS` | unsigned integer | `50` | Inline claim reconciliation budget in milliseconds. A non-numeric value is a startup error |
+| `ENTITY_FUZZY_THRESHOLD` | floating-point number | `0.85` | Entity fuzzy-match threshold. Must be finite and within `0.0..=1.0` |
 
 Advanced provider selection may cause network access or model downloads. Keep these variables unset for the local-first quick start.
 
@@ -1042,7 +1206,7 @@ Read only by the `memory_mcp_http` binary built with the `streamable-http` featu
 | Variable | Type | Default | Description |
 | --- | --- | --- | --- |
 | `MEMORY_MCP_HTTP_BIND` | socket address (`IP:port`) | `0.0.0.0:8080` | Listen address |
-| `MEMORY_MCP_HTTP_PUBLIC_BASE_URL` | URL | unset | Required. Public base URL used for OIDC redirects and absolute links. Its **path** is also the mount base of the server (e.g. `https://mcp.example/memory`); no path means the origin root. The path is stamped into the served UI bundle at startup, so no UI rebuild is needed when it changes |
+| `MEMORY_MCP_HTTP_PUBLIC_BASE_URL` | URL | unset | **Required** — startup fails without it. Public base URL used for OIDC redirects and absolute links. Its **path** is also the mount base of the server (e.g. `https://mcp.example/memory`); no path means the origin root. The path is stamped into the served UI bundle at startup, so no UI rebuild is needed when it changes. The `memory_mcp admin` CLI is the one exception: it falls back to `https://localhost` when unset, so it accepts a deployment the server would refuse |
 | `ALLOWED_HOSTS` | comma-separated list | unset | Required for production. Wildcard and unset values are rejected at startup; missing `Host` returns `403` |
 | `ALLOWED_ORIGINS` | comma-separated list | unset | Required for production. Wildcard values are rejected; missing `Origin` is allowed only for non-browser MCP clients, present `Origin` must match |
 | `MEMORY_MCP_HTTP_TRUSTED_PROXY_CIDRS` | comma-separated `CIDR` list | unset | Trusted reverse-proxy CIDRs for forwarded `Host`/`Origin`; if unset, the values are ignored entirely |
@@ -1084,7 +1248,7 @@ form startup fails — material is never invented.
 
 | Variable | Type | Default | Description |
 | --- | --- | --- | --- |
-| `MEMORY_MCP_HTTP_AUTH_METHODS` | comma-separated set of `local` \| `oidc` | `oidc` | The browser authentication methods this deployment serves. Each enabled method mounts its own surface and each disabled method mounts nothing. A set that omits a method the deployment has already enabled fails startup: removing a method is an explicit guarded operation, `memory_mcp admin auth-methods remove --method local` |
+| `MEMORY_MCP_HTTP_AUTH_METHODS` | comma-separated set of `local` \| `oidc` | `oidc` | The browser authentication methods this deployment serves. Each enabled method mounts its own surface and each disabled method mounts nothing. Supplying neither this nor `MEMORY_MCP_HTTP_AUTH_MODE` keeps the historical default of `oidc` alone. A set that omits a method the deployment has already enabled fails startup: removing a method is an explicit guarded operation, `memory_mcp admin auth-methods remove --method local`. Note that the shipped `docker-compose.yml` sets this to `local` — that is a deliberate opinionated override for zero-input local startup, not the binary default |
 | `MEMORY_MCP_HTTP_AUTH_MODE` | one of `local` \| `oidc` | unset | Deprecated alias for a one-element `MEMORY_MCP_HTTP_AUTH_METHODS`, accepted for one release. Supplying both is an error unless they agree |
 | `MEMORY_MCP_HTTP_SIGNUP_MODE` | enum: `invite_only` \| `open` | `invite_only` | Optional. The default `invite_only` rejects self-service sign-up; `open` must be explicit, requires the seven plan seed variables below, and is rejected without the `oidc` method. The first identity under `invite_only` arrives through an identity invitation: `POST /api/v1/admin/clients/{account_id}/identity_invitation` (local administrator) returns the authorize URL to hand to the user |
 | `MEMORY_MCP_HTTP_OIDC_ISSUER` | URL | unset | Required when `oidc` is enabled, refused when it is not. May be written with or without a trailing slash: comparison against the provider's published issuer is normalized on both sides (providers such as Rauthy >= 0.35 always publish a trailing slash), and the published form from the discovery document is authoritative for ID-token `iss` validation and identity keying. The discovery document is fetched at startup, so an unreachable issuer is a startup failure |
@@ -1137,6 +1301,11 @@ that would otherwise be unreachable.
 
 **Runtime pool, subscriptions, tasks, replica identity**
 
+Every limit in the two tables above and in this one must be greater than zero;
+`0` is a startup error rather than an "unlimited" spelling. The one upper bound
+is `MEMORY_MCP_HTTP_SUBSCRIPTION_AUTH_RECHECK_SECS`, which must not exceed `60`
+seconds — a longer interval would let a revoked authorization keep streaming.
+
 | Variable | Type | Default | Description |
 | --- | --- | --- | --- |
 | `MEMORY_MCP_HTTP_POOL_CAP` | `usize` | `32` | Maximum number of tenant runtimes kept warm |
@@ -1153,7 +1322,9 @@ that would otherwise be unreachable.
 | `MEMORY_MCP_HTTP_TASK_SYNC_MAX_BYTES` | `usize` | `1048576` (1 MiB) | Preflight size limit: `extract` work above this returns a preflight rejection for clients that did not advertise Tasks |
 | `MEMORY_MCP_HTTP_REPLICA_ID` | string | unset (falls back to process PID) | Stable replica identity. Set in multi-replica deployments; the PID fallback is safe only for a single process |
 
-`MEMORY_INGESTION_INBOX` and any other stdio-only filesystem variable are rejected as a fatal startup error in the HTTP profile.
+`MEMORY_INGESTION_INBOX` is never read by the HTTP profile: filesystem ingestion
+is a stdio-only path, so a value set in the environment has no effect here rather
+than failing startup.
 
 **Additional startup-failure rules**:
 
@@ -1164,9 +1335,13 @@ that would otherwise be unreachable.
 
 ### Runtime metrics
 
-Build with the optional `prometheus` feature and set
-`MEMORY_PROMETHEUS_LISTEN_ADDR` to expose the Prometheus endpoint. The runtime
-exports three generic bounded metric families:
+The HTTP profile serves metrics on its own `/metrics` route, so
+`MEMORY_PROMETHEUS_LISTEN_ADDR` must **not** be set here — startup rejects it.
+That variable belongs to the stdio/local profile, where it opens a separate
+listener; see [Advanced runtime overrides](#advanced-runtime-overrides). In the
+HTTP profile the `prometheus` feature comes in through `streamable-http` and
+needs no configuration. The runtime exports three generic bounded metric
+families:
 
 | Metric | Labels | Meaning |
 | --- | --- | --- |
@@ -1250,6 +1425,85 @@ sign-in looks exactly like a quiet one.
 Neither label is ever a username, an issuer, a subject or an error string.
 Those are the identifiers that turn a metrics backend into a disclosure, and
 the audit trail already carries them under a keyed fingerprint.
+
+### Agent memory lifecycle hooks
+
+The lifecycle scripts in `hooks/` capture a session snapshot when an agent run
+ends and an emergency snapshot before context compaction. They read the
+environment, launch the server themselves, and are configured entirely through
+variables. [`hooks/README.md`](hooks/README.md) is the contract of record,
+including the editor-by-editor hook matrix.
+
+| Variable | Default | Description |
+| --- | --- | --- |
+| `MEMORY_MCP_SERVER_CMD` | `cargo run --quiet --bin memory_mcp` | Shell command that launches the server the hook ingests into. Runs through a shell, so quoting is yours to control |
+| `MEMORY_MCP_SERVER_CWD` | the repository root, else the editor's working directory | Working directory for that server process, and the anchor for the default `SURREALDB_DATA_DIR` |
+| `MEMORY_HOOK_CONTENT` | unset | Explicit snapshot text. Wins over the transcript and over the hook payload |
+| `MEMORY_HOOK_MAX_TRANSCRIPT_LINES` | `80` | How many trailing lines to copy from the transcript path in the payload. Must be an integer — a non-numeric value fails the hook |
+| `MEMORY_HOOK_SOURCE_TYPE` | `session_summary` | `source_type` recorded with the ingested episode |
+| `MEMORY_HOOK_POLICY_TAGS` | event-specific: `hook:stop,session_summary` and `hook:precompact,session_summary,emergency_save` | Replaces the default tag list entirely. An empty value falls back to the event default |
+| `MEMORY_HOOK_VERBOSE` | unset; `1` enables | Print one success line per invocation |
+
+The scripts also inject server defaults with `setdefault`, so they never override
+a value you exported: `SURREALDB_DB_NAME=memory`, `SURREALDB_EMBEDDED=true`,
+`SURREALDB_NAMESPACE=main`, `SURREALDB_USERNAME=root`, `SURREALDB_PASSWORD=root`,
+`SURREALDB_DATA_DIR=<server cwd>/data/surrealdb`, `RUST_LOG=error`.
+
+Four variables are **internal to the scripts and not operator-settable** — each
+script hard-exports them, so an exported value of the same name is ignored:
+`MEMORY_HOOK_EVENT`, `MEMORY_HOOK_DEFAULT_POLICY_TAGS`, `MEMORY_HOOK_REPO_ROOT`,
+and `MEMORY_HOOK_INPUT_JSON`.
+
+### Removed and ignored variables
+
+These names are not part of the configuration surface. Some are hard errors that
+name their replacement, so a stale deployment fails loudly instead of silently
+changing behavior; the rest are inert and can be deleted from any environment
+file.
+
+| Variable | Status | Replacement |
+| --- | --- | --- |
+| `NER_PROVIDER` | Rejected at startup | `NER_EXTRACTOR` |
+| `NER_MODEL` | Rejected at startup | `NER_EXTRACTOR` (the closed backend catalog replaces a free-form model id) |
+| `NER_MODEL_DIR` | Rejected at startup | `NER_CACHE_DIR` |
+| `NER_BATCH_SIZE` | Rejected at startup | `GLINER_BATCH_SIZE` |
+| `NER_MAX_BATCH_TOKENS` | Rejected at startup | `GLINER_MAX_BATCH_TOKENS` |
+| `NER_DEVICE` | Rejected at startup | `GLINER_DEVICE` |
+| `GLINER_IDLE_UNLOAD_SECS` | Rejected at startup | `NER_IDLE_UNLOAD_SECS` |
+| `SURREALDB_NAMESPACES` | Rejected at startup | `SURREALDB_NAMESPACE` — exactly one namespace, per [One active namespace](#one-active-namespace) |
+| `SURREALDB_FS_WATCH_INBOX` | Rejected in the HTTP profile | `MEMORY_INGESTION_INBOX`. This guard is defensive: no code path ever sets this name, but the HTTP profile checks for it so a hand-edited deployment file cannot reintroduce filesystem ingestion silently |
+| `MEMORY_MCP_HTTP_ENABLE_CONTROL_PLANE` | Ignored — never read | The `streamable-http` build feature selects the control plane |
+| `MEMORY_MCP_HTTP_ENABLE_CONTROL_PLANE_UI` | Ignored — never read | The `ui` feature, implied by `streamable-http` |
+| `MEMORY_HOOK_PROJECT` | Ignored — never read | Nothing. It appeared in older hook documentation and does nothing anywhere; remove it from your editor config |
+| `MEMORY_MCP_HTTP_AUTH_MODE` | Deprecated, still accepted for one release | `MEMORY_MCP_HTTP_AUTH_METHODS`. Setting both is an error unless they agree |
+
+### Not operator configuration
+
+These variables exist, but they configure tooling, tests, benchmarks, or the
+build — never a running deployment. They are listed here so a search of this
+document turns up, and deliberately carry no detail:
+
+- **Build-time:** `MEMORY_MCP_UI_DIST` (UI bundle directory read by `build.rs`;
+  see [Control-plane UI asset packaging](#control-plane-ui-asset-packaging)),
+  plus the Cargo-supplied `CARGO_*`, `OUT_DIR`, and `GIT_COMMIT`, and the
+  Dockerfile build args `DIOXUS_CLI_VERSION` and `WASM_TARGET`.
+- **Test-only** (behind the `test-fixtures` feature, or inside `#[cfg(test)]`):
+  `MEMORY_MCP_HTTP_TEST_BOOTSTRAP`, `MEMORY_MCP_HTTP_TEST_SEED_RESERVED`,
+  `MEMORY_MCP_HTTP_TEST_SEED_SESSION`, `MEMORY_MCP_HTTP_TEST_FAULT_POINT`,
+  `MEMORY_MCP_HTTP_TEST_FAULT_AT`, and `LOCAL_ADMIN_TEST_CONTROL_URL`,
+  `LOCAL_ADMIN_TEST_CONTROL_USERNAME`, `LOCAL_ADMIN_TEST_CONTROL_PASSWORD`.
+  Setting these outside a test build is a startup error.
+- **Benchmarks and evaluations:** `MEMORY_MCP_BENCH_REQUIRE_FIXTURES`,
+  `MEMORY_RELEASE_BINARY`, `MEMORY_MCP_TEST_PROXY_BIN`,
+  `MEMORY_EVAL_NER_ARTIFACT_BASE_URL`, and the `eval-harness` run fingerprint —
+  `MEMORY_MCP_PROVIDER`, `MEMORY_MCP_MODEL`, `MEMORY_MCP_DEVICE`,
+  `MEMORY_MCP_ENABLED_FEATURES` — which record provenance in a run hash and do
+  not select a provider. The runtime selectors are `EMBEDDINGS_PROVIDER` and
+  `GLINER_DEVICE`. See [Performance benchmarks](#performance-benchmarks).
+- **Scripts and harnesses:** `PROXY_LISTEN`, `PROXY_UPSTREAM`,
+  `PROXY_READ_TIMEOUT`, `PROXY_BLOCK_METRICS` (`scripts/test_proxy.py`),
+  `MEMORY_MCP_BINARY`, and `LONGMEMEVAL_V2_REPO_COMMIT` /
+  `LONGMEMEVAL_V2_HF_REVISION` (pinned in `evals/longmemeval_v2/pins.env`).
 
 ### Build features
 

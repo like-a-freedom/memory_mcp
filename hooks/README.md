@@ -99,6 +99,21 @@ You usually do **not** need to set these in the hook configuration either.
 
 They are normal server-level settings, not hook-level UX knobs. The hooks only provide these defaults so they can work out of the box on a local checkout.
 
+They are injected with `setdefault`, so an exported value always wins.
+
+### Script-internal variables
+
+Four names are exported by the scripts themselves and are **not** operator
+settings. Each script hard-exports them before running its Python body, so
+setting any of them in your editor or shell has no effect:
+
+| Variable | Set to |
+| --- | --- |
+| `MEMORY_HOOK_EVENT` | `stop` or `precompact`, depending on the script |
+| `MEMORY_HOOK_DEFAULT_POLICY_TAGS` | The event's fallback tag list |
+| `MEMORY_HOOK_REPO_ROOT` | The repository root, used as a fallback for `MEMORY_MCP_SERVER_CWD` |
+| `MEMORY_HOOK_INPUT_JSON` | The raw hook payload read from stdin |
+
 ## One-time setup
 
 Make the scripts executable:
@@ -232,7 +247,6 @@ Example `.vscode/tasks.json`:
       "options": {
         "cwd": "${workspaceFolder}",
         "env": {
-          "MEMORY_HOOK_PROJECT": "memory_mcp",
           "MEMORY_HOOK_VERBOSE": "1"
         }
       },
@@ -249,7 +263,6 @@ Example `.vscode/tasks.json`:
       "options": {
         "cwd": "${workspaceFolder}",
         "env": {
-          "MEMORY_HOOK_PROJECT": "memory_mcp",
           "MEMORY_HOOK_VERBOSE": "1"
         }
       },
@@ -284,7 +297,7 @@ Notes:
 
 - VS Code tasks are available when working in a workspace/folder, not when editing a single loose file.
 - `options.cwd` is the documented way to ensure the task runs from the workspace root.
-- `options.env` is a convenient place to set `MEMORY_HOOK_PROJECT` or `MEMORY_HOOK_VERBOSE` without exporting them globally in your shell.
+- `options.env` is a convenient place to set `MEMORY_HOOK_VERBOSE` or any of the server/override variables above without exporting them globally in your shell.
 
 ## Continue
 
