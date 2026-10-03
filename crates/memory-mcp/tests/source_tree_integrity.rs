@@ -189,6 +189,13 @@ fn has_path_attribute(tokens: &[Token]) -> bool {
     false
 }
 
+fn contains_module_generating_syntax(tokens: &[Token]) -> bool {
+    tokens.iter().any(|token| token.text == "mod")
+        || tokens
+            .windows(2)
+            .any(|pair| pair[0].text == "include" && pair[1].text == "!")
+}
+
 fn rooted_module_graph(src: &Path, roots: &[PathBuf]) -> (BTreeSet<PathBuf>, Vec<String>) {
     let canonical_src = src
         .canonicalize()
@@ -287,8 +294,14 @@ impl ModuleGraph<'_> {
             if tokens[index].text == "macro_rules"
                 && tokens.get(index + 1).is_some_and(|token| token.text == "!")
             {
-                let Some(open) = (index + 2..tokens.len()).find(|&at| tokens[at].text == "{")
-                else {
+                let open = index + 3;
+                if tokens
+                    .get(index + 2)
+                    .is_none_or(|token| !is_identifier(&token.text))
+                    || tokens
+                        .get(open)
+                        .is_none_or(|token| !is_open_group(&token.text))
+                {
                     self.diagnostics.push(format!(
                         "{}: unsupported macro_rules declaration",
                         source_file.display()
@@ -302,6 +315,17 @@ impl ModuleGraph<'_> {
                     ));
                     return;
                 };
+                let body = &tokens[open + 1..close];
+                if contains_module_generating_syntax(body) {
+                    // Do not try to expand or resolve macro invocation scopes.
+                    // Reject even unused definitions that could introduce
+                    // modules; their transcribers cannot confer reachability.
+                    self.diagnostics.push(format!(
+                        "{}: macro_rules may declare modules the rooted walker cannot inspect",
+                        source_file.display()
+                    ));
+                    return;
+                }
                 index = close + 1;
                 continue;
             }
@@ -328,13 +352,9 @@ impl ModuleGraph<'_> {
             {
                 if let Some(close) = matching_group(tokens, index + 1) {
                     let body = &tokens[index + 2..close];
-                    if body.windows(3).any(|window| {
-                        window[0].text == "mod"
-                            && is_identifier(&window[1].text)
-                            && matches!(window[2].text.as_str(), ";" | "{")
-                    }) {
+                    if contains_module_generating_syntax(body) {
                         self.diagnostics.push(format!(
-                            "{}: macro invocation contains a module declaration that this \
+                            "{}: macro invocation contains module-generating syntax that this \
                              lexical guard cannot resolve",
                             source_file.display()
                         ));
@@ -487,7 +507,7 @@ mod tests {
     }
 
     #[test]
-    fn module_text_in_comments_strings_and_macros_is_not_a_declaration() {
+    fn module_text_in_comments_strings_and_macro_literals_is_not_a_declaration() {
         let (_temp, src) = fixture();
         let root = write(
             &src,
@@ -495,7 +515,7 @@ mod tests {
             r#"
                 // mod comment_only;
                 const TEXT: &str = "mod string_only;";
-                macro_rules! declare_later { () => { mod macro_only; } }
+                macro_rules! example { () => { const TEXT: &str = "mod macro_only;"; } }
             "#,
         );
         let (reachable, diagnostics) = rooted_module_graph(&src, &[root]);
@@ -505,15 +525,42 @@ mod tests {
 
     #[test]
     fn macro_generated_module_declarations_fail_closed() {
-        let (_temp, src) = fixture();
-        let root = write(&src, "lib.rs", "declare! { mod generated; }\n");
+        for source in [
+            "declare! { mod generated; }",
+            "external_macro! { include!(\"generated.rs\"); }",
+            "identity! { macro_rules! generated { ($name:ident) => { mod $name; } } }",
+        ] {
+            let (_temp, src) = fixture();
+            let root = write(&src, "lib.rs", source);
 
-        let (_, diagnostics) = rooted_module_graph(&src, &[root]);
-        assert_eq!(diagnostics.len(), 1, "{diagnostics:#?}");
-        assert!(
-            diagnostics[0].contains("macro invocation"),
-            "{diagnostics:#?}"
-        );
+            let (_, diagnostics) = rooted_module_graph(&src, &[root]);
+            assert_eq!(diagnostics.len(), 1, "{source}: {diagnostics:#?}");
+            assert!(
+                diagnostics[0].contains("macro invocation"),
+                "{source}: {diagnostics:#?}"
+            );
+        }
+    }
+
+    #[test]
+    fn module_producing_macro_definitions_fail_closed() {
+        for source in [
+            "macro_rules! unused { () => { mod generated {} } }",
+            "macro_rules! generate { () => { mod generated {} } } generate!();",
+            "macro_rules! generate { ($name:ident) => { mod $name; } } generate!(generated);",
+            "macro_rules! generate { () => { include!(\"generated.rs\"); } } generate!();",
+        ] {
+            let (_temp, src) = fixture();
+            let root = write(&src, "lib.rs", source);
+
+            let (reachable, diagnostics) = rooted_module_graph(&src, &[root]);
+            assert_eq!(reachable.len(), 1, "macro text is not a resolved module");
+            assert_eq!(diagnostics.len(), 1, "{source}: {diagnostics:#?}");
+            assert!(
+                diagnostics[0].contains("macro_rules"),
+                "{source}: {diagnostics:#?}"
+            );
+        }
     }
 
     #[test]
