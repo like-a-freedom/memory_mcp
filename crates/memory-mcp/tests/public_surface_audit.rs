@@ -93,24 +93,89 @@ fn reexported_names(text: &str) -> BTreeSet<String> {
         if clause.is_empty() || clause.ends_with('*') {
             continue;
         }
-        // The last path segment is the name being brought into scope; a
-        // trailing `as Alias` renames it.
-        let leaf = clause
-            .rsplit("::")
-            .next()
-            .unwrap_or_default()
-            .split(" as ")
-            .next()
-            .unwrap_or_default()
-            .trim();
-        for part in leaf.split(',') {
-            let name = part.trim();
-            if !name.is_empty() && name.chars().all(|c| c.is_alphanumeric() || c == '_') {
-                names.insert(name.to_string());
-            }
+        for name in use_tree_names(clause) {
+            names.insert(name);
         }
     }
     names
+}
+
+/// The names a `use` clause brings into scope.
+///
+/// The clause is a tree, not a path with one leaf: `a::b::{Fact, ids}`
+/// re-exports two names, and reading the last `::` segment as the name — which
+/// is what this parser used to do — yields `{Fact, ids}`, fails the
+/// identifier check, and reports nothing. A cut name written in the grouped
+/// form therefore passed the ratchet silently.
+fn use_tree_names(clause: &str) -> Vec<String> {
+    let clause = clause.trim().trim_end_matches(';').trim();
+    if clause.is_empty() {
+        return Vec::new();
+    }
+    if let Some(open) = clause.find('{') {
+        // `prefix::{a, b}` — every element is a name under `prefix`.
+        let prefix = &clause[..open];
+        let Some(close) = clause.rfind('}') else {
+            return Vec::new();
+        };
+        let inner = &clause[open + 1..close];
+        let mut names = Vec::new();
+        for element in split_top_level(inner) {
+            let element = element.trim();
+            if element == "self" {
+                // `a::b::{self, c}` brings `b` itself into scope.
+                if let Some(name) = prefix
+                    .trim_end_matches("::")
+                    .rsplit("::")
+                    .next()
+                    .filter(|name| is_identifier(name))
+                {
+                    names.push(name.to_string());
+                }
+                continue;
+            }
+            names.extend(use_tree_names(&format!("{prefix}{element}")));
+        }
+        return names;
+    }
+
+    // A leaf: the last path segment, possibly renamed by `as`.
+    let (path, alias) = match clause.split_once(" as ") {
+        Some((path, alias)) => (path, Some(alias.trim())),
+        None => (clause, None),
+    };
+    let leaf = path.trim().rsplit("::").next().unwrap_or_default().trim();
+    match alias {
+        Some(alias) if is_identifier(alias) => vec![alias.to_string()],
+        Some(_) => Vec::new(),
+        None if is_identifier(leaf) => vec![leaf.to_string()],
+        None => Vec::new(),
+    }
+}
+
+/// Split a `use` group body on its top-level commas, ignoring commas inside a
+/// nested group.
+fn split_top_level(text: &str) -> Vec<&str> {
+    let mut parts = Vec::new();
+    let mut depth = 0usize;
+    let mut start = 0usize;
+    for (index, c) in text.char_indices() {
+        match c {
+            '{' | '<' => depth += 1,
+            '}' | '>' => depth = depth.saturating_sub(1),
+            ',' if depth == 0 => {
+                parts.push(&text[start..index]);
+                start = index + 1;
+            }
+            _ => {}
+        }
+    }
+    parts.push(&text[start..]);
+    parts
+}
+
+fn is_identifier(name: &str) -> bool {
+    !name.is_empty() && name.chars().all(|c| c.is_alphanumeric() || c == '_')
 }
 
 /// Blank out comments so a `pub use` mentioned in prose is not read as a
@@ -160,6 +225,71 @@ fn no_cut_name_is_re_exported_again() {
         regrown.is_empty(),
         "these names were re-exported by `service` with no consumer and must \
          stay cut. Import from the owning module instead:\n{regrown:#?}"
+    );
+}
+
+/// The ratchet above is only as good as this parser. A grouped re-export of a
+/// cut name — `pub use crate::types::{Fact, ids};` — used to yield no names at
+/// all, so the ratchet could not fire however the name regrew.
+#[test]
+fn a_grouped_re_export_of_a_cut_name_is_seen() {
+    let grouped = reexported_names("pub use crate::types::{Fact, ids};\n");
+    assert!(
+        grouped.contains("Fact") && grouped.contains("ids"),
+        "a grouped re-export must enumerate every name in it, got {grouped:?}"
+    );
+    assert!(
+        CUT_REEXPORTS.iter().any(|cut| grouped.contains(*cut)),
+        "the ratchet must be able to fire on this form"
+    );
+}
+
+#[test]
+fn every_re_export_form_the_module_uses_is_enumerated() {
+    let cases = [
+        ("pub use crate::types::Fact;", vec!["Fact"]),
+        (
+            "pub(crate) use crate::types::Fact as Renamed;",
+            vec!["Renamed"],
+        ),
+        (
+            "pub use crate::types::{alpha, beta as gamma};",
+            vec!["alpha", "gamma"],
+        ),
+        (
+            "pub use crate::types::{self, delta};",
+            vec!["types", "delta"],
+        ),
+        (
+            "pub use crate::outer::{inner::{epsilon, zeta}, eta};",
+            vec!["eta", "epsilon", "zeta"],
+        ),
+    ];
+
+    for (source, expected) in cases {
+        let names = reexported_names(source);
+        for name in expected {
+            assert!(
+                names.contains(name),
+                "{source:?} must yield {name}, got {names:?}"
+            );
+        }
+    }
+}
+
+/// A grouped body must not swallow the elements around a nested group: a
+/// naive comma split would report `inner::{epsilon` as a name and lose `zeta`.
+#[test]
+fn a_nested_group_does_not_hide_its_siblings() {
+    let names = reexported_names("pub use crate::outer::{inner::{epsilon, zeta}, eta};");
+
+    assert!(names.contains("eta"), "got {names:?}");
+    assert!(names.contains("zeta"), "got {names:?}");
+    assert!(
+        !names
+            .iter()
+            .any(|name| name.contains('{') || name.contains('}')),
+        "a delimiter must never be read as part of a name, got {names:?}"
     );
 }
 
