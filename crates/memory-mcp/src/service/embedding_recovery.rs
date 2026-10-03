@@ -241,8 +241,6 @@ pub(crate) async fn run_backfill(
         let vector_port = crate::embedding::infra::FactVectorAdapter::new(
             service.db_client.clone(),
             service.active_namespace,
-            model.map(str::to_owned),
-            Some(dimension),
         );
         for fact in batch {
             let fact_id = required_fact_string(&fact, "fact_id")?;

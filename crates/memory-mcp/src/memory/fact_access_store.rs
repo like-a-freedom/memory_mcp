@@ -35,11 +35,9 @@ impl FactAccessStore {
     /// Increments fact access metadata without exposing record mutation details
     /// to retrieval or explanation orchestration.
     ///
-    /// The write names only the two fields this store owns. It used to read the
-    /// whole fact, change those fields, and write the whole record back — which
-    /// meant a retrieval that raced a background vector write restored the
-    /// record it had read, dropping the vector. The count is still read first
-    /// because the arithmetic needs it; only the write is narrow.
+    /// The access count changes in the statement itself. A read-modify-write
+    /// here would both lose concurrent increments and restore a stale vector
+    /// from the whole-record snapshot.
     pub async fn record_fact_access(&self, fact_id: &str, boost: i64) -> Result<(), MemoryError> {
         crate::storage::require_record_kind(fact_id, "fact")?;
         let record_id = fact_id.strip_prefix("fact:").ok_or_else(|| {
@@ -50,25 +48,25 @@ impl FactAccessStore {
                 "fact id carries no record id for access write: {fact_id}"
             )));
         }
-        let record = self.db.select_one(fact_id).await?;
-        let Some(record) = record.and_then(|value| value.as_object().cloned()) else {
-            return Ok(());
-        };
-
-        let access_count = record
-            .get("access_count")
-            .and_then(crate::storage::value_helpers::json_i64)
-            .unwrap_or(0)
-            .saturating_add(boost);
         let last_accessed = crate::shared::temporal::normalize_dt(crate::shared::temporal::now());
 
         self.db
             .query(
-                "UPDATE type::record('fact', $fact_id) SET access_count = $access_count, \
+                "UPDATE type::record('fact', $fact_id) SET \
+                 access_count = IF access_count IS NONE OR access_count IS NULL THEN $boost \
+                 ELSE IF $boost > 0 THEN \
+                   IF access_count > $int_max - $boost THEN $int_max \
+                   ELSE access_count + $boost END \
+                 ELSE IF $boost < 0 THEN \
+                   IF access_count < $int_min - $boost THEN $int_min \
+                   ELSE access_count + $boost END \
+                 ELSE access_count END, \
                  last_accessed = type::datetime($last_accessed)",
                 Some(json!({
                     "fact_id": record_id,
-                    "access_count": access_count,
+                    "boost": boost,
+                    "int_max": i64::MAX,
+                    "int_min": i64::MIN,
                     "last_accessed": last_accessed,
                 })),
             )
@@ -334,10 +332,8 @@ mod tests {
         );
     }
 
-    /// The count accumulates from what is stored, not from zero. The
-    /// `json_i64` coercion the read applies is defensive only: the fact table's
-    /// schema types `access_count` as `int`, so a legacy string count cannot be
-    /// stored under it and that branch is unreachable here rather than untested.
+    /// The count accumulates from what is stored, including under simultaneous
+    /// retrievals.
     #[tokio::test]
     async fn record_fact_access_accumulates_from_the_stored_count() {
         let db = make_db().await;
@@ -349,6 +345,28 @@ mod tests {
         store.record_fact_access(fact_id, 2).await.expect("second");
 
         assert_eq!(read_fact(&db, fact_id).await["access_count"], 9);
+    }
+
+    #[tokio::test]
+    async fn concurrent_access_updates_do_not_lose_increments() {
+        let db = make_db().await;
+        let fact_id = "fact:access_concurrent";
+        seed_fact(&db, fact_id, serde_json::json!(0)).await;
+        let store = Arc::new(FactAccessStore::new(
+            Arc::clone(&db) as Arc<dyn DbClient>,
+            NAMESPACE,
+        ));
+        let mut tasks = tokio::task::JoinSet::new();
+        for _ in 0..32 {
+            let store = Arc::clone(&store);
+            let fact_id = fact_id.to_string();
+            tasks.spawn(async move { store.record_fact_access(&fact_id, 1).await });
+        }
+        while let Some(result) = tasks.join_next().await {
+            result.expect("access task joins").expect("access update");
+        }
+
+        assert_eq!(read_fact(&db, fact_id).await["access_count"], 32);
     }
 
     #[tokio::test]
@@ -365,5 +383,38 @@ mod tests {
         store.record_fact_access(fact_id, 10).await.expect("second");
 
         assert_eq!(read_fact(&db, fact_id).await["access_count"], i64::MAX);
+    }
+
+    #[tokio::test]
+    async fn record_fact_access_saturates_at_the_lower_bound() {
+        let db = make_db().await;
+        let fact_id = "fact:access_lower_saturation";
+        seed_fact(&db, fact_id, serde_json::json!(i64::MIN)).await;
+        let store = FactAccessStore::new(Arc::clone(&db) as Arc<dyn DbClient>, NAMESPACE);
+
+        store
+            .record_fact_access(fact_id, -1)
+            .await
+            .expect("lower bound");
+
+        assert_eq!(read_fact(&db, fact_id).await["access_count"], i64::MIN);
+    }
+
+    #[tokio::test]
+    async fn record_fact_access_binds_forged_record_ids_as_values() {
+        let db = make_db().await;
+        let innocent = "fact:access_innocent";
+        seed_fact(&db, innocent, serde_json::json!(0)).await;
+        let store = FactAccessStore::new(Arc::clone(&db) as Arc<dyn DbClient>, NAMESPACE);
+        let forged =
+            "fact:x⟩ SET access_count = 77; UPDATE fact:⟨access_innocent⟩ SET access_count = 99"
+                .to_string();
+
+        store
+            .record_fact_access(&forged, 1)
+            .await
+            .expect("a non-existent id is a no-op, not SQL");
+
+        assert_eq!(read_fact(&db, innocent).await["access_count"], 0);
     }
 }

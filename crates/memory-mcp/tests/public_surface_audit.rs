@@ -11,9 +11,12 @@
 //! each one earns its place. A new name is added to the allowlist deliberately,
 //! with a reason, or not at all.
 
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
 use std::path::{Path, PathBuf};
+
+#[path = "support/rust_source.rs"]
+mod rust_source;
 
 /// The re-exported names that still have a consumer, and where it is.
 ///
@@ -69,35 +72,129 @@ fn service_module() -> (PathBuf, String) {
 /// miss every name in it. That failure mode is silent, so it is not one worth
 /// having.
 fn reexported_names(text: &str) -> BTreeSet<String> {
-    let mut joined = String::new();
-    for line in strip_comments(text).lines() {
-        let trimmed = line.trim_start();
-        if trimmed.starts_with("//") {
-            continue;
-        }
-        joined.push_str(trimmed);
-        if !trimmed.ends_with(';') {
-            joined.push(' ');
-        }
-    }
-
+    let tokens = rust_source::tokenize(text)
+        .unwrap_or_else(|error| panic!("cannot tokenize service exports: {error}"));
     let mut names = BTreeSet::new();
-    let mut rest = joined.as_str();
-    while let Some(at) = rest.find("use ") {
-        rest = &rest[at + 4..];
-        let end = rest.find(';').unwrap_or(rest.len());
-        let clause = rest[..end].trim();
-        rest = &rest[end.min(rest.len())..];
-        // A glob names nothing in particular, and is not part of the block
-        // this test is about.
-        if clause.is_empty() || clause.ends_with('*') {
+    for (index, token) in tokens.iter().enumerate() {
+        if token.text != "use" || !has_public_visibility(&tokens, index) {
             continue;
         }
-        for name in use_tree_names(clause) {
+        let Some(end) = tokens[index + 1..]
+            .iter()
+            .position(|token| token.text == ";")
+            .map(|offset| index + 1 + offset)
+        else {
+            panic!("public use at token {index} has no semicolon");
+        };
+        let clause = render_tokens(&tokens[index + 1..end]);
+        let exported = if clause.ends_with("::*") {
+            let module = clause
+                .trim_end_matches("::*")
+                .rsplit("::")
+                .next()
+                .unwrap_or_default();
+            if module != "constants" {
+                panic!("public glob re-export is unsupported by the cut-name ratchet: {clause}");
+            }
+            local_module_exports(&tokens, module)
+                .unwrap_or_else(|| panic!("cannot resolve local public glob re-export: {clause}"))
+        } else {
+            use_tree_names(&clause)
+        };
+        for name in exported {
             names.insert(name);
         }
     }
     names
+}
+
+fn has_public_visibility(tokens: &[rust_source::Token], use_index: usize) -> bool {
+    if use_index > 0 && tokens[use_index - 1].text == "pub" {
+        return true;
+    }
+    if use_index == 0 || tokens[use_index - 1].text != ")" {
+        return false;
+    }
+    for open in (0..use_index).rev() {
+        if tokens[open].text == "("
+            && rust_source::matching_group(tokens, open) == Some(use_index - 1)
+        {
+            return open > 0 && tokens[open - 1].text == "pub";
+        }
+    }
+    false
+}
+
+fn render_tokens(tokens: &[rust_source::Token]) -> String {
+    let mut rendered = String::new();
+    let mut previous_ident = false;
+    for token in tokens {
+        let ident = token
+            .text
+            .chars()
+            .all(|character| character == '_' || character.is_alphanumeric());
+        if previous_ident && ident {
+            rendered.push(' ');
+        }
+        rendered.push_str(&token.text);
+        previous_ident = ident;
+    }
+    rendered
+}
+
+/// The sole public glob in `service.rs` is `constants::*`, a private inline
+/// module in that same file. Expand that bounded case so adding a cut name
+/// there is visible; reject any other glob rather than silently claiming the
+/// ratchet knows what it exports.
+fn local_module_exports(tokens: &[rust_source::Token], module: &str) -> Option<Vec<String>> {
+    for index in 0..tokens.len().saturating_sub(2) {
+        if tokens[index].text != "mod"
+            || tokens[index + 1].text != module
+            || tokens[index + 2].text != "{"
+        {
+            continue;
+        }
+        let end = rust_source::matching_group(tokens, index + 2)?;
+        let body = &tokens[index + 3..end];
+        let mut names = Vec::new();
+        let mut cursor = 0;
+        while cursor + 2 < body.len() {
+            if body[cursor].text == "pub"
+                && matches!(
+                    body[cursor + 1].text.as_str(),
+                    "const" | "static" | "fn" | "struct" | "enum" | "type" | "trait" | "mod"
+                )
+                && is_identifier(&body[cursor + 2].text)
+            {
+                names.push(body[cursor + 2].text.clone());
+                cursor += 3;
+            } else {
+                cursor += 1;
+            }
+        }
+        return Some(names);
+    }
+    None
+}
+
+/// For a consumer import, the original path name counts even when it is
+/// locally renamed (`use service::{LifecycleOperation as ServiceOperation}`).
+/// The cut-name ratchet uses only the exported/local name from
+/// `use_tree_names`.
+fn use_tree_mentions(clause: &str, name: &str) -> bool {
+    use_tree_names(clause).iter().any(|item| item == name)
+        || clause.split(',').any(|item| {
+            let leaf = item
+                .trim()
+                .trim_start_matches('{')
+                .trim()
+                .rsplit("::")
+                .next()
+                .unwrap_or_default()
+                .trim();
+            leaf.strip_prefix(name)
+                .is_some_and(|rest| rest.trim_start().starts_with("as "))
+        })
 }
 
 /// The names a `use` clause brings into scope.
@@ -112,12 +209,20 @@ fn use_tree_names(clause: &str) -> Vec<String> {
     if clause.is_empty() {
         return Vec::new();
     }
+    assert!(
+        !clause.split("::").any(|segment| segment.trim() == "*"),
+        "grouped glob use trees are unsupported by the cut-name ratchet: {clause}"
+    );
+    assert!(
+        !clause.contains('#'),
+        "raw identifiers and attributes in a use tree are unsupported: {clause}"
+    );
     if let Some(open) = clause.find('{') {
         // `prefix::{a, b}` — every element is a name under `prefix`.
         let prefix = &clause[..open];
-        let Some(close) = clause.rfind('}') else {
-            return Vec::new();
-        };
+        let close = clause
+            .rfind('}')
+            .unwrap_or_else(|| panic!("unterminated grouped use tree: {clause}"));
         let inner = &clause[open + 1..close];
         let mut names = Vec::new();
         for element in split_top_level(inner) {
@@ -176,39 +281,6 @@ fn split_top_level(text: &str) -> Vec<&str> {
 
 fn is_identifier(name: &str) -> bool {
     !name.is_empty() && name.chars().all(|c| c.is_alphanumeric() || c == '_')
-}
-
-/// Blank out comments so a `pub use` mentioned in prose is not read as a
-/// declaration.
-fn strip_comments(text: &str) -> String {
-    let mut out = String::with_capacity(text.len());
-    let mut chars = text.chars().peekable();
-    let mut in_block = false;
-    while let Some(c) = chars.next() {
-        if in_block {
-            if c == '*' && chars.peek() == Some(&'/') {
-                chars.next();
-                in_block = false;
-            }
-            continue;
-        }
-        match c {
-            '/' if chars.peek() == Some(&'/') => {
-                for c in chars.by_ref() {
-                    if c == '\n' {
-                        out.push('\n');
-                        break;
-                    }
-                }
-            }
-            '/' if chars.peek() == Some(&'*') => {
-                chars.next();
-                in_block = true;
-            }
-            _ => out.push(c),
-        }
-    }
-    out
 }
 
 #[test]
@@ -293,43 +365,150 @@ fn a_nested_group_does_not_hide_its_siblings() {
     );
 }
 
-/// Whether `text` reaches `name` through the `service` module.
-///
-/// Both forms count: a `use` that brings the name into scope, and a qualified
-/// call that names it in place. A `use` clause is joined before it is read,
-/// because the interesting imports wrap across lines —
-/// `apps_ingestion_review.rs` names three items over two lines, and a
-/// line-at-a-time check would score the last one as unused.
-fn imports_through_service(text: &str, name: &str) -> bool {
-    let mut joined = String::new();
-    for line in text.lines() {
-        let trimmed = line.trim_start();
-        joined.push_str(trimmed);
-        if !trimmed.ends_with(';') && !trimmed.ends_with(',') {
-            joined.push(' ');
-        }
-    }
+#[test]
+fn an_unclosed_use_group_is_not_silently_treated_as_no_exports() {
+    let malformed =
+        std::panic::catch_unwind(|| reexported_names("pub use crate::types::{Fact, ids;\n"));
+    assert!(
+        malformed.is_err(),
+        "an unsupported use tree must fail the guard rather than return an empty export set"
+    );
+}
 
-    let mut rest = joined.as_str();
-    while let Some(at) = rest.find("::service::") {
-        rest = &rest[at + "::service::".len()..];
-        if rest.starts_with(name) {
+#[test]
+fn a_nested_grouped_glob_fails_closed() {
+    let unsupported =
+        std::panic::catch_unwind(|| reexported_names("pub use crate::shared::{ids::*};\n"));
+
+    assert!(
+        unsupported.is_err(),
+        "a nested glob must not silently yield an empty export set"
+    );
+}
+
+#[test]
+fn public_methods_are_found_in_split_impl_files() {
+    let temp = tempfile::tempdir().expect("temp source tree");
+    let src = temp.path().join("src");
+    let file = src.join("service/reembed.rs");
+    std::fs::create_dir_all(file.parent().expect("parent")).expect("parent dir");
+    std::fs::write(
+        &file,
+        "impl crate::service::MemoryService { pub async fn reembed_all_facts(&self) {} }\n",
+    )
+    .expect("write fixture");
+
+    let methods = collect_public_methods(&src);
+    assert!(
+        methods
+            .iter()
+            .any(|method| { method.name == "reembed_all_facts" && method.file == file }),
+        "split inherent impl methods must be inventoried: {methods:?}"
+    );
+}
+
+#[test]
+fn test_cfg_methods_do_not_enter_the_public_inventory() {
+    let temp = tempfile::tempdir().expect("temp source tree");
+    let src = temp.path().join("src");
+    let file = src.join("service/test_helpers.rs");
+    std::fs::create_dir_all(file.parent().expect("parent")).expect("parent dir");
+    std::fs::write(
+        &file,
+        "impl MemoryService { #[cfg(test)] pub fn fixture_only() {} pub fn production() {} }\n",
+    )
+    .expect("write fixture");
+
+    let methods = collect_public_methods(&src);
+    assert_eq!(
+        methods
+            .iter()
+            .map(|method| method.name.as_str())
+            .collect::<Vec<_>>(),
+        vec!["production"]
+    );
+}
+
+#[test]
+fn caller_ratchet_ignores_comments_strings_and_test_cfg_items() {
+    let temp = tempfile::tempdir().expect("temp caller tree");
+    let file = temp.path().join("caller.rs");
+    std::fs::write(
+        &file,
+        r#"
+            // fake.call()
+            const TEXT: &str = "fake.call()";
+            #[cfg(test)]
+            mod tests {
+                fn test_only() { fake.call(); }
+            }
+        "#,
+    )
+    .expect("write fixture");
+    let names = BTreeSet::from(["call".to_string()]);
+
+    assert!(
+        count_calls_in_files(std::slice::from_ref(&file), &names, true).is_empty(),
+        "comments, strings and test-only modules are not production callers"
+    );
+    assert_eq!(
+        count_calls_in_files(&[file], &names, false).get("call"),
+        Some(&1),
+        "the lexical test scan still sees a real call"
+    );
+}
+
+#[test]
+fn allowlist_import_evidence_ignores_comments_and_literals() {
+    assert!(!imports_through_service(
+        r#"
+            // use crate::service::normalize_text;
+            const EXAMPLE: &str = "crate::service::normalize_text";
+        "#,
+        "normalize_text"
+    ));
+    assert!(imports_through_service(
+        "use crate::service::{normalize_dt, normalize_text};",
+        "normalize_text"
+    ));
+}
+
+/// Whether `text` imports or qualifies `name` through the `service` module.
+///
+/// The shared lexer means comments and string literals are not evidence of a
+/// consumer. Grouped imports use the same nested use-tree reader as the
+/// re-export guard.
+fn imports_through_service(text: &str, name: &str) -> bool {
+    let tokens = rust_source::tokenize(text)
+        .unwrap_or_else(|error| panic!("cannot tokenize consumer source: {error}"));
+    for index in 0..tokens.len() {
+        if tokens[index].text != "service"
+            || !double_colon_at(&tokens, index.saturating_sub(2))
+            || !double_colon_at(&tokens, index + 1)
+        {
+            continue;
+        }
+        if tokens
+            .get(index + 3)
+            .is_some_and(|token| token.text == name)
+        {
             return true;
         }
-        let end = rest.find(';').unwrap_or(rest.len());
-        let clause = rest[..end].trim();
-        rest = &rest[end.min(rest.len())..];
-        let items = clause
-            .trim_start_matches('{')
-            .trim_end_matches('}')
-            .trim_end_matches(';');
-        for item in items.split(',') {
-            if item.split_whitespace().next().unwrap_or("").trim() == name {
+        if tokens.get(index + 3).is_some_and(|token| token.text == "{")
+            && let Some(end) = rust_source::matching_group(&tokens, index + 3)
+        {
+            let grouped = render_tokens(&tokens[index + 3..=end]);
+            if use_tree_mentions(&grouped, name) {
                 return true;
             }
         }
     }
     false
+}
+
+fn double_colon_at(tokens: &[rust_source::Token], index: usize) -> bool {
+    tokens.get(index).is_some_and(|token| token.text == ":")
+        && tokens.get(index + 1).is_some_and(|token| token.text == ":")
 }
 
 #[test]
@@ -464,13 +643,13 @@ fn every_public_container_method_has_a_production_caller() {
         "no `pub` methods found on MemoryService — the scan is broken, not the code"
     );
 
-    let mut test_text = String::new();
-    collect_rust_text(&manifest.join("tests"), &mut test_text);
-    for path in &declared {
-        if let Ok(text) = std::fs::read_to_string(&path.file) {
-            test_text.push_str(&text);
-        }
-    }
+    let names: BTreeSet<String> = declared.iter().map(|method| method.name.clone()).collect();
+    let production_calls = count_calls_in_files(&rust_files(&src), &names, true);
+    let mut test_files = rust_files(&manifest.join("tests"));
+    test_files.extend(declared.iter().map(|method| method.file.clone()));
+    test_files.sort();
+    test_files.dedup();
+    let test_calls = count_calls_in_files(&test_files, &names, false);
 
     let mut orphans = Vec::new();
     for method in &declared {
@@ -478,11 +657,10 @@ fn every_public_container_method_has_a_production_caller() {
         if TEST_ONLY.iter().any(|(allowed, _)| allowed == name) {
             continue;
         }
-        let callers = count_production_callers(&src, name);
-        if callers > 0 {
+        if production_calls.get(name).copied().unwrap_or_default() > 0 {
             continue;
         }
-        let test_only = test_text.contains(&format!(".{name}("));
+        let test_only = test_calls.get(name).copied().unwrap_or_default() > 0;
         orphans.push(format!(
             "  {name} — {}{}",
             method.file.display(),
@@ -504,144 +682,204 @@ fn every_public_container_method_has_a_production_caller() {
     );
 }
 
+#[derive(Debug)]
 struct DeclaredMethod {
     name: String,
     file: PathBuf,
 }
 
 fn collect_public_methods(src: &Path) -> Vec<DeclaredMethod> {
-    // The container's `pub` methods live in `service/core.rs`,
-    // `service/core/builder.rs` and `service/apps/graph.rs`. Walking the
-    // whole tree and keeping `pub async fn` / `pub fn` on an `impl
-    // MemoryService` block would be more general; the file list is explicit
-    // so a moved method cannot silently fall out of the scan.
-    let files = [
-        src.join("service/core.rs"),
-        src.join("service/core/builder.rs"),
-        src.join("service/apps/graph.rs"),
-    ];
     let mut found = Vec::new();
-    for file in files {
+    for file in rust_files(src) {
         let Ok(text) = std::fs::read_to_string(&file) else {
             continue;
         };
-        let mut in_impl = false;
-        for line in text.lines() {
-            if line.starts_with("impl MemoryService") {
-                in_impl = true;
+        let tokens = rust_source::tokenize(&text)
+            .unwrap_or_else(|error| panic!("cannot tokenize {}: {error}", file.display()));
+        let mut index = 0;
+        while index < tokens.len() {
+            if let Some(end) = test_cfg_item_end(&tokens, index) {
+                index = end + 1;
                 continue;
             }
-            if in_impl && line == "}" {
-                in_impl = false;
+            if tokens[index].text != "impl" {
+                index += 1;
                 continue;
             }
-            if !in_impl {
+            let Some(open) = (index + 1..tokens.len()).find(|&at| tokens[at].text == "{") else {
+                index += 1;
+                continue;
+            };
+            let Some(close) = rust_source::matching_group(&tokens, open) else {
+                panic!("unterminated impl block in {}", file.display());
+            };
+            let header = &tokens[index + 1..open];
+            let memory_service_impl = header.iter().any(|token| token.text == "MemoryService")
+                && !header.iter().any(|token| token.text == "for");
+            if !memory_service_impl {
+                index = close + 1;
                 continue;
             }
-            let body = line.trim_start();
-            for prefix in ["pub async fn ", "pub fn "] {
-                if let Some(rest) = body
-                    .strip_prefix(prefix)
-                    .and_then(|rest| rest.split('(').next())
+
+            let mut cursor = open + 1;
+            while cursor < close {
+                if let Some(end) = test_cfg_item_end(&tokens, cursor) {
+                    cursor = end + 1;
+                    continue;
+                }
+                if tokens[cursor].text == "pub"
+                    && !tokens.get(cursor + 1).is_some_and(|t| t.text == "(")
                 {
-                    found.push(DeclaredMethod {
-                        name: rest.to_string(),
-                        file: file.clone(),
-                    });
+                    let mut signature = cursor + 1;
+                    while signature < close
+                        && !matches!(tokens[signature].text.as_str(), "fn" | ";" | "{")
+                    {
+                        signature += 1;
+                    }
+                    if tokens
+                        .get(signature)
+                        .is_some_and(|token| token.text == "fn")
+                        && tokens
+                            .get(signature + 1)
+                            .is_some_and(|token| rust_source::is_identifier(&token.text))
+                    {
+                        let name = tokens[signature + 1].text.clone();
+                        found.push(DeclaredMethod {
+                            name,
+                            file: file.clone(),
+                        });
+                        // Skip the method body so nested local items cannot
+                        // masquerade as methods on the outer impl.
+                        if let Some(body) =
+                            (signature + 2..close).find(|&at| tokens[at].text == "{")
+                            && let Some(body_end) = rust_source::matching_group(&tokens, body)
+                        {
+                            cursor = body_end + 1;
+                            continue;
+                        }
+                    }
+                }
+                if rust_source::is_open_group(&tokens[cursor].text)
+                    && let Some(end) = rust_source::matching_group(&tokens, cursor)
+                {
+                    cursor = end + 1;
+                } else {
+                    cursor += 1;
                 }
             }
+            index = close + 1;
         }
     }
     found
 }
 
-fn count_production_callers(src: &Path, name: &str) -> usize {
-    let needle = format!(".{name}(");
-    // A `#[cfg(test)] mod tests` inside `src/` is still a test. Counting
-    // those as production callers is how a method with no production
-    // caller passes the ratchet, so the in-file test module is skipped.
-    let mut count = 0;
-    let mut stack = vec![src.to_path_buf()];
-    while let Some(dir) = stack.pop() {
-        let Ok(entries) = std::fs::read_dir(&dir) else {
-            continue;
-        };
-        for entry in entries.flatten() {
+fn rust_files(root: &Path) -> Vec<PathBuf> {
+    let mut files = Vec::new();
+    let mut stack = vec![root.to_path_buf()];
+    while let Some(directory) = stack.pop() {
+        let entries = std::fs::read_dir(&directory)
+            .unwrap_or_else(|error| panic!("{} is not readable: {error}", directory.display()));
+        for entry in entries {
+            let entry = entry.unwrap_or_else(|error| {
+                panic!("unreadable entry in {}: {error}", directory.display())
+            });
             let path = entry.path();
             if path.is_dir() {
                 stack.push(path);
-                continue;
-            }
-            if path.extension().and_then(|e| e.to_str()) != Some("rs") {
-                continue;
-            }
-            let Ok(text) = std::fs::read_to_string(&path) else {
-                continue;
-            };
-            // Only a `#[cfg(test)] mod ... { }` block is a test module. A
-            // bare `#[cfg(test)] fn` is a helper for the module further
-            // down, and truncating the file at the first marker would
-            // discard every production call site after it.
-            let lines: Vec<&str> = text.lines().collect();
-            let mut skip_until = None;
-            let mut idx = 0;
-            while idx < lines.len() {
-                let trimmed = lines[idx].trim();
-                if trimmed == "#[cfg(test)]"
-                    && lines[idx + 1..]
-                        .iter()
-                        .any(|l| l.trim_start().starts_with("mod "))
-                {
-                    // A test module: skip to the line that closes it at
-                    // brace depth zero. Counting braces from the `mod` line
-                    // is more reliable than looking for a marker, because
-                    // `#[cfg(test)] fn` helpers must *not* trigger this.
-                    let mut j = idx + 1;
-                    let mut depth = 0usize;
-                    while j < lines.len() {
-                        depth += lines[j].matches('{').count();
-                        depth = depth.saturating_sub(lines[j].matches('}').count());
-                        if depth == 0 && lines[j].contains('{') {
-                            break;
-                        }
-                        if depth == 0 && j > idx + 1 {
-                            break;
-                        }
-                        j += 1;
-                    }
-                    skip_until = Some(j);
-                    idx = j + 1;
-                    continue;
-                }
-                if let Some(limit) = skip_until {
-                    if idx <= limit {
-                        idx += 1;
-                        continue;
-                    }
-                    skip_until = None;
-                }
-                if lines[idx].contains(&needle) && !trimmed.starts_with("//") {
-                    count += 1;
-                }
-                idx += 1;
+            } else if path.extension().is_some_and(|extension| extension == "rs") {
+                files.push(path);
             }
         }
     }
-    count
+    files.sort();
+    files
 }
 
-fn collect_rust_text(dir: &Path, out: &mut String) {
-    let Ok(entries) = std::fs::read_dir(dir) else {
-        return;
-    };
-    for entry in entries.flatten() {
-        let path = entry.path();
-        if path.is_dir() {
-            collect_rust_text(&path, out);
-        } else if path.extension().and_then(|e| e.to_str()) == Some("rs")
-            && let Ok(text) = std::fs::read_to_string(&path)
-        {
-            out.push_str(&text);
+fn test_cfg_item_end(tokens: &[rust_source::Token], attribute: usize) -> Option<usize> {
+    let cfg_test = ["#", "[", "cfg", "(", "test", ")", "]"];
+    if tokens
+        .get(attribute..attribute + cfg_test.len())?
+        .iter()
+        .map(|token| token.text.as_str())
+        .ne(cfg_test)
+    {
+        return None;
+    }
+    let item_start = attribute + cfg_test.len();
+    let body = (item_start..tokens.len())
+        .find(|&index| tokens[index].text == "{" || tokens[index].text == ";")?;
+    if tokens[body].text == ";" {
+        Some(body)
+    } else {
+        rust_source::matching_group(tokens, body)
+    }
+}
+
+fn count_calls_in_files(
+    files: &[PathBuf],
+    names: &BTreeSet<String>,
+    exclude_test_cfg: bool,
+) -> BTreeMap<String, usize> {
+    let mut counts = BTreeMap::new();
+    for file in files {
+        let Ok(text) = std::fs::read_to_string(file) else {
+            continue;
+        };
+        let tokens = rust_source::tokenize(&text)
+            .unwrap_or_else(|error| panic!("cannot tokenize {}: {error}", file.display()));
+        let mut index = 0;
+        while index < tokens.len() {
+            if exclude_test_cfg && let Some(end) = test_cfg_item_end(&tokens, index) {
+                index = end + 1;
+                continue;
+            }
+            if index + 1 < tokens.len()
+                && tokens[index].text == "."
+                && names.contains(&tokens[index + 1].text)
+                && method_call_open(&tokens, index + 2).is_some()
+            {
+                *counts.entry(tokens[index + 1].text.clone()).or_insert(0) += 1;
+                index += 3;
+            } else {
+                index += 1;
+            }
         }
     }
+    counts
+}
+
+fn method_call_open(tokens: &[rust_source::Token], after_name: usize) -> Option<usize> {
+    if tokens
+        .get(after_name)
+        .is_some_and(|token| token.text == "(")
+    {
+        return Some(after_name);
+    }
+    if !tokens
+        .get(after_name)
+        .is_some_and(|token| token.text == "::")
+        || !tokens
+            .get(after_name + 1)
+            .is_some_and(|token| token.text == "<")
+    {
+        return None;
+    }
+    let mut depth = 0usize;
+    for index in after_name + 1..tokens.len() {
+        match tokens[index].text.as_str() {
+            "<" => depth += 1,
+            ">" => {
+                depth = depth.checked_sub(1)?;
+                if depth == 0 {
+                    let open = index + 1;
+                    return tokens
+                        .get(open)
+                        .is_some_and(|token| token.text == "(")
+                        .then_some(open);
+                }
+            }
+            _ => {}
+        }
+    }
+    None
 }

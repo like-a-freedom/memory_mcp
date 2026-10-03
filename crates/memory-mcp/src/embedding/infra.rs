@@ -15,7 +15,6 @@ use crate::embedding::api::{
     CanonicalVectorPort, StoredVector, VectorApplication, VectorIdentity, VectorWritePolicy,
 };
 use crate::shared::temporal::normalize_dt;
-use crate::storage::BoundDbClient;
 
 /// Applies validated vectors to canonical fact records.
 ///
@@ -25,41 +24,25 @@ use crate::storage::BoundDbClient;
 /// target reports them, so a runtime without that knowledge
 /// stores exactly what it stored before.
 pub struct FactVectorAdapter {
-    db: BoundDbClient,
     backfill: crate::embedding::backfill_store::EmbeddingBackfillStoreClient,
-    model: Option<String>,
-    dimension: Option<usize>,
 }
 
 impl FactVectorAdapter {
-    pub fn new(
-        db: Arc<dyn crate::storage::DbClient>,
-        namespace: impl Into<String>,
-        model: Option<String>,
-        dimension: Option<usize>,
-    ) -> Self {
+    pub fn new(db: Arc<dyn crate::storage::DbClient>, namespace: impl Into<String>) -> Self {
         let namespace = namespace.into();
         Self {
-            db: BoundDbClient::new(Arc::clone(&db), namespace.clone()),
             backfill: crate::embedding::backfill_store::EmbeddingBackfillStoreClient::new(
                 db, namespace,
             ),
-            model,
-            dimension,
         }
     }
 
     /// The embedding-only field set for this write.
     ///
-    /// Built from scratch rather than cloned from the stored record: a snapshot
-    /// of the record is what let a concurrent writer's field change be
-    /// overwritten by the vector write.
-    fn embedding_fields(
-        &self,
-        vector: Vec<f64>,
-        identity: &VectorIdentity,
-        at: DateTime<Utc>,
-    ) -> Value {
+    /// Built from the validated identity rather than constructor parameters.
+    /// Duplicating model/dimension on the adapter lets a caller store metadata
+    /// that disagrees with the signature and vector it just validated.
+    fn embedding_fields(vector: Vec<f64>, identity: &VectorIdentity, at: DateTime<Utc>) -> Value {
         let mut fields = serde_json::Map::new();
         fields.insert("embedding".to_string(), Value::from(vector));
         fields.insert(
@@ -67,17 +50,17 @@ impl FactVectorAdapter {
             Value::from(identity.provider.clone()),
         );
         // Written explicitly even when absent, so a provider change cannot leave
-        // the previous provider's model and dimension attached to this vector.
+        // the previous provider's model attached to this vector.
         fields.insert(
             "embedding_model".to_string(),
-            match self.model.as_deref().or(identity.model.as_deref()) {
+            match identity.model.as_deref() {
                 Some(model) => Value::from(model),
                 None => Value::Null,
             },
         );
         fields.insert(
             "embedding_dimension".to_string(),
-            Value::from(self.dimension.unwrap_or(identity.dimension)),
+            Value::from(identity.dimension),
         );
         fields.insert(
             "embedding_signature".to_string(),
@@ -94,7 +77,7 @@ impl FactVectorAdapter {
 #[async_trait::async_trait]
 impl CanonicalVectorPort for FactVectorAdapter {
     async fn stored_fact_vector(&self, fact_id: &str) -> Result<StoredVector, MemoryError> {
-        let Some(Value::Object(record)) = self.db.select_one(fact_id).await? else {
+        let Some(Value::Object(record)) = self.backfill.select_fact(fact_id).await? else {
             return Err(MemoryError::NotFound(format!(
                 "fact not found for canonical vector read: {fact_id}"
             )));
@@ -129,7 +112,7 @@ impl CanonicalVectorPort for FactVectorAdapter {
                  OR embedding_signature != $embedding_signature"
             }
         };
-        let fields = self.embedding_fields(vector, &identity, at);
+        let fields = Self::embedding_fields(vector, &identity, at);
         if self
             .backfill
             .apply_embedding_fields(fact_id, fields, predicate)
@@ -140,7 +123,7 @@ impl CanonicalVectorPort for FactVectorAdapter {
 
         // The predicate refused. Distinguish "already has a vector" from "no
         // such fact", which is the one answer the predicate cannot express.
-        if self.db.select_one(fact_id).await?.is_none() {
+        if self.backfill.select_fact(fact_id).await?.is_none() {
             return Err(MemoryError::NotFound(format!(
                 "fact_id not found for canonical vector update: {fact_id}"
             )));

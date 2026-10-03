@@ -70,6 +70,35 @@ impl EmbeddingBackfillStoreClient {
             .await
     }
 
+    /// Read one fact using a bound record value rather than embedding an
+    /// identifier in SQL text. `None` means the fact does not exist; malformed
+    /// result shapes are errors rather than being mistaken for absence.
+    pub(crate) async fn select_fact(&self, fact_id: &str) -> Result<Option<Value>, MemoryError> {
+        let record_id = fact_record_key(fact_id)?;
+        let result = self
+            .db
+            .query(
+                "SELECT * FROM type::record('fact', $fact_id)",
+                Some(json!({ "fact_id": record_id })),
+            )
+            .await?;
+        let Value::Array(rows) = result else {
+            return Err(MemoryError::Storage(format!(
+                "fact read for {fact_id} returned a non-array result"
+            )));
+        };
+        match rows.as_slice() {
+            [] => Ok(None),
+            [Value::Object(_)] => Ok(rows.into_iter().next()),
+            [_] => Err(MemoryError::Storage(format!(
+                "fact read for {fact_id} returned a non-object row"
+            ))),
+            _ => Err(MemoryError::Storage(format!(
+                "fact read for {fact_id} returned more than one row"
+            ))),
+        }
+    }
+
     /// Conditionally write embedding fields on one fact, and report whether a
     /// row was written.
     ///
@@ -89,14 +118,7 @@ impl EmbeddingBackfillStoreClient {
         fields: Value,
         predicate: &str,
     ) -> Result<bool, MemoryError> {
-        let record_id = fact_id.strip_prefix("fact:").ok_or_else(|| {
-            MemoryError::Validation(format!("invalid fact id for embedding write: {fact_id}"))
-        })?;
-        if record_id.is_empty() {
-            return Err(MemoryError::Validation(format!(
-                "fact id carries no record id for embedding write: {fact_id}"
-            )));
-        }
+        let record_id = fact_record_key(fact_id)?;
         let Value::Object(fields) = fields else {
             return Err(MemoryError::Validation(
                 "embedding write fields must be an object".to_string(),
@@ -125,6 +147,18 @@ impl EmbeddingBackfillStoreClient {
             ))),
         }
     }
+}
+
+fn fact_record_key(fact_id: &str) -> Result<&str, MemoryError> {
+    let record_id = fact_id.strip_prefix("fact:").ok_or_else(|| {
+        MemoryError::Validation(format!("invalid fact id for embedding write: {fact_id}"))
+    })?;
+    if record_id.is_empty() {
+        return Err(MemoryError::Validation(format!(
+            "fact id carries no record id for embedding write: {fact_id}"
+        )));
+    }
+    Ok(record_id)
 }
 
 #[cfg(test)]

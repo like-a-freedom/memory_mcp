@@ -12,8 +12,8 @@
 
 ## Execution Status
 
-Recorded 2026-10-03, after the first execution pass. Checkboxes below are the
-original step plan; this table is what actually happened.
+Recorded 2026-10-03, after two implementation/review passes. Checkboxes below are
+the original step plan; this table is what actually happened.
 
 | Task | State | Evidence |
 |---|---|---|
@@ -21,17 +21,17 @@ original step plan; this table is what actually happened.
 | 2 Cancellation counterexamples | Done | The three cancellation tests fail with the attempt guard's cleanup removed and pass with it |
 | 3 Tenancy loses the cache | Done | `Tenancy`/`RuntimeLease` deleted; identity projection added |
 | 4 One state machine + RAII | Done | `SlotState`, `ActivationAttempt`, generation fencing |
-| 5 Reservations and capacity | Done | `SlotReservation`; `cancelled_slots_do_not_exhaust_capacity` |
+| 5 Reservations and capacity | Done | `SlotReservation`; cancelled reservations recover capacity; pin release wakes every drain/capacity waiter |
 | 6 Identity and revision | Done | `binding_mismatch_is_rejected_*`, `plan_change_replaces_the_runtime` |
 | 7 Shutdown wiring | Done | `Pool` holds the instance `ShutdownState`; existing drain tests pass |
-| 8 HTTP-level deadline test | **Not done** | Blocked and recorded below |
-| 9 Vector conditional writes | Done | `replace_stale_preserves_concurrent_fact_access` fails against the previous write and passes with the fix; commit `b3fd349` |
-| 10 Access writer | Done | `fact_access_preserves_concurrent_vector_write`, same red/green evidence |
+| 8 HTTP-level deadline test | Done | `http_deadline_cancels_activation_and_the_next_request_recovers` uses the real Axum deadline layer around pool acquisition |
+| 9 Vector conditional writes | Done | `replace_stale_preserves_concurrent_fact_access` fails against the previous write and passes with the fix; metadata comes from `VectorIdentity`; commit `b3fd349` |
+| 10 Access writer | Done | One atomic saturating update; concurrent increments, concurrent vector and forged-id tests pass |
 | 11 Initialize negotiation | Done | `unsupported_initialize_proposal_negotiates_legacy_revision`; commit `6881141` |
-| 12 Rooted source guard | **Not started** | The walk still counts incoming declarations instead of reaching files from Cargo roots |
-| 13 Public-surface scope | **Partly done** | Grouped/aliased `use` trees are read and the ratchet fires on them; the split-`impl` scope and the trait-caller claim are not done |
+| 12 Rooted source guard | Done | `source_tree_integrity` discovers Cargo lib/bin roots, walks external and inline modules, and rejects cycles, missing/ambiguous files, and path attrs |
+| 13 Public-surface scope | Done | Split `MemoryService` impls inventoried; grouped exports parse via shared lexer; nested grouped globs fail closed; trait declarations match their named body and caller scans ignore comments/literals |
 | 14 No-default CI row | Done | `2 passed` under `--no-default-features`; commit `afee2b8` |
-| 15 Integrated verification | **Partly done** | Per-lane gates and the workspace gate run; the whole-gate list was not run end to end |
+| 15 Integrated verification | Done | Workspace (103 targets), full-feature (2440 passed), no-default (2 passed), observability, fmt and required Clippy all pass |
 
 ### Second pass, 2026-10-03
 
@@ -43,26 +43,51 @@ name regrew. Proven end to end by temporarily adding
 `no_cut_name_is_re_exported_again` naming `hash_prefix`; the line was removed
 again before the commit.
 
+The source guard was then replaced with a rooted module graph starting from
+Cargo's lib/bin targets. It uses the bounded token reader in
+`tests/support/rust_source.rs`; the same reader now powers the public use-tree
+and lexical caller guards. The guard unions cfg-gated declarations, follows
+inline/external modules with Rust's directory rules, and fails closed on
+unresolved/ambiguous modules and production path attributes. Fixtures cover an
+unrooted cycle, incorrect sibling fallback, inline search dirs, Cargo roots,
+feature-gated declarations, comments/strings/macros, path attributes and
+ambiguity.
+
+The pool now drains old runtime pins before replacing a revision, extracts
+runtime destruction outside the pool lock, wakes capacity waiters on guard
+release, and linearizes shutdown against runtime publication. Tests cover each
+path, including the HTTP deadline middleware around a blocked activation.
+
+The second review of the implementation found all of those lifecycle gaps before
+they were closed, plus a metadata source mismatch and the unrooted guard/parser
+gaps. Vector metadata now comes only from the validated identity. The source
+walker starts at Cargo production roots; the public export and trait declaration/
+caller guards share the bounded lexer, fail closed on unsupported forms, and
+exclude comment/string lookalikes.
+The Axum deadline middleware now has a direct request-level regression: the first
+request times out while activation is blocked; the next request for that tenant
+activates successfully.
+
+The final independent review caught two additional bypasses: a pin-release
+notification could wake a capacity waiter but leave a revision-drain waiter
+asleep, and a nested grouped glob could enumerate no export names. Pin release
+now wakes all pool waiters to re-check their predicates; `public_surface_audit`
+rejects glob leaves anywhere in a grouped use tree. Regressions cover both cases.
+
 Gates actually run: `cargo fmt --all --check` clean; the repo's required Clippy
 command clean; `cargo test --workspace --lib --bins --tests --locked` green
 across 103 test targets with 0 failures; `cargo test -p memory_mcp --lib --bins
---features streamable-http,test-fixtures` 2395 passed, 0 failed;
+--tests --features fs-watch,mcp-apps,streamable-http,test-fixtures --locked`
+green (2440 passed, 4 ignored); `cargo test -p memory_mcp --no-default-features
+--test fs_watch_process_disabled --locked` runs 2 tests; `cargo run --locked -p
+xtask -- check-observability` passes all three checkers. The focused guards pass:
+doc_claims (3), source_tree_integrity (13), public_surface_audit (16),
+trait_methods_are_called (7), no_duplicate_implementations (4).
 `http_control_plane`, `http_load_concurrency`, `http_crash_recovery`,
 `http_isolation`, `http_proto_conformance`, `tenancy_runtime`,
 `tenancy_resolution`, `tenant_lifecycle`, `embedding_vector_policies`,
 `embedding_canonical_vectors` and `memory_recall` all pass;
 `--no-default-features --test fs_watch_process_disabled` runs 2 tests.
-
-### Why Task 8's HTTP-level test is not done
-
-The HTTP fixtures spawn `memory_mcp_http` as a subprocess
-(`tests/common/http_server.rs`), so there is no seam to inject a blocking
-factory into the process under test. A test that claimed to expire the request
-deadline mid-activation would have to weaken the fixture or assert something
-weaker than the claim. Task 8 stays open rather than being replaced with a test
-that does not test it. The middleware ordering that produces the cancellation is
-traced in the commit that fixed it, and the defect itself is reproduced through
-the pool's own interface.
 
 ### Additional finding, not in the plan
 
@@ -328,9 +353,9 @@ git commit -m "refactor(tenancy): the runtime cache moves to its HTTP owner"
   - `pub enum SlotState { Absent, Loading, Ready { runtime: Arc<TenantRuntime> }, Failed { retry_at: Instant }, Draining { runtime: Arc<TenantRuntime> } }`
   - `pub struct TenantRuntimeSlot { pub identity: TenantRuntimeIdentity, pub revision: RuntimeRevision, pub generation: u64, pub state: SlotState, pub completion: Option<watch::Sender<Option<Result<(), MemoryError>>>>, pub pins: Arc<AtomicU32>, pub concurrency: Arc<Semaphore>, pub last_used: Instant }`
   - `pub struct RuntimeRevision { pub plan_version: u32, pub schema_version: u32, pub concurrency: u32 }`
-  - `impl TenantRuntimeSlot { pub fn state(&self) -> &SlotState; pub fn is_ready(&self, generation: u64) -> Option<&Arc<TenantRuntime>>; pub fn in_negative_backoff(&self) -> bool; pub fn begin_attempt(&mut self, revision: RuntimeRevision) -> (u64, watch::Receiver<Option<Result<(), MemoryError>>>); pub fn complete_attempt(&mut self, generation: u64, outcome: Result<Arc<TenantRuntime>, MemoryError>, timed_out_or_failed: bool) -> bool }`
-  - `pub(crate) struct ActivationAttempt { pool: Arc<Pool>, tenant_id: String, generation: u64, completed: bool }` with `activate(...)`, `finish(Result<...>) -> bool` and `impl Drop`.
-  - `OperationGuard::from_reservation(runtime: Arc<TenantRuntime>, reservation: SlotReservation, tenant_permit: OwnedSemaphorePermit) -> Self`, where the reservation is already counted. `OperationGuard::new` keeps its signature for existing callers and increments the pin itself.
+  - `impl TenantRuntimeSlot { pub fn new(identity, revision); pub fn ready_runtime(&self); pub fn in_negative_backoff(&self, now); pub fn is_reclaimable(&self, now, idle_ttl); pub fn begin_loading(&mut self); pub fn subscribe(&self); pub fn finish_attempt(&mut self, generation, result, now); pub fn abandon(&mut self, generation) }`
+  - `ActivationAttempt::complete` publishes under the shared shutdown gate; `Drop` abandons the generation if the producer future is cancelled or unwinds.
+  - `OperationGuard::from_reservation(runtime, pins, release_notify, permit)` takes an already-counted pin. Dropping the guard decrements it and notifies pool waiters.
 
 - [ ] **Step 1: Replace the duplicated state fields with `SlotState`**
 
@@ -342,11 +367,11 @@ Replace `map: tokio::sync::Mutex<LruCache<..>>` and the per-slot `tokio::sync::M
 
 - [ ] **Step 3: Make the attempt guard own cancellation**
 
-`acquire_spec_with_limit` becomes: lock, resolve/create the slot, compare identity, refuse on backoff, subscribe to `completion` if `Loading`, else reserve a pin and publish `Loading` with a fresh generation, **unlock**, then either await completion or run the factory under one `tokio::time::timeout(self.activation_timeout, ...)` wrapped in `ActivationAttempt`. `ActivationAttempt::drop` locks the pool, and only if the slot is still `Loading` at the same generation: set `state = Absent`, drop the `completion` sender (which closes the channel so followers wake), clear the pin reservation, notify waiters. `finish` publishes `Ready { runtime }` or `Failed { retry_at: now + 5s }` and always drops the sender. A cancelled attempt leaves no `Failed` backoff.
+`acquire_spec_with_limit` compares identity and revision under the pool lock. A Ready slot at the requested revision reserves its pin there, before waiting for a concurrency permit. A Loading slot is non-reclaimable and followers subscribe to its completion. The request that creates Loading runs the factory outside the lock under one activation timeout and owns an `ActivationAttempt`. `Drop` returns its still-current generation to `Absent`; `finish_attempt` sends a terminal watch value before dropping the sender. Cancellation has no failure backoff; factory error and timeout retain the 5-second backoff.
 
 - [ ] **Step 4: Make followers observe completion without holding a slot lock**
 
-A follower's `watch::Receiver<Option<Result<(), MemoryError>>>` is created while `Loading`; it checks the current value before awaiting `changed()`, then re-reads the slot under the lock. A closed channel means the attempt was abandoned → `Err(PoolError::ActivationFailed)`. A follower never calls `slot_for` again to re-find its slot.
+A follower's `watch::Receiver<Option<Result<(), MemoryError>>>` is created while Loading; `wait_for` observes the saved completion value or channel closure. A closed channel means the attempt was abandoned → `Err(PoolError::ActivationFailed)`. A follower never calls `slot_for` again to re-find its slot.
 
 - [ ] **Step 5: Run the Task 2 tests**
 
@@ -369,10 +394,10 @@ git commit -m "fix(http): one activation state machine that survives cancellatio
 - Test: `crates/memory-mcp/src/http/runtime/pool.rs`
 
 **Interfaces:**
-- Consumes: Task 4's `SlotState`, `TenantRuntimeSlot::pins`, `PoolState::waiters`.
+- Consumes: Task 4's `SlotState`, `TenantRuntimeSlot::pins`, and the pool's `Arc<Notify>` waiter.
 - Produces:
-  - `pub(crate) struct SlotReservation { pins: Arc<AtomicU32>, tenant_id: String }` with `impl Drop` decrementing the pin, and `fn into_pin(self, runtime: Arc<TenantRuntime>, permit: OwnedSemaphorePermit) -> OperationGuard` for transferring the count.
-  - `fn reclaim_for(&self, state: &mut PoolState, tenant_id: &str, per_tenant_concurrency: u32) -> Result<(), PoolError>` — the single eligibility/removal rule used by idle eviction, capacity pressure and `mark_draining_if_idle`.
+  - `pub(crate) struct SlotReservation { pins: Arc<AtomicU32>, release_notify: Arc<Notify>, transferred: bool }` with `acquire(...)`, `into_guard(...)`, and `Drop` decrementing the pin and waking waiters.
+  - `TenantRuntimeSlot::is_reclaimable(...)` is the single eligibility predicate used by idle eviction and capacity reclamation; map removals return a slot for destruction after the lock is released.
 
 - [ ] **Step 1: Write the failing tests**
 
@@ -396,11 +421,11 @@ async fn capacity_wakeups_do_not_extend_the_deadline() {
 
 - [ ] **Step 2: Reserve the pin while still holding the lock**
 
-Order inside the lock: compare identity → honour backoff → (`Loading`: subscribe; `Ready`: reserve pin and return the runtime) → else publish `Loading`, bump generation, reserve the pin. The reservation is dropped by `SlotReservation::drop` on every error path, and transferred into the `OperationGuard` on success without a second increment.
+Order inside the lock: compare identity → (`Loading`: subscribe; `Ready` at same revision: reserve pin) → otherwise publish/revision state. Loading itself is non-reclaimable, so an activation leader does not need a pin before construction. The reservation is dropped by `SlotReservation::drop` on every permit error/cancellation path and transferred into `OperationGuard` on success without a second increment.
 
 - [ ] **Step 3: Make one reclamation rule and use it everywhere**
 
-Reclaimable: `Absent`, `Ready` with `pins == 0` and `last_used <= now - idle_ttl`, and `Failed` whose `retry_at` has passed. Never reclaimable: `Loading`, `Draining`, or any slot with `pins > 0`. `LruCache::put` must not implicitly evict a non-reclaimable entry — remove the entry explicitly before inserting.
+Reclaimable: `Absent`, `Ready` with `pins == 0` and `last_used <= now - idle_ttl`, and `Failed` whose `retry_at` has passed. Never reclaimable: `Loading`, `Draining`, or any slot with `pins > 0`. `LruCache::put` must not implicitly evict a non-reclaimable entry — the decision returns the popped slot so it is dropped outside the lock before retrying insertion.
 
 - [ ] **Step 4: Recheck the full predicate at a bounded deadline**
 
@@ -668,8 +693,8 @@ git commit -m "fix(embedding): persist only vector fields and report the stored 
 - Test: `crates/memory-mcp/src/memory/fact_access_store.rs` (`#[cfg(test)]`)
 
 **Interfaces:**
-- Consumes: `DbClient::query`, `crate::storage::value_helpers::json_i64`, `crate::shared::temporal`.
-- Produces: `FactAccessStore::record_fact_access(&self, fact_id: &str, boost: i64) -> Result<(), MemoryError>` — unchanged signature; the write becomes access-fields-only.
+- Consumes: `DbClient::query`, `crate::shared::temporal`.
+- Produces: `FactAccessStore::record_fact_access(&self, fact_id: &str, boost: i64) -> Result<(), MemoryError>` — unchanged signature; the count increment and timestamp update are one atomic access-fields-only statement.
 
 - [ ] **Step 1: Write the failing tests**
 
@@ -682,13 +707,16 @@ async fn fact_access_preserves_concurrent_vector_write() {
 }
 
 #[tokio::test]
-async fn concurrent_access_updates_do_not_lose_increments() { /* two sequential calls sum, no reset */ }
+async fn concurrent_access_updates_do_not_lose_increments() { /* simultaneous increments all persist */ }
 
 #[tokio::test]
 async fn record_fact_access_leaves_absent_records_alone() { /* still a no-op, no error */ }
 
 #[tokio::test]
-async fn record_fact_access_preserves_legacy_count_coercion() { /* json_i64 accepts a string/number count */ }
+async fn record_fact_access_binds_forged_record_ids_as_values() { /* delimiter text is never SQL */ }
+
+#[tokio::test]
+async fn record_fact_access_saturates_at_the_lower_bound() { /* i64::MIN - 1 remains i64::MIN */ }
 ```
 
 - [ ] **Step 2: Run them and confirm the vector-preservation test fails**
@@ -697,7 +725,7 @@ Run: `cargo test -p memory_mcp --lib memory::fact_access_store --locked`
 
 - [ ] **Step 3: Update only the access fields**
 
-`UPDATE type::record('fact', $id) SET access_count = $access_count, last_accessed = type::datetime($last_accessed)`. Read the current count for the arithmetic, keep `json_i64` coercion and `saturating_add`, and keep the absent-record no-op. Do not switch to an in-SQL `+=` unless the missing-count default is handled explicitly.
+Use one parameterized `UPDATE type::record('fact', $id)` statement that sets only `access_count` and `last_accessed`. The count expression handles a missing count as zero and clamps at both i64 bounds before adding; the single statement prevents concurrent retrievals from losing increments. Preserve the absent-record no-op (an update of a missing record affects no rows) and bind the suffix of the validated `fact:` id rather than interpolating it into SQL.
 
 - [ ] **Step 4: Run the tests**
 
@@ -773,15 +801,11 @@ git commit -m "fix(http): let an initialize proposal reach protocol negotiation"
 - Test: both files
 
 **Interfaces:**
-- Produces (in `tests/support/rust_source.rs`, included with `#[path = "support/rust_source.rs"] mod rust_source;`):
-  - `pub struct Token { pub kind: TokenKind, pub text: String, pub line: usize }`, `pub enum TokenKind { Ident, Punct, Literal }`
-  - `pub fn tokenize(source: &str) -> Result<Vec<Token>, SyntaxDiagnostic>` — skips line/block/nested block comments and string/char/raw literals; treats their contents as `Literal`.
-  - `pub struct SyntaxDiagnostic { pub line: usize, pub message: String }`
-  - `pub struct ModDecl { pub name: String, pub inline: Option<String>, pub cfg: Option<String> }`
-  - `pub fn module_decls(tokens: &[Token]) -> Result<Vec<ModDecl>, SyntaxDiagnostic>`
-  - `pub fn use_tree_names(tokens: &[Token], after: &str) -> Result<Vec<String>, SyntaxDiagnostic>` — parses `use ...::{a, b as c};` into the *exported* names (`a`, `c`).
-  - `pub fn is_test_only_cfg(cfg: &str) -> bool`
-- Consumes: `serde_json` (already a direct dev dependency), `tempfile`.
+- Produces: `tests/support/rust_source.rs`, included by each guard as `#[path = "support/rust_source.rs"] mod rust_source;`:
+  - `Token { text: String }`, `tokenize(source: &str) -> Result<Vec<Token>, String>`, `matching_group(tokens, open)`, `is_identifier(name)`, and `is_open_group(token)`.
+  - The reader removes comments and string/character/raw literals, tracks nested comments and delimiter groups, and errors on unterminated comments/literals. It is lexical support, not a Rust AST.
+- Produces (local to `source_tree_integrity.rs`): `roots_from_metadata`, `rooted_module_graph`, Rust file-module search-directory handling, and explicit diagnostics for unsupported `#[path]`, unresolvable/ambiguous modules, and unsupported module-producing macros.
+- Consumes: `serde_json` (already a direct dev dependency), `tempfile`, and `cargo metadata --no-deps`.
 
 - [ ] **Step 1: Write the failing fixture tests**
 
@@ -819,11 +843,11 @@ fn production_path_attributes_fail_closed() { /* #[path = "..."] is reported, no
 - [ ] **Step 2: Run them to confirm they fail**
 
 Run: `cargo test -p memory_mcp --test source_tree_integrity --locked`
-Expected: FAIL — the tests do not exist yet.
+Expected before the fix: the disconnected cycle is not reported as unreachable, or the inline module path fixture is reported missing.
 
 - [ ] **Step 3: Implement the tokenizer and traversal**
 
-Roots come from `cargo metadata --format-version 1 --no-deps --locked --offline`, parsed with `serde_json`, selecting `targets` whose `src_path` ends in `.rs` and whose `kind` contains `lib`/`bin` for the `memory_mcp` package (the package is identified by manifest path). Traverse from those roots only, carrying the module search directory: `foo.rs` children live in `foo/`, `mod.rs` children live beside it, an inline module changes the directory to `.../name/`. Take the union of `cfg`-gated declarations; report an unsupported `cfg`/macro-include form as a diagnostic rather than passing. Exempt only the generated `OUT_DIR` include in `src/ui/assets.rs` from the checked-in-file inventory.
+Roots come from `cargo metadata --format-version 1 --no-deps --locked --offline`, parsed with `serde_json`, selecting only `lib`/`bin` targets for the exact memory-mcp manifest path. Traverse from those roots only, carrying the module search directory: crate-root children live beside the root; `foo.rs` children live in `foo/`; `mod.rs` children live beside it; an inline module changes the directory to `.../name/`. Union cfg-gated declarations (the graph is a declared-source union, not a proof every feature combination compiles). A module-generating macro invocation, `include!` outside `src/ui/assets.rs`, unresolved/ambiguous module or path attribute yields a diagnostic rather than an empty accepted result.
 
 - [ ] **Step 4: Assert the live tree and report unreachable files**
 
@@ -832,7 +856,7 @@ Compare the disk inventory of `src/**/*.rs` against the reachable set. The asser
 - [ ] **Step 5: Run against the live tree**
 
 Run: `cargo test -p memory_mcp --test source_tree_integrity --locked`
-Expected: PASS with the current tree (an independent traversal reached all 391 production files); the seven fixtures fail if the traversal regresses.
+Expected: PASS with every current `src/**/*.rs` file reached from the Cargo lib/bin roots; the counterexample fixtures fail if the traversal regresses.
 
 - [ ] **Step 6: Commit**
 
@@ -852,10 +876,11 @@ git commit -m "test(architecture): prove reachability from Cargo roots, not inco
 - Test: the same three files
 
 **Interfaces:**
-- Consumes: `rust_source::{tokenize, use_tree_names, is_test_only_cfg}` (Task 12).
+- Consumes: `rust_source::{tokenize, matching_group, is_identifier, is_open_group}` (Task 12); `use_tree_names` remains local to `public_surface_audit.rs`.
 - Produces:
-  - `CUT_REEXPORTS` keeps its two entries; the parser now returns `{"Fact", "ids"}` for `pub use crate::types::{Fact, ids};`.
-  - `collect_public_methods` walks every reached `impl MemoryService` block, including `impl crate::service::MemoryService` split across files, and records `(file, line, name)`.
+  - `reexported_names` enumerates exported leaves and aliases from public use trees, including `{"Fact", "ids"}` from `pub use crate::types::{Fact, ids};`; it expands the one local `constants::*` glob and rejects other public globs.
+  - `collect_public_methods` token-scans every source file for inherent `impl MemoryService` blocks, including split and qualified impls, and records `(name, file)`.
+  - The caller ratchet parses the named trait body, ignores cfg(test) items, comments and literals, and recognizes receiver, explicit `Trait::method`, and `<T as Trait>::method` syntax. It remains lexical, not receiver-type-resolved.
 
 - [ ] **Step 1: Write the failing tests**
 
@@ -1018,11 +1043,12 @@ interpolation, strict `query` plus one existence read, and `body_method !=
 
 **3. Type consistency.** `TenantRuntimeIdentity` and `TenantRuntimeSpec::identity()`
 are defined in Task 3 and used in Tasks 4 and 6. `SlotState`, `RuntimeRevision`,
-`TenantRuntimeSlot::begin_attempt`/`complete_attempt`, `ActivationAttempt`,
-`SlotReservation` and `reclaim_for` are defined once in Tasks 4–5 and referenced by
-name afterwards. `CanonicalVectorPort::apply_fact_vector -> VectorApplication` and
-`update_embedding_fields -> bool` are defined in Task 9 and used by Task 10 and the
-call sites. `rust_source` symbols are defined in Task 12 and consumed in Task 13.
+`TenantRuntimeSlot::begin_loading`/`finish_attempt`, `ActivationAttempt`,
+`SlotReservation` and `is_reclaimable` are defined once in Tasks 4–5 and referenced
+by name afterwards. `CanonicalVectorPort::apply_fact_vector ->
+VectorApplication` and `apply_embedding_fields -> bool` are defined in Task 9
+and used by Task 10 and the call sites. `rust_source::{Token, tokenize,
+matching_group}` are defined in Task 12 and consumed in Tasks 12–13.
 
 **4. Review Focus.** Each of the five uncovered input classes has an owning task
 with a named test: activation cancellation (Task 2), concurrent fact mutation under
@@ -1036,17 +1062,23 @@ two counterexample tests, the factory double, the identity projection, the SQL
 predicate, and the CI row. Bodies are otherwise described as signatures plus
 assertions.
 
-**Known gaps, recorded rather than hidden.**
+**Review resolution.**
 
-- Lane A's exact `SlotState` transitions are described behaviourally; an executor
-  who finds a simpler equivalent state machine that keeps Tasks 2 and 5–7 green
-  should take it and say so in the commit message.
-- `PoolError` may need a `BindingConflict` variant if a caller wants to
-  distinguish it from `ActivationFailed`; Task 6 decides and records it.
-- Task 2's red run is the only evidence that the counterexamples describe the real
-  defect. If a test cannot be made to fail against the pre-fix code, it is
-  misdescribed and must be rewritten, not kept as decoration.
-- The Metal and real-client interop paths remain unexecuted here.
+An independent standards/spec review reported the revision drain, runtime drop
+under lock, missing capacity wakeup, late shutdown publication, identity metadata
+mismatch, unrooted-source, use-tree/caller lexer and stale-document claims. The
+implementation now drains until pins reach zero, destroys runtimes outside the
+lock, notifies on reservation/guard release, gates publication with shutdown,
+derives vector metadata only from `VectorIdentity`, roots source inventory at
+Cargo lib/bin targets, parses guarded syntax through the bounded lexer, and
+records current implementation status in this ledger. Targeted tests cover each
+reported behavior.
+
+The review identified the completed implementation before these fixes; both its
+standards and spec reports are retained in the thread. Remaining limits are
+explicitly in the spec: the caller ratchet is lexical and does not resolve
+receiver types; real-client interoperability and target-specific Metal tests are
+not run in this environment.
 
 ## Execution Handoff
 

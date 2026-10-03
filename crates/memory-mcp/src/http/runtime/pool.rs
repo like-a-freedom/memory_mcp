@@ -170,6 +170,12 @@ enum Decision {
     Backoff,
     /// Different storage is bound to this tenant id. Never served or replaced.
     ForeignBinding,
+    /// An old revision is still in use; wait for its pins to drain.
+    Drain,
+    /// Release a runtime after the state lock has been dropped, then retry.
+    Retire(Arc<TenantRuntime>),
+    /// Release a reclaimed slot after the state lock has been dropped.
+    Reclaim(TenantRuntimeSlot),
     /// No slot free and nothing reclaimable.
     NoRoom,
 }
@@ -191,7 +197,7 @@ pub struct Pool {
     /// lock is released.
     state: Mutex<LruCache<String, TenantRuntimeSlot>>,
     /// Woken whenever a slot changes state, so a capacity wait re-checks.
-    waiters: tokio::sync::Notify,
+    waiters: Arc<tokio::sync::Notify>,
     cap: usize,
     // Read by `evict_idle` and the tracked scheduler job.
     idle_ttl: Duration,
@@ -218,20 +224,38 @@ struct ActivationAttempt {
     completed: bool,
 }
 
+enum AttemptCompletion {
+    Published(Result<Arc<TenantRuntime>, MemoryError>),
+    Shutdown,
+}
+
 impl ActivationAttempt {
-    fn complete(
-        &mut self,
-        outcome: Result<Arc<TenantRuntime>, MemoryError>,
-    ) -> Result<Arc<TenantRuntime>, MemoryError> {
+    fn complete(&mut self, outcome: Result<Arc<TenantRuntime>, MemoryError>) -> AttemptCompletion {
         self.completed = true;
-        {
+        let completion = {
             let mut map = self.pool.lock_state();
-            if let Some(slot) = map.get_mut(&self.tenant_id) {
-                slot.finish_attempt(self.generation, outcome.clone(), Instant::now());
+            let published = self.pool.shutdown.publish_while_running(|| {
+                if let Some(slot) = map.get_mut(&self.tenant_id) {
+                    slot.finish_attempt(self.generation, outcome.clone(), Instant::now())
+                } else {
+                    false
+                }
+            });
+            match published {
+                None => {
+                    if let Some(slot) = map.get_mut(&self.tenant_id) {
+                        slot.abandon(self.generation);
+                    }
+                    AttemptCompletion::Shutdown
+                }
+                Some(true) => AttemptCompletion::Published(outcome),
+                Some(false) => AttemptCompletion::Published(Err(MemoryError::Unavailable(
+                    "tenant runtime activation was superseded".into(),
+                ))),
             }
-        }
+        };
         self.pool.waiters.notify_waiters();
-        outcome
+        completion
     }
 }
 
@@ -298,7 +322,7 @@ impl Pool {
             state: Mutex::new(LruCache::new(
                 std::num::NonZeroUsize::new(cap).unwrap_or(std::num::NonZeroUsize::MIN),
             )),
-            waiters: tokio::sync::Notify::new(),
+            waiters: Arc::new(tokio::sync::Notify::new()),
             cap,
             idle_ttl,
             capacity_wait,
@@ -400,37 +424,60 @@ impl Pool {
             if &slot.identity != identity {
                 return Decision::ForeignBinding;
             }
-            if let Some(runtime) = slot.ready_runtime() {
-                if slot.revision == revision {
-                    let runtime = Arc::clone(runtime);
-                    let semaphore = Arc::clone(&slot.concurrency);
-                    let reservation = SlotReservation::acquire(&slot.pins);
-                    slot.last_used = now;
-                    return Decision::Serve {
-                        runtime,
-                        semaphore,
-                        reservation,
-                    };
+            if matches!(slot.state, SlotState::Loading) {
+                if let Some(receiver) = slot.subscribe() {
+                    return Decision::Follow(receiver);
                 }
-                // Same binding, different runtime inputs: the resident runtime
-                // is stale, not wrong. Unload it and build the requested one
-                // below. Guards still holding the old `Arc` finish normally; no
-                // new caller is served from it.
-                slot.state = SlotState::Absent;
-                slot.completion = None;
-            } else if slot.in_negative_backoff(now) && slot.revision == revision {
-                // A refusal belongs to the revision that failed. A changed
-                // revision is a different runtime and gets its own attempt.
+                return Decision::NoRoom;
+            }
+            if slot.revision == revision && slot.in_negative_backoff(now) {
                 return Decision::Backoff;
             }
-
-            // An attempt already in flight is waited on rather than replaced,
-            // whatever revision it was started for: the caller that owns it will
-            // finish, and this one re-decides afterwards.
-            if matches!(slot.state, SlotState::Loading)
-                && let Some(receiver) = slot.subscribe()
-            {
-                return Decision::Follow(receiver);
+            match std::mem::replace(&mut slot.state, SlotState::Absent) {
+                SlotState::Ready { runtime } => {
+                    if slot.revision == revision {
+                        slot.state = SlotState::Ready {
+                            runtime: Arc::clone(&runtime),
+                        };
+                        let semaphore = Arc::clone(&slot.concurrency);
+                        let reservation =
+                            SlotReservation::acquire(&slot.pins, Arc::clone(&self.waiters));
+                        slot.last_used = now;
+                        return Decision::Serve {
+                            runtime,
+                            semaphore,
+                            reservation,
+                        };
+                    }
+                    // Stop admitting work to the old revision. Existing guards
+                    // keep their runtime alive, while this slot blocks new
+                    // activation until all those guards have released their pins.
+                    slot.state = SlotState::Draining { runtime };
+                    slot.revision = revision;
+                    return if slot.pins.load(Ordering::SeqCst) == 0 {
+                        self.retire_draining(slot)
+                    } else {
+                        Decision::Drain
+                    };
+                }
+                SlotState::Draining { runtime } => {
+                    slot.state = SlotState::Draining { runtime };
+                    slot.revision = revision;
+                    return if slot.pins.load(Ordering::SeqCst) == 0 {
+                        self.retire_draining(slot)
+                    } else {
+                        Decision::Drain
+                    };
+                }
+                SlotState::Failed { retry_at } if retry_at > now && slot.revision == revision => {
+                    slot.state = SlotState::Failed { retry_at };
+                    return Decision::Backoff;
+                }
+                SlotState::Absent | SlotState::Failed { .. } => {}
+                SlotState::Loading => {
+                    slot.state = SlotState::Loading;
+                    return Decision::NoRoom;
+                }
             }
 
             slot.revision = revision;
@@ -449,7 +496,10 @@ impl Pool {
                 // least-recently-used entry when the map is full, and that entry
                 // may be pinned or mid-activation.
                 Some(victim) => {
-                    map.pop(&victim);
+                    let Some(retired) = map.pop(&victim) else {
+                        return Decision::NoRoom;
+                    };
+                    return Decision::Reclaim(retired);
                 }
                 None => return Decision::NoRoom,
             }
@@ -464,6 +514,22 @@ impl Pool {
         };
         let (generation, _receiver) = slot.begin_loading();
         Decision::Lead { generation }
+    }
+
+    /// Move a drained runtime out of its slot and return it to the caller for
+    /// destruction after the pool state lock is released.
+    fn retire_draining(&self, slot: &mut TenantRuntimeSlot) -> Decision {
+        match std::mem::replace(&mut slot.state, SlotState::Absent) {
+            SlotState::Draining { runtime } => {
+                slot.concurrency =
+                    Arc::new(Semaphore::new(slot.revision.concurrency.max(1) as usize));
+                Decision::Retire(runtime)
+            }
+            other => {
+                slot.state = other;
+                Decision::NoRoom
+            }
+        }
     }
 
     /// Remove idle, unpinned Ready runtimes. Dropping the last runtime
@@ -570,7 +636,7 @@ impl Pool {
     ) -> Result<OperationGuard, PoolError> {
         let identity = spec.identity();
         let revision = self.revision(spec, per_tenant_concurrency);
-        let deadline = Instant::now() + self.capacity_wait;
+        let capacity_deadline = Instant::now() + self.capacity_wait;
 
         loop {
             if self.shutdown.is_shutting_down() {
@@ -579,6 +645,8 @@ impl Pool {
             // Registered before the decision, so a release that lands between
             // the check and the wait still wakes this caller.
             let notified = self.waiters.notified();
+            tokio::pin!(notified);
+            notified.as_mut().enable();
             let decision = {
                 let mut map = self.lock_state();
                 self.decide(&mut map, &identity, revision, Instant::now())
@@ -590,10 +658,37 @@ impl Pool {
                     semaphore,
                     reservation,
                 } => {
-                    let permit = self.acquire_tenant_permit(semaphore, deadline).await?;
+                    let permit = self
+                        .acquire_tenant_permit(semaphore, Instant::now() + self.capacity_wait)
+                        .await?;
                     return Ok(reservation.into_guard(runtime, permit));
                 }
                 Decision::Backoff => return Err(PoolError::ActivationFailed),
+                Decision::Drain => {
+                    if Instant::now() >= capacity_deadline {
+                        return Err(PoolError::CapacityTimeout);
+                    }
+                    let shutdown = self.shutdown.token();
+                    tokio::select! {
+                        _ = notified => {}
+                        _ = shutdown.cancelled() => return Err(PoolError::ShuttingDown),
+                        _ = tokio::time::sleep_until(capacity_deadline.into()) => {
+                            return Err(PoolError::CapacityTimeout);
+                        }
+                    }
+                }
+                Decision::Retire(runtime) => {
+                    // Runtime teardown closes tenant stores and may be slow.
+                    // This branch runs after `decide` released the pool lock.
+                    drop(runtime);
+                    self.waiters.notify_waiters();
+                }
+                Decision::Reclaim(slot) => {
+                    // The last runtime reference is dropped outside the global
+                    // bookkeeping lock; an eviction never blocks other tenants.
+                    drop(slot);
+                    self.waiters.notify_waiters();
+                }
                 Decision::ForeignBinding => {
                     crate::http::logging::log_warn(
                         "http.runtime.binding_conflict",
@@ -635,6 +730,7 @@ impl Pool {
                     };
                     let shutdown = self.shutdown.token();
                     let activation = tokio::select! {
+                        biased;
                         _ = shutdown.cancelled() => {
                             // The guard is dropped with the attempt, returning
                             // the slot to `Absent` rather than leaving a
@@ -653,8 +749,9 @@ impl Pool {
                         },
                     };
                     match attempt.complete(activation) {
-                        Ok(_) => continue,
-                        Err(error) => {
+                        AttemptCompletion::Published(Ok(_)) => continue,
+                        AttemptCompletion::Shutdown => return Err(PoolError::ShuttingDown),
+                        AttemptCompletion::Published(Err(error)) => {
                             crate::http::logging::log_warn(
                                 "http.runtime.activation_failed",
                                 &format!("tenant {}: {error}", identity.tenant_id),
@@ -664,14 +761,14 @@ impl Pool {
                     }
                 }
                 Decision::NoRoom => {
-                    if Instant::now() >= deadline {
+                    if Instant::now() >= capacity_deadline {
                         return Err(PoolError::CapacityTimeout);
                     }
                     let shutdown = self.shutdown.token();
                     tokio::select! {
                         _ = notified => {}
                         _ = shutdown.cancelled() => return Err(PoolError::ShuttingDown),
-                        _ = tokio::time::sleep_until(deadline.into()) => {
+                        _ = tokio::time::sleep_until(capacity_deadline.into()) => {
                             return Err(PoolError::CapacityTimeout);
                         }
                     }
@@ -696,9 +793,16 @@ impl Pool {
         if slot.ready_runtime().is_none() {
             return false;
         }
-        slot.state = SlotState::Absent;
+        let runtime = match std::mem::replace(&mut slot.state, SlotState::Absent) {
+            SlotState::Ready { runtime } => runtime,
+            other => {
+                slot.state = other;
+                return false;
+            }
+        };
         slot.last_used = now;
         drop(map);
+        drop(runtime);
         self.waiters.notify_waiters();
         true
     }
@@ -727,6 +831,20 @@ mod tests {
     use chrono::Utc;
     use surrealdb::Surreal;
     use surrealdb::engine::local::Mem;
+    use tower_service::Service;
+
+    async fn acquire_for_deadline_test(
+        axum::extract::State(state): axum::extract::State<Arc<crate::http::HttpState>>,
+    ) -> axum::http::StatusCode {
+        match state
+            .pool
+            .acquire_spec_with_limit(&spec("ten_deadline", "tns_deadline"), 4)
+            .await
+        {
+            Ok(_guard) => axum::http::StatusCode::OK,
+            Err(_) => axum::http::StatusCode::SERVICE_UNAVAILABLE,
+        }
+    }
 
     fn ready_tenant(id: &str, ns: &str) -> Tenant {
         Tenant {
@@ -797,6 +915,7 @@ mod tests {
         release: Arc<tokio::sync::Semaphore>,
         calls: Arc<std::sync::atomic::AtomicU64>,
         panic_next: Arc<std::sync::atomic::AtomicBool>,
+        shutdown: crate::http::shutdown::ShutdownState,
     }
 
     impl BlockingHarness {
@@ -842,6 +961,7 @@ mod tests {
                 release,
                 calls,
                 panic_next,
+                shutdown: crate::http::shutdown::ShutdownState::new(),
             },
         )
     }
@@ -854,6 +974,7 @@ mod tests {
 
     async fn pool_over_blocking_factory(cap: usize) -> (Arc<Pool>, BlockingHarness) {
         let (factory, harness) = blocking_factory(mem_registry().await);
+        let shutdown = crate::http::shutdown::ShutdownState::new();
         let pool = Arc::new(Pool::with_factory(
             cap,
             Duration::ZERO,
@@ -861,9 +982,15 @@ mod tests {
             Duration::from_secs(30),
             DEFAULT_PER_TENANT_CONCURRENCY,
             factory,
-            crate::http::shutdown::ShutdownState::new(),
+            shutdown.clone(),
         ));
-        (pool, harness)
+        (
+            pool,
+            BlockingHarness {
+                shutdown,
+                ..harness
+            },
+        )
     }
 
     /// The request that started an activation is the one that owns it. When that
@@ -978,6 +1105,150 @@ mod tests {
         assert!(other.is_ok(), "an abandoned slot must not hold the pool");
     }
 
+    #[tokio::test]
+    async fn shutdown_does_not_publish_a_late_runtime() {
+        let (pool, harness) = pool_over_blocking_factory(4).await;
+        let tenant = spec("ten_shutdown", "tns_shutdown");
+        let leader = tokio::spawn({
+            let pool = Arc::clone(&pool);
+            let tenant = tenant.clone();
+            async move { pool.acquire_spec_with_limit(&tenant, 4).await }
+        });
+        harness.wait_until_entered().await;
+
+        // Make both sides of the select ready. Shutdown wins, and the
+        // publication path also checks the shared shutdown state under lock.
+        harness.release_one();
+        harness.shutdown.begin();
+        let result = tokio::time::timeout(Duration::from_secs(5), leader)
+            .await
+            .expect("shutdown cancels the pending activation")
+            .expect("leader task joins");
+
+        assert!(matches!(result, Err(PoolError::ShuttingDown)));
+        assert!(
+            !pool.contains_ready("ten_shutdown").await,
+            "a runtime completed after shutdown must not become Ready"
+        );
+    }
+
+    #[tokio::test]
+    async fn http_deadline_cancels_activation_and_the_next_request_recovers() {
+        let mut state = crate::http::HttpState::default_for_test().await;
+        let registry = Arc::new(state.registry.clone());
+        let (factory, harness) = blocking_factory(registry);
+        let state_mut = Arc::get_mut(&mut state).expect("test state has one owner");
+        state_mut.config.request_deadline = Duration::from_millis(30);
+        state_mut.pool = Arc::new(Pool::with_factory(
+            4,
+            Duration::ZERO,
+            Duration::from_secs(2),
+            Duration::from_secs(10),
+            4,
+            factory,
+            state_mut.shutdown.clone(),
+        ));
+
+        let mut service = axum::Router::new()
+            .route("/", axum::routing::get(acquire_for_deadline_test))
+            .layer(axum::middleware::from_fn_with_state(
+                Arc::clone(&state),
+                crate::http::middleware::request_deadline,
+            ))
+            .with_state(state);
+        let request = || {
+            axum::http::Request::builder()
+                .uri("/")
+                .body(axum::body::Body::empty())
+                .expect("request")
+        };
+
+        let first = service.call(request()).await.expect("first response");
+        assert_eq!(
+            first.status(),
+            axum::http::StatusCode::REQUEST_TIMEOUT,
+            "the actual request deadline must cancel the in-flight acquisition"
+        );
+        harness.wait_until_entered().await;
+        harness.release_one();
+
+        let second = tokio::time::timeout(Duration::from_secs(5), service.call(request()))
+            .await
+            .expect("the retry after request cancellation must terminate")
+            .expect("second response");
+        assert_eq!(
+            second.status(),
+            axum::http::StatusCode::OK,
+            "the request after deadline cancellation must activate the tenant"
+        );
+    }
+
+    #[tokio::test]
+    async fn revision_replacement_waits_until_old_guards_drain() {
+        let pool = test_pool().await;
+        let original = ready_tenant("ten_revision_drain", "tns_revision_drain");
+        let old_guard = pool.acquire_or_wait(&original).await.expect("old revision");
+        let mut replacement = spec("ten_revision_drain", "tns_revision_drain");
+        replacement.plan_version = 2;
+
+        let waiter = tokio::spawn({
+            let pool = Arc::clone(&pool);
+            async move { pool.acquire_spec_with_limit(&replacement, 4).await }
+        });
+        tokio::time::sleep(Duration::from_millis(50)).await;
+
+        assert_eq!(
+            pool.activation_count("ten_revision_drain").await,
+            1,
+            "the new revision must not activate while old response pins remain"
+        );
+        assert!(
+            !pool.contains_ready("ten_revision_drain").await,
+            "the old runtime is draining and accepts no new acquisitions"
+        );
+
+        drop(old_guard);
+        let new_guard = tokio::time::timeout(Duration::from_secs(5), waiter)
+            .await
+            .expect("the pin release wakes the replacement")
+            .expect("replacement task joins")
+            .expect("replacement activates");
+        assert_eq!(pool.activation_count("ten_revision_drain").await, 2);
+        drop(new_guard);
+    }
+
+    #[tokio::test]
+    async fn capacity_wait_retries_when_a_pin_is_released() {
+        let registry = mem_registry().await;
+        let pool = Arc::new(Pool::new(
+            1,
+            Duration::ZERO,
+            Duration::from_secs(2),
+            DEFAULT_ACTIVATION_TIMEOUT,
+            DEFAULT_PER_TENANT_CONCURRENCY,
+            registry,
+        ));
+        let held = pool
+            .acquire_or_wait(&ready_tenant("ten_capacity_held", "tns_capacity_held"))
+            .await
+            .expect("first runtime");
+        let waiter = tokio::spawn({
+            let pool = Arc::clone(&pool);
+            async move {
+                pool.acquire_or_wait(&ready_tenant("ten_capacity_waiter", "tns_capacity_waiter"))
+                    .await
+            }
+        });
+        tokio::time::sleep(Duration::from_millis(50)).await;
+        drop(held);
+
+        let acquired = tokio::time::timeout(Duration::from_secs(5), waiter)
+            .await
+            .expect("releasing a pin wakes the capacity waiter")
+            .expect("capacity waiter joins");
+        assert!(acquired.is_ok());
+    }
+
     /// A factory that panics must leave the tenant retryable. The unwinding
     /// runs the attempt's guard, which is the entire point of putting cleanup in
     /// `Drop` rather than after the await.
@@ -1014,7 +1285,14 @@ mod tests {
     /// A runtime a caller is waiting to use must not be unloaded underneath it.
     #[tokio::test]
     async fn runtime_is_pinned_before_waiting_for_tenant_permit() {
-        let pool = test_pool().await;
+        let pool = Arc::new(Pool::new(
+            4,
+            Duration::ZERO,
+            Duration::from_secs(2),
+            DEFAULT_ACTIVATION_TIMEOUT,
+            1,
+            mem_registry().await,
+        ));
         let tenant = ready_tenant("ten_pin_wait", "tns_pin_wait");
         let held = pool.acquire_or_wait(&tenant).await.expect("first guard");
 
@@ -1121,6 +1399,34 @@ mod tests {
         db.use_ns("control").use_db("control").await.unwrap();
         let registry = Arc::new(RegistryHandle::in_memory_with_mem_engine(Arc::new(db)));
         Arc::new(Pool::with_defaults(registry))
+    }
+
+    #[tokio::test]
+    async fn releasing_a_pin_wakes_drain_and_capacity_waiters() {
+        let pool = test_pool().await;
+        let guard = pool
+            .acquire_or_wait(&ready_tenant("ten_notify", "tns_notify"))
+            .await
+            .expect("acquire runtime");
+
+        // Revision-drain and capacity waiters share the pool event stream.
+        // Both must re-check after one pin is released; notify_one lets either
+        // class consume the event and leave the other asleep.
+        let drain_waiter = pool.waiters.notified();
+        tokio::pin!(drain_waiter);
+        let capacity_waiter = pool.waiters.notified();
+        tokio::pin!(capacity_waiter);
+        drain_waiter.as_mut().enable();
+        capacity_waiter.as_mut().enable();
+
+        drop(guard);
+
+        tokio::time::timeout(Duration::from_secs(1), &mut drain_waiter)
+            .await
+            .expect("pin release wakes revision-drain waiter");
+        tokio::time::timeout(Duration::from_secs(1), &mut capacity_waiter)
+            .await
+            .expect("pin release wakes capacity waiter");
     }
 
     #[tokio::test]

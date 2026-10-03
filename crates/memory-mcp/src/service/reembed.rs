@@ -860,8 +860,6 @@ impl MemoryService {
         let port = crate::embedding::infra::FactVectorAdapter::new(
             self.db_client.clone(),
             self.active_namespace.clone(),
-            embedding_state.model.clone(),
-            Some(target_dimension),
         );
         // Generate and write as one call. Before this, the two were separate
         // and the caller had to hold the vector in between — which is what let

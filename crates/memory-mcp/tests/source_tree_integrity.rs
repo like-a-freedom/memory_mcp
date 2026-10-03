@@ -1,22 +1,27 @@
-//! Every source file in this crate must be reachable from a `mod`
-//! declaration.
+//! Every Rust source file under `src/` must be reachable from a production
+//! Cargo root through Rust file-module declarations.
 //!
-//! rustc only compiles what the module graph reaches. A file that no `mod`
-//! names is invisible to the compiler: it can hold broken code, a stale
-//! duplicate of a moved function, or a `todo!()`, and every check the project
-//! runs will still pass green. ADR-0061 recorded that the compiler graph is
-//! the source of truth and ADR-0063 retired the check that used to assert it;
-//! ADR-0065 reinstates it, because a fact nothing derives is a fact that
-//! decays.
+//! rustc only compiles files reached from a crate root. Counting incoming
+//! declarations from every file on disk is not enough: an unreachable cycle can
+//! give its members incoming edges while remaining invisible to rustc. Cargo's
+//! lib/bin targets are the roots; this test walks outward from those roots and
+//! compares the result to the source inventory. The walk deliberately unions
+//! feature-gated declarations, including declarations behind disabled features.
 
 use std::collections::BTreeSet;
 use std::fs;
 use std::path::{Path, PathBuf};
+use std::process::Command;
+
+#[path = "support/rust_source.rs"]
+mod rust_source;
+
+use rust_source::{Token, is_identifier, is_open_group, matching_group, tokenize};
 
 #[test]
-fn every_source_file_is_reachable_from_a_mod_declaration() {
-    let src = Path::new(env!("CARGO_MANIFEST_DIR")).join("src");
-
+fn every_source_file_is_reachable_from_a_cargo_root() {
+    let manifest_dir = Path::new(env!("CARGO_MANIFEST_DIR"));
+    let src = manifest_dir.join("src");
     let files = source_files(&src);
     assert!(
         !files.is_empty(),
@@ -24,41 +29,40 @@ fn every_source_file_is_reachable_from_a_mod_declaration() {
         src.display()
     );
 
-    let mut declared: BTreeSet<PathBuf> = BTreeSet::new();
-    for file in &files {
-        let text = fs::read_to_string(file)
-            .unwrap_or_else(|e| panic!("{} is not readable: {e}", file.display()));
-        for name in module_declarations(&text) {
-            declared.extend(resolve(file, &name));
-        }
-    }
-    // A crate root and a binary root are named by Cargo, not by a `mod`.
-    declared.extend(cargo_root_files());
+    let roots = cargo_root_files(manifest_dir);
+    let (reachable, diagnostics) = rooted_module_graph(&src, &roots);
+    assert!(
+        diagnostics.is_empty(),
+        "the source graph contains declarations the bounded walker cannot resolve:\n{diagnostics:#?}"
+    );
 
-    let orphans: Vec<&PathBuf> = files.iter().filter(|f| !declared.contains(*f)).collect();
+    let orphans: Vec<&PathBuf> = files
+        .iter()
+        .filter(|file| !reachable.contains(*file))
+        .collect();
     assert!(
         orphans.is_empty(),
-        "rustc does not compile {} file(s) under {}, because no `mod` declaration \
-         names them. Delete them, or declare them:\n{:#?}",
+        "rustc cannot reach {} checked-in source file(s) under {} from any Cargo lib/bin root:\n{orphans:#?}",
         orphans.len(),
         src.display(),
-        orphans
     );
 }
 
-/// The crate uses no `#[path]` module declarations, so the resolver above
-/// does not have to understand them. This assertion is what keeps that true:
-/// without it, the first `#[path = "…"] mod x;` would make its file look like
-/// an orphan, and the fix would be to weaken this test rather than teach the
-/// resolver about a form the crate does not use.
+/// Keep path attributes out of the production source graph until their Rust
+/// resolution rules are implemented here. Silently guessing is not a valid
+/// fallback: a wrong path can make a real file look like an orphan or let an
+/// unrelated file make the guard pass.
 #[test]
 fn no_source_file_uses_a_path_attribute() {
     let src = Path::new(env!("CARGO_MANIFEST_DIR")).join("src");
     let offenders: Vec<String> = source_files(&src)
-        .iter()
+        .into_iter()
         .filter(|file| {
             fs::read_to_string(file)
-                .map(|text| strip_comments(&text).contains("#[path"))
+                .map(|text| {
+                    let tokens = tokenize(&text).unwrap_or_default();
+                    has_path_attribute(&tokens)
+                })
                 .unwrap_or(false)
         })
         .map(|file| file.display().to_string())
@@ -66,54 +70,76 @@ fn no_source_file_uses_a_path_attribute() {
 
     assert!(
         offenders.is_empty(),
-        "`#[path]` is not supported by the reachability guard. Either teach it \
-         to resolve the attribute, or teach this test about it — do not leave \
-         the two disagreeing:\n{offenders:#?}"
+        "`#[path]` is not supported by the rooted source walker. Teach the walker \
+         to resolve it or keep the construct prohibited:\n{offenders:#?}"
     );
 }
 
-/// The crate roots Cargo compiles, which no `mod` declaration names: the
-/// library root, the implicit `src/main.rs` binary, and every `[[bin]]` and
-/// `[[example]]` path.
-///
-/// These are read out of `Cargo.toml` rather than hardcoded, because the
-/// alternative is a guard with its own blind spot: a new binary target would
-/// be added to the manifest, compiled by CI, and reported here as an orphan.
-fn cargo_root_files() -> Vec<PathBuf> {
-    let manifest_dir = Path::new(env!("CARGO_MANIFEST_DIR"));
-    let manifest = fs::read_to_string(manifest_dir.join("Cargo.toml"))
-        .unwrap_or_else(|e| panic!("Cargo.toml is not readable: {e}"));
-    let mut roots = vec![manifest_dir.join("src/lib.rs")];
-    // An implicit `src/main.rs` is a binary root when it exists, and nothing
-    // at all when it does not — a library-only crate has no such target.
-    let implicit_bin = manifest_dir.join("src/main.rs");
-    if implicit_bin.is_file() {
-        roots.push(implicit_bin);
-    }
+fn cargo_root_files(manifest_dir: &Path) -> Vec<PathBuf> {
+    let cargo = std::env::var_os("CARGO").unwrap_or_else(|| "cargo".into());
+    let output = Command::new(cargo)
+        .args([
+            "metadata",
+            "--format-version",
+            "1",
+            "--no-deps",
+            "--locked",
+            "--offline",
+        ])
+        .current_dir(manifest_dir)
+        .output()
+        .unwrap_or_else(|error| panic!("could not run cargo metadata: {error}"));
+    assert!(
+        output.status.success(),
+        "cargo metadata failed: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let metadata: serde_json::Value = serde_json::from_slice(&output.stdout)
+        .unwrap_or_else(|error| panic!("cargo metadata returned invalid JSON: {error}"));
+    roots_from_metadata(&metadata, &manifest_dir.join("Cargo.toml"))
+}
 
-    let target_paths = |table: &str| -> Vec<String> {
-        let mut paths = Vec::new();
-        let mut in_table = false;
-        for line in manifest.lines() {
-            let line = line.trim();
-            if line.starts_with('[') {
-                in_table = line == format!("[{table}]") || line == format!("[[{table}]]");
-                continue;
-            }
-            if in_table
-                && let Some(path) = line.strip_prefix("path")
-                && let Some(value) = path.trim_start().strip_prefix('=')
-            {
-                paths.push(value.trim().trim_matches('"').to_string());
-            }
-        }
-        paths
+/// Discover only lib/bin roots for this package. Integration-test files do not
+/// establish that a production source file is reachable.
+fn roots_from_metadata(metadata: &serde_json::Value, manifest: &Path) -> Vec<PathBuf> {
+    let wanted = manifest.to_string_lossy();
+    let Some(packages) = metadata
+        .get("packages")
+        .and_then(serde_json::Value::as_array)
+    else {
+        return Vec::new();
     };
-    for table in ["bin", "example", "bench", "test"] {
-        for path in target_paths(table) {
-            roots.push(manifest_dir.join(path));
+    let Some(package) = packages.iter().find(|package| {
+        package
+            .get("manifest_path")
+            .and_then(serde_json::Value::as_str)
+            == Some(wanted.as_ref())
+    }) else {
+        return Vec::new();
+    };
+    let Some(targets) = package.get("targets").and_then(serde_json::Value::as_array) else {
+        return Vec::new();
+    };
+
+    let mut roots = Vec::new();
+    for target in targets {
+        let is_production_root = target
+            .get("kind")
+            .and_then(serde_json::Value::as_array)
+            .is_some_and(|kinds| {
+                kinds
+                    .iter()
+                    .any(|kind| matches!(kind.as_str(), Some("lib" | "bin")))
+            });
+        if !is_production_root {
+            continue;
+        }
+        if let Some(path) = target.get("src_path").and_then(serde_json::Value::as_str) {
+            roots.push(PathBuf::from(path));
         }
     }
+    roots.sort();
+    roots.dedup();
     roots
 }
 
@@ -122,14 +148,15 @@ fn source_files(dir: &Path) -> Vec<PathBuf> {
     let mut stack = vec![dir.to_path_buf()];
     while let Some(current) = stack.pop() {
         let entries = fs::read_dir(&current)
-            .unwrap_or_else(|e| panic!("{} is not readable: {e}", current.display()));
+            .unwrap_or_else(|error| panic!("{} is not readable: {error}", current.display()));
         for entry in entries {
-            let entry =
-                entry.unwrap_or_else(|e| panic!("unreadable entry in {}: {e}", current.display()));
+            let entry = entry.unwrap_or_else(|error| {
+                panic!("unreadable entry in {}: {error}", current.display())
+            });
             let path = entry.path();
             if path.is_dir() {
                 stack.push(path);
-            } else if path.extension().is_some_and(|ext| ext == "rs") {
+            } else if path.extension().is_some_and(|extension| extension == "rs") {
                 found.push(path);
             }
         }
@@ -138,123 +165,408 @@ fn source_files(dir: &Path) -> Vec<PathBuf> {
     found
 }
 
-/// The names of every `mod x;` declaration in `text`.
-///
-/// `mod x { … }` is an inline module and names no file, so it is skipped —
-/// the crate has 266 of them. Visibility keywords and attributes on the
-/// preceding line (`#[cfg(feature = "…")] pub mod x;`) do not change the name.
-fn module_declarations(text: &str) -> Vec<String> {
-    let code = strip_comments(text);
-    let mut names = Vec::new();
-    for line in code.lines() {
-        let line = line.trim();
-        if line.contains('{') {
-            continue;
-        }
-        let Some(rest) = split_mod_keyword(line) else {
-            continue;
-        };
-        let rest = rest.trim();
-        let Some(name) = rest.strip_suffix(';').map(str::trim) else {
-            continue;
-        };
-        if !name.is_empty() && name.chars().all(|c| c.is_alphanumeric() || c == '_') {
-            names.push(name.to_string());
-        }
-    }
-    names
-}
-
-/// The text after the `mod` keyword on `line`, or `None` when the line does not
-/// declare a module. This is deliberately not a regex: a regex over `mod`
-/// would also match `model`, and the crate is full of words starting with it.
-fn split_mod_keyword(line: &str) -> Option<&str> {
-    let mut search = line;
-    loop {
-        let found = search.find("mod")?;
-        let before_ok = search[..found]
-            .chars()
-            .next_back()
-            .is_none_or(|c| c.is_whitespace());
-        let after = &search[found + 3..];
-        let after_ok = after
-            .chars()
-            .next()
-            .is_some_and(|c| c.is_whitespace() || c == '_');
-        if before_ok && after_ok {
-            return Some(after);
-        }
-        search = after;
-    }
-}
-
-/// Blank out comments so a `mod` mentioned in prose is not read as a
-/// declaration. String literals are left alone: no string in this crate
-/// contains a `mod x;` declaration, and a false positive there would be a
-/// silent one, which is the failure mode this test exists to prevent.
-fn strip_comments(text: &str) -> String {
-    let mut out = String::with_capacity(text.len());
-    let mut chars = text.chars().peekable();
-    let mut in_block = false;
-    while let Some(c) = chars.next() {
-        if in_block {
-            if c == '*' && chars.peek() == Some(&'/') {
-                chars.next();
-                in_block = false;
+/// Detect `path = ...` inside an attribute, including nested `cfg_attr(...,
+/// path = ...)`. Literal contents have already been removed by the lexer, so a
+/// string that discusses the attribute cannot trip this check.
+fn has_path_attribute(tokens: &[Token]) -> bool {
+    let mut index = 0;
+    while index + 1 < tokens.len() {
+        if tokens[index].text == "#"
+            && tokens[index + 1].text == "["
+            && let Some(close) = matching_group(tokens, index + 1)
+        {
+            if tokens[index + 2..close]
+                .windows(2)
+                .any(|pair| pair[0].text == "path" && pair[1].text == "=")
+            {
+                return true;
             }
+            index = close + 1;
+        } else {
+            index += 1;
+        }
+    }
+    false
+}
+
+fn rooted_module_graph(src: &Path, roots: &[PathBuf]) -> (BTreeSet<PathBuf>, Vec<String>) {
+    let canonical_src = src
+        .canonicalize()
+        .unwrap_or_else(|error| panic!("{} is not readable: {error}", src.display()));
+    let mut graph = ModuleGraph {
+        src: &canonical_src,
+        reachable: BTreeSet::new(),
+        visited: BTreeSet::new(),
+        diagnostics: Vec::new(),
+    };
+    for root in roots {
+        let canonical_root = match root.canonicalize() {
+            Ok(path) => path,
+            Err(error) => {
+                graph.diagnostics.push(format!(
+                    "Cargo root {} does not resolve: {error}",
+                    root.display()
+                ));
+                continue;
+            }
+        };
+        if !canonical_root.starts_with(&canonical_src) {
+            graph.diagnostics.push(format!(
+                "Cargo root {} is outside {}",
+                canonical_root.display(),
+                canonical_src.display()
+            ));
             continue;
         }
-        match c {
-            '/' if chars.peek() == Some(&'/') => {
-                for c in chars.by_ref() {
-                    if c == '\n' {
-                        out.push('\n');
-                        break;
+        graph.walk_file(&canonical_root, true);
+    }
+    (graph.reachable, graph.diagnostics)
+}
+
+struct ModuleGraph<'a> {
+    src: &'a Path,
+    reachable: BTreeSet<PathBuf>,
+    visited: BTreeSet<PathBuf>,
+    diagnostics: Vec<String>,
+}
+
+impl ModuleGraph<'_> {
+    fn walk_file(&mut self, file: &Path, is_root: bool) {
+        let canonical = match file.canonicalize() {
+            Ok(path) if path.starts_with(self.src) => path,
+            Ok(path) => {
+                self.diagnostics.push(format!(
+                    "module path {} escapes src/ to {}",
+                    file.display(),
+                    path.display()
+                ));
+                return;
+            }
+            Err(error) => {
+                self.diagnostics.push(format!(
+                    "module path {} does not resolve: {error}",
+                    file.display()
+                ));
+                return;
+            }
+        };
+        if !self.visited.insert(canonical.clone()) {
+            return;
+        }
+        self.reachable.insert(canonical.clone());
+        let source = match fs::read_to_string(&canonical) {
+            Ok(source) => source,
+            Err(error) => {
+                self.diagnostics
+                    .push(format!("{} is not readable: {error}", canonical.display()));
+                return;
+            }
+        };
+        let tokens = match tokenize(&source) {
+            Ok(tokens) => tokens,
+            Err(error) => {
+                self.diagnostics
+                    .push(format!("{}: {error}", canonical.display()));
+                return;
+            }
+        };
+        let search_dir = module_search_dir(&canonical, is_root);
+        self.walk_scope(&canonical, &tokens, &search_dir);
+    }
+
+    fn walk_scope(&mut self, source_file: &Path, tokens: &[Token], search_dir: &Path) {
+        if has_path_attribute(tokens) {
+            self.diagnostics.push(format!(
+                "{}: #[path] module declarations are prohibited until resolved",
+                source_file.display()
+            ));
+            return;
+        }
+        let mut index = 0;
+        while index < tokens.len() {
+            if tokens[index].text == "macro_rules"
+                && tokens.get(index + 1).is_some_and(|token| token.text == "!")
+            {
+                let Some(open) = (index + 2..tokens.len()).find(|&at| tokens[at].text == "{")
+                else {
+                    self.diagnostics.push(format!(
+                        "{}: unsupported macro_rules declaration",
+                        source_file.display()
+                    ));
+                    return;
+                };
+                let Some(close) = matching_group(tokens, open) else {
+                    self.diagnostics.push(format!(
+                        "{}: unterminated macro_rules body",
+                        source_file.display()
+                    ));
+                    return;
+                };
+                index = close + 1;
+                continue;
+            }
+
+            if tokens[index].text == "include"
+                && tokens.get(index + 1).is_some_and(|token| token.text == "!")
+            {
+                if source_file == self.src.join("ui/assets.rs") {
+                    index += 2;
+                    continue;
+                }
+                self.diagnostics.push(format!(
+                    "{}: include! may declare modules the rooted walker cannot inspect",
+                    source_file.display()
+                ));
+                return;
+            }
+
+            if tokens[index].text == "!"
+                && index > 0
+                && tokens
+                    .get(index + 1)
+                    .is_some_and(|token| is_open_group(&token.text))
+            {
+                if let Some(close) = matching_group(tokens, index + 1) {
+                    let body = &tokens[index + 2..close];
+                    if body.windows(3).any(|window| {
+                        window[0].text == "mod"
+                            && is_identifier(&window[1].text)
+                            && matches!(window[2].text.as_str(), ";" | "{")
+                    }) {
+                        self.diagnostics.push(format!(
+                            "{}: macro invocation contains a module declaration that this \
+                             lexical guard cannot resolve",
+                            source_file.display()
+                        ));
+                        return;
                     }
+                    index = close + 1;
+                    continue;
+                }
+                self.diagnostics.push(format!(
+                    "{}: unterminated macro invocation",
+                    source_file.display()
+                ));
+                return;
+            }
+
+            if tokens[index].text == "mod"
+                && let Some(name) = tokens.get(index + 1)
+                && is_identifier(&name.text)
+            {
+                match tokens.get(index + 2).map(|token| token.text.as_str()) {
+                    Some(";") => {
+                        self.follow_external(source_file, search_dir, &name.text);
+                        index += 3;
+                        continue;
+                    }
+                    Some("{") => {
+                        if let Some(close) = matching_group(tokens, index + 2) {
+                            self.walk_scope(
+                                source_file,
+                                &tokens[index + 3..close],
+                                &search_dir.join(&name.text),
+                            );
+                            index = close + 1;
+                            continue;
+                        }
+                        self.diagnostics.push(format!(
+                            "{}: unterminated inline module {}",
+                            source_file.display(),
+                            name.text
+                        ));
+                        return;
+                    }
+                    _ => {}
                 }
             }
-            '/' if chars.peek() == Some(&'*') => {
-                chars.next();
-                in_block = true;
-            }
-            _ => out.push(c),
+            index += 1;
         }
     }
-    out
+
+    fn follow_external(&mut self, source_file: &Path, search_dir: &Path, name: &str) {
+        let flat = search_dir.join(format!("{name}.rs"));
+        let nested = search_dir.join(name).join("mod.rs");
+        let flat_exists = flat.is_file();
+        let nested_exists = nested.is_file();
+        match (flat_exists, nested_exists) {
+            (true, false) => self.walk_file(&flat, false),
+            (false, true) => self.walk_file(&nested, false),
+            (false, false) => self.diagnostics.push(format!(
+                "{}: mod {name}; has no file at {} or {}",
+                source_file.display(),
+                flat.display(),
+                nested.display()
+            )),
+            (true, true) => self.diagnostics.push(format!(
+                "{}: mod {name}; is ambiguous; both {} and {} exist",
+                source_file.display(),
+                flat.display(),
+                nested.display()
+            )),
+        }
+    }
 }
 
-/// Where a `mod <name>;` in `file` could name a file on disk.
-///
-/// Rust 2018 gives a module one home plus a legacy fallback. A module file
-/// `src/tools.rs` declares `pub mod assemble_context;`, which resolves to
-/// `src/tools/assemble_context.rs` — and `src/tools.rs` is only a *sibling*
-/// file, so the directory `src/tools/` has to exist for that to be the
-/// reading. The fallback path `src/assemble_context.rs` is returned too,
-/// because Rust accepts it and a caller relying on it must not be reported as
-/// an orphan.
-fn resolve(file: &Path, name: &str) -> Vec<PathBuf> {
-    let Some(dir) = file.parent() else {
-        return Vec::new();
-    };
-    let stem = file
-        .file_stem()
-        .and_then(|s| s.to_str())
-        .unwrap_or_default();
-    // A crate root's children live beside it, not in a directory named after
-    // the file: `src/lib.rs` declares `pub mod tools;` for `src/tools.rs`.
-    let is_crate_root = stem == "lib" || stem == "main";
-    let module_dir = if is_crate_root || stem == "mod" {
-        dir.to_path_buf()
+fn module_search_dir(file: &Path, is_root: bool) -> PathBuf {
+    let parent = file.parent().unwrap_or_else(|| Path::new(""));
+    if is_root || file.file_name().is_some_and(|name| name == "mod.rs") {
+        parent.to_path_buf()
     } else {
-        let candidate = dir.join(stem);
-        if candidate.is_dir() {
-            candidate
-        } else {
-            dir.to_path_buf()
-        }
-    };
-    vec![
-        module_dir.join(format!("{name}.rs")),
-        module_dir.join(name).join("mod.rs"),
-    ]
+        parent.join(file.file_stem().unwrap_or_default())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use tempfile::TempDir;
+
+    fn fixture() -> (TempDir, PathBuf) {
+        let temp = TempDir::new().expect("fixture dir");
+        let src = temp.path().join("src");
+        fs::create_dir_all(&src).expect("src dir");
+        let canonical = src.canonicalize().expect("canonical src");
+        (temp, canonical)
+    }
+
+    fn write(src: &Path, relative: &str, text: &str) -> PathBuf {
+        let path = src.join(relative);
+        fs::create_dir_all(path.parent().expect("parent")).expect("parent dir");
+        fs::write(&path, text).expect("write fixture");
+        path
+    }
+
+    #[test]
+    fn unrooted_mod_cycle_is_reported_unreachable() {
+        let (_temp, src) = fixture();
+        let root = write(&src, "lib.rs", "");
+        write(&src, "a.rs", "mod b;\n");
+        write(&src, "b.rs", "mod a;\n");
+        let (reachable, diagnostics) = rooted_module_graph(&src, &[root]);
+        assert!(diagnostics.is_empty(), "{diagnostics:#?}");
+        assert_eq!(reachable.len(), 1);
+        assert!(!reachable.contains(&src.join("a.rs")));
+        assert!(!reachable.contains(&src.join("b.rs")));
+    }
+
+    #[test]
+    fn ordinary_module_files_have_no_sibling_fallback() {
+        let (_temp, src) = fixture();
+        let root = write(&src, "lib.rs", "mod a;\n");
+        write(&src, "a.rs", "");
+        write(&src, "b.rs", "");
+        let (reachable, diagnostics) = rooted_module_graph(&src, &[root]);
+        assert!(diagnostics.is_empty(), "{diagnostics:#?}");
+        assert!(reachable.contains(&src.join("a.rs")));
+        assert!(!reachable.contains(&src.join("b.rs")));
+    }
+
+    #[test]
+    fn inline_modules_resolve_children_under_the_inline_directory() {
+        let (_temp, src) = fixture();
+        let root = write(&src, "lib.rs", "mod outer { mod inner; }\n");
+        write(&src, "outer/inner.rs", "");
+        let (reachable, diagnostics) = rooted_module_graph(&src, &[root]);
+        assert!(diagnostics.is_empty(), "{diagnostics:#?}");
+        assert!(reachable.contains(&src.join("outer/inner.rs")));
+    }
+
+    #[test]
+    fn feature_gated_declarations_are_in_the_union_graph() {
+        let (_temp, src) = fixture();
+        let root = write(
+            &src,
+            "lib.rs",
+            "#[cfg(feature = \"optional\")] mod optional;\n",
+        );
+        write(&src, "optional.rs", "");
+        let (reachable, diagnostics) = rooted_module_graph(&src, &[root]);
+        assert!(diagnostics.is_empty(), "{diagnostics:#?}");
+        assert!(reachable.contains(&src.join("optional.rs")));
+    }
+
+    #[test]
+    fn module_text_in_comments_strings_and_macros_is_not_a_declaration() {
+        let (_temp, src) = fixture();
+        let root = write(
+            &src,
+            "lib.rs",
+            r#"
+                // mod comment_only;
+                const TEXT: &str = "mod string_only;";
+                macro_rules! declare_later { () => { mod macro_only; } }
+            "#,
+        );
+        let (reachable, diagnostics) = rooted_module_graph(&src, &[root]);
+        assert!(diagnostics.is_empty(), "{diagnostics:#?}");
+        assert_eq!(reachable.len(), 1);
+    }
+
+    #[test]
+    fn macro_generated_module_declarations_fail_closed() {
+        let (_temp, src) = fixture();
+        let root = write(&src, "lib.rs", "declare! { mod generated; }\n");
+
+        let (_, diagnostics) = rooted_module_graph(&src, &[root]);
+        assert_eq!(diagnostics.len(), 1, "{diagnostics:#?}");
+        assert!(
+            diagnostics[0].contains("macro invocation"),
+            "{diagnostics:#?}"
+        );
+    }
+
+    #[test]
+    fn missing_and_ambiguous_module_files_fail_closed() {
+        let (_temp, src) = fixture();
+        let root = write(&src, "lib.rs", "mod missing;\n");
+        let (_, diagnostics) = rooted_module_graph(&src, std::slice::from_ref(&root));
+        assert_eq!(diagnostics.len(), 1, "{diagnostics:#?}");
+
+        write(&src, "missing.rs", "");
+        write(&src, "missing/mod.rs", "");
+        let (_, diagnostics) = rooted_module_graph(&src, &[root]);
+        assert_eq!(diagnostics.len(), 1, "{diagnostics:#?}");
+        assert!(diagnostics[0].contains("ambiguous"), "{diagnostics:#?}");
+    }
+
+    #[test]
+    fn path_attributes_inside_cfg_attr_fail_closed() {
+        let (_temp, src) = fixture();
+        let root = write(
+            &src,
+            "lib.rs",
+            "#[cfg_attr(feature = \"unused\", path = \"other.rs\")] mod selected;\n",
+        );
+        write(&src, "selected.rs", "");
+        write(&src, "other.rs", "");
+
+        let (_, diagnostics) = rooted_module_graph(&src, &[root]);
+        assert_eq!(diagnostics.len(), 1, "{diagnostics:#?}");
+        assert!(diagnostics[0].contains("#[path]"), "{diagnostics:#?}");
+    }
+
+    #[test]
+    fn cargo_metadata_selects_only_lib_and_bin_roots() {
+        let manifest = Path::new("/workspace/crates/memory-mcp/Cargo.toml");
+        let metadata = serde_json::json!({
+            "packages": [{
+                "manifest_path": manifest,
+                "targets": [
+                    {"kind": ["lib"], "src_path": "/workspace/crates/memory-mcp/src/lib.rs"},
+                    {"kind": ["bin"], "src_path": "/workspace/crates/memory-mcp/src/bin/server.rs"},
+                    {"kind": ["test"], "src_path": "/workspace/crates/memory-mcp/tests/check.rs"},
+                    {"kind": ["custom-build"], "src_path": "/workspace/crates/memory-mcp/build.rs"}
+                ]
+            }]
+        });
+        let roots = roots_from_metadata(&metadata, manifest);
+        assert_eq!(
+            roots,
+            vec![
+                PathBuf::from("/workspace/crates/memory-mcp/src/bin/server.rs"),
+                PathBuf::from("/workspace/crates/memory-mcp/src/lib.rs")
+            ]
+        );
+    }
 }

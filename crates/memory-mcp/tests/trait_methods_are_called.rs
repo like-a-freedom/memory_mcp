@@ -1,4 +1,4 @@
-//! Every method on a store trait must have a caller.
+//! Every listed store-trait method must have lexical evidence of a use site.
 //!
 //! A trait method is a promise. `TaskStore::update_progress_fenced` promised
 //! that progress could be reported under a fence, had a real implementation in
@@ -7,15 +7,18 @@
 //! no warning for a trait method that is implemented but never called, and
 //! `#[async_trait]` hides even the implementation.
 //
-//! The trait methods are listed here explicitly rather than parsed out of the
-//! source, because a parser that reads the trait and searches for `.name(`
-//! will score the `impl` block as a call site and pass everything. The
-//! declaration and the implementation are both excluded by name below; what is
-//! left is somebody asking for the method.
+//! The exact named trait body is checked for each declaration, and the bounded
+//! source lexer excludes comments and literals from caller evidence. Receiver
+//! type resolution is not possible here: `.load()` is lexical evidence, not a
+//! proof that the receiver implements `TaskStore`. Aliases, macros and blanket
+//! implementations are outside this ratchet's guarantee.
 
 use std::collections::BTreeSet;
 use std::fs;
 use std::path::{Path, PathBuf};
+
+#[path = "support/rust_source.rs"]
+mod rust_source;
 
 /// `(trait path, method name)` for every method that must have a caller.
 ///
@@ -313,15 +316,6 @@ fn all_sources() -> BTreeSet<(String, String)> {
     out
 }
 
-/// The method part of a `Trait::method` entry.
-fn method_name(qualified: &str) -> &str {
-    qualified
-        .rsplit("::")
-        .next()
-        .filter(|name| !name.is_empty())
-        .unwrap_or(qualified)
-}
-
 fn relative(path: &Path) -> String {
     path.strip_prefix(Path::new(env!("CARGO_MANIFEST_DIR")))
         .unwrap_or(path)
@@ -329,43 +323,132 @@ fn relative(path: &Path) -> String {
         .to_string()
 }
 
-/// A method counts as called when some file names it as a receiver call —
-/// `.method(` or `.method (` — anywhere the declaration or an `impl` body is
-/// not.
-fn has_caller(sources: &BTreeSet<(String, String)>, method: &str) -> Option<String> {
-    let needle = format!(".{method}(");
-    let spaced = format!(".{method} (");
+/// This is intentionally a *lexical usage ratchet*, not a type-resolved proof
+/// that the receiver implements the named trait. It excludes comments and
+/// literals and requires the named trait declaration to contain the method,
+/// but it cannot resolve receiver types, aliases, macros or blanket impls.
+fn has_caller(sources: &BTreeSet<(String, String)>, qualified: &str) -> Option<String> {
+    let (trait_name, method) = qualified.split_once("::")?;
     for (file, text) in sources {
-        if !text.contains(&needle) && !text.contains(&spaced) {
-            continue;
+        let tokens = rust_source::tokenize(text)
+            .unwrap_or_else(|error| panic!("cannot tokenize {file}: {error}"));
+        if contains_method_call(&tokens, trait_name, method) {
+            return Some(file.clone());
         }
-        // Skip the trait declaration itself.
-        if text.contains(&format!("async fn {method}(")) || text.contains(&format!("fn {method}("))
-        {
-            // A file may both declare and call; only skip it if every hit is
-            // inside a signature.
-            if !calls_outside_signatures(text, method) {
-                continue;
-            }
-        }
-        return Some(file.clone());
     }
     None
 }
 
-/// Whether `text` contains a `.method(` that is not the one in a signature.
-///
-/// A signature reads `async fn method(` without a leading dot, so a hit with a
-/// dot is a call by construction. The only way a declaration can carry a dot
-/// is a doc comment or a bound, and neither is `.method(`.
-fn calls_outside_signatures(text: &str, method: &str) -> bool {
-    for (index, _) in text.match_indices(&format!(".{method}(")) {
-        let line = &text[..index].rsplit('\n').next().unwrap_or_default();
-        let before = line.trim_start();
-        if before.ends_with(&format!("fn {method}(")) {
+fn contains_method_call(tokens: &[rust_source::Token], trait_name: &str, method: &str) -> bool {
+    debug_assert!(rust_source::is_identifier(trait_name));
+    debug_assert!(rust_source::is_identifier(method));
+    for index in 0..tokens.len() {
+        // Receiver call: `receiver.method(...)`, with whitespace irrelevant.
+        if tokens[index].text == "."
+            && tokens
+                .get(index + 1)
+                .is_some_and(|token| token.text == method)
+            && (tokens.get(index + 2).is_some_and(|token| token.text == "(")
+                || turbofish_call_follows(tokens, index + 2))
+        {
+            return true;
+        }
+
+        // Explicit path call: `Trait::method(...)` or
+        // `<T as Trait>::method(...)`. This is stronger evidence for a
+        // particular trait, but receiver calls remain lexical only.
+        if tokens[index].text == trait_name
+            && double_colon_at(tokens, index + 1)
+            && tokens
+                .get(index + 3)
+                .is_some_and(|token| token.text == method)
+            && (tokens.get(index + 4).is_some_and(|token| token.text == "(")
+                || turbofish_call_follows(tokens, index + 4))
+        {
+            return true;
+        }
+        if tokens[index].text == trait_name
+            && tokens.get(index + 1).is_some_and(|token| token.text == ">")
+            && double_colon_at(tokens, index + 2)
+            && tokens
+                .get(index + 4)
+                .is_some_and(|token| token.text == method)
+            && (tokens.get(index + 5).is_some_and(|token| token.text == "(")
+                || turbofish_call_follows(tokens, index + 5))
+        {
+            return true;
+        }
+    }
+    false
+}
+
+fn turbofish_call_follows(tokens: &[rust_source::Token], start: usize) -> bool {
+    if !double_colon_at(tokens, start)
+        || !tokens.get(start + 1).is_some_and(|token| token.text == "<")
+    {
+        return false;
+    }
+    let mut depth = 0usize;
+    for (index, token) in tokens.iter().enumerate().skip(start + 1) {
+        match token.text.as_str() {
+            "<" => depth += 1,
+            ">" => {
+                depth = depth.saturating_sub(1);
+                if depth == 0 {
+                    return tokens.get(index + 1).is_some_and(|token| token.text == "(");
+                }
+            }
+            _ => {}
+        }
+    }
+    false
+}
+
+fn double_colon_at(tokens: &[rust_source::Token], index: usize) -> bool {
+    tokens.get(index).is_some_and(|token| token.text == ":")
+        && tokens.get(index + 1).is_some_and(|token| token.text == ":")
+}
+
+fn trait_declares_method(text: &str, trait_name: &str, method: &str) -> bool {
+    let tokens = rust_source::tokenize(text)
+        .unwrap_or_else(|error| panic!("cannot tokenize trait declaration: {error}"));
+    for index in 0..tokens.len() {
+        if tokens[index].text != "trait"
+            || !tokens
+                .get(index + 1)
+                .is_some_and(|token| token.text == trait_name)
+        {
             continue;
         }
-        return true;
+        let Some(open) = (index + 2..tokens.len()).find(|&at| tokens[at].text == "{") else {
+            continue;
+        };
+        let Some(close) = rust_source::matching_group(&tokens, open) else {
+            continue;
+        };
+        let mut nested = 0usize;
+        let mut cursor = open + 1;
+        while cursor < close {
+            match tokens[cursor].text.as_str() {
+                group if rust_source::is_open_group(group) => {
+                    if let Some(end) = rust_source::matching_group(&tokens, cursor) {
+                        nested += 1;
+                        cursor = end + 1;
+                        nested -= 1;
+                        continue;
+                    }
+                }
+                "fn" if nested == 0
+                    && tokens
+                        .get(cursor + 1)
+                        .is_some_and(|token| token.text == method) =>
+                {
+                    return true;
+                }
+                _ => {}
+            }
+            cursor += 1;
+        }
     }
     false
 }
@@ -381,11 +464,15 @@ fn every_trait_method_named_in_the_table_still_exists() {
             problems.push(format!("{qualified}: {path} is missing"));
             continue;
         };
-        let method = method_name(qualified);
-        if !text.contains(&format!("fn {method}(")) {
+        let Some((trait_name, method)) = qualified.split_once("::") else {
+            problems.push(format!("{qualified}: expected Trait::method spelling"));
+            continue;
+        };
+        if !trait_declares_method(&text, trait_name, method) {
             problems.push(format!(
-                "{qualified} is gone from {path}. Delete its row from this table in \
-                 the same commit, or the method is no longer covered."
+                "{qualified} is not declared in the named trait body in {path}. \
+                 Delete its row from this table in the same commit, or the method \
+                 is no longer covered."
             ));
         }
     }
@@ -405,8 +492,7 @@ fn every_trait_method_has_a_caller() {
     let mut uncalled = Vec::new();
 
     for (_, qualified) in METHODS {
-        let method = method_name(qualified);
-        if has_caller(&sources, method).is_none() {
+        if has_caller(&sources, qualified).is_none() {
             uncalled.push(*qualified);
         }
     }
@@ -420,6 +506,31 @@ fn every_trait_method_has_a_caller() {
         uncalled.len(),
         uncalled
     );
+}
+
+#[test]
+fn trait_inventory_requires_the_named_trait_body() {
+    let source = r#"
+        fn load() {}
+        trait OtherStore { fn load(&self); }
+        trait TaskStore { fn save(&self); }
+    "#;
+    assert!(!trait_declares_method(source, "TaskStore", "load"));
+    assert!(trait_declares_method(source, "TaskStore", "save"));
+    assert!(trait_declares_method(source, "OtherStore", "load"));
+}
+
+#[test]
+fn lexical_call_scan_ignores_comments_and_string_literals() {
+    let source = r#"
+        // store.load()
+        const EXAMPLE: &str = "store.load()";
+        /* store.load() */
+        fn caller(store: &impl TaskStore) { store.save(); }
+    "#;
+    let tokens = rust_source::tokenize(source).expect("tokenize");
+    assert!(!contains_method_call(&tokens, "TaskStore", "load"));
+    assert!(contains_method_call(&tokens, "TaskStore", "save"));
 }
 
 /// `TaskStore` had eleven methods and one of them was a promise nobody asked

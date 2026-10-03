@@ -477,8 +477,6 @@ impl EmbeddingService {
         let adapter = crate::embedding::infra::FactVectorAdapter::new(
             self.db.db.clone(),
             self.db.namespace(),
-            self.current_embedding_model.clone(),
-            self.current_embedding_dimension,
         );
         crate::embedding::api::update_canonical_vector(
             &adapter,

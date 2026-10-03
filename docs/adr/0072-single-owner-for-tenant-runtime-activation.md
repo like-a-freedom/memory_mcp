@@ -28,7 +28,8 @@ await; factory work, logging and runtime destruction happen outside it. A
 generation can be completed only once; cleanup from an older generation cannot
 clear or publish into a newer one. Empty cancelled/failed slots are reclaimable
 under capacity pressure. Runtime pins are reserved under the same state lock
-that authorizes reuse, before waiting for activation or a concurrency permit.
+that authorizes reuse, before waiting for a concurrency permit. A Loading slot
+is protected by its non-reclaimable state until its attempt completes.
 
 Tenant binding identity is `(tenant_id, database, namespace)`, not the whole
 runtime specification. Mutable lifecycle status must still pass resolution on
@@ -73,9 +74,11 @@ configuration knob is introduced.
   runtime-revision change.
 - [x] Remove the redundant Tenancy lifecycle implementation; its lifecycle tests
   moved to the pool rather than being kept against a deleted cache.
-- [x] Keep factory cancellation safe for resources acquired before it returns:
-  the attempt guard owns cleanup, so unwinding releases the slot.
-- [ ] Verify the real HTTP deadline path end to end. The HTTP fixtures spawn the
-  server as a subprocess and expose no factory seam, so this remains open and is
-  recorded as such in the plan rather than claimed.
+- [x] Keep pool cancellation safe: the attempt guard owns slot cleanup, including
+  panic unwinding. The registry factory's construction resources rely on their
+  existing Rust drop/cancellation behavior; no detached activation task was
+  introduced.
+- [x] Verify the real request-deadline middleware around pool acquisition: the
+  first request times out during a blocked activation; the next request for that
+  Tenant activates successfully.
 - [x] Do not claim this decision is implemented beyond the evidence above.

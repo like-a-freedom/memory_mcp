@@ -400,17 +400,8 @@ async fn read_fact(db: &Arc<SurrealDbClient>, fact_id: &str) -> serde_json::Valu
         .unwrap_or_else(|| panic!("{fact_id} must exist"))
 }
 
-fn adapter(
-    db: Arc<dyn DbClient>,
-    model: Option<&str>,
-    dimension: Option<usize>,
-) -> memory_mcp::embedding::infra::FactVectorAdapter {
-    memory_mcp::embedding::infra::FactVectorAdapter::new(
-        db,
-        ADAPTER_NAMESPACE,
-        model.map(str::to_string),
-        dimension,
-    )
+fn adapter(db: Arc<dyn DbClient>) -> memory_mcp::embedding::infra::FactVectorAdapter {
+    memory_mcp::embedding::infra::FactVectorAdapter::new(db, ADAPTER_NAMESPACE)
 }
 
 /// A vector write must change embedding fields and nothing else. The access
@@ -422,11 +413,7 @@ async fn replace_stale_preserves_concurrent_fact_access() {
     let fact_id = "fact:adapter_race";
     seed_adapter_fact(&db, fact_id).await;
     let racing: Arc<dyn DbClient> = InterleavingDb::new(Arc::clone(&db), fact_id);
-    let port = adapter(
-        racing,
-        Some("text-embedding-3-small"),
-        Some(ADAPTER_DIMENSION),
-    );
+    let port = adapter(racing);
 
     let applied = update_canonical_vector(
         &port,
@@ -449,6 +436,8 @@ async fn replace_stale_preserves_concurrent_fact_access() {
         stored["embedding_signature"], "sig-new",
         "the vector write must still land"
     );
+    assert_eq!(stored["embedding_model"], "text-embedding-3-small");
+    assert_eq!(stored["embedding_dimension"], ADAPTER_DIMENSION);
     assert!(
         stored["content"]
             .as_str()
@@ -465,11 +454,7 @@ async fn fill_missing_loser_reports_already_current() {
     let db = adapter_db().await;
     let fact_id = "fact:adapter_gap";
     seed_adapter_fact(&db, fact_id).await;
-    let port = adapter(
-        Arc::clone(&db) as Arc<dyn DbClient>,
-        Some("text-embedding-3-small"),
-        Some(ADAPTER_DIMENSION),
-    );
+    let port = adapter(Arc::clone(&db) as Arc<dyn DbClient>);
 
     let winner = update_canonical_vector(
         &port,
@@ -509,11 +494,7 @@ async fn fill_missing_loser_reports_already_current() {
 #[tokio::test]
 async fn canonical_write_missing_fact_is_not_found() {
     let db = adapter_db().await;
-    let port = adapter(
-        Arc::clone(&db) as Arc<dyn DbClient>,
-        Some("text-embedding-3-small"),
-        Some(ADAPTER_DIMENSION),
-    );
+    let port = adapter(Arc::clone(&db) as Arc<dyn DbClient>);
 
     let error = update_canonical_vector(
         &port,
@@ -538,11 +519,7 @@ async fn vector_write_rejects_a_forged_record_target() {
     let db = adapter_db().await;
     let innocent = "fact:adapter_innocent";
     seed_adapter_fact(&db, innocent).await;
-    let port = adapter(
-        Arc::clone(&db) as Arc<dyn DbClient>,
-        Some("text-embedding-3-small"),
-        Some(ADAPTER_DIMENSION),
-    );
+    let port = adapter(Arc::clone(&db) as Arc<dyn DbClient>);
 
     let forged = format!(
         "fact:x⟩ SET embedding_signature = 'sig-forged' WHERE fact_id = '{innocent}' REMOVE"

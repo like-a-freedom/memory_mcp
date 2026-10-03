@@ -20,6 +20,7 @@ use std::task::{Context, Poll};
 use http_body::Body;
 use http_body::Frame;
 use http_body::SizeHint;
+use tokio::sync::Notify;
 use tokio::sync::OwnedSemaphorePermit;
 
 use super::pool::AdmissionPermit;
@@ -29,6 +30,7 @@ use super::storage::TenantRuntime;
 pub struct OperationGuard {
     runtime: Arc<TenantRuntime>,
     pin_count: Arc<AtomicU32>,
+    release_notify: Option<Arc<Notify>>,
     _tenant_permit: OwnedSemaphorePermit,
 }
 
@@ -56,6 +58,23 @@ impl OperationGuard {
         Self {
             runtime,
             pin_count,
+            release_notify: None,
+            _tenant_permit: tenant_permit,
+        }
+    }
+
+    /// Build a pool-owned guard from a pin reservation and notify capacity
+    /// waiters when this pin is released.
+    pub(crate) fn from_reservation(
+        runtime: Arc<TenantRuntime>,
+        pin_count: Arc<AtomicU32>,
+        release_notify: Arc<Notify>,
+        tenant_permit: OwnedSemaphorePermit,
+    ) -> Self {
+        Self {
+            runtime,
+            pin_count,
+            release_notify: Some(release_notify),
             _tenant_permit: tenant_permit,
         }
     }
@@ -73,6 +92,12 @@ impl OperationGuard {
 impl Drop for OperationGuard {
     fn drop(&mut self) {
         self.pin_count.fetch_sub(1, Ordering::SeqCst);
+        if let Some(notify) = &self.release_notify {
+            // A pin can unblock either a revision drain or capacity recovery.
+            // Wake every waiter so a capacity waiter cannot consume the only
+            // notification while a draining revision remains asleep.
+            notify.notify_waiters();
+        }
     }
 }
 
@@ -84,15 +109,17 @@ impl Drop for OperationGuard {
 /// cancelled.
 pub(crate) struct SlotReservation {
     pins: Arc<AtomicU32>,
+    release_notify: Arc<Notify>,
     transferred: bool,
 }
 
 impl SlotReservation {
     /// Count one pin against `pins`.
-    pub(crate) fn acquire(pins: &Arc<AtomicU32>) -> Self {
+    pub(crate) fn acquire(pins: &Arc<AtomicU32>, release_notify: Arc<Notify>) -> Self {
         pins.fetch_add(1, Ordering::SeqCst);
         Self {
             pins: Arc::clone(pins),
+            release_notify,
             transferred: false,
         }
     }
@@ -104,7 +131,12 @@ impl SlotReservation {
         tenant_permit: OwnedSemaphorePermit,
     ) -> OperationGuard {
         self.transferred = true;
-        OperationGuard::from_parts(runtime, Arc::clone(&self.pins), tenant_permit)
+        OperationGuard::from_reservation(
+            runtime,
+            Arc::clone(&self.pins),
+            Arc::clone(&self.release_notify),
+            tenant_permit,
+        )
     }
 }
 
@@ -112,6 +144,7 @@ impl Drop for SlotReservation {
     fn drop(&mut self) {
         if !self.transferred {
             self.pins.fetch_sub(1, Ordering::SeqCst);
+            self.release_notify.notify_waiters();
         }
     }
 }

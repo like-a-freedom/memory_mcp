@@ -2,9 +2,11 @@
 
 **Status:** Accepted direction
 
-**Implementation:** planned, not implemented. The production changes below have
-not been made; the linked plan carries the task-level gates. Design decisions
-were made autonomously under the user's instruction to decide and act.
+**Implementation:** all five audit findings have code changes and targeted
+regressions. The linked plan's execution ledger distinguishes those targeted
+results from integrated gates that have and have not been rerun. Real-client
+interoperability remains unverified until real clients are driven against a
+live deployment.
 
 **Baseline:** `e506d99` (`v1.23.0`). This is a follow-up to the September 30
 remediation, not a replacement or a claim that its checked steps never landed.
