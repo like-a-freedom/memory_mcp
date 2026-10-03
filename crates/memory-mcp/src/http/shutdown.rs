@@ -45,7 +45,8 @@ impl ShutdownState {
 
     /// Run one synchronous publication step only if it linearizes before
     /// shutdown. `begin` takes the same lock before setting the flag, so a
-    /// runtime cannot transition to Ready after shutdown wins this gate.
+    /// runtime cannot transition to Ready and an acquisition cannot hand out a
+    /// new lease after shutdown wins this gate.
     pub(crate) fn publish_while_running<T>(&self, publish: impl FnOnce() -> T) -> Option<T> {
         let _publication = self
             .publication
