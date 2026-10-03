@@ -248,11 +248,20 @@ pub async fn prevalidate_mcp(
         // in `params.protocolVersion`; later requests may carry it in the
         // header alone. Neither may name a revision that has no handshake, and
         // where both are present they must agree.
+        //
+        // An `initialize` is the one request where the named revision is a
+        // *proposal*, not a selection: rmcp's negotiation answers it with a
+        // supported legacy revision, falling back when the proposal is unknown.
+        // Checking membership here would refuse that proposal before
+        // authentication, which is exactly the failure ADR-0071 removed for
+        // known revisions. Later requests have already been answered by a
+        // handshake, so their revision must be one this server negotiated.
         None => {
             let declared = params
                 .and_then(|params| params.get("protocolVersion"))
                 .and_then(Value::as_str);
-            if let Some(declared) = declared
+            if body_method != "initialize"
+                && let Some(declared) = declared
                 && !is_legacy_revision(declared)
             {
                 return bad_request("HeaderMismatch: protocol version");

@@ -207,6 +207,112 @@ async fn legacy_initialize_negotiates_a_legacy_revision_without_a_session() {
     );
 }
 
+/// An `initialize` names a revision it *proposes*, and rmcp's negotiation is
+/// what answers it. Refusing an unknown proposal at preflight makes the server
+/// depend on the client having guessed a revision the server already supports —
+/// the same class of failure ADR-0071 removed for known revisions, and the same
+/// pre-authentication 400 that hid a real client's API key from `last_used_at`.
+#[tokio::test]
+async fn unsupported_initialize_proposal_negotiates_legacy_revision() {
+    let fixture =
+        HttpServerFixture::spawn(HttpServerConfig::default().with_tenant(conformance_tenant()))
+            .await;
+    let body = json!({
+        "jsonrpc": "2.0",
+        "id": 1,
+        "method": "initialize",
+        "params": {
+            "protocolVersion": "2099-01-01",
+            "capabilities": {},
+            "clientInfo": {"name": "future-legacy-test", "version": "0.0.0"},
+        },
+    });
+    let resp = fixture
+        .client()
+        .post(format!("{}/mcp", fixture.base_url))
+        .header("host", "localhost")
+        .header("content-type", "application/json")
+        .header("accept", "application/json, text/event-stream")
+        .header("authorization", format!("Bearer {BOOTSTRAP_KEY}"))
+        .body(body.to_string())
+        .send()
+        .await
+        .expect("send");
+    let status = resp.status();
+    let text = resp.text().await.expect("initialize body");
+    assert_eq!(
+        status, 200,
+        "an initialize proposal must reach negotiation, not preflight; body: {text}"
+    );
+    let payload = json_rpc_payload(&text);
+    assert_eq!(
+        payload["id"], 1,
+        "the negotiated answer matches the request: {text}"
+    );
+    let negotiated = payload["result"]["protocolVersion"]
+        .as_str()
+        .unwrap_or_else(|| panic!("initialize must return a protocolVersion: {text}"));
+    assert_eq!(
+        negotiated, "2025-11-25",
+        "negotiation must fall back to a supported legacy revision: {text}"
+    );
+}
+
+/// An `initialize` that names no revision at all is not a proposal to
+/// negotiate: it is a malformed request, and reaching rmcp must not turn it into
+/// a successful handshake.
+#[tokio::test]
+async fn initialize_without_a_protocol_version_is_not_negotiated() {
+    let fixture =
+        HttpServerFixture::spawn(HttpServerConfig::default().with_tenant(conformance_tenant()))
+            .await;
+    for proposal in [json!(null), json!(20251125), json!([])] {
+        let body = json!({
+            "jsonrpc": "2.0",
+            "id": 7,
+            "method": "initialize",
+            "params": {
+                "protocolVersion": proposal,
+                "capabilities": {},
+                "clientInfo": {"name": "malformed", "version": "0.0.0"},
+            },
+        });
+        let resp = fixture
+            .client()
+            .post(format!("{}/mcp", fixture.base_url))
+            .header("host", "localhost")
+            .header("content-type", "application/json")
+            .header("accept", "application/json, text/event-stream")
+            .header("authorization", format!("Bearer {BOOTSTRAP_KEY}"))
+            .body(body.to_string())
+            .send()
+            .await
+            .expect("send");
+        let status = resp.status();
+        let text = resp.text().await.expect("body");
+        let payload = json_rpc_payload(&text);
+        let negotiated = payload["result"]["protocolVersion"].as_str().is_some();
+        assert!(
+            !(status == 200 && negotiated),
+            "a malformed initialize must not be answered with a negotiated revision: {status} {text}"
+        );
+    }
+}
+
+/// The JSON-RPC payload of a response that may arrive as a JSON body or as SSE.
+fn json_rpc_payload(text: &str) -> serde_json::Value {
+    if text.starts_with("event:") || text.starts_with("data:") {
+        for line in text.lines() {
+            if let Some(data) = line.strip_prefix("data: ")
+                && let Ok(value) = serde_json::from_str::<serde_json::Value>(data)
+            {
+                return value;
+            }
+        }
+    }
+    serde_json::from_str(text).unwrap_or_else(|_| json!({"raw": text}))
+}
+
 #[tokio::test]
 async fn server_discover_advertises_every_known_revision() {
     let fixture =
