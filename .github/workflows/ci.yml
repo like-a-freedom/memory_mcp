@@ -65,6 +65,13 @@ jobs:
           cargo run --locked -p xtask -- check-observability
       - name: Default workspace tests
         run: cargo test --workspace --lib --bins --tests --locked
+      - name: Filesystem-disabled process tests
+        # `tests/fs_watch_process_disabled.rs` is gated by
+        # `cfg(not(feature = "fs-watch"))`, so no other row in this workflow
+        # executes it: both quality rows enable fs-watch, and the no-default
+        # rows below only compile. This row is the only place the
+        # reject-a-configured-inbox behavior is actually observed.
+        run: cargo test -p memory_mcp --no-default-features --test fs_watch_process_disabled --locked
       - name: Optional feature tests
         run: cargo test -p memory_mcp --lib --bins --tests --features fs-watch,mcp-apps,streamable-http,test-fixtures --locked
       - name: Check the HTTP profile and its internal back-compat name
