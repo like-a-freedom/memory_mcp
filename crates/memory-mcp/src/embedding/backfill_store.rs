@@ -139,11 +139,19 @@ impl EmbeddingBackfillStoreClient {
             assignments.join(", ")
         );
         let rows = self.db.query(&sql, Some(Value::Object(vars))).await?;
-        match rows.as_array().map(Vec::len) {
-            Some(0) => Ok(false),
-            Some(1) => Ok(true),
-            other => Err(MemoryError::Storage(format!(
-                "embedding write for {fact_id} returned {other:?} rows, expected at most one"
+        let Value::Array(rows) = rows else {
+            return Err(MemoryError::Storage(format!(
+                "embedding write for {fact_id} returned a non-array result"
+            )));
+        };
+        match rows.as_slice() {
+            [] => Ok(false),
+            [Value::Object(_)] => Ok(true),
+            [_] => Err(MemoryError::Storage(format!(
+                "embedding write for {fact_id} returned a non-object row"
+            ))),
+            _ => Err(MemoryError::Storage(format!(
+                "embedding write for {fact_id} returned more than one row"
             ))),
         }
     }
@@ -290,5 +298,72 @@ mod tests {
             .filter_map(|row| row.get("fact_id").and_then(Value::as_str))
             .collect();
         assert_eq!(ids, vec!["fact:2", "fact:3"]);
+    }
+
+    #[tokio::test]
+    async fn canonical_write_rejects_malformed_storage_result() {
+        use std::sync::atomic::{AtomicUsize, Ordering};
+
+        use crate::embedding::api::{VectorIdentity, VectorWritePolicy, update_canonical_vector};
+        use crate::embedding::infra::FactVectorAdapter;
+        use crate::error::MemoryError;
+        use crate::service::mock_db::MockDbClient;
+
+        let identity = VectorIdentity {
+            provider: "test".into(),
+            model: None,
+            dimension: 2,
+            signature: "sig:test".into(),
+        };
+        for policy in [
+            VectorWritePolicy::FillMissing,
+            VectorWritePolicy::ReplaceStale,
+        ] {
+            for malformed in [
+                json!({}),
+                json!([null]),
+                json!([17]),
+                json!(["bad"]),
+                json!([{}, {}]),
+            ] {
+                let writes = Arc::new(AtomicUsize::new(0));
+                let seen_writes = Arc::clone(&writes);
+                let response = malformed.clone();
+                let db = Arc::new(
+                    MockDbClient::new()
+                        .expect_query_with(
+                            |sql| sql.starts_with("SELECT * FROM type::record('fact'"),
+                            |_, _| Ok(json!([{"fact_id": "fact:malformed"}])),
+                        )
+                        .expect_query_with(
+                            |sql| sql.starts_with("UPDATE type::record('fact'"),
+                            move |_, _| {
+                                seen_writes.fetch_add(1, Ordering::SeqCst);
+                                Ok(response.clone())
+                            },
+                        ),
+                );
+                let adapter = FactVectorAdapter::new(db, "org");
+                let result = update_canonical_vector(
+                    &adapter,
+                    "fact:malformed",
+                    vec![0.1, 0.2],
+                    &identity,
+                    chrono::Utc::now(),
+                    policy,
+                )
+                .await;
+
+                assert_eq!(
+                    writes.load(Ordering::SeqCst),
+                    1,
+                    "exercise the write result"
+                );
+                assert!(
+                    matches!(result, Err(MemoryError::Storage(_))),
+                    "{policy:?} must reject {malformed}, got {result:?}"
+                );
+            }
+        }
     }
 }
