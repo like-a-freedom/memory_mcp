@@ -20,6 +20,11 @@ request speaks**, not what a deployment is configured to allow.
   defines the discriminants (a per-request `_meta` envelope selects modern; an
   `initialize` selects legacy). Detection is never taken from a header a client
   can set to a different value than the body it sent.
+- **Proposed revision** — the protocol revision a client requests during a
+  legacy `initialize` handshake. A proposal is not evidence that the server
+  supports that revision.
+- **Negotiated revision** — the supported legacy protocol revision returned by
+  the server's initialization response. It can differ from the proposed revision.
 
 ### Rejected: "legacy profile" / "compat mode"
 
@@ -53,6 +58,12 @@ naming the prior decision being superseded.
 - **Tenant** — the storage and isolation boundary, selected at startup as the one
   Active Namespace. A request's tenant derives from the verified API key, never
   from MCP arguments, URL paths, or client-supplied headers.
+- **Tenant binding** — the association between a Tenant and its database and
+  namespace. A change in plan or lifecycle status is not a change in binding.
+- **Tenant runtime** — the active execution environment for a Tenant's bound
+  storage. It is distinct from the Tenant's durable identity and lifecycle status.
+- **Tenant activation** — preparing a Tenant runtime for use. Waiting for an
+  activation does not itself authorize access to the Tenant's data.
 
 ## Request validation
 

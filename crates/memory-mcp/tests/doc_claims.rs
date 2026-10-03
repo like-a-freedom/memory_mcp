@@ -229,6 +229,10 @@ fn expected_spec_statuses() -> BTreeMap<&'static str, &'static str> {
             "2026-09-30-architecture-audit-remediation.md",
             "Accepted direction",
         ),
+        (
+            "2026-10-03-architecture-audit-follow-up.md",
+            "Accepted direction",
+        ),
     ])
 }
 
