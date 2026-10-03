@@ -12,26 +12,28 @@
 
 ## Execution Status
 
-Recorded 2026-10-03, after two implementation/review passes. Checkboxes below are
-the original step plan; this table is what actually happened.
+Updated 2026-10-03 during the continuation acceptance audit. Checkboxes below are
+the original step plan; this table records implementation and remaining evidence.
 
 | Task | State | Evidence |
 |---|---|---|
 | 1 Injected factory seam | Done | `Pool::with_factory`; commit `2e0c3e1` |
-| 2 Cancellation counterexamples | Done | The three cancellation tests fail with the attempt guard's cleanup removed and pass with it |
+| 2 Cancellation counterexamples | Done, targeted | Cancellation and production-timeout/backoff retry regressions pass |
 | 3 Tenancy loses the cache | Done | `Tenancy`/`RuntimeLease` deleted; identity projection added |
 | 4 One state machine + RAII | Done | `SlotState`, `ActivationAttempt`, generation fencing |
-| 5 Reservations and capacity | Done | `SlotReservation`; cancelled reservations recover capacity; pin release wakes every drain/capacity waiter |
+| 5 Reservations and capacity | Done, targeted | Waiters retry at positive TTL/backoff expiry; failed-slot removal notifies; repeated wakeups preserve the deadline |
 | 6 Identity and revision | Done | `binding_mismatch_is_rejected_*`, `plan_change_replaces_the_runtime` |
-| 7 Shutdown wiring | Done | `Pool` holds the instance `ShutdownState`; existing drain tests pass |
+| 7 Shutdown wiring | Done, targeted | All blocked stages pass; shutdown also wins over a ready permit and fences final warm-runtime lease handoff |
 | 8 HTTP-level deadline test | Done | `http_deadline_cancels_activation_and_the_next_request_recovers` uses the real Axum deadline layer around pool acquisition |
-| 9 Vector conditional writes | Done | `replace_stale_preserves_concurrent_fact_access` fails against the previous write and passes with the fix; metadata comes from `VectorIdentity`; commit `b3fd349` |
+| 9 Vector conditional writes | Done, targeted | Conditional writes and identity metadata pass; malformed singleton write replies now return Storage, with a red/green capability regression |
 | 10 Access writer | Done | One atomic saturating update; concurrent increments, concurrent vector and forged-id tests pass |
 | 11 Initialize negotiation | Done | `unsupported_initialize_proposal_negotiates_legacy_revision`; commit `6881141` |
-| 12 Rooted source guard | Done | `source_tree_integrity` discovers Cargo lib/bin roots, walks external and inline modules, and rejects cycles, missing/ambiguous files, and path attrs |
-| 13 Public-surface scope | Done | Split `MemoryService` impls inventoried; grouped exports parse via shared lexer; nested grouped globs fail closed; trait declarations match their named body and caller scans ignore comments/literals |
+| 12 Rooted source guard | Done, targeted | Cargo roots, file rules, path checks and nested module-generating macros fail closed; 16 tests pass |
+| 13 Public-surface scope | In progress | Lifetime/cfg/exception repairs pass; reviewers found signature-item extent and const-generic delimiter gaps now being repaired |
 | 14 No-default CI row | Done | `2 passed` under `--no-default-features`; commit `afee2b8` |
-| 15 Integrated verification | Done | Workspace (103 targets), full-feature (2440 passed), no-default (2 passed), observability, fmt and required Clippy all pass |
+| 15 Integrated verification | Pending rerun | Previous gates at `0305f30` passed; continuation changes require a fresh integrated gate |
+| 16 Lint/test profile parity | Done, targeted | CI now lints `test-fixtures`; expanded workspace Clippy is clean and protocol conformance has 35 passing tests |
+| 17 Production-test relevance | Done, targeted | Doc inventory/status tests retired under ADR-0073; 131 runtime/protocol/tenancy/vector/recall scenario tests and both Clippy profiles pass |
 
 ### Second pass, 2026-10-03
 
@@ -74,7 +76,7 @@ asleep, and a nested grouped glob could enumerate no export names. Pin release
 now wakes all pool waiters to re-check their predicates; `public_surface_audit`
 rejects glob leaves anywhere in a grouped use tree. Regressions cover both cases.
 
-Gates actually run: `cargo fmt --all --check` clean; the repo's required Clippy
+Gates at `0305f30`: `cargo fmt --all --check` clean; the repo's required Clippy
 command clean; `cargo test --workspace --lib --bins --tests --locked` green
 across 103 test targets with 0 failures; `cargo test -p memory_mcp --lib --bins
 --tests --features fs-watch,mcp-apps,streamable-http,test-fixtures --locked`
@@ -89,15 +91,60 @@ trait_methods_are_called (7), no_duplicate_implementations (4).
 `embedding_canonical_vectors` and `memory_recall` all pass;
 `--no-default-features --test fs_watch_process_disabled` runs 2 tests.
 
-### Additional finding, not in the plan
+### Continuation acceptance audit
 
-`cargo clippy -p memory_mcp --all-targets --features
-fs-watch,mcp-apps,streamable-http,test-fixtures` reports 4 pre-existing
-`needless_borrow` warnings in `tests/http_proto_conformance.rs`. The repo's
-required Clippy row does not enable `test-fixtures`, so those files are never
-linted, while CI does execute them in the `Optional feature tests` row. Not
-fixed here: it is unrelated to this plan and fixing it would hide that the lint
-row has a hole.
+The earlier completion ledger was broader than its acceptance evidence. A fresh
+audit reproduced a module-producing macro accepted without diagnostics, lifetimes
+swallowing real call tokens, missed turbofish calls, stale method exceptions,
+malformed singleton vector replies reported as Applied, and capacity waits that
+miss TTL/backoff expiry. Timeout/backoff and all acquisition-stage shutdown
+regressions were also absent. The rows above are reopened until those repairs
+and their integrated verification finish.
+
+Two new red/green regressions already pass: the source graph rejects local
+macro definitions containing `mod` or `include!`, and canonical vector updates
+reject `[null]`, numeric/string rows, non-array replies and multiple rows for
+both write policies.
+
+The merged runtime repairs pass 57 runtime tests, including production five-second
+backoff, positive TTL expiry, absolute deadlines and all four blocked shutdown
+stages. A further red/green regression covers simultaneously ready shutdown and
+tenant permits; final lease handoff now uses the activation publication gate.
+Ordering checks use explicitly polled pending futures rather than sleeps, and
+timeout/panic regressions establish termination of registered followers.
+The first shared lexer/public/trait repair passes in both default and optional
+profiles: 16 source-tree, 23 public-surface and 10 trait-usage tests. Both the
+required and expanded workspace Clippy commands are clean. Reviewers then found
+braced-signature item extents and const-generic comparisons were mishandled;
+those guard repairs and the whole-branch gate remain in progress.
+
+### Task 16: Lint the same optional profile CI tests
+
+The previous CI lint command excluded `test-fixtures`, although the optional
+test row executes that profile. Expanded workspace Clippy reproduced four
+`needless_borrow` errors in `tests/http_proto_conformance.rs`.
+
+- [x] Remove those four redundant borrows without changing assertions.
+- [x] Add `test-fixtures` to the existing quality lint row rather than adding a
+  duplicate row or a new feature/dependency.
+- [x] Run the expanded workspace Clippy with `--locked -- -D warnings`: clean.
+- [x] Run `http_proto_conformance` with the tested profile: 35 passed.
+- [ ] Rerun the integrated gate after the parallel acceptance repairs.
+
+### Task 17: Retire document inventory as production evidence
+
+The user rejected document/directory assertions as production tests. Moving only
+the plans directory out of a scratch checkout reproduced the two exact CI
+failures; production code was unchanged. The third assertion compared status
+strings with a manual table, not with implementation behavior.
+
+- [x] Delete `doc_claims.rs`, without placeholder directories or exemptions.
+- [x] Record ADR-0073 and the behavior-based testing standard in `AGENTS.md`.
+- [x] Qualify ADR-0065 and remove active instructions to restore the guard.
+- [x] Run production scenario suites: 57 runtime, 35 protocol, 18 vector and
+  21 tenancy/recall tests pass; both workspace Clippy profiles are clean.
+- [ ] Run the final integrated gate after the remaining syntax repairs. Do not
+  replace the deleted tests with another layout/status assertion.
 
 ## Global Constraints
 
@@ -111,7 +158,7 @@ row has a hole.
 - Business policy lives in the owning context's `api.rs` (ADR-0066); the HTTP layer wires and enforces, it does not own policy.
 - Feature flags are additive; `default = ["fs-watch"]` and `streamable-http` stays the single SaaS switch.
 - Environment variable names and defaults are unchanged; a new configuration knob is out of scope.
-- Documentation claims are executed: adding a spec file requires a row in `expected_spec_statuses()` in `crates/memory-mcp/tests/doc_claims.rs`.
+- Documentation claims are reviewed against observed scenario outcomes. Directory/citation checks and mirrored status tables are not implementation evidence (ADR-0073).
 
 ## Review Focus
 
@@ -847,7 +894,7 @@ Expected before the fix: the disconnected cycle is not reported as unreachable, 
 
 - [ ] **Step 3: Implement the tokenizer and traversal**
 
-Roots come from `cargo metadata --format-version 1 --no-deps --locked --offline`, parsed with `serde_json`, selecting only `lib`/`bin` targets for the exact memory-mcp manifest path. Traverse from those roots only, carrying the module search directory: crate-root children live beside the root; `foo.rs` children live in `foo/`; `mod.rs` children live beside it; an inline module changes the directory to `.../name/`. Union cfg-gated declarations (the graph is a declared-source union, not a proof every feature combination compiles). A module-generating macro invocation, `include!` outside `src/ui/assets.rs`, unresolved/ambiguous module or path attribute yields a diagnostic rather than an empty accepted result.
+Roots come from `cargo metadata --format-version 1 --no-deps --locked --offline`, parsed with `serde_json`, selecting only `lib`/`bin` targets for the exact memory-mcp manifest path. Traverse from those roots only, carrying the module search directory: crate-root children live beside the root; `foo.rs` children live in `foo/`; `mod.rs` children live beside it; an inline module changes the directory to `.../name/`. Union cfg-gated declarations (the graph is a declared-source union, not a proof every feature combination compiles). Macro definitions containing `mod` or `include!` are prohibited even if unused; the walker does not expand macros. Invocation arguments containing module declarations, `include!` outside `src/ui/assets.rs`, unresolved/ambiguous modules and path attributes yield diagnostics rather than empty accepted results.
 
 - [ ] **Step 4: Assert the live tree and report unreachable files**
 
@@ -880,7 +927,7 @@ git commit -m "test(architecture): prove reachability from Cargo roots, not inco
 - Produces:
   - `reexported_names` enumerates exported leaves and aliases from public use trees, including `{"Fact", "ids"}` from `pub use crate::types::{Fact, ids};`; it expands the one local `constants::*` glob and rejects other public globs.
   - `collect_public_methods` token-scans every source file for inherent `impl MemoryService` blocks, including split and qualified impls, and records `(name, file)`.
-  - The caller ratchet parses the named trait body, ignores cfg(test) items, comments and literals, and recognizes receiver, explicit `Trait::method`, and `<T as Trait>::method` syntax. It remains lexical, not receiver-type-resolved.
+  - The public container-method caller ratchet excludes items guaranteed to be test-only, while preserving feature paths that may compile in production. The trait-usage ratchet parses the named trait body and scans both production and test witnesses. Both exclude comments/literals and recognize receiver, associated and trait-qualified call syntax, including turbofish; neither resolves receiver types.
 
 - [ ] **Step 1: Write the failing tests**
 
@@ -923,7 +970,7 @@ Detect calls from tokens, excluding declarations, comments and literals; recogni
 
 - [ ] **Step 5: Run the guard suite**
 
-Run: `cargo test -p memory_mcp --test public_surface_audit --test trait_methods_are_called --test source_tree_integrity --test doc_claims --locked`
+Run: `cargo test -p memory_mcp --test public_surface_audit --test trait_methods_are_called --test source_tree_integrity --locked`
 Expected: PASS.
 
 - [ ] **Step 6: Reconcile the ADR and commit**
@@ -997,6 +1044,7 @@ git commit -m "ci: execute the filesystem-disabled process behavior tests"
 ```sh
 cargo fmt --all --check
 cargo clippy --workspace --all-targets --features fs-watch,mcp-apps,streamable-http --locked -- -D warnings
+cargo clippy --workspace --all-targets --features fs-watch,mcp-apps,streamable-http,test-fixtures --locked -- -D warnings
 cargo test --workspace --lib --bins --tests --locked
 cargo test -p memory_mcp --lib --bins --tests --features fs-watch,mcp-apps,streamable-http,test-fixtures --locked
 cargo test -p memory_mcp --no-default-features --test fs_watch_process_disabled --locked
@@ -1013,9 +1061,11 @@ For each of the five findings, write the command and its observed result into th
 
 `GLOSSARY.md` keeps only domain terms (no file paths, no code); drop or rewrite anything that reads as an implementation note. The September plan gets a one-line follow-up link, and its unchecked review templates stay untouched.
 
-- [ ] **Step 4: Verify the documentation guards still pass and commit**
+- [ ] **Step 4: Review the recorded evidence and commit**
 
-Run: `cargo test -p memory_mcp --test doc_claims --locked`
+Review the ledger against actual runtime, protocol, tenancy and persistence
+scenario results. Do not infer completion from document paths or matching
+status strings; ADR-0073 retires those checks.
 
 ```bash
 git add docs GLOSSARY.md
@@ -1082,7 +1132,7 @@ not run in this environment.
 
 ## Execution Handoff
 
-Plan complete. Reviewers should read this plan with the
+Continuation acceptance repairs are in progress. Reviewers should read this plan with the
 [spec](../specs/2026-10-03-architecture-audit-follow-up.md) and
 [ADR-0072](../../adr/0072-single-owner-for-tenant-runtime-activation.md).
 

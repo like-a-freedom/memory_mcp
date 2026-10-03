@@ -10,6 +10,10 @@
 
 **Spec:** `docs/superpowers/specs/2026-09-30-architecture-audit-remediation.md` — written as the first step of Task 0.1. This plan is the plan; the spec records the problem statement and the nine candidates so the spec and the plan agree on vocabulary. ADRs 0065–0069 are written in Wave 0 and Wave 5.
 
+**Later policy:** [ADR-0073](../../adr/0073-test-behavior-not-document-inventory.md)
+retires Task 0.3's directory/citation and mirrored-status tests. Their original
+steps and results below are historical, not current execution requirements.
+
 **Commit location:** at execution time, commit this file as `docs/superpowers/plans/2026-09-30-architecture-audit-remediation.md`. This also repairs the 19 dangling `docs/superpowers/plans/` citations (see Task 1.4).
 
 ---

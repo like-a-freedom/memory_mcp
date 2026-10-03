@@ -48,20 +48,20 @@ in ADR-0016.
 > [ADR-0063](docs/adr/0063-retire-the-undeclared-source-audit.md),
 > [ADR-0065](docs/adr/0065-reinstate-the-source-tree-and-doc-claim-guards.md)).
 >
-> **A document that cites a file is making a claim that a reader can check.**
-> `crates/memory-mcp/tests/doc_claims.rs` asserts that every relative markdown
-> link and every ADR reference resolves, and that each spec's `**Status:**` is
-> one of `Implemented`, `Accepted direction`, or `Superseded` — with the
-> expected value written by hand, because the question is whether the document
-> matches the code. A spec claiming `Implemented` must name ADRs that exist
-> ([ADR-0065](docs/adr/0065-reinstate-the-source-tree-and-doc-claim-guards.md)).
+> **Production evidence comes from scenarios, not document inventory.**
+> Tests exercise use cases and assert results, durable effects, isolation and
+> recovery. Source/lexical policy checks are lints, not proof of functional
+> wiring. The directory/citation and mirrored-status tests were retired by
+> [ADR-0073](docs/adr/0073-test-behavior-not-document-inventory.md); documentation
+> claims are reviewed against observed scenario results.
 
 - `src/models/` — domain values and typed records.
 - `src/identity/api.rs` — identity use cases: unlink/last-link, verified link
   and replace, invitation policy and first-login session, browser-auth method
   policy.
 - `src/tenancy/api.rs` — Account→Tenant resolution to a server-owned
-  `TenantRuntimeSpec`, plus a single-flight runtime factory with eviction.
+  `TenantRuntimeSpec` and the narrow runtime factory port. The HTTP runtime pool
+  owns single-flight activation, residency and eviction (ADR-0072).
 - `src/provisioning/api.rs` — client creation, API-key issuance, durable-task
   request surface, App Session open/read/write/close, and the Tenant status
   transition table (`can_transition`, `transition_tenant`).

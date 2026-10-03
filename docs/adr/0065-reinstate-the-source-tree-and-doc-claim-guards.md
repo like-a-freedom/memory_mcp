@@ -6,6 +6,12 @@
 - Reverses in part: ADR-0063, ADR-0064
 - Related: ADR-0058, ADR-0069
 
+> The documentation-guard portion is superseded by
+> [ADR-0073](0073-test-behavior-not-document-inventory.md). The source-tree
+> architecture lint remains; it is not functional use-case coverage.
+> The original documentation decision below is retained as history, not a
+> requirement to restore `doc_claims.rs` or its mirrored status table.
+
 ## Context
 
 Two facts were true of this repository and nothing enforced either.
@@ -53,15 +59,14 @@ else, cannot drift from the build it describes, and cannot be skipped by a
 runner that forgot a step.
 
 **`crates/memory-mcp/tests/source_tree_integrity.rs`** walks the `mod`
-declarations in the source and asserts every `.rs` file under `src/` is named
-by one. It reads the declarations themselves rather than inferring them from a
-build directory, so there is no artifact layout to drift and no feature matrix
-to keep a superset: the 306 `cfg`-gated `mod` declarations are read whether or
-not their feature is enabled, which is strictly more than the retired script
-could see. The crate roots Cargo compiles are read out of `Cargo.toml`, so a
-new binary target is not misreported as an orphan. A companion test asserts
-the crate uses no `#[path]` attribute, which the resolver does not implement —
-so the first one added fails loudly instead of quietly.
+declarations outward from Cargo's lib/bin roots discovered through metadata,
+then reconciles that rooted declared-module graph with the `src/` inventory.
+The graph unions cfg-gated declarations; it does not prove every feature
+combination compiles or that a reachable method has a production caller.
+Comments/literals cannot confer reachability, and unsupported path attributes
+and module-generating macro syntax fail explicitly. The generated UI include
+is outside the checked-in source inventory. Fixture scenarios check the
+walker's root, file-resolution and unsupported-syntax rules.
 
 **`crates/memory-mcp/tests/doc_claims.rs`** asserts that every relative
 markdown link resolves, that every ADR's link and backticked `docs/…`

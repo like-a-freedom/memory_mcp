@@ -2,9 +2,10 @@
 
 **Status:** Accepted direction
 
-**Implementation:** all five audit findings have code changes and targeted
-regressions. The linked plan's execution ledger distinguishes those targeted
-results from integrated gates that have and have not been rerun. Real-client
+**Implementation:** the five original finding repairs landed, but a continuation
+acceptance audit reopened capacity-expiry recovery, malformed vector replies and
+bounded lexical guard behavior. The linked plan's ledger records current repairs
+and integrated gates that have and have not been rerun. Real-client
 interoperability remains unverified until real clients are driven against a
 live deployment.
 
@@ -27,8 +28,9 @@ remediation, not a replacement or a claim that its checked steps never landed.
 
 An independent source traversal reached all 391 current production source files
 across the union of feature declarations. No present undeclared file was found.
-That result is not semantic function-call reachability. The trait-caller guard
-matches method text and must not be described as proof of production use.
+That result is not semantic function-call reachability. The trait-usage guard
+matches lexical call tokens in production and test sources; it must not be
+described as proof of production use.
 
 ## Resolved design questions
 
@@ -51,6 +53,8 @@ existing bounds rather than returned stale or rejected as a binding conflict.
 Lifecycle status is not reuse equality; neither a warm runtime nor a completed
 activation bypasses trusted resolution. Shutdown terminates pending acquisition
 without starting detached cleanup and prevents late runtime publication.
+The same shutdown gate fences activation publication and final lease handoff:
+a newly available tenant permit cannot override a begun shutdown.
 
 ### Canonical vectors
 
@@ -104,9 +108,19 @@ produce explicit diagnostics rather than silently passing. This is not a new
 Rust compiler or a claim of type-resolved call reachability.
 
 Share lexical mechanics only where two guard callers need them. Keep source,
-public-surface and documentation assertions separate; ADR-0065 rejects combining
-unrelated guard failures into one test. Mark the trait-caller check as lexical,
+public-surface and functional scenario assertions separate. ADR-0073 retires
+document inventory and mirrored-status tests; architecture-policy lints are not
+functional coverage. Mark the trait-caller check as lexical,
 exclude comments/strings, and document its receiver-type limitation.
+
+The walker does not expand macros: local macro definitions containing `mod` or
+`include!` are prohibited even if unused. The same lexical rule applies to
+invocation arguments, including nested definitions and includes; such tokens
+cannot confer reachability. Public container-method
+production witnesses exclude cfg predicates guaranteed false when `test = false`;
+unknown feature-dependent predicates remain in the declared-feature union.
+Trait-usage witnesses intentionally include tests and are not production-wiring
+evidence.
 
 ### CI behavior
 

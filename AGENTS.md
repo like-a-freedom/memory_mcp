@@ -66,6 +66,22 @@ cargo run --features streamable-http --bin memory_mcp_http  # Start SaaS HTTP se
 - Add tests for new functionality
 - Follow the design principles below
 
+## Testing
+
+- Test concrete use cases and observable contracts: results/errors, durable
+  state, isolation, resource release, recovery and limits.
+- Use controlled adapters to establish faults and ordering; exercise real
+  storage adapters for query/transaction correctness.
+- A regression scenario must detect the original defect. Use barriers, permits
+  or explicit future polling for ordering, not sleeps; bound waits and child
+  process lifetimes.
+- Do not add production tests for repository/document directory presence,
+  markdown citations or a document status mirrored in a hand-written table.
+  These do not prove functionality. See [ADR-0073](docs/adr/0073-test-behavior-not-document-inventory.md).
+- Filesystem assertions are valid when files are actual product inputs/outputs
+  (ingestion, backups, release bundles). Label architecture-policy checks as
+  lints and never count them as production scenario coverage.
+
 ## Design Principles
 
 1. **`main.rs` stays thin** — CLI parsing and mode dispatch only

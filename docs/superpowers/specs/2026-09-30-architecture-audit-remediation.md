@@ -5,6 +5,11 @@
 **Plan:** `docs/superpowers/plans/2026-09-30-architecture-audit-remediation.md`
 **Architecture decision:** ADR-0065 and ADR-0069 are written, in Wave 0. ADR-0066, ADR-0067 and ADR-0068 are written at the point each decision is made, in Waves 3 and 5. All five are named here so the guard in Wave 0 can require an implemented spec to name ADRs that exist.
 
+**Later policy:** [ADR-0073](../../adr/0073-test-behavior-not-document-inventory.md)
+supersedes the documentation-guard portion of this design and its completion
+criteria. The directory/citation and mirrored-status checks described below are
+historical, not current production-test requirements.
+
 ## Problem
 
 `memory_mcp` has outgrown its shape. The bounded-context reorganisation (ADR-0058) landed, the per-file manifest went with it, and the two checks that would have noticed the consequences were retired in the same breath (ADR-0061, ADR-0063, ADR-0064). What the audit found in the gap is not one defect but a class: **things exist, are believed to be live, and are not.**

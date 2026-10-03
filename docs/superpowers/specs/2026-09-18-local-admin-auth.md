@@ -7,8 +7,9 @@
 
 > The status line was `Approved product requirements; proposed technical design
 > awaiting review` until 2026-09-30. The work shipped; the document did not
-> follow. `every_spec_status_line_matches_the_code` in
-> `crates/memory-mcp/tests/doc_claims.rs` is what caught it.
+> follow. The now-retired document status table flagged this metadata
+> discrepancy; it did not verify authentication behavior. See
+> [ADR-0073](../../adr/0073-test-behavior-not-document-inventory.md).
 
 ## 1. Approval boundary
 
