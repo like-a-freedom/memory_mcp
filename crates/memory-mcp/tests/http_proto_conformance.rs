@@ -1041,7 +1041,7 @@ async fn both_eras_reach_the_same_tools() {
         HttpServerFixture::spawn(HttpServerConfig::default().with_tenant(conformance_tenant()))
             .await;
     let modern = common::http_server::mcp_call(
-        &fixture.client(),
+        fixture.client(),
         &fixture.base_url,
         BOOTSTRAP_KEY,
         "tools/list",
@@ -1049,7 +1049,7 @@ async fn both_eras_reach_the_same_tools() {
     )
     .await;
     let legacy = common::http_server::legacy_mcp_call(
-        &fixture.client(),
+        fixture.client(),
         &fixture.base_url,
         BOOTSTRAP_KEY,
         "tools/list",
@@ -1104,7 +1104,7 @@ async fn legacy_tools_call_succeeds_without_the_modern_mirrored_headers() {
         },
     });
     let legacy = common::http_server::legacy_mcp_call(
-        &fixture.client(),
+        fixture.client(),
         &fixture.base_url,
         BOOTSTRAP_KEY,
         "tools/call",
@@ -1129,7 +1129,7 @@ async fn legacy_tools_call_succeeds_without_the_modern_mirrored_headers() {
     // The same call in the modern era must succeed too. Both eras reach the
     // same tools.
     let modern = common::http_server::mcp_call(
-        &fixture.client(),
+        fixture.client(),
         &fixture.base_url,
         BOOTSTRAP_KEY,
         "tools/call",

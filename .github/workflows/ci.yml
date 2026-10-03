@@ -48,7 +48,10 @@ jobs:
           # dependency tree (rocksdb, ONNX, SurrealDB) per job.
           cache-shared-key: dev
       - run: cargo fmt --all --check
-      - run: cargo clippy --workspace --all-targets --features fs-watch,mcp-apps,streamable-http --locked -- -D warnings
+      - name: Workspace and HTTP fixture lint
+        # Match the optional test profile: otherwise test-fixtures-gated
+        # protocol tests execute below but never receive lint coverage.
+        run: cargo clippy --workspace --all-targets --features fs-watch,mcp-apps,streamable-http,test-fixtures --locked -- -D warnings
       - name: Control-plane UI WASM lint
         run: |
           rustup target add wasm32-unknown-unknown
