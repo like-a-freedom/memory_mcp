@@ -83,6 +83,7 @@ pub const HTTP_OPERATIONS: &[&str] = &[
     "http.lease.provision_failed",
     "http.lease.release_failed",
     "http.runtime.activation_failed",
+    "http.runtime.binding_conflict",
     "http.quota.plan_load_failed",
     "http.quota.reserve_failed",
     "http.task.bind_failed",

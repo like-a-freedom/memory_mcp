@@ -39,6 +39,20 @@ impl OperationGuard {
         tenant_permit: OwnedSemaphorePermit,
     ) -> Self {
         pin_count.fetch_add(1, Ordering::SeqCst);
+        Self::from_parts(runtime, pin_count, tenant_permit)
+    }
+
+    /// Build a guard from a pin that is already counted.
+    ///
+    /// The pool reserves the pin under its state lock, before it can wait for
+    /// anything, so the slot cannot be unloaded between choosing to use it and
+    /// receiving it. Transferring the reservation here — instead of incrementing
+    /// again — is what keeps the count equal to the number of live guards.
+    pub(crate) fn from_parts(
+        runtime: Arc<TenantRuntime>,
+        pin_count: Arc<AtomicU32>,
+        tenant_permit: OwnedSemaphorePermit,
+    ) -> Self {
         Self {
             runtime,
             pin_count,
@@ -59,6 +73,46 @@ impl OperationGuard {
 impl Drop for OperationGuard {
     fn drop(&mut self) {
         self.pin_count.fetch_sub(1, Ordering::SeqCst);
+    }
+}
+
+/// A pin counted against a slot before its runtime is usable.
+///
+/// Taken while the pool's state lock is held, and either transferred into an
+/// [`OperationGuard`] or released by its own `Drop`. A cancelled acquisition
+/// therefore returns its pin without any cleanup step that could itself be
+/// cancelled.
+pub(crate) struct SlotReservation {
+    pins: Arc<AtomicU32>,
+    transferred: bool,
+}
+
+impl SlotReservation {
+    /// Count one pin against `pins`.
+    pub(crate) fn acquire(pins: &Arc<AtomicU32>) -> Self {
+        pins.fetch_add(1, Ordering::SeqCst);
+        Self {
+            pins: Arc::clone(pins),
+            transferred: false,
+        }
+    }
+
+    /// Hand the pin to the guard that will release it.
+    pub(crate) fn into_guard(
+        mut self,
+        runtime: Arc<TenantRuntime>,
+        tenant_permit: OwnedSemaphorePermit,
+    ) -> OperationGuard {
+        self.transferred = true;
+        OperationGuard::from_parts(runtime, Arc::clone(&self.pins), tenant_permit)
+    }
+}
+
+impl Drop for SlotReservation {
+    fn drop(&mut self) {
+        if !self.transferred {
+            self.pins.fetch_sub(1, Ordering::SeqCst);
+        }
     }
 }
 

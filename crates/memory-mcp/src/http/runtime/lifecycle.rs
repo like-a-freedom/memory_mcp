@@ -1,262 +1,317 @@
 //! Runtime lifecycle states.
 //!
-//! Each `TenantRuntimeSlot` carries a `RuntimePhase` that the
-//! pool mutates under a per-tenant mutex. The transitions
-//! are: `Absent -> Loading -> Ready`, `Ready -> Draining ->
-//! Unloaded` (eviction), and any state can short-circuit to
-//! `Failed` on activation error.
+//! One slot per tenant, one state machine. The pool holds the slot's state and
+//! mutates it under its own short-held lock; the transitions are
+//! `Absent -> Loading -> Ready`, `Ready -> Draining` (eviction), and
+//! `Loading -> Absent | Failed` when an attempt ends.
+//!
+//! The generation counter is what makes an attempt identifiable. A slot can
+//! return to `Absent` and start loading again while an older attempt is still
+//! finishing, and the older attempt must not publish into the newer one — that
+//! is the bug this counter exists to prevent, not a broadcast to filter.
 
 use std::sync::Arc;
-use std::sync::atomic::AtomicU32;
-use std::sync::atomic::AtomicU64;
-use std::sync::atomic::Ordering;
+use std::sync::atomic::{AtomicU32, Ordering};
 use std::time::Instant;
 
-use tokio::sync::{Semaphore, broadcast};
+use tokio::sync::{Semaphore, watch};
 
 use super::storage::TenantRuntime;
+use crate::error::MemoryError;
+use crate::tenancy::api::TenantRuntimeIdentity;
 
+/// How long a failed activation keeps a tenant in negative backoff.
+pub(super) const ACTIVATION_BACKOFF: std::time::Duration = std::time::Duration::from_secs(5);
+
+/// The runtime inputs a slot was built from.
+///
+/// Distinct from [`TenantRuntimeIdentity`] on purpose. A change here is a
+/// runtime the pool should replace; a change there is a different binding,
+/// which the pool must refuse. Lifecycle status appears in neither: it is
+/// resolved per request and is never a reason to reuse or replace a runtime.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum RuntimePhase {
+pub struct RuntimeRevision {
+    pub plan_version: u32,
+    pub schema_version: u32,
+    pub concurrency: u32,
+}
+
+/// What one attempt reports to the callers waiting on it.
+///
+/// The runtime itself is deliberately not carried: a follower reads it from the
+/// slot under the pool's lock, so a runtime can never be paired with the state
+/// of a different slot.
+pub type ActivationOutcome = Result<(), MemoryError>;
+
+/// What a slot is doing now.
+pub enum SlotState {
+    /// No runtime, and none being built.
     Absent,
+    /// An attempt is running. The channel reports its outcome.
     Loading,
-    Ready,
-    Draining,
-    Unloaded,
-    Failed,
+    /// A resident runtime, ready to serve.
+    Ready { runtime: Arc<TenantRuntime> },
+    /// The last attempt failed; the slot is refused until `retry_at`.
+    Failed { retry_at: Instant },
+    /// Being unloaded: still resident for the guards that hold it, no longer
+    /// serving new acquisitions.
+    Draining { runtime: Arc<TenantRuntime> },
 }
 
-/// In-flight activation slot. `acquire_or_wait` subscribes to
-/// the broadcast channel so all callers wait on the SAME
-/// activation; the producer (the worker that wins the race)
-/// sends the runtime on every receiver.
-pub struct ActivationSlot {
-    pub state: RuntimePhase,
-    /// Increments on every (re)activation. Used to discard
-    /// broadcasts from a previous activation that a slow
-    /// subscriber might still receive.
-    pub generation: AtomicU64,
-    pub in_flight: Option<broadcast::Sender<Arc<TenantRuntime>>>,
-    /// If a recent activation failed, future activations
-    /// short-circuit until this Instant passes.
-    pub negative_backoff_until: Option<Instant>,
-}
-
-impl Default for ActivationSlot {
-    fn default() -> Self {
-        Self {
-            state: RuntimePhase::Absent,
-            generation: AtomicU64::new(0),
-            in_flight: None,
-            negative_backoff_until: None,
-        }
-    }
-}
-
-impl ActivationSlot {
-    pub fn new() -> Self {
-        Self::default()
-    }
-
-    /// Begin a new activation: bump the generation and store
-    /// the broadcast sender. Subsequent `acquire_or_wait`
-    /// calls subscribe to it.
-    pub fn begin(&mut self) -> broadcast::Receiver<Arc<TenantRuntime>> {
-        self.generation.fetch_add(1, Ordering::SeqCst);
-        let (tx, rx) = broadcast::channel(1);
-        self.in_flight = Some(tx);
-        rx
-    }
-
-    /// True if a previous activation failed and the backoff
-    /// window is still open.
-    pub fn in_negative_backoff(&self) -> bool {
-        self.negative_backoff_until
-            .map(|until| Instant::now() < until)
-            .unwrap_or(false)
-    }
-}
-
-/// Per-Tenant slot. The LRU pool maps `tenant_id` to
-/// `Arc<Mutex<TenantRuntimeSlot>>`. The slot's `phase` and
-/// `last_used` drive the idle-eviction tick.
+/// Per-tenant slot: the pool's whole record of what it holds for a tenant.
 pub struct TenantRuntimeSlot {
-    pub runtime: Option<Arc<TenantRuntime>>,
-    pub phase: RuntimePhase,
-    pub pin_count: Arc<AtomicU32>,
-    pub active_operations: AtomicU32,
+    /// Which tenant and which storage this slot is bound to.
+    pub identity: TenantRuntimeIdentity,
+    /// The revision the resident runtime was built for.
+    pub revision: RuntimeRevision,
+    /// Bumped when an attempt starts. Identifies that attempt.
+    pub generation: u64,
+    pub state: SlotState,
+    /// Present only while `Loading`. Dropping it closes the channel, which is
+    /// how a follower learns the attempt was abandoned rather than answering.
+    pub completion: Option<watch::Sender<Option<ActivationOutcome>>>,
+    pub pins: Arc<AtomicU32>,
     pub concurrency: Arc<Semaphore>,
     pub last_used: Instant,
-    pub activation: ActivationSlot,
 }
 
 impl TenantRuntimeSlot {
-    pub fn new() -> Self {
-        Self::new_with_limit(4)
-    }
-
-    pub fn new_with_limit(limit: u32) -> Self {
+    pub fn new(identity: TenantRuntimeIdentity, revision: RuntimeRevision) -> Self {
         Self {
-            runtime: None,
-            phase: RuntimePhase::Absent,
-            pin_count: Arc::new(AtomicU32::new(0)),
-            active_operations: AtomicU32::new(0),
-            concurrency: Arc::new(Semaphore::new(limit.max(1) as usize)),
+            identity,
+            revision,
+            generation: 0,
+            state: SlotState::Absent,
+            completion: None,
+            pins: Arc::new(AtomicU32::new(0)),
+            concurrency: Arc::new(Semaphore::new(revision.concurrency.max(1) as usize)),
             last_used: Instant::now(),
-            activation: ActivationSlot::new(),
         }
     }
 
-    /// Pin the slot for an in-flight request. Returns the new
-    /// pin count.
-    pub fn pin(&mut self) -> u32 {
+    /// The resident runtime, when this slot is ready to serve.
+    pub fn ready_runtime(&self) -> Option<&Arc<TenantRuntime>> {
+        match &self.state {
+            SlotState::Ready { runtime } => Some(runtime),
+            _ => None,
+        }
+    }
+
+    /// Whether a recent attempt failed inside its backoff window.
+    pub fn in_negative_backoff(&self, now: Instant) -> bool {
+        matches!(&self.state, SlotState::Failed { retry_at } if *retry_at > now)
+    }
+
+    /// Whether this slot may be unloaded to make room.
+    ///
+    /// An attempt in flight is never reclaimable, and neither is a slot a
+    /// response still holds: dropping the runtime under a live guard is how a
+    /// pooled runtime disappears mid-request.
+    pub fn is_reclaimable(&self, now: Instant, idle_ttl: std::time::Duration) -> bool {
+        if self.pins.load(Ordering::SeqCst) > 0 {
+            return false;
+        }
+        match &self.state {
+            SlotState::Absent => true,
+            SlotState::Failed { retry_at } => *retry_at <= now,
+            SlotState::Ready { .. } => now.duration_since(self.last_used) >= idle_ttl,
+            SlotState::Loading | SlotState::Draining { .. } => false,
+        }
+    }
+
+    /// Start an attempt: bump the generation, publish `Loading`, and return the
+    /// receiver its followers wait on.
+    pub fn begin_loading(&mut self) -> (u64, watch::Receiver<Option<ActivationOutcome>>) {
+        self.generation += 1;
+        let (sender, receiver) = watch::channel(None);
+        self.state = SlotState::Loading;
+        self.completion = Some(sender);
         self.last_used = Instant::now();
-        self.pin_count.fetch_add(1, Ordering::SeqCst) + 1
+        (self.generation, receiver)
     }
 
-    /// Unpin. Returns the new count.
-    pub fn unpin(&self) -> u32 {
-        self.pin_count.fetch_sub(1, Ordering::SeqCst) - 1
+    /// A receiver on the in-flight attempt, if one is running.
+    pub fn subscribe(&self) -> Option<watch::Receiver<Option<ActivationOutcome>>> {
+        self.completion.as_ref().map(watch::Sender::subscribe)
+    }
+
+    /// Complete a `Loading` attempt.
+    ///
+    /// Returns whether the outcome was applied. A stale attempt returns `false`
+    /// and is dropped without touching the slot: it was cancelled or superseded,
+    /// and its result describes a runtime nobody is waiting for any more.
+    pub fn finish_attempt(
+        &mut self,
+        generation: u64,
+        runtime: Result<Arc<TenantRuntime>, MemoryError>,
+        now: Instant,
+    ) -> bool {
+        if self.generation != generation || !matches!(self.state, SlotState::Loading) {
+            return false;
+        }
+        let succeeded = runtime.is_ok();
+        self.state = match runtime {
+            Ok(runtime) => SlotState::Ready { runtime },
+            Err(_) => SlotState::Failed {
+                retry_at: now + ACTIVATION_BACKOFF,
+            },
+        };
+        // Wake the followers with an answer before closing the channel. A
+        // sender dropped without a value is the cancellation signal, so
+        // conflating the two would report every completed attempt as abandoned.
+        if let Some(sender) = self.completion.take() {
+            let _ = sender.send(Some(if succeeded {
+                Ok(())
+            } else {
+                Err(MemoryError::Unavailable(
+                    "tenant runtime activation failed".into(),
+                ))
+            }));
+        }
+        true
+    }
+
+    /// End a `Loading` attempt without an outcome: it was cancelled, or the
+    /// server is shutting down. The slot becomes immediately retryable, which
+    /// is the difference between a cancelled request and a failing activation.
+    pub fn abandon(&mut self, generation: u64) -> bool {
+        if self.generation != generation || !matches!(self.state, SlotState::Loading) {
+            return false;
+        }
+        self.state = SlotState::Absent;
+        self.completion = None;
+        true
     }
 }
 
-impl Default for TenantRuntimeSlot {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
+/// `SlotState::Ready` is only ever built by the pool, which has the runtime in
+/// hand when an attempt finishes.
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::time::Duration;
+    use crate::tenancy::api::TenantRuntimeSpec;
 
-    #[test]
-    fn a_fresh_slot_has_no_runtime() {
-        assert!(TenantRuntimeSlot::new().runtime.is_none());
+    fn identity(tenant_id: &str, namespace: &str) -> TenantRuntimeIdentity {
+        TenantRuntimeSpec {
+            tenant_id: tenant_id.to_string(),
+            namespace: namespace.to_string(),
+            database: "memory".to_string(),
+            plan_version: 1,
+            schema_version: 0,
+            status: crate::tenancy::api::TenantLifecycleStatus::Ready,
+        }
+        .identity()
+    }
+
+    fn revision() -> RuntimeRevision {
+        RuntimeRevision {
+            plan_version: 1,
+            schema_version: 0,
+            concurrency: 4,
+        }
+    }
+
+    fn slot() -> TenantRuntimeSlot {
+        TenantRuntimeSlot::new(identity("ten_a", "tns_a"), revision())
     }
 
     #[test]
-    fn a_fresh_slot_is_absent() {
-        assert_eq!(TenantRuntimeSlot::new().phase, RuntimePhase::Absent);
+    fn a_fresh_slot_is_absent_with_no_runtime() {
+        let slot = slot();
+        assert!(matches!(slot.state, SlotState::Absent));
+        assert!(slot.ready_runtime().is_none());
+        assert_eq!(slot.generation, 0);
     }
 
     #[test]
-    fn a_fresh_slot_has_no_pins() {
-        assert_eq!(TenantRuntimeSlot::new().pin_count.load(Ordering::SeqCst), 0);
-    }
-
-    #[test]
-    fn a_fresh_slot_has_no_active_operations() {
-        assert_eq!(
-            TenantRuntimeSlot::new()
-                .active_operations
-                .load(Ordering::SeqCst),
-            0
-        );
-    }
-
-    #[test]
-    fn pinning_increments_the_pin_count() {
-        let mut slot = TenantRuntimeSlot::new();
-
-        assert_eq!(slot.pin(), 1);
-    }
-
-    #[test]
-    fn pinning_twice_reports_two_pins() {
-        let mut slot = TenantRuntimeSlot::new();
-        slot.pin();
-
-        assert_eq!(slot.pin(), 2);
-    }
-
-    #[test]
-    fn unpinning_decrements_the_pin_count() {
-        let mut slot = TenantRuntimeSlot::new();
-        slot.pin();
-
-        assert_eq!(slot.unpin(), 0);
+    fn a_fresh_slot_has_no_pins_and_honours_its_concurrency() {
+        let slot = slot();
+        assert_eq!(slot.pins.load(Ordering::SeqCst), 0);
+        assert_eq!(slot.concurrency.available_permits(), 4);
     }
 
     #[test]
     fn a_zero_concurrency_limit_is_raised_to_one() {
-        let slot = TenantRuntimeSlot::new_with_limit(0);
-
+        let slot = TenantRuntimeSlot::new(
+            identity("ten_a", "tns_a"),
+            RuntimeRevision {
+                concurrency: 0,
+                ..revision()
+            },
+        );
         assert_eq!(slot.concurrency.available_permits(), 1);
     }
 
     #[test]
-    fn the_default_slot_allows_four_concurrent_operations() {
-        assert_eq!(TenantRuntimeSlot::new().concurrency.available_permits(), 4);
+    fn beginning_an_attempt_bumps_the_generation_and_publishes_loading() {
+        let mut slot = slot();
+        let (generation, _rx) = slot.begin_loading();
+        assert_eq!(generation, 1);
+        assert!(matches!(slot.state, SlotState::Loading));
+        assert!(slot.subscribe().is_some());
     }
 
     #[test]
-    fn an_explicit_concurrency_limit_is_honoured() {
-        assert_eq!(
-            TenantRuntimeSlot::new_with_limit(7)
-                .concurrency
-                .available_permits(),
-            7
-        );
+    fn a_second_attempt_gets_a_new_generation() {
+        let mut slot = slot();
+        let (first, _rx) = slot.begin_loading();
+        let (second, _rx) = slot.begin_loading();
+        assert_ne!(first, second);
     }
 
     #[test]
-    fn a_fresh_activation_slot_is_absent() {
-        assert_eq!(ActivationSlot::new().state, RuntimePhase::Absent);
+    fn abandoning_an_attempt_makes_the_slot_retryable_without_backoff() {
+        let mut slot = slot();
+        let (generation, _rx) = slot.begin_loading();
+        assert!(slot.abandon(generation));
+        assert!(matches!(slot.state, SlotState::Absent));
+        assert!(!slot.in_negative_backoff(Instant::now()));
+        assert!(slot.completion.is_none());
     }
 
     #[test]
-    fn a_fresh_activation_slot_starts_at_generation_zero() {
-        assert_eq!(ActivationSlot::new().generation.load(Ordering::SeqCst), 0);
+    fn a_stale_generation_cannot_abandon_a_newer_attempt() {
+        let mut slot = slot();
+        let (stale, _rx) = slot.begin_loading();
+        let (current, _rx) = slot.begin_loading();
+        assert!(!slot.abandon(stale));
+        assert!(matches!(slot.state, SlotState::Loading));
+        assert!(slot.abandon(current));
     }
 
     #[test]
-    fn beginning_an_activation_increments_the_generation() {
-        let mut slot = ActivationSlot::new();
-
-        slot.begin();
-
-        assert_eq!(slot.generation.load(Ordering::SeqCst), 1);
+    fn a_failed_attempt_opens_a_backoff_window() {
+        let mut slot = slot();
+        let (generation, _rx) = slot.begin_loading();
+        let now = Instant::now();
+        assert!(slot.finish_attempt(
+            generation,
+            Err(MemoryError::Unavailable("factory said no".into())),
+            now
+        ));
+        assert!(slot.in_negative_backoff(now));
+        assert!(!slot.in_negative_backoff(now + ACTIVATION_BACKOFF));
     }
 
     #[test]
-    fn beginning_a_second_activation_increments_the_generation_again() {
-        let mut slot = ActivationSlot::new();
-        slot.begin();
-
-        slot.begin();
-
-        assert_eq!(slot.generation.load(Ordering::SeqCst), 2);
+    fn a_pinned_slot_is_never_reclaimable() {
+        let slot = slot();
+        let now = Instant::now();
+        assert!(slot.is_reclaimable(now, std::time::Duration::ZERO));
+        slot.pins.fetch_add(1, Ordering::SeqCst);
+        assert!(!slot.is_reclaimable(
+            now + std::time::Duration::from_secs(3600),
+            std::time::Duration::ZERO
+        ));
     }
 
     #[test]
-    fn beginning_an_activation_records_the_broadcast_sender() {
-        let mut slot = ActivationSlot::new();
-
-        slot.begin();
-
-        assert!(slot.in_flight.is_some());
-    }
-
-    #[test]
-    fn a_fresh_slot_is_not_in_negative_backoff() {
-        assert!(!ActivationSlot::new().in_negative_backoff());
-    }
-
-    #[test]
-    fn a_slot_with_a_future_backoff_is_in_negative_backoff() {
-        let mut slot = ActivationSlot::new();
-        slot.negative_backoff_until = Some(Instant::now() + Duration::from_secs(60));
-
-        assert!(slot.in_negative_backoff());
-    }
-
-    #[test]
-    fn a_slot_whose_backoff_has_passed_is_no_longer_backed_off() {
-        let mut slot = ActivationSlot::new();
-        slot.negative_backoff_until = Some(Instant::now() - Duration::from_secs(1));
-
-        assert!(!slot.in_negative_backoff());
+    fn a_loading_slot_is_never_reclaimable() {
+        let mut slot = slot();
+        let _ = slot.begin_loading();
+        assert!(!slot.is_reclaimable(
+            Instant::now() + std::time::Duration::from_secs(3600),
+            std::time::Duration::ZERO
+        ));
     }
 }

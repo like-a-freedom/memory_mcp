@@ -17,19 +17,12 @@ use crate::tenancy::api::{
 /// handle of its own.
 pub(crate) struct RegistryTenantRuntimeFactory {
     registry: Arc<RegistryHandle>,
-    options: std::sync::RwLock<RuntimeOptions>,
+    options: RuntimeOptions,
 }
 
 impl RegistryTenantRuntimeFactory {
     pub(crate) fn new(registry: Arc<RegistryHandle>, options: RuntimeOptions) -> Self {
-        Self {
-            registry,
-            options: std::sync::RwLock::new(options),
-        }
-    }
-
-    pub(crate) fn set_options(&self, options: RuntimeOptions) {
-        *self.options.write().expect("runtime options lock") = options;
+        Self { registry, options }
     }
 }
 
@@ -64,7 +57,7 @@ impl TenantRuntimeFactory for RegistryTenantRuntimeFactory {
             created_at: chrono::Utc::now(),
             version: 0,
         };
-        let options = self.options.read().expect("runtime options lock").clone();
+        let options = self.options.clone();
         build_runtime_with_options(&self.registry, &tenant, options)
             .await
             .map_err(RuntimeFactoryError::Storage)

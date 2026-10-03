@@ -164,9 +164,11 @@ impl HttpState {
             };
             registry.ensure_plan(&signup_plan).await?;
         }
-        let pool = Arc::new(runtime::pool::Pool::from_http_config(
+        let shutdown = shutdown::ShutdownState::new();
+        let pool = Arc::new(runtime::pool::Pool::from_http_config_with_shutdown(
             &config,
             Arc::new(registry.clone()),
+            shutdown.clone(),
         ));
         // Each consumer below is handed the owner traits it uses, not the
         // registry. One handle is still built above, but nothing below reaches
@@ -363,7 +365,7 @@ impl HttpState {
         Ok(Arc::new(Self {
             config: config.clone(),
             pool,
-            shutdown: shutdown::ShutdownState::new(),
+            shutdown,
             admission: Arc::new(runtime::pool::AdmissionGate::new_with_limits(
                 config.global_request_limit,
                 config.subscription_limit,
