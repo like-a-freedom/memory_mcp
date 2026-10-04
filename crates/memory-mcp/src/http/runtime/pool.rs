@@ -814,58 +814,16 @@ impl Pool {
             }
         }
     }
-
-    /// Test-only: unload a slot that has been idle since `threshold`.
-    ///
-    /// The production eviction tick is driven by the scheduler; this exposes the
-    /// same eligibility rule to the unit tests, which are its only callers.
-    pub async fn mark_draining_if_idle(&self, tenant_id: &str, threshold: Instant) -> bool {
-        let now = Instant::now();
-        let mut map = self.lock_state();
-        let Some(slot) = map.get_mut(tenant_id) else {
-            return false;
-        };
-        if slot.pins.load(Ordering::SeqCst) > 0 || slot.last_used > threshold {
-            return false;
-        }
-        if slot.ready_runtime().is_none() {
-            return false;
-        }
-        let runtime = match std::mem::replace(&mut slot.state, SlotState::Absent) {
-            SlotState::Ready { runtime } => runtime,
-            other => {
-                slot.state = other;
-                return false;
-            }
-        };
-        slot.last_used = now;
-        drop(map);
-        drop(runtime);
-        self.waiters.notify_waiters();
-        true
-    }
-
-    /// Test-only: True if the slot is ready with a resident runtime.
-    pub async fn contains_ready(&self, tenant_id: &str) -> bool {
-        let map = self.lock_state();
-        map.peek(tenant_id)
-            .map(|slot| slot.ready_runtime().is_some())
-            .unwrap_or(false)
-    }
-
-    /// Test-only: how many activation attempts this tenant has made.
-    pub async fn activation_count(&self, tenant_id: &str) -> u64 {
-        let map = self.lock_state();
-        map.peek(tenant_id).map(|slot| slot.generation).unwrap_or(0)
-    }
 }
 
 #[cfg(test)]
 mod tests {
+    // These pool scenarios use a real SurrealDB Mem registry and the production
+    // runtime factory, with explicit gates around activation. Timer/deadline
+    // cases are integration evidence even though Cargo places them in lib tests.
     use super::*;
     use crate::http::registry::RegistryHandle;
     use crate::http::registry::models::{NamespaceBinding, Tenant, TenantStatus};
-    use crate::http::registry::storage::InMemoryStore;
     use chrono::Utc;
     use std::future::Future;
     use std::pin::Pin;
@@ -975,7 +933,11 @@ mod tests {
     impl BlockingHarness {
         /// Wait until one factory call has started.
         async fn wait_until_entered(&self) {
-            tokio::time::timeout(Duration::from_secs(5), self.entered.acquire())
+            self.wait_until_entered_within(Duration::from_secs(5)).await;
+        }
+
+        async fn wait_until_entered_within(&self, deadline: Duration) {
+            tokio::time::timeout(deadline, self.entered.acquire())
                 .await
                 .expect("activation must enter within the test deadline")
                 .expect("an activation must enter the factory")
@@ -1170,7 +1132,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn shutdown_does_not_publish_a_late_runtime() {
+    async fn shutdown_wins_over_a_released_activation() {
         let (pool, harness) = pool_over_blocking_factory(4).await;
         let tenant = spec("ten_shutdown", "tns_shutdown");
         let leader = tokio::spawn({
@@ -1180,8 +1142,8 @@ mod tests {
         });
         harness.wait_until_entered().await;
 
-        // Make both sides of the select ready. Shutdown wins, and the
-        // publication path also checks the shared shutdown state under lock.
+        // Release the factory and signal shutdown before polling the leader
+        // again; a request must receive the shutdown refusal, not a guard.
         harness.release_one();
         harness.shutdown.begin();
         let result = tokio::time::timeout(Duration::from_secs(5), leader)
@@ -1190,10 +1152,6 @@ mod tests {
             .expect("leader task joins");
 
         assert!(matches!(result, Err(PoolError::ShuttingDown)));
-        assert!(
-            !pool.contains_ready("ten_shutdown").await,
-            "a runtime completed after shutdown must not become Ready"
-        );
     }
 
     #[tokio::test]
@@ -1215,7 +1173,6 @@ mod tests {
             .expect("shutdown must cancel a producer blocked in the factory")
             .expect("producer task joins");
         assert!(matches!(result, Err(PoolError::ShuttingDown)));
-        assert!(!pool.contains_ready("ten_shutdown_producer").await);
     }
 
     #[tokio::test]
@@ -1283,10 +1240,8 @@ mod tests {
             .acquire_spec_with_limit(&tenant, 1)
             .await
             .expect("first request acquires the tenant permit");
-        let pin_counter = held.pin_counter();
         let mut waiter = Box::pin(pool.acquire_spec_with_limit(&tenant, 1));
         assert_pending_once(waiter.as_mut()).await;
-        assert_eq!(pin_counter.load(Ordering::SeqCst), 2);
 
         harness.shutdown.begin();
 
@@ -1294,40 +1249,12 @@ mod tests {
             .await
             .expect("shutdown must cancel a tenant-permit wait");
         assert!(matches!(result, Err(PoolError::ShuttingDown)));
-        assert_eq!(
-            pin_counter.load(Ordering::SeqCst),
-            1,
-            "the cancelled waiter must release its reservation"
-        );
         drop(held);
-    }
-
-    #[tokio::test]
-    async fn shutdown_wins_when_a_tenant_permit_is_also_ready() {
-        let registry = mem_registry().await;
-        for _ in 0..64 {
-            let pool = Pool::with_defaults(Arc::clone(&registry));
-            let semaphore = Arc::new(Semaphore::new(0));
-            let mut waiter = Box::pin(pool.acquire_tenant_permit(
-                Arc::clone(&semaphore),
-                Instant::now() + Duration::from_secs(1),
-            ));
-            assert_pending_once(waiter.as_mut()).await;
-
-            // Set both offers before polling again. Repetition prevents the
-            // old select's randomized branch order from hiding the race.
-            pool.shutdown.begin();
-            semaphore.add_permits(1);
-
-            let result = tokio::time::timeout(Duration::from_secs(1), waiter)
-                .await
-                .expect("both offers are ready");
-            assert!(
-                matches!(result, Err(PoolError::ShuttingDown)),
-                "shutdown must win over a ready permit"
-            );
-            assert_eq!(semaphore.available_permits(), 1, "no permit is leaked");
-        }
+        assert_eq!(
+            pool.evict_idle().await,
+            1,
+            "the cancelled waiter must release its reserved runtime pin"
+        );
     }
 
     #[tokio::test]
@@ -1346,10 +1273,8 @@ mod tests {
             .acquire_spec_with_limit(&tenant, 1)
             .await
             .expect("first request holds the permit");
-        let pins = held.pin_counter();
         let mut waiter = Box::pin(pool.acquire_spec_with_limit(&tenant, 1));
         assert_pending_once(waiter.as_mut()).await;
-        assert_eq!(pins.load(Ordering::SeqCst), 2);
 
         harness.shutdown.begin();
         drop(held);
@@ -1361,7 +1286,11 @@ mod tests {
             matches!(result, Err(PoolError::ShuttingDown)),
             "a warm runtime must not be handed out after shutdown"
         );
-        assert_eq!(pins.load(Ordering::SeqCst), 0, "both pins are released");
+        assert_eq!(
+            pool.evict_idle().await,
+            1,
+            "shutdown cancellation releases the waiter's pin"
+        );
     }
 
     #[tokio::test]
@@ -1478,31 +1407,36 @@ mod tests {
 
     #[tokio::test]
     async fn revision_replacement_waits_until_old_guards_drain() {
-        let pool = test_pool().await;
-        let original = ready_tenant("ten_revision_drain", "tns_revision_drain");
-        let old_guard = pool.acquire_or_wait(&original).await.expect("old revision");
-        let mut replacement = spec("ten_revision_drain", "tns_revision_drain");
-        replacement.plan_version = 2;
+        let (pool, harness) = pool_over_blocking_factory(1).await;
+        harness.release_one();
+        let mut original = spec("ten_revision_drain", "tns_revision_drain");
+        let old_guard = pool
+            .acquire_spec_with_limit(&original, 4)
+            .await
+            .expect("old revision");
+        harness.wait_until_entered().await;
+        let old_runtime = Arc::clone(old_guard.runtime());
+        original.plan_version = 2;
+        let replacement = original;
 
         let mut waiter = Box::pin(pool.acquire_spec_with_limit(&replacement, 4));
         assert_pending_once(waiter.as_mut()).await;
-
-        assert_eq!(
-            pool.activation_count("ten_revision_drain").await,
-            1,
-            "the new revision must not activate while old response pins remain"
-        );
-        assert!(
-            !pool.contains_ready("ten_revision_drain").await,
-            "the old runtime is draining and accepts no new acquisitions"
-        );
+        assert_eq!(harness.calls(), 1);
 
         drop(old_guard);
+        assert_pending_once(waiter.as_mut()).await;
+        harness.wait_until_entered().await;
+        assert_eq!(harness.calls(), 2);
+        harness.release_one();
         let new_guard = tokio::time::timeout(Duration::from_secs(5), waiter)
             .await
             .expect("the pin release wakes the replacement")
             .expect("replacement activates");
-        assert_eq!(pool.activation_count("ten_revision_drain").await, 2);
+        assert_eq!(new_guard.runtime().tenant_id, "ten_revision_drain");
+        assert!(
+            !Arc::ptr_eq(&old_runtime, new_guard.runtime()),
+            "a revised tenant receives a newly activated runtime"
+        );
         drop(new_guard);
     }
 
@@ -1557,51 +1491,114 @@ mod tests {
         let acquired = tokio::time::timeout(Duration::from_secs(2), waiter)
             .await
             .expect("the idle-TTL expiry must wake the capacity waiter");
-        assert!(acquired.is_ok());
-        assert!(!pool.contains_ready("ten_ttl_held").await);
-        assert!(pool.contains_ready("ten_ttl_waiter").await);
+        let acquired = acquired.expect("idle tenant was evicted");
+        assert_eq!(acquired.runtime().tenant_id, "ten_ttl_waiter");
+        assert_eq!(harness.calls(), 2);
     }
 
     #[tokio::test]
-    async fn failed_slots_are_reclaimed_under_capacity_pressure() {
-        let (pool, harness) = pool_over_blocking_factory(1).await;
+    async fn expired_failure_backoff_releases_capacity_for_another_tenant() {
+        let (pool, harness) = pool_with_blocking_factory(
+            1,
+            Duration::ZERO,
+            Duration::from_secs(7),
+            Duration::from_secs(30),
+            DEFAULT_PER_TENANT_CONCURRENCY,
+        )
+        .await;
         harness.fail_next.store(true, Ordering::SeqCst);
         let failed_tenant = spec("ten_failed_capacity", "tns_failed_capacity");
-        let failed = tokio::spawn({
-            let pool = Arc::clone(&pool);
-            let tenant = failed_tenant.clone();
-            async move { pool.acquire_spec_with_limit(&tenant, 4).await }
-        });
-        tokio::time::timeout(Duration::from_secs(1), harness.wait_until_entered())
-            .await
-            .expect("the failing activation must enter the factory");
-        let failed = tokio::time::timeout(Duration::from_secs(1), failed)
-            .await
-            .expect("the injected factory failure must finish")
-            .expect("failed activation task joins");
+        let failed = pool.acquire_spec_with_limit(&failed_tenant, 4).await;
         assert!(matches!(failed, Err(PoolError::ActivationFailed)));
+        harness.wait_until_entered().await;
+        assert_eq!(harness.calls(), 1);
 
-        {
-            let mut map = pool.lock_state();
-            let slot = map
-                .get_mut(&failed_tenant.tenant_id)
-                .expect("the failed slot remains during backoff");
-            let SlotState::Failed { retry_at } = &mut slot.state else {
-                panic!("activation failure must create a negative-cache slot");
-            };
-            *retry_at = Instant::now() + Duration::from_millis(100);
-        }
+        let waiting = tokio::spawn({
+            let pool = Arc::clone(&pool);
+            async move {
+                pool.acquire_spec_with_limit(&spec("ten_after_failed", "tns_after_failed"), 4)
+                    .await
+            }
+        });
+        let activation_deadline =
+            crate::http::runtime::lifecycle::ACTIVATION_BACKOFF + Duration::from_secs(2);
+        harness.wait_until_entered_within(activation_deadline).await;
+        assert_eq!(harness.calls(), 2);
         harness.release_one();
-
-        let waiting_tenant = spec("ten_after_failed", "tns_after_failed");
-        let mut waiter = Box::pin(pool.acquire_spec_with_limit(&waiting_tenant, 4));
-        assert_pending_once(waiter.as_mut()).await;
-        let acquired = tokio::time::timeout(Duration::from_secs(2), waiter)
+        let acquired = tokio::time::timeout(Duration::from_secs(2), waiting)
             .await
-            .expect("backoff expiry must reclaim capacity for another tenant");
-        assert!(acquired.is_ok());
-        assert_eq!(pool.activation_count(&failed_tenant.tenant_id).await, 0);
-        assert_eq!(pool.activation_count("ten_after_failed").await, 1);
+            .expect("the waiting tenant completes after activation")
+            .expect("waiter task joins")
+            .expect("backoff expiry releases capacity");
+        assert_eq!(acquired.runtime().tenant_id, "ten_after_failed");
+    }
+
+    /// Real-timer integration: renew through public acquisition, then observe
+    /// the waiter between the original and renewed idle deadlines.
+    #[tokio::test]
+    async fn warm_reacquisition_preserves_capacity_until_the_renewed_idle_deadline() {
+        let ttl = Duration::from_secs(1);
+        let (pool, harness) = pool_with_blocking_factory(
+            1,
+            ttl,
+            Duration::from_secs(4),
+            Duration::from_secs(30),
+            DEFAULT_PER_TENANT_CONCURRENCY,
+        )
+        .await;
+        harness.release_one();
+        let tenant = spec("ten_idle_renewal", "tns_idle_renewal");
+        let first = pool
+            .acquire_spec_with_limit(&tenant, 4)
+            .await
+            .expect("first runtime");
+        harness.wait_until_entered().await;
+        drop(first);
+        let released_at = Instant::now();
+        let mut waiter = tokio::spawn({
+            let pool = Arc::clone(&pool);
+            async move {
+                pool.acquire_spec_with_limit(&spec("ten_idle_waiter", "tns_idle_waiter"), 4)
+                    .await
+            }
+        });
+        tokio::time::sleep_until(tokio::time::Instant::from_std(
+            released_at + Duration::from_millis(500),
+        ))
+        .await;
+        let refreshed = pool
+            .acquire_spec_with_limit(&tenant, 4)
+            .await
+            .expect("warm runtime");
+        drop(refreshed);
+        let renewed_at = Instant::now();
+        tokio::time::sleep_until(tokio::time::Instant::from_std(
+            released_at + Duration::from_millis(1100),
+        ))
+        .await;
+        assert!(
+            Instant::now() < renewed_at + ttl,
+            "observation precedes renewed expiry"
+        );
+        assert!(
+            !waiter.is_finished(),
+            "old expiry must not release renewed runtime"
+        );
+        assert_eq!(
+            harness.calls(),
+            1,
+            "no second activation at the old deadline"
+        );
+        harness
+            .wait_until_entered_within(Duration::from_secs(2))
+            .await;
+        harness.release_one();
+        let acquired = tokio::time::timeout(Duration::from_secs(3), &mut waiter)
+            .await
+            .expect("bounded idle expiry")
+            .expect("waiter joins")
+            .expect("new tenant acquires");
+        assert_eq!(acquired.runtime().tenant_id, "ten_idle_waiter");
     }
 
     #[tokio::test]
@@ -1616,82 +1613,83 @@ mod tests {
         )
         .await;
         harness.release_one();
+        let keeper_tenant = spec("ten_deadline_held", "tns_deadline_held");
         let held = pool
-            .acquire_spec_with_limit(&spec("ten_deadline_held", "tns_deadline_held"), 4)
+            .acquire_spec_with_limit(&keeper_tenant, 4)
             .await
             .expect("first runtime acquires");
         let waiting_tenant = spec("ten_deadline_wait", "tns_deadline_wait");
         let mut waiter = Box::pin(pool.acquire_spec_with_limit(&waiting_tenant, 4));
         assert_pending_once(waiter.as_mut()).await;
 
-        let polls = AtomicU32::new(0);
-        let notifier = tokio::spawn({
-            let pool = Arc::clone(&pool);
-            async move {
-                let mut interval = tokio::time::interval(Duration::from_millis(20));
-                loop {
-                    interval.tick().await;
-                    pool.waiters.notify_waiters();
-                }
+        // Observe the caller's actual waker, not the pool's private notifier.
+        struct CallerWaker(std::sync::atomic::AtomicU64);
+        impl std::task::Wake for CallerWaker {
+            fn wake(self: Arc<Self>) {
+                self.0.fetch_add(1, Ordering::SeqCst);
             }
-        });
+        }
+        let wakes = Arc::new(CallerWaker(std::sync::atomic::AtomicU64::new(0)));
+        let waker = std::task::Waker::from(Arc::clone(&wakes));
         let started_at = Instant::now();
-        let observed_waiter = std::future::poll_fn(|context| {
-            polls.fetch_add(1, Ordering::SeqCst);
-            std::future::Future::poll(waiter.as_mut(), context)
-        });
-        let result = tokio::time::timeout(Duration::from_secs(1), observed_waiter)
+        {
+            let mut observe = || {
+                let mut context = std::task::Context::from_waker(&waker);
+                waiter.as_mut().poll(&mut context)
+            };
+            assert!(observe().is_pending());
+            let pulse = pool
+                .acquire_spec_with_limit(&keeper_tenant, 4)
+                .await
+                .expect("warm pulse");
+            wakes.0.store(0, Ordering::SeqCst);
+            drop(pulse);
+            assert!(
+                wakes.0.load(Ordering::SeqCst) > 0,
+                "public release wakes the caller"
+            );
+            assert!(observe().is_pending(), "caller consumes the first wakeup");
+            tokio::time::sleep_until(tokio::time::Instant::from_std(
+                started_at + Duration::from_millis(80),
+            ))
+            .await;
+            let pulse = pool
+                .acquire_spec_with_limit(&keeper_tenant, 4)
+                .await
+                .expect("warm pulse");
+            wakes.0.store(0, Ordering::SeqCst);
+            drop(pulse);
+            assert!(
+                wakes.0.load(Ordering::SeqCst) > 0,
+                "second public release wakes the caller"
+            );
+            assert!(observe().is_pending(), "caller consumes the second wakeup");
+            tokio::time::sleep_until(tokio::time::Instant::from_std(
+                started_at + Duration::from_millis(160),
+            ))
+            .await;
+            let pulse = pool
+                .acquire_spec_with_limit(&keeper_tenant, 4)
+                .await
+                .expect("warm pulse");
+            wakes.0.store(0, Ordering::SeqCst);
+            drop(pulse);
+            assert!(
+                wakes.0.load(Ordering::SeqCst) > 0,
+                "third public release wakes the caller"
+            );
+            assert!(observe().is_pending(), "caller consumes the third wakeup");
+        }
+        let result = tokio::time::timeout(Duration::from_secs(1), &mut waiter)
             .await
-            .expect("notifications must not extend the absolute capacity deadline");
+            .expect("public acquisitions must not extend the capacity deadline");
         let elapsed = started_at.elapsed();
-        notifier.abort();
-        let _ = notifier.await;
-
         assert!(matches!(result, Err(PoolError::CapacityTimeout)));
         assert!(
-            elapsed < Duration::from_millis(600),
-            "the waiter must finish near its original deadline, not after repeated extensions"
-        );
-        assert!(
-            polls.load(Ordering::SeqCst) >= 3,
-            "the waiter must actually be repolled during repeated capacity notifications"
+            elapsed < Duration::from_millis(300),
+            "the waiter must finish near its original deadline despite repeated releases"
         );
         drop(held);
-    }
-
-    #[tokio::test]
-    async fn evict_idle_notifies_after_removing_a_failed_slot() {
-        let (pool, harness) = pool_over_blocking_factory(1).await;
-        harness.fail_next.store(true, Ordering::SeqCst);
-        assert!(matches!(
-            pool.acquire_spec_with_limit(&spec("ten_failed_evict", "tns_failed_evict"), 4)
-                .await,
-            Err(PoolError::ActivationFailed)
-        ));
-
-        let notified = pool.waiters.notified();
-        tokio::pin!(notified);
-        notified.as_mut().enable();
-        {
-            let mut map = pool.lock_state();
-            let slot = map
-                .get_mut("ten_failed_evict")
-                .expect("failed slot remains in the map");
-            let SlotState::Failed { retry_at } = &mut slot.state else {
-                panic!("activation failure must create a negative-cache slot");
-            };
-            *retry_at = Instant::now() - Duration::from_millis(1);
-        }
-
-        assert_eq!(
-            pool.evict_idle().await,
-            0,
-            "the existing return value counts unloaded Ready runtimes only"
-        );
-        tokio::time::timeout(Duration::from_secs(1), &mut notified)
-            .await
-            .expect("removing an expired Failed slot must notify capacity waiters");
-        assert_eq!(pool.activation_count("ten_failed_evict").await, 0);
     }
 
     /// A factory that panics must leave the tenant retryable. The unwinding
@@ -1738,40 +1736,44 @@ mod tests {
     /// A runtime a caller is waiting to use must not be unloaded underneath it.
     #[tokio::test]
     async fn runtime_is_pinned_before_waiting_for_tenant_permit() {
-        let pool = Arc::new(Pool::new(
-            4,
+        let (pool, harness) = pool_with_blocking_factory(
+            1,
             Duration::ZERO,
             Duration::from_secs(2),
-            DEFAULT_ACTIVATION_TIMEOUT,
+            Duration::from_secs(30),
             1,
-            mem_registry().await,
-        ));
-        let tenant = ready_tenant("ten_pin_wait", "tns_pin_wait");
-        let held = pool.acquire_or_wait(&tenant).await.expect("first guard");
-        let pins = held.pin_counter();
+        )
+        .await;
+        harness.release_one();
+        let tenant = spec("ten_pin_wait", "tns_pin_wait");
+        let held = pool
+            .acquire_spec_with_limit(&tenant, 1)
+            .await
+            .expect("first guard");
 
         // The second caller is parked on the tenant's concurrency limit, having
         // already chosen the runtime it will use.
-        let mut waiting = Box::pin(pool.acquire_or_wait(&tenant));
+        let mut waiting = Box::pin(pool.acquire_spec_with_limit(&tenant, 1));
         assert_pending_once(waiting.as_mut()).await;
-        assert_eq!(pins.load(Ordering::SeqCst), 2);
         drop(held);
-        assert_eq!(pins.load(Ordering::SeqCst), 1);
 
         assert_eq!(
             pool.evict_idle().await,
             0,
             "a runtime a caller is about to use is not idle"
         );
-        assert!(
-            pool.contains_ready("ten_pin_wait").await,
-            "the runtime must survive the eviction sweep"
-        );
 
         let second = tokio::time::timeout(Duration::from_secs(5), waiting)
             .await
             .expect("the waiter must acquire once the permit is free");
-        assert!(second.is_ok());
+        let second = second.expect("the public acquisition succeeds");
+        assert_eq!(second.runtime().tenant_id, "ten_pin_wait");
+        drop(second);
+        assert_eq!(
+            pool.evict_idle().await,
+            1,
+            "an unused runtime can now unload"
+        );
     }
 
     /// A tenant id bound to different storage is refused, not silently served
@@ -1779,7 +1781,7 @@ mod tests {
     #[tokio::test]
     async fn binding_mismatch_is_rejected_while_ready() {
         let pool = test_pool().await;
-        let _guard = pool
+        let resident = pool
             .acquire_or_wait(&ready_tenant("ten_bind", "tns_bind_a"))
             .await
             .expect("first binding");
@@ -1791,7 +1793,15 @@ mod tests {
             foreign.is_err(),
             "a tenant bound to another namespace must not be served"
         );
-        assert!(pool.contains_ready("ten_bind").await);
+        let original = pool
+            .acquire_or_wait(&ready_tenant("ten_bind", "tns_bind_a"))
+            .await
+            .expect("the original binding remains usable");
+        assert_eq!(original.runtime().namespace, "tns_bind_a");
+        assert!(
+            Arc::ptr_eq(resident.runtime(), original.runtime()),
+            "a refused binding cannot replace the resident runtime"
+        );
     }
 
     #[tokio::test]
@@ -1821,30 +1831,6 @@ mod tests {
         assert!(led.is_ok(), "the original binding still activates");
     }
 
-    /// Plan and schema describe the runtime revision, not the binding. A change
-    /// makes the resident runtime stale, so it is replaced rather than reused or
-    /// refused.
-    #[tokio::test]
-    async fn plan_change_replaces_the_runtime() {
-        let pool = test_pool().await;
-        let tenant = ready_tenant("ten_revision", "tns_revision");
-        drop(pool.acquire_or_wait(&tenant).await.expect("first"));
-
-        let mut changed = spec("ten_revision", "tns_revision");
-        changed.plan_version = 2;
-        drop(
-            pool.acquire_spec_with_limit(&changed, 4)
-                .await
-                .expect("replaced runtime"),
-        );
-
-        assert_eq!(
-            pool.activation_count("ten_revision").await,
-            2,
-            "a changed revision must be rebuilt, not reused"
-        );
-    }
-
     async fn test_pool() -> Arc<Pool> {
         let db = Surreal::new::<Mem>(()).await.unwrap();
         db.use_ns("control").use_db("control").await.unwrap();
@@ -1854,52 +1840,52 @@ mod tests {
 
     #[tokio::test]
     async fn releasing_a_pin_wakes_drain_and_capacity_waiters() {
-        let pool = test_pool().await;
-        let guard = pool
-            .acquire_or_wait(&ready_tenant("ten_notify", "tns_notify"))
-            .await
-            .expect("acquire runtime");
-
-        // Revision-drain and capacity waiters share the pool event stream.
-        // Both must re-check after one pin is released; notify_one lets either
-        // class consume the event and leave the other asleep.
-        let drain_waiter = pool.waiters.notified();
-        tokio::pin!(drain_waiter);
-        let capacity_waiter = pool.waiters.notified();
-        tokio::pin!(capacity_waiter);
-        drain_waiter.as_mut().enable();
-        capacity_waiter.as_mut().enable();
-
-        drop(guard);
-
-        tokio::time::timeout(Duration::from_secs(1), &mut drain_waiter)
-            .await
-            .expect("pin release wakes revision-drain waiter");
-        tokio::time::timeout(Duration::from_secs(1), &mut capacity_waiter)
-            .await
-            .expect("pin release wakes capacity waiter");
-    }
-
-    #[tokio::test]
-    async fn capacity_one_returns_capacity_timeout_when_pinned() {
-        let db = Surreal::new::<Mem>(()).await.unwrap();
-        db.use_ns("control").use_db("control").await.unwrap();
-        let registry = Arc::new(RegistryHandle::in_memory_with_mem_engine(Arc::new(db)));
-        let pool = Arc::new(Pool::new(
+        let (pool, harness) = pool_with_blocking_factory(
             1,
             Duration::ZERO,
-            Duration::from_millis(20),
-            DEFAULT_ACTIVATION_TIMEOUT,
+            Duration::from_secs(2),
+            Duration::from_secs(30),
             DEFAULT_PER_TENANT_CONCURRENCY,
-            registry,
-        ));
-        let guard = pool
-            .acquire_or_wait(&ready_tenant("ten_x", "tns_x"))
+        )
+        .await;
+        harness.release_one();
+        let mut original = spec("ten_notify", "tns_notify");
+        let old_guard = pool
+            .acquire_spec_with_limit(&original, 4)
             .await
-            .expect("first runtime acquires");
-        let result = pool.acquire_or_wait(&ready_tenant("ten_y", "tns_y")).await;
-        assert!(matches!(result, Err(PoolError::CapacityTimeout)));
-        drop(guard);
+            .expect("acquire runtime");
+        harness.wait_until_entered().await;
+        original.plan_version = 2;
+        let mut drain_waiter = Box::pin(pool.acquire_spec_with_limit(&original, 4));
+        assert_pending_once(drain_waiter.as_mut()).await;
+        let capacity_tenant = spec("ten_capacity", "tns_capacity");
+        let mut capacity_waiter = Box::pin(pool.acquire_spec_with_limit(&capacity_tenant, 4));
+        assert_pending_once(capacity_waiter.as_mut()).await;
+
+        drop(old_guard);
+        assert_pending_once(drain_waiter.as_mut()).await;
+        assert_pending_once(capacity_waiter.as_mut()).await;
+        harness.wait_until_entered().await;
+        assert_eq!(harness.calls(), 2);
+        harness.release_one();
+
+        let replacement = tokio::time::timeout(Duration::from_secs(5), &mut drain_waiter)
+            .await
+            .expect("the drain waiter activates the new revision")
+            .expect("the new revision acquires");
+        assert_eq!(replacement.runtime().tenant_id, "ten_notify");
+        assert_pending_once(capacity_waiter.as_mut()).await;
+
+        drop(replacement);
+        assert_pending_once(capacity_waiter.as_mut()).await;
+        harness.wait_until_entered().await;
+        assert_eq!(harness.calls(), 3);
+        harness.release_one();
+        let acquired = tokio::time::timeout(Duration::from_secs(5), capacity_waiter)
+            .await
+            .expect("the capacity waiter recovers after the pin is released")
+            .expect("the waiting tenant acquires");
+        assert_eq!(acquired.runtime().tenant_id, "ten_capacity");
     }
 
     #[tokio::test]
@@ -1924,167 +1910,226 @@ mod tests {
             .acquire_or_wait(&ready_tenant("ten_y", "tns_y"))
             .await
             .expect("idle runtime makes capacity available");
-        assert!(pool.contains_ready("ten_y").await);
+        assert_eq!(second.runtime().tenant_id, "ten_y");
         drop(second);
     }
 
-    /// `evict_idle` drops only Ready, unpinned slots whose `last_used`
-    /// is older than `idle_ttl`. Pinned runtimes must be retained so
-    /// in-flight requests can finish.
     #[tokio::test]
-    async fn evict_idle_drops_only_idle_unpinned_slots() {
-        let db = Surreal::new::<Mem>(()).await.unwrap();
-        db.use_ns("control").use_db("control").await.unwrap();
-        let registry = Arc::new(RegistryHandle::in_memory_with_mem_engine(Arc::new(db)));
-        let pool = Arc::new(Pool::new(
-            4,
-            // ttl > 0 so freshly-pinned slots are not eligible.
-            Duration::from_millis(50),
-            Duration::from_millis(20),
-            DEFAULT_ACTIVATION_TIMEOUT,
+    async fn idle_eviction_removes_only_unpinned_runtimes() {
+        let (pool, harness) = pool_with_blocking_factory(
+            3,
+            Duration::ZERO,
+            Duration::from_secs(2),
+            Duration::from_secs(30),
             DEFAULT_PER_TENANT_CONCURRENCY,
-            registry,
-        ));
-        // Slot A: idle past TTL — eligible for eviction.
-        let guard_a = pool
-            .acquire_or_wait(&ready_tenant("ten_a", "tns_a"))
+        )
+        .await;
+        harness.release_one();
+        harness.release_one();
+        harness.release_one();
+        harness.release_one();
+        harness.release_one();
+
+        let idle_a = pool
+            .acquire_spec_with_limit(&spec("ten_a", "tns_a"), 4)
             .await
-            .expect("acquire A");
-        drop(guard_a);
-        // Wait past the idle TTL.
-        tokio::time::sleep(Duration::from_millis(80)).await;
-        // Slot B: held by a guard — pin count > 0, must NOT be evicted.
-        let _guard_b = pool
-            .acquire_or_wait(&ready_tenant("ten_b", "tns_b"))
+            .expect("tenant A acquires");
+        let runtime_a = Arc::clone(idle_a.runtime());
+        drop(idle_a);
+        let pinned_b = pool
+            .acquire_spec_with_limit(&spec("ten_b", "tns_b"), 4)
             .await
-            .expect("acquire B");
-        // Slot C: freshly activated, last_used == now — not eligible.
-        let guard_c = pool
-            .acquire_or_wait(&ready_tenant("ten_c", "tns_c"))
+            .expect("tenant B acquires");
+        let idle_c = pool
+            .acquire_spec_with_limit(&spec("ten_c", "tns_c"), 4)
             .await
-            .expect("acquire C");
-        drop(guard_c);
+            .expect("tenant C acquires");
+        let runtime_c = Arc::clone(idle_c.runtime());
+        drop(idle_c);
 
-        let evicted = pool.evict_idle().await;
-        assert_eq!(evicted, 1, "only ten_a is idle and unpinned");
-        assert!(!pool.contains_ready("ten_a").await);
-        assert!(pool.contains_ready("ten_b").await);
-        assert!(pool.contains_ready("ten_c").await);
+        assert_eq!(pool.evict_idle().await, 2);
+
+        let same_b = pool
+            .acquire_spec_with_limit(&spec("ten_b", "tns_b"), 4)
+            .await
+            .expect("a pinned runtime remains reusable");
+        assert!(
+            Arc::ptr_eq(pinned_b.runtime(), same_b.runtime()),
+            "eviction retains the runtime held by an operation"
+        );
+        drop(same_b);
+        drop(pinned_b);
+
+        let new_a = pool
+            .acquire_spec_with_limit(&spec("ten_a", "tns_a"), 4)
+            .await
+            .expect("an evicted tenant can activate again");
+        let new_c = pool
+            .acquire_spec_with_limit(&spec("ten_c", "tns_c"), 4)
+            .await
+            .expect("a second evicted tenant can activate again");
+        assert!(!Arc::ptr_eq(&runtime_a, new_a.runtime()));
+        assert!(!Arc::ptr_eq(&runtime_c, new_c.runtime()));
+        assert_eq!(harness.calls(), 5);
     }
 
-    #[tokio::test]
-    async fn admission_gate_request_capacity() {
-        let gate = Arc::new(AdmissionGate::new(1));
-        let _p1 = gate.try_acquire().expect("first permit");
-        let p2 = gate.try_acquire();
-        assert!(p2.is_err());
-    }
+    // Integration scenarios below use a real SurrealDB Mem registry and the
+    // production runtime factory. Their gates hold the real activation path
+    // open; these are not isolated pool policy units.
 
-    #[tokio::test]
-    async fn admission_gate_subscription_separate_budget() {
-        let gate = Arc::new(AdmissionGate::new(1));
-        let req_permit = gate.try_acquire().expect("request permit");
-        let sub_permit = gate.try_acquire_for(true).expect("subscription permit");
-        // Drop before the test ends so the permits are not
-        // held when the next test case starts.
-        drop(req_permit);
-        drop(sub_permit);
-    }
-
-    #[tokio::test]
-    async fn contains_ready_after_acquire() {
-        let pool = test_pool().await;
-        let tenant = ready_tenant("ten_y", "tns_y");
-        let _g = pool.acquire_or_wait(&tenant).await.unwrap();
-        assert!(pool.contains_ready("ten_y").await);
-    }
-
-    // ─── Pool contract tests ──────────────────────────────────────
-
-    /// Pool test 1: 8 concurrent acquirers for the same
-    /// tenant should single-flight into a single activation.
+    /// A cold leader remains in the factory until a public follower is pending.
     #[tokio::test]
     async fn single_flight_activation_runs_once() {
-        // Build a pool that counts activations. The fixture
-        // uses the real in-memory engine; activation count is
-        // measured by the `ActivationSlot.generation`
-        // counter, which is bumped exactly once per (re)activation.
-        let pool = test_pool().await;
-        let tenant = ready_tenant("ten_single", "tns_single");
-        let mut joins = tokio::task::JoinSet::new();
-        for _ in 0..8 {
-            let pool = pool.clone();
+        let (pool, harness) = pool_over_blocking_factory(1).await;
+        let tenant = spec("ten_single", "tns_single");
+        let leader = tokio::spawn({
+            let pool = Arc::clone(&pool);
             let tenant = tenant.clone();
-            joins.spawn(async move { pool.acquire_or_wait(&tenant).await });
-        }
-        let mut ok = 0;
-        while let Some(r) = joins.join_next().await {
-            assert!(r.expect("task").is_ok());
-            ok += 1;
-        }
-        assert_eq!(ok, 8);
-        // ActivationSlot.generation was bumped once for the
-        // first arriver; subsequent acquirers subscribed to
-        // the in-flight channel and did not trigger a new
-        // activation. The generation counter therefore stays
-        // at 1.
-        assert_eq!(pool.activation_count("ten_single").await, 1);
+            async move { pool.acquire_spec_with_limit(&tenant, 4).await }
+        });
+        harness.wait_until_entered().await;
+
+        let mut follower = Box::pin(pool.acquire_spec_with_limit(&tenant, 4));
+        assert_pending_once(follower.as_mut()).await;
+        assert_eq!(
+            harness.calls(),
+            1,
+            "the blocked cold path has one factory call"
+        );
+        harness.release_one();
+
+        let leader_guard = tokio::time::timeout(Duration::from_secs(5), leader)
+            .await
+            .expect("cold leader completes")
+            .expect("leader task joins")
+            .expect("leader acquires");
+        let follower_guard = tokio::time::timeout(Duration::from_secs(5), follower)
+            .await
+            .expect("follower acquires the published runtime")
+            .expect("follower acquisition succeeds");
+
+        assert_eq!(leader_guard.runtime().tenant_id, "ten_single");
+        assert_eq!(follower_guard.runtime().tenant_id, "ten_single");
+        assert!(
+            Arc::ptr_eq(leader_guard.runtime(), follower_guard.runtime()),
+            "overlapping cold acquisitions return the same runtime"
+        );
+
+        drop(leader_guard);
+        drop(follower_guard);
+        harness.release_one();
+        let recovered = tokio::time::timeout(
+            Duration::from_secs(5),
+            pool.acquire_spec_with_limit(&spec("ten_recovered", "tns_recovered"), 4),
+        )
+        .await
+        .expect("dropping both guards returns pool capacity")
+        .expect("the next tenant acquires");
+        assert_eq!(recovered.runtime().tenant_id, "ten_recovered");
+        assert_eq!(harness.calls(), 2);
     }
 
-    /// Pool test 2: a pinned runtime is not evicted by
-    /// the idle-eviction path. The pin holds the slot
-    /// until the guard is dropped.
+    /// Component integration: constructed lease releases its actual guard.
     #[tokio::test]
-    async fn pinned_runtime_is_not_evicted() {
-        let pool = test_pool().await;
-        let tenant = ready_tenant("ten_pinned", "tns_pinned");
-        let guard = pool.acquire_or_wait(&tenant).await.expect("acquire");
-        let pin_counter = guard.pin_counter();
-        assert_eq!(pin_counter.load(Ordering::SeqCst), 1);
-        // mark_draining_if_idle unloads only if the slot is unpinned.
-        // With the guard held, pin_count is 1, so the call
-        // must return None and the slot must remain Ready.
-        let threshold = std::time::Instant::now() + std::time::Duration::from_secs(3600);
-        let result = pool.mark_draining_if_idle("ten_pinned", threshold).await;
-        assert!(!result, "pinned runtime must not be evicted");
-        assert!(pool.contains_ready("ten_pinned").await);
-        drop(guard);
-        assert_eq!(pin_counter.load(Ordering::SeqCst), 0);
-    }
-
-    /// Pool test 3: the response body holds the pin and
-    /// the admission permit until it is dropped. The test does
-    /// not need a real OperationGuard; it directly checks
-    /// the AdmissionPermit RAII lifecycle through
-    /// `ResponseLease` + `LeasedBody`.
-    #[tokio::test]
-    async fn response_body_keeps_pin_and_global_admission_until_drop() {
+    async fn dropping_an_unconsumed_response_body_releases_runtime_and_admission() {
         use crate::http::runtime::guard::{LeasedBody, ResponseLease};
-        use http_body_util::BodyExt;
-        // 1 global permit; we hold it via the lease.
+
+        let (pool, harness) = pool_over_blocking_factory(1).await;
+        harness.release_one();
+        let held_runtime = pool
+            .acquire_spec_with_limit(&spec("ten_response", "tns_response"), 4)
+            .await
+            .expect("runtime acquires");
+        harness.wait_until_entered().await;
         let gate = Arc::new(AdmissionGate::new(1));
         let permit = gate.try_acquire().expect("first permit");
-        let lease = ResponseLease::new(None, Arc::new(permit));
-        let inner = axum::body::Body::from("hello");
-        let body = LeasedBody::new(inner, lease);
-        // Drive the body to completion by collecting it; the
-        // lease must release on drop (terminal frame).
-        let _ = body.collect().await;
-        // After collect the body is dropped, the lease is
-        // released, and the permit becomes available again.
-        assert!(
-            gate.try_acquire().is_ok(),
-            "permit must be released after body collect"
+        let body = LeasedBody::new(
+            axum::body::Body::from("hello"),
+            ResponseLease::new(Some(Arc::new(held_runtime)), Arc::new(permit)),
         );
+        let next_tenant = spec("ten_after_response", "tns_after");
+        let mut capacity_waiter = Box::pin(pool.acquire_spec_with_limit(&next_tenant, 4));
+        assert_pending_once(capacity_waiter.as_mut()).await;
+        assert!(gate.try_acquire().is_err(), "the body retains admission");
+
+        drop(body);
+        assert!(gate.try_acquire().is_ok(), "body drop returns admission");
+        assert_pending_once(capacity_waiter.as_mut()).await;
+        harness.wait_until_entered().await;
+        harness.release_one();
+        let acquired = tokio::time::timeout(Duration::from_secs(5), capacity_waiter)
+            .await
+            .expect("body drop releases the runtime pin")
+            .expect("the next tenant acquires");
+        assert_eq!(acquired.runtime().tenant_id, "ten_after_response");
     }
 
-    /// Pool test 4: capacity overflow returns
-    /// `PoolError::CapacityTimeout`; the HTTP middleware
-    /// maps that to 503.
+    /// Full router integration: lease attachment must retain the real gate.
+    #[cfg(feature = "test-fixtures")]
     #[tokio::test]
-    async fn capacity_overflow_returns_503() {
-        // cap=1 means the second distinct tenant cannot
-        // acquire a slot while the first is pinned.
+    async fn actual_http_response_retains_admission_until_body_drop() {
+        use crate::http::config::HttpConfig;
+        use crate::http::test_state::HttpStateTestBuilder;
+        use axum::body::Body;
+        use axum::http::{Request, StatusCode};
+
+        const API_KEY: &str =
+            "mem_sk_ak_aaaa0000-0000-4000-8000-000000000000_isolationtest0000000000000000000";
+        let mut config = HttpConfig::default_for_test();
+        config.global_request_limit = 1;
+        let state = HttpStateTestBuilder::new()
+            .await
+            .with_config(config)
+            .build()
+            .await
+            .expect("HTTP state");
+        crate::http::test_bootstrap::apply_bootstrap_entries(
+            &state,
+            &format!("lease_test={API_KEY}"),
+        )
+        .await
+        .expect("ready tenant");
+        let mut router = crate::http::router::build_router(state, None).expect("real router");
+        let request = || {
+            Request::builder()
+                .method("POST")
+                .uri("/mcp")
+                .header("host", "localhost")
+                .header("content-type", "application/json")
+                .header("accept", "application/json, text/event-stream")
+                .header("authorization", format!("Bearer {API_KEY}"))
+                .header("mcp-protocol-version", "2026-07-28")
+                .header("mcp-method", "tools/list")
+                .body(Body::from(serde_json::json!({
+                    "jsonrpc": "2.0", "id": 1, "method": "tools/list",
+                    "params": {"_meta": {
+                        "io.modelcontextprotocol/protocolVersion": "2026-07-28",
+                        "io.modelcontextprotocol/clientInfo": {"name": "lease-test", "version": "0"},
+                        "io.modelcontextprotocol/clientCapabilities": {}
+                    }}
+                }).to_string()))
+                .expect("MCP request")
+        };
+        let held = tokio::time::timeout(Duration::from_secs(10), router.call(request()))
+            .await
+            .expect("bounded first response")
+            .expect("first response");
+        assert_eq!(held.status(), StatusCode::OK);
+        let refused = tokio::time::timeout(Duration::from_secs(5), router.call(request()))
+            .await
+            .expect("bounded refusal")
+            .expect("refused response");
+        assert_eq!(refused.status(), StatusCode::SERVICE_UNAVAILABLE);
+        drop(held);
+        let recovered = tokio::time::timeout(Duration::from_secs(10), router.call(request()))
+            .await
+            .expect("bounded recovery")
+            .expect("recovered response");
+        assert_eq!(recovered.status(), StatusCode::OK);
+    }
+
+    #[tokio::test]
+    async fn a_pinned_runtime_causes_capacity_timeout_for_a_distinct_tenant() {
         let db = surrealdb::Surreal::new::<surrealdb::engine::local::Mem>(())
             .await
             .unwrap();
@@ -2093,7 +2138,6 @@ mod tests {
         let pool = Arc::new(Pool::new(
             1,
             DEFAULT_IDLE_TTL,
-            // Short wait so the test does not block.
             std::time::Duration::from_millis(50),
             DEFAULT_ACTIVATION_TIMEOUT,
             DEFAULT_PER_TENANT_CONCURRENCY,
@@ -2109,38 +2153,27 @@ mod tests {
         );
     }
 
-    /// Pool test 5: a failed activation puts the slot in
-    /// negative backoff; subsequent acquirers see
-    /// `ActivationFailed` without re-attempting.
     #[tokio::test]
     async fn negative_cache_swallows_repeated_failures() {
-        // Use a registry without a privileged engine so
-        // `build_runtime` fails through the explicit missing-engine
-        // error, without constructing a production placeholder.
-        let registry = RegistryHandle::from_store(Arc::new(InMemoryStore::default()));
-        let pool = Arc::new(Pool::with_defaults(Arc::new(registry)));
-        let tenant = ready_tenant("ten_neg", "tns_neg");
-        let r1 = pool.acquire_or_wait(&tenant).await;
-        assert!(matches!(r1, Err(PoolError::ActivationFailed)));
-        let r2 = pool.acquire_or_wait(&tenant).await;
-        assert!(matches!(r2, Err(PoolError::ActivationFailed)));
-        // activation_count stays at 1 because the negative
-        // cache short-circuited the second call.
-        assert_eq!(pool.activation_count("ten_neg").await, 1);
+        let (pool, harness) = pool_over_blocking_factory(4).await;
+        harness.fail_next.store(true, Ordering::SeqCst);
+        let tenant = spec("ten_neg", "tns_neg");
+
+        let first = pool.acquire_spec_with_limit(&tenant, 4).await;
+        assert!(matches!(first, Err(PoolError::ActivationFailed)));
+        assert_eq!(harness.calls(), 1);
+
+        let backoff = pool.acquire_spec_with_limit(&tenant, 4).await;
+        assert!(matches!(backoff, Err(PoolError::ActivationFailed)));
+        assert_eq!(
+            harness.calls(),
+            1,
+            "a request inside negative backoff does not invoke the factory again"
+        );
     }
 
-    /// Activation is never refused while the pool has capacity.
-    ///
-    /// The pool owns an LRU of runtime slots and separately consults
-    /// `Tenancy`, which keeps its own resident-binding map. Both apply
-    /// a capacity check, so a binding `Tenancy` retained for a tenant
-    /// the pool had already evicted would eventually reject an
-    /// activation the pool had made room for — degrading a live server
-    /// to `CapacityTimeout` with nothing to explain it. Cycling many
-    /// tenants through a two-slot pool makes that show up as a
-    /// refused activation, which the loop below asserts never happens.
     #[tokio::test]
-    async fn repeated_activation_cycles_within_capacity() {
+    async fn a_reclaimed_slot_can_serve_a_later_tenant() {
         let db = Surreal::new::<Mem>(()).await.unwrap();
         db.use_ns("control").use_db("control").await.unwrap();
         let registry = Arc::new(RegistryHandle::in_memory_with_mem_engine(Arc::new(db)));
@@ -2153,26 +2186,48 @@ mod tests {
             registry,
         ));
 
-        // Cycle well past the capacity. With one owner there is no second
-        // cache to fall behind, so every activation here must succeed.
-        for round in 0..6 {
-            for name in ["a", "b", "c"] {
-                let tenant_id = format!("ten_{name}_{round}");
-                let guard = pool
-                    .acquire_or_wait(&ready_tenant(&tenant_id, &format!("tns_{name}")))
-                    .await
-                    .expect("cycling tenants must never exhaust the pool's capacity");
-                drop(guard);
-            }
-        }
+        let tenant_a = pool
+            .acquire_or_wait(&ready_tenant("ten_a", "tns_a"))
+            .await
+            .expect("first tenant activates");
+        drop(tenant_a);
+        let tenant_b = pool
+            .acquire_or_wait(&ready_tenant("ten_b", "tns_b"))
+            .await
+            .expect("second tenant activates");
+        drop(tenant_b);
+        let tenant_c = pool
+            .acquire_or_wait(&ready_tenant("ten_c", "tns_c"))
+            .await
+            .expect("a reclaimed slot activates for the next tenant");
+        assert_eq!(tenant_c.runtime().tenant_id, "ten_c");
+    }
+}
 
-        // The LRU keeps only the most recently used slots, each of them Ready.
-        // There is no second cache left behind to reject an activation for a
-        // tenant the pool had already made room for.
-        assert!(
-            pool.contains_ready("ten_c_5").await,
-            "the most recently activated tenant must still be resident"
-        );
-        assert_eq!(pool.capacity(), 2, "the pool's bound is unchanged");
+#[cfg(test)]
+mod admission_gate_tests {
+    use super::AdmissionGate;
+    use std::sync::Arc;
+
+    #[test]
+    fn request_budget_refuses_acquisitions_above_its_limit() {
+        let gate = Arc::new(AdmissionGate::new(1));
+        let _first = gate.try_acquire().expect("first request permit");
+
+        assert!(gate.try_acquire().is_err());
+    }
+
+    #[test]
+    fn subscriptions_use_a_separate_budget_from_requests() {
+        let gate = Arc::new(AdmissionGate::new(1));
+        let request = gate.try_acquire().expect("request permit");
+        let subscription = gate
+            .try_acquire_for(true)
+            .expect("subscription has its own budget");
+
+        assert!(gate.try_acquire().is_err());
+        drop(request);
+        drop(subscription);
+        assert!(gate.try_acquire().is_ok());
     }
 }

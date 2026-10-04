@@ -410,7 +410,13 @@ impl NerArtifactStore {
                 Ok(Some(lease)) => break lease,
                 Ok(None) => {
                     match Lease::read(&lease_path) {
-                        Ok(Some(held)) if lease::can_reclaim(&held, self.clock.now_secs()) => {
+                        Ok(Some(held))
+                            if lease::can_reclaim(
+                                &held,
+                                self.clock.now_secs(),
+                                lease::process_is_live,
+                            ) =>
+                        {
                             // Conservative reclaim: expired heartbeat + dead process.
                             let _ = std::fs::remove_file(&lease_path);
                             continue;
@@ -790,7 +796,7 @@ impl NerArtifactStore {
                 Ok(None) => {
                     // Check whether we can reclaim an expired heartbeat.
                     if let Ok(Some(held)) = Lease::read(lease_path)
-                        && lease::can_reclaim(&held, self.clock.now_secs())
+                        && lease::can_reclaim(&held, self.clock.now_secs(), lease::process_is_live)
                     {
                         let _ = std::fs::remove_file(lease_path);
                         continue;

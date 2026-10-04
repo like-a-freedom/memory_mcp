@@ -125,6 +125,14 @@ mod tests {
         Account, AccountStatus, NamespaceBinding, Tenant, TenantStatus,
     };
     use crate::http::registry::storage::{AccountStore, InMemoryStore, TenantStore};
+    use crate::http::registry::surreal_store::SurrealRegistryStore;
+    use crate::tenancy::api::resolve_tenant_runtime;
+
+    fn fixed_time() -> chrono::DateTime<chrono::Utc> {
+        chrono::DateTime::parse_from_rfc3339("2026-10-03T12:00:00Z")
+            .expect("fixed timestamp")
+            .with_timezone(&chrono::Utc)
+    }
 
     /// A resolver over a store holding `acc_1` and its tenant in `status`.
     async fn resolver_with(status: TenantStatus) -> RegistryTenantResolver {
@@ -134,7 +142,7 @@ mod tests {
                 id: "acc_1".to_string(),
                 status: AccountStatus::Active,
                 tenant_id: "ten_1".to_string(),
-                created_at: chrono::Utc::now(),
+                created_at: fixed_time(),
             })
             .await
             .expect("seed account");
@@ -150,12 +158,48 @@ mod tests {
                 schema_version: 2,
                 retry_stage: None,
                 provisioning_lease: None,
-                created_at: chrono::Utc::now(),
+                created_at: fixed_time(),
                 version: 0,
             })
             .await
             .expect("seed tenant");
         RegistryTenantResolver::new(Arc::new(AccountResolver::new(store)))
+    }
+
+    async fn surreal_resolver_with(status: TenantStatus) -> RegistryTenantResolver {
+        let store = Arc::new(
+            SurrealRegistryStore::connect_in_memory("tenancy_resolution", "registry")
+                .await
+                .expect("migrated registry"),
+        );
+        store
+            .write_account(&Account {
+                id: "acc_1".to_string(),
+                status: AccountStatus::Active,
+                tenant_id: "ten_1".to_string(),
+                created_at: fixed_time(),
+            })
+            .await
+            .expect("seed account");
+        store
+            .write_tenant(&Tenant {
+                id: "ten_1".to_string(),
+                status,
+                namespace_binding: NamespaceBinding {
+                    namespace: "tns_1".to_string(),
+                    database: "memory".to_string(),
+                },
+                plan_version: 1,
+                schema_version: 2,
+                retry_stage: None,
+                provisioning_lease: None,
+                created_at: fixed_time(),
+                version: 0,
+            })
+            .await
+            .expect("seed tenant");
+        let tenant_store: Arc<dyn TenantStore> = store;
+        RegistryTenantResolver::new(Arc::new(AccountResolver::new(tenant_store)))
     }
 
     /// A resolver over a store that holds no tenants at all.
@@ -219,18 +263,27 @@ mod tests {
         }
     }
 
+    /// Integration of the actual registry adapter and owner resolver: the
+    /// maintenance binding reaches the deleting row while request resolution
+    /// refuses that same row.
     #[tokio::test]
-    async fn a_deleting_tenant_is_refused_on_the_request_path() {
+    async fn a_deleting_tenant_is_maintenance_visible_but_refused_to_requests() {
         // Deleting is not a provisioning status, so the request path refuses it
         // rather than resolving it — a request must not reach a tenant that is
         // mid-deletion.
-        let resolver = resolver_with(TenantStatus::Deleting).await;
+        let resolver = surreal_resolver_with(TenantStatus::Deleting).await;
 
-        let observed = resolver.resolve_tenant("acc_1").await;
+        let binding = resolver
+            .resolve_tenant_for_maintenance("ten_1")
+            .await
+            .expect("maintenance can bind the deleting tenant");
+        assert_eq!(binding.status, TenantLifecycleStatus::Deleting);
+        assert_eq!(binding.spec.namespace, "tns_1");
 
+        let request = resolve_tenant_runtime(&resolver, "acc_1").await;
         assert!(
-            observed.is_err(),
-            "a deleting tenant must not resolve for a request"
+            request.is_err(),
+            "the request path must still refuse deletion"
         );
     }
 
@@ -244,30 +297,6 @@ mod tests {
             observed.expect("resolution succeeds"),
             TenantResolution::NotFound
         ));
-    }
-
-    #[tokio::test]
-    async fn a_ready_tenant_is_visible_to_the_maintenance_path() {
-        let resolver = resolver_with(TenantStatus::Ready).await;
-
-        let observed = resolver
-            .resolve_tenant_for_maintenance("ten_1")
-            .await
-            .expect("maintenance resolves");
-
-        assert_eq!(observed.status, TenantLifecycleStatus::Ready);
-    }
-
-    #[tokio::test]
-    async fn a_deleting_tenant_is_visible_to_the_maintenance_path() {
-        let resolver = resolver_with(TenantStatus::Deleting).await;
-
-        let observed = resolver
-            .resolve_tenant_for_maintenance("ten_1")
-            .await
-            .expect("deletion recovery must be able to see the tenant");
-
-        assert_eq!(observed.status, TenantLifecycleStatus::Deleting);
     }
 
     #[tokio::test]

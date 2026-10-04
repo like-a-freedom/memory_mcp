@@ -57,7 +57,7 @@ pub enum CandidateSkipReason {
 /// not reject a file that is physically inside the inbox; the returned
 /// relative path is always lexical (never canonical), preserving the
 /// configured lineage identity.
-pub fn normalized_relative_path(inbox: &Path, path: &Path) -> Result<String, MemoryError> {
+fn normalized_relative_path(inbox: &Path, path: &Path) -> Result<String, MemoryError> {
     let relative = match path.strip_prefix(inbox) {
         Ok(relative) => relative.to_path_buf(),
         Err(_) => {
@@ -281,6 +281,8 @@ pub async fn prepare_candidate(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::future::Future;
+    use std::task::Poll;
     use tempfile::tempdir;
 
     fn config_for(dir: &std::path::Path) -> FsWatchConfig {
@@ -293,26 +295,72 @@ mod tests {
         tokio_util::sync::CancellationToken::new()
     }
 
-    #[test]
-    fn normalized_relative_path_uses_forward_slashes() {
-        let root = Path::new("/tmp/inbox");
-        let nested = root.join("docs").join("spec.md");
-        assert_eq!(
-            normalized_relative_path(root, &nested).unwrap(),
-            "docs/spec.md"
-        );
+    // Integration scenario: relative lineage comes from candidate preparation
+    // over a real nested inbox path.
+    #[tokio::test]
+    async fn prepared_candidate_uses_forward_slashes_in_relative_lineage() {
+        let dir = tempdir().expect("temp");
+        let nested = dir.path().join("docs");
+        std::fs::create_dir_all(&nested).expect("create nested inbox path");
+        let file = nested.join("spec.md");
+        std::fs::write(&file, "stable document").expect("write file");
+        let config = config_for(dir.path());
+        let cancel = no_cancel();
+
+        let outcome = prepare_candidate(
+            &config,
+            &file,
+            Some((Duration::ZERO, 1, Duration::from_secs(1))),
+            &cancel,
+        )
+        .await
+        .expect("candidate preparation");
+        let CandidateOutcome::Ready(prepared) = outcome else {
+            panic!("expected prepared candidate");
+        };
+
+        assert_eq!(prepared.relative_path, "docs/spec.md");
+        assert_eq!(prepared.lineage, "fs:docs/spec.md");
     }
 
-    #[test]
-    fn normalized_relative_path_rejects_escapes() {
-        let root = Path::new("/tmp/inbox");
-        let outside = Path::new("/etc/passwd");
-        let err = normalized_relative_path(root, outside).unwrap_err();
-        assert!(err.to_string().contains("not inside inbox root"));
+    // Integration scenario: a real file outside the inbox is refused by the
+    // candidate interface's canonical containment check.
+    #[tokio::test]
+    async fn candidate_outside_inbox_root_is_refused() {
+        let parent = tempdir().expect("temp parent");
+        let inbox = parent.path().join("inbox");
+        std::fs::create_dir(&inbox).expect("create inbox");
+        let outside_root = tempdir().expect("temp outside");
+        let outside = outside_root.path().join("secret.md");
+        std::fs::write(&outside, "outside").expect("write outside file");
+        let config = config_for(&inbox);
 
-        let escape = root.join("..").join("secret.md");
-        let err = normalized_relative_path(root, &escape).unwrap_err();
-        assert!(err.to_string().contains("escapes"));
+        let result = prepare_candidate(&config, &outside, None, &no_cancel()).await;
+
+        assert!(matches!(
+            result,
+            Err(MemoryError::Validation(message)) if message.contains("not inside inbox root")
+        ));
+    }
+
+    // Integration scenario: lexical parent traversal is rejected before a
+    // file outside the inbox can be ingested.
+    #[tokio::test]
+    async fn candidate_parent_traversal_is_refused() {
+        let parent = tempdir().expect("temp parent");
+        let inbox = parent.path().join("inbox");
+        std::fs::create_dir(&inbox).expect("create inbox");
+        let outside = parent.path().join("secret.md");
+        std::fs::write(&outside, "outside").expect("write outside file");
+        let escape = inbox.join("..").join("secret.md");
+        let config = config_for(&inbox);
+
+        let result = prepare_candidate(&config, &escape, None, &no_cancel()).await;
+
+        assert!(matches!(
+            result,
+            Err(MemoryError::Validation(message)) if message.contains("escapes")
+        ));
     }
 
     #[test]
@@ -406,67 +454,51 @@ mod tests {
         assert_eq!(second_prep.lineage, "fs:b.md");
     }
 
+    // Integration scenario: controlled file revisions are interleaved with
+    // explicit candidate polls instead of racing a writer against sleeps.
     #[tokio::test]
-    async fn still_changing_file_waits_for_stability() {
+    async fn candidate_waits_until_two_samples_match() {
         let dir = tempdir().expect("temp");
-        let file = dir.path().join("growing.txt");
+        let file = dir.path().join("changing.md");
         std::fs::write(&file, "one").expect("write");
-
         let config = config_for(dir.path());
-        // The writer mutates the file continuously; the candidate must not be
-        // ready while the writer is still active, and must succeed only after
-        // the writer stops.
-        let stop_writer = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
-        let file_for_writer = file.clone();
-        let stop_for_writer = stop_writer.clone();
-        let writer = tokio::spawn(async move {
-            let mut index = 0u32;
-            while !stop_for_writer.load(std::sync::atomic::Ordering::SeqCst) {
-                index += 1;
-                std::fs::write(&file_for_writer, format!("content {index}")).expect("rewrite");
-                tokio::time::sleep(std::time::Duration::from_millis(10)).await;
-            }
-        });
+        let interval = Duration::from_millis(10);
+        let cancel = no_cancel();
+        let mut candidate = Box::pin(prepare_candidate(
+            &config,
+            &file,
+            Some((interval, 2, Duration::from_secs(1))),
+            &cancel,
+        ));
 
-        let candidate = tokio::spawn({
-            let config = config.clone();
-            let file = file.clone();
-            let cancel = no_cancel();
-            async move {
-                prepare_candidate(
-                    &config,
-                    &file,
-                    Some((
-                        std::time::Duration::from_millis(40),
-                        2,
-                        std::time::Duration::from_secs(10),
-                    )),
-                    &cancel,
-                )
-                .await
-                .expect("outcome")
-            }
-        });
+        let first_sample =
+            std::future::poll_fn(|context| Poll::Ready(candidate.as_mut().poll(context))).await;
+        assert!(first_sample.is_pending(), "one sample is not yet stable");
 
-        // While the writer is active, the candidate must not resolve.
-        tokio::time::sleep(std::time::Duration::from_millis(200)).await;
+        std::fs::write(&file, "version two").expect("rewrite file");
+        tokio::time::timeout(Duration::from_secs(1), tokio::time::sleep(interval))
+            .await
+            .expect("first stability interval");
+        let changed_sample =
+            std::future::poll_fn(|context| Poll::Ready(candidate.as_mut().poll(context))).await;
         assert!(
-            !candidate.is_finished(),
-            "candidate must not resolve while the file is still changing"
+            changed_sample.is_pending(),
+            "a changed sample restarts the consecutive-match requirement"
         );
 
-        stop_writer.store(true, std::sync::atomic::Ordering::SeqCst);
-        writer.await.expect("writer stopped");
-
-        let outcome = candidate
+        tokio::time::timeout(Duration::from_secs(1), tokio::time::sleep(interval))
             .await
-            .expect("candidate resolved after writer stopped");
+            .expect("second stability interval");
+        let outcome = tokio::time::timeout(Duration::from_secs(1), candidate)
+            .await
+            .expect("candidate resolves within the bound")
+            .expect("candidate preparation");
         let CandidateOutcome::Ready(prepared) = outcome else {
             panic!("expected ready after stability");
         };
         assert!(
-            prepared.prepared_content.contains("content"),
-            "expected prepared content to include the writer output, got {:?}",
+            prepared.prepared_content.ends_with("version two"),
+            "prepared content must come from the stable second revision: {:?}",
             prepared.prepared_content
         );
     }
@@ -479,24 +511,22 @@ mod tests {
 
         let config = config_for(dir.path());
         let cancel = tokio_util::sync::CancellationToken::new();
-        let cancel_for_task = cancel.clone();
-        let handle = tokio::spawn(async move {
-            prepare_candidate(
-                &config,
-                &file,
-                Some((
-                    std::time::Duration::from_millis(50),
-                    2,
-                    std::time::Duration::from_secs(30),
-                )),
-                &cancel_for_task,
-            )
-            .await
-            .expect("outcome")
-        });
-        tokio::time::sleep(std::time::Duration::from_millis(30)).await;
+        let interval = Duration::from_millis(10);
+        let mut candidate = Box::pin(prepare_candidate(
+            &config,
+            &file,
+            Some((interval, 2, Duration::from_secs(1))),
+            &cancel,
+        ));
+        let in_progress =
+            std::future::poll_fn(|context| Poll::Ready(candidate.as_mut().poll(context))).await;
+        assert!(in_progress.is_pending(), "candidate reached stabilization");
         cancel.cancel();
-        match handle.await.expect("task") {
+        let outcome = tokio::time::timeout(Duration::from_secs(1), candidate)
+            .await
+            .expect("cancellation is observed within the bound")
+            .expect("candidate preparation");
+        match outcome {
             CandidateOutcome::Skipped(reason) => {
                 assert_eq!(reason, CandidateSkipReason::Interrupted)
             }

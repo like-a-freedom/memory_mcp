@@ -12,7 +12,7 @@ use std::fs;
 use std::path::Path;
 use std::sync::{Arc, Mutex};
 
-use chrono::{DateTime, Utc};
+use chrono::{DateTime, TimeZone, Utc};
 use memory_mcp::MemoryError;
 use memory_mcp::embedding::api::{
     CanonicalVectorPort, EmbeddingGeneration, GenerationOutcome, SkipReason, StoredVector,
@@ -25,6 +25,7 @@ struct WriteCall {
     fact_id: String,
     vector: Vec<f64>,
     signature: String,
+    at: DateTime<Utc>,
     has_model: bool,
     has_dimension: bool,
     policy: VectorWritePolicy,
@@ -79,13 +80,14 @@ impl CanonicalVectorPort for RecordingPort {
         fact_id: &str,
         vector: Vec<f64>,
         identity: VectorIdentity,
-        _at: DateTime<Utc>,
+        at: DateTime<Utc>,
         policy: VectorWritePolicy,
     ) -> Result<VectorApplication, MemoryError> {
         self.calls.lock().expect("calls lock").push(WriteCall {
             fact_id: fact_id.to_owned(),
             vector,
             signature: identity.signature.clone(),
+            at,
             has_model: identity.model.is_some(),
             has_dimension: true,
             policy,
@@ -105,6 +107,12 @@ fn identity(signature: &str) -> VectorIdentity {
         dimension: 3,
         signature: signature.into(),
     }
+}
+
+fn fixed_at() -> DateTime<Utc> {
+    Utc.with_ymd_and_hms(2026, 10, 3, 12, 0, 0)
+        .single()
+        .expect("fixed UTC time")
 }
 
 // ---------------------------------------------------------------------------
@@ -165,6 +173,7 @@ async fn a_disabled_provider_skips_the_write_and_reports_why() {
         "fact:f1",
         "note\nhello",
         &identity("sig-a"),
+        || panic!("a skipped generation must not consult the write clock"),
         VectorWritePolicy::FillMissing,
     )
     .await
@@ -195,6 +204,7 @@ async fn a_disabled_provider_skips_the_write_and_reports_why() {
 async fn a_generated_vector_is_written_under_the_named_policy() {
     let port = RecordingPort::new();
     let generator = RecordingGenerator::generating(vec![0.4, 0.5, 0.6]);
+    let at = fixed_at();
 
     let applied = generate_and_update(
         generator.as_ref(),
@@ -202,6 +212,7 @@ async fn a_generated_vector_is_written_under_the_named_policy() {
         "fact:f1",
         "note\nhello",
         &identity("sig-a"),
+        move || at,
         VectorWritePolicy::FillMissing,
     )
     .await
@@ -212,6 +223,7 @@ async fn a_generated_vector_is_written_under_the_named_policy() {
     assert_eq!(calls.len(), 1, "exactly one owner write");
     assert_eq!(calls[0].fact_id, "fact:f1");
     assert_eq!(calls[0].vector, vec![0.4, 0.5, 0.6]);
+    assert_eq!(calls[0].at, at);
     assert_eq!(calls[0].policy, VectorWritePolicy::FillMissing);
 }
 
@@ -230,6 +242,7 @@ async fn a_mis_dimensioned_vector_is_refused_before_the_write() {
         "fact:f1",
         "note\nhello",
         &identity("sig-a"),
+        fixed_at,
         VectorWritePolicy::FillMissing,
     )
     .await;
@@ -253,25 +266,32 @@ async fn a_mis_dimensioned_vector_is_refused_before_the_write() {
 /// all: it needs no embedded database and no provider, because the decision is
 /// a pure function over an outcome.
 #[test]
-fn a_backfill_continues_on_a_write_and_halts_on_a_skip() {
+fn a_backfill_continues_after_a_write() {
     use memory_mcp::embedding::api::{BatchAdvance, batch_advance};
 
     assert_eq!(
         batch_advance(VectorApplication::Applied),
-        BatchAdvance::Continue,
-        "a written row advances the batch"
+        BatchAdvance::Continue
     );
+}
+
+#[test]
+fn a_backfill_continues_after_an_already_current_vector() {
+    use memory_mcp::embedding::api::{BatchAdvance, batch_advance};
+
     assert_eq!(
         batch_advance(VectorApplication::AlreadyCurrent),
-        BatchAdvance::Continue,
-        "a row that was already current has advanced the batch by not needing to"
+        BatchAdvance::Continue
     );
+}
+
+#[test]
+fn a_backfill_halts_after_a_skip() {
+    use memory_mcp::embedding::api::{BatchAdvance, batch_advance};
+
     assert_eq!(
         batch_advance(VectorApplication::Skipped(SkipReason::ProviderDisabled)),
         BatchAdvance::Halt(SkipReason::ProviderDisabled),
-        "a skip advances nothing, and a disabled provider will skip every \
-         remaining row too — so the loop must stop rather than walk the table \
-         learning the same thing once per fact"
     );
 }
 
@@ -288,6 +308,8 @@ fn a_backfill_continues_on_a_write_and_halts_on_a_skip() {
 /// a loophole: the port's adapters live there, and the input limit, the
 /// enabled check and the stage timer are all in the same module. A scan that
 /// also rejected the adapters would be a scan nobody could satisfy.
+// Architecture lint: this source scan enforces caller policy; it is not
+// functional evidence for the production embedding use case.
 #[test]
 fn no_caller_outside_embedding_bypasses_the_generation_port() {
     let manifest = Path::new(env!("CARGO_MANIFEST_DIR"));
@@ -370,7 +392,7 @@ async fn backfill_never_overwrites_a_fact_that_already_has_a_vector() {
         "fact:f1",
         vec![0.1, 0.2, 0.3],
         &identity("new-sig"),
-        Utc::now(),
+        fixed_at(),
         VectorWritePolicy::FillMissing,
     )
     .await
@@ -393,7 +415,7 @@ async fn backfill_fills_a_fact_that_has_no_vector_yet() {
         "fact:f1",
         vec![0.1, 0.2, 0.3],
         &identity("sig-a"),
-        Utc::now(),
+        fixed_at(),
         VectorWritePolicy::FillMissing,
     )
     .await
@@ -411,7 +433,7 @@ async fn reembed_rewrites_a_stale_vector_but_keeps_the_current_one() {
         "fact:stale",
         vec![0.7, 0.8, 0.9],
         &identity("sig-b"),
-        Utc::now(),
+        fixed_at(),
         VectorWritePolicy::ReplaceStale,
     )
     .await
@@ -423,7 +445,7 @@ async fn reembed_rewrites_a_stale_vector_but_keeps_the_current_one() {
         "fact:stale",
         vec![0.1, 0.1, 0.1],
         &identity("sig-b"),
-        Utc::now(),
+        fixed_at(),
         VectorWritePolicy::ReplaceStale,
     )
     .await
@@ -451,7 +473,7 @@ async fn the_policy_is_recorded_on_the_owner_write() {
         "fact:f1",
         vec![0.1, 0.2, 0.3],
         &identity("sig-a"),
-        Utc::now(),
+        fixed_at(),
         VectorWritePolicy::FillMissing,
     )
     .await

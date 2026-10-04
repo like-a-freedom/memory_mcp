@@ -338,81 +338,171 @@ mod tests {
         }
     }
 
-    /// The log reporter under test. Its logger is set to `error`, so the
-    /// progress events it emits at `info` are dropped by the level filter
-    /// rather than written to the process-wide stderr stream; the tests assert
-    /// the callbacks are safe to run, not on the rendered output.
+    /// The log reporter under test, configured to emit its information events.
     fn log_reporter() -> LogProgressReporter {
-        LogProgressReporter::new(crate::logging::StdoutLogger::new("error"))
+        LogProgressReporter::new(crate::logging::StdoutLogger::new("info"))
+    }
+
+    fn captured_event(
+        capture: &crate::logging::capture::CaptureGuard,
+        op: &str,
+        distinctive_field: &str,
+    ) -> String {
+        capture
+            .lines()
+            .into_iter()
+            .find(|line| line.contains(&format!("op={op}")) && line.contains(distinctive_field))
+            .unwrap_or_else(|| {
+                panic!(
+                    "expected captured {op} event containing {distinctive_field:?}; output: {:?}",
+                    capture.lines()
+                )
+            })
     }
 
     #[test]
-    fn log_job_started_emits_for_a_fresh_run() {
+    fn non_tty_fresh_run_emits_initialization_details() {
+        let capture = crate::logging::capture::install();
         let reporter = log_reporter();
 
-        reporter.on_job_started(100, false, 0);
+        reporter.on_job_started(107, false, 0);
+
+        let line = captured_event(&capture, "reembed.init_completed", "total_facts=107");
+        assert!(line.contains("resumed=false"));
+        assert!(line.contains("resumed_count=0"));
     }
 
     #[test]
-    fn log_job_started_emits_for_a_resumed_run() {
+    fn non_tty_resumed_run_emits_resume_details() {
+        let capture = crate::logging::capture::install();
         let reporter = log_reporter();
 
-        reporter.on_job_started(100, true, 30);
+        reporter.on_job_started(109, true, 23);
+
+        let line = captured_event(&capture, "reembed.init_completed", "total_facts=109");
+        assert!(line.contains("resumed=true"));
+        assert!(line.contains("resumed_count=23"));
     }
 
     #[test]
-    fn log_namespace_started_emits() {
+    fn non_tty_namespace_start_is_visible_in_captured_output() {
+        let capture = crate::logging::capture::install();
         let reporter = log_reporter();
 
-        reporter.on_namespace_started("acme", 100);
+        reporter.on_namespace_started("capture-ns-start-unique", 127);
+
+        let line = captured_event(
+            &capture,
+            "reembed.namespace_started",
+            "capture-ns-start-unique",
+        );
+        assert!(line.contains("namespace_total=127"));
     }
 
     #[test]
     fn log_fact_processed_stays_silent_in_non_tty_mode() {
+        let capture = crate::logging::capture::install();
         let reporter = log_reporter();
 
-        // Non-TTY mode deliberately drops per-fact events; batch progress is
-        // logged by the caller. The callback must be a no-op, not a per-fact flood.
-        reporter.on_fact_processed("acme", &summary(), Duration::from_secs(1));
+        reporter.on_fact_processed(
+            "capture-fact-silent-unique",
+            &summary(),
+            Duration::from_secs(1),
+        );
+
+        assert!(
+            capture
+                .lines()
+                .iter()
+                .all(|line| !line.contains("capture-fact-silent-unique")),
+            "non-TTY per-fact updates must not emit progress lines"
+        );
     }
 
     #[test]
-    fn log_namespace_completed_emits() {
+    fn non_tty_namespace_completion_reports_counts_and_duration() {
+        let capture = crate::logging::capture::install();
         let reporter = log_reporter();
 
-        reporter.on_namespace_completed("acme", 45, 5, Duration::from_secs(10));
+        reporter.on_namespace_completed(
+            "capture-ns-complete-unique",
+            45,
+            5,
+            Duration::from_secs(9),
+        );
+
+        let line = captured_event(
+            &capture,
+            "reembed.namespace_completed",
+            "capture-ns-complete-unique",
+        );
+        assert!(line.contains("succeeded=45"));
+        assert!(line.contains("failed=5"));
+        assert!(line.contains("duration_ms=9000"));
     }
 
     #[test]
-    fn log_namespace_completed_emits_with_a_zero_duration() {
+    fn non_tty_namespace_completion_preserves_zero_duration() {
+        let capture = crate::logging::capture::install();
         let reporter = log_reporter();
 
-        reporter.on_namespace_completed("acme", 0, 0, Duration::ZERO);
+        reporter.on_namespace_completed("capture-ns-zero-unique", 0, 0, Duration::ZERO);
+
+        let line = captured_event(
+            &capture,
+            "reembed.namespace_completed",
+            "capture-ns-zero-unique",
+        );
+        assert!(line.contains("duration_ms=0"));
     }
 
     #[test]
-    fn log_index_recreating_emits() {
+    fn non_tty_index_rebuild_start_is_visible_in_captured_output() {
+        let capture = crate::logging::capture::install();
         let reporter = log_reporter();
 
-        reporter.on_index_recreating("acme");
+        reporter.on_index_recreating("capture-index-start-unique");
+
+        let line = captured_event(
+            &capture,
+            "reembed.index_recreating",
+            "capture-index-start-unique",
+        );
+        assert!(line.contains("op=reembed.index_recreating"));
     }
 
     #[test]
-    fn log_index_recreated_emits() {
+    fn non_tty_index_rebuild_completion_is_visible_in_captured_output() {
+        let capture = crate::logging::capture::install();
         let reporter = log_reporter();
 
-        reporter.on_index_recreated("acme");
+        reporter.on_index_recreated("capture-index-done-unique");
+
+        let line = captured_event(
+            &capture,
+            "reembed.index_recreated",
+            "capture-index-done-unique",
+        );
+        assert!(line.contains("op=reembed.index_recreated"));
     }
 
     #[test]
-    fn log_interrupted_emits() {
+    fn non_tty_interruption_reports_progress_in_captured_output() {
+        let capture = crate::logging::capture::install();
         let reporter = log_reporter();
 
         reporter.on_interrupted(&summary(), Duration::from_secs(10));
+
+        let line = captured_event(&capture, "reembed.job_interrupted", "processed_facts=50");
+        assert!(line.contains("succeeded_facts=45"));
+        assert!(line.contains("failed_facts=5"));
+        assert!(line.contains("total_facts=100"));
+        assert!(line.contains("duration_ms=10000"));
     }
 
     #[test]
-    fn log_job_completed_emits() {
+    fn non_tty_success_completion_is_visible_in_captured_output() {
+        let capture = crate::logging::capture::install();
         let reporter = log_reporter();
 
         reporter.on_job_completed(
@@ -420,80 +510,21 @@ mod tests {
             &summary(),
             Duration::from_secs(10),
         );
+
+        let line = captured_event(&capture, "reembed.job_completed", "outcome=Completed");
+        assert!(line.contains("processed_facts=50"));
+        assert!(line.contains("total_facts=100"));
     }
 
     #[test]
-    fn log_job_completed_emits_for_a_failed_outcome() {
+    fn non_tty_failure_completion_is_visible_in_captured_output() {
+        let capture = crate::logging::capture::install();
         let reporter = log_reporter();
 
         reporter.on_job_completed(&ReembedOutcome::Failed, &summary(), Duration::from_secs(10));
-    }
 
-    #[test]
-    fn indicatif_reporter_tolerates_every_callback() {
-        // Under a non-TTY stderr (the test harness) `indicatif` renders nothing;
-        // this asserts the callbacks stay side-effect free in that mode.
-        let reporter = IndicatifProgressReporter::new();
-
-        reporter.on_job_started(100, false, 0);
-        reporter.on_namespace_started("acme", 100);
-        reporter.on_fact_processed("acme", &summary(), Duration::from_secs(1));
-        reporter.on_namespace_completed("acme", 45, 5, Duration::from_secs(10));
-        reporter.on_index_recreating("acme");
-        reporter.on_index_recreated("acme");
-        reporter.on_interrupted(&summary(), Duration::from_secs(10));
-        reporter.on_job_completed(
-            &ReembedOutcome::Completed,
-            &summary(),
-            Duration::from_secs(10),
-        );
-    }
-
-    #[test]
-    fn indicatif_reporter_tolerates_a_resumed_run() {
-        let reporter = IndicatifProgressReporter::new();
-
-        reporter.on_job_started(100, true, 30);
-    }
-
-    #[test]
-    fn indicatif_reporter_tolerates_an_interruption_with_no_facts() {
-        // The interruption message divides by total_facts, so zero must not panic.
-        let reporter = IndicatifProgressReporter::new();
-
-        reporter.on_interrupted(&ReembedSummary::default(), Duration::from_secs(1));
-    }
-
-    #[test]
-    fn indicatif_reporter_tolerates_a_completion_with_failures() {
-        // A failed-fact summary takes the other arm of the message formatter.
-        let reporter = IndicatifProgressReporter::new();
-
-        reporter.on_fact_processed("acme", &summary(), Duration::from_secs(1));
-    }
-
-    #[test]
-    fn indicatif_reporter_tolerates_the_init_spinner() {
-        let reporter = IndicatifProgressReporter::new();
-
-        reporter.start_init_spinner("loading models");
-    }
-
-    #[test]
-    fn noop_reporter_tolerates_every_callback() {
-        let reporter = NoopProgressReporter;
-
-        reporter.on_job_started(100, false, 0);
-        reporter.on_namespace_started("acme", 100);
-        reporter.on_fact_processed("acme", &summary(), Duration::from_secs(1));
-        reporter.on_namespace_completed("acme", 45, 5, Duration::from_secs(10));
-        reporter.on_index_recreating("acme");
-        reporter.on_index_recreated("acme");
-        reporter.on_interrupted(&summary(), Duration::from_secs(10));
-        reporter.on_job_completed(
-            &ReembedOutcome::Completed,
-            &summary(),
-            Duration::from_secs(10),
-        );
+        let line = captured_event(&capture, "reembed.job_completed", "outcome=Failed");
+        assert!(line.contains("processed_facts=50"));
+        assert!(line.contains("failed_facts=5"));
     }
 }

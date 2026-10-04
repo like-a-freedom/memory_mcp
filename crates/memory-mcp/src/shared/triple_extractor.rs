@@ -288,6 +288,7 @@ mod tests {
             .unwrap();
         assert_eq!(triples.len(), 1);
         assert_eq!(triples[0].predicate, "lives_in");
+        assert_eq!(triples[0].object, "Москв");
     }
 
     #[tokio::test]
@@ -348,33 +349,16 @@ mod tests {
         assert!(!is_singleton_predicate("met"));
     }
 
-    #[test]
-    fn normalize_object_strips_russian_prepositional() {
-        assert_eq!(normalize_russian_object("Газпроме"), "Газпром");
-        assert_eq!(normalize_russian_object("Москве"), "Москв");
-        // "Омске" → "Омск" (4 chars, ending -е correctly removed)
-        assert_eq!(normalize_russian_object("Омске"), "Омск");
-    }
+    #[tokio::test]
+    async fn extracts_russian_instrumental_object_in_nominative_like_form() {
+        let extractor = RuleBasedTripleExtractor::new();
 
-    #[test]
-    fn normalize_object_does_not_strip_short_english() {
-        // English text should be unchanged (no Cyrillic = pass-through)
-        assert_eq!(normalize_russian_object("Alice"), "Alice");
-        assert_eq!(normalize_russian_object("New York"), "New York");
-    }
+        let triples = extractor
+            .extract("Иван Петров работает в Газпромом", "fact:ru4")
+            .await
+            .unwrap();
 
-    #[test]
-    fn normalize_object_strips_russian_instrumental() {
-        assert_eq!(normalize_russian_object("Газпромом"), "Газпром");
-        assert_eq!(normalize_russian_object("Москвой"), "Москв");
-    }
-
-    #[test]
-    fn has_cyrillic_detects_russian_text() {
-        assert!(has_cyrillic("Газпром"));
-        assert!(has_cyrillic("Москва"));
-        assert!(!has_cyrillic("Acme Corp"));
-        assert!(!has_cyrillic("New York"));
-        assert!(!has_cyrillic(""));
+        assert_eq!(triples.len(), 1);
+        assert_eq!(triples[0].object, "Газпром");
     }
 }

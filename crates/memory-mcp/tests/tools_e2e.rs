@@ -577,9 +577,12 @@ async fn test_mcp_full_flow_end_to_end() {
     assert!(facts.iter().any(|f| f.fact_type == "metric"));
     assert!(facts.iter().any(|f| f.fact_type == "promise"));
 
+    // Extraction assigns transaction time at runtime. A fixed future query
+    // point includes that write without making this storage scenario wall-clock
+    // dependent.
     let assemble_request: AssembleContextRequest = serde_json::from_value(serde_json::json!({
         "query": "ARR",
-        "as_of": Utc::now().to_rfc3339(),
+        "as_of": "2099-12-31T23:59:59Z",
         "budget": 5,
         "compact": false,
     }))
@@ -617,7 +620,7 @@ async fn test_mcp_full_flow_end_to_end() {
     let assemble_request_after: AssembleContextRequest =
         serde_json::from_value(serde_json::json!({
             "query": "ARR",
-            "as_of": Utc::now().to_rfc3339(),
+            "as_of": "2099-12-31T23:59:59Z",
             "budget": 5,
             "compact": false,
         }))

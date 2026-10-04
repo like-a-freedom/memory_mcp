@@ -830,6 +830,7 @@ mod tests {
         assert!(!payload.contains("private memory"));
     }
 
+    // Integration scenario: a real loopback HTTP server returns a provider error.
     #[tokio::test]
     async fn remote_probe_error_includes_endpoint_model_and_response_payload() {
         use tokio::io::{AsyncReadExt, AsyncWriteExt};
@@ -839,90 +840,99 @@ mod tests {
             .await
             .expect("bind listener");
         let address = listener.local_addr().expect("listener address");
-        let server = tokio::spawn(async move {
-            let (mut socket, _) = listener.accept().await.expect("accept request");
-            let mut request = [0u8; 4096];
-            let _ = socket.read(&mut request).await.expect("read request");
-            let body = br#"{"error":{"message":"route not found"}}"#;
-            let response = format!(
-                "HTTP/1.1 404 Not Found\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n",
-                body.len()
-            );
-            socket
-                .write_all(response.as_bytes())
-                .await
-                .expect("write headers");
-            socket.write_all(body).await.expect("write body");
-        });
-
         let client = reqwest::Client::builder()
+            .no_proxy()
             .timeout(Duration::from_secs(2))
             .build()
             .expect("http client");
         let base_url = format!("http://{address}/v1");
-        let error = detect_openai_embedding_dimension(&client, &base_url, "test-model", None)
-            .await
-            .expect_err("404 probe should fail");
+        let ((), probe) = tokio::time::timeout(Duration::from_secs(3), async {
+            let server = async {
+                let (mut socket, _) = listener.accept().await.expect("accept request");
+                let mut request = [0u8; 4096];
+                let _ = socket.read(&mut request).await.expect("read request");
+                let body = br#"{"error":{"message":"route not found"}}"#;
+                let response = format!(
+                    "HTTP/1.1 404 Not Found\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n",
+                    body.len()
+                );
+                socket
+                    .write_all(response.as_bytes())
+                    .await
+                    .expect("write headers");
+                socket.write_all(body).await.expect("write body");
+            };
+            let probe =
+                detect_openai_embedding_dimension(&client, &base_url, "test-model", None);
+            tokio::join!(server, probe)
+        })
+        .await
+        .expect("stub and probe complete within the bound");
+        let error = probe.expect_err("404 probe should fail");
         let message = error.to_string();
 
         assert!(message.contains("status 404"));
         assert!(message.contains("/v1/embeddings"));
         assert!(message.contains("model=test-model"));
         assert!(message.contains("route not found"));
-        server.await.expect("server task");
     }
 
-    /// The probe must classify the transport error category and include the
-    /// endpoint URL in the message, so an operator can distinguish a
-    /// connection refused, request timeout, or DNS failure.
+    /// Integration scenario: the loopback server accepts but never responds,
+    /// so the bounded client request exercises timeout classification.
     #[tokio::test]
     async fn remote_probe_transport_error_classifies_category_and_endpoint() {
-        // Bind and immediately drop so the port is closed; any connection
-        // attempt will receive ECONNREFUSED.
+        use tokio::io::AsyncReadExt;
+
         let listener = tokio::net::TcpListener::bind("127.0.0.1:0")
             .await
             .expect("bind");
         let address = listener.local_addr().expect("addr");
-        drop(listener);
-
         let client = reqwest::Client::builder()
-            .timeout(Duration::from_secs(2))
+            .no_proxy()
+            .timeout(Duration::from_millis(100))
             .build()
             .expect("http client");
         let base_url = format!("http://{address}/v1");
-        let error = detect_openai_embedding_dimension(&client, &base_url, "test-model", None)
-            .await
-            .expect_err("closed port must fail the probe");
+        let ((), probe) = tokio::time::timeout(Duration::from_secs(2), async {
+            let server = async {
+                let (mut socket, _) = listener.accept().await.expect("accept request");
+                let mut request = [0u8; 4096];
+                let _ = socket.read(&mut request).await.expect("read request");
+                tokio::time::sleep(Duration::from_millis(200)).await;
+                drop(socket);
+            };
+            let probe = detect_openai_embedding_dimension(&client, &base_url, "test-model", None);
+            tokio::join!(server, probe)
+        })
+        .await
+        .expect("stub and timed-out probe complete within the bound");
+        let error = probe.expect_err("an unanswered request must time out");
         let message = error.to_string();
 
-        // The probe must distinguish "connection refused" from "timeout"
-        // and "DNS" — the operator needs that to diagnose the failure.
+        assert!(message.contains("timeout"), "got: {message}");
         assert!(
-            message.contains("connect")
-                || message.contains("refused")
-                || message.contains("timeout"),
-            "transport probe error must classify the failure category, got: {message}"
-        );
-        // The redacted endpoint URL must appear in the message.
-        assert!(
-            message.contains(&format!("{}/v1/embeddings", address))
-                || message.contains(&address.to_string()),
+            message.contains(&format!("{address}/v1/embeddings")),
             "transport probe error must include the redacted endpoint URL, got: {message}"
         );
     }
 
-    /// The probe must include the endpoint URL even when the host cannot be
-    /// resolved (DNS failure), so the operator can spot a misconfiguration.
+    /// Integration scenario: a reserved `.invalid` name is resolved directly,
+    /// without ambient proxy configuration, and remains bounded.
     #[tokio::test]
     async fn remote_probe_transport_error_surfaces_dns_failure_with_endpoint() {
         let client = reqwest::Client::builder()
+            .no_proxy()
             .timeout(Duration::from_secs(2))
             .build()
             .expect("http client");
-        let base_url = "http://this-host-does-not-exist.invalid./v1";
-        let error = detect_openai_embedding_dimension(&client, base_url, "test-model", None)
-            .await
-            .expect_err("DNS failure must fail the probe");
+        let base_url = "http://this-host-does-not-exist.invalid/v1";
+        let error = tokio::time::timeout(
+            Duration::from_secs(3),
+            detect_openai_embedding_dimension(&client, base_url, "test-model", None),
+        )
+        .await
+        .expect("DNS probe is bounded")
+        .expect_err("DNS failure must fail the probe");
         let message = error.to_string();
 
         assert!(

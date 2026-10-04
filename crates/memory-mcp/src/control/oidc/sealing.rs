@@ -155,3 +155,59 @@ pub fn unseal_oidc_payload(
         intent,
     })
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn sealing_round_trips_flow_material_and_the_invitation_intent() {
+        let key = [0x5a; 32];
+        let state = OidcState("state-token-fixed".into());
+        let nonce = OidcNonce("nonce-token-fixed".into());
+        let pkce = PkceCode {
+            verifier: "fixed-verifier-from-the-caller".into(),
+            challenge: "not-stored".into(),
+        };
+        let intent = OidcFlowIntent::Invite {
+            account_id: "acct_invited".into(),
+            invited_by: "admin_1".into(),
+            replace: true,
+        };
+
+        let (ciphertext, nonce_bytes) =
+            seal_oidc_payload(&key, &state, &nonce, &pkce, &intent).expect("seal flow");
+        let stored = unseal_oidc_payload(&key, &ciphertext, &nonce_bytes).expect("unseal flow");
+
+        assert_eq!(stored.state.as_str(), "state-token-fixed");
+        assert_eq!(stored.nonce.as_str(), "nonce-token-fixed");
+        assert_eq!(stored.pkce.verifier, "fixed-verifier-from-the-caller");
+        assert_eq!(stored.intent, intent);
+    }
+
+    #[test]
+    fn a_legacy_sealed_flow_without_an_intent_is_sign_in() {
+        use chacha20poly1305::{ChaCha20Poly1305, KeyInit, Nonce, aead::Aead};
+
+        let key = [0x31; 32];
+        let nonce_bytes = [0x42; 12];
+        let nonce: &Nonce = (&nonce_bytes).into();
+        let plaintext = serde_json::to_vec(&serde_json::json!({
+            "state": "legacy-state",
+            "nonce": "legacy-nonce",
+            "pkce_verifier": "legacy-verifier",
+        }))
+        .expect("serialize legacy flow");
+        let ciphertext = ChaCha20Poly1305::new((&key).into())
+            .encrypt(nonce, plaintext.as_ref())
+            .expect("encrypt legacy flow");
+
+        let stored =
+            unseal_oidc_payload(&key, &ciphertext, &nonce_bytes).expect("unseal legacy flow");
+
+        assert_eq!(stored.state.as_str(), "legacy-state");
+        assert_eq!(stored.nonce.as_str(), "legacy-nonce");
+        assert_eq!(stored.pkce.verifier, "legacy-verifier");
+        assert_eq!(stored.intent, OidcFlowIntent::SignIn);
+    }
+}

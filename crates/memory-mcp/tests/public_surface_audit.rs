@@ -459,6 +459,79 @@ fn caller_ratchet_ignores_comments_strings_and_test_cfg_items() {
 }
 
 #[test]
+fn caller_filter_skips_only_cfgs_definitely_false_outside_tests() {
+    let temp = tempfile::tempdir().expect("temp caller tree");
+    let file = temp.path().join("caller.rs");
+    std::fs::write(
+        &file,
+        r#"
+            #[cfg(all(test, feature = "fixture"))]
+            fn test_and_feature() { fake.call(); }
+            #[cfg(all(test, any(feature = "fixture", target_os = "linux")))]
+            fn nested_test_and_feature() { fake.call(); }
+            #[cfg(any(test, feature = "fixture"))]
+            fn test_or_feature() { fake.call(); }
+            #[cfg(not(test))]
+            fn not_test() { fake.call(); }
+        "#,
+    )
+    .expect("write cfg caller fixture");
+    let names = BTreeSet::from(["call".to_string()]);
+
+    assert_eq!(
+        count_calls_in_files(std::slice::from_ref(&file), &names, true).get("call"),
+        Some(&2),
+        "all(test, ...) is excluded; any(test, feature) and not(test) remain possible production callers"
+    );
+    assert_eq!(
+        count_calls_in_files(&[file], &names, false).get("call"),
+        Some(&4),
+        "the test-inclusive scan sees every lexical call"
+    );
+}
+
+#[test]
+fn public_inventory_filters_compound_test_gates_and_keeps_feature_union() {
+    let temp = tempfile::tempdir().expect("temp source tree");
+    let src = temp.path().join("src");
+    std::fs::create_dir(&src).expect("create source tree");
+    std::fs::write(
+        src.join("service.rs"),
+        r#"
+            impl MemoryService {
+                pub fn visible(&self) {}
+                #[cfg(all(test, feature = "fixture"))]
+                pub fn test_and_feature(&self) {}
+                #[cfg(any(test, feature = "fixture"))]
+                pub fn test_or_feature(&self) {}
+            }
+        "#,
+    )
+    .expect("write source fixture");
+
+    let names: BTreeSet<String> = collect_public_methods(&src)
+        .into_iter()
+        .map(|method| method.name)
+        .collect();
+    assert_eq!(
+        names,
+        BTreeSet::from(["visible".to_string(), "test_or_feature".to_string()])
+    );
+}
+
+#[test]
+fn unsupported_cfg_predicates_are_reported() {
+    let tokens = rust_source::tokenize("#[cfg(not(test, feature = \"fixture\"))] fn gated() {}")
+        .expect("tokenize cfg fixture");
+
+    assert!(
+        test_cfg_item_end(&tokens, 0)
+            .expect_err("unsupported not arity must be reported")
+            .contains("exactly one argument")
+    );
+}
+
+#[test]
 fn allowlist_import_evidence_ignores_comments_and_literals() {
     assert!(!imports_through_service(
         r#"
@@ -608,11 +681,9 @@ fn every_public_container_method_has_a_production_caller() {
     // empty: Task 5.4 put two names in it, each of which turned out to be
     // the only public door to something.
     const TEST_ONLY: &[(&str, &str)] = &[
-        // The constructors. `new` and `new_with_embedding_provider` are how a
-        // caller obtains a container at all, so having no caller *of their
-        // own* inside the crate is the point.
+        // `new` is how a caller obtains a container at all, so having no
+        // caller *of its own* inside the crate is the point.
         ("new", "constructs the container"),
-        ("new_with_embedding_provider", "constructs the container"),
         // The only public way to record an edge. `store_edge` in
         // `memory/episode/edges.rs` is `pub(crate)`, so an out-of-crate
         // caller — the eval harness, an embedding — has exactly one door, and
@@ -644,6 +715,12 @@ fn every_public_container_method_has_a_production_caller() {
     );
 
     let names: BTreeSet<String> = declared.iter().map(|method| method.name.clone()).collect();
+    let stale_test_only = test_only_names_missing_from_inventory(TEST_ONLY, &names);
+    assert!(
+        stale_test_only.is_empty(),
+        "TEST_ONLY contains method(s) absent from the public inventory:\n\n{}",
+        stale_test_only.join("\n")
+    );
     let production_calls = count_calls_in_files(&rust_files(&src), &names, true);
     let mut test_files = rust_files(&manifest.join("tests"));
     test_files.extend(declared.iter().map(|method| method.file.clone()));
@@ -682,6 +759,31 @@ fn every_public_container_method_has_a_production_caller() {
     );
 }
 
+fn test_only_names_missing_from_inventory(
+    test_only: &[(&str, &str)],
+    names: &BTreeSet<String>,
+) -> Vec<String> {
+    test_only
+        .iter()
+        .filter(|(name, _)| !names.contains(*name))
+        .map(|(name, reason)| format!("{name} — {reason}"))
+        .collect()
+}
+
+#[test]
+fn test_only_allowlist_entries_must_name_declared_methods() {
+    let names = BTreeSet::from(["present".to_string()]);
+    let exceptions = [
+        ("present", "current declaration"),
+        ("removed", "stale exception"),
+    ];
+
+    assert_eq!(
+        test_only_names_missing_from_inventory(&exceptions, &names),
+        ["removed — stale exception"]
+    );
+}
+
 #[derive(Debug)]
 struct DeclaredMethod {
     name: String,
@@ -698,7 +800,9 @@ fn collect_public_methods(src: &Path) -> Vec<DeclaredMethod> {
             .unwrap_or_else(|error| panic!("cannot tokenize {}: {error}", file.display()));
         let mut index = 0;
         while index < tokens.len() {
-            if let Some(end) = test_cfg_item_end(&tokens, index) {
+            if let Some(end) = test_cfg_item_end(&tokens, index)
+                .unwrap_or_else(|error| panic!("unsupported cfg in {}: {error}", file.display()))
+            {
                 index = end + 1;
                 continue;
             }
@@ -723,7 +827,9 @@ fn collect_public_methods(src: &Path) -> Vec<DeclaredMethod> {
 
             let mut cursor = open + 1;
             while cursor < close {
-                if let Some(end) = test_cfg_item_end(&tokens, cursor) {
+                if let Some(end) = test_cfg_item_end(&tokens, cursor).unwrap_or_else(|error| {
+                    panic!("unsupported cfg in {}: {error}", file.display())
+                }) {
                     cursor = end + 1;
                     continue;
                 }
@@ -795,24 +901,191 @@ fn rust_files(root: &Path) -> Vec<PathBuf> {
     files
 }
 
-fn test_cfg_item_end(tokens: &[rust_source::Token], attribute: usize) -> Option<usize> {
-    let cfg_test = ["#", "[", "cfg", "(", "test", ")", "]"];
-    if tokens
-        .get(attribute..attribute + cfg_test.len())?
-        .iter()
-        .map(|token| token.text.as_str())
-        .ne(cfg_test)
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum CfgValue {
+    True,
+    False,
+    Unknown,
+}
+
+fn test_cfg_item_end(
+    tokens: &[rust_source::Token],
+    attribute: usize,
+) -> Result<Option<usize>, String> {
+    if tokens.get(attribute).is_none_or(|token| token.text != "#")
+        || tokens
+            .get(attribute + 1)
+            .is_none_or(|token| token.text != "[")
+        || tokens
+            .get(attribute + 2)
+            .is_none_or(|token| token.text != "cfg")
     {
-        return None;
+        return Ok(None);
     }
-    let item_start = attribute + cfg_test.len();
-    let body = (item_start..tokens.len())
-        .find(|&index| tokens[index].text == "{" || tokens[index].text == ";")?;
-    if tokens[body].text == ";" {
-        Some(body)
-    } else {
-        rust_source::matching_group(tokens, body)
+    let attribute_end = rust_source::matching_group(tokens, attribute + 1)
+        .ok_or_else(|| "unterminated cfg attribute".to_string())?;
+    let expression_open = attribute + 3;
+    if tokens
+        .get(expression_open)
+        .is_none_or(|token| token.text != "(")
+    {
+        return Err("expected a parenthesized cfg expression".into());
     }
+    let expression_end = rust_source::matching_group(tokens, expression_open)
+        .ok_or_else(|| "unterminated cfg expression".to_string())?;
+    if expression_end + 1 != attribute_end {
+        return Err("unexpected tokens after cfg expression".into());
+    }
+    if cfg_value_when_test_is_false(&tokens[expression_open + 1..expression_end])?
+        != CfgValue::False
+    {
+        return Ok(None);
+    }
+
+    let mut cursor = attribute_end + 1;
+    let mut angles = 0usize;
+    let mut semicolon_item = false;
+    let mut kind_found = false;
+    while cursor < tokens.len() {
+        let text = tokens[cursor].text.as_str();
+        if angles == 0 {
+            if !kind_found {
+                match text {
+                    "const" => {
+                        semicolon_item = tokens
+                            .get(cursor + 1)
+                            .is_none_or(|token| token.text != "fn");
+                        kind_found = true;
+                    }
+                    "static" | "type" | "use" => {
+                        semicolon_item = true;
+                        kind_found = true;
+                    }
+                    "fn" | "mod" | "impl" | "struct" | "enum" | "trait" => kind_found = true,
+                    _ => {}
+                }
+            }
+            match text {
+                ";" => return Ok(Some(cursor)),
+                "{" if !semicolon_item => {
+                    return rust_source::matching_group(tokens, cursor)
+                        .map(Some)
+                        .ok_or_else(|| "unterminated cfg-gated item".to_string());
+                }
+                _ => {}
+            }
+        }
+        if rust_source::is_open_group(text) {
+            cursor = rust_source::matching_group(tokens, cursor)
+                .ok_or_else(|| "unterminated cfg-gated signature group".to_string())?
+                + 1;
+            continue;
+        }
+        match text {
+            "<" => angles += 1,
+            ">" if angles > 0 => angles -= 1,
+            _ => {}
+        }
+        cursor += 1;
+    }
+    Err("cfg-gated item has no body or semicolon".to_string())
+}
+
+fn cfg_value_when_test_is_false(expression: &[rust_source::Token]) -> Result<CfgValue, String> {
+    let Some(first) = expression.first() else {
+        return Err("empty cfg expression".into());
+    };
+    if matches!(first.text.as_str(), "all" | "any" | "not") {
+        if !expression.get(1).is_some_and(|token| token.text == "(") {
+            return Err(format!("unsupported cfg predicate `{}`", first.text));
+        }
+        let close = rust_source::matching_group(expression, 1)
+            .ok_or_else(|| format!("unterminated `{}` predicate", first.text))?;
+        if close + 1 != expression.len() {
+            return Err(format!("unexpected tokens in `{}` predicate", first.text));
+        }
+        let arguments = split_cfg_arguments(&expression[2..close])?;
+        if first.text == "not" {
+            if arguments.len() != 1 {
+                return Err("`not` cfg predicate requires exactly one argument".into());
+            }
+            return Ok(match cfg_value_when_test_is_false(arguments[0])? {
+                CfgValue::True => CfgValue::False,
+                CfgValue::False => CfgValue::True,
+                CfgValue::Unknown => CfgValue::Unknown,
+            });
+        }
+
+        let values = arguments
+            .iter()
+            .map(|argument| cfg_value_when_test_is_false(argument))
+            .collect::<Result<Vec<_>, _>>()?;
+        return if first.text == "all" {
+            if values.contains(&CfgValue::False) {
+                Ok(CfgValue::False)
+            } else if values.contains(&CfgValue::Unknown) {
+                Ok(CfgValue::Unknown)
+            } else {
+                Ok(CfgValue::True)
+            }
+        } else if values.contains(&CfgValue::True) {
+            Ok(CfgValue::True)
+        } else if values.contains(&CfgValue::Unknown) {
+            Ok(CfgValue::Unknown)
+        } else {
+            Ok(CfgValue::False)
+        };
+    }
+
+    if expression.len() == 1 && is_identifier(&first.text) {
+        return Ok(if first.text == "test" {
+            CfgValue::False
+        } else {
+            CfgValue::Unknown
+        });
+    }
+    if expression.len() == 3
+        && is_identifier(&expression[0].text)
+        && expression[1].text == "="
+        && expression[2].text == "<literal>"
+    {
+        return Ok(CfgValue::Unknown);
+    }
+    Err(format!(
+        "unsupported cfg expression `{}`",
+        render_tokens(expression)
+    ))
+}
+
+fn split_cfg_arguments(
+    expression: &[rust_source::Token],
+) -> Result<Vec<&[rust_source::Token]>, String> {
+    if expression.is_empty() {
+        return Ok(Vec::new());
+    }
+    let mut arguments = Vec::new();
+    let mut start = 0;
+    let mut index = 0;
+    while index < expression.len() {
+        if rust_source::is_open_group(&expression[index].text) {
+            index = rust_source::matching_group(expression, index)
+                .ok_or_else(|| "unterminated group in cfg expression".to_string())?
+                + 1;
+        } else if expression[index].text == "," {
+            if start == index {
+                return Err("empty argument in cfg expression".into());
+            }
+            arguments.push(&expression[start..index]);
+            start = index + 1;
+            index += 1;
+        } else {
+            index += 1;
+        }
+    }
+    if start < expression.len() {
+        arguments.push(&expression[start..]);
+    }
+    Ok(arguments)
 }
 
 fn count_calls_in_files(
@@ -829,7 +1102,11 @@ fn count_calls_in_files(
             .unwrap_or_else(|error| panic!("cannot tokenize {}: {error}", file.display()));
         let mut index = 0;
         while index < tokens.len() {
-            if exclude_test_cfg && let Some(end) = test_cfg_item_end(&tokens, index) {
+            if exclude_test_cfg
+                && let Some(end) = test_cfg_item_end(&tokens, index).unwrap_or_else(|error| {
+                    panic!("unsupported cfg in {}: {error}", file.display())
+                })
+            {
                 index = end + 1;
                 continue;
             }
@@ -849,37 +1126,44 @@ fn count_calls_in_files(
 }
 
 fn method_call_open(tokens: &[rust_source::Token], after_name: usize) -> Option<usize> {
-    if tokens
-        .get(after_name)
-        .is_some_and(|token| token.text == "(")
-    {
-        return Some(after_name);
-    }
-    if !tokens
-        .get(after_name)
-        .is_some_and(|token| token.text == "::")
-        || !tokens
-            .get(after_name + 1)
-            .is_some_and(|token| token.text == "<")
-    {
-        return None;
-    }
-    let mut depth = 0usize;
-    for index in after_name + 1..tokens.len() {
-        match tokens[index].text.as_str() {
-            "<" => depth += 1,
-            ">" => {
-                depth = depth.checked_sub(1)?;
-                if depth == 0 {
-                    let open = index + 1;
-                    return tokens
-                        .get(open)
-                        .is_some_and(|token| token.text == "(")
-                        .then_some(open);
-                }
-            }
-            _ => {}
-        }
-    }
-    None
+    rust_source::call_open(tokens, after_name)
+}
+
+#[test]
+fn public_method_call_scan_accepts_tokenized_turbofish() {
+    let tokens = rust_source::tokenize("receiver.lookup::<Key>();").expect("tokenize call");
+    let method = tokens
+        .iter()
+        .position(|token| token.text == "lookup")
+        .expect("method token");
+    let after_name = method + 1;
+
+    assert!(double_colon_at(&tokens, after_name));
+    let open = method_call_open(&tokens, after_name).expect("turbofish call opening");
+    assert_eq!(tokens[open].text, "(");
+}
+
+#[test]
+fn call_scan_ignores_comparisons_inside_const_arguments() {
+    let tokens = rust_source::tokenize("receiver.lookup::<{ 1 < 2 }, [u8; { 3 > 2 }]>();")
+        .expect("tokenize const generic call");
+    let method = tokens
+        .iter()
+        .position(|token| token.text == "lookup")
+        .expect("method");
+    let open = method_call_open(&tokens, method + 1).expect("call after const arguments");
+    assert_eq!(tokens[open].text, "(");
+}
+
+#[test]
+fn cfg_item_extent_skips_signature_groups_before_the_body() {
+    let tokens = rust_source::tokenize(
+        "#[cfg(test)] fn hidden<const N: usize>() -> [u8; { 1 }] { fake.call(); } fn live() {}",
+    )
+    .expect("tokenize signature");
+    let end = test_cfg_item_end(&tokens, 0)
+        .expect("cfg item")
+        .expect("test-only extent");
+    assert_eq!(tokens[end + 1].text, "fn");
+    assert_eq!(tokens[end + 2].text, "live");
 }

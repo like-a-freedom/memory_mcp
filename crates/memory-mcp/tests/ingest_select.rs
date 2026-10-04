@@ -16,12 +16,18 @@ use serde_json::json;
 /// `MemoryService::episode_count` used to provide this. No production
 /// caller reached it, and the owner-named read is the seam this test
 /// actually wants: the same rows a caller would enumerate.
-async fn episode_count(service: &memory_mcp::MemoryService) -> Result<i32, MemoryError> {
+async fn episode_scan(
+    service: &memory_mcp::MemoryService,
+) -> Result<Vec<serde_json::Value>, MemoryError> {
     let port = memory_mcp::knowledge::infra::KnowledgeReadAdapter::new(
         service.db_client_for_port(),
         service.namespace_for_port(),
     );
-    Ok(owned_episode_scan(&port).await?.len() as i32)
+    owned_episode_scan(&port).await
+}
+
+async fn episode_count(service: &memory_mcp::MemoryService) -> Result<i32, MemoryError> {
+    Ok(episode_scan(service).await?.len() as i32)
 }
 
 async fn seed_legacy_episode(
@@ -60,8 +66,8 @@ async fn ingest_then_extract_roundtrip() -> Result<(), Box<dyn std::error::Error
         source_type: "meeting".to_string(),
         source_id: "test-1".to_string(),
         content: "Meeting with Alice Inc and Bob Corp. Budget $100k".to_string(),
-        t_ref: Utc::now(),
-        t_ingested: None,
+        t_ref: Utc.with_ymd_and_hms(2026, 10, 3, 9, 30, 0).unwrap(),
+        t_ingested: Some(Utc.with_ymd_and_hms(2026, 10, 3, 9, 31, 0).unwrap()),
         policy_tags: vec![],
     };
 
@@ -77,6 +83,63 @@ async fn ingest_then_extract_roundtrip() -> Result<(), Box<dyn std::error::Error
     let count = episode_count(&svc).await?;
     assert!(count >= 1, "expected at least one episode in DB");
 
+    Ok(())
+}
+
+/// Integration scenario: ingestion persists the supplied episode.
+#[tokio::test]
+async fn ingest_persists_the_supplied_episode() -> Result<(), Box<dyn std::error::Error>> {
+    let (service, _) = common::make_service_with_client_result().await?;
+    let t_ref = Utc.with_ymd_and_hms(2026, 10, 3, 10, 0, 0).unwrap();
+    let t_ingested = Utc.with_ymd_and_hms(2026, 10, 3, 10, 1, 0).unwrap();
+    let request = || IngestRequest {
+        source_type: "inline".to_owned(),
+        source_id: "source-a01".to_owned(),
+        content: "exact original episode content".to_owned(),
+        t_ref,
+        t_ingested: Some(t_ingested),
+        policy_tags: vec!["reviewed".to_owned()],
+    };
+
+    let episode_id = IngestCapability::ingest_from_service(&service, request(), None).await?;
+    let before_retry = episode_scan(&service).await?;
+    assert_eq!(before_retry.len(), 1, "one episode was persisted");
+    assert_eq!(before_retry[0]["episode_id"], episode_id);
+    assert_eq!(before_retry[0]["source_type"], "inline");
+    assert_eq!(before_retry[0]["source_id"], "source-a01");
+    assert_eq!(before_retry[0]["content"], "exact original episode content");
+    assert_eq!(before_retry[0]["t_ref"], "2026-10-03T10:00:00Z");
+    assert_eq!(before_retry[0]["t_ingested"], "2026-10-03T10:01:00Z");
+    assert_eq!(before_retry[0]["policy_tags"], json!(["reviewed"]));
+    Ok(())
+}
+
+/// Integration scenario: an idempotent retry preserves the existing episode.
+#[tokio::test]
+async fn duplicate_ingestion_preserves_the_existing_episode()
+-> Result<(), Box<dyn std::error::Error>> {
+    let (service, _) = common::make_service_with_client_result().await?;
+    let request = || IngestRequest {
+        source_type: "inline".to_owned(),
+        source_id: "source-a01".to_owned(),
+        content: "exact original episode content".to_owned(),
+        t_ref: Utc.with_ymd_and_hms(2026, 10, 3, 10, 0, 0).unwrap(),
+        t_ingested: Some(Utc.with_ymd_and_hms(2026, 10, 3, 10, 1, 0).unwrap()),
+        policy_tags: vec!["reviewed".to_owned()],
+    };
+    let episode_id = IngestCapability::ingest_from_service(&service, request(), None).await?;
+    let before_retry = episode_scan(&service).await?;
+    let duplicate_id = IngestCapability::ingest_from_service(&service, request(), None).await?;
+    let after_retry = episode_scan(&service).await?;
+
+    assert_eq!(
+        duplicate_id, episode_id,
+        "the duplicate reuses its stable ID"
+    );
+    assert_eq!(
+        after_retry, before_retry,
+        "duplicate ingestion must not replace or add to the stored episode"
+    );
     Ok(())
 }
 

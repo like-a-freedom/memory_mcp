@@ -271,17 +271,22 @@ pub fn batch_advance(application: VectorApplication) -> BatchAdvance {
 /// its reason attached, not an error: a server started without an embedding
 /// provider is a supported configuration, and it must ingest facts rather
 /// than refuse to.
+///
+/// `clock_now` is invoked only after generation produces a vector, immediately
+/// before the owner write. Production supplies the system clock; tests can
+/// supply a fixed instant without changing the write policy.
 pub async fn generate_and_update(
     generation: &(impl EmbeddingGeneration + ?Sized),
     port: &(impl CanonicalVectorPort + ?Sized),
     fact_id: &str,
     input: &str,
     identity: &VectorIdentity,
+    clock_now: impl FnOnce() -> DateTime<Utc>,
     policy: VectorWritePolicy,
 ) -> Result<VectorApplication, MemoryError> {
     let vector = match generation.generate(input).await? {
         GenerationOutcome::Generated(vector) => vector,
         GenerationOutcome::Skipped(reason) => return Ok(VectorApplication::Skipped(reason)),
     };
-    update_canonical_vector(port, fact_id, vector, identity, Utc::now(), policy).await
+    update_canonical_vector(port, fact_id, vector, identity, clock_now(), policy).await
 }

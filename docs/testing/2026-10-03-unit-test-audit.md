@@ -1,5 +1,10 @@
 # Unit-test audit — 2026-10-03
 
+This is the preserved pre-remediation audit snapshot, not a fresh verdict on the
+current tree. The [remediation plan and evidence](../superpowers/plans/2026-10-03-unit-test-remediation.md)
+record the subsequent repairs, classifications, retirements and execution limits.
+They do not certify every remaining repository test as an isolated unit.
+
 ## Verdict
 
 The current test collection cannot be certified as an isolated unit-test suite.

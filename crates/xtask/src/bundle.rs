@@ -309,15 +309,15 @@ mod tests {
         assert!(error.to_string().contains("module"), "{error}");
     }
 
-    /// The real repository: the CLI the image installs must be the framework
-    /// the UI crate pins. This is the check `test_ui_bundle_pin.py` used to
-    /// provide, and the only thing relating the two files.
+    /// Architecture/toolchain lint: the CLI the image installs must be the
+    /// framework the UI crate pins. This reads repository source policy and is
+    /// not functional application coverage.
     #[test]
-    fn the_images_dioxus_cli_matches_the_ui_crates_pin() {
+    fn architecture_lint_matches_the_image_cli_to_the_ui_crate_pin() {
         check_cli_pin().expect("the Dioxus CLI pin must equal the crate's dioxus requirement");
     }
 
-    /// The parsers, so the check above cannot pass by finding nothing. A
+    /// Checker-fixture lint: the parsers cannot pass by finding nothing. A
     /// `Dockerfile` with no `ARG` and a manifest with no `dioxus` requirement
     /// must both read as absent rather than as a silent match.
     #[test]

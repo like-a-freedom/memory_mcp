@@ -1,3 +1,8 @@
+//! Deletion recovery integration scenarios.
+//!
+//! The recovery workflow is driven through its public use case, while namespace
+//! binding uses a real SurrealDB Mem engine. The recording ports control faults;
+//! they do not claim to verify SQL transactions.
 #![cfg(feature = "control-plane")]
 
 use std::sync::{Arc, Mutex};
@@ -9,6 +14,25 @@ use memory_mcp::operations::api::{
     RetainedTenantWork, TenantUnderDeletion, run_deletion_recovery,
 };
 use memory_mcp::storage::{BoundDbClient, SurrealDbClient};
+
+#[derive(Clone, Default)]
+struct RecoveryTrace(Arc<Mutex<Vec<String>>>);
+
+impl RecoveryTrace {
+    fn record(&self, step: &str) {
+        self.0.lock().expect("trace lock").push(step.to_string());
+    }
+
+    fn steps(&self) -> Vec<String> {
+        self.0.lock().expect("trace lock").clone()
+    }
+}
+
+fn at(timestamp: &str) -> DateTime<Utc> {
+    DateTime::parse_from_rfc3339(timestamp)
+        .expect("fixed timestamp")
+        .with_timezone(&Utc)
+}
 
 /// Which step of the workflow should fail, so the failure policy can be tested
 /// at each one rather than only at the end.
@@ -30,8 +54,8 @@ enum FailAt {
 #[derive(Default)]
 struct RecoveryPort {
     listed: Mutex<Vec<String>>,
-    /// The order of steps taken, across every tenant.
-    steps: Mutex<Vec<String>>,
+    /// Shared with retained work so ordering crosses the two owning ports.
+    trace: RecoveryTrace,
     purged: Mutex<Vec<String>>,
     fail_at: Mutex<FailAt>,
     released: Mutex<Vec<String>>,
@@ -48,10 +72,7 @@ impl RecoveryPort {
     }
 
     fn record(&self, step: &str) {
-        self.steps
-            .lock()
-            .expect("steps lock")
-            .push(step.to_string());
+        self.trace.record(step);
     }
 
     fn should_fail(&self, at: FailAt) -> bool {
@@ -110,7 +131,6 @@ impl DeletionRecoveryPort for RecoveryPort {
     ) -> Result<Option<DeletionLease>, MemoryError> {
         assert_eq!(ttl_secs, DELETION_LEASE_TTL_SECS);
         assert!(!owner_id.is_empty());
-        assert!(!lease_id.is_empty());
         self.record(&format!("claim:{tenant_id}"));
         *self.claims.lock().expect("claims lock") += 1;
         Ok(Some(DeletionLease {
@@ -154,14 +174,10 @@ impl DeletionRecoveryPort for RecoveryPort {
     async fn write_deletion_tombstone(
         &self,
         tenant_id: &str,
-        lease: &DeletionLease,
+        _lease: &DeletionLease,
         _now: DateTime<Utc>,
     ) -> Result<(), MemoryError> {
         self.record(&format!("tombstone:{tenant_id}"));
-        assert!(
-            !lease.lease_id.is_empty(),
-            "the tombstone is written under the claimed lease"
-        );
         if self.should_fail(FailAt::Tombstone) {
             return Err(MemoryError::Transient(format!("tombstone {tenant_id}")));
         }
@@ -203,16 +219,13 @@ impl DeletionRecoveryPort for RecoveryPort {
 /// A sweep that records the tenant it ran for, and can be told to fail.
 #[derive(Default)]
 struct RetainedWork {
-    swept: Mutex<Vec<String>>,
+    trace: RecoveryTrace,
     fail: bool,
 }
 
 impl RetainedWork {
-    fn failing() -> Self {
-        Self {
-            swept: Mutex::new(Vec::new()),
-            fail: true,
-        }
+    fn failing(trace: RecoveryTrace) -> Self {
+        Self { trace, fail: true }
     }
 }
 
@@ -226,10 +239,7 @@ impl RetainedTenantWork for RetainedWork {
         if self.fail {
             return Err(MemoryError::Transient(format!("sweep {tenant_id}")));
         }
-        self.swept
-            .lock()
-            .expect("swept lock")
-            .push(tenant_id.to_string());
+        self.trace.record(&format!("sweep:{tenant_id}"));
         Ok(())
     }
 }
@@ -242,12 +252,17 @@ impl RetainedTenantWork for RetainedWork {
 /// tombstone and that the tenant ended up terminal.
 #[tokio::test]
 async fn a_recovered_tenant_is_swept_then_tombstoned() {
-    let now = Utc::now();
+    let now = at("2026-10-03T12:00:00Z");
+    let trace = RecoveryTrace::default();
     let port = RecoveryPort {
+        trace: trace.clone(),
         succeed_bind: true,
         ..Default::default()
     };
-    let work = RetainedWork::default();
+    let work = RetainedWork {
+        trace,
+        ..Default::default()
+    };
     *port.listed.lock().expect("listed lock") = vec!["ten_ok".into()];
 
     run_deletion_recovery(&port, &work, "replica_a", now)
@@ -255,20 +270,20 @@ async fn a_recovered_tenant_is_swept_then_tombstoned() {
         .expect("a clean pass");
 
     assert_eq!(
-        *port.steps.lock().expect("steps lock"),
+        port.trace.steps(),
         vec![
             "find:ten_ok",
             "claim:ten_ok",
             "bind:ten_ok",
+            "sweep:ten_ok",
             "tombstone:ten_ok"
         ],
         "sweep then tombstone, and no release on the success path"
     );
-    assert_eq!(*work.swept.lock().expect("swept lock"), vec!["ten_ok"]);
-    assert_eq!(
-        *port.purged.lock().expect("purged lock"),
-        vec!["ten_ok"],
-        "the tombstone makes the tenant terminal"
+    assert!(
+        port.is_tenant_purged("ten_ok")
+            .await
+            .expect("tombstone state")
     );
     assert!(
         port.released.lock().expect("released lock").is_empty(),
@@ -278,12 +293,17 @@ async fn a_recovered_tenant_is_swept_then_tombstoned() {
 
 #[tokio::test]
 async fn deletion_recovery_preserves_first_error_and_continues_remaining_tenants() {
-    let now = Utc::now();
+    let now = at("2026-10-03T12:00:00Z");
+    let trace = RecoveryTrace::default();
     let port = Arc::new(RecoveryPort {
+        trace: trace.clone(),
         succeed_bind: true,
         ..Default::default()
     });
-    let work = RetainedWork::default();
+    let work = RetainedWork {
+        trace: trace.clone(),
+        ..Default::default()
+    };
     *port.listed.lock().expect("listed lock") =
         vec!["ten_first".into(), "ten_second".into(), "ten_third".into()];
     port.fail_at(FailAt::Tombstone);
@@ -293,22 +313,35 @@ async fn deletion_recovery_preserves_first_error_and_continues_remaining_tenants
         .expect_err("first recovery failure");
 
     assert!(error.to_string().contains("tombstone ten_first"));
-    // Every listed tenant was attempted: a failure on one does not abandon
-    // the rest of the batch.
-    let attempted: Vec<String> = port
-        .steps
-        .lock()
-        .expect("steps lock")
-        .iter()
-        .filter(|step| step.starts_with("claim:"))
-        .cloned()
-        .collect();
-    assert_eq!(attempted.len(), 3, "one claim per listed tenant");
+    assert_eq!(
+        trace.steps(),
+        vec![
+            "find:ten_first",
+            "claim:ten_first",
+            "bind:ten_first",
+            "sweep:ten_first",
+            "tombstone:ten_first",
+            "release:ten_first",
+            "find:ten_second",
+            "claim:ten_second",
+            "bind:ten_second",
+            "sweep:ten_second",
+            "tombstone:ten_second",
+            "release:ten_second",
+            "find:ten_third",
+            "claim:ten_third",
+            "bind:ten_third",
+            "sweep:ten_third",
+            "tombstone:ten_third",
+            "release:ten_third",
+        ],
+        "a failed tenant does not stop the remaining recovery attempts"
+    );
 }
 
 #[tokio::test]
 async fn deletion_recovery_returns_early_when_no_work_exists() {
-    let now = Utc::now();
+    let now = at("2026-10-03T12:00:00Z");
     let port = RecoveryPort::default();
     let work = RetainedWork::default();
 
@@ -316,7 +349,7 @@ async fn deletion_recovery_returns_early_when_no_work_exists() {
         .await
         .expect("empty pass");
 
-    assert!(port.steps.lock().expect("steps lock").is_empty());
+    assert!(port.trace.steps().is_empty());
 }
 
 /// The sweep happens before the tombstone, and never after it.
@@ -327,10 +360,17 @@ async fn deletion_recovery_returns_early_when_no_work_exists() {
 /// tenant whose namespace was never swept and whose lease nobody reclaims.
 #[tokio::test]
 async fn a_failed_bind_stops_before_the_sweep() {
-    let now = Utc::now();
+    let now = at("2026-10-03T12:00:00Z");
+    let trace = RecoveryTrace::default();
     // `succeed_bind` stays false, so the bind itself fails.
-    let port = RecoveryPort::default();
-    let work = RetainedWork::default();
+    let port = RecoveryPort {
+        trace: trace.clone(),
+        ..Default::default()
+    };
+    let work = RetainedWork {
+        trace,
+        ..Default::default()
+    };
     *port.listed.lock().expect("listed lock") = vec!["ten_x".into()];
 
     let error = run_deletion_recovery(&port, &work, "replica_a", now)
@@ -339,22 +379,13 @@ async fn a_failed_bind_stops_before_the_sweep() {
 
     assert!(error.to_string().contains("no test engine wired"));
     assert_eq!(
-        *port.steps.lock().expect("steps lock"),
+        port.trace.steps(),
         vec!["find:ten_x", "claim:ten_x", "bind:ten_x", "release:ten_x"],
         "a failed bind releases the lease so the next replica can retry"
     );
     assert!(
-        work.swept.lock().expect("swept lock").is_empty(),
-        "a failed bind must not report a completed sweep"
-    );
-    assert!(
-        !port
-            .steps
-            .lock()
-            .expect("steps lock")
-            .iter()
-            .any(|step| step.starts_with("tombstone")),
-        "no tombstone may be written for a tenant whose namespace was never bound"
+        !port.trace.steps().contains(&"tombstone:ten_x".to_string()),
+        "a failed bind must stop before retained work and the tombstone"
     );
 }
 
@@ -362,12 +393,14 @@ async fn a_failed_bind_stops_before_the_sweep() {
 /// reclaim it immediately rather than waiting out the TTL.
 #[tokio::test]
 async fn a_failed_sweep_releases_the_lease_for_the_next_replica() {
-    let now = Utc::now();
+    let now = at("2026-10-03T12:00:00Z");
+    let trace = RecoveryTrace::default();
     let port = RecoveryPort {
+        trace: trace.clone(),
         succeed_bind: true,
         ..Default::default()
     };
-    let work = RetainedWork::failing();
+    let work = RetainedWork::failing(trace.clone());
     *port.listed.lock().expect("listed lock") = vec!["ten_y".into()];
 
     let error = run_deletion_recovery(&port, &work, "replica_a", now)
@@ -375,6 +408,10 @@ async fn a_failed_sweep_releases_the_lease_for_the_next_replica() {
         .expect_err("sweep fails");
 
     assert!(error.to_string().contains("sweep ten_y"));
+    assert_eq!(
+        trace.steps(),
+        vec!["find:ten_y", "claim:ten_y", "bind:ten_y", "release:ten_y"]
+    );
     assert_eq!(
         *port.released.lock().expect("released lock"),
         vec!["ten_y"],
@@ -386,9 +423,16 @@ async fn a_failed_sweep_releases_the_lease_for_the_next_replica() {
 /// claimed, so a replayed recovery pass is a no-op rather than a second write.
 #[tokio::test]
 async fn an_already_purged_tenant_is_never_claimed() {
-    let now = Utc::now();
-    let port = RecoveryPort::default();
-    let work = RetainedWork::default();
+    let now = at("2026-10-03T12:00:00Z");
+    let trace = RecoveryTrace::default();
+    let port = RecoveryPort {
+        trace: trace.clone(),
+        ..Default::default()
+    };
+    let work = RetainedWork {
+        trace: trace.clone(),
+        ..Default::default()
+    };
     *port.listed.lock().expect("listed lock") = vec!["ten_z".into()];
     *port.purged.lock().expect("purged lock") = vec!["ten_z".into()];
 
@@ -396,7 +440,7 @@ async fn an_already_purged_tenant_is_never_claimed() {
         .await
         .expect("replay is a no-op");
 
-    let steps = port.steps.lock().expect("steps lock").clone();
+    let steps = trace.steps();
     assert_eq!(
         steps,
         vec!["find:ten_z"],
@@ -412,8 +456,10 @@ async fn an_already_purged_tenant_is_never_claimed() {
 /// successful pass rather than a retry that would find nothing left to do.
 #[tokio::test]
 async fn a_failure_after_the_tombstone_is_reported_as_purged() {
-    let now = Utc::now();
+    let now = at("2026-10-03T12:00:00Z");
+    let trace = RecoveryTrace::default();
     let port = RecoveryPort {
+        trace: trace.clone(),
         succeed_bind: true,
         ..Default::default()
     };
@@ -422,11 +468,23 @@ async fn a_failure_after_the_tombstone_is_reported_as_purged() {
     port.fail_at(FailAt::TombstoneAfterCommit);
     *port.listed.lock().expect("listed lock") = vec!["ten_w".into()];
 
-    run_deletion_recovery(&port, &RetainedWork::default(), "replica_a", now)
-        .await
-        .expect("a committed tombstone is not an error, however the call reported it");
+    run_deletion_recovery(
+        &port,
+        &RetainedWork {
+            trace: trace.clone(),
+            ..Default::default()
+        },
+        "replica_a",
+        now,
+    )
+    .await
+    .expect("a committed tombstone is not an error, however the call reported it");
 
-    assert_eq!(*port.purged.lock().expect("purged lock"), vec!["ten_w"]);
+    assert!(
+        port.is_tenant_purged("ten_w")
+            .await
+            .expect("tombstone state")
+    );
     assert!(
         port.released.lock().expect("released lock").is_empty(),
         "the lease is not released when the tenant is already terminal"

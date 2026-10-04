@@ -16,6 +16,9 @@ use std::time::Duration;
 use serde_json::Value;
 use tokio::task::JoinHandle;
 
+const SERVER_STARTUP_TIMEOUT: Duration = Duration::from_secs(10);
+const SERVER_CLEANUP_TIMEOUT: Duration = Duration::from_secs(2);
+
 #[derive(Clone)]
 pub struct TestTenant {
     pub name: String,
@@ -77,6 +80,11 @@ pub struct HttpServerFixture {
 
 impl HttpServerFixture {
     pub async fn spawn(config: HttpServerConfig) -> Self {
+        Self::spawn_command(config, Command::new(env!("CARGO_BIN_EXE_memory_mcp_http"))).await
+    }
+
+    /// Apply the same startup handshake to a controlled external process.
+    pub async fn spawn_command(config: HttpServerConfig, mut cmd: Command) -> Self {
         let client = reqwest::Client::builder()
             .timeout(Duration::from_secs(10))
             .build()
@@ -95,7 +103,6 @@ impl HttpServerFixture {
             None => config.storage_url.clone(),
         };
 
-        let mut cmd = Command::new(env!("CARGO_BIN_EXE_memory_mcp_http"));
         cmd.stdout(Stdio::piped())
             .stderr(Stdio::piped())
             .env("RUST_LOG", "info");
@@ -106,24 +113,47 @@ impl HttpServerFixture {
         let stdout = child.stdout.take().expect("stdout piped");
         let stderr = child.stderr.take().expect("stderr piped");
 
-        let bound = tokio::task::spawn_blocking(move || {
+        let mut bound = tokio::task::spawn_blocking(move || {
             let reader = BufReader::new(stdout);
             for line in reader.lines() {
-                let line = line.expect("read stdout");
+                let line = line.map_err(|error| format!("read server stdout: {error}"))?;
                 if let Some(addr) = line.strip_prefix("memory_mcp_http bound=") {
-                    return addr.to_string();
+                    return Ok(addr.to_string());
                 }
             }
-            panic!("server exited before printing bound line");
+            Err("server exited before printing bound line".to_string())
         });
-        let stderr_drain = tokio::task::spawn_blocking(move || {
+        let mut stderr_drain = tokio::task::spawn_blocking(move || {
             let reader = BufReader::new(stderr);
             for line in reader.lines() {
-                let line = line.expect("read stderr");
+                let Ok(line) = line else {
+                    break;
+                };
                 eprintln!("server stderr: {line}");
             }
         });
-        let addr = bound.await.expect("join bound line");
+        let addr = match tokio::time::timeout(SERVER_STARTUP_TIMEOUT, &mut bound).await {
+            Ok(Ok(Ok(addr))) => addr,
+            Ok(Ok(Err(error))) => {
+                stop_startup_child(&mut child).await;
+                let _ = tokio::time::timeout(Duration::from_secs(1), &mut stderr_drain).await;
+                panic!("HTTP server failed before binding: {error}");
+            }
+            Ok(Err(error)) => {
+                stop_startup_child(&mut child).await;
+                let _ = tokio::time::timeout(Duration::from_secs(1), &mut stderr_drain).await;
+                panic!("HTTP server stdout reader failed: {error}");
+            }
+            Err(_) => {
+                stop_startup_child(&mut child).await;
+                let _ = tokio::time::timeout(Duration::from_secs(1), &mut bound).await;
+                let _ = tokio::time::timeout(Duration::from_secs(1), &mut stderr_drain).await;
+                panic!(
+                    "HTTP server did not report its bound address within {}s",
+                    SERVER_STARTUP_TIMEOUT.as_secs()
+                );
+            }
+        };
         let base_url = format!("http://{addr}");
 
         Self {
@@ -190,6 +220,27 @@ impl HttpServerFixture {
         // directory and its contents survive the restart.
         let new = Self::spawn(std::mem::take(&mut self.config)).await;
         let _ = std::mem::replace(self, new);
+    }
+}
+
+async fn stop_startup_child(child: &mut Child) {
+    if matches!(child.try_wait(), Ok(Some(_))) {
+        return;
+    }
+    let _ = child.kill();
+    let deadline = std::time::Instant::now() + SERVER_CLEANUP_TIMEOUT;
+    loop {
+        match child.try_wait() {
+            Ok(Some(_)) => return,
+            Ok(None) if std::time::Instant::now() < deadline => {
+                tokio::time::sleep(Duration::from_millis(10)).await;
+            }
+            Ok(None) => panic!(
+                "HTTP server did not exit within {}s after startup was aborted",
+                SERVER_CLEANUP_TIMEOUT.as_secs()
+            ),
+            Err(error) => panic!("failed to reap HTTP server after startup: {error}"),
+        }
     }
 }
 

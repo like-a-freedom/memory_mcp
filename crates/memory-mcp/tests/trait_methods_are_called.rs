@@ -383,25 +383,7 @@ fn contains_method_call(tokens: &[rust_source::Token], trait_name: &str, method:
 }
 
 fn turbofish_call_follows(tokens: &[rust_source::Token], start: usize) -> bool {
-    if !double_colon_at(tokens, start)
-        || !tokens.get(start + 1).is_some_and(|token| token.text == "<")
-    {
-        return false;
-    }
-    let mut depth = 0usize;
-    for (index, token) in tokens.iter().enumerate().skip(start + 1) {
-        match token.text.as_str() {
-            "<" => depth += 1,
-            ">" => {
-                depth = depth.saturating_sub(1);
-                if depth == 0 {
-                    return tokens.get(index + 1).is_some_and(|token| token.text == "(");
-                }
-            }
-            _ => {}
-        }
-    }
-    false
+    rust_source::call_open(tokens, start).is_some()
 }
 
 fn double_colon_at(tokens: &[rust_source::Token], index: usize) -> bool {
@@ -531,6 +513,29 @@ fn lexical_call_scan_ignores_comments_and_string_literals() {
     let tokens = rust_source::tokenize(source).expect("tokenize");
     assert!(!contains_method_call(&tokens, "TaskStore", "load"));
     assert!(contains_method_call(&tokens, "TaskStore", "save"));
+}
+
+#[test]
+fn turbofish_calls_are_found_for_receiver_associated_and_qualified_paths() {
+    let sources = [
+        "fn caller(store: Store) { store.load::<u8>(); }",
+        "fn caller() { TaskStore::load::<u8>(); }",
+        "fn caller() { <Store as TaskStore>::load::<u8>(); }",
+    ];
+
+    for source in sources {
+        let tokens = rust_source::tokenize(source).expect("tokenize turbofish call");
+        assert!(
+            tokens
+                .windows(2)
+                .any(|pair| pair[0].text == ":" && pair[1].text == ":"),
+            "the fixture uses the lexer's two-token `::` representation"
+        );
+        assert!(
+            contains_method_call(&tokens, "TaskStore", "load"),
+            "missed turbofish call in {source}"
+        );
+    }
 }
 
 /// `TaskStore` had eleven methods and one of them was a promise nobody asked

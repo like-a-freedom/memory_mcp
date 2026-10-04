@@ -82,11 +82,6 @@ impl OperationGuard {
     pub fn runtime(&self) -> &Arc<TenantRuntime> {
         &self.runtime
     }
-
-    #[cfg(test)]
-    pub fn pin_counter(&self) -> Arc<AtomicU32> {
-        self.pin_count.clone()
-    }
 }
 
 impl Drop for OperationGuard {

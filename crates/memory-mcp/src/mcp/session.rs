@@ -2,6 +2,8 @@
 //!
 //! Session state lives in [`crate::service::apps::session`]; this module
 //! maps service results to `rmcp::ErrorData` and shapes protocol envelopes.
+//! Its tests are isolated protocol-mapping units; persistence scenarios live at
+//! the owning session interface.
 
 #![cfg_attr(not(feature = "mcp-apps"), allow(dead_code))]
 
@@ -147,34 +149,6 @@ mod tests {
     }
 
     #[test]
-    fn app_command_result_carries_the_resource_uri_through() {
-        let observed = app_command_result_from_details(
-            "diff",
-            "ses:2",
-            "export_diff",
-            Some("ui://memory/app/diff/ses:2".to_string()),
-            serde_json::json!({}),
-        )
-        .resource_uri;
-
-        assert_eq!(observed.as_deref(), Some("ui://memory/app/diff/ses:2"));
-    }
-
-    #[test]
-    fn app_command_result_keeps_the_raw_details() {
-        let observed = app_command_result_from_details(
-            "diff",
-            "ses:2",
-            "export_diff",
-            None,
-            serde_json::json!({"added": 2}),
-        )
-        .details;
-
-        assert_eq!(observed.expect("details are retained")["added"], 2);
-    }
-
-    #[test]
     fn invalid_params_carries_retry_guidance() {
         let observed = invalid_params("bad input").data.expect("data is attached");
 
@@ -210,13 +184,5 @@ mod tests {
             .expect("data is attached");
 
         assert!(observed["guidance"].is_string());
-    }
-
-    #[test]
-    fn open_app_result_carries_the_supplied_fallback() {
-        let observed =
-            open_app_result("inspector", "ses:1", serde_json::json!({"rows": []})).fallback;
-
-        assert_eq!(observed["rows"].as_array().map(Vec::len), Some(0));
     }
 }

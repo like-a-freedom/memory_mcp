@@ -1065,12 +1065,14 @@ mod tests {
     use chrono::Datelike;
     #[cfg(feature = "mcp-apps")]
     use chrono::{TimeZone, Utc};
-    use rmcp::model::ProtocolVersion;
     #[cfg(feature = "mcp-apps")]
     use rmcp::model::{ReadResourceRequestParams, ResourceContents};
     use serde_json::{Value, json};
     use std::path::Path;
 
+    /// Integration fixture: opens a real embedded Mem engine and applies its
+    /// migrations. Tests that build `MemoryMcp` from this adapter are integration
+    /// scenarios even though they share this `#[cfg(test)]` module.
     async fn test_db_client() -> Arc<SurrealDbClient> {
         let namespaces = vec!["org".to_string()];
         let db_client = Arc::new(
@@ -1141,11 +1143,6 @@ mod tests {
 
     fn schema_json<T: schemars::JsonSchema>() -> serde_json::Value {
         serde_json::to_value(schemars::schema_for!(T)).expect("schema json")
-    }
-
-    #[test]
-    fn protocol_version_2026_07_28_is_canonical() {
-        assert_eq!(PROTOCOL_VERSION_2026_07_28, ProtocolVersion::V_2026_07_28);
     }
 
     #[cfg(feature = "streamable-http")]

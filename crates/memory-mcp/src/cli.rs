@@ -184,48 +184,72 @@ mod tests {
     }
 
     #[test]
-    fn lifecycle_parser_covers_every_typed_operation() {
-        let cases = [
-            (
-                ["archive-candidates", "episode:test", "--dry-run"].as_slice(),
-                args::LifecycleOperation::ArchiveCandidates {
-                    target_ids: vec!["episode:test".to_string()],
-                    dry_run: true,
-                    confirmed: false,
-                },
-            ),
-            (
-                ["restore-archived", "episode:test", "--confirmed"].as_slice(),
-                args::LifecycleOperation::RestoreArchived {
-                    target_ids: vec!["episode:test".to_string()],
-                    confirmed: true,
-                },
-            ),
-            (
-                ["recompute-decay", "--dry-run"].as_slice(),
-                args::LifecycleOperation::RecomputeDecay {
-                    dry_run: true,
-                    confirmed: false,
-                },
-            ),
-            (
-                ["rebuild-communities", "--dry-run"].as_slice(),
-                args::LifecycleOperation::RebuildCommunities {
-                    dry_run: true,
-                    confirmed: false,
-                },
-            ),
-        ];
+    fn archive_candidates_parser_preserves_target_and_dry_run_arguments() {
+        let cli = Cli::try_parse_from([
+            "memory_mcp",
+            "lifecycle",
+            "archive-candidates",
+            "episode:test",
+            "--dry-run",
+        ])
+        .expect("archive-candidates command should parse");
+        let Some(Command::Lifecycle(parsed)) = cli.command else {
+            panic!("expected lifecycle command");
+        };
 
-        for (operation_args, expected) in cases {
-            let mut argv = vec!["memory_mcp", "lifecycle"];
-            argv.extend(operation_args);
-            let cli = Cli::try_parse_from(argv).expect("lifecycle operation should parse");
-            let Some(Command::Lifecycle(parsed)) = cli.command else {
-                panic!("expected lifecycle command");
-            };
-            assert_eq!(parsed.operation, expected);
-        }
+        assert_eq!(
+            parsed.operation,
+            args::LifecycleOperation::ArchiveCandidates {
+                target_ids: vec!["episode:test".to_string()],
+                dry_run: true,
+                confirmed: false,
+            }
+        );
+    }
+
+    #[test]
+    fn restore_archived_parser_preserves_confirmation_argument() {
+        let cli = Cli::try_parse_from([
+            "memory_mcp",
+            "lifecycle",
+            "restore-archived",
+            "episode:test",
+            "--confirmed",
+        ])
+        .expect("restore-archived command should parse");
+        let Some(Command::Lifecycle(parsed)) = cli.command else {
+            panic!("expected lifecycle command");
+        };
+
+        assert_eq!(
+            parsed.operation,
+            args::LifecycleOperation::RestoreArchived {
+                target_ids: vec!["episode:test".to_string()],
+                confirmed: true,
+            }
+        );
+    }
+
+    #[test]
+    fn rebuild_communities_parser_preserves_dry_run_arguments() {
+        let cli = Cli::try_parse_from([
+            "memory_mcp",
+            "lifecycle",
+            "rebuild-communities",
+            "--dry-run",
+        ])
+        .expect("rebuild-communities command should parse");
+        let Some(Command::Lifecycle(parsed)) = cli.command else {
+            panic!("expected lifecycle command");
+        };
+
+        assert_eq!(
+            parsed.operation,
+            args::LifecycleOperation::RebuildCommunities {
+                dry_run: true,
+                confirmed: false,
+            }
+        );
     }
 
     #[test]

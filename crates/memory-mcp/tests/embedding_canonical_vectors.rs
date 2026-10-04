@@ -4,7 +4,7 @@
 
 use std::sync::{Arc, Mutex};
 
-use chrono::{DateTime, Utc};
+use chrono::{DateTime, TimeZone, Utc};
 use memory_mcp::MemoryError;
 use memory_mcp::embedding::api::{
     CanonicalVectorPort, StoredVector, VectorApplication, VectorIdentity, VectorWritePolicy,
@@ -82,6 +82,12 @@ fn target(signature: &str, dimension: usize) -> VectorIdentity {
     }
 }
 
+fn fixed_at() -> DateTime<Utc> {
+    Utc.with_ymd_and_hms(2026, 10, 3, 12, 0, 0)
+        .single()
+        .expect("fixed UTC time")
+}
+
 #[tokio::test]
 async fn vector_update_rejects_a_dimension_that_does_not_match_the_target() {
     let port = RecordingPort::fresh();
@@ -92,7 +98,7 @@ async fn vector_update_rejects_a_dimension_that_does_not_match_the_target() {
         "fact:f1",
         vec![0.1, 0.2],
         &identity,
-        Utc::now(),
+        fixed_at(),
         VectorWritePolicy::ReplaceStale,
     )
     .await
@@ -112,7 +118,7 @@ async fn vector_update_rejects_a_dimension_that_does_not_match_the_target() {
 async fn vector_update_writes_once_and_advances_the_stored_signature() {
     let port = RecordingPort::fresh();
     let identity = target("sig-a", 3);
-    let at = Utc::now();
+    let at = fixed_at();
 
     let applied = update_canonical_vector(
         port.as_ref(),
@@ -144,7 +150,7 @@ async fn repeating_the_current_signature_is_a_no_op() {
         "fact:f1",
         vec![0.1, 0.2, 0.3],
         &identity,
-        Utc::now(),
+        fixed_at(),
         VectorWritePolicy::ReplaceStale,
     )
     .await
@@ -154,7 +160,7 @@ async fn repeating_the_current_signature_is_a_no_op() {
         "fact:f1",
         vec![0.4, 0.5, 0.6],
         &identity,
-        Utc::now(),
+        fixed_at(),
         VectorWritePolicy::ReplaceStale,
     )
     .await
@@ -181,7 +187,7 @@ async fn a_changed_signature_rewrites_the_record() {
         "fact:f1",
         vec![0.1, 0.2, 0.3],
         &target("sig-a", 3),
-        Utc::now(),
+        fixed_at(),
         VectorWritePolicy::ReplaceStale,
     )
     .await
@@ -192,7 +198,7 @@ async fn a_changed_signature_rewrites_the_record() {
         "fact:f1",
         vec![0.7, 0.8, 0.9],
         &target("sig-b", 3),
-        Utc::now(),
+        fixed_at(),
         VectorWritePolicy::ReplaceStale,
     )
     .await
@@ -204,21 +210,32 @@ async fn a_changed_signature_rewrites_the_record() {
     assert_eq!(calls[1].identity.signature, "sig-b");
 }
 
-#[tokio::test]
-async fn preparation_never_generates_and_only_validates_identity() {
+#[test]
+fn preparation_accepts_a_vector_matching_the_target() {
     let identity = target("sig-a", 3);
-    let prepared = prepare_canonical_vector(vec![0.1, 0.2, 0.3], &identity, Utc::now())
+    let at = fixed_at();
+    let prepared = prepare_canonical_vector(vec![0.1, 0.2, 0.3], &identity, at)
         .expect("a matching vector is prepared");
     assert_eq!(prepared.vector, vec![0.1, 0.2, 0.3]);
     assert_eq!(prepared.identity, identity);
+    assert_eq!(prepared.at, at);
+}
+
+#[test]
+fn preparation_rejects_a_vector_with_the_wrong_dimension() {
+    let result = prepare_canonical_vector(vec![0.1], &target("sig-a", 3), fixed_at());
 
     assert!(
-        prepare_canonical_vector(vec![0.1], &identity, Utc::now()).is_err(),
-        "preparation enforces the target dimension"
+        matches!(result, Err(MemoryError::Validation(message)) if message.contains("dimension"))
     );
+}
+
+#[test]
+fn preparation_rejects_an_empty_vector() {
+    let result = prepare_canonical_vector(Vec::new(), &target("sig-a", 3), fixed_at());
+
     assert!(
-        prepare_canonical_vector(Vec::new(), &identity, Utc::now()).is_err(),
-        "an empty vector is not a valid embedding"
+        matches!(result, Err(MemoryError::Validation(message)) if message == "embedding vector is empty")
     );
 }
 
@@ -239,30 +256,36 @@ async fn preparation_never_generates_and_only_validates_identity() {
 /// about what it proves.
 struct InterleavingDb {
     inner: Arc<SurrealDbClient>,
-    /// The fact whose concurrent write is still pending, consumed once.
-    pending: Mutex<Option<String>>,
+    /// A concurrent owner write held until the canonical conditional write.
+    pending: Mutex<Option<(String, serde_json::Value)>>,
 }
 
 impl InterleavingDb {
     fn new(inner: Arc<SurrealDbClient>, fact_id: &str) -> Arc<Self> {
+        Self::with_change(inner, fact_id, serde_json::json!({ "access_count": 7 }))
+    }
+
+    fn with_change(
+        inner: Arc<SurrealDbClient>,
+        fact_id: &str,
+        change: serde_json::Value,
+    ) -> Arc<Self> {
         Arc::new(Self {
             inner,
-            pending: Mutex::new(Some(fact_id.to_string())),
+            pending: Mutex::new(Some((fact_id.to_string(), change))),
         })
     }
 
-    /// Apply the pending concurrent change, if this call targets it.
+    /// Apply the competing owner write immediately before the vector CAS.
     async fn race_ahead_of(&self, namespace: &str) -> Result<(), MemoryError> {
         let target = self.pending.lock().expect("pending lock").take();
-        let Some(fact_id) = target else {
+        let Some((fact_id, change)) = target else {
             return Ok(());
         };
-        // A retrieval heat update: the access log owns this field, and a
-        // vector write has no business rewriting it.
         self.inner
             .update(
                 &fact_id,
-                serde_json::json!({ "access_count": 7 }),
+                change,
                 namespace,
                 memory_mcp::knowledge::queries::FACT_TEMPORAL_FIELDS,
             )
@@ -320,7 +343,9 @@ impl DbClient for InterleavingDb {
         vars: Option<serde_json::Value>,
         namespace: &str,
     ) -> Result<serde_json::Value, MemoryError> {
-        self.race_ahead_of(namespace).await?;
+        if sql.starts_with("UPDATE type::record('fact'") {
+            self.race_ahead_of(namespace).await?;
+        }
         self.inner.query(sql, vars, namespace).await
     }
 
@@ -367,7 +392,7 @@ fn adapter_identity(signature: &str) -> VectorIdentity {
 }
 
 async fn seed_adapter_fact(db: &Arc<SurrealDbClient>, fact_id: &str) -> serde_json::Value {
-    let now = memory_mcp::shared::temporal::normalize_dt(memory_mcp::shared::temporal::now());
+    let now = memory_mcp::shared::temporal::normalize_dt(fixed_at());
     db.create(
         fact_id,
         serde_json::json!({
@@ -394,9 +419,14 @@ async fn seed_adapter_fact(db: &Arc<SurrealDbClient>, fact_id: &str) -> serde_js
 }
 
 async fn read_fact(db: &Arc<SurrealDbClient>, fact_id: &str) -> serde_json::Value {
-    db.select_one(fact_id, ADAPTER_NAMESPACE)
+    let db_client: Arc<dyn DbClient> = Arc::clone(db) as Arc<dyn DbClient>;
+    let reader =
+        memory_mcp::knowledge::infra::KnowledgeReadAdapter::new(db_client, ADAPTER_NAMESPACE);
+    memory_mcp::knowledge::api::owned_fact_scan(&reader)
         .await
-        .expect("read fact")
+        .expect("scan facts")
+        .into_iter()
+        .find(|record| record.get("fact_id").and_then(serde_json::Value::as_str) == Some(fact_id))
         .unwrap_or_else(|| panic!("{fact_id} must exist"))
 }
 
@@ -420,7 +450,7 @@ async fn replace_stale_preserves_concurrent_fact_access() {
         fact_id,
         vec![0.1; ADAPTER_DIMENSION],
         &adapter_identity("sig-new"),
-        Utc::now(),
+        fixed_at(),
         VectorWritePolicy::ReplaceStale,
     )
     .await
@@ -447,10 +477,9 @@ async fn replace_stale_preserves_concurrent_fact_access() {
     assert_eq!(stored["index_keys"][0], "alpha");
 }
 
-/// A gap fill must not overwrite a vector that already exists, even when it
-/// raced: the second writer's answer is "already current", not "applied".
+/// Sequential refusal through the advisory read.
 #[tokio::test]
-async fn fill_missing_loser_reports_already_current() {
+async fn sequential_fill_refuses_a_current_vector() {
     let db = adapter_db().await;
     let fact_id = "fact:adapter_gap";
     seed_adapter_fact(&db, fact_id).await;
@@ -461,7 +490,7 @@ async fn fill_missing_loser_reports_already_current() {
         fact_id,
         vec![0.1; ADAPTER_DIMENSION],
         &adapter_identity("sig-winner"),
-        Utc::now(),
+        fixed_at(),
         VectorWritePolicy::FillMissing,
     )
     .await
@@ -473,7 +502,7 @@ async fn fill_missing_loser_reports_already_current() {
         fact_id,
         vec![0.9; ADAPTER_DIMENSION],
         &adapter_identity("sig-loser"),
-        Utc::now(),
+        fixed_at(),
         VectorWritePolicy::FillMissing,
     )
     .await
@@ -489,6 +518,47 @@ async fn fill_missing_loser_reports_already_current() {
     );
 }
 
+/// Integration scenario: the advisory read sees no vector, then another writer
+/// wins before the conditional write reaches storage.
+#[tokio::test]
+async fn fill_missing_cas_loser_keeps_the_winning_signature()
+-> Result<(), Box<dyn std::error::Error>> {
+    let db = adapter_db().await;
+    let fact_id = "fact:adapter_cas_loser";
+    seed_adapter_fact(&db, fact_id).await;
+    let winning_fields = serde_json::json!({
+        "embedding": vec![0.4; ADAPTER_DIMENSION],
+        "embedding_provider": "openai",
+        "embedding_model": "text-embedding-3-small",
+        "embedding_dimension": ADAPTER_DIMENSION,
+        "embedding_signature": "sig-winner",
+        "embedding_updated_at": memory_mcp::shared::temporal::normalize_dt(fixed_at()),
+    });
+    let racing: Arc<dyn DbClient> =
+        InterleavingDb::with_change(Arc::clone(&db), fact_id, winning_fields);
+    let port = adapter(racing);
+
+    let result = update_canonical_vector(
+        &port,
+        fact_id,
+        vec![0.9; ADAPTER_DIMENSION],
+        &adapter_identity("sig-loser"),
+        fixed_at(),
+        VectorWritePolicy::FillMissing,
+    )
+    .await?;
+
+    assert_eq!(result, VectorApplication::AlreadyCurrent);
+    assert_eq!(
+        port.stored_fact_vector(fact_id).await?,
+        StoredVector::Present {
+            signature: "sig-winner".to_owned()
+        },
+        "the storage predicate must preserve the vector written after the absent read"
+    );
+    Ok(())
+}
+
 /// The predicate cannot distinguish "already has a vector" from "no such
 /// fact", so the adapter must answer that question separately.
 #[tokio::test]
@@ -501,7 +571,7 @@ async fn canonical_write_missing_fact_is_not_found() {
         "fact:does_not_exist",
         vec![0.1; ADAPTER_DIMENSION],
         &adapter_identity("sig-new"),
-        Utc::now(),
+        fixed_at(),
         VectorWritePolicy::ReplaceStale,
     )
     .await
@@ -529,7 +599,7 @@ async fn vector_write_rejects_a_forged_record_target() {
         &forged,
         vec![0.1; ADAPTER_DIMENSION],
         &adapter_identity("sig-forged"),
-        Utc::now(),
+        fixed_at(),
         VectorWritePolicy::ReplaceStale,
     )
     .await;

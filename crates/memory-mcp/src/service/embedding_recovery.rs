@@ -268,6 +268,7 @@ pub(crate) async fn run_backfill(
                     dimension,
                     signature: signature.to_owned(),
                 },
+                crate::shared::temporal::now,
                 // Backfill only fills gaps: a fact selected here
                 // had no vector, and a concurrent pass that
                 // already wrote one keeps it.

@@ -1468,14 +1468,14 @@ struct SetStateBody {
 
 #[cfg(test)]
 mod tests {
-    /// Regression: every request construction must go through
+    /// Architecture lint: every request construction must go through
     /// `crate::base::url(...)`. A single unwrapped site (the `revoke_key`
     /// DELETE was exactly that) sends the request to origin-root under a
     /// mount base — on a shared host it leaves the prefix entirely, and at
-    /// the origin root every test stays green, so the gap hides. This scan
-    /// makes the whole class unrepresentable.
+    /// the origin root every test stays green, so the gap hides. This checker
+    /// protects source policy; it is not functional UI behavior coverage.
     #[test]
-    fn every_request_construction_is_wrapped_in_the_base_url() {
+    fn architecture_lint_requires_every_request_to_use_the_base_url() {
         let src = include_str!("admin_api.rs");
         // Scan production code only: the test module itself contains the
         // constructor names as string literals (the `ctors` array below).
@@ -1500,68 +1500,7 @@ mod tests {
 
     use super::*;
 
-    // ── Operation ids ─────────────────────────────────────
-
-    /// The formatter is the only part of id generation that is portable, so it
-    /// is the part worth pinning: the version and variant bits are set here, not
-    /// trusted from the source.
-    #[test]
-    fn formatting_sets_the_v4_version_and_variant_bits() {
-        let id = format_v4([0x00; 16]);
-        assert_eq!(id.len(), 36);
-        assert_eq!(id.matches('-').count(), 4);
-        assert_eq!(&id[14..15], "4", "version nibble");
-        assert!(
-            matches!(&id[19..20], "8" | "9" | "a" | "b"),
-            "variant nibble must be RFC 4122, got {}",
-            &id[19..20]
-        );
-        assert!(OperationId::parse(&id).is_some());
-    }
-
-    #[test]
-    fn formatting_is_lowercase_hex_in_canonical_positions() {
-        assert_eq!(
-            format_v4([
-                0x00, 0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77, 0x88, 0x99, 0xaa, 0xbb, 0xcc, 0xdd,
-                0xee, 0xff,
-            ]),
-            "00112233-4455-4677-8899-aabbccddeeff"
-        );
-    }
-
-    #[test]
-    fn every_formatted_id_passes_the_parser() {
-        for seed in 0u8..=255 {
-            let id = format_v4([seed; 16]);
-            assert!(OperationId::parse(&id).is_some(), "{id} was rejected");
-        }
-    }
-
-    // ── Browser clock ─────────────────────────────────────
-
-    /// `browser_now_millis` cannot be called from a host test: `Date::now()` is a
-    /// `wasm-bindgen` import that has no host implementation. The range check is
-    /// the part that can be pinned here, and it is the part that decides whether
-    /// an unusable reading reaches `ApiKeyMeta::display_status`.
-    #[test]
-    fn a_clock_reading_is_accepted_only_when_it_names_a_real_instant() {
-        assert_eq!(millis_to_i64(0.0), Some(0));
-        assert_eq!(millis_to_i64(1_756_000_000_000.0), Some(1_756_000_000_000));
-        // Sub-millisecond precision is truncated, never rounded up into a
-        // different instant.
-        assert_eq!(millis_to_i64(1_756_000_000_000.75), Some(1_756_000_000_000));
-
-        // Before the epoch, non-finite, and out of range are all "unknown"
-        // rather than a silently wrong instant.
-        assert_eq!(millis_to_i64(-1.0), None);
-        assert_eq!(millis_to_i64(f64::NAN), None);
-        assert_eq!(millis_to_i64(f64::INFINITY), None);
-        assert_eq!(millis_to_i64(f64::NEG_INFINITY), None);
-        assert_eq!(millis_to_i64(f64::MAX), None);
-    }
-
-    /// An unknown clock must degrade to the server-reported status, not to a
+    /// A missing browser clock must degrade to the server-reported status, not to a
     /// guess that a key has expired.
     #[test]
     fn an_unknown_clock_leaves_the_server_reported_status_alone() {

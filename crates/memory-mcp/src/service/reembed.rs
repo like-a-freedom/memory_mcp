@@ -879,6 +879,7 @@ impl MemoryService {
                 dimension: target_dimension,
                 signature: target_signature.to_owned(),
             },
+            crate::shared::temporal::now,
             // Re-embedding exists to replace a stale signature,
             // so a mismatched vector is overwritten; a fact that
             // is already current is left alone.

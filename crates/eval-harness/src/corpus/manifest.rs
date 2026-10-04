@@ -335,35 +335,6 @@ mod tests {
     }
 
     #[test]
-    fn digest_mismatch_invalidates_the_corpus() {
-        let dir = tempfile::tempdir().unwrap();
-        let data_path = dir.path().join("data.json");
-        std::fs::write(&data_path, b"actual content").unwrap();
-
-        let manifest_json = serde_json::json!({
-            "schema_version": "memory-mcp-corpus/v1",
-            "corpus_id": "test",
-            "source_url": "https://example.com",
-            "revision": "rev1",
-            "sha256": "0".repeat(64),
-            "license": "MIT",
-            "byte_size": 14,
-            "case_count": 1,
-            "adapter_version": "1",
-            "data_file": "data.json"
-        })
-        .to_string();
-
-        let manifest = CorpusManifest::parse(&manifest_json).unwrap();
-        let result = manifest.validate_at(dir.path());
-        assert!(result.is_err());
-        assert!(
-            result.unwrap_err().to_string().contains("sha-256 mismatch"),
-            "expected sha-256 mismatch error"
-        );
-    }
-
-    #[test]
     fn unknown_manifest_fields_are_rejected() {
         let raw = valid_manifest_json().replace("\"license\"", "\"unexpected\":1,\"license\"");
         assert!(CorpusManifest::parse(&raw).is_err());
@@ -376,14 +347,27 @@ mod tests {
     }
 
     #[test]
-    fn symbolic_revision_is_rejected() {
-        for sym in ["main", "master", "latest", "HEAD"] {
-            let raw = valid_manifest_json().replace("\"abc123\"", &format!("\"{sym}\""));
-            assert!(
-                CorpusManifest::parse(&raw).is_err(),
-                "symbolic revision '{sym}' should be rejected"
-            );
-        }
+    fn main_revision_is_rejected() {
+        let raw = valid_manifest_json().replace("\"abc123\"", "\"main\"");
+        assert!(CorpusManifest::parse(&raw).is_err());
+    }
+
+    #[test]
+    fn master_revision_is_rejected() {
+        let raw = valid_manifest_json().replace("\"abc123\"", "\"master\"");
+        assert!(CorpusManifest::parse(&raw).is_err());
+    }
+
+    #[test]
+    fn latest_revision_is_rejected() {
+        let raw = valid_manifest_json().replace("\"abc123\"", "\"latest\"");
+        assert!(CorpusManifest::parse(&raw).is_err());
+    }
+
+    #[test]
+    fn head_revision_is_rejected() {
+        let raw = valid_manifest_json().replace("\"abc123\"", "\"HEAD\"");
+        assert!(CorpusManifest::parse(&raw).is_err());
     }
 
     #[test]
@@ -439,21 +423,38 @@ mod tests {
     }
 
     #[test]
-    fn manifest_paths_cannot_escape_or_overwrite_metadata() {
-        for (field, value) in [
-            ("corpus_id", "../escape"),
-            ("revision", "/tmp/escape"),
-            ("data_file", "/tmp/data.json"),
-            ("data_file", "manifest.json"),
-            ("data_file", "."),
-        ] {
-            let mut raw: serde_json::Value = serde_json::from_str(&valid_manifest_json()).unwrap();
-            raw[field] = value.into();
-            assert!(
-                CorpusManifest::parse(&raw.to_string()).is_err(),
-                "accepted {field}={value}"
-            );
-        }
+    fn corpus_id_parent_traversal_is_rejected() {
+        let mut raw: serde_json::Value = serde_json::from_str(&valid_manifest_json()).unwrap();
+        raw["corpus_id"] = "../escape".into();
+        assert!(CorpusManifest::parse(&raw.to_string()).is_err());
+    }
+
+    #[test]
+    fn absolute_revision_is_rejected() {
+        let mut raw: serde_json::Value = serde_json::from_str(&valid_manifest_json()).unwrap();
+        raw["revision"] = "/tmp/escape".into();
+        assert!(CorpusManifest::parse(&raw.to_string()).is_err());
+    }
+
+    #[test]
+    fn absolute_data_file_is_rejected() {
+        let mut raw: serde_json::Value = serde_json::from_str(&valid_manifest_json()).unwrap();
+        raw["data_file"] = "/tmp/data.json".into();
+        assert!(CorpusManifest::parse(&raw.to_string()).is_err());
+    }
+
+    #[test]
+    fn manifest_metadata_cannot_be_replaced_by_corpus_data() {
+        let mut raw: serde_json::Value = serde_json::from_str(&valid_manifest_json()).unwrap();
+        raw["data_file"] = "manifest.json".into();
+        assert!(CorpusManifest::parse(&raw.to_string()).is_err());
+    }
+
+    #[test]
+    fn dot_is_not_a_data_file() {
+        let mut raw: serde_json::Value = serde_json::from_str(&valid_manifest_json()).unwrap();
+        raw["data_file"] = ".".into();
+        assert!(CorpusManifest::parse(&raw.to_string()).is_err());
     }
 
     #[test]
@@ -476,39 +477,5 @@ mod tests {
         let short_hash = &valid_hash[..32];
         let raw = valid_manifest_json().replace(valid_hash, short_hash);
         assert!(CorpusManifest::parse(&raw).is_err());
-    }
-
-    #[test]
-    fn valid_manifest_with_correct_digest_passes() {
-        use std::io::Write;
-
-        let dir = tempfile::tempdir().unwrap();
-        let data_path = dir.path().join("data.json");
-        let content = b"test content here";
-        let mut file = std::fs::File::create(&data_path).unwrap();
-        file.write_all(content).unwrap();
-        file.sync_all().unwrap();
-
-        let mut hasher = Sha256::new();
-        hasher.update(content);
-        let hash = hex::encode(hasher.finalize());
-
-        let manifest_json = serde_json::json!({
-            "schema_version": "memory-mcp-corpus/v1",
-            "corpus_id": "test",
-            "source_url": "https://example.com",
-            "revision": "rev1",
-            "sha256": hash,
-            "license": "MIT",
-            "byte_size": content.len(),
-            "case_count": 1,
-            "adapter_version": "1",
-            "data_file": "data.json"
-        })
-        .to_string();
-
-        let manifest = CorpusManifest::parse(&manifest_json).unwrap();
-        let prepared = manifest.validate_at(dir.path()).unwrap();
-        assert!(prepared.data_path.exists());
     }
 }

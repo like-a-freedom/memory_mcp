@@ -8,6 +8,8 @@
 //! otherwise waiters wait and report progress.
 
 use std::path::{Path, PathBuf};
+use std::process::{Command, Output, Stdio};
+use std::time::{Duration, Instant};
 
 use crate::error::MemoryError;
 
@@ -128,29 +130,70 @@ impl Drop for Lease {
 ///
 /// Uses `kill -0` on Unix and `tasklist` on Windows. Any tool failure is
 /// treated as "unknown" (`None`), which callers must interpret as
-/// wait-instead-of-reclaim.
+/// wait-instead-of-reclaim. Unix permission errors do not prove death;
+/// only the standard missing-process diagnostic can authorize reclamation.
 pub fn process_is_live(pid: u32) -> Option<bool> {
     #[cfg(unix)]
     {
-        let status = std::process::Command::new("kill")
-            .arg("-0")
-            .arg(pid.to_string())
-            .status()
-            .ok()?;
-        Some(status.success())
+        let output = bounded_probe(
+            Command::new("/bin/kill")
+                .env("LC_ALL", "C")
+                .arg("-0")
+                .arg(pid.to_string()),
+        )?;
+        if output.status.success() {
+            Some(true)
+        } else if String::from_utf8_lossy(&output.stderr).contains("No such process") {
+            Some(false)
+        } else {
+            None
+        }
     }
     #[cfg(windows)]
     {
-        let output = std::process::Command::new("tasklist")
-            .args(["/FI", &format!("PID eq {pid}"), "/NH"])
-            .output()
-            .ok()?;
+        let output =
+            bounded_probe(Command::new("tasklist").args(["/FI", &format!("PID eq {pid}"), "/NH"]))?;
+        if !output.status.success() {
+            return None;
+        }
         let stdout = String::from_utf8_lossy(&output.stdout);
-        Some(stdout.contains(&pid.to_string()))
+        if stdout
+            .split_whitespace()
+            .any(|field| field == pid.to_string())
+        {
+            Some(true)
+        } else if stdout.contains("No tasks are running") {
+            Some(false)
+        } else {
+            None
+        }
     }
     #[cfg(not(any(unix, windows)))]
     {
         None
+    }
+}
+
+fn bounded_probe(command: &mut Command) -> Option<Output> {
+    let mut child = command
+        .stdin(Stdio::null())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .ok()?;
+    let deadline = Instant::now() + Duration::from_secs(2);
+    loop {
+        match child.try_wait() {
+            Ok(Some(_)) => return child.wait_with_output().ok(),
+            Ok(None) if Instant::now() < deadline => {
+                std::thread::sleep(Duration::from_millis(10));
+            }
+            Ok(None) | Err(_) => {
+                let _ = child.kill();
+                let _ = child.wait();
+                return None;
+            }
+        }
     }
 }
 
@@ -159,8 +202,12 @@ pub fn process_is_live(pid: u32) -> Option<bool> {
 /// Never reclaims solely by age: the heartbeat must be expired AND the owner
 /// process must be confirmed dead. Unknown liveness means "wait".
 #[must_use]
-pub fn can_reclaim(record: &LeaseRecord, now: i64) -> bool {
-    if now - record.heartbeat_at < LEASE_HEARTBEAT_TTL_SECS {
+pub fn can_reclaim(
+    record: &LeaseRecord,
+    now: i64,
+    process_is_live: impl FnOnce(u32) -> Option<bool>,
+) -> bool {
+    if now.saturating_sub(record.heartbeat_at) < LEASE_HEARTBEAT_TTL_SECS {
         return false;
     }
     match process_is_live(record.pid) {
@@ -175,32 +222,52 @@ mod tests {
     use super::*;
     use tempfile::TempDir;
 
-    fn record(pid: u32, heartbeat_at: i64) -> LeaseRecord {
+    fn record(heartbeat_at: i64) -> LeaseRecord {
         LeaseRecord {
             extractor: "vago".to_string(),
             revision: "abc123".to_string(),
-            pid,
+            pid: 77,
             created_at: heartbeat_at - 10,
             heartbeat_at,
             staging: PathBuf::from("/tmp/staging"),
         }
     }
 
+    // Integration: the real platform probe sees the current live process.
+    #[test]
+    fn platform_probe_confirms_a_live_process() {
+        assert_eq!(process_is_live(std::process::id()), Some(true));
+    }
+
+    // Integration: the OS has reaped this child before liveness is checked.
+    #[cfg(unix)]
+    #[test]
+    fn platform_probe_confirms_a_reaped_process_is_dead() {
+        let mut child = Command::new("/bin/sh")
+            .args(["-c", "exit 0"])
+            .spawn()
+            .expect("spawn bounded child");
+        let pid = child.id();
+        child.wait().expect("reap child");
+        assert_eq!(process_is_live(pid), Some(false));
+    }
+
+    // Integration evidence: these cases exercise real temporary lease files.
     #[test]
     fn acquire_is_exclusive_and_drop_releases() {
         let dir = TempDir::new().expect("temp dir");
         let path = dir.path().join("lease.json");
-        let first = Lease::acquire(&path, &record(100, 1_700_000_000))
+        let first = Lease::acquire(&path, &record(1_700_000_000))
             .expect("acquire")
             .expect("first owner");
         assert!(
-            Lease::acquire(&path, &record(200, 1_700_000_000))
+            Lease::acquire(&path, &record(1_700_000_000))
                 .expect("acquire")
                 .is_none()
         );
         drop(first);
         assert!(
-            Lease::acquire(&path, &record(200, 1_700_000_000))
+            Lease::acquire(&path, &record(1_700_000_000))
                 .expect("acquire")
                 .is_some()
         );
@@ -210,7 +277,7 @@ mod tests {
     fn heartbeat_updates_record() {
         let dir = TempDir::new().expect("temp dir");
         let path = dir.path().join("lease.json");
-        let lease = Lease::acquire(&path, &record(100, 1_700_000_000))
+        let lease = Lease::acquire(&path, &record(1_700_000_000))
             .expect("acquire")
             .expect("owner");
         lease.heartbeat(1_700_000_100).expect("heartbeat");
@@ -218,26 +285,46 @@ mod tests {
         assert_eq!(loaded.heartbeat_at, 1_700_000_100);
     }
 
+    // Unit policy cases below receive controlled liveness and never spawn tools.
     #[test]
-    fn can_reclaim_only_after_expired_heartbeat_and_dead_process() {
-        // Fresh heartbeat: never reclaim.
+    fn fresh_heartbeat_skips_process_liveness_check() {
+        assert!(!can_reclaim(&record(1_700_000_000), 1_700_000_000, |_| {
+            panic!("fresh lease must not invoke process liveness")
+        }));
+    }
+
+    #[test]
+    fn expired_heartbeat_is_not_reclaimed_while_process_is_live() {
         assert!(!can_reclaim(
-            &record(std::process::id(), 1_700_000_000),
-            1_700_000_000
+            &record(1_700_000_000 - LEASE_HEARTBEAT_TTL_SECS - 1),
+            1_700_000_000,
+            |_| Some(true)
         ));
-        // Expired heartbeat against the live current process: never reclaim.
+    }
+
+    #[test]
+    fn expired_heartbeat_is_reclaimed_after_process_death_is_confirmed() {
+        let owner = record(1_700_000_000 - LEASE_HEARTBEAT_TTL_SECS - 1);
+
+        assert!(can_reclaim(&owner, 1_700_000_000, |pid| {
+            (pid == 77).then_some(false)
+        }));
+    }
+
+    #[test]
+    fn expired_heartbeat_is_not_reclaimed_when_process_liveness_is_unknown() {
         assert!(!can_reclaim(
-            &record(
-                std::process::id(),
-                1_700_000_000 - LEASE_HEARTBEAT_TTL_SECS - 1
-            ),
-            1_700_000_000
+            &record(1_700_000_000 - LEASE_HEARTBEAT_TTL_SECS - 1),
+            1_700_000_000,
+            |_| None
         ));
-        // Expired heartbeat with a definitely-dead PID: reclaim.
-        assert!(can_reclaim(
-            &record(999_999, 1_700_000_000 - LEASE_HEARTBEAT_TTL_SECS - 1),
-            1_700_000_000
-        ));
+    }
+
+    #[test]
+    fn a_future_heartbeat_is_not_reclaimed_at_the_clock_range_boundary() {
+        let owner = record(i64::MAX);
+
+        assert!(!can_reclaim(&owner, i64::MIN, |_| Some(false)));
     }
 
     #[test]

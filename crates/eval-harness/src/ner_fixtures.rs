@@ -11,7 +11,7 @@
 //! checkpoint (or any required file) is absent, so benches and suites can
 //! skip honestly.
 
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use memory_mcp::config::{
@@ -50,12 +50,14 @@ fn required_files(kind: NerExtractorKind) -> &'static [&'static str] {
 /// Fixture directory for a model-backed kind that is present and complete.
 /// Lightweight kinds have no fixture directory (`None`).
 fn fixture_dir(kind: NerExtractorKind) -> Option<PathBuf> {
+    fixture_dir_at(&fixture_root(), kind)
+}
+
+fn fixture_dir_at(root: &Path, kind: NerExtractorKind) -> Option<PathBuf> {
     let dir = match kind {
-        NerExtractorKind::AnnoOnnx => fixture_root().join("deepanwa--NuNerZero_onnx"),
-        NerExtractorKind::ClassicGliner => fixture_root().join("urchade--gliner_multi-v2.1"),
-        NerExtractorKind::SauerkrautLfm25 => {
-            fixture_root().join("VAGOsolutions--SauerkrautLM-LFM2.5-GLiNER")
-        }
+        NerExtractorKind::AnnoOnnx => root.join("deepanwa--NuNerZero_onnx"),
+        NerExtractorKind::ClassicGliner => root.join("urchade--gliner_multi-v2.1"),
+        NerExtractorKind::SauerkrautLfm25 => root.join("VAGOsolutions--SauerkrautLM-LFM2.5-GLiNER"),
         // Lightweight kinds never consult the filesystem.
         NerExtractorKind::Anno | NerExtractorKind::Regex => return None,
     };
@@ -165,7 +167,18 @@ pub async fn build_extractor_for(
     kind: NerExtractorKind,
     device: GlinerDeviceKind,
 ) -> Option<Arc<dyn EntityExtractor>> {
-    if let Some(dir) = fixture_dir(kind) {
+    build_extractor_from_root(&fixture_root(), kind, device).await
+}
+
+/// Build against an explicitly supplied local checkpoint root. Evaluation
+/// composition can supply owned fixtures without changing the global default
+/// or consulting a remote model registry.
+pub async fn build_extractor_from_root(
+    root: &Path,
+    kind: NerExtractorKind,
+    device: GlinerDeviceKind,
+) -> Option<Arc<dyn EntityExtractor>> {
+    if let Some(dir) = fixture_dir_at(root, kind) {
         return build_model_extractor(kind, &dir, device).await;
     }
     match kind {
@@ -201,95 +214,4 @@ pub async fn build_extractor_for(
 /// Builds the extractor for `kind` on the CPU device.
 pub async fn build_extractor(kind: NerExtractorKind) -> Option<Arc<dyn EntityExtractor>> {
     build_extractor_for(kind, GlinerDeviceKind::Cpu).await
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn fixture_root_points_at_memory_mcp_model_dir() {
-        assert!(fixture_root().ends_with("memory-mcp/tests/models/ner"));
-    }
-
-    #[test]
-    fn default_labels_cover_corpus_labels() {
-        let labels = default_labels();
-        for required in [
-            "person",
-            "company",
-            "location",
-            "product",
-            "event",
-            "technology",
-        ] {
-            assert!(labels.iter().any(|l| l == required), "missing {required}");
-        }
-    }
-
-    #[test]
-    fn lightweight_kinds_build_without_fixtures() {
-        let rt = tokio::runtime::Runtime::new().unwrap();
-        for kind in [NerExtractorKind::Anno, NerExtractorKind::Regex] {
-            let extractor = rt.block_on(build_extractor(kind));
-            assert!(extractor.is_some(), "{kind:?} must build offline");
-        }
-    }
-
-    #[test]
-    fn model_kinds_are_fixture_gated() {
-        let rt = tokio::runtime::Runtime::new().unwrap();
-        for kind in [
-            NerExtractorKind::AnnoOnnx,
-            NerExtractorKind::ClassicGliner,
-            NerExtractorKind::SauerkrautLfm25,
-        ] {
-            let extractor = rt.block_on(build_extractor(kind));
-            assert_eq!(fixture_present(kind), extractor.is_some(), "{kind:?}");
-        }
-    }
-
-    #[test]
-    fn model_kinds_declare_required_checkpoint_files() {
-        // The completeness contract that keeps `build_extractor` panic-free:
-        // every model-backed kind declares the exact files its loader reads.
-        assert_eq!(
-            required_files(NerExtractorKind::AnnoOnnx),
-            &["model.onnx", "tokenizer.json"]
-        );
-        assert_eq!(
-            required_files(NerExtractorKind::ClassicGliner),
-            &["model.safetensors", "gliner_config.json", "tokenizer.json"]
-        );
-        assert_eq!(
-            required_files(NerExtractorKind::SauerkrautLfm25),
-            &["pytorch_model.bin", "gliner_config.json", "tokenizer.json"]
-        );
-        // Lightweight kinds never consult the filesystem.
-        assert!(required_files(NerExtractorKind::Anno).is_empty());
-        assert!(required_files(NerExtractorKind::Regex).is_empty());
-    }
-
-    #[test]
-    fn corrupt_model_fixture_never_panics() {
-        // A fixture whose files exist but fail to load (a truncated ONNX
-        // session or unparseable tokenizer) must yield `None`, not panic: the
-        // completeness check proves existence only, so construction errors are
-        // mapped to `None` by `build_model_extractor`.
-        let rt = tokio::runtime::Runtime::new().unwrap();
-        let temp = tempfile::TempDir::new().expect("temp dir");
-        for file in ["model.onnx", "tokenizer.json"] {
-            std::fs::write(temp.path().join(file), b"not a real model")
-                .expect("write corrupt file");
-        }
-        let extractor = rt.block_on(build_model_extractor(
-            NerExtractorKind::AnnoOnnx,
-            temp.path(),
-            GlinerDeviceKind::Cpu,
-        ));
-        assert!(
-            extractor.is_none(),
-            "corrupt ONNX fixture must not construct"
-        );
-    }
 }

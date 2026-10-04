@@ -144,7 +144,8 @@ pub fn package(build_dir: &Path, target: &str, dist: &Path) -> Result<Vec<PathBu
     }
 
     let license = bundle.join("LICENSE");
-    fs::copy("LICENSE", &license).map_err(|e| (license.clone(), e))?;
+    let license_source = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../LICENSE");
+    fs::copy(&license_source, &license).map_err(|e| (license.clone(), e))?;
 
     // No development library search paths are added: a missing runtime library
     // has to fail here rather than pass on the build machine.
@@ -606,98 +607,231 @@ mod tests {
         assert!(!stderr_reports_missing_fs_watch("ingested 2 episodes"));
     }
 
-    /// The digest written beside an artifact must be over that artifact's
-    /// bytes: it is what a downloader verifies against, so a mismatch is a
-    /// silently corrupt release rather than a test failure.
-    #[test]
-    fn the_sidecar_digest_is_over_the_artifact_bytes() {
-        let dir = tempfile::tempdir().expect("tempdir");
-        let artifact = dir.path().join("memory_mcp.tar.gz");
-        fs::write(&artifact, b"a deterministic payload").expect("write");
-        let sidecar = dir.path().join("memory_mcp.tar.gz.sha256");
+    fn host_target() -> String {
+        match std::env::consts::OS {
+            "windows" => format!("{}-pc-windows-msvc", std::env::consts::ARCH),
+            "macos" => format!("{}-apple-darwin", std::env::consts::ARCH),
+            _ => format!("{}-unknown-linux-gnu", std::env::consts::ARCH),
+        }
+    }
 
-        write_sha256(&artifact, &sidecar).expect("digest");
-
-        let recorded = fs::read_to_string(&sidecar).expect("read sidecar");
-        let expected = hex::encode(Sha256::digest(b"a deterministic payload"));
-        assert_eq!(recorded.trim(), expected);
+    fn compile_fixture_binary(dir: &Path, name: &str, source: &str) -> PathBuf {
+        let source_path = dir.join(format!("{name}.rs"));
+        let output_path = dir.join(format!("{name}{}", std::env::consts::EXE_SUFFIX));
+        fs::write(&source_path, source).expect("write fixture source");
+        let output = Command::new("rustc")
+            .arg("--edition=2021")
+            .arg(&source_path)
+            .arg("-o")
+            .arg(&output_path)
+            .output()
+            .expect("run rustc for fixture binary");
         assert!(
-            recorded.ends_with('\n'),
-            "a trailing newline keeps it shell-friendly"
+            output.status.success(),
+            "fixture binary did not compile: {}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+        output_path
+    }
+
+    fn directory_file_names(dir: &Path) -> Vec<String> {
+        let mut names = fs::read_dir(dir)
+            .expect("read artifact directory")
+            .map(|entry| {
+                entry
+                    .expect("read artifact directory entry")
+                    .file_name()
+                    .to_string_lossy()
+                    .into_owned()
+            })
+            .collect::<Vec<_>>();
+        names.sort();
+        names
+    }
+
+    fn archive_contents(archive: &Path, windows: bool) -> Vec<(String, String)> {
+        let mut contents = if windows {
+            let file = fs::File::open(archive).expect("open zip");
+            let mut zip = zip::ZipArchive::new(file).expect("read zip directory");
+            let mut contents = Vec::new();
+            for index in 0..zip.len() {
+                let mut entry = zip.by_index(index).expect("read zip entry");
+                let name = entry.name().replace('\\', "/");
+                let mut bytes = Vec::new();
+                entry.read_to_end(&mut bytes).expect("read zip payload");
+                contents.push((name, hex::encode(Sha256::digest(&bytes))));
+            }
+            contents
+        } else {
+            let mut decoder =
+                flate2::read::GzDecoder::new(fs::File::open(archive).expect("open tar.gz"));
+            let mut tar = tar::Archive::new(&mut decoder);
+            let mut contents = Vec::new();
+            for entry in tar.entries().expect("read tar entries") {
+                let mut entry = entry.expect("read tar entry");
+                let path = entry.path().expect("read tar path");
+                let name = path
+                    .to_string_lossy()
+                    .trim_start_matches("./")
+                    .replace('\\', "/");
+                if name.is_empty() && entry.header().entry_type().is_dir() {
+                    continue;
+                }
+                let mut bytes = Vec::new();
+                entry.read_to_end(&mut bytes).expect("read tar payload");
+                contents.push((name, hex::encode(Sha256::digest(&bytes))));
+            }
+            contents
+        };
+        contents.sort();
+        contents
+    }
+
+    fn assert_sidecar_matches(artifact: &Path) {
+        let bytes = fs::read(artifact).expect("read artifact");
+        let sidecar = artifact.with_file_name(format!(
+            "{}.sha256",
+            artifact
+                .file_name()
+                .expect("artifact name")
+                .to_string_lossy()
+        ));
+        let recorded = fs::read_to_string(sidecar).expect("read checksum sidecar");
+        assert_eq!(
+            recorded,
+            format!("{}\n", hex::encode(Sha256::digest(&bytes)))
         );
     }
 
-    /// Both programs and the licence must be present, and nothing else: the
-    /// archive is what a user downloads, so a missing member is a broken
-    /// release and a stray one is a leak of build output.
+    /// Exercise the public packaging workflow, including its smoke processes,
+    /// archive, standalone copy, and checksum sidecars.
     #[test]
-    fn the_archive_carries_both_programs_and_the_licence() {
+    fn package_publishes_only_the_expected_archive_and_standalone_artifact() {
         let dir = tempfile::tempdir().expect("tempdir");
-        let bundle = dir.path().join("bundle");
-        fs::create_dir_all(&bundle).expect("bundle dir");
-        for name in ["memory_mcp", "memory_mcp_http", "LICENSE"] {
-            fs::write(bundle.join(name), name.as_bytes()).expect("write");
+        let build = dir.path().join("build");
+        fs::create_dir(&build).expect("build dir");
+        let suffix = std::env::consts::EXE_SUFFIX;
+        let cli_source = r##"
+use std::io::Read;
+fn main() {
+    match std::env::args().nth(1).as_deref() {
+        Some("--version") => println!("memory_mcp fixture 1"),
+        Some("init") => println!(r#"{{"mutates_files":false,"target":"vscode"}}"#),
+        Some("ingest") => {}
+        Some("serve") => {
+            println!(r#"{{"jsonrpc":"2.0","id":1,"result":{{}}}}"#);
+            let mut input = String::new();
+            let _ = std::io::stdin().read_to_string(&mut input);
         }
-        let archive = dir.path().join("out.tar.gz");
+        _ => std::process::exit(1),
+    }
+}
+"##;
+        let http_source = r#"
+fn main() {
+    eprintln!("config error: invalid bind");
+    std::process::exit(2);
+}
+"#;
+        let cli = compile_fixture_binary(dir.path(), "memory_mcp", cli_source);
+        let http = compile_fixture_binary(dir.path(), "memory_mcp_http", http_source);
+        let cli_file = build.join(format!("memory_mcp{suffix}"));
+        let http_file = build.join(format!("memory_mcp_http{suffix}"));
+        fs::copy(cli, &cli_file).expect("copy cli fixture");
+        fs::copy(http, &http_file).expect("copy http fixture");
+        let dist = dir.path().join("dist");
+        let target = host_target();
 
-        tar_gz_archive(&bundle, &archive).expect("archive");
+        let artifacts = package(&build, &target, &dist).expect("package fixtures");
 
-        let mut members = Vec::new();
-        let mut decoder = flate2::read::GzDecoder::new(fs::File::open(&archive).expect("open"));
-        let mut tar = tar::Archive::new(&mut decoder);
-        for entry in tar.entries().expect("entries") {
-            let entry = entry.expect("entry");
-            if entry.path().is_ok() {
-                members.push(entry.path().unwrap().to_string_lossy().into_owned());
-            }
-        }
-        for expected in ["memory_mcp", "memory_mcp_http", "LICENSE"] {
-            assert!(
-                members.iter().any(|member| member == expected),
-                "the archive must carry {expected}, got {members:?}"
-            );
-        }
+        let windows = target.contains("windows");
+        let archive_name = if windows {
+            format!("memory_mcp-{target}.zip")
+        } else {
+            format!("memory_mcp-{target}.tar.gz")
+        };
+        let standalone_name = format!(
+            "memory_mcp_{}_{}{suffix}",
+            if windows {
+                "windows"
+            } else if target.contains("apple") {
+                "macos"
+            } else {
+                "linux"
+            },
+            std::env::consts::ARCH
+        );
+        let archive = dist.join(&archive_name);
+        let standalone = dist.join(&standalone_name);
+        assert_eq!(
+            artifacts,
+            vec![archive.clone(), standalone.clone()],
+            "package returns the archive and standalone copy in order"
+        );
+        let mut expected_dist = vec![
+            archive_name.clone(),
+            format!("{archive_name}.sha256"),
+            standalone_name.clone(),
+            format!("{standalone_name}.sha256"),
+        ];
+        expected_dist.sort();
+        assert_eq!(directory_file_names(&dist), expected_dist);
+        let mut expected_archive = vec![
+            (
+                "LICENSE".to_owned(),
+                hex::encode(Sha256::digest(
+                    fs::read(Path::new(env!("CARGO_MANIFEST_DIR")).join("../../LICENSE"))
+                        .expect("read license"),
+                )),
+            ),
+            (
+                format!("memory_mcp{suffix}"),
+                hex::encode(Sha256::digest(
+                    fs::read(&cli_file).expect("read cli fixture"),
+                )),
+            ),
+            (
+                format!("memory_mcp_http{suffix}"),
+                hex::encode(Sha256::digest(
+                    fs::read(&http_file).expect("read http fixture"),
+                )),
+            ),
+        ];
+        expected_archive.sort();
+        assert_eq!(archive_contents(&archive, windows), expected_archive);
+        assert_eq!(
+            fs::read(&standalone).expect("read standalone"),
+            fs::read(&cli_file).expect("read cli fixture")
+        );
+        assert_sidecar_matches(&archive);
+        assert_sidecar_matches(&standalone);
     }
 
-    /// A failed smoke test must leave `dist/` empty. An archive produced from
-    /// a binary that does not run is worse than no archive: the release
-    /// workflow would attach it and `fail_on_unmatched_files` would be
-    /// satisfied.
+    /// An actual package attempt rejected by the smoke workflow leaves no
+    /// release artifact behind.
     #[test]
     fn a_failed_smoke_test_produces_no_artifact() {
         let dir = tempfile::tempdir().expect("tempdir");
         let build = dir.path().join("build");
-        fs::create_dir_all(&build).expect("build dir");
-        for name in ["memory_mcp", "memory_mcp_http"] {
-            // A script that is not a working binary: it fails at the first
-            // smoke step, which is exactly the path under test.
-            let path = build.join(name);
-            fs::write(&path, "#!/bin/sh\nexit 1\n").expect("write");
-            #[cfg(unix)]
-            {
-                use std::os::unix::fs::PermissionsExt;
-                let mut permissions = fs::metadata(&path).expect("stat").permissions();
-                permissions.set_mode(0o755);
-                fs::set_permissions(&path, permissions).expect("chmod");
-            }
-        }
-        fs::write(dir.path().join("LICENSE"), "licence").expect("licence");
+        fs::create_dir(&build).expect("build dir");
+        let failed_source = "fn main() { std::process::exit(1); }\n";
+        let cli = compile_fixture_binary(dir.path(), "failing_cli", failed_source);
+        let http = compile_fixture_binary(dir.path(), "failing_http", failed_source);
+        fs::copy(
+            cli,
+            build.join(format!("memory_mcp{}", std::env::consts::EXE_SUFFIX)),
+        )
+        .expect("copy cli fixture");
+        fs::copy(
+            http,
+            build.join(format!("memory_mcp_http{}", std::env::consts::EXE_SUFFIX)),
+        )
+        .expect("copy http fixture");
         let dist = dir.path().join("dist");
 
-        let outcome = package(&build, "x86_64-unknown-linux-gnu", &dist);
+        let outcome = package(&build, &host_target(), &dist);
 
-        assert!(outcome.is_err(), "a stub binary must not be packaged");
-        let produced: Vec<_> = fs::read_dir(&dist)
-            .map(|entries| {
-                entries
-                    .filter_map(|entry| entry.ok())
-                    .map(|entry| entry.file_name().to_string_lossy().into_owned())
-                    .collect()
-            })
-            .unwrap_or_default();
-        assert!(
-            produced.is_empty(),
-            "a refused package must leave dist empty, found {produced:?}"
-        );
+        assert!(outcome.is_err(), "a failing binary must not be packaged");
+        assert_eq!(directory_file_names(&dist), Vec::<String>::new());
     }
 }

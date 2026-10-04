@@ -134,7 +134,14 @@ impl<T> Paged<T> {
     /// cannot be advanced by one request while the rows come from another.
     pub fn accept(&mut self, page: Page<T>, request: PageRequest) {
         match request.direction {
-            PageDirection::Replace => self.previous.clear(),
+            PageDirection::Replace => {
+                // First-page refreshes change the cursor and reset the walk.
+                // Poll refreshes replace rows for the same cursor and preserve
+                // the operator's back-navigation history.
+                if request.cursor != self.cursor {
+                    self.previous.clear();
+                }
+            }
             PageDirection::Next => self.previous.push(self.cursor.clone()),
             PageDirection::Previous => {
                 self.previous.pop();
@@ -227,43 +234,105 @@ mod tests {
         }
     }
 
-    #[test]
-    fn pager_moves_forward_and_back_without_losing_the_cursor_stack() {
-        let mut paged: Paged<String> = Paged::default();
-        assert!(!paged.is_loaded());
-        assert!(!paged.has_next());
-        assert!(!paged.has_previous());
-
+    fn first_page() -> Paged<String> {
+        let mut paged = Paged::default();
         paged.accept(
             page(vec!["a"], Some("cursor-1")),
-            request(None, PageDirection::Replace),
+            PageRequest::refresh(None, 0),
         );
-        assert!(paged.is_loaded());
-        assert!(paged.has_next());
-        assert_eq!(paged.cursor(), None);
-        assert_eq!(paged.items(), ["a"]);
-        assert_eq!(paged.next_cursor().as_deref(), Some("cursor-1"));
+        paged
+    }
 
-        // Forward.
+    fn second_page() -> Paged<String> {
+        let mut paged = first_page();
         let cursor = paged.next_cursor();
         paged.accept(
             page(vec!["b"], None),
             request(cursor.as_deref(), PageDirection::Next),
         );
+        paged
+    }
+
+    #[test]
+    fn next_loads_the_backend_cursor_and_keeps_back_navigation() {
+        let mut paged = first_page();
+        let cursor = paged.next_cursor();
+        paged.accept(
+            page(vec!["b"], None),
+            request(cursor.as_deref(), PageDirection::Next),
+        );
+
         assert_eq!(paged.items(), ["b"]);
+        assert_eq!(paged.cursor(), Some("cursor-1"));
         assert!(paged.has_previous());
         assert!(!paged.has_next());
-        assert_eq!(paged.cursor(), Some("cursor-1"));
+        assert_eq!(paged.page_number(), 2);
+    }
 
-        // Back.
+    #[test]
+    fn back_loads_the_previous_cursor_and_restores_the_first_page() {
+        let mut paged = second_page();
+        let previous = paged.previous_cursor();
+
+        assert_eq!(previous, Some(None));
+        paged.accept(
+            page(vec!["a"], Some("cursor-1")),
+            request(None, PageDirection::Previous),
+        );
+
+        assert_eq!(paged.items(), ["a"]);
+        assert_eq!(paged.cursor(), None);
+        assert_eq!(paged.page_number(), 1);
+        assert!(!paged.has_previous());
+    }
+
+    #[test]
+    fn first_page_refresh_clears_the_cursor_history() {
+        let mut paged = second_page();
+        paged.accept(
+            page(vec!["refreshed"], Some("cursor-1")),
+            request(None, PageDirection::Replace),
+        );
+
+        assert_eq!(paged.items(), ["refreshed"]);
+        assert_eq!(paged.cursor(), None);
+        assert_eq!(paged.page_number(), 1);
+        assert!(!paged.has_previous());
+    }
+
+    #[test]
+    fn refreshing_the_visible_page_keeps_back_navigation() {
+        let mut paged = second_page();
+        paged.accept(
+            page(vec!["b"], Some("cursor-2")),
+            PageRequest::refresh(Some("cursor-1".to_owned()), 2),
+        );
+        paged.accept(
+            page(vec!["c"], None),
+            request(Some("cursor-2"), PageDirection::Next),
+        );
+        let cursor = paged.cursor().map(ToOwned::to_owned);
+        let refresh = PageRequest::refresh(cursor, 3);
+
+        paged.accept(page(vec!["updated"], None), refresh);
+
+        assert_eq!(paged.items(), ["updated"]);
+        assert_eq!(paged.cursor(), Some("cursor-2"));
+        assert_eq!(paged.page_number(), 3);
+        assert_eq!(paged.previous_cursor(), Some(Some("cursor-1".to_owned())));
+        paged.accept(
+            page(vec!["b"], Some("cursor-2")),
+            request(Some("cursor-1"), PageDirection::Previous),
+        );
+        assert_eq!(paged.page_number(), 2);
         assert_eq!(paged.previous_cursor(), Some(None));
         paged.accept(
             page(vec!["a"], Some("cursor-1")),
             request(None, PageDirection::Previous),
         );
-        assert_eq!(paged.items(), ["a"]);
-        assert!(!paged.has_previous());
+        assert_eq!(paged.page_number(), 1);
         assert_eq!(paged.cursor(), None);
+        assert!(!paged.has_previous());
     }
 
     #[test]
@@ -274,15 +343,11 @@ mod tests {
 
     #[test]
     fn a_failure_keeps_the_rows_already_on_screen() {
-        let mut paged: Paged<String> = Paged::default();
-        paged.accept(
-            page(vec!["a"], Some("cursor-1")),
-            request(None, PageDirection::Replace),
-        );
+        let mut paged = second_page();
         paged.begin();
         assert!(paged.is_loading());
         paged.fail("The service is temporarily unavailable.".to_owned());
-        assert_eq!(paged.items(), ["a"]);
+        assert_eq!(paged.items(), ["b"]);
         assert_eq!(
             paged.error(),
             Some("The service is temporarily unavailable.")
@@ -294,42 +359,9 @@ mod tests {
     fn an_empty_page_is_loaded_rather_than_pending() {
         let mut paged: Paged<String> = Paged::default();
         assert!(!paged.is_loaded());
-        paged.accept(
-            page(Vec::new(), None),
-            request(None, PageDirection::Replace),
-        );
+        paged.accept(page(Vec::new(), None), PageRequest::refresh(None, 1));
         assert!(paged.is_loaded());
         assert!(paged.items().is_empty());
         assert!(paged.error().is_none());
-    }
-
-    #[test]
-    fn a_refresh_returns_to_the_first_page_even_when_the_operator_walked_forward() {
-        let mut paged: Paged<String> = Paged::default();
-        assert_eq!(paged.page_number(), 1);
-        paged.accept(
-            page(vec!["a"], Some("cursor-1")),
-            request(None, PageDirection::Replace),
-        );
-        let cursor = paged.next_cursor();
-        paged.accept(
-            page(vec!["b"], None),
-            request(cursor.as_deref(), PageDirection::Next),
-        );
-        assert_eq!(paged.page_number(), 2);
-        // A refresh asks for the collection from the start, so the position the
-        // operator had reached is gone with it.
-        paged.accept(
-            page(vec!["a"], Some("cursor-1")),
-            request(None, PageDirection::Replace),
-        );
-        assert_eq!(paged.page_number(), 1);
-    }
-
-    #[test]
-    fn a_request_defaults_to_the_first_page() {
-        let request = PageRequest::default();
-        assert_eq!(request.cursor(), None);
-        assert_eq!(request.generation(), 0);
     }
 }

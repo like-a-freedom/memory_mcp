@@ -1,8 +1,8 @@
 #![cfg(feature = "control-plane")]
 
-use std::sync::{Arc, Mutex};
+use std::sync::Mutex;
 
-use chrono::{Duration, Utc};
+use chrono::{DateTime, Duration, Utc};
 use memory_mcp::operations::api::{
     AccountDeletionPort, BeginAccountDeletionCommand, OperationsError, begin_account_deletion,
 };
@@ -33,24 +33,34 @@ impl AccountDeletionPort for RecordingPort {
     }
 }
 
-#[tokio::test]
-async fn account_deletion_requires_recent_auth_exact_phrase_and_one_atomic_call() {
-    let now = Utc::now();
-    let port = Arc::new(RecordingPort::default());
-    let command = BeginAccountDeletionCommand {
+fn at(timestamp: &str) -> DateTime<Utc> {
+    DateTime::parse_from_rfc3339(timestamp)
+        .expect("fixed timestamp")
+        .with_timezone(&Utc)
+}
+
+fn command(authenticated_at: DateTime<Utc>, typed_phrase: &str) -> BeginAccountDeletionCommand {
+    BeginAccountDeletionCommand {
         account_id: "acct_1".into(),
         session_id: "session_1".into(),
-        authenticated_at: now - Duration::minutes(1),
-        typed_phrase: " DELETE my account ".into(),
+        authenticated_at,
+        typed_phrase: typed_phrase.into(),
         challenge_verifier: "verifier_1".into(),
-    };
+    }
+}
 
-    begin_account_deletion(port.as_ref(), &command, now)
+#[tokio::test]
+async fn confirmed_deletion_forwards_one_atomic_command() {
+    let now = at("2026-10-03T12:00:00Z");
+    let port = RecordingPort::default();
+    let command = command(now - Duration::minutes(1), " DELETE my account ");
+
+    begin_account_deletion(&port, &command, now)
         .await
         .expect("accepted command");
 
     assert_eq!(
-        *port.calls.lock().expect("calls lock"),
+        port.calls.lock().expect("calls lock").as_slice(),
         vec![(
             "verifier_1".into(),
             "acct_1".into(),
@@ -58,19 +68,38 @@ async fn account_deletion_requires_recent_auth_exact_phrase_and_one_atomic_call(
             now,
         )]
     );
+}
 
-    let mut stale = command.clone();
-    stale.authenticated_at = now - Duration::minutes(11);
+#[tokio::test]
+async fn deletion_refuses_stale_authentication_before_the_atomic_command() {
+    let now = at("2026-10-03T12:00:00Z");
+    let port = RecordingPort::default();
+
     assert!(matches!(
-        begin_account_deletion(port.as_ref(), &stale, now).await,
+        begin_account_deletion(
+            &port,
+            &command(now - Duration::minutes(11), "DELETE my account"),
+            now,
+        )
+        .await,
         Err(OperationsError::ReauthenticationRequired)
     ));
+    assert!(port.calls.lock().expect("calls lock").is_empty());
+}
 
-    let mut wrong_phrase = command.clone();
-    wrong_phrase.typed_phrase = "delete my account".into();
+#[tokio::test]
+async fn deletion_refuses_a_wrong_confirmation_phrase_before_the_atomic_command() {
+    let now = at("2026-10-03T12:00:00Z");
+    let port = RecordingPort::default();
+
     assert!(matches!(
-        begin_account_deletion(port.as_ref(), &wrong_phrase, now).await,
+        begin_account_deletion(
+            &port,
+            &command(now - Duration::minutes(1), "delete my account"),
+            now,
+        )
+        .await,
         Err(OperationsError::ConfirmationPhraseRejected)
     ));
-    assert_eq!(port.calls.lock().expect("calls lock").len(), 1);
+    assert!(port.calls.lock().expect("calls lock").is_empty());
 }

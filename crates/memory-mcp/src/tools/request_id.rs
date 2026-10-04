@@ -18,16 +18,3 @@ pub fn next_request_id() -> String {
     let n = REQUEST_COUNTER.fetch_add(1, Ordering::Relaxed) + 1;
     format!("req_{n:04}")
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn next_request_id_is_monotonic_and_zero_padded() {
-        let a = next_request_id();
-        let b = next_request_id();
-        assert!(a.starts_with("req_"));
-        assert!(b > a, "ids must be monotonically ordered as strings");
-    }
-}

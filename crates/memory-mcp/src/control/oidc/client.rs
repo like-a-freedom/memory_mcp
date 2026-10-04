@@ -380,6 +380,66 @@ fn log_exchange_rejection(status: u16, reason: Option<&str>) {
 mod tests {
     use super::*;
 
+    fn authorization_client() -> OidcClient {
+        OidcClient {
+            issuer: "https://idp.example.com".into(),
+            client_id: "memory-mcp".into(),
+            audience: "memory-mcp".into(),
+            redirect_uri: "https://memory.example.com/auth/callback".into(),
+            allowed_algorithms: vec!["RS256"],
+            authorization_endpoint: "https://idp.example.com/authorize?tenant=one".into(),
+            token_endpoint: "https://idp.example.com/token".into(),
+            jwks: JwksCache::from_parts(
+                reqwest::Client::new(),
+                "https://idp.example.com/jwks".into(),
+                std::time::Duration::from_secs(300),
+            ),
+        }
+    }
+
+    #[test]
+    fn authorization_url_encodes_fixed_flow_values_and_the_rfc_pkce_challenge() {
+        let verifier = "dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk";
+        let pkce = PkceCode {
+            verifier: verifier.into(),
+            challenge: "must-be-derived-from-the-verifier".into(),
+        };
+        let url = authorization_client()
+            .authorize_url(
+                &OidcState("state /?&".into()),
+                &pkce,
+                &OidcNonce("nonce +/=".into()),
+            )
+            .expect("authorization URL");
+        let query = reqwest::Url::parse(&url)
+            .expect("absolute authorization URL")
+            .query_pairs()
+            .into_owned()
+            .collect::<std::collections::HashMap<_, _>>();
+
+        assert_eq!(query.get("response_type").map(String::as_str), Some("code"));
+        assert_eq!(
+            query.get("client_id").map(String::as_str),
+            Some("memory-mcp")
+        );
+        assert_eq!(
+            query.get("redirect_uri").map(String::as_str),
+            Some("https://memory.example.com/auth/callback")
+        );
+        assert_eq!(query.get("scope").map(String::as_str), Some("openid"));
+        assert_eq!(query.get("state").map(String::as_str), Some("state /?&"));
+        assert_eq!(query.get("nonce").map(String::as_str), Some("nonce +/="));
+        assert_eq!(
+            query.get("code_challenge").map(String::as_str),
+            Some("E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM")
+        );
+        assert_eq!(
+            query.get("code_challenge_method").map(String::as_str),
+            Some("S256")
+        );
+        assert_eq!(query.get("tenant").map(String::as_str), Some("one"));
+    }
+
     fn discovery_with_issuer(issuer: &str) -> serde_json::Value {
         serde_json::json!({ "issuer": issuer })
     }

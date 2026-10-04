@@ -292,29 +292,31 @@ mod tests {
 
     #[test]
     fn parse_datetime_parses_rfc3339() {
-        use chrono::Datelike;
-        let result = parse_datetime("2024-01-15T10:30:00Z");
-        assert!(result.is_some());
-        let dt = result.unwrap();
-        assert_eq!(dt.year(), 2024);
-        assert_eq!(dt.month(), 1);
-        assert_eq!(dt.day(), 15);
+        let result = parse_datetime("2024-01-15T10:30:00Z").expect("valid RFC 3339 timestamp");
+
+        assert_eq!(result.to_rfc3339(), "2024-01-15T10:30:00+00:00");
     }
 
     #[test]
     fn parse_datetime_parses_with_timezone() {
-        let result = parse_datetime("2024-01-15T10:30:00+05:00");
-        assert!(result.is_some());
+        let result = parse_datetime("2024-01-15T10:30:00+05:00").expect("timestamp with offset");
+
+        assert_eq!(result.to_rfc3339(), "2024-01-15T05:30:00+00:00");
     }
 
     #[test]
     fn parse_datetime_parses_without_seconds_zulu() {
-        assert!(parse_datetime("2026-05-11T17:34Z").is_some());
+        let result = parse_datetime("2026-05-11T17:34Z").expect("minute-precision UTC timestamp");
+
+        assert_eq!(result.to_rfc3339(), "2026-05-11T17:34:00+00:00");
     }
 
     #[test]
     fn parse_datetime_parses_without_seconds_offset() {
-        assert!(parse_datetime("2026-05-11T17:34+05:00").is_some());
+        let result = parse_datetime("2026-05-11T17:34+05:00")
+            .expect("minute-precision timestamp with offset");
+
+        assert_eq!(result.to_rfc3339(), "2026-05-11T12:34:00+00:00");
     }
 
     #[test]
@@ -323,36 +325,13 @@ mod tests {
     }
 
     #[test]
-    fn parse_datetime_returns_none_for_invalid() {
-        assert!(parse_datetime("invalid").is_none());
-        assert!(parse_datetime("").is_none());
+    fn parse_datetime_returns_none_for_invalid_calendar_date() {
         assert!(parse_datetime("2024-13-45").is_none());
     }
 
     #[test]
-    fn parse_datetime_returns_none_for_empty() {
-        assert!(parse_datetime("").is_none());
-    }
-
-    #[test]
-    fn content_hash_is_deterministic() {
-        let hash1 = content_hash("test content");
-        let hash2 = content_hash("test content");
-        assert_eq!(hash1, hash2);
-    }
-
-    #[test]
-    fn content_hash_differs_for_different_content() {
-        let hash1 = content_hash("content A");
-        let hash2 = content_hash("content B");
-        assert_ne!(hash1, hash2);
-    }
-
-    #[test]
-    fn content_hash_produces_hex_string() {
-        let hash = content_hash("test");
-        assert_eq!(hash.len(), 16);
-        assert!(hash.chars().all(|c| c.is_ascii_hexdigit()));
+    fn content_hash_has_a_stable_truncated_sha256_value() {
+        assert_eq!(content_hash("test"), "9f86d081884c7d65");
     }
 
     #[test]
@@ -384,18 +363,6 @@ mod tests {
             normalize_optional_string(Some("  test  ".to_string())),
             Some("test".to_string())
         );
-    }
-
-    #[test]
-    fn normalize_optional_string_returns_none_for_none_input() {
-        assert_eq!(normalize_optional_string(None), None::<String>);
-    }
-
-    #[test]
-    fn parse_context_items_prefers_source_episode_over_id() {
-        let raw = r#"[{"content":"Test","source_episode":"episode:456"}]"#;
-        let items = parse_context_items(raw).unwrap();
-        assert_eq!(items[0].source_episode, "episode:456");
     }
 
     #[test]

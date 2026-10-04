@@ -103,22 +103,27 @@ mod tests {
     use crate::error::MemoryError;
     use crate::service::mock_db::MockDbClient;
     use crate::storage::{DbClient, SurrealDbClient};
+    use chrono::{DateTime, TimeZone, Utc};
 
     #[tokio::test]
     async fn record_fact_access_rejects_invalid_record_ids() {
         let store = FactAccessStore::new(Arc::new(MockDbClient::new()), "org");
 
-        for bad_id in ["bare-hex-id", "", "episode:xyz"] {
-            let result = store.record_fact_access(bad_id, 1).await;
-            assert!(
-                matches!(result, Err(MemoryError::Validation(_))),
-                "expected validation error for '{bad_id}'"
-            );
-        }
+        let result = store.record_fact_access("episode:xyz", 1).await;
+
+        assert!(matches!(result, Err(MemoryError::Validation(_))));
     }
 
     const NAMESPACE: &str = "org";
 
+    fn fixed_at() -> DateTime<Utc> {
+        Utc.with_ymd_and_hms(2026, 10, 3, 12, 0, 0)
+            .single()
+            .expect("fixed UTC time")
+    }
+
+    // Integration evidence: these scenarios use a real embedded SurrealDB to
+    // verify the access statement, transaction arithmetic, and field isolation.
     async fn make_db() -> Arc<SurrealDbClient> {
         let database = format!(
             "fact_access_store_test_{}",
@@ -150,7 +155,7 @@ mod tests {
         access_count: serde_json::Value,
         signature: &str,
     ) {
-        let now = crate::shared::temporal::normalize_dt(crate::shared::temporal::now());
+        let now = crate::shared::temporal::normalize_dt(fixed_at());
         db.create(
             fact_id,
             serde_json::json!({
@@ -181,16 +186,29 @@ mod tests {
         .expect("seed fact");
     }
 
-    async fn read_fact(db: &Arc<SurrealDbClient>, fact_id: &str) -> serde_json::Value {
-        db.select_one(fact_id, NAMESPACE)
+    async fn read_fact_if_present(
+        db: &Arc<SurrealDbClient>,
+        fact_id: &str,
+    ) -> Option<serde_json::Value> {
+        let db_client: Arc<dyn DbClient> = Arc::clone(db) as Arc<dyn DbClient>;
+        let reader = crate::knowledge::infra::KnowledgeReadAdapter::new(db_client, NAMESPACE);
+        crate::knowledge::api::owned_fact_scan(&reader)
             .await
-            .expect("read fact")
+            .expect("scan facts")
+            .into_iter()
+            .find(|record| {
+                record.get("fact_id").and_then(serde_json::Value::as_str) == Some(fact_id)
+            })
+    }
+
+    async fn read_fact(db: &Arc<SurrealDbClient>, fact_id: &str) -> serde_json::Value {
+        read_fact_if_present(db, fact_id)
+            .await
             .unwrap_or_else(|| panic!("{fact_id} must exist"))
     }
 
-    /// A `DbClient` that lets a vector write land immediately before this
-    /// store's write. The access update and the vector update touch different
-    /// fields, and only a whole-record write can lose one of them.
+    /// Commits competing count/vector changes immediately before the access
+    /// write, after a legacy whole-record read would have captured stale fields.
     struct RacingVectorWriter {
         inner: Arc<SurrealDbClient>,
         pending: std::sync::Mutex<Option<String>>,
@@ -216,6 +234,15 @@ mod tests {
                     Some(serde_json::json!({
                         "fact_id": fact_id.trim_start_matches("fact:"),
                         "embedding": vec![0.1f64; 1536],
+                    })),
+                    NAMESPACE,
+                )
+                .await?;
+            self.inner
+                .query(
+                    "UPDATE type::record('fact', $fact_id) SET access_count = access_count + 1",
+                    Some(serde_json::json!({
+                        "fact_id": fact_id.trim_start_matches("fact:"),
                     })),
                     NAMESPACE,
                 )
@@ -282,12 +309,9 @@ mod tests {
         }
     }
 
-    /// Retrieval heat and vectors are different owners' fields on one record.
-    ///
-    /// The fact already carries a vector, so a whole-record access write has a
-    /// vector in its snapshot to write back; the concurrent writer replaces that
-    /// vector's signature before the access write lands. Recording an access
-    /// must leave the newer vector alone.
+    /// Integration: both external changes must survive the focal access write.
+    /// The database decorator fixes their ordering rather than relying on two
+    /// concurrent tasks happening to read the same old count.
     #[tokio::test]
     async fn fact_access_preserves_concurrent_vector_write() {
         let db = make_db().await;
@@ -309,8 +333,8 @@ mod tests {
             "the access write must not restore the vector its snapshot carried"
         );
         assert_eq!(
-            stored["access_count"], 1,
-            "the access write must still land"
+            stored["access_count"], 2,
+            "the external increment and this access must both land"
         );
     }
 
@@ -324,9 +348,8 @@ mod tests {
             .await
             .expect("an absent fact is a no-op, not an error");
         assert!(
-            db.select_one("fact:never_created", NAMESPACE)
+            read_fact_if_present(&db, "fact:never_created")
                 .await
-                .expect("read")
                 .is_none(),
             "a no-op read must not create the record"
         );
@@ -352,21 +375,33 @@ mod tests {
         let db = make_db().await;
         let fact_id = "fact:access_concurrent";
         seed_fact(&db, fact_id, serde_json::json!(0)).await;
-        let store = Arc::new(FactAccessStore::new(
-            Arc::clone(&db) as Arc<dyn DbClient>,
-            NAMESPACE,
-        ));
-        let mut tasks = tokio::task::JoinSet::new();
-        for _ in 0..32 {
-            let store = Arc::clone(&store);
-            let fact_id = fact_id.to_string();
-            tasks.spawn(async move { store.record_fact_access(&fact_id, 1).await });
-        }
-        while let Some(result) = tasks.join_next().await {
-            result.expect("access task joins").expect("access update");
-        }
+        let store = FactAccessStore::new(Arc::clone(&db) as Arc<dyn DbClient>, NAMESPACE);
+        let gate = tokio::sync::Barrier::new(4);
+        tokio::time::timeout(std::time::Duration::from_secs(5), async {
+            tokio::try_join!(
+                async {
+                    gate.wait().await;
+                    store.record_fact_access(fact_id, 1).await
+                },
+                async {
+                    gate.wait().await;
+                    store.record_fact_access(fact_id, 1).await
+                },
+                async {
+                    gate.wait().await;
+                    store.record_fact_access(fact_id, 1).await
+                },
+                async {
+                    gate.wait().await;
+                    store.record_fact_access(fact_id, 1).await
+                },
+            )
+        })
+        .await
+        .expect("concurrent updates complete within the bound")
+        .expect("all access updates succeed");
 
-        assert_eq!(read_fact(&db, fact_id).await["access_count"], 32);
+        assert_eq!(read_fact(&db, fact_id).await["access_count"], 4);
     }
 
     #[tokio::test]

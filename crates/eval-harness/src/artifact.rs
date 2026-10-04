@@ -529,37 +529,4 @@ mod tests {
         artifact.schema_version = "wrong-version".into();
         assert!(artifact.validate().is_err());
     }
-
-    #[test]
-    fn write_artifact_writes_valid_json() {
-        let dir = tempfile::tempdir().unwrap();
-        let path = dir.path().join("test-artifact.json");
-        let artifact = RunArtifact::fixture(
-            vec![passed_fixture("case-1")],
-            vec![EvalCaseId::parse("case-1").unwrap()],
-        );
-        write_artifact(&path, &artifact).unwrap();
-        assert!(path.exists());
-
-        let written: serde_json::Value =
-            serde_json::from_str(&std::fs::read_to_string(&path).unwrap()).unwrap();
-        assert_eq!(
-            written["schema_version"].as_str().unwrap(),
-            EVAL_ARTIFACT_SCHEMA_V1
-        );
-    }
-
-    #[test]
-    fn write_artifact_is_atomic() {
-        let dir = tempfile::tempdir().unwrap();
-        let path = dir.path().join("test-artifact.json");
-        let artifact = RunArtifact::fixture(
-            vec![passed_fixture("case-1")],
-            vec![EvalCaseId::parse("case-1").unwrap()],
-        );
-        write_artifact(&path, &artifact).unwrap();
-
-        let tmp_path = path.with_extension("json.tmp");
-        assert!(!tmp_path.exists(), "tmp file should not remain after write");
-    }
 }

@@ -417,19 +417,25 @@ mod tests {
     #[tokio::test]
     async fn regex_entity_extractor_classifies_company_types() {
         let extractor = RegexEntityExtractor::new().unwrap();
-        // Use company names that the regex can extract (multi-word or with lowercase)
         let candidates = extractor
             .extract_candidates("Acme Corp and Globex Inc and Initech Limited")
             .await
             .unwrap();
 
-        for candidate in &candidates {
-            assert_eq!(
-                candidate.entity_type, "company",
-                "{:?} should be classified as company",
-                candidate.canonical_name
-            );
-        }
+        let classified: std::collections::BTreeMap<_, _> = candidates
+            .into_iter()
+            .map(|candidate| (candidate.canonical_name, candidate.entity_type))
+            .collect();
+
+        assert_eq!(
+            classified,
+            std::collections::BTreeMap::from([
+                ("Acme Corp".to_owned(), "company".to_owned()),
+                ("Globex Inc".to_owned(), "company".to_owned()),
+                ("Initech Limited".to_owned(), "company".to_owned()),
+            ]),
+            "the extractor must return the exact nonempty company classifications"
+        );
     }
 
     #[tokio::test]

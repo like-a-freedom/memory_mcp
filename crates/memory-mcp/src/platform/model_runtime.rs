@@ -8,6 +8,8 @@
 //! This module owns only in-memory retention. Artifact acquisition, model
 //! construction, device policy, and validation are backend responsibilities.
 
+use std::future::Future;
+use std::pin::Pin;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
@@ -15,10 +17,36 @@ use tokio::sync::Mutex;
 
 use crate::error::MemoryError;
 
+type ScheduledTask = Pin<Box<dyn Future<Output = ()> + Send + 'static>>;
+
+trait MonotonicRuntime: Send + Sync {
+    fn now(&self) -> Duration;
+
+    fn spawn_at(&self, deadline: Duration, task: ScheduledTask) -> tokio::task::JoinHandle<()>;
+}
+
+struct TokioRuntime {
+    origin: Instant,
+}
+
+impl MonotonicRuntime for TokioRuntime {
+    fn now(&self) -> Duration {
+        self.origin.elapsed()
+    }
+
+    fn spawn_at(&self, deadline: Duration, task: ScheduledTask) -> tokio::task::JoinHandle<()> {
+        let deadline = self.origin + deadline;
+        tokio::spawn(async move {
+            tokio::time::sleep_until(tokio::time::Instant::from_std(deadline)).await;
+            task.await;
+        })
+    }
+}
+
 /// State of a loaded model instance.
 pub(crate) struct LoadedModelState<T> {
     loaded: Option<Arc<T>>,
-    last_used: Instant,
+    last_used: Duration,
     unload_handle: Option<tokio::task::JoinHandle<()>>,
 }
 
@@ -27,17 +55,29 @@ pub(crate) struct LoadedModelState<T> {
 pub(crate) struct LoadedModel<T> {
     state: Arc<Mutex<LoadedModelState<T>>>,
     idle_unload: Option<Duration>,
+    runtime: Arc<dyn MonotonicRuntime>,
 }
 
 impl<T: Send + Sync + 'static> LoadedModel<T> {
     pub(crate) fn new(idle_unload: Option<Duration>) -> Self {
+        Self::with_runtime(
+            idle_unload,
+            Arc::new(TokioRuntime {
+                origin: Instant::now(),
+            }),
+        )
+    }
+
+    fn with_runtime(idle_unload: Option<Duration>, runtime: Arc<dyn MonotonicRuntime>) -> Self {
+        let last_used = runtime.now();
         Self {
             state: Arc::new(Mutex::new(LoadedModelState {
                 loaded: None,
-                last_used: Instant::now(),
+                last_used,
                 unload_handle: None,
             })),
             idle_unload,
+            runtime,
         }
     }
 
@@ -50,7 +90,7 @@ impl<T: Send + Sync + 'static> LoadedModel<T> {
     {
         let mut guard = self.state.lock().await;
         if guard.loaded.is_some() {
-            guard.last_used = Instant::now();
+            guard.last_used = self.runtime.now();
             if let Some(handle) = guard.unload_handle.take() {
                 handle.abort();
             }
@@ -64,7 +104,7 @@ impl<T: Send + Sync + 'static> LoadedModel<T> {
         let loaded = tokio::task::spawn_blocking(load)
             .await
             .map_err(|err| MemoryError::Storage(format!("model load task panicked: {err}")))??;
-        guard.last_used = Instant::now();
+        guard.last_used = self.runtime.now();
         guard.loaded = Some(Arc::clone(&loaded));
         Ok(loaded)
     }
@@ -80,7 +120,7 @@ impl<T: Send + Sync + 'static> LoadedModel<T> {
         if let Some(handle) = guard.unload_handle.take() {
             handle.abort();
         }
-        guard.last_used = Instant::now();
+        guard.last_used = self.runtime.now();
         guard.loaded = Some(loaded);
     }
 
@@ -89,27 +129,38 @@ impl<T: Send + Sync + 'static> LoadedModel<T> {
     /// while an extract is still running.
     pub(crate) async fn arm_unload(&self) {
         let mut guard = self.state.lock().await;
-        guard.last_used = Instant::now();
+        let last_used = self.runtime.now();
+        guard.last_used = last_used;
         if let Some(handle) = guard.unload_handle.take() {
             handle.abort();
         }
-        guard.unload_handle = self
-            .idle_unload
-            .map(|timeout| Self::spawn_unload_task(Arc::clone(&self.state), timeout));
+        guard.unload_handle = self.idle_unload.map(|timeout| {
+            Self::spawn_unload_task(
+                Arc::clone(&self.state),
+                Arc::clone(&self.runtime),
+                last_used.saturating_add(timeout),
+                timeout,
+            )
+        });
     }
 
     fn spawn_unload_task(
         state: Arc<Mutex<LoadedModelState<T>>>,
+        runtime: Arc<dyn MonotonicRuntime>,
+        deadline: Duration,
         timeout: Duration,
     ) -> tokio::task::JoinHandle<()> {
-        tokio::spawn(async move {
-            tokio::time::sleep(timeout).await;
-            let mut guard = state.lock().await;
-            if guard.last_used.elapsed() >= timeout {
-                guard.loaded = None;
-                guard.unload_handle = None;
-            }
-        })
+        let task_runtime = Arc::clone(&runtime);
+        runtime.spawn_at(
+            deadline,
+            Box::pin(async move {
+                let mut guard = state.lock().await;
+                if task_runtime.now().saturating_sub(guard.last_used) >= timeout {
+                    guard.loaded = None;
+                    guard.unload_handle = None;
+                }
+            }),
+        )
     }
 }
 
@@ -142,185 +193,333 @@ impl InferenceGate {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::sync::atomic::{AtomicUsize, Ordering};
+    use std::sync::Mutex as StdMutex;
+    use tokio::sync::oneshot;
 
-    fn make_counter() -> Arc<AtomicUsize> {
-        Arc::new(AtomicUsize::new(0))
-    }
-
-    fn fake_load(
-        calls: &Arc<AtomicUsize>,
-    ) -> impl FnOnce() -> Result<Arc<String>, MemoryError> + Send + 'static {
-        let calls = Arc::clone(calls);
-        move || {
-            calls.fetch_add(1, Ordering::SeqCst);
-            Ok(Arc::new("model".to_string()))
-        }
-    }
-
-    #[tokio::test]
-    async fn installed_model_is_reused_without_calling_loader() {
-        let model = LoadedModel::new(None);
-        model
-            .install_loaded(Arc::new("validated".to_string()))
-            .await;
-        let loaded = model
-            .get_or_load(|| panic!("loader must not run"))
+    async fn bounded<F: Future>(future: F) -> F::Output {
+        tokio::time::timeout(Duration::from_secs(5), future)
             .await
-            .unwrap();
-        assert_eq!(loaded.as_str(), "validated");
+            .expect("model runtime test must make progress")
     }
 
-    #[tokio::test]
-    async fn constructs_on_first_call() {
-        let calls = make_counter();
-        let model = LoadedModel::<String>::new(Some(Duration::from_secs(60)));
-        let value = model.get_or_load(fake_load(&calls)).await.unwrap();
-        assert_eq!(*value, "model");
-        assert_eq!(calls.load(Ordering::SeqCst), 1);
+    struct ControlledRuntime {
+        state: StdMutex<ControlledRuntimeState>,
     }
 
-    #[tokio::test]
-    async fn caches_within_idle_timeout() {
-        let calls = make_counter();
-        let model = LoadedModel::<String>::new(Some(Duration::from_secs(60)));
-        model.get_or_load(fake_load(&calls)).await.unwrap();
-        tokio::time::sleep(Duration::from_millis(30)).await;
-        model.get_or_load(fake_load(&calls)).await.unwrap();
-        assert_eq!(calls.load(Ordering::SeqCst), 1);
+    struct ControlledRuntimeState {
+        now: Duration,
+        scheduled: Vec<ScheduledJob>,
     }
 
-    #[tokio::test]
-    async fn unloads_after_idle_timeout() {
-        let calls = make_counter();
-        let model = LoadedModel::<String>::new(Some(Duration::from_millis(60)));
-        model.get_or_load(fake_load(&calls)).await.unwrap();
-        assert_eq!(calls.load(Ordering::SeqCst), 1);
-        // The idle clock starts at the end of use.
-        model.arm_unload().await;
-        await_unloaded(&model).await;
-        // A subsequent call must rebuild.
-        model.get_or_load(fake_load(&calls)).await.unwrap();
-        assert_eq!(calls.load(Ordering::SeqCst), 2);
+    struct ScheduledJob {
+        deadline: Duration,
+        trigger: oneshot::Sender<()>,
+        completed: oneshot::Receiver<()>,
     }
 
-    #[tokio::test]
-    async fn arm_after_use_resets_the_idle_timer() {
-        let calls = make_counter();
-        let model = LoadedModel::<String>::new(Some(Duration::from_millis(500)));
-        // t=0: load + first use completes -> arm (task A fires at t=500).
-        model.get_or_load(fake_load(&calls)).await.unwrap();
-        model.arm_unload().await;
-        // t=100ms: a new use starts and completes -> get + arm (cancels A,
-        // task B fires at t=600).
-        tokio::time::sleep(Duration::from_millis(100)).await;
-        model.get_or_load(fake_load(&calls)).await.unwrap();
-        model.arm_unload().await;
-        // t=200ms: inside the fresh 500ms window since the last arm.
-        tokio::time::sleep(Duration::from_millis(100)).await;
-        assert!({ model.state.lock().await.loaded.is_some() });
-        assert_eq!(calls.load(Ordering::SeqCst), 1);
-        await_unloaded(&model).await;
-    }
-
-    #[tokio::test]
-    async fn no_unload_before_first_arm() {
-        // The idle clock only starts after the first completed use; a freshly
-        // loaded model with no arm yet must stay loaded past the timeout.
-        let calls = make_counter();
-        let model = LoadedModel::<String>::new(Some(Duration::from_millis(40)));
-        model.get_or_load(fake_load(&calls)).await.unwrap();
-        tokio::time::sleep(Duration::from_millis(120)).await;
-        assert!({ model.state.lock().await.loaded.is_some() });
-        // First arm schedules the unload.
-        model.arm_unload().await;
-        await_unloaded(&model).await;
-    }
-
-    #[tokio::test]
-    async fn concurrent_loads_construct_exactly_once() {
-        let calls = make_counter();
-        let model = Arc::new(LoadedModel::<String>::new(None));
-        let mut handles = Vec::new();
-        for _ in 0..8 {
-            let m = Arc::clone(&model);
-            let c = Arc::clone(&calls);
-            handles.push(tokio::spawn(async move {
-                m.get_or_load(fake_load(&c)).await.unwrap();
-            }));
+    impl ControlledRuntime {
+        fn new() -> Self {
+            Self {
+                state: StdMutex::new(ControlledRuntimeState {
+                    now: Duration::ZERO,
+                    scheduled: Vec::new(),
+                }),
+            }
         }
-        for handle in handles {
-            handle.await.unwrap();
+
+        async fn advance_by(&self, duration: Duration) {
+            let due = {
+                let mut state = self.state.lock().expect("controlled runtime lock");
+                state.now = state.now.saturating_add(duration);
+                let now = state.now;
+                let (due, pending): (Vec<_>, Vec<_>) = std::mem::take(&mut state.scheduled)
+                    .into_iter()
+                    .partition(|job| job.deadline <= now);
+                state.scheduled = pending;
+                due
+            };
+
+            let completions = due
+                .into_iter()
+                .filter_map(|job| job.trigger.send(()).ok().map(|()| job.completed))
+                .collect::<Vec<_>>();
+            for completion in completions {
+                // Aborting a scheduled task may race with its trigger.
+                let _ = bounded(completion).await;
+            }
         }
-        assert_eq!(calls.load(Ordering::SeqCst), 1);
+    }
+
+    impl MonotonicRuntime for ControlledRuntime {
+        fn now(&self) -> Duration {
+            self.state.lock().expect("controlled runtime lock").now
+        }
+
+        fn spawn_at(&self, deadline: Duration, task: ScheduledTask) -> tokio::task::JoinHandle<()> {
+            let (trigger, wait) = oneshot::channel();
+            let (complete, completed) = oneshot::channel();
+            self.state
+                .lock()
+                .expect("controlled runtime lock")
+                .scheduled
+                .push(ScheduledJob {
+                    deadline,
+                    trigger,
+                    completed,
+                });
+
+            tokio::spawn(async move {
+                if wait.await.is_ok() {
+                    task.await;
+                    let _ = complete.send(());
+                }
+            })
+        }
+    }
+
+    fn controlled_model(
+        idle_unload: Option<Duration>,
+    ) -> (LoadedModel<String>, Arc<ControlledRuntime>) {
+        let runtime = Arc::new(ControlledRuntime::new());
+        let model_runtime: Arc<dyn MonotonicRuntime> = runtime.clone();
+        let model = LoadedModel::with_runtime(idle_unload, model_runtime);
+        (model, runtime)
     }
 
     #[tokio::test]
-    async fn disabled_unload_keeps_model_loaded() {
-        let calls = make_counter();
-        let model = LoadedModel::<String>::new(None);
-        model.get_or_load(fake_load(&calls)).await.unwrap();
-        model.arm_unload().await; // idle_unload=None -> no task scheduled
-        tokio::time::sleep(Duration::from_millis(30)).await;
-        model.get_or_load(fake_load(&calls)).await.unwrap();
-        assert_eq!(calls.load(Ordering::SeqCst), 1);
+    async fn constructs_and_reuses_the_same_model() {
+        let (model, _) = controlled_model(None);
+        let constructed = Arc::new("model".to_string());
+        let loaded = model
+            .get_or_load({
+                let constructed = Arc::clone(&constructed);
+                move || Ok(constructed)
+            })
+            .await
+            .expect("first construction");
+        assert!(Arc::ptr_eq(&loaded, &constructed));
+        assert_eq!(loaded.as_str(), "model");
+
+        let cached = model
+            .get_or_load(|| Ok(Arc::new("unexpected".to_string())))
+            .await
+            .expect("cached model");
+        assert!(Arc::ptr_eq(&cached, &constructed));
     }
 
     #[tokio::test]
-    async fn install_aborts_pending_unload_and_resets_timer() {
-        let model = LoadedModel::<String>::new(Some(Duration::from_millis(20)));
+    async fn installation_returns_the_installed_model_and_cancels_pending_unload() {
+        let (model, runtime) = controlled_model(Some(Duration::from_secs(10)));
         let first = Arc::new("first".to_string());
         model.install_loaded(Arc::clone(&first)).await;
         model.arm_unload().await;
-        // An activation handoff cancels the pending unload.
-        model
-            .install_loaded(Arc::new("replacement".to_string()))
-            .await;
-        tokio::time::sleep(Duration::from_millis(50)).await;
+
+        runtime.advance_by(Duration::from_secs(5)).await;
+        let replacement = Arc::new("replacement".to_string());
+        model.install_loaded(Arc::clone(&replacement)).await;
+        runtime.advance_by(Duration::from_secs(5)).await;
+
         let loaded = model
-            .get_or_load(|| panic!("loader must not run"))
+            .get_or_load(|| Ok(Arc::new("unexpected".to_string())))
             .await
-            .unwrap();
+            .expect("installed model remains loaded");
+        assert!(Arc::ptr_eq(&loaded, &replacement));
         assert_eq!(loaded.as_str(), "replacement");
     }
 
-    async fn await_unloaded(model: &LoadedModel<String>) {
-        let deadline = Instant::now() + Duration::from_secs(2);
-        loop {
-            let unloaded = { model.state.lock().await.loaded.is_none() };
-            if unloaded {
-                return;
-            }
-            assert!(
-                Instant::now() < deadline,
-                "model was not unloaded within the deadline"
-            );
-            tokio::time::sleep(Duration::from_millis(10)).await;
-        }
+    #[tokio::test]
+    async fn no_unload_is_scheduled_before_the_first_arm() {
+        let (model, runtime) = controlled_model(Some(Duration::from_secs(10)));
+        let original = model
+            .get_or_load(|| Ok(Arc::new("original".to_string())))
+            .await
+            .expect("initial model");
+
+        runtime.advance_by(Duration::from_secs(20)).await;
+
+        let loaded = model
+            .get_or_load(|| Ok(Arc::new("unexpected".to_string())))
+            .await
+            .expect("model remains loaded before first arm");
+        assert!(Arc::ptr_eq(&loaded, &original));
     }
 
     #[tokio::test]
-    async fn second_caller_waits_until_the_only_permit_is_released() {
+    async fn rearming_retains_model_past_the_original_deadline() {
+        let (model, runtime) = controlled_model(Some(Duration::from_millis(500)));
+        let original = model
+            .get_or_load(|| Ok(Arc::new("original".to_string())))
+            .await
+            .expect("initial model");
+        model.arm_unload().await;
+
+        runtime.advance_by(Duration::from_millis(100)).await;
+        model.arm_unload().await;
+        runtime.advance_by(Duration::from_millis(450)).await;
+
+        let loaded = model
+            .get_or_load(|| Ok(Arc::new("reloaded too early".to_string())))
+            .await
+            .expect("renewed idle window retains model");
+        assert!(Arc::ptr_eq(&loaded, &original));
+        assert_eq!(loaded.as_str(), "original");
+    }
+
+    #[tokio::test]
+    async fn rearmed_model_unloads_at_the_renewed_deadline() {
+        let (model, runtime) = controlled_model(Some(Duration::from_millis(500)));
+        let original = model
+            .get_or_load(|| Ok(Arc::new("original".to_string())))
+            .await
+            .expect("initial model");
+        model.arm_unload().await;
+
+        runtime.advance_by(Duration::from_millis(100)).await;
+        model.arm_unload().await;
+        runtime.advance_by(Duration::from_millis(500)).await;
+
+        let reloaded = model
+            .get_or_load(|| Ok(Arc::new("reloaded".to_string())))
+            .await
+            .expect("expired model is reconstructed");
+        assert!(!Arc::ptr_eq(&reloaded, &original));
+        assert_eq!(reloaded.as_str(), "reloaded");
+    }
+
+    #[tokio::test]
+    async fn disabled_unload_keeps_model_loaded_after_an_arm() {
+        let (model, runtime) = controlled_model(None);
+        let original = model
+            .get_or_load(|| Ok(Arc::new("original".to_string())))
+            .await
+            .expect("initial model");
+        model.arm_unload().await;
+        runtime.advance_by(Duration::from_secs(100)).await;
+
+        let loaded = model
+            .get_or_load(|| Ok(Arc::new("unexpected".to_string())))
+            .await
+            .expect("unload is disabled");
+        assert!(Arc::ptr_eq(&loaded, &original));
+    }
+
+    #[tokio::test]
+    async fn loader_failure_does_not_prevent_a_later_construction() {
+        let (model, _) = controlled_model(None);
+        let failure = model
+            .get_or_load(|| {
+                Err(MemoryError::Storage(
+                    "planned model load failure".to_string(),
+                ))
+            })
+            .await;
+        assert!(matches!(
+            failure,
+            Err(MemoryError::Storage(message)) if message == "planned model load failure"
+        ));
+
+        let constructed = Arc::new("recovered".to_string());
+        let recovered = model
+            .get_or_load({
+                let constructed = Arc::clone(&constructed);
+                move || Ok(constructed)
+            })
+            .await
+            .expect("loader recovers after failure");
+        assert!(Arc::ptr_eq(&recovered, &constructed));
+        assert_eq!(recovered.as_str(), "recovered");
+    }
+
+    #[tokio::test]
+    async fn concurrent_construction_shares_the_model_from_the_first_loader() {
+        let (model, _) = controlled_model(None);
+        let model = Arc::new(model);
+        let (started, started_rx) = oneshot::channel();
+        let (release, release_rx) = oneshot::channel();
+        let first_model = Arc::clone(&model);
+        let first = tokio::spawn(async move {
+            first_model
+                .get_or_load(move || {
+                    started.send(()).expect("test receiver remains open");
+                    release_rx
+                        .blocking_recv()
+                        .expect("test releases first loader");
+                    Ok(Arc::new("first".to_string()))
+                })
+                .await
+                .expect("first loader succeeds")
+        });
+        bounded(started_rx).await.expect("first loader started");
+
+        let second_model = Arc::clone(&model);
+        let second = second_model.get_or_load(|| Ok(Arc::new("second".to_string())));
+        tokio::pin!(second);
+        tokio::select! {
+            biased;
+            result = &mut second => panic!("second loader must wait for the first: {result:?}"),
+            _ = tokio::task::yield_now() => {}
+        }
+
+        release.send(()).expect("first loader is waiting");
+        let first = bounded(first).await.expect("first task completes");
+        let second = bounded(second)
+            .await
+            .expect("waiting caller receives cached model");
+        assert!(Arc::ptr_eq(&first, &second));
+        assert_eq!(second.as_str(), "first");
+    }
+
+    /// Integration: the default Tokio scheduler actually releases its model.
+    #[tokio::test]
+    async fn default_runtime_releases_the_resource_after_idle_expiry() {
+        struct ModelResource(Option<oneshot::Sender<()>>);
+        impl Drop for ModelResource {
+            fn drop(&mut self) {
+                if let Some(released) = self.0.take() {
+                    let _ = released.send(());
+                }
+            }
+        }
+        let (released, release_observed) = oneshot::channel();
+        let model = LoadedModel::new(Some(Duration::from_millis(1)));
+        let loaded = model
+            .get_or_load(move || Ok(Arc::new(ModelResource(Some(released)))))
+            .await
+            .expect("load owned resource");
+        drop(loaded);
+        model.arm_unload().await;
+        bounded(release_observed)
+            .await
+            .expect("actual model resource was released");
+    }
+
+    // InferenceGate deliberately uses Tokio scheduling and std::time::Instant.
+    // This test controls permit ordering, not elapsed wall-clock time.
+    #[tokio::test]
+    async fn inference_gate_waits_until_the_only_permit_is_released() {
         let gate = InferenceGate::new(1);
         let (first, _) = gate.acquire().await.expect("first permit");
-        assert!(
-            tokio::time::timeout(Duration::from_millis(10), gate.acquire())
-                .await
-                .is_err()
-        );
+        let waiting = gate.acquire();
+        tokio::pin!(waiting);
+
+        tokio::select! {
+            biased;
+            result = &mut waiting => panic!("acquisition should remain pending: {result:?}"),
+            _ = tokio::task::yield_now() => {}
+        }
+
         drop(first);
-        assert!(
-            tokio::time::timeout(Duration::from_millis(100), gate.acquire())
-                .await
-                .is_ok()
-        );
+        let (second, _) = bounded(waiting)
+            .await
+            .expect("released permit wakes waiter");
+        drop(second);
     }
 
     #[tokio::test]
-    async fn configured_parallelism_is_available() {
+    async fn configured_parallelism_allows_two_acquisitions() {
         let gate = InferenceGate::new(2);
-        let (_first, _) = gate.acquire().await.expect("first permit");
-        let (_second, _) = gate.acquire().await.expect("second permit");
-        assert_eq!(gate.available_permits(), 0);
+        let (first, _) = gate.acquire().await.expect("first permit");
+        let (second, _) = bounded(gate.acquire()).await.expect("second permit");
+        drop((first, second));
     }
 }
