@@ -10,14 +10,13 @@ interoperability remains unverified until real clients are driven against a
 live deployment.
 
 The [strict unit-test audit](../../testing/2026-10-03-unit-test-audit.md) later
-identified incomplete CAS-loser and single-flight oracles. Those acceptance
-scenarios remain open; passing integration or lint fixtures is not certification
-of a pure unit-test suite.
+identified incomplete CAS-loser and single-flight oracles. The subsequent
+remediation closed those acceptance scenarios; passing integration or lint
+fixtures is still not certification of a pure unit-test suite.
 
 **Baseline:** `e506d99` (`v1.23.0`). This is a follow-up to the September 30
 remediation, not a replacement or a claim that its checked steps never landed.
 
-**Plan:** [implementation tasks and verification](../plans/2026-10-03-architecture-audit-follow-up.md).
 **Decision:** [ADR-0072](../../adr/0072-single-owner-for-tenant-runtime-activation.md).
 **Vocabulary:** [GLOSSARY.md](../../../GLOSSARY.md).
 

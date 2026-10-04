@@ -4,7 +4,7 @@
   activation one cancellation-safe owner`
 - Date: 2026-10-03
 - Related: ADR-0046, ADR-0052, ADR-0058, ADR-0066
-- Implementation: [architecture audit follow-up](../superpowers/plans/2026-10-03-architecture-audit-follow-up.md)
+- Implementation: [HTTP runtime pool](../../crates/memory-mcp/src/http/runtime/pool.rs) and its lifecycle scenarios
 
 ## Decision
 

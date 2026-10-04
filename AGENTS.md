@@ -147,7 +147,6 @@ Read on demand:
 - [`README.md`](README.md) — architecture overview, configuration, MCP tools surface, CLI mode, and lifecycle integration
 - [`docs/adr/`](docs/adr/) — Architecture Decision Records, including ADR-0038 (one Active Namespace), ADR-0048 (bounded runtime observability), ADR-0051 (background GLiNER refresh), and ADR-0052 (Streamable HTTP SaaS profile)
 - [`docs/superpowers/specs/`](docs/superpowers/specs/) — approved design specifications, including the Streamable HTTP SaaS specification, the truthful-evaluation system design, and the token-efficient responses design
-- [`docs/superpowers/plans/`](docs/superpowers/plans/) — implementation plans tied to the specifications above
 - [`docs/operations/`](docs/operations/) — operator runbooks for protocol conformance coverage, credential rotation, known limitations, and the SurrealDB restore drill
 - [`docs/performance/`](docs/performance/) — memory profile and NER performance measurements
 - [`docs/compatibility/`](docs/compatibility/) — scope/namespace compatibility contract
