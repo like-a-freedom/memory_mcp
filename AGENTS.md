@@ -1,6 +1,6 @@
 # AGENTS.md — Memory MCP
 
-Rust-based MCP server for agent long-term memory. Two composition roots share the same protocol-agnostic capabilities: `memory_mcp` (CLI and stdio MCP) and `memory_mcp_http` (multi-user Streamable HTTP SaaS). The server ingests episodes, extracts entities and facts, resolves aliases, and assembles context with bi-temporal validity. Workspace `rust-version` is `1.97.1`. See [README.md](README.md) for setup.
+Rust-based MCP server for agent long-term memory. Two composition roots share the same protocol-agnostic capabilities: `memory_mcp` (CLI and stdio MCP) and `memory_mcp_http` (multi-user Streamable HTTP SaaS). The server ingests episodes, extracts entities and facts, resolves aliases, and assembles context with bi-temporal validity. Workspace `rust-version` is `1.99.0`. See [README.md](README.md) for setup.
 
 ## Code Navigation
 

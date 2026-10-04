@@ -1121,7 +1121,7 @@ mod tests {
                 let (mut socket, _) = listener.accept().await.expect("accept");
                 read_http_request(&mut socket).await.expect("request");
                 let failed = server_failures
-                    .fetch_update(Ordering::SeqCst, Ordering::SeqCst, |remaining| {
+                    .try_update(Ordering::SeqCst, Ordering::SeqCst, |remaining| {
                         remaining.checked_sub(1)
                     })
                     .is_ok();

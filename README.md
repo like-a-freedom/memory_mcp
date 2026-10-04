@@ -1,6 +1,6 @@
 # Memory MCP
 
-[![Rust](https://img.shields.io/badge/Rust-1.97%2B-orange.svg?logo=rust)](https://www.rust-lang.org)
+[![Rust](https://img.shields.io/badge/Rust-1.99%2B-orange.svg?logo=rust)](https://www.rust-lang.org)
 [![Edition](https://img.shields.io/badge/edition-2024-blue.svg)](https://doc.rust-lang.org/edition-guide/)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
@@ -256,7 +256,7 @@ erDiagram
 
 ### Requirements
 
-- Rust 1.97.1+ only when compiling from source (matches workspace `rust-version`)
+- Rust 1.99.0+ only when compiling from source (matches workspace `rust-version`)
 - No external SurrealDB service is required for the default embedded mode
 
 ### First run with a release binary

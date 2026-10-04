@@ -35,7 +35,7 @@
 # only after re-running `dx --version` / `dx bundle --help` and re-checking this
 # layout.
 # ─────────────────────────────────────────────────────────────────────────────
-FROM rust:1.97.1-slim-trixie AS ui-builder
+FROM rust:1.99.0-slim-trixie AS ui-builder
 
 WORKDIR /src
 
@@ -97,7 +97,7 @@ RUN --mount=type=cache,id=memory-mcp-cargo-registry-ui,target=/usr/local/cargo/r
 # Stage 2 — Rust binaries. Consumes the UI bundle produced by stage 1 and
 # embeds it at compile time through `MEMORY_MCP_UI_DIST`.
 # ─────────────────────────────────────────────────────────────────────────────
-FROM rust:1.97.1-slim-trixie AS builder
+FROM rust:1.99.0-slim-trixie AS builder
 
 WORKDIR /src
 

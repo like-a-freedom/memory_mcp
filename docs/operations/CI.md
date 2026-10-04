@@ -38,7 +38,7 @@ retroactively use a newer workflow. Create a new version/tag after merging.
 | macOS | — | `macos-15` |
 | Windows | `windows-2025` | `windows-11-arm` |
 
-All jobs use native hosts and Rust **1.97.1**, matching `rust-version` and
+All jobs use native hosts and Rust **1.99.0**, matching `rust-version` and
 `rust-toolchain.toml`. There are no 32-bit targets or emulated Linux builds.
 Runner labels come from the [GitHub runner reference](https://docs.github.com/en/actions/reference/runners/github-hosted-runners).
 
