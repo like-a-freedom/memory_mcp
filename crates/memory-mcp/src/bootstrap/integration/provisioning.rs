@@ -55,6 +55,7 @@ impl ClientCreationPort for LocalAdminClientCreation {
                 status: AccountStatus::Active,
                 tenant_id: command.tenant_id.clone(),
                 created_at: command.now,
+                display_name: None,
             },
             tenant: Tenant {
                 id: command.tenant_id,

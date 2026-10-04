@@ -102,6 +102,12 @@ pub struct AccountMeta {
     pub status: String,
     pub tenant_id: String,
     pub created_at: String,
+    /// The human label the identity provider asserted. Absent from a server
+    /// that predates the field, and absent for a provider that asserted no
+    /// name. Both are normal, so both must decode — the default is what keeps a
+    /// new console working against an older server.
+    #[serde(default)]
+    pub display_name: Option<String>,
 }
 
 /// API key metadata (without secret).
@@ -308,7 +314,39 @@ impl ApiClient {
 
 #[cfg(test)]
 mod tests {
-    use super::{ApiClient, failure_message, fallback_message, server_message};
+    use super::{AccountMeta, ApiClient, failure_message, fallback_message, server_message};
+
+    /// A console built against a server that predates `display_name` must
+    /// still read the account. Without `#[serde(default)]` on the field the
+    /// decode fails outright and the page renders "The server sent a response
+    /// this console could not read" instead of simply showing no name.
+    #[test]
+    fn account_meta_tolerates_a_server_without_the_display_name() {
+        let meta: AccountMeta = serde_json::from_value(serde_json::json!({
+            "id": "acct_1",
+            "status": "active",
+            "tenant_id": "ten_1",
+            "created_at": "2026-10-02T13:47:00Z",
+        }))
+        .expect("an older server must still decode");
+        assert_eq!(meta.display_name, None);
+        assert_eq!(meta.id, "acct_1", "the rest of the payload still reads");
+    }
+
+    /// A server that sends the field decodes it, so the default above is not
+    /// the only path that works.
+    #[test]
+    fn account_meta_reads_a_display_name_when_the_server_sends_one() {
+        let meta: AccountMeta = serde_json::from_value(serde_json::json!({
+            "id": "acct_1",
+            "status": "active",
+            "tenant_id": "ten_1",
+            "created_at": "2026-10-02T13:47:00Z",
+            "display_name": "Ada Lovelace",
+        }))
+        .expect("decode");
+        assert_eq!(meta.display_name.as_deref(), Some("Ada Lovelace"));
+    }
 
     /// The regression that motivated `endpoint`. `format!("{}/api/v1/account", "/")`
     /// is `//api/v1/account`, which is a scheme-relative URL, so the browser

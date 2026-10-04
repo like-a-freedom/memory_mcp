@@ -853,7 +853,7 @@ fn fixed_digits(bytes: &[u8], start: usize, end: usize) -> Option<i64> {
     Some(value)
 }
 
-fn days_in_month(year: i64, month: i64) -> i64 {
+pub fn days_in_month(year: i64, month: i64) -> i64 {
     match month {
         1 | 3 | 5 | 7 | 8 | 10 | 12 => 31,
         4 | 6 | 9 | 11 => 30,
@@ -868,7 +868,7 @@ fn is_leap_year(year: i64) -> bool {
 }
 
 /// Days between 1970-01-01 and the given civil date (Howard Hinnant's algorithm).
-fn days_from_civil(year: i64, month: i64, day: i64) -> i64 {
+pub fn days_from_civil(year: i64, month: i64, day: i64) -> i64 {
     let year = if month <= 2 { year - 1 } else { year };
     let era = if year >= 0 { year } else { year - 399 } / 400;
     let year_of_era = year - era * 400;
@@ -876,6 +876,25 @@ fn days_from_civil(year: i64, month: i64, day: i64) -> i64 {
     let day_of_year = (153 * shifted_month + 2) / 5 + day - 1;
     let day_of_era = year_of_era * 365 + year_of_era / 4 - year_of_era / 100 + day_of_year;
     era * 146_097 + day_of_era - 719_468
+}
+
+/// The civil date `days` days after 1970-01-01, as `(year, month, day)`.
+///
+/// The inverse of [`days_from_civil`], by the same algorithm: shifting an
+/// instant by whole days has to come back to a calendar date, and a timezone
+/// shift crosses a day boundary routinely.
+pub fn civil_from_days(days: i64) -> (i64, i64, i64) {
+    let z = days + 719_468;
+    let era = if z >= 0 { z } else { z - 146_096 } / 146_097;
+    let day_of_era = z - era * 146_097;
+    let year_of_era =
+        (day_of_era - day_of_era / 1_460 + day_of_era / 36_524 - day_of_era / 146_096) / 365;
+    let year = year_of_era + era * 400;
+    let day_of_year = day_of_era - (365 * year_of_era + year_of_era / 4 - year_of_era / 100);
+    let shifted_month = (5 * day_of_year + 2) / 153;
+    let day = day_of_year - (153 * shifted_month + 2) / 5 + 1;
+    let month = shifted_month + if shifted_month < 10 { 3 } else { -9 };
+    (year + i64::from(month <= 2), month, day)
 }
 
 fn split_fraction_and_offset(rest: &str) -> Option<(i64, &str)> {
@@ -2122,6 +2141,62 @@ mod tests {
     }
 
     // ── Timestamps ────────────────────────────────────────
+
+    #[test]
+    fn civil_from_days_inverts_days_from_civil() {
+        // `local_timestamp` reaches `civil_from_days` only indirectly, and an
+        // off-by-one there would shift a timestamp by a whole day at exactly
+        // the boundaries — so the inverse is pinned directly.
+        for (year, month, day) in [
+            (1970, 1, 1),
+            (1969, 12, 31),
+            (2000, 3, 1),  // a leap day, and the century rule
+            (2028, 2, 29), // a leap day in a leap-century-adjacent year
+            (2100, 1, 1),  // 2100 is not a leap year: 100 divides it, 400 does not
+            (2026, 10, 2),
+        ] {
+            let days = days_from_civil(year, month, day);
+            assert_eq!(
+                civil_from_days(days),
+                (year, month, day),
+                "round-trip failed for {year}-{month}-{day} ({days} days)"
+            );
+        }
+    }
+
+    #[test]
+    fn civil_from_days_agrees_with_the_forward_direction_over_a_year() {
+        // A dense sweep across two years, so a wrong month length cannot hide
+        // behind a single lucky boundary. Walking the calendar is the point:
+        // it is what a timestamp shift actually does.
+        //
+        // The month walk is bounded by construction — `days_in_month` answers 0
+        // past December, and an unbounded loop against a 0 would never
+        // terminate.
+        for (year, last_day) in [(2026, 365), (2028, 366)] {
+            // `day_of_year` is a zero-based index, so the last real day is
+            // `last_day - 1`; including `last_day` itself would ask for a day
+            // that does not exist and walk past December.
+            for day_of_year in 0..last_day {
+                let mut remaining = day_of_year;
+                let mut month = 1;
+                while month <= 12 && remaining >= days_in_month(year, month) {
+                    remaining -= days_in_month(year, month);
+                    month += 1;
+                }
+                assert!(
+                    month <= 12,
+                    "day {day_of_year} of {year} walked past December"
+                );
+                let days = days_from_civil(year, month, remaining + 1);
+                assert_eq!(
+                    civil_from_days(days),
+                    (year, month, remaining + 1),
+                    "sweep failed at {year} day {day_of_year}"
+                );
+            }
+        }
+    }
 
     #[test]
     fn rfc3339_parser_accepts_the_backend_format() {

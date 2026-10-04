@@ -201,6 +201,37 @@ pub struct AccessClaims {
     pub aud: Audience,
     pub exp: u64,
     pub nonce: Option<String>,
+    /// Optional provider-asserted display attributes. Many providers issue
+    /// neither claim, so these must never be required: without
+    /// `#[serde(default)]` a token lacking the key would fail to decode and
+    /// break every login against that provider.
+    #[serde(default)]
+    pub name: Option<String>,
+    #[serde(default)]
+    pub preferred_username: Option<String>,
+}
+
+impl AccessClaims {
+    /// The best human label the token offers: a real name beats a login handle.
+    ///
+    /// A blank claim is skipped rather than returned: a provider can assert an
+    /// empty `name`, and returning it would store an empty label where the
+    /// handle was the better answer. Final trimming and length bounding happen
+    /// in `registry::account_display_name`, which is the boundary every value
+    /// passes through.
+    ///
+    /// Display only — never an identity key, and never logged
+    /// (`http::logging`).
+    pub(crate) fn display_name_claim(&self) -> Option<&str> {
+        self.name
+            .as_deref()
+            .filter(|name| !name.trim().is_empty())
+            .or_else(|| {
+                self.preferred_username
+                    .as_deref()
+                    .filter(|handle| !handle.trim().is_empty())
+            })
+    }
 }
 
 #[cfg(test)]
@@ -219,6 +250,52 @@ mod tests {
         serde_json::from_str::<AccessClaims>(json)
             .expect("claims decode")
             .aud
+    }
+
+    #[test]
+    fn a_token_without_display_claims_still_decodes() {
+        // Machine and service accounts are common, and many providers issue neither
+        // claim. Requiring them would break every login against such a provider, so
+        // absence must decode rather than fail.
+        let claims: AccessClaims = serde_json::from_str(
+            r#"{"iss":"https://issuer.example","sub":"user-1","aud":"client","exp":4000000000}"#,
+        )
+        .expect("a token with no display claims must still decode");
+        assert_eq!(claims.display_name_claim(), None);
+    }
+
+    #[test]
+    fn preferred_username_is_used_when_there_is_no_name() {
+        let claims: AccessClaims = serde_json::from_str(
+            r#"{"iss":"https://issuer.example","sub":"user-1","aud":"client",
+                "exp":4000000000,"preferred_username":"ada"}"#,
+        )
+        .expect("decode");
+        assert_eq!(claims.display_name_claim(), Some("ada"));
+    }
+
+    #[test]
+    fn a_real_name_beats_a_login_handle() {
+        // The discriminating case: with both claims present, the order matters.
+        // A test that only covered the fallback would pass under either preference.
+        let claims: AccessClaims = serde_json::from_str(
+            r#"{"iss":"https://issuer.example","sub":"user-1","aud":"client",
+                "exp":4000000000,"name":"Ada Lovelace","preferred_username":"ada"}"#,
+        )
+        .expect("decode");
+        assert_eq!(claims.display_name_claim(), Some("Ada Lovelace"));
+    }
+
+    #[test]
+    fn a_blank_name_falls_through_to_the_login_handle() {
+        // A provider can assert an empty `name`. Returning it would store a blank
+        // label; the handle is the better of the two answers.
+        let claims: AccessClaims = serde_json::from_str(
+            r#"{"iss":"https://issuer.example","sub":"user-1","aud":"client",
+                "exp":4000000000,"name":"","preferred_username":"ada"}"#,
+        )
+        .expect("decode");
+        assert_eq!(claims.display_name_claim(), Some("ada"));
     }
 
     #[test]

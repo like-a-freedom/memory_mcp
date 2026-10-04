@@ -221,8 +221,21 @@ pub async fn create_api_key(
     })?;
 
     let resp = CreateApiKeyResponse {
-        id: created.id,
-        secret: created.secret,
+        id: created.id.clone(),
+        // The response carries the full `mem_sk_<key_id>_<secret>`
+        // credential, not the bare secret the registry's verifier was
+        // computed over. The data plane parses that exact shape, so
+        // handing back the bare secret produces a key the operator
+        // copies once and can never use — the parser rejects it on the
+        // prefix check, and the one-time secret is unrecoverable.
+        //
+        // Assembly belongs here, in the adapter, because this is the
+        // only place that knows the id and the secret together. It
+        // cannot live in `provisioning::api::create_api_key`: the
+        // service deliberately persists `HMAC(pepper, secret)` over
+        // the bare secret, and the credential's tail must stay that
+        // bare token or the verifier comparison fails.
+        secret: crate::http::principal::api_keys::assemble_credential(&created.id, &created.secret),
         name: created.name,
         expires_at: created.expires_at,
     };
@@ -497,6 +510,7 @@ pub async fn create_account(
         status: AccountStatus::Active,
         tenant_id: new_tenant_id(),
         created_at: chrono::Utc::now(),
+        display_name: None,
     };
     let tenant = Tenant {
         id: account.tenant_id.clone(),
@@ -546,6 +560,7 @@ mod tests {
                 status: AccountStatus::Active,
                 tenant_id: "ten_links".to_owned(),
                 created_at: chrono::Utc::now(),
+                display_name: None,
             })
             .await
             .expect("write account");
@@ -751,6 +766,7 @@ mod tests {
                 status: AccountStatus::Active,
                 tenant_id: "ten_1".to_owned(),
                 created_at: chrono::Utc::now(),
+                display_name: None,
             })
             .await
             .expect("write account");

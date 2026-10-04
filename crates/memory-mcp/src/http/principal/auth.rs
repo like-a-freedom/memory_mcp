@@ -257,6 +257,7 @@ mod tests {
             status: AccountStatus::Active,
             tenant_id: tenant_id.to_string(),
             created_at: Utc::now(),
+            display_name: None,
         }
     }
 

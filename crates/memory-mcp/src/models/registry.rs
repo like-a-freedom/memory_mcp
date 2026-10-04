@@ -26,6 +26,10 @@ pub struct Account {
     pub status: AccountStatus,
     pub tenant_id: String,
     pub created_at: DateTime<Utc>,
+    /// A human label the identity provider asserted, shown on the account
+    /// page. Display only: it never selects a namespace, never authorizes, and
+    /// is never logged. Set once, when the Account is created.
+    pub display_name: Option<String>,
 }
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
@@ -452,6 +456,22 @@ pub fn new_namespace_name() -> String {
     format!("tns_{}", uuid::Uuid::new_v4().simple())
 }
 
+/// A display name is free text an identity provider asserted about a person,
+/// used only for display. It is never an identity key, never logged, and is
+/// bounded so a careless or hostile provider cannot put unbounded text in a
+/// durable record that outlives the account.
+///
+/// Only the browser-auth workflow has an identity provider to name a person, so
+/// this is gated the same way the neighbouring id helpers are.
+#[cfg(feature = "streamable-http")]
+pub(crate) fn account_display_name(value: Option<&str>) -> Option<String> {
+    let trimmed = value?.trim();
+    if trimmed.is_empty() || trimmed.chars().count() > 200 {
+        return None;
+    }
+    Some(trimmed.to_owned())
+}
+
 /// A fresh `Account` + `Tenant` pair in the state every browser-auth workflow
 /// starts from: an `Active` account whose tenant is `Reserved` at
 /// `plan_version` and has not been provisioned yet.
@@ -466,6 +486,7 @@ pub fn new_reserved_bundle(plan_version: u32, now: DateTime<Utc>) -> (Account, T
         status: AccountStatus::Active,
         tenant_id: new_tenant_id(),
         created_at: now,
+        display_name: None,
     };
     let tenant = Tenant {
         id: account.tenant_id.clone(),
@@ -487,6 +508,36 @@ pub fn new_reserved_bundle(plan_version: u32, now: DateTime<Utc>) -> (Account, T
 #[cfg(all(test, feature = "streamable-http"))]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_display_name_is_trimmed_bounded_and_absent_when_blank() {
+        assert_eq!(
+            account_display_name(Some("  Ada Lovelace  ")),
+            Some("Ada Lovelace".to_owned())
+        );
+        assert_eq!(account_display_name(Some("   ")), None);
+        assert_eq!(account_display_name(Some("")), None);
+        assert_eq!(account_display_name(None), None);
+        assert_eq!(account_display_name(Some(&"x".repeat(201))), None);
+        assert_eq!(
+            account_display_name(Some(&"x".repeat(200))),
+            Some("x".repeat(200))
+        );
+    }
+
+    #[test]
+    fn a_display_name_counts_characters_not_bytes() {
+        // A multi-byte name that fits in 200 characters must be kept; one that
+        // exceeds 200 characters must be dropped even though its byte length is
+        // far past the boundary.
+        let fits = "é".repeat(200);
+        assert_eq!(
+            account_display_name(Some(&fits)).map(|n| n.chars().count()),
+            Some(200)
+        );
+        let too_long = "é".repeat(201);
+        assert_eq!(account_display_name(Some(&too_long)), None);
+    }
 
     #[test]
     fn ids_have_expected_prefixes() {

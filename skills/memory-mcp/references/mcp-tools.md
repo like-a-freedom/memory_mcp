@@ -38,7 +38,11 @@ Namespace is server startup configuration and is never selected per request.
 Record IDs are canonical `<table>:<id>` strings — `episode:474b2d8b…`,
 `fact:52f9d92d…`, `entity:…`. Round-trip every ID exactly as a tool returned
 it; never strip or re-add the table prefix. A bare hex ID without its prefix
-is rejected with a validation error, not treated as "not found".
+is rejected with a validation error, not treated as "not found". Such an
+error names the exact ID to send back, so retry with the string it quotes
+rather than guessing a prefix from the parameter name — a wrong-kind prefix
+(`fact:` passed to `extract`) is refused separately and also names the kind
+the tool expects.
 
 Successful tool responses use an envelope with `status`, `result`, and
 `guidance`. List results also expose pagination metadata. MCP errors are

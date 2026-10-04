@@ -76,7 +76,9 @@ pub async fn ingest<T: ToolContext>(
             });
             Ok(ToolResponse::success_with_guidance(
                 episode_id,
-                "Call extract next to derive entities and facts.",
+                "Call extract next to derive entities and facts. Pass the episode_id you just \
+                 received back exactly as it appears, including the 'episode:' prefix — do not \
+                 strip or re-add it.",
             ))
         }
         Err(err) => {
@@ -90,5 +92,150 @@ pub async fn ingest<T: ToolContext>(
             });
             Err(err)
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::sync::Mutex;
+
+    use crate::models::Episode;
+    use crate::tools::context::ToolContext;
+
+    /// The one capability `ingest` reaches; every other one panics if
+    /// the tool ever grows a call to it.
+    struct StubContext {
+        episode_id: String,
+        events: Mutex<Vec<&'static str>>,
+    }
+
+    impl ToolContext for StubContext {
+        fn record(&self, event: ToolEvent) {
+            self.events.lock().expect("event log").push(event.op);
+        }
+
+        async fn ingest(
+            &self,
+            _request: IngestRequest,
+            _access: Option<AccessPayload>,
+        ) -> Result<String, MemoryError> {
+            Ok(self.episode_id.clone())
+        }
+
+        async fn extract(
+            &self,
+            _episode_id: &str,
+            _access: Option<AccessPayload>,
+            _zero_shot_labels: Option<&[String]>,
+        ) -> Result<crate::models::ExtractResult, MemoryError> {
+            panic!("ingest must not reach extract")
+        }
+
+        async fn resolve(
+            &self,
+            _candidate: crate::models::EntityCandidate,
+            _access: Option<AccessPayload>,
+        ) -> Result<String, MemoryError> {
+            panic!("ingest must not reach resolve")
+        }
+
+        async fn explain(
+            &self,
+            _request: crate::models::ExplainRequest,
+            _access: Option<AccessPayload>,
+        ) -> Result<Vec<crate::models::ExplainItem>, MemoryError> {
+            panic!("ingest must not reach explain")
+        }
+
+        async fn invalidate(
+            &self,
+            _request: crate::models::InvalidateRequest,
+            _access: Option<AccessPayload>,
+        ) -> Result<(), MemoryError> {
+            panic!("ingest must not reach invalidate")
+        }
+
+        async fn assemble_context(
+            &self,
+            _request: crate::models::AssembleContextRequest,
+        ) -> Result<Vec<crate::models::AssembledContextItem>, MemoryError> {
+            panic!("ingest must not reach assemble_context")
+        }
+
+        async fn find_episode(&self, _episode_id: &str) -> Result<Option<Episode>, MemoryError> {
+            panic!("ingest must not reach find_episode")
+        }
+    }
+
+    fn params() -> IngestParams {
+        IngestParams {
+            source_type: "ad-hoc".to_string(),
+            source_id: "guidance-roundtrip".to_string(),
+            content: "content".to_string(),
+            t_ref: "2026-01-01T00:00:00Z".to_string(),
+            t_ingested: None,
+            policy_tags: Vec::new(),
+        }
+    }
+
+    fn run(ctx: &StubContext) -> Result<ToolResponse<String>, MemoryError> {
+        tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .expect("current-thread runtime")
+            .block_on(ingest(ctx, params()))
+    }
+
+    #[test]
+    fn guidance_tells_the_caller_to_pass_the_id_back_unchanged() {
+        // `ingest` returns the id as a bare string and then tells the
+        // caller to use it in the next call. A caller that re-types it
+        // and drops the `episode:` prefix gets a validation error on the
+        // next tool, so the guidance is the only place that can prevent
+        // the mistake.
+        let ctx = StubContext {
+            episode_id: "episode:d1a2438bcfb3380ffb913ec4".to_string(),
+            events: Mutex::new(Vec::new()),
+        };
+
+        let response = run(&ctx).expect("ingest should succeed");
+        let guidance = response.guidance.expect("ingest must carry guidance");
+
+        assert!(
+            guidance.contains("episode:"),
+            "guidance must name the canonical prefix, got: {guidance}"
+        );
+        assert!(
+            guidance.contains("exact") || guidance.contains("unchanged"),
+            "guidance must require the id be passed back verbatim, got: {guidance}"
+        );
+        assert!(
+            guidance.to_lowercase().contains("strip"),
+            "guidance must warn against stripping the prefix, got: {guidance}"
+        );
+        assert!(
+            guidance.contains("extract"),
+            "guidance must still name the next tool, got: {guidance}"
+        );
+    }
+
+    #[test]
+    fn guidance_names_the_same_id_the_result_carries() {
+        // The guidance is only actionable if it agrees with the result
+        // it sits next to; a caller that reads one and compares the
+        // other must not be told to send something else.
+        let episode_id = "episode:d1a2438bcfb3380ffb913ec4";
+        let ctx = StubContext {
+            episode_id: episode_id.to_string(),
+            events: Mutex::new(Vec::new()),
+        };
+
+        let response = run(&ctx).expect("ingest should succeed");
+
+        assert_eq!(
+            response.result, episode_id,
+            "the result must be the canonical id the guidance refers to"
+        );
     }
 }

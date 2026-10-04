@@ -125,6 +125,10 @@ impl OidcClient {
         let (mut url, _csrf) = client
             .authorize_url(|| CsrfToken::new(state.as_str().to_string()))
             .add_scope(Scope::new("openid".to_string()))
+            // `profile` carries the optional `name` / `preferred_username`
+            // claims an Account's display name comes from. Both are optional:
+            // a provider that issues neither still authenticates.
+            .add_scope(Scope::new("profile".to_string()))
             .set_pkce_challenge(pkce_challenge)
             .url();
 
@@ -426,7 +430,10 @@ mod tests {
             query.get("redirect_uri").map(String::as_str),
             Some("https://memory.example.com/auth/callback")
         );
-        assert_eq!(query.get("scope").map(String::as_str), Some("openid"));
+        assert_eq!(
+            query.get("scope").map(String::as_str),
+            Some("openid profile")
+        );
         assert_eq!(query.get("state").map(String::as_str), Some("state /?&"));
         assert_eq!(query.get("nonce").map(String::as_str), Some("nonce +/="));
         assert_eq!(

@@ -110,6 +110,7 @@ async fn seed_reserved_tenant_with_key(registry: RegistryHandle, name: &str, api
             status: AccountStatus::Active,
             tenant_id: tenant_id.clone(),
             created_at: now,
+            display_name: None,
         })
         .await
         .expect("write account");
@@ -173,6 +174,7 @@ async fn seed_ready_sibling(registry: RegistryHandle, name: &str, api_key: &str)
             status: AccountStatus::Active,
             tenant_id: tenant_id.clone(),
             created_at: now,
+            display_name: None,
         })
         .await
         .expect("write sibling account");
@@ -384,6 +386,7 @@ async fn provisioning_resumes_a_tenant_stranded_in_namespace_creating() {
             status: AccountStatus::Active,
             tenant_id: tenant_id.clone(),
             created_at: now,
+            display_name: None,
         })
         .await
         .expect("write account");

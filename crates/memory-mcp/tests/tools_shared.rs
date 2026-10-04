@@ -112,9 +112,11 @@ async fn tools_ingest_and_extract_happy_path() {
         "result: {:?}",
         response.result
     );
-    assert_eq!(
-        response.guidance.as_deref(),
-        Some("Call extract next to derive entities and facts."),
+    let guidance = response.guidance.as_deref().expect("ingest guidance");
+    assert!(guidance.contains("extract"), "{guidance}");
+    assert!(
+        guidance.contains("episode:"),
+        "the guidance must name the prefix the caller preserves, got: {guidance}"
     );
 
     // Now extract from the ingested episode

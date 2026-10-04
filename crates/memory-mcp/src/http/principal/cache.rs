@@ -94,6 +94,7 @@ mod tests {
             status: AccountStatus::Active,
             tenant_id: "ten_test".into(),
             created_at: chrono::Utc::now(),
+            display_name: None,
         }
     }
 

@@ -15,6 +15,24 @@ use crate::error::MemoryError;
 const MAX_LEN: usize = 200;
 const MIN_SECRET_LEN: usize = 32;
 
+/// Assemble the `mem_sk_<key_id>_<secret>` credential that this module
+/// parses, from the key's public id and its bare secret.
+///
+/// The grammar lives beside [`ApiKeyCredential::parse`] on purpose:
+/// minting and parsing are two halves of one contract, and the bug this
+/// guards against came from a second, independent spelling of the mint
+/// side. An issuer that returns `secret` on its own produces a string
+/// the data plane refuses on the prefix check — a key the operator
+/// copies once and can never use, with no way to recover it.
+///
+/// `secret` is the bare token the registry's verifier was computed
+/// over. The tail of the credential must remain that bare token, not
+/// the assembled string, or the HMAC comparison in
+/// `AuthenticateBearer` fails even though the grammar accepts it.
+pub fn assemble_credential(key_id: &str, secret: &str) -> String {
+    format!("mem_sk_{key_id}_{secret}")
+}
+
 #[derive(Debug, Clone)]
 pub struct ApiKeyCredential {
     key_id: String,
@@ -172,6 +190,26 @@ mod tests {
     #[test]
     fn rejects_missing_secret() {
         assert!(ApiKeyCredential::parse("mem_sk_ak_01234567-89ab-4cde-8f01-23456789abcd").is_err());
+    }
+
+    #[test]
+    fn assembling_then_parsing_round_trips_the_id_and_secret() {
+        let key_id = "ak_9d53493a-288c-436f-9b4b-ce2a42345d18";
+        let secret = "ff96".repeat(16);
+
+        let credential = assemble_credential(key_id, &secret);
+
+        let parsed = ApiKeyCredential::parse(&credential)
+            .expect("an assembled credential is the shape the data plane accepts");
+        assert_eq!(parsed.key_id(), key_id);
+        assert_eq!(parsed.secret(), secret.as_bytes());
+    }
+
+    #[test]
+    fn a_bare_secret_is_not_a_credential() {
+        // The failure this guards: an issuer returning the bare secret
+        // is refused on the prefix check before any verifier is consulted.
+        assert!(ApiKeyCredential::parse(&"ff96".repeat(16)).is_err());
     }
 
     #[test]

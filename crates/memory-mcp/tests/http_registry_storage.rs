@@ -232,6 +232,7 @@ async fn real_registry_store_admits_ingest_on_mem_engine() {
         status: AccountStatus::Active,
         tenant_id: tenant.id.clone(),
         created_at: now,
+        display_name: None,
     };
     let bundle_tx =
         memory_mcp::http::registry::control_impl::account_bundle_tx(comp.registry.stores());

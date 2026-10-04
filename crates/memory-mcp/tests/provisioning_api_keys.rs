@@ -3,7 +3,7 @@
 use std::sync::{Arc, Mutex};
 
 use memory_mcp::MemoryError;
-use memory_mcp::http::principal::api_keys::ApiKeyCredential;
+use memory_mcp::http::principal::api_keys::{ApiKeyCredential, assemble_credential};
 use memory_mcp::provisioning::api::{
     ApiKeyIssuancePort, ApiKeyOwner, CreateApiKeyCommand, NewApiKeyRecord, create_api_key,
 };
@@ -140,14 +140,14 @@ async fn created_api_key_debug_redacts_the_one_time_secret() {
 
 /// A key this workflow issues must be one the data plane accepts.
 ///
-/// The credential the console copies is assembled here as
-/// `mem_sk_<key_id>_<secret>` — the same shape the local-admin
-/// workflow emits — and handed to the same parser
-/// `authenticate_bearer` runs. An id that this parser rejects is a key
-/// the operator copies, stores, and can never use: the failure is silent
-/// because the secret is shown exactly once, so the only symptom is a
-/// credential that never authenticates. The id must therefore be a
-/// canonical UUID, which is what the grammar above requires.
+/// This asserts a property of the *id* the service mints: `ak_<uuid
+/// v4>`, which is what the credential grammar requires. The credential
+/// is assembled here by the shared helper, so this test cannot fail if
+/// an adapter forgets to assemble it — it deliberately does not try to.
+/// That gap is covered at the transport boundary by
+/// `issued_api_key_secret_is_a_usable_data_plane_credential` and
+/// `issued_api_key_credential_authenticates_against_the_data_plane` in
+/// `http_control_plane`, which drive the real endpoint.
 #[tokio::test]
 async fn issued_credential_is_accepted_by_the_data_plane_parser() {
     let port = Arc::new(RecordingIssuance::default());
@@ -170,7 +170,7 @@ async fn issued_credential_is_accepted_by_the_data_plane_parser() {
     .await
     .expect("issue key");
 
-    let credential = format!("mem_sk_{}_{}", created.id, created.secret);
+    let credential = assemble_credential(&created.id, &created.secret);
     let parsed = ApiKeyCredential::parse(&credential).unwrap_or_else(|error| {
         panic!("an issued key must be usable: {credential} was refused ({error:?})")
     });
@@ -178,5 +178,48 @@ async fn issued_credential_is_accepted_by_the_data_plane_parser() {
         parsed.key_id(),
         created.id,
         "the credential must resolve back to the id that was stored"
+    );
+}
+
+/// `CreatedApiKey.secret` must stay the bare token the registry's
+/// verifier is computed over, and must not become the assembled
+/// credential.
+///
+/// These are the two halves of a contract that is easy to "fix" in the
+/// wrong place. Assembling inside `create_api_key` looks tidier and is
+/// wrong: `insert_key` then stores `HMAC(pepper, "mem_sk_ak_…_…")`,
+/// while the data plane recomputes the HMAC over the *tail* of the
+/// credential the client presents — so every issued key would parse
+/// and then 401, turning a visible failure into a silent one. The
+/// assembly belongs in the adapter that returns the secret.
+#[tokio::test]
+async fn the_issued_secret_is_the_bare_verifier_input() {
+    let port = Arc::new(RecordingIssuance::default());
+    *port.owner.lock().expect("owner lock") = Some(ApiKeyOwner {
+        tenant_id: "ten_1".into(),
+        plan_version: 1,
+    });
+    *port.cap.lock().expect("cap lock") = 5;
+    *port.expect_expiry.lock().expect("expect_expiry lock") = Some(false);
+
+    let created = create_api_key(
+        port.as_ref(),
+        CreateApiKeyCommand {
+            account_id: "acct_1".into(),
+            name: "agent".into(),
+            expires_in_days: None,
+        },
+        chrono::Utc::now(),
+    )
+    .await
+    .expect("issue key");
+
+    assert!(
+        !created.secret.starts_with("mem_sk_"),
+        "the service must return the bare secret; the adapter assembles the credential"
+    );
+    assert!(
+        ApiKeyCredential::parse(&created.secret).is_err(),
+        "the bare secret must not itself be a parseable credential, or this test would pass for the wrong reason"
     );
 }

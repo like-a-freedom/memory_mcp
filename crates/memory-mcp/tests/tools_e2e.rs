@@ -182,10 +182,13 @@ async fn test_mcp_tools_flow() {
         .expect("ingest")
         .0;
     assert_eq!(episode_id.status, "success");
-    assert_eq!(
-        episode_id.guidance.as_deref(),
-        Some("Call extract next to derive entities and facts."),
-    );
+    // The guidance is asserted on content, not pinned verbatim: it names
+    // the next tool and the prefix the caller must preserve. A hardcoded
+    // copy would fail on any wording change while proving nothing about
+    // whether the guidance is actionable.
+    let guidance = episode_id.guidance.as_deref().expect("guidance");
+    assert!(guidance.contains("extract"), "{guidance}");
+    assert!(guidance.contains("episode:"), "{guidance}");
     let episode_id = episode_id.result;
 
     let extract_params = serde_json::json!({
@@ -878,6 +881,10 @@ async fn test_mcp_assemble_context_timeline_mode_passes_optional_fields() {
 ///   - `validate_record_id` runs at every record-id entry point and rejects
 ///     bare hex with a `Validation` error that names the canonical
 ///     `<table>:<id>` form and echoes the bad input.
+///   - The owner-scoped gate (`require_record_kind`) refines that further:
+///     because it knows the table the caller wanted, the refusal names the
+///     exact id to send back (`pass 'episode:<hex>' exactly as returned`),
+///     so the retry needs no inference from the parameter name.
 ///   - The MCP `extract` tool surfaces this as `INVALID_PARAMS` (the same
 ///     error code as before) but with a message that explains the input
 ///     shape, not a fake "not found".
@@ -922,16 +929,20 @@ async fn extract_with_bare_hex_episode_id_returns_validation_error_not_not_found
     };
     let message = err.to_string();
     assert!(
-        message.contains("'<table>:<id>'") || message.contains("no ':' separator"),
-        "expected validation message to name the canonical form, got: {message}"
-    );
-    assert!(
-        !message.starts_with("Episode not found"),
-        "bug regression: extract still returns misleading 'Episode not found': {message}"
+        message.contains("episode:"),
+        "the refusal must name the prefix to restore, got: {message}"
     );
     assert!(
         message.contains(&bare_hex),
         "validation message should echo the bad input '{bare_hex}', got: {message}"
+    );
+    assert!(
+        message.contains(&format!("episode:{bare_hex}")),
+        "the refusal must name the exact id to pass back, got: {message}"
+    );
+    assert!(
+        !message.starts_with("Episode not found"),
+        "bug regression: extract still returns misleading 'Episode not found': {message}"
     );
 
     // 4. Control: extract with the correct prefixed id must succeed.
@@ -939,4 +950,110 @@ async fn extract_with_bare_hex_episode_id_returns_validation_error_not_not_found
     mcp.extract(Parameters(serde_json::from_value(ok_params).unwrap()))
         .await
         .expect("well-formed episode_id must succeed");
+}
+
+/// Regression test for the second half of the reported bug: the agent
+/// stripped `episode:`, got a validation error, and then re-added the
+/// WRONG prefix (`fact:`) on the retry — which fails with a different
+/// message that never says which kind was wanted.
+///
+/// The refusal must therefore name the expected kind, so a retry
+/// following the error message succeeds without guessing.
+#[tokio::test]
+async fn extract_with_a_foreign_table_prefix_names_the_expected_kind() {
+    let service = common::make_service().await;
+    let mcp = MemoryMcp::new(service);
+
+    let ingest_params = serde_json::json!({
+        "source_type": "ad-hoc",
+        "source_id": "reproducer:foreign-prefix",
+        "content": "Test content: EPS reduction decision notes.",
+        "t_ref": "2026-07-31T18:00:00Z"
+    });
+    let canonical_id = mcp
+        .ingest(Parameters(serde_json::from_value(ingest_params).unwrap()))
+        .await
+        .expect("ingest")
+        .0
+        .result;
+    let bare_hex = canonical_id.trim_start_matches("episode:").to_string();
+
+    // The wrong-kind id: a real prefix, but the wrong table.
+    let wrong_kind = format!("fact:{bare_hex}");
+    let err = match mcp
+        .extract(Parameters(
+            serde_json::from_value(serde_json::json!({ "episode_id": &wrong_kind })).unwrap(),
+        ))
+        .await
+    {
+        Ok(_) => panic!("extract with a fact: id must fail validation; got Ok"),
+        Err(err) => err,
+    };
+    let message = err.to_string();
+
+    assert!(
+        message.contains("fact") && message.contains("episode"),
+        "the refusal must name both the given and the expected kind, got: {message}"
+    );
+    assert!(
+        !message.contains("not a episode"),
+        "the refusal must not use the 'a episode' article, got: {message}"
+    );
+
+    // The correction the message implies must actually work.
+    let corrected = mcp
+        .extract(Parameters(
+            serde_json::from_value(serde_json::json!({ "episode_id": &canonical_id })).unwrap(),
+        ))
+        .await
+        .expect("the episode:<id> the message names must be accepted");
+    assert_eq!(corrected.0.status, "success");
+}
+
+/// The full `ingest` → `extract` round-trip, driven only by what the
+/// previous response handed back. This is the exact scenario from the
+/// bug report, and it is the seam that has to stay green for the fix to
+/// mean anything: if `ingest` ever returns something `extract` cannot
+/// accept verbatim, this fails.
+#[tokio::test]
+async fn ingest_result_is_accepted_verbatim_by_extract() {
+    let service = common::make_service().await;
+    let mcp = MemoryMcp::new(service);
+
+    let ingest_params = serde_json::json!({
+        "source_type": "ad-hoc",
+        "source_id": "reproducer:verbatim-roundtrip",
+        "content": "The team decided to cut Q3 infrastructure spend.",
+        "t_ref": "2026-07-31T18:00:00Z"
+    });
+    let ingested = mcp
+        .ingest(Parameters(serde_json::from_value(ingest_params).unwrap()))
+        .await
+        .expect("ingest")
+        .0;
+
+    // Whatever the guidance tells the caller to do next, the id in
+    // `result` must be usable exactly as-is.
+    let episode_id = ingested.result;
+    assert!(
+        episode_id.starts_with("episode:"),
+        "ingest must return a prefixed id, got: {episode_id}"
+    );
+    assert!(
+        ingested
+            .guidance
+            .as_deref()
+            .is_some_and(|g| g.contains("episode:")),
+        "the guidance must name the prefix the caller has to preserve"
+    );
+
+    let extracted = mcp
+        .extract(Parameters(
+            serde_json::from_value(serde_json::json!({ "episode_id": &episode_id })).unwrap(),
+        ))
+        .await
+        .expect("the id ingest returned must be accepted verbatim by extract");
+
+    assert_eq!(extracted.0.status, "success");
+    assert_eq!(extracted.0.result.episode_id, episode_id);
 }

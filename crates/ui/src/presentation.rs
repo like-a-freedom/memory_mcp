@@ -126,6 +126,106 @@ fn humanize(raw: &str) -> Option<String> {
 pub const KEY_PRIVILEGE_NOTE: &str =
     "Administrators can issue keys that access this client's memory. Issuance is audited.";
 
+/// Convert a JS `getTimezoneOffset()` reading into minutes east of UTC.
+///
+/// JavaScript reports UTC-minus-local, so the sign is inverted here and
+/// nowhere else. The reading is in minutes already, which is what lets a
+/// half-hour zone survive; it is not converted to hours and back.
+///
+/// A non-finite or out-of-range reading returns `None`: nothing on earth is
+/// more than 14 hours from UTC, so such a value is a bad clock rather than a
+/// zone, and applying it would shift a timestamp by a day.
+///
+/// Part of this module's public surface: the conversion is separable from the
+/// single `js_sys` call that feeds it, which is what makes it host-testable.
+/// Off-wasm nothing calls it — the browser read is compiled out — so the
+/// unused warning there is expected rather than a dangling function.
+#[allow(dead_code)]
+pub fn offset_minutes_from(js_offset_minutes: f64) -> Option<i32> {
+    if !js_offset_minutes.is_finite() || js_offset_minutes.abs() > 14.0 * 60.0 {
+        return None;
+    }
+    Some(-(js_offset_minutes as i32))
+}
+
+/// The browser's UTC offset, in minutes, **for the given instant**.
+///
+/// The instant is a parameter rather than an implicit "now" on purpose: a zone
+/// that observes DST resolves different offsets for a winter moment and a
+/// summer one, so a timestamp rendered with the current offset would be wrong
+/// for half the year.
+///
+/// `js_sys` has no host implementation, so this is compiled for wasm only and
+/// the caller falls back to the stored value elsewhere. Splitting it this way
+/// is the same seam `admin_api::browser_now_millis` uses.
+#[cfg(target_arch = "wasm32")]
+pub fn browser_offset_minutes(instant_millis: f64) -> Option<i32> {
+    // `Date::new` takes `&JsValue`, and `f64: Into<JsValue>` is provided by
+    // wasm-bindgen, so `&instant_millis.into()` is a `&JsValue` built from the
+    // millisecond count. A numeric JsValue is milliseconds since the epoch, so
+    // this needs no direct `wasm-bindgen` dependency — `js-sys` is already one.
+    //
+    // This reads the zone rules **for this instant**: `getTimezoneOffset` is
+    // `(tv - LocalTime(tv)) / 60000`, and `LocalTime` resolves the political
+    // rules "in effect at tv" (ES `LocalTZA`). That is why the instant is
+    // passed in rather than read from the clock — a fixed "current" offset
+    // would be wrong for half the year in any DST zone.
+    let date = js_sys::Date::new(&instant_millis.into());
+    offset_minutes_from(date.get_timezone_offset())
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+pub fn browser_offset_minutes(_instant_millis: f64) -> Option<i32> {
+    None
+}
+
+/// Render an RFC 3339 instant in a given zone, at minute precision.
+///
+/// `offset_minutes` is the zone's offset **for this instant**, which is why it
+/// is a parameter rather than a value read once: a zone that observes DST
+/// resolves different offsets for a winter moment and a summer one, and a
+/// timestamp rendered with the current offset would be wrong for half the year.
+///
+/// The stored value's own offset is data, not a zone to re-apply — the instant
+/// is parsed to epoch millis first, so a `+02:00` value converts from UTC rather
+/// than being treated as already local.
+///
+/// No zone label is printed: the zone is the reader's, and naming one would
+/// misstate where the value came from. A value that does not parse is returned
+/// unchanged, so a malformed timestamp is never silently shifted.
+pub fn local_timestamp(value: &str, offset_minutes: Option<i32>) -> String {
+    let Some(offset) = offset_minutes else {
+        return compact_timestamp(value);
+    };
+    let Some(instant) = crate::admin_api::parse_rfc3339_millis(value) else {
+        return value.to_owned();
+    };
+    let shifted = instant + i64::from(offset) * 60_000;
+    let day_millis = 86_400_000;
+    // Floor-divide, so an instant before the epoch lands on the previous day
+    // rather than truncating toward zero and reading a day late.
+    let days = shifted.div_euclid(day_millis);
+    let within_day = shifted.rem_euclid(day_millis);
+    let (year, month, day) = crate::admin_api::civil_from_days(days);
+    let hours = within_day / 3_600_000;
+    let minutes = (within_day % 3_600_000) / 60_000;
+    format!("{year:04}-{month:02}-{day:02} {hours:02}:{minutes:02}")
+}
+
+/// Render an instant in the browser's timezone, falling back to the stored
+/// value when that is unknown.
+///
+/// This is the single entry point the `Timestamp` component calls, and the
+/// single place the browser is consulted. A value that does not parse, or a
+/// build with no browser to ask, both fall through to
+/// [`compact_timestamp`] — so a timestamp is never shifted on a guess.
+pub fn render_in_browser_zone(value: &str) -> String {
+    let Some(instant) = crate::admin_api::parse_rfc3339_millis(value) else {
+        return compact_timestamp(value);
+    };
+    local_timestamp(value, browser_offset_minutes(instant as f64))
+}
+
 /// Make an RFC 3339 timestamp compact enough for a table cell while the exact
 /// value stays available in the element's `datetime` and `title` attributes.
 ///
@@ -158,7 +258,10 @@ pub fn compact_timestamp(value: &str) -> String {
 
 #[cfg(test)]
 mod tests {
-    use super::{Status, StatusTone, compact_timestamp};
+    use super::{
+        Status, StatusTone, browser_offset_minutes, compact_timestamp, local_timestamp,
+        offset_minutes_from, render_in_browser_zone,
+    };
 
     #[test]
     fn known_states_use_plain_operator_labels() {
@@ -217,6 +320,140 @@ mod tests {
         assert_eq!(
             Status::new("namespace_creating").raw(),
             "namespace_creating"
+        );
+    }
+
+    #[test]
+    fn a_negative_offset_shifts_the_clock_backward_across_a_day_boundary() {
+        assert_eq!(
+            local_timestamp("2026-10-02T02:30:00Z", Some(-300)),
+            "2026-10-01 21:30"
+        );
+    }
+
+    #[test]
+    fn half_hour_and_quarter_hour_zones_are_supported() {
+        // Zones that are not a whole number of hours are the offsets most likely
+        // to break arithmetic that assumes otherwise.
+        assert_eq!(
+            local_timestamp("2026-10-02T13:47:00Z", Some(330)),
+            "2026-10-02 19:17"
+        );
+        assert_eq!(
+            local_timestamp("2026-10-02T13:47:00Z", Some(345)),
+            "2026-10-02 19:32"
+        );
+    }
+
+    #[test]
+    fn a_whole_hour_zone_across_a_month_boundary_is_exact() {
+        assert_eq!(
+            local_timestamp("2026-03-01T00:30:00Z", Some(60)),
+            "2026-03-01 01:30"
+        );
+        assert_eq!(
+            local_timestamp("2026-03-01T00:30:00Z", Some(-60)),
+            "2026-02-28 23:30"
+        );
+    }
+
+    #[test]
+    fn a_shift_across_a_leap_day_is_exact() {
+        // February 2028 has 29 days; a shift landing on the 29th proves the day
+        // arithmetic reads the calendar rather than assuming a month length.
+        assert_eq!(
+            local_timestamp("2028-02-28T23:30:00Z", Some(60)),
+            "2028-02-29 00:30"
+        );
+    }
+
+    #[test]
+    fn an_unknown_offset_leaves_the_value_exactly_as_it_arrived() {
+        assert_eq!(
+            local_timestamp("2026-10-02T13:47:00Z", None),
+            "2026-10-02 13:47 UTC"
+        );
+        assert_eq!(local_timestamp("not-a-date", Some(60)), "not-a-date");
+        assert_eq!(local_timestamp("", Some(60)), "");
+    }
+
+    #[test]
+    fn a_borrowed_offset_in_the_value_is_not_mistaken_for_the_browser_zone() {
+        // The stored value's own offset is data, not a zone to re-apply: a
+        // `+02:00` instant converts from UTC rather than being treated as already
+        // local. 13:47+02:00 is 11:47 UTC, so a UTC browser shows 11:47.
+        assert_eq!(
+            local_timestamp("2026-10-02T13:47:00+02:00", Some(0)),
+            "2026-10-02 11:47"
+        );
+    }
+
+    #[test]
+    fn an_instant_before_the_epoch_shifts_to_the_previous_day() {
+        assert_eq!(
+            local_timestamp("1969-12-31T23:30:00Z", Some(-60)),
+            "1969-12-31 22:30"
+        );
+        assert_eq!(
+            local_timestamp("1970-01-01T00:30:00Z", Some(-60)),
+            "1969-12-31 23:30"
+        );
+    }
+
+    #[test]
+    fn a_browser_offset_is_minutes_east_of_utc_with_the_sign_inverted() {
+        // JS `getTimezoneOffset()` is UTC-minus-local, so a browser in UTC+1
+        // reports -60 and the conversion must hand back +60. A browser in
+        // UTC+5:30 reports -330 and must hand back +330 — the reading is
+        // already in minutes, and rounding it to hours would lose the half.
+        assert_eq!(offset_minutes_from(-60.0), Some(60));
+        assert_eq!(offset_minutes_from(-330.0), Some(330));
+        assert_eq!(offset_minutes_from(-345.0), Some(345));
+        assert_eq!(offset_minutes_from(0.0), Some(0));
+        assert_eq!(offset_minutes_from(60.0), Some(-60));
+        assert_eq!(offset_minutes_from(f64::NAN), None);
+        assert_eq!(offset_minutes_from(f64::INFINITY), None);
+        // Nothing on earth is 15 hours from UTC; an out-of-range reading is a bad
+        // clock, not a zone, and must not be applied to a timestamp.
+        assert_eq!(offset_minutes_from(15.0 * 60.0), None);
+        assert_eq!(offset_minutes_from(-15.0 * 60.0), None);
+    }
+
+    #[test]
+    fn rendering_without_a_browser_keeps_the_stored_value() {
+        // Off-wasm the offset is always None, so this is what the host suite pins:
+        // the exact instant the backend sent, never a shifted one. In a browser the
+        // same call renders the reader's own zone and drops the " UTC" label — so
+        // these expectations describe the host fallback specifically, not browser
+        // output.
+        assert_eq!(
+            render_in_browser_zone("2026-10-02T13:47:00Z"),
+            "2026-10-02 13:47 UTC"
+        );
+        assert_eq!(
+            render_in_browser_zone("2026-10-02T13:47:00+02:00"),
+            "2026-10-02 13:47 +02:00"
+        );
+        assert_eq!(render_in_browser_zone("not-a-date"), "not-a-date");
+        assert_eq!(render_in_browser_zone(""), "");
+    }
+
+    #[test]
+    fn no_browser_means_no_offset_rather_than_a_guessed_one() {
+        // `browser_offset_minutes` is the one function whose correctness the host
+        // suite cannot reach, because it is compiled out. What this pins is the
+        // contract the wasm build relies on: off-wasm it answers `None`, so the
+        // fallback is the stored value rather than an assumed zero offset. A `Some`
+        // here would mean every host-rendered timestamp silently claimed UTC.
+        assert_eq!(browser_offset_minutes(0.0), None);
+        assert_eq!(browser_offset_minutes(1_788_000_000_000.0), None);
+    }
+
+    #[test]
+    fn a_positive_offset_shifts_the_clock_forward() {
+        assert_eq!(
+            local_timestamp("2026-10-02T13:47:00Z", Some(180)),
+            "2026-10-02 16:47"
         );
     }
 

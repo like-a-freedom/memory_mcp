@@ -143,6 +143,7 @@ mod tests {
                 status: AccountStatus::Active,
                 tenant_id: "ten_1".to_string(),
                 created_at: fixed_time(),
+                display_name: None,
             })
             .await
             .expect("seed account");
@@ -178,6 +179,7 @@ mod tests {
                 status: AccountStatus::Active,
                 tenant_id: "ten_1".to_string(),
                 created_at: fixed_time(),
+                display_name: None,
             })
             .await
             .expect("seed account");

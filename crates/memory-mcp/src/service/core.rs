@@ -939,8 +939,10 @@ mod tests {
             .await;
         match result {
             Err(crate::error::MemoryError::Validation(msg)) => {
-                assert!(msg.contains("'<table>:<id>'"), "{msg}");
+                // The refusal must name the exact id to pass back, not a
+                // `<table>:<id>` placeholder the caller still has to fill in.
                 assert!(msg.contains("474b2d8b81b3feabf832ef08"), "{msg}");
+                assert!(msg.contains("episode:474b2d8b81b3feabf832ef08"), "{msg}");
             }
             other => panic!("expected Validation, got {other:?}"),
         }

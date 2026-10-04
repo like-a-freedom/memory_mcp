@@ -2,6 +2,14 @@
 # equivalent of one. A target nothing runs is a target that rots: the profile
 # it names stops matching what CI executes, and nothing notices.
 #
+# Environment:
+#
+#   MEMORY_MCP_BENCH_REQUIRE_FIXTURES  Set to 1 by `bench-cpu` and `bench-metal`
+#     so a missing local NER checkpoint fails the bench instead of skipping it.
+#     The two benches disagree on how they read it: `ner_cpu` only tests that the
+#     variable is PRESENT, while `ner_metal` requires the literal value "1". A
+#     Metal CI job that sets any other truthy value silently skips. Always 1.
+#
 # Invoked by a workflow:
 #
 #   eval-response-size   ci.yml `quality`, evaluations.yml

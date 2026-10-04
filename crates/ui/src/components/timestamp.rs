@@ -6,18 +6,21 @@
 
 use dioxus::prelude::*;
 
-use crate::presentation::compact_timestamp;
-
 /// `value` is the timestamp exactly as the backend reported it.
+///
+/// The visible text is in the reader's own timezone — an operator reading an
+/// expiry in UTC has to do arithmetic to answer "has this already passed".
+/// `datetime` and `title` keep the backend's exact instant, so the machine
+/// readable value and the hover text remain the authority.
 #[component]
 pub fn Timestamp(value: String) -> Element {
-    let compact = compact_timestamp(&value);
+    let shown = crate::presentation::render_in_browser_zone(&value);
     rsx! {
         time {
             class: "timestamp",
             datetime: "{value}",
             title: "{value}",
-            "{compact}"
+            "{shown}"
         }
     }
 }

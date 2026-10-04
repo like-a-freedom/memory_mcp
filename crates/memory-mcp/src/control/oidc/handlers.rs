@@ -547,6 +547,11 @@ async fn callback_inner(
             VerifiedExternalIdentity {
                 issuer: claims.iss.clone(),
                 subject_verifier,
+                // Display only, and bounded at the boundary: a blank or
+                // over-long provider claim must not reach the durable record.
+                display_name: crate::models::registry::account_display_name(
+                    claims.display_name_claim(),
+                ),
             },
             chrono::Utc::now(),
         )
@@ -1061,6 +1066,7 @@ mod tests {
                     status: AccountStatus::Active,
                     tenant_id: format!("ten_{id}"),
                     created_at: Utc::now(),
+                    display_name: None,
                 })
                 .await
                 .expect("write account");

@@ -19,7 +19,8 @@
 
 use std::time::Duration;
 
-use common::http_server::{HttpServerConfig, HttpServerFixture, TestTenant, modern_meta};
+use common::http_server::{HttpServerConfig, HttpServerFixture, TestTenant, mcp_call, modern_meta};
+use memory_mcp::http::principal::api_keys::ApiKeyCredential;
 use serde_json::json;
 
 mod common;
@@ -464,6 +465,114 @@ async fn create_api_key_response_carries_cache_control_no_store() {
     );
     assert!(body["secret"].as_str().unwrap_or("").len() >= 32);
     assert!(body["id"].as_str().unwrap_or("").starts_with("ak_"));
+}
+
+/// The secret this endpoint hands back must be a credential the data
+/// plane accepts, not the bare HMAC-verified token.
+///
+/// The two are different strings. The registry stores
+/// `HMAC(pepper, secret)`, and `ApiKeyCredential::parse` recovers the
+/// same bare `secret` from the tail of a well-formed credential and
+/// compares it in constant time — so the credential's tail is what the
+/// verifier is checked against, and the tail must stay the bare secret
+/// for the comparison to succeed. An endpoint that returns the bare
+/// secret alone is therefore returning something the data plane's
+/// parser rejects on the prefix check, and the operator's only symptom
+/// is a 401 against a key that was shown exactly once and can never be
+/// fetched again.
+///
+/// This is the regression guard for the account-key path specifically:
+/// the service-layer test in `provisioning_api_keys` assembles the
+/// credential itself, so it stays green whether or not the endpoint
+/// does.
+#[tokio::test]
+async fn issued_api_key_secret_is_a_usable_data_plane_credential() {
+    let (fixture, _mock, cookie) = spawn_with_env(Vec::new()).await;
+    let client = reqwest::Client::builder()
+        .timeout(Duration::from_secs(5))
+        .build()
+        .expect("client");
+    let (status, body) = fetch_csrf(&client, &fixture.base_url, &cookie).await;
+    assert_eq!(status, 200);
+    let csrf = body["csrf_token"].as_str().expect("csrf string");
+
+    let resp = client
+        .post(format!("{}/api/v1/account/api_keys", fixture.base_url))
+        .header("host", "localhost")
+        .header(cookie_header(&cookie).0, cookie_header(&cookie).1)
+        .header("x-csrf-token", csrf)
+        .header("content-type", "application/json")
+        .body(json!({"name": "data-plane-usable"}).to_string())
+        .send()
+        .await
+        .expect("create api key request");
+
+    assert_eq!(resp.status(), 201);
+    let body: serde_json::Value = resp.json().await.expect("api key json");
+    let secret = body["secret"]
+        .as_str()
+        .expect("the response must carry the one-time secret")
+        .to_string();
+    let id = body["id"].as_str().expect("the response must carry the id");
+
+    let parsed = ApiKeyCredential::parse(&secret).unwrap_or_else(|error| {
+        panic!("the console must hand out a credential the data plane accepts, but {secret} was refused ({error:?})")
+    });
+    assert_eq!(
+        parsed.key_id(),
+        id,
+        "the credential must resolve back to the id that was stored, or revoking it by id is meaningless"
+    );
+}
+
+/// The assembled credential must actually authenticate, not merely
+/// parse. Parsing only proves the grammar; the verifier comparison is
+/// what decides a 401, and it is computed over the bare secret — so a
+/// credential whose tail were the *whole* assembled string would parse
+/// cleanly and still be refused at authentication time. This drives the
+/// real data-plane endpoint with the issued credential and therefore
+/// closes the seam the parse-only test above cannot see.
+#[tokio::test]
+async fn issued_api_key_credential_authenticates_against_the_data_plane() {
+    let (fixture, _mock, cookie) = spawn_with_env(Vec::new()).await;
+    let client = reqwest::Client::builder()
+        .timeout(Duration::from_secs(5))
+        .build()
+        .expect("client");
+    let (status, body) = fetch_csrf(&client, &fixture.base_url, &cookie).await;
+    assert_eq!(status, 200);
+    let csrf = body["csrf_token"].as_str().expect("csrf string");
+
+    let resp = client
+        .post(format!("{}/api/v1/account/api_keys", fixture.base_url))
+        .header("host", "localhost")
+        .header(cookie_header(&cookie).0, cookie_header(&cookie).1)
+        .header("x-csrf-token", csrf)
+        .header("content-type", "application/json")
+        .body(json!({"name": "data-plane-authenticates"}).to_string())
+        .send()
+        .await
+        .expect("create api key request");
+    assert_eq!(resp.status(), 201);
+    let body: serde_json::Value = resp.json().await.expect("api key json");
+    let credential = body["secret"]
+        .as_str()
+        .expect("the response must carry the one-time secret")
+        .to_string();
+
+    let response = mcp_call(
+        &client,
+        &fixture.base_url,
+        &credential,
+        "tools/list",
+        json!({}),
+    )
+    .await;
+
+    assert_eq!(
+        response["http_status"], 200,
+        "a key issued by the console must authenticate against the data plane, but {credential} was refused: {response}"
+    );
 }
 
 #[tokio::test]

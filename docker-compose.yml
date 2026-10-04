@@ -112,6 +112,10 @@ services:
       # Browser methods select which authentication routes are mounted. The
       # supported streamable-http profile always mounts the control plane and
       # compiled UI; no runtime product-shape switch is available.
+      #
+      # Note the default below is `local`, while the binary's own default when
+      # this variable is unset is `oidc`. The override is deliberate: this file
+      # targets zero-input local startup with an admin-created account.
       MEMORY_MCP_HTTP_AUTH_METHODS: "${MEMORY_MCP_HTTP_AUTH_METHODS:-local}"
       MEMORY_MCP_HTTP_SIGNUP_MODE: "${MEMORY_MCP_HTTP_SIGNUP_MODE:-invite_only}"
 

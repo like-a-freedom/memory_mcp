@@ -450,6 +450,7 @@ mod tests {
                 status: AccountStatus::Active,
                 tenant_id: "ten_a".into(),
                 created_at: now,
+                display_name: None,
             })
             .await
             .unwrap();
