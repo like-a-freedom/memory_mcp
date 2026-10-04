@@ -18,22 +18,32 @@ the original step plan; this table records implementation and remaining evidence
 | Task | State | Evidence |
 |---|---|---|
 | 1 Injected factory seam | Done | `Pool::with_factory`; commit `2e0c3e1` |
-| 2 Cancellation counterexamples | Done, targeted | Cancellation and production-timeout/backoff retry regressions pass |
+| 2 Cancellation counterexamples | Reopened oracle | Cancellation/timeout/panic scenarios pass; single-flight test must force overlapping cold callers (unit audit A09) |
 | 3 Tenancy loses the cache | Done | `Tenancy`/`RuntimeLease` deleted; identity projection added |
 | 4 One state machine + RAII | Done | `SlotState`, `ActivationAttempt`, generation fencing |
 | 5 Reservations and capacity | Done, targeted | Waiters retry at positive TTL/backoff expiry; failed-slot removal notifies; repeated wakeups preserve the deadline |
 | 6 Identity and revision | Done | `binding_mismatch_is_rejected_*`, `plan_change_replaces_the_runtime` |
 | 7 Shutdown wiring | Done, targeted | All blocked stages pass; shutdown also wins over a ready permit and fences final warm-runtime lease handoff |
 | 8 HTTP-level deadline test | Done | `http_deadline_cancels_activation_and_the_next_request_recovers` uses the real Axum deadline layer around pool acquisition |
-| 9 Vector conditional writes | Done, targeted | Conditional writes and identity metadata pass; malformed singleton write replies now return Storage, with a red/green capability regression |
+| 9 Vector conditional writes | Reopened oracle | Metadata/lost-update/malformed-result regressions pass; CAS-loser test is sequential and can bypass the write predicate (unit audit A04) |
 | 10 Access writer | Done | One atomic saturating update; concurrent increments, concurrent vector and forged-id tests pass |
 | 11 Initialize negotiation | Done | `unsupported_initialize_proposal_negotiates_legacy_revision`; commit `6881141` |
 | 12 Rooted source guard | Done, targeted | Cargo roots, file rules, path checks and nested module-generating macros fail closed; 16 tests pass |
 | 13 Public-surface scope | In progress | Lifetime/cfg/exception repairs pass; reviewers found signature-item extent and const-generic delimiter gaps now being repaired |
 | 14 No-default CI row | Done | `2 passed` under `--no-default-features`; commit `afee2b8` |
-| 15 Integrated verification | Pending rerun | Previous gates at `0305f30` passed; continuation changes require a fresh integrated gate |
+| 15 Integrated verification | Pending | Delimiter/oracle repairs remain; routine concurrent runs need owned xtask fixtures, while a serialized run with an isolated owned temp root is possible |
 | 16 Lint/test profile parity | Done, targeted | CI now lints `test-fixtures`; expanded workspace Clippy is clean and protocol conformance has 35 passing tests |
 | 17 Production-test relevance | Done, targeted | Doc inventory/status tests retired under ADR-0073; 131 runtime/protocol/tenancy/vector/recall scenario tests and both Clippy profiles pass |
+| 18 Strict unit-test audit | Done, audit | Cargo inventory and manually confirmed findings recorded in `docs/testing/2026-10-03-unit-test-audit.md`; no blanket unit-compliance claim |
+
+The [strict unit-test audit](../../testing/2026-10-03-unit-test-audit.md)
+separates units, integration/artifact scenarios and architecture lints. It also
+reopens two original behavioral oracles: sequential fill-missing refusal is not
+a CAS race, and uncoordinated callers can establish warm reuse rather than
+single-flight cold activation. The useful persistence and lifecycle scenarios
+remain integration evidence; their presence under `--lib` does not make them
+isolated units. The broader P1 test-quality repairs are recorded in that report,
+not silently counted as completed implementation.
 
 ### Second pass, 2026-10-03
 

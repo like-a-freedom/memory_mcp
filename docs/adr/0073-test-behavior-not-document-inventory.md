@@ -31,6 +31,16 @@ make an arbitrary assertion useful.
 
 ## Testing standard
 
+- A unit test crosses the owning module's public interface with fixed inputs
+  and controlled adapters for time, identity and other external effects. Real
+  databases (even embedded in-memory engines), filesystem, network,
+  subprocesses and process-global environment are integration dependencies,
+  regardless of Cargo's `unittests` label or source-file location.
+- Each unit test has one scenario and one focal action. Split independent cases
+  into separately named or parameterized tests instead of runtime
+  `if`/`for`/`while` assertion logic. Do not call private implementation helpers
+  directly or expose them solely for tests; retire trivial accessor/default
+  checks that protect no rule.
 - Arrange a concrete scenario, invoke the owning use case or transport
   interface, and assert the observable outcome. Cover failure, recovery,
   concurrency and limits where the contract requires them.

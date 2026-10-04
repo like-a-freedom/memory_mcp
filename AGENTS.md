@@ -70,8 +70,16 @@ cargo run --features streamable-http --bin memory_mcp_http  # Start SaaS HTTP se
 
 - Test concrete use cases and observable contracts: results/errors, durable
   state, isolation, resource release, recovery and limits.
+- Unit tests exercise the owning module's public interface with controlled
+  inputs, time and identity sources. Real databases (including embedded memory
+  engines), filesystem, network, subprocesses and process-global environment
+  belong to integration tests, even when placed under `#[cfg(test)]`.
+- Keep one scenario and one focal action per unit test. Use independently named
+  or parameterized cases, not `if`/`for`/`while` assertion logic. Do not test
+  private implementation helpers directly or widen visibility just for tests.
+  Retire bare getter/setter/constructor checks unless they protect actual rules.
 - Use controlled adapters to establish faults and ordering; exercise real
-  storage adapters for query/transaction correctness.
+  storage adapters in integration tests for query/transaction correctness.
 - A regression scenario must detect the original defect. Use barriers, permits
   or explicit future polling for ordering, not sleeps; bound waits and child
   process lifetimes.

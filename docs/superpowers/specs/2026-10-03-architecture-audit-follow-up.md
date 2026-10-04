@@ -9,6 +9,11 @@ and integrated gates that have and have not been rerun. Real-client
 interoperability remains unverified until real clients are driven against a
 live deployment.
 
+The [strict unit-test audit](../../testing/2026-10-03-unit-test-audit.md) later
+identified incomplete CAS-loser and single-flight oracles. Those acceptance
+scenarios remain open; passing integration or lint fixtures is not certification
+of a pure unit-test suite.
+
 **Baseline:** `e506d99` (`v1.23.0`). This is a follow-up to the September 30
 remediation, not a replacement or a claim that its checked steps never landed.
 
