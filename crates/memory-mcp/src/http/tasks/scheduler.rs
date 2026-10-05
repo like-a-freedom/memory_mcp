@@ -12,7 +12,7 @@ use crate::http::leases::scheduler::SchedulerJob;
 use crate::http::registry::RegistryHandle;
 use crate::platform::fault_injection::{FaultInjector, FaultPoint};
 
-use crate::http::tasks::state::TaskStore;
+use crate::http::tasks::state::{TASK_KIND_EXTRACT, TASK_KIND_REEMBED, TaskStore};
 use crate::http::tasks::worker::DurableTaskStore;
 use crate::storage::client::{BoundDbClient, SurrealDbClient};
 
@@ -183,6 +183,43 @@ async fn execute_one_task(
     if record.cancellation_intent {
         return task_store.cancel_before_commit_fenced(&handle).await;
     }
+    match record.kind.as_str() {
+        TASK_KIND_EXTRACT => {
+            execute_extract_task(task_store, db, namespace, &handle, &record, fault_injector).await
+        }
+        TASK_KIND_REEMBED => {
+            execute_reembed_task(task_store, db, namespace, &handle, &record).await
+        }
+        // Fail closed. An unrecognised kind is never decoded as whichever
+        // payload happens to fit: the only two kinds that exist are the two
+        // above, and guessing would run a maintenance task as an extraction (or
+        // an extraction as a destructive whole-namespace rewrite). Naming the
+        // kind is what makes the row diagnosable instead of mysterious.
+        other => {
+            task_store
+                .fail_fenced(
+                    &handle,
+                    serde_json::json!({
+                        "message": format!("unknown task kind `{other}`"),
+                    }),
+                )
+                .await
+        }
+    }
+}
+
+/// The extract executor. Unchanged from the pre-`kind` body of
+/// [`execute_one_task`]: a row whose kind is `extract` — including every row
+/// written before migration 045, which reads back as `extract` — decodes
+/// [`crate::tools::params::ExtractParams`] and runs the real `extract` tool.
+async fn execute_extract_task(
+    task_store: &DurableTaskStore,
+    db: Arc<SurrealDbClient>,
+    namespace: &str,
+    handle: &crate::http::tasks::state::TaskHandle,
+    record: &crate::http::tasks::state::TenantTaskRecord,
+    fault_injector: &Arc<dyn FaultInjector>,
+) -> Result<(), MemoryError> {
     let params: crate::tools::params::ExtractParams = serde_json::from_value(record.params.clone())
         .map_err(|error| {
             MemoryError::Validation(format!("invalid durable extract parameters: {error}"))
@@ -198,7 +235,7 @@ async fn execute_one_task(
             })?;
             // The artifact is the durable commit boundary. Once it exists, a
             // cancellation request is reported as completed_before_cancel.
-            task_store.record_artifact_fenced(&handle, &value).await?;
+            task_store.record_artifact_fenced(handle, &value).await?;
             // Hit after the artifact row is committed. The next
             // worker sees the artifact via `reconcile_artifacts`
             // and projects the completed terminal state.
@@ -208,7 +245,7 @@ async fn execute_one_task(
                 .await?
                 .is_some_and(|task| task.cancellation_intent);
             task_store
-                .complete_fenced(&handle, value, cancelled_after_commit)
+                .complete_fenced(handle, value, cancelled_after_commit)
                 .await?;
             // Hit after the terminal state is committed.
             fault_injector.hit(FaultPoint::TaskCompleted)?;
@@ -216,10 +253,42 @@ async fn execute_one_task(
         }
         Err(error) => {
             task_store
-                .fail_fenced(&handle, serde_json::json!({"message": error.to_string()}))
+                .fail_fenced(handle, serde_json::json!({"message": error.to_string()}))
                 .await
         }
     }
+}
+
+/// The reembed executor. **STUB — Task 6 replaces this body.**
+///
+/// Dispatch exists (Task 4) so the operator route can enqueue a `reembed` task
+/// and the scheduler can route it here; the pass itself — building a
+/// force-enabled `MemoryService`, parsing `ReembedOptions`, running
+/// `reembed_all_facts`, heartbeating the lease (Task 5) and mapping
+/// `ReembedOutcome` onto the durable state machine — lands in Task 6.
+///
+/// It fails the task rather than completing it, and says so in the stored
+/// error. A silent success here would be the worst possible stub: the task
+/// would read `completed` with no vectors rewritten, and Task 6's end-to-end
+/// test would pass without Task 6 having run. A loud durable failure is a
+/// truthful intermediate state an operator can see.
+async fn execute_reembed_task(
+    task_store: &DurableTaskStore,
+    _db: Arc<SurrealDbClient>,
+    _namespace: &str,
+    handle: &crate::http::tasks::state::TaskHandle,
+    _record: &crate::http::tasks::state::TenantTaskRecord,
+) -> Result<(), MemoryError> {
+    // STUB (Task 6). See the doc comment above: fails loudly, never succeeds.
+    task_store
+        .fail_fenced(
+            handle,
+            serde_json::json!({
+                "message": "execute_reembed_task is not implemented: the reembed pass \
+                            lands in Task 6, so this task failed without rewriting any vector",
+            }),
+        )
+        .await
 }
 
 /// Test-only mirror of [`execute_one_task`]. Drives the same durable
@@ -253,17 +322,54 @@ pub async fn execute_one_task_for_test(
     if record.cancellation_intent {
         return task_store.cancel_before_commit_fenced(&handle).await;
     }
+    // Dispatch mirrors [`execute_one_task`] exactly, so a test cannot observe a
+    // kind routing the production scheduler would not have applied. Only the
+    // `extract` executor is stubbed; `reembed` goes to the real one, because a
+    // stubbed routing decision is precisely what this seam must not fake.
+    match record.kind.as_str() {
+        TASK_KIND_EXTRACT => {
+            execute_extract_task_for_test(task_store, &handle, &record, &fault_injector, &extractor)
+                .await
+        }
+        TASK_KIND_REEMBED => {
+            execute_reembed_task(task_store, db, namespace, &handle, &record).await
+        }
+        other => {
+            task_store
+                .fail_fenced(
+                    &handle,
+                    serde_json::json!({
+                        "message": format!("unknown task kind `{other}`"),
+                    }),
+                )
+                .await
+        }
+    }
+}
+
+/// The stubbed `extract` executor behind [`execute_one_task_for_test`]. Runs
+/// the same durable state machine with the same fault points as
+/// [`execute_extract_task`], substituting the supplied [`ExtractorFn`] for the
+/// real `extract` tool.
+#[cfg(any(test, feature = "test-fixtures"))]
+async fn execute_extract_task_for_test(
+    task_store: &DurableTaskStore,
+    handle: &crate::http::tasks::state::TaskHandle,
+    record: &crate::http::tasks::state::TenantTaskRecord,
+    fault_injector: &Arc<dyn FaultInjector>,
+    extractor: &ExtractorFn,
+) -> Result<(), MemoryError> {
     let params: crate::tools::params::ExtractParams = serde_json::from_value(record.params.clone())
         .map_err(|error| {
             MemoryError::Validation(format!("invalid durable extract parameters: {error}"))
         })?;
     // The stub extractor is only used in test-fixtures builds; the
     // real `extract` call is the production seam and lives in
-    // `execute_one_task` above.
+    // `execute_extract_task`.
     let extraction = extractor(params).await;
     match extraction {
         Ok(value) => {
-            task_store.record_artifact_fenced(&handle, &value).await?;
+            task_store.record_artifact_fenced(handle, &value).await?;
             // Hit after the artifact row is committed. The next
             // worker sees the artifact via `reconcile_artifacts`
             // and projects the completed terminal state.
@@ -273,21 +379,15 @@ pub async fn execute_one_task_for_test(
                 .await?
                 .is_some_and(|task| task.cancellation_intent);
             task_store
-                .complete_fenced(&handle, value, cancelled_after_commit)
+                .complete_fenced(handle, value, cancelled_after_commit)
                 .await?;
             // Hit after the terminal state is committed.
             fault_injector.hit(FaultPoint::TaskCompleted)?;
-            // `db` is unused on this test seam path because the stub
-            // does not run real extract; the local-binding analysis
-            // would otherwise flag it as dead. Document the
-            // intentional reservation for future stub extractors that
-            // need the underlying client.
-            let _ = (db, namespace);
             Ok(())
         }
         Err(error) => {
             task_store
-                .fail_fenced(&handle, serde_json::json!({"message": error.to_string()}))
+                .fail_fenced(handle, serde_json::json!({"message": error.to_string()}))
                 .await
         }
     }

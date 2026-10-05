@@ -19,6 +19,8 @@ use axum::middleware::Next;
 use axum::response::Response;
 
 use super::error::ApiError;
+#[cfg(feature = "streamable-http")]
+use crate::http::tasks::state::TaskStore;
 
 #[derive(Clone)]
 pub struct OperatorPrincipal {
@@ -246,6 +248,103 @@ pub async fn purge_tenant(
     tx.begin_operator_deletion(&tenant.id, "operator", chrono::Utc::now())
         .await?;
     Ok(axum::http::StatusCode::ACCEPTED)
+}
+
+/// The durable fingerprint of a tenant's reembed task.
+///
+/// One fingerprint per tenant, because the pass is a destructive rewrite of
+/// every vector in a namespace and must not run twice concurrently. The
+/// `UNIQUE (tenant_id, fingerprint)` index behind [`enqueue`]'s dedupe turns a
+/// second operator request into "the same task", so a retried or double-posted
+/// request is a no-op rather than a second concurrent pass.
+pub fn reembed_tenant_fingerprint(tenant_id: &str) -> String {
+    format!("reembed:{tenant_id}")
+}
+
+/// POST /api/v1/operator/tenants/:id/reembed — enqueue a whole-namespace
+/// re-embedding pass.
+///
+/// Class B maintenance (spec §2 Rule 1): the provider is deployment-level, so a
+/// tenant whose vectors were written by a different provider stays on lexical
+/// retrieval until a human asks for this. Nothing else may trigger it — not a
+/// changed env var, not a startup probe — because the previous vectors are
+/// destroyed with no way back.
+///
+/// 202 ACCEPTED when a new task was created, 204 NO_CONTENT when the
+/// fingerprint already names a live task, matching `suspend_tenant`'s
+/// already-terminal behaviour: an operator who retries after a timeout must
+/// not double-spend the pass.
+pub async fn reembed_tenant(
+    axum::extract::State(state): axum::extract::State<Arc<crate::http::HttpState>>,
+    axum::extract::Extension(operator): axum::extract::Extension<OperatorPrincipal>,
+    axum::extract::Path(tenant_id): axum::extract::Path<String>,
+) -> Result<axum::http::StatusCode, super::error::ApiError> {
+    operator.require_recent_auth()?;
+    let store = state.registry.tenants();
+    let tenant = store
+        .find_tenant_by_id(&tenant_id)
+        .await?
+        .ok_or(super::error::ApiError::NotFound)?;
+    let task_store = reembed_task_store(&state, &tenant).await?;
+    let fingerprint = reembed_tenant_fingerprint(&tenant.id);
+    // The dedupe probe runs BEFORE the enqueue. `enqueue` returns the existing
+    // id for a live fingerprint and a fresh id for a new one, but both are
+    // indistinguishable after the fact; probing first makes "was one already
+    // queued?" answerable, so a retried request answers 204 and does not
+    // re-spend the pass. A request that loses the race between the probe and the
+    // enqueue lands on the store's `UNIQUE (tenant_id, fingerprint)` index and
+    // returns the winner's id, which is the same no-op.
+    let already_queued = task_store.find_task_by_fingerprint(&fingerprint).await?;
+    let task_id = task_store
+        .enqueue(
+            crate::http::tasks::state::TASK_KIND_REEMBED,
+            &fingerprint,
+            // `max_failures`/`retry_failed` are the reembed pass options
+            // (`ReembedOptions`), written at their wire defaults rather than
+            // guessed from the struct: this route creates no body, so the
+            // defaults are the only defensible values.
+            serde_json::json!({ "max_failures": null, "retry_failed": false }),
+        )
+        .await
+        .map_err(super::error::ApiError::from)?;
+    if already_queued.is_some() {
+        Ok(axum::http::StatusCode::NO_CONTENT)
+    } else {
+        let record = task_store
+            .load(&task_id)
+            .await
+            .map_err(super::error::ApiError::from)?
+            .ok_or(super::error::ApiError::NotFound)?;
+        debug_assert_eq!(record.kind, crate::http::tasks::state::TASK_KIND_REEMBED);
+        Ok(axum::http::StatusCode::ACCEPTED)
+    }
+}
+
+/// Build the `DurableTaskStore` a reembed request enqueues into: the same
+/// tenant-namespace binding the scheduler tick later claims from, so the row the
+/// route writes is the row the worker reads. Split out because both the handler
+/// and its tests need it and neither should re-derive the binding.
+async fn reembed_task_store(
+    state: &Arc<crate::http::HttpState>,
+    tenant: &crate::http::registry::models::Tenant,
+) -> Result<crate::http::tasks::worker::DurableTaskStore, super::error::ApiError> {
+    let engine = state.registry.tenant_engine_optional().ok_or_else(|| {
+        super::error::ApiError::from(crate::error::MemoryError::Unavailable(
+            "tenant storage engine unavailable".into(),
+        ))
+    })?;
+    let db = engine
+        .bind(tenant)
+        .await
+        .map_err(super::error::ApiError::from)?;
+    let bound_db = Arc::new(crate::storage::client::BoundDbClient::new(
+        db,
+        tenant.namespace_binding.namespace.clone(),
+    ));
+    Ok(crate::http::tasks::worker::DurableTaskStore::new(
+        bound_db,
+        tenant.id.clone(),
+    ))
 }
 
 /// GET /api/v1/operator/recovery/status — read recovery status.
@@ -596,8 +695,185 @@ mod tests {
         assert_eq!(observed.ok(), Some(axum::http::StatusCode::NO_CONTENT));
     }
 
-    /// Read back a tenant's status, so a test can assert a refused transition
-    /// left it alone.
+    /// Apply the durable task table to a tenant namespace, so a route test can
+    /// enqueue and read back a real `tenant_task` row. The table lives in the
+    /// HTTP tenant migrations rather than the storage migrations.
+    async fn apply_task_schema(state: &Arc<crate::http::HttpState>, tenant: &Tenant) {
+        let engine = state
+            .registry
+            .tenant_engine_optional()
+            .expect("tenant engine wired for tests");
+        let db = engine.bind(tenant).await.expect("bind tenant namespace");
+        for ddl in [
+            include_str!("../../migrations/041_tenant_tasks.surql"),
+            include_str!("../../migrations/045_tenant_task_kind.surql"),
+        ] {
+            crate::storage::client::DbClient::query(
+                &*db,
+                ddl,
+                None,
+                &tenant.namespace_binding.namespace,
+            )
+            .await
+            .expect("apply tenant_task migration");
+        }
+    }
+
+    /// Read back the tenant's reembed task row, so a test can assert what the
+    /// route wrote rather than only what it answered.
+    async fn reembed_record(
+        state: &Arc<crate::http::HttpState>,
+        tenant: &Tenant,
+    ) -> crate::http::tasks::state::TenantTaskRecord {
+        use crate::http::tasks::state::TaskStore;
+        let engine = state
+            .registry
+            .tenant_engine_optional()
+            .expect("tenant engine wired for tests");
+        let db = engine.bind(tenant).await.expect("bind tenant namespace");
+        let store = crate::http::tasks::worker::DurableTaskStore::new(
+            Arc::new(crate::storage::client::BoundDbClient::new(
+                db,
+                tenant.namespace_binding.namespace.clone(),
+            )),
+            tenant.id.clone(),
+        );
+        let task_id = store
+            .find_task_by_fingerprint(&reembed_tenant_fingerprint(&tenant.id))
+            .await
+            .expect("probe fingerprint")
+            .expect("a reembed task exists");
+        store
+            .load(&task_id)
+            .await
+            .expect("load reembed task")
+            .expect("the row is present")
+    }
+
+    /// The fingerprint is per tenant, so a second tenant's reembed is not the
+    /// first one's. It is what makes a retried request a no-op, so its shape is
+    /// pinned: `reembed:<tenant_id>`.
+    #[test]
+    fn the_reembed_fingerprint_is_namespaced_by_tenant() {
+        assert_eq!(reembed_tenant_fingerprint("ten_a"), "reembed:ten_a");
+        assert_ne!(
+            reembed_tenant_fingerprint("ten_a"),
+            reembed_tenant_fingerprint("ten_b")
+        );
+    }
+
+    #[tokio::test]
+    async fn reembedding_an_unknown_tenant_is_a_not_found() {
+        let state = state().await;
+
+        let observed = reembed_tenant(
+            State(state),
+            Extension(operator()),
+            Path("ten_missing".to_string()),
+        )
+        .await;
+
+        assert!(matches!(observed, Err(ApiError::NotFound)));
+    }
+
+    /// A first request creates the task and says so with 202. The row it wrote is
+    /// asserted, not just the status: a 202 that enqueued nothing would satisfy
+    /// the status assertion alone.
+    #[tokio::test]
+    async fn a_first_reembed_request_is_accepted_and_queues_a_reembed_task() {
+        let state = state().await;
+        let tenant = tenant("ten_reembed", TenantStatus::Ready);
+        apply_task_schema(&state, &tenant).await;
+        seed(&state, &tenant).await;
+
+        let observed = reembed_tenant(
+            State(state.clone()),
+            Extension(operator()),
+            Path("ten_reembed".to_string()),
+        )
+        .await;
+
+        assert_eq!(observed.ok(), Some(axum::http::StatusCode::ACCEPTED));
+        let record = reembed_record(&state, &tenant).await;
+        assert_eq!(
+            record.kind,
+            crate::http::tasks::state::TASK_KIND_REEMBED,
+            "the route must enqueue a reembed task, not an extraction"
+        );
+        assert_eq!(
+            record.fingerprint,
+            reembed_tenant_fingerprint("ten_reembed"),
+            "the fingerprint is what makes a second request a no-op"
+        );
+        assert_eq!(record.state, crate::http::tasks::state::TaskState::Queued);
+    }
+
+    /// Two requests for one tenant must not queue two passes. The second is a
+    /// retried request, and a reembed is an irreversible rewrite of every vector
+    /// in the namespace, so re-spending it is the failure.
+    #[tokio::test]
+    async fn a_second_reembed_request_for_the_same_tenant_is_a_no_op() {
+        let state = state().await;
+        let tenant = tenant("ten_reembed2", TenantStatus::Ready);
+        apply_task_schema(&state, &tenant).await;
+        seed(&state, &tenant).await;
+
+        let first = reembed_tenant(
+            State(state.clone()),
+            Extension(operator()),
+            Path("ten_reembed2".to_string()),
+        )
+        .await;
+        assert_eq!(first.ok(), Some(axum::http::StatusCode::ACCEPTED));
+        let task_id = reembed_record(&state, &tenant).await.id;
+
+        let second = reembed_tenant(
+            State(state.clone()),
+            Extension(operator()),
+            Path("ten_reembed2".to_string()),
+        )
+        .await;
+
+        assert_eq!(
+            second.ok(),
+            Some(axum::http::StatusCode::NO_CONTENT),
+            "a retried request must report no new work, not 202 again"
+        );
+        assert_eq!(
+            reembed_record(&state, &tenant).await.id,
+            task_id,
+            "the retry must join the existing task, not create a second pass"
+        );
+    }
+
+    #[tokio::test]
+    async fn reembedding_with_stale_operator_auth_is_refused() {
+        let state = state().await;
+        let tenant = tenant("ten_reembed3", TenantStatus::Ready);
+        apply_task_schema(&state, &tenant).await;
+        seed(&state, &tenant).await;
+        let stale = OperatorPrincipal {
+            authenticated_at: chrono::Utc::now() - chrono::Duration::hours(1),
+        };
+
+        let observed = reembed_tenant(
+            State(state.clone()),
+            Extension(stale),
+            Path("ten_reembed3".to_string()),
+        )
+        .await;
+
+        assert!(matches!(observed, Err(ApiError::ReauthRequired)));
+        assert!(
+            state
+                .registry
+                .tenant_engine_optional()
+                .expect("engine")
+                .bind(&tenant)
+                .await
+                .is_ok()
+        );
+    }
     async fn status_of(state: &Arc<crate::http::HttpState>, id: &str) -> TenantStatus {
         state
             .registry

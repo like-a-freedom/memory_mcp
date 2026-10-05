@@ -1024,6 +1024,7 @@ async fn local_mode_does_not_mount_oidc_routes() {
         "/api/v1/account/csrf",
         "/api/v1/account/api_keys",
         "/api/v1/operator/tenants/some-tenant",
+        "/api/v1/operator/tenants/some-tenant/reembed",
         "/api/v1/operator/recovery/status",
     ] {
         let response = harness.get(path, &[]).await;

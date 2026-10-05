@@ -25,6 +25,14 @@ use memory_mcp::http::tasks::state::{TASK_KIND_EXTRACT, TASK_KIND_REEMBED, TaskS
 use memory_mcp::http::tasks::worker::DurableTaskStore;
 use memory_mcp::storage::{BoundDbClient, DbClient, SurrealDbClient};
 
+/// Reembed pass parameters, exactly as the durable row stores them. Written out
+/// rather than derived from the Rust struct because the durable contract is the
+/// wire form: `max_failures`/`retry_failed` are not extract fields, so a
+/// dispatcher that hardcodes `ExtractParams` cannot possibly decode them.
+fn reembed_params() -> serde_json::Value {
+    serde_json::json!({ "max_failures": null, "retry_failed": false })
+}
+
 struct SchedulerHarness {
     store: DurableTaskStore,
     client: Arc<SurrealDbClient>,
@@ -413,4 +421,110 @@ async fn an_enqueued_kind_round_trips_through_the_store() {
             .kind,
         TASK_KIND_REEMBED
     );
+}
+
+/// The scheduler dispatches on `kind`. A `reembed` row whose payload is a
+/// reembed pass (not an `ExtractParams`) must reach the reembed executor rather
+/// than be decoded as extract parameters — which is the failure that made the
+/// kind column inert: dispatch hardcoded `ExtractParams`, so the only kind
+/// reachable was `extract`.
+#[tokio::test]
+async fn a_reembed_task_is_dispatched_to_the_reembed_executor() {
+    let h = harness().await;
+    let task_id = h
+        .store
+        .enqueue(TASK_KIND_REEMBED, "reembed:ten_sched", reembed_params())
+        .await
+        .expect("enqueue reembed");
+
+    let observed = execute_one_task_for_test(
+        &h.store,
+        h.client.clone(),
+        &h.namespace,
+        no_faults(),
+        succeeding_extractor(),
+    )
+    .await;
+
+    // The tick itself must succeed: dispatch named the reembed executor, which
+    // committed its own durable outcome rather than leaving the payload to be
+    // decoded as extract parameters.
+    assert!(
+        observed.is_ok(),
+        "a reembed task must not be decoded as extract parameters: {observed:?}"
+    );
+    let record = h
+        .store
+        .load(&task_id)
+        .await
+        .expect("load")
+        .expect("reembed row present");
+    assert_eq!(record.state, TaskState::Failed);
+    assert!(
+        names_reembed_stub(&record),
+        "the row must carry the reembed executor's own outcome, so dispatch is \
+         distinguishable from extract decoding: {record:?}"
+    );
+}
+
+/// A kind the scheduler does not recognise fails closed, naming the kind. It is
+/// never guessed at: decoding an unknown payload as whichever kind happens to
+/// fit is how a maintenance task would be run as an extraction.
+#[tokio::test]
+async fn an_unrecognised_task_kind_fails_closed_naming_the_kind() {
+    let h = harness().await;
+    let task_id = h
+        .store
+        .enqueue(
+            "not-a-kind",
+            "fp-unknown-kind",
+            serde_json::json!({ "whatever": true }),
+        )
+        .await
+        .expect("enqueue unknown kind");
+
+    let observed = execute_one_task_for_test(
+        &h.store,
+        h.client.clone(),
+        &h.namespace,
+        no_faults(),
+        succeeding_extractor(),
+    )
+    .await;
+
+    assert!(
+        observed.is_ok(),
+        "an unknown kind is a durable failure, not a tick error: {observed:?}"
+    );
+    let record = h
+        .store
+        .load(&task_id)
+        .await
+        .expect("load")
+        .expect("unknown-kind row present");
+    assert_eq!(record.state, TaskState::Failed);
+    let message = record
+        .error
+        .expect("an unknown kind records an error")
+        .get("message")
+        .and_then(serde_json::Value::as_str)
+        .unwrap_or_default()
+        .to_owned();
+    assert!(
+        message.contains("not-a-kind"),
+        "the failure must name the unknown kind so the row is diagnosable: {message}"
+    );
+}
+
+/// Whether the reembed row carries the Task 4 stub's loud marker. The stub
+/// fails the task rather than completing it, precisely so this assertion can
+/// tell "dispatched to reembed" apart from "silently succeeded" — a silent
+/// success would make Task 6's end-to-end test pass without Task 6.
+fn names_reembed_stub(record: &memory_mcp::http::tasks::state::TenantTaskRecord) -> bool {
+    record
+        .error
+        .as_ref()
+        .and_then(|error| error.get("message"))
+        .and_then(serde_json::Value::as_str)
+        .is_some_and(|message| message.contains("execute_reembed_task is not implemented"))
 }

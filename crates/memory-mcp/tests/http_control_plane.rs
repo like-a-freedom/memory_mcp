@@ -997,6 +997,47 @@ async fn operator_route_returns_403_without_operator_identity() {
     );
 }
 
+/// Reembed is a Class B maintenance operation: it rewrites every vector in a
+/// namespace irreversibly, so it is reachable only by an operator on the
+/// deployment allowlist. The seeded session is a normal account.
+///
+/// The assertion is 401/403 and deliberately not 404: a route that does not
+/// exist also answers 404, and accepting 404 would make this test pass without
+/// the route existing at all.
+#[tokio::test]
+async fn operator_reembed_route_rejects_a_non_operator_session() {
+    let (fixture, _mock, cookie) = spawn_with_env(Vec::new()).await;
+    let client = reqwest::Client::builder()
+        .timeout(Duration::from_secs(5))
+        .build()
+        .expect("client");
+    let (csrf_status, csrf_body) = fetch_csrf(&client, &fixture.base_url, &cookie).await;
+    assert_eq!(csrf_status, 200);
+    let csrf = csrf_body["csrf_token"]
+        .as_str()
+        .expect("csrf token")
+        .to_owned();
+
+    let resp = client
+        .post(format!(
+            "{}/api/v1/operator/tenants/anything/reembed",
+            fixture.base_url
+        ))
+        .header("host", "localhost")
+        .header(cookie_header(&cookie).0, cookie_header(&cookie).1)
+        .header("x-csrf-token", csrf)
+        .send()
+        .await
+        .expect("reembed request");
+
+    assert!(
+        resp.status() == 403 || resp.status() == 401,
+        "the reembed route must reject a non-operator session with 401/403, \
+         never 404 (which would mean the route is not mounted at all): {}",
+        resp.status()
+    );
+}
+
 #[tokio::test]
 async fn api_v1_routes_take_precedence_over_static_fallback() {
     // The control plane and its compiled UI are part of this profile; the

@@ -162,6 +162,15 @@ pub fn build_router(
                 "/api/v1/operator/tenants/{id}/purge",
                 post(crate::control::operator::purge_tenant),
             )
+            // Reembed is a Class B maintenance operation and is registered
+            // inside this block rather than at the top level so it inherits the
+            // stack verbatim: session → operator allowlist → CSRF. Hoisting it
+            // would drop the allowlist check and expose an irreversible
+            // whole-namespace rewrite to any authenticated account.
+            .route(
+                "/api/v1/operator/tenants/{id}/reembed",
+                post(crate::control::operator::reembed_tenant),
+            )
             .route(
                 "/api/v1/operator/recovery/status",
                 get(crate::control::operator::recovery_status),
