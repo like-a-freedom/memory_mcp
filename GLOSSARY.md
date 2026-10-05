@@ -77,3 +77,88 @@ naming the prior decision being superseded.
   concurrency budget it draws from, whether a deadline applies, whether runtime
   capacity is pinned. Distinct from authentication, which decides *who* the
   caller is.
+
+## Memory domain
+
+The vocabulary below governs what the system stores and reconciles. The terms
+`retraction`, `supersession`, and `correction` are strictly distinct operations
+and are the single most frequently confused group in this domain: conflating
+them invalidates evidence the system is supposed to preserve.
+
+- **Claim** — an attributed assertion extracted from an episode, carrying its
+  subject, value, validity interval and lineage. The unit that reconciliation
+  operates on; a fact may carry several claims.
+_Avoid_: assertion, fact, statement
+
+- **Fact** — a piece of remembered content, the unit retrieval ranks and returns.
+  A fact is the reader-facing object; a claim is the attributed proposition
+  beneath it.
+_Avoid_: memory, record
+
+- **Reconciliation** — the process of comparing claims about the same subject
+  and recording a typed relation between them: `duplicate`, `supersession`,
+  `correction`, `contradiction`, or `temporal_ambiguity`. Reconciliation
+  produces relations; it does not by itself change what a reader is shown.
+_Avoid_: dedup, conflict resolution, merge
+
+- **Supersession** — a claim replaces an earlier claim of the same lineage
+  because the later one is true over a later interval. The earlier claim's
+  *real-world* validity interval closes; it is not erased, and the fact it
+  supported remains retrievable.
+_Avoid_: replacement, override, update
+
+- **Correction** — a claim replaces an earlier one because the earlier was
+  **wrong**, not merely outdated. Distinguished from supersession by *which*
+  interval each closes.
+_Avoid_: fix, patch, supersession
+
+- **Retraction** — withdrawing a fact or claim from service because it should no
+  longer be asserted at all, without asserting anything in its place. Closes
+  transaction time only; the validity interval is untouched. This is what
+  `invalidate` performs.
+_Avoid_: invalidation (use retraction), deletion, forget
+
+- **Duplicate** — a claim asserting the same proposition as another with a
+  compatible validity interval. Redundancy, **not** staleness: a duplicate is
+  never demoted by being superseded, because either copy may outlive the other.
+_Avoid_: redundancy, clone
+
+- **Contradiction** — two claims that cannot both be true. Recorded as a
+  relation; a contradiction alone never invalidates anything.
+_Avoid_: conflict, disagreement
+
+- **Temporal ambiguity** — claims that cannot be compared because the validity
+  information is insufficient. A recorded outcome, not a failure: it is how the
+  system declines to guess.
+_Avoid_: uncertainty, unknown
+
+- **Successor** — the claim that supersedes or corrects another. Recorded once,
+  in the relation's `successor_claim_id`; never recomputed by a reader.
+_Avoid_: replacement claim, winner
+
+- **Active claim** — a claim whose validity interval has not ended. Claims are
+  never deleted: a claim leaves the active set by closing its interval, and its
+  record persists.
+_Avoid_: valid claim, current claim, live claim
+
+- **Trust class** — how far a source may be trusted, distinct from extraction
+  confidence. Trust describes *where a record came from*, not how sure the
+  extractor was. Derived trust is the minimum over its bases and is never
+  elevated by summarization or consolidation.
+_Avoid_: confidence, reliability
+
+- **Belief** — a current, materialized interpretation held to be true. **Not a
+  type in this repository**: the reconciliation relation vocabulary already
+  covers the concern, and adding a parallel belief layer would duplicate it.
+  Named here only so external reviews using the term resolve to *reconciliation*.
+_Avoid_: belief state, hypothesis (if it means the same thing)
+
+### Rejected: "belief layer" as an addition to the claim model
+
+External reviews propose a separate `Belief` entity with
+`active | disputed | superseded | uncertain` statuses and its own
+`supports`/`contradicts` vocabulary. The relation outcome set already expresses
+all of it — a `disputed` belief is two claims in `contradiction`, an `uncertain`
+one is a claim related by `temporal_ambiguity`. A parallel entity would make
+every query answer two questions ("what does the claim say, and what does the
+belief say?") and give two places for the answer to drift.
