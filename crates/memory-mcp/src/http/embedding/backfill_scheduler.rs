@@ -149,11 +149,18 @@ async fn backfill_tenant(
     // The same call also repairs the Class A case activation never touched — a
     // ready tenant that has never been activated — by re-declaring an index
     // that stands under no vectors, which is what makes its writes land.
-    if crate::http::runtime::storage::reconcile_tenant_index_dimension(&db, &namespace, embedding)
-        .await
-        == crate::http::runtime::storage::IndexWriteGate::ForeignVectors
-    {
-        log_declined(tenant, embedding.dimension);
+    //
+    // `Unreadable` declines for the same reason as `ForeignVectors`, and the
+    // gate's own contract says why: the caller must not guess, because a wrong
+    // guess is a write that fails after it has been paid for. Activation
+    // tolerates an unreadable index because lexical retrieval does not need
+    // it; backfill cannot, because it is about to *write vectors*. The two
+    // callers share one reading and draw different consequences from it.
+    let gate =
+        crate::http::runtime::storage::reconcile_tenant_index_dimension(&db, &namespace, embedding)
+            .await;
+    if let Some(reason) = declined_reason(gate) {
+        log_declined(tenant, embedding.dimension, reason);
         return Ok(());
     }
     let extractor = match policy.entity_extractor.clone() {
@@ -256,14 +263,37 @@ fn log_tenant_failure(op: &'static str, tenant: &Tenant, error: &MemoryError) {
     crate::http::logging::log_warn(op, &format!("tenant {}: {error}", tenant.id));
 }
 
-/// A tenant the tick deliberately did not touch, because its stored vectors
-/// belong to another dimension and only a reembed may rewrite them.
+/// Whether an [`IndexWriteGate`] stops the tick from writing, and why.
+///
+/// This is the policy that makes backfill safe to run unattended, stated in
+/// one place so it can be read and pinned directly. Two of the four readings
+/// decline, and the second one is the easy one to "simplify" away:
+///
+/// - [`ForeignVectors`](crate::http::runtime::storage::IndexWriteGate::ForeignVectors)
+///   — vectors exist at a width the deployment no longer writes. Rewriting them
+///   is a reembed, and attempting it anyway pays the provider for a write the
+///   database rejects.
+/// - [`Unreadable`](crate::http::runtime::storage::IndexWriteGate::Unreadable)
+///   — the index state could not be determined. The gate's own contract is that
+///   the caller must not guess, because guessing wrong is a write that fails
+///   after it has been paid for. Activation tolerates this; backfill is about to
+///   write vectors, so it does not.
+fn declined_reason(gate: crate::http::runtime::storage::IndexWriteGate) -> Option<&'static str> {
+    use crate::http::runtime::storage::IndexWriteGate;
+    match gate {
+        IndexWriteGate::Matches | IndexWriteGate::Redeclared => None,
+        IndexWriteGate::ForeignVectors => Some("stored_vectors_at_other_dimension"),
+        IndexWriteGate::Unreadable => Some("index_state_unknown"),
+    }
+}
+
+/// A tenant the tick deliberately did not touch, with the reason it gave.
 ///
 /// `Info`, not `Warn`, and never counted as degraded: this is the job working
 /// correctly. A decline that were reported as a failure would page an operator
 /// for every tenant an operator has not reembedded yet — which is every tenant
 /// in the fleet after a provider change.
-fn log_declined(tenant: &Tenant, dimension: usize) {
+fn log_declined(tenant: &Tenant, dimension: usize, reason: &'static str) {
     let mut event = std::collections::HashMap::new();
     event.insert(
         "op".to_string(),
@@ -275,10 +305,7 @@ fn log_declined(tenant: &Tenant, dimension: usize) {
         serde_json::json!(tenant.namespace_binding.namespace),
     );
     event.insert("dimension".to_string(), serde_json::json!(dimension));
-    event.insert(
-        "reason".to_string(),
-        serde_json::json!("stored_vectors_at_other_dimension"),
-    );
+    event.insert("reason".to_string(), serde_json::json!(reason));
     crate::logging::StdoutLogger::from_env().log(event, crate::logging::LogLevel::Info);
 }
 
@@ -406,5 +433,46 @@ mod tests {
         let observed = run_backfill_pass(&registry, &policy(true)).await;
 
         assert!(observed.is_ok());
+    }
+
+    /// An index already at the deployment's width lets the tick write.
+    #[tokio::test]
+    async fn a_matching_index_does_not_decline() {
+        use crate::http::runtime::storage::IndexWriteGate;
+        assert_eq!(declined_reason(IndexWriteGate::Matches), None);
+    }
+
+    /// An index re-declared because no vector stands under it is now correct,
+    /// which is the case that makes an unactivated tenant backfillable at all.
+    #[tokio::test]
+    async fn an_index_just_redeclared_for_a_vectorless_namespace_does_not_decline() {
+        use crate::http::runtime::storage::IndexWriteGate;
+        assert_eq!(declined_reason(IndexWriteGate::Redeclared), None);
+    }
+
+    /// Vectors stored at another provider's width are a reembed's business.
+    /// Attempting this would pay the provider for a write the database rejects,
+    /// on every tick, for as long as the deployment stays this way.
+    #[tokio::test]
+    async fn a_namespace_holding_vectors_at_another_width_is_declined() {
+        use crate::http::runtime::storage::IndexWriteGate;
+        assert_eq!(
+            declined_reason(IndexWriteGate::ForeignVectors),
+            Some("stored_vectors_at_other_dimension")
+        );
+    }
+
+    /// An index that could not be read must not be assumed correct. The gate's
+    /// contract is that the caller must not guess, because a wrong guess is a
+    /// write that fails after it has been paid for — and unlike activation,
+    /// which tolerates the unknown because lexical retrieval does not need the
+    /// index, backfill is about to write vectors into it.
+    #[tokio::test]
+    async fn an_unreadable_index_is_declined_rather_than_guessed_at() {
+        use crate::http::runtime::storage::IndexWriteGate;
+        assert_eq!(
+            declined_reason(IndexWriteGate::Unreadable),
+            Some("index_state_unknown")
+        );
     }
 }

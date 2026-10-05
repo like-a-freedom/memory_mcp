@@ -145,11 +145,6 @@ impl RuntimeOptions {
         self
     }
 
-    pub fn with_embedding_similarity_threshold(mut self, threshold: f64) -> Self {
-        self.embedding_similarity_threshold = threshold;
-        self
-    }
-
     pub fn with_entity_extractor(mut self, extractor: Arc<dyn EntityExtractor>) -> Self {
         self.entity_extractor = Some(extractor);
         self
@@ -587,8 +582,10 @@ pub(crate) async fn reconcile_tenant_index_dimension(
             // width are a reembed's business (ADR-0042): re-declaring here
             // would leave vectors that the new index cannot accept, stranding
             // the namespace in a state only an operator can exit. A
-            // vector-less namespace is a backfill's business, and backfill
-            // never touches the index.
+            // vector-less namespace may be re-declared by anyone, because
+            // both the activation path and the backfill tick come through this
+            // function — and the latter must fix the index itself when it
+            // meets a ready tenant that was never activated.
             match store.count_stored_vectors().await {
                 Ok(stored) if stored > 0 => {
                     let mut event = std::collections::HashMap::new();

@@ -30,7 +30,7 @@ Two operations that look alike and are not:
 |---|---|---|
 | Selects | `embedding IS NONE` | `embedding_signature != target` |
 | Touches existing vectors | never | all of them |
-| HNSW index | untouched | dropped, recreated at the target dimension |
+| HNSW index | re-declared **only** when the namespace stores no vector; never under vectors | dropped, recreated at the target dimension |
 | Reversible | yes | **no** |
 
 **Class A is automatic. Class B requires an explicit operator decision.**

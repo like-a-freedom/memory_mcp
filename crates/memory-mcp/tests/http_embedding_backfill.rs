@@ -280,7 +280,8 @@ async fn one_backfill_tick_fills_every_missing_vector_at_the_deployment_dimensio
     assert_eq!(
         declared_index_dimension(&provisioned, &namespace).await,
         index_before,
-        "backfill fills gaps and never re-declares the index"
+        "an index already at the deployment width is left as it is — backfill \
+         repairs a wrong one only when no vector stands under it"
     );
     assert_eq!(
         read_embedding_state(&provisioned, &namespace).await,

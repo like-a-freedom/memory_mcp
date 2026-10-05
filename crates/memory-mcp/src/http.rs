@@ -159,28 +159,12 @@ impl HttpState {
     }
 
     /// [`Self::assemble`] with the deployment-level policy threaded into every
-    /// tenant runtime the pool builds.
+    /// tenant runtime the pool builds. This is the body of the assembly; every
+    /// other entry point above adds one parameter and forwards here.
     ///
     /// `None` means the operator did not enable embeddings, so tenant
     /// runtimes serve lexical retrieval only.
     pub(crate) async fn assemble_with_deployment_policy(
-        config: HttpConfig,
-        registry: registry::RegistryHandle,
-        _metrics_handle: AssembleMetrics,
-        browser_policy_override: Option<crate::http::registry::models::BrowserPolicyFence>,
-        deployment_policy: Option<runtime::bootstrap::DeploymentPolicy>,
-    ) -> Result<Arc<Self>, crate::error::MemoryError> {
-        Self::assemble_inner(
-            config,
-            registry,
-            _metrics_handle,
-            browser_policy_override,
-            deployment_policy,
-        )
-        .await
-    }
-
-    async fn assemble_inner(
         config: HttpConfig,
         registry: registry::RegistryHandle,
         _metrics_handle: AssembleMetrics,

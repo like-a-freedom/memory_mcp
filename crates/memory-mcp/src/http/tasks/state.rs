@@ -20,9 +20,11 @@ use crate::error::MemoryError;
 pub const TASK_KIND_EXTRACT: &str = "extract";
 
 /// The durable kind of a whole-namespace re-embedding task.
-/// Introduced here so the discriminator has one spelling; the
-/// dispatch that acts on it lands in a later change.
-#[allow(dead_code)]
+///
+/// One spelling for the discriminator, shared by the route that enqueues it
+/// (`control::operator::reembed_tenant`), the migration that defines the
+/// column, and the dispatch in `http::tasks::scheduler::execute_one_task` that
+/// routes it to the reembed executor.
 pub const TASK_KIND_REEMBED: &str = "reembed";
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]

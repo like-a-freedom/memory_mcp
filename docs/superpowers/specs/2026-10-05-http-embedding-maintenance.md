@@ -44,7 +44,7 @@ Two operations that look alike and are not:
 |---|---|---|
 | Selects | `embedding IS NONE` | `embedding_signature != target` |
 | Touches existing vectors | never | all of them |
-| HNSW index | untouched | dropped, recreated at target dimension |
+| HNSW index | re-declared **only** when the namespace stores no vector; never under vectors | dropped, recreated at target dimension |
 | Idempotence | additive, naturally | convergent but not idempotent mid-pass |
 | Reversible | yes (writes only what was absent) | **no** |
 | Cost | bounded by the missing count | bounded by the total fact count |
@@ -374,8 +374,22 @@ cargo clippy --workspace --all-targets \
   --features fs-watch,mcp-apps,streamable-http --locked -- -D warnings
 cargo test -p memory_mcp --lib --features streamable-http
 cargo test -p memory_mcp --lib
-cargo test -p memory_mcp --tests --features streamable-http
+cargo test -p memory_mcp --tests --features streamable-http,mcp-apps,test-fixtures
 ```
 
 Zero warnings, zero failures, on both feature profiles. No task may merge with a
 red gate; a red gate is a defect in the task, not an obstacle to route around.
+
+**The integration line must carry `test-fixtures`.** Every HTTP integration
+test that drives the durable scheduler or the control plane opens with
+`#![cfg(all(feature = "streamable-http", feature = "control-plane",
+feature = "test-fixtures"))]`. `streamable-http` already implies
+`control-plane` (`crates/memory-mcp/Cargo.toml` lists it in that feature), so
+`test-fixtures` is the only one of the three that must be added — and without
+it those files compile to empty test binaries and report success. Verified
+directly: `--features streamable-http` alone prints `running 0 tests` and
+`ok`. A zero-count run is therefore part of "passed", not a detail of it.
+
+`.github/workflows/ci.yml` runs the superset
+(`--features fs-watch,mcp-apps,streamable-http,test-fixtures`), so CI covers
+this; the gate above is the local equivalent.
