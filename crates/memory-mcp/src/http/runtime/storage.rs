@@ -537,17 +537,41 @@ pub async fn build_runtime_with_options(
     TenantRuntime::from_bound_client_with_runtime_options(tenant, tenant_db, plan, options).await
 }
 
+/// Whether a vector may be written into a namespace at the deployment's
+/// dimension.
+///
+/// This is the one question the activation path and the backfill tick must
+/// answer the same way. They asked it independently at first, and the answers
+/// disagreed: activation declined to re-declare an index that stood under
+/// foreign vectors, while backfill went ahead and paid the provider for a write
+/// the database then rejected — every tick, for every affected tenant, with the
+/// job marked degraded each time. One function, two callers.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum IndexWriteGate {
+    /// The index already reports the deployment's dimension.
+    Matches,
+    /// The index stood at another dimension and the namespace stored no
+    /// vector, so it was re-declared. Writes are now safe.
+    Redeclared,
+    /// The index stands at another dimension and vectors exist at that width.
+    /// Rewriting them is a reembed's work, not a backfill's.
+    ForeignVectors,
+    /// The index could not be read. The caller must not guess, because a wrong
+    /// guess here is a write that fails after it has been paid for.
+    Unreadable,
+}
+
 /// Re-define a tenant's fact index when it was provisioned at a dimension other
-/// than the deployment's.
+/// than the deployment's, and report whether writing is safe afterwards.
 ///
 /// Best-effort by design: a namespace that cannot be inspected or re-defined
 /// must still activate, because lexical retrieval does not depend on the index.
 /// The tenant's embedding decision is separate and degrades on its own.
-async fn reconcile_tenant_index_dimension(
+pub(crate) async fn reconcile_tenant_index_dimension(
     tenant_db: &Arc<SurrealDbClient>,
     namespace: &str,
     policy: &EmbeddingPolicy,
-) {
+) -> IndexWriteGate {
     // The index vocabulary lives on `ReembedStoreClient`, the owner of the
     // reembed-owned DDL. `Arc<SurrealDbClient>` coerces to `Arc<dyn DbClient>`
     // here; a `&SurrealDbClient` could not, because the client is neither
@@ -581,6 +605,7 @@ async fn reconcile_tenant_index_dimension(
                     event.insert("stored_vectors".to_string(), serde_json::json!(stored));
                     crate::logging::StdoutLogger::new("info")
                         .log(event, crate::logging::LogLevel::Warn);
+                    IndexWriteGate::ForeignVectors
                 }
                 Ok(_) => {
                     if let Err(err) = redefine_embedding_index(&store, policy.dimension).await {
@@ -590,7 +615,7 @@ async fn reconcile_tenant_index_dimension(
                             policy.dimension,
                             &err.to_string(),
                         );
-                        return;
+                        return IndexWriteGate::Unreadable;
                     }
                     let mut event = std::collections::HashMap::new();
                     event.insert(
@@ -605,17 +630,24 @@ async fn reconcile_tenant_index_dimension(
                     event.insert("dimension".to_string(), serde_json::json!(policy.dimension));
                     crate::logging::StdoutLogger::new("info")
                         .log(event, crate::logging::LogLevel::Warn);
+                    IndexWriteGate::Redeclared
                 }
-                Err(err) => log_index_reconcile(
-                    namespace,
-                    Some(existing),
-                    policy.dimension,
-                    &err.to_string(),
-                ),
+                Err(err) => {
+                    log_index_reconcile(
+                        namespace,
+                        Some(existing),
+                        policy.dimension,
+                        &err.to_string(),
+                    );
+                    IndexWriteGate::Unreadable
+                }
             }
         }
-        Ok(_) => {}
-        Err(err) => log_index_reconcile(namespace, None, policy.dimension, &err.to_string()),
+        Ok(_) => IndexWriteGate::Matches,
+        Err(err) => {
+            log_index_reconcile(namespace, None, policy.dimension, &err.to_string());
+            IndexWriteGate::Unreadable
+        }
     }
 }
 

@@ -138,6 +138,24 @@ async fn backfill_tenant(
     policy: &DeploymentPolicy,
 ) -> Result<(), MemoryError> {
     let namespace = tenant.namespace_binding.namespace.clone();
+    // One decision, shared with the activation path. A namespace whose stored
+    // vectors sit at another dimension is Class B — only an operator's reembed
+    // may rewrite them — and backfill must decline it *before* it calls the
+    // provider: a 2048-wide vector written into a 1536-wide index is rejected
+    // by the database, but only after the provider has been paid for it. On a
+    // tick that runs for every affected tenant, every time, with the job
+    // reported degraded on each of them.
+    //
+    // The same call also repairs the Class A case activation never touched — a
+    // ready tenant that has never been activated — by re-declaring an index
+    // that stands under no vectors, which is what makes its writes land.
+    if crate::http::runtime::storage::reconcile_tenant_index_dimension(&db, &namespace, embedding)
+        .await
+        == crate::http::runtime::storage::IndexWriteGate::ForeignVectors
+    {
+        log_declined(tenant, embedding.dimension);
+        return Ok(());
+    }
     let extractor = match policy.entity_extractor.clone() {
         Some(extractor) => extractor,
         None => Arc::new(crate::knowledge::entity_extraction::AnnoEntityExtractor::new()?)
@@ -236,6 +254,32 @@ fn log_backfill_completed(namespace: &str, processed: usize) {
 /// the batch.
 fn log_tenant_failure(op: &'static str, tenant: &Tenant, error: &MemoryError) {
     crate::http::logging::log_warn(op, &format!("tenant {}: {error}", tenant.id));
+}
+
+/// A tenant the tick deliberately did not touch, because its stored vectors
+/// belong to another dimension and only a reembed may rewrite them.
+///
+/// `Info`, not `Warn`, and never counted as degraded: this is the job working
+/// correctly. A decline that were reported as a failure would page an operator
+/// for every tenant an operator has not reembedded yet — which is every tenant
+/// in the fleet after a provider change.
+fn log_declined(tenant: &Tenant, dimension: usize) {
+    let mut event = std::collections::HashMap::new();
+    event.insert(
+        "op".to_string(),
+        serde_json::json!("http.embedding.backfill_declined"),
+    );
+    event.insert("tenant".to_string(), serde_json::json!(tenant.id));
+    event.insert(
+        "namespace".to_string(),
+        serde_json::json!(tenant.namespace_binding.namespace),
+    );
+    event.insert("dimension".to_string(), serde_json::json!(dimension));
+    event.insert(
+        "reason".to_string(),
+        serde_json::json!("stored_vectors_at_other_dimension"),
+    );
+    crate::logging::StdoutLogger::from_env().log(event, crate::logging::LogLevel::Info);
 }
 
 #[cfg(test)]

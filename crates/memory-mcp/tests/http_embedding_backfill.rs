@@ -30,8 +30,21 @@ use memory_mcp::http::runtime::storage::{
 use memory_mcp::storage::{DbClient, SurrealDbClient};
 
 /// An enabled provider that answers deterministically and offline.
+///
+/// It counts its own `embed` calls. A tick that declines to touch a tenant and
+/// a tick that attempts the write and watches it fail both leave the fact
+/// without a vector, so the stored row alone cannot tell them apart — the call
+/// count can, and it is the cost a real deployment would have paid.
 struct StaticEmbeddingProvider {
     dimension: usize,
+    calls: Arc<std::sync::atomic::AtomicUsize>,
+}
+
+fn static_provider(dimension: usize) -> Arc<StaticEmbeddingProvider> {
+    Arc::new(StaticEmbeddingProvider {
+        dimension,
+        calls: Arc::new(std::sync::atomic::AtomicUsize::new(0)),
+    })
 }
 
 #[async_trait::async_trait]
@@ -49,13 +62,21 @@ impl memory_mcp::embedding::providers::EmbeddingProvider for StaticEmbeddingProv
     }
 
     async fn embed(&self, _input: &str) -> Result<Vec<f64>, memory_mcp::error::MemoryError> {
+        self.calls.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
         Ok(vec![0.0; self.dimension])
     }
 }
 
 fn embedding_policy(dimension: usize) -> EmbeddingPolicy {
+    embedding_policy_for(static_provider(dimension), dimension)
+}
+
+fn embedding_policy_for(
+    provider: Arc<StaticEmbeddingProvider>,
+    dimension: usize,
+) -> EmbeddingPolicy {
     EmbeddingPolicy {
-        provider: Arc::new(StaticEmbeddingProvider { dimension }),
+        provider,
         dimension,
         signature: memory_mcp::config::build_embedding_signature(
             "openai-compatible",
@@ -70,8 +91,12 @@ fn embedding_policy(dimension: usize) -> EmbeddingPolicy {
 
 /// The deployment policy the backfill job is registered with.
 fn deployment_policy(dimension: usize, auto_recovery: bool) -> DeploymentPolicy {
+    deployment_policy_from(embedding_policy(dimension), auto_recovery)
+}
+
+fn deployment_policy_from(embedding: EmbeddingPolicy, auto_recovery: bool) -> DeploymentPolicy {
     DeploymentPolicy {
-        embedding: Some(embedding_policy(dimension)),
+        embedding: Some(embedding),
         entity_extractor: None,
         lifecycle: memory_mcp::config::LifecycleConfig::default(),
         auto_recovery,
@@ -304,6 +329,66 @@ async fn the_tick_writes_nothing_when_auto_recovery_is_off() {
     assert!(
         fact.get("embedding").is_none_or(|value| value.is_null()),
         "recovery off means the fact keeps no vector: {fact}"
+    );
+}
+
+/// A tenant whose stored vectors were written at another provider's dimension
+/// is Class B: only an operator's reembed may touch it.
+///
+/// Backfill would write a 2048-wide vector into a 1536-wide index, which the
+/// database rejects — but only after the provider has been paid for the call.
+/// On a scheduler tick that repeats for every affected tenant, forever, and
+/// reports the job degraded every time. So the tick must decline before it
+/// spends anything.
+///
+/// The assertion is the provider's call count, not the stored row: a write
+/// that fails and a write that was never attempted both leave the fact without
+/// a vector, so the row alone would let a broken implementation pass.
+#[tokio::test]
+async fn the_tick_declines_a_tenant_whose_vectors_are_at_another_dimension() {
+    let namespace = format!("tns_backfill_foreign_{}", uuid::Uuid::new_v4().simple());
+    let registry = RegistryHandle::in_memory_with_default_mem_engine().await;
+    // The default-dimension constructor renders the index at 1536, which is
+    // what a tenant provisioned by an earlier deployment looks like.
+    let provisioned = registry
+        .tenant_engine_optional()
+        .expect("in-memory engine wired")
+        .bind_to_test_namespace(&namespace)
+        .await;
+    provisioned
+        .apply_migrations(&namespace)
+        .await
+        .expect("apply tenant migrations");
+    seed_fact_with_vector(&provisioned, &namespace, "fact:old", 1536).await;
+    seed_fact_without_vector(&provisioned, &namespace, "fact:gap").await;
+    registry
+        .tenants()
+        .write_tenant(&tenant(&namespace))
+        .await
+        .expect("register the tenant as ready");
+
+    // The deployment wants 2048; the namespace stores 1536.
+    let provider = static_provider(2048);
+    let calls = provider.calls.clone();
+    let policy = deployment_policy_from(embedding_policy_for(provider, 2048), true);
+
+    let job = backfill_scheduler_job(policy);
+    job(registry).await.expect("one backfill tick");
+
+    assert_eq!(
+        calls.load(std::sync::atomic::Ordering::SeqCst),
+        0,
+        "a tenant whose vectors are at another dimension is a reembed's job, \
+         so the tick must decline it before spending a provider call"
+    );
+    let fact = provisioned
+        .select_one("fact:gap", &namespace)
+        .await
+        .expect("read the untouched fact")
+        .expect("the fact is still there");
+    assert!(
+        fact.get("embedding").is_none_or(|value| value.is_null()),
+        "declining means no vector was written: {fact}"
     );
 }
 
