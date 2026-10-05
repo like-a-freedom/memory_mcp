@@ -48,12 +48,38 @@ pub fn scheduler_job() -> SchedulerJob {
 pub fn scheduler_job_with_options(
     options: crate::http::runtime::storage::RuntimeOptions,
 ) -> SchedulerJob {
+    scheduler_job_with_policy(options, None)
+}
+
+/// The task job with the deployment's embedding policy attached, so a claimed
+/// `reembed` row can force-enable the deployment provider for a tenant whose
+/// own runtime is degraded.
+///
+/// A sibling rather than a parameter on [`scheduler_job_with_options`], because
+/// the policy is an input only the reembed executor reads: widening the
+/// existing entry point would make every current caller — and the deprecated
+/// [`scheduler_job`] that delegates to it — name an argument it does not use.
+///
+/// [`SchedulerJob`] receives only the [`RegistryHandle`], so the policy is
+/// captured by the closure, exactly as `RuntimeOptions` is. `None` means the
+/// deployment has no embedding policy at all, which is what a lexical-only
+/// deployment passes; a reembed row then fails loudly rather than running with
+/// a provider nobody resolved.
+pub fn scheduler_job_with_policy(
+    options: crate::http::runtime::storage::RuntimeOptions,
+    policy: Option<crate::http::runtime::bootstrap::DeploymentPolicy>,
+) -> SchedulerJob {
     let options_for_job = options.clone();
+    let policy_for_job = policy.clone();
     Arc::new(move |registry| {
         let options = options_for_job.clone();
+        let embedding = policy_for_job
+            .as_ref()
+            .and_then(|policy| policy.embedding.as_ref())
+            .cloned();
         let injector = options.fault_injector.clone();
         Box::pin(async move {
-            retry_reconcile_and_retain_with_options(&registry, options, injector).await
+            retry_reconcile_and_retain_with_policy(&registry, options, injector, embedding).await
         })
     })
 }
@@ -70,10 +96,24 @@ pub async fn retry_reconcile_and_retain(registry: &RegistryHandle) -> Result<(),
     .await
 }
 
+/// [`retry_reconcile_and_retain_with_policy`] with no embedding policy: the
+/// pre-Task-6 entry point, where a `reembed` row could not be executed at all
+/// because no provider was reachable from here.
 async fn retry_reconcile_and_retain_with_options(
     registry: &RegistryHandle,
     options: crate::http::runtime::storage::RuntimeOptions,
     fault_injector: Arc<dyn FaultInjector>,
+) -> Result<(), MemoryError> {
+    retry_reconcile_and_retain_with_policy(registry, options, fault_injector, None).await
+}
+
+/// The pass itself, with the deployment's embedding policy, which only the
+/// reembed executor reads.
+async fn retry_reconcile_and_retain_with_policy(
+    registry: &RegistryHandle,
+    options: crate::http::runtime::storage::RuntimeOptions,
+    fault_injector: Arc<dyn FaultInjector>,
+    embedding: Option<crate::http::runtime::storage::EmbeddingPolicy>,
 ) -> Result<(), MemoryError> {
     let tenants = registry.tenants().list_ready_tenants(None, 100).await?;
     let Some(engine) = registry.tenant_engine_optional() else {
@@ -133,6 +173,7 @@ async fn retry_reconcile_and_retain_with_options(
             db,
             &tenant.namespace_binding.namespace,
             &fault_injector,
+            embedding.as_ref(),
         )
         .await
         {
@@ -169,6 +210,7 @@ async fn execute_one_task(
     db: Arc<SurrealDbClient>,
     namespace: &str,
     fault_injector: &Arc<dyn FaultInjector>,
+    embedding: Option<&crate::http::runtime::storage::EmbeddingPolicy>,
 ) -> Result<(), MemoryError> {
     let replica_id = crate::http::leases::scheduler::replica_id();
     let Some(handle) = task_store.claim_next_due(&replica_id).await? else {
@@ -188,7 +230,22 @@ async fn execute_one_task(
             execute_extract_task(task_store, db, namespace, &handle, &record, fault_injector).await
         }
         TASK_KIND_REEMBED => {
-            execute_reembed_task(task_store, db, namespace, &handle, &record).await
+            // A reembed needs the deployment's provider. A tick with no policy
+            // has none to force-enable, so the row fails loudly rather than
+            // being decoded as an extraction or silently rewritten with a
+            // degraded provider.
+            let Some(policy) = embedding else {
+                return task_store
+                    .fail_fenced(
+                        &handle,
+                        serde_json::json!({
+                            "message": "no deployment embedding policy is configured, so a reembed \
+                                        cannot force-enable a provider for this tenant",
+                    }),
+                    )
+                    .await;
+            };
+            execute_reembed_task(task_store, db, namespace, &handle, &record, policy).await
         }
         // Fail closed. An unrecognised kind is never decoded as whichever
         // payload happens to fit: the only two kinds that exist are the two
@@ -259,68 +316,302 @@ async fn execute_extract_task(
     }
 }
 
-/// The reembed executor. **STUB — Task 6 replaces the pass inside it.**
+/// The reembed executor: one whole-namespace rewrite, committed through the
+/// durable state machine.
 ///
-/// Dispatch exists (Task 4) so the operator route can enqueue a `reembed` task
-/// and the scheduler can route it here; the pass itself — building a
-/// force-enabled `MemoryService`, parsing `ReembedOptions`, running
-/// `reembed_all_facts` and mapping `ReembedOutcome` onto the durable state
-/// machine — lands in Task 6. What *is* here is the lease heartbeat (Task 5),
-/// because the lease is claimed here, and a pass that outlives it is re-claimed
-/// and re-run forever.
+/// The service it builds is **force-enabled**. `prepare_reembed_pass` refuses a
+/// service carrying a disabled provider or a `None` signature, which is correct
+/// for serving and fatal for rewriting — and the namespaces that need a reembed
+/// most are precisely those whose runtime provider the activation path degraded,
+/// because their stored vectors disagree with the deployment's signature. If
+/// this executor reused the tenant's runtime provider, the one tenant that most
+/// needs the rewrite would be the one that cannot get it. So it builds its own
+/// service from the deployment policy and forces that identity onto it, through
+/// the same helper the stdio CLI uses.
 ///
-/// It fails the task rather than completing it, and says so in the stored
-/// error. A silent success here would be the worst possible stub: the task
-/// would read `completed` with no vectors rewritten, and Task 6's end-to-end
-/// test would pass without Task 6 having run. A loud durable failure is a
-/// truthful intermediate state an operator can see.
+/// The mapping onto the durable state machine:
+///
+/// | [`ReembedOutcome`]            | durable state | why                                    |
+/// |-------------------------------|---------------|----------------------------------------|
+/// | `Completed` / `NothingToDo`  | `completed`   | every vector agrees with the target   |
+/// | `CompletedWithErrors`         | `completed`   | within quota; the failure count is in the result |
+/// | `Failed` / `Interrupted`      | `failed`      | cut short; resumable, because `embedding_job:fact_reembed` holds the cursor |
+///
+/// A `Failed`/`Interrupted` row is re-requestable rather than a dead end: the
+/// job row's `last_completed_fact_id` means the next pass resumes at the
+/// cursor instead of restarting, and the operator route's per-tenant
+/// fingerprint lets a failed row be re-requested (the dedupe only names a
+/// *live* task).
+///
+/// `CompletedWithErrors` completes rather than fails because the pass did
+/// finish: the vectors it did rewrite are at the target, and an operator who
+/// re-runs after a within-quota failure must get the failures retried rather
+/// than have them silently treated as fatal.
 async fn execute_reembed_task(
     task_store: &DurableTaskStore,
     db: Arc<SurrealDbClient>,
     namespace: &str,
     handle: &crate::http::tasks::state::TaskHandle,
     record: &crate::http::tasks::state::TenantTaskRecord,
+    policy: &crate::http::runtime::storage::EmbeddingPolicy,
 ) -> Result<(), MemoryError> {
     // One token for the pass and the heartbeat. A shutdown cancels both, and a
     // lost fence cancels it too — from the pass's point of view those are the
     // same signal: stop, someone else owns this task now.
     let cancel = tokio_util::sync::CancellationToken::new();
+    let service = build_force_enabled_reembed_service(db, namespace, policy)?;
+    let options = ReembedTaskParams::from_record(record)?.into();
+    // `LogProgressReporter::new` takes the logger by value and
+    // `MemoryService::logger` is a `Clone`, so the reporter borrows a clone
+    // rather than fighting the service for its own field.
+    let reporter =
+        crate::service::reembed_progress::LogProgressReporter::new(service.logger.clone());
+    let cancel_for_pass = cancel.clone();
     let pass = run_task_heartbeated(
         Arc::new(task_store.clone()),
         handle.clone(),
         crate::http::tasks::worker::TASK_LEASE_TTL_SECS,
         cancel,
-        // STUB (Task 6). See the doc comment above: fails loudly, never succeeds.
         async move {
-            let _ = (db, namespace, record);
-            Err(MemoryError::Validation(
-                "execute_reembed_task is not implemented: the reembed pass \
-                 lands in Task 6, so this task failed without rewriting any vector"
-                    .into(),
-            ))
+            service
+                .reembed_all_facts(&options, &reporter, &cancel_for_pass)
+                .await
         },
     )
     .await;
     // The terminal write is deliberately *outside* the heartbeat: the loop is
     // stopped before the outcome is committed, so the last renewal cannot race
-    // the state transition it exists to protect. Task 6 replaces these two arms
-    // with the `ReembedOutcome` mapping; the shape is already the extract one.
+    // the state transition it exists to protect.
     match pass {
-        Ok(()) => {
-            task_store
-                .complete_fenced(
-                    handle,
-                    serde_json::json!({ "message": "reembed pass finished" }),
-                    false,
-                )
-                .await
+        Ok((summary, outcome)) => {
+            let failed = matches!(
+                outcome,
+                crate::service::reembed_options::ReembedOutcome::Failed
+                    | crate::service::reembed_options::ReembedOutcome::Interrupted
+            );
+            let result = reembed_result(&outcome, &summary);
+            if failed {
+                task_store.fail_fenced(handle, result).await
+            } else {
+                task_store.complete_fenced(handle, result, false).await
+            }
         }
         Err(error) => {
+            // The pass returned an error rather than an outcome (the provider
+            // refused, the namespace was unreadable, the fence was lost).
+            // Nothing partial is reported as done: the operator's row says the
+            // rewrite did not complete, and the next pass resumes from the
+            // durable cursor rather than restarting.
             task_store
                 .fail_fenced(handle, serde_json::json!({"message": error.to_string()}))
                 .await
         }
     }
+}
+
+/// Build the service a reembed pass runs against, with the deployment's
+/// embedding identity **forced** onto it.
+///
+/// The forcing is the point, and it goes through
+/// [`crate::bootstrap::stdio::forced_embedding_runtime_state`] rather than a
+/// private copy of the same line: stdio's `ForceEnabledForReembed` arm and this
+/// executor share one definition of "ignore the namespace decision, use the
+/// deployment's provider".
+///
+/// `new_with_embedding_provider` starts the service with a `None` signature
+/// (it cannot know one), and `prepare_reembed_pass` refuses exactly that — so
+/// without the forced state the pass would fail with "reembed requires an
+/// enabled embedding signature" on every namespace, degraded or not.
+///
+/// The entity extractor is the built-in rule extractor rather than the
+/// deployment's: a reembed rewrites vectors, not entities, so loading a
+/// deployment's GLiNER checkpoint here would cost a model load per pass and
+/// change nothing about the vectors written.
+fn build_force_enabled_reembed_service(
+    db: Arc<SurrealDbClient>,
+    namespace: &str,
+    policy: &crate::http::runtime::storage::EmbeddingPolicy,
+) -> Result<crate::service::MemoryService, MemoryError> {
+    let extractor =
+        std::sync::Arc::new(crate::knowledge::entity_extraction::AnnoEntityExtractor::new()?)
+            as std::sync::Arc<dyn crate::knowledge::entity_extraction::EntityExtractor>;
+    // `Arc<SurrealDbClient>` coerces to `Arc<dyn DbClient>`; the client itself
+    // is neither `Clone` nor able to lend its engine, so the `Arc` handle the
+    // caller already owns is the only conversion available (ADR-0042).
+    let service = crate::service::MemoryService::new_with_embedding_provider(
+        db as Arc<dyn crate::storage::client::DbClient>,
+        namespace.to_owned(),
+        "info".into(),
+        // Rate limits are request-path policy; a maintenance pass is not
+        // request traffic and must not be throttled by one.
+        100,
+        100,
+        policy.provider.clone(),
+        crate::config::DEFAULT_EMBEDDING_SIMILARITY_THRESHOLD,
+        extractor,
+    )?;
+    service.replace_embedding_runtime_state(
+        crate::bootstrap::stdio::forced_embedding_runtime_state(
+            policy.provider.clone(),
+            Some(policy.signature.clone()),
+            policy.model.clone(),
+            Some(policy.dimension),
+        ),
+    );
+    Ok(service)
+}
+
+/// The durable row's reembed parameters, decoded from the stored `params`.
+///
+/// `ReembedOptions` is not `Deserialize` (it is a CLI-shaped struct whose
+/// `max_failures: Option<usize>` carries documented `None`/`Some(0)` semantics),
+/// so the wire form is read here and converted.
+///
+/// The read goes through [`durable_scalar`] because `params` is a SurrealDB
+/// `option<object> FLEXIBLE` column, and the values in it come back in the
+/// server's **tagged** wire form rather than as the JSON that went in:
+///
+/// ```text
+/// enqueued: {"max_failures": null, "retry_failed": false}
+/// stored:   {"max_failures": "Null",   "retry_failed": {"Bool": false}}
+/// ```
+///
+/// A plain `serde` decode therefore fails on every row the operator route has
+/// ever written — with `invalid type: string "Null", expected usize` for the
+/// first field and `invalid type: map, expected a boolean` for the second. This
+/// is a property of the durable form rather than of any one writer, so it is
+/// decoded once, here, instead of patched at the route.
+struct ReembedTaskParams {
+    max_failures: Option<usize>,
+    retry_failed: bool,
+}
+
+impl ReembedTaskParams {
+    fn from_record(
+        record: &crate::http::tasks::state::TenantTaskRecord,
+    ) -> Result<Self, MemoryError> {
+        let params = &record.params;
+        Ok(Self {
+            max_failures: durable_scalar::<usize>(params.get("max_failures"))?,
+            // An absent, null or `"Null"` value means "not set", and not set
+            // means the wire default the operator route writes: `false`.
+            retry_failed: durable_scalar::<bool>(params.get("retry_failed"))?.unwrap_or(false),
+        })
+    }
+}
+
+impl From<ReembedTaskParams> for crate::service::reembed_options::ReembedOptions {
+    fn from(params: ReembedTaskParams) -> Self {
+        Self {
+            max_failures: params.max_failures,
+            retry_failed: params.retry_failed,
+        }
+    }
+}
+
+/// Read one field out of a durable `params` payload, accepting both the JSON
+/// that was enqueued and the tagged wire form SurrealDB stores it in.
+///
+/// `None` covers all three ways a field can be unset: the key is absent, the
+/// value is JSON `null`, or the value is SurrealDB's `"Null"` marker. Anything
+/// that is present but unreadable as `T` is an error rather than a silent
+/// default — a row whose `max_failures` says `"twelve"` must fail the pass, not
+/// quietly reembed with the default quota.
+fn durable_scalar<T>(value: Option<&serde_json::Value>) -> Result<Option<T>, MemoryError>
+where
+    T: serde::de::DeserializeOwned,
+{
+    let Some(value) = value else {
+        return Ok(None);
+    };
+    if value.is_null() || value.as_str() == Some("Null") {
+        return Ok(None);
+    }
+    // Unwrap a single-key tag (`{"Bool": false}`, `{"Number": 3}`) back to the
+    // value it wraps, so both spellings decode through one path.
+    let untagged = match value.as_object() {
+        Some(object) if object.len() == 1 => object.values().next().unwrap_or(value).clone(),
+        _ => value.clone(),
+    };
+    serde_json::from_value(untagged).map(Some).map_err(|error| {
+        MemoryError::Validation(format!(
+            "invalid durable reembed parameter {value}: {error}"
+        ))
+    })
+}
+
+/// The durable result payload for a pass that returned an outcome.
+///
+/// `CompletedWithErrors` completes with its failure count here rather than
+/// failing the row: the pass finished, the vectors it did write are at the
+/// target, and an operator reading `failed_facts` is told the truth about the
+/// ones that were not.
+fn reembed_result(
+    outcome: &crate::service::reembed_options::ReembedOutcome,
+    summary: &crate::service::ReembedSummary,
+) -> serde_json::Value {
+    use crate::service::reembed_options::ReembedOutcome;
+    let outcome = match outcome {
+        ReembedOutcome::Completed => "completed",
+        ReembedOutcome::CompletedWithErrors => "completed_with_errors",
+        ReembedOutcome::Failed => "failed",
+        ReembedOutcome::Interrupted => "interrupted",
+        ReembedOutcome::NothingToDo => "nothing_to_do",
+    };
+    serde_json::json!({
+        "outcome": outcome,
+        "total_facts": summary.total_facts,
+        "processed_facts": summary.processed_facts,
+        "succeeded_facts": summary.succeeded_facts,
+        "failed_facts": summary.failed_facts,
+    })
+}
+
+/// Test-only seam over the reembed executor: claim a real due `reembed` row and
+/// delegate to [`execute_reembed_task`] with the deployment policy.
+///
+/// A sibling rather than a widened [`execute_one_task_for_test`], because the
+/// policy is an input only the reembed executor reads, and the stub extractor
+/// is an input only the extract executor reads. Two task kinds, two shapes of
+/// seam — neither shared function grows an argument its other caller ignores.
+///
+/// Claims nothing and commits nothing of its own: the claim, the heartbeat and
+/// the terminal write all happen inside the production executor, so a test
+/// observes exactly what the scheduler would observe.
+#[cfg(any(test, feature = "test-fixtures"))]
+pub async fn execute_reembed_task_for_test(
+    task_store: &DurableTaskStore,
+    db: Arc<SurrealDbClient>,
+    namespace: &str,
+    policy: &crate::http::runtime::storage::EmbeddingPolicy,
+) -> Result<(), MemoryError> {
+    let replica_id = crate::http::leases::scheduler::replica_id();
+    let Some(handle) = task_store.claim_next_due(&replica_id).await? else {
+        return Ok(());
+    };
+    let record = task_store.load(&handle.task_id).await?.ok_or_else(|| {
+        MemoryError::NotFound(format!("task {} disappeared after claim", handle.task_id))
+    })?;
+    if record.cancellation_intent {
+        return task_store.cancel_before_commit_fenced(&handle).await;
+    }
+    if record.kind.as_str() != TASK_KIND_REEMBED {
+        // The caller asked for a reembed tick. Anything else is a test bug, and
+        // running it anyway would mean the row is rewritten by an executor the
+        // test did not mean to exercise.
+        return task_store
+            .fail_fenced(
+                &handle,
+                serde_json::json!({
+                    "message": format!(
+                        "execute_reembed_task_for_test claimed a `{}` task, not a reembed",
+                        record.kind
+                    ),
+                }),
+            )
+            .await;
+    }
+    execute_reembed_task(task_store, db, namespace, &handle, &record, policy).await
 }
 
 /// Heartbeat the task lease while a long pass runs, then return the pass's own
@@ -464,6 +755,25 @@ pub async fn execute_one_task_for_test(
     fault_injector: Arc<dyn FaultInjector>,
     extractor: ExtractorFn,
 ) -> Result<(), MemoryError> {
+    execute_one_task_with_policy(task_store, db, namespace, &fault_injector, extractor, None).await
+}
+
+/// Test-only mirror of [`execute_one_task`] that also carries the deployment's
+/// embedding policy, so a `reembed` row dispatched through the seam reaches the
+/// real reembed executor with a provider it can force-enable.
+///
+/// A sibling rather than a fifth parameter on [`execute_one_task_for_test`]:
+/// the provider is an argument only one of the two task kinds reads, and every
+/// existing caller of that seam would carry a parameter it ignores.
+#[cfg(any(test, feature = "test-fixtures"))]
+pub async fn execute_one_task_with_policy(
+    task_store: &DurableTaskStore,
+    db: Arc<SurrealDbClient>,
+    namespace: &str,
+    fault_injector: &Arc<dyn FaultInjector>,
+    extractor: ExtractorFn,
+    embedding_policy: Option<&crate::http::runtime::storage::EmbeddingPolicy>,
+) -> Result<(), MemoryError> {
     let replica_id = crate::http::leases::scheduler::replica_id();
     let Some(handle) = task_store.claim_next_due(&replica_id).await? else {
         return Ok(());
@@ -483,11 +793,28 @@ pub async fn execute_one_task_for_test(
     // stubbed routing decision is precisely what this seam must not fake.
     match record.kind.as_str() {
         TASK_KIND_EXTRACT => {
-            execute_extract_task_for_test(task_store, &handle, &record, &fault_injector, &extractor)
+            execute_extract_task_for_test(task_store, &handle, &record, fault_injector, &extractor)
                 .await
         }
         TASK_KIND_REEMBED => {
-            execute_reembed_task(task_store, db, namespace, &handle, &record).await
+            // A reembed goes to the real executor, because a stubbed routing
+            // decision is precisely what this seam must not fake — and, since
+            // Task 6, that executor needs a provider to force-enable. It gets
+            // the same shape of failure production does: a row dispatched here
+            // without a policy fails loudly instead of running with a degraded
+            // provider.
+            let Some(policy) = embedding_policy else {
+                return task_store
+                    .fail_fenced(
+                        &handle,
+                        serde_json::json!({
+                            "message": "no deployment embedding policy is configured, so a reembed \
+                                        cannot force-enable a provider for this tenant",
+                    }),
+                    )
+                    .await;
+            };
+            execute_reembed_task(task_store, db, namespace, &handle, &record, policy).await
         }
         other => {
             task_store

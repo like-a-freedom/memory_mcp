@@ -220,7 +220,7 @@ pub async fn build_memory_service_from_env(
     service.lifecycle_config = config.lifecycle.clone();
     service.ner_artifact_refresh_config = ner_artifact_refresh_config;
     service.ner_artifact_refresh_native = ner_artifact_refresh_native;
-    service.replace_embedding_runtime_state(EmbeddingRuntimeState::new(
+    service.replace_embedding_runtime_state(forced_embedding_runtime_state(
         runtime_provider,
         target.as_ref().map(|value| value.signature.clone()),
         target.as_ref().and_then(|value| value.model.clone()),
@@ -285,4 +285,26 @@ pub async fn build_memory_service_from_env(
         );
     }
     Ok(service)
+}
+
+/// Force a deployment's embedding identity onto a service, ignoring whatever
+/// per-namespace decision was reached.
+///
+/// This is the step every *rewrite* shares, and it is deliberately one function
+/// rather than two bodies. `prepare_reembed_pass` refuses a service carrying a
+/// disabled provider or a `None` signature — correct for serving, fatal for
+/// rewriting — so the reembed path has to override the decision before the pass
+/// starts. The stdio CLI does that under
+/// [`EmbeddingActivationMode::ForceEnabledForReembed`]; the HTTP durable-task
+/// executor does it for the tenant whose runtime provider the activation path
+/// downgraded, which is exactly the tenant that needs a reembed most. A third
+/// copy of this line would eventually diverge from the other two, and a
+/// divergence here is a namespace left half-rewritten.
+pub(crate) fn forced_embedding_runtime_state(
+    provider: Arc<dyn EmbeddingProvider>,
+    signature: Option<String>,
+    model: Option<String>,
+    dimension: Option<usize>,
+) -> EmbeddingRuntimeState {
+    EmbeddingRuntimeState::new(provider, signature, model, dimension)
 }

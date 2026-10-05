@@ -74,8 +74,15 @@ async fn main() -> ExitCode {
                 .with_fault_injector(runtime.fault_injector.clone());
         let hooks = hooks
             .with_additional_job(memory_mcp::http::app_sessions::scheduler::scheduler_job())
+            // The task job carries the deployment policy, because a `reembed`
+            // row can only force-enable a provider if the provider is
+            // reachable from here. `None` for a lexical-only deployment, whose
+            // reembed rows then fail loudly rather than running degraded.
             .with_additional_job(
-                memory_mcp::http::tasks::scheduler::scheduler_job_with_options(task_options),
+                memory_mcp::http::tasks::scheduler::scheduler_job_with_policy(
+                    task_options,
+                    Some(backfill_policy.clone()),
+                ),
             )
             .with_additional_job(memory_mcp::http::subscriptions::scheduler::scheduler_job())
             .with_additional_job(memory_mcp::http::registry::plan::scheduler_job())

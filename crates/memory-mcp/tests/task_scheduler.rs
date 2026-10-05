@@ -465,7 +465,7 @@ async fn a_reembed_task_is_dispatched_to_the_reembed_executor() {
         .expect("reembed row present");
     assert_eq!(record.state, TaskState::Failed);
     assert!(
-        names_reembed_stub(&record),
+        names_reembed_executor(&record),
         "the row must carry the reembed executor's own outcome, so dispatch is \
          distinguishable from extract decoding: {record:?}"
     );
@@ -843,15 +843,24 @@ async fn a_blocked_pass_keeps_its_fence_through_the_heartbeat() {
     );
 }
 
-/// Whether the reembed row carries the Task 4 stub's loud marker. The stub
-/// fails the task rather than completing it, precisely so this assertion can
-/// tell "dispatched to reembed" apart from "silently succeeded" — a silent
-/// success would make Task 6's end-to-end test pass without Task 6.
-fn names_reembed_stub(record: &memory_mcp::http::tasks::state::TenantTaskRecord) -> bool {
+/// True when the row's stored error is the reembed executor's own, not the
+/// extract decoder's.
+///
+/// `execute_one_task_for_test` is invoked without a deployment policy, so the
+/// executor reaches its own precondition and names the reembed domain:
+/// "no deployment embedding policy is configured, so a reembed cannot
+/// force-enable a provider for this tenant". What matters here is the
+/// *origin* — if dispatch had routed the payload to the extract arm, the row
+/// would instead carry `invalid durable extract parameters`, which is the
+/// failure the `kind` column exists to prevent. Rejecting that prefix rather
+/// than pinning the whole sentence keeps the assertion about routing.
+fn names_reembed_executor(record: &memory_mcp::http::tasks::state::TenantTaskRecord) -> bool {
     record
         .error
         .as_ref()
         .and_then(|error| error.get("message"))
         .and_then(serde_json::Value::as_str)
-        .is_some_and(|message| message.contains("execute_reembed_task is not implemented"))
+        .is_some_and(|message| {
+            !message.contains("invalid durable extract parameters") && message.contains("reembed")
+        })
 }
