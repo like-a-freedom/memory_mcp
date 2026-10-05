@@ -30,7 +30,8 @@ Use octocode MCP tools before reading files:
 
 ```bash
 cargo build                              # Build everything
-cargo test -p memory_mcp                 # Test production crate
+cargo test -p memory_mcp                 # Test production crate (prefer narrowing:
+                                         #   -p <crate>, --test <target>, or a name filter)
 cargo check                              # Fast compile check
 cargo clippy --workspace --all-targets \ # Lint (zero warnings required)
   --features fs-watch,mcp-apps,streamable-http --locked -- -D warnings
@@ -68,6 +69,15 @@ cargo run --features streamable-http --bin memory_mcp_http  # Start SaaS HTTP se
 
 ## Testing
 
+- **Run the smallest test set that covers your change.** The suite is large and
+  its compile and run time dominates iteration, so a whole-workspace run is a
+  last step, not a first one. Narrow by crate, then by module or test target,
+  then by name filter, and touch only the packages you changed:
+  `cargo test -p memory_mcp`, `cargo test -p memory_mcp --test <target>`, or
+  `cargo test -p memory_mcp <module_or_test_name>`. Prefer `cargo test` scoped
+  with `-p`/`--test`/name over `--workspace`. Escalate to the full
+  `cargo test -p memory_mcp` (and the workspace clippy pass) only when the change
+  crosses crate boundaries or before shipping.
 - Test concrete use cases and observable contracts: results/errors, durable
   state, isolation, resource release, recovery and limits.
 - Unit tests exercise the owning module's public interface with controlled
