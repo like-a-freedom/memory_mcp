@@ -30,9 +30,7 @@ use std::sync::Arc;
 use memory_mcp::http::registry::RegistryHandle;
 use memory_mcp::http::runtime::storage::EmbeddingPolicy;
 use memory_mcp::http::tasks::DurableTaskTestDriver;
-use memory_mcp::http::tasks::scheduler::{
-    execute_one_task_with_policy, execute_reembed_task_for_test,
-};
+use memory_mcp::http::tasks::scheduler::execute_one_task_with_policy;
 use memory_mcp::http::tasks::state::{TASK_KIND_REEMBED, TaskState};
 use memory_mcp::http::tasks::worker::DurableTaskStore;
 use memory_mcp::storage::{BoundDbClient, DbClient, SurrealDbClient};
@@ -133,11 +131,36 @@ async fn harness() -> ReembedHarness {
     }
 }
 
-/// Run exactly one reembed tick against the harness's tenant.
+/// An extractor that is never called: a `reembed` row never reaches the
+/// extract arm. Supplying one is what lets this file drive the real dispatch
+/// rather than a helper that claims on its own.
+fn unused_extractor() -> memory_mcp::http::tasks::scheduler::ExtractorFn {
+    Arc::new(|_params| Box::pin(async { Ok(serde_json::json!({"unused": true})) }))
+}
+
+/// An injector that never fires, so the happy path runs to completion.
+fn no_faults() -> Arc<dyn memory_mcp::platform::fault_injection::FaultInjector> {
+    Arc::new(memory_mcp::platform::fault_injection::NoFaults)
+}
+
+/// Run exactly one tick against the harness's tenant, through the production
+/// dispatch: claim → `kind` match → the real reembed executor → a fenced commit.
+///
+/// Every test in this file goes through here, so a regression in the dispatch
+/// — a `kind` that routes to the wrong arm, or a deployment policy that stops
+/// being threaded into the `match` — fails them all rather than only a test
+/// that happened to call the executor directly.
 async fn one_tick(h: &ReembedHarness, policy: &EmbeddingPolicy) {
-    execute_reembed_task_for_test(&h.store, h.db.clone(), &h.namespace, policy)
-        .await
-        .expect("one reembed tick");
+    execute_one_task_with_policy(
+        &h.store,
+        h.db.clone(),
+        &h.namespace,
+        &no_faults(),
+        unused_extractor(),
+        Some(policy),
+    )
+    .await
+    .expect("one reembed tick");
 }
 
 /// A fact carrying no vector at all: the state an outage, or a deployment that
@@ -468,21 +491,21 @@ async fn a_second_pass_over_an_already_current_namespace_does_nothing() {
     );
 }
 
-/// The composition neither neighbour covers: a claimed row travelling claim →
-/// `kind` dispatch → the real executor → a fenced completion, *while carrying
-/// the deployment's policy*.
+/// The composition named explicitly: a claimed row travelling claim → `kind`
+/// dispatch → the real executor → a fenced completion, *while carrying the
+/// deployment's policy*.
 ///
-/// The two halves are tested separately and each passes on its own terms:
-/// `task_scheduler` dispatches with no policy and asserts the row fails loudly,
-/// and every other test here calls the executor directly, bypassing dispatch
-/// altogether. A change that stopped threading the policy through the `match`
-/// arm would keep both green — the row would fail with "no deployment embedding
-/// policy is configured" while every test here still passed, because none of
-/// them reaches the dispatch.
+/// `one_tick` reaches the same seam today, so the three tests above fail if
+/// policy threading breaks. This one calls [`execute_one_task_with_policy`]
+/// directly anyway, and says what it is for, because the seam is the load-
+/// bearing part: if `one_tick` were later simplified to call the executor
+/// directly — a small, tempting change — every other test in this file would
+/// silently stop exercising dispatch while staying green.
 ///
-/// This is the seam the operator route actually depends on: `POST /reembed`
-/// enqueues a row, and a later tick must claim it and find the policy the
-/// composition root captured at startup.
+/// The alternative this replaced was worse: dispatch existed as a second copy
+/// of itself for tests, so no test reached the `match` the scheduler runs. A
+/// change that stopped threading the policy into it would have passed
+/// everything here and broken the operator's reembed route in production.
 #[tokio::test]
 async fn a_claimed_reembed_row_completes_through_the_full_dispatch_with_a_policy() {
     let h = harness().await;

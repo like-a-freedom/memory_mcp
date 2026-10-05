@@ -604,53 +604,6 @@ fn reembed_result(
     })
 }
 
-/// Test-only seam over the reembed executor: claim a real due `reembed` row and
-/// delegate to [`execute_reembed_task`] with the deployment policy.
-///
-/// A sibling rather than a widened [`execute_one_task_for_test`], because the
-/// policy is an input only the reembed executor reads, and the stub extractor
-/// is an input only the extract executor reads. Two task kinds, two shapes of
-/// seam — neither shared function grows an argument its other caller ignores.
-///
-/// Claims nothing and commits nothing of its own: the claim, the heartbeat and
-/// the terminal write all happen inside the production executor, so a test
-/// observes exactly what the scheduler would observe.
-#[cfg(any(test, feature = "test-fixtures"))]
-pub async fn execute_reembed_task_for_test(
-    task_store: &DurableTaskStore,
-    db: Arc<SurrealDbClient>,
-    namespace: &str,
-    policy: &crate::http::runtime::storage::EmbeddingPolicy,
-) -> Result<(), MemoryError> {
-    let replica_id = crate::http::leases::scheduler::replica_id();
-    let Some(handle) = task_store.claim_next_due(&replica_id).await? else {
-        return Ok(());
-    };
-    let record = task_store.load(&handle.task_id).await?.ok_or_else(|| {
-        MemoryError::NotFound(format!("task {} disappeared after claim", handle.task_id))
-    })?;
-    if record.cancellation_intent {
-        return task_store.cancel_before_commit_fenced(&handle).await;
-    }
-    if record.kind.as_str() != TASK_KIND_REEMBED {
-        // The caller asked for a reembed tick. Anything else is a test bug, and
-        // running it anyway would mean the row is rewritten by an executor the
-        // test did not mean to exercise.
-        return task_store
-            .fail_fenced(
-                &handle,
-                serde_json::json!({
-                    "message": format!(
-                        "execute_reembed_task_for_test claimed a `{}` task, not a reembed",
-                        record.kind
-                    ),
-                }),
-            )
-            .await;
-    }
-    execute_reembed_task(task_store, db, namespace, &handle, &record, policy).await
-}
-
 /// Heartbeat the task lease while a long pass runs, then return the pass's own
 /// result.
 ///
