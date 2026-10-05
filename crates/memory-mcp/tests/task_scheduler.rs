@@ -21,9 +21,9 @@ use memory_mcp::error::MemoryError;
 use memory_mcp::http::registry::RegistryHandle;
 use memory_mcp::http::tasks::DurableTaskTestDriver;
 use memory_mcp::http::tasks::scheduler::{execute_one_task_for_test, scheduler_job_with_options};
-use memory_mcp::http::tasks::state::{TaskState, TaskStore};
+use memory_mcp::http::tasks::state::{TASK_KIND_EXTRACT, TASK_KIND_REEMBED, TaskState, TaskStore};
 use memory_mcp::http::tasks::worker::DurableTaskStore;
-use memory_mcp::storage::{BoundDbClient, SurrealDbClient};
+use memory_mcp::storage::{BoundDbClient, DbClient, SurrealDbClient};
 
 struct SchedulerHarness {
     store: DurableTaskStore,
@@ -109,7 +109,7 @@ async fn a_due_task_completes_after_a_successful_extraction() {
     let h = harness().await;
     let task_id = h
         .store
-        .enqueue("fp-1", episode_params("episode:abc"))
+        .enqueue(TASK_KIND_EXTRACT, "fp-1", episode_params("episode:abc"))
         .await
         .expect("enqueue");
 
@@ -132,7 +132,7 @@ async fn a_failing_extraction_marks_the_task_failed() {
     let h = harness().await;
     let task_id = h
         .store
-        .enqueue("fp-2", episode_params("episode:abc"))
+        .enqueue(TASK_KIND_EXTRACT, "fp-2", episode_params("episode:abc"))
         .await
         .expect("enqueue");
 
@@ -155,7 +155,7 @@ async fn a_committed_task_records_its_artifact() {
     let h = harness().await;
     let task_id = h
         .store
-        .enqueue("fp-3", episode_params("episode:abc"))
+        .enqueue(TASK_KIND_EXTRACT, "fp-3", episode_params("episode:abc"))
         .await
         .expect("enqueue");
 
@@ -181,7 +181,7 @@ async fn a_task_cancelled_before_the_claim_is_not_extracted() {
     let h = harness().await;
     let task_id = h
         .store
-        .enqueue("fp-4", episode_params("episode:abc"))
+        .enqueue(TASK_KIND_EXTRACT, "fp-4", episode_params("episode:abc"))
         .await
         .expect("enqueue");
     h.store
@@ -208,7 +208,7 @@ async fn a_task_cancelled_before_the_claim_records_no_artifact() {
     let h = harness().await;
     let task_id = h
         .store
-        .enqueue("fp-5", episode_params("episode:abc"))
+        .enqueue(TASK_KIND_EXTRACT, "fp-5", episode_params("episode:abc"))
         .await
         .expect("enqueue");
     h.store
@@ -234,7 +234,11 @@ async fn a_task_cancelled_before_the_claim_records_no_artifact() {
 async fn an_unparseable_parameter_set_fails_the_tick() {
     let h = harness().await;
     h.store
-        .enqueue("fp-6", serde_json::json!({"unexpected": true}))
+        .enqueue(
+            TASK_KIND_EXTRACT,
+            "fp-6",
+            serde_json::json!({"unexpected": true}),
+        )
         .await
         .expect("enqueue");
 
@@ -258,7 +262,7 @@ async fn a_second_tick_does_not_reprocess_a_completed_task() {
     let h = harness().await;
     let task_id = h
         .store
-        .enqueue("fp-7", episode_params("episode:abc"))
+        .enqueue(TASK_KIND_EXTRACT, "fp-7", episode_params("episode:abc"))
         .await
         .expect("enqueue");
     execute_one_task_for_test(
@@ -321,7 +325,7 @@ async fn deleting_expired_tasks_keeps_a_fresh_task() {
     let h = harness().await;
     let task_id = h
         .store
-        .enqueue("fp-8", episode_params("episode:abc"))
+        .enqueue(TASK_KIND_EXTRACT, "fp-8", episode_params("episode:abc"))
         .await
         .expect("enqueue");
 
@@ -330,5 +334,83 @@ async fn deleting_expired_tasks_keeps_a_fresh_task() {
     assert!(
         h.store.load(&task_id).await.expect("load").is_some(),
         "retention must not delete a task inside its window"
+    );
+}
+
+/// A task row written before the `kind` column existed carries no `kind`. It
+/// must still read back as `extract`, or every in-flight extraction breaks on
+/// deploy: the legacy row is what an extraction queued before the migration is.
+#[tokio::test]
+async fn a_task_row_written_without_a_kind_reads_back_as_extract() {
+    let h = harness().await;
+    let task_id = "legacy-task-without-kind";
+    let now = chrono::Utc::now().to_rfc3339();
+    let seeded = DbClient::query(
+        &*h.client,
+        "CREATE type::record('tenant_task', $id) SET tenant_id = $tenant_id, fingerprint = 'fp-legacy', state = 'queued', version = 1, cancellation_intent = false, params = { episode_id: 'episode:legacy' }, created_at = type::datetime($now), updated_at = type::datetime($now), retention_expiry = type::datetime($now)",
+        Some(serde_json::json!({
+            "id": task_id,
+            "tenant_id": "ten_sched",
+            "now": now,
+        })),
+        &h.namespace,
+    )
+    .await
+    .expect("seed a pre-migration tenant_task row");
+    let seeded_rows: Vec<serde_json::Value> = serde_json::from_value(seeded).expect("seed rows");
+    assert_eq!(seeded_rows.len(), 1, "the legacy row must exist");
+    assert!(
+        seeded_rows[0].get("kind").is_none(),
+        "a row written before 045 has no kind field at all"
+    );
+
+    let record = h
+        .store
+        .load(task_id)
+        .await
+        .expect("load legacy row")
+        .expect("legacy row present");
+
+    assert_eq!(record.kind, TASK_KIND_EXTRACT);
+}
+
+/// The discriminator is persisted, not inferred: a reembed row reads back as
+/// `reembed` so Task 4's dispatch can branch on it.
+#[tokio::test]
+async fn an_enqueued_kind_round_trips_through_the_store() {
+    let h = harness().await;
+
+    let extract_id = h
+        .store
+        .enqueue(
+            TASK_KIND_EXTRACT,
+            "fp-kind-extract",
+            episode_params("episode:a"),
+        )
+        .await
+        .expect("enqueue extract");
+    let reembed_id = h
+        .store
+        .enqueue(TASK_KIND_REEMBED, "fp-kind-reembed", serde_json::json!({}))
+        .await
+        .expect("enqueue reembed");
+
+    assert_eq!(
+        h.store
+            .load(&extract_id)
+            .await
+            .expect("load")
+            .expect("present")
+            .kind,
+        TASK_KIND_EXTRACT
+    );
+    assert_eq!(
+        h.store
+            .load(&reembed_id)
+            .await
+            .expect("load")
+            .expect("present")
+            .kind,
+        TASK_KIND_REEMBED
     );
 }

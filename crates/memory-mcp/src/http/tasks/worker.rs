@@ -26,7 +26,9 @@ use serde_json::{Value, json};
 use crate::error::MemoryError;
 use crate::storage::client::BoundDbClient;
 
-use super::state::{TaskHandle, TaskState, TaskStore, TenantTaskRecord, is_terminal};
+use super::state::{
+    TASK_KIND_EXTRACT, TaskHandle, TaskState, TaskStore, TenantTaskRecord, is_terminal,
+};
 
 /// Retention window for a finished task.
 pub const RETENTION_SECS: i64 = 7 * 24 * 60 * 60;
@@ -157,7 +159,12 @@ fn record_id_str(v: &Value) -> Option<String> {
 
 #[async_trait::async_trait]
 impl TaskStore for DurableTaskStore {
-    async fn enqueue(&self, fingerprint: &str, params: Value) -> Result<String, MemoryError> {
+    async fn enqueue(
+        &self,
+        kind: &str,
+        fingerprint: &str,
+        params: Value,
+    ) -> Result<String, MemoryError> {
         let now = Utc::now();
         let retention = now + chrono::Duration::seconds(self.retention_secs);
         let id = uuid::Uuid::new_v4().to_string();
@@ -175,11 +182,12 @@ impl TaskStore for DurableTaskStore {
                  LET $active = (SELECT VALUE count() FROM tenant_task \
                     WHERE tenant_id = $tenant_id AND state IN ['queued', 'running', 'cancel_requested'])[0]; \
                  IF $active >= $queue_capacity { THROW 'task queue capacity reached'; }; \
-                 CREATE type::record('tenant_task', $id) SET tenant_id = $tenant_id, fingerprint = $fingerprint, state = 'queued', version = 1, cancellation_intent = false, params = $params, created_at = type::datetime($now), updated_at = type::datetime($now), retention_expiry = type::datetime($retention); \
+                 CREATE type::record('tenant_task', $id) SET tenant_id = $tenant_id, kind = $kind, fingerprint = $fingerprint, state = 'queued', version = 1, cancellation_intent = false, params = $params, created_at = type::datetime($now), updated_at = type::datetime($now), retention_expiry = type::datetime($retention); \
                  COMMIT TRANSACTION;",
                 Some(json!({
                     "id": id,
                     "tenant_id": self.tenant_id.as_str(),
+                    "kind": kind,
                     "fingerprint": fingerprint,
                     "params": params,
                     "now": Self::to_datetime(now),
@@ -203,6 +211,10 @@ impl TaskStore for DurableTaskStore {
     }
 
     async fn load(&self, task_id: &str) -> Result<Option<TenantTaskRecord>, MemoryError> {
+        // `SELECT *` is kept deliberately: a schemafull row only returns the
+        // fields the table defines, so an explicit column list would make this
+        // read fail (and drop the datetime wrapper the projection parses) on a
+        // namespace that has not yet applied the 045 column.
         let result = self
             .db
             .query(
@@ -601,6 +613,14 @@ fn project(row: &Value) -> Result<TenantTaskRecord, MemoryError> {
         }
     };
     let version = get("version")?.as_u64().unwrap_or(0);
+    // A row written before migration 045 has no `kind` field at all. Reading
+    // it as `extract` is what keeps in-flight extractions executing across the
+    // deploy that introduced the discriminator. The default lives here, in the
+    // projection, rather than in SQL so the query stays a plain read.
+    let kind = get_opt("kind")
+        .as_str()
+        .unwrap_or(TASK_KIND_EXTRACT)
+        .to_string();
     let params = get_opt("params");
     let cancellation_intent = get("cancellation_intent")?.as_bool().unwrap_or(false);
     let parse_dt = |v: &Value| -> Result<DateTime<Utc>, MemoryError> {
@@ -623,6 +643,7 @@ fn project(row: &Value) -> Result<TenantTaskRecord, MemoryError> {
     Ok(TenantTaskRecord {
         id,
         tenant_id,
+        kind,
         fingerprint,
         state,
         version,
@@ -668,6 +689,7 @@ mod tests {
                 "DEFINE TABLE tenant_task SCHEMAFULL; \
                  DEFINE FIELD id ON tenant_task TYPE string; \
                  DEFINE FIELD tenant_id ON tenant_task TYPE string; \
+                 DEFINE FIELD kind ON tenant_task TYPE option<string>; \
                  DEFINE FIELD fingerprint ON tenant_task TYPE string; \
                  DEFINE FIELD state ON tenant_task TYPE string; \
                  DEFINE FIELD version ON tenant_task TYPE int; \
@@ -695,7 +717,7 @@ mod tests {
     async fn enqueue_dedupes_by_fingerprint() {
         let store = fresh_store().await;
         let id1 = store
-            .enqueue("fp_1", json!({"source": "a"}))
+            .enqueue(TASK_KIND_EXTRACT, "fp_1", json!({"source": "a"}))
             .await
             .expect("first enqueue");
         // Inspect the raw row so the dedupe failure is
@@ -716,7 +738,7 @@ mod tests {
         );
         assert!(!raw_rows.is_empty(), "exactly one task row");
         let id2 = store
-            .enqueue("fp_1", json!({"source": "a"}))
+            .enqueue(TASK_KIND_EXTRACT, "fp_1", json!({"source": "a"}))
             .await
             .expect("duplicate enqueue");
         assert_eq!(id1, id2, "same fingerprint must return the same task id");
@@ -729,10 +751,12 @@ mod tests {
         let capped =
             DurableTaskStore::new_with_options(store.db.clone(), "test_tenant".into(), 3600, 1);
         capped
-            .enqueue("queue-first", json!({}))
+            .enqueue(TASK_KIND_EXTRACT, "queue-first", json!({}))
             .await
             .expect("first queued task");
-        let second = capped.enqueue("queue-second", json!({})).await;
+        let second = capped
+            .enqueue(TASK_KIND_EXTRACT, "queue-second", json!({}))
+            .await;
         assert!(
             matches!(second, Err(MemoryError::Conflict(message)) if message.contains("queue capacity"))
         );
@@ -742,11 +766,11 @@ mod tests {
     async fn claim_updates_only_one_due_task_per_call() {
         let store = fresh_store().await;
         let first_id = store
-            .enqueue("fp_many_1", json!({}))
+            .enqueue(TASK_KIND_EXTRACT, "fp_many_1", json!({}))
             .await
             .expect("enqueue");
         let second_id = store
-            .enqueue("fp_many_2", json!({}))
+            .enqueue(TASK_KIND_EXTRACT, "fp_many_2", json!({}))
             .await
             .expect("enqueue");
 
@@ -779,7 +803,7 @@ mod tests {
     async fn requeue_preserves_fence_monotonicity() {
         let store = fresh_store().await;
         let id = store
-            .enqueue("fp_requeue", json!({}))
+            .enqueue(TASK_KIND_EXTRACT, "fp_requeue", json!({}))
             .await
             .expect("enqueue");
         let first = store
@@ -820,7 +844,10 @@ mod tests {
     #[tokio::test]
     async fn stale_fenced_worker_cannot_transition_terminal_state() {
         let store = fresh_store().await;
-        let id = store.enqueue("fp_2", json!({})).await.expect("enqueue");
+        let id = store
+            .enqueue(TASK_KIND_EXTRACT, "fp_2", json!({}))
+            .await
+            .expect("enqueue");
         let handle = store
             .claim_next_due("replica_a")
             .await
@@ -861,7 +888,10 @@ mod tests {
     #[tokio::test]
     async fn cancel_during_running_does_not_rollback_committed_facts() {
         let store = fresh_store().await;
-        let id = store.enqueue("fp_3", json!({})).await.expect("enqueue");
+        let id = store
+            .enqueue(TASK_KIND_EXTRACT, "fp_3", json!({}))
+            .await
+            .expect("enqueue");
         let handle = store
             .claim_next_due("replica_a")
             .await
@@ -886,7 +916,10 @@ mod tests {
     #[tokio::test]
     async fn reconciler_recovers_terminal_outcome_from_artifacts() {
         let store = fresh_store().await;
-        let id = store.enqueue("fp_4", json!({})).await.expect("enqueue");
+        let id = store
+            .enqueue(TASK_KIND_EXTRACT, "fp_4", json!({}))
+            .await
+            .expect("enqueue");
         let handle = store
             .claim_next_due("replica_a")
             .await
@@ -910,7 +943,7 @@ mod tests {
     async fn cancel_before_commit_fenced_marks_running_task_as_cancelled_before_commit() {
         let store = fresh_store().await;
         let id = store
-            .enqueue("fp_cancel_before_commit", json!({}))
+            .enqueue(TASK_KIND_EXTRACT, "fp_cancel_before_commit", json!({}))
             .await
             .expect("enqueue");
         let handle = store
@@ -947,7 +980,7 @@ mod tests {
     async fn cancel_before_commit_fenced_rejects_stale_lease() {
         let store = fresh_store().await;
         store
-            .enqueue("fp_cancel_stale", json!({}))
+            .enqueue(TASK_KIND_EXTRACT, "fp_cancel_stale", json!({}))
             .await
             .expect("enqueue");
         let handle = store
@@ -988,7 +1021,7 @@ mod tests {
     async fn cancelling_terminal_task_is_idempotent_and_immutable() {
         let store = fresh_store().await;
         let id = store
-            .enqueue("fp_terminal_cancel", json!({}))
+            .enqueue(TASK_KIND_EXTRACT, "fp_terminal_cancel", json!({}))
             .await
             .expect("enqueue");
         let handle = store
@@ -1014,7 +1047,10 @@ mod tests {
     #[tokio::test]
     async fn expired_tasks_are_deleted_after_retention_window() {
         let store = fresh_store().await;
-        let id = store.enqueue("fp_5", json!({})).await.expect("enqueue");
+        let id = store
+            .enqueue(TASK_KIND_EXTRACT, "fp_5", json!({}))
+            .await
+            .expect("enqueue");
         let handle = store
             .claim_next_due("replica_a")
             .await

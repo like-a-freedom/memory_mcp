@@ -22,7 +22,7 @@ use std::sync::Arc;
 
 use memory_mcp::http::registry::RegistryHandle;
 use memory_mcp::http::tasks::DurableTaskTestDriver;
-use memory_mcp::http::tasks::state::TaskState;
+use memory_mcp::http::tasks::state::{TASK_KIND_EXTRACT, TaskState};
 use memory_mcp::storage::BoundDbClient;
 
 /// One tenant namespace bound to a fresh engine, plus two
@@ -132,12 +132,12 @@ async fn enqueue_dedupes_by_fingerprint() {
     let fp = "fingerprint_dedup";
     let first = h
         .driver_a
-        .enqueue(fp, serde_json::json!({"a": 1}))
+        .enqueue(TASK_KIND_EXTRACT, fp, serde_json::json!({"a": 1}))
         .await
         .unwrap();
     let second = h
         .driver_a
-        .enqueue(fp, serde_json::json!({"a": 2}))
+        .enqueue(TASK_KIND_EXTRACT, fp, serde_json::json!({"a": 2}))
         .await
         .unwrap();
     assert_eq!(
@@ -161,11 +161,11 @@ async fn enqueue_rejects_when_queue_is_at_capacity() {
     let (store, _registry) =
         single_driver_with_options("tenant_cap", "ns_cap", 7 * 24 * 60 * 60, 1).await;
     let first = store
-        .enqueue("fp_capacity_1", serde_json::json!({}))
+        .enqueue(TASK_KIND_EXTRACT, "fp_capacity_1", serde_json::json!({}))
         .await
         .expect("first enqueue");
     let err = store
-        .enqueue("fp_capacity_2", serde_json::json!({}))
+        .enqueue(TASK_KIND_EXTRACT, "fp_capacity_2", serde_json::json!({}))
         .await
         .expect_err("second enqueue at capacity must fail");
     assert!(
@@ -180,7 +180,11 @@ async fn claim_completes_through_full_lifecycle() {
     let h = two_handles("tenant_lc", "ns_lc").await;
     let task_id = h
         .driver_a
-        .enqueue("fp_lifecycle", serde_json::json!({"x": 1}))
+        .enqueue(
+            TASK_KIND_EXTRACT,
+            "fp_lifecycle",
+            serde_json::json!({"x": 1}),
+        )
         .await
         .unwrap();
     let handle = h
@@ -216,7 +220,7 @@ async fn stale_worker_cannot_overwrite_running_state() {
     let h = two_handles("tenant_stale", "ns_stale").await;
     let task_id = h
         .driver_a
-        .enqueue("fp_stale", serde_json::json!({}))
+        .enqueue(TASK_KIND_EXTRACT, "fp_stale", serde_json::json!({}))
         .await
         .unwrap();
     let handle_a = h
@@ -254,7 +258,7 @@ async fn cancel_before_commit_keeps_state_machine_consistent() {
     let h = two_handles("tenant_cancel", "ns_cancel").await;
     let task_id = h
         .driver_a
-        .enqueue("fp_cancel", serde_json::json!({}))
+        .enqueue(TASK_KIND_EXTRACT, "fp_cancel", serde_json::json!({}))
         .await
         .unwrap();
     // Cancel intent on a Queued task transitions the row to
@@ -277,7 +281,7 @@ async fn completed_before_cancel_wins_over_late_intent() {
     let h = two_handles("tenant_cbc", "ns_cbc").await;
     let task_id = h
         .driver_a
-        .enqueue("fp_cbc", serde_json::json!({}))
+        .enqueue(TASK_KIND_EXTRACT, "fp_cbc", serde_json::json!({}))
         .await
         .unwrap();
     let handle = h
@@ -306,7 +310,7 @@ async fn cross_tenant_driver_cannot_see_other_tenants_row() {
     // filtered by tenant_id in SQL.
     let (driver_a, driver_b) = two_drivers_one_engine("ns_x", "tenant_a", "tenant_b").await;
     let task_id = driver_a
-        .enqueue("fp_x", serde_json::json!({}))
+        .enqueue(TASK_KIND_EXTRACT, "fp_x", serde_json::json!({}))
         .await
         .unwrap();
     let visible = driver_b.load(&task_id).await.unwrap();
@@ -329,11 +333,11 @@ async fn retention_cleanup_deletes_only_expired_rows() {
     let (long_store, _) =
         single_driver_with_options("tenant_ret", "ns_ret", 7 * 24 * 60 * 60, 256).await;
     let short_id = short_store
-        .enqueue("fp_short", serde_json::json!({}))
+        .enqueue(TASK_KIND_EXTRACT, "fp_short", serde_json::json!({}))
         .await
         .unwrap();
     let long_id = long_store
-        .enqueue("fp_long", serde_json::json!({}))
+        .enqueue(TASK_KIND_EXTRACT, "fp_long", serde_json::json!({}))
         .await
         .unwrap();
     // `delete_expired` only sweeps terminal states, so move

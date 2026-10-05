@@ -14,6 +14,17 @@ use serde::{Deserialize, Serialize};
 
 use crate::error::MemoryError;
 
+/// The durable kind of an extraction task. Every row written
+/// before migration 045 has no `kind` at all, so this is also
+/// the default a reader must supply for an absent field.
+pub const TASK_KIND_EXTRACT: &str = "extract";
+
+/// The durable kind of a whole-namespace re-embedding task.
+/// Introduced here so the discriminator has one spelling; the
+/// dispatch that acts on it lands in a later change.
+#[allow(dead_code)]
+pub const TASK_KIND_REEMBED: &str = "reembed";
+
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 pub enum TaskState {
@@ -45,6 +56,11 @@ pub fn is_terminal(s: TaskState) -> bool {
 pub struct TenantTaskRecord {
     pub id: String,
     pub tenant_id: String,
+    /// Discriminator introduced by migration 045. A row stored
+    /// before that migration has no `kind`; the load path reads
+    /// an absent value as [`TASK_KIND_EXTRACT`] so an in-flight
+    /// extraction survives the deploy that added the column.
+    pub kind: String,
     pub fingerprint: String,
     pub state: TaskState,
     pub version: u64,
@@ -82,12 +98,13 @@ pub struct TaskHandle {
 /// `tenant_task` table.
 #[async_trait::async_trait]
 pub trait TaskStore: Send + Sync + 'static {
-    /// Enqueue a new task; returns the task id. A
-    /// duplicate fingerprint returns the existing task id
-    /// (the same Tenant-local unique dedupe invariant the
-    /// episode path enforces).
+    /// Enqueue a new task of the given durable kind; returns
+    /// the task id. A duplicate fingerprint returns the
+    /// existing task id (the same Tenant-local unique dedupe
+    /// invariant the episode path enforces).
     async fn enqueue(
         &self,
+        kind: &str,
         fingerprint: &str,
         params: serde_json::Value,
     ) -> Result<String, MemoryError>;

@@ -58,10 +58,11 @@ impl DurableTaskTestDriver {
 
     pub async fn enqueue(
         &self,
+        kind: &str,
         fingerprint: &str,
         params: serde_json::Value,
     ) -> Result<String, crate::error::MemoryError> {
-        self.as_store().enqueue(fingerprint, params).await
+        self.as_store().enqueue(kind, fingerprint, params).await
     }
 
     pub async fn load(
@@ -147,21 +148,23 @@ impl DurableTaskTestDriver {
     ) -> Result<(), crate::error::MemoryError> {
         crate::storage::client::DbClient::apply_migrations(&*self.store.db.db, namespace).await?;
         // The `tenant_task` table lives in the HTTP tenant
-        // migrations (040–044), not the storage migrations
+        // migrations (040–045), not the storage migrations
         // (which `DbClient::apply_migrations` runs). Apply the
-        // HTTP tenant migration script that creates it so the
-        // driver can enqueue without the table-missing error.
-        const TENANT_TASK_DDL: &str = include_str!("../../migrations/041_tenant_tasks.surql");
-        crate::storage::client::DbClient::query(
-            &*self.store.db.db,
-            TENANT_TASK_DDL,
-            None,
-            namespace,
-        )
-        .await
-        .map_err(|err| {
-            crate::error::MemoryError::Storage(format!("apply_http_migrations_for_test: {err}"))
-        })?;
+        // HTTP tenant migration scripts that create it and add the
+        // `kind` discriminator so the driver can enqueue without the
+        // table-missing error.
+        for ddl in [
+            include_str!("../../migrations/041_tenant_tasks.surql"),
+            include_str!("../../migrations/045_tenant_task_kind.surql"),
+        ] {
+            crate::storage::client::DbClient::query(&*self.store.db.db, ddl, None, namespace)
+                .await
+                .map_err(|err| {
+                    crate::error::MemoryError::Storage(format!(
+                        "apply_http_migrations_for_test: {err}"
+                    ))
+                })?;
+        }
         Ok(())
     }
 

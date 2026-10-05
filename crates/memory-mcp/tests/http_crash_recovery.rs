@@ -43,7 +43,7 @@ use memory_mcp::http::registry::models::{
 };
 #[allow(unused_imports)]
 use memory_mcp::http::tasks::scheduler::{ExtractorFn, execute_one_task_for_test};
-use memory_mcp::http::tasks::state::TaskStore as _;
+use memory_mcp::http::tasks::state::{TASK_KIND_EXTRACT, TaskStore as _};
 use memory_mcp::http::tasks::worker::DurableTaskStore;
 use memory_mcp::platform::fault_injection::{FailOnceAt, FaultInjector, FaultPoint, NoFaults};
 use memory_mcp::storage::{BoundDbClient, SurrealDbClient};
@@ -753,6 +753,7 @@ async fn run_task_recovery(registry: RegistryHandle, name: &str, fault: FaultPoi
     // persisted; the rest fall through to their struct defaults.
     let task_id = task_store
         .enqueue(
+            TASK_KIND_EXTRACT,
             &format!("fp_{name}"),
             serde_json::to_value(ExtractParams {
                 episode_id: Some("episode:stub".into()),

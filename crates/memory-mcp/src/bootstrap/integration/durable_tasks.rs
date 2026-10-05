@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use crate::MemoryError;
-use crate::http::tasks::state::{TaskState, TaskStore};
+use crate::http::tasks::state::{TASK_KIND_EXTRACT, TaskState, TaskStore};
 use crate::provisioning::api::{DurableTaskPort, TaskView};
 
 pub(crate) struct DurableTaskAdapter {
@@ -21,7 +21,13 @@ impl DurableTaskPort for DurableTaskAdapter {
         fingerprint: String,
         params: serde_json::Value,
     ) -> Result<String, MemoryError> {
-        self.store.enqueue(&fingerprint, params).await
+        // Every durable task reachable through the MCP surface is an
+        // extraction; the operator-triggered reembed arrives on its own
+        // control-plane path (Task 4), so the `DurableTaskPort` signature
+        // stays unchanged and no MCP-visible behaviour moves.
+        self.store
+            .enqueue(TASK_KIND_EXTRACT, &fingerprint, params)
+            .await
     }
 
     async fn load(&self, task_id: &str) -> Result<Option<TaskView>, MemoryError> {

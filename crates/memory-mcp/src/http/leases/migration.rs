@@ -63,7 +63,7 @@ impl std::ops::Deref for TenantAndProvisioning {
 /// constant via the release process; the runner copies the
 /// value out at compile time so the test path can compare
 /// against it without an env var.
-pub const CURRENT_SCHEMA_VERSION: u32 = 44;
+pub const CURRENT_SCHEMA_VERSION: u32 = 45;
 
 /// Inclusive range of schema versions this replica can
 /// serve. The lower bound is `CURRENT_SCHEMA_VERSION - 1`
@@ -121,7 +121,7 @@ impl ApplyMigrations for NoopMigrations {
 /// binds a fresh cloned connection to the immutable tenant namespace/database
 /// for each provisioning pass. The existing stdio migration runner supplies
 /// the base memory schema (001/006-039); the HTTP-only catalog adds durable
-/// App Sessions, Tasks, outbox, and task artifacts (040-044).
+/// App Sessions, Tasks, outbox, and task artifacts (040-045).
 pub struct SurrealTenantMigrations {
     engine: crate::http::registry::PrivilegedEngine,
 }
@@ -213,6 +213,7 @@ impl ApplyMigrations for SurrealTenantMigrations {
             include_str!("../../../migrations/042_tenant_change_event.surql"),
             include_str!("../../../migrations/043_tenant_task_unique_fingerprint.surql"),
             include_str!("../../../migrations/044_task_artifacts.surql"),
+            include_str!("../../../migrations/045_tenant_task_kind.surql"),
         ];
         for sql in HTTP_MIGRATIONS {
             client.execute_migration_script(sql, namespace).await?;
