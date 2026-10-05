@@ -45,12 +45,20 @@ of the pair. Only `Supersession` and `Correction` demote.
   presence is known only after candidates are selected and ordered, so the rule
   cannot be evaluated earlier without a second classification axis on the hot
   path. It introduces no constant to tune and no new candidate axis.
-- `ClaimRelationSummary` already carries `counterpart_fact_id`, so pointing a
-  reader at the replacement needs no schema change. That field is currently
-  never populated (its only mention in the tree is its own declaration) and is
+- The reordering needs to name the successor's fact, and `ClaimRelationSummary`
+  carried no such field. Its `counterpart_fact_id` looked like one but was never
+  populated — its only mention in the tree was its own declaration — and was
   removed in a separate commit ahead of this work, because `claim_relation`
   already records direction in `predecessor_claim_id` / `successor_claim_id`.
   Removing a field that was never populated is not a behavior change.
+  **Amended 2026-10-05:** the original Consequences wording said "needs no
+  schema change" on the strength of that dead field. Removing it made the
+  justification evaporate rather than the decision, so the plan does change the
+  schema by one field: `ClaimRelationSummary.superseded_by_fact_id:
+  Option<String>`, populated only for `Supersession` / `Correction`. The
+  decision itself — post-assembly reordering, no constant, no new candidate
+  axis — is unaffected. `claim_relation` remains the source of truth and
+  nothing recomputes direction.
 - `explain` reads no claim or relation data today (`explanation.rs` touches only
   facts and entities). Whether `explain` gains the same projection is a
   deliberate open choice of this ADR, recorded in the accompanying spec, and is

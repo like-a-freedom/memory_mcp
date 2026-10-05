@@ -274,7 +274,6 @@ pub struct ClaimReconciliationMetadata {
 pub struct ClaimRelationSummary {
     pub relation_id: String,
     pub outcome: crate::models::claim::ClaimRelationOutcome,
-    pub counterpart_fact_id: String,
     pub counterpart_source_episode_id: String,
     pub reason_code: String,
     pub evaluator_version: String,
