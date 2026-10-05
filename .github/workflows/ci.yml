@@ -2,8 +2,15 @@ name: CI
 
 on:
   pull_request:
-  push:
-    branches: [master]
+  # Disabled for now: a push to master no longer starts CI, so a rapid
+  # sequence of commits costs one run instead of one per commit. Validation
+  # still happens on a release, where it matters — `release.yml` calls this
+  # workflow through `workflow_call` with `release: true` — and it can still
+  # be started by hand.
+  #
+  # To restore, re-add:
+  #   push:
+  #     branches: [master]
   workflow_dispatch:
   workflow_call:
     inputs:
