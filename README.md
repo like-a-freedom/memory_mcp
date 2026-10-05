@@ -785,7 +785,7 @@ MEMORY_MCP_HTTP_REPLICA_ID=node-a \
 |---|---|---|
 | `POST /mcp` | Bearer API key | MCP Streamable HTTP, dual-era: modern `2026-07-28` and legacy `2025-11-25` and earlier, selected per request on one route. Stateless — no `Mcp-Session-Id`, no configuration switch. Only `POST` is accepted; `GET`/`DELETE` return `405`. See [ADR-0071](docs/adr/0071-dual-era-mcp-http-profile.md). |
 | `/api/v1/account/*` | Browser session + CSRF | Self-service: API keys, linked identities, profile, account deletion |
-| `/api/v1/operator/*` | OIDC operator + CSRF + recent-auth | Operator-only: provisioning retry, suspend, purge, recovery |
+| `/api/v1/operator/*` | OIDC operator + CSRF + recent-auth | Operator-only: provisioning retry, suspend, resume, purge, reembed, recovery. `reembed` rewrites a whole tenant namespace's vectors — irreversible; see [ADR-0077](docs/adr/0077-http-embedding-maintenance.md) |
 | `/auth/oidc/*` | OIDC flow | Login, callback, logout |
 | `/api/v1/auth/local/*` | Local administrator password | Administrator login, activation, password reset |
 | `/api/v1/admin/*` | Local administrator session + CSRF | Client provisioning, key issuance and revocation, suspend and resume |
@@ -1106,9 +1106,15 @@ Variables that are retired, removed, or ignored are collected under
 These are read by the stdio/local profile (`memory_mcp serve`). The HTTP profile
 ignores them in favour of the `SURREALDB_CONTROL_*` and `SURREALDB_TENANT_*`
 pair; see [Streamable HTTP environment variables](#streamable-http-environment-variables).
-`RUST_LOG`, `QUERY_LOGGING_ENABLED`, `QUERY_LOG_RETENTION_DAYS`, and every
-`LIFECYCLE_*` variable are read through the same stdio config path even in an
-HTTP build, so they still apply there.
+
+Some of the variables below are also honoured by an HTTP build, but not all,
+and not by the same code path — check the row before assuming one applies:
+
+| Variable | In an HTTP build | How |
+| --- | --- | --- |
+| `RUST_LOG` | Yes | Read directly by the logging layer in every profile, not through the stdio config path. |
+| `LIFECYCLE_*` | Yes, config only | Read by `resolve_deployment_policy` and copied onto every tenant service, so `LIFECYCLE_ENABLED` and the decay/archival thresholds govern what that service would run. The **background workers are not spawned per tenant**: only the stdio profile calls `spawn_workers_from_config`. |
+| `QUERY_LOGGING_ENABLED`, `QUERY_LOG_RETENTION_DAYS` | **No** | Read only by `SurrealConfig::from_env`, which the HTTP binary never calls. Setting them in an HTTP deployment has no effect. |
 
 | Variable | Type | Default | Required | Description |
 | --- | --- | --- | --- | --- |
@@ -1163,7 +1169,7 @@ The following settings are optional for power users. They are read by the same e
 | `MEMORY_PROMETHEUS_LISTEN_ADDR` | socket address (`IP:port`) | unset | Prometheus listener for the **stdio/local** profile, active when the `prometheus` feature is compiled in and this variable is set. The HTTP profile **rejects it** — `memory_mcp_http` serves metrics on its own `/metrics` route, and two scrape surfaces for one recorder is a configuration error |
 | `QUERY_LOGGING_ENABLED` | boolean | `false` | Persist `assemble_context` analytics rows into `query_log` when `true` |
 | `QUERY_LOG_RETENTION_DAYS` | unsigned integer | `90` | Days to retain persisted `query_log` analytics before best-effort pruning |
-| `LIFECYCLE_ENABLED` | boolean | `false` | Enable background lifecycle jobs |
+| `LIFECYCLE_ENABLED` | boolean | `false` | Enable background lifecycle jobs. In the stdio/local profile the decay and archival workers are spawned from this config; in an HTTP build the same config is read and copied onto every tenant service, but **the background workers are not spawned per tenant** — only the stdio binary calls `spawn_workers_from_config` |
 | `LIFECYCLE_DECAY_INTERVAL_SECS` | unsigned integer | `3600` | Decay worker interval in seconds |
 | `LIFECYCLE_ARCHIVAL_INTERVAL_SECS` | unsigned integer | `86400` | Archival worker interval in seconds |
 | `LIFECYCLE_DECAY_THRESHOLD` | floating-point number | `0.3` | Confidence threshold for fact invalidation |
@@ -1336,11 +1342,24 @@ the full variable table — with these HTTP-specific consequences:
 | `EMBEDDINGS_AUTO_RECOVERY` | boolean | `true` | Whether a background scheduler job fills tenant facts that carry no vector. Only `1`, `true`, and `yes` enable it — **`auto` is not a truthy value**, so `EMBEDDINGS_AUTO_RECOVERY=auto` reads as *off* and gets no backfill |
 
 The backfill job walks the ready tenants once per scheduler cycle and fills
-`embedding IS NONE` in place. It never rewrites an existing vector and never
-re-declares the tenant's HNSW index; when it is disabled it logs
-`http.embedding.backfill_disabled` at `Debug` and does nothing, so a deployment
-that enabled embeddings but left recovery off does not silently scan every tenant
-on every tick.
+`embedding IS NONE` in place. It never rewrites an existing vector. Before it
+writes anything it checks the tenant's HNSW index against the deployment
+dimension, through the same function the activation path uses:
+
+- **Index matches, or the index stands at another width with no vectors under
+  it** — the index is re-declared at the deployment width if needed, then the
+  gaps are filled. This is the outage/enable-later case, and it has to repair
+  the index or the first vector written would be rejected by a stale one.
+- **Index at another width with vectors still in it** — the tenant is skipped
+  entirely, before any provider call. Those vectors belong to another provider
+  and only a reembed may rewrite them; attempting it would pay the provider for
+  a write the database then rejects, on every tick, forever. The skip logs
+  `http.embedding.backfill_declined` at `Info` and does not count as degraded,
+  because it is the job behaving correctly.
+
+When the job is disabled it logs `http.embedding.backfill_disabled` at `Debug`
+and does nothing, so a deployment that enabled embeddings but left recovery off
+does not silently scan every tenant on every tick.
 
 A tenant whose stored vectors were written by a **different** provider is a
 different situation, and backfill does not apply to it: those facts already hold

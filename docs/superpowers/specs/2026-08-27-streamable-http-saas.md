@@ -46,6 +46,14 @@ V1 does not provide:
 automation uses the protected control-plane API. A future admin CLI may be a thin
 HTTP client, never a direct production-DB client.
 
+This names the absence of *CLI verbs*, not the absence of the operations
+themselves. Embedding maintenance is reachable through the control-plane API the
+second sentence prescribes: backfill runs from the scheduler when
+`EMBEDDINGS_AUTO_RECOVERY` is enabled, and a whole-namespace vector rewrite is
+requested with `POST /api/v1/operator/tenants/{id}/reembed`. The distinction is
+deliberate and is recorded in
+[ADR-0077](../adr/0077-http-embedding-maintenance.md).
+
 ### 2.2 Cargo features
 
 Planned additive features:
@@ -625,6 +633,15 @@ operator credentials and receives only required content, never Account/Tenant
 identity unless technically necessary. Product privacy documentation discloses
 remote processing. Tenant-provided provider credentials and per-Tenant opt-out are
 not v1 features.
+
+Because provider policy is deployment-level, changing it changes every Tenant at
+once, so the repair paths differ by cost. Facts that merely lack a vector are
+filled in place by the scheduler under `EMBEDDINGS_AUTO_RECOVERY`; that path
+writes through `FillMissing` and never rewrites an existing vector or touches the
+index. Facts whose vectors were written by a different provider or dimension must
+be rewritten, which means replacing the HNSW index and cannot be undone — so that
+path runs only when an operator asks for it through the control plane. See
+[ADR-0077](../adr/0077-http-embedding-maintenance.md).
 
 The application does not require production egress allowlisting. Operators may
 add network policy as defense in depth. This residual risk is documented.
