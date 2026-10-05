@@ -16,20 +16,24 @@ use crate::http::tasks::state::{TASK_KIND_EXTRACT, TASK_KIND_REEMBED, TaskStore}
 use crate::http::tasks::worker::DurableTaskStore;
 use crate::storage::client::{BoundDbClient, SurrealDbClient};
 
-/// Test-only seam (ADR-0053, Task 6). The HTTP crash-recovery tests use
-/// this to drive the same `execute_one_task` body with a stub extractor
-/// instead of [`crate::tools::extract`], so the fault-point coverage
-/// does not depend on a local GLiNER checkpoint. Production callers must
-/// always use [`execute_one_task`] through the scheduler.
-#[cfg(any(test, feature = "test-fixtures"))]
+/// The future an [`ExtractorFn`] produces.
+///
+/// Defined unconditionally rather than behind `test-fixtures` because
+/// [`execute_extract_task`] takes an `Option<&ExtractorFn>`: injecting the
+/// extraction step is what lets the crash-recovery tests drive the *real*
+/// dispatch instead of a copy of it. A production call site passes `None` and
+/// the branch is not taken.
 pub type ExtractorFuture = std::pin::Pin<
     Box<dyn std::future::Future<Output = Result<serde_json::Value, MemoryError>> + Send>,
 >;
 
-/// Test-only extractor seam. The closure receives the durable task's
-/// stored `ExtractParams` and returns the JSON value the worker would
-/// otherwise receive from a real `extract` call. See [`execute_one_task_for_test`].
-#[cfg(any(test, feature = "test-fixtures"))]
+/// The durable task's extraction step, as a value the caller may supply.
+///
+/// `None` — every production call site — runs the real
+/// [`crate::tools::extract`] against a freshly built service. `Some` runs the
+/// supplied closure instead, which is how a test reaches
+/// `TaskArtifactCommitted` / `TaskCompleted` without a local GLiNER
+/// checkpoint. See [`execute_one_task_for_test`].
 pub type ExtractorFn =
     Arc<dyn Fn(crate::tools::params::ExtractParams) -> ExtractorFuture + Send + Sync>;
 
@@ -174,6 +178,9 @@ async fn retry_reconcile_and_retain_with_policy(
             &tenant.namespace_binding.namespace,
             &fault_injector,
             embedding.as_ref(),
+            // Production always extracts through the real tool; a stub is
+            // supplied only by the test seam, which passes it in directly.
+            None,
         )
         .await
         {
@@ -211,6 +218,7 @@ async fn execute_one_task(
     namespace: &str,
     fault_injector: &Arc<dyn FaultInjector>,
     embedding: Option<&crate::http::runtime::storage::EmbeddingPolicy>,
+    extractor: Option<&ExtractorFn>,
 ) -> Result<(), MemoryError> {
     let replica_id = crate::http::leases::scheduler::replica_id();
     let Some(handle) = task_store.claim_next_due(&replica_id).await? else {
@@ -227,7 +235,16 @@ async fn execute_one_task(
     }
     match record.kind.as_str() {
         TASK_KIND_EXTRACT => {
-            execute_extract_task(task_store, db, namespace, &handle, &record, fault_injector).await
+            execute_extract_task(
+                task_store,
+                db,
+                namespace,
+                &handle,
+                &record,
+                fault_injector,
+                extractor,
+            )
+            .await
         }
         TASK_KIND_REEMBED => {
             // A reembed needs the deployment's provider. A tick with no policy
@@ -276,20 +293,40 @@ async fn execute_extract_task(
     handle: &crate::http::tasks::state::TaskHandle,
     record: &crate::http::tasks::state::TenantTaskRecord,
     fault_injector: &Arc<dyn FaultInjector>,
+    extractor: Option<&ExtractorFn>,
 ) -> Result<(), MemoryError> {
     let params: crate::tools::params::ExtractParams = serde_json::from_value(record.params.clone())
         .map_err(|error| {
             MemoryError::Validation(format!("invalid durable extract parameters: {error}"))
         })?;
-    let service =
-        crate::service::MemoryService::new(db, namespace.to_owned(), "info".into(), 100, 100)?
+    // One extraction seam for both profiles. Production passes `None` and runs
+    // the real tool against a service built here; a test passes a closure and
+    // skips the service, which needs no local model checkpoint. Everything
+    // after this point — the artifact commit boundary, the fault points, the
+    // fenced terminal write — is shared, which is the whole reason the seam is
+    // an argument rather than a second copy of the function.
+    let extraction: Result<serde_json::Value, MemoryError> = match extractor {
+        Some(stub) => stub(params).await,
+        None => {
+            let service = crate::service::MemoryService::new(
+                db,
+                namespace.to_owned(),
+                "info".into(),
+                100,
+                100,
+            )?
             .with_http_outbox();
-    let extraction = crate::tools::extract(&service, params).await;
+            crate::tools::extract(&service, params)
+                .await
+                .and_then(|result| {
+                    serde_json::to_value(result).map_err(|error| {
+                        MemoryError::Storage(format!("serialize extract result: {error}"))
+                    })
+                })
+        }
+    };
     match extraction {
-        Ok(result) => {
-            let value = serde_json::to_value(result).map_err(|error| {
-                MemoryError::Storage(format!("serialize extract result: {error}"))
-            })?;
+        Ok(value) => {
             // The artifact is the durable commit boundary. Once it exists, a
             // cancellation request is reported as completed_before_cancel.
             task_store.record_artifact_fenced(handle, &value).await?;
@@ -737,16 +774,24 @@ where
     .await
 }
 
-/// Test-only mirror of [`execute_one_task`]. Drives the same durable
-/// state machine but replaces the real `extract` call with the
-/// provided [`ExtractorFn`], so the recovery tests can exercise the
-/// `TaskClaimed` / `TaskArtifactCommitted` / `TaskCompleted` fault
-/// points without a local GLiNER checkpoint.
+/// Test seam over [`execute_one_task`]: the same claim, the same `kind`
+/// dispatch, the same executors and the same fenced commits, with the
+/// extraction step supplied rather than built.
 ///
-/// The closure is invoked with the deserialized `ExtractParams` from
-/// the durable task row and must return the JSON value
-/// `record_artifact_fenced` would otherwise receive. The exact same
-/// hit points fire in the same order as the production path.
+/// A thin wrapper, deliberately. This file previously carried a *second copy*
+/// of the dispatch body here — claim, `kind` match, policy check, fail-closed
+/// arm — because the stub extractor could not be passed through
+/// `execute_one_task`. That copy meant every test drove an imitation of
+/// production dispatch, so a change that stopped threading the deployment
+/// policy into the real `match` would have kept every test green while
+/// breaking the operator's reembed route. Injection removes the need for a
+/// copy; the wrapper stays only because the stub must reach a `pub` symbol
+/// from outside the crate.
+///
+/// `embedding_policy` is `None` for the crash-recovery tests, which never
+/// enqueue a `reembed` row. Passing `None` here is not a shortcut: it is the
+/// same value a lexical-only deployment passes, so those tests exercise the
+/// loud failure production produces.
 #[cfg(any(test, feature = "test-fixtures"))]
 pub async fn execute_one_task_for_test(
     task_store: &DurableTaskStore,
@@ -758,13 +803,11 @@ pub async fn execute_one_task_for_test(
     execute_one_task_with_policy(task_store, db, namespace, &fault_injector, extractor, None).await
 }
 
-/// Test-only mirror of [`execute_one_task`] that also carries the deployment's
-/// embedding policy, so a `reembed` row dispatched through the seam reaches the
-/// real reembed executor with a provider it can force-enable.
+/// The same seam, carrying the deployment's embedding policy so a `reembed`
+/// row reaches the real executor with a provider it can force-enable.
 ///
-/// A sibling rather than a fifth parameter on [`execute_one_task_for_test`]:
-/// the provider is an argument only one of the two task kinds reads, and every
-/// existing caller of that seam would carry a parameter it ignores.
+/// Both `for_test` entry points delegate here and this one delegates to
+/// [`execute_one_task`], so there is exactly one dispatch in the crate.
 #[cfg(any(test, feature = "test-fixtures"))]
 pub async fn execute_one_task_with_policy(
     task_store: &DurableTaskStore,
@@ -774,103 +817,13 @@ pub async fn execute_one_task_with_policy(
     extractor: ExtractorFn,
     embedding_policy: Option<&crate::http::runtime::storage::EmbeddingPolicy>,
 ) -> Result<(), MemoryError> {
-    let replica_id = crate::http::leases::scheduler::replica_id();
-    let Some(handle) = task_store.claim_next_due(&replica_id).await? else {
-        return Ok(());
-    };
-    // Hit after the claim is durable. The next worker sees a
-    // `Running` row with an expired lease and reclaims it.
-    fault_injector.hit(FaultPoint::TaskClaimed)?;
-    let record = task_store.load(&handle.task_id).await?.ok_or_else(|| {
-        MemoryError::NotFound(format!("task {} disappeared after claim", handle.task_id))
-    })?;
-    if record.cancellation_intent {
-        return task_store.cancel_before_commit_fenced(&handle).await;
-    }
-    // Dispatch mirrors [`execute_one_task`] exactly, so a test cannot observe a
-    // kind routing the production scheduler would not have applied. Only the
-    // `extract` executor is stubbed; `reembed` goes to the real one, because a
-    // stubbed routing decision is precisely what this seam must not fake.
-    match record.kind.as_str() {
-        TASK_KIND_EXTRACT => {
-            execute_extract_task_for_test(task_store, &handle, &record, fault_injector, &extractor)
-                .await
-        }
-        TASK_KIND_REEMBED => {
-            // A reembed goes to the real executor, because a stubbed routing
-            // decision is precisely what this seam must not fake — and, since
-            // Task 6, that executor needs a provider to force-enable. It gets
-            // the same shape of failure production does: a row dispatched here
-            // without a policy fails loudly instead of running with a degraded
-            // provider.
-            let Some(policy) = embedding_policy else {
-                return task_store
-                    .fail_fenced(
-                        &handle,
-                        serde_json::json!({
-                            "message": "no deployment embedding policy is configured, so a reembed \
-                                        cannot force-enable a provider for this tenant",
-                    }),
-                    )
-                    .await;
-            };
-            execute_reembed_task(task_store, db, namespace, &handle, &record, policy).await
-        }
-        other => {
-            task_store
-                .fail_fenced(
-                    &handle,
-                    serde_json::json!({
-                        "message": format!("unknown task kind `{other}`"),
-                    }),
-                )
-                .await
-        }
-    }
-}
-
-/// The stubbed `extract` executor behind [`execute_one_task_for_test`]. Runs
-/// the same durable state machine with the same fault points as
-/// [`execute_extract_task`], substituting the supplied [`ExtractorFn`] for the
-/// real `extract` tool.
-#[cfg(any(test, feature = "test-fixtures"))]
-async fn execute_extract_task_for_test(
-    task_store: &DurableTaskStore,
-    handle: &crate::http::tasks::state::TaskHandle,
-    record: &crate::http::tasks::state::TenantTaskRecord,
-    fault_injector: &Arc<dyn FaultInjector>,
-    extractor: &ExtractorFn,
-) -> Result<(), MemoryError> {
-    let params: crate::tools::params::ExtractParams = serde_json::from_value(record.params.clone())
-        .map_err(|error| {
-            MemoryError::Validation(format!("invalid durable extract parameters: {error}"))
-        })?;
-    // The stub extractor is only used in test-fixtures builds; the
-    // real `extract` call is the production seam and lives in
-    // `execute_extract_task`.
-    let extraction = extractor(params).await;
-    match extraction {
-        Ok(value) => {
-            task_store.record_artifact_fenced(handle, &value).await?;
-            // Hit after the artifact row is committed. The next
-            // worker sees the artifact via `reconcile_artifacts`
-            // and projects the completed terminal state.
-            fault_injector.hit(FaultPoint::TaskArtifactCommitted)?;
-            let cancelled_after_commit = task_store
-                .load(&handle.task_id)
-                .await?
-                .is_some_and(|task| task.cancellation_intent);
-            task_store
-                .complete_fenced(handle, value, cancelled_after_commit)
-                .await?;
-            // Hit after the terminal state is committed.
-            fault_injector.hit(FaultPoint::TaskCompleted)?;
-            Ok(())
-        }
-        Err(error) => {
-            task_store
-                .fail_fenced(handle, serde_json::json!({"message": error.to_string()}))
-                .await
-        }
-    }
+    execute_one_task(
+        task_store,
+        db,
+        namespace,
+        fault_injector,
+        embedding_policy,
+        Some(&extractor),
+    )
+    .await
 }
