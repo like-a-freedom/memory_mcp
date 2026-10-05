@@ -123,6 +123,21 @@ pub trait TaskStore: Send + Sync + 'static {
     /// creates a second task for the same fingerprint.
     async fn claim_next_due(&self, replica_id: &str) -> Result<Option<TaskHandle>, MemoryError>;
 
+    /// Extend the held lease to `extend_to`, so a pass that outlives the claim
+    /// window keeps its fence.
+    ///
+    /// Fenced on `lease_owner` AND `lease_generation`, exactly like the
+    /// terminal transitions: a worker whose lease expired and was re-claimed
+    /// must not be able to extend the claim it just lost, or the two workers
+    /// would both consider themselves the owner and the task would be claimed
+    /// and re-run forever. `MemoryError::Conflict` when no row matches, which
+    /// the caller treats as "the fence is gone, stop the pass".
+    async fn renew_lease(
+        &self,
+        handle: &TaskHandle,
+        extend_to: DateTime<Utc>,
+    ) -> Result<(), MemoryError>;
+
     /// Mark the task completed with a CAS. When
     /// `completed_before_cancel` is true the task had
     /// already committed facts before the intent arrived;

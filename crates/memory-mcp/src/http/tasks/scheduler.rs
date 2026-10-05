@@ -259,13 +259,15 @@ async fn execute_extract_task(
     }
 }
 
-/// The reembed executor. **STUB — Task 6 replaces this body.**
+/// The reembed executor. **STUB — Task 6 replaces the pass inside it.**
 ///
 /// Dispatch exists (Task 4) so the operator route can enqueue a `reembed` task
 /// and the scheduler can route it here; the pass itself — building a
 /// force-enabled `MemoryService`, parsing `ReembedOptions`, running
-/// `reembed_all_facts`, heartbeating the lease (Task 5) and mapping
-/// `ReembedOutcome` onto the durable state machine — lands in Task 6.
+/// `reembed_all_facts` and mapping `ReembedOutcome` onto the durable state
+/// machine — lands in Task 6. What *is* here is the lease heartbeat (Task 5),
+/// because the lease is claimed here, and a pass that outlives it is re-claimed
+/// and re-run forever.
 ///
 /// It fails the task rather than completing it, and says so in the stored
 /// error. A silent success here would be the worst possible stub: the task
@@ -274,21 +276,174 @@ async fn execute_extract_task(
 /// truthful intermediate state an operator can see.
 async fn execute_reembed_task(
     task_store: &DurableTaskStore,
-    _db: Arc<SurrealDbClient>,
-    _namespace: &str,
+    db: Arc<SurrealDbClient>,
+    namespace: &str,
     handle: &crate::http::tasks::state::TaskHandle,
-    _record: &crate::http::tasks::state::TenantTaskRecord,
+    record: &crate::http::tasks::state::TenantTaskRecord,
 ) -> Result<(), MemoryError> {
-    // STUB (Task 6). See the doc comment above: fails loudly, never succeeds.
-    task_store
-        .fail_fenced(
-            handle,
-            serde_json::json!({
-                "message": "execute_reembed_task is not implemented: the reembed pass \
-                            lands in Task 6, so this task failed without rewriting any vector",
-            }),
-        )
-        .await
+    // One token for the pass and the heartbeat. A shutdown cancels both, and a
+    // lost fence cancels it too — from the pass's point of view those are the
+    // same signal: stop, someone else owns this task now.
+    let cancel = tokio_util::sync::CancellationToken::new();
+    let pass = run_task_heartbeated(
+        Arc::new(task_store.clone()),
+        handle.clone(),
+        crate::http::tasks::worker::TASK_LEASE_TTL_SECS,
+        cancel,
+        // STUB (Task 6). See the doc comment above: fails loudly, never succeeds.
+        async move {
+            let _ = (db, namespace, record);
+            Err(MemoryError::Validation(
+                "execute_reembed_task is not implemented: the reembed pass \
+                 lands in Task 6, so this task failed without rewriting any vector"
+                    .into(),
+            ))
+        },
+    )
+    .await;
+    // The terminal write is deliberately *outside* the heartbeat: the loop is
+    // stopped before the outcome is committed, so the last renewal cannot race
+    // the state transition it exists to protect. Task 6 replaces these two arms
+    // with the `ReembedOutcome` mapping; the shape is already the extract one.
+    match pass {
+        Ok(()) => {
+            task_store
+                .complete_fenced(
+                    handle,
+                    serde_json::json!({ "message": "reembed pass finished" }),
+                    false,
+                )
+                .await
+        }
+        Err(error) => {
+            task_store
+                .fail_fenced(handle, serde_json::json!({"message": error.to_string()}))
+                .await
+        }
+    }
+}
+
+/// Heartbeat the task lease while a long pass runs, then return the pass's own
+/// result.
+///
+/// A claim lasts [`TASK_LEASE_TTL_SECS`]. A reembed over a large namespace can
+/// outlive that, and once the lease lapses the row is claimable again: a second
+/// replica claims it, bumps the generation, and starts a second pass while the
+/// first is still rewriting vectors. Both passes then fail their fenced
+/// completion, and the task is re-run forever. Renewing on a `ttl / 3` cadence
+/// keeps the fence held for as long as the pass runs.
+///
+/// The loop's arithmetic is deliberately *not* shared with
+/// [`crate::http::leases::migration::run_heartbeated`], which cannot be reused
+/// here (it renews a provisioning lease in a different table through a
+/// different store). Duplicating ~10 lines of cadence arithmetic is the cheap
+/// half of that trade: the two leases are unrelated, and a shared helper for
+/// exactly two callers whose lease types share nothing is an abstraction with
+/// no reason behind it. When a *third* lease type needs the same cadence,
+/// extract it then — this is the one place in the plan where YAGNI and DRY
+/// genuinely disagreed, and YAGNI won.
+///
+/// Two boundaries, both deliberate:
+/// - `shutdown` stops the loop and, because the caller hands the same token to
+///   the pass, the pass too. One shutdown signal, no ordering to get wrong.
+/// - A `renew_lease` that returns `Conflict` means the fence is gone, so the
+///   shared token is cancelled: the pass is told to stop rather than running on
+///   against a task another worker now owns. The pass's own result stays
+///   authoritative — the wrapper does not invent an error on its behalf.
+async fn run_task_heartbeated<F, T>(
+    task_store: Arc<DurableTaskStore>,
+    handle: crate::http::tasks::state::TaskHandle,
+    ttl_secs: i64,
+    shutdown: tokio_util::sync::CancellationToken,
+    body: F,
+) -> Result<T, MemoryError>
+where
+    F: std::future::Future<Output = Result<T, MemoryError>> + Send,
+    T: Send + 'static,
+{
+    let base_interval =
+        std::time::Duration::from_secs(u64::try_from((ttl_secs / 3).max(1)).unwrap_or(u64::MAX));
+    // Apply ±20% jitter from the process clock without adding a random-number
+    // dependency to this path: two replicas that started together must not
+    // renew on the same instant forever.
+    let nanos = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|since_epoch| since_epoch.subsec_nanos() as u64)
+        .unwrap_or(0);
+    let span_ms = (base_interval.as_millis() / 5) as u64;
+    let jitter_ms = if span_ms == 0 {
+        0
+    } else {
+        nanos % (span_ms * 2)
+    };
+    let offset = jitter_ms.saturating_sub(span_ms);
+    let mut interval =
+        tokio::time::interval(base_interval + std::time::Duration::from_millis(offset));
+    // Skip, not Burst: a pass that blocked the runtime past several periods has
+    // no use for a burst of renewals for periods it already skipped.
+    interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
+    // Do not renew synchronously before the pass starts: the lease was just
+    // claimed, and the first regular tick is well inside the window.
+    interval.tick().await;
+
+    let heartbeat_cancel = tokio_util::sync::CancellationToken::new();
+    let heartbeat = tokio::spawn({
+        let heartbeat_cancel = heartbeat_cancel.clone();
+        let shutdown = shutdown.clone();
+        async move {
+            loop {
+                tokio::select! {
+                    _ = heartbeat_cancel.cancelled() => break,
+                    _ = shutdown.cancelled() => break,
+                    _ = interval.tick() => {
+                        let extend_to =
+                            chrono::Utc::now() + chrono::Duration::seconds(ttl_secs);
+                        if task_store.renew_lease(&handle, extend_to).await.is_err() {
+                            // The fence is gone. Stop the pass too: the caller
+                            // shares this token with it.
+                            shutdown.cancel();
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+    });
+
+    let result = body.await;
+    heartbeat_cancel.cancel();
+    let _ = heartbeat.await;
+    result
+}
+
+/// Test-only seam over [`run_task_heartbeated`]. Claims nothing and commits
+/// nothing: the caller owns the `TaskHandle` and writes the terminal outcome
+/// itself, which is what lets the test drive a pass that outlives its lease and
+/// then observe that the completion it writes still matches the row.
+///
+/// It exists under the same gate as [`execute_one_task_for_test`] because a
+/// test outside the crate cannot reach a private function, and the alternative
+/// — widening the production entry point's visibility for one test — is the
+/// worse trade.
+#[cfg(any(test, feature = "test-fixtures"))]
+pub async fn run_task_heartbeated_for_test<F, T>(
+    task_store: Arc<DurableTaskStore>,
+    handle: crate::http::tasks::state::TaskHandle,
+    ttl_secs: i64,
+    body: F,
+) -> Result<T, MemoryError>
+where
+    F: std::future::Future<Output = Result<T, MemoryError>> + Send,
+    T: Send + 'static,
+{
+    run_task_heartbeated(
+        task_store,
+        handle,
+        ttl_secs,
+        tokio_util::sync::CancellationToken::new(),
+        body,
+    )
+    .await
 }
 
 /// Test-only mirror of [`execute_one_task`]. Drives the same durable

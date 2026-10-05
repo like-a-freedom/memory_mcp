@@ -20,10 +20,14 @@ use std::sync::Arc;
 use memory_mcp::error::MemoryError;
 use memory_mcp::http::registry::RegistryHandle;
 use memory_mcp::http::tasks::DurableTaskTestDriver;
-use memory_mcp::http::tasks::scheduler::{execute_one_task_for_test, scheduler_job_with_options};
+use memory_mcp::http::tasks::scheduler::{
+    execute_one_task_for_test, run_task_heartbeated_for_test, scheduler_job_with_options,
+};
 use memory_mcp::http::tasks::state::{TASK_KIND_EXTRACT, TASK_KIND_REEMBED, TaskState, TaskStore};
 use memory_mcp::http::tasks::worker::DurableTaskStore;
 use memory_mcp::storage::{BoundDbClient, DbClient, SurrealDbClient};
+
+use chrono::Utc;
 
 /// Reembed pass parameters, exactly as the durable row stores them. Written out
 /// rather than derived from the Rust struct because the durable contract is the
@@ -513,6 +517,329 @@ async fn an_unrecognised_task_kind_fails_closed_naming_the_kind() {
     assert!(
         message.contains("not-a-kind"),
         "the failure must name the unknown kind so the row is diagnosable: {message}"
+    );
+}
+
+/// The lease a claim takes. `claim_next_due` writes `now + 60s`; the test
+/// names that constant rather than restating the arithmetic, so a change to the
+/// claim window is visible here instead of silently weakening the assertion.
+const CLAIM_LEASE_SECS: i64 = 60;
+
+/// Backdate the lease on a running row so a second replica can claim it, the
+/// same shape the fenced-staleness tests use. Direct SQL on purpose: the
+/// store must not expose "make my lease expire", and the operation under test
+/// is the claim that follows.
+async fn expire_lease_externally(h: &SchedulerHarness, task_id: &str) {
+    let past = (chrono::Utc::now() - chrono::Duration::seconds(1)).to_rfc3339();
+    DbClient::query(
+        &*h.client,
+        "UPDATE tenant_task SET lease_expiry = type::datetime($past) WHERE id = type::record('tenant_task', $id)",
+        Some(serde_json::json!({ "id": task_id, "past": past })),
+        &h.namespace,
+    )
+    .await
+    .expect("backdate the lease");
+}
+
+/// Renewing a lease twice keeps the fence and pushes the expiry forward.
+///
+/// This is the mechanism a reembed longer than 60 seconds depends on: the
+/// generation is what another worker's claim would bump, so a renewal that
+/// moved it would invalidate the very handle doing the renewal. It must not,
+/// and the expiry it writes must actually move.
+#[tokio::test]
+async fn renewing_a_lease_extends_the_expiry_without_moving_the_fence() {
+    let h = harness().await;
+    h.store
+        .enqueue(TASK_KIND_REEMBED, "reembed:ten_renew", reembed_params())
+        .await
+        .expect("enqueue reembed");
+    let handle = h
+        .store
+        .claim_next_due("replica_a")
+        .await
+        .expect("claim")
+        .expect("a queued task is due");
+    let claimed_expiry = h
+        .store
+        .load(&handle.task_id)
+        .await
+        .expect("load")
+        .expect("present")
+        .lease_expiry
+        .expect("a claimed row carries a lease expiry");
+
+    h.store
+        .renew_lease(
+            &handle,
+            chrono::Utc::now() + chrono::Duration::seconds(CLAIM_LEASE_SECS * 2),
+        )
+        .await
+        .expect("first renewal succeeds on a live lease");
+    let after_first = h
+        .store
+        .load(&handle.task_id)
+        .await
+        .expect("load")
+        .expect("present");
+
+    h.store
+        .renew_lease(
+            &handle,
+            chrono::Utc::now() + chrono::Duration::seconds(CLAIM_LEASE_SECS * 3),
+        )
+        .await
+        .expect("second renewal succeeds on a live lease");
+    let after_second = h
+        .store
+        .load(&handle.task_id)
+        .await
+        .expect("load")
+        .expect("present");
+
+    let first = after_first
+        .lease_expiry
+        .expect("expiry after first renewal");
+    let second = after_second
+        .lease_expiry
+        .expect("expiry after second renewal");
+    assert!(
+        second > first && first > claimed_expiry,
+        "each renewal must push the expiry forward: claimed={claimed_expiry:?} \
+         first={first:?} second={second:?}"
+    );
+    assert_eq!(
+        after_second.lease_generation,
+        Some(handle.lease_generation),
+        "a renewal extends the lease; it never re-fences it, or the renewing \
+         handle would invalidate itself"
+    );
+    assert_eq!(
+        after_second.lease_owner.as_deref(),
+        Some(handle.lease_owner.as_str()),
+        "a renewal must not change the owner it was claimed under"
+    );
+    assert_eq!(
+        after_second.state,
+        TaskState::Running,
+        "a renewal is not a state transition"
+    );
+}
+
+/// A lease that expired and was stolen cannot be renewed by the worker that
+/// lost it. The renewal is fenced on `lease_owner` AND `lease_generation`, so
+/// the superseded worker gets `Conflict` and the row is left exactly as the
+/// new owner wrote it — the alternative is a resurrected lease and a task that
+/// runs twice forever.
+#[tokio::test]
+async fn renewing_a_superseded_lease_conflicts_and_leaves_the_row_untouched() {
+    let h = harness().await;
+    let task_id = h
+        .store
+        .enqueue(TASK_KIND_REEMBED, "reembed:ten_steal", reembed_params())
+        .await
+        .expect("enqueue reembed");
+    let stale = h
+        .store
+        .claim_next_due("replica_a")
+        .await
+        .expect("first claim")
+        .expect("a queued task is due");
+    expire_lease_externally(&h, &task_id).await;
+    let stolen = h
+        .store
+        .claim_next_due("replica_b")
+        .await
+        .expect("second claim")
+        .expect("a running task with an expired lease is claimable");
+    assert_eq!(
+        stolen.lease_generation,
+        stale.lease_generation + 1,
+        "the steal is what supersedes the first worker"
+    );
+    let before = h
+        .store
+        .load(&task_id)
+        .await
+        .expect("load")
+        .expect("present");
+
+    let observed = h
+        .store
+        .renew_lease(
+            &stale,
+            chrono::Utc::now() + chrono::Duration::seconds(CLAIM_LEASE_SECS * 2),
+        )
+        .await;
+
+    assert!(
+        matches!(observed, Err(MemoryError::Conflict(_))),
+        "a superseded lease must not be able to renew itself: {observed:?}"
+    );
+    let after = h
+        .store
+        .load(&task_id)
+        .await
+        .expect("load")
+        .expect("present");
+    assert_eq!(after.lease_expiry, before.lease_expiry);
+    assert_eq!(after.lease_generation, before.lease_generation);
+    assert_eq!(after.lease_owner, before.lease_owner);
+    assert_eq!(after.state, TaskState::Running);
+}
+
+/// A pass that outlives its lease keeps its fence: the heartbeat extends the
+/// lease while the body is still blocked, so the completion the body eventually
+/// returns is committed under the original handle rather than rejected as a
+/// lost fence.
+///
+/// The blocked body is the whole point of the test. Without one the tick
+/// finishes long before the first heartbeat tick, and a heartbeat that never
+/// fired would look exactly like one that did. The clock is real time — no
+/// sleep anywhere — so the test costs one heartbeat period, which is why the
+/// lease is a few seconds here rather than the production 60.
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn a_blocked_pass_keeps_its_fence_through_the_heartbeat() {
+    const HEARTBEAT_TTL_SECS: i64 = 3;
+    let h = harness().await;
+    let task_id = h
+        .store
+        .enqueue(TASK_KIND_REEMBED, "reembed:ten_long", reembed_params())
+        .await
+        .expect("enqueue reembed");
+    // Claim it here rather than letting the helper claim, so the test owns the
+    // handle: the wrapper must renew under exactly the fence it was given, and
+    // it can only do that if the caller supplies the handle.
+    let handle = h
+        .store
+        .claim_next_due("replica_a")
+        .await
+        .expect("claim")
+        .expect("a queued reembed task is due");
+    // Backdate the claim's own lease, without touching its owner or generation.
+    // What follows is therefore a pass that begins after its lease has lapsed:
+    // the row is claimable again, so a second replica would claim it and run a
+    // second pass while the first is still rewriting vectors. That is the
+    // failure Task 5 exists to prevent.
+    expire_lease_externally(&h, &task_id).await;
+    let lapsed_expiry = h
+        .store
+        .load(&task_id)
+        .await
+        .expect("load")
+        .expect("present")
+        .lease_expiry
+        .expect("a claimed row carries a lease expiry");
+    assert!(
+        lapsed_expiry < Utc::now(),
+        "the pass must start behind a lapsed lease, or it proves nothing"
+    );
+
+    let (entered_tx, entered_rx) = tokio::sync::oneshot::channel::<()>();
+    let (release_tx, release_rx) = tokio::sync::oneshot::channel::<()>();
+    // The pass itself: report that it started, then block until the test
+    // releases it. Polling the row before that point would only prove the pass
+    // is slow, not that the heartbeat fired. The receiver sits behind a mutex
+    // so it can be shared with a future the helper may need to own more than
+    // once; a single pass awaits it exactly once.
+    let release = Arc::new(tokio::sync::Mutex::new(Some(release_rx)));
+    let pass = {
+        let release = release.clone();
+        async move {
+            let _ = entered_tx.send(());
+            let mut blocked = release.lock().await;
+            if let Some(receiver) = blocked.take() {
+                let _ = receiver.await;
+            }
+            Ok(())
+        }
+    };
+
+    let body_task = tokio::spawn(run_task_heartbeated_for_test(
+        Arc::new(h.store.clone()),
+        handle.clone(),
+        HEARTBEAT_TTL_SECS,
+        pass,
+    ));
+
+    // Explicit wait for the pass to start. A timeout here is a real failure,
+    // not a hang: the heartbeat loop is already running.
+    tokio::time::timeout(std::time::Duration::from_secs(30), entered_rx)
+        .await
+        .expect("the reembed pass must start")
+        .expect("the pass must report that it started");
+
+    // Explicit polling on the row — no sleep anywhere. Read until the heartbeat
+    // has written a lease that is both still in the future and past the lapsed
+    // one the pass started with. Only the heartbeat can move that field, so the
+    // wait is on the write rather than on a duration.
+    let settled = async {
+        loop {
+            let current = h
+                .store
+                .load(&task_id)
+                .await
+                .expect("load")
+                .expect("present");
+            if current
+                .lease_expiry
+                .is_some_and(|expiry| expiry > Utc::now() && expiry > lapsed_expiry)
+            {
+                return current;
+            }
+            tokio::task::yield_now().await;
+        }
+    };
+    let renewed = tokio::time::timeout(std::time::Duration::from_secs(60), settled)
+        .await
+        .expect("the heartbeat must renew the lease while the pass is blocked");
+    assert_eq!(
+        renewed.state,
+        TaskState::Running,
+        "the pass is mid-flight, so the row must still read running: {renewed:?}"
+    );
+    assert_eq!(
+        renewed.lease_generation,
+        Some(handle.lease_generation),
+        "the heartbeat renews the fence it was given; it never re-fences"
+    );
+    assert_eq!(
+        renewed.lease_owner.as_deref(),
+        Some("replica_a"),
+        "renewal happens under the owner that holds the claim"
+    );
+
+    // The pass resolves under the fence it still holds, and commits its own
+    // terminal outcome. Without the heartbeat this write would have matched no
+    // rows: the lapped lease left the row claimable, and any other replica's
+    // claim would have moved the generation out from under this handle.
+    release_tx
+        .send(())
+        .expect("the blocked pass must still be waiting for its release");
+    body_task
+        .await
+        .expect("the heartbeat wrapper must not panic")
+        .expect("the pass returns while it still holds the fence");
+    h.store
+        .complete_fenced(
+            &handle,
+            serde_json::json!({ "message": "reembed pass finished" }),
+            false,
+        )
+        .await
+        .expect("the pass commits its own outcome while it still holds the fence");
+
+    let after = h
+        .store
+        .load(&task_id)
+        .await
+        .expect("load")
+        .expect("present");
+    assert_eq!(
+        after.state,
+        TaskState::Completed,
+        "a pass that heartbeated through its own expiry commits, rather than \
+         being requeued and re-run: {after:?}"
     );
 }
 

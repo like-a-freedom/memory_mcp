@@ -33,6 +33,12 @@ use super::state::{
 /// Retention window for a finished task.
 pub const RETENTION_SECS: i64 = 7 * 24 * 60 * 60;
 
+/// The lease a claim takes, in seconds. `claim_next_due` writes
+/// `now + TASK_LEASE_TTL_SECS`, and the reembed heartbeat renews to the same
+/// horizon so a long pass and a short one are covered by the same window.
+pub(crate) const TASK_LEASE_TTL_SECS: i64 = 60;
+
+#[derive(Clone)]
 pub struct DurableTaskStore {
     pub(crate) db: Arc<BoundDbClient>,
     pub(crate) tenant_id: String,
@@ -297,7 +303,9 @@ impl TaskStore for DurableTaskStore {
                  RETURN AFTER;",
                 Some(json!({
                     "owner": replica_id,
-                    "lease_expiry": Self::to_datetime(now + chrono::Duration::seconds(60)),
+                    "lease_expiry": Self::to_datetime(
+                        now + chrono::Duration::seconds(TASK_LEASE_TTL_SECS)
+                    ),
                     "now": Self::to_datetime(now),
                     "tenant_id": self.tenant_id.as_str(),
                 })),
@@ -318,11 +326,30 @@ impl TaskStore for DurableTaskStore {
                     task_id,
                     lease_owner: replica_id.to_string(),
                     lease_generation,
-                    lease_expiry: now + chrono::Duration::seconds(60),
+                    lease_expiry: now + chrono::Duration::seconds(TASK_LEASE_TTL_SECS),
                 }))
             }
             None => Ok(None),
         }
+    }
+
+    async fn renew_lease(
+        &self,
+        handle: &TaskHandle,
+        extend_to: DateTime<Utc>,
+    ) -> Result<(), MemoryError> {
+        self.fenced_update(
+            handle,
+            // A renewal touches `lease_expiry` and nothing else: no version
+            // bump (it is not a state transition a reader needs to observe), no
+            // `updated_at` churn for a write no operator reads. The state
+            // predicate keeps a renewal off a task that already reached a
+            // terminal state — the last heartbeat must not revive the row's
+            // liveness fields after the pass committed.
+            "UPDATE tenant_task SET lease_expiry = type::datetime($extend_to) WHERE id = type::record('tenant_task', $id) AND tenant_id = $tenant_id AND lease_owner = $owner AND lease_generation = $gen AND state IN ['running', 'cancel_requested']",
+            Some(json!({"extend_to": Self::to_datetime(extend_to)})),
+        )
+        .await
     }
 
     async fn complete_fenced(
@@ -517,6 +544,22 @@ impl DurableTaskStore {
             )
             .await?;
         Ok(())
+    }
+
+    /// The live task id holding `fingerprint` for this tenant, if any.
+    ///
+    /// Public because a control-plane caller must be able to say "one is
+    /// already queued" *before* enqueueing: [`TaskStore::enqueue`] returns the
+    /// existing id for a duplicate fingerprint and a fresh id for a new row, and
+    /// the two are indistinguishable from the return value alone. A retried
+    /// request has to be able to answer "no new work" rather than report 202 for
+    /// a task it did not create. `failed` rows are excluded, exactly as in the
+    /// dedupe itself, so a failed reembed can be re-requested.
+    pub async fn find_task_by_fingerprint(
+        &self,
+        fingerprint: &str,
+    ) -> Result<Option<String>, MemoryError> {
+        self.find_existing_id(fingerprint).await
     }
 
     async fn find_existing_id(&self, fingerprint: &str) -> Result<Option<String>, MemoryError> {
