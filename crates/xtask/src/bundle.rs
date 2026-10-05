@@ -70,8 +70,89 @@ pub fn check_cli_pin() -> Result<(), PackError> {
              compiles against, so the two must be the same version."
         )));
     }
+    check_web_strip_profile()
+}
+
+/// Require the profile `dx bundle` builds the console with to keep wasm-bindgen's
+/// metadata intact.
+///
+/// The CLI builds the web target under the profile named `wasm-release`
+/// (`Platform::profile_name`), reads that profile out of the workspace manifest,
+/// passes `strip=false` to cargo so the linker keeps its sections, and then runs
+/// `rust-objcopy` on the module itself *before* wasm-bindgen. `strip = true`
+/// resolves to `--strip-all`, which since LLVM 23 removes every custom section —
+/// including `__wasm_bindgen_unstable`, the metadata wasm-bindgen reads to emit
+/// the JS glue. The build then dies with "the `__wasm_bindgen_unstable` custom
+/// section is missing", and wasm-opt fails afterwards on a module that was never
+/// written.
+///
+/// The symptom is far from the cause: it surfaces inside `wasm-opt`, names a
+/// file that legitimately does not exist yet, and only under an LLVM recent
+/// enough to have changed `--strip-all`. So the profile that decides it is
+/// checked here, where the other console-build contract is.
+fn check_web_strip_profile() -> Result<(), PackError> {
+    let manifest = read_repository_file(WORKSPACE_MANIFEST)?;
+    check_web_strip_profile_for(&manifest)
+}
+
+/// `check_web_strip_profile` over a manifest's text, so the rule can be exercised
+/// without the repository.
+fn check_web_strip_profile_for(manifest: &str) -> Result<(), PackError> {
+    let setting = web_profile_strip(manifest).ok_or_else(|| {
+        PackError::Bundle(format!(
+            "{WORKSPACE_MANIFEST} declares no [profile.wasm-release], so `dx bundle` \
+             falls back to [profile.release] for the console"
+        ))
+    })?;
+
+    if setting == STRIP_SYMBOLS {
+        return Err(PackError::Bundle(format!(
+            "[profile.wasm-release] sets strip = {STRIP_SYMBOLS}, which makes `dx \
+             bundle` run `rust-objcopy --strip-all` on the console module before \
+             wasm-bindgen. Since LLVM 23 that deletes the \
+             `__wasm_bindgen_unstable` custom section wasm-bindgen requires, and \
+             the build fails. Use strip = \"debuginfo\", which drops the DWARF and \
+             keeps the custom sections."
+        )));
+    }
     Ok(())
 }
+
+/// The `strip` value of `[profile.wasm-release]`, or `None` when the manifest
+/// declares no such profile.
+fn web_profile_strip(manifest: &str) -> Option<String> {
+    section_body(manifest, "[profile.wasm-release]")
+        .lines()
+        .map(str::trim)
+        .filter(|line| !line.starts_with('#') && !line.is_empty())
+        .find_map(|line| line.strip_prefix("strip")?.trim_start().strip_prefix('='))
+        .map(|value| value.trim().trim_matches('"').to_owned())
+}
+
+/// The lines of a top-level `[section]` in a manifest, up to the next section.
+///
+/// Comments are left in place; callers filter them. Only a top-level section
+/// ends the body, so a nested `[profile.release.package."*"]` does not truncate
+/// the profile above it.
+fn section_body<'a>(manifest: &'a str, header: &str) -> &'a str {
+    let Some(start) = manifest.find(header) else {
+        return "";
+    };
+    let rest = &manifest[start + header.len()..];
+    // Byte offsets, not line counts: only the first `line` of a match is
+    // guaranteed to start where the match starts.
+    let end = rest
+        .match_indices('\n')
+        .find(|(_, after)| after.starts_with('['))
+        .map_or(rest.len(), |(offset, _)| offset);
+    &rest[..end]
+}
+
+/// Cargo's `strip = true`, the spelling that means `--strip-all`.
+const STRIP_SYMBOLS: &str = "true";
+
+/// The `Cargo.toml` whose profiles `dx bundle` reads.
+const WORKSPACE_MANIFEST: &str = "Cargo.toml";
 
 /// The `DIOXUS_CLI_VERSION` the `Dockerfile` installs.
 fn dioxus_cli_arg(dockerfile: &str) -> Option<String> {
@@ -333,5 +414,45 @@ mod tests {
         let relaxed = "[dependencies]\ndioxus = { version = \"0.8.0\" }\n";
         assert_eq!(dioxus_requirement(relaxed).as_deref(), Some("0.8.0"));
         assert_eq!(dioxus_requirement("[dependencies]\nserde = \"1\""), None);
+    }
+
+    /// The real workspace: the profile `dx bundle` builds the console with must
+    /// not ask for `--strip-all`, which strips wasm-bindgen's own metadata.
+    #[test]
+    fn the_web_profile_does_not_strip_wasm_bindgen_metadata() {
+        check_web_strip_profile()
+            .expect("the console's web profile must keep the wasm-bindgen sections");
+    }
+
+    /// The parser, and the value it must refuse. `strip = true` is the spelling
+    /// that becomes `--strip-all`; `"debuginfo"` is the one that is safe. The
+    /// other two cases matter because a parser that finds nothing must not read
+    /// as safe — a missing profile is exactly what makes dx fall back to
+    /// `[profile.release]`, where `strip = true` lives.
+    #[test]
+    fn the_web_profile_strip_is_read_from_the_right_section() {
+        let manifest = "[profile.release]\nstrip = true\n\n[profile.wasm-release]\n\
+                        inherits = \"release\"\nstrip = \"debuginfo\"\n";
+        assert_eq!(web_profile_strip(manifest).as_deref(), Some("debuginfo"));
+
+        // The value the check refuses, in both spellings cargo accepts.
+        let symbols = "[profile.wasm-release]\nstrip = true\n";
+        assert_eq!(web_profile_strip(symbols).as_deref(), Some("true"));
+        assert!(check_web_strip_profile_for(symbols).is_err());
+
+        // Absent reads as absent, not as a silent pass.
+        assert_eq!(web_profile_strip("[profile.release]\nstrip = true\n"), None);
+        assert!(check_web_strip_profile_for("[profile.release]\nstrip = true\n").is_err());
+
+        // A commented-out setting is not a setting.
+        let commented = "[profile.wasm-release]\n# strip = true\n";
+        assert_eq!(web_profile_strip(commented), None);
+        assert!(check_web_strip_profile_for(commented).is_err());
+
+        // A nested table does not truncate the profile above it, and the first
+        // `strip` in the body is the profile's own.
+        let nested = "[profile.wasm-release]\nstrip = \"debuginfo\"\n\
+                      [profile.release.package.\"*\"]\nstrip = true\n";
+        assert_eq!(web_profile_strip(nested).as_deref(), Some("debuginfo"));
     }
 }

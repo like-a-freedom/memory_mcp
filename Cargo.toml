@@ -104,6 +104,37 @@ codegen-units = 1
 panic = "abort"
 strip = true
 
+# The console's release build. `dx bundle` builds the web target under the
+# profile named `wasm-release` (see `Platform::profile_name`), so this is the
+# profile that crate actually compiles with — `[profile.release]` above only
+# reaches it through dx's fallback.
+#
+# `strip` must be "debuginfo" rather than the workspace's `true`, and the reason
+# is the wasm-bindgen contract, not binary size. The CLI reads this profile,
+# passes `strip=false` to cargo so the linker keeps its sections, and then runs
+# `rust-objcopy` on the module itself *before* wasm-bindgen. `strip = true`
+# resolves to `--strip-all`, and since LLVM 23 that removes every custom
+# section — including `__wasm_bindgen_unstable`, which is the metadata
+# wasm-bindgen reads to generate the JS glue. The build then dies with
+# "the `__wasm_bindgen_unstable` custom section is missing", followed by
+# wasm-opt failing on the module that was never written.
+#
+# `--strip-debug` drops the DWARF the browser cannot use and leaves custom
+# sections intact, which is also what dx itself uses when a project asks for
+# debuginfo-only stripping.
+#
+# `opt-level = "s"` is dx's own default for a web release bundle (it skips
+# this only when the profile is absent), so naming the profile here means the
+# manifest, not the CLI, decides the bundle's optimisation level.
+#
+# `inherits` is explicit because dx stops injecting its own profile arguments
+# once the manifest defines one; without it this would silently be a fresh
+# profile rather than `release`.
+[profile.wasm-release]
+inherits = "release"
+opt-level = "s"
+strip = "debuginfo"
+
 [patch.crates-io]
 # esaxx-rs 0.1.10 hard-codes /MT on MSVC, which conflicts with the /MD ONNX Runtime binaries.
 esaxx-rs = { path = "vendor/esaxx-rs" }

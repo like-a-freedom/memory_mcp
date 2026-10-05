@@ -21,6 +21,7 @@
 mod bundle;
 mod observability;
 mod pack;
+mod toolchain;
 
 use std::path::PathBuf;
 
@@ -49,6 +50,9 @@ enum Command {
     },
     /// Require the image's Dioxus CLI version to match the UI crate's pin.
     CheckDioxusPin,
+    /// Require the image and CI to build on the channel `rust-toolchain.toml`
+    /// pins.
+    CheckToolchainPin,
     /// Regenerate the dashboards and check the rules, alerts and panels
     /// against the metrics the crate actually exports.
     CheckObservability,
@@ -62,6 +66,7 @@ fn main() -> std::process::ExitCode {
         }
         Command::CheckUiBundle { dist } => bundle::check(&dist),
         Command::CheckDioxusPin => bundle::check_cli_pin(),
+        Command::CheckToolchainPin => toolchain::check(),
         Command::CheckObservability => observability::run(&observability::scripts_dir()),
     };
     match result {

@@ -52,6 +52,14 @@ jobs:
         # Match the optional test profile: otherwise test-fixtures-gated
         # protocol tests execute below but never receive lint coverage.
         run: cargo clippy --workspace --all-targets --features fs-watch,mcp-apps,streamable-http,test-fixtures --locked -- -D warnings
+      - name: Require the image and CI to build on the pinned toolchain
+        # A `FROM` tag or a setup action left behind by a `rust-toolchain.toml`
+        # bump does not fail the build: rustup resolves the pinned channel over
+        # both. So the drift is silent until a toolchain bump turns into a
+        # behavioural one, which is how the image tag stayed on 1.97.1 while
+        # everything built on 1.99. Checked here because this job needs no
+        # console build to run it.
+        run: cargo run --locked -p xtask -- check-toolchain-pin
       - name: Control-plane UI WASM lint
         run: |
           rustup target add wasm32-unknown-unknown

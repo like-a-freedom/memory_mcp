@@ -6,6 +6,11 @@
 .commandcode
 .impeccable
 .zed
+# Agent worktrees hold full checkouts of this repository. `COPY . .` would send
+# every one of them as build context even though no layer reads them; a local
+# session leaves hundreds of gigabytes behind and the build dies on a full disk
+# part-way through the copy, long before anything is compiled.
+.delta
 target
 dist
 data

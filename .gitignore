@@ -48,6 +48,10 @@ scripts/*
 *~
 .DS_Store
 .worktrees/
+# Agent worktrees: full checkouts of this repository, one per session. Never
+# meant to be committed and never meant to enter a Docker build context — a
+# local run leaves hundreds of gigabytes behind under either.
+.delta/
 
 # Cargo-specific
 .cargo/

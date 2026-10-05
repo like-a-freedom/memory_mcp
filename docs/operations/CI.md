@@ -42,6 +42,11 @@ All jobs use native hosts and Rust **1.99.0**, matching `rust-version` and
 `rust-toolchain.toml`. There are no 32-bit targets or emulated Linux builds.
 Runner labels come from the [GitHub runner reference](https://docs.github.com/en/actions/reference/runners/github-hosted-runners).
 
+The channel also has to appear in the `Dockerfile` `FROM` tags and in the setup
+action, because a pin that lags is silently overridden by `rust-toolchain.toml`
+rather than rejected. `cargo run -p xtask -- check-toolchain-pin` requires all
+three to agree and runs in the `quality` job.
+
 Each archive contains `memory_mcp` and `memory_mcp_http` with `fs-watch`,
 `mcp-apps`, `streamable-http` and `control-plane`. It excludes the browser UI
 and test fixtures. macOS Metal is linted separately; it is not enabled in the
