@@ -350,14 +350,17 @@ impl Pool {
         config: &crate::http::config::HttpConfig,
         registry: Arc<crate::http::registry::RegistryHandle>,
     ) -> Self {
-        Self::from_http_config_with_shutdown(config, registry, ShutdownState::new())
+        Self::from_http_config_with_shutdown(config, registry, ShutdownState::new(), None)
     }
 
-    /// As [`Pool::from_http_config`], sharing the instance's shutdown signal.
+    /// As [`Pool::from_http_config`], sharing the instance's shutdown signal
+    /// and carrying the deployment-level policy into every tenant runtime this
+    /// pool activates.
     pub(crate) fn from_http_config_with_shutdown(
         config: &crate::http::config::HttpConfig,
         registry: Arc<crate::http::registry::RegistryHandle>,
         shutdown: ShutdownState,
+        deployment_policy: Option<crate::http::runtime::bootstrap::DeploymentPolicy>,
     ) -> Self {
         let per_tenant_concurrency = config
             .signup_plan_limits
@@ -365,6 +368,16 @@ impl Pool {
             .map_or(DEFAULT_PER_TENANT_CONCURRENCY, |limits| {
                 limits.per_tenant_request_concurrency
             });
+        let mut options = crate::http::runtime::storage::RuntimeOptions::from_http_config(config);
+        if let Some(policy) = deployment_policy {
+            options = options.with_lifecycle_config(policy.lifecycle);
+            if let Some(extractor) = policy.entity_extractor {
+                options = options.with_entity_extractor(extractor);
+            }
+            if let Some(embedding) = policy.embedding {
+                options = options.with_embedding_policy(embedding);
+            }
+        }
         Self::with_factory(
             config.pool_cap,
             config.runtime_idle_ttl,
@@ -373,8 +386,7 @@ impl Pool {
             per_tenant_concurrency,
             Arc::new(
                 crate::bootstrap::integration::tenancy_runtime::RegistryTenantRuntimeFactory::new(
-                    registry,
-                    crate::http::runtime::storage::RuntimeOptions::from_http_config(config),
+                    registry, options,
                 ),
             ),
             shutdown,
