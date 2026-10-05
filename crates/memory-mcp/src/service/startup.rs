@@ -59,17 +59,19 @@ pub(crate) async fn load_embedding_state(
         .await
 }
 
-async fn count_facts(db: &BoundDbClient) -> Result<usize, MemoryError> {
+pub(crate) async fn count_facts(db: &BoundDbClient) -> Result<usize, MemoryError> {
     Ok(db.select_table(KnowledgeTables::table("fact")).await?.len())
 }
 
-async fn count_facts_missing_embeddings(db: &BoundDbClient) -> Result<usize, MemoryError> {
+pub(crate) async fn count_facts_missing_embeddings(
+    db: &BoundDbClient,
+) -> Result<usize, MemoryError> {
     crate::embedding::backfill_store::EmbeddingBackfillStoreClient::from_bound(db.clone())
         .count_facts_missing_embeddings()
         .await
 }
 
-async fn sample_stored_embedding_dimensions(
+pub(crate) async fn sample_stored_embedding_dimensions(
     db: &BoundDbClient,
     sample_size: usize,
 ) -> Result<Vec<usize>, MemoryError> {
@@ -157,6 +159,19 @@ pub(crate) fn decide_embedding_startup(
                 }
             }
         }
+        None if sample_dimensions.is_empty() => {
+            // An empty sample is not ambiguous: it means no stored fact
+            // carries a vector at all. That is missing-vector work — a
+            // namespace written while embeddings were off, or before they were
+            // ever enabled — and backfill fills it in place without replacing
+            // the HNSW index. Refusing it as "legacy embeddings" would name
+            // `reembed` as the way out for a namespace that has nothing to
+            // re-embed *from*, and in the HTTP profile there is no `reembed`
+            // to run at all.
+            EmbeddingStartupDecision::BootstrapReadyNamespace {
+                active_signature: target_signature.to_string(),
+            }
+        }
         None if fact_count == 0
             || (!sample_dimensions.is_empty()
                 && sample_dimensions
@@ -199,82 +214,114 @@ pub(crate) async fn resolve_embedding_startup(
     ),
     MemoryError,
 > {
-    use crate::embedding::providers::resolve_embedding_target_identity;
-
-    let target = if config.is_enabled() {
-        match resolve_embedding_target_identity(config, data_dir).await {
-            Ok(target) => Some(target),
-            Err(err) => {
-                let mut event = std::collections::HashMap::new();
-                event.insert(
-                    "op".to_string(),
-                    serde_json::json!("embedding.preflight_failed"),
-                );
-                event.insert("error".to_string(), serde_json::json!(err.to_string()));
-                event.insert(
-                    "provider".to_string(),
-                    serde_json::json!(config.provider_label()),
-                );
-                event.insert(
-                    "endpoint".to_string(),
-                    serde_json::json!(
-                        config
-                            .base_url
-                            .as_deref()
-                            .map(crate::embedding::providers::embedding_endpoint_for_log)
-                    ),
-                );
-                event.insert("model".to_string(), serde_json::json!(config.model.clone()));
-                startup_logger.log(event, crate::logging::LogLevel::Warn);
-                None
-            }
-        }
-    } else {
-        None
-    };
+    let target = resolve_embedding_preflight(config, data_dir, startup_logger).await;
 
     let decision = if let Some(target) = target.as_ref() {
         let db = BoundDbClient::new(db_client.clone(), active_namespace);
-        let namespace_state = load_embedding_state(&db).await?;
-        let fact_count = count_facts(&db).await?;
-        let sample_dimensions =
-            sample_stored_embedding_dimensions(&db, STORED_EMBEDDING_SAMPLE_SIZE).await?;
-        let missing_embedding_count = count_facts_missing_embeddings(&db).await?;
-
-        let mut event = std::collections::HashMap::new();
-        event.insert(
-            "op".to_string(),
-            serde_json::json!("embedding.startup_state_loaded"),
-        );
-        event.insert("namespace".to_string(), serde_json::json!(active_namespace));
-        event.insert(
-            "state_present".to_string(),
-            serde_json::json!(namespace_state.is_some()),
-        );
-        event.insert("fact_count".to_string(), serde_json::json!(fact_count));
-        event.insert(
-            "missing_embedding_count".to_string(),
-            serde_json::json!(missing_embedding_count),
-        );
-        startup_logger.log(event, crate::logging::LogLevel::Debug);
-
-        decide_embedding_startup(
+        let decision = resolve_namespace_embedding_decision(&db, active_namespace, target).await?;
+        report_embedding_decision(
+            startup_logger,
             active_namespace,
-            namespace_state.as_ref(),
-            &sample_dimensions,
-            fact_count,
-            missing_embedding_count,
-            &target.signature,
-            target.dimension,
-        )
-    } else if config.is_enabled() {
+            &decision,
+            Some(&target.signature),
+        );
+        decision
+    } else {
+        let decision = preflight_failed_decision(config);
+        report_embedding_decision(startup_logger, active_namespace, &decision, None);
+        decision
+    };
+
+    Ok((decision, target))
+}
+
+/// Probe the configured provider once for the deployment's embedding identity.
+///
+/// The HTTP profile resolves this once per process rather than once per
+/// namespace: the dimension probe is a network round trip and every tenant
+/// shares one deployment-level provider (spec §13). Callers reuse the returned
+/// target across tenants and re-run only [`resolve_namespace_embedding_decision`].
+pub(crate) async fn resolve_embedding_preflight(
+    config: &crate::config::EmbeddingConfig,
+    data_dir: &str,
+    startup_logger: &crate::logging::StdoutLogger,
+) -> Option<crate::embedding::providers::ResolvedEmbeddingTarget> {
+    if !config.is_enabled() {
+        return None;
+    }
+    use crate::embedding::providers::resolve_embedding_target_identity;
+
+    match resolve_embedding_target_identity(config, data_dir).await {
+        Ok(target) => Some(target),
+        Err(err) => {
+            let mut event = std::collections::HashMap::new();
+            event.insert(
+                "op".to_string(),
+                serde_json::json!("embedding.preflight_failed"),
+            );
+            event.insert("error".to_string(), serde_json::json!(err.to_string()));
+            event.insert(
+                "provider".to_string(),
+                serde_json::json!(config.provider_label()),
+            );
+            event.insert(
+                "endpoint".to_string(),
+                serde_json::json!(
+                    config
+                        .base_url
+                        .as_deref()
+                        .map(crate::embedding::providers::embedding_endpoint_for_log)
+                ),
+            );
+            event.insert("model".to_string(), serde_json::json!(config.model.clone()));
+            startup_logger.log(event, crate::logging::LogLevel::Warn);
+            None
+        }
+    }
+}
+
+/// The decision a namespace gets when embeddings are disabled or the
+/// deployment preflight could not resolve an embedding identity.
+fn preflight_failed_decision(config: &crate::config::EmbeddingConfig) -> EmbeddingStartupDecision {
+    if config.is_enabled() {
         EmbeddingStartupDecision::DisableSemantic {
             reason: "embedding target preflight failed".to_string(),
         }
     } else {
         EmbeddingStartupDecision::UseConfiguredProvider
-    };
+    }
+}
 
+/// Read one namespace's embedding state and decide what that namespace may do
+/// with the deployment's embedding target.
+pub(crate) async fn resolve_namespace_embedding_decision(
+    db: &BoundDbClient,
+    active_namespace: &str,
+    target: &crate::embedding::providers::ResolvedEmbeddingTarget,
+) -> Result<EmbeddingStartupDecision, MemoryError> {
+    let namespace_state = load_embedding_state(db).await?;
+    let fact_count = count_facts(db).await?;
+    let sample_dimensions =
+        sample_stored_embedding_dimensions(db, STORED_EMBEDDING_SAMPLE_SIZE).await?;
+    let missing_embedding_count = count_facts_missing_embeddings(db).await?;
+
+    Ok(decide_embedding_startup(
+        active_namespace,
+        namespace_state.as_ref(),
+        &sample_dimensions,
+        fact_count,
+        missing_embedding_count,
+        &target.signature,
+        target.dimension,
+    ))
+}
+
+fn report_embedding_decision(
+    startup_logger: &crate::logging::StdoutLogger,
+    active_namespace: &str,
+    decision: &EmbeddingStartupDecision,
+    target_signature: Option<&str>,
+) {
     let mut decision_event = std::collections::HashMap::new();
     decision_event.insert(
         "op".to_string(),
@@ -287,11 +334,9 @@ pub(crate) async fn resolve_embedding_startup(
     decision_event.insert("namespace".to_string(), serde_json::json!(active_namespace));
     decision_event.insert(
         "target_signature".to_string(),
-        serde_json::json!(target.as_ref().map(|value| value.signature.clone())),
+        serde_json::json!(target_signature),
     );
     startup_logger.log(decision_event, crate::logging::LogLevel::Info);
-
-    Ok((decision, target))
 }
 
 #[cfg(test)]
@@ -582,7 +627,46 @@ mod tests {
 
     #[test]
     fn decide_embedding_startup_does_not_bootstrap_when_legacy_dimensions_are_unknown() {
+        // Genuinely legacy: vectors exist, but at a width this target does not
+        // produce. They must be rewritten, which only `reembed` can do.
+        let decision =
+            decide_embedding_startup("main", None, &[768usize], 12, 0, "embsig:new", 384);
+        assert!(matches!(
+            decision,
+            EmbeddingStartupDecision::DisableSemantic { .. }
+        ));
+    }
+
+    /// A namespace whose facts were written while embeddings were off holds no
+    /// vectors at all. `sample_dimensions` is empty only when *no* fact carries
+    /// one, so this is missing-vector work — `embedding IS NONE` — which
+    /// backfill does in place without touching the HNSW index.
+    ///
+    /// Refusing it as "legacy embeddings require reembed" would strand the
+    /// tenant: there is nothing to re-embed *from*, and in the HTTP profile
+    /// there is no reembed to run.
+    #[test]
+    fn decide_embedding_startup_bootstraps_a_namespace_whose_facts_have_no_vectors() {
         let decision = decide_embedding_startup("main", None, &[], 12, 12, "embsig:new", 384);
+        assert!(
+            matches!(
+                decision,
+                EmbeddingStartupDecision::BootstrapReadyNamespace { .. }
+            ),
+            "facts without any vectors are backfill work, not a migration: {decision:?}"
+        );
+    }
+
+    /// The same state must not bootstrap when a durable state row says the
+    /// namespace is mid-migration — that row is authoritative, not the sample.
+    #[test]
+    fn decide_embedding_startup_prefers_recorded_state_over_an_absent_vector_sample() {
+        let rebuilding = serde_json::json!({
+            "status": "rebuilding",
+            "active_signature": "embsig:new",
+        });
+        let decision =
+            decide_embedding_startup("main", Some(&rebuilding), &[], 12, 12, "embsig:new", 384);
         assert!(matches!(
             decision,
             EmbeddingStartupDecision::DisableSemantic { .. }

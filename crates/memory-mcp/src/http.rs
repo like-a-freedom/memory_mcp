@@ -4,6 +4,7 @@
 pub mod app_sessions;
 pub mod composition;
 pub mod config;
+pub mod embedding;
 pub mod health;
 pub mod leases;
 pub mod logging;
@@ -147,6 +148,45 @@ impl HttpState {
         _metrics_handle: AssembleMetrics,
         browser_policy_override: Option<crate::http::registry::models::BrowserPolicyFence>,
     ) -> Result<Arc<Self>, crate::error::MemoryError> {
+        Self::assemble_with_deployment_policy(
+            config,
+            registry,
+            _metrics_handle,
+            browser_policy_override,
+            None,
+        )
+        .await
+    }
+
+    /// [`Self::assemble`] with the deployment-level policy threaded into every
+    /// tenant runtime the pool builds.
+    ///
+    /// `None` means the operator did not enable embeddings, so tenant
+    /// runtimes serve lexical retrieval only.
+    pub(crate) async fn assemble_with_deployment_policy(
+        config: HttpConfig,
+        registry: registry::RegistryHandle,
+        _metrics_handle: AssembleMetrics,
+        browser_policy_override: Option<crate::http::registry::models::BrowserPolicyFence>,
+        deployment_policy: Option<runtime::bootstrap::DeploymentPolicy>,
+    ) -> Result<Arc<Self>, crate::error::MemoryError> {
+        Self::assemble_inner(
+            config,
+            registry,
+            _metrics_handle,
+            browser_policy_override,
+            deployment_policy,
+        )
+        .await
+    }
+
+    async fn assemble_inner(
+        config: HttpConfig,
+        registry: registry::RegistryHandle,
+        _metrics_handle: AssembleMetrics,
+        browser_policy_override: Option<crate::http::registry::models::BrowserPolicyFence>,
+        deployment_policy: Option<runtime::bootstrap::DeploymentPolicy>,
+    ) -> Result<Arc<Self>, crate::error::MemoryError> {
         // The `free` plan backs the data plane: tenants created by signup, and
         // tenants that predate this change, carry `plan_version 1`, and the data
         // plane resolves that row on every ingest. A `local`-only deployment
@@ -169,6 +209,7 @@ impl HttpState {
             &config,
             Arc::new(registry.clone()),
             shutdown.clone(),
+            deployment_policy,
         ));
         // Each consumer below is handed the owner traits it uses, not the
         // registry. One handle is still built above, but nothing below reaches

@@ -318,19 +318,6 @@ impl SurrealDbClient {
         })
     }
 
-    /// Wraps an already-bound embedded (RocksDB) client.
-    /// The caller MUST have called `use_ns(...).use_db(...)` on
-    /// `db` exactly once before passing it in; this constructor
-    /// never rebinds. stdio never calls this constructor.
-    pub fn from_prebound(db: Surreal<Db>, active_namespace: &str, log_level: &str) -> Self {
-        Self {
-            engine: DbEngine::Local(Arc::new(db)),
-            active_namespace: active_namespace.to_string(),
-            logger: StdoutLogger::new(log_level),
-            fact_embedding_dimension: crate::config::DEFAULT_EMBEDDING_DIMENSION,
-        }
-    }
-
     /// Wraps an already-bound remote (Ws) client. The caller
     /// MUST have called `use_ns(...).use_db(...)` on `db`
     /// exactly once before passing it in; this constructor
@@ -340,11 +327,62 @@ impl SurrealDbClient {
         active_namespace: &str,
         log_level: &str,
     ) -> Self {
+        Self::from_prebound_remote_with_dimension(
+            db,
+            active_namespace,
+            log_level,
+            crate::config::DEFAULT_EMBEDDING_DIMENSION,
+        )
+    }
+
+    /// As [`Self::from_prebound_remote`], rendering migrations with an explicit
+    /// embedding dimension.
+    ///
+    /// The HTTP profile resolves its provider dimension once per deployment and
+    /// hands it to every tenant client here, so a tenant namespace's
+    /// `fact_embedding_hnsw` is defined with the dimension its vectors are
+    /// actually written at. The default-dimension constructor cannot do that:
+    /// it would render 1536 for a deployment whose provider emits 2048.
+    pub fn from_prebound_remote_with_dimension(
+        db: Surreal<Client>,
+        active_namespace: &str,
+        log_level: &str,
+        fact_embedding_dimension: usize,
+    ) -> Self {
         Self {
             engine: DbEngine::Remote(Arc::new(db)),
             active_namespace: active_namespace.to_string(),
             logger: StdoutLogger::new(log_level),
-            fact_embedding_dimension: crate::config::DEFAULT_EMBEDDING_DIMENSION,
+            fact_embedding_dimension,
+        }
+    }
+
+    /// Wraps an already-bound embedded (RocksDB) client.
+    /// The caller MUST have called `use_ns(...).use_db(...)` on
+    /// `db` exactly once before passing it in; this constructor
+    /// never rebinds. stdio never calls this constructor.
+    pub fn from_prebound(db: Surreal<Db>, active_namespace: &str, log_level: &str) -> Self {
+        Self::from_prebound_with_dimension(
+            db,
+            active_namespace,
+            log_level,
+            crate::config::DEFAULT_EMBEDDING_DIMENSION,
+        )
+    }
+
+    /// As [`Self::from_prebound`], rendering migrations with an explicit
+    /// embedding dimension.
+    pub fn from_prebound_with_dimension(
+        db: Surreal<Db>,
+        active_namespace: &str,
+        log_level: &str,
+        fact_embedding_dimension: usize,
+    ) -> Self {
+        Self {
+            engine: DbEngine::Local(Arc::new(db)),
+            active_namespace: active_namespace.to_string(),
+            logger: StdoutLogger::new(log_level),
+            fact_embedding_dimension,
         }
     }
 
@@ -354,11 +392,27 @@ impl SurrealDbClient {
     /// engine is in-memory under the hood. Used by test
     /// fixtures and bootstrap.
     pub fn from_prebound_mem(db: Surreal<Db>, active_namespace: &str, log_level: &str) -> Self {
+        Self::from_prebound_mem_with_dimension(
+            db,
+            active_namespace,
+            log_level,
+            crate::config::DEFAULT_EMBEDDING_DIMENSION,
+        )
+    }
+
+    /// As [`Self::from_prebound_mem`], rendering migrations with an explicit
+    /// embedding dimension.
+    pub fn from_prebound_mem_with_dimension(
+        db: Surreal<Db>,
+        active_namespace: &str,
+        log_level: &str,
+        fact_embedding_dimension: usize,
+    ) -> Self {
         Self {
             engine: DbEngine::Mem(Arc::new(db)),
             active_namespace: active_namespace.to_string(),
             logger: StdoutLogger::new(log_level),
-            fact_embedding_dimension: crate::config::DEFAULT_EMBEDDING_DIMENSION,
+            fact_embedding_dimension,
         }
     }
 

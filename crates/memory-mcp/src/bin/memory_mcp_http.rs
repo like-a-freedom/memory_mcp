@@ -28,7 +28,7 @@ async fn main() -> ExitCode {
         eprintln!("{msg}");
         return ExitCode::from(2);
     }
-    let runtime = match bootstrap::build_state(&cfg).await {
+    let runtime = match bootstrap::build_state(&cfg, &logger).await {
         Ok(r) => r,
         Err((code, msg)) => {
             eprintln!("{msg}");
@@ -56,6 +56,13 @@ async fn main() -> ExitCode {
     }
 
     signal_watcher::spawn(state.shutdown.clone(), state.admission.clone());
+
+    // The backfill job walks tenants, so a deployment with no embedding
+    // policy has nothing for it to do. It is not registered at all in that
+    // case rather than registered-and-gated: a job that cannot act is a line in
+    // the job list an operator has to reason about, and a lexical-only
+    // deployment should not have one.
+    let backfill_policy = runtime.deployment_policy.clone();
 
     let scheduler_hooks = match memory_mcp::bootstrap::provisioning_scheduler_hooks(
         runtime.tenant_migrations.clone(),
@@ -85,7 +92,14 @@ async fn main() -> ExitCode {
         let hooks = hooks.with_additional_job(
             memory_mcp::http::registry::surreal_store::rate_bucket_cleanup_scheduler_job(),
         );
-        hooks
+        match backfill_policy.embedding.is_some() {
+            true => hooks.with_additional_job(
+                memory_mcp::http::embedding::backfill_scheduler::backfill_scheduler_job(
+                    backfill_policy,
+                ),
+            ),
+            false => hooks,
+        }
     })
     .and_then(|hooks| hooks.with_maintenance_parallelism(cfg.maintenance_parallelism))
     {

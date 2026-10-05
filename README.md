@@ -1177,7 +1177,7 @@ The following settings are optional for power users. They are read by the same e
 | `EMBEDDINGS_MAX_TOKENS` | unsigned integer | `384` | Max token budget before `local-candle` chunks long inputs |
 | `EMBEDDINGS_TIMEOUT_SECS` | unsigned integer | `15` | Timeout for remote embedding calls |
 | `EMBEDDINGS_RECOVERY_INTERVAL_SECS` | positive unsigned integer | `60` | Initial delay before the in-process recovery worker probes a remote provider after degraded startup; failed probes use exponential backoff. Must be greater than zero — `0` is a startup error, not a way to disable the interval (use `EMBEDDINGS_AUTO_RECOVERY=false`) |
-| `EMBEDDINGS_AUTO_RECOVERY` | boolean | `true` | Enable automatic in-process recovery after a failed remote startup preflight; set `false` for explicit opt-out |
+| `EMBEDDINGS_AUTO_RECOVERY` | boolean | `true` | Enable automatic in-process recovery after a failed remote startup preflight; set `false` for explicit opt-out. In the **HTTP** profile this additionally gates the per-tenant backfill scheduler job — only `1`/`true`/`yes` are true, and `auto` is not. See [Streamable HTTP environment variables](#streamable-http-environment-variables) |
 | `EMBEDDINGS_SIMILARITY_THRESHOLD` | floating-point number | `0.7` | Minimum cosine similarity for semantic matches |
 | `EMBEDDINGS_API_KEY` | string | unset | Optional bearer token for OpenAI-compatible providers |
 | `NER_EXTRACTOR` | string enum | `anno` (unset) | Entity extraction backend selector. Closed catalog: `anno` (lightweight, download-free), `regex` (project-owned deterministic), `anno-onnx` (Anno NuNER ONNX, local-path only), `urchade/gliner_multi-v2.1` (classic Candle GLiNER), `VAGOsolutions/SauerkrautLM-LFM2.5-GLiNER` (native Candle LFM2 GLiNER). Unknown values and arbitrary repository IDs are rejected. The removed `NER_PROVIDER` and `NER_MODEL` variables fail with migration guidance if present |
@@ -1321,6 +1321,33 @@ seconds — a longer interval would let a revoked authorization keep streaming.
 | `MEMORY_MCP_HTTP_TASK_QUEUE_CAPACITY` | `usize` | `256` | Bounded durable Task queue capacity |
 | `MEMORY_MCP_HTTP_TASK_SYNC_MAX_BYTES` | `usize` | `1048576` (1 MiB) | Preflight size limit: `extract` work above this returns a preflight rejection for clients that did not advertise Tasks |
 | `MEMORY_MCP_HTTP_REPLICA_ID` | string | unset (falls back to process PID) | Stable replica identity. Set in multi-replica deployments; the PID fallback is safe only for a single process |
+
+**Embeddings (deployment-level)**
+
+The embedding provider is deployment-level policy, not tenant configuration:
+one provider, model, and dimension for the whole HTTP deployment, applied to
+every tenant namespace. `EMBEDDINGS_*` carries the same meaning here as in the
+stdio profile — see [Advanced runtime overrides](#advanced-runtime-overrides) for
+the full variable table — with these HTTP-specific consequences:
+
+| Variable | Type | Default | Description |
+| --- | --- | --- | --- |
+| `EMBEDDINGS_ENABLED` | boolean | `false` when unset and no provider is set | Enable semantic retrieval for every tenant. A deployment that enables it but cannot resolve the provider fails startup rather than silently degrading |
+| `EMBEDDINGS_AUTO_RECOVERY` | boolean | `true` | Whether a background scheduler job fills tenant facts that carry no vector. Only `1`, `true`, and `yes` enable it — **`auto` is not a truthy value**, so `EMBEDDINGS_AUTO_RECOVERY=auto` reads as *off* and gets no backfill |
+
+The backfill job walks the ready tenants once per scheduler cycle and fills
+`embedding IS NONE` in place. It never rewrites an existing vector and never
+re-declares the tenant's HNSW index; when it is disabled it logs
+`http.embedding.backfill_disabled` at `Debug` and does nothing, so a deployment
+that enabled embeddings but left recovery off does not silently scan every tenant
+on every tick.
+
+A tenant whose stored vectors were written by a **different** provider is a
+different situation, and backfill does not apply to it: those facts already hold
+a vector, so nothing is missing to fill. Such a tenant stays on lexical
+retrieval until an operator rewrites its vectors through the reembed route, and
+the deployment never does that on its own. See
+[docs/operations/LIMITATIONS.md](docs/operations/LIMITATIONS.md).
 
 `MEMORY_INGESTION_INBOX` is never read by the HTTP profile: filesystem ingestion
 is a stdio-only path, so a value set in the environment has no effect here rather

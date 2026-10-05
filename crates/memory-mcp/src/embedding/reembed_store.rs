@@ -53,6 +53,64 @@ impl ReembedStoreClient {
         }
     }
 
+    /// Extract the `DIMENSION <n>` width from a `DEFINE INDEX … HNSW DIMENSION n`
+    /// statement, or `None` when the statement declares no width.
+    ///
+    /// The statement is SurrealDB's own rendering of the index, so this reads
+    /// the schema rather than any value the server was asked about.
+    #[cfg(feature = "streamable-http")]
+    fn parse_defined_index_dimension(define_statement: &str) -> Option<usize> {
+        const MARKER: &str = "DIMENSION ";
+        let after = &define_statement[define_statement.find(MARKER)? + MARKER.len()..];
+        let width: String = after.chars().take_while(char::is_ascii_digit).collect();
+        width.parse().ok()
+    }
+
+    /// Read the dimension the namespace's `fact_embedding_hnsw` index was
+    /// defined with, or `None` when the index does not exist.
+    ///
+    /// The index definition is the schema's own record of the vector width
+    /// stored facts were written at. A deployment whose provider changed
+    /// dimension needs it: without this, an already-provisioned namespace
+    /// keeps an index that silently rejects every new embedding.
+    ///
+    /// Only the HTTP activation path consults it, so a stdio build compiles
+    /// without it rather than carrying an unread method.
+    #[cfg(feature = "streamable-http")]
+    pub async fn embedding_index_dimension(&self) -> Result<Option<usize>, MemoryError> {
+        // `INFO FOR TABLE` reports each index as its full `DEFINE` statement
+        // rather than as structured fields, so the width is read back out of
+        // that text. (`INFO FOR INDEX <name>` needs an `ON TABLE` clause and
+        // reports only build status, not the definition.) `BoundDbClient::query`
+        // already applies the `Object`/`String` unwrapping the tagged wire form
+        // needs, so the record reads as an ordinary object here.
+        let rows = self.db.query_rows("INFO FOR TABLE fact", None).await?;
+        Ok(rows
+            .first()
+            .and_then(|record| record.get("indexes"))
+            .and_then(|indexes| indexes.get(EMBEDDING_INDEX_NAME))
+            .and_then(Value::as_str)
+            .and_then(Self::parse_defined_index_dimension))
+    }
+
+    /// Counts facts that carry a vector, whatever wrote it.
+    ///
+    /// This is the predicate that separates a namespace whose gaps backfill
+    /// may fill from one whose vectors only a reembed may rewrite, so it
+    /// answers "how many hold a vector", not "how many are stale".
+    #[cfg(feature = "streamable-http")]
+    pub async fn count_stored_vectors(&self) -> Result<usize, MemoryError> {
+        let sql = "SELECT count() AS count FROM fact WHERE embedding IS NOT NONE GROUP ALL";
+        let rows = self.db.query_rows(sql, None).await?;
+
+        Ok(rows
+            .first()
+            .and_then(|record| record.get("count").cloned())
+            .and_then(|value| value.as_u64())
+            .and_then(|value| usize::try_from(value).ok())
+            .unwrap_or(0))
+    }
+
     /// Defines the fact embedding HNSW index with the given vector dimension
     /// in the process-bound namespace (C2).
     pub async fn define_embedding_index(&self, dimension: usize) -> Result<(), MemoryError> {
@@ -138,6 +196,10 @@ mod tests {
     use std::sync::Arc;
 
     use serde_json::json;
+    #[cfg(feature = "streamable-http")]
+    use surrealdb::Surreal;
+    #[cfg(feature = "streamable-http")]
+    use surrealdb::engine::local::Mem;
 
     use crate::embedding::reembed_store::ReembedStoreClient;
     use crate::shared::temporal::normalize_dt;
@@ -202,6 +264,126 @@ mod tests {
             )
             .await
             .expect("seed fact should succeed");
+    }
+
+    /// A client told which width it writes vectors at renders the
+    /// `fact_embedding_hnsw` index at that width, and the index's own
+    /// definition reports it back.
+    ///
+    /// This is the regression for the HTTP profile hardcoding 1536 in every
+    /// `from_prebound*` constructor: a namespace provisioned by a
+    /// 2048-dimension provider was indexed at 1536, and every vector that
+    /// provider wrote was rejected by its own index.
+    #[cfg(feature = "streamable-http")]
+    #[tokio::test]
+    async fn a_dimension_aware_namespace_reports_the_index_width_it_was_provisioned_at() {
+        let db = Surreal::new::<Mem>(()).await.expect("mem engine");
+        db.use_ns("dim_aware").use_db("memory").await.expect("bind");
+        let client = Arc::new(SurrealDbClient::from_prebound_mem_with_dimension(
+            db,
+            "dim_aware",
+            "warn",
+            2048,
+        ));
+        client
+            .apply_migrations("dim_aware")
+            .await
+            .expect("migrations apply");
+
+        let store = ReembedStoreClient::new(Arc::clone(&client) as Arc<dyn DbClient>, "dim_aware");
+        assert_eq!(
+            store
+                .embedding_index_dimension()
+                .await
+                .expect("index probe"),
+            Some(2048),
+            "the rendered HNSW index must carry the dimension the provider writes"
+        );
+    }
+
+    /// The default constructor still renders 1536: a stdio deployment with no
+    /// explicit dimension keeps the process-wide default.
+    #[cfg(feature = "streamable-http")]
+    #[tokio::test]
+    async fn a_namespace_provisioned_without_a_dimension_reports_the_default_width() {
+        let db = Surreal::new::<Mem>(()).await.expect("mem engine");
+        db.use_ns("dim_default")
+            .use_db("memory")
+            .await
+            .expect("bind");
+        let client = Arc::new(SurrealDbClient::from_prebound_mem(
+            db,
+            "dim_default",
+            "warn",
+        ));
+        client
+            .apply_migrations("dim_default")
+            .await
+            .expect("migrations apply");
+
+        let store =
+            ReembedStoreClient::new(Arc::clone(&client) as Arc<dyn DbClient>, "dim_default");
+        assert_eq!(
+            store
+                .embedding_index_dimension()
+                .await
+                .expect("index probe"),
+            Some(crate::config::DEFAULT_EMBEDDING_DIMENSION)
+        );
+    }
+
+    /// `None` for an index that was never defined, so the caller cannot
+    /// mistake "no index" for a mismatch it should repair.
+    #[cfg(feature = "streamable-http")]
+    #[tokio::test]
+    async fn an_absent_index_reports_no_dimension() {
+        let db = Surreal::new::<Mem>(()).await.expect("mem engine");
+        db.use_ns("dim_absent")
+            .use_db("memory")
+            .await
+            .expect("bind");
+        let client = Arc::new(SurrealDbClient::from_prebound_mem(db, "dim_absent", "warn"));
+
+        let store = ReembedStoreClient::new(Arc::clone(&client) as Arc<dyn DbClient>, "dim_absent");
+        assert_eq!(
+            store
+                .embedding_index_dimension()
+                .await
+                .expect("index probe"),
+            None
+        );
+    }
+
+    /// The activation reconcile asks "does this namespace store any vector?"
+    /// before it may re-declare an index at the deployment's width. Zero means
+    /// backfill's business; one or more means a reembed is required, and
+    /// silently re-declaring would strand vectors the new index rejects.
+    #[cfg(feature = "streamable-http")]
+    #[tokio::test]
+    async fn stored_vectors_are_counted_so_the_reconcile_can_tell_backfill_from_reembed() {
+        let db_client = make_db().await;
+        let store = ReembedStoreClient::new(
+            Arc::clone(&db_client) as Arc<dyn DbClient>,
+            "org".to_string(),
+        );
+
+        assert_eq!(
+            store
+                .count_stored_vectors()
+                .await
+                .expect("count on an empty namespace"),
+            0,
+            "a namespace that never embedded has nothing for a reembed to rewrite"
+        );
+
+        seed_fact(&db_client, "fact:seed", Some("sig:a")).await;
+        assert_eq!(
+            store
+                .count_stored_vectors()
+                .await
+                .expect("count after seeding"),
+            1
+        );
     }
 
     #[tokio::test]

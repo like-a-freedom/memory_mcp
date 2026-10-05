@@ -17,3 +17,5 @@
 7. **Session lifetime limits** — Browser sessions have absolute and idle expiry limits (configurable). Long-running operations may be interrupted by session expiry.
 
 8. **API key secret shown once** — API key secrets are only displayed at creation time. If lost, a new key must be generated.
+
+9. **Cross-provider vectors need an operator reembed** — In the HTTP profile, a tenant whose stored fact vectors were written by a *different* embedding provider (a changed `EMBEDDINGS_PROVIDER`, `EMBEDDINGS_MODEL`, `EMBEDDINGS_BASE_URL`, or effective dimension) stays on lexical/graph retrieval until an operator rewrites its vectors through the reembed route. The automatic backfill job does **not** apply to such a tenant: backfill only fills facts whose `embedding` is absent, and these facts already carry one. Automatic rewriting is deliberately not performed, because replacing every stored vector is a destructive, non-reversible operation on tenant data and is not a decision a background job should make.
