@@ -72,6 +72,21 @@ pub fn build_router(
         get(crate::control::local_admin::handlers::auth_config),
     );
 
+    // RFC 9728 Protected Resource Metadata. Public (mounted on the base
+    // router, so only the boundary layers cover it) and present only when an
+    // OIDC authorization server is configured — its whole content is that
+    // server plus the resource it authorizes. MCP clients read it to discover
+    // how to obtain the access token `authenticate` accepts.
+    #[cfg(feature = "control-plane")]
+    let router = if state.config.has_method(BrowserAuthMethod::Oidc) {
+        router.route(
+            "/.well-known/oauth-protected-resource",
+            get(crate::http::oauth::protected_resource_metadata),
+        )
+    } else {
+        router
+    };
+
     // The fault injector is installed unconditionally, never conditionally.
     //
     // `confirm_account_deletion` takes it as an `Extension`, and axum rejects
@@ -470,6 +485,49 @@ mod tests {
         );
     }
 
+    /// The RFC 9728 Protected Resource Metadata route is mounted exactly when
+    /// an OIDC authorization server is configured: a client can only discover a
+    /// resource the deployment actually serves, and the metadata's whole
+    /// content is that server plus this resource.
+    #[cfg(feature = "control-plane")]
+    #[tokio::test]
+    async fn protected_resource_metadata_is_mounted_only_with_an_oidc_method() {
+        let oidc_state = HttpStateTestBuilder::new()
+            .await
+            .build()
+            .await
+            .expect("oidc-shaped state");
+        let mut router = build_router(oidc_state, None).expect("router builds in tests");
+        let resp = router
+            .call(request(
+                Method::GET,
+                "/.well-known/oauth-protected-resource",
+            ))
+            .await
+            .expect("dispatch");
+        assert_eq!(
+            resp.status(),
+            StatusCode::OK,
+            "an OIDC deployment must publish protected-resource metadata"
+        );
+
+        let (builder, _store) = HttpStateTestBuilder::local_admin().await;
+        let local_state = builder.build().await.expect("local-admin state");
+        let mut router = build_router(local_state, None).expect("router builds in tests");
+        let resp = router
+            .call(request(
+                Method::GET,
+                "/.well-known/oauth-protected-resource",
+            ))
+            .await
+            .expect("dispatch");
+        assert_eq!(
+            resp.status(),
+            StatusCode::NOT_FOUND,
+            "a deployment with no OIDC authorization server publishes nothing to discover"
+        );
+    }
+
     /// The mode disclosure is mounted in the supported control-plane profile
     /// without a runtime product switch.
     #[cfg(feature = "control-plane")]
@@ -798,31 +856,5 @@ mod tests {
                  the refusal or rejection the route is mounted to answer: {body}"
             );
         }
-    }
-}
-
-#[cfg(test)]
-pub mod test_helpers {
-    use super::*;
-    use axum::body::Body;
-    use axum::http::{Method, Request};
-    use tower_service::Service;
-
-    /// Drive a single request through the router. Caller specifies
-    /// method, URI, and (method, host) header set used by the
-    /// host-origin middleware.
-    pub async fn dispatch(
-        router: Router,
-        method: Method,
-        uri: &str,
-        headers: &[(&str, &str)],
-    ) -> axum::response::Response {
-        let mut svc = router;
-        let mut b = Request::builder().method(method).uri(uri);
-        for (k, v) in headers {
-            b = b.header(*k, *v);
-        }
-        let req = b.body(Body::empty()).expect("request builder");
-        svc.call(req).await.expect("dispatch")
     }
 }

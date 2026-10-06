@@ -2,13 +2,11 @@
 //!
 //! The runtime is the per-Tenant bundle: a tenant-bound
 //! SurrealDB client, a `MemoryService` (and the modern
-//! `MemoryMcp` handler built from it), a `BoundDbClient` for
-//! namespace-free adapters, and a creation timestamp the
-//! pool uses for idle eviction. The construction rule is
-//! "clone once, bind once" — see `build_runtime`.
+//! `MemoryMcp` handler built from it), and a `BoundDbClient` for
+//! namespace-free adapters. The construction rule is
+//! "clone once, bind once" — see `build_runtime_with_options`.
 
 use std::sync::Arc;
-use std::time::Instant;
 
 use crate::embedding::providers::{DisabledEmbeddingProvider, EmbeddingProvider};
 use crate::error::MemoryError;
@@ -194,19 +192,12 @@ impl RuntimeOptions {
 pub struct TenantRuntime {
     pub tenant_id: String,
     pub namespace: String,
-    pub database: String,
-    pub schema_version: u32,
     /// Tenant-bound SurrealDB client. Acquired by cloning the
     /// privileged raw handle and calling `use_ns(...).use_db(...)`
     /// exactly once at build time; the resulting adapter is
     /// never rebound.
     pub tenant_db: Arc<SurrealDbClient>,
-    /// Namespace-free adapter for App Sessions, the outbox,
-    /// and other tenant stores. Always delegates with this
-    /// runtime's immutable namespace.
-    pub bound_db: Arc<BoundDbClient>,
     pub mcp_service: MemoryMcp,
-    pub created_at: Instant,
 }
 
 /// What one tenant namespace resolved to: the provider it may use, and the
@@ -369,7 +360,6 @@ impl TenantRuntime {
         options: RuntimeOptions,
     ) -> Result<Self, MemoryError> {
         let namespace = tenant.namespace_binding.namespace.clone();
-        let database = tenant.namespace_binding.database.clone();
         let bound_db = Arc::new(BoundDbClient::new(tenant_db.clone(), namespace.clone()));
         // Propagate the composition-owned injector to the
         // per-tenant bound client so the outbox commit path
@@ -464,31 +454,10 @@ impl TenantRuntime {
         Ok(Self {
             tenant_id: tenant.id.clone(),
             namespace,
-            database,
-            schema_version: tenant.schema_version,
             tenant_db,
-            bound_db,
             mcp_service,
-            created_at: Instant::now(),
         })
     }
-}
-
-/// Build a runtime by cloning the privileged `Surreal<C>`
-/// handle from the registry, binding it once, and wrapping
-/// the result. The engine variant determines which
-/// `from_prebound*` constructor to call.
-///
-/// This entry point is retained for compatibility but
-/// accepts no options. Use `build_runtime_with_options`
-/// when a task retention or queue capacity override is
-/// needed.
-#[deprecated(note = "use build_runtime_with_options")]
-pub async fn build_runtime(
-    registry: &super::super::registry::RegistryHandle,
-    tenant: &Tenant,
-) -> Result<TenantRuntime, MemoryError> {
-    build_runtime_with_options(registry, tenant, RuntimeOptions::default()).await
 }
 
 pub async fn build_runtime_with_options(

@@ -47,6 +47,9 @@ pub use jwks::JwksCache;
 pub use sealing::{identity_subject_verifier, seal_oidc_payload, unseal_oidc_payload};
 
 #[cfg(test)]
+pub(crate) mod test_provider;
+
+#[cfg(test)]
 mod tests {
     use super::*;
     use crate::control::session::ControlPlaneSession;

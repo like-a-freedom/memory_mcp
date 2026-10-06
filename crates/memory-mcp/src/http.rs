@@ -64,8 +64,6 @@ pub struct HttpState {
     /// Trusted Account → Tenant resolution owned by tenancy.
     pub tenant_resolver: Arc<dyn crate::tenancy::api::ResolveTenantPort>,
     pub api_key_issuance: Arc<dyn crate::provisioning::api::ApiKeyIssuancePort>,
-    #[cfg(feature = "control-plane")]
-    pub client_creation: Option<Arc<dyn crate::provisioning::api::ClientCreationPort>>,
     /// OIDC client for the control-plane login flow.
     /// `None` when the control plane is disabled.
     #[cfg(feature = "control-plane")]
@@ -409,9 +407,6 @@ impl HttpState {
             account_deletion_port,
             authenticator,
             api_key_issuance,
-            client_creation: local_admin
-                .as_ref()
-                .map(|extension| Arc::clone(&extension.client_creation)),
             tenant_resolver,
             #[cfg(feature = "control-plane")]
             oidc_client,

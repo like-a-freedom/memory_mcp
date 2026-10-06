@@ -267,6 +267,13 @@ impl OidcClient {
 
         Ok(token_data.claims)
     }
+
+    /// The JWKS cache the MCP OAuth resource-server path validates access
+    /// tokens against. Shared with the login flow so both trust one key set,
+    /// and so an unknown key triggers the same bounded single-flight refresh.
+    pub fn jwks(&self) -> &JwksCache {
+        &self.jwks
+    }
 }
 
 /// Normalize an issuer identifier for comparison.
@@ -586,5 +593,281 @@ mod tests {
             resolve_allowed_algorithms("PS256", &serde_json::json!({})),
             Err(MemoryError::ConfigInvalid(_))
         ));
+    }
+
+    // --- discovery, code exchange and ID-token validation -----------------
+
+    use crate::control::oidc::test_provider::{
+        KEY_ID as PROVIDER_KEY_ID, MockProvider, MockProviderConfig, RSA_PRIVATE_PEM, TokenAnswer,
+        sign_id_token,
+    };
+
+    /// A far-future expiry, so the assertions never race the wall clock.
+    const FAR_FUTURE: u64 = 4_102_444_800; // 2100-01-01T00:00:00Z
+    /// The audience and redirect URI the clients below are configured with.
+    const CLIENT_AUDIENCE: &str = "memory-mcp";
+    const CLIENT_REDIRECT: &str = "https://app.example/callback";
+
+    /// A client that has completed discovery against `provider`.
+    async fn discovered_client(provider: &MockProvider) -> OidcClient {
+        OidcClient::new(
+            provider.base_url(),
+            "memory-mcp",
+            CLIENT_AUDIENCE,
+            CLIENT_REDIRECT,
+            "auto",
+        )
+        .await
+        .expect("discovery succeeds against the mock provider")
+    }
+
+    /// The ID-token claims a provider issues for `sub`, naming `issuer`.
+    fn id_token_claims(issuer: &str, sub: &str) -> serde_json::Value {
+        serde_json::json!({
+            "sub": sub,
+            "iss": issuer,
+            "aud": CLIENT_AUDIENCE,
+            "exp": FAR_FUTURE,
+        })
+    }
+
+    #[tokio::test]
+    async fn discovery_builds_a_client_that_authorizes_at_the_discovered_endpoint() {
+        let provider = MockProvider::spawn(MockProviderConfig::default()).await;
+        let client = discovered_client(&provider).await;
+
+        let url = client
+            .authorize_url(&OidcState::new(), &PkceCode::new(), &OidcNonce::new())
+            .expect("authorization URL");
+
+        assert!(
+            url.starts_with(&format!("{}/auth", provider.base_url())),
+            "the authorization endpoint must come from discovery, got {url}"
+        );
+    }
+
+    /// The freshly minted PKCE pair must be self-consistent — the challenge is
+    /// `S256(verifier)`. A mismatch is invisible until the provider refuses the
+    /// code exchange, so pin it where it is cheap.
+    #[test]
+    fn pkce_new_derives_the_challenge_from_its_own_verifier() {
+        use oauth2::{PkceCodeChallenge, PkceCodeVerifier};
+
+        let pkce = PkceCode::new();
+
+        assert_eq!(
+            pkce.challenge,
+            PkceCodeChallenge::from_code_verifier_sha256(&PkceCodeVerifier::new(
+                pkce.verifier.clone()
+            ))
+            .as_str(),
+            "the challenge must be S256(verifier) or every code exchange fails"
+        );
+    }
+
+    #[tokio::test]
+    async fn discovery_rejects_a_document_for_another_issuer() {
+        let provider = MockProvider::spawn(MockProviderConfig {
+            published_issuer: Some("https://evil.example".to_string()),
+            ..Default::default()
+        })
+        .await;
+
+        let result = OidcClient::new(
+            provider.base_url(),
+            "memory-mcp",
+            CLIENT_AUDIENCE,
+            CLIENT_REDIRECT,
+            "auto",
+        )
+        .await;
+
+        assert!(matches!(result, Err(MemoryError::ConfigInvalid(_))));
+    }
+
+    #[tokio::test]
+    async fn discovery_fails_when_the_provider_advertises_no_supported_algorithm() {
+        // `auto` intersects the advertisement with the safe set, so a provider
+        // offering only a symmetric algorithm leaves it empty — a startup error
+        // rather than a silent widening.
+        let provider = MockProvider::spawn(MockProviderConfig {
+            algorithms: vec!["HS256".to_string()],
+            ..Default::default()
+        })
+        .await;
+
+        let result = OidcClient::new(
+            provider.base_url(),
+            "memory-mcp",
+            CLIENT_AUDIENCE,
+            CLIENT_REDIRECT,
+            "auto",
+        )
+        .await;
+
+        assert!(matches!(result, Err(MemoryError::ConfigInvalid(_))));
+    }
+
+    #[tokio::test]
+    async fn discovery_reports_an_unreachable_provider() {
+        // A port nothing listens on: discovery must fail, not hang or panic.
+        let result = OidcClient::new(
+            "http://127.0.0.1:1",
+            "memory-mcp",
+            CLIENT_AUDIENCE,
+            CLIENT_REDIRECT,
+            "auto",
+        )
+        .await;
+
+        assert!(matches!(result, Err(MemoryError::ConfigInvalid(_))));
+    }
+
+    #[tokio::test]
+    async fn exchange_code_returns_the_provider_id_token() {
+        // `exchange_code` only extracts the `id_token` from the token response,
+        // so the fixture's issuer need not name this provider.
+        let id_token = sign_id_token(&id_token_claims("https://idp.example", "user-1"));
+        let provider = MockProvider::spawn(MockProviderConfig {
+            token: TokenAnswer::IdToken(id_token.clone()),
+            ..Default::default()
+        })
+        .await;
+        let client = discovered_client(&provider).await;
+
+        let tokens = client
+            .exchange_code("auth-code".to_string(), PkceCode::new())
+            .await
+            .expect("the provider answers with an id_token");
+
+        assert_eq!(tokens.id_token, id_token);
+    }
+
+    #[tokio::test]
+    async fn exchange_code_reports_a_provider_refusal() {
+        let provider = MockProvider::spawn(MockProviderConfig {
+            token: TokenAnswer::Refused,
+            ..Default::default()
+        })
+        .await;
+        let client = discovered_client(&provider).await;
+
+        let result = client
+            .exchange_code("auth-code".to_string(), PkceCode::new())
+            .await;
+
+        assert!(matches!(result, Err(AuthError::Provider(_))));
+    }
+
+    #[tokio::test]
+    async fn exchange_code_requires_an_id_token() {
+        let provider = MockProvider::spawn(MockProviderConfig {
+            token: TokenAnswer::NoIdToken,
+            ..Default::default()
+        })
+        .await;
+        let client = discovered_client(&provider).await;
+
+        let result = client
+            .exchange_code("auth-code".to_string(), PkceCode::new())
+            .await;
+
+        assert!(matches!(result, Err(AuthError::MalformedToken)));
+    }
+
+    #[tokio::test]
+    async fn validate_id_token_accepts_a_token_signed_by_the_published_key() {
+        let provider = MockProvider::spawn(MockProviderConfig::default()).await;
+        let client = discovered_client(&provider).await;
+        let token = sign_id_token(&id_token_claims(provider.base_url(), "user-1"));
+
+        let claims = client
+            .validate_id_token(&token)
+            .await
+            .expect("token validates");
+
+        assert_eq!(claims.sub, "user-1");
+    }
+
+    #[tokio::test]
+    async fn validate_id_token_rejects_a_token_with_no_key_id() {
+        let provider = MockProvider::spawn(MockProviderConfig::default()).await;
+        let client = discovered_client(&provider).await;
+        let mut header = jsonwebtoken::Header::new(jsonwebtoken::Algorithm::RS256);
+        header.kid = None;
+        let token = jsonwebtoken::encode(
+            &header,
+            &id_token_claims(provider.base_url(), "user-1"),
+            &jsonwebtoken::EncodingKey::from_rsa_pem(RSA_PRIVATE_PEM.as_bytes())
+                .expect("fixture key"),
+        )
+        .expect("token signs");
+
+        let result = client.validate_id_token(&token).await;
+
+        assert!(matches!(result, Err(AuthError::MissingKeyId)));
+    }
+
+    #[tokio::test]
+    async fn validate_id_token_rejects_an_algorithm_the_provider_never_advertised() {
+        let provider = MockProvider::spawn(MockProviderConfig::default()).await;
+        let client = discovered_client(&provider).await;
+        // A symmetric header for a provider that only advertises RS256: the
+        // token must be refused before any signature check.
+        let mut header = jsonwebtoken::Header::new(jsonwebtoken::Algorithm::HS256);
+        header.kid = Some(PROVIDER_KEY_ID.to_string());
+        let token = jsonwebtoken::encode(
+            &header,
+            &id_token_claims(provider.base_url(), "user-1"),
+            &jsonwebtoken::EncodingKey::from_secret(b"secret"),
+        )
+        .expect("token signs");
+
+        let result = client.validate_id_token(&token).await;
+
+        assert!(matches!(result, Err(AuthError::DisallowedAlgorithm { .. })));
+    }
+
+    #[tokio::test]
+    async fn validate_id_token_rejects_an_expired_token() {
+        let provider = MockProvider::spawn(MockProviderConfig::default()).await;
+        let client = discovered_client(&provider).await;
+        let mut claims = id_token_claims(provider.base_url(), "user-1");
+        claims["exp"] = serde_json::json!(1);
+        let token = sign_id_token(&claims);
+
+        let result = client.validate_id_token(&token).await;
+
+        assert!(result.is_err(), "an expired ID token must not validate");
+    }
+
+    #[tokio::test]
+    async fn validate_id_token_rejects_a_token_for_another_audience() {
+        let provider = MockProvider::spawn(MockProviderConfig::default()).await;
+        let client = discovered_client(&provider).await;
+        let mut claims = id_token_claims(provider.base_url(), "user-1");
+        claims["aud"] = serde_json::json!("some-other-service");
+        let token = sign_id_token(&claims);
+
+        let result = client.validate_id_token(&token).await;
+
+        assert!(
+            result.is_err(),
+            "an ID token for another audience must not validate"
+        );
+    }
+
+    #[tokio::test]
+    async fn validate_id_token_rejects_a_token_from_another_issuer() {
+        let provider = MockProvider::spawn(MockProviderConfig::default()).await;
+        let client = discovered_client(&provider).await;
+        let token = sign_id_token(&id_token_claims("https://evil.example", "user-1"));
+
+        let result = client.validate_id_token(&token).await;
+
+        assert!(
+            result.is_err(),
+            "an ID token from another issuer must not validate"
+        );
     }
 }

@@ -157,7 +157,14 @@ pub(crate) async fn reconcile_claim_inline(
         updated_at: chrono::Utc::now(),
         completed_at: None,
     };
-    reconcile_page_with_owning(claim_service, &job, owning).await
+    reconcile_page_with_owning(
+        claim_service,
+        &job,
+        owning,
+        claim_service.config.inline_candidate_limit,
+        Some(claim_service.config.inline_budget),
+    )
+    .await
 }
 
 async fn reconcile_page(claim_service: &ClaimService, job: &ClaimJob) -> Result<(), MemoryError> {
@@ -184,13 +191,30 @@ async fn reconcile_page(claim_service: &ClaimService, job: &ClaimJob) -> Result<
         None => return Ok(()),
     };
 
-    reconcile_page_with_owning(claim_service, job, owning).await
+    reconcile_page_with_owning(
+        claim_service,
+        job,
+        owning,
+        claim_service.config.candidate_page_size,
+        None,
+    )
+    .await
 }
 
+/// Reconcile one page of candidates for `owning`.
+///
+/// `limit` bounds the candidate fetch and `budget` bounds the wall-clock the
+/// pass may spend. The durable reconciler passes the configured page size and
+/// no budget; the inline write-path pass passes its own (tighter) limit and
+/// budget, and stops once the budget is spent — leaving the commit's cursor at
+/// the last candidate it actually considered, so a resumption continues at the
+/// candidate it declined rather than skipping it.
 async fn reconcile_page_with_owning(
     claim_service: &ClaimService,
     job: &ClaimJob,
     owning: crate::models::claim::Claim,
+    limit: usize,
+    budget: Option<std::time::Duration>,
 ) -> Result<(), MemoryError> {
     let page_start = std::time::Instant::now();
     let slot_fp = owning.slot_fingerprint.clone();
@@ -201,7 +225,7 @@ async fn reconcile_page_with_owning(
             slot_fingerprint: &slot_fp,
             identity_version: owning.identity_version,
             after_claim_id: None,
-            limit: claim_service.config.candidate_page_size,
+            limit,
         })
         .await?;
 
@@ -241,8 +265,16 @@ async fn reconcile_page_with_owning(
     let mut processed: u64 = 0;
     let mut succeeded: u64 = 0;
     let mut skipped: u64 = 0;
+    // The last candidate this pass took responsibility for. A budget break
+    // leaves it one behind the candidate it declined to consider, so the
+    // cursor below resumes at that candidate rather than stepping past it.
+    let mut last_considered: Option<crate::models::ClaimId> = None;
 
     for candidate in &candidates {
+        if budget.is_some_and(|budget| page_start.elapsed() >= budget) {
+            break;
+        }
+        last_considered = Some(candidate.claim_id.clone());
         if candidate.claim_id == owning.claim_id {
             skipped += 1;
             continue;
@@ -339,7 +371,7 @@ async fn reconcile_page_with_owning(
         }
     }
 
-    let last_id = candidates.last().map(|c| c.claim_id.clone());
+    let last_id = last_considered;
     let request = CommitReconciliationPageRequest {
         job_id: &job.job_id,
         expected_lease_owner: "",
@@ -641,5 +673,102 @@ mod tests {
                 "swapped={swapped}: right_fact_id must be the fact of right_claim_id"
             );
         }
+    }
+
+    /// Persist `facts` same-slot facts through `after_fact_persisted` under
+    /// `config` and return how many relations the inline pass wrote.
+    async fn inline_relations(config: ClaimConfig, facts: usize) -> usize {
+        let store = Arc::new(RecordingClaimStore::default());
+        let service = ClaimService::new(store.clone()).with_config(config);
+        let no_tags: Vec<String> = Vec::new();
+        for index in 0..facts {
+            let fact_id = FactId::from(format!("fact:inline-probe-{index}"));
+            let episode_id = EpisodeId::from(format!("episode:inline-probe-{index}"));
+            service
+                .after_fact_persisted(&FactPersistedParams {
+                    namespace: "main",
+                    fact_id: &fact_id,
+                    source_episode_id: &episode_id,
+                    fact_type: "note",
+                    content: "status is active",
+                    policy_tags: &no_tags,
+                    entity_links: &[],
+                    t_valid: chrono::Utc::now(),
+                    source_lineage: Some("lineage:inline-probe"),
+                })
+                .await
+                .expect("fact projection and inline reconciliation should succeed");
+        }
+        store.relations.lock().unwrap().len()
+    }
+
+    /// The inline pass bounds its candidate fetch by `inline_candidate_limit`
+    /// — the value `MEMORY_CLAIM_INLINE_CANDIDATE_LIMIT` loads — rather than by
+    /// the durable page size. `inline_candidate_limit` was parsed, carried all
+    /// the way to `ClaimConfig`, and read by nothing, so a configured value
+    /// silently governed nothing; a narrow limit must now visibly reconcile
+    /// against fewer candidates.
+    #[tokio::test]
+    async fn inline_reconciliation_honours_its_own_candidate_limit() {
+        let narrow = inline_relations(
+            ClaimConfig {
+                rollout_stage: ClaimRolloutStage::Relations,
+                inline_candidate_limit: 1,
+                ..Default::default()
+            },
+            3,
+        )
+        .await;
+        let wide = inline_relations(
+            ClaimConfig {
+                rollout_stage: ClaimRolloutStage::Relations,
+                ..Default::default()
+            },
+            3,
+        )
+        .await;
+
+        assert_eq!(
+            narrow, 2,
+            "a one-candidate inline limit reconciles each new claim against one candidate"
+        );
+        assert_eq!(
+            wide, 3,
+            "a wide inline limit reconciles the new claim against every earlier one"
+        );
+    }
+
+    /// The inline pass stops once `inline_budget` — the value
+    /// `MEMORY_CLAIM_INLINE_BUDGET_MS` loads — is spent. A zero budget is the
+    /// deterministic case: `elapsed() >= ZERO` holds on the first check, so
+    /// nothing is reconciled, while the default budget reconciles normally.
+    #[tokio::test]
+    async fn inline_reconciliation_honours_its_budget() {
+        let exhausted = inline_relations(
+            ClaimConfig {
+                rollout_stage: ClaimRolloutStage::Relations,
+                inline_budget: std::time::Duration::ZERO,
+                ..Default::default()
+            },
+            2,
+        )
+        .await;
+        let ample = inline_relations(
+            ClaimConfig {
+                rollout_stage: ClaimRolloutStage::Relations,
+                ..Default::default()
+            },
+            2,
+        )
+        .await;
+
+        assert_eq!(
+            exhausted, 0,
+            "a spent inline budget must stop the write-path pass"
+        );
+        assert_eq!(
+            ample, 1,
+            "the same facts reconcile under the default budget, so the budget is what changed"
+        );
     }
 }

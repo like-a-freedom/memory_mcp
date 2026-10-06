@@ -4,15 +4,7 @@
 //! `ProvisioningStore::claim_provisioning`. The fenced CAS in
 //! the registry matches `(owner_id, lease_id,
 //! fencing_generation)` against the stored lease before any
-//! state advance. The `run_with_heartbeat` helper spawns a
-//! jittered heartbeat task and cancels the work future if
-//! the lease is lost.
-//!
-//! `LeaseRecord` is the durable shape stored in the
-//! `provisioning_lease` field of a `Tenant`. The
-//! `FenceUpdate` enum and `commit_with_fence` helper
-//! implement the closed-set CAS surface so a request handler
-//! cannot inject arbitrary SurrealQL through the lease.
+//! state advance, and `heartbeat` forwards the periodic renewal.
 
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
@@ -38,17 +30,6 @@ where
 pub mod migration;
 pub mod scheduler;
 
-/// Stored shape of a `provisioning_lease` in the
-/// `tenant_provisioning_lease` table.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct LeaseRecord {
-    pub owner_id: String,
-    pub lease_id: String,
-    pub expires_at: DateTime<Utc>,
-    pub fencing_generation: u64,
-    pub heartbeat_at: DateTime<Utc>,
-}
-
 /// Fenced provisioning lease returned by
 /// `ProvisioningStore::claim_provisioning`. The token is
 /// intentionally not constructible by a request handler; only
@@ -63,17 +44,6 @@ pub struct ProvisioningLease {
 }
 
 impl ProvisioningLease {
-    /// Seconds remaining until the lease expires. May be
-    /// negative if the scheduler has not yet noticed expiry.
-    pub fn ttl_secs(&self, now: DateTime<Utc>) -> i64 {
-        (self.expires_at - now).num_seconds()
-    }
-
-    /// True if the lease has expired relative to `now`.
-    pub fn is_expired(&self, now: DateTime<Utc>) -> bool {
-        self.ttl_secs(now) <= 0
-    }
-
     /// Heartbeat the lease. Forwarded to
     /// `ProvisioningStore::heartbeat_provisioning`.
     pub async fn heartbeat(
@@ -94,126 +64,13 @@ impl ProvisioningLease {
             )
             .await
     }
-
-    /// Release the lease. Forwarded to
-    /// `ProvisioningStore::release_provisioning_lease`.
-    pub async fn release(
-        &self,
-        store: &dyn crate::http::registry::ProvisioningStore,
-        tenant_id: &str,
-    ) -> Result<(), crate::error::MemoryError> {
-        store
-            .release_provisioning_lease(
-                tenant_id,
-                &self.owner_id,
-                &self.lease_id,
-                self.fencing_generation,
-            )
-            .await
-    }
-
-    /// Run `work` while heartbeating the lease at a
-    /// `lease_ttl / 3` cadence with ±20% jitter. If the
-    /// heartbeat fails (lease lost), the work future is
-    /// cancelled and a `Conflict` error is returned. The
-    /// tenant id is passed explicitly; it is never derived
-    /// by parsing the opaque lease id.
-    pub async fn run_with_heartbeat<T, F>(
-        &self,
-        registry: crate::http::registry::RegistryHandle,
-        tenant_id: &str,
-        work: F,
-    ) -> Result<T, crate::error::MemoryError>
-    where
-        T: Send + 'static,
-        F: std::future::Future<Output = Result<T, crate::error::MemoryError>> + Send,
-    {
-        // Heartbeats are provisioning's fenced-lease store; the holder of the
-        // lease needs nothing else from the registry.
-        let provisioning = registry.provisioning();
-        let tenant_id = tenant_id.to_owned();
-        let heartbeat_cancel = tokio_util::sync::CancellationToken::new();
-        let (lost_tx, mut lost_rx) = tokio::sync::oneshot::channel();
-        let lease = self.clone();
-        let cancel = heartbeat_cancel.clone();
-        let heartbeat = tokio::spawn(async move {
-            loop {
-                // 16–24 seconds: lease_ttl / 3 with ±20% jitter.  Waiting
-                // before the first heartbeat prevents a fresh lease from
-                // racing the operation it was created to fence.
-                let delay = std::time::Duration::from_secs(16 + u64::from(rand_u8_below(9)));
-                tokio::select! {
-                    _ = cancel.cancelled() => break,
-                    _ = tokio::time::sleep(delay) => {
-                        let now = chrono::Utc::now();
-                        let expiry = now + chrono::Duration::seconds(60);
-                        if lease.heartbeat(&*provisioning, &tenant_id, now, expiry).await.is_err() {
-                            let _ = lost_tx.send(());
-                            break;
-                        }
-                    }
-                }
-            }
-        });
-        let result = await_body_or_lease_loss(work, &mut lost_rx).await;
-        heartbeat_cancel.cancel();
-        let _ = heartbeat.await;
-        result
-    }
-}
-
-/// Closed-set lease mutations. Callers cannot inject
-/// arbitrary SurrealQL through `commit_with_fence`; only
-/// these three shapes are valid.
-#[derive(Debug, Clone)]
-pub enum FenceUpdate {
-    Claim {
-        owner_id: String,
-        lease_id: String,
-        lease_expiry: DateTime<Utc>,
-    },
-    Heartbeat {
-        owner_id: String,
-        lease_id: String,
-        lease_expiry: DateTime<Utc>,
-        heartbeat_at: DateTime<Utc>,
-    },
-    Release {
-        owner_id: String,
-        lease_id: String,
-    },
-}
-
-#[cfg(feature = "streamable-http")]
-fn rand_u8_below(upper: u8) -> u8 {
-    rand::random::<u8>() % upper
-}
-#[cfg(not(feature = "streamable-http"))]
-fn rand_u8_below(upper: u8) -> u8 {
-    // Without `streamable-http` the lease module is unused;
-    // the function still exists for test builds that pull
-    // it in directly. A deterministic 0 keeps the cadence
-    // predictable.
-    0u8.min(upper.saturating_sub(1))
 }
 
 #[cfg(test)]
 mod heartbeat_tests {
     use super::*;
-    use chrono::{Duration, Utc};
 
     use crate::error::MemoryError;
-
-    /// A lease owned by `owner`, expiring `seconds` from `now`.
-    fn lease_expiring_at(now: chrono::DateTime<Utc>, seconds: i64) -> ProvisioningLease {
-        ProvisioningLease {
-            owner_id: "replica-1".to_string(),
-            lease_id: "lease-1".to_string(),
-            fencing_generation: 4,
-            expires_at: now + Duration::seconds(seconds),
-            heartbeat_at: now,
-        }
-    }
 
     #[tokio::test]
     async fn completed_body_wins_over_simultaneous_lease_loss() {
@@ -270,163 +127,6 @@ mod heartbeat_tests {
 
         assert_eq!(result.unwrap(), 7);
         drop(lost_tx);
-    }
-
-    #[test]
-    fn a_lease_with_future_expiry_is_not_expired() {
-        let now = Utc::now();
-
-        assert!(!lease_expiring_at(now, 60).is_expired(now));
-    }
-
-    #[test]
-    fn a_lease_expiring_now_is_expired() {
-        let now = Utc::now();
-
-        assert!(lease_expiring_at(now, 0).is_expired(now));
-    }
-
-    #[test]
-    fn a_lease_with_past_expiry_is_expired() {
-        let now = Utc::now();
-
-        assert!(lease_expiring_at(now, -1).is_expired(now));
-    }
-
-    #[test]
-    fn a_future_lease_reports_a_positive_ttl() {
-        let now = Utc::now();
-
-        assert_eq!(lease_expiring_at(now, 60).ttl_secs(now), 60);
-    }
-
-    #[test]
-    fn a_past_lease_reports_a_negative_ttl() {
-        let now = Utc::now();
-
-        assert_eq!(lease_expiring_at(now, -30).ttl_secs(now), -30);
-    }
-
-    #[test]
-    fn rand_u8_below_one_always_returns_zero() {
-        assert_eq!(rand_u8_below(1), 0);
-    }
-
-    #[cfg(feature = "streamable-http")]
-    #[test]
-    fn rand_u8_below_stays_under_its_upper_bound() {
-        let observed = rand_u8_below(5);
-
-        assert!(observed < 5, "jitter must land inside the requested range");
-    }
-}
-
-impl ProvisioningLease {
-    /// Fenced commit using the closed-set `FenceUpdate` enum.
-    /// The `expected_generation` and `record_id` are bound
-    /// here; callers cannot supply or override the generation
-    /// through an interpolated clause.
-    pub async fn commit_with_fence(
-        client: &std::sync::Arc<dyn crate::storage::client::DbClient>,
-        namespace: &str,
-        record_id: &str,
-        expected_generation: u64,
-        update: FenceUpdate,
-    ) -> Result<u64, crate::error::MemoryError> {
-        if record_id.is_empty()
-            || !record_id
-                .chars()
-                .all(|c| c.is_ascii_alphanumeric() || c == '_' || c == ':')
-        {
-            return Err(crate::error::MemoryError::Validation(format!(
-                "unsafe record id: {record_id}"
-            )));
-        }
-        let mut params = serde_json::Map::new();
-        params.insert(
-            "expected_gen".to_string(),
-            serde_json::Value::from(expected_generation),
-        );
-        let (set_clause, owner_clause, update_vars, returned_generation) = match update {
-            FenceUpdate::Claim {
-                owner_id,
-                lease_id,
-                lease_expiry,
-            } => {
-                let next_generation = expected_generation.checked_add(1).ok_or_else(|| {
-                    crate::error::MemoryError::Conflict("fencing generation overflow".into())
-                })?;
-                (
-                    "lease_owner = $owner_id, lease_id = $lease_id, lease_expiry = $lease_expiry, lease_generation = $next_gen",
-                    "(lease_expiry IS NONE OR lease_expiry < time::now())",
-                    serde_json::json!({
-                        "owner_id": owner_id,
-                        "lease_id": lease_id,
-                        "lease_expiry": lease_expiry,
-                        "next_gen": next_generation,
-                    }),
-                    next_generation,
-                )
-            }
-            FenceUpdate::Heartbeat {
-                owner_id,
-                lease_id,
-                lease_expiry,
-                heartbeat_at,
-            } => (
-                "lease_expiry = $lease_expiry, heartbeat_at = $heartbeat_at",
-                "lease_owner = $owner_id AND lease_id = $lease_id",
-                serde_json::json!({
-                    "owner_id": owner_id,
-                    "lease_id": lease_id,
-                    "lease_expiry": lease_expiry,
-                    "heartbeat_at": heartbeat_at,
-                }),
-                expected_generation,
-            ),
-            FenceUpdate::Release { owner_id, lease_id } => (
-                "lease_owner = NONE, lease_id = NONE, lease_expiry = NONE",
-                "lease_owner = $owner_id AND lease_id = $lease_id",
-                serde_json::json!({
-                    "owner_id": owner_id,
-                    "lease_id": lease_id,
-                }),
-                expected_generation,
-            ),
-        };
-        if let serde_json::Value::Object(update_vars) = update_vars {
-            params.extend(update_vars);
-        }
-        let sql = format!(
-            "UPDATE {record_id} SET {set_clause} WHERE lease_generation = $expected_gen AND {owner_clause} RETURN AFTER;"
-        );
-        let result = client
-            .query(&sql, Some(serde_json::Value::Object(params)), namespace)
-            .await?;
-        let rows: Vec<serde_json::Value> = serde_json::from_value(result).map_err(|err| {
-            crate::error::MemoryError::Storage(format!("fence commit result: {err}"))
-        })?;
-        match rows.first() {
-            Some(row) => {
-                let generation = row
-                    .get("lease_generation")
-                    .and_then(|v| v.as_u64())
-                    .ok_or_else(|| {
-                        crate::error::MemoryError::Storage(
-                            "fence commit returned no generation".into(),
-                        )
-                    })?;
-                if generation != returned_generation {
-                    return Err(crate::error::MemoryError::Conflict(format!(
-                        "fencing generation mismatch: expected {returned_generation}, found {generation}"
-                    )));
-                }
-                Ok(generation)
-            }
-            None => Err(crate::error::MemoryError::Conflict(
-                "fence commit matched no rows (lease lost)".into(),
-            )),
-        }
     }
 }
 

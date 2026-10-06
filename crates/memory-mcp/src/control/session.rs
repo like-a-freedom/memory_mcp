@@ -278,3 +278,131 @@ mod cookie_tests {
         );
     }
 }
+
+/// Scenario tests for `resolve_session_record`: the ways a browser session ends.
+/// Each drives the real store, so the observable behaviour — resolves, or is
+/// refused — is what a signed-in user actually experiences.
+#[cfg(test)]
+mod resolve_session_tests {
+    use super::*;
+    use crate::http::registry::models::{Account, AccountStatus};
+
+    /// A composed OIDC-shaped state with one Active Account.
+    ///
+    /// Composition reconciles the browser policy into the durable store (the
+    /// production path), so a session minted under that fence is storable —
+    /// which also means composition runs discovery, supplied here against a
+    /// loopback provider.
+    async fn state_with_account() -> (std::sync::Arc<crate::http::HttpState>, Account) {
+        use crate::control::oidc::test_provider::{MockProvider, MockProviderConfig};
+
+        let provider = MockProvider::spawn(MockProviderConfig::default()).await;
+        let mut config = crate::http::config::HttpConfig::default_for_test();
+        config.oidc_issuer = provider.base_url().to_string();
+        let state = crate::http::test_state::HttpStateTestBuilder::new()
+            .await
+            .with_config(config)
+            .without_prejoined_browser_policy()
+            .build()
+            .await
+            .expect("composed state");
+        let account = Account {
+            id: "acct_session".into(),
+            status: AccountStatus::Active,
+            tenant_id: "ten_session".into(),
+            created_at: Utc::now(),
+            display_name: None,
+        };
+        state
+            .registry
+            .accounts()
+            .write_account(&account)
+            .await
+            .expect("seed account");
+        (state, account)
+    }
+
+    /// Mint and store a session for `account` under the deployment's fence.
+    async fn store_session(
+        state: &crate::http::HttpState,
+        account: &Account,
+        cookie: &str,
+    ) -> ControlPlaneSession {
+        let policy = state.browser_policy.as_ref().expect("oidc fence").clone();
+        let session = ControlPlaneSession::new(account, cookie, policy.epoch, &state.config)
+            .expect("session");
+        state
+            .registry
+            .sessions()
+            .store_session(&policy, &session)
+            .await
+            .expect("store session");
+        session
+    }
+
+    #[tokio::test]
+    async fn a_live_session_resolves() {
+        let (state, account) = state_with_account().await;
+        let cookie = "live-cookie";
+        store_session(&state, &account, cookie).await;
+
+        assert!(
+            resolve_session_record(&state, cookie).await.is_ok(),
+            "a live session must resolve"
+        );
+    }
+
+    #[tokio::test]
+    async fn a_session_for_a_suspended_account_does_not_resolve() {
+        let (state, account) = state_with_account().await;
+        let cookie = "suspended-cookie";
+        store_session(&state, &account, cookie).await;
+        // The Account is suspended after the session was minted, so the next
+        // request must not authenticate even though the session row is live.
+        state
+            .registry
+            .accounts()
+            .transition_account_state(&account.id, AccountStatus::Active, AccountStatus::Suspended)
+            .await
+            .expect("suspend account");
+
+        assert!(
+            resolve_session_record(&state, cookie).await.is_err(),
+            "a suspended Account must end its sessions"
+        );
+    }
+
+    #[tokio::test]
+    async fn an_expired_session_does_not_resolve() {
+        let (state, account) = state_with_account().await;
+        let cookie = "expired-cookie";
+        let policy = state.browser_policy.as_ref().expect("oidc fence").clone();
+        let mut session = ControlPlaneSession::new(&account, cookie, policy.epoch, &state.config)
+            .expect("session");
+        session.idle_expiry = Utc::now() - chrono::Duration::seconds(1);
+        session.absolute_expiry = Utc::now() - chrono::Duration::seconds(1);
+        state
+            .registry
+            .sessions()
+            .store_session(&policy, &session)
+            .await
+            .expect("store session");
+
+        assert!(
+            resolve_session_record(&state, cookie).await.is_err(),
+            "an expired session must not resolve"
+        );
+    }
+
+    #[tokio::test]
+    async fn an_unknown_cookie_does_not_resolve() {
+        let (state, _account) = state_with_account().await;
+
+        assert!(
+            resolve_session_record(&state, "never-issued")
+                .await
+                .is_err(),
+            "a cookie no session owns must not resolve"
+        );
+    }
+}

@@ -77,8 +77,15 @@ async fn main() -> ExitCode {
         let task_options =
             memory_mcp::http::runtime::storage::RuntimeOptions::from_http_config(&cfg)
                 .with_fault_injector(runtime.fault_injector.clone());
+        // The app-session pass walks the durable session table, which only
+        // exists under `mcp-apps` (`runtime/storage.rs` wires the durable
+        // `AppSessionStore` behind the same feature). Registering the job
+        // without the store would have it sweep a table nothing writes, so the
+        // two are gated by one feature.
+        #[cfg(feature = "mcp-apps")]
+        let hooks =
+            hooks.with_additional_job(memory_mcp::http::app_sessions::scheduler::scheduler_job());
         let hooks = hooks
-            .with_additional_job(memory_mcp::http::app_sessions::scheduler::scheduler_job())
             // The task job carries the deployment policy, because a `reembed`
             // row can only force-enable a provider if the provider is
             // reachable from here. `None` for a lexical-only deployment, whose

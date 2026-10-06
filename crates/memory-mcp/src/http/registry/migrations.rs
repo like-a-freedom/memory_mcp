@@ -2,12 +2,7 @@
 //!
 //! The durable runner lives on `SurrealRegistryStore` so it can use the same
 //! bound SurrealDB connection as the registry. This module owns only the
-//! append-only catalog and the public adapter used by startup.
-
-use std::sync::Arc;
-
-use crate::error::MemoryError;
-use crate::http::registry::storage::SurrealRegistryStore;
+//! append-only catalog.
 
 /// Path to the registry migration directory.
 pub const REGISTRY_MIGRATION_DIR: &str = "crates/memory-mcp/migrations";
@@ -26,15 +21,6 @@ pub const REGISTRY_MIGRATIONS: &[&str] = &[
     "051_local_admin_table_permissions",
     "052_account_display_name",
 ];
-
-/// Apply the registry migration catalog through the durable store. The store
-/// performs checksum validation, lease-based claiming, recovery of expired
-/// `applying` rows, and postcondition checks.
-pub async fn apply_registry_migrations(
-    store: &Arc<SurrealRegistryStore>,
-) -> Result<Vec<String>, MemoryError> {
-    store.apply_migrations().await
-}
 
 /// Migration ids the registry needs. The actual SQL is in the
 /// migration directory referenced by `REGISTRY_MIGRATION_DIR`.

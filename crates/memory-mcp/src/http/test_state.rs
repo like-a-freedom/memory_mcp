@@ -19,6 +19,8 @@ pub struct HttpStateTestBuilder {
     browser_policy: Option<crate::http::registry::models::BrowserPolicyFence>,
     #[cfg(feature = "prometheus")]
     metrics_handle: Option<super::MetricsHandle>,
+    #[cfg(feature = "control-plane")]
+    oidc_client: Option<std::sync::Arc<crate::control::oidc::OidcClient>>,
 }
 
 impl HttpStateTestBuilder {
@@ -39,6 +41,8 @@ impl HttpStateTestBuilder {
             }),
             #[cfg(feature = "prometheus")]
             metrics_handle: super::HttpState::test_metrics_handle(),
+            #[cfg(feature = "control-plane")]
+            oidc_client: None,
         }
     }
 
@@ -91,6 +95,8 @@ impl HttpStateTestBuilder {
                 browser_policy: None,
                 #[cfg(feature = "prometheus")]
                 metrics_handle: super::HttpState::test_metrics_handle(),
+                #[cfg(feature = "control-plane")]
+                oidc_client: None,
             },
             store,
         )
@@ -137,42 +143,91 @@ impl HttpStateTestBuilder {
         self
     }
 
+    /// Drop the pre-joined browser policy so composition reconciles it from the
+    /// durable store, exactly as production does.
+    ///
+    /// A test that seeds durable browser sessions needs the store's policy fence
+    /// to be the one composition produced: `store_session` rejects a session
+    /// whose epoch the store does not hold, and the pre-joined override is never
+    /// written to the store. Composition also runs OIDC discovery in this mode,
+    /// so the config must name a reachable issuer.
+    #[cfg(feature = "control-plane")]
+    pub fn without_prejoined_browser_policy(mut self) -> Self {
+        self.browser_policy = None;
+        self
+    }
+
+    /// Supply the OIDC client the composed state authenticates access tokens
+    /// with.
+    ///
+    /// Production derives this client by discovery against the configured
+    /// issuer, which a unit test cannot reach. A test points it at a loopback
+    /// provider so the resource-server path (protected-resource metadata and
+    /// the `/mcp` bearer fallback) can be driven end to end.
+    #[cfg(feature = "control-plane")]
+    pub fn with_oidc_client(
+        mut self,
+        client: std::sync::Arc<crate::control::oidc::OidcClient>,
+    ) -> Self {
+        self.oidc_client = Some(client);
+        self
+    }
+
     pub async fn build(
-        self,
+        mut self,
     ) -> Result<std::sync::Arc<super::HttpState>, crate::error::MemoryError> {
-        #[cfg(feature = "prometheus")]
-        {
-            #[cfg(feature = "control-plane")]
+        let state = {
+            #[cfg(feature = "prometheus")]
             {
-                super::HttpState::assemble_with_browser_policy(
-                    self.config,
-                    self.registry,
-                    self.metrics_handle,
-                    self.browser_policy,
-                )
-                .await
+                #[cfg(feature = "control-plane")]
+                {
+                    super::HttpState::assemble_with_browser_policy(
+                        self.config,
+                        self.registry,
+                        self.metrics_handle,
+                        self.browser_policy,
+                    )
+                    .await
+                }
+                #[cfg(not(feature = "control-plane"))]
+                {
+                    super::HttpState::assemble(self.config, self.registry, self.metrics_handle)
+                        .await
+                }
             }
-            #[cfg(not(feature = "control-plane"))]
+            #[cfg(not(feature = "prometheus"))]
             {
-                super::HttpState::assemble(self.config, self.registry, self.metrics_handle).await
+                #[cfg(feature = "control-plane")]
+                {
+                    super::HttpState::assemble_with_browser_policy(
+                        self.config,
+                        self.registry,
+                        None,
+                        self.browser_policy,
+                    )
+                    .await
+                }
+                #[cfg(not(feature = "control-plane"))]
+                {
+                    super::HttpState::assemble(self.config, self.registry, None).await
+                }
             }
-        }
-        #[cfg(not(feature = "prometheus"))]
-        {
-            #[cfg(feature = "control-plane")]
-            {
-                super::HttpState::assemble_with_browser_policy(
-                    self.config,
-                    self.registry,
-                    None,
-                    self.browser_policy,
-                )
-                .await
+        }?;
+
+        // The assembled state is uniquely owned here (assembly returns a fresh
+        // `Arc` and nothing else clones it), so swapping the OIDC client in is
+        // infallible.
+        #[cfg(feature = "control-plane")]
+        let state = match self.oidc_client.take() {
+            Some(client) => {
+                let mut inner = std::sync::Arc::try_unwrap(state)
+                    .unwrap_or_else(|_| panic!("the assembled state is uniquely owned"));
+                inner.oidc_client = Some(client);
+                std::sync::Arc::new(inner)
             }
-            #[cfg(not(feature = "control-plane"))]
-            {
-                super::HttpState::assemble(self.config, self.registry, None).await
-            }
-        }
+            None => state,
+        };
+
+        Ok(state)
     }
 }

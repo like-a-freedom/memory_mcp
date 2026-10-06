@@ -1028,6 +1028,7 @@ operator configuration and are listed under
 | `MEMORY_MCP_HTTP_BIND` | HTTP ingress | No | [Streamable HTTP](#streamable-http-environment-variables) |
 | `MEMORY_MCP_HTTP_BODY_LIMIT` | HTTP limits | No | [Streamable HTTP](#streamable-http-environment-variables) |
 | `MEMORY_MCP_HTTP_CSRF_KEY` | HTTP secrets | Conditional | [Streamable HTTP](#streamable-http-environment-variables) |
+| `MEMORY_MCP_HTTP_DATA_DIR` | HTTP storage | No | [Streamable HTTP](#streamable-http-environment-variables) |
 | `MEMORY_MCP_HTTP_EXTRACTION_CONCURRENCY` | Plan limits | Conditional | [Streamable HTTP](#streamable-http-environment-variables) |
 | `MEMORY_MCP_HTTP_GLOBAL_REQUEST_LIMIT` | HTTP limits | No | [Streamable HTTP](#streamable-http-environment-variables) |
 | `MEMORY_MCP_HTTP_IDENTITY_INDEX_KEY` | HTTP secrets | Conditional | [Streamable HTTP](#streamable-http-environment-variables) |
@@ -1183,7 +1184,7 @@ The following settings are optional for power users. They are read by the same e
 | `EMBEDDINGS_BASE_URL` | URL | unset for `local-candle`; `https://api.openai.com/v1` for `openai-compatible`; `http://127.0.0.1:11434` for `ollama` | Base URL for remote embedding providers |
 | `EMBEDDINGS_MAX_TOKENS` | unsigned integer | `384` | Max token budget before `local-candle` chunks long inputs |
 | `EMBEDDINGS_TIMEOUT_SECS` | unsigned integer | `15` | Timeout for remote embedding calls |
-| `EMBEDDINGS_RECOVERY_INTERVAL_SECS` | positive unsigned integer | `60` | Initial delay before the in-process recovery worker probes a remote provider after degraded startup; failed probes use exponential backoff. Must be greater than zero — `0` is a startup error, not a way to disable the interval (use `EMBEDDINGS_AUTO_RECOVERY=false`) |
+| `EMBEDDINGS_RECOVERY_INTERVAL_SECS` | positive unsigned integer | `60` | Initial delay before the in-process recovery worker probes a remote provider after degraded startup; failed probes use exponential backoff. Must be greater than zero — `0` is a startup error, not a way to disable the interval (use `EMBEDDINGS_AUTO_RECOVERY=false`). The **HTTP** profile spawns no in-process recovery worker — a deployment that cannot resolve its provider fails startup rather than degrading — so there the variable only enforces its `>0` check |
 | `EMBEDDINGS_AUTO_RECOVERY` | boolean | `true` | Enable automatic in-process recovery after a failed remote startup preflight; set `false` for explicit opt-out. In the **HTTP** profile this additionally gates the per-tenant backfill scheduler job — only `1`/`true`/`yes` are true, and `auto` is not. See [Streamable HTTP environment variables](#streamable-http-environment-variables) |
 | `EMBEDDINGS_SIMILARITY_THRESHOLD` | floating-point number | `0.7` | Minimum cosine similarity for semantic matches |
 | `EMBEDDINGS_API_KEY` | string | unset | Optional bearer token for OpenAI-compatible providers |
@@ -1198,8 +1199,8 @@ The following settings are optional for power users. They are read by the same e
 | `GLINER_DEVICE` | string enum | `cpu` | Device for the native Candle GLiNER backends: `cpu`, `metal`, or `auto`; `metal` requires `--features metal`, while `auto` uses Metal when available and otherwise falls back to CPU (with an event) |
 | `MEMORY_CLAIM_ROLLOUT_STAGE` | string enum | `shadow` | Claim reconciliation rollout stage: `disabled`, `shadow`, `relations`, or `evidence` |
 | `MEMORY_CLAIM_CANDIDATE_PAGE_SIZE` | unsigned integer | `256` | Candidate page size for claim reconciliation. A non-numeric value is a startup error |
-| `MEMORY_CLAIM_INLINE_CANDIDATE_LIMIT` | unsigned integer | `1024` | Inline claim candidate limit. A non-numeric value is a startup error |
-| `MEMORY_CLAIM_INLINE_BUDGET_MS` | unsigned integer | `50` | Inline claim reconciliation budget in milliseconds. A non-numeric value is a startup error |
+| `MEMORY_CLAIM_INLINE_CANDIDATE_LIMIT` | unsigned integer | `1024` | Candidate limit for the inline write-path reconciliation the `add_fact` path runs, separately from the durable reconciler's `MEMORY_CLAIM_CANDIDATE_PAGE_SIZE`; the durable job continues from the last candidate the inline pass considered. A non-numeric value is a startup error |
+| `MEMORY_CLAIM_INLINE_BUDGET_MS` | unsigned integer | `50` | Wall-clock budget, in milliseconds, for the inline write-path reconciliation. Once it is spent the inline pass stops and the durable reconciler finishes the slot, so a slow store bounds `add_fact` latency instead of extending it. A non-numeric value is a startup error |
 | `ENTITY_FUZZY_THRESHOLD` | floating-point number | `0.85` | Entity fuzzy-match threshold. Must be finite and within `0.0..=1.0` |
 
 Advanced provider selection may cause network access or model downloads. Keep these variables unset for the local-first quick start.
@@ -1341,6 +1342,7 @@ the full variable table — with these HTTP-specific consequences:
 | --- | --- | --- | --- |
 | `EMBEDDINGS_ENABLED` | boolean | `false` when unset and no provider is set | Enable semantic retrieval for every tenant. A deployment that enables it but cannot resolve the provider fails startup rather than silently degrading |
 | `EMBEDDINGS_AUTO_RECOVERY` | boolean | `true` | Whether a background scheduler job fills tenant facts that carry no vector. Only `1`, `true`, and `yes` enable it — **`auto` is not a truthy value**, so `EMBEDDINGS_AUTO_RECOVERY=auto` reads as *off* and gets no backfill |
+| `MEMORY_MCP_HTTP_DATA_DIR` | path | a temp directory (`<TMPDIR>/memory-mcp-http-models`) | Root under which the HTTP deployment resolves local model artifacts — the embedding preflight's model cache and the entity extractor's weights. HTTP has no per-client data directory, so an operator sets this to place downloads on a mounted volume instead of the container's ephemeral filesystem |
 
 The backfill job walks the ready tenants **at most once every 60 seconds** —
 the scheduler ticks once a second, but a registry walk that binds every

@@ -39,16 +39,6 @@ pub type ExtractorFn =
 
 /// The retention/retry/execution job. Registers itself with the process-level
 /// scheduler; it never creates an untracked per-tenant loop.
-///
-/// This entry point is retained for compatibility but
-/// accepts no options. Use `scheduler_job_with_options`
-/// when a non-default task retention, queue capacity, or
-/// fault injector override is needed.
-#[deprecated(note = "use scheduler_job_with_options")]
-pub fn scheduler_job() -> SchedulerJob {
-    scheduler_job_with_options(crate::http::runtime::storage::RuntimeOptions::default())
-}
-
 pub fn scheduler_job_with_options(
     options: crate::http::runtime::storage::RuntimeOptions,
 ) -> SchedulerJob {
@@ -61,8 +51,8 @@ pub fn scheduler_job_with_options(
 ///
 /// A sibling rather than a parameter on [`scheduler_job_with_options`], because
 /// the policy is an input only the reembed executor reads: widening the
-/// existing entry point would make every current caller — and the deprecated
-/// [`scheduler_job`] that delegates to it — name an argument it does not use.
+/// existing entry point would make every current caller name an argument it
+/// does not use.
 ///
 /// [`SchedulerJob`] receives only the [`RegistryHandle`], so the policy is
 /// captured by the closure, exactly as `RuntimeOptions` is. `None` means the
@@ -90,28 +80,7 @@ pub fn scheduler_job_with_policy(
 
 /// Walk a bounded ready-tenant batch, recover expired tasks, execute one due
 /// extraction per tenant, reconcile durable artifacts, and delete only terminal
-/// rows past retention.
-pub async fn retry_reconcile_and_retain(registry: &RegistryHandle) -> Result<(), MemoryError> {
-    retry_reconcile_and_retain_with_options(
-        registry,
-        crate::http::runtime::storage::RuntimeOptions::default(),
-        Arc::new(crate::platform::fault_injection::NoFaults),
-    )
-    .await
-}
-
-/// [`retry_reconcile_and_retain_with_policy`] with no embedding policy: the
-/// pre-Task-6 entry point, where a `reembed` row could not be executed at all
-/// because no provider was reachable from here.
-async fn retry_reconcile_and_retain_with_options(
-    registry: &RegistryHandle,
-    options: crate::http::runtime::storage::RuntimeOptions,
-    fault_injector: Arc<dyn FaultInjector>,
-) -> Result<(), MemoryError> {
-    retry_reconcile_and_retain_with_policy(registry, options, fault_injector, None).await
-}
-
-/// The pass itself, with the deployment's embedding policy, which only the
+/// rows past retention, with the deployment's embedding policy, which only the
 /// reembed executor reads.
 async fn retry_reconcile_and_retain_with_policy(
     registry: &RegistryHandle,

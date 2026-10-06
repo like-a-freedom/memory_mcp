@@ -81,6 +81,45 @@ pub async fn validate_token(
     Ok(claims)
 }
 
+/// Resolve an OAuth 2.0 access token to a tenant Account.
+///
+/// Validates the token against the OIDC provider's JWKS, derives the
+/// `(issuer, subject_verifier)` blind index exactly as the login flow does,
+/// and returns the Account that index names — but only while it is Active.
+/// Every failure mode (bad signature, wrong issuer/audience, expired, unknown
+/// identity, suspended Account) collapses to `None`, so a caller cannot tell
+/// them apart.
+pub async fn resolve_bearer_principal(
+    config: &crate::http::config::HttpConfig,
+    accounts: &dyn crate::http::registry::storage::AccountStore,
+    jwks: &crate::control::oidc::JwksCache,
+    token: &str,
+) -> Option<crate::http::principal::AuthenticatedPrincipal> {
+    let claims = validate_token(token, config, jwks).await.ok()?;
+    let verifier = crate::control::oidc::identity_subject_verifier(
+        &config.keys.identity_index,
+        &claims.iss,
+        &claims.sub,
+    )
+    .ok()?;
+    let account = accounts
+        .find_account_by_identity(
+            &claims.iss,
+            &crate::http::registry::models::SubjectVerifier(verifier),
+        )
+        .await
+        .ok()
+        .flatten()?;
+    if account.status != crate::http::registry::models::AccountStatus::Active {
+        return None;
+    }
+    Some(crate::http::principal::AuthenticatedPrincipal::Oidc {
+        account: Arc::new(account),
+        issuer: claims.iss,
+        subject: claims.sub,
+    })
+}
+
 /// GET /.well-known/oauth-protected-resource
 pub async fn protected_resource_metadata(
     State(state): State<Arc<HttpState>>,
@@ -342,5 +381,156 @@ mod tests {
         let observed = Header::new(Algorithm::RS256);
 
         assert_eq!(observed.alg, Algorithm::RS256);
+    }
+
+    // --- resource-server principal resolution -----------------------------
+
+    use crate::control::oidc::identity_subject_verifier;
+    use crate::http::principal::AuthenticatedPrincipal;
+    use crate::http::registry::models::{
+        Account, AccountStatus, ExternalIdentity, NamespaceBinding, SubjectVerifier, Tenant,
+        TenantStatus,
+    };
+    use crate::http::registry::storage::{AccountStore, InMemoryStore};
+
+    /// A registry holding one Account reachable through `(issuer, sub)` — the
+    /// same blind index the login flow writes — so the resource-server path
+    /// proves it resolves identities the way login does, not some parallel one.
+    async fn registry_with_identity(sub: &str, status: AccountStatus) -> Arc<dyn AccountStore> {
+        let stores =
+            crate::http::registry::RegistryStores::from_backend(Arc::new(InMemoryStore::default()));
+        let accounts = stores.accounts();
+        let now = chrono::Utc::now();
+        let verifier = identity_subject_verifier(&config().keys.identity_index, ISSUER, sub)
+            .expect("identity index");
+        accounts
+            .create_account_bundle(
+                &Account {
+                    id: "acct_1".into(),
+                    status,
+                    tenant_id: "ten_1".into(),
+                    created_at: now,
+                    display_name: None,
+                },
+                &Tenant {
+                    id: "ten_1".into(),
+                    status: TenantStatus::Ready,
+                    namespace_binding: NamespaceBinding {
+                        namespace: "tns_1".into(),
+                        database: "memory".into(),
+                    },
+                    plan_version: 1,
+                    schema_version: 0,
+                    retry_stage: None,
+                    provisioning_lease: None,
+                    created_at: now,
+                    version: 0,
+                },
+                Some(&ExternalIdentity {
+                    id: "idn_1".into(),
+                    issuer: ISSUER.into(),
+                    subject_verifier: SubjectVerifier(verifier),
+                    account_id: "acct_1".into(),
+                    created_at: now,
+                }),
+            )
+            .await
+            .expect("seed account with identity");
+        accounts
+    }
+
+    #[tokio::test]
+    async fn resolves_an_active_account_from_a_valid_access_token() {
+        let accounts = registry_with_identity("user-1", AccountStatus::Active).await;
+        let token = sign(&valid_claims("user-1", FAR_FUTURE), Some(KEY_ID));
+
+        let principal =
+            resolve_bearer_principal(&config(), &*accounts, &jwks_cache(), &token).await;
+
+        match principal {
+            Some(AuthenticatedPrincipal::Oidc {
+                account,
+                issuer,
+                subject,
+            }) => {
+                assert_eq!(account.id, "acct_1");
+                assert_eq!(issuer, ISSUER);
+                assert_eq!(subject, "user-1");
+            }
+            other => panic!("expected an Oidc principal, got {other:?}"),
+        }
+    }
+
+    #[tokio::test]
+    async fn a_suspended_account_is_not_resolved() {
+        let accounts = registry_with_identity("user-1", AccountStatus::Suspended).await;
+        let token = sign(&valid_claims("user-1", FAR_FUTURE), Some(KEY_ID));
+
+        let principal =
+            resolve_bearer_principal(&config(), &*accounts, &jwks_cache(), &token).await;
+
+        assert!(
+            principal.is_none(),
+            "a token for an Account that is not Active must not authenticate"
+        );
+    }
+
+    #[tokio::test]
+    async fn an_identity_no_account_owns_is_not_resolved() {
+        let accounts = registry_with_identity("user-1", AccountStatus::Active).await;
+        // Signed by the provider's real key and naming the configured issuer,
+        // so only the identity lookup can reject it.
+        let token = sign(&valid_claims("someone-else", FAR_FUTURE), Some(KEY_ID));
+
+        let principal =
+            resolve_bearer_principal(&config(), &*accounts, &jwks_cache(), &token).await;
+
+        assert!(principal.is_none(), "an unlinked subject must not resolve");
+    }
+
+    #[tokio::test]
+    async fn an_invalid_access_token_is_not_resolved() {
+        let accounts = registry_with_identity("user-1", AccountStatus::Active).await;
+
+        let principal =
+            resolve_bearer_principal(&config(), &*accounts, &jwks_cache(), "not-a-jwt").await;
+
+        assert!(principal.is_none(), "a malformed token must not resolve");
+    }
+
+    #[tokio::test]
+    async fn an_array_audience_naming_this_resource_resolves() {
+        // RFC 7519 lets `aud` be a single string or an array, and the login-flow
+        // decoder accepts both. The resource-server path must accept the array
+        // form too, or an access token minted for several resources would work
+        // for browser sign-in but not for MCP.
+        let accounts = registry_with_identity("user-1", AccountStatus::Active).await;
+        let mut claims = valid_claims("user-1", FAR_FUTURE);
+        claims["aud"] = serde_json::json!([AUDIENCE, "another-resource"]);
+        let token = sign(&claims, Some(KEY_ID));
+
+        let principal =
+            resolve_bearer_principal(&config(), &*accounts, &jwks_cache(), &token).await;
+
+        assert!(
+            principal.is_some(),
+            "an array audience naming this resource must resolve the Account"
+        );
+    }
+
+    #[tokio::test]
+    async fn an_array_audience_without_this_resource_is_not_resolved() {
+        let accounts = registry_with_identity("user-1", AccountStatus::Active).await;
+        let mut claims = valid_claims("user-1", FAR_FUTURE);
+        claims["aud"] = serde_json::json!(["another-resource", "a-third"]);
+        let token = sign(&claims, Some(KEY_ID));
+
+        let principal =
+            resolve_bearer_principal(&config(), &*accounts, &jwks_cache(), &token).await;
+
+        assert!(
+            principal.is_none(),
+            "an array audience that omits this resource must not resolve"
+        );
     }
 }

@@ -59,7 +59,16 @@ pub async fn authenticate(
                 (Some(scheme), Some(credentials), None)
                     if scheme.eq_ignore_ascii_case("Bearer") =>
                 {
-                    state.authenticator.authenticate_bearer(credentials).await
+                    match state.authenticator.authenticate_bearer(credentials).await {
+                        // Not an API key: fall through to the OAuth
+                        // resource-server path, which accepts an access token
+                        // issued by the deployment's OIDC provider.
+                        AuthDecision::Deny => match oauth_bearer(&state, credentials).await {
+                            Some(principal) => AuthDecision::Allow(principal),
+                            None => AuthDecision::Deny,
+                        },
+                        other => other,
+                    }
                 }
                 _ => AuthDecision::Deny,
             }
@@ -72,6 +81,45 @@ pub async fn authenticate(
     };
     req.extensions_mut().insert(principal);
     next.run(req).await
+}
+
+/// Authenticate an OAuth 2.0 access token as a fallback for a credential that
+/// is not an API key.
+///
+/// Only meaningful where the deployment serves an OIDC authorization server
+/// (`MEMORY_MCP_HTTP_AUTH_METHODS` includes `oidc`) and therefore publishes
+/// protected-resource metadata; a deployment without one accepts no access
+/// tokens, so the fallback is inert rather than rejecting what the API-key
+/// path already denied.
+#[cfg(feature = "control-plane")]
+async fn oauth_bearer(
+    state: &HttpState,
+    token: &str,
+) -> Option<crate::http::principal::AuthenticatedPrincipal> {
+    if !state
+        .config
+        .has_method(crate::http::config::BrowserAuthMethod::Oidc)
+    {
+        return None;
+    }
+    let client = state.oidc_client.as_ref()?;
+    crate::http::oauth::resolve_bearer_principal(
+        &state.config,
+        &*state.registry.accounts(),
+        client.jwks(),
+        token,
+    )
+    .await
+}
+
+/// Without a control plane there is no OIDC provider, so no access token can
+/// be resolved and the fallback stays inert.
+#[cfg(not(feature = "control-plane"))]
+async fn oauth_bearer(
+    _state: &HttpState,
+    _token: &str,
+) -> Option<crate::http::principal::AuthenticatedPrincipal> {
+    None
 }
 
 /// Authenticate the control-plane Secure cookie and attach the server-side
@@ -313,5 +361,219 @@ mod tests {
         let mut svc = router2;
         let resp = svc.call(req).await.unwrap();
         assert_eq!(resp.status(), StatusCode::OK);
+    }
+
+    // --- OAuth resource-server fallback -----------------------------------
+
+    #[cfg(feature = "control-plane")]
+    use crate::control::oidc::test_provider::{MockProvider, MockProviderConfig, sign_id_token};
+
+    /// The audience the token fixtures below carry, and a far-future expiry so
+    /// the assertions never race the wall clock.
+    #[cfg(feature = "control-plane")]
+    const OAUTH_AUDIENCE: &str = "memory-mcp";
+    #[cfg(feature = "control-plane")]
+    const OAUTH_EXPIRY: u64 = 4_102_444_800; // 2100-01-01T00:00:00Z
+
+    /// Compose a state whose resource-server path trusts `provider`, and seed
+    /// the Account its `(issuer, subject)` blind index names.
+    #[cfg(feature = "control-plane")]
+    async fn state_with_oauth_account(
+        provider: &MockProvider,
+        sub: &str,
+    ) -> std::sync::Arc<HttpState> {
+        use crate::http::registry::models::{
+            Account, AccountStatus, ExternalIdentity, NamespaceBinding, SubjectVerifier, Tenant,
+            TenantStatus,
+        };
+        use crate::http::test_state::HttpStateTestBuilder;
+
+        let client = crate::control::oidc::OidcClient::new(
+            provider.base_url(),
+            "memory-mcp",
+            OAUTH_AUDIENCE,
+            "https://app.example/callback",
+            "auto",
+        )
+        .await
+        .expect("OIDC discovery against the mock provider");
+
+        let mut config = crate::http::config::HttpConfig::default_for_test();
+        config.oidc_issuer = provider.base_url().to_string();
+        config.oidc_audience = OAUTH_AUDIENCE.to_string();
+        // The resource-server path maps an explicit algorithm pin, so the test
+        // names the one the provider advertises rather than the `auto` default.
+        config.oidc_allowed_alg = "RS256".to_string();
+
+        let state = HttpStateTestBuilder::new()
+            .await
+            .with_config(config)
+            .with_oidc_client(std::sync::Arc::new(client))
+            .build()
+            .await
+            .expect("composed OAuth-shaped state");
+
+        let now = chrono::Utc::now();
+        let verifier = crate::control::oidc::identity_subject_verifier(
+            &state.config.keys.identity_index,
+            provider.base_url(),
+            sub,
+        )
+        .expect("identity index");
+        state
+            .registry
+            .accounts()
+            .create_account_bundle(
+                &Account {
+                    id: "acct_oauth".into(),
+                    status: AccountStatus::Active,
+                    tenant_id: "ten_oauth".into(),
+                    created_at: now,
+                    display_name: None,
+                },
+                &Tenant {
+                    id: "ten_oauth".into(),
+                    status: TenantStatus::Ready,
+                    namespace_binding: NamespaceBinding {
+                        namespace: "tns_oauth".into(),
+                        database: "memory".into(),
+                    },
+                    plan_version: 1,
+                    schema_version: 0,
+                    retry_stage: None,
+                    provisioning_lease: None,
+                    created_at: now,
+                    version: 0,
+                },
+                Some(&ExternalIdentity {
+                    id: "idn_oauth".into(),
+                    issuer: provider.base_url().into(),
+                    subject_verifier: SubjectVerifier(verifier),
+                    account_id: "acct_oauth".into(),
+                    created_at: now,
+                }),
+            )
+            .await
+            .expect("seed Account with identity");
+
+        state
+    }
+
+    /// POST a valid MCP envelope to `/mcp` with `token` as the bearer, exactly
+    /// as a client sends it (host, origin and peer included).
+    #[cfg(feature = "control-plane")]
+    async fn post_mcp_with_bearer(router: axum::Router, token: &str) -> Response {
+        use axum::extract::connect_info::ConnectInfo;
+        use std::net::SocketAddr;
+        use tower_service::Service;
+
+        let body = serde_json::json!({
+            "jsonrpc": "2.0",
+            "id": 1,
+            "method": "server/discover",
+            "params": {
+                "_meta": {
+                    "io.modelcontextprotocol/protocolVersion": "2026-07-28",
+                    "io.modelcontextprotocol/clientInfo": { "name": "oauth-test", "version": "0.0.0" },
+                    "io.modelcontextprotocol/clientCapabilities": {}
+                }
+            }
+        });
+        let peer: SocketAddr = "127.0.0.1:54321".parse().expect("peer address");
+        let request = axum::http::Request::builder()
+            .method("POST")
+            .uri("/mcp")
+            .header("host", "localhost")
+            .header("origin", "http://localhost")
+            .header("authorization", format!("Bearer {token}"))
+            .header("content-type", "application/json")
+            .header("accept", "application/json, text/event-stream")
+            .header("mcp-protocol-version", "2026-07-28")
+            .header("mcp-method", "server/discover")
+            .extension(ConnectInfo(peer))
+            .body(axum::body::Body::from(body.to_string()))
+            .expect("request");
+        let mut router = router;
+        router.call(request).await.expect("dispatch")
+    }
+
+    /// An access token the OIDC provider issued for a linked Account clears the
+    /// `/mcp` authenticator, exactly where an API key does.
+    #[cfg(feature = "control-plane")]
+    #[tokio::test]
+    async fn an_oidc_access_token_authenticates_on_mcp() {
+        let provider = MockProvider::spawn(MockProviderConfig::default()).await;
+        let state = state_with_oauth_account(&provider, "user-1").await;
+        let token = sign_id_token(&serde_json::json!({
+            "sub": "user-1",
+            "iss": provider.base_url(),
+            "aud": OAUTH_AUDIENCE,
+            "exp": OAUTH_EXPIRY,
+        }));
+        let router = crate::http::router::build_router(state, None).expect("router builds");
+
+        let response = post_mcp_with_bearer(router, &token).await;
+
+        assert_ne!(
+            response.status(),
+            StatusCode::UNAUTHORIZED,
+            "an OIDC access token must clear the `/mcp` authenticator"
+        );
+        assert!(
+            !response
+                .headers()
+                .contains_key(axum::http::header::WWW_AUTHENTICATE),
+            "an authenticated request must not carry the bearer challenge"
+        );
+    }
+
+    /// A well-formed access token whose subject no Account owns is refused: the
+    /// fallback must not become an open door.
+    #[cfg(feature = "control-plane")]
+    #[tokio::test]
+    async fn an_access_token_for_an_unlinked_subject_is_denied_on_mcp() {
+        let provider = MockProvider::spawn(MockProviderConfig::default()).await;
+        let state = state_with_oauth_account(&provider, "user-1").await;
+        let token = sign_id_token(&serde_json::json!({
+            "sub": "nobody",
+            "iss": provider.base_url(),
+            "aud": OAUTH_AUDIENCE,
+            "exp": OAUTH_EXPIRY,
+        }));
+        let router = crate::http::router::build_router(state, None).expect("router builds");
+
+        let response = post_mcp_with_bearer(router, &token).await;
+
+        assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
+        assert!(
+            response
+                .headers()
+                .contains_key(axum::http::header::WWW_AUTHENTICATE),
+            "a refused request must carry the bearer challenge"
+        );
+    }
+
+    /// Where no OIDC method is configured the fallback is inert: a token that
+    /// is not an API key is refused outright, whatever it claims.
+    #[cfg(feature = "control-plane")]
+    #[tokio::test]
+    async fn the_access_token_fallback_is_inert_without_the_oidc_method() {
+        let (builder, _store) = crate::http::test_state::HttpStateTestBuilder::local_admin().await;
+        let state = builder.build().await.expect("composed local-admin state");
+        let token = sign_id_token(&serde_json::json!({
+            "sub": "user-1",
+            "iss": "https://issuer.invalid",
+            "aud": OAUTH_AUDIENCE,
+            "exp": OAUTH_EXPIRY,
+        }));
+        let router = crate::http::router::build_router(state, None).expect("router builds");
+
+        let response = post_mcp_with_bearer(router, &token).await;
+
+        assert_eq!(
+            response.status(),
+            StatusCode::UNAUTHORIZED,
+            "a deployment with no OIDC method must accept no access token"
+        );
     }
 }

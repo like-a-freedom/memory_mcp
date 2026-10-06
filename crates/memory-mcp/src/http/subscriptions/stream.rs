@@ -5,8 +5,6 @@ use std::time::Duration;
 
 use crate::platform::persistence::outbox::TenantChangeEvent;
 
-/// Maximum number of distinct resource invalidations buffered for one listener.
-pub const DEFAULT_QUEUE_CAPACITY: usize = 64;
 /// A sink that does not accept a frame within this bound is disconnected.
 pub const SEND_TIMEOUT: Duration = Duration::from_secs(5);
 
