@@ -9,5 +9,6 @@ pub mod alert;
 pub mod modal;
 pub mod one_time_secret;
 pub mod session_bar;
+pub mod sign_out_confirm;
 pub mod status_badge;
 pub mod timestamp;

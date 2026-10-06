@@ -14,10 +14,11 @@ use dioxus::prelude::*;
 use dioxus_router::Link;
 use dioxus_router::hooks::use_navigator;
 
-use crate::api::{ApiClient, ApiKeyMeta};
+use crate::api::{ApiClient, ApiKeyMeta, CreateApiKeyResponse};
 use crate::components::alert::{Alert, AlertTone};
 use crate::components::modal::claim_initial_focus;
 use crate::components::one_time_secret::OneTimeSecret;
+use crate::components::sign_out_confirm::SignOutConfirm;
 use crate::components::status_badge::StatusBadge;
 use crate::components::timestamp::Timestamp;
 use crate::inert;
@@ -29,12 +30,14 @@ use crate::state::account_session::end_account_session;
 pub fn KeysPage() -> Element {
     let navigator = use_navigator();
     let mut keys = use_resource(|| async { ApiClient::same_origin().list_keys().await });
-    let mut new_key_secret = use_signal(|| None::<String>);
+    let mut new_key = use_signal(|| None::<CreateApiKeyResponse>);
     let mut new_key_name = use_signal(String::new);
+    let mut created_notice = use_signal(|| None::<String>);
     let mut error = use_signal(|| None::<String>);
     let mut pending = use_signal(|| false);
     let signing_out = use_signal(|| false);
     let logout_error = use_signal(|| None::<String>);
+    let mut sign_out_confirm = use_signal(|| false);
     // Which key is about to be revoked, if any. Confirming is what clears it.
     let mut revoke_target = use_signal(|| None::<ApiKeyMeta>);
 
@@ -55,7 +58,7 @@ pub fn KeysPage() -> Element {
             match api.create_key(name).await {
                 Ok(response) => {
                     new_key_name.set(String::new());
-                    new_key_secret.set(Some(response.secret));
+                    new_key.set(Some(response));
                     keys.restart();
                 }
                 Err(value) => error.set(Some(value.message)),
@@ -79,25 +82,29 @@ pub fn KeysPage() -> Element {
         });
     };
 
-    let sign_out = move |_| {
+    let request_sign_out = move |_| sign_out_confirm.set(true);
+    let confirm_sign_out = move |_| {
+        sign_out_confirm.set(false);
         // A secret on screen must not outlive the sign-out request.
-        new_key_secret.set(None);
+        new_key.set(None);
         end_account_session(navigator, signing_out, logout_error);
     };
-    let secret_open = new_key_secret.read().is_some();
+    let cancel_sign_out = move |_| sign_out_confirm.set(false);
+    let modal_open = new_key.read().is_some() || *sign_out_confirm.read();
     let signing_out_now = *signing_out.read();
     let pending_now = *pending.read();
     let confirming = revoke_target.read().as_ref().map(|key| key.id.clone());
 
     rsx! {
         div { class: "container container--narrow",
-            div { class: "page-surface", inert: inert::attr(secret_open),
+            div { class: "page-surface", inert: inert::attr(modal_open),
                 h1 { "API keys" }
                 if signing_out_now {
                     Alert { tone: AlertTone::Status, message: Some("Signing out…".to_owned()) }
                 }
                 Alert { tone: AlertTone::Error, message: error.read().clone() }
                 Alert { tone: AlertTone::Warning, message: logout_error.read().clone() }
+                Alert { tone: AlertTone::Success, message: created_notice.read().clone() }
                 // The cached list is hidden rather than left on screen behind the
                 // navigation: the session it was read with is already gone.
                 if !signing_out_now {
@@ -132,12 +139,16 @@ pub fn KeysPage() -> Element {
                                 value: "{new_key_name}",
                                 oninput: move |event| new_key_name.set(event.value()),
                             }
-                            p { id: "new-key-name-hint", class: "hint",
-                                "A label you will recognise. The secret is shown once."
-                            }
                         }
                         button { r#type: "submit", disabled: pending_now,
                             if pending_now { "Creating…" } else { "Create key" }
+                        }
+                        // Beside the row, not inside the field: a hint inside the
+                        // field makes the field's bottom edge the hint's, and the
+                        // row's `align-items: flex-end` then drops the button a
+                        // hint-line below the input it belongs to.
+                        p { id: "new-key-name-hint", class: "hint",
+                            "A label you will recognise. The secret is shown once."
                         }
                     }
                     }
@@ -186,6 +197,7 @@ pub fn KeysPage() -> Element {
                                                 td {
                                                     button {
                                                         r#type: "button",
+                                                        class: "button--danger",
                                                         disabled: pending_now,
                                                         onclick: {
                                                             let target = key.clone();
@@ -206,7 +218,11 @@ pub fn KeysPage() -> Element {
                                                             role: "group",
                                                             "aria-labelledby": "revoke-key-question",
                                                             p { id: "revoke-key-question",
-                                                                "Revoke key {key.name} ({key.id})? Requests already using it stop working."
+                                                                "Revoke key {key.name}, created "
+                                                                Timestamp {
+                                                                    value: key.created_at.clone(),
+                                                                }
+                                                                "? Requests already using it stop working."
                                                             }
                                                             button {
                                                                 r#type: "button",
@@ -241,19 +257,34 @@ pub fn KeysPage() -> Element {
                             }
                         },
                     }
-                    nav { class: "actions", "aria-label": "Account",
+                    nav { class: "actions actions--split", "aria-label": "Account",
                         Link { class: "button", to: Route::Status {}, "Back to status" }
-                        button { r#type: "button", onclick: sign_out, "Sign out" }
+                        button { r#type: "button", onclick: request_sign_out, "Sign out" }
                     }
                 }
             }
         }
-        if let Some(secret) = new_key_secret.read().as_ref() {
+        if let Some(created) = new_key.read().as_ref() {
             OneTimeSecret {
                 id: "new-account-key",
                 title: "New API key",
-                secret: secret.clone(),
-                on_dismiss: move |_| new_key_secret.set(None),
+                secret: created.secret.clone(),
+                detail: Some(format!("Key {} ({})", created.name, created.id)),
+                on_dismiss: move |_| {
+                    let name = new_key.read().as_ref().map(|created| created.name.clone());
+                    new_key.set(None);
+                    if let Some(name) = name {
+                        created_notice.set(Some(format!(
+                            "Key {name} created. The secret cannot be shown again."
+                        )));
+                    }
+                },
+            }
+        }
+        if *sign_out_confirm.read() {
+            SignOutConfirm {
+                on_confirm: confirm_sign_out,
+                on_cancel: cancel_sign_out,
             }
         }
     }

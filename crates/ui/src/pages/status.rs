@@ -10,8 +10,10 @@ use dioxus_router::hooks::use_navigator;
 
 use crate::api::ApiClient;
 use crate::components::alert::{Alert, AlertTone};
+use crate::components::sign_out_confirm::SignOutConfirm;
 use crate::components::status_badge::StatusBadge;
 use crate::components::timestamp::Timestamp;
+use crate::inert;
 use crate::routes::Route;
 use crate::state::account_session::end_account_session;
 
@@ -24,11 +26,21 @@ pub fn StatusPage() -> Element {
     let mut account = use_resource(|| async { ApiClient::same_origin().me().await });
     let signing_out = use_signal(|| false);
     let logout_error = use_signal(|| None::<String>);
-    let sign_out = move |_| end_account_session(navigator, signing_out, logout_error);
+    let mut sign_out_confirm = use_signal(|| false);
+    let request_sign_out = move |_| sign_out_confirm.set(true);
+    let confirm_sign_out = move |_| {
+        sign_out_confirm.set(false);
+        end_account_session(navigator, signing_out, logout_error);
+    };
+    let cancel_sign_out = move |_| sign_out_confirm.set(false);
     let signing_out_now = *signing_out.read();
 
     rsx! {
-        div { class: "container container--narrow",
+        // `inert` sits on the container because it holds the whole page, and
+        // the sign-out question renders outside it as a sibling root.
+        div {
+            class: "container container--narrow",
+            inert: inert::attr(*sign_out_confirm.read()),
             h1 { "Account status" }
             if signing_out_now {
                 Alert { tone: AlertTone::Status, message: Some("Signing out…".to_owned()) }
@@ -81,7 +93,7 @@ pub fn StatusPage() -> Element {
                         // Account actions are shown only to a loaded account:
                         // leading a sessionless visitor to `/delete` is how the
                         // destructive flow used to dead-end on "not found".
-                        nav { class: "actions", "aria-label": "Account",
+                        nav { class: "actions actions--split", "aria-label": "Account",
                             Link { class: "button", to: Route::Keys {}, "API keys" }
                             // Destructive, so it must not look like its neighbour: the
                             // colour is the only warning an operator gets before the page
@@ -91,10 +103,16 @@ pub fn StatusPage() -> Element {
                                 to: Route::Delete {},
                                 "Delete account"
                             }
-                            button { r#type: "button", onclick: sign_out, "Sign out" }
+                            button { r#type: "button", onclick: request_sign_out, "Sign out" }
                         }
                     },
                 }
+            }
+        }
+        if *sign_out_confirm.read() {
+            SignOutConfirm {
+                on_confirm: confirm_sign_out,
+                on_cancel: cancel_sign_out,
             }
         }
     }

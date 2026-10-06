@@ -21,6 +21,8 @@ use crate::admin_api::{
 };
 use crate::components::alert::{Alert, AlertTone};
 use crate::components::session_bar::AdminSessionBar;
+use crate::components::sign_out_confirm::SignOutConfirm;
+use crate::inert;
 use crate::state::admin_session::{
     SESSION_ENDED, SESSION_ENDED_BEFORE_MUTATION, end_session, use_console_session,
 };
@@ -38,7 +40,13 @@ const CLIENT_PAGE_LIMIT: u16 = 50;
 pub fn AdminClientListPage() -> Element {
     let mut session = use_console_session();
     let navigator = use_navigator();
-    let sign_out = move |_| end_session(session, navigator);
+    let mut sign_out_confirm = use_signal(|| false);
+    let request_sign_out = move |_| sign_out_confirm.set(true);
+    let sign_out = move |_| {
+        sign_out_confirm.set(false);
+        end_session(session, navigator);
+    };
+    let cancel_sign_out = move |_| sign_out_confirm.set(false);
 
     let mut query = use_paged_query(|cursor| async move {
         AdminApi::new()
@@ -177,94 +185,102 @@ pub fn AdminClientListPage() -> Element {
     };
 
     rsx! {
-        header { class: "page-header",
-            h1 { "Clients" }
-            button {
-                r#type: "button",
-                onclick: retry,
-                disabled: loaded.is_loading(),
-                "Refresh"
-            }
-        }
-        AdminSessionBar { session, on_sign_out: sign_out }
-        // The form is offered only once the session is known to be usable, so a
-        // signed-out operator is never invited to fill in something that cannot
-        // be submitted.
-        if session_ready {
-            form { class: "create-client", onsubmit: create_submit,
-                div { class: "field",
-                    label { r#for: "client-display-name", "New client name" }
-                    input {
-                        id: "client-display-name",
-                        name: "display-name",
-                        r#type: "text",
-                        autocomplete: "off",
-                        required: true,
-                        "aria-describedby": "client-display-name-hint",
-                        value: "{display_name}",
-                        oninput: move |event| display_name.set(event.value()),
-                    }
-                    p { id: "client-display-name-hint", class: "hint",
-                        "Up to 100 characters. Shown on every console page."
-                    }
-                }
-                Alert { tone: AlertTone::Error, message: create_error.read().clone() }
-                button { r#type: "submit", disabled: *create_pending.read(),
-                    if *create_pending.read() { "Creating…" } else { "Create client" }
-                }
-                Alert {
-                    tone: AlertTone::Status,
-                    message: create_pending.read().then(|| "Creating the client…".to_owned()),
-                }
-            }
-        } else if !session_loading {
-            p { class: "hint", "Sign in again to create clients." }
-        }
-        if let Some(message) = loaded.error() {
-            Alert { tone: AlertTone::Error, message: Some(message.to_owned()) }
-            div { class: "actions",
+        div { class: "page-surface", inert: inert::attr(*sign_out_confirm.read()),
+            header { class: "page-header",
+                h1 { "Clients" }
                 button {
                     r#type: "button",
                     onclick: retry,
                     disabled: loaded.is_loading(),
-                    "Try again"
+                    "Refresh"
                 }
             }
-        }
-        // The rows keep their place while a newer page is fetched, so a refresh
-        // or a page step does not blank the table the operator is reading. A
-        // failure without rows says so, and a failure with rows shows the rows
-        // and the reason they may be stale.
-        if !loaded.items().is_empty() {
-            ClientsTable { items: loaded.items().to_vec() }
-            footer { class: "table-footer",
-                p { class: "hint", "{page_summary}" }
-                if loaded.has_previous() || loaded.has_next() {
-                    nav { class: "actions", "aria-label": "Client pages",
-                        button {
-                            r#type: "button",
-                            onclick: move |_| query.previous(),
-                            disabled: !loaded.has_previous() || loaded.is_loading(),
-                            "Previous page"
+            AdminSessionBar { session, on_sign_out: request_sign_out }
+            // The form is offered only once the session is known to be usable, so a
+            // signed-out operator is never invited to fill in something that cannot
+            // be submitted.
+            if session_ready {
+                form { class: "create-client", onsubmit: create_submit,
+                    div { class: "field",
+                        label { r#for: "client-display-name", "New client name" }
+                        input {
+                            id: "client-display-name",
+                            name: "display-name",
+                            r#type: "text",
+                            autocomplete: "off",
+                            required: true,
+                            "aria-describedby": "client-display-name-hint",
+                            value: "{display_name}",
+                            oninput: move |event| display_name.set(event.value()),
                         }
-                        button {
-                            r#type: "button",
-                            onclick: move |_| query.next(),
-                            disabled: !loaded.has_next() || loaded.is_loading(),
-                            "Next page"
+                        p { id: "client-display-name-hint", class: "hint",
+                            "Up to 100 characters. Shown on every console page."
                         }
+                    }
+                    Alert { tone: AlertTone::Error, message: create_error.read().clone() }
+                    button { r#type: "submit", disabled: *create_pending.read(),
+                        if *create_pending.read() { "Creating…" } else { "Create client" }
+                    }
+                    Alert {
+                        tone: AlertTone::Status,
+                        message: create_pending.read().then(|| "Creating the client…".to_owned()),
+                    }
+                }
+            } else if !session_loading {
+                p { class: "hint", "Sign in again to create clients." }
+            }
+            if let Some(message) = loaded.error() {
+                Alert { tone: AlertTone::Error, message: Some(message.to_owned()) }
+                div { class: "actions",
+                    button {
+                        r#type: "button",
+                        onclick: retry,
+                        disabled: loaded.is_loading(),
+                        "Try again"
                     }
                 }
             }
-        } else if loaded.error().is_none() {
-            if loaded.is_loaded() {
-                p { class: "empty", "No clients yet. Create the first one above." }
-            } else {
-                Alert { tone: AlertTone::Status, message: Some("Loading clients…".to_owned()) }
+            // The rows keep their place while a newer page is fetched, so a refresh
+            // or a page step does not blank the table the operator is reading. A
+            // failure without rows says so, and a failure with rows shows the rows
+            // and the reason they may be stale.
+            if !loaded.items().is_empty() {
+                ClientsTable { items: loaded.items().to_vec() }
+                footer { class: "table-footer",
+                    p { class: "hint", "{page_summary}" }
+                    if loaded.has_previous() || loaded.has_next() {
+                        nav { class: "actions", "aria-label": "Client pages",
+                            button {
+                                r#type: "button",
+                                onclick: move |_| query.previous(),
+                                disabled: !loaded.has_previous() || loaded.is_loading(),
+                                "Previous page"
+                            }
+                            button {
+                                r#type: "button",
+                                onclick: move |_| query.next(),
+                                disabled: !loaded.has_next() || loaded.is_loading(),
+                                "Next page"
+                            }
+                        }
+                    }
+                }
+            } else if loaded.error().is_none() {
+                if loaded.is_loaded() {
+                    p { class: "empty", "No clients yet. Create the first one above." }
+                } else {
+                    Alert { tone: AlertTone::Status, message: Some("Loading clients…".to_owned()) }
+                }
+            }
+            p { class: "hint",
+                "Client ids are stable. Failed clients keep the reason the backend reported."
             }
         }
-        p { class: "hint",
-            "Client ids are stable. Failed clients keep the reason the backend reported."
+        if *sign_out_confirm.read() {
+            SignOutConfirm {
+                on_confirm: sign_out,
+                on_cancel: cancel_sign_out,
+            }
         }
     }
 }

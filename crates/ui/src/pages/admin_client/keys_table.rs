@@ -88,6 +88,7 @@ pub fn KeysTable(
                                 } else {
                                     button {
                                         r#type: "button",
+                                        class: "button--danger",
                                         disabled: pending,
                                         onclick: {
                                             let target = key.clone();
@@ -106,7 +107,9 @@ pub fn KeysTable(
                                         role: "group",
                                         "aria-labelledby": "revoke-key-question",
                                         p { id: "revoke-key-question",
-                                            "Revoke key {key.name} ({key.id})? Requests already using it stop working."
+                                            "Revoke key {key.name}, created "
+                                            Timestamp { value: key.created_at.clone() }
+                                            "? Requests already using it stop working."
                                         }
                                         button {
                                             r#type: "button",

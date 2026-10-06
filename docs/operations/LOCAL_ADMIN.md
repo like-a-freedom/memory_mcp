@@ -382,9 +382,10 @@ working through.
 *There is no "are you sure you want to leave" guard on the client detail page.*
 While a secret is on screen the page content is `inert` behind the secret's own
 modal, so the way out of the page cannot be reached: the guard could never fire.
-The modal's own two-stage close — first Escape or Close arms the question, then
-"Discard the secret" or "Keep it" answers it — is the guard, and it is the one
-place the warning is stated.
+The modal's own close gate is the guard: closing is refused until the clipboard
+has accepted the value or the operator confirms the key is saved ("I have saved
+this key"), so a stray Escape cannot lose a secret nobody has taken. The warning
+is stated in the panel itself.
 
 *Every modal frame takes focus as it opens, and no modal panel relies on
 `autofocus`.*
@@ -457,10 +458,11 @@ one. Three properties make it more than a smoke test:
   assertion would prove nothing. Escape reaches a `<dialog>` only while focus is
   inside it, so this is the executable form of the guarantee in §2.6 that the
   panel cannot strand the operator's focus on the document body.
-* It asserts the panel's **two-stage close**: the first Escape must leave the
-  panel open and asking, and only the second may discard the secret and leave the
-  page interactive again. That guard protects the one value the backend cannot
-  reissue, and until now it was described in prose with no scenario covering it.
+* It asserts the panel's **close gate**: while the value is untaken, Escape must
+  leave the panel open and warn, and only a proven or attested save may close it
+  and leave the page interactive again. That guard protects the one value the
+  backend cannot reissue, and until now it was described in prose with no
+  scenario covering it.
 * It asserts `navigator.clipboard.readText()` equals the secret that was just
   revealed, so a clipboard call that silently targets nothing fails. The runner
   registers the secret for redaction *before* any diagnostic can observe it, and
@@ -1674,7 +1676,7 @@ regardless.
 | `ui` requires an absolute, non-symlink bundle directory containing `index.html` | `crates/memory-mcp/build.rs`; the suite only builds with `MEMORY_MCP_UI_DIST` pointing at one |
 | The image builds both binaries and a real UI bundle | `docker build` → `25/25 FINISHED`; `memory_mcp --help` lists `admin`; `ui-dist/public` contains `index.html`, a 46 KB JS and a 775 KB WASM |
 | The console is served with the CSP the WASM client needs | `ui_assets.rs::every_ui_response_carries_the_policy_the_wasm_client_needs`, plus the `docker` job's walk of the shipped image (which asserts the same header against a real image rather than a fixture) |
-| A modal frame takes focus as it opens, so Escape reaches it | `--scenario flow` → `the one-time secret arrives in an alertdialog that has taken focus`, plus the two-stage close (`the first escape asks before discarding the secret`, `the second escape discards the secret and leaves the page interactive`). The re-authentication panel is the case that needed the frame to take focus, and the one the scenario cannot reach: `reauth_required` is driven by `control::recent_auth::DEFAULT_REAUTH_MAX_AGE`, a 600-second constant with no configuration knob, so a fresh session cannot provoke it. For that panel the evidence is a before/after in a real browser against the packaged bundle: before, the dialog open with `document.activeElement` on `BODY` and Escape leaving it open; after, focus on `#reauth-password` and Escape dismissing it (§2.6) |
+| A modal frame takes focus as it opens, so Escape reaches it | `--scenario flow` → `the one-time secret arrives in an alertdialog that has taken focus`, plus the close gate (an Escape before the value is taken warns and keeps the panel open; a saved secret closes and leaves the page interactive). The re-authentication panel is the case that needed the frame to take focus, and the one the scenario cannot reach: `reauth_required` is driven by `control::recent_auth::DEFAULT_REAUTH_MAX_AGE`, a 600-second constant with no configuration knob, so a fresh session cannot provoke it. For that panel the evidence is a before/after in a real browser against the packaged bundle: before, the dialog open with `document.activeElement` on `BODY` and Escape leaving it open; after, focus on `#reauth-password` and Escape dismissing it (§2.6) |
 | Activation, login, client creation, keys and suspend/resume through the real HTTP surface | `http_local_admin.rs` (42 tests) |
 | The CLI narrows the durable policy and the restarted deployment serves the narrowed set | `--scenario removal` → the two guards, the store's `would leave no browser authentication method`, `removed_method`/`enabled_methods`/`epoch`/`guidance`, the second removal refused by name, and the local routes `404` while the provider routes are mounted (§5) |
 | The Compose file resolves with operator-generated secrets | `docker compose --env-file … config --quiet` |

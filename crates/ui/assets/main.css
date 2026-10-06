@@ -141,15 +141,14 @@ h2,
 h3 {
     margin: 0;
     font-weight: 600;
-    /* Display type on a dark surface needs its tracking opened slightly, not
-       tightened: a negative track that flatters large type on white makes the
-       same type look loose and grey here. */
+    /* Display type on a dark surface keeps its tracking neutral: a negative
+       track flatters large type on white, but light on dark it makes the
+       same glyphs look loose and grey. */
     line-height: var(--leading-tight);
 }
 
 h1 {
     font-size: var(--text-xl);
-    letter-spacing: -0.014em;
     /* A page title is one or two lines. Balancing evens them out, so a client
        name that wraps does not leave one orphan word under it. */
     text-wrap: balance;
@@ -157,7 +156,6 @@ h1 {
 
 h2 {
     font-size: var(--text-lg);
-    letter-spacing: -0.008em;
     text-wrap: balance;
 }
 
@@ -167,7 +165,6 @@ h2 {
 h3 {
     font-size: var(--text-md);
     font-weight: 600;
-    letter-spacing: -0.004em;
 }
 
 /* The measure. `ch` is measured against this element's own size, so the cap is
@@ -312,7 +309,6 @@ main:focus {
 
 .app-brand {
     font-weight: 600;
-    letter-spacing: -0.011em;
 }
 
 .app-brand-suffix {
@@ -622,8 +618,8 @@ button[type="submit"]:hover:not(:disabled) {
 }
 
 /* Destructive controls. `button.danger` is a solid button that starts or
-   confirms an irreversible action; `.button--danger` is an outlined link that
-   leads to one without committing to it. */
+   confirms an irreversible action; `.button--danger` is an outlined control
+   that leads to one without committing to it. */
 button.danger {
     background-color: var(--danger);
     color: var(--danger-text);
@@ -637,13 +633,15 @@ button.danger:hover:not(:disabled) {
     color: var(--danger-text);
 }
 
-a.button.button--danger {
+a.button.button--danger,
+button.button--danger {
     background-color: var(--danger-bg);
     color: var(--danger);
     border-color: var(--danger-border);
 }
 
-a.button.button--danger:hover {
+a.button.button--danger:hover,
+button.button--danger:hover:not(:disabled) {
     background-color: var(--danger-hover);
     border-color: var(--danger);
     color: var(--danger);
@@ -684,10 +682,11 @@ a.button.button--danger:hover {
     gap: var(--space-2);
 }
 
-.actions > p {
-    flex-basis: 100%;
-    color: var(--warning);
-    font-size: var(--text-base);
+/* Ending the session is not interchangeable with navigating, so its control
+   takes the trailing edge — the same move `.session-bar > button` makes —
+   instead of sitting beside "Back to status" as an equal sibling. */
+.actions--split > :last-child {
+    margin-left: auto;
 }
 
 /* Standing copy that is not a message about something that just happened, and
@@ -850,7 +849,9 @@ p.error {
 .status-detail {
     color: var(--fg-muted);
     font-size: var(--text-sm);
-    overflow-wrap: anywhere;
+    /* A reason is prose, so it breaks at words; `anywhere` below is the
+       stronger break a value read character by character needs. */
+    overflow-wrap: break-word;
 }
 
 .timestamp {
@@ -968,12 +969,16 @@ thead th {
 
 /* One cell padding for every cell in a body row. `tbody th[scope="row"]` had its
    own, two pixels lighter, which put the label's text 2px above the value's in
-   the same row — both cells are top-aligned, so the offset was pure drift. */
+   the same row — the offset was pure drift.
+
+   Cells are middle-aligned: a row mixes one line of text with a 1.75rem
+   control, and top-aligning them floats the name at the button's top edge
+   while the button hangs below it. */
 tbody td,
 tbody th[scope="row"] {
     border-top: 1px solid var(--border);
     padding: 0.625rem var(--space-3);
-    vertical-align: top;
+    vertical-align: middle;
     font-variant-numeric: tabular-nums;
 }
 
@@ -999,6 +1004,50 @@ tbody th[scope="row"] {
    tables scroll, so the name column keeps its width instead. */
 .data-table tbody tr:not(.confirm-row) > td:first-child {
     white-space: nowrap;
+}
+
+/* A row action is not the page's primary control: it borrows the status
+   badge's mass (1.75rem, --text-sm) instead of the 2.5rem form-button box, so
+   a column of them reads as row affordances rather than a column of banners.
+   The confirmation row keeps the full-size pair — that pair is the decision. */
+.data-table tbody tr:not(.confirm-row) button {
+    min-height: 1.75rem;
+    padding: 0.2rem var(--space-2);
+    font-size: var(--text-sm);
+}
+
+/* The action column hugs its control and hangs at the trailing edge, so the
+   buttons form one line down the table instead of floating mid-cell. */
+.data-table thead th:last-child,
+.data-table tbody tr:not(.confirm-row) > td:last-child {
+    width: 1%;
+    white-space: nowrap;
+    text-align: right;
+}
+
+/* The name is the row's identity, so it stays in view while the wide table
+   scrolls — the same move `.client-list` makes with its first column. */
+.data-table thead th:first-child,
+.data-table tbody tr:not(.confirm-row) > td:first-child {
+    position: sticky;
+    left: 0;
+    z-index: 1;
+}
+
+.data-table thead th:first-child {
+    background-color: var(--surface-raised);
+}
+
+.data-table tbody tr:not(.confirm-row) > td:first-child {
+    background-color: var(--surface);
+    box-shadow: 1px 0 0 var(--border);
+}
+
+/* The pinned name paints its own background, so it follows the row's hover
+   too: a sticky cell that stays dark on a highlighted row looks like a
+   rendering fault. */
+.data-table tbody tr:not(.confirm-row):hover > td:first-child {
+    background-color: var(--surface-raised);
 }
 
 /* The confirmation panel fills the cell it is placed in, so the row reads as one
@@ -1153,14 +1202,14 @@ dialog.modal-layer {
 /* The one-time secret is the highest-risk value this console ever renders: it
    is visually quarantined and set in mono so it can be read aloud or retyped
    without ambiguity. The deletion confirmation phrase is set the same way for
-   the same reason: it has to be copied or retyped exactly. */
+   the same reason: it has to be copied or retyped exactly.
+
+   The heading keeps the ordinary foreground. A title is not a state: this used
+   to be the console's only coloured heading — decorative use of a semantic
+   token — and three amber elements at once left the one sentence that
+   genuinely is a warning with no colour left to distinguish it. */
 .secret {
     border-color: var(--warning-border);
-}
-
-.secret > h2,
-.secret > h3 {
-    color: var(--warning);
 }
 
 .secret-value,
@@ -1189,8 +1238,16 @@ dialog.modal-layer {
     font-size: inherit;
 }
 
-.secret > p[role="alert"] {
-    color: var(--danger);
+/* The delivery attestation: a successful copy checks it, and the operator who
+   captured the value by hand checks it themselves. The label wraps the box, so
+   the whole row is one target. */
+.secret-confirm {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    color: var(--fg);
+    font-size: var(--text-base);
+    cursor: pointer;
 }
 
 /* The sentence explaining why a modal is open. Every modal renders one, so it
@@ -1223,19 +1280,30 @@ dialog.modal-layer {
 }
 
 /* The OIDC key page and the local admin pages stack no more than one column,
-   but a create row reads better as an inline pair on a wide screen. */
+   but a create row reads better as an inline pair on a wide screen. The row gap
+   is `--space-2` — the scale's step "between controls in one row" — rather than
+   the form's `--space-4`, which is the step between stacked fields. */
 .create-key {
     flex-direction: row;
+    flex-wrap: wrap;
     align-items: flex-end;
+    gap: var(--space-2);
 }
 
 .create-key > .field {
     flex: 1 1 18rem;
 }
 
+/* The hint is a sibling of the field and the button, not a field member: inside
+   the field it makes the field's bottom edge the hint's, and `align-items:
+   flex-end` then drops the button a hint-line below the input it belongs to. */
+.create-key > .hint {
+    flex-basis: 100%;
+}
+
 /* `form > button[type="submit"] { align-self: flex-start }` is right for a
    column form, where the control takes the width of its label. This row is the
-   one place the button must line up with the *bottom* of the field beside it,
+   one place the button must line up with the *bottom* of the input beside it,
    so it opts back in: inheriting the column rule put the control level with
    the field's label and left the panel's lower half empty. */
 .create-key > button[type="submit"] {
@@ -1286,6 +1354,11 @@ dialog.modal-layer {
         align-items: stretch;
     }
 
+    /* Stacked full-width, the trailing margin would only shrink the target. */
+    .actions--split > :last-child {
+        margin-left: 0;
+    }
+
     .actions > button,
     .actions > a.button {
         width: 100%;
@@ -1300,6 +1373,13 @@ dialog.modal-layer {
        24px minimum but short of the 44px comfortably tappable size. */
     button,
     a.button {
+        min-height: 2.75rem;
+        padding: 0.625rem 0.875rem;
+    }
+
+    /* The compact row-action metrics win on specificity, so the touch target
+       has to be restored for them explicitly. */
+    .data-table tbody tr:not(.confirm-row) button {
         min-height: 2.75rem;
         padding: 0.625rem 0.875rem;
     }

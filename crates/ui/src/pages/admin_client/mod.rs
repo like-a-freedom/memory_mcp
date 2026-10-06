@@ -22,7 +22,8 @@
 //! While a secret is on screen the page content is `inert` behind the secret's
 //! own modal, so the way out of this page cannot be reached at all: the guard
 //! could never fire, and a protection that cannot fire is worse than none,
-//! because it reads as one. The modal's own two-stage close is the guard.
+//! because it reads as one. The modal's own close gate — closing is refused
+//! until the value is known to be taken — is the guard.
 
 mod keys_panel;
 mod keys_table;
@@ -39,6 +40,7 @@ use crate::components::admin_auth::AdminReauthDialog;
 use crate::components::alert::{Alert, AlertTone};
 use crate::components::one_time_secret::OneTimeSecret;
 use crate::components::session_bar::AdminSessionBar;
+use crate::components::sign_out_confirm::SignOutConfirm;
 use crate::inert;
 use crate::presentation::KEY_PRIVILEGE_NOTE;
 use crate::routes::Route;
@@ -54,7 +56,10 @@ pub fn AdminClientDetailPage(account_id: String) -> Element {
     let navigator = use_navigator();
     let mut state = use_page_state(account_id.clone());
 
+    let mut sign_out_confirm = use_signal(|| false);
+    let request_sign_out = move |_| sign_out_confirm.set(true);
     let sign_out = move |_| {
+        sign_out_confirm.set(false);
         // Do not wait for navigation to unmount the page: the one-time secret
         // must disappear as soon as the operator starts signing out.
         state.secret.set(None);
@@ -63,6 +68,7 @@ pub fn AdminClientDetailPage(account_id: String) -> Element {
         state.pending.set(false);
         end_session(state.session, navigator);
     };
+    let cancel_sign_out = move |_| sign_out_confirm.set(false);
     let leave_page = move |_| {
         navigator.push(Route::AdminClientList {});
     };
@@ -93,7 +99,7 @@ pub fn AdminClientDetailPage(account_id: String) -> Element {
     let loaded = state.client.read().clone();
     let session_ready = state.session.read().is_ready();
     let refused = *state.refused.read();
-    let modal_open = state.secret.read().is_some() || refused.is_some();
+    let modal_open = state.secret.read().is_some() || refused.is_some() || *sign_out_confirm.read();
     // The panel's availability is decided in one place, in the order that
     // matters: a session that cannot mutate is reported as such even when the
     // client itself is ready.
@@ -119,7 +125,7 @@ pub fn AdminClientDetailPage(account_id: String) -> Element {
                 // key table.
                 button { r#type: "button", onclick: leave_page, "Back to clients" }
             }
-            AdminSessionBar { session: state.session, on_sign_out: sign_out }
+            AdminSessionBar { session: state.session, on_sign_out: request_sign_out }
             p { class: "privilege-note", "{KEY_PRIVILEGE_NOTE}" }
             Alert { tone: AlertTone::Error, message: state.error.read().clone() }
             if state.error.read().is_some() && loaded.is_none() {
@@ -184,6 +190,12 @@ pub fn AdminClientDetailPage(account_id: String) -> Element {
                 reason: refusal.reason().to_owned(),
                 on_confirmed: confirmed_reauth,
                 on_cancel: move |_| state.refused.set(None),
+            }
+        }
+        if *sign_out_confirm.read() {
+            SignOutConfirm {
+                on_confirm: sign_out,
+                on_cancel: cancel_sign_out,
             }
         }
     }
