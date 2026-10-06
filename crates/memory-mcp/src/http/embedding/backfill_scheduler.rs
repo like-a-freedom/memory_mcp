@@ -26,7 +26,7 @@
 //!   environment the parallel test harness shares.
 
 use std::sync::Arc;
-use std::time::Instant;
+use std::time::{Duration, Instant};
 
 use crate::error::MemoryError;
 use crate::http::leases::scheduler::SchedulerJob;
@@ -48,6 +48,36 @@ const FACT_BATCH: i32 = 100;
 /// one tenant's pass failed and the pass continued past it.
 const JOB_METRIC: &str = "embedding_backfill";
 
+/// How often the backfill job actually walks the registry.
+///
+/// The scheduler ticks every second; backfill is not a per-second job. It
+/// reads the tenant list, binds each namespace and probes its HNSW index —
+/// work a small box pays for on every tick if it is ungated, and whose only
+/// observable output was a line an operator could not pace. 60s is the same
+/// cadence the plan-reconcile and provisioning passes already use.
+const BACKFILL_CADENCE: Duration = Duration::from_secs(60);
+
+/// Whether the gate is open at `now`: the first call always opens it, and
+/// later calls open it only once `cadence` has elapsed since the last one.
+///
+/// The instant is a parameter rather than read here so the opening and closing
+/// of the window can both be pinned without sleeping through a real minute —
+/// a gate tested only from the closed side would pass while being stuck shut.
+fn cadence_due_at(
+    last_run: &std::sync::Mutex<Option<Instant>>,
+    cadence: Duration,
+    now: Instant,
+) -> bool {
+    let mut guard = last_run
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner());
+    if guard.is_some_and(|previous| now.duration_since(previous) < cadence) {
+        return false;
+    }
+    *guard = Some(now);
+    true
+}
+
 /// The backfill job. Registers itself with
 /// `SchedulerHooks::with_additional_job`.
 ///
@@ -56,10 +86,25 @@ const JOB_METRIC: &str = "embedding_backfill";
 /// [`RegistryHandle`], so there is nowhere else to carry it — and capturing it
 /// is what makes the gate a value the operator set once, rather than a lookup
 /// the tick repeats.
+///
+/// The cadence gate is captured the same way. It lives in the closure, not a
+/// `static`, so every job instance owns its own window: a process-wide static
+/// would be shared by every test in the binary, and the second test's first
+/// tick would be skipped because the first test opened it. Production builds
+/// one job, so one window governs it.
 pub fn backfill_scheduler_job(policy: DeploymentPolicy) -> SchedulerJob {
+    let last_run: Arc<std::sync::Mutex<Option<Instant>>> = Arc::new(std::sync::Mutex::new(None));
     Arc::new(move |registry| {
         let policy = policy.clone();
-        Box::pin(async move { run_backfill_pass(&registry, &policy).await })
+        let last_run = Arc::clone(&last_run);
+        Box::pin(async move {
+            // Cheapest check first: a tick inside the window must not even
+            // read the registry, which is the cost this gate exists to avoid.
+            if !cadence_due_at(&last_run, BACKFILL_CADENCE, Instant::now()) {
+                return Ok(());
+            }
+            run_backfill_pass(&registry, &policy).await
+        })
     })
 }
 
@@ -441,30 +486,13 @@ mod tests {
         let engine = registry.tenant_engine_optional().expect("engine wired");
         let db = engine.bind_to_test_namespace(namespace).await;
         db.apply_migrations(namespace).await.expect("migrations");
-        let now = crate::shared::temporal::normalize_dt(chrono::Utc::now());
-        db.create(
-            "fact:lvl",
-            serde_json::json!({
-                "fact_id": "fact:lvl",
-                "fact_type": "note",
-                "content": "content",
-                "quote": "content",
-                "source_episode": "episode:seed",
-                "t_valid": now,
-                "t_ingested": now,
-                "confidence": 0.9,
-                "index_keys": [],
-                "access_count": 0,
-                "entity_links": [],
-                "scope": namespace,
-                "policy_tags": [],
-                "provenance": {"source_episode": "episode:seed"},
-            }),
-            namespace,
-            crate::knowledge::queries::FACT_TEMPORAL_FIELDS,
-        )
-        .await
-        .expect("seed a fact with no vector");
+        // Three facts, not one: `embedding.backfill_started` carries
+        // `total_missing`, and a count no other test produces is what lets this
+        // assertion pick *its own* line out of a sink that receives every test's
+        // output. One fact would collide with the cadence test's `total_missing=1`.
+        for fact_id in ["fact:lvl1", "fact:lvl2", "fact:lvl3"] {
+            seed_fact_without_vector(&db, namespace, fact_id).await;
+        }
         // Register the tenant ready, so the bounded walk reaches it — a
         // registry with no ready tenant would pass without running a backfill.
         registry
@@ -487,19 +515,160 @@ mod tests {
             .expect("register the tenant as ready");
 
         let sink = crate::logging::capture::install();
-        crate::logging::capture::with_level("error", || {
+        crate::logging::capture::with_level("warn", || {
             backfill_scheduler_job(policy(true))(registry)
         })
         .await
         .expect("a tick under a quiet level still succeeds");
 
         let recorded = sink.lines();
+        // `total_missing=3` is this test's own count, so a sibling backfill's
+        // `total_missing=1` (the cadence test) or `0` (the empty-store test)
+        // cannot satisfy — or mask — the assertion.
         assert!(
-            !recorded
-                .iter()
-                .any(|line| line.contains("op=embedding.backfill_started")),
+            !recorded.iter().any(|line| {
+                line.contains("op=embedding.backfill_started") && line.contains("total_missing=3")
+            }),
             "the backfill service logger must obey the deployment level, not a \
              hardcoded info: {recorded:?}"
+        );
+    }
+
+    /// The gate must open, not just close. [`the_backfill_job_gates_its_cadence`]
+    /// pins the closed side; a gate that opened once and then stayed shut for
+    /// the process's lifetime would pass that test while backfilling exactly
+    /// once ever, so the opening is pinned here against synthetic instants —
+    /// no test should sleep through a real minute to prove it.
+    #[test]
+    fn the_cadence_gate_opens_when_the_window_has_elapsed() {
+        let last_run = std::sync::Mutex::new(None);
+        let t0 = Instant::now();
+
+        assert!(
+            cadence_due_at(&last_run, Duration::from_secs(60), t0),
+            "the first run always opens the gate"
+        );
+        assert!(
+            !cadence_due_at(
+                &last_run,
+                Duration::from_secs(60),
+                t0 + Duration::from_secs(30)
+            ),
+            "a run inside the window is gated"
+        );
+        assert!(
+            cadence_due_at(
+                &last_run,
+                Duration::from_secs(60),
+                t0 + Duration::from_secs(60)
+            ),
+            "a run at the boundary opens the gate again"
+        );
+        assert!(
+            !cadence_due_at(
+                &last_run,
+                Duration::from_secs(60),
+                t0 + Duration::from_secs(90)
+            ),
+            "and the window closes from the new anchor"
+        );
+    }
+
+    /// Seed one fact with no vector, so a backfill pass has a gap to fill.
+    async fn seed_fact_without_vector(
+        db: &crate::storage::client::SurrealDbClient,
+        namespace: &str,
+        fact_id: &str,
+    ) {
+        use crate::storage::client::DbClient;
+        let now = crate::shared::temporal::normalize_dt(chrono::Utc::now());
+        db.create(
+            fact_id,
+            serde_json::json!({
+                "fact_id": fact_id,
+                "fact_type": "note",
+                "content": format!("content {fact_id}"),
+                "quote": format!("content {fact_id}"),
+                "source_episode": "episode:seed",
+                "t_valid": now,
+                "t_ingested": now,
+                "confidence": 0.9,
+                "index_keys": [],
+                "access_count": 0,
+                "entity_links": [],
+                "scope": namespace,
+                "policy_tags": [],
+                "provenance": {"source_episode": "episode:seed"},
+            }),
+            namespace,
+            crate::knowledge::queries::FACT_TEMPORAL_FIELDS,
+        )
+        .await
+        .expect("seed a fact with no vector");
+    }
+
+    /// The scheduler ticks once a second, and an ungated backfill walked the
+    /// registry, bound every tenant and probed its index on each of them — a
+    /// query storm on a small box and a line an operator could not pace. The
+    /// gate lives in the job closure, so a second tick inside the cadence is a
+    /// no-op while the first tick runs immediately.
+    #[tokio::test]
+    async fn the_backfill_job_gates_its_cadence() {
+        use crate::http::registry::models::{NamespaceBinding, TenantStatus};
+        use crate::storage::client::DbClient;
+
+        let namespace = "tns_backfill_cadence";
+        let registry = empty_registry().await;
+        let engine = registry.tenant_engine_optional().expect("engine wired");
+        let db = engine.bind_to_test_namespace(namespace).await;
+        db.apply_migrations(namespace).await.expect("migrations");
+        seed_fact_without_vector(&db, namespace, "fact:a").await;
+        registry
+            .tenants()
+            .write_tenant(&Tenant {
+                id: "ten_backfill_cadence".to_string(),
+                status: TenantStatus::Ready,
+                namespace_binding: NamespaceBinding {
+                    namespace: namespace.to_string(),
+                    database: "memory".into(),
+                },
+                plan_version: 1,
+                schema_version: 0,
+                retry_stage: None,
+                provisioning_lease: None,
+                created_at: chrono::Utc::now(),
+                version: 0,
+            })
+            .await
+            .expect("register the tenant as ready");
+
+        let job = backfill_scheduler_job(policy(true));
+
+        // The first tick must run: it fills fact:a.
+        job(registry.clone()).await.expect("the first tick runs");
+        let a = db
+            .select_one("fact:a", namespace)
+            .await
+            .expect("read fact:a")
+            .expect("fact:a exists");
+        assert!(
+            a.get("embedding_dimension").is_some(),
+            "the first tick must run and fill fact:a"
+        );
+
+        // A gap that appears immediately after must wait for the cadence.
+        seed_fact_without_vector(&db, namespace, "fact:b").await;
+        job(registry)
+            .await
+            .expect("a gated tick is still a successful no-op");
+        let b = db
+            .select_one("fact:b", namespace)
+            .await
+            .expect("read fact:b")
+            .expect("fact:b exists");
+        assert!(
+            b.get("embedding_dimension").is_none(),
+            "the second tick inside the cadence must not run a backfill"
         );
     }
 

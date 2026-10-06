@@ -931,7 +931,7 @@ mod tests {
     async fn a_tenant_runtime_honors_the_deployment_log_level() {
         let sink = crate::logging::capture::install();
 
-        let runtime = crate::logging::capture::with_level("error", || async {
+        let runtime = crate::logging::capture::with_level("warn", || async {
             let db = Surreal::new::<Mem>(()).await.unwrap();
             db.use_ns("tenant_lvl").use_db("memory").await.unwrap();
             let client = Arc::new(SurrealDbClient::from_prebound_mem(
@@ -963,10 +963,15 @@ mod tests {
         .await;
 
         let recorded = sink.lines();
+        // Filtered by this test's namespace: `record` broadcasts every line to
+        // every active sink, so a sibling tenant test building its own runtime
+        // lands its decision line here too. Only *this* runtime's decision can
+        // prove *this* runtime's logger.
         assert!(
-            !recorded
-                .iter()
-                .any(|line| line.contains("op=http.tenant_embedding_decision")),
+            !recorded.iter().any(|line| {
+                line.contains("op=http.tenant_embedding_decision")
+                    && line.contains("namespace=tenant_lvl")
+            }),
             "the decision helper must obey the deployment level, not log at a \
              hardcoded info: {recorded:?}"
         );

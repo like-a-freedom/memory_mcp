@@ -1341,7 +1341,9 @@ the full variable table — with these HTTP-specific consequences:
 | `EMBEDDINGS_ENABLED` | boolean | `false` when unset and no provider is set | Enable semantic retrieval for every tenant. A deployment that enables it but cannot resolve the provider fails startup rather than silently degrading |
 | `EMBEDDINGS_AUTO_RECOVERY` | boolean | `true` | Whether a background scheduler job fills tenant facts that carry no vector. Only `1`, `true`, and `yes` enable it — **`auto` is not a truthy value**, so `EMBEDDINGS_AUTO_RECOVERY=auto` reads as *off* and gets no backfill |
 
-The backfill job walks the ready tenants once per scheduler cycle and fills
+The backfill job walks the ready tenants **at most once every 60 seconds** —
+the scheduler ticks once a second, but a registry walk that binds every
+tenant and probes its index is not a per-second job — and fills
 `embedding IS NONE` in place. It never rewrites an existing vector. Before it
 writes anything it checks the tenant's HNSW index against the deployment
 dimension, through the same function the activation path uses:
@@ -1359,7 +1361,10 @@ dimension, through the same function the activation path uses:
 
 When the job is disabled it logs `http.embedding.backfill_disabled` at `Debug`
 and does nothing, so a deployment that enabled embeddings but left recovery off
-does not silently scan every tenant on every tick.
+does not silently scan every tenant on every tick. For the same reason
+`embedding.backfill_started` reports at `Debug` when a pass finds nothing to
+fill and at `Info` when it finds work — an idle deployment is silent at the
+default level rather than printing one line per tenant per pass.
 
 A tenant whose stored vectors were written by a **different** provider is a
 different situation, and backfill does not apply to it: those facts already hold

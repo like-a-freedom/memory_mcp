@@ -682,14 +682,25 @@ pub mod capture {
     /// test asserting on its own log line failed intermittently while passing
     /// on its own. Last override wins, and it is restored on the way out
     /// including on unwind.
+    ///
+    /// The whole region is then held under [`SERIAL`]: `override_level` reads
+    /// the *top* of that stack, so two tests installing concurrently each read
+    /// the other's directive. A test asserting "quiet at error" found its own
+    /// events emitted because a sibling's `http=debug` sat on top and reset the
+    /// default to `info`. One lock makes the override unambiguous for the
+    /// duration.
     pub async fn with_level<F, Fut, T>(level: &str, body: F) -> T
     where
         F: FnOnce() -> Fut,
         Fut: std::future::Future<Output = T>,
     {
+        let _serialized = SERIAL.lock().await;
         let _guard = LevelOverride::install(level);
         body().await
     }
+
+    /// One region at a time for every `with_level` caller. See `with_level`.
+    static SERIAL: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(());
 
     /// Restores the previous override when dropped, including on unwind.
     ///
