@@ -1466,3 +1466,487 @@ mod tests {
         );
     }
 }
+
+/// The browser OIDC journey against a loopback identity provider: the routes a
+/// user's browser actually visits, driven through the real router.
+///
+/// These are the paths the unit tests around the handlers cannot reach — the
+/// sealed request is stored by `/auth/oidc/authorize` and consumed by
+/// `/auth/oidc/callback`, and `/auth/oidc/logout` sits behind the real CSRF and
+/// session stack — so only a real round trip exercises them together.
+#[cfg(test)]
+mod browser_flow_tests {
+    use super::*;
+    use crate::control::oidc::test_provider::{
+        MockProvider, MockProviderConfig, TokenAnswer, sign_id_token,
+    };
+    use crate::http::config::SignupMode;
+    use crate::http::router::build_router;
+    use crate::http::test_state::HttpStateTestBuilder;
+    use axum::body::Body;
+    use axum::http::{Request, StatusCode};
+    use std::collections::HashMap;
+    use std::net::SocketAddr;
+    use std::sync::Arc;
+    use tower_service::Service;
+
+    /// The audience the configured client and the token fixtures agree on, and
+    /// a far-future expiry so the assertions never race the wall clock.
+    const AUDIENCE: &str = "memory-mcp";
+    const FAR_FUTURE: u64 = 4_102_444_800; // 2100-01-01T00:00:00Z
+
+    /// A state that serves the OIDC routes against `provider`, with
+    /// `signup_mode`.
+    async fn state_for(provider: &MockProvider, signup_mode: SignupMode) -> Arc<HttpState> {
+        let client = crate::control::oidc::OidcClient::new(
+            provider.base_url(),
+            "memory-mcp",
+            AUDIENCE,
+            "https://app.example/callback",
+            "auto",
+        )
+        .await
+        .expect("OIDC discovery against the mock provider");
+
+        let mut config = crate::http::config::HttpConfig::default_for_test();
+        config.oidc_issuer = provider.base_url().to_string();
+        config.oidc_audience = AUDIENCE.to_string();
+        config.oidc_allowed_alg = "RS256".to_string();
+        config.signup_mode = signup_mode;
+
+        HttpStateTestBuilder::new()
+            .await
+            .with_config(config)
+            // Reconcile the browser policy into the durable store, the way
+            // production does: `store_oidc_request` rejects a request whose
+            // epoch the store does not hold.
+            .without_prejoined_browser_policy()
+            .with_oidc_client(Arc::new(client))
+            .build()
+            .await
+            .expect("composed sign-in state")
+    }
+
+    /// Drive one GET through the router, with the host/origin/peer a browser
+    /// sends.
+    async fn get(router: axum::Router, uri: &str) -> axum::response::Response {
+        let peer: SocketAddr = "127.0.0.1:54321".parse().expect("peer address");
+        let request = Request::builder()
+            .method("GET")
+            .uri(uri)
+            .header("host", "localhost")
+            .header("origin", "http://localhost")
+            .extension(axum::extract::connect_info::ConnectInfo(peer))
+            .body(Body::empty())
+            .expect("request");
+        let mut router = router;
+        router.call(request).await.expect("dispatch")
+    }
+
+    /// Start a sign-in and return the `state` and `nonce` the provider URL
+    /// carries — the nonce is what the ID token has to echo back.
+    async fn start_sign_in(router: axum::Router) -> (String, String) {
+        let response = get(router, "/auth/oidc/authorize").await;
+        assert_eq!(
+            response.status(),
+            StatusCode::SEE_OTHER,
+            "authorize must redirect the browser to the provider"
+        );
+        let location = response
+            .headers()
+            .get(axum::http::header::LOCATION)
+            .expect("the authorize redirect carries a Location")
+            .to_str()
+            .expect("Location is ASCII");
+        let url = reqwest::Url::parse(location).expect("the Location is an absolute URL");
+        let query: HashMap<_, _> = url.query_pairs().into_owned().collect();
+        (
+            query
+                .get("state")
+                .expect("state in the provider URL")
+                .clone(),
+            query
+                .get("nonce")
+                .expect("nonce in the provider URL")
+                .clone(),
+        )
+    }
+
+    /// The ID token the provider would issue for a completed flow.
+    fn id_token_for(provider: &MockProvider, sub: &str, nonce: &str) -> String {
+        sign_id_token(&serde_json::json!({
+            "sub": sub,
+            "iss": provider.base_url(),
+            "aud": AUDIENCE,
+            "nonce": nonce,
+            "exp": FAR_FUTURE,
+        }))
+    }
+
+    /// Seed an Account already linked to `(provider issuer, sub)`, so the
+    /// invite-only gate admits its re-login.
+    async fn seed_linked_account(state: &HttpState, provider: &MockProvider, sub: &str) {
+        use crate::http::registry::models::{
+            Account, AccountStatus, ExternalIdentity, NamespaceBinding, SubjectVerifier, Tenant,
+            TenantStatus,
+        };
+
+        let now = chrono::Utc::now();
+        let verifier = crate::control::oidc::identity_subject_verifier(
+            &state.config.keys.identity_index,
+            provider.base_url(),
+            sub,
+        )
+        .expect("identity index");
+        state
+            .registry
+            .accounts()
+            .create_account_bundle(
+                &Account {
+                    id: "acct_invited".into(),
+                    status: AccountStatus::Active,
+                    tenant_id: "ten_invited".into(),
+                    created_at: now,
+                    display_name: None,
+                },
+                &Tenant {
+                    id: "ten_invited".into(),
+                    status: TenantStatus::Ready,
+                    namespace_binding: NamespaceBinding {
+                        namespace: "tns_invited".into(),
+                        database: "memory".into(),
+                    },
+                    plan_version: 1,
+                    schema_version: 0,
+                    retry_stage: None,
+                    provisioning_lease: None,
+                    created_at: now,
+                    version: 0,
+                },
+                Some(&ExternalIdentity {
+                    id: "idn_invited".into(),
+                    issuer: provider.base_url().into(),
+                    subject_verifier: SubjectVerifier(verifier),
+                    account_id: "acct_invited".into(),
+                    created_at: now,
+                }),
+            )
+            .await
+            .expect("seed Account with identity");
+    }
+
+    /// The whole journey: authorize redirects to the provider, and the callback
+    /// comes back with a session cookie.
+    #[tokio::test]
+    async fn a_completed_sign_in_issues_a_session() {
+        let provider = MockProvider::spawn(MockProviderConfig::default()).await;
+        let state = state_for(&provider, SignupMode::Open).await;
+        let router = build_router(state, None).expect("router builds");
+
+        let (flow_state, nonce) = start_sign_in(router.clone()).await;
+        provider.set_token_answer(TokenAnswer::IdToken(id_token_for(
+            &provider, "user-1", &nonce,
+        )));
+
+        let response = get(
+            router,
+            &format!("/auth/oidc/callback?state={flow_state}&code=auth-code"),
+        )
+        .await;
+
+        assert_eq!(
+            response.status(),
+            StatusCode::SEE_OTHER,
+            "a completed sign-in redirects into the console"
+        );
+        let cookie = response
+            .headers()
+            .get(axum::http::header::SET_COOKIE)
+            .expect("the sign-in sets the session cookie")
+            .to_str()
+            .expect("cookie is ASCII");
+        assert!(
+            cookie.contains("__Host-memory_mcp_session="),
+            "got: {cookie}"
+        );
+    }
+
+    /// An invite-only deployment refuses an identity no Account holds, and says
+    /// so with 403 — the provider authenticated the caller, so 401 would blame
+    /// the credentials.
+    #[tokio::test]
+    async fn an_invite_only_deployment_refuses_an_unknown_identity() {
+        let provider = MockProvider::spawn(MockProviderConfig::default()).await;
+        let state = state_for(&provider, SignupMode::InviteOnly).await;
+        let router = build_router(state, None).expect("router builds");
+        let (flow_state, nonce) = start_sign_in(router.clone()).await;
+        provider.set_token_answer(TokenAnswer::IdToken(id_token_for(
+            &provider, "stranger", &nonce,
+        )));
+
+        let response = get(
+            router,
+            &format!("/auth/oidc/callback?state={flow_state}&code=auth-code"),
+        )
+        .await;
+
+        assert_eq!(response.status(), StatusCode::FORBIDDEN);
+    }
+
+    /// The same gate admits an identity that is already linked: invite-only
+    /// governs new accounts, not returning ones.
+    #[tokio::test]
+    async fn an_invite_only_deployment_admits_a_linked_identity() {
+        let provider = MockProvider::spawn(MockProviderConfig::default()).await;
+        let state = state_for(&provider, SignupMode::InviteOnly).await;
+        seed_linked_account(&state, &provider, "user-1").await;
+        let router = build_router(state, None).expect("router builds");
+        let (flow_state, nonce) = start_sign_in(router.clone()).await;
+        provider.set_token_answer(TokenAnswer::IdToken(id_token_for(
+            &provider, "user-1", &nonce,
+        )));
+
+        let response = get(
+            router,
+            &format!("/auth/oidc/callback?state={flow_state}&code=auth-code"),
+        )
+        .await;
+
+        assert_eq!(
+            response.status(),
+            StatusCode::SEE_OTHER,
+            "a linked Account may sign in under invite-only"
+        );
+        assert!(
+            response
+                .headers()
+                .contains_key(axum::http::header::SET_COOKIE),
+            "the re-login must issue a session"
+        );
+    }
+
+    /// A provider that reports an error is refused before any lookup, so a
+    /// cancelled sign-in never touches the durable store.
+    #[tokio::test]
+    async fn a_provider_error_is_refused() {
+        let provider = MockProvider::spawn(MockProviderConfig::default()).await;
+        let state = state_for(&provider, SignupMode::Open).await;
+        let router = build_router(state, None).expect("router builds");
+
+        let response = get(
+            router,
+            "/auth/oidc/callback?error=access_denied&state=whatever",
+        )
+        .await;
+
+        assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
+    }
+
+    /// An authorization state no flow stored is refused.
+    #[tokio::test]
+    async fn an_unknown_authorization_state_is_refused() {
+        let provider = MockProvider::spawn(MockProviderConfig::default()).await;
+        let state = state_for(&provider, SignupMode::Open).await;
+        let router = build_router(state, None).expect("router builds");
+
+        let response = get(
+            router,
+            "/auth/oidc/callback?state=0000000000000000000000000000000000000000000000000000000000000000&code=x",
+        )
+        .await;
+
+        assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
+    }
+
+    /// A callback that returns without a code is refused.
+    #[tokio::test]
+    async fn a_callback_without_a_code_is_refused() {
+        let provider = MockProvider::spawn(MockProviderConfig::default()).await;
+        let state = state_for(&provider, SignupMode::Open).await;
+        let router = build_router(state, None).expect("router builds");
+        let (flow_state, _nonce) = start_sign_in(router.clone()).await;
+
+        let response = get(router, &format!("/auth/oidc/callback?state={flow_state}")).await;
+
+        assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
+    }
+
+    /// An ID token that does not echo the flow's nonce is refused: the nonce is
+    /// the replay binding.
+    #[tokio::test]
+    async fn an_id_token_with_the_wrong_nonce_is_refused() {
+        let provider = MockProvider::spawn(MockProviderConfig::default()).await;
+        let state = state_for(&provider, SignupMode::Open).await;
+        let router = build_router(state, None).expect("router builds");
+        let (flow_state, _nonce) = start_sign_in(router.clone()).await;
+        provider.set_token_answer(TokenAnswer::IdToken(id_token_for(
+            &provider,
+            "user-1",
+            "some-other-nonce",
+        )));
+
+        let response = get(
+            router,
+            &format!("/auth/oidc/callback?state={flow_state}&code=auth-code"),
+        )
+        .await;
+
+        assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
+    }
+
+    /// An RFC 9207 `iss` that names another authorization server is refused
+    /// before the code is exchanged.
+    #[tokio::test]
+    async fn a_callback_from_another_issuer_is_refused() {
+        let provider = MockProvider::spawn(MockProviderConfig::default()).await;
+        let state = state_for(&provider, SignupMode::Open).await;
+        let router = build_router(state, None).expect("router builds");
+        let (flow_state, _nonce) = start_sign_in(router.clone()).await;
+
+        let response = get(
+            router,
+            &format!(
+                "/auth/oidc/callback?state={flow_state}&code=auth-code&iss=https://evil.example"
+            ),
+        )
+        .await;
+
+        assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
+    }
+
+    /// An identity provider that refuses the code exchange is a server-side
+    /// fault and keeps 503 — it must not be relabelled as bad credentials.
+    #[tokio::test]
+    async fn a_provider_outage_during_the_exchange_is_unavailable() {
+        let provider = MockProvider::spawn(MockProviderConfig::default()).await;
+        let state = state_for(&provider, SignupMode::Open).await;
+        let router = build_router(state, None).expect("router builds");
+        let (flow_state, _nonce) = start_sign_in(router.clone()).await;
+        provider.set_token_answer(TokenAnswer::Refused);
+
+        let response = get(
+            router,
+            &format!("/auth/oidc/callback?state={flow_state}&code=auth-code"),
+        )
+        .await;
+
+        assert_eq!(response.status(), StatusCode::SERVICE_UNAVAILABLE);
+    }
+
+    /// A composed state with one live browser session: the cookie value the
+    /// browser holds and the CSRF token bound to that session.
+    async fn state_with_session() -> (Arc<HttpState>, String, String) {
+        use crate::http::registry::models::{Account, AccountStatus};
+
+        let provider = MockProvider::spawn(MockProviderConfig::default()).await;
+        let state = state_for(&provider, SignupMode::Open).await;
+        let account = Account {
+            id: "acct_logout".into(),
+            status: AccountStatus::Active,
+            tenant_id: "ten_logout".into(),
+            created_at: chrono::Utc::now(),
+            display_name: None,
+        };
+        state
+            .registry
+            .accounts()
+            .write_account(&account)
+            .await
+            .expect("seed account");
+        let cookie = "logout-cookie".to_string();
+        let policy = state.browser_policy.as_ref().expect("oidc fence").clone();
+        let session = crate::control::session::ControlPlaneSession::new(
+            &account,
+            &cookie,
+            policy.epoch,
+            &state.config,
+        )
+        .expect("session");
+        state
+            .registry
+            .sessions()
+            .store_session(&policy, &session)
+            .await
+            .expect("store session");
+        let csrf =
+            crate::control::csrf::compute_csrf(&state.config.keys.csrf, &account.id, &session.id)
+                .expect("csrf token");
+        (state, cookie, csrf)
+    }
+
+    /// Drive one POST through the router, optionally with the session cookie
+    /// and the CSRF token.
+    async fn post(
+        router: axum::Router,
+        uri: &str,
+        cookie: Option<&str>,
+        csrf: Option<&str>,
+    ) -> axum::response::Response {
+        let peer: SocketAddr = "127.0.0.1:54321".parse().expect("peer address");
+        let mut builder = Request::builder()
+            .method("POST")
+            .uri(uri)
+            .header("host", "localhost")
+            .header("origin", "http://localhost");
+        if let Some(cookie) = cookie {
+            builder = builder.header("cookie", format!("__Host-memory_mcp_session={cookie}"));
+        }
+        if let Some(csrf) = csrf {
+            builder = builder.header("x-csrf-token", csrf);
+        }
+        let request = builder
+            .extension(axum::extract::connect_info::ConnectInfo(peer))
+            .body(Body::empty())
+            .expect("request");
+        let mut router = router;
+        router.call(request).await.expect("dispatch")
+    }
+
+    /// Signing out through the real CSRF and session stack revokes the session
+    /// and clears the cookie.
+    #[tokio::test]
+    async fn signing_out_revokes_the_session_and_clears_the_cookie() {
+        let (state, cookie, csrf) = state_with_session().await;
+        let router = build_router(state.clone(), None).expect("router builds");
+
+        let response = post(router, "/auth/oidc/logout", Some(&cookie), Some(&csrf)).await;
+
+        assert_eq!(response.status(), StatusCode::SEE_OTHER);
+        let cleared = response
+            .headers()
+            .get(axum::http::header::SET_COOKIE)
+            .expect("logout clears the cookie")
+            .to_str()
+            .expect("cookie is ASCII");
+        assert!(cleared.contains("Max-Age=0"), "got: {cleared}");
+        assert!(
+            crate::control::session::resolve_session_record(&state, &cookie)
+                .await
+                .is_err(),
+            "the revoked session must no longer resolve"
+        );
+    }
+
+    /// A logout without a session is refused by the session middleware.
+    #[tokio::test]
+    async fn signing_out_without_a_session_is_unauthorized() {
+        let (state, _cookie, csrf) = state_with_session().await;
+        let router = build_router(state, None).expect("router builds");
+
+        let response = post(router, "/auth/oidc/logout", None, Some(&csrf)).await;
+
+        assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
+    }
+
+    /// A logout with a session but no CSRF token is refused by the CSRF
+    /// middleware.
+    #[tokio::test]
+    async fn signing_out_without_the_csrf_token_is_forbidden() {
+        let (state, cookie, _csrf) = state_with_session().await;
+        let router = build_router(state, None).expect("router builds");
+
+        let response = post(router, "/auth/oidc/logout", Some(&cookie), None).await;
+
+        assert_eq!(response.status(), StatusCode::FORBIDDEN);
+    }
+}

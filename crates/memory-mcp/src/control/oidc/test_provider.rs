@@ -61,12 +61,13 @@ struct ProviderState {
     base: String,
     published_issuer: String,
     algorithms: Vec<String>,
-    token: TokenAnswer,
+    token: std::sync::Mutex<TokenAnswer>,
 }
 
 /// A loopback identity provider the test process owns; dropping it stops it.
 pub(crate) struct MockProvider {
     base_url: String,
+    state: Arc<ProviderState>,
     task: tokio::task::JoinHandle<()>,
 }
 
@@ -91,13 +92,13 @@ impl MockProvider {
             base: base.clone(),
             published_issuer,
             algorithms: config.algorithms,
-            token: config.token,
+            token: std::sync::Mutex::new(config.token),
         });
         let app: Router = Router::new()
             .route("/.well-known/openid-configuration", get(discovery))
             .route("/jwks", get(jwks))
             .route("/token", post(token_endpoint))
-            .with_state(state);
+            .with_state(Arc::clone(&state));
         let task = tokio::spawn(async move {
             let _ = axum::serve(listener, app).await;
         });
@@ -106,6 +107,7 @@ impl MockProvider {
         tokio::time::sleep(Duration::from_millis(20)).await;
         Self {
             base_url: base,
+            state,
             task,
         }
     }
@@ -114,6 +116,14 @@ impl MockProvider {
     /// and, unless overridden, what discovery publishes back.
     pub(crate) fn base_url(&self) -> &str {
         &self.base_url
+    }
+
+    /// Replace what the token endpoint answers.
+    ///
+    /// A sign-in test only learns the `id_token` it must return after the flow
+    /// has started, because the nonce it has to carry is minted by the flow.
+    pub(crate) fn set_token_answer(&self, answer: TokenAnswer) {
+        *self.state.token.lock().expect("token answer lock") = answer;
     }
 }
 
@@ -137,7 +147,8 @@ async fn jwks() -> Response {
 }
 
 async fn token_endpoint(State(state): State<Arc<ProviderState>>) -> Response {
-    match &state.token {
+    let answer = state.token.lock().expect("token answer lock").clone();
+    match &answer {
         TokenAnswer::Refused => Response::builder()
             .status(StatusCode::SERVICE_UNAVAILABLE)
             .body(Body::empty())
