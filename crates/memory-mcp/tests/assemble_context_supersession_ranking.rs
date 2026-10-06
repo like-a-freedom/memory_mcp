@@ -16,8 +16,6 @@ mod common;
 use chrono::{TimeZone, Utc};
 use memory_mcp::models::AssembleContextRequest;
 use memory_mcp::service::memory_container_shims::memory_capabilities_assemble_context::AssembleContextCapability;
-use memory_mcp::service::memory_container_shims::memory_capabilities_extract::ExtractCapability;
-use memory_mcp::storage::DbClient;
 
 fn request(query: &str) -> AssembleContextRequest {
     AssembleContextRequest {
@@ -33,79 +31,12 @@ fn request(query: &str) -> AssembleContextRequest {
     }
 }
 
-/// Persist an episode with an explicit `source_lineage`, then extract.
-///
-/// `ingest` derives lineage from `source_id`, and ADR-0008's source gate
-/// refuses automatic supersession unless both sides share a lineage while
-/// coming from different facts — so lineage is pinned here on purpose.
-async fn ingest_lineage_episode(
-    service: &memory_mcp::service::MemoryService,
-    db_client: &memory_mcp::storage::SurrealDbClient,
-    episode_id: &str,
-    source_id: &str,
-    lineage: &str,
-    content: &str,
-    t_ref: chrono::DateTime<Utc>,
-) {
-    let iso = t_ref.to_rfc3339();
-    db_client
-        .create(
-            episode_id,
-            serde_json::json!({
-                "episode_id": episode_id,
-                "source_type": "document",
-                "source_id": source_id,
-                "content": content,
-                "t_ref": iso,
-                "t_ingested": iso,
-                "policy_tags": [],
-                "source_lineage": lineage,
-            }),
-            "org",
-            memory_mcp::memory::queries::EPISODE_TEMPORAL_FIELDS,
-        )
-        .await
-        .expect("create episode with lineage");
-
-    ExtractCapability::extract_from_service(service, episode_id, None, None)
-        .await
-        .expect("extract episode with lineage");
-}
-
-async fn wait_for_supersession(db_client: &memory_mcp::storage::SurrealDbClient) -> bool {
-    for _ in 0..200 {
-        let found = db_client
-            .query(
-                "SELECT count() AS cnt FROM claim_relation WHERE outcome = 'supersession' AND (t_invalid_ingested IS NONE OR t_invalid_ingested IS NULL)",
-                None,
-                "org",
-            )
-            .await
-            .map(|v| serde_json::from_value::<Vec<serde_json::Value>>(v).unwrap_or_default())
-            .map(|rows| {
-                rows.first()
-                    .and_then(|r| r.get("cnt").and_then(|c| c.as_i64()))
-                    .unwrap_or(0)
-            })
-            .unwrap_or(0);
-        if found > 0 {
-            return true;
-        }
-        tokio::task::yield_now().await;
-        tokio::time::sleep(std::time::Duration::from_millis(10)).await;
-    }
-    false
-}
-
 #[tokio::test]
 async fn demotes_predecessor_below_successor_in_an_assembled_pack() {
     let tm = common::TestMemory::new(false).await;
-    let service = tm
-        .service
-        .with_claim_rollout_stage("evidence")
-        .expect("evidence is a valid claim rollout stage");
+    let service = common::exposing_claims(tm.service).expect("evidence is a valid stage");
 
-    ingest_lineage_episode(
+    common::ingest_lineage_episode(
         &service,
         &tm.db_client,
         "episode:rank-1",
@@ -115,7 +46,7 @@ async fn demotes_predecessor_below_successor_in_an_assembled_pack() {
         Utc.with_ymd_and_hms(2026, 6, 1, 10, 0, 0).unwrap(),
     )
     .await;
-    ingest_lineage_episode(
+    common::ingest_lineage_episode(
         &service,
         &tm.db_client,
         "episode:rank-2",
@@ -127,7 +58,7 @@ async fn demotes_predecessor_below_successor_in_an_assembled_pack() {
     .await;
 
     assert!(
-        wait_for_supersession(&tm.db_client).await,
+        common::wait_for_supersessions(&tm.db_client, 1).await,
         "the pipeline must produce a supersession before ordering can be tested"
     );
 

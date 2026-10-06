@@ -9,19 +9,9 @@
 
 mod common;
 
-use chrono::{DateTime, TimeZone, Utc};
+use chrono::{TimeZone, Utc};
 use memory_mcp::models::AssembleContextRequest;
 use memory_mcp::service::memory_container_shims::memory_capabilities_assemble_context::AssembleContextCapability;
-use memory_mcp::service::memory_container_shims::memory_capabilities_extract::ExtractCapability;
-use memory_mcp::storage::{DbClient, SurrealDbClient};
-
-/// The claim rollout stage this file runs at.
-///
-/// Relations are persisted at any stage that is not `disabled`, but the read
-/// path only serves them at `evidence` — see `docs/evals/CLAIM_RECONCILIATION.md`
-/// and `knowledge::api::SurrealRelationReader`. Without this the assertions
-/// below fail for a reason unrelated to the projection being tested.
-const CLAIM_STAGE: &str = "evidence";
 
 fn request(query: &str) -> AssembleContextRequest {
     AssembleContextRequest {
@@ -41,90 +31,15 @@ fn request(query: &str) -> AssembleContextRequest {
     }
 }
 
-/// Persist an episode directly with an explicit `source_lineage`, then run the
-/// public extract path. `ingest` derives lineage from `source_id`, and two
-/// episodes with distinct source ids would therefore never satisfy the source
-/// gate — lineage is the thing being pinned here, not the content.
-async fn ingest_lineage_episode(
-    service: &memory_mcp::service::MemoryService,
-    db_client: &SurrealDbClient,
-    episode_id: &str,
-    source_id: &str,
-    lineage: &str,
-    content: &str,
-    t_ref: DateTime<Utc>,
-) {
-    let iso = t_ref.to_rfc3339();
-    db_client
-        .create(
-            episode_id,
-            serde_json::json!({
-                "episode_id": episode_id,
-                "source_type": "document",
-                "source_id": source_id,
-                "content": content,
-                "t_ref": iso,
-                "t_ingested": iso,
-                "policy_tags": [],
-                "source_lineage": lineage,
-            }),
-            "org",
-            memory_mcp::memory::queries::EPISODE_TEMPORAL_FIELDS,
-        )
-        .await
-        .expect("create episode with lineage");
-
-    ExtractCapability::extract_from_service(service, episode_id, None, None)
-        .await
-        .expect("extract episode with lineage");
-}
-
-/// Poll until at least `want` active supersession relations exist.
-///
-/// Claim projection is fire-and-forget off `add_fact`, so the rows land after
-/// `extract` returns. The bound is a real deadline, not a fixed sleep: it
-/// yields between attempts and gives up after two hundred of them.
-async fn wait_for_supersessions(db_client: &SurrealDbClient, want: usize) -> bool {
-    for _ in 0..200 {
-        let found = supersession_count(db_client).await;
-        if found >= want {
-            return true;
-        }
-        tokio::task::yield_now().await;
-        tokio::time::sleep(std::time::Duration::from_millis(10)).await;
-    }
-    false
-}
-
-async fn supersession_count(db_client: &SurrealDbClient) -> usize {
-    db_client
-        .query(
-            "SELECT count() AS cnt FROM claim_relation WHERE outcome = 'supersession' AND (t_invalid_ingested IS NONE OR t_invalid_ingested IS NULL)",
-            None,
-            "org",
-        )
-        .await
-        .map(|v| serde_json::from_value::<Vec<serde_json::Value>>(v).unwrap_or_default())
-        .map(|rows| {
-            rows.first()
-                .and_then(|r| r.get("cnt").and_then(|c| c.as_i64()))
-                .unwrap_or(0) as usize
-        })
-        .unwrap_or(0)
-}
-
 #[tokio::test]
 async fn exposes_supersession_on_the_predecessor_item() {
     let tm = common::TestMemory::new(false).await;
-    let service = tm
-        .service
-        .with_claim_rollout_stage(CLAIM_STAGE)
-        .expect("evidence is a valid claim rollout stage");
+    let service = common::exposing_claims(tm.service).expect("evidence is a valid stage");
 
     // Same lineage, distinct source ids: ADR-0008's source gate refuses
     // automatic supersession inside one source lineage, and refuses it across
     // lineages too. Both conditions are pinned here rather than assumed.
-    ingest_lineage_episode(
+    common::ingest_lineage_episode(
         &service,
         &tm.db_client,
         "episode:sup-1",
@@ -135,7 +50,7 @@ async fn exposes_supersession_on_the_predecessor_item() {
     )
     .await;
 
-    ingest_lineage_episode(
+    common::ingest_lineage_episode(
         &service,
         &tm.db_client,
         "episode:sup-2",
@@ -146,11 +61,11 @@ async fn exposes_supersession_on_the_predecessor_item() {
     )
     .await;
 
-    let reconciled = wait_for_supersessions(&tm.db_client, 1).await;
+    let reconciled = common::wait_for_supersessions(&tm.db_client, 1).await;
     assert!(
         reconciled,
         "the pipeline must actually produce a supersession before the read path can be tested; got {}",
-        supersession_count(&tm.db_client).await
+        common::supersession_count(&tm.db_client).await
     );
 
     // One assembly per query: the context cache returns the first result on a
@@ -244,13 +159,10 @@ async fn exposes_supersession_on_the_predecessor_item() {
 #[tokio::test]
 async fn leaves_reconciliation_none_when_no_relation_exists() {
     let tm = common::TestMemory::new(false).await;
-    let service = tm
-        .service
-        .with_claim_rollout_stage(CLAIM_STAGE)
-        .expect("evidence is a valid claim rollout stage");
+    let service = common::exposing_claims(tm.service).expect("evidence is a valid stage");
 
     // A single episode: one claim, nothing to relate it to.
-    ingest_lineage_episode(
+    common::ingest_lineage_episode(
         &service,
         &tm.db_client,
         "episode:lonely",
@@ -285,7 +197,7 @@ async fn withholds_relations_below_the_evidence_stage() {
         .with_claim_rollout_stage("shadow")
         .expect("shadow is a valid claim rollout stage");
 
-    ingest_lineage_episode(
+    common::ingest_lineage_episode(
         &service,
         &tm.db_client,
         "episode:gate-1",
@@ -295,7 +207,7 @@ async fn withholds_relations_below_the_evidence_stage() {
         Utc.with_ymd_and_hms(2026, 6, 1, 10, 0, 0).unwrap(),
     )
     .await;
-    ingest_lineage_episode(
+    common::ingest_lineage_episode(
         &service,
         &tm.db_client,
         "episode:gate-2",
@@ -307,7 +219,7 @@ async fn withholds_relations_below_the_evidence_stage() {
     .await;
 
     assert!(
-        wait_for_supersessions(&tm.db_client, 1).await,
+        common::wait_for_supersessions(&tm.db_client, 1).await,
         "relations are persisted at shadow too; only disclosure is withheld"
     );
 

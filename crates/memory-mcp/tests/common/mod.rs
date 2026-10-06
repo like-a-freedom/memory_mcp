@@ -263,3 +263,100 @@ pub async fn seed_community(
         .await
         .expect("seed community should succeed");
 }
+
+/// The claim rollout stage at which the read path discloses relations.
+///
+/// Relations are persisted at any stage except `disabled`, but
+/// `assemble_context` serves them only at `evidence` — see
+/// `knowledge::api::SurrealRelationReader` and
+/// `docs/evals/CLAIM_RECONCILIATION.md`. Tests asserting disclosure set this;
+/// tests that only assert relations were *persisted* do not need it.
+#[allow(dead_code)]
+pub const CLAIM_STAGE_EVIDENCE: &str = "evidence";
+
+/// Put a service on the claim stage that discloses relations.
+///
+/// Returns `Result` so a test can `.expect("evidence is a valid stage")`
+/// rather than unwrap, matching the shape of the capability calls beside it.
+#[allow(dead_code)]
+pub fn exposing_claims(service: MemoryService) -> Result<MemoryService, memory_mcp::MemoryError> {
+    service.with_claim_rollout_stage(CLAIM_STAGE_EVIDENCE)
+}
+
+/// Persist an episode with an explicit `source_lineage`, then run extract.
+///
+/// `ingest` derives lineage from `source_id`, and ADR-0008's source gate
+/// refuses automatic supersession unless both sides share a lineage while
+/// coming from different facts. Two episodes with distinct source ids would
+/// therefore never reconcile, so lineage is the thing this pins — not content.
+#[allow(dead_code)]
+pub async fn ingest_lineage_episode(
+    service: &MemoryService,
+    db_client: &SurrealDbClient,
+    episode_id: &str,
+    source_id: &str,
+    lineage: &str,
+    content: &str,
+    t_ref: DateTime<Utc>,
+) {
+    let iso = t_ref.to_rfc3339();
+    db_client
+        .create(
+            episode_id,
+            json!({
+                "episode_id": episode_id,
+                "source_type": "document",
+                "source_id": source_id,
+                "content": content,
+                "t_ref": iso,
+                "t_ingested": iso,
+                "policy_tags": [],
+                "source_lineage": lineage,
+            }),
+            TEST_ACTIVE_NAMESPACE,
+            memory_mcp::memory::queries::EPISODE_TEMPORAL_FIELDS,
+        )
+        .await
+        .expect("create episode with lineage");
+
+    ExtractCapability::extract_from_service(service, episode_id, None, None)
+        .await
+        .expect("extract episode with lineage");
+}
+
+/// Count active supersession rows. Read-only, so a test can assert on the
+/// pipeline's own decision rather than re-deriving it from content.
+#[allow(dead_code)]
+pub async fn supersession_count(db_client: &SurrealDbClient) -> usize {
+    db_client
+        .query(
+            "SELECT count() AS cnt FROM claim_relation WHERE outcome = 'supersession' AND (t_invalid_ingested IS NONE OR t_invalid_ingested IS NULL)",
+            None,
+            TEST_ACTIVE_NAMESPACE,
+        )
+        .await
+        .map(|v| serde_json::from_value::<Vec<serde_json::Value>>(v).unwrap_or_default())
+        .map(|rows| {
+            rows.first()
+                .and_then(|r| r.get("cnt").and_then(|c| c.as_i64()))
+                .unwrap_or(0) as usize
+        })
+        .unwrap_or(0)
+}
+
+/// Poll until at least `want` active supersessions exist.
+///
+/// Claim projection is fire-and-forget off `add_fact`, so the rows land after
+/// `extract` returns. Bounded at two hundred attempts with a yield between
+/// them: a real deadline, not a fixed sleep.
+#[allow(dead_code)]
+pub async fn wait_for_supersessions(db_client: &SurrealDbClient, want: usize) -> bool {
+    for _ in 0..200 {
+        if supersession_count(db_client).await >= want {
+            return true;
+        }
+        tokio::task::yield_now().await;
+        tokio::time::sleep(std::time::Duration::from_millis(10)).await;
+    }
+    false
+}
