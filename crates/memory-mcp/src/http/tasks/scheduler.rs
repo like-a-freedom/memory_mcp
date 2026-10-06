@@ -311,7 +311,7 @@ async fn execute_extract_task(
             let service = crate::service::MemoryService::new(
                 db,
                 namespace.to_owned(),
-                "info".into(),
+                crate::logging::StdoutLogger::directives_from_env(),
                 100,
                 100,
             )?
@@ -478,7 +478,7 @@ fn build_force_enabled_reembed_service(
     let service = crate::service::MemoryService::new_with_embedding_provider(
         db as Arc<dyn crate::storage::client::DbClient>,
         namespace.to_owned(),
-        "info".into(),
+        crate::logging::StdoutLogger::directives_from_env(),
         // Rate limits are request-path policy; a maintenance pass is not
         // request traffic and must not be throttled by one.
         100,

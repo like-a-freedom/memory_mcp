@@ -283,7 +283,7 @@ fn log_tenant_embedding_decision(
         "target_signature".to_string(),
         serde_json::json!(target_signature),
     );
-    crate::logging::StdoutLogger::new("info").log(event, crate::logging::LogLevel::Info);
+    crate::logging::StdoutLogger::from_env().log(event, crate::logging::LogLevel::Info);
 }
 
 fn log_tenant_embedding_degraded(namespace: &str, target_signature: &str, reason: &str) {
@@ -298,7 +298,7 @@ fn log_tenant_embedding_degraded(namespace: &str, target_signature: &str, reason
         serde_json::json!(target_signature),
     );
     event.insert("reason".to_string(), serde_json::json!(reason));
-    crate::logging::StdoutLogger::new("info").log(event, crate::logging::LogLevel::Warn);
+    crate::logging::StdoutLogger::from_env().log(event, crate::logging::LogLevel::Warn);
 }
 
 impl TenantRuntime {
@@ -382,7 +382,7 @@ impl TenantRuntime {
         let mut service = crate::service::MemoryService::new_with_embedding_provider(
             tenant_db.clone(),
             namespace.clone(),
-            "info".into(),
+            crate::logging::StdoutLogger::directives_from_env(),
             100, // rate_limit_rps; access-payload limiter remains separate
             100, // rate_limit_burst
             embedding.provider.clone(),
@@ -488,7 +488,7 @@ pub async fn build_runtime_with_options(
             Arc::new(SurrealDbClient::from_prebound_remote_with_dimension(
                 ns_client,
                 &tenant.namespace_binding.namespace,
-                "info",
+                &crate::logging::StdoutLogger::directives_from_env(),
                 dimension,
             ))
         }
@@ -502,7 +502,7 @@ pub async fn build_runtime_with_options(
             Arc::new(SurrealDbClient::from_prebound_with_dimension(
                 ns_client,
                 &tenant.namespace_binding.namespace,
-                "info",
+                &crate::logging::StdoutLogger::directives_from_env(),
                 dimension,
             ))
         }
@@ -516,7 +516,7 @@ pub async fn build_runtime_with_options(
             Arc::new(SurrealDbClient::from_prebound_mem_with_dimension(
                 ns_client,
                 &tenant.namespace_binding.namespace,
-                "info",
+                &crate::logging::StdoutLogger::directives_from_env(),
                 dimension,
             ))
         }
@@ -600,7 +600,7 @@ pub(crate) async fn reconcile_tenant_index_dimension(
                     );
                     event.insert("dimension".to_string(), serde_json::json!(policy.dimension));
                     event.insert("stored_vectors".to_string(), serde_json::json!(stored));
-                    crate::logging::StdoutLogger::new("info")
+                    crate::logging::StdoutLogger::from_env()
                         .log(event, crate::logging::LogLevel::Warn);
                     IndexWriteGate::ForeignVectors
                 }
@@ -625,7 +625,7 @@ pub(crate) async fn reconcile_tenant_index_dimension(
                         serde_json::json!(existing),
                     );
                     event.insert("dimension".to_string(), serde_json::json!(policy.dimension));
-                    crate::logging::StdoutLogger::new("info")
+                    crate::logging::StdoutLogger::from_env()
                         .log(event, crate::logging::LogLevel::Warn);
                     IndexWriteGate::Redeclared
                 }
@@ -673,7 +673,7 @@ fn log_index_reconcile(namespace: &str, existing: Option<usize>, target: usize, 
     );
     event.insert("target_dimension".to_string(), serde_json::json!(target));
     event.insert("reason".to_string(), serde_json::json!(reason));
-    crate::logging::StdoutLogger::new("info").log(event, crate::logging::LogLevel::Warn);
+    crate::logging::StdoutLogger::from_env().log(event, crate::logging::LogLevel::Warn);
 }
 
 #[cfg(test)]
@@ -917,6 +917,67 @@ mod tests {
             snapshot.dimension,
             Some(2048),
             "the gaps must be filled at the width the index was reconciled to"
+        );
+    }
+
+    /// The tenant runtime's own loggers must obey the deployment's level.
+    ///
+    /// They used to be built from the literal `"info"` — the decision helper
+    /// with `StdoutLogger::new("info")`, the service with a hardcoded
+    /// `"info".into()` — so neither `RUST_LOG=error` nor a subsystem directive
+    /// could reach them. Under a level of `error` a correctly-wired runtime
+    /// emits nothing at Info, which is the whole assertion.
+    #[tokio::test]
+    async fn a_tenant_runtime_honors_the_deployment_log_level() {
+        let sink = crate::logging::capture::install();
+
+        let runtime = crate::logging::capture::with_level("error", || async {
+            let db = Surreal::new::<Mem>(()).await.unwrap();
+            db.use_ns("tenant_lvl").use_db("memory").await.unwrap();
+            let client = Arc::new(SurrealDbClient::from_prebound_mem(
+                db,
+                "tenant_lvl",
+                "error",
+            ));
+            let options = RuntimeOptions::default().with_embedding_policy(EmbeddingPolicy {
+                provider: Arc::new(StaticEmbeddingProvider { dimension: 2048 }),
+                dimension: 2048,
+                signature: crate::config::build_embedding_signature(
+                    "openai-compatible",
+                    Some("nvidia/nemotron-3-embed-1b"),
+                    Some("https://integrate.api.nvidia.com/v1"),
+                    2048,
+                ),
+                model: Some("nvidia/nemotron-3-embed-1b".to_string()),
+                provider_label: "openai-compatible",
+            });
+            TenantRuntime::from_bound_client_with_runtime_options(
+                &tenant("ten_lvl", "tenant_lvl"),
+                client,
+                crate::operations::quota::QuotaPlan::default(),
+                options,
+            )
+            .await
+            .unwrap()
+        })
+        .await;
+
+        let recorded = sink.lines();
+        assert!(
+            !recorded
+                .iter()
+                .any(|line| line.contains("op=http.tenant_embedding_decision")),
+            "the decision helper must obey the deployment level, not log at a \
+             hardcoded info: {recorded:?}"
+        );
+        assert!(
+            !runtime
+                .mcp_service
+                .service()
+                .logger
+                .is_event_enabled(crate::logging::LogLevel::Info, "any.op"),
+            "the tenant service logger must carry the deployment level, not a \
+             hardcoded info"
         );
     }
 

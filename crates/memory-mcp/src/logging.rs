@@ -197,6 +197,24 @@ impl StdoutLogger {
         Self::from_env_with(|key| std::env::var(key).ok())
     }
 
+    /// The deployment's `RUST_LOG` value as a string, for a caller that must
+    /// pass it somewhere that takes a level *string* rather than a logger —
+    /// `MemoryService::new`, whose `log_level` argument is a `String`.
+    ///
+    /// Reads the same variable `from_env` does, and takes the same test
+    /// override first, so a test that installs `with_level` sees its own level
+    /// here too without mutating the process environment. The fallback is
+    /// `"info"`: an unset dial must still report, exactly as `from_env`
+    /// defaults to `info`.
+    #[must_use]
+    pub fn directives_from_env() -> String {
+        #[cfg(test)]
+        if let Some(level) = capture::override_level() {
+            return level;
+        }
+        std::env::var(Self::LEVEL_ENV).unwrap_or_else(|_| "info".to_string())
+    }
+
     /// [`from_env`] with the environment read through `lookup`, so the
     /// behaviour can be exercised without mutating the process environment,
     /// which is global state the parallel test harness shares.

@@ -171,7 +171,7 @@ async fn backfill_tenant(
     let service = crate::service::MemoryService::new_with_embedding_provider(
         Arc::clone(&db) as Arc<dyn crate::storage::DbClient>,
         namespace.clone(),
-        "info".into(),
+        crate::logging::StdoutLogger::directives_from_env(),
         100, // rate_limit_rps; the maintenance pass is not request traffic
         100, // rate_limit_burst
         embedding.provider.clone(),
@@ -421,6 +421,86 @@ mod tests {
         let observed = backfill_scheduler_job(policy(false))(registry).await;
 
         assert!(observed.is_ok(), "an empty pass is a valid pass");
+    }
+
+    /// The service `backfill_tenant` builds must carry the deployment's level,
+    /// not a hardcoded `"info"`.
+    ///
+    /// This was the logger `RUST_LOG` could not reach: built with the literal
+    /// `"info"`, so `embedding.backfill_started` — the very line an operator
+    /// tries to quiet — printed no matter what the deployment set, while the
+    /// neighbouring `http.embedding.backfill_completed`, which goes through
+    /// `from_env`, obeyed the same directive.
+    #[tokio::test]
+    async fn the_backfill_tick_obeys_the_deployment_log_level() {
+        use crate::http::registry::models::{NamespaceBinding, TenantStatus};
+        use crate::storage::client::DbClient;
+
+        let namespace = "tns_backfill_level";
+        let registry = empty_registry().await;
+        let engine = registry.tenant_engine_optional().expect("engine wired");
+        let db = engine.bind_to_test_namespace(namespace).await;
+        db.apply_migrations(namespace).await.expect("migrations");
+        let now = crate::shared::temporal::normalize_dt(chrono::Utc::now());
+        db.create(
+            "fact:lvl",
+            serde_json::json!({
+                "fact_id": "fact:lvl",
+                "fact_type": "note",
+                "content": "content",
+                "quote": "content",
+                "source_episode": "episode:seed",
+                "t_valid": now,
+                "t_ingested": now,
+                "confidence": 0.9,
+                "index_keys": [],
+                "access_count": 0,
+                "entity_links": [],
+                "scope": namespace,
+                "policy_tags": [],
+                "provenance": {"source_episode": "episode:seed"},
+            }),
+            namespace,
+            crate::knowledge::queries::FACT_TEMPORAL_FIELDS,
+        )
+        .await
+        .expect("seed a fact with no vector");
+        // Register the tenant ready, so the bounded walk reaches it — a
+        // registry with no ready tenant would pass without running a backfill.
+        registry
+            .tenants()
+            .write_tenant(&Tenant {
+                id: "ten_backfill_lvl".to_string(),
+                status: TenantStatus::Ready,
+                namespace_binding: NamespaceBinding {
+                    namespace: namespace.to_string(),
+                    database: "memory".into(),
+                },
+                plan_version: 1,
+                schema_version: 0,
+                retry_stage: None,
+                provisioning_lease: None,
+                created_at: chrono::Utc::now(),
+                version: 0,
+            })
+            .await
+            .expect("register the tenant as ready");
+
+        let sink = crate::logging::capture::install();
+        crate::logging::capture::with_level("error", || {
+            backfill_scheduler_job(policy(true))(registry)
+        })
+        .await
+        .expect("a tick under a quiet level still succeeds");
+
+        let recorded = sink.lines();
+        assert!(
+            !recorded
+                .iter()
+                .any(|line| line.contains("op=embedding.backfill_started")),
+            "the backfill service logger must obey the deployment level, not a \
+             hardcoded info: {recorded:?}"
+        );
     }
 
     /// An enabled deployment with no ready tenants walks the registry and finds
