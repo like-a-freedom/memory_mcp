@@ -264,7 +264,7 @@ fn log_disabled(reason: &'static str) {
         serde_json::json!("http.embedding.backfill_disabled"),
     );
     event.insert("reason".to_string(), serde_json::json!(reason));
-    crate::logging::StdoutLogger::from_env().log(event, crate::logging::LogLevel::Debug);
+    crate::logging::emit(event, crate::logging::LogLevel::Debug);
 }
 
 fn log_backfill_completed(namespace: &str, processed: usize) {
@@ -275,7 +275,7 @@ fn log_backfill_completed(namespace: &str, processed: usize) {
     );
     event.insert("namespace".to_string(), serde_json::json!(namespace));
     event.insert("processed".to_string(), serde_json::json!(processed));
-    crate::logging::StdoutLogger::from_env().log(event, crate::logging::LogLevel::Info);
+    crate::logging::emit(event, crate::logging::LogLevel::Info);
 }
 
 /// A per-tenant failure, named by the tenant and kept to one prose detail.
@@ -331,7 +331,7 @@ fn log_declined(tenant: &Tenant, dimension: usize, reason: &'static str) {
     );
     event.insert("dimension".to_string(), serde_json::json!(dimension));
     event.insert("reason".to_string(), serde_json::json!(reason));
-    crate::logging::StdoutLogger::from_env().log(event, crate::logging::LogLevel::Info);
+    crate::logging::emit(event, crate::logging::LogLevel::Info);
 }
 
 #[cfg(test)]

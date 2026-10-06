@@ -384,7 +384,7 @@ fn log_exchange_rejection(status: u16, reason: Option<&str>) {
     if let Some(reason) = reason {
         event.insert("reason".into(), reason.to_string().into());
     }
-    crate::logging::StdoutLogger::from_env().log(event, crate::logging::LogLevel::Warn);
+    crate::logging::emit(event, crate::logging::LogLevel::Warn);
 }
 
 #[cfg(test)]

@@ -152,7 +152,7 @@ pub(crate) async fn request_log(mut req: Request, next: Next) -> Response {
         // `RUST_LOG=<prefix>=<level>` — the one stream an operator most wants
         // to turn up or down, and the only one with a request id.
         fields.insert("op".to_string(), crate::logging::OP_HTTP_REQUEST.into());
-        crate::logging::StdoutLogger::from_env().log(fields, crate::logging::LogLevel::Info);
+        crate::logging::emit(fields, crate::logging::LogLevel::Info);
     }
     response
 }

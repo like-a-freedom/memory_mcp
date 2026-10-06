@@ -22,7 +22,7 @@ use tokio_util::sync::CancellationToken;
 
 use crate::error::MemoryError;
 use crate::http::registry::RegistryHandle;
-use crate::logging::{LogLevel, StdoutLogger};
+use crate::logging::LogLevel;
 use crate::observability::record_job_metric;
 
 pub type JobFuture = Pin<Box<dyn Future<Output = Result<(), MemoryError>> + Send>>;
@@ -259,7 +259,7 @@ fn log_scheduler(op: &'static str, field: &'static str, detail: &str, level: Log
     let mut event = std::collections::HashMap::new();
     event.insert("op".into(), op.into());
     event.insert(field.into(), detail.to_string().into());
-    StdoutLogger::from_env().log(event, level);
+    crate::logging::emit(event, level);
 }
 
 #[cfg(test)]

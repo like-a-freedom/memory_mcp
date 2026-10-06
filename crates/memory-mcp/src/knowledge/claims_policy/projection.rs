@@ -33,7 +33,7 @@ use super::schema::{ClaimProjectionInput, ClaimSchemaRegistry};
 /// position would need one, since the slice's type is inferred from the first
 /// element alone.
 pub(super) fn log_claim_event(op: &'static str, fields: &[(&str, String)], error: &str) {
-    use crate::logging::{LogLevel, StdoutLogger};
+    use crate::logging::LogLevel;
 
     let level = if op.ends_with("projected") {
         LogLevel::Debug
@@ -48,7 +48,9 @@ pub(super) fn log_claim_event(op: &'static str, fields: &[(&str, String)], error
     if !error.is_empty() {
         event.insert("error".into(), error.to_string().into());
     }
-    StdoutLogger::from_env().log(event, level);
+    // Dynamic fields cannot be `tracing` field macros, so this uses the map
+    // facade; it is still selected by the subscriber's `OpFilter`.
+    crate::logging::emit(event, level);
 }
 
 /// Projection summary for a single fact.

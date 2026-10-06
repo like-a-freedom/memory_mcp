@@ -26,7 +26,7 @@ use tracing::{
 use tracing_subscriber::filter::Targets;
 use tracing_subscriber::fmt::format::{FormatEvent, FormatFields, Writer};
 use tracing_subscriber::fmt::{FmtContext, MakeWriter};
-use tracing_subscriber::layer::SubscriberExt;
+use tracing_subscriber::layer::{Context, Filter, Layer, SubscriberExt};
 use tracing_subscriber::registry::LookupSpan;
 
 /// Log level for filtering log output.
@@ -161,42 +161,68 @@ fn from_tracing_level(level: &tracing::Level) -> LogLevel {
     }
 }
 
-/// Reads a `tracing` event's fields: our events carry the serialised map in a
-/// single `payload` field; a foreign event carries its own fields instead.
+/// Reads a `tracing` event's fields.
+///
+/// This service's events carry a serialised map in a single `payload` field;
+/// a native producer may instead carry its fields directly with an `op` naming
+/// the operation. A foreign event (a dependency's) carries neither and is
+/// rendered from its own fields.
 #[derive(Default)]
 struct EventVisitor {
     payload: Option<String>,
+    op: Option<String>,
     fields: Vec<(String, String)>,
+}
+
+impl EventVisitor {
+    fn record(&mut self, field: &Field, value: String) {
+        match field.name() {
+            // The payload is not a rendered field: it is the whole event.
+            "payload" => self.payload = Some(value),
+            "op" => {
+                self.op = Some(value.clone());
+                self.fields.push(("op".to_string(), value));
+            }
+            name => self.fields.push((name.to_string(), value)),
+        }
+    }
 }
 
 impl Visit for EventVisitor {
     fn record_str(&mut self, field: &Field, value: &str) {
-        if field.name() == "payload" {
-            self.payload = Some(value.to_string());
-        } else {
-            self.fields
-                .push((field.name().to_string(), value.to_string()));
-        }
+        self.record(field, value.to_string());
     }
 
     fn record_debug(&mut self, field: &Field, value: &dyn fmt::Debug) {
-        if field.name() == "payload" {
-            self.payload = Some(format!("{value:?}"));
-        } else {
-            self.fields
-                .push((field.name().to_string(), format!("{value:?}")));
-        }
+        self.record(field, format!("{value:?}"));
     }
 }
 
-/// Renders every event — ours and foreign — into the configured format.
+/// Renders every event — ours (map or native) and foreign — into the
+/// configured format.
 ///
 /// A `tracing` field set is static per callsite, but our payload is an arbitrary
-/// map, so it travels in one field that this formatter flattens. Foreign events
-/// (no `payload`) are rendered from their own fields so a third-party warning is
-/// readable instead of dropped.
+/// map, so it travels in one field that this formatter flattens. A native event
+/// (no `payload`, but an `op`) is rendered from its own fields, and a foreign
+/// event (neither) is rendered so a third-party warning is readable instead of
+/// dropped.
 pub(crate) struct MemoryFormat {
     format: LogFormat,
+}
+
+impl MemoryFormat {
+    fn render(
+        &self,
+        event: &HashMap<String, Value>,
+        level: LogLevel,
+        ts: &str,
+        ansi: bool,
+    ) -> String {
+        match self.format {
+            LogFormat::Text => render_human(event, level, ts, ansi),
+            LogFormat::Json => render_json(event, level, ts),
+        }
+    }
 }
 
 impl<S, N> FormatEvent<S, N> for MemoryFormat
@@ -217,23 +243,25 @@ where
         let mut visitor = EventVisitor::default();
         event.record(&mut visitor);
 
-        let line = match visitor.payload {
-            Some(payload) => {
-                let event: HashMap<String, Value> =
-                    serde_json::from_str(&payload).unwrap_or_default();
-                match self.format {
-                    LogFormat::Text => render_human(&event, level, &ts, ansi),
-                    LogFormat::Json => render_json(&event, level, &ts),
-                }
-            }
-            None => render_foreign(
+        let line = if let Some(payload) = visitor.payload.as_deref() {
+            let event: HashMap<String, Value> = serde_json::from_str(payload).unwrap_or_default();
+            self.render(&event, level, &ts, ansi)
+        } else if visitor.op.is_some() {
+            let event: HashMap<String, Value> = visitor
+                .fields
+                .iter()
+                .map(|(key, value)| (key.clone(), Value::String(value.clone())))
+                .collect();
+            self.render(&event, level, &ts, ansi)
+        } else {
+            render_foreign(
                 event.metadata().target(),
                 &visitor.fields,
                 level,
                 &ts,
                 ansi,
                 self.format,
-            ),
+            )
         };
 
         #[cfg(test)]
@@ -373,7 +401,8 @@ pub fn install() {
                 tracing_subscriber::fmt::layer()
                     .event_format(MemoryFormat { format })
                     .with_writer(LogMakeWriter)
-                    .with_ansi(ansi_enabled_from_env()),
+                    .with_ansi(ansi_enabled_from_env())
+                    .with_filter(OpFilter),
             )
             .with(targets);
         let _ = tracing::subscriber::set_global_default(subscriber);
@@ -394,6 +423,115 @@ fn foreign_filter(configured: &str) -> Targets {
         .unwrap_or_default()
         .with_target(LOG_TARGET, tracing::Level::TRACE)
         .with_default(FOREIGN_DEFAULT_LEVEL)
+}
+
+/// The directives in force right now: the process's `RUST_LOG`, or a test's
+/// level override when one is installed.
+///
+/// The environment is read once and cached; the test override is read per call
+/// so `with_level` can raise or lower a subsystem for one test without a
+/// restart. The override branch is compiled out of a production build.
+fn current_directives() -> Directives {
+    #[cfg(test)]
+    if let Some(level) = capture::override_level() {
+        return Directives::parse(&level);
+    }
+    static ENV: OnceLock<Directives> = OnceLock::new();
+    ENV.get_or_init(|| {
+        Directives::parse(&std::env::var(StdoutLogger::LEVEL_ENV).unwrap_or_default())
+    })
+    .clone()
+}
+
+/// Reads just the `op` field off an event.
+#[derive(Default)]
+struct OpField {
+    op: Option<String>,
+}
+
+impl Visit for OpField {
+    fn record_str(&mut self, field: &Field, value: &str) {
+        if field.name() == "op" {
+            self.op = Some(value.to_string());
+        }
+    }
+
+    fn record_debug(&mut self, field: &Field, value: &dyn fmt::Debug) {
+        if field.name() == "op" {
+            self.op = Some(format!("{value:?}"));
+        }
+    }
+}
+
+/// Applies the `RUST_LOG` op-prefix rules to this service's events at the
+/// subscriber.
+///
+/// Recorded map events are filtered before emission, but a native `tracing`
+/// event (a span, or a producer migrated off [`StdoutLogger`]) is not. This
+/// filter is what makes `RUST_LOG` mean the same thing for both. Foreign
+/// targets are left entirely to [`foreign_filter`].
+struct OpFilter;
+
+impl<S: Subscriber> Filter<S> for OpFilter {
+    fn enabled(&self, _metadata: &tracing::Metadata<'_>, _cx: &Context<'_, S>) -> bool {
+        true
+    }
+
+    fn event_enabled(&self, event: &Event<'_>, _cx: &Context<'_, S>) -> bool {
+        if event.metadata().target() != LOG_TARGET {
+            return true;
+        }
+        let mut field = OpField::default();
+        event.record(&mut field);
+        current_directives().is_event_enabled(
+            from_tracing_level(event.metadata().level()),
+            field.op.as_deref().unwrap_or(""),
+        )
+    }
+}
+
+/// Emit a recorded map event without constructing a logger.
+///
+/// Dynamic producers — a slice of fields, a bound map — cannot use `tracing`
+/// field macros, so this is their facade. It is selected by the same
+/// directives the subscriber's [`OpFilter`] uses, so a map event and a native
+/// `tracing` event obey one rule and a deep module never has to build a logger
+/// just to log one line.
+pub fn emit(event: HashMap<String, Value>, level: LogLevel) {
+    let op = event.get("op").and_then(Value::as_str).unwrap_or("");
+    // The subscriber would drop this too, but skipping the serialization here
+    // keeps a filtered event free.
+    if !current_directives().is_event_enabled(level, op) {
+        return;
+    }
+    emit_traced(op, &event, level);
+}
+
+/// Hand one recorded event to the `tracing` subscriber.
+fn emit_traced(op: &str, event: &HashMap<String, Value>, level: LogLevel) {
+    install();
+    let payload = serde_json::to_string(event).unwrap_or_else(|_| "{}".to_string());
+    // `op` travels as its own field as well as inside the payload: the
+    // subscriber's `OpFilter` and a native `tracing` producer both read it
+    // directly. `tracing::event!` embeds the level in the callsite, so it must
+    // be a constant: one arm per level rather than a computed value.
+    match level {
+        LogLevel::Error => {
+            tracing::event!(target: LOG_TARGET, tracing::Level::ERROR, op = op, payload = payload.as_str());
+        }
+        LogLevel::Warn => {
+            tracing::event!(target: LOG_TARGET, tracing::Level::WARN, op = op, payload = payload.as_str());
+        }
+        LogLevel::Info => {
+            tracing::event!(target: LOG_TARGET, tracing::Level::INFO, op = op, payload = payload.as_str());
+        }
+        LogLevel::Debug => {
+            tracing::event!(target: LOG_TARGET, tracing::Level::DEBUG, op = op, payload = payload.as_str());
+        }
+        LogLevel::Trace => {
+            tracing::event!(target: LOG_TARGET, tracing::Level::TRACE, op = op, payload = payload.as_str());
+        }
+    }
 }
 
 /// The operation name of the HTTP access log.
@@ -531,11 +669,75 @@ pub fn install_log_file_from_env() {
 /// installed via [`install_log_file`]).
 #[derive(Clone)]
 pub struct StdoutLogger {
-    level: LogLevel,
-    /// Per-subsystem levels from `RUST_LOG` directives, in the order written.
-    /// [`is_event_enabled`] picks the most specific match, so order does not
-    /// decide precedence.
+    directives: Directives,
+}
+
+/// The `RUST_LOG` directive list: a default level plus per-`op`-prefix
+/// overrides.
+///
+/// The single source of truth for what is enabled. The per-instance logger and
+/// the subscriber's [`OpFilter`] both consult it, so a native `tracing` event
+/// and a recorded map event cannot be filtered by different rules.
+#[derive(Clone)]
+struct Directives {
+    default: LogLevel,
     overrides: Vec<(String, LogLevel)>,
+}
+
+impl Directives {
+    /// Parse a comma-separated directive list: a bare level sets the default,
+    /// and `prefix=level` sets it for events whose `op` starts with that prefix
+    /// at a segment boundary. The most specific prefix wins.
+    fn parse(configured: &str) -> Self {
+        let mut directives = Self {
+            default: LogLevel::parse(first_directive(configured)),
+            overrides: Vec::new(),
+        };
+        // Every segment is examined, not every one after the first: a list may
+        // lead with a directive (`oidc=debug,info`), and skipping the first
+        // would silently drop the only rule in it.
+        for directive in configured.split(',') {
+            if let Some((prefix, level)) = directive.split_once('=') {
+                let prefix = prefix.trim();
+                if prefix.is_empty() {
+                    continue;
+                }
+                // The same prefix twice is one directive written twice, so the
+                // later replaces the earlier. Replacing rather than appending
+                // means precedence cannot depend on written order.
+                directives
+                    .overrides
+                    .retain(|(existing, _)| existing != prefix);
+                directives
+                    .overrides
+                    .push((prefix.to_string(), LogLevel::parse(level)));
+            }
+        }
+        directives
+    }
+
+    /// Whether an event with this `op` and level would be emitted.
+    ///
+    /// The most specific matching directive decides, so a broad one can be
+    /// narrowed without repeating it. An event with no `op` uses the default
+    /// level: it names no subsystem, so no subsystem rule can be about it.
+    fn is_event_enabled(&self, level: LogLevel, op: &str) -> bool {
+        let applicable = self
+            .overrides
+            .iter()
+            .filter(|(prefix, _)| op == prefix || op.starts_with(&format!("{prefix}.")))
+            .max_by_key(|(prefix, _)| prefix.len());
+        let threshold = applicable.map_or(self.default, |(_, level)| *level);
+        level >= threshold
+    }
+
+    fn is_enabled(&self, level: LogLevel) -> bool {
+        level >= self.default
+    }
+
+    fn default_level(&self) -> LogLevel {
+        self.default
+    }
 }
 
 /// The default level from a directive list: the first segment that names a bare
@@ -630,10 +832,6 @@ impl StdoutLogger {
         Self::new(configured)
     }
 
-    fn remove_override(&mut self, prefix: &str) {
-        self.overrides.retain(|(existing, _)| existing != prefix);
-    }
-
     /// Creates a logger from a level or a full `RUST_LOG`-style directive
     /// list.
     ///
@@ -647,37 +845,15 @@ impl StdoutLogger {
     /// A bare level parses exactly as before.
     #[must_use]
     pub fn new(configured: &str) -> Self {
-        let mut logger = Self {
-            level: LogLevel::parse(first_directive(configured)),
-            overrides: Vec::new(),
-        };
-        // Every segment is examined, not every one after the first: a list may
-        // lead with a directive (`oidc=debug,info`), and skipping the first
-        // would silently drop the only rule in it.
-        for directive in configured.split(',') {
-            if let Some((prefix, level)) = directive.split_once('=') {
-                let prefix = prefix.trim();
-                if prefix.is_empty() {
-                    continue;
-                }
-                // The same prefix twice is one directive written twice, so the
-                // later replaces the earlier. Replacing rather than appending
-                // means precedence cannot depend on written order, which is the
-                // invariant `is_event_enabled`'s tie-break would otherwise
-                // break.
-                logger.remove_override(prefix);
-                logger
-                    .overrides
-                    .push((prefix.to_string(), LogLevel::parse(level)));
-            }
+        Self {
+            directives: Directives::parse(configured),
         }
-        logger
     }
 
     /// The level this logger emits at and above, for events no directive names.
     #[must_use]
     pub fn level(&self) -> LogLevel {
-        self.level
+        self.directives.default_level()
     }
 
     /// Whether an event with this `op` and level would be emitted.
@@ -687,20 +863,14 @@ impl StdoutLogger {
     /// level: it names no subsystem, so no subsystem rule can be about it.
     #[must_use]
     pub fn is_event_enabled(&self, level: LogLevel, op: &str) -> bool {
-        let applicable = self
-            .overrides
-            .iter()
-            .filter(|(prefix, _)| op == prefix || op.starts_with(&format!("{prefix}.")))
-            .max_by_key(|(prefix, _)| prefix.len());
-        let threshold = applicable.map_or(self.level, |(_, level)| *level);
-        level >= threshold
+        self.directives.is_event_enabled(level, op)
     }
 
     /// Returns true if the provided `level` should be emitted given the
     /// currently configured minimum level.
     #[must_use]
     pub fn is_enabled(&self, level: LogLevel) -> bool {
-        level >= self.level
+        self.directives.is_enabled(level)
     }
 
     /// Logs an event if the level is enabled.
@@ -714,40 +884,11 @@ impl StdoutLogger {
     /// a directive can turn one subsystem up without turning up the hot paths
     /// that would drown it.
     pub fn log(&self, event: HashMap<String, Value>, level: LogLevel) {
-        let op = event.get("op").and_then(Value::as_str);
-        let enabled = match op {
-            Some(op) => self.is_event_enabled(level, op),
-            None => level >= self.level,
-        };
-        if !enabled {
+        let op = event.get("op").and_then(Value::as_str).unwrap_or("");
+        if !self.is_event_enabled(level, op) {
             return;
         }
-
-        // The subscriber is the only writer now: it resolves the sink per
-        // write and renders the line (see `MemoryFormat`). `install` is
-        // idempotent, so a library or test that logs without having called it
-        // still gets a working pipeline.
-        install();
-        let payload = serde_json::to_string(&event).unwrap_or_else(|_| "{}".to_string());
-        // `tracing::event!` embeds the level in the callsite, so it must be a
-        // constant: one arm per level rather than a computed value.
-        match level {
-            LogLevel::Error => {
-                tracing::event!(target: LOG_TARGET, tracing::Level::ERROR, payload = payload.as_str());
-            }
-            LogLevel::Warn => {
-                tracing::event!(target: LOG_TARGET, tracing::Level::WARN, payload = payload.as_str());
-            }
-            LogLevel::Info => {
-                tracing::event!(target: LOG_TARGET, tracing::Level::INFO, payload = payload.as_str());
-            }
-            LogLevel::Debug => {
-                tracing::event!(target: LOG_TARGET, tracing::Level::DEBUG, payload = payload.as_str());
-            }
-            LogLevel::Trace => {
-                tracing::event!(target: LOG_TARGET, tracing::Level::TRACE, payload = payload.as_str());
-            }
-        }
+        emit_traced(op, &event, level);
     }
 
     /// Formats an event into a single human-readable line.
@@ -947,8 +1088,14 @@ pub(crate) fn render_human(
     };
 
     let mut tokens = Vec::with_capacity(event.len());
-    if let Some(op) = event.get("op") {
-        tokens.push(key_token("op", &value_to_string(op), ansi));
+    // An empty `op` is a native event that names no operation; it is not a
+    // token. A map event always carries a non-empty one.
+    if let Some(op) = event
+        .get("op")
+        .and_then(Value::as_str)
+        .filter(|op| !op.is_empty())
+    {
+        tokens.push(key_token("op", op, ansi));
     }
     if let Some(request_id) = event.get("request_id").and_then(Value::as_str) {
         tokens.push(key_token("req", request_id, ansi));
@@ -1903,7 +2050,8 @@ mod tests {
                 tracing_subscriber::fmt::layer()
                     .event_format(MemoryFormat { format })
                     .with_writer(buffer)
-                    .with_ansi(false),
+                    .with_ansi(false)
+                    .with_filter(OpFilter),
             )
             .with(foreign_filter(""))
     }
@@ -1980,6 +2128,50 @@ mod tests {
         let line = buffer.contents();
         assert!(!line.contains("should not appear"), "{line}");
         assert!(line.contains("should appear"), "{line}");
+    }
+
+    /// A native `tracing` producer — a migrated module, or a span — is rendered
+    /// in the same shape as a recorded map event: its own fields, `op` first,
+    /// not the foreign `target: message` shape.
+    #[test]
+    fn format_event_renders_a_native_op_event() {
+        let buffer = SharedBuf::default();
+        let subscriber = subscriber_with(buffer.clone(), LogFormat::Text);
+        tracing::subscriber::with_default(subscriber, || {
+            tracing::warn!(target: LOG_TARGET, op = "http.lease.claim_failed", attempt = 3);
+        });
+
+        let line = buffer.contents();
+        assert!(line.contains("op=http.lease.claim_failed"), "{line}");
+        assert!(line.contains("attempt=3"), "{line}");
+        assert!(
+            !line.contains("memory_mcp:"),
+            "a native event must not fall through to the foreign shape: {line}"
+        );
+    }
+
+    /// `RUST_LOG` selects a native event too: the subscriber's `OpFilter` applies
+    /// the same op-prefix rules the logger does, so a producer that emits
+    /// `tracing` directly cannot bypass the documented dial.
+    #[tokio::test]
+    async fn a_native_event_is_filtered_by_rust_log() {
+        let buffer = SharedBuf::default();
+        let subscriber = subscriber_with(buffer.clone(), LogFormat::Text);
+
+        capture::with_level("error,http=info", || async {
+            tracing::subscriber::with_default(subscriber, || {
+                tracing::info!(target: LOG_TARGET, op = "http.lease.claim_failed");
+                tracing::info!(target: LOG_TARGET, op = "embedding.backfill_started");
+            });
+        })
+        .await;
+
+        let line = buffer.contents();
+        assert!(line.contains("http.lease.claim_failed"), "{line}");
+        assert!(
+            !line.contains("embedding.backfill_started"),
+            "a native op outside the directive must be held at the default level: {line}"
+        );
     }
 
     /// The one dial an operator has over foreign output: a `target=level` list

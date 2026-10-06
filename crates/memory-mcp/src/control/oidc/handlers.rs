@@ -123,8 +123,10 @@ where
 }
 
 fn log_stage(stage: &'static str, elapsed_ms: f64, request_id: Option<uuid::Uuid>) {
-    use crate::logging::{LogLevel, StdoutLogger};
-    StdoutLogger::from_env().log(stage_event(stage, elapsed_ms, request_id), LogLevel::Debug);
+    crate::logging::emit(
+        stage_event(stage, elapsed_ms, request_id),
+        crate::logging::LogLevel::Debug,
+    );
 }
 
 /// Record one refusal through the deployment's logger.
@@ -133,8 +135,10 @@ fn log_stage(stage: &'static str, elapsed_ms: f64, request_id: Option<uuid::Uuid
 /// sign-in is filtered by the same level as everything else and reaches
 /// `MEMORY_LOG_FILE` when one is installed.
 fn log_rejection(branch: &'static str, detail: &str, request_id: Option<uuid::Uuid>) {
-    use crate::logging::{LogLevel, StdoutLogger};
-    StdoutLogger::from_env().log(rejection_event(branch, detail, request_id), LogLevel::Warn);
+    crate::logging::emit(
+        rejection_event(branch, detail, request_id),
+        crate::logging::LogLevel::Warn,
+    );
 }
 
 /// Refuse the callback and say why.
@@ -946,9 +950,10 @@ mod tests {
         );
         assert!(line.contains("branch=take_oidc_request"), "{line}");
         assert!(line.contains("reason=expired"), "{line}");
-        // A timestamp is what makes the line sortable against every other.
+        // A timestamp is what makes the line sortable against every other. The
+        // format is unbracketed RFC 3339 with a `Z` suffix.
         assert!(
-            line.starts_with('[') && line.contains('T'),
+            line.as_bytes().first().is_some_and(u8::is_ascii_digit) && line.contains('T'),
             "the line must start with a timestamp: {line}"
         );
     }

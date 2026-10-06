@@ -74,7 +74,7 @@ fn log_internal_error(detail: &str, request_id: Option<uuid::Uuid>) {
     if let Some(id) = request_id {
         event.insert("request_id".into(), id.to_string().into());
     }
-    crate::logging::StdoutLogger::from_env().log(event, crate::logging::LogLevel::Error);
+    crate::logging::emit(event, crate::logging::LogLevel::Error);
 }
 
 impl IntoResponse for ApiError {

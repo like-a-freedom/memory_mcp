@@ -100,9 +100,7 @@ fn log_unknown_fault_point(name: &str) {
         "detail".to_string(),
         format!("MEMORY_MCP_HTTP_TEST_FAULT_POINT={name} names no known point").into(),
     );
-    // `crate::logging` rather than `crate::http::logging`: this module is not
-    // gated on `streamable-http`, and the HTTP module does not exist without it.
-    crate::logging::StdoutLogger::from_env().log(event, crate::logging::LogLevel::Warn);
+    crate::logging::emit(event, crate::logging::LogLevel::Warn);
 }
 
 /// A `FaultInjector` that returns `MemoryError::Transient` exactly once at

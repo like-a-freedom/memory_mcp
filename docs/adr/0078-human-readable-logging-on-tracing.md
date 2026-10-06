@@ -26,27 +26,42 @@ existing `RUST_LOG` op-prefix rules *before* emitting, then dispatches one
 `FormatEvent` renders the human line (default) or NDJSON (`MEMORY_LOG_FORMAT`),
 with TTY-aware colour honouring `NO_COLOR`.
 
-**Filtering stays bespoke.** The documented `RUST_LOG` semantics (`prefix=level`,
-most-specific wins, bare-level default) are preserved by reusing
-`is_event_enabled` pre-emit, not replaced by `EnvFilter`. A `Targets` layer only
-silences third-party targets (default `WARN`), so foreign noise stays quiet and
-`RUST_LOG` keeps meaning exactly what it meant.
+**Filtering stays bespoke and has one source of truth.** The documented
+`RUST_LOG` semantics (`prefix=level`, most-specific wins, bare-level default)
+live in `Directives` and are applied in two places that read the same rules:
+the per-instance logger filters a recorded map event before emission, and the
+subscriber's `OpFilter` filters any event that reached `tracing` directly. That
+second path is what lets a native `tracing` producer — `tracing::warn!(target:
+"memory_mcp", op = "…", …)`, or a span — obey the same dial instead of
+bypassing it. A `Targets` layer only silences third-party targets (default
+`WARN`), so foreign noise stays quiet and `RUST_LOG` keeps meaning exactly what
+it meant.
+
+**Dynamic producers keep the map facade.** A field set built at runtime (a
+slice of `(key, value)`, a bound map) cannot be a `tracing` field macro, so the
+`op` travels as a first-class field beside the serialised payload and the map
+facade `logging::emit(event, level)` emits without constructing a logger. The
+deep modules that used to build a logger per call (`StdoutLogger::from_env()`)
+now call `emit`, retiring the service-locator smell for every dynamic site.
 
 **The dynamic payload is not modelled as `tracing` fields.** `tracing` fields
 are static per callsite; our events are arbitrary maps. The map therefore
 travels as one `&str` field and the formatter flattens it, reusing the existing
-value-rendering (`value_to_string`, `quote_if_needed`, `render_duration`).
+value-rendering (`value_to_string`, `quote_if_needed`, `render_duration`). A
+native event (an `op`, no payload) is rendered from its own fields in the same
+shape.
 
 *Rejected — no dependency; only reformat `StdoutLogger`.* That is strictly
 simpler for the formatting outcome alone, but it leaves the bespoke writer/
-ANSI/TTY plumbing in place and does not unlock two near-term wins: capturing
-third-party output and spans that would retire the scattered
-`StdoutLogger::from_env()` calls (a service-locator smell). If those follow-ups
-are not pursued, `tracing` should be dropped rather than half-adopted.
+ANSI/TTY plumbing in place and does not unlock the two wins above: capturing
+third-party output and a native event path that retires the scattered
+`StdoutLogger::from_env()` calls.
 
 *Rejected — a full rewrite of the ~190 producers onto `tracing` macros now.*
-It changes `RUST_LOG`'s selector from `op` to module target and touches ~72
-files for no user-visible gain in this change. It is a follow-up (phases 2–3).
+Most producers build dynamic field sets that `tracing` macros cannot express, so
+this is not mechanical; it would change `RUST_LOG`'s selector for map events and
+touch ~72 files for no user-visible gain. The native path is additive: any
+static-field producer can move to it, and the rest keep the facade.
 
 ## Consequences
 
@@ -63,6 +78,11 @@ files for no user-visible gain in this change. It is a follow-up (phases 2–3).
   tests and `grep`/`awk` keep working.
 - No new fields are logged; the bounded/no-PII guarantees of `http/logging.rs`
   are unchanged. ADR-0048's log/metric separation is unchanged.
+- A producer with static fields may emit a native `tracing` event
+  (`target: "memory_mcp"`, `op = "…"`); `RUST_LOG` selects it and the formatter
+  renders it in the same shape. A producer with a dynamic field set calls
+  `logging::emit`. The `log_warn`/`RequestWarning` facade in `http/logging.rs`
+  keeps its logger parameter because tests pass a bound-directive logger there.
 - Third-party output was discarded before, so capturing it at `warn` by default
   is additive; `MEMORY_LOG_TARGETS` opts a dependency up when needed.
 - `log_warn_dedup` had no callers and is removed.

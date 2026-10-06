@@ -294,7 +294,7 @@ fn log_tenant_embedding_decision(
         "target_signature".to_string(),
         serde_json::json!(target_signature),
     );
-    crate::logging::StdoutLogger::from_env().log(event, crate::logging::LogLevel::Info);
+    crate::logging::emit(event, crate::logging::LogLevel::Info);
 }
 
 fn log_tenant_embedding_degraded(namespace: &str, target_signature: &str, reason: &str) {
@@ -309,7 +309,7 @@ fn log_tenant_embedding_degraded(namespace: &str, target_signature: &str, reason
         serde_json::json!(target_signature),
     );
     event.insert("reason".to_string(), serde_json::json!(reason));
-    crate::logging::StdoutLogger::from_env().log(event, crate::logging::LogLevel::Warn);
+    crate::logging::emit(event, crate::logging::LogLevel::Warn);
 }
 
 impl TenantRuntime {
@@ -598,8 +598,7 @@ pub(crate) async fn reconcile_tenant_index_dimension(
                     );
                     event.insert("dimension".to_string(), serde_json::json!(policy.dimension));
                     event.insert("stored_vectors".to_string(), serde_json::json!(stored));
-                    crate::logging::StdoutLogger::from_env()
-                        .log(event, crate::logging::LogLevel::Warn);
+                    crate::logging::emit(event, crate::logging::LogLevel::Warn);
                     IndexWriteGate::ForeignVectors
                 }
                 Ok(_) => {
@@ -623,8 +622,7 @@ pub(crate) async fn reconcile_tenant_index_dimension(
                         serde_json::json!(existing),
                     );
                     event.insert("dimension".to_string(), serde_json::json!(policy.dimension));
-                    crate::logging::StdoutLogger::from_env()
-                        .log(event, crate::logging::LogLevel::Warn);
+                    crate::logging::emit(event, crate::logging::LogLevel::Warn);
                     IndexWriteGate::Redeclared
                 }
                 Err(err) => {
@@ -671,7 +669,7 @@ fn log_index_reconcile(namespace: &str, existing: Option<usize>, target: usize, 
     );
     event.insert("target_dimension".to_string(), serde_json::json!(target));
     event.insert("reason".to_string(), serde_json::json!(reason));
-    crate::logging::StdoutLogger::from_env().log(event, crate::logging::LogLevel::Warn);
+    crate::logging::emit(event, crate::logging::LogLevel::Warn);
 }
 
 #[cfg(test)]
