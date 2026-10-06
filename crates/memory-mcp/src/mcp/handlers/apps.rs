@@ -206,7 +206,14 @@ impl MemoryMcp {
         )
         .await
         .map_err(crate::mcp::mcp_error)?;
-        if outcome.action == "close_session" {
+        // `execute_app_command` removes a closed session from `manager` and
+        // returns no `resource_uri`; a persisting command keeps both. Branch on
+        // that closure signal rather than on the action name: `commit_review`
+        // and `cancel_review` also close the session but are not the generic
+        // `close_session` action. Branching on the action name previously read
+        // a session that had just been removed and turned a successful commit
+        // into a spurious `Unknown or closed app session` error.
+        if outcome.resource_uri.is_none() {
             crate::bootstrap::integration::provisioning_app_sessions::close_tenant_app_session(
                 store, tenant_id, session_id,
             )

@@ -58,6 +58,17 @@ Use when verified source material must outlive the current session.
 
 3. **Extract.** Call the qualified `extract` tool for the returned episode.
    Inspect every fact and warning; do not infer success from the episode alone.
+   Pass `episode_id` to extract stored content; inline `content`/`text` ingests
+   a new episode first, so it is not a re-extraction.
+
+   A result with no extracted facts is `episode-only`: the source is stored but
+   nothing durable is recallable. Free-form prose extracts nothing — only
+   structured summaries do. To capture facts, ingest content shaped as a
+   summary: markdown section headings (`## Decisions`, `## Facts`,
+   `## Pending items`) with bullet items, or `Decision: …` / `Fact: …` lines.
+   The response's `guidance` field states which path applies. When the input is
+   already free-form, open the `ingestion_review` app and approve the draft
+   note instead of relying on automatic extraction.
 
    *Completion:* the result is classified as `verified`, `episode-only`, or
    `pending`, using the memory contract.

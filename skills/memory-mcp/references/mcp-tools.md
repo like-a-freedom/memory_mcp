@@ -30,6 +30,13 @@ raw names only to identify the operation.
 | `explain` | `context_items` encoded as required by the exposed schema | citation-ready provenance |
 | `invalidate` | `fact_id`, `reason`, `t_invalid` | persisted invalidation confirmation |
 
+`extract` with inline `content`/`text` is an ingest-then-extract: it creates a
+new episode (default `source_type` `ad-hoc`) before extracting, so it is not a
+way to re-extract stored content — pass `episode_id` for that. Extracting
+free-form prose yields no durable facts and the episode stays `episode-only`;
+the response's `guidance` names this and points at the structured-summary format
+or the `ingestion_review` app. See the capture SOP for the exact format.
+
 Arguments use flat `snake_case` fields. Do not wrap them in `payload`. Inspect
 the live schema for optional fields and enums rather than inventing them. No
 canonical tool accepts a `scope`, `project`, or `namespace` argument: the Active

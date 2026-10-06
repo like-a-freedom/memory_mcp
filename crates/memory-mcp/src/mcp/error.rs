@@ -158,6 +158,13 @@ impl ParsedNotFound {
         // (canonical resource_type, [prefixes ordered longest-first])
         const PREFIXES: &[(&str, &[&str])] = &[
             (
+                "app session",
+                &[
+                    "Unknown or closed app session: ",
+                    "Unknown or closed app session",
+                ],
+            ),
+            (
                 "episode",
                 &[
                     "episode_id not found: ", // "episode_id not found: 123"
@@ -219,9 +226,13 @@ impl ParsedNotFound {
         map.insert(
             "guidance".into(),
             Value::String(
-                "Verify the identifier is correct. If the record was recently archived, \
-                 try assemble_context instead to find relevant information."
-                    .into(),
+                if self.resource_type == "app session" {
+                    "This app session is unknown or already closed. Open a new session with `open_app` and continue there; a session ends after `commit_review`, `cancel_review`, or `close_session`."
+                } else {
+                    "Verify the identifier is correct. If the record was recently archived, \
+                     try assemble_context instead to find relevant information."
+                }
+                .into(),
             ),
         );
         map.insert("explanation".into(), Value::String(explanation));
@@ -483,6 +494,33 @@ mod tests {
         assert_eq!(p.resource_type, "resource");
         assert_eq!(p.missing_id, None);
         assert_eq!(p.clean_msg, "Not found: something went wrong");
+    }
+
+    /// A closed app session must not look like a generic missing resource: the
+    /// agent cannot "verify the identifier", it must reopen a session. The
+    /// guidance has to say so.
+    #[test]
+    fn app_session_not_found_names_the_resource_and_its_id() {
+        let mapped = mcp_error(MemoryError::NotFound(
+            "Unknown or closed app session: ses:0001".to_string(),
+        ));
+        assert_eq!(mapped.message, "App session not found: ses:0001");
+        let data = mapped.data.expect("data");
+        assert_eq!(data["resource_type"], "app session");
+        assert_eq!(data["missing_id"], "ses:0001");
+    }
+
+    #[test]
+    fn app_session_not_found_guidance_points_at_open_app() {
+        let mapped = mcp_error(MemoryError::NotFound(
+            "Unknown or closed app session: ses:0001".to_string(),
+        ));
+        let data = mapped.data.expect("data");
+        let guidance = data["guidance"].as_str().expect("guidance");
+        assert!(
+            guidance.contains("open_app"),
+            "guidance must tell the agent how to recover: {guidance}"
+        );
     }
 
     #[test]

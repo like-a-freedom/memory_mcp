@@ -117,10 +117,8 @@ pub async fn extract<T: ToolContext>(
                     request_id: Some(request_id.clone()),
                     duration: Some(timer.elapsed()),
                 });
-                return Ok(ToolResponse::success_with_guidance(
-                    result,
-                    "Resolve canonical entities for any ambiguous names before creating manual links.",
-                ));
+                let guidance = extract_guidance(&result);
+                return Ok(ToolResponse::success_with_guidance(result, guidance));
             }
             Err(err) => {
                 ctx.record(ToolEvent {
@@ -199,10 +197,8 @@ pub async fn extract<T: ToolContext>(
                         request_id: Some(request_id.clone()),
                         duration: Some(timer.elapsed()),
                     });
-                    Ok(ToolResponse::success_with_guidance(
-                        result,
-                        "Resolve canonical entities for any ambiguous names before creating manual links.",
-                    ))
+                    let guidance = extract_guidance(&result);
+                    Ok(ToolResponse::success_with_guidance(result, guidance))
                 }
                 Err(err) => {
                     ctx.record(ToolEvent {
@@ -228,6 +224,20 @@ pub async fn extract<T: ToolContext>(
             });
             Err(err)
         }
+    }
+}
+
+/// Next-step guidance for an `extract` result.
+///
+/// A successful extraction that produced no durable facts leaves the source as
+/// `episode-only`. Staying silent there let a capture that followed the
+/// documented SOP look complete while storing nothing recallable, so the empty
+/// case names the outcome and the structured-capture path that yields facts.
+fn extract_guidance(result: &ExtractResult) -> &'static str {
+    if result.facts.is_empty() {
+        "episode-only: the content was stored but no durable facts were extracted. To capture recallable facts, ingest a structured summary — markdown headings such as `## Decisions`, `## Facts` or `## Pending items` with bullet items, or `Decision: …` / `Fact: …` lines. Alternatively open the `ingestion_review` app and approve a draft note."
+    } else {
+        "Resolve canonical entities for any ambiguous names before creating manual links."
     }
 }
 

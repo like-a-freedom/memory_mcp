@@ -912,7 +912,7 @@ impl MemoryMcp {
                     );
                     Ok(Json(ToolResponse::success_with_guidance(
                         opened,
-                        "Read the returned `resource_uri` to retrieve the current app view. Prefer canonical memory tools when the business intent already matches them.",
+                        "Read the returned `resource_uri` to view this session, or continue it with `app_command` using `session_id`. To refresh, re-read the same `resource_uri`; do not call `open_app` again — that opens a new session.",
                     )))
                 }
                 Err(err) => {
@@ -1015,7 +1015,7 @@ impl MemoryMcp {
                     );
                     Ok(Json(ToolResponse::success_with_guidance(
                         command_result,
-                        "Re-read `resource_uri` when `refresh_required=true` to retrieve the latest app view.",
+                        "Continue this session with `app_command`; re-read the same `resource_uri` when `refresh_required=true`. Do not call `open_app` again to refresh — that opens a new session.",
                     )))
                 }
                 Err(err) => {
@@ -1678,6 +1678,258 @@ mod tests {
                 .await
                 .is_err(),
             "closed sessions should no longer resolve as readable resources"
+        );
+    }
+
+    /// Builds a durable (HTTP SaaS) `MemoryMcp` with an `ingestion_review`
+    /// session whose single draft item is approved and ready for a closing
+    /// command. Returns the mcp and the session id.
+    #[cfg(all(feature = "mcp-apps", feature = "streamable-http"))]
+    async fn durable_ingestion_review_ready_to_close() -> (MemoryMcp, String) {
+        use crate::http::app_sessions::store::AppSessionStore;
+        use crate::storage::client::BoundDbClient;
+
+        let db_client = test_db_client().await;
+        // The `app_session` table ships in the SaaS lease migration set, which
+        // the embedded test DB does not apply; define it here.
+        db_client
+            .query(
+                "DEFINE TABLE IF NOT EXISTS app_session SCHEMAFULL; \
+                 DEFINE FIELD IF NOT EXISTS handle ON app_session TYPE string; \
+                 DEFINE FIELD IF NOT EXISTS tenant_id ON app_session TYPE string; \
+                 DEFINE FIELD IF NOT EXISTS app ON app_session TYPE string; \
+                 DEFINE FIELD IF NOT EXISTS version ON app_session TYPE int; \
+                 DEFINE FIELD IF NOT EXISTS payload ON app_session TYPE object FLEXIBLE; \
+                 DEFINE FIELD IF NOT EXISTS idle_expiry ON app_session TYPE datetime; \
+                 DEFINE FIELD IF NOT EXISTS absolute_expiry ON app_session TYPE datetime; \
+                 DEFINE INDEX IF NOT EXISTS idx_app_session_handle ON app_session FIELDS handle UNIQUE;",
+                None,
+                "org",
+            )
+            .await
+            .expect("define app_session schema");
+
+        let service = MemoryService::new(
+            db_client.clone(),
+            "org".to_string(),
+            "warn".to_string(),
+            50,
+            100,
+        )
+        .expect("create test service");
+        let store = AppSessionStore::new(Arc::new(BoundDbClient::new(db_client.clone(), "org")));
+        let mcp = MemoryMcp::new(service)
+            .with_tenant_id("org")
+            .with_durable_app_sessions(Arc::new(store));
+
+        let opened = mcp
+            .open_app(Parameters(OpenAppParams {
+                app: "ingestion_review".to_string(),
+                target_type: None,
+                target_id: None,
+                from_entity_id: None,
+                to_entity_id: None,
+                source_text: Some("Alpha release is scheduled for Friday.".to_string()),
+                draft_episode_id: None,
+                as_of: None,
+                as_of_left: None,
+                as_of_right: None,
+                time_axis: None,
+                view: None,
+                cursor: None,
+                page_size: None,
+                max_depth: None,
+                ttl_seconds: None,
+            }))
+            .await
+            .expect("open durable ingestion review app")
+            .0
+            .result;
+
+        let payload = mcp
+            .read_app_resource_payload("ingestion_review", &opened.session_id)
+            .await
+            .expect("read durable ingestion review payload");
+        let item_id = payload["items"][0]["item_id"]
+            .as_str()
+            .expect("draft item id")
+            .to_string();
+
+        let approve = mcp
+            .app_command(Parameters(AppCommandParams {
+                session_id: opened.session_id.clone(),
+                action: "approve_items".to_string(),
+                item_ids: vec![item_id],
+                target_ids: Vec::new(),
+                target_id: None,
+                item_id: None,
+                patch_json: None,
+                reason: None,
+                dry_run: None,
+                confirmed: None,
+                format: None,
+                direction: None,
+                depth: None,
+            }))
+            .await
+            .expect("approve durable ingestion review item")
+            .0;
+        assert_eq!(approve.status, "success");
+
+        (mcp, opened.session_id)
+    }
+
+    #[cfg(all(feature = "mcp-apps", feature = "streamable-http"))]
+    fn closing_command_input(session_id: &str, action: &str) -> AppCommandParams {
+        AppCommandParams {
+            session_id: session_id.to_string(),
+            action: action.to_string(),
+            item_ids: Vec::new(),
+            target_ids: Vec::new(),
+            target_id: None,
+            item_id: None,
+            patch_json: None,
+            reason: None,
+            dry_run: None,
+            confirmed: None,
+            format: None,
+            direction: None,
+            depth: None,
+        }
+    }
+
+    /// Regression: over the durable (HTTP SaaS) app-session path a closing
+    /// command such as `commit_review` must report success, commit exactly one
+    /// fact, and delete the session row. Previously the durable write-back
+    /// branched on `action == "close_session"`, then read the session that
+    /// `execute_app_command` had just removed and turned a successful commit
+    /// into a spurious `Unknown or closed app session` error.
+    #[cfg(all(feature = "mcp-apps", feature = "streamable-http"))]
+    #[tokio::test]
+    async fn durable_commit_review_reports_success_and_closes_session() {
+        let (mcp, session_id) = durable_ingestion_review_ready_to_close().await;
+
+        let commit = mcp
+            .app_command(Parameters(closing_command_input(
+                &session_id,
+                "commit_review",
+            )))
+            .await
+            .expect("commit_review must succeed over the durable path")
+            .0;
+
+        assert_eq!(commit.status, "success");
+        assert_eq!(
+            commit.result.details.as_ref().expect("details")["committed_count"],
+            1,
+            "exactly one approved fact must be committed"
+        );
+        assert!(
+            mcp.read_app_resource_payload("ingestion_review", &session_id)
+                .await
+                .is_err(),
+            "the durable session row must be deleted after a closing command"
+        );
+    }
+
+    /// `cancel_review` closes the session without writing a fact. It must also
+    /// report success and delete the durable row — the same closure family the
+    /// action-name branch used to mishandle.
+    #[cfg(all(feature = "mcp-apps", feature = "streamable-http"))]
+    #[tokio::test]
+    async fn durable_cancel_review_reports_success_and_closes_session() {
+        let (mcp, session_id) = durable_ingestion_review_ready_to_close().await;
+
+        let cancel = mcp
+            .app_command(Parameters(closing_command_input(
+                &session_id,
+                "cancel_review",
+            )))
+            .await
+            .expect("cancel_review must succeed over the durable path")
+            .0;
+
+        assert_eq!(cancel.status, "success");
+        assert!(
+            mcp.read_app_resource_payload("ingestion_review", &session_id)
+                .await
+                .is_err(),
+            "the durable session row must be deleted after a closing command"
+        );
+    }
+
+    /// The app-session guidance must steer callers to continue the *same*
+    /// session. Re-calling `open_app` to "refresh" opens a new session and
+    /// (for ingestion review) re-ingests, which is exactly what produced
+    /// duplicated episodes and lost sessions.
+    #[cfg(feature = "mcp-apps")]
+    #[tokio::test]
+    async fn app_session_guidance_forbids_reopening_to_refresh() {
+        let mcp = create_test_mcp().await;
+
+        let opened = mcp
+            .open_app(Parameters(OpenAppParams {
+                app: "ingestion_review".to_string(),
+                target_type: None,
+                target_id: None,
+                from_entity_id: None,
+                to_entity_id: None,
+                source_text: Some("Review this ingestion draft".to_string()),
+                draft_episode_id: None,
+                as_of: None,
+                as_of_left: None,
+                as_of_right: None,
+                time_axis: None,
+                view: None,
+                cursor: None,
+                page_size: None,
+                max_depth: None,
+                ttl_seconds: None,
+            }))
+            .await
+            .expect("open ingestion review app")
+            .0;
+
+        let open_guidance = opened.guidance.expect("open_app guidance");
+        assert!(
+            open_guidance.contains("do not call `open_app` again"),
+            "open_app must warn against reopening: {open_guidance}"
+        );
+
+        let session_id = opened.result.session_id;
+        let payload = mcp
+            .read_app_resource_payload("ingestion_review", &session_id)
+            .await
+            .expect("read payload");
+        let item_id = payload["items"][0]["item_id"]
+            .as_str()
+            .expect("draft item id")
+            .to_string();
+
+        let approve = mcp
+            .app_command(Parameters(AppCommandParams {
+                session_id,
+                action: "approve_items".to_string(),
+                item_ids: vec![item_id],
+                target_ids: Vec::new(),
+                target_id: None,
+                item_id: None,
+                patch_json: None,
+                reason: None,
+                dry_run: None,
+                confirmed: None,
+                format: None,
+                direction: None,
+                depth: None,
+            }))
+            .await
+            .expect("approve item")
+            .0;
+
+        let command_guidance = approve.guidance.expect("app_command guidance");
+        assert!(
+            command_guidance.contains("Do not call `open_app` again"),
+            "app_command must warn against reopening: {command_guidance}"
         );
     }
 
