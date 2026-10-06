@@ -1495,9 +1495,26 @@ mod browser_flow_tests {
     const AUDIENCE: &str = "memory-mcp";
     const FAR_FUTURE: u64 = 4_102_444_800; // 2100-01-01T00:00:00Z
 
-    /// A state that serves the OIDC routes against `provider`, with
-    /// `signup_mode`.
-    async fn state_for(provider: &MockProvider, signup_mode: SignupMode) -> Arc<HttpState> {
+    /// The config every state in this module shares: the mock provider as the
+    /// issuer, the audience the token fixtures use, and the algorithm pin the
+    /// resource-server path expects.
+    fn sign_in_config(provider: &MockProvider) -> crate::http::config::HttpConfig {
+        let mut config = crate::http::config::HttpConfig::default_for_test();
+        config.oidc_issuer = provider.base_url().to_string();
+        config.oidc_audience = AUDIENCE.to_string();
+        config.oidc_allowed_alg = "RS256".to_string();
+        config
+    }
+
+    /// Compose a state from `config`, with discovery against `provider`.
+    ///
+    /// The browser policy is reconciled into the durable store the way
+    /// production does it: `store_oidc_request` rejects a request whose epoch
+    /// the store does not hold.
+    async fn compose(
+        provider: &MockProvider,
+        config: crate::http::config::HttpConfig,
+    ) -> Arc<HttpState> {
         let client = crate::control::oidc::OidcClient::new(
             provider.base_url(),
             "memory-mcp",
@@ -1508,23 +1525,30 @@ mod browser_flow_tests {
         .await
         .expect("OIDC discovery against the mock provider");
 
-        let mut config = crate::http::config::HttpConfig::default_for_test();
-        config.oidc_issuer = provider.base_url().to_string();
-        config.oidc_audience = AUDIENCE.to_string();
-        config.oidc_allowed_alg = "RS256".to_string();
-        config.signup_mode = signup_mode;
-
         HttpStateTestBuilder::new()
             .await
             .with_config(config)
-            // Reconcile the browser policy into the durable store, the way
-            // production does: `store_oidc_request` rejects a request whose
-            // epoch the store does not hold.
             .without_prejoined_browser_policy()
             .with_oidc_client(Arc::new(client))
             .build()
             .await
-            .expect("composed sign-in state")
+            .expect("composed OIDC state")
+    }
+
+    /// A state that serves the OIDC routes against `provider`, with
+    /// `signup_mode`.
+    async fn state_for(provider: &MockProvider, signup_mode: SignupMode) -> Arc<HttpState> {
+        let mut config = sign_in_config(provider);
+        config.signup_mode = signup_mode;
+        compose(provider, config).await
+    }
+
+    /// [`state_for`] with an operator identity allowlist installed.
+    async fn state_for_operator(provider: &MockProvider, allowlist: Vec<String>) -> Arc<HttpState> {
+        let mut config = sign_in_config(provider);
+        config.signup_mode = SignupMode::Open;
+        config.operator_identity_allowlist = allowlist;
+        compose(provider, config).await
     }
 
     /// Drive one GET through the router, with the host/origin/peer a browser
@@ -1543,8 +1567,19 @@ mod browser_flow_tests {
         router.call(request).await.expect("dispatch")
     }
 
+    /// The `state` and `nonce` a provider authorize URL carries — the nonce is
+    /// what the ID token has to echo back.
+    fn flow_state_nonce(flow_url: &str) -> (String, String) {
+        let url = reqwest::Url::parse(flow_url).expect("the flow URL is absolute");
+        let query: HashMap<_, _> = url.query_pairs().into_owned().collect();
+        (
+            query.get("state").expect("state in the flow URL").clone(),
+            query.get("nonce").expect("nonce in the flow URL").clone(),
+        )
+    }
+
     /// Start a sign-in and return the `state` and `nonce` the provider URL
-    /// carries — the nonce is what the ID token has to echo back.
+    /// carries.
     async fn start_sign_in(router: axum::Router) -> (String, String) {
         let response = get(router, "/auth/oidc/authorize").await;
         assert_eq!(
@@ -1558,18 +1593,92 @@ mod browser_flow_tests {
             .expect("the authorize redirect carries a Location")
             .to_str()
             .expect("Location is ASCII");
-        let url = reqwest::Url::parse(location).expect("the Location is an absolute URL");
-        let query: HashMap<_, _> = url.query_pairs().into_owned().collect();
-        (
-            query
-                .get("state")
-                .expect("state in the provider URL")
-                .clone(),
-            query
-                .get("nonce")
-                .expect("nonce in the provider URL")
-                .clone(),
+        flow_state_nonce(location)
+    }
+
+    /// Drive one GET through the router with the session cookie attached.
+    async fn get_with_cookie(
+        router: axum::Router,
+        uri: &str,
+        cookie: &str,
+    ) -> axum::response::Response {
+        let peer: SocketAddr = "127.0.0.1:54321".parse().expect("peer address");
+        let request = Request::builder()
+            .method("GET")
+            .uri(uri)
+            .header("host", "localhost")
+            .header("origin", "http://localhost")
+            .header("cookie", format!("__Host-memory_mcp_session={cookie}"))
+            .extension(axum::extract::connect_info::ConnectInfo(peer))
+            .body(Body::empty())
+            .expect("request");
+        let mut router = router;
+        router.call(request).await.expect("dispatch")
+    }
+
+    /// Complete a started flow (`flow_url` is the provider URL) through the
+    /// callback, with an ID token minted for `sub` against the flow's nonce.
+    async fn complete_flow(
+        provider: &MockProvider,
+        router: axum::Router,
+        flow_url: &str,
+        sub: &str,
+    ) -> axum::response::Response {
+        let (flow_state, nonce) = flow_state_nonce(flow_url);
+        provider.set_token_answer(TokenAnswer::IdToken(id_token_for(provider, sub, &nonce)));
+        get(
+            router,
+            &format!("/auth/oidc/callback?state={flow_state}&code=auth-code"),
         )
+        .await
+    }
+
+    /// The subject-verifier blind index `(issuer, sub)` under the deployment's
+    /// key.
+    fn subject_verifier(
+        state: &HttpState,
+        provider: &MockProvider,
+        sub: &str,
+    ) -> crate::http::registry::models::SubjectVerifier {
+        crate::http::registry::models::SubjectVerifier(
+            crate::control::oidc::identity_subject_verifier(
+                &state.config.keys.identity_index,
+                provider.base_url(),
+                sub,
+            )
+            .expect("identity index"),
+        )
+    }
+
+    /// Seed a live session for `account_id` and return it, so a test can bind a
+    /// CSRF token to the same session.
+    async fn seed_session(
+        state: &HttpState,
+        account_id: &str,
+        cookie: &str,
+    ) -> crate::control::session::ControlPlaneSession {
+        let policy = state.browser_policy.as_ref().expect("oidc fence").clone();
+        let account = state
+            .registry
+            .accounts()
+            .find_account_by_id(account_id)
+            .await
+            .expect("account lookup")
+            .expect("the Account was seeded");
+        let session = crate::control::session::ControlPlaneSession::new(
+            &account,
+            cookie,
+            policy.epoch,
+            &state.config,
+        )
+        .expect("session");
+        state
+            .registry
+            .sessions()
+            .store_session(&policy, &session)
+            .await
+            .expect("store session");
+        session
     }
 
     /// The ID token the provider would issue for a completed flow.
@@ -1946,6 +2055,157 @@ mod browser_flow_tests {
         let router = build_router(state, None).expect("router builds");
 
         let response = post(router, "/auth/oidc/logout", Some(&cookie), None).await;
+
+        assert_eq!(response.status(), StatusCode::FORBIDDEN);
+    }
+
+    // --- link, invitation and operator journeys ---------------------------
+
+    /// Linking an identity through the callback attaches it to the signed-in
+    /// Account and leaves the browser's session alone.
+    #[tokio::test]
+    async fn linking_an_identity_attaches_it_without_touching_the_session() {
+        let provider = MockProvider::spawn(MockProviderConfig::default()).await;
+        let state = state_for(&provider, SignupMode::Open).await;
+        seed_linked_account(&state, &provider, "existing-identity").await;
+        let cookie = "link-cookie";
+        let session = seed_session(&state, "acct_invited", cookie).await;
+        let csrf = crate::control::csrf::compute_csrf(
+            &state.config.keys.csrf,
+            "acct_invited",
+            &session.id,
+        )
+        .expect("csrf token");
+        let router = build_router(state.clone(), None).expect("router builds");
+
+        let started = post(
+            router.clone(),
+            "/api/v1/account/identity_links",
+            Some(cookie),
+            Some(&csrf),
+        )
+        .await;
+        assert_eq!(started.status(), StatusCode::OK);
+        let body = axum::body::to_bytes(started.into_body(), usize::MAX)
+            .await
+            .expect("body");
+        let flow_url =
+            serde_json::from_slice::<serde_json::Value>(&body).expect("json body")["authorize_url"]
+                .as_str()
+                .expect("authorize_url")
+                .to_string();
+
+        let completed = complete_flow(&provider, router, &flow_url, "new-identity").await;
+
+        assert_eq!(completed.status(), StatusCode::SEE_OTHER);
+        assert!(
+            !completed
+                .headers()
+                .contains_key(axum::http::header::SET_COOKIE),
+            "linking leaves the existing session alone"
+        );
+        let linked = state
+            .registry
+            .accounts()
+            .find_account_by_identity(
+                provider.base_url(),
+                &subject_verifier(&state, &provider, "new-identity"),
+            )
+            .await
+            .expect("lookup")
+            .expect("the callback attaches the identity");
+        assert_eq!(linked.id, "acct_invited");
+    }
+
+    /// An invitation is accepted through the callback: the identity attaches to
+    /// the invited Account and, because the browser holds no session yet, it is
+    /// signed in as that Account.
+    #[tokio::test]
+    async fn an_invitation_is_accepted_and_signs_the_browser_in() {
+        let provider = MockProvider::spawn(MockProviderConfig::default()).await;
+        let state = state_for(&provider, SignupMode::Open).await;
+        seed_linked_account(&state, &provider, "existing-identity").await;
+        let router = build_router(state.clone(), None).expect("router builds");
+
+        let flow_url =
+            crate::control::oidc::start_invite_flow(&state, "acct_invited", "acct_admin", false)
+                .await
+                .ok()
+                .expect("the invitation flow starts");
+
+        let completed = complete_flow(&provider, router, &flow_url, "invited-person").await;
+
+        assert_eq!(completed.status(), StatusCode::SEE_OTHER);
+        assert!(
+            completed
+                .headers()
+                .contains_key(axum::http::header::SET_COOKIE),
+            "accepting an invitation is the first login, so it issues a session"
+        );
+        let linked = state
+            .registry
+            .accounts()
+            .find_account_by_identity(
+                provider.base_url(),
+                &subject_verifier(&state, &provider, "invited-person"),
+            )
+            .await
+            .expect("lookup")
+            .expect("the invitation attaches the identity");
+        assert_eq!(linked.id, "acct_invited");
+    }
+
+    /// A session whose Account holds an allowlisted identity clears the
+    /// operator gate — the success path the refusal tests could not reach.
+    #[tokio::test]
+    async fn an_allowlisted_identity_grants_operator_access() {
+        let provider = MockProvider::spawn(MockProviderConfig::default()).await;
+        let issuer = provider.base_url().to_string();
+        let verifier = crate::control::oidc::identity_subject_verifier(
+            &crate::http::config::HttpConfig::default_for_test()
+                .keys
+                .identity_index,
+            &issuer,
+            "operator-1",
+        )
+        .expect("identity index");
+        let allowlist = vec![format!("{issuer}|{}", hex::encode(verifier))];
+        let state = state_for_operator(&provider, allowlist).await;
+        seed_linked_account(&state, &provider, "operator-1").await;
+        seed_session(&state, "acct_invited", "operator-cookie").await;
+        let router = build_router(state, None).expect("router builds");
+
+        let response = get_with_cookie(
+            router,
+            "/api/v1/operator/recovery/status",
+            "operator-cookie",
+        )
+        .await;
+
+        assert_ne!(
+            response.status(),
+            StatusCode::FORBIDDEN,
+            "an allowlisted identity must clear the operator gate"
+        );
+        assert_ne!(response.status(), StatusCode::UNAUTHORIZED);
+    }
+
+    /// The same request without the allowlist entry is refused: the allowlist is
+    /// what grants operator access, not merely holding a session.
+    #[tokio::test]
+    async fn an_account_without_an_allowlisted_identity_is_refused_operator_access() {
+        let provider = MockProvider::spawn(MockProviderConfig::default()).await;
+        let state = state_for_operator(&provider, Vec::new()).await;
+        seed_linked_account(&state, &provider, "operator-1").await;
+        seed_session(&state, "acct_invited", "operator-cookie").await;
+        let router = build_router(state, None).expect("router builds");
+
+        let response = get_with_cookie(
+            router,
+            "/api/v1/operator/recovery/status",
+            "operator-cookie",
+        )
+        .await;
 
         assert_eq!(response.status(), StatusCode::FORBIDDEN);
     }
