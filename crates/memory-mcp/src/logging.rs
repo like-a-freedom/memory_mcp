@@ -95,6 +95,23 @@ pub const HTTP_OPERATIONS: &[&str] = &[
     "http.registry.missing_namespace_binding",
     "http.registry.orphan_namespace",
     "http.config.bind_unspecified",
+    // Emitted from the runtime/bootstrap, runtime/storage and
+    // embedding/backfill_scheduler sources. They were absent here while the
+    // inventory scanner did not read those files, so the completeness test
+    // passed on a list that did not cover them.
+    "http.start",
+    "http.embedding_policy_resolved",
+    "http.entity_extractor_unavailable",
+    "http.embedding.backfill_bind_failed",
+    "http.embedding.backfill_completed",
+    "http.embedding.backfill_declined",
+    "http.embedding.backfill_disabled",
+    "http.embedding.backfill_failed",
+    "http.tenant_embedding_decision",
+    "http.tenant_embedding_read_failed",
+    "http.tenant_embedding_index_reconcile_skipped",
+    "http.tenant_embedding_index_redefined",
+    "http.tenant_embedding_index_reconcile_failed",
 ];
 
 /// Writes one line to a sink, best-effort. Logging must never panic or
