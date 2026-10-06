@@ -59,6 +59,11 @@ pub struct DeploymentPolicy {
     /// `QUERY_LOG_RETENTION_DAYS`: how long those rows are kept before
     /// best-effort pruning.
     pub query_log_retention_days: u32,
+    /// `EMBEDDINGS_SIMILARITY_THRESHOLD`: the minimum cosine similarity for a
+    /// semantic match. The stdio profile passes it straight to the service;
+    /// the HTTP profile used to fall back to the hard-coded default, so an
+    /// operator's `0.9` silently stayed `0.7`.
+    pub embedding_similarity_threshold: f64,
 }
 
 /// Resolve the deployment-level embedding and entity-extractor policy from the
@@ -99,6 +104,10 @@ pub async fn resolve_deployment_policy(logger: &StdoutLogger) -> Result<Deployme
         auto_recovery: embedding_config.auto_recovery,
         query_logging_enabled,
         query_log_retention_days,
+        // Parsed by `EmbeddingConfig` above; carried here because the stdio
+        // profile passes it straight to its service and the HTTP profile must
+        // not silently drop it.
+        embedding_similarity_threshold: embedding_config.similarity_threshold,
     })
 }
 
@@ -442,6 +451,21 @@ mod tests {
         assert_eq!(
             policy.query_log_retention_days, 7,
             "QUERY_LOG_RETENTION_DAYS must reach the policy, not the 90-day default"
+        );
+    }
+
+    /// `EMBEDDINGS_SIMILARITY_THRESHOLD` was parsed by `EmbeddingConfig` and
+    /// then dropped: the policy never carried it, so the tenant service always
+    /// ran on the hard-coded default and an operator's `0.9` silently stayed
+    /// `0.7`. README promises the variable has the same meaning in HTTP as in
+    /// stdio, so the policy must carry it.
+    #[test]
+    fn the_similarity_threshold_reaches_the_deployment_policy_from_the_environment() {
+        let policy = deployment_policy_for_env(&[("EMBEDDINGS_SIMILARITY_THRESHOLD", Some("0.9"))]);
+
+        assert_eq!(
+            policy.embedding_similarity_threshold, 0.9,
+            "EMBEDDINGS_SIMILARITY_THRESHOLD must reach the policy, not the 0.7 default"
         );
     }
 

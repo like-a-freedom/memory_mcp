@@ -375,6 +375,7 @@ impl Pool {
                 policy.query_logging_enabled,
                 policy.query_log_retention_days,
             );
+            options.embedding_similarity_threshold = policy.embedding_similarity_threshold;
             if let Some(extractor) = policy.entity_extractor {
                 options = options.with_entity_extractor(extractor);
             }

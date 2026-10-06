@@ -102,6 +102,7 @@ fn deployment_policy_from(embedding: EmbeddingPolicy, auto_recovery: bool) -> De
         auto_recovery,
         query_logging_enabled: false,
         query_log_retention_days: memory_mcp::config::DEFAULT_QUERY_LOG_RETENTION_DAYS,
+        embedding_similarity_threshold: memory_mcp::config::DEFAULT_EMBEDDING_SIMILARITY_THRESHOLD,
     }
 }
 

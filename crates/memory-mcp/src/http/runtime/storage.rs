@@ -1040,6 +1040,40 @@ mod tests {
         );
     }
 
+    /// The apply half of `EMBEDDINGS_SIMILARITY_THRESHOLD`: once the policy
+    /// carries the value, the tenant service must run on it rather than the
+    /// hard-coded default, or the composition root's parse is a number nobody
+    /// uses.
+    #[tokio::test]
+    async fn the_similarity_threshold_reaches_the_tenant_service() {
+        let db = Surreal::new::<Mem>(()).await.unwrap();
+        db.use_ns("tenant_simthr").use_db("memory").await.unwrap();
+        let client = Arc::new(SurrealDbClient::from_prebound_mem(
+            db,
+            "tenant_simthr",
+            "error",
+        ));
+        let options = RuntimeOptions {
+            embedding_similarity_threshold: 0.9,
+            ..RuntimeOptions::default()
+        };
+
+        let runtime = TenantRuntime::from_bound_client_with_runtime_options(
+            &tenant("ten_simthr", "tenant_simthr"),
+            client,
+            crate::operations::quota::QuotaPlan::default(),
+            options,
+        )
+        .await
+        .unwrap();
+
+        assert_eq!(
+            runtime.mcp_service.service().embedding_similarity_threshold,
+            0.9,
+            "the configured threshold must reach the service, not the default"
+        );
+    }
+
     /// An enabled provider that answers deterministically, so the tests above
     /// can observe which provider the tenant actually received without a
     /// network or model dependency.
