@@ -23,6 +23,12 @@ pub(crate) use surreal::StorageBackend;
 pub use surreal::{ActiveNamespace, SurrealConfig, SurrealConfigBuilder};
 pub use target::SurrealTargetConfig;
 
+// Re-exported so a composition root outside `config` (the HTTP deployment
+// policy) reads an env var through the same parser the stdio config uses,
+// rather than a second hand-rolled one that could disagree about what a
+// value means.
+pub(crate) use helpers::{parse_bool_env, parse_env};
+
 #[cfg(test)]
 pub(crate) fn env_lock() -> &'static std::sync::Mutex<()> {
     static LOCK: std::sync::OnceLock<std::sync::Mutex<()>> = std::sync::OnceLock::new();

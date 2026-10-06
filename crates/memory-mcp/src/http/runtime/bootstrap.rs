@@ -52,6 +52,13 @@ pub struct DeploymentPolicy {
     /// The default is `true`, matching `EmbeddingConfig::auto_recovery`, so
     /// the two readings of one variable cannot disagree.
     pub auto_recovery: bool,
+    /// `QUERY_LOGGING_ENABLED`: whether `assemble_context` persists an
+    /// analytics row per tenant. Read here so the HTTP profile honours the
+    /// variable the stdio profile reads through `SurrealConfig`.
+    pub query_logging_enabled: bool,
+    /// `QUERY_LOG_RETENTION_DAYS`: how long those rows are kept before
+    /// best-effort pruning.
+    pub query_log_retention_days: u32,
 }
 
 /// Resolve the deployment-level embedding and entity-extractor policy from the
@@ -77,11 +84,21 @@ pub async fn resolve_deployment_policy(logger: &StdoutLogger) -> Result<Deployme
     let embedding = resolve_embedding_policy(logger).await?;
     let lifecycle = crate::config::LifecycleConfig::from_env();
     let entity_extractor = resolve_entity_extractor(logger, embedding.is_some()).await?;
+    // The stdio profile reads these through `SurrealConfig::from_env`, which
+    // this binary never calls; parsing them here is what makes the same two
+    // variables mean the same thing in both profiles.
+    let query_logging_enabled =
+        crate::config::parse_bool_env("QUERY_LOGGING_ENABLED").unwrap_or(false);
+    let query_log_retention_days = crate::config::parse_env::<u32>("QUERY_LOG_RETENTION_DAYS")
+        .map_err(|err| format!("query log config error: {err}"))?
+        .unwrap_or(crate::config::DEFAULT_QUERY_LOG_RETENTION_DAYS);
     Ok(DeploymentPolicy {
         embedding,
         entity_extractor,
         lifecycle,
         auto_recovery: embedding_config.auto_recovery,
+        query_logging_enabled,
+        query_log_retention_days,
     })
 }
 
@@ -390,6 +407,42 @@ mod tests {
                 .expect("runtime")
                 .block_on(resolve_embedding_policy(&logger))
         })
+    }
+
+    /// Resolve the whole deployment policy on a throwaway current-thread
+    /// runtime, with `vars` in force for the duration.
+    fn deployment_policy_for_env(vars: &[(&str, Option<&str>)]) -> DeploymentPolicy {
+        with_env_vars(vars, || {
+            let logger = StdoutLogger::new("error");
+            tokio::runtime::Builder::new_current_thread()
+                .enable_all()
+                .build()
+                .expect("runtime")
+                .block_on(resolve_deployment_policy(&logger))
+                .expect("deployment policy resolves")
+        })
+    }
+
+    /// `QUERY_LOGGING_ENABLED` and `QUERY_LOG_RETENTION_DAYS` were read only
+    /// by the stdio `SurrealConfig`, which the HTTP binary never calls, so an
+    /// HTTP deployment that set them got no `query_log` rows at all — silently,
+    /// with the default `false`. The policy must carry both from the
+    /// environment to the tenant service.
+    #[test]
+    fn query_logging_reaches_the_deployment_policy_from_the_environment() {
+        let policy = deployment_policy_for_env(&[
+            ("QUERY_LOGGING_ENABLED", Some("true")),
+            ("QUERY_LOG_RETENTION_DAYS", Some("7")),
+        ]);
+
+        assert!(
+            policy.query_logging_enabled,
+            "QUERY_LOGGING_ENABLED=true must reach the policy, not stay at the default false"
+        );
+        assert_eq!(
+            policy.query_log_retention_days, 7,
+            "QUERY_LOG_RETENTION_DAYS must reach the policy, not the 90-day default"
+        );
     }
 
     /// The regression that made this an HTTP-profile bug at all: setting

@@ -399,6 +399,8 @@ mod tests {
             entity_extractor: None,
             lifecycle: crate::config::LifecycleConfig::default(),
             auto_recovery,
+            query_logging_enabled: false,
+            query_log_retention_days: crate::config::DEFAULT_QUERY_LOG_RETENTION_DAYS,
         }
     }
 

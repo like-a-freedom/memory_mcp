@@ -1114,7 +1114,7 @@ and not by the same code path — check the row before assuming one applies:
 | --- | --- | --- |
 | `RUST_LOG` | Yes | Read directly by the logging layer in every profile, not through the stdio config path. |
 | `LIFECYCLE_*` | Yes, config only | Read by `resolve_deployment_policy` and copied onto every tenant service, so `LIFECYCLE_ENABLED` and the decay/archival thresholds govern what that service would run. The **background workers are not spawned per tenant**: only the stdio profile calls `spawn_workers_from_config`. |
-| `QUERY_LOGGING_ENABLED`, `QUERY_LOG_RETENTION_DAYS` | **No** | Read only by `SurrealConfig::from_env`, which the HTTP binary never calls. Setting them in an HTTP deployment has no effect. |
+| `QUERY_LOGGING_ENABLED`, `QUERY_LOG_RETENTION_DAYS` | Yes | Read by `resolve_deployment_policy` and applied to every tenant service, so `assemble_context` persists `query_log` rows in HTTP exactly as it does in the stdio profile. |
 
 | Variable | Type | Default | Required | Description |
 | --- | --- | --- | --- | --- |

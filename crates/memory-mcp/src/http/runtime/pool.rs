@@ -371,6 +371,10 @@ impl Pool {
         let mut options = crate::http::runtime::storage::RuntimeOptions::from_http_config(config);
         if let Some(policy) = deployment_policy {
             options = options.with_lifecycle_config(policy.lifecycle);
+            options = options.with_query_logging(
+                policy.query_logging_enabled,
+                policy.query_log_retention_days,
+            );
             if let Some(extractor) = policy.entity_extractor {
                 options = options.with_entity_extractor(extractor);
             }

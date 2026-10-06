@@ -47,6 +47,11 @@ pub struct RuntimeOptions {
     pub entity_extractor: Option<Arc<dyn EntityExtractor>>,
     /// Lifecycle policy copied into each tenant service.
     pub lifecycle_config: crate::config::LifecycleConfig,
+    /// Whether the tenant service persists `query_log` analytics rows
+    /// (`QUERY_LOGGING_ENABLED`), copied from the deployment policy.
+    pub query_logging_enabled: bool,
+    /// How long `query_log` rows are kept (`QUERY_LOG_RETENTION_DAYS`).
+    pub query_log_retention_days: u32,
 }
 
 /// The deployment-level embedding identity one tenant runtime starts from.
@@ -106,6 +111,8 @@ impl Default for RuntimeOptions {
             embedding_similarity_threshold: crate::config::DEFAULT_EMBEDDING_SIMILARITY_THRESHOLD,
             entity_extractor: None,
             lifecycle_config: crate::config::LifecycleConfig::default(),
+            query_logging_enabled: false,
+            query_log_retention_days: crate::config::DEFAULT_QUERY_LOG_RETENTION_DAYS,
         }
     }
 }
@@ -155,6 +162,15 @@ impl RuntimeOptions {
         lifecycle_config: crate::config::LifecycleConfig,
     ) -> Self {
         self.lifecycle_config = lifecycle_config;
+        self
+    }
+
+    /// Whether the tenant service persists `query_log` rows, and for how long
+    /// they are kept. Copied from the deployment policy so the variable the
+    /// stdio profile reads through `SurrealConfig` reaches HTTP tenants too.
+    pub fn with_query_logging(mut self, enabled: bool, retention_days: u32) -> Self {
+        self.query_logging_enabled = enabled;
+        self.query_log_retention_days = retention_days;
         self
     }
 
@@ -389,7 +405,9 @@ impl TenantRuntime {
             options.embedding_similarity_threshold,
             entity_extractor,
         )?
-        .with_http_outbox();
+        .with_http_outbox()
+        .with_query_logging_enabled(options.query_logging_enabled)
+        .with_query_log_retention_days(options.query_log_retention_days);
         service.lifecycle_config = options.lifecycle_config.clone();
         service.replace_embedding_runtime_state(
             crate::embedding::runtime::EmbeddingRuntimeState::new(
@@ -983,6 +1001,42 @@ mod tests {
                 .is_event_enabled(crate::logging::LogLevel::Info, "any.op"),
             "the tenant service logger must carry the deployment level, not a \
              hardcoded info"
+        );
+    }
+
+    /// The apply half of `QUERY_LOGGING_*`: once the policy carries the
+    /// variables, the tenant service must actually turn on persisted query
+    /// analytics and honour the retention window — otherwise the read at the
+    /// composition root would be a value nobody uses.
+    #[tokio::test]
+    async fn query_logging_configuration_reaches_the_tenant_service() {
+        let db = Surreal::new::<Mem>(()).await.unwrap();
+        db.use_ns("tenant_querylog").use_db("memory").await.unwrap();
+        let client = Arc::new(SurrealDbClient::from_prebound_mem(
+            db,
+            "tenant_querylog",
+            "error",
+        ));
+        let options = RuntimeOptions::default().with_query_logging(true, 7);
+
+        let runtime = TenantRuntime::from_bound_client_with_runtime_options(
+            &tenant("ten_querylog", "tenant_querylog"),
+            client,
+            crate::operations::quota::QuotaPlan::default(),
+            options,
+        )
+        .await
+        .unwrap();
+
+        let service = runtime.mcp_service.service();
+        assert!(
+            service.is_query_logging_enabled(),
+            "the tenant service must persist query_log rows when the policy says so"
+        );
+        assert_eq!(
+            service.query_log_retention_days(),
+            7,
+            "the retention window must reach the service, not the 90-day default"
         );
     }
 
