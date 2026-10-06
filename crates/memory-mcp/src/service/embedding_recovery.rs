@@ -209,6 +209,24 @@ impl<'a> From<&'a MemoryService> for RecoveryHandles<'a> {
     }
 }
 
+/// The level for the `backfill_started` line: a pass with nothing to fill is
+/// Debug, a pass with work is Info.
+///
+/// The distinction is the whole point. This line runs once per tenant per
+/// scheduler tick, so logging "about to backfill, total_missing=0" at Info
+/// made an idle deployment print it forever at the default level — noise an
+/// operator could not quiet without turning everything down. A pass that
+/// actually has gaps is real work and stays visible, exactly like
+/// `http.embedding.backfill_disabled`, which reports at Debug for the same
+/// "nothing happening" reason.
+fn backfill_started_level(total: usize) -> LogLevel {
+    if total == 0 {
+        LogLevel::Debug
+    } else {
+        LogLevel::Info
+    }
+}
+
 pub(crate) async fn run_backfill(
     service: &RecoveryHandles<'_>,
     provider: Arc<dyn EmbeddingProvider>,
@@ -225,7 +243,7 @@ pub(crate) async fn run_backfill(
     log_recovery_event(
         service.logger,
         "embedding.backfill_started",
-        LogLevel::Info,
+        backfill_started_level(total),
         [("total_missing", json!(total))],
     );
 
@@ -1192,6 +1210,67 @@ mod tests {
         assert_eq!(
             fact.get("embedding_signature").and_then(Value::as_str),
             Some(expected_signature.as_str())
+        );
+    }
+
+    /// Run one backfill over an empty store and return every line it logged.
+    ///
+    /// The service is built inside the level override, so its logger sees the
+    /// test's level through `directives_from_env` — which is what production
+    /// does. That isolates the thing under test: the level `run_backfill`
+    /// *chooses* for the started line, not how the logger was constructed.
+    async fn backfill_an_empty_store_at_level(level: &str) -> Vec<String> {
+        let db = make_in_memory_db("backfill_started_level").await;
+        let sink = crate::logging::capture::install();
+        crate::logging::capture::with_level(level, || async {
+            let service = MemoryService::new_with_embedding_provider(
+                db.clone(),
+                "org".to_string(),
+                crate::logging::StdoutLogger::directives_from_env(),
+                50,
+                100,
+                Arc::new(DisabledEmbeddingProvider::new(DEFAULT_EMBEDDING_DIMENSION)),
+                DEFAULT_EMBEDDING_SIMILARITY_THRESHOLD,
+                Arc::new(crate::service::AnnoEntityExtractor::new().expect("anno extractor")),
+            )
+            .expect("service");
+            run_backfill(
+                &RecoveryHandles::from(&service),
+                Arc::new(FakeEmbeddingProvider::new(DEFAULT_EMBEDDING_DIMENSION)),
+                "embsig:target",
+                Some("test-model"),
+                DEFAULT_EMBEDDING_DIMENSION,
+                100,
+            )
+            .await
+            .expect("backfill")
+        })
+        .await;
+        sink.lines()
+    }
+
+    /// `embedding.backfill_started` is the line an idle deployment sees once
+    /// per tenant per tick. It used to log at Info unconditionally, so a store
+    /// with nothing to fill still printed it at the default level — the noise
+    /// an operator cannot quiet without turning everything down. It must report
+    /// at Debug when there is no work and stay visible at Debug when asked for.
+    #[tokio::test]
+    async fn backfill_started_reports_at_debug_when_there_is_nothing_to_do() {
+        let at_info = backfill_an_empty_store_at_level("info").await;
+        assert!(
+            !at_info
+                .iter()
+                .any(|line| line.contains("op=embedding.backfill_started")),
+            "an empty store must be silent at the default info level: {at_info:?}"
+        );
+
+        let at_debug = backfill_an_empty_store_at_level("debug").await;
+        assert!(
+            at_debug.iter().any(|line| {
+                line.contains("op=embedding.backfill_started") && line.contains("DEBUG")
+            }),
+            "the line is moved to debug, not removed — an operator asking for \
+             debug must still see it: {at_debug:?}"
         );
     }
 
