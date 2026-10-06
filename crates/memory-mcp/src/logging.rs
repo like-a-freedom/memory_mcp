@@ -2174,6 +2174,37 @@ mod tests {
         );
     }
 
+    /// `RUST_LOG` is the one dial for a recorded map event too: the subscriber
+    /// drops a map event emitted through [`emit`] exactly as it drops a native
+    /// one, so no producer can force a level by choosing a logger.
+    #[tokio::test]
+    async fn emit_is_governed_by_rust_log() {
+        let guard = capture::install();
+
+        capture::with_level("error", || async {
+            let mut event = HashMap::new();
+            event.insert("op".to_string(), json!("probe.warn"));
+            emit(event, LogLevel::Warn);
+        })
+        .await;
+        assert!(
+            !guard.lines().iter().any(|line| line.contains("probe.warn")),
+            "RUST_LOG=error must silence a warn map event"
+        );
+
+        guard.clear();
+        capture::with_level("info", || async {
+            let mut event = HashMap::new();
+            event.insert("op".to_string(), json!("probe.warn"));
+            emit(event, LogLevel::Warn);
+        })
+        .await;
+        assert!(
+            guard.lines().iter().any(|line| line.contains("probe.warn")),
+            "RUST_LOG=info must admit a warn map event"
+        );
+    }
+
     /// The one dial an operator has over foreign output: a `target=level` list
     /// raises a noisy dependency without touching this service's events, and a
     /// malformed list is ignored rather than taking the service's own events

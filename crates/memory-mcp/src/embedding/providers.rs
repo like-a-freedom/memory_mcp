@@ -8,7 +8,7 @@ use serde_json::{Value, json};
 
 use crate::config::{EmbeddingConfig, EmbeddingProviderKind, build_embedding_signature};
 use crate::error::MemoryError;
-use crate::logging::{LogLevel, StdoutLogger};
+use crate::logging::LogLevel;
 use crate::storage::value_helpers::json_f64;
 
 mod local;
@@ -21,12 +21,6 @@ use remote::{
     REMOTE_EMBEDDING_PROBE_TIMEOUT_SECS, detect_ollama_embedding_dimension,
     detect_openai_embedding_dimension,
 };
-
-static EMBEDDING_LOGGER: std::sync::OnceLock<StdoutLogger> = std::sync::OnceLock::new();
-
-fn embedding_logger() -> &'static StdoutLogger {
-    EMBEDDING_LOGGER.get_or_init(|| StdoutLogger::new("warn"))
-}
 
 pub(crate) fn embedding_endpoint_for_log(endpoint: &str) -> String {
     remote::redact_endpoint_for_log(endpoint)
@@ -165,7 +159,7 @@ fn validate_dimension_override(
                      provider dimension ({actual_dimension}), using provider dimension"
                 )),
             );
-            embedding_logger().log(event, LogLevel::Warn);
+            crate::logging::emit(event, LogLevel::Warn);
             Ok(actual_dimension)
         }
         Some(expected_dimension) => Ok(expected_dimension),
@@ -353,7 +347,7 @@ pub(crate) fn cosine_similarity(left: &[f64], right: &[f64]) -> f64 {
         );
         event.insert("left_dim".to_string(), json!(left.len()));
         event.insert("right_dim".to_string(), json!(right.len()));
-        embedding_logger().log(event, LogLevel::Warn);
+        crate::logging::emit(event, LogLevel::Warn);
         return 0.0;
     }
 

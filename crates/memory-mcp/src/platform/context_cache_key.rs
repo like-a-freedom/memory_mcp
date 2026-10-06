@@ -105,8 +105,7 @@ impl InvalidateContextCache
                 let mut event = std::collections::HashMap::new();
                 event.insert("op".to_string(), serde_json::json!("cache.invalidate"));
                 event.insert("invalidated_count".to_string(), serde_json::json!(count));
-                crate::logging::StdoutLogger::new("trace")
-                    .log(event, crate::logging::LogLevel::Trace);
+                crate::logging::emit(event, crate::logging::LogLevel::Trace);
             }
         })
     }

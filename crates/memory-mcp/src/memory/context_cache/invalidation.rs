@@ -6,12 +6,8 @@ use serde_json::json;
 use tokio::sync::RwLock;
 
 use super::CacheKey;
-use crate::logging::{LogLevel, StdoutLogger};
+use crate::logging::LogLevel;
 use crate::models::AssembledContextItem;
-
-fn cache_logger() -> StdoutLogger {
-    StdoutLogger::new("trace")
-}
 
 /// Invalidate all cached context results for the process-bound namespace.
 pub async fn invalidate_cache(cache: &Arc<RwLock<LruCache<CacheKey, Vec<AssembledContextItem>>>>) {
@@ -22,6 +18,8 @@ pub async fn invalidate_cache(cache: &Arc<RwLock<LruCache<CacheKey, Vec<Assemble
         let mut event = HashMap::new();
         event.insert("op".to_string(), json!("cache.invalidate"));
         event.insert("invalidated_count".to_string(), json!(count));
-        cache_logger().log(event, LogLevel::Trace);
+        // A trace event the operator opts into with `RUST_LOG=trace`; it is not
+        // forced on, so the documented dial governs it like every other event.
+        crate::logging::emit(event, LogLevel::Trace);
     }
 }

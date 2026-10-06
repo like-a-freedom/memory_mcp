@@ -192,7 +192,7 @@ fn log_remote_retry(
     event.insert("max_attempts".to_string(), json!(max_attempts));
     event.insert("delay_ms".to_string(), json!(delay.as_millis() as u64));
     event.insert("reason".to_string(), json!(message));
-    super::embedding_logger().log(event, LogLevel::Warn);
+    crate::logging::emit(event, LogLevel::Warn);
 }
 
 async fn with_remote_embedding_retry<T, F, Fut>(

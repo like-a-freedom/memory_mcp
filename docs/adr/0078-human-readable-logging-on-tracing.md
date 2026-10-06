@@ -42,7 +42,10 @@ slice of `(key, value)`, a bound map) cannot be a `tracing` field macro, so the
 `op` travels as a first-class field beside the serialised payload and the map
 facade `logging::emit(event, level)` emits without constructing a logger. The
 deep modules that used to build a logger per call (`StdoutLogger::from_env()`)
-now call `emit`, retiring the service-locator smell for every dynamic site.
+now call `emit`, and the contexts that forced a level with
+`StdoutLogger::new("trace"/"warn")` do too: with the subscriber's filter in
+place that forced level was already redundant, so one facade governs them and
+`RUST_LOG` is the dial.
 
 **The dynamic payload is not modelled as `tracing` fields.** `tracing` fields
 are static per callsite; our events are arbitrary maps. The map therefore
