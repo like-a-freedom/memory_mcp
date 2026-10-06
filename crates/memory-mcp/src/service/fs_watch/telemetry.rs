@@ -3,8 +3,10 @@
 //! Metric labels are strictly bounded; paths, hashes, IDs, and error text are
 //! never labels. Unknown values map to `other`.
 //!
-//! Several metric families are emitted by the runtime in a later task; until
-//! then they are exercised only by tests, so dead-code analysis is relaxed.
+//! Every family here is written by the runtime or the processor once a watcher
+//! starts. A few helpers (`KNOWN_OUTCOMES`, `KNOWN_RETRY_REASONS`,
+//! `RevisionTimer`) have no caller in this build, so dead-code analysis stays
+//! relaxed for this module.
 #![allow(dead_code)]
 
 use std::time::Instant;

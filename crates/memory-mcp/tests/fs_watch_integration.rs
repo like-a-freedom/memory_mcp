@@ -389,6 +389,32 @@ async fn runtime_startup_scan_enqueues_and_processes_existing_files() {
     runtime.shutdown().await;
 }
 
+#[cfg(feature = "prometheus")]
+#[tokio::test]
+async fn starting_the_watcher_exports_a_healthy_degraded_gauge() {
+    use memory_mcp::config::fs_watch::FsWatchConfig;
+
+    let handle = memory_mcp::observability::shared_test_handle()
+        .expect("the prometheus recorder installs once for this test binary");
+
+    let inbox = tempfile::tempdir().expect("temp inbox");
+    let (service, _db, _store) = make_pipeline().await;
+    let runtime = service
+        .start_fs_watch(FsWatchConfig {
+            inbox: inbox.path().to_path_buf(),
+        })
+        .await
+        .expect("start runtime");
+
+    let output = handle.render();
+    assert!(
+        output.contains("memory_fs_watch_degraded 0"),
+        "a running watcher must export its latch as 0, or a healthy deployment reads No data on the dashboard:\n{output}"
+    );
+
+    runtime.shutdown().await;
+}
+
 #[tokio::test]
 async fn runtime_drops_supported_file_event_and_shutdown_is_bounded() {
     use memory_mcp::config::fs_watch::FsWatchConfig;

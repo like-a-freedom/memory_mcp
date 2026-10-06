@@ -257,6 +257,13 @@ impl FsWatchRuntime {
     /// bridge, startup scan, and sequential processor.
     pub async fn start(service: MemoryService, config: FsWatchConfig) -> Result<Self, MemoryError> {
         let telemetry = FsWatchTelemetry::new();
+        // The degraded gauge is a one-way latch with no else branch: it was
+        // only ever set when the retry loop gave up, so a healthy deployment
+        // exported no series at all and the dashboard read "No data" instead
+        // of a green 0. Export the healthy state from startup. A deployment
+        // that never starts a watcher still exports nothing, which is how
+        // "off" stays distinguishable from "running and not degraded".
+        telemetry.set_degraded(false);
         let store = InboxRevisionStoreClient::new(
             service.db_client.clone(),
             service.active_namespace.clone(),

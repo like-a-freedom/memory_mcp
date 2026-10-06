@@ -48,6 +48,37 @@ def target(expr: str, legend: str, ref_id: str = "A") -> dict:
     }
 
 
+def unique_ref_ids(targets: list[dict]) -> list[dict]:
+    """One RefId per query on a panel, no matter what `target()` was given.
+
+    Results, query status and per-query transformations are keyed by RefId, so
+    two queries called `A` are one query as far as Grafana's machinery is
+    concerned — the second one's result is the one the query editor reports on,
+    and a query inspector cannot tell them apart. `target()` defaults to `A`,
+    so a panel built from three `target(...)` calls shipped three queries named
+    `A` until this ran over them.
+    """
+    used: set[str] = set()
+    unique: list[dict] = []
+    for index, item in enumerate(targets):
+        ref_id = item.get("refId") or ""
+        if not ref_id or ref_id in used:
+            ref_id = _first_free_ref_id(used, index)
+        used.add(ref_id)
+        unique.append({**item, "refId": ref_id})
+    return unique
+
+
+def _first_free_ref_id(used: set[str], index: int) -> str:
+    for code in range(ord("A"), ord("Z") + 1):
+        candidate = chr(code)
+        if candidate not in used:
+            return candidate
+    # Twenty-seven queries on one panel is a bug in the generator, not a
+    # layout; keep it unique rather than reusing a RefId the panel already has.
+    return f"Q{index}"
+
+
 def stat(
     title: str,
     expr: str,
@@ -180,7 +211,7 @@ def timeseries(
             "tooltip": {"mode": "multi", "sort": "desc"},
         },
         "pluginVersion": "13.2.4",
-        "targets": targets,
+        "targets": unique_ref_ids(targets),
         "title": title,
         "type": "timeseries",
     }
@@ -644,7 +675,9 @@ def technical() -> dict:
             "A dashboard that averaged it would report a fraction of a broken "
             "deployment; this reads the value as it stands. A `1` means "
             "filesystem ingestion is off and knowledge from the inbox has "
-            "stopped arriving.",
+            "stopped arriving.\n\n"
+            "Exported from watcher startup, so a running watcher reads `0` and "
+            "reads *No data* only when no watcher ever started.",
             thresholds=[
                 {"color": "green", "value": None},
                 {"color": "red", "value": 1},
@@ -671,6 +704,13 @@ def technical() -> dict:
             unit="ops",
             legend_calcs=["mean", "max"],
         ),
+    ]
+    # One band per row. A collapsed row whose children span two bands renders
+    # as a diagonal staircase in Grafana once the row sits below the top of the
+    # dashboard: the children are laid out in x order, one per line, and the
+    # declared second line is lost. So the section's second line of panels
+    # becomes a second row instead — checked by check_dashboards.py.
+    fswatch_detail = [
         timeseries(
             "Revision latency p95",
             [target("memory:fs_watch_revision_duration:p95_5m", "{{outcome}}")],
@@ -679,9 +719,6 @@ def technical() -> dict:
             "attempt timeout, so the upper percentiles can sit well past the "
             "last reported bucket — a high number here is often a timeout, not "
             "a slow success.",
-            # Second line of the section: the first three panels occupy y=0
-            # through y=4, so these start below them rather than on top.
-            y=4,
             unit="s",
             legend_calcs=["max", "lastNotNull"],
         ),
@@ -695,16 +732,15 @@ def technical() -> dict:
             "growing for an hour is invisible in it, and a panel showing it "
             "would invite exactly the wrong conclusion.\n\n"
             "There is no live backlog gauge in this build. The honest signal for "
-            "a stuck queue is the retry and degraded panels above.\n\n"
+            "a stuck queue is the retry and degraded panels in the row above.\n\n"
             "*These series exist only when the build carries `fs-watch` **and** "
             "the deployment set `MEMORY_INGESTION_INBOX`. Without both, the "
             "panels are empty — which reads as 'off', not 'broken'.*",
             (12, 4, 12, 4),
-            # Second line of the section, beside the latency panel.
-            y=4,
         ),
     ]
     sections.append(("Filesystem ingestion", fswatch))
+    sections.append(("Filesystem ingestion — latency and caveats", fswatch_detail))
 
     sections.append((
         "Reference",
@@ -1089,13 +1125,27 @@ def dashboard(
     }
 
 
+def count_panels(panels: list[dict]) -> tuple[int, int]:
+    """(rows, panels) counting the panels nested inside collapsed rows too."""
+    rows = 0
+    found = 0
+    for panel in panels:
+        if panel["type"] == "row":
+            rows += 1
+            child_rows, child_panels = count_panels(panel.get("panels", []))
+            rows += child_rows
+            found += child_panels
+        else:
+            found += 1
+    return rows, found
+
+
 def main() -> None:
     OUT.mkdir(parents=True, exist_ok=True)
     for name, built in (("technical.json", technical()), ("product.json", product())):
         path = OUT / name
         path.write_text(json.dumps(built, indent=2, sort_keys=False) + "\n")
-        panels = sum(1 for p in built["panels"] if p["type"] != "row")
-        rows = sum(1 for p in built["panels"] if p["type"] == "row")
+        rows, panels = count_panels(built["panels"])
         print(f"{path.relative_to(ROOT)}: {rows} rows, {panels} panels")
 
 

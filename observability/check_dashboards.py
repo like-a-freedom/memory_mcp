@@ -57,6 +57,28 @@ def panel_titles(panel: dict) -> list[tuple[str, str]]:
     ]
 
 
+def check_ref_ids(path: pathlib.Path, panel: dict, failures: list[str]) -> None:
+    """Every query on a panel needs its own RefId, rows included.
+
+    Grafana keys query results, query status and per-query transformations by
+    RefId, so two queries called `A` collide: the query editor reports on one
+    of them and a query inspector cannot tell them apart. The generator's
+    `target()` defaults to `A`, which is how a three-query panel shipped three
+    queries named `A`.
+    """
+    if isinstance(panel.get("panels"), list):
+        for child in panel["panels"]:
+            check_ref_ids(path, child, failures)
+        return
+    ref_ids = [target.get("refId") for target in panel.get("targets", [])]
+    shared = sorted({ref_id for ref_id in ref_ids if ref_ids.count(ref_id) > 1})
+    if shared:
+        failures.append(
+            f"{path.name} / {panel.get('title', '<untitled>')}: queries share "
+            f"RefId {shared} ({ref_ids})"
+        )
+
+
 def check_layout(path: pathlib.Path, document: dict, failures: list[str]) -> None:
     """Panels must not overlap, and rows must be stacked.
 
@@ -115,7 +137,25 @@ def check_row_contents(path: pathlib.Path, row: dict, failures: list[str]) -> No
     layout with two overlapping panels inside a nested row reported nothing,
     and a row pushed off the right edge of the grid reported nothing. Both are
     silent — an unchecked layout is one nobody can trust.
+
+    Children must also sit on **one** grid band. A collapsed row whose children
+    span two bands is rendered by Grafana as a diagonal staircase — the
+    children come out in x order, one per line, and the declared second line is
+    lost — while a single-band row lays out correctly at any depth. Verified
+    against Grafana 13.2.3: a two-band row at row y=0 looked fine, the same
+    content at row y=9 did not, so a layout that only appears correct at the
+    top of a dashboard is not correct.
     """
+    children = [child for child in row.get("panels", []) if child["type"] != "row"]
+    bands = sorted({child["gridPos"]["y"] for child in children})
+    if len(bands) > 1:
+        failures.append(
+            f"{path.name} / {row['title']}: children sit on {len(bands)} grid "
+            f"bands (y={bands}); Grafana renders a multi-band row as a diagonal "
+            f"staircase — give the row a single band, or split it into one row "
+            f"per band"
+        )
+
     occupied: dict[tuple[int, int], str] = {}
     for child in row.get("panels", []):
         child_grid = child["gridPos"]
@@ -156,6 +196,8 @@ def main() -> int:
         document = json.loads(path.read_text())
         check_layout(path, document, failures)
         for panel in document["panels"]:
+            check_ref_ids(path, panel, failures)
+        for panel in document["panels"]:
             for expr in panel_expressions(panel):
                 if not expr:
                     continue
@@ -186,7 +228,10 @@ def main() -> int:
         print(f"  FAIL {failure}")
     if failures:
         return 1
-    print("  every panel reads a series that exists, and nothing overlaps")
+    print(
+        "  every panel reads a series that exists, nothing overlaps, every "
+        "row is one band, and every query has its own RefId"
+    )
     return 0
 
 

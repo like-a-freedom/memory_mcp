@@ -646,7 +646,7 @@
               "expr": "memory:http_request_duration:p95_5m_total",
               "legendFormat": "p95",
               "range": true,
-              "refId": "A"
+              "refId": "B"
             },
             {
               "datasource": {
@@ -657,7 +657,7 @@
               "expr": "memory:http_request_duration:p99_5m_total",
               "legendFormat": "p99",
               "range": true,
-              "refId": "A"
+              "refId": "C"
             }
           ],
           "title": "Latency percentiles over time",
@@ -1991,7 +1991,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "description": "Whether the watcher backend exhausted its retries.\n\n**A one-way latch.** Once this reads 1 it stays 1 for the process lifetime \u2014 the retry loop has returned and nothing can set it back. A dashboard that averaged it would report a fraction of a broken deployment; this reads the value as it stands. A `1` means filesystem ingestion is off and knowledge from the inbox has stopped arriving.",
+          "description": "Whether the watcher backend exhausted its retries.\n\n**A one-way latch.** Once this reads 1 it stays 1 for the process lifetime \u2014 the retry loop has returned and nothing can set it back. A dashboard that averaged it would report a fraction of a broken deployment; this reads the value as it stands. A `1` means filesystem ingestion is off and knowledge from the inbox has stopped arriving.\n\nExported from watcher startup, so a running watcher reads `0` and reads *No data* only when no watcher ever started.",
           "fieldConfig": {
             "defaults": {
               "unit": "short",
@@ -2227,7 +2227,21 @@
           ],
           "title": "Retries by stage and reason",
           "type": "timeseries"
-        },
+        }
+      ],
+      "title": "Filesystem ingestion",
+      "type": "row"
+    },
+    {
+      "collapsed": true,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 10
+      },
+      "id": 0,
+      "panels": [
         {
           "datasource": {
             "type": "prometheus",
@@ -2280,7 +2294,7 @@
             "h": 4,
             "w": 12,
             "x": 0,
-            "y": 4
+            "y": 0
           },
           "id": 0,
           "options": {
@@ -2325,7 +2339,7 @@
             "h": 4,
             "w": 12,
             "x": 12,
-            "y": 4
+            "y": 0
           },
           "id": 0,
           "options": {
@@ -2334,7 +2348,7 @@
               "showLineNumbers": false,
               "showMiniMap": false
             },
-            "content": "`memory_fs_watch_queue_depth` is deliberately absent from this dashboard.\n\nIt is set **once**, at startup, from a recovery pass, and never updated again. It is a snapshot of what was queued when the process started, not the queue as it is now \u2014 a backlog that has been growing for an hour is invisible in it, and a panel showing it would invite exactly the wrong conclusion.\n\nThere is no live backlog gauge in this build. The honest signal for a stuck queue is the retry and degraded panels above.\n\n*These series exist only when the build carries `fs-watch` **and** the deployment set `MEMORY_INGESTION_INBOX`. Without both, the panels are empty \u2014 which reads as 'off', not 'broken'.*",
+            "content": "`memory_fs_watch_queue_depth` is deliberately absent from this dashboard.\n\nIt is set **once**, at startup, from a recovery pass, and never updated again. It is a snapshot of what was queued when the process started, not the queue as it is now \u2014 a backlog that has been growing for an hour is invisible in it, and a panel showing it would invite exactly the wrong conclusion.\n\nThere is no live backlog gauge in this build. The honest signal for a stuck queue is the retry and degraded panels in the row above.\n\n*These series exist only when the build carries `fs-watch` **and** the deployment set `MEMORY_INGESTION_INBOX`. Without both, the panels are empty \u2014 which reads as 'off', not 'broken'.*",
             "mode": "markdown"
           },
           "pluginVersion": "13.2.4",
@@ -2342,7 +2356,7 @@
           "type": "text"
         }
       ],
-      "title": "Filesystem ingestion",
+      "title": "Filesystem ingestion \u2014 latency and caveats",
       "type": "row"
     },
     {
@@ -2351,7 +2365,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 10
+        "y": 11
       },
       "id": 0,
       "panels": [
