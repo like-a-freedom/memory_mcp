@@ -4,35 +4,22 @@
 //! Returns `Result<(), ExitCode>`. The only `std::process::exit` call lives in
 //! `main.rs`. See Risk R7.
 
-use std::collections::HashMap;
 use std::process::ExitCode;
 
 use clap::Parser;
-use serde_json::json;
 
 use crate::cli::commands;
 use crate::cli::{
     Cli, Command, build_memory_service, log_session_duration, log_startup, run_reembed_mode,
     run_stdio_server,
 };
-use crate::logging::{LogLevel, StdoutLogger, install_log_file};
+use crate::logging::{StdoutLogger, install_log_file_from_env};
 // `EmbeddingActivationMode` is `pub(crate)` re-exported from `service` (the
 // underlying `startup` module is private). The `error` submodule is also
 // private — reach `MemoryError` via the `pub use error::MemoryError;` at
 // `src/service.rs:15`, not via `service::error::`. See Risk R12.
 use crate::error::MemoryError;
 use crate::service::EmbeddingActivationMode;
-
-/// Normalizes a raw `MEMORY_LOG_FILE` value. Returns `Some(trimmed_path)`
-/// if the value is non-empty after trimming; `None` otherwise.
-fn resolve_log_file_path(raw: &str) -> Option<String> {
-    let trimmed = raw.trim();
-    if trimmed.is_empty() {
-        None
-    } else {
-        Some(trimmed.to_string())
-    }
-}
 
 /// Application entry point. Called from `main.rs`.
 ///
@@ -43,23 +30,9 @@ pub async fn run() -> Result<(), ExitCode> {
     let logger = StdoutLogger::from_env();
 
     // Install file log sink if configured. Must happen before log_startup
-    // so the very first event goes to the file.
-    if let Ok(raw_path) = std::env::var("MEMORY_LOG_FILE")
-        && let Some(path) = resolve_log_file_path(&raw_path)
-        && let Err(err) = install_log_file(&path)
-    {
-        // Fallback: warn to stderr unconditionally. The sink is not installed,
-        // so stderr works; going through `logger.log` would let `RUST_LOG=error`
-        // silently swallow the one diagnostic that must not be lost.
-        let mut event = HashMap::new();
-        event.insert("op".to_string(), json!("main.log_file_open_failed"));
-        event.insert("path".to_string(), json!(&path));
-        event.insert("error".to_string(), json!(err.to_string()));
-        eprintln!(
-            "{}",
-            StdoutLogger::format_event_line(&event, LogLevel::Warn)
-        );
-    }
+    // so the very first event goes to the file. The shared helper reads
+    // `MEMORY_LOG_FILE`, normalizes it and warns on stderr if the open fails.
+    install_log_file_from_env();
 
     let cli = Cli::parse();
 
@@ -233,19 +206,5 @@ mod tests {
         let value = cli_error_json(&MemoryError::Validation("bad input".into()));
 
         assert!(value.get("hint").is_none());
-    }
-
-    #[test]
-    fn resolve_log_file_path_trims_and_rejects_empty() {
-        assert_eq!(
-            super::resolve_log_file_path("  /tmp/test.log  "),
-            Some("/tmp/test.log".to_string())
-        );
-        assert_eq!(super::resolve_log_file_path(""), None);
-        assert_eq!(super::resolve_log_file_path("   "), None);
-        assert_eq!(
-            super::resolve_log_file_path("/var/log/memory.log"),
-            Some("/var/log/memory.log".to_string())
-        );
     }
 }

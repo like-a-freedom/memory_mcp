@@ -13,6 +13,11 @@ use memory_mcp::logging::StdoutLogger;
 #[tokio::main]
 async fn main() -> ExitCode {
     let logger = StdoutLogger::from_env();
+    // Install the file sink before anything logs or reads configuration, so
+    // `MEMORY_LOG_FILE` means the same here as in the stdio profile. It used
+    // to be installed only by the stdio runner, and this binary silently kept
+    // writing to stderr no matter what the variable said.
+    memory_mcp::logging::install_log_file_from_env();
     let cfg = match HttpConfig::from_env() {
         Ok(c) => c,
         Err(err) => {

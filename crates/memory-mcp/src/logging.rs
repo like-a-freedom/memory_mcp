@@ -158,6 +158,48 @@ pub fn install_log_file(path: &str) -> Result<(), io::Error> {
     })
 }
 
+/// The path `MEMORY_LOG_FILE` names, or `None` when the variable is unset or
+/// blank. A blank value means "unset", not "write to a file called nothing".
+fn resolve_log_file_path(raw: &str) -> Option<String> {
+    let trimmed = raw.trim();
+    if trimmed.is_empty() {
+        None
+    } else {
+        Some(trimmed.to_string())
+    }
+}
+
+/// Install the file sink named by `MEMORY_LOG_FILE`, if the variable is set.
+///
+/// Both entry points call this before anything logs, so the variable means the
+/// same thing in the stdio and HTTP profiles. It used to be installed only by
+/// the stdio runner, and an HTTP deployment that set it silently kept writing
+/// to stderr. The fallback warning goes to stderr directly rather than through
+/// the logger: the sink failed to install, so stderr is the only channel left,
+/// and a `RUST_LOG` that filters warnings must not swallow the one diagnostic
+/// that explains where the log *isn't* going.
+pub fn install_log_file_from_env() {
+    let Ok(raw) = std::env::var("MEMORY_LOG_FILE") else {
+        return;
+    };
+    let Some(path) = resolve_log_file_path(&raw) else {
+        return;
+    };
+    if let Err(err) = install_log_file(&path) {
+        let mut event = HashMap::new();
+        event.insert(
+            "op".to_string(),
+            serde_json::json!("main.log_file_open_failed"),
+        );
+        event.insert("path".to_string(), serde_json::json!(&path));
+        event.insert("error".to_string(), serde_json::json!(err.to_string()));
+        eprintln!(
+            "{}",
+            StdoutLogger::format_event_line(&event, LogLevel::Warn)
+        );
+    }
+}
+
 /// Logger that writes structured events to stderr (or to the file sink
 /// installed via [`install_log_file`]).
 #[derive(Clone)]
@@ -1029,6 +1071,19 @@ mod tests {
         assert!(
             logger.is_event_enabled(LogLevel::Warn, "embedding.backfill_started"),
             "the directive raises the op to warn, it does not silence it"
+        );
+    }
+
+    /// A blank or whitespace-only `MEMORY_LOG_FILE` means "unset", not "write
+    /// to a file called nothing" — the sink must not be installed for it, and
+    /// a real path must survive trimming.
+    #[test]
+    fn memory_log_file_path_is_normalized() {
+        assert_eq!(resolve_log_file_path(""), None);
+        assert_eq!(resolve_log_file_path("   "), None);
+        assert_eq!(
+            resolve_log_file_path("  /tmp/log.txt  "),
+            Some("/tmp/log.txt".to_string())
         );
     }
 
