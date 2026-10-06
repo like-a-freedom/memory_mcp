@@ -30,6 +30,7 @@ use std::time::{Duration, Instant};
 
 use crate::error::MemoryError;
 use crate::http::leases::scheduler::SchedulerJob;
+use crate::http::leases::scheduler::cadence_due_at;
 use crate::http::registry::RegistryHandle;
 use crate::http::registry::models::Tenant;
 use crate::http::runtime::bootstrap::DeploymentPolicy;
@@ -56,27 +57,6 @@ const JOB_METRIC: &str = "embedding_backfill";
 /// observable output was a line an operator could not pace. 60s is the same
 /// cadence the plan-reconcile and provisioning passes already use.
 const BACKFILL_CADENCE: Duration = Duration::from_secs(60);
-
-/// Whether the gate is open at `now`: the first call always opens it, and
-/// later calls open it only once `cadence` has elapsed since the last one.
-///
-/// The instant is a parameter rather than read here so the opening and closing
-/// of the window can both be pinned without sleeping through a real minute —
-/// a gate tested only from the closed side would pass while being stuck shut.
-fn cadence_due_at(
-    last_run: &std::sync::Mutex<Option<Instant>>,
-    cadence: Duration,
-    now: Instant,
-) -> bool {
-    let mut guard = last_run
-        .lock()
-        .unwrap_or_else(|poisoned| poisoned.into_inner());
-    if guard.is_some_and(|previous| now.duration_since(previous) < cadence) {
-        return false;
-    }
-    *guard = Some(now);
-    true
-}
 
 /// The backfill job. Registers itself with
 /// `SchedulerHooks::with_additional_job`.

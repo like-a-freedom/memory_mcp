@@ -28,6 +28,32 @@ use crate::observability::record_job_metric;
 pub type JobFuture = Pin<Box<dyn Future<Output = Result<(), MemoryError>> + Send>>;
 pub type SchedulerJob = Arc<dyn Fn(RegistryHandle) -> JobFuture + Send + Sync>;
 
+/// Whether a cadenced job is due at `now`: the first call always opens the
+/// window, and later calls open it only once `cadence` has elapsed since the
+/// last one.
+///
+/// The scheduler ticks every second; a job that walks storage on each tick —
+/// backfill, the lifecycle passes — runs on its own slower cadence instead.
+/// The instant is a parameter rather than read here so both the opening and
+/// the closing of the window can be pinned without sleeping through a real
+/// interval: a gate tested only from the closed side would pass while being
+/// stuck shut. The state lives in the job's closure, not a `static`, so each
+/// job instance owns its own window and tests do not share one.
+pub(crate) fn cadence_due_at(
+    last_run: &std::sync::Mutex<Option<std::time::Instant>>,
+    cadence: Duration,
+    now: std::time::Instant,
+) -> bool {
+    let mut guard = last_run
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner());
+    if guard.is_some_and(|previous| now.duration_since(previous) < cadence) {
+        return false;
+    }
+    *guard = Some(now);
+    true
+}
+
 /// Stable owner identity shared by all fenced workers in one process. Deployments
 /// should set `MEMORY_MCP_HTTP_REPLICA_ID` to a durable replica identity; the PID
 /// fallback is unique for the process lifetime and remains safe after restart.

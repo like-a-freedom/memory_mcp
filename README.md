@@ -1113,7 +1113,7 @@ and not by the same code path — check the row before assuming one applies:
 | Variable | In an HTTP build | How |
 | --- | --- | --- |
 | `RUST_LOG` | Yes | Read directly by the logging layer in every profile, not through the stdio config path. |
-| `LIFECYCLE_*` | Yes, config only | Read by `resolve_deployment_policy` and copied onto every tenant service, so `LIFECYCLE_ENABLED` and the decay/archival thresholds govern what that service would run. The **background workers are not spawned per tenant**: only the stdio profile calls `spawn_workers_from_config`. |
+| `LIFECYCLE_*` | Yes | Read by `resolve_deployment_policy` and applied to every tenant service. In HTTP the decay, archival and community passes run as a **process-level scheduler job** over the ready tenants, on the intervals `LIFECYCLE_DECAY_INTERVAL_SECS` / `LIFECYCLE_ARCHIVAL_INTERVAL_SECS`, registered only when `LIFECYCLE_ENABLED` is on. Per-tenant background workers are still not spawned — the pool evicts idle tenants and a worker tied to a runtime would outlive it — which is why HTTP walks tenants the way the embedding backfill does. |
 | `QUERY_LOGGING_ENABLED`, `QUERY_LOG_RETENTION_DAYS` | Yes | Read by `resolve_deployment_policy` and applied to every tenant service, so `assemble_context` persists `query_log` rows in HTTP exactly as it does in the stdio profile. |
 | `MEMORY_CLAIM_*` | Yes | Read by `resolve_deployment_policy` and applied to every tenant service. An invalid value is a startup error in **both** profiles. |
 
@@ -1170,7 +1170,7 @@ The following settings are optional for power users. They are read by the same e
 | `MEMORY_PROMETHEUS_LISTEN_ADDR` | socket address (`IP:port`) | unset | Prometheus listener for the **stdio/local** profile, active when the `prometheus` feature is compiled in and this variable is set. The HTTP profile **rejects it** — `memory_mcp_http` serves metrics on its own `/metrics` route, and two scrape surfaces for one recorder is a configuration error |
 | `QUERY_LOGGING_ENABLED` | boolean | `false` | Persist `assemble_context` analytics rows into `query_log` when `true` |
 | `QUERY_LOG_RETENTION_DAYS` | unsigned integer | `90` | Days to retain persisted `query_log` analytics before best-effort pruning |
-| `LIFECYCLE_ENABLED` | boolean | `false` | Enable background lifecycle jobs. In the stdio/local profile the decay and archival workers are spawned from this config; in an HTTP build the same config is read and copied onto every tenant service, but **the background workers are not spawned per tenant** — only the stdio binary calls `spawn_workers_from_config` |
+| `LIFECYCLE_ENABLED` | boolean | `false` | Enable background lifecycle jobs. In the stdio/local profile the decay and archival workers are spawned from this config; in an HTTP build the same config drives a process-level scheduler job that walks the ready tenants and runs the decay, archival and community passes on their configured intervals (registered only when this is on) — per-tenant background workers are still not spawned, because the pool evicts idle tenants |
 | `LIFECYCLE_DECAY_INTERVAL_SECS` | unsigned integer | `3600` | Decay worker interval in seconds |
 | `LIFECYCLE_ARCHIVAL_INTERVAL_SECS` | unsigned integer | `86400` | Archival worker interval in seconds |
 | `LIFECYCLE_DECAY_THRESHOLD` | floating-point number | `0.3` | Confidence threshold for fact invalidation |

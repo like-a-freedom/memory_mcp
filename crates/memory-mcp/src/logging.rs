@@ -112,6 +112,8 @@ pub const HTTP_OPERATIONS: &[&str] = &[
     "http.tenant_embedding_index_reconcile_skipped",
     "http.tenant_embedding_index_redefined",
     "http.tenant_embedding_index_reconcile_failed",
+    "http.lifecycle.decay_failed",
+    "http.lifecycle.archival_failed",
 ];
 
 /// Writes one line to a sink, best-effort. Logging must never panic or

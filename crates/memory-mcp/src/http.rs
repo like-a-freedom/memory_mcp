@@ -7,6 +7,7 @@ pub mod config;
 pub mod embedding;
 pub mod health;
 pub mod leases;
+pub mod lifecycle;
 pub mod logging;
 pub mod metrics;
 pub mod middleware;

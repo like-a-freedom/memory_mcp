@@ -104,11 +104,20 @@ async fn main() -> ExitCode {
         let hooks = hooks.with_additional_job(
             memory_mcp::http::registry::surreal_store::rate_bucket_cleanup_scheduler_job(),
         );
-        match backfill_policy.embedding.is_some() {
+        let hooks = match backfill_policy.embedding.is_some() {
             true => hooks.with_additional_job(
                 memory_mcp::http::embedding::backfill_scheduler::backfill_scheduler_job(
-                    backfill_policy,
+                    backfill_policy.clone(),
                 ),
+            ),
+            false => hooks,
+        };
+        // `LIFECYCLE_ENABLED` gets the same treatment as the embedding gate:
+        // not registered at all when off, rather than registered-and-gated, so
+        // a deployment that opted out carries no lifecycle job to reason about.
+        match backfill_policy.lifecycle.enabled {
+            true => hooks.with_additional_job(
+                memory_mcp::http::lifecycle::lifecycle_scheduler_job(backfill_policy),
             ),
             false => hooks,
         }

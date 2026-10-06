@@ -1259,6 +1259,7 @@ mod tests {
                     include_str!("runtime/storage.rs"),
                     include_str!("runtime/bootstrap.rs"),
                     include_str!("embedding/backfill_scheduler.rs"),
+                    include_str!("lifecycle.rs"),
                     include_str!("tasks/scheduler.rs"),
                     include_str!("app_sessions/scheduler.rs"),
                     include_str!("registry/provisioning.rs"),
