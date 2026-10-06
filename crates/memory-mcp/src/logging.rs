@@ -166,35 +166,64 @@ fn from_tracing_level(level: &tracing::Level) -> LogLevel {
 /// This service's events carry a serialised map in a single `payload` field;
 /// a native producer may instead carry its fields directly with an `op` naming
 /// the operation. A foreign event (a dependency's) carries neither and is
-/// rendered from its own fields.
+/// rendered from its own fields. Values keep their JSON type, so a number is a
+/// number in the machine format.
 #[derive(Default)]
 struct EventVisitor {
     payload: Option<String>,
     op: Option<String>,
-    fields: Vec<(String, String)>,
+    fields: Vec<(String, Value)>,
 }
 
 impl EventVisitor {
-    fn record(&mut self, field: &Field, value: String) {
+    fn push(&mut self, field: &Field, value: Value) {
         match field.name() {
-            // The payload is not a rendered field: it is the whole event.
-            "payload" => self.payload = Some(value),
+            // The payload is not a rendered field: it is the whole event, and
+            // it is parsed back, so it must not go through the value renderer
+            // (which truncates long strings).
+            "payload" => {
+                self.payload = Some(match value {
+                    Value::String(json) => json,
+                    other => value_to_string(&other),
+                });
+            }
             "op" => {
-                self.op = Some(value.clone());
+                self.op = Some(value_to_string(&value));
                 self.fields.push(("op".to_string(), value));
             }
             name => self.fields.push((name.to_string(), value)),
         }
     }
+
+    fn push_str(&mut self, field: &Field, value: String) {
+        self.push(field, Value::String(value));
+    }
 }
 
 impl Visit for EventVisitor {
     fn record_str(&mut self, field: &Field, value: &str) {
-        self.record(field, value.to_string());
+        self.push_str(field, value.to_string());
     }
 
     fn record_debug(&mut self, field: &Field, value: &dyn fmt::Debug) {
-        self.record(field, format!("{value:?}"));
+        self.push_str(field, format!("{value:?}"));
+    }
+
+    fn record_i64(&mut self, field: &Field, value: i64) {
+        self.push(field, Value::Number(value.into()));
+    }
+
+    fn record_u64(&mut self, field: &Field, value: u64) {
+        self.push(field, Value::Number(value.into()));
+    }
+
+    fn record_f64(&mut self, field: &Field, value: f64) {
+        let value = serde_json::Number::from_f64(value).map_or(Value::Null, Value::Number);
+        self.push(field, value);
+    }
+
+    fn record_bool(&mut self, field: &Field, value: bool) {
+        self.push(field, Value::Bool(value));
     }
 }
 
@@ -247,11 +276,7 @@ where
             let event: HashMap<String, Value> = serde_json::from_str(payload).unwrap_or_default();
             self.render(&event, level, &ts, ansi)
         } else if visitor.op.is_some() {
-            let event: HashMap<String, Value> = visitor
-                .fields
-                .iter()
-                .map(|(key, value)| (key.clone(), Value::String(value.clone())))
-                .collect();
+            let event: HashMap<String, Value> = visitor.fields.iter().cloned().collect();
             self.render(&event, level, &ts, ansi)
         } else {
             render_foreign(
@@ -301,7 +326,7 @@ where
 /// Render a foreign (`tracing`-originated) event in the same shape.
 fn render_foreign(
     target: &str,
-    fields: &[(String, String)],
+    fields: &[(String, Value)],
     span_context: &str,
     level: LogLevel,
     ts: &str,
@@ -311,16 +336,11 @@ fn render_foreign(
     let message = fields
         .iter()
         .find(|(key, _)| key == "message")
-        .map(|(_, value)| value.clone());
+        .map(|(_, value)| value_to_string(value));
 
     match format {
         LogFormat::Text => {
-            let level_text = format!("{:>5}", level.as_str().to_uppercase());
-            let level_text = if ansi {
-                format!("{}{level_text}{ANSI_RESET}", level_ansi(level))
-            } else {
-                level_text
-            };
+            let level_text = level_field(level, ansi);
             let mut parts = Vec::with_capacity(fields.len());
             if let Some(message) = message {
                 parts.push(message);
@@ -329,7 +349,11 @@ fn render_foreign(
                 if key == "message" {
                     continue;
                 }
-                parts.push(key_token(key, &quote_if_needed(value), ansi));
+                parts.push(key_token(
+                    key,
+                    &quote_if_needed(&value_to_string(value)),
+                    ansi,
+                ));
             }
             let span_prefix = if span_context.is_empty() {
                 String::new()
@@ -344,23 +368,39 @@ fn render_foreign(
         }
         LogFormat::Json => {
             let mut object = serde_json::Map::with_capacity(fields.len() + 3);
-            object.insert("timestamp".to_string(), Value::String(ts.to_string()));
-            object.insert(
-                "level".to_string(),
-                Value::String(level.as_str().to_string()),
-            );
             object.insert("target".to_string(), Value::String(target.to_string()));
             if !span_context.is_empty() {
                 object.insert("span".to_string(), Value::String(span_context.to_string()));
             }
             let mut mapped = serde_json::Map::with_capacity(fields.len());
             for (key, value) in fields {
-                mapped.insert(key.clone(), Value::String(value.clone()));
+                mapped.insert(key.clone(), value.clone());
             }
             object.insert("fields".to_string(), Value::Object(mapped));
+            insert_meta(&mut object, level, ts);
             Value::Object(object).to_string()
         }
     }
+}
+
+/// The right-aligned, uppercased level, coloured when `ansi`.
+fn level_field(level: LogLevel, ansi: bool) -> String {
+    let text = format!("{:>5}", level.as_str().to_uppercase());
+    if ansi {
+        format!("{}{text}{ANSI_RESET}", level_ansi(level))
+    } else {
+        text
+    }
+}
+
+/// Write `timestamp` and `level` last, so a payload or field set cannot
+/// overwrite the metadata a collector relies on.
+fn insert_meta(object: &mut serde_json::Map<String, Value>, level: LogLevel, ts: &str) {
+    object.insert("timestamp".to_string(), Value::String(ts.to_string()));
+    object.insert(
+        "level".to_string(),
+        Value::String(level.as_str().to_string()),
+    );
 }
 
 /// The `MakeWriter` behind the `fmt` layer: the `MEMORY_LOG_FILE` sink when
@@ -482,33 +522,39 @@ fn current_directives() -> Directives {
     .clone()
 }
 
-/// Reads just the `op` field off an event.
+/// Reads the `op` and `payload` fields off an event.
 #[derive(Default)]
 struct OpField {
     op: Option<String>,
+    has_payload: bool,
 }
 
 impl Visit for OpField {
     fn record_str(&mut self, field: &Field, value: &str) {
-        if field.name() == "op" {
-            self.op = Some(value.to_string());
+        match field.name() {
+            "op" => self.op = Some(value.to_string()),
+            "payload" => self.has_payload = true,
+            _ => {}
         }
     }
 
     fn record_debug(&mut self, field: &Field, value: &dyn fmt::Debug) {
-        if field.name() == "op" {
-            self.op = Some(format!("{value:?}"));
+        match field.name() {
+            "op" => self.op = Some(format!("{value:?}")),
+            "payload" => self.has_payload = true,
+            _ => {}
         }
     }
 }
 
-/// Applies the `RUST_LOG` op-prefix rules to this service's events at the
+/// Applies the `RUST_LOG` op-prefix rules to a native `tracing` event at the
 /// subscriber.
 ///
-/// Recorded map events are filtered before emission, but a native `tracing`
-/// event (a span, or a producer migrated off [`StdoutLogger`]) is not. This
-/// filter is what makes `RUST_LOG` mean the same thing for both. Foreign
-/// targets are left entirely to [`foreign_filter`].
+/// Recorded map events carry a `payload` and were already filtered by whoever
+/// emitted them — the per-instance logger (its own directives) or [`emit`]
+/// (`RUST_LOG`). This filter governs only the events that reach `tracing`
+/// directly, so `RUST_LOG` reaches a native producer without re-filtering, and
+/// over-restricting, a map event. Foreign targets are left to [`foreign_filter`].
 struct OpFilter;
 
 impl<S: Subscriber> Filter<S> for OpFilter {
@@ -517,13 +563,20 @@ impl<S: Subscriber> Filter<S> for OpFilter {
     }
 
     fn event_enabled(&self, event: &Event<'_>, _cx: &Context<'_, S>) -> bool {
-        if event.metadata().target() != LOG_TARGET {
+        let metadata = event.metadata();
+        // A module target inside this crate counts: a native producer that
+        // forgets `target: LOG_TARGET` still gets `memory_mcp::…`, and its
+        // events must not slip past the dial.
+        if !metadata.target().starts_with(LOG_TARGET) {
             return true;
         }
         let mut field = OpField::default();
         event.record(&mut field);
+        if field.has_payload {
+            return true;
+        }
         current_directives().is_event_enabled(
-            from_tracing_level(event.metadata().level()),
+            from_tracing_level(metadata.level()),
             field.op.as_deref().unwrap_or(""),
         )
     }
@@ -1119,12 +1172,7 @@ pub(crate) fn render_human(
     ts: &str,
     ansi: bool,
 ) -> String {
-    let level_text = format!("{:>5}", level.as_str().to_uppercase());
-    let level_text = if ansi {
-        format!("{}{level_text}{ANSI_RESET}", level_ansi(level))
-    } else {
-        level_text
-    };
+    let level_text = level_field(level, ansi);
 
     let mut tokens = Vec::with_capacity(event.len());
     // An empty `op` is a native event that names no operation; it is not a
@@ -1169,14 +1217,12 @@ pub(crate) fn render_human(
 #[must_use]
 pub(crate) fn render_json(event: &HashMap<String, Value>, level: LogLevel, ts: &str) -> String {
     let mut object = serde_json::Map::with_capacity(event.len() + 2);
-    object.insert("timestamp".to_string(), Value::String(ts.to_string()));
-    object.insert(
-        "level".to_string(),
-        Value::String(level.as_str().to_string()),
-    );
     for (key, value) in event {
         object.insert(key.clone(), value.clone());
     }
+    // Metadata is written last, so a payload key of the same name cannot
+    // overwrite what a collector reads.
+    insert_meta(&mut object, level, ts);
     Value::Object(object).to_string()
 }
 
@@ -2133,6 +2179,22 @@ mod tests {
         assert_eq!(parsed["level"], "info");
     }
 
+    /// A native event's fields keep their JSON types in the machine format, so
+    /// a collector reads `attempt` as a number rather than a string.
+    #[test]
+    fn a_native_event_keeps_value_types_in_json() {
+        let buffer = SharedBuf::default();
+        let subscriber = subscriber_with(buffer.clone(), LogFormat::Json);
+        tracing::subscriber::with_default(subscriber, || {
+            tracing::warn!(target: LOG_TARGET, op = "x", attempt = 3, ratio = 1.5, ok = true);
+        });
+
+        let parsed: Value = serde_json::from_str(buffer.contents().trim()).expect("json");
+        assert_eq!(parsed["attempt"], 3);
+        assert_eq!(parsed["ratio"], 1.5);
+        assert_eq!(parsed["ok"], true);
+    }
+
     /// A third-party event (no `payload` field) is rendered from its own
     /// fields, not dropped to nothing.
     #[test]
@@ -2284,6 +2346,29 @@ mod tests {
         assert!(
             guard.lines().iter().any(|line| line.contains("probe.warn")),
             "RUST_LOG=info must admit a warn map event"
+        );
+    }
+
+    /// A recorded map event is filtered by the logger that emitted it, not
+    /// re-checked by the subscriber: `RUST_LOG` is the dial for the process
+    /// logger (`from_env`) and for `emit`, and a logger built at an explicit
+    /// level keeps that level. Otherwise `new("warn")` under `RUST_LOG=error`
+    /// would silently lose its own warnings, which is not the documented
+    /// semantics.
+    #[tokio::test]
+    async fn a_loggers_own_level_is_not_overridden_by_rust_log() {
+        let guard = capture::install();
+        capture::with_level("error", || async {
+            let logger = StdoutLogger::new("warn");
+            let mut event = HashMap::new();
+            event.insert("op".to_string(), json!("probe.warn"));
+            logger.log(event, LogLevel::Warn);
+        })
+        .await;
+
+        assert!(
+            guard.lines().iter().any(|line| line.contains("probe.warn")),
+            "a warn-level logger's warn event must still be emitted under RUST_LOG=error"
         );
     }
 
