@@ -275,6 +275,11 @@ pub struct ClaimRelationSummary {
     pub relation_id: String,
     pub outcome: crate::models::claim::ClaimRelationOutcome,
     pub counterpart_source_episode_id: String,
+    /// The fact that replaced this one, present only for `Supersession` and
+    /// `Correction`. `claim_relation` stores the direction; this is the
+    /// projection the read path needs to rank the pair, never recomputed here.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub superseded_by_fact_id: Option<String>,
     pub reason_code: String,
     pub evaluator_version: String,
 }
@@ -314,7 +319,12 @@ pub struct AssembledContextItem {
     pub rationale: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub retrieval_tier: Option<String>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    /// Claim relations of the source fact. Omitted under compact=true, like
+    /// `quote`, so the frozen compact budget does not grow a relation vector.
+    #[serde(
+        default,
+        skip_serializing_if = "crate::tools::compact::skip_if_compact"
+    )]
     pub reconciliation: Option<ClaimReconciliationMetadata>,
 }
 

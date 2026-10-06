@@ -398,7 +398,8 @@ mod tests {
     use crate::knowledge::claims::{
         ActiveRelationCount, BackfillFactQuery, ClaimCandidateQuery, ClaimStore,
         ClaimsForFactsQuery, CommitReconciliationPageRequest, LeaseJobRequest,
-        PersistProjectionRequest, RelationsForFactsQuery, RetractFactAndClaimsRequest,
+        PersistProjectionRequest, RelationsByFactQuery, RelationsByFactResult,
+        RelationsForFactsQuery, RetractFactAndClaimsRequest,
     };
     use crate::models::claim::{Claim, ClaimJob, ClaimRelation, ClaimRelationOutcome};
     use crate::models::{EpisodeId, FactId};
@@ -467,6 +468,13 @@ mod tests {
             _query: RelationsForFactsQuery<'_>,
         ) -> Result<Vec<ClaimRelation>, MemoryError> {
             Ok(vec![])
+        }
+
+        async fn select_relations_by_fact(
+            &self,
+            _query: RelationsByFactQuery<'_>,
+        ) -> Result<RelationsByFactResult, MemoryError> {
+            Ok(RelationsByFactResult::default())
         }
 
         async fn count_active_relations(&self) -> Result<Vec<ActiveRelationCount>, MemoryError> {

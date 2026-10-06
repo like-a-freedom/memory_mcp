@@ -66,6 +66,25 @@ of the pair. Only `Supersession` and `Correction` demote.
 - `assemble_context` output changes, so ADR-0022's frozen compact default and the
   response-size budget apply. The new projection is surfaced under compact-mode
   `skip_serializing_if` gating.
+- **Disclosure is gated by the claim rollout stage, not unconditional.** The
+  Decision above says an item *must* expose its relations; read together with
+  `docs/evals/CLAIM_RECONCILIATION.md`, which states that the default `shadow`
+  stage "projects claims but does not expose relations in `assemble_context`"
+  and makes promotion to `evidence` conditional on precision and recall
+  thresholds. Both hold: the read path serves relations only when the stage is
+  `evidence`, and at `shadow` / `relations` the projection returns nothing.
+  The gate lives in `knowledge::api::SurrealRelationReader`, the adapter behind
+  `RelationReadPort`, so `memory/retrieval` never learns the stage exists and a
+  deployment cannot be talked into disclosure from the retrieval layer. One gate
+  covers both halves of the decision: `demote_superseded` reads its input from
+  the rows that gate withholds, so neither the metadata nor the reordering can
+  happen while disclosure is forbidden.
+- `MemoryService::with_claim_rollout_stage` is the configuration seam for the
+  stage, complementing `MEMORY_CLAIM_ROLLOUT_STAGE`. It accepts the same
+  vocabulary as the environment variable rather than exposing the crate-private
+  `ClaimRolloutStage` type, and the promotion thresholds in
+  `CLAIM_RECONCILIATION.md` remain the operator's to verify — this ADR changes
+  where relations surface, not when an operator may turn them on.
 - The supersession acceptance test that today calls `InvalidateCapability` is
   testing retraction, ADR-0009's deliberate opposite. It does not become evidence
   for this decision until it exercises a real supersession.

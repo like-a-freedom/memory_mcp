@@ -30,6 +30,9 @@ pub struct AssembleContextDeps {
     /// The knowledge graph store, for the app graph and lifecycle
     /// reads that sit alongside retrieval.
     pub(crate) graph_store: crate::knowledge::graph_store::KnowledgeGraphStore,
+    /// The reconciliation relations of the facts being assembled, read through
+    /// a knowledge-declared port so retrieval never composes claim SQL.
+    pub(crate) relation_read: Arc<dyn crate::knowledge::api::RelationReadPort>,
     pub(crate) episode_store: crate::memory::EpisodeContextStore,
     /// The fact access log. Memory owns it: memory performs the
     /// retrieval that produces the heat.

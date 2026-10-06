@@ -340,6 +340,36 @@ impl MemoryService {
         self
     }
 
+    /// Returns a copy of the service with a different claim rollout stage.
+    ///
+    /// This is the configuration seam for the stage, complementing the
+    /// `MEMORY_CLAIM_ROLLOUT_STAGE` environment variable that
+    /// `bootstrap::stdio` applies. It exists because `ClaimConfig` and
+    /// `ClaimRolloutStage` are crate-private while the stage changes what
+    /// `assemble_context` may disclose: `shadow` and `relations` project and
+    /// persist claims but serve no relations to the read path, and `evidence`
+    /// does. Accepting the same vocabulary as the environment variable keeps
+    /// one stringly-typed boundary instead of widening the public API with a
+    /// crate-private type.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`MemoryError::ConfigInvalid`] for a stage name outside
+    /// `disabled`, `shadow`, `relations`, `evidence`.
+    pub fn with_claim_rollout_stage(
+        mut self,
+        stage: &str,
+    ) -> Result<Self, crate::error::MemoryError> {
+        use std::str::FromStr;
+        let rollout_stage = crate::config::claims::ClaimRolloutStage::from_str(stage)?;
+        let config = crate::config::claims::ClaimConfig {
+            rollout_stage,
+            ..Default::default()
+        };
+        self.claim_service = self.claim_service.clone().with_config(config);
+        Ok(self)
+    }
+
     /// Returns a copy of the service with lifecycle integration enabled or
     /// disabled. This controls whether `lifecycle_capture` returns `Some` and
     /// whether the projection worker is started.

@@ -409,6 +409,12 @@ mod tests {
         ) -> Result<Vec<crate::models::claim::ClaimRelation>, MemoryError> {
             Ok(vec![])
         }
+        async fn select_relations_by_fact(
+            &self,
+            _q: crate::knowledge::claims::RelationsByFactQuery<'_>,
+        ) -> Result<crate::knowledge::claims::RelationsByFactResult, MemoryError> {
+            Ok(crate::knowledge::claims::RelationsByFactResult::default())
+        }
         async fn count_active_relations(
             &self,
         ) -> Result<Vec<crate::knowledge::claims::ActiveRelationCount>, MemoryError> {

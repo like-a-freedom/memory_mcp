@@ -4,6 +4,8 @@
 //! from `MemoryService` lives here, on the adapter side of the dependency
 //! direction, so the context never has to name the container.
 
+use std::sync::Arc;
+
 use crate::memory::retrieval_deps::AssembleContextDeps;
 use crate::service::MemoryService;
 
@@ -20,6 +22,11 @@ impl From<&MemoryService> for AssembleContextDeps {
                 ctx.db_client.clone(),
                 ctx.active_namespace.clone(),
             ),
+            relation_read: Arc::new(crate::knowledge::api::SurrealRelationReader::new(
+                ctx.db_client.clone(),
+                ctx.active_namespace.clone(),
+                ctx.claim_service.config.rollout_stage.exposes_evidence(),
+            )),
             fact_access_store: crate::memory::fact_access_store::FactAccessStore::new(
                 ctx.db_client.clone(),
                 ctx.active_namespace.clone(),

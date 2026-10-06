@@ -309,6 +309,8 @@ async fn assemble_context_inner(
         }
     }
 
+    attach_reconciliation(ctx, &mut results).await?;
+
     // --- Results logging, access tracking, cache store ---
     ctx.logger.log(
         log_event(
@@ -358,6 +360,49 @@ async fn assemble_context_inner(
     .await;
 
     Ok(results)
+}
+
+/// Attach the claim relations of each assembled fact to its item.
+///
+/// One read for the whole pack — a per-item call would be N queries on the hot
+/// path — and it runs *before* `pipeline::store_cache`, because the cache
+/// stores `Vec<AssembledContextItem>`: items cached without relations would be
+/// served with `reconciliation: None` forever.
+///
+/// Facts with no relations are left untouched rather than set to `Some(empty)`,
+/// so `None` keeps meaning "this fact participates in nothing".
+async fn attach_reconciliation(
+    ctx: &RetrievalContext,
+    items: &mut [AssembledContextItem],
+) -> Result<(), MemoryError> {
+    let mut seen = std::collections::HashSet::new();
+    let fact_ids: Vec<crate::models::FactId> = items
+        .iter()
+        .map(|item| crate::models::FactId::from(item.fact_id.as_str()))
+        .filter(|id| seen.insert(id.to_string()))
+        .collect();
+
+    if fact_ids.is_empty() {
+        return Ok(());
+    }
+
+    let read = crate::knowledge::api::relations_for_facts(&*ctx.relation_read, &fact_ids).await?;
+    if read.relations.is_empty() {
+        return Ok(());
+    }
+
+    let by_fact = crate::knowledge::api::reconciliation_metadata_by_fact(&read);
+    if by_fact.is_empty() {
+        return Ok(());
+    }
+
+    for item in items.iter_mut() {
+        if let Some(metadata) = by_fact.get(&item.fact_id) {
+            item.reconciliation = Some(metadata.clone());
+        }
+    }
+
+    Ok(())
 }
 
 #[cfg(test)]

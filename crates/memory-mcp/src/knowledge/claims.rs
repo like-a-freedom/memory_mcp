@@ -7,8 +7,8 @@ use serde::{Deserialize, Serialize};
 use serde_json::{self, Value};
 
 use crate::error::MemoryError;
-use crate::models::FactId;
 use crate::models::claim::{Claim, ClaimIdentityVersion, ClaimJob, ClaimRelation};
+use crate::models::{EpisodeId, FactId};
 use crate::shared::temporal::normalize_dt;
 use crate::storage::{BoundDbClient, DbClient};
 
@@ -54,6 +54,14 @@ pub(crate) trait ClaimStore: Send + Sync {
         &self,
         query: RelationsForFactsQuery<'_>,
     ) -> Result<Vec<ClaimRelation>, MemoryError>;
+
+    /// Relations whose claims are sourced from the given facts, with each
+    /// side's direction already resolved to a fact id. A relation whose
+    /// `t_invalid_ingested` is set is omitted entirely.
+    async fn select_relations_by_fact(
+        &self,
+        query: RelationsByFactQuery<'_>,
+    ) -> Result<RelationsByFactResult, MemoryError>;
 
     async fn count_active_relations(&self) -> Result<Vec<ActiveRelationCount>, MemoryError>;
 
@@ -104,6 +112,47 @@ pub(crate) struct ClaimsForFactsQuery<'a> {
 /// Query for relations involving specific facts.
 pub(crate) struct RelationsForFactsQuery<'a> {
     pub fact_ids: &'a [FactId],
+}
+
+/// One reconciliation relation, resolved to the facts each side's claim came
+/// from. This is what the read path consumes: the direction the evaluator
+/// recorded (`predecessor` / `successor`), already projected onto fact ids so
+/// no caller has to join claim data itself.
+///
+/// `predecessor_fact_id` is the fact whose claim lost; `successor_fact_id` is
+/// the fact whose claim replaced it. Both are `None` for outcomes with no
+/// direction (`Contradiction`, `TemporalAmbiguity`), and both are `None` when
+/// the corresponding claim's source fact is outside the queried set.
+#[derive(Debug, Clone)]
+pub(crate) struct RelationForFact {
+    pub relation_id: String,
+    pub outcome: crate::models::claim::ClaimRelationOutcome,
+    pub reason_code: String,
+    pub evaluator_version: String,
+    pub predecessor_fact_id: Option<FactId>,
+    pub successor_fact_id: Option<FactId>,
+    pub predecessor_source_episode_id: Option<EpisodeId>,
+    pub successor_source_episode_id: Option<EpisodeId>,
+}
+
+/// Query for relations whose claims are sourced from the given facts.
+pub(crate) struct RelationsByFactQuery<'a> {
+    pub fact_ids: &'a [FactId],
+}
+
+/// Result of a [`ClaimStore::select_relations_by_fact`] call.
+///
+/// Both halves come out of the same read because they answer one question for
+/// the caller: *what does this pack of facts look like to the claim layer?*
+/// Splitting them would cost a second identical claim lookup.
+#[derive(Debug, Clone, Default)]
+pub(crate) struct RelationsByFactResult {
+    /// Relations whose claims are sourced from the queried facts.
+    pub relations: Vec<RelationForFact>,
+    /// The claims of each queried fact, grouped by fact id. A fact in the query
+    /// with no claims is absent rather than present-and-empty, so a caller can
+    /// tell "no claims" from "not queried".
+    pub claims_by_fact: std::collections::HashMap<FactId, Vec<String>>,
 }
 
 /// Count of active relations grouped by schema family and outcome.
@@ -348,6 +397,100 @@ impl ClaimStore for SurrealClaimStore {
                     .map_err(|e| MemoryError::Storage(format!("relation deser: {e}")))
             })
             .collect()
+    }
+
+    async fn select_relations_by_fact(
+        &self,
+        query: RelationsByFactQuery<'_>,
+    ) -> Result<RelationsByFactResult, MemoryError> {
+        if query.fact_ids.is_empty() {
+            return Ok(RelationsByFactResult::default());
+        }
+
+        // Resolve the caller's fact ids to their claims first, so direction is
+        // read from the columns the evaluator wrote rather than inferred from
+        // the unordered left/right storage pair.
+        let claims = self
+            .select_claims_for_facts(ClaimsForFactsQuery {
+                fact_ids: query.fact_ids,
+            })
+            .await?;
+
+        let mut claims_by_fact: std::collections::HashMap<FactId, Vec<String>> =
+            std::collections::HashMap::with_capacity(query.fact_ids.len());
+        let mut fact_of_claim: std::collections::HashMap<String, &Claim> =
+            std::collections::HashMap::with_capacity(claims.len());
+        for claim in &claims {
+            claims_by_fact
+                .entry(claim.source_fact_id.clone())
+                .or_default()
+                .push(claim.claim_id.to_string());
+            fact_of_claim.insert(claim.claim_id.to_string(), claim);
+        }
+
+        if fact_of_claim.is_empty() {
+            return Ok(RelationsByFactResult {
+                relations: vec![],
+                claims_by_fact,
+            });
+        }
+
+        // `IN` against the resolved claim ids, not the fact ids: a relation is
+        // linked to claims, and only after resolving them do we know which
+        // relations belong to the caller's facts.
+        let claim_ids: Vec<&str> = fact_of_claim.keys().map(String::as_str).collect();
+        let sql = "SELECT * FROM claim_relation WHERE (left_claim_id IN $claim_ids OR right_claim_id IN $claim_ids) AND (t_invalid_ingested IS NONE OR t_invalid_ingested IS NULL)";
+        let vars = serde_json::json!({"claim_ids": claim_ids});
+        let result = self.db.query(sql, Some(vars)).await?;
+        let records = Self::deserialize_vec(result);
+
+        let mut relations = Vec::with_capacity(records.len());
+        for record in records {
+            let relation: ClaimRelation = serde_json::from_value(record)
+                .map_err(|e| MemoryError::Storage(format!("relation deser: {e}")))?;
+
+            // Direction exists only for outcomes that name a winner. Deriving it
+            // from left/right would invent a winner for Contradiction.
+            let directed = matches!(
+                relation.outcome,
+                crate::models::claim::ClaimRelationOutcome::Supersession
+                    | crate::models::claim::ClaimRelationOutcome::Correction
+            );
+            let (predecessor_fact_id, successor_fact_id, pred_episode, succ_episode) = if directed {
+                let pred = relation
+                    .predecessor_claim_id
+                    .as_ref()
+                    .and_then(|id| fact_of_claim.get(id.as_ref()));
+                let succ = relation
+                    .successor_claim_id
+                    .as_ref()
+                    .and_then(|id| fact_of_claim.get(id.as_ref()));
+                (
+                    pred.map(|c| c.source_fact_id.clone()),
+                    succ.map(|c| c.source_fact_id.clone()),
+                    pred.map(|c| c.source_episode_id.clone()),
+                    succ.map(|c| c.source_episode_id.clone()),
+                )
+            } else {
+                (None, None, None, None)
+            };
+
+            relations.push(RelationForFact {
+                relation_id: relation.claim_relation_id.to_string(),
+                outcome: relation.outcome,
+                reason_code: relation.reason_code,
+                evaluator_version: relation.evaluator_version,
+                predecessor_fact_id,
+                successor_fact_id,
+                predecessor_source_episode_id: pred_episode,
+                successor_source_episode_id: succ_episode,
+            });
+        }
+
+        Ok(RelationsByFactResult {
+            relations,
+            claims_by_fact,
+        })
     }
 
     async fn count_active_relations(&self) -> Result<Vec<ActiveRelationCount>, MemoryError> {
@@ -920,5 +1063,336 @@ mod tests {
     async fn surreal_claim_store_implements_trait() {
         // Verify the trait is object-safe and can be used as dyn
         let _check: Option<&dyn ClaimStore> = None;
+    }
+
+    // ─── select_relations_by_fact ─────────────────────────────────────────────
+
+    /// A claim whose source fact is `fact_id`. Mirrors the shape
+    /// `claims_policy/reconcile.rs` builds in its own tests.
+    fn fact_claim(claim: &str, fact_id: &str, episode_id: &str) -> Claim {
+        use crate::models::claim::{
+            ClaimCardinality, ClaimSchemaFamily, ClaimSchemaRef, ClaimSlot, ClaimValiditySource,
+            ClaimValue, ComparisonKey, ComparisonKeyHash, ExtractorFingerprint, PolicyFingerprint,
+            QualifierHash,
+        };
+
+        let schema = ClaimSchemaRef {
+            family: ClaimSchemaFamily::Attribute,
+            version: std::num::NonZeroU16::new(1).unwrap(),
+        };
+        let mut components = std::collections::BTreeMap::new();
+        components.insert("dim".to_string(), "test".to_string());
+        let key = ComparisonKey::new(schema, components).unwrap();
+        let comparison_key_hash = ComparisonKeyHash::compute(&key);
+        let qualifiers = std::collections::BTreeMap::new();
+        let qualifier_hash = QualifierHash::compute(&qualifiers);
+        let scope = "test";
+        let access_policy_fingerprint = PolicyFingerprint::compute(scope, None, &[]);
+
+        Claim {
+            identity_version: ClaimIdentityVersion::Legacy,
+            claim_id: crate::models::ClaimId::from_raw(format!("claim:{claim}")),
+            namespace: "org".to_string(),
+            source_fact_id: FactId::from(fact_id),
+            source_episode_id: EpisodeId::from(episode_id),
+            scope: Some(scope.to_string()),
+            project: None,
+            project_identity: Some("__none__".to_string()),
+            policy_tags: vec![],
+            access_policy_fingerprint: access_policy_fingerprint.clone(),
+            schema_family: ClaimSchemaFamily::Attribute,
+            schema_version: 1,
+            subject: ClaimSlot {
+                identity_version: ClaimIdentityVersion::Legacy,
+                namespace: "org".to_string(),
+                scope: Some(scope.to_string()),
+                project_identity: Some("__none__".to_string()),
+                access_policy_fingerprint: access_policy_fingerprint.clone(),
+                schema_ref: schema,
+                subject_key: format!("entity:{claim}"),
+                comparison_key_hash: comparison_key_hash.clone(),
+                qualifier_hash: qualifier_hash.clone(),
+            },
+            subject_key: format!("entity:{claim}"),
+            comparison_key: key,
+            comparison_key_hash,
+            qualifiers,
+            qualifier_hash,
+            slot_fingerprint: format!("test:{scope}:__none__:1:entity:{claim}"),
+            value: ClaimValue::Integer(1),
+            cardinality: ClaimCardinality::SingleValued,
+            observed_at: chrono::Utc::now(),
+            valid_from: None,
+            valid_to: None,
+            validity_source: ClaimValiditySource::Explicit,
+            source_lineage: None,
+            source_span: None,
+            derivation: crate::models::claim::ClaimDerivation {
+                source_fact_id: FactId::from(fact_id),
+                source_episode_id: EpisodeId::from(episode_id),
+                extractor_fingerprint: ExtractorFingerprint::compute(1, "test"),
+            },
+            extractor_fingerprint: ExtractorFingerprint::compute(1, "test"),
+            t_ingested: chrono::Utc::now(),
+            t_invalid_ingested: None,
+        }
+    }
+
+    /// A relation row. `left_fact_id` / `right_fact_id` are left `None` so the
+    /// tests prove direction comes from `claim.source_fact_id`, not from the
+    /// denormalized columns.
+    fn fact_relation(
+        name: &str,
+        left: &str,
+        right: &str,
+        outcome: crate::models::claim::ClaimRelationOutcome,
+        predecessor: Option<&str>,
+        successor: Option<&str>,
+        t_invalid_ingested: Option<chrono::DateTime<chrono::Utc>>,
+    ) -> ClaimRelation {
+        use crate::models::claim::{ClaimRelationEvidence, ReconciliationContextFingerprint};
+
+        ClaimRelation {
+            claim_relation_id: crate::models::ClaimRelationId::from_raw(format!(
+                "claim_relation:{name}"
+            )),
+            left_claim_id: crate::models::ClaimId::from_raw(format!("claim:{left}")),
+            right_claim_id: crate::models::ClaimId::from_raw(format!("claim:{right}")),
+            pair_fingerprint: format!("{left}:{right}"),
+            outcome,
+            predecessor_claim_id: predecessor
+                .map(|c| crate::models::ClaimId::from_raw(format!("claim:{c}"))),
+            successor_claim_id: successor
+                .map(|c| crate::models::ClaimId::from_raw(format!("claim:{c}"))),
+            reason_code: outcome.to_string(),
+            evidence: ClaimRelationEvidence {
+                reason_code: outcome.to_string(),
+                description: None,
+            },
+            evaluator_version: "test".to_string(),
+            context_fingerprint: ReconciliationContextFingerprint::compute(
+                "test",
+                "attribute",
+                "alias",
+                "policy",
+            ),
+            evaluated_at: chrono::Utc::now(),
+            supersedes_relation_id: None,
+            scope: None,
+            project: None,
+            policy_tags: vec![],
+            t_ingested: chrono::Utc::now(),
+            t_invalid_ingested,
+            schema_family: None,
+            schema_version: None,
+            left_fact_id: None,
+            right_fact_id: None,
+        }
+    }
+
+    async fn seed_claims(store: &SurrealClaimStore, claims: Vec<Claim>) {
+        store
+            .persist_projection(PersistProjectionRequest {
+                claims,
+                jobs: vec![],
+            })
+            .await
+            .expect("seed claims");
+    }
+
+    async fn seed_relation(store: &SurrealClaimStore, relation: &ClaimRelation) {
+        let content = SurrealClaimStore::serialize(relation).expect("serialize relation");
+        store
+            .db
+            .create(
+                relation.claim_relation_id.as_ref(),
+                content,
+                crate::knowledge::queries::CLAIM_RELATION_TEMPORAL_FIELDS,
+            )
+            .await
+            .expect("seed relation");
+    }
+
+    #[tokio::test]
+    async fn maps_supersession_direction_to_facts() {
+        let store = embedded_claim_store().await;
+        // The relation's left claim is the *newer* one, so a reader that derived
+        // direction from the unordered storage columns would swap the pair.
+        seed_claims(
+            &store,
+            vec![
+                fact_claim("old", "fact:old", "ep:old"),
+                fact_claim("new", "fact:new", "ep:new"),
+            ],
+        )
+        .await;
+        seed_relation(
+            &store,
+            &fact_relation(
+                "sup",
+                "new",
+                "old",
+                crate::models::claim::ClaimRelationOutcome::Supersession,
+                Some("old"),
+                Some("new"),
+                None,
+            ),
+        )
+        .await;
+
+        let result = store
+            .select_relations_by_fact(RelationsByFactQuery {
+                fact_ids: &[FactId::from("fact:old"), FactId::from("fact:new")],
+            })
+            .await
+            .expect("query succeeds");
+        let relations = &result.relations;
+
+        assert_eq!(relations.len(), 1, "exactly one relation expected");
+        assert_eq!(
+            relations[0].outcome,
+            crate::models::claim::ClaimRelationOutcome::Supersession
+        );
+        assert_eq!(
+            relations[0].predecessor_fact_id,
+            Some(FactId::from("fact:old")),
+            "predecessor is the fact whose claim lost"
+        );
+        assert_eq!(
+            relations[0].successor_fact_id,
+            Some(FactId::from("fact:new")),
+            "successor is the fact whose claim replaced it"
+        );
+        assert_eq!(
+            relations[0].predecessor_source_episode_id,
+            Some(EpisodeId::from("ep:old"))
+        );
+        assert_eq!(
+            relations[0].successor_source_episode_id,
+            Some(EpisodeId::from("ep:new"))
+        );
+    }
+
+    #[tokio::test]
+    async fn excludes_invalidated_relations() {
+        let store = embedded_claim_store().await;
+        seed_claims(
+            &store,
+            vec![
+                fact_claim("old2", "fact:old2", "ep:old2"),
+                fact_claim("new2", "fact:new2", "ep:new2"),
+            ],
+        )
+        .await;
+        seed_relation(
+            &store,
+            &fact_relation(
+                "retracted",
+                "old2",
+                "new2",
+                crate::models::claim::ClaimRelationOutcome::Supersession,
+                Some("old2"),
+                Some("new2"),
+                Some(chrono::Utc::now()),
+            ),
+        )
+        .await;
+
+        let result = store
+            .select_relations_by_fact(RelationsByFactQuery {
+                fact_ids: &[FactId::from("fact:old2"), FactId::from("fact:new2")],
+            })
+            .await
+            .expect("query succeeds");
+        let relations = &result.relations;
+
+        assert!(
+            relations.is_empty(),
+            "a relation whose t_invalid_ingested is set must not demote anything"
+        );
+    }
+
+    #[tokio::test]
+    async fn omits_direction_for_undirected_outcomes() {
+        let store = embedded_claim_store().await;
+        seed_claims(
+            &store,
+            vec![
+                fact_claim("a", "fact:a", "ep:a"),
+                fact_claim("b", "fact:b", "ep:b"),
+            ],
+        )
+        .await;
+        seed_relation(
+            &store,
+            &fact_relation(
+                "contra",
+                "a",
+                "b",
+                crate::models::claim::ClaimRelationOutcome::Contradiction,
+                Some("a"),
+                Some("b"),
+                None,
+            ),
+        )
+        .await;
+
+        let result = store
+            .select_relations_by_fact(RelationsByFactQuery {
+                fact_ids: &[FactId::from("fact:a"), FactId::from("fact:b")],
+            })
+            .await
+            .expect("query succeeds");
+        let relations = &result.relations;
+
+        assert_eq!(relations.len(), 1, "the contradiction is still reported");
+        assert_eq!(
+            relations[0].outcome,
+            crate::models::claim::ClaimRelationOutcome::Contradiction
+        );
+        assert_eq!(
+            relations[0].predecessor_fact_id, None,
+            "Contradiction has no winner, so no direction"
+        );
+        assert_eq!(relations[0].successor_fact_id, None);
+    }
+
+    #[tokio::test]
+    async fn ignores_relations_for_absent_facts() {
+        let store = embedded_claim_store().await;
+        seed_claims(
+            &store,
+            vec![
+                fact_claim("c", "fact:c", "ep:c"),
+                fact_claim("d", "fact:d", "ep:d"),
+            ],
+        )
+        .await;
+        seed_relation(
+            &store,
+            &fact_relation(
+                "unrelated",
+                "c",
+                "d",
+                crate::models::claim::ClaimRelationOutcome::Supersession,
+                Some("c"),
+                Some("d"),
+                None,
+            ),
+        )
+        .await;
+
+        let result = store
+            .select_relations_by_fact(RelationsByFactQuery {
+                fact_ids: &[FactId::from("fact:absent")],
+            })
+            .await
+            .expect("query succeeds");
+        let relations = &result.relations;
+
+        assert!(
+            relations.is_empty(),
+            "a fact id the query does not drive must not produce a phantom entry"
+        );
     }
 }
