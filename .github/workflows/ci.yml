@@ -127,6 +127,16 @@ jobs:
     name: ${{ matrix.target }}
     runs-on: ${{ matrix.os }}
     timeout-minutes: 150
+    # Retry a whole job on a fresh runner. The aarch64 build was
+    # killed with exit 143 (SIGTERM) and its post steps were skipped,
+    # which is the signature of a runner lost mid-build — not a
+    # compile error (no diagnostic), not the OOM killer (that is 137,
+    # SIGKILL) and not the timeout (20 of 150 minutes). A lost
+    # runner cannot be resumed, and its cache is lost with it, so the
+    # only repair is to start again. One retry absorbs a transient
+    # loss without masking a real failure: a genuine build error fails
+    # both attempts identically and still turns the job red.
+    max-attempts: 2
     strategy:
       fail-fast: false
       matrix:
