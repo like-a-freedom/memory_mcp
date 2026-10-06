@@ -435,15 +435,46 @@ subsystem that cannot affect the answer produces a number that cannot move.
    ADR elects to project relations into `explain`, assert it there too; otherwise assert the
    relation is reachable through the same named knowledge method the read view uses, so the
    evidence does not depend on a second public surface.
+6. **Gate disclosure on the claim rollout stage.** `docs/evals/CLAIM_RECONCILIATION.md` states
+   that the default `shadow` stage "projects claims but does not expose relations in
+   `assemble_context`", and ties promotion to `evidence` to precision/recall thresholds — while
+   ADR-0074's Decision says an item *must* expose its relations. Both hold if the read path
+   serves relations only at `evidence`. The gate belongs in the `knowledge`-owned adapter behind
+   `RelationReadPort`, never in `memory/retrieval`, so no deployment can be talked into
+   disclosure from the retrieval layer; and because `demote_superseded` reads the rows the gate
+   withholds, one gate covers the metadata *and* the reordering. `MemoryService::
+   with_claim_rollout_stage` is the seam, mirroring `MEMORY_CLAIM_ROLLOUT_STAGE` for callers that
+   build a container directly. The promotion thresholds remain the operator's to verify — this
+   phase changes where relations surface, not when an operator may turn them on.
 
-**Evidence:** a correction scenario observed failing before the fix; the retrieval and
-response-size gates still green; and — the real proof — a Phase 2 external run whose
-knowledge-update number is no longer structurally incapable of moving. The ranking rule is
-asserted in both halves: with both facts present the superseded fact ranks lower, and with the
-successor absent the predecessor keeps its rank and survives the budget. Note that `explain`
-today reads no claim or relation data at all (`explanation.rs` touches only facts and
-entities), so "observable in `explain`" is part of this phase's work, not a precondition for
-it — ADR-0074 records this as a deliberate open choice rather than a precondition.
+**Evidence.** What was required, and what was actually obtained, on 2026-10-05:
+
+- *A correction scenario observed failing before the fix* — obtained.
+  `corrected_fact_supersedes_the_stale_value_in_the_latest_view` replaces the
+  retraction test that used to sit under this name; disabling `demote_superseded` fails its
+  first assertion with `left: "ARR is legacy"`.
+- *The ranking rule asserted in both halves* — obtained. Six unit tests cover the policy on
+  constructed items with no database; the successor-present and successor-absent halves are
+  separate cases, and the successor-absent one asserts the predecessor both keeps its rank and
+  survives the budget.
+- *The retrieval and response-size gates still green* — obtained: 117/117 cases, 9/9 gates,
+  `RESULT: PASSED` against the committed baseline.
+- *A Phase 2 external run whose knowledge-update number is no longer structurally incapable of
+  moving* — **not obtained, and not obtainable yet.** Two blockers, reported rather than
+  explained away. First, `eval-harness` built its service without a claim rollout stage, so
+  every run measured the feature's absence at `shadow`; it now runs at `evidence`. Second, and
+  structural: **the number does not exist.** No key matching knowledge / update / temporal /
+  supersession appears anywhere in the artifact, because `CLAIM_RECONCILIATION.md` lists seven
+  metrics and only `claim_precision`/`recall`/`f1` are implemented — `supersession_recall`,
+  `temporal_ambiguity_rate` and `projection_precision` have neither code nor key. The retrieval
+  suites also seed facts without the lineage that produces relations, so nothing there is
+  positioned to move.
+
+The honest statement of Phase 0 today: the production code is complete and mutation-verified
+in-process — a relation demonstrably changes which fact leads a pack. The external evaluation
+evidence this phase promised depends on a metric Phase 2 adds, and Phase 0 is therefore
+**partially** evidenced, not complete. Saying otherwise would repeat the mistake this document
+exists to correct.
 
 **ADR:** one — [ADR-0074](../../adr/0074-connect-the-reconciliation-relation-to-the-read-path.md).
 This changes what `assemble_context` returns and is therefore visible on a frozen surface;
@@ -723,6 +754,9 @@ recorded in an ADR or in `GLOSSARY.md` so it does not have to be re-derived.
 | Two pointers to the replacement | Collapse to one. `counterpart_fact_id` is never populated and duplicates stored direction. The one pointer that survives is **`superseded_by_fact_id: Option<String>`** on `ClaimRelationSummary`, added by Phase 0 so the reorder rule can name the successor's fact; direction still originates in `claim_relation` and is projected, never recomputed | ADR-0074, Phase 0 item 4 |
 | When to remove it | A separate commit ahead of Phase 0, so Phase 0's diff stays attributable | Phase 0 item 4 |
 | ADR-0074's rationale needs correcting | Its Consequences justify "no schema change" by pointing at `counterpart_fact_id` — the field this plan deletes. Phase 0 **does** add one field (`superseded_by_fact_id`), so that clause is amended in the same commit as the deletion. The decision itself (post-assembly reorder, no constant, no new candidate axis) stands unchanged | Phase 0 item 4, plan Global Constraints |
+| Who may disclose relations | `evidence` only. `CLAIM_RECONCILIATION.md` forbids disclosure at `shadow`; ADR-0074 demands it unconditionally. Reconciled by gating the read path, with the threshold promotion left to the operator | Phase 0 item 6, ADR-0074 Consequences |
+| Where the gate lives | The `knowledge`-owned adapter behind `RelationReadPort`, never in `memory/retrieval` — so no deployment can be talked into disclosure from the retrieval layer | Phase 0 item 6 |
+| One gate covers both halves | Metadata and demotion are gated together, because `demote_superseded` reads the rows the gate withholds. Gating only one would produce either an unexplained reorder or metadata that names a winner the reader is not served | Phase 0 item 6 |
 | Intent-routing surface | A new schema-skipped field. `view_mode` is a public string meaning "shape of presentation"; intent means "what to look for" | ADR-0076 |
 | Intent vs `fact_types` | Intent selects a traversal plan, not a type predicate — `fact_types` already exists and is pinned as intentional | ADR-0076 |
 | Trust vocabulary | Reuse `TrustClass`; two vocabularies would split the min-over-bases rule | ADR-0075 |
@@ -865,3 +899,38 @@ files are verbatim — `CONTEXT.md:386` on manufacturing corrective facts, `docs
 on not being a leaderboard score, and `GLOSSARY.md:3–4` on terms being canonical with that file
 winning on conflict. All three were inherited from a subagent report rather than read directly,
 which is exactly the path that produced four of the earlier errors.
+### Sixth pass — found during implementation, not during review
+
+Five rounds of reading the spec against source missed a conflict that only surfaced once the
+code was being written. Every round asked *"is this claim about the repository true?"*; none
+asked *"does this phase contradict a contract the repository already enforces?"*
+
+1. **Phase 0 as written violated a rollout contract.** `docs/evals/CLAIM_RECONCILIATION.md`
+   states that the default `shadow` stage "projects claims but does not expose relations in
+   `assemble_context`" and ties promotion to `evidence` to precision/recall thresholds. ADR-0074,
+   written the same day as the first draft, says an item *must* expose its relations and never
+   mentions the stage. The plan implemented ADR-0074 unconditionally, which would have shipped
+   relations to every deployment before the thresholds that gate them were verified. Resolved
+   with Phase 0 item 6: the read path serves relations only at `evidence`, the gate sits in the
+   `knowledge`-owned adapter, and one gate covers the metadata and the reordering together
+   because the reordering reads the rows the gate withholds. The contract is now true instead of
+   vacuously true — it was previously unverifiable, since `assemble_context` never exposed
+   relations at any stage.
+
+2. **The evaluation harness measured the feature's absence.** `eval-harness` built its service
+   with no claim rollout stage, so it ran at `shadow` on every profile. A run like that reports
+   the *absence* of the read path as evidence about the read path. It now runs at `evidence`,
+   with a comment recording that this does not promote the deployment default.
+
+3. **Phase 0's promised external evidence is unattainable, and saying otherwise would repeat
+   the first draft's central mistake.** The phase promised "a Phase 2 external run whose
+   knowledge-update number is no longer structurally incapable of moving." There is no such
+   number: no knowledge / update / temporal / supersession key appears in the artifact, and
+   three of the seven metrics `CLAIM_RECONCILIATION.md` contracts have neither code nor key.
+   This was already recorded as a correction in the third pass — but Phase 0's evidence list was
+   never revised to match, so the document still promised what it had already proven absent.
+   The evidence list now states what was obtained, what was not, and why.
+
+The lesson is narrow and worth stating: verifying claims about a system and verifying that a
+plan is *consistent with* the system are different checks, and only the second one was being
+run. Contracts written in `docs/` count as constraints whether or not an ADR mentions them.
