@@ -13,6 +13,7 @@ use axum::extract::Request;
 use axum::middleware::Next;
 use axum::response::Response;
 use serde::Serialize;
+use tracing::Instrument;
 use uuid::Uuid;
 
 use crate::logging::{LogLevel, StdoutLogger};
@@ -83,7 +84,12 @@ pub(crate) async fn request_log(mut req: Request, next: Next) -> Response {
     // scrape would pin the gauge at one for the whole time it took to render an
     // exposition — which is exactly the signal the dashboard describes as
     // meaningful only when it is caught across several scrapes.
-    let mut response = next.run(req).await;
+    // The request's span carries the correlation id, so a foreign event raised
+    // while the request is in flight (the embedded database, an HTTP client)
+    // is rendered with `req=` and joins the access log. Our own events carry
+    // their fields explicitly; only foreign lines read the span.
+    let span = tracing::info_span!("http_request", req = %request_id);
+    let mut response = next.run(req).instrument(span).await;
     if let Ok(value) = axum::http::HeaderValue::from_str(&request_id.to_string()) {
         response.headers_mut().insert(REQUEST_ID_HEADER, value);
     }

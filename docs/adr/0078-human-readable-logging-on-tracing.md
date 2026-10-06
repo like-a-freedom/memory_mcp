@@ -54,6 +54,13 @@ value-rendering (`value_to_string`, `quote_if_needed`, `render_duration`). A
 native event (an `op`, no payload) is rendered from its own fields in the same
 shape.
 
+**A request span correlates foreign output.** The HTTP request layer opens a
+span carrying the request id. A foreign event rendered while it is in flight is
+printed with the span's fields (`req=…`), so a dependency warning raised during
+a request joins that request's access log. Our own events are not enriched from
+the span — they already carry their fields — so the span is purely additive and
+our line format is unchanged.
+
 *Rejected — no dependency; only reformat `StdoutLogger`.* That is strictly
 simpler for the formatting outcome alone, but it leaves the bespoke writer/
 ANSI/TTY plumbing in place and does not unlock the two wins above: capturing
