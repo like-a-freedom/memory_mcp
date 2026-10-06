@@ -78,7 +78,8 @@ smoke checks as well and skip compiling a second test profile.
   compiled (`cache-on-failure: true`), so the next run reuses the dependency
   tree and rebuilds only what changed. This covers a job that fails but runs
   its post steps; a runner lost mid-build skips post steps and loses its cache,
-  which is why the `native` job retries (`max-attempts: 2`). Pull
+  and needs a manual re-run — GitHub has no job-retry key, and `max-attempts`
+  is not one (it makes GitHub reject the workflow file outright). Pull
   requests restore caches and save their own branch-scoped cache, so later
   pushes of the same PR reuse the first build; GitHub expires these caches on
   inactivity. Rust, lockfile and Cargo config
