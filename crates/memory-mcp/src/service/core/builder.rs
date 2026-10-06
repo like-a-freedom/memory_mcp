@@ -473,6 +473,50 @@ mod tests {
         );
     }
 
+    /// The service logger is what service-internal events go through
+    /// (`embedding.backfill_started` and friends), and its `log_level`
+    /// argument carries the deployment's raw `RUST_LOG` list from the stdio
+    /// config. The constructor used to parse only a bare level, so every
+    /// `prefix=level` rule died at this boundary and the documented subsystem
+    /// dial never reached a service event.
+    #[tokio::test]
+    async fn the_service_logger_carries_the_directives_it_was_given() {
+        let db: surrealdb::Surreal<surrealdb::engine::local::Db> =
+            surrealdb::Surreal::new::<surrealdb::engine::local::Mem>(())
+                .await
+                .expect("mem engine init");
+        db.use_ns("directive_ns")
+            .use_db("memory")
+            .await
+            .expect("bind");
+        let db_client: Arc<dyn crate::storage::DbClient> = Arc::new(
+            crate::storage::SurrealDbClient::from_prebound_mem(db, "directive_ns", "error"),
+        );
+
+        let service = MemoryService::new(
+            db_client,
+            "directive_ns".to_string(),
+            "info,embedding.backfill_started=warn".to_string(),
+            100,
+            10,
+        )
+        .expect("service builds");
+
+        assert!(
+            !service
+                .logger
+                .is_event_enabled(crate::logging::LogLevel::Info, "embedding.backfill_started"),
+            "the directive must reach the service logger, not die at the constructor"
+        );
+        assert!(
+            service.logger.is_event_enabled(
+                crate::logging::LogLevel::Info,
+                "embedding.backfill_progress"
+            ),
+            "an unnamed op keeps the default level"
+        );
+    }
+
     /// The `MemoryServiceDependencies` seam (Task 13) lets a
     /// caller inject a custom `TripleExtractor` without
     /// changing the public constructor signatures. The

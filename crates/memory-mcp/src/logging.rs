@@ -221,9 +221,34 @@ impl StdoutLogger {
         Self::from_directives(&configured)
     }
 
-    /// Build a logger from a directive list.
+    /// Build a logger from a directive list. Alias of [`Self::new`], kept for
+    /// the call sites that name the input for what it is.
     fn from_directives(configured: &str) -> Self {
-        let mut logger = Self::new(first_directive(configured));
+        Self::new(configured)
+    }
+
+    fn remove_override(&mut self, prefix: &str) {
+        self.overrides.retain(|(existing, _)| existing != prefix);
+    }
+
+    /// Creates a logger from a level or a full `RUST_LOG`-style directive
+    /// list.
+    ///
+    /// The value is the same comma-separated list `from_env` accepts: a bare
+    /// level sets the default, `prefix=level` sets the level for the events
+    /// whose `op` starts with that prefix at a segment boundary. Accepting the
+    /// list here — rather than parsing only a bare level — is what lets a
+    /// caller that already holds the deployment's `RUST_LOG` string (the stdio
+    /// config, `MemoryService::build`, the HTTP runtime's service builders)
+    /// hand it through unchanged; the rules used to die at this boundary.
+    /// A bare level parses exactly as before.
+    #[must_use]
+    pub fn new(configured: &str) -> Self {
+        let mut logger = Self {
+            level: LogLevel::parse(first_directive(configured)),
+            overrides: Vec::new(),
+            warn_tracker: std::sync::Arc::new(WarnTracker::default()),
+        };
         // Every segment is examined, not every one after the first: a list may
         // lead with a directive (`oidc=debug,info`), and skipping the first
         // would silently drop the only rule in it.
@@ -245,20 +270,6 @@ impl StdoutLogger {
             }
         }
         logger
-    }
-
-    fn remove_override(&mut self, prefix: &str) {
-        self.overrides.retain(|(existing, _)| existing != prefix);
-    }
-
-    /// Creates a new logger with the specified minimum log level.
-    #[must_use]
-    pub fn new(level: &str) -> Self {
-        Self {
-            level: LogLevel::parse(level),
-            overrides: Vec::new(),
-            warn_tracker: std::sync::Arc::new(WarnTracker::default()),
-        }
     }
 
     /// The level this logger emits at and above, for events no directive names.
@@ -950,6 +961,44 @@ mod tests {
         assert!(trace_logger.is_enabled(LogLevel::Trace));
         assert!(trace_logger.is_enabled(LogLevel::Debug));
         assert!(trace_logger.is_enabled(LogLevel::Info));
+    }
+
+    /// `StdoutLogger::new` must accept the same directive list the rest of the
+    /// deployment writes. It used to parse only a bare level: every caller that
+    /// passed a raw `RUST_LOG` value (the stdio config, `MemoryService::build`)
+    /// silently lost every `prefix=level` rule, so the documented subsystem
+    /// dial did nothing for service-internal events.
+    #[test]
+    fn new_parses_a_directive_list_not_just_a_bare_level() {
+        let logger = StdoutLogger::new("info,embedding.backfill_started=warn");
+
+        assert!(
+            !logger.is_event_enabled(LogLevel::Info, "embedding.backfill_started"),
+            "the named op must be held back at its directive level"
+        );
+        assert!(
+            logger.is_event_enabled(LogLevel::Info, "embedding.backfill_progress"),
+            "an op no directive names keeps the default level"
+        );
+        assert!(
+            logger.is_event_enabled(LogLevel::Warn, "embedding.backfill_started"),
+            "the directive raises the op to warn, it does not silence it"
+        );
+    }
+
+    /// A bare level behaves byte-for-byte as before — this is the whole
+    /// existing call surface (`new("error")`, `new("info")`) and it must not
+    /// move an inch.
+    #[test]
+    fn new_with_a_bare_level_parses_exactly_as_before() {
+        let error_logger = StdoutLogger::new("error");
+        assert!(!error_logger.is_enabled(LogLevel::Warn));
+        assert!(error_logger.is_enabled(LogLevel::Error));
+        assert!(error_logger.is_event_enabled(LogLevel::Error, "any.op"));
+
+        let info_logger = StdoutLogger::new("info");
+        assert!(info_logger.is_enabled(LogLevel::Info));
+        assert!(!info_logger.is_enabled(LogLevel::Debug));
     }
 
     #[test]
