@@ -402,6 +402,7 @@ mod tests {
             query_logging_enabled: false,
             query_log_retention_days: crate::config::DEFAULT_QUERY_LOG_RETENTION_DAYS,
             embedding_similarity_threshold: crate::config::DEFAULT_EMBEDDING_SIMILARITY_THRESHOLD,
+            claim_config: crate::config::claims::ClaimConfig::default(),
         }
     }
 

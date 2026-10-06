@@ -52,6 +52,9 @@ pub struct RuntimeOptions {
     pub query_logging_enabled: bool,
     /// How long `query_log` rows are kept (`QUERY_LOG_RETENTION_DAYS`).
     pub query_log_retention_days: u32,
+    /// The claim-reconciliation config copied from the deployment policy
+    /// (`MEMORY_CLAIM_*`), applied to every tenant service.
+    pub claim_config: crate::config::claims::ClaimConfig,
 }
 
 /// The deployment-level embedding identity one tenant runtime starts from.
@@ -113,6 +116,7 @@ impl Default for RuntimeOptions {
             lifecycle_config: crate::config::LifecycleConfig::default(),
             query_logging_enabled: false,
             query_log_retention_days: crate::config::DEFAULT_QUERY_LOG_RETENTION_DAYS,
+            claim_config: crate::config::claims::ClaimConfig::default(),
         }
     }
 }
@@ -409,6 +413,13 @@ impl TenantRuntime {
         .with_query_logging_enabled(options.query_logging_enabled)
         .with_query_log_retention_days(options.query_log_retention_days);
         service.lifecycle_config = options.lifecycle_config.clone();
+        // The stdio composition root applies the same config the same way;
+        // without it every HTTP tenant ran on the claim defaults no matter
+        // what `MEMORY_CLAIM_*` said.
+        service.claim_service = service
+            .claim_service
+            .clone()
+            .with_config(options.claim_config.clone());
         service.replace_embedding_runtime_state(
             crate::embedding::runtime::EmbeddingRuntimeState::new(
                 embedding.provider,

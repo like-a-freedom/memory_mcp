@@ -64,6 +64,10 @@ pub struct DeploymentPolicy {
     /// the HTTP profile used to fall back to the hard-coded default, so an
     /// operator's `0.9` silently stayed `0.7`.
     pub embedding_similarity_threshold: f64,
+    /// `MEMORY_CLAIM_*`: the claim-reconciliation rollout stage and its
+    /// tuning. The stdio profile applies this to its service; the HTTP profile
+    /// never read it, so every tenant ran on the defaults regardless of env.
+    pub claim_config: crate::config::claims::ClaimConfig,
 }
 
 /// Resolve the deployment-level embedding and entity-extractor policy from the
@@ -97,6 +101,10 @@ pub async fn resolve_deployment_policy(logger: &StdoutLogger) -> Result<Deployme
     let query_log_retention_days = crate::config::parse_env::<u32>("QUERY_LOG_RETENTION_DAYS")
         .map_err(|err| format!("query log config error: {err}"))?
         .unwrap_or(crate::config::DEFAULT_QUERY_LOG_RETENTION_DAYS);
+    // `?`, not `if let Ok`: an invalid value is a startup error, which is what
+    // README promises and what the stdio path now does too.
+    let claim_config = crate::config::claims::ClaimConfig::from_env()
+        .map_err(|err| format!("claim config error: {err}"))?;
     Ok(DeploymentPolicy {
         embedding,
         entity_extractor,
@@ -108,6 +116,7 @@ pub async fn resolve_deployment_policy(logger: &StdoutLogger) -> Result<Deployme
         // profile passes it straight to its service and the HTTP profile must
         // not silently drop it.
         embedding_similarity_threshold: embedding_config.similarity_threshold,
+        claim_config,
     })
 }
 
@@ -467,6 +476,53 @@ mod tests {
             policy.embedding_similarity_threshold, 0.9,
             "EMBEDDINGS_SIMILARITY_THRESHOLD must reach the policy, not the 0.7 default"
         );
+    }
+
+    /// `MEMORY_CLAIM_ROLLOUT_STAGE` was applied only by the stdio bootstrap,
+    /// so an HTTP deployment that set it still ran every tenant on the default
+    /// `shadow` stage — silently, with the variable having no effect.
+    #[test]
+    fn the_claim_rollout_stage_reaches_the_deployment_policy_from_the_environment() {
+        let policy = deployment_policy_for_env(&[("MEMORY_CLAIM_ROLLOUT_STAGE", Some("evidence"))]);
+
+        assert_eq!(
+            policy.claim_config.rollout_stage,
+            crate::config::claims::ClaimRolloutStage::Evidence,
+            "MEMORY_CLAIM_ROLLOUT_STAGE must reach the policy, not the default shadow"
+        );
+    }
+
+    /// A value outside the documented enum must be a startup error, not a
+    /// silent fall-back to the default. README promises exactly that ("a
+    /// startup error"), and the stdio path used to swallow it with
+    /// `if let Ok(...)`; reading the config through `?` is what makes the
+    /// contract true in both profiles.
+    #[test]
+    fn an_invalid_claim_rollout_stage_fails_startup() {
+        let error =
+            deployment_policy_for_env_err(&[("MEMORY_CLAIM_ROLLOUT_STAGE", Some("bogus-stage"))]);
+
+        assert!(
+            error.contains("MEMORY_CLAIM_ROLLOUT_STAGE"),
+            "the failure must name the offending variable: {error}"
+        );
+    }
+
+    /// [`deployment_policy_for_env`] for the error path: the policy must not
+    /// resolve when the claim config is invalid.
+    fn deployment_policy_for_env_err(vars: &[(&str, Option<&str>)]) -> String {
+        with_env_vars(vars, || {
+            let logger = StdoutLogger::new("error");
+            let resolved = tokio::runtime::Builder::new_current_thread()
+                .enable_all()
+                .build()
+                .expect("runtime")
+                .block_on(resolve_deployment_policy(&logger));
+            match resolved {
+                Ok(_) => panic!("an invalid claim config must not resolve a policy"),
+                Err(err) => err,
+            }
+        })
     }
 
     /// The regression that made this an HTTP-profile bug at all: setting

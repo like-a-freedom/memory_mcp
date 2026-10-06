@@ -1,6 +1,6 @@
 //! Configuration management for the Memory MCP system.
 
-pub(crate) mod claims;
+pub mod claims;
 mod constants;
 mod embedding;
 pub mod fs_watch;

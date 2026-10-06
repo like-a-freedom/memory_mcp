@@ -226,10 +226,11 @@ pub async fn build_memory_service_from_env(
         target.as_ref().and_then(|value| value.model.clone()),
         target.as_ref().map(|value| value.dimension),
     ));
-    // Wire environment-driven claim configuration
-    if let Ok(claim_config) = crate::config::claims::ClaimConfig::from_env() {
-        service.claim_service = service.claim_service.clone().with_config(claim_config);
-    }
+    // Wire environment-driven claim configuration. `?`, not `if let Ok`: an
+    // invalid `MEMORY_CLAIM_*` value is a startup error, which is what README
+    // promises — swallowing it left a typo silently running the default stage.
+    let claim_config = crate::config::claims::ClaimConfig::from_env()?;
+    service.claim_service = service.claim_service.clone().with_config(claim_config);
     if let (EmbeddingStartupDecision::BootstrapReadyNamespace { active_signature }, Some(target)) =
         (&decision, target.as_ref())
     {

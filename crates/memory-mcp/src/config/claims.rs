@@ -3,8 +3,12 @@
 use crate::error::MemoryError;
 
 /// Rollout stage for claim reconciliation.
+///
+/// `pub` because it appears in `DeploymentPolicy`, the HTTP composition
+/// root's public policy struct: a public field's type must be publicly
+/// nameable for that struct to be constructed outside the crate.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
-pub(crate) enum ClaimRolloutStage {
+pub enum ClaimRolloutStage {
     /// No claim extraction or reconciliation.
     Disabled,
     /// Extract and store claims but do not expose relations. Default.
@@ -63,8 +67,10 @@ impl std::str::FromStr for ClaimRolloutStage {
 }
 
 /// Configuration for the claim reconciliation pipeline.
+///
+/// `pub` because it appears in `DeploymentPolicy`; see [`ClaimRolloutStage`].
 #[derive(Debug, Clone)]
-pub(crate) struct ClaimConfig {
+pub struct ClaimConfig {
     pub rollout_stage: ClaimRolloutStage,
     pub candidate_page_size: usize,
     pub inline_candidate_limit: usize,

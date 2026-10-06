@@ -376,6 +376,7 @@ impl Pool {
                 policy.query_log_retention_days,
             );
             options.embedding_similarity_threshold = policy.embedding_similarity_threshold;
+            options.claim_config = policy.claim_config;
             if let Some(extractor) = policy.entity_extractor {
                 options = options.with_entity_extractor(extractor);
             }
