@@ -13,7 +13,7 @@ use crate::cli::{
     Cli, Command, build_memory_service, log_session_duration, log_startup, run_reembed_mode,
     run_stdio_server,
 };
-use crate::logging::{StdoutLogger, install_log_file_from_env};
+use crate::logging::{StdoutLogger, install, install_log_file_from_env};
 // `EmbeddingActivationMode` is `pub(crate)` re-exported from `service` (the
 // underlying `startup` module is private). The `error` submodule is also
 // private — reach `MemoryError` via the `pub use error::MemoryError;` at
@@ -33,6 +33,9 @@ pub async fn run() -> Result<(), ExitCode> {
     // so the very first event goes to the file. The shared helper reads
     // `MEMORY_LOG_FILE`, normalizes it and warns on stderr if the open fails.
     install_log_file_from_env();
+    // Build the process-wide `tracing` subscriber now, so the sink and the
+    // format/colour environment are read before the first event.
+    install();
 
     let cli = Cli::parse();
 

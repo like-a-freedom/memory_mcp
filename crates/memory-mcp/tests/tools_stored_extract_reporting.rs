@@ -59,10 +59,14 @@ async fn stored_extraction_logs_its_lifecycle_without_ingesting_again() {
     let done = log.find("op=extract.done").expect("completion event");
     assert!(start < done, "start must precede completion");
     let id = |position: usize| {
-        log[..position]
-            .lines()
-            .last()
-            .expect("event prefix")
+        // The whole line that contains `position`: the human format now puts
+        // `op=` before `req=` (the operation is the primary tag), so reading
+        // only the prefix before the match would miss the correlation id.
+        let line_start = log[..position].rfind('\n').map_or(0, |index| index + 1);
+        let line_end = log[position..]
+            .find('\n')
+            .map_or(log.len(), |index| position + index);
+        log[line_start..line_end]
             .split_whitespace()
             .find(|field| field.starts_with("req="))
             .expect("correlation ID")

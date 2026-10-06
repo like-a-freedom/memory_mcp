@@ -71,6 +71,10 @@ tokio = { version = "1.53.1", features = [
 ] }
 tokio-util = { version = "0.7.19", features = ["rt"] }
 tower-service = "0.3.3"
+# Logging facility. Versions align with the `tracing` already pulled
+# transitively by `surrealdb`, so the lock gains no duplicate major.
+tracing = { version = "0.1", default-features = false, features = ["std"] }
+tracing-subscriber = { version = "0.3", default-features = false, features = ["fmt", "ansi", "registry", "std"] }
 unicode-normalization = "0.1.25"
 uuid = { version = "1.26.1", features = ["v4"] }
 zip = { version = "8.6.0", default-features = false, features = ["deflate"] }

@@ -1,17 +1,33 @@
 //! Structured logging utilities.
 //!
-//! This module provides a simple logger with structured event formatting
-//! and configurable log levels. Events go to **stderr** (or to the file
-//! sink installed at startup), never to stdout: under the stdio transport
+//! A bespoke `StdoutLogger` records structured events, filtering them by
+//! `RUST_LOG` before emission, and hands each to a process-wide `tracing`
+//! subscriber, which formats and writes it. Events go to **stderr** (or to the
+//! file sink installed at startup), never to stdout: under the stdio transport
 //! stdout is reserved for MCP protocol framing.
+//!
+//! The subscriber is installed once (see [`install`]); `MEMORY_LOG_FORMAT`
+//! selects human-readable text (default) or NDJSON, and colour is enabled only
+//! for a colour-capable terminal unless `MEMORY_LOG_COLOR` says otherwise. See
+//! [ADR-0078](../../../docs/adr/0078-human-readable-logging-on-tracing.md).
 
 use std::collections::HashMap;
+use std::fmt;
 use std::fs::{File, OpenOptions};
-use std::io::{self, Write};
+use std::io::{self, IsTerminal, Write};
 use std::sync::{Mutex, OnceLock};
 
-use chrono::Utc;
+use chrono::{SecondsFormat, Utc};
 use serde_json::Value;
+use tracing::{
+    Event, Subscriber,
+    field::{Field, Visit},
+};
+use tracing_subscriber::filter::Targets;
+use tracing_subscriber::fmt::format::{FormatEvent, FormatFields, Writer};
+use tracing_subscriber::fmt::{FmtContext, MakeWriter};
+use tracing_subscriber::layer::SubscriberExt;
+use tracing_subscriber::registry::LookupSpan;
 
 /// Log level for filtering log output.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
@@ -55,6 +71,316 @@ impl std::fmt::Display for LogLevel {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", self.as_str())
     }
+}
+
+/// How the logger decides whether to emit ANSI colour.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum ColorMode {
+    /// Colour only when the destination is a colour-capable terminal.
+    Auto,
+    /// Colour even without a TTY (an explicit operator override).
+    Always,
+    /// Never colour.
+    Never,
+}
+
+impl ColorMode {
+    /// Parses `MEMORY_LOG_COLOR`. Unknown values fall back to `Auto`, so a
+    /// typo cannot silently disable colour for an interactive operator.
+    #[must_use]
+    pub(crate) fn parse(value: &str) -> Self {
+        match value.trim().to_ascii_lowercase().as_str() {
+            "always" => Self::Always,
+            "never" => Self::Never,
+            _ => Self::Auto,
+        }
+    }
+}
+
+/// Whether output should carry ANSI colour, from the destination and the
+/// environment.
+///
+/// Pure on purpose: the truth table is exercisable without a terminal and
+/// without installing a process-global subscriber. `sink` is true when
+/// `MEMORY_LOG_FILE` is installed — a file is never a terminal, so escape
+/// codes there are corruption, not colour. `no_color` is `NO_COLOR` set and
+/// non-empty; `term` is `TERM` (`"dumb"` is not colour-capable); `mode` is
+/// `MEMORY_LOG_COLOR`.
+#[must_use]
+pub(crate) fn use_ansi(
+    sink: bool,
+    is_tty: bool,
+    no_color: bool,
+    term: &str,
+    mode: ColorMode,
+) -> bool {
+    match mode {
+        ColorMode::Never => false,
+        ColorMode::Always => !sink && !no_color,
+        ColorMode::Auto => !sink && !no_color && is_tty && term != "dumb",
+    }
+}
+
+/// The output encoding, chosen by `MEMORY_LOG_FORMAT`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum LogFormat {
+    /// The human-readable single line an operator reads.
+    Text,
+    /// One JSON object per line, for a log collector.
+    Json,
+}
+
+impl LogFormat {
+    /// Parses `MEMORY_LOG_FORMAT`. Unknown values fall back to `Text`.
+    #[must_use]
+    pub(crate) fn parse(value: &str) -> Self {
+        match value.trim().to_ascii_lowercase().as_str() {
+            "json" => Self::Json,
+            _ => Self::Text,
+        }
+    }
+}
+
+/// The `tracing` target every recorded event carries.
+///
+/// It is the one thing the `Targets` filter keys on to tell our events — already
+/// filtered by `RUST_LOG` before emission — from third-party noise.
+pub(crate) const LOG_TARGET: &str = "memory_mcp";
+
+/// The level `RUST_LOG` is not allowed to reach: third-party events below it
+/// are dropped rather than flooding the stream the operator reads.
+const FOREIGN_DEFAULT_LEVEL: tracing::Level = tracing::Level::WARN;
+
+fn from_tracing_level(level: &tracing::Level) -> LogLevel {
+    match *level {
+        tracing::Level::ERROR => LogLevel::Error,
+        tracing::Level::WARN => LogLevel::Warn,
+        tracing::Level::INFO => LogLevel::Info,
+        tracing::Level::DEBUG => LogLevel::Debug,
+        tracing::Level::TRACE => LogLevel::Trace,
+    }
+}
+
+/// Reads a `tracing` event's fields: our events carry the serialised map in a
+/// single `payload` field; a foreign event carries its own fields instead.
+#[derive(Default)]
+struct EventVisitor {
+    payload: Option<String>,
+    fields: Vec<(String, String)>,
+}
+
+impl Visit for EventVisitor {
+    fn record_str(&mut self, field: &Field, value: &str) {
+        if field.name() == "payload" {
+            self.payload = Some(value.to_string());
+        } else {
+            self.fields
+                .push((field.name().to_string(), value.to_string()));
+        }
+    }
+
+    fn record_debug(&mut self, field: &Field, value: &dyn fmt::Debug) {
+        if field.name() == "payload" {
+            self.payload = Some(format!("{value:?}"));
+        } else {
+            self.fields
+                .push((field.name().to_string(), format!("{value:?}")));
+        }
+    }
+}
+
+/// Renders every event — ours and foreign — into the configured format.
+///
+/// A `tracing` field set is static per callsite, but our payload is an arbitrary
+/// map, so it travels in one field that this formatter flattens. Foreign events
+/// (no `payload`) are rendered from their own fields so a third-party warning is
+/// readable instead of dropped.
+pub(crate) struct MemoryFormat {
+    format: LogFormat,
+}
+
+impl<S, N> FormatEvent<S, N> for MemoryFormat
+where
+    S: Subscriber + for<'lookup> LookupSpan<'lookup>,
+    N: for<'writer> FormatFields<'writer> + 'static,
+{
+    fn format_event(
+        &self,
+        _ctx: &FmtContext<'_, S, N>,
+        mut writer: Writer<'_>,
+        event: &Event<'_>,
+    ) -> fmt::Result {
+        let ts = Utc::now().to_rfc3339_opts(SecondsFormat::Micros, true);
+        let level = from_tracing_level(event.metadata().level());
+        let ansi = writer.has_ansi_escapes();
+
+        let mut visitor = EventVisitor::default();
+        event.record(&mut visitor);
+
+        let line = match visitor.payload {
+            Some(payload) => {
+                let event: HashMap<String, Value> =
+                    serde_json::from_str(&payload).unwrap_or_default();
+                match self.format {
+                    LogFormat::Text => render_human(&event, level, &ts, ansi),
+                    LogFormat::Json => render_json(&event, level, &ts),
+                }
+            }
+            None => render_foreign(
+                event.metadata().target(),
+                &visitor.fields,
+                level,
+                &ts,
+                ansi,
+                self.format,
+            ),
+        };
+
+        #[cfg(test)]
+        capture::record(&line);
+
+        writeln!(writer, "{line}")
+    }
+}
+
+/// Render a foreign (`tracing`-originated) event in the same shape.
+fn render_foreign(
+    target: &str,
+    fields: &[(String, String)],
+    level: LogLevel,
+    ts: &str,
+    ansi: bool,
+    format: LogFormat,
+) -> String {
+    let message = fields
+        .iter()
+        .find(|(key, _)| key == "message")
+        .map(|(_, value)| value.clone());
+
+    match format {
+        LogFormat::Text => {
+            let level_text = format!("{:>5}", level.as_str().to_uppercase());
+            let level_text = if ansi {
+                format!("{}{level_text}{ANSI_RESET}", level_ansi(level))
+            } else {
+                level_text
+            };
+            let mut parts = Vec::with_capacity(fields.len());
+            if let Some(message) = message {
+                parts.push(message);
+            }
+            for (key, value) in fields {
+                if key == "message" {
+                    continue;
+                }
+                parts.push(key_token(key, &quote_if_needed(value), ansi));
+            }
+            let separator = if parts.is_empty() { "" } else { " " };
+            format!("{ts} {level_text} {target}:{separator}{}", parts.join(" "))
+        }
+        LogFormat::Json => {
+            let mut object = serde_json::Map::with_capacity(fields.len() + 3);
+            object.insert("timestamp".to_string(), Value::String(ts.to_string()));
+            object.insert(
+                "level".to_string(),
+                Value::String(level.as_str().to_string()),
+            );
+            object.insert("target".to_string(), Value::String(target.to_string()));
+            let mut mapped = serde_json::Map::with_capacity(fields.len());
+            for (key, value) in fields {
+                mapped.insert(key.clone(), Value::String(value.clone()));
+            }
+            object.insert("fields".to_string(), Value::Object(mapped));
+            Value::Object(object).to_string()
+        }
+    }
+}
+
+/// The `MakeWriter` behind the `fmt` layer: the `MEMORY_LOG_FILE` sink when
+/// installed, otherwise stderr.
+///
+/// Resolved per write, not at install, so a sink installed after the subscriber
+/// still takes effect — the same guarantee the old direct-write logger gave.
+pub(crate) struct LogMakeWriter;
+
+/// Where one formatted event is written. Errors are swallowed: logging must
+/// never panic or take a caller down, and the line is flushed on drop so a file
+/// sink is durable per line exactly as before.
+pub(crate) enum SinkWriter {
+    File(std::sync::MutexGuard<'static, File>),
+    Stderr(io::Stderr),
+}
+
+impl<'a> MakeWriter<'a> for LogMakeWriter {
+    type Writer = SinkWriter;
+
+    fn make_writer(&'a self) -> Self::Writer {
+        match LOG_FILE_SINK.get() {
+            Some(sink) => {
+                SinkWriter::File(sink.lock().unwrap_or_else(|poison| poison.into_inner()))
+            }
+            None => SinkWriter::Stderr(io::stderr()),
+        }
+    }
+}
+
+impl Write for SinkWriter {
+    fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
+        match self {
+            Self::File(file) => file.write(buf),
+            Self::Stderr(stderr) => stderr.write(buf),
+        }
+    }
+
+    fn flush(&mut self) -> io::Result<()> {
+        match self {
+            Self::File(file) => file.flush(),
+            Self::Stderr(stderr) => stderr.flush(),
+        }
+    }
+}
+
+impl Drop for SinkWriter {
+    fn drop(&mut self) {
+        let _ = self.flush();
+    }
+}
+
+/// Whether colour is enabled, from the destination and the environment.
+fn ansi_enabled_from_env() -> bool {
+    let sink = LOG_FILE_SINK.get().is_some();
+    let is_tty = io::stderr().is_terminal();
+    let no_color = std::env::var_os("NO_COLOR").is_some_and(|value| !value.is_empty());
+    let term = std::env::var("TERM").unwrap_or_default();
+    let mode = ColorMode::parse(&std::env::var("MEMORY_LOG_COLOR").unwrap_or_default());
+    use_ansi(sink, is_tty, no_color, &term, mode)
+}
+
+/// Install the process-wide `tracing` subscriber, once.
+///
+/// Idempotent: the first caller wins and later calls are no-ops, so both
+/// binaries can call it explicitly and a library or test that logs without
+/// doing so still gets a working pipeline. Errors from
+/// `set_global_default` (a subscriber already set by something else) are
+/// ignored — logging must never fail a caller.
+pub fn install() {
+    static INSTALLED: OnceLock<()> = OnceLock::new();
+    INSTALLED.get_or_init(|| {
+        let format = LogFormat::parse(&std::env::var("MEMORY_LOG_FORMAT").unwrap_or_default());
+        let subscriber = tracing_subscriber::registry()
+            .with(
+                tracing_subscriber::fmt::layer()
+                    .event_format(MemoryFormat { format })
+                    .with_writer(LogMakeWriter)
+                    .with_ansi(ansi_enabled_from_env()),
+            )
+            .with(
+                Targets::new()
+                    .with_target(LOG_TARGET, tracing::Level::TRACE)
+                    .with_default(FOREIGN_DEFAULT_LEVEL),
+            );
+        let _ = tracing::subscriber::set_global_default(subscriber);
+    });
 }
 
 /// The operation name of the HTTP access log.
@@ -115,20 +441,6 @@ pub const HTTP_OPERATIONS: &[&str] = &[
     "http.lifecycle.decay_failed",
     "http.lifecycle.archival_failed",
 ];
-
-/// Writes one line to a sink, best-effort. Logging must never panic or
-/// propagate I/O failures (a broken sink should not take down callers).
-fn write_line<W: Write>(writer: &mut W, line: &str) {
-    let _ = writer.write_all(line.as_bytes());
-    let _ = writer.write_all(b"\n");
-    let _ = writer.flush();
-}
-
-/// Tracks repeated warning occurrences for deduplication.
-#[derive(Default)]
-struct WarnTracker {
-    counts: Mutex<HashMap<String, u64>>,
-}
 
 /// Process-global file sink. When installed, all `StdoutLogger` instances
 /// write to this file instead of stderr. Set once at startup via
@@ -211,7 +523,6 @@ pub struct StdoutLogger {
     /// [`is_event_enabled`] picks the most specific match, so order does not
     /// decide precedence.
     overrides: Vec<(String, LogLevel)>,
-    warn_tracker: std::sync::Arc<WarnTracker>,
 }
 
 /// The default level from a directive list: the first segment that names a bare
@@ -326,7 +637,6 @@ impl StdoutLogger {
         let mut logger = Self {
             level: LogLevel::parse(first_directive(configured)),
             overrides: Vec::new(),
-            warn_tracker: std::sync::Arc::new(WarnTracker::default()),
         };
         // Every segment is examined, not every one after the first: a list may
         // lead with a directive (`oidc=debug,info`), and skipping the first
@@ -373,33 +683,6 @@ impl StdoutLogger {
         level >= threshold
     }
 
-    /// Logs a warning with deduplication. The `dedup_key` identifies
-    /// repeated occurrences. The first occurrence is always logged.
-    /// Subsequent occurrences are logged only at every Nth repetition
-    /// (controlled by `every_nth`, default 10).
-    pub fn log_warn_dedup(&self, event: HashMap<String, Value>, dedup_key: &str, every_nth: u64) {
-        let count = {
-            // Logging must never panic on a poisoned counter; the count map
-            // remains valid to increment after recovery.
-            let mut counts = self
-                .warn_tracker
-                .counts
-                .lock()
-                .unwrap_or_else(|poison| poison.into_inner());
-            let c = counts.entry(dedup_key.to_string()).or_insert(0);
-            *c += 1;
-            *c
-        };
-
-        if count == 1 || count % every_nth == 0 {
-            let mut event = event;
-            if count > 1 {
-                event.insert("repeat_count".to_string(), Value::Number(count.into()));
-            }
-            self.log(event, LogLevel::Warn);
-        }
-    }
-
     /// Returns true if the provided `level` should be emitted given the
     /// currently configured minimum level.
     #[must_use]
@@ -427,98 +710,48 @@ impl StdoutLogger {
             return;
         }
 
-        let line = Self::format_event_line(&event, level);
-
-        // Write to file sink if installed; otherwise fall through to stderr.
-        if let Some(sink) = LOG_FILE_SINK.get() {
-            let mut file = sink.lock().unwrap_or_else(|poison| poison.into_inner());
-            write_line(&mut *file, &line);
-            return;
+        // The subscriber is the only writer now: it resolves the sink per
+        // write and renders the line (see `MemoryFormat`). `install` is
+        // idempotent, so a library or test that logs without having called it
+        // still gets a working pipeline.
+        install();
+        let payload = serde_json::to_string(&event).unwrap_or_else(|_| "{}".to_string());
+        // `tracing::event!` embeds the level in the callsite, so it must be a
+        // constant: one arm per level rather than a computed value.
+        match level {
+            LogLevel::Error => {
+                tracing::event!(target: LOG_TARGET, tracing::Level::ERROR, payload = payload.as_str());
+            }
+            LogLevel::Warn => {
+                tracing::event!(target: LOG_TARGET, tracing::Level::WARN, payload = payload.as_str());
+            }
+            LogLevel::Info => {
+                tracing::event!(target: LOG_TARGET, tracing::Level::INFO, payload = payload.as_str());
+            }
+            LogLevel::Debug => {
+                tracing::event!(target: LOG_TARGET, tracing::Level::DEBUG, payload = payload.as_str());
+            }
+            LogLevel::Trace => {
+                tracing::event!(target: LOG_TARGET, tracing::Level::TRACE, payload = payload.as_str());
+            }
         }
-
-        // A test observing the rendered line reads it here. This is compiled
-        // only under `cfg(test)`, so production output is unchanged.
-        #[cfg(test)]
-        capture::record(&line);
-
-        let mut stderr = io::stderr();
-        write_line(&mut stderr, &line);
     }
 
     /// Formats an event into a single human-readable line.
     #[must_use]
     pub fn format_event_line(event: &HashMap<String, Value>, level: LogLevel) -> String {
-        let ts = Utc::now().to_rfc3339();
+        let ts = Utc::now().to_rfc3339_opts(SecondsFormat::Micros, true);
         Self::format_event_line_with_ts(event, level, &ts)
     }
 
-    /// Formats an event with a provided timestamp.
+    /// Formats an event with a provided timestamp — a thin wrapper over
+    /// [`render_human`], kept for callers and tests that inject a clock.
     pub(crate) fn format_event_line_with_ts(
         event: &HashMap<String, Value>,
         level: LogLevel,
         ts: &str,
     ) -> String {
-        // Truncate timestamp to milliseconds for readability: ...608.123456Z -> ...608Z
-        let ts_short = if ts.len() > 23 {
-            // RFC3339: "2026-04-12T20:03:59.608616+00:00" → find '.' then keep 3 digits then 'Z'
-            if let Some(dot) = ts.find('.') {
-                format!("{}Z", &ts[..dot + 4])
-            } else {
-                ts.to_string()
-            }
-        } else {
-            ts.to_string()
-        };
-
-        // Extract special fields for prominent placement
-        let request_id = event
-            .get("request_id")
-            .and_then(|v| v.as_str())
-            .unwrap_or("-");
-        // A duration may be fractional. `as_u64` would drop the fraction, and
-        // a sub-millisecond stage — the ones worth timing, since a fast cache
-        // hit and a query are otherwise indistinguishable — would read as
-        // zero, the same as a stage that was never measured.
-        let duration_ms = event.get("duration_ms").and_then(render_duration);
-
-        let mut parts = Vec::with_capacity(event.len() + 4);
-        // Header: [ts] LEVEL  req=XXXX
-        parts.push(format!(
-            "[{}] {:<5} req={:<6}",
-            ts_short,
-            level.as_str().to_uppercase(),
-            request_id
-        ));
-
-        // Build remaining keys, excluding special fields we already rendered
-        let special_keys = ["request_id", "duration_ms"];
-        let mut keys: Vec<_> = event
-            .keys()
-            .filter(|k| !special_keys.contains(&k.as_str()))
-            .cloned()
-            .collect();
-        keys.sort();
-
-        // Render: op first, then duration_ms (if present), then the rest
-        if let Some(pos) = keys.iter().position(|k| k == "op") {
-            let op = keys.remove(pos);
-            if let Some(value) = event.get(&op) {
-                parts.push(format!("{}={}", op, value_to_string(value)));
-            }
-        }
-
-        if let Some(ms) = duration_ms {
-            parts.push(format!("duration_ms={}", ms));
-        }
-
-        for key in keys {
-            if let Some(value) = event.get(&key) {
-                let value_str = value_to_string(value);
-                parts.push(format!("{}={}", key, quote_if_needed(&value_str)));
-            }
-        }
-
-        parts.join("  ")
+        render_human(event, level, ts, false)
     }
 }
 
@@ -618,6 +851,134 @@ fn render_duration(value: &Value) -> Option<String> {
         }
         _ => None,
     }
+}
+
+/// ANSI reset, used after every coloured span.
+const ANSI_RESET: &str = "\u{1b}[0m";
+/// Dim, for the timestamp and field keys: present but not competing with the
+/// value it names.
+const ANSI_DIM: &str = "\u{1b}[2m";
+
+/// The SGR colour for a level. Deliberately minimal — colour marks severity,
+/// it does not decorate.
+fn level_ansi(level: LogLevel) -> &'static str {
+    match level {
+        LogLevel::Error => "\u{1b}[31m",
+        LogLevel::Warn => "\u{1b}[33m",
+        LogLevel::Info => "\u{1b}[32m",
+        LogLevel::Debug => "\u{1b}[34m",
+        LogLevel::Trace => "\u{1b}[90m",
+    }
+}
+
+/// One `key=value` token, with the key dimmed when colour is on.
+fn key_token(key: &str, value: &str, ansi: bool) -> String {
+    if ansi {
+        format!("{ANSI_DIM}{key}{ANSI_RESET}={value}")
+    } else {
+        format!("{key}={value}")
+    }
+}
+
+/// Whether an object is a serialized `Option`/`Result` artifact rather than a
+/// real nested object, in which case it is rendered as one value instead of
+/// being flattened into `key.Some=…`.
+fn is_option_or_result(map: &serde_json::Map<String, Value>) -> bool {
+    ["Some", "None", "Ok", "Err"]
+        .iter()
+        .any(|key| map.contains_key(*key))
+}
+
+/// Flatten one field into tokens. Objects become dotted keys; leaves keep the
+/// existing quoting/truncation rules.
+fn flatten_value(prefix: &str, value: &Value, ansi: bool, out: &mut Vec<String>) {
+    match value {
+        Value::Object(map) if !is_option_or_result(map) => {
+            if map.is_empty() {
+                out.push(key_token(prefix, "{}", ansi));
+                return;
+            }
+            let mut keys: Vec<&String> = map.keys().collect();
+            keys.sort();
+            for key in keys {
+                if let Some(inner) = map.get(key) {
+                    flatten_value(&format!("{prefix}.{key}"), inner, ansi, out);
+                }
+            }
+        }
+        _ => {
+            let rendered = quote_if_needed(&value_to_string(value));
+            out.push(key_token(prefix, &rendered, ansi));
+        }
+    }
+}
+
+/// Render one recorded event as a human-readable line.
+///
+/// Pure: the timestamp is passed in, so the exact line an operator reads is
+/// assertable without a clock. Layout is `<ts> <LEVEL:>5  <tokens>` — a single
+/// space separator and the level right-aligned in width five, so the columns
+/// line up.
+#[must_use]
+pub(crate) fn render_human(
+    event: &HashMap<String, Value>,
+    level: LogLevel,
+    ts: &str,
+    ansi: bool,
+) -> String {
+    let level_text = format!("{:>5}", level.as_str().to_uppercase());
+    let level_text = if ansi {
+        format!("{}{level_text}{ANSI_RESET}", level_ansi(level))
+    } else {
+        level_text
+    };
+
+    let mut tokens = Vec::with_capacity(event.len());
+    if let Some(op) = event.get("op") {
+        tokens.push(key_token("op", &value_to_string(op), ansi));
+    }
+    if let Some(request_id) = event.get("request_id").and_then(Value::as_str) {
+        tokens.push(key_token("req", request_id, ansi));
+    }
+    if let Some(ms) = event.get("duration_ms").and_then(render_duration) {
+        tokens.push(key_token("duration_ms", &ms, ansi));
+    }
+    const SPECIAL: [&str; 3] = ["op", "request_id", "duration_ms"];
+    let mut keys: Vec<&String> = event
+        .keys()
+        .filter(|key| !SPECIAL.contains(&key.as_str()))
+        .collect();
+    keys.sort();
+    for key in keys {
+        if let Some(value) = event.get(key) {
+            flatten_value(key, value, ansi, &mut tokens);
+        }
+    }
+
+    let timestamp = if ansi {
+        format!("{ANSI_DIM}{ts}{ANSI_RESET}")
+    } else {
+        ts.to_string()
+    };
+    format!("{timestamp} {level_text}  {}", tokens.join("  "))
+}
+
+/// Render one recorded event as a single NDJSON object.
+///
+/// Pure, like [`render_human`]. Metadata (`timestamp`, `level`) is folded in
+/// beside the payload so a collector parses one line and has the whole event.
+#[must_use]
+pub(crate) fn render_json(event: &HashMap<String, Value>, level: LogLevel, ts: &str) -> String {
+    let mut object = serde_json::Map::with_capacity(event.len() + 2);
+    object.insert("timestamp".to_string(), Value::String(ts.to_string()));
+    object.insert(
+        "level".to_string(),
+        Value::String(level.as_str().to_string()),
+    );
+    for (key, value) in event {
+        object.insert(key.clone(), value.clone());
+    }
+    Value::Object(object).to_string()
 }
 
 /// Capture what the logger writes, for a test that has to observe a line
@@ -928,8 +1289,11 @@ mod tests {
             "2026-01-01T00:00:00.000+00:00",
         );
 
-        assert!(line.contains("[2026-01-01T00:00:00.000Z] INFO "));
-        assert!(line.contains("req=-"));
+        assert!(
+            line.starts_with("2026-01-01T00:00:00.000+00:00  INFO  "),
+            "{line}"
+        );
+        assert!(!line.contains("req="), "no request id, no token: {line}");
         assert!(line.contains("op=migrations"));
         assert!(line.contains("stage=start"));
         assert!(line.contains("source=filesystem"));
@@ -950,9 +1314,8 @@ mod tests {
 
         assert!(line.contains("name=\"Dmitry Ivanov\""));
         assert!(line.contains("list=[a,b,c]"));
-        assert!(line.contains("args="));
-        assert!(line.contains("query=ARR"));
-        assert!(line.contains("scope=org"));
+        assert!(line.contains("args.query=ARR"));
+        assert!(line.contains("args.scope=org"));
     }
 
     #[test]
@@ -993,7 +1356,8 @@ mod tests {
     fn format_event_line_uses_current_timestamp() {
         let event = HashMap::new();
         let line = StdoutLogger::format_event_line(&event, LogLevel::Info);
-        assert!(line.contains("] INFO"));
+        assert!(line.contains(" INFO "), "{line}");
+        assert!(!line.contains('['), "no brackets: {line}");
     }
 
     #[test]
@@ -1010,19 +1374,21 @@ mod tests {
             "2026-04-12T20:03:59.608616+00:00",
         );
 
-        assert!(line.contains("[2026-04-12T20:03:59.608Z]"));
-        assert!(line.contains("INFO "));
+        assert!(
+            line.starts_with("2026-04-12T20:03:59.608616+00:00  INFO  "),
+            "{line}"
+        );
         assert!(line.contains("req=req_0042"));
         assert!(line.contains("op=extract.done"));
         assert!(line.contains("duration_ms=152"));
         assert!(line.contains("entities=3"));
-        // request_id should NOT appear again in the key-value section
+        // request_id must not appear again in the key-value section
         let after_op = line.split("op=extract.done").nth(1).unwrap_or("");
         assert!(!after_op.contains("request_id="));
     }
 
     #[test]
-    fn format_without_request_id_shows_dash() {
+    fn format_without_request_id_omits_the_token() {
         let mut event = HashMap::new();
         event.insert("op".to_string(), json!("main.startup"));
 
@@ -1032,7 +1398,7 @@ mod tests {
             "2026-04-12T20:03:59.608616+00:00",
         );
 
-        assert!(line.contains("req=-"));
+        assert!(!line.contains("req="), "no placeholder token: {line}");
     }
 
     #[test]
@@ -1303,5 +1669,331 @@ mod tests {
         let line = StdoutLogger::format_event_line(&event, LogLevel::Info);
 
         assert!(line.contains("duration_ms=271"), "{line}");
+    }
+
+    /// Colour is for a human at a terminal and nothing else. `clig.dev`:
+    /// disable it when the destination is not a TTY, when `NO_COLOR` is set,
+    /// or when the terminal is dumb — and never write escape codes into a file.
+    ///
+    /// `always` is the explicit override an operator uses when a wrapper hides
+    /// the TTY check, but it still cannot colour a file sink or defeat
+    /// `NO_COLOR`.
+    #[test]
+    fn ansi_is_on_only_for_a_colour_terminal() {
+        use ColorMode::{Always, Auto, Never};
+
+        // auto: on only for a real, colour-capable terminal.
+        assert!(use_ansi(false, true, false, "xterm-256color", Auto));
+        assert!(
+            !use_ansi(false, false, false, "xterm-256color", Auto),
+            "not a TTY"
+        );
+        assert!(
+            !use_ansi(false, true, true, "xterm-256color", Auto),
+            "NO_COLOR"
+        );
+        assert!(!use_ansi(false, true, false, "dumb", Auto), "TERM=dumb");
+        assert!(
+            !use_ansi(true, true, false, "xterm-256color", Auto),
+            "file sink"
+        );
+
+        // always: overrides the TTY and TERM checks, but not NO_COLOR or a sink.
+        assert!(use_ansi(false, false, false, "dumb", Always));
+        assert!(
+            !use_ansi(false, false, true, "dumb", Always),
+            "NO_COLOR wins"
+        );
+        assert!(
+            !use_ansi(true, true, false, "xterm-256color", Always),
+            "sink wins"
+        );
+
+        // never: off everywhere.
+        assert!(!use_ansi(false, true, false, "xterm-256color", Never));
+    }
+
+    fn event(pairs: &[(&str, Value)]) -> HashMap<String, Value> {
+        pairs
+            .iter()
+            .map(|(k, v)| ((*k).to_string(), v.clone()))
+            .collect()
+    }
+
+    /// The line an operator reads: unbracketed microsecond timestamp, a
+    /// right-aligned level, then `k=v` tokens with the operation first and the
+    /// correlation id next. Nested objects are flattened to dotted keys so a
+    /// payload does not hide behind `args={…}`.
+    #[test]
+    fn render_human_flattens_and_orders_fields() {
+        let event = event(&[
+            ("op", json!("ingest.done")),
+            ("request_id", json!("req_0042")),
+            ("duration_ms", json!(152u64)),
+            ("args", json!({"source_id": "note-1"})),
+            ("result", json!({"episode_id": "episode:x"})),
+        ]);
+
+        let line = render_human(&event, LogLevel::Info, "2026-10-06T12:34:56.789012Z", false);
+
+        assert_eq!(
+            line,
+            "2026-10-06T12:34:56.789012Z  INFO  op=ingest.done  req=req_0042  \
+             duration_ms=152  args.source_id=note-1  result.episode_id=episode:x"
+        );
+    }
+
+    /// The reference's spacing: one separator, level right-aligned in width
+    /// five, so a five-character level gets a single leading space and a
+    /// four-character one gets two. Alignment is what lets a column of levels
+    /// be scanned.
+    #[test]
+    fn render_human_aligns_every_level() {
+        for (level, rendered) in [
+            (LogLevel::Info, " INFO"),
+            (LogLevel::Warn, " WARN"),
+            (LogLevel::Debug, "DEBUG"),
+            (LogLevel::Error, "ERROR"),
+            (LogLevel::Trace, "TRACE"),
+        ] {
+            let line = render_human(
+                &event(&[("op", json!("x"))]),
+                level,
+                "2026-10-06T12:34:56.789012Z",
+                false,
+            );
+            assert!(
+                line.contains(&format!("Z {rendered} ")),
+                "{level:?} must be right-aligned in width five: {line}"
+            );
+        }
+    }
+
+    /// `req=-` was noise on every line that had no request: the field is simply
+    /// absent when there is no correlation id.
+    #[test]
+    fn render_human_omits_an_absent_request_id() {
+        let line = render_human(
+            &event(&[("op", json!("main.startup"))]),
+            LogLevel::Info,
+            "2026-10-06T12:34:56.789012Z",
+            false,
+        );
+        assert!(!line.contains("req="), "no request id, no token: {line}");
+    }
+
+    /// Values keep the existing quoting/truncation/artifact rules, so nested
+    /// flattening does not change how a leaf is rendered.
+    #[test]
+    fn render_human_reuses_value_rendering() {
+        let event = event(&[
+            ("op", json!("resolve.done")),
+            ("name", json!("Dmitry Ivanov")),
+            ("list", json!(["a", "b", "c"])),
+            ("args", json!({"nested": {"deep": true}})),
+        ]);
+
+        let line = render_human(&event, LogLevel::Info, "2026-10-06T12:34:56.789012Z", false);
+
+        assert!(line.contains("name=\"Dmitry Ivanov\""), "{line}");
+        assert!(line.contains("list=[a,b,c]"), "{line}");
+        assert!(line.contains("args.nested.deep=true"), "{line}");
+    }
+
+    /// No ANSI when the caller says not to; escape codes only when told.
+    #[test]
+    fn render_human_only_colours_when_asked() {
+        let event = event(&[("op", json!("x"))]);
+        let plain = render_human(
+            &event,
+            LogLevel::Error,
+            "2026-10-06T12:34:56.789012Z",
+            false,
+        );
+        let coloured = render_human(&event, LogLevel::Error, "2026-10-06T12:34:56.789012Z", true);
+
+        assert!(!plain.contains('\u{1b}'), "{plain}");
+        assert!(coloured.contains('\u{1b}'), "{coloured}");
+        assert!(coloured.contains("ERROR"), "{coloured}");
+    }
+
+    /// JSON mode is one object per line, machine-parseable, with the metadata
+    /// folded in beside the payload so a collector needs no second source.
+    /// Asserted by parsing, not string-comparison: key order is not a promise.
+    #[test]
+    fn render_json_is_one_object_per_event() {
+        let event = event(&[
+            ("op", json!("ingest.done")),
+            ("request_id", json!("req_0042")),
+            ("duration_ms", json!(152u64)),
+            ("args", json!({"source_id": "note-1"})),
+        ]);
+
+        let line = render_json(&event, LogLevel::Info, "2026-10-06T12:34:56.789012Z");
+
+        assert!(!line.contains('\n'), "one object per line: {line}");
+        let parsed: Value = serde_json::from_str(&line).expect("valid NDJSON object");
+        assert_eq!(parsed["timestamp"], "2026-10-06T12:34:56.789012Z");
+        assert_eq!(parsed["level"], "info");
+        assert_eq!(parsed["op"], "ingest.done");
+        assert_eq!(parsed["request_id"], "req_0042");
+        assert_eq!(parsed["duration_ms"], 152);
+        assert_eq!(parsed["args"]["source_id"], "note-1");
+    }
+
+    /// `MEMORY_LOG_FORMAT=json` selects the machine format; anything else,
+    /// including a typo, stays human-readable.
+    #[test]
+    fn log_format_parse_selects_json() {
+        assert_eq!(LogFormat::parse("json"), LogFormat::Json);
+        assert_eq!(LogFormat::parse("  JSON "), LogFormat::Json);
+        assert_eq!(LogFormat::parse("text"), LogFormat::Text);
+        assert_eq!(LogFormat::parse(""), LogFormat::Text);
+        assert_eq!(LogFormat::parse("yaml"), LogFormat::Text);
+    }
+
+    /// A buffer the formatter writes into, so a test can read the emitted line
+    /// without touching stderr or a file.
+    #[derive(Clone, Default)]
+    struct SharedBuf(std::sync::Arc<Mutex<Vec<u8>>>);
+
+    impl SharedBuf {
+        fn contents(&self) -> String {
+            String::from_utf8(self.0.lock().expect("buffer").clone()).expect("utf8")
+        }
+    }
+
+    struct SharedBufGuard(std::sync::Arc<Mutex<Vec<u8>>>);
+
+    impl Write for SharedBufGuard {
+        fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
+            self.0.lock().expect("buffer").extend_from_slice(buf);
+            Ok(buf.len())
+        }
+
+        fn flush(&mut self) -> io::Result<()> {
+            Ok(())
+        }
+    }
+
+    impl<'a> MakeWriter<'a> for SharedBuf {
+        type Writer = SharedBufGuard;
+
+        fn make_writer(&'a self) -> Self::Writer {
+            SharedBufGuard(self.0.clone())
+        }
+    }
+
+    fn subscriber_with(buffer: SharedBuf, format: LogFormat) -> impl Subscriber + Send + Sync {
+        tracing_subscriber::registry()
+            .with(
+                tracing_subscriber::fmt::layer()
+                    .event_format(MemoryFormat { format })
+                    .with_writer(buffer)
+                    .with_ansi(false),
+            )
+            .with(
+                Targets::new()
+                    .with_target(LOG_TARGET, tracing::Level::TRACE)
+                    .with_default(FOREIGN_DEFAULT_LEVEL),
+            )
+    }
+
+    /// Our events carry the serialised map in `payload`; the formatter flattens
+    /// it through the same renderer the pure tests assert on.
+    #[test]
+    fn format_event_renders_our_payload() {
+        let buffer = SharedBuf::default();
+        let subscriber = subscriber_with(buffer.clone(), LogFormat::Text);
+        tracing::subscriber::with_default(subscriber, || {
+            tracing::event!(
+                target: LOG_TARGET,
+                tracing::Level::INFO,
+                payload = r#"{"op":"ingest.done","request_id":"req_1","args":{"source_id":"note-1"}}"#
+            );
+        });
+
+        let line = buffer.contents();
+        assert!(line.contains("op=ingest.done"), "{line}");
+        assert!(line.contains("req=req_1"), "{line}");
+        assert!(line.contains("args.source_id=note-1"), "{line}");
+    }
+
+    /// `MEMORY_LOG_FORMAT=json` yields one parseable object per event.
+    #[test]
+    fn format_event_renders_the_json_mode() {
+        let buffer = SharedBuf::default();
+        let subscriber = subscriber_with(buffer.clone(), LogFormat::Json);
+        tracing::subscriber::with_default(subscriber, || {
+            tracing::event!(
+                target: LOG_TARGET,
+                tracing::Level::INFO,
+                payload = r#"{"op":"x"}"#
+            );
+        });
+
+        let parsed: Value = serde_json::from_str(buffer.contents().trim()).expect("json");
+        assert_eq!(parsed["op"], "x");
+        assert_eq!(parsed["level"], "info");
+    }
+
+    /// A third-party event (no `payload` field) is rendered from its own
+    /// fields, not dropped to nothing.
+    #[test]
+    fn format_event_renders_a_foreign_event() {
+        let buffer = SharedBuf::default();
+        let subscriber = subscriber_with(buffer.clone(), LogFormat::Text);
+        tracing::subscriber::with_default(subscriber, || {
+            tracing::warn!(
+                target: "surrealdb::kvs",
+                count = 8,
+                message = "level-0 slowdown"
+            );
+        });
+
+        let line = buffer.contents();
+        assert!(line.contains("surrealdb::kvs:"), "{line}");
+        assert!(line.contains("level-0 slowdown"), "{line}");
+        assert!(line.contains("count=8"), "{line}");
+    }
+
+    /// The `Targets` policy keeps third-party noise below its default out while
+    /// letting its warnings through.
+    #[test]
+    fn foreign_events_below_the_policy_are_dropped() {
+        let buffer = SharedBuf::default();
+        let subscriber = subscriber_with(buffer.clone(), LogFormat::Text);
+        tracing::subscriber::with_default(subscriber, || {
+            tracing::info!(target: "noisy_dep", "should not appear");
+            tracing::error!(target: "noisy_dep", "should appear");
+        });
+
+        let line = buffer.contents();
+        assert!(!line.contains("should not appear"), "{line}");
+        assert!(line.contains("should appear"), "{line}");
+    }
+
+    /// The test capture observes the same line the formatter emits — the seam
+    /// the rest of the suite asserts through.
+    #[test]
+    fn format_event_records_for_capture() {
+        let guard = capture::install();
+        let buffer = SharedBuf::default();
+        let subscriber = subscriber_with(buffer, LogFormat::Text);
+        tracing::subscriber::with_default(subscriber, || {
+            tracing::event!(
+                target: LOG_TARGET,
+                tracing::Level::INFO,
+                payload = r#"{"op":"capture.probe"}"#
+            );
+        });
+
+        assert!(
+            guard
+                .lines()
+                .iter()
+                .any(|line| line.contains("op=capture.probe")),
+            "capture must see the emitted line"
+        );
     }
 }

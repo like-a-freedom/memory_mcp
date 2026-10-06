@@ -5101,6 +5101,8 @@ dependencies = [
  "tokio",
  "tokio-util",
  "tower-service",
+ "tracing",
+ "tracing-subscriber",
  "unicode-normalization",
  "uuid",
  "zip",

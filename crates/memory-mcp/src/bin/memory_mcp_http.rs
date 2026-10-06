@@ -18,6 +18,9 @@ async fn main() -> ExitCode {
     // to be installed only by the stdio runner, and this binary silently kept
     // writing to stderr no matter what the variable said.
     memory_mcp::logging::install_log_file_from_env();
+    // Build the process-wide `tracing` subscriber before anything logs, so the
+    // sink and the format/colour environment are read once, up front.
+    memory_mcp::logging::install();
     let cfg = match HttpConfig::from_env() {
         Ok(c) => c,
         Err(err) => {

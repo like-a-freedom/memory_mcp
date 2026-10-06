@@ -1021,7 +1021,9 @@ operator configuration and are listed under
 | `MEMORY_HOOK_SOURCE_TYPE` | Hooks | No | [Agent memory lifecycle hooks](#agent-memory-lifecycle-hooks) |
 | `MEMORY_HOOK_VERBOSE` | Hooks | No | [Agent memory lifecycle hooks](#agent-memory-lifecycle-hooks) |
 | `MEMORY_INGESTION_INBOX` | Filesystem ingestion | No | [Filesystem ingestion](#filesystem-ingestion) |
+| `MEMORY_LOG_COLOR` | Logging | No | [Advanced runtime overrides](#advanced-runtime-overrides) |
 | `MEMORY_LOG_FILE` | Logging | No | [Advanced runtime overrides](#advanced-runtime-overrides) |
+| `MEMORY_LOG_FORMAT` | Logging | No | [Advanced runtime overrides](#advanced-runtime-overrides) |
 | `MEMORY_MCP_API_KEY_PEPPER` | HTTP secrets | Conditional | [Streamable HTTP](#streamable-http-environment-variables) |
 | `MEMORY_MCP_HTTP_AUTH_METHODS` | HTTP auth | No | [Streamable HTTP](#streamable-http-environment-variables) |
 | `MEMORY_MCP_HTTP_AUTH_MODE` | HTTP auth | No | [Streamable HTTP](#streamable-http-environment-variables) |
@@ -1114,6 +1116,7 @@ and not by the same code path — check the row before assuming one applies:
 | Variable | In an HTTP build | How |
 | --- | --- | --- |
 | `RUST_LOG` | Yes | Read directly by the logging layer in every profile, not through the stdio config path. |
+| `MEMORY_LOG_FORMAT`, `MEMORY_LOG_COLOR` | Yes | Read by the logging layer in every profile, at startup, before the subscriber is built. |
 | `LIFECYCLE_*` | Yes | Read by `resolve_deployment_policy` and applied to every tenant service. In HTTP the decay, archival and community passes run as a **process-level scheduler job** over the ready tenants, on the intervals `LIFECYCLE_DECAY_INTERVAL_SECS` / `LIFECYCLE_ARCHIVAL_INTERVAL_SECS`, registered only when `LIFECYCLE_ENABLED` is on. Per-tenant background workers are still not spawned — the pool evicts idle tenants and a worker tied to a runtime would outlive it — which is why HTTP walks tenants the way the embedding backfill does. |
 | `QUERY_LOGGING_ENABLED`, `QUERY_LOG_RETENTION_DAYS` | Yes | Read by `resolve_deployment_policy` and applied to every tenant service, so `assemble_context` persists `query_log` rows in HTTP exactly as it does in the stdio profile. |
 | `MEMORY_CLAIM_*` | Yes | Read by `resolve_deployment_policy` and applied to every tenant service. An invalid value is a startup error in **both** profiles. |
@@ -1166,8 +1169,10 @@ The following settings are optional for power users. They are read by the same e
 
 | Variable | Type | Default | Description |
 | --- | --- | --- | --- |
-| `RUST_LOG` | string | `info` | Logging level. A comma-separated list of directives: a bare level (`trace`, `debug`, `info`, `warn`, `error`; `warning` aliases `warn`) sets the default, and `prefix=level` sets it for the events whose `op` starts with that prefix at a dot boundary. The most specific prefix wins, and an unparseable directive is ignored rather than taking the rest of the list with it. An unknown level falls back to `info`. Example: `RUST_LOG=info,oidc=debug,ner=warn` turns the OIDC callback up without turning up the extraction pipeline |
-| `MEMORY_LOG_FILE` | path | unset | Write structured log events to this file instead of stderr, in **both** profiles (the HTTP binary installs the sink before it reads configuration); the file is created if missing (parent directory must exist), opened in append mode, and flushed after every line; on open failure the process falls back to stderr with a warning |
+| `RUST_LOG` | string | `info` | Logging level. A comma-separated list of directives: a bare level (`trace`, `debug`, `info`, `warn`, `error`; `warning` aliases `warn`) sets the default, and `prefix=level` sets it for the events whose `op` starts with that prefix at a dot boundary. The most specific prefix wins, and an unparseable directive is ignored rather than taking the rest of the list with it. An unknown level falls back to `info`. Example: `RUST_LOG=info,oidc=debug,ner=warn` turns the OIDC callback up without turning up the extraction pipeline. It selects this service's events only: third-party `tracing` output (the embedded database, HTTP clients) is capped at `warn` and is not raised by this variable |
+| `MEMORY_LOG_FORMAT` | `text` \| `json` | `text` | Output encoding. `text` is the single human-readable line; `json` is newline-delimited JSON, one object per event, for a log collector. Read at startup, in **both** profiles; an unknown value falls back to `text` |
+| `MEMORY_LOG_COLOR` | `auto` \| `always` \| `never` | `auto` | ANSI colour. `auto` colours only when stderr is a colour-capable terminal; `always` forces it; `never` disables it. `NO_COLOR` (set and non-empty) and `TERM=dumb` also disable colour, and a file sink (`MEMORY_LOG_FILE`) is never coloured |
+| `MEMORY_LOG_FILE` | path | unset | Write log events to this file instead of stderr, in **both** profiles (the HTTP binary installs the sink before it reads configuration); the file is created if missing (parent directory must exist), opened in append mode, and flushed after every line; colour is disabled for the file; on open failure the process falls back to stderr with a warning |
 | `MEMORY_PROMETHEUS_LISTEN_ADDR` | socket address (`IP:port`) | unset | Prometheus listener for the **stdio/local** profile, active when the `prometheus` feature is compiled in and this variable is set. The HTTP profile **rejects it** — `memory_mcp_http` serves metrics on its own `/metrics` route, and two scrape surfaces for one recorder is a configuration error |
 | `QUERY_LOGGING_ENABLED` | boolean | `false` | Persist `assemble_context` analytics rows into `query_log` when `true` |
 | `QUERY_LOG_RETENTION_DAYS` | unsigned integer | `90` | Days to retain persisted `query_log` analytics before best-effort pruning |
@@ -1959,6 +1964,29 @@ Recommended presets:
 - `RUST_LOG=trace` when debugging retrieval tiers, cache behavior, or filesystem-ingestion revision decisions
 
 An `.env` file already exists in the repository root, so you can keep local values there if your MCP host or shell loads it.
+
+#### Log line format
+
+Logs are written to stderr in the human-readable format by default: an
+unbracketed RFC 3339 timestamp with microseconds, a right-aligned level, then
+`key=value` tokens with `op=` first, the request id (`req=`) next, the duration,
+and the remaining fields sorted. Nested payloads are flattened to dotted keys:
+
+```
+2026-10-06T12:34:56.789012Z  INFO  op=ingest.done  req=req_0042  duration_ms=152  args.source_id=note-1  result.episode_id=episode:x
+```
+
+Set `MEMORY_LOG_FORMAT=json` for newline-delimited JSON, one object per event,
+for a log collector:
+
+```json
+{"timestamp":"2026-10-06T12:34:56.789012Z","level":"info","op":"ingest.done","request_id":"req_0042","duration_ms":152,"args":{"source_id":"note-1"},"result":{"episode_id":"episode:x"}}
+```
+
+Colour is enabled only when stderr is a colour-capable terminal. `NO_COLOR`,
+`TERM=dumb`, `MEMORY_LOG_COLOR=never`, and a file sink all disable it, and
+`MEMORY_LOG_COLOR=always` forces it on. `op=` and `req=` remain separate tokens
+in both formats, so `grep`/`awk` pipelines keep working.
 
 When `MEMORY_LOG_FILE` is set to a non-empty path, all structured log events are written to that file instead of stderr. This is useful for MCP hosts that do not expose the server's stderr. The file is opened in append mode (no rotation); the parent directory must already exist. If the file cannot be opened, a warning is emitted to stderr and logging continues there.
 
