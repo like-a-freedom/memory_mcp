@@ -356,6 +356,11 @@ impl MemoryService {
     ///
     /// Returns [`MemoryError::ConfigInvalid`] for a stage name outside
     /// `disabled`, `shadow`, `relations`, `evidence`.
+    ///
+    /// Only the stage changes: the candidate page size, inline limit and
+    /// inline budget the composition root loaded from the environment are
+    /// carried over from this container's existing config, so setting the
+    /// stage never silently re-tunes an unrelated knob.
     pub fn with_claim_rollout_stage(
         mut self,
         stage: &str,
@@ -364,7 +369,7 @@ impl MemoryService {
         let rollout_stage = crate::config::claims::ClaimRolloutStage::from_str(stage)?;
         let config = crate::config::claims::ClaimConfig {
             rollout_stage,
-            ..Default::default()
+            ..self.claim_service.config.clone()
         };
         self.claim_service = self.claim_service.clone().with_config(config);
         Ok(self)

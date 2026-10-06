@@ -113,8 +113,11 @@ async fn exposes_supersession_on_the_predecessor_item() {
         "the summary must carry the evaluator's reason code"
     );
     assert!(
-        !summary.counterpart_source_episode_id.is_empty(),
-        "the summary must say which episode the replacement came from"
+        summary
+            .counterpart_source_episode_id
+            .as_deref()
+            .is_some_and(|episode| !episode.is_empty()),
+        "both facts are in the pack, so the counterpart episode must be known"
     );
 
     // The predecessor names its successor; the successor names nothing, so no
@@ -187,52 +190,68 @@ async fn leaves_reconciliation_none_when_no_relation_exists() {
 #[tokio::test]
 async fn withholds_relations_below_the_evidence_stage() {
     // The rollout contract in `docs/evals/CLAIM_RECONCILIATION.md`: `shadow`
-    // projects claims and persists relations, but the read path serves none of
-    // them. Without this test the gate is invisible — nothing else in the tree
-    // observes the difference between `shadow` and `evidence`, so a regression
-    // that exposes relations to every deployment would stay green.
-    let tm = common::TestMemory::new(false).await;
-    let service = tm
-        .service
-        .with_claim_rollout_stage("shadow")
-        .expect("shadow is a valid claim rollout stage");
+    // projects claims and persists relations but serves none of them to
+    // `assemble_context`; `relations` persists without disclosing; `disabled`
+    // extracts nothing. All three share `exposes_evidence() == false`, so they
+    // take one branch today — but asserting a single stage would leave the
+    // other two unguarded, and that predicate is the only thing standing
+    // between a deployment and a relation row it was never cleared for.
+    for stage in ["disabled", "shadow", "relations"] {
+        let tm = common::TestMemory::new(false).await;
+        let service = tm
+            .service
+            .with_claim_rollout_stage(stage)
+            .unwrap_or_else(|err| panic!("{stage} is a valid claim rollout stage: {err}"));
 
-    common::ingest_lineage_episode(
-        &service,
-        &tm.db_client,
-        "episode:gate-1",
-        "fs:docs/gated.md:aaaa",
-        "fs:docs/gated.md",
-        "ARR is legacy",
-        Utc.with_ymd_and_hms(2026, 6, 1, 10, 0, 0).unwrap(),
-    )
-    .await;
-    common::ingest_lineage_episode(
-        &service,
-        &tm.db_client,
-        "episode:gate-2",
-        "fs:docs/gated.md:bbbb",
-        "fs:docs/gated.md",
-        "ARR is supersedes",
-        Utc.with_ymd_and_hms(2026, 6, 2, 10, 0, 0).unwrap(),
-    )
-    .await;
+        common::ingest_lineage_episode(
+            &service,
+            &tm.db_client,
+            "episode:gate-1",
+            "fs:docs/gated.md:aaaa",
+            "fs:docs/gated.md",
+            "ARR is legacy",
+            Utc.with_ymd_and_hms(2026, 6, 1, 10, 0, 0).unwrap(),
+        )
+        .await;
+        common::ingest_lineage_episode(
+            &service,
+            &tm.db_client,
+            "episode:gate-2",
+            "fs:docs/gated.md:bbbb",
+            "fs:docs/gated.md",
+            "ARR is supersedes",
+            Utc.with_ymd_and_hms(2026, 6, 2, 10, 0, 0).unwrap(),
+        )
+        .await;
 
-    assert!(
-        common::wait_for_supersessions(&tm.db_client, 1).await,
-        "relations are persisted at shadow too; only disclosure is withheld"
-    );
+        if stage == "disabled" {
+            assert_eq!(
+                common::supersession_count(&tm.db_client).await,
+                0,
+                "disabled must not project claims at all"
+            );
+        } else {
+            assert!(
+                common::wait_for_supersessions(&tm.db_client, 1).await,
+                "{stage} persists relations; only disclosure is withheld"
+            );
+        }
 
-    let items = AssembleContextCapability::assemble_context_from_service(&service, request("ARR"))
-        .await
-        .expect("context should assemble");
+        let items =
+            AssembleContextCapability::assemble_context_from_service(&service, request("ARR"))
+                .await
+                .expect("context should assemble");
 
-    assert!(!items.is_empty(), "the fixture must be retrievable");
-    assert!(
-        items.iter().all(|item| item.reconciliation.is_none()),
-        "shadow must not disclose relations through assemble_context, got {} disclosures",
-        items.iter().filter(|i| i.reconciliation.is_some()).count()
-    );
+        assert!(
+            !items.is_empty(),
+            "{stage}: the fixture must still be retrievable — facts are not claim-gated"
+        );
+        assert!(
+            items.iter().all(|item| item.reconciliation.is_none()),
+            "{stage} must not disclose relations through assemble_context, got {} disclosures",
+            items.iter().filter(|i| i.reconciliation.is_some()).count()
+        );
+    }
 }
 
 /// The relation must change a response, not merely appear in one.

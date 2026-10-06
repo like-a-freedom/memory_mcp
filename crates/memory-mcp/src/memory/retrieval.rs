@@ -374,15 +374,27 @@ async fn assemble_context_inner(
 ///
 /// Facts with no relations are left untouched rather than set to `Some(empty)`,
 /// so `None` keeps meaning "this fact participates in nothing".
+///
+/// **A failed read fails the assembly.** This is deliberately asymmetric with
+/// the steps beside it: `track_fact_accesses` and `store_cache` are best-effort
+/// because losing them costs telemetry or a cache entry. Losing this read would
+/// silently downgrade a disclosed pack to an undisclosed one, and at the
+/// `evidence` stage the caller believes disclosure was served. Failing loudly
+/// is the smaller error.
 async fn attach_reconciliation(
     ctx: &RetrievalContext,
     items: &mut [AssembledContextItem],
 ) -> Result<(), MemoryError> {
+    // Dedup on the borrow, not on a fresh `FactId` per item: this runs on
+    // every cache miss, and allocating one String per element to discover an
+    // id is already in the set is pure waste. One allocation per *distinct*
+    // fact is the floor.
     let mut seen = std::collections::HashSet::new();
     let fact_ids: Vec<crate::models::FactId> = items
         .iter()
-        .map(|item| crate::models::FactId::from(item.fact_id.as_str()))
-        .filter(|id| seen.insert(id.to_string()))
+        .map(|item| item.fact_id.as_str())
+        .filter(|id| seen.insert(*id))
+        .map(crate::models::FactId::from)
         .collect();
 
     if fact_ids.is_empty() {

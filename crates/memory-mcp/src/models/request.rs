@@ -274,7 +274,14 @@ pub struct ClaimReconciliationMetadata {
 pub struct ClaimRelationSummary {
     pub relation_id: String,
     pub outcome: crate::models::claim::ClaimRelationOutcome,
-    pub counterpart_source_episode_id: String,
+    /// The episode the other side of this relation came from.
+    ///
+    /// `None` when the counterpart's claim is outside the queried facts — most
+    /// often because the budget dropped it — or when the row predates the
+    /// lineage columns. `None` rather than `""` so "unknown" is not
+    /// indistinguishable from an empty identifier.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub counterpart_source_episode_id: Option<String>,
     /// The fact that replaced this one, present only for `Supersession` and
     /// `Correction`. `claim_relation` stores the direction; this is the
     /// projection the read path needs to rank the pair, never recomputed here.
@@ -320,10 +327,12 @@ pub struct AssembledContextItem {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub retrieval_tier: Option<String>,
     /// Claim relations of the source fact. Omitted under compact=true, like
-    /// `quote`, so the frozen compact budget does not grow a relation vector.
+    /// `quote`, so the frozen compact budget does not grow a relation vector,
+    /// and omitted when there are none, so verbose output does not carry
+    /// `null` where every sibling `Option` omits the key.
     #[serde(
         default,
-        skip_serializing_if = "crate::tools::compact::skip_if_compact"
+        skip_serializing_if = "crate::tools::compact::skip_if_none_or_compact"
     )]
     pub reconciliation: Option<ClaimReconciliationMetadata>,
 }

@@ -1,6 +1,6 @@
 # Read-Path Reconciliation Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [x]`) syntax for tracking.
 
 **Goal:** Make the claim reconciliation layer observable to `assemble_context`, so a superseded fact reaches a reader ranked below its successor and annotated with the relation that demoted it.
 
@@ -9,6 +9,17 @@
 **Tech Stack:** Rust 1.99.0, SurrealDB (embedded + remote), `tokio`, `async-trait`, `serde`/`schemars`, `thiserror`. Crate: `memory_mcp`.
 
 **Spec:** `docs/superpowers/specs/2026-10-05-memory-quality-evidence-review.md` (Phase 0)
+
+**Status: implemented.** All six tasks landed in commits `d351158`…`5be02dc` (2026-10-05);
+the checkboxes are recorded state, not an invitation. Four steps departed from the wording
+above and each departure is recorded in its commit body rather than rewritten here, so the
+plan still shows what was asked: Tasks 2+3 share a commit (a query with no consumer fails
+`-D warnings`, so the per-task gate could not be green independently); Task 5 kept the old
+test body under an honest name instead of deleting it; Task 6's measurement came back
+unchanged with the reason recorded in its own step; and the rollout gate in Global
+Constraints was added during implementation after `CLAIM_RECONCILIATION.md` contradicted
+ADR-0074. The gates are green: `cargo fmt --all --check`, `cargo clippy` with `-D warnings`,
+3165 `memory_mcp` tests and 203 `eval-harness` tests.
 **ADRs:** `docs/adr/0074-connect-the-reconciliation-relation-to-the-read-path.md` (this plan's governing decision), `docs/adr/0058-bounded-contexts-modular-monolith.md` (knowledge owns claims and relations), `docs/adr/0044-narrow-stores-expose-named-methods-only.md`, `docs/adr/0066-business-policy-in-the-owning-context.md`, `docs/adr/0009-separate-claim-supersession-from-fact-retraction.md`, `docs/adr/0022-compact-response-default-for-llm-consumers.md`, `docs/adr/0073-test-behavior-not-document-inventory.md`
 
 ## Global Constraints
@@ -66,7 +77,7 @@ The field is declared at `models/request.rs:277` and its only occurrence in the 
 - Consumes: nothing.
 - Produces: `ClaimRelationSummary { relation_id, outcome, counterpart_source_episode_id, reason_code, evaluator_version }`. Later tasks build on this shape; **Task 3 adds exactly one field to it**, `superseded_by_fact_id: Option<String>`, and changes nothing else.
 
-- [ ] **Step 1: Confirm the field is dead before deleting it**
+- [x] **Step 1: Confirm the field is dead before deleting it**
 
 Run:
 ```bash
@@ -74,25 +85,25 @@ grep -rn "counterpart_fact_id" crates/ --include=*.rs
 ```
 Expected: exactly one hit, the declaration at `models/request.rs:277`. **If there is any second hit, stop and report it** — that means a writer or reader exists and this task's premise is false.
 
-- [ ] **Step 2: Remove the field**
+- [x] **Step 2: Remove the field**
 
 Delete this line from `ClaimRelationSummary` in `crates/memory-mcp/src/models/request.rs`:
 ```rust
     pub counterpart_fact_id: String,
 ```
 
-- [ ] **Step 3: Build**
+- [x] **Step 3: Build**
 
 Run: `cargo build`
 Expected: compiles. If any constructor sets the field, Step 1 was wrong — stop and report.
 
-- [ ] **Step 4: Amend ADR-0074's stale rationale in the same commit**
+- [x] **Step 4: Amend ADR-0074's stale rationale in the same commit**
 
 ADR-0074 justified "no schema change" by pointing at `counterpart_fact_id` — the field this task deletes. Correct that clause so the ADR matches what the plan actually does (Global Constraints): the successor fact id arrives in a new `superseded_by_fact_id` field added by Task 3.
 
 The ADR's decision — post-assembly reordering, no constant, no new candidate axis — stands unchanged. Only the rationale is corrected. Same commit as the deletion, so the record shows both together.
 
-- [ ] **Step 5: Verify the full gate set**
+- [x] **Step 5: Verify the full gate set**
 
 Run:
 ```bash
@@ -102,7 +113,7 @@ cargo clippy --workspace --all-targets \
 ```
 Expected: both clean.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add crates/memory-mcp/src/models/request.rs docs/adr/0074-connect-the-reconciliation-relation-to-the-read-path.md
@@ -154,7 +165,7 @@ git commit -m "refactor: drop never-populated counterpart_fact_id from ClaimRela
   ```
   Direction semantics: `predecessor_fact_id` is the fact whose claim lost; `successor_fact_id` is the fact whose claim replaced it. Both `None` for outcomes with no direction (`Contradiction`, `TemporalAmbiguity`). A relation whose `t_invalid_ingested` is set is omitted entirely.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 Add a `#[cfg(test)] mod tests` to `crates/memory-mcp/src/knowledge/claims.rs`. It already has one — `latest_registered_migration_is_expected` lives at line 792 — so extend that module rather than adding a second. Reuse its in-memory store bootstrap if one exists; `SurrealClaimStore::new(db: Arc<dyn DbClient>, namespace)` (line 156) is the only constructor.
 
@@ -190,16 +201,16 @@ async fn ignores_relations_for_absent_facts() { /* query with an unrelated fact 
 
 **Fixture note.** `common::seed_fact_at` lives in `tests/common/` and is not reachable from inside the crate; do not try to use it here. This test builds `claim` and `claim_relation` rows directly through the `DbClient`. That is appropriate: the unit under test is a *query*, and `tests/claim_reconciliation_e2e.rs` already covers the full ingest → extract → reconcile pipeline end to end. Do not duplicate that pipeline here.
 
-- [ ] **Step 2: Run the test to verify it fails**
+- [x] **Step 2: Run the test to verify it fails**
 
 Run: `cargo test -p memory_mcp --lib knowledge::claims`
 Expected: **compile error** — `RelationsByFactQuery` and `select_relations_by_fact` do not exist yet. This is the correct failure; a runtime assertion failure would mean you are testing existing behavior.
 
-- [ ] **Step 3: Add the query types to `knowledge/claims.rs`**
+- [x] **Step 3: Add the query types to `knowledge/claims.rs`**
 
 Add `RelationForFact` and `RelationsByFactQuery` next to the existing `RelationsForFactsQuery` (around line 105), and add the `select_relations_by_fact` declaration to the `ClaimStore` trait after `select_relations_for_facts` (line 57).
 
-- [ ] **Step 4: Implement the SurrealDB query**
+- [x] **Step 4: Implement the SurrealDB query**
 
 Implement it on `SurrealClaimStore`. Two options; take the first:
 
@@ -212,11 +223,11 @@ Direction mapping, exactly: when `outcome` is `Supersession` or `Correction`, re
 
 Filter out rows where `t_invalid_ingested` is present and non-null. Set `predecessor_source_episode_id` / `successor_source_episode_id` from the matching `Claim.source_episode_id`.
 
-- [ ] **Step 5: Make every `ClaimStore` implementor compile**
+- [x] **Step 5: Make every `ClaimStore` implementor compile**
 
 `ClaimStore` is implemented by test doubles too (`knowledge/claims_policy/worker.rs:466`, `claims_policy/projection.rs:406`). Add the new method to each. **Do not** give a double a real implementation it does not need — `todo!()` is acceptable for a double that no test exercising it will call, but the compiler will reject an omitted method.
 
-- [ ] **Step 6: Do not widen the public surface**
+- [x] **Step 6: Do not widen the public surface**
 
 `RelationForFact` stays `pub(crate)`. `eval_support::ClaimEvidenceReader` already exists as a public seam (`eval_support.rs:100`, used by `crates/eval-harness/src/suites/claims.rs:608`), but **nothing in this plan calls it** — Task 6 measures through the eval harness, not through that reader. So this plan does not touch `eval_support.rs` and does not make `RelationForFact` `pub`.
 
@@ -224,12 +235,16 @@ An earlier draft added `relations_by_fact` to `ClaimEvidenceReader` "so Task 6 c
 
 Corollary: `RelationForFact` is consumed only inside the crate (Task 2's unit tests, Task 3's projection), so `pub(crate)` is correct and sufficient. Do not add `pub use` re-exports to `lib.rs` for any of these types.
 
-- [ ] **Step 7: Run the tests to verify they pass**
+- [x] **Step 7: Run the tests to verify they pass**
 
 Run: `cargo test -p memory_mcp --lib knowledge::claims`
-Expected: **4 passed**.
+Expected: the four added here — `maps_supersession_direction_to_facts`,
+`excludes_invalidated_relations`, `omits_direction_for_undirected_outcomes`,
+`ignores_relations_for_absent_facts` — pass, alongside the module's existing
+tests. The filter is a module prefix, not a test list, so the run reports
+considerably more than four.
 
-- [ ] **Step 8: Verify the full gate set**
+- [x] **Step 8: Verify the full gate set**
 
 ```bash
 cargo fmt --all --check && \
@@ -238,7 +253,7 @@ cargo clippy --workspace --all-targets \
 ```
 Expected: clean.
 
-- [ ] **Step 9: Commit**
+- [x] **Step 9: Commit**
 
 ```bash
 git add crates/memory-mcp/src/knowledge/claims.rs
@@ -268,7 +283,7 @@ This task makes the read path populate the field it already declares.
 - Consumes: `RelationReadPort` from Step 3, whose single method delegates to `ClaimStore::select_relations_by_fact` (Task 2). **`memory/retrieval` never names `ClaimStore`** — Step 3 is explicit that this task depends on the port, not the store.
 - Produces: `AssembledContextItem.reconciliation` is `Some(ClaimReconciliationMetadata { .. })` for any item whose fact participates in at least one relation; `None` otherwise. The **decision** this produces — demotion — is Task 4; this task only attaches data.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Create `crates/memory-mcp/tests/assemble_context_reconciliation.rs`:
 
@@ -304,12 +319,12 @@ async fn leaves_reconciliation_none_when_no_relation_exists() { /* one fact, no
 
 `assemble_context_from_service` returns `Vec<AssembledContextItem>` directly (`service/memory_container_shims/memory_capabilities_assemble_context.rs:21-26`) — there is no wrapper struct and no `.items` field.
 
-- [ ] **Step 2: Run the test to verify it fails**
+- [x] **Step 2: Run the test to verify it fails**
 
 Run: `cargo test -p memory_mcp --test assemble_context_reconciliation --features test-fixtures`
 Expected: FAIL — `reconciliation` is `None`, exactly the defect this plan fixes. A compile error means you referenced something Task 2 did not produce.
 
-- [ ] **Step 3: Add the port in the owning context, not in the retrieval module**
+- [x] **Step 3: Add the port in the owning context, not in the retrieval module**
 
 Do **not** add a raw `Arc<dyn ClaimStore>` field to `AssembleContextDeps` and call it from `retrieval.rs`. That was the earlier shape of this step and it is wrong twice over: it hands a storage adapter to a use case (ISP — `assemble_context` would depend on every method of a 10-method trait), and it puts the projection policy in a transport-shaped module rather than the context that owns it (ADR-0066).
 
@@ -346,7 +361,7 @@ Two things do **not** need changing:
 - `service/apps/graph.rs:62` implements `GraphContext for AssembleContextDeps`. Adding a field is fine — a trait impl that never reads the new field still compiles. No change there.
 - Nothing else constructs `AssembleContextDeps`; `grep -rn "AssembleContextDeps {" crates/` returns this one file plus the two impl blocks. A second construction site appearing later is a compile error, which is the intended failure.
 
-- [ ] **Step 4: Implement the projection**
+- [x] **Step 4: Implement the projection**
 
 Insert after the view dispatch (`retrieval.rs:226`, where `results` is bound) and before `store_cache` (`retrieval.rs:334`). Collect the distinct `fact_id`s from `results`, call `select_relations_by_fact` **once** for the whole set — a per-item call is N queries on the hot path — group by fact id, and set `reconciliation` on each item whose fact appears in the group.
 
@@ -356,7 +371,7 @@ Direction: fill `ClaimRelationSummary` from `RelationForFact`. The summary carri
 
 **Place this before `store_cache`, not after.** The cache stores `Vec<AssembledContextItem>` (`retrieval_deps.rs:46-51`), so items stored without relations would be served back with `reconciliation: None` forever. Details in the cache section below.
 
-- [ ] **Step 5: The context cache will hide your work — read this before writing the test**
+- [x] **Step 5: The context cache will hide your work — read this before writing the test**
 
 Three facts about the cache that change how Tasks 3–6 must be tested:
 
@@ -372,7 +387,7 @@ Consequence for every test in Tasks 3, 4, 5 and 6: **a test that assembles the s
 
 Do **not** add a cache-bypass parameter to the public request. `AssembleContextRequest` is a frozen MCP surface; adding a field to it is out of scope for this plan.
 
-- [ ] **Step 6: Gate the field under compact mode**
+- [x] **Step 6: Gate the field under compact mode**
 
 `AssembledContextItem` gates `quote` with `skip_serializing_if = "crate::tools::compact::skip_if_compact"` (`models/request.rs:292`). `reconciliation` currently uses `skip_serializing_if = "Option::is_none"` (line 319).
 
@@ -383,19 +398,32 @@ Do **not** add a cache-bypass parameter to the public request. `AssembleContextR
 
 ADR-0022 froze compact responses as the default for LLM consumers, and the response-size gate protects that budget — adding a relation vector moves it. Apply the same compact gate `quote` uses, so under `compact=true` the full `relations` vector is omitted. Measure the compact payload before and after rather than inspecting it.
 
-- [ ] **Step 7: Run the test to verify it passes**
+- [x] **Step 7: Run the test to verify it passes**
 
 Run: `cargo test -p memory_mcp --test assemble_context_reconciliation --features test-fixtures`
-Expected: **2 passed**.
+Expected: **3 passed** — `exposes_supersession_on_the_predecessor_item`,
+`leaves_reconciliation_none_when_no_relation_exists`, and
+`withholds_relations_below_the_evidence_stage`. Task 6 adds a fourth to this file.
 
-- [ ] **Step 8: Run the retrieval and size gates**
+- [x] **Step 8: Run the retrieval and size gates**
 
 ```bash
 cargo test -p memory_mcp --features fs-watch,mcp-apps,streamable-http
+cargo run -p eval-harness --bin memory-eval -- run \
+  --profile evals/profiles/release.json \
+  --artifact target/eval/gate-check.json \
+  --baseline evals/baselines/one-active-namespace-release.json
 ```
-Expected: all pass, including the response-size and retrieval gates. If the size gate fails, Step 6 was applied incorrectly — fix the gate, do not raise the budget.
 
-- [ ] **Step 9: Commit**
+Expected: the first command all green; the second prints one `gate=… status=passed`
+line per gate and `RESULT: PASSED`. The response-size and retrieval **gates** (the
+ones with floors and a regression budget) are implemented in `eval-harness` —
+`crates/eval-harness/src/suites/response_size.rs` and `suites/retrieval.rs` — not
+in `memory_mcp`, so running only the first command would run none of them. If the
+size gate fails, Step 6 was applied incorrectly — fix the gate, do not raise the
+budget. `target/` must exist first; the harness does not create it.
+
+- [x] **Step 9: Commit**
 
 ```bash
 git add crates/memory-mcp/src/memory/retrieval crates/memory-mcp/src/models/request.rs crates/memory-mcp/tests/assemble_context_reconciliation.rs
@@ -421,7 +449,7 @@ This is a post-assembly reordering, not a scoring term. Successor presence is un
 - Consumes: `AssembledContextItem.reconciliation` populated by Task 3.
 - Produces: within the returned item list, for every item `x` that has a `Supersession` or `Correction` relation whose successor fact is also present in the list, `index(x) > index(successor)`. Every other relative order is unchanged.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 Two levels, because the policy and the wiring fail differently.
 
@@ -460,7 +488,7 @@ Keep the wiring level to **one** test. The three policy rules are already covere
 
 `never_demotes_duplicate_outcome` asserting only an order is weak evidence — it would pass if the reorder were a no-op. Assert both facts remain present too, so the test detects a demotion that pushed one out of the budget.
 
-- [ ] **Step 2: Run the tests to verify they fail**
+- [x] **Step 2: Run the tests to verify they fail**
 
 ```bash
 cargo test -p memory_mcp --lib memory::retrieval::ranking
@@ -468,7 +496,7 @@ cargo test -p memory_mcp --test assemble_context_supersession_ranking --features
 ```
 Expected: the unit tests FAIL (no `demote_superseded` yet) and the wiring test FAILS (nothing demotes A). After the policy exists, both halves must go green — a green wiring test with a missing unit test means the policy was never pinned.
 
-- [ ] **Step 3: Implement the reordering as a pure function in `ranking.rs`**
+- [x] **Step 3: Implement the reordering as a pure function in `ranking.rs`**
 
 Do not write the loop inline in `retrieval.rs`. `retrieval.rs` is already 1409 lines and is the transport-shaped dispatcher; ADR-0066 puts policy in the owning context as pure functions over state, and `ranking.rs` (2023 lines) is where ranking policy already lives as pure functions taking a `…Request` struct — `build_ranked_context_facts(BuildRankedContextFactsRequest { .. }, decayed_fn)` (`ranking.rs:158-171`) is the exact pattern.
 
@@ -502,16 +530,19 @@ Call it from `retrieval.rs` at the single point Task 3 established. Nothing else
 
 **Note what step 2 needs:** the successor's **fact id**. `ClaimRelationSummary` does not carry one — Task 1 removed `counterpart_fact_id`, and `reason_code` is not a pointer. Add `superseded_by_fact_id: Option<String>` to `ClaimRelationSummary`, populated in Task 3 only for `Supersession`/`Correction`. One field, one producer, one consumer; `claim_relation` still stores the truth and nothing recomputes it. Do not derive direction from string-matching `outcome`, and do not re-derive it from `claim_ids`.
 
-- [ ] **Step 4: Run the tests to verify they pass**
+- [x] **Step 4: Run the tests to verify they pass**
 
 Run: `cargo test -p memory_mcp --test assemble_context_supersession_ranking --features test-fixtures`
-Expected: **3 passed**.
+Expected: **1 passed** — `demotes_predecessor_below_successor_in_an_assembled_pack`.
+Step 1 keeps the wiring level to exactly one test, so the three policy rules are
+asserted only as unit tests in `ranking.rs`; an expectation of three here would
+contradict that instruction.
 
-- [ ] **Step 5: Prove the demotion test detects the original defect**
+- [x] **Step 5: Prove the demotion test detects the original defect**
 
 ADR-0073 requires a regression scenario to demonstrate it fails against the defect. Temporarily comment out the reordering block, run the three tests, and confirm `demotes_predecessor_below_successor` fails while the other two pass. Restore the code and re-run. Record the output in the commit body.
 
-- [ ] **Step 5b: Run the full gate set**
+- [x] **Step 5b: Run the full gate set**
 
 ```bash
 cargo test -p memory_mcp --features fs-watch,mcp-apps,streamable-http && \
@@ -521,7 +552,7 @@ cargo clippy --workspace --all-targets \
 ```
 Expected: all green.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add crates/memory-mcp/src/memory/retrieval crates/memory-mcp/tests/assemble_context_supersession_ranking.rs
@@ -544,14 +575,14 @@ ADR-0074 requires this be replaced by a genuine correction scenario, because unt
 - Consumes: everything Tasks 1–4 produced.
 - Produces: an acceptance test that distinguishes correction from retraction by observable outcome.
 
-- [ ] **Step 1: Read the existing test and name the defect**
+- [x] **Step 1: Read the existing test and name the defect**
 
 ```bash
 sed -n '120,175p' crates/memory-mcp/tests/longmem_acceptance.rs
 ```
 Expected: the body calls `invalidate`. If it does not, stop — this task's premise changed.
 
-- [ ] **Step 2: Write the replacement failing test**
+- [x] **Step 2: Write the replacement failing test**
 
 Replace the misnamed test with:
 
@@ -603,27 +634,27 @@ Assert 2 is the one that distinguishes correction from retraction. A test assert
 
 If the test rollout stage does not emit relations, insert the `claim` and `claim_relation` rows directly and say so in the commit body. Do not weaken Assert 1 to make the test pass.
 
-- [ ] **Step 3: Run it to verify it fails**
+- [x] **Step 3: Run it to verify it fails**
 
 Run: `cargo test -p memory_mcp --test longmem_acceptance corrected_fact_supersedes_the_stale_value_in_the_latest_view --features test-fixtures`
 Expected: FAIL on Assert 1. If it passes immediately, your arrangement produced no relation — check that the correction use case actually ran.
 
-- [ ] **Step 4: Run it to verify it passes**
+- [x] **Step 4: Run it to verify it passes**
 
 Expected after Tasks 1–4: **PASS**.
 
-- [ ] **Step 5: Delete the old test**
+- [x] **Step 5: Delete the old test**
 
 Remove the misnamed test entirely rather than leaving it beside the new one. Two tests covering overlapping ground, one named for behavior it does not exercise, is how the next reader gets misled.
 
-- [ ] **Step 6: Run the full acceptance suite**
+- [x] **Step 6: Run the full acceptance suite**
 
 ```bash
 cargo test -p memory_mcp --test longmem_acceptance --features test-fixtures
 ```
 Expected: all pass.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add crates/memory-mcp/tests/longmem_acceptance.rs
@@ -644,7 +675,7 @@ Phase 0's real evidence is not "the tests pass." It is that the knowledge-update
 - Consumes: all prior tasks.
 - Produces: a recorded measurement, not a code change.
 
-- [ ] **Step 1: Add a test that the relation changes a response, not just a field**
+- [x] **Step 1: Add a test that the relation changes a response, not just a field**
 
 The naive shape of this test — assemble once with the relation, assemble again without it, compare the leaders — **cannot work**, and failing to notice that is the easiest way to produce a green test proving nothing. Two assemblies of the same query return the *first* result from the context cache (Task 3 Step 5), so the second assertion would compare the cached list against itself.
 
@@ -672,11 +703,11 @@ The point is not that the unreconciled service leads with A. It may still rank B
 
 Each service needs its own namespace and database — `common::TestMemory::new` allocates a fresh one per call (`tests/common/mod.rs:35-38`), so two calls give two isolated stores.
 
-- [ ] **Step 2: Run it and confirm it passes**
+- [x] **Step 2: Run it and confirm it passes**
 
 Expected: **PASS**. If it fails, Phase 0 did not achieve its goal — the relation is attached but not influential, and Tasks 3–4 need revisiting.
 
-- [ ] **Step 3: Run the eval harness**
+- [x] **Step 3: Run the eval harness**
 
 The binary is `memory-eval` (`crates/eval-harness/Cargo.toml:13`, `path = "src/main.rs"`), not `eval-harness`, and there is no `compare` subcommand and no `--systems` flag. The real surface is `run` / `prepare-corpus` / `merge`, with `--profile`, `--artifact`, `--baseline`, and repeatable `--suite` (`crates/eval-harness/src/cli.rs:13-22`).
 
@@ -692,7 +723,7 @@ Baseline arms (bm25 / dense / hybrid) are **profile** definitions, not a CLI fla
 
 **If the harness cannot run**, say so in the handoff rather than substituting a local assertion. `target/` is gitignored, so no committed baseline artifact exists to compare against, and a locally fabricated baseline would not be evidence.
 
-- [ ] **Step 4: Record the before/after knowledge-update number**
+- [x] **Step 4: Record the before/after knowledge-update number**
 
 Report the number, the corpus, the reader, and the label-trust class. If the number did not move, Phase 0 is not complete — report that, do not explain it away.
 
@@ -709,7 +740,7 @@ Two blockers, one of them structural and neither of them the retrieval code:
 
 Consequence, stated rather than explained: Phase 0's production code is complete and mutation-verified in-process, but **its external evaluation evidence is not established**. The in-process proof — that a relation changes which fact leads a pack — is recorded in the Task 4 and Task 6 tests and their commit bodies. The external proof requires a metric that Phase 2 of the spec adds and this plan places out of scope.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add crates/memory-mcp/tests/assemble_context_reconciliation.rs

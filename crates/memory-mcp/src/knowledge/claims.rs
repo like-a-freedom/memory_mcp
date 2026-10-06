@@ -449,13 +449,10 @@ impl ClaimStore for SurrealClaimStore {
             let relation: ClaimRelation = serde_json::from_value(record)
                 .map_err(|e| MemoryError::Storage(format!("relation deser: {e}")))?;
 
-            // Direction exists only for outcomes that name a winner. Deriving it
-            // from left/right would invent a winner for Contradiction.
-            let directed = matches!(
-                relation.outcome,
-                crate::models::claim::ClaimRelationOutcome::Supersession
-                    | crate::models::claim::ClaimRelationOutcome::Correction
-            );
+            // Direction exists only for outcomes that name a winner, per the
+            // enum's own rule. Deriving it from left/right would invent a
+            // winner for Contradiction.
+            let directed = relation.outcome.has_direction();
             let (predecessor_fact_id, successor_fact_id, pred_episode, succ_episode) = if directed {
                 let pred = relation
                     .predecessor_claim_id

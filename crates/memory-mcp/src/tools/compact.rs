@@ -40,6 +40,18 @@ pub fn skip_if_compact<T>(_value: &T) -> bool {
     is_compact()
 }
 
+/// serde `skip_serializing_if` for an `Option` that must disappear under
+/// compact mode *and* stay absent when there is nothing to say.
+///
+/// [`skip_if_compact`] alone would emit `"field": null` for every item that
+/// has no value once compact mode is off: it answers only "is this compact?",
+/// never "is there a value?". Sibling `Option` fields on the same struct skip
+/// on `Option::is_none`, so using that alone would drop the value under
+/// compact and let the response-size gate regress. This is both.
+pub fn skip_if_none_or_compact<T>(value: &Option<T>) -> bool {
+    value.is_none() || is_compact()
+}
+
 /// Custom serializer for `rationale`. Under compact mode, emits only the
 /// leading `tier=<tier>` token; otherwise passes the string through.
 /// Must be `pub` because `models/request.rs` references it.
@@ -106,6 +118,39 @@ mod tests {
             assert!(skip_if_compact(&42));
         }
         assert!(!skip_if_compact(&42));
+    }
+
+    // Exercises the attribute through serde: the predicate's contract is
+    // about what appears in the payload, not about the predicate alone.
+    #[derive(serde::Serialize)]
+    struct TestOptional {
+        #[serde(default, skip_serializing_if = "skip_if_none_or_compact")]
+        value: Option<String>,
+    }
+
+    #[test]
+    fn optional_field_is_absent_when_empty_and_absent_when_compact() {
+        let verbose = serde_json::to_value(TestOptional { value: None }).unwrap();
+        assert!(
+            verbose.get("value").is_none(),
+            "an empty optional must not serialize as null next to siblings that omit it"
+        );
+
+        let verbose = serde_json::to_value(TestOptional {
+            value: Some("kept".into()),
+        })
+        .unwrap();
+        assert_eq!(verbose["value"], "kept", "verbose mode must keep the value");
+
+        let _guard = set_compact(true);
+        let compact = serde_json::to_value(TestOptional {
+            value: Some("kept".into()),
+        })
+        .unwrap();
+        assert!(
+            compact.get("value").is_none(),
+            "compact mode must drop the value, or the response-size gate regresses"
+        );
     }
 
     // Exercises the serialize_with attribute directly.

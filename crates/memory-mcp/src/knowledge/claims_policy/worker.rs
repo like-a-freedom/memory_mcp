@@ -281,6 +281,24 @@ async fn reconcile_page_with_owning(
             super::reconcile::ReconciliationDecision::Persist(draft) => {
                 let rid =
                     crate::models::claim::relation_id(&draft.left_claim_id, &draft.right_claim_id);
+                // `draft.left_claim_id` is the *smaller* of the two claim ids
+                // (every outcome orders them canonically), so it may name the
+                // candidate rather than the claim being reconciled. The fact
+                // columns have to follow that same order — pairing them by
+                // evaluation position instead leaves `left_fact_id` naming the
+                // fact of `right_claim_id` on every row where the candidate
+                // sorts lower, and nothing reading one column can tell.
+                let (left_fact_id, right_fact_id) = if draft.left_claim_id == owning.claim_id {
+                    (
+                        owning.source_fact_id.clone(),
+                        candidate.source_fact_id.clone(),
+                    )
+                } else {
+                    (
+                        candidate.source_fact_id.clone(),
+                        owning.source_fact_id.clone(),
+                    )
+                };
                 relations.push(crate::models::claim::ClaimRelation {
                     claim_relation_id: rid,
                     left_claim_id: draft.left_claim_id.clone(),
@@ -309,8 +327,8 @@ async fn reconcile_page_with_owning(
                     t_invalid_ingested: None,
                     schema_family: Some(owning.schema_family),
                     schema_version: Some(owning.schema_version),
-                    left_fact_id: Some(owning.source_fact_id.clone()),
-                    right_fact_id: Some(candidate.source_fact_id.clone()),
+                    left_fact_id: Some(left_fact_id),
+                    right_fact_id: Some(right_fact_id),
                 });
                 succeeded += 1;
             }
@@ -550,5 +568,78 @@ mod tests {
         ];
         assert!(relation_fact_ids.contains(&Some(&first_fact_id)));
         assert!(relation_fact_ids.contains(&Some(&second_fact_id)));
+    }
+
+    /// `left_claim_id` / `right_claim_id` are stored in canonical (smaller-id
+    /// first) order, so `left_claim_id` may name the candidate rather than the
+    /// claim being reconciled. The fact columns must be paired by *claim*
+    /// order, not by evaluation position — otherwise `left_fact_id` names the
+    /// fact of `right_claim_id` on every row where the candidate sorts lower,
+    /// and no single-column read can tell.
+    ///
+    /// Both insertion orders are run because `claim_id` hashes the source
+    /// fact: whichever fact sorts higher is opposite in the two runs, so
+    /// exactly one of them exercises the swap. Asserting the invariant in both
+    /// makes detection deterministic instead of a coin flip on hash order —
+    /// a single run would pass on the buggy pairing half the time.
+    #[tokio::test]
+    async fn fact_columns_follow_the_canonical_claim_order() {
+        let facts = [FactId::from("fact:order-a"), FactId::from("fact:order-b")];
+
+        for swapped in [false, true] {
+            let store = Arc::new(RecordingClaimStore::default());
+            let service = ClaimService::new(store.clone()).with_config(ClaimConfig {
+                rollout_stage: ClaimRolloutStage::Relations,
+                ..Default::default()
+            });
+            let policy_tags = vec!["source:chat".to_string()];
+            let order = if swapped {
+                [&facts[1], &facts[0]]
+            } else {
+                [&facts[0], &facts[1]]
+            };
+
+            for (index, fact_id) in order.into_iter().enumerate() {
+                let episode_id = EpisodeId::from(format!("episode:order-{swapped}-{index}"));
+                service
+                    .after_fact_persisted(&FactPersistedParams {
+                        namespace: "main",
+                        fact_id,
+                        source_episode_id: &episode_id,
+                        fact_type: "note",
+                        content: "status is active",
+                        policy_tags: &policy_tags,
+                        entity_links: &[],
+                        t_valid: chrono::Utc::now(),
+                        source_lineage: Some("lineage:order"),
+                    })
+                    .await
+                    .expect("fact projection and inline reconciliation should succeed");
+            }
+
+            let relations = store.relations.lock().unwrap();
+            let claims = store.claims.lock().unwrap();
+            assert_eq!(relations.len(), 1, "swapped={swapped}: one relation");
+            let relation = &relations[0];
+
+            let fact_of = |claim_id: &crate::models::ClaimId| -> FactId {
+                claims
+                    .iter()
+                    .find(|claim| &claim.claim_id == claim_id)
+                    .map(|claim| claim.source_fact_id.clone())
+                    .unwrap_or_else(|| panic!("swapped={swapped}: {claim_id} was projected"))
+            };
+
+            assert_eq!(
+                relation.left_fact_id.as_ref(),
+                Some(&fact_of(&relation.left_claim_id)),
+                "swapped={swapped}: left_fact_id must be the fact of left_claim_id"
+            );
+            assert_eq!(
+                relation.right_fact_id.as_ref(),
+                Some(&fact_of(&relation.right_claim_id)),
+                "swapped={swapped}: right_fact_id must be the fact of right_claim_id"
+            );
+        }
     }
 }

@@ -129,11 +129,7 @@ pub(crate) fn reconciliation_metadata_by_fact(
         std::collections::HashMap::new();
 
     for relation in &result.relations {
-        let directed = matches!(
-            relation.outcome,
-            crate::models::claim::ClaimRelationOutcome::Supersession
-                | crate::models::claim::ClaimRelationOutcome::Correction
-        );
+        let directed = relation.outcome.has_direction();
 
         // (fact whose claim lost, its episode, fact whose claim won, its episode)
         let sides: [(
@@ -158,9 +154,7 @@ pub(crate) fn reconciliation_metadata_by_fact(
             let summary = ClaimRelationSummary {
                 relation_id: relation.relation_id.clone(),
                 outcome: relation.outcome,
-                counterpart_source_episode_id: counterpart_episode
-                    .map(ToString::to_string)
-                    .unwrap_or_default(),
+                counterpart_source_episode_id: counterpart_episode.map(ToString::to_string),
                 // Only the losing side names its replacement; see the doc comment.
                 superseded_by_fact_id: if directed && side_index == 0 {
                     counterpart_fact.map(ToString::to_string)

@@ -655,6 +655,23 @@ pub enum ClaimRelationOutcome {
     TemporalAmbiguity,
 }
 
+impl ClaimRelationOutcome {
+    /// Whether this outcome names a winner, so `predecessor_claim_id` and
+    /// `successor_claim_id` mean something.
+    ///
+    /// Only `Supersession` and `Correction` do. `Contradiction` has no winner
+    /// and `Duplicate` is redundancy rather than a winner, so both leave the
+    /// direction `None` — deriving it from the unordered `left`/`right`
+    /// storage columns would invent one. This is the single home for that
+    /// rule: the projection, the query and the ordering policy all ask this
+    /// same question, and a second copy of the set would drift silently
+    /// rather than fail.
+    #[must_use]
+    pub const fn has_direction(self) -> bool {
+        matches!(self, Self::Supersession | Self::Correction)
+    }
+}
+
 impl std::fmt::Display for ClaimRelationOutcome {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {

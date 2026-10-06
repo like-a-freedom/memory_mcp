@@ -1245,11 +1245,7 @@ fn supersession_target<'a>(
 ) -> Option<&'a str> {
     let metadata = item.reconciliation.as_ref()?;
     metadata.relations.iter().find_map(|relation| {
-        if !matches!(
-            relation.outcome,
-            crate::models::claim::ClaimRelationOutcome::Supersession
-                | crate::models::claim::ClaimRelationOutcome::Correction
-        ) {
+        if !relation.outcome.has_direction() {
             return None;
         }
         let target = relation.superseded_by_fact_id.as_deref()?;
@@ -1364,7 +1360,7 @@ mod tests {
             relations: vec![ClaimRelationSummary {
                 relation_id: format!("claim_relation:{fact_id}"),
                 outcome,
-                counterpart_source_episode_id: format!("episode:{fact_id}"),
+                counterpart_source_episode_id: Some(format!("episode:{fact_id}")),
                 superseded_by_fact_id: target.map(str::to_string),
                 reason_code: outcome.to_string(),
                 evaluator_version: "test".to_string(),

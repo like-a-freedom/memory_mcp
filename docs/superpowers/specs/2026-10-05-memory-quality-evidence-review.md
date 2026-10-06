@@ -419,6 +419,15 @@ subsystem that cannot affect the answer produces a number that cannot move.
    handed a superseded value without being able to see that it was. Direction is read from
    `claim_relation.predecessor_claim_id`/`successor_claim_id`, which already records it once —
    never recomputed by the reader.
+   *Ruled 2026-10-05, on a tension between this sentence and the plan.* The purpose clause
+   governs, not the literal one. The successor identifier resolves through the claims of the
+   queried facts, so when the budget drops the successor the predecessor carries
+   `superseded_by_fact_id: None` — it still says *that* it was superseded (outcome + reason
+   code), just not *by what*. Resolving it would mean a second claim read for a fact the reader
+   cannot see anyway, against no consumer: the demotion rule requires the successor to be in the
+   pack by definition, and nothing else reads the pointer. The counterpart episode is `None` in
+   the same case rather than `""`, so "unknown" is not confused with an empty identifier. If a
+   later phase grows a consumer for the out-of-pack pointer, that phase adds the read.
 3. Rank a superseded fact **strictly below** its successor when both are present in the pack;
    when no successor is present, do not demote it. `Duplicate` is never demoted: a duplicate is
    redundancy, not staleness, and demoting it can remove the only surviving copy once decay
