@@ -8,7 +8,7 @@ use chrono::{DateTime, Utc};
 use super::graph::GraphCandidate;
 use super::lexical::{lexical_query_overlap_for_fact, lexical_query_score_for_fact};
 use super::temporal::TemporalWindow;
-use crate::models::{Fact, FactType};
+use crate::models::{AssembledContextItem, Fact, FactType};
 use crate::shared::search::normalize_text;
 use crate::shared::search::{
     query_hard_anchor_terms, query_term_should_be_soft_anchor, search_query_terms,
@@ -1227,9 +1227,285 @@ pub(crate) fn apply_time_window(
     });
 }
 
+/// The reordering input for [`demote_superseded`].
+pub(crate) struct DemoteSupersededRequest<'a> {
+    pub(crate) items: &'a [AssembledContextItem],
+}
+
+/// The fact that replaced `item`, when a relation names one that is present.
+///
+/// Only `Supersession` and `Correction` name a winner: a `Duplicate` is
+/// redundancy rather than staleness, and demoting one can remove the only
+/// surviving copy once decay retires its partner. A relation whose target is
+/// absent from the pack, or names the item itself, resolves to `None` — the
+/// caller then leaves the order alone.
+fn supersession_target<'a>(
+    item: &'a AssembledContextItem,
+    present: &HashSet<&str>,
+) -> Option<&'a str> {
+    let metadata = item.reconciliation.as_ref()?;
+    metadata.relations.iter().find_map(|relation| {
+        if !matches!(
+            relation.outcome,
+            crate::models::claim::ClaimRelationOutcome::Supersession
+                | crate::models::claim::ClaimRelationOutcome::Correction
+        ) {
+            return None;
+        }
+        let target = relation.superseded_by_fact_id.as_deref()?;
+        if target == item.fact_id.as_str() || !present.contains(target) {
+            return None;
+        }
+        Some(target)
+    })
+}
+
+/// Reorder so a superseded fact sits immediately after its successor, when
+/// the successor is present in the same pack. Pure: no I/O, no clock.
+///
+/// This is a post-assembly reordering, not a scoring term — successor presence
+/// is unknowable until candidates are selected, so the rule adds no constant
+/// and no second candidate axis (ADR-0074). With no successor in the pack the
+/// predecessor keeps its rank: demoted and alone it would be the least-stale
+/// value a reader has, and dropping it further can push it out of the budget
+/// entirely.
+pub(crate) fn demote_superseded(request: DemoteSupersededRequest<'_>) -> Vec<AssembledContextItem> {
+    let items = request.items;
+    let present: HashSet<&str> = items.iter().map(|item| item.fact_id.as_str()).collect();
+
+    // Successor fact id -> the predecessors to place under it, in pack order.
+    let mut targets: Vec<Option<&str>> = Vec::with_capacity(items.len());
+    let mut predecessors: HashMap<&str, Vec<usize>> = HashMap::new();
+    for (index, item) in items.iter().enumerate() {
+        let target = supersession_target(item, &present);
+        if let Some(target) = target {
+            predecessors.entry(target).or_default().push(index);
+        }
+        targets.push(target);
+    }
+
+    let demoted = |index: usize| targets[index].is_some();
+    let mut emitted = vec![false; items.len()];
+    let mut out: Vec<AssembledContextItem> = Vec::with_capacity(items.len());
+
+    // Depth-first so a predecessor lands directly under its successor while
+    // still collecting anything demoted below *it*. The `emitted` check is
+    // what makes the walk terminate on a cycle without a pass bound.
+    fn flush(
+        index: usize,
+        items: &[AssembledContextItem],
+        predecessors: &HashMap<&str, Vec<usize>>,
+        emitted: &mut [bool],
+        out: &mut Vec<AssembledContextItem>,
+    ) {
+        if emitted[index] {
+            return;
+        }
+        emitted[index] = true;
+        out.push(items[index].clone());
+        if let Some(indices) = predecessors.get(items[index].fact_id.as_str()) {
+            for &next in indices {
+                flush(next, items, predecessors, emitted, out);
+            }
+        }
+    }
+
+    for index in 0..items.len() {
+        if emitted[index] || demoted(index) {
+            // A demoted item is placed by its successor instead.
+            continue;
+        }
+        flush(index, items, &predecessors, &mut emitted, &mut out);
+    }
+
+    // Anything still unplaced — only reachable through a cycle among
+    // demotions — goes back in pack order rather than being dropped.
+    for index in 0..items.len() {
+        flush(index, items, &predecessors, &mut emitted, &mut out);
+    }
+
+    out
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    // -----------------------------------------------------------------------
+    // demote_superseded — the ADR-0074 ordering policy.
+    //
+    // Three rules, one scenario each: demote when the successor is present,
+    // leave the ranking alone when it is not, and never demote a duplicate.
+    // They run on constructed items with no database because the policy is
+    // pure; only the wiring in `retrieval.rs` needs a store.
+    // -----------------------------------------------------------------------
+
+    use crate::models::claim::ClaimRelationOutcome;
+    use crate::models::{ClaimReconciliationMetadata, ClaimRelationSummary};
+
+    fn item(fact_id: &str) -> AssembledContextItem {
+        AssembledContextItem {
+            fact_id: fact_id.to_string(),
+            content: format!("content of {fact_id}"),
+            ..Default::default()
+        }
+    }
+
+    /// An item carrying one relation of `outcome` naming `target` as the fact
+    /// that replaced it.
+    fn item_with_relation(
+        fact_id: &str,
+        outcome: ClaimRelationOutcome,
+        target: Option<&str>,
+    ) -> AssembledContextItem {
+        let mut built = item(fact_id);
+        built.reconciliation = Some(ClaimReconciliationMetadata {
+            claim_ids: vec![format!("claim:{fact_id}")],
+            relations: vec![ClaimRelationSummary {
+                relation_id: format!("claim_relation:{fact_id}"),
+                outcome,
+                counterpart_source_episode_id: format!("episode:{fact_id}"),
+                superseded_by_fact_id: target.map(str::to_string),
+                reason_code: outcome.to_string(),
+                evaluator_version: "test".to_string(),
+            }],
+        });
+        built
+    }
+
+    fn order(items: &[AssembledContextItem]) -> Vec<&str> {
+        items.iter().map(|i| i.fact_id.as_str()).collect()
+    }
+
+    #[test]
+    fn demotes_predecessor_below_successor() {
+        let before = vec![
+            item_with_relation(
+                "fact:old",
+                ClaimRelationOutcome::Supersession,
+                Some("fact:new"),
+            ),
+            item("fact:new"),
+            item("fact:other"),
+        ];
+
+        let after = demote_superseded(DemoteSupersededRequest { items: &before });
+
+        assert_eq!(
+            order(&after),
+            vec!["fact:new", "fact:old", "fact:other"],
+            "the superseded fact must sit immediately after its successor"
+        );
+        assert_eq!(
+            after.len(),
+            before.len(),
+            "reordering must never add or drop an item"
+        );
+    }
+
+    #[test]
+    fn leaves_ranking_untouched_when_successor_is_absent() {
+        let before = vec![
+            item_with_relation(
+                "fact:old",
+                ClaimRelationOutcome::Supersession,
+                Some("fact:not-in-pack"),
+            ),
+            item("fact:other"),
+        ];
+
+        let after = demote_superseded(DemoteSupersededRequest { items: &before });
+
+        assert_eq!(
+            order(&after),
+            vec!["fact:old", "fact:other"],
+            "with no successor present the predecessor keeps its rank — it is the least-stale value a reader has"
+        );
+        assert!(
+            after.iter().any(|i| i.fact_id == "fact:old"),
+            "the predecessor must survive the budget, not be pushed out"
+        );
+    }
+
+    #[test]
+    fn never_demotes_duplicate_outcome() {
+        let before = vec![
+            item_with_relation("fact:a", ClaimRelationOutcome::Duplicate, Some("fact:c")),
+            item("fact:c"),
+        ];
+
+        let after = demote_superseded(DemoteSupersededRequest { items: &before });
+
+        assert_eq!(
+            order(&after),
+            vec!["fact:a", "fact:c"],
+            "a duplicate is redundancy, not staleness; demoting it can remove the only surviving copy"
+        );
+        assert_eq!(
+            after.len(),
+            2,
+            "both facts must remain present after the reorder"
+        );
+    }
+
+    #[test]
+    fn correction_demotes_the_same_way_supersession_does() {
+        let before = vec![
+            item_with_relation(
+                "fact:wrong",
+                ClaimRelationOutcome::Correction,
+                Some("fact:right"),
+            ),
+            item("fact:right"),
+        ];
+
+        let after = demote_superseded(DemoteSupersededRequest { items: &before });
+
+        assert_eq!(order(&after), vec!["fact:right", "fact:wrong"]);
+    }
+
+    #[test]
+    fn a_relation_naming_no_target_leaves_the_order_alone() {
+        // The successor's own entry deliberately names no replacement. If it
+        // named itself, an item could be demoted below itself.
+        let mut winning = item_with_relation(
+            "fact:new",
+            ClaimRelationOutcome::Supersession,
+            Some("fact:new"),
+        );
+        // Re-read as the successor's view: target absent.
+        winning
+            .reconciliation
+            .as_mut()
+            .expect("relation present")
+            .relations[0]
+            .superseded_by_fact_id = None;
+        let before = vec![item("fact:old"), winning];
+
+        let after = demote_superseded(DemoteSupersededRequest { items: &before });
+
+        assert_eq!(
+            order(&after),
+            vec!["fact:old", "fact:new"],
+            "a None target must leave the order alone"
+        );
+    }
+
+    #[test]
+    fn demotion_is_idempotent() {
+        let before = vec![
+            item_with_relation(
+                "fact:old",
+                ClaimRelationOutcome::Supersession,
+                Some("fact:new"),
+            ),
+            item("fact:new"),
+        ];
+        let once = demote_superseded(DemoteSupersededRequest { items: &before });
+        let twice = demote_superseded(DemoteSupersededRequest { items: &once });
+
+        assert_eq!(order(&once), order(&twice));
+    }
 
     #[test]
     fn graph_rank_weight_penalizes_deeper_matches() {

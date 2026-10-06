@@ -706,6 +706,19 @@ fn every_public_container_method_has_a_production_caller() {
             "with_lifecycle_enabled",
             "the constructor-path equivalent of the composition root's LifecycleConfig::from_env",
         ),
+        // Same shape as `with_lifecycle_enabled`, one field over:
+        // `bootstrap::stdio` applies `ClaimConfig::from_env` to a container it
+        // just built, and a caller that builds `MemoryService` directly — the
+        // eval harness, an embedding — has no other way to set the stage. It
+        // is not a fixture convenience: the stage decides whether
+        // `assemble_context` may disclose claim relations at all, so an
+        // out-of-crate caller evaluating that behaviour needs the door. The
+        // crate-private `ClaimRolloutStage` cannot cross the boundary, so the
+        // method takes the same vocabulary as the environment variable.
+        (
+            "with_claim_rollout_stage",
+            "the constructor-path equivalent of the composition root's ClaimConfig::from_env",
+        ),
     ];
 
     let declared = collect_public_methods(&src);

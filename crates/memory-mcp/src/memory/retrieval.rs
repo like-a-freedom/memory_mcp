@@ -310,6 +310,9 @@ async fn assemble_context_inner(
     }
 
     attach_reconciliation(ctx, &mut results).await?;
+    // Post-assembly, before the cache: a cached list must carry the reorder
+    // already, because a cache hit returns before any post-processing.
+    results = ranking::demote_superseded(ranking::DemoteSupersededRequest { items: &results });
 
     // --- Results logging, access tracking, cache store ---
     ctx.logger.log(
