@@ -2181,13 +2181,20 @@ mod tests {
 
     /// A native event's fields keep their JSON types in the machine format, so
     /// a collector reads `attempt` as a number rather than a string.
-    #[test]
-    fn a_native_event_keeps_value_types_in_json() {
+    ///
+    /// The level is set through `with_level` so the test is serialized against
+    /// the other level-sensitive tests: `OpFilter` reads the process-global
+    /// override, and an unrelated test's override must not drop this event.
+    #[tokio::test]
+    async fn a_native_event_keeps_value_types_in_json() {
         let buffer = SharedBuf::default();
         let subscriber = subscriber_with(buffer.clone(), LogFormat::Json);
-        tracing::subscriber::with_default(subscriber, || {
-            tracing::warn!(target: LOG_TARGET, op = "x", attempt = 3, ratio = 1.5, ok = true);
-        });
+        capture::with_level("info", || async {
+            tracing::subscriber::with_default(subscriber, || {
+                tracing::warn!(target: LOG_TARGET, op = "x", attempt = 3, ratio = 1.5, ok = true);
+            });
+        })
+        .await;
 
         let parsed: Value = serde_json::from_str(buffer.contents().trim()).expect("json");
         assert_eq!(parsed["attempt"], 3);
@@ -2277,13 +2284,19 @@ mod tests {
     /// A native `tracing` producer — a migrated module, or a span — is rendered
     /// in the same shape as a recorded map event: its own fields, `op` first,
     /// not the foreign `target: message` shape.
-    #[test]
-    fn format_event_renders_a_native_op_event() {
+    ///
+    /// Serialized through `with_level` because `OpFilter` reads the
+    /// process-global override.
+    #[tokio::test]
+    async fn format_event_renders_a_native_op_event() {
         let buffer = SharedBuf::default();
         let subscriber = subscriber_with(buffer.clone(), LogFormat::Text);
-        tracing::subscriber::with_default(subscriber, || {
-            tracing::warn!(target: LOG_TARGET, op = "http.lease.claim_failed", attempt = 3);
-        });
+        capture::with_level("info", || async {
+            tracing::subscriber::with_default(subscriber, || {
+                tracing::warn!(target: LOG_TARGET, op = "http.lease.claim_failed", attempt = 3);
+            });
+        })
+        .await;
 
         let line = buffer.contents();
         assert!(line.contains("op=http.lease.claim_failed"), "{line}");
