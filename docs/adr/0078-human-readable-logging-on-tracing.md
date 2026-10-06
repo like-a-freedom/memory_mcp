@@ -55,10 +55,14 @@ files for no user-visible gain in this change. It is a follow-up (phases 2–3).
   the subscriber still takes effect.
 - New env: `MEMORY_LOG_FORMAT=text|json`, `MEMORY_LOG_COLOR=auto|always|never`;
   `NO_COLOR` and non-TTY disable colour; a file sink is always uncoloured.
+- Third-party `tracing` output is capped at `warn` and is not selected by
+  `RUST_LOG` (which keeps selecting this service's `op` prefixes). An operator
+  raises a dependency's level with `MEMORY_LOG_TARGETS`, a separate
+  comma-separated `target=level` list.
 - `op=` and `req=` remain whitespace-separated tokens, so existing integration
   tests and `grep`/`awk` keep working.
 - No new fields are logged; the bounded/no-PII guarantees of `http/logging.rs`
   are unchanged. ADR-0048's log/metric separation is unchanged.
-- Third-party levels are not configurable in this change; `RUST_LOG` does not
-  raise them (they were discarded before, so this is not a regression).
+- Third-party output was discarded before, so capturing it at `warn` by default
+  is additive; `MEMORY_LOG_TARGETS` opts a dependency up when needed.
 - `log_warn_dedup` had no callers and is removed.

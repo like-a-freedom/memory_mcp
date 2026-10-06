@@ -367,6 +367,7 @@ pub fn install() {
     static INSTALLED: OnceLock<()> = OnceLock::new();
     INSTALLED.get_or_init(|| {
         let format = LogFormat::parse(&std::env::var("MEMORY_LOG_FORMAT").unwrap_or_default());
+        let targets = foreign_filter(&std::env::var("MEMORY_LOG_TARGETS").unwrap_or_default());
         let subscriber = tracing_subscriber::registry()
             .with(
                 tracing_subscriber::fmt::layer()
@@ -374,13 +375,25 @@ pub fn install() {
                     .with_writer(LogMakeWriter)
                     .with_ansi(ansi_enabled_from_env()),
             )
-            .with(
-                Targets::new()
-                    .with_target(LOG_TARGET, tracing::Level::TRACE)
-                    .with_default(FOREIGN_DEFAULT_LEVEL),
-            );
+            .with(targets);
         let _ = tracing::subscriber::set_global_default(subscriber);
     });
+}
+
+/// The third-party `Targets` policy: quiet by default, raisable per target
+/// through `MEMORY_LOG_TARGETS` (a comma-separated `target=level` list), and
+/// never able to drop this service's own events.
+///
+/// Kept separate from `RUST_LOG`: that variable selects this service's `op`
+/// prefixes and must not silently start selecting dependency module paths. A
+/// malformed target list is discarded rather than reinterpreting or dropping
+/// the service's own events.
+fn foreign_filter(configured: &str) -> Targets {
+    configured
+        .parse::<Targets>()
+        .unwrap_or_default()
+        .with_target(LOG_TARGET, tracing::Level::TRACE)
+        .with_default(FOREIGN_DEFAULT_LEVEL)
 }
 
 /// The operation name of the HTTP access log.
@@ -1892,11 +1905,7 @@ mod tests {
                     .with_writer(buffer)
                     .with_ansi(false),
             )
-            .with(
-                Targets::new()
-                    .with_target(LOG_TARGET, tracing::Level::TRACE)
-                    .with_default(FOREIGN_DEFAULT_LEVEL),
-            )
+            .with(foreign_filter(""))
     }
 
     /// Our events carry the serialised map in `payload`; the formatter flattens
@@ -1971,6 +1980,29 @@ mod tests {
         let line = buffer.contents();
         assert!(!line.contains("should not appear"), "{line}");
         assert!(line.contains("should appear"), "{line}");
+    }
+
+    /// The one dial an operator has over foreign output: a `target=level` list
+    /// raises a noisy dependency without touching this service's events, and a
+    /// malformed list is ignored rather than taking the service's own events
+    /// down with it.
+    #[test]
+    fn foreign_filter_defaults_quiet_and_honours_overrides() {
+        let default = foreign_filter("");
+        assert!(default.would_enable(LOG_TARGET, &tracing::Level::TRACE));
+        assert!(default.would_enable("surrealdb", &tracing::Level::WARN));
+        assert!(
+            !default.would_enable("surrealdb", &tracing::Level::INFO),
+            "foreign info stays out by default"
+        );
+
+        let raised = foreign_filter("surrealdb=info");
+        assert!(raised.would_enable("surrealdb", &tracing::Level::INFO));
+        assert!(raised.would_enable(LOG_TARGET, &tracing::Level::TRACE));
+
+        let malformed = foreign_filter("=not-a-target");
+        assert!(malformed.would_enable(LOG_TARGET, &tracing::Level::TRACE));
+        assert!(!malformed.would_enable("surrealdb", &tracing::Level::INFO));
     }
 
     /// The test capture observes the same line the formatter emits — the seam
