@@ -43,6 +43,30 @@ pub fn reconciliation_scheduler_job() -> crate::http::leases::scheduler::Schedul
 /// `reconcile_namespaces` so the diff can be tested without the
 /// 60-second scheduler throttle.
 #[cfg(feature = "streamable-http")]
+/// Registry reconciliation metric family: namespaces the registry believes in
+/// and the engine does not, or the other way round.
+pub const METRIC_HTTP_REGISTRY_RECONCILIATION_TOTAL: &str =
+    "memory_http_registry_reconciliation_total";
+
+/// Record one namespace the registry and the engine disagree about.
+///
+/// A single recorder for both directions, for the same reason the rest of the
+/// surface has one per family: two inline `metrics::counter!` calls with the
+/// family name spelled out as a string is how a family ends up with two
+/// spellings, and it is also why nothing else could record this one — a test
+/// cannot drive a counter that only exists inside a loop over a database.
+///
+/// `kind` is bounded by the two branches below and collapses to `other`, so a
+/// caller cannot widen the series by formatting a string into it.
+pub(crate) fn record_registry_reconciliation(kind: &'static str) {
+    let kind = match kind {
+        "missing_namespace" => "missing_namespace",
+        "orphan_namespace" => "orphan_namespace",
+        _ => "other",
+    };
+    metrics::counter!(METRIC_HTTP_REGISTRY_RECONCILIATION_TOTAL, "kind" => kind).increment(1);
+}
+
 fn classify_namespace_diff<'a>(
     tenants: &'a [crate::http::registry::models::Tenant],
     actual_namespaces: &'a HashSet<String>,
@@ -97,11 +121,7 @@ async fn reconcile_namespaces(
         .collect();
     let diff = classify_namespace_diff(&registered, &actual_namespaces);
     for tenant in diff.missing {
-        metrics::counter!(
-            "memory_http_registry_reconciliation_total",
-            "kind" => "missing_namespace"
-        )
-        .increment(1);
+        record_registry_reconciliation("missing_namespace");
         crate::http::logging::log_warn(
             "http.registry.missing_namespace_binding",
             &format!(
@@ -112,11 +132,7 @@ async fn reconcile_namespaces(
         );
     }
     for namespace in diff.orphan {
-        metrics::counter!(
-            "memory_http_registry_reconciliation_total",
-            "kind" => "orphan_namespace"
-        )
-        .increment(1);
+        record_registry_reconciliation("orphan_namespace");
         crate::http::logging::log_warn(
             "http.registry.orphan_namespace",
             &format!(

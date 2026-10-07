@@ -1122,6 +1122,121 @@ pub(crate) mod tests {
         }
     }
 
+    /// Every declared family reaches the exposition.
+    ///
+    /// The other direction is covered — `every_named_family_is_described` fails
+    /// when something is exported without a description — but nothing stopped a
+    /// family from being *declared and never recorded*, and that failure is
+    /// invisible from inside the process: `describe_metrics` registers the help
+    /// line, the scrape looks healthy, and the series simply is not there. A
+    /// panel reading it then renders *No data*, which is what an unexercised
+    /// subsystem looks like too.
+    ///
+    /// So this drives every recorder this module and its neighbours own — the
+    /// operations, the stage timers, the background pass, the refusals, the
+    /// sign-in and the knowledge clock, and the claims and filesystem-watch
+    /// telemetry facades — and then reads the exposition and asks whether each
+    /// declared family is in it.
+    ///
+    /// The three HTTP families are the exception, and the exception is not a
+    /// loophole: they are recorded by the request-logging middleware, which needs
+    /// a served request to run. That is what
+    /// `http::metrics::tests::a_served_request_reaches_the_exposition` covers,
+    /// and the two tests between them cover the whole list — a family added to
+    /// `DESCRIPTIONS` is missing from one of them or the other until something
+    /// records it.
+    #[tokio::test]
+    async fn every_declared_family_reaches_the_exposition() {
+        use crate::knowledge::claims_policy::telemetry as claims_telemetry;
+        use crate::knowledge::claims_policy::telemetry::{ClaimMatchMode, ClaimMetricStage};
+        use crate::models::claim::ClaimSchemaFamily;
+        use crate::models::inbox_revision::InboxFailureClass;
+        use crate::service::fs_watch::processor::ProcessOutcome;
+        use crate::service::fs_watch::telemetry::FsWatchTelemetry;
+
+        // Families the HTTP middleware owns; covered by its own test.
+        const HTTP_MIDDLEWARE: [&str; 3] = [
+            METRIC_HTTP_REQUESTS_TOTAL,
+            METRIC_HTTP_REQUEST_DURATION_SECONDS,
+            METRIC_HTTP_REQUESTS_INFLIGHT,
+        ];
+
+        let exposition = exposed(|| async {
+            let mut ingest = OperationMetrics::new("ingest");
+            ingest.record_result("episodes", 1);
+            ingest.record_stock("active_facts", 2);
+            ingest.success();
+            drop(ingest);
+
+            let mut extract = OperationMetrics::new("extract");
+            extract.record_result("facts", 1);
+            extract.success();
+            drop(extract);
+
+            let _ = crate::shared::observability::StageTimer::new("ingest", "store_write");
+
+            record_job_metric("lease", "ok", 0.01);
+            record_auth_refusal("nonce");
+            record_runtime_refusal("quota");
+            record_signin_success();
+            record_knowledge_write();
+            record_build_info();
+
+            claims_telemetry::record_pipeline_event(
+                ClaimMetricStage::Project,
+                ClaimSchemaFamily::Attribute,
+                "duplicate",
+                "none",
+            );
+            claims_telemetry::record_pipeline_duration(
+                ClaimMetricStage::Reconcile,
+                ClaimSchemaFamily::Attribute,
+                "duplicate",
+                std::time::Duration::from_millis(5),
+            );
+            claims_telemetry::record_candidate_count(
+                ClaimSchemaFamily::Attribute,
+                ClaimMatchMode::Exact,
+                2,
+            );
+            claims_telemetry::set_active_relations(ClaimSchemaFamily::Attribute, "duplicate", 1.0);
+            claims_telemetry::record_backfill_fact("projected", "none");
+            crate::http::registry::provisioning::record_registry_reconciliation(
+                "missing_namespace",
+            );
+
+            let telemetry = FsWatchTelemetry::new();
+            telemetry.record_revision(ProcessOutcome::Processed);
+            telemetry.record_retry("backend", InboxFailureClass::Io);
+            telemetry.record_scan_file("enqueued");
+            telemetry.set_queue_depth(1);
+            telemetry.set_inflight(1);
+            telemetry.set_degraded(false);
+            telemetry.record_revision_duration(
+                ProcessOutcome::Processed,
+                std::time::Duration::from_millis(3),
+            );
+
+            render()
+        })
+        .await;
+
+        let missing: Vec<&str> = crate::shared::observability::DESCRIPTIONS
+            .iter()
+            .map(|described| described.name)
+            .filter(|name| {
+                !exposition.contains(&format!("# HELP {name} ")) && !HTTP_MIDDLEWARE.contains(name)
+            })
+            .collect();
+        assert!(
+            missing.is_empty(),
+            "these families are declared and described, so a panel author is \
+             promised them, but nothing recorded into them: a declared family \
+             no recorder writes is absent from every scrape, and a panel \
+             reading it looks like a subsystem that is switched off: {missing:?}"
+        );
+    }
+
     /// A stock reported as a flow again is the original defect, and nothing
     /// about it is visible at the call site: `record_stock(name, x.len())`
     /// and `record_result(name, x.len())` read the same at the line. The

@@ -1,6 +1,6 @@
 # Observability
 
-Two Grafana dashboards, forty-three recording rules and twenty alerts over the
+Two Grafana dashboards, forty-five recording rules and twenty alerts over the
 metrics the `streamable-http` profile exports on `/metrics`, plus the scrape
 configuration that gets those metrics to a collector in the first place.
 
@@ -12,7 +12,7 @@ rather than keeping its own copy.
 
 ```
 observability/
-├── recording_rules.yml     43 rules in 10 groups
+├── recording_rules.yml     45 rules in 10 groups
 ├── alerts.yml              20 alerts in 8 groups
 ├── prometheus.yml          scrape + rule_files, for Prometheus
 ├── vmagent/
@@ -24,7 +24,8 @@ observability/
 ├── build_dashboards.py     regenerates the two JSON files
 ├── check_rules.py          every rule reads a metric and a label value that exist
 ├── check_alerts.py         every alert is routable and names a real metric
-└── check_dashboards.py     every panel reads a series that exists
+└── check_dashboards.py     every panel reads a real series, and no family is
+                            read by nothing
 ```
 
 ## Getting it running
@@ -412,6 +413,23 @@ Each exits non-zero and names the offending line. They are not a substitute for
 but they catch the failures that matter more in practice: a rule or panel
 naming a series that does not exist renders empty, and an empty panel is
 indistinguishable from a subsystem that is switched off.
+
+They also catch a metric nobody reads. `check_dashboards.py` fails when the
+crate exports a family that no recording rule and no panel mentions — a metric
+scraped on every request, stored forever, informing no one: a cost with no
+benefit, and nothing in the pipeline notices. The one family in that position is
+listed in the checker with its reason — `memory_fs_watch_queue_depth` is set once
+at startup and never updated, so a panel of it would draw a snapshot as if it
+were a queue.
+
+Coverage is enforced in the crate as well, in the other direction. A family can
+be declared, described, and never recorded — invisible from outside the process,
+because the scrape looks healthy and the series simply is not there, so a panel
+reading it shows *No data*, which is what an off subsystem looks like too. Two
+tests between them drive every recorder, one serving a request through the HTTP
+middleware and one calling the rest, and assert that each declared family is in
+a real exposition. The second one found a family that had no named recorder at
+all, which is why the registry's reconciliation counter has one now.
 
 They also check the *label values* an expression filters on, against the
 `KNOWN_OPERATIONS` and `KNOWN_RESULTS` vocabulary in `observability.rs`. That

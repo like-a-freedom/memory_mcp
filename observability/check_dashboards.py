@@ -189,6 +189,78 @@ def check_row_contents(path: pathlib.Path, row: dict, failures: list[str]) -> No
                 occupied[cell] = child["title"]
 
 
+# Families the crate records and deliberately does not chart, each with the
+# reason. A list rather than a heuristic: every entry is a decision somebody
+# made, and it has to be re-made when the family changes.
+UNREAD_BY_DECISION = {
+    "memory_fs_watch_queue_depth": (
+        "set once at startup from a recovery pass and never updated, so a panel "
+        "of it would draw a snapshot as if it were a queue; the *Filesystem "
+        "ingestion — latency and caveats* row says so in prose"
+    ),
+}
+
+
+def families_with_no_reader(recorded: set[str], families: set[str]) -> list[str]:
+    """Recorded families that no rule and no panel reads.
+
+    A metric nobody reads is not documentation, it is cost: it is scraped on
+    every request, stored, and never looked at. The failure is silent in both
+    directions — the exposition carries the series and the dashboard looks
+    complete — so it is worth a check rather than a reviewer's memory.
+
+    A name that is a strict prefix of another family is not a family: `job` in a
+    test's own string literal, or a prefix used to match a whole group of them.
+    Those are excluded here rather than allow-listed, because a prefix that
+    happens to equal a real family name is vanishingly unlikely and an
+    allow-list is something nobody re-reads.
+    """
+    charted = _charted_names(recorded, families)
+    prefix_of_a_family = {
+        name for name in families
+        if any(other != name and other.startswith(name) for other in families)
+    }
+    unread = [
+        family for family in sorted(families)
+        if family not in charted and family not in prefix_of_a_family
+    ]
+    return [
+        f"{family} — {UNREAD_BY_DECISION[family]}"
+        if family in UNREAD_BY_DECISION else family
+        for family in unread
+    ]
+
+
+# Suffixes the exporter appends to a summary's series. A rule that reads
+# `…_sum` or `…_count` is reading the family, and a word-boundary match on the
+# bare name would call it unreadable — which is how `memory_claim_candidates_
+# considered` looked like an orphan while a rule stood right there dividing its
+# `_sum` by its `_count`.
+DERIVED = ("_sum", "_count", "_bucket")
+
+
+def _charted_names(recorded: set[str], families: set[str]) -> set[str]:
+    """Every family a recording rule or a panel expression reads.
+
+    Read as the identifiers the expressions actually contain, then mapped back
+    to families through the derived suffixes, rather than matched by name: the
+    bare name of a summary family does not appear in the very expressions that
+    read it.
+    """
+    text = RULES.read_text()
+    for path in sorted(DASHBOARDS.glob("*.json")):
+        document = json.loads(path.read_text())
+        for panel in document["panels"]:
+            text += "\n" + "\n".join(panel_expressions(panel))
+    mentioned = set(re.findall(r"\b(memory_[a-z0-9_]+)", strip_strings(text)))
+    read = set(mentioned)
+    for name in mentioned:
+        for suffix in DERIVED:
+            if name.endswith(suffix) and name[: -len(suffix)] in families | recorded:
+                read.add(name[: -len(suffix)])
+    return read
+
+
 def main() -> int:
     recorded = recorded_series()
     families = exported_families()
@@ -243,6 +315,16 @@ def main() -> int:
                         f"empty"
                     )
 
+    for orphan in families_with_no_reader(recorded, families):
+        family = orphan.split(" — ")[0]
+        if family in UNREAD_BY_DECISION:
+            continue
+        failures.append(
+            f"the crate exports `{family}` and nothing reads it: no recording "
+            f"rule, no panel. A metric nobody reads is scraped and stored "
+            f"forever without informing anyone — either chart it, or record it "
+            f"in UNREAD_BY_DECISION with the reason it is left unread"
+        )
     print(f"{len(recorded)} recorded series, {len(families)} exported families")
     print(f"{panels_checked} panel expressions checked")
     for failure in failures:

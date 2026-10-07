@@ -371,6 +371,17 @@ groups:
             0.000001
           )
 
+
+  # Backfill is the slow half of the claims pipeline: facts already
+      # extracted being projected into claims by the background walk rather than
+      # at extract time. It is counted apart from the pipeline events for that
+      # reason, and it is the series that says whether that walk is keeping up.
+      - record: memory:claim_backfill_facts:rate15m
+        expr: |
+          sum by (outcome, reason_code) (
+            rate(memory_claim_backfill_facts_total[15m])
+          )
+
   # ─── Lifecycle ──────────────────────────────────────────────────────────────
   #
   # The recall-then-capture loop, and the two questions about it that no
@@ -555,6 +566,22 @@ groups:
         expr: |
           sum by (stage, reason) (
             rate(memory_fs_watch_retries_total[15m])
+          )
+
+      # Startup-scan outcomes over a day, by outcome.
+      #
+      # The scan runs once when the watcher starts, so a *rate* would be
+      # meaningless — a window that happens to contain the scan reads as a burst
+      # and every other window reads as zero. The question is what the last scan
+      # did, and a day's increase is the window that contains it.
+      #
+      # `skipped_symlink` and friends are not failures; the point of the split is
+      # that a scan which enqueued nothing because it skipped everything reads
+      # differently from one that enqueued nothing because it failed to read.
+      - record: memory:fs_watch_scan_files:increase1d
+        expr: |
+          sum by (outcome) (
+            increase(memory_fs_watch_scan_files_total[1d])
           )
 
       - record: memory:fs_watch_revision_duration:p95_5m

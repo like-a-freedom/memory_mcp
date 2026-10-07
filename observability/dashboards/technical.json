@@ -2493,7 +2493,7 @@
           },
           "gridPos": {
             "h": 8,
-            "w": 8,
+            "w": 7,
             "x": 0,
             "y": 0
           },
@@ -2559,7 +2559,7 @@
           "gridPos": {
             "h": 8,
             "w": 4,
-            "x": 8,
+            "x": 7,
             "y": 0
           },
           "id": 0,
@@ -2622,8 +2622,8 @@
           },
           "gridPos": {
             "h": 8,
-            "w": 6,
-            "x": 12,
+            "w": 4,
+            "x": 11,
             "y": 0
           },
           "id": 0,
@@ -2656,6 +2656,70 @@
             }
           ],
           "title": "Mean candidates per slot",
+          "type": "stat"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "description": "Facts the background walk projected into claims, by outcome.\n\n**The slow half of the claims pipeline, and the one that can fall behind silently.** Extraction derives facts immediately; claims are projected from them by a background walk, so a projection that stalls leaves facts in the store with no claims above them \u2014 the graph quietly less complete than the facts it was built from, with nothing failing.\n\nRead against *Active relations* beside it: backfill flowing with a flat relation count means claims are being derived and not kept, and a standing zero with a non-zero fact count means the walk has not run.",
+          "fieldConfig": {
+            "defaults": {
+              "unit": "ops",
+              "color": {
+                "mode": "thresholds"
+              },
+              "mappings": [],
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "text",
+                    "value": null
+                  }
+                ]
+              },
+              "decimals": 3
+            },
+            "overrides": []
+          },
+          "gridPos": {
+            "h": 8,
+            "w": 4,
+            "x": 15,
+            "y": 0
+          },
+          "id": 0,
+          "options": {
+            "colorMode": "value",
+            "graphMode": "none",
+            "justifyMode": "auto",
+            "orientation": "auto",
+            "reduceOptions": {
+              "calcs": [
+                "lastNotNull"
+              ],
+              "fields": "",
+              "values": false
+            },
+            "textMode": "auto"
+          },
+          "pluginVersion": "13.2.4",
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${datasource}"
+              },
+              "editorMode": "code",
+              "expr": "memory:claim_backfill_facts:rate15m",
+              "legendFormat": "",
+              "range": true,
+              "refId": "A"
+            }
+          ],
+          "title": "Claims backfilled, per second",
           "type": "stat"
         },
         {
@@ -2708,8 +2772,8 @@
           },
           "gridPos": {
             "h": 8,
-            "w": 6,
-            "x": 18,
+            "w": 5,
+            "x": 19,
             "y": 0
           },
           "id": 0,
@@ -2790,8 +2854,8 @@
             "overrides": []
           },
           "gridPos": {
-            "h": 4,
-            "w": 6,
+            "h": 8,
+            "w": 5,
             "x": 0,
             "y": 0
           },
@@ -2876,9 +2940,9 @@
             "overrides": []
           },
           "gridPos": {
-            "h": 4,
-            "w": 9,
-            "x": 6,
+            "h": 8,
+            "w": 8,
+            "x": 10,
             "y": 0
           },
           "id": 0,
@@ -2963,9 +3027,9 @@
             "overrides": []
           },
           "gridPos": {
-            "h": 4,
-            "w": 9,
-            "x": 15,
+            "h": 8,
+            "w": 6,
+            "x": 18,
             "y": 0
           },
           "id": 0,
@@ -3000,6 +3064,70 @@
           ],
           "title": "Retries by stage and reason",
           "type": "timeseries"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "description": "Revisions being processed right now.\n\nThe live half of the watcher: queue depth is what is *waiting*, this is what is *worked on*, and the two move together when the watcher keeps up. A depth that climbs while this stays flat means revisions arrive faster than they finish.\n\n*Empty unless the deployment set `MEMORY_INGESTION_INBOX`.*",
+          "fieldConfig": {
+            "defaults": {
+              "unit": "short",
+              "color": {
+                "mode": "thresholds"
+              },
+              "mappings": [],
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "text",
+                    "value": null
+                  }
+                ]
+              },
+              "decimals": 0
+            },
+            "overrides": []
+          },
+          "gridPos": {
+            "h": 8,
+            "w": 5,
+            "x": 5,
+            "y": 0
+          },
+          "id": 0,
+          "options": {
+            "colorMode": "value",
+            "graphMode": "none",
+            "justifyMode": "auto",
+            "orientation": "auto",
+            "reduceOptions": {
+              "calcs": [
+                "lastNotNull"
+              ],
+              "fields": "",
+              "values": false
+            },
+            "textMode": "auto"
+          },
+          "pluginVersion": "13.2.4",
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${datasource}"
+              },
+              "editorMode": "code",
+              "expr": "memory_fs_watch_inflight",
+              "legendFormat": "",
+              "range": true,
+              "refId": "A"
+            }
+          ],
+          "title": "Revisions in flight",
+          "type": "stat"
         }
       ],
       "title": "Filesystem ingestion",
@@ -3064,8 +3192,8 @@
             "overrides": []
           },
           "gridPos": {
-            "h": 4,
-            "w": 12,
+            "h": 8,
+            "w": 11,
             "x": 0,
             "y": 0
           },
@@ -3109,9 +3237,9 @@
           },
           "description": "",
           "gridPos": {
-            "h": 4,
-            "w": 12,
-            "x": 12,
+            "h": 8,
+            "w": 8,
+            "x": 16,
             "y": 0
           },
           "id": 0,
@@ -3127,6 +3255,92 @@
           "pluginVersion": "13.2.4",
           "title": "Queue depth is not a backlog",
           "type": "text"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "description": "What the inbox scan found when the watcher last started, by outcome.\n\n**Read it as a one-shot, not a trend.** The scan runs once at startup, so this panel is flat at zero on any day it did not run and steps once on the day it did \u2014 which is the honest shape, and the reason it says what the *last* scan did rather than how busy the watcher is (the two panels above answer that).\n\n`skipped_symlink` and the other skips are not failures. The split that matters is a scan which enqueued nothing because everything was skipped, against one that enqueued nothing because every read failed.",
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "palette-classic"
+              },
+              "custom": {
+                "axisBorderShow": false,
+                "axisCenteredZero": false,
+                "axisLabel": "",
+                "axisPlacement": "auto",
+                "barAlignment": 0,
+                "drawStyle": "line",
+                "fillOpacity": 8,
+                "gradientMode": "none",
+                "hideFrom": {
+                  "legend": false,
+                  "tooltip": false,
+                  "viz": false
+                },
+                "insertNulls": false,
+                "lineInterpolation": "linear",
+                "lineWidth": 1,
+                "pointSize": 5,
+                "scaleDistribution": {
+                  "type": "linear"
+                },
+                "showPoints": "never",
+                "spanNulls": false,
+                "stacking": {
+                  "group": "A",
+                  "mode": "normal"
+                },
+                "thresholdsStyle": {
+                  "mode": "off"
+                }
+              },
+              "mappings": [],
+              "min": 0,
+              "unit": "short"
+            },
+            "overrides": []
+          },
+          "gridPos": {
+            "h": 8,
+            "w": 5,
+            "x": 11,
+            "y": 0
+          },
+          "id": 0,
+          "options": {
+            "legend": {
+              "calcs": [
+                "sum"
+              ],
+              "displayMode": "table",
+              "placement": "right",
+              "showLegend": true
+            },
+            "tooltip": {
+              "mode": "multi",
+              "sort": "desc"
+            }
+          },
+          "pluginVersion": "13.2.4",
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${datasource}"
+              },
+              "editorMode": "code",
+              "expr": "memory:fs_watch_scan_files:increase1d",
+              "legendFormat": "{{outcome}}",
+              "range": true,
+              "refId": "A"
+            }
+          ],
+          "title": "Startup scan, last 24 hours",
+          "type": "timeseries"
         }
       ],
       "title": "Filesystem ingestion \u2014 latency and caveats",

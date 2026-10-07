@@ -110,6 +110,65 @@ mod tests {
         assert!(std::str::from_utf8(&body).is_ok());
     }
 
+    /// A served request reaches the exposition.
+    ///
+    /// The three HTTP families are the only ones this crate cannot record
+    /// without a request being served: they are written by the request-logging
+    /// middleware, so they exist only where the router was actually called. That
+    /// makes them the one part of the exposition no recorder-level test can
+    /// cover, and it is exactly why they can rot unnoticed — a middleware that
+    /// stopped recording would leave every dashboard blank for HTTP while the
+    /// rest of the surface stayed green.
+    ///
+    /// So this serves a request through the real router — middleware included —
+    /// and asks whether the families the dashboards read are in the exposition
+    /// afterwards. Together with `every_declared_family_reaches_the_exposition`
+    /// in the observability module, the whole declared list is covered by a test
+    /// that reaches it.
+    #[cfg(feature = "prometheus")]
+    #[tokio::test]
+    async fn a_served_request_reaches_the_exposition() {
+        use axum::body::Body;
+        use axum::http::Request;
+        use tower_service::Service;
+
+        crate::observability::shared_test_handle().expect("prometheus enabled");
+
+        let state = crate::http::HttpState::default_for_test().await;
+        let router =
+            crate::http::router::build_router(state, None).expect("router builds in tests");
+        // `/metrics` rather than a business route: it needs no database, no
+        // identity provider and no body, and the middleware wraps it exactly as
+        // it wraps everything else.
+        let request = Request::builder()
+            .uri("/metrics")
+            .header("host", "localhost")
+            .body(Body::empty())
+            .expect("request builds");
+        let mut router = router;
+        let response = router
+            .call(request)
+            .await
+            .expect("the router serves /metrics");
+        assert_eq!(response.status(), axum::http::StatusCode::OK);
+
+        let exposition = crate::observability::shared_test_handle()
+            .expect("prometheus enabled")
+            .render();
+        for family in [
+            crate::observability::METRIC_HTTP_REQUESTS_TOTAL,
+            crate::observability::METRIC_HTTP_REQUEST_DURATION_SECONDS,
+            crate::observability::METRIC_HTTP_REQUESTS_INFLIGHT,
+        ] {
+            assert!(
+                exposition.contains(&format!("# HELP {family} ")),
+                "a request was served through the middleware, so `{family}` must \
+                 be in the exposition; a blank HTTP row on every dashboard is \
+                 what its absence looks like: {exposition}"
+            );
+        }
+    }
+
     /// The recorder is installed before anything else can fail.
     ///
     /// `build_state` calls `install_recorder` on its first lines, ahead of the

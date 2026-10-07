@@ -962,7 +962,7 @@ def technical() -> dict:
         timeseries(
             "Claim pipeline events",
             [target("memory:claim_pipeline:rate15m", "{{stage}} · {{outcome}}")],
-            (0, 8, 8, 8),
+            (0, 8, 7, 8),
             "Claim projection and reconciliation, by stage and outcome. "
             "Outcomes worth watching are `supersession` and `contradiction`: a "
             "rise in either means the knowledge graph is finding claims that "
@@ -974,7 +974,7 @@ def technical() -> dict:
             "Active relations",
             "memory:claim_relations:active",
             "short",
-            (8, 8, 4, 8),
+            (7, 8, 4, 8),
             "Claim relations currently stored, across schema and outcome. A "
             "level, read as it stands.\n\n"
             "**This under-reports.** A series only exists once it has been set at "
@@ -987,13 +987,31 @@ def technical() -> dict:
             "Mean candidates per slot",
             "memory:claim_candidates:mean15m",
             "short",
-            (12, 8, 6, 8),
+            (11, 8, 4, 8),
             "Candidates considered for one claim slot, averaged.\n\n"
             "A **mean, deliberately** — the family is exported as a summary, so a "
             "quantile would read zero for both 'no candidates' and 'a handful', "
             "which is the exact distinction this number exists to show. A rising "
             "mean means reconciliation is scanning more to place each claim.",
             decimals= 2,
+        ),
+        stat(
+            "Claims backfilled, per second",
+            "memory:claim_backfill_facts:rate15m",
+            "ops",
+            (15, 8, 4, 8),
+            "Facts the background walk projected into claims, by outcome.\n\n"
+            "**The slow half of the claims pipeline, and the one that can fall "
+            "behind silently.** Extraction derives facts immediately; claims are "
+            "projected from them by a background walk, so a projection that "
+            "stalls leaves facts in the store with no claims above them — the "
+            "graph quietly less complete than the facts it was built from, "
+            "with nothing failing.\n\n"
+            "Read against *Active relations* beside it: backfill flowing with a "
+            "flat relation count means claims are being derived and not kept, "
+            "and a standing zero with a non-zero fact count means the walk has "
+            "not run.",
+            decimals=3,
         ),
         timeseries(
             "Reconciliation latency p95",
@@ -1003,7 +1021,7 @@ def technical() -> dict:
                     "p95",
                 )
             ],
-            (18, 8, 6, 8),
+            (19, 8, 5, 8),
             "How long a claim reconciliation pass takes. Recorded for the "
             "`reconcile` stage; projection is fast enough not to need a panel.",
             unit="s",
@@ -1017,7 +1035,7 @@ def technical() -> dict:
             "Watcher degraded",
             "max(memory_fs_watch_degraded)",
             "short",
-            (0, 4, 6, 4),
+            (0, 8, 5, 8),
             "Whether the watcher backend exhausted its retries.\n\n"
             "**A one-way latch.** Once this reads 1 it stays 1 for the process "
             "lifetime — the retry loop has returned and nothing can set it back. "
@@ -1036,7 +1054,7 @@ def technical() -> dict:
         timeseries(
             "Revisions by outcome",
             [target("memory:fs_watch_revisions:rate15m", "{{outcome}}")],
-            (6, 4, 9, 4),
+            (10, 8, 8, 8),
             "Inbox files processed, by outcome. This is the product's "
             "automatic ingestion path: a rising `failed` count is knowledge that "
             "stopped arriving, and nothing else in this deployment says so.",
@@ -1046,7 +1064,7 @@ def technical() -> dict:
         timeseries(
             "Retries by stage and reason",
             [target("memory:fs_watch_retries:rate15m", "{{stage}} · {{reason}}")],
-            (15, 4, 9, 4),
+            (18, 8, 6, 8),
             "Retries while processing a revision, by the stage that failed and "
             "why. `timeout` is a single revision exceeding its attempt limit; "
             "the failure classes separate a bad file from an unreachable store.",
@@ -1063,7 +1081,7 @@ def technical() -> dict:
         timeseries(
             "Revision latency p95",
             [target("memory:fs_watch_revision_duration:p95_5m", "{{outcome}}")],
-            (0, 4, 12, 4),
+            (0, 8, 11, 8),
             "How long one revision takes. A single revision may run to its "
             "attempt timeout, so the upper percentiles can sit well past the "
             "last reported bucket — a high number here is often a timeout, not "
@@ -1085,10 +1103,50 @@ def technical() -> dict:
             "*These series exist only when the build carries `fs-watch` **and** "
             "the deployment set `MEMORY_INGESTION_INBOX`. Without both, the "
             "panels are empty — which reads as 'off', not 'broken'.*",
-            (12, 4, 12, 4),
+            (16, 8, 8, 8),
         ),
     ]
     sections.append(("Filesystem ingestion", fswatch))
+    # The live levels together, and what the last startup scan found. Both are
+    # levels or one-window increases rather than trends: a queue depth that has
+    # been growing for a week and one that grew once and drained look identical
+    # on a trend, and only the current number tells them apart.
+    fswatch.append(
+        stat(
+            "Revisions in flight",
+            "memory_fs_watch_inflight",
+            "short",
+            (5, 8, 5, 8),
+            "Revisions being processed right now.\n\n"
+            "The live half of the watcher: queue depth is what is *waiting*, "
+            "this is what is *worked on*, and the two move together when the "
+            "watcher keeps up. A depth that climbs while this stays flat means "
+            "revisions arrive faster than they finish.\n\n"
+            "*Empty unless the deployment set `MEMORY_INGESTION_INBOX`.*",
+            decimals=0,
+        )
+    )
+    fswatch_detail.append(
+        timeseries(
+            "Startup scan, last 24 hours",
+            [target("memory:fs_watch_scan_files:increase1d", "{{outcome}}")],
+            (11, 8, 5, 8),
+            "What the inbox scan found when the watcher last started, by "
+            "outcome.\n\n"
+            "**Read it as a one-shot, not a trend.** The scan runs once at "
+            "startup, so this panel is flat at zero on any day it did not run "
+            "and steps once on the day it did — which is the honest shape, and "
+            "the reason it says what the *last* scan did rather than how busy "
+            "the watcher is (the two panels above answer that).\n\n"
+            "`skipped_symlink` and the other skips are not failures. The split "
+            "that matters is a scan which enqueued nothing because everything "
+            "was skipped, against one that enqueued nothing because every read "
+            "failed.",
+            unit="short",
+            stack=True,
+            legend_calcs=["sum"],
+        )
+    )
     sections.append(("Filesystem ingestion — latency and caveats", fswatch_detail))
 
     sections.append((
