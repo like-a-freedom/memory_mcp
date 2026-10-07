@@ -1,6 +1,6 @@
 # HTTP memory baseline protocol
 
-Status: procedure and sampler contract; **no controlled baseline has been collected yet**.
+Status: procedure and sampler contract; **no controlled baseline has been collected yet**. The staging safety tests pass, but no disposable staging deployment/database/provider was supplied. Production has not been seeded or sent workload requests; Task 2 attribution remains unresolved, so no RAM-reduction claim is supported.
 
 ## Sampler
 
