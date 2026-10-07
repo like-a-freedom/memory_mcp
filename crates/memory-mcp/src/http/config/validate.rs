@@ -93,6 +93,15 @@ pub(super) fn validate(cfg: &HttpConfig) -> Result<(), MemoryError> {
             "MEMORY_MCP_HTTP_BODY_LIMIT must be positive".into(),
         ));
     }
+    if cfg.preflight_request_limit == 0
+        || cfg.preflight_request_limit > tokio::sync::Semaphore::MAX_PERMITS
+        || cfg.preflight_bytes == 0
+        || cfg.preflight_bytes < cfg.body_limit_bytes
+    {
+        return Err(MemoryError::ConfigInvalid(
+            "HTTP preflight request limit must be within Tokio's semaphore maximum and preflight bytes must be at least the body limit".into(),
+        ));
+    }
     if cfg.request_deadline.is_zero()
         || cfg.shutdown_grace.is_zero()
         || cfg.pool_cap == 0

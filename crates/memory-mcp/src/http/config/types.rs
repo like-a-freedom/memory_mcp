@@ -17,9 +17,10 @@ pub use crate::models::auth::{AUTH_METHOD_LOCAL, AUTH_METHOD_OIDC, BrowserAuthMe
 
 use super::parse::{
     DEFAULT_BIND, DEFAULT_BODY_LIMIT_BYTES, DEFAULT_GLOBAL_REQUEST_LIMIT,
-    DEFAULT_MAINTENANCE_PARALLELISM, DEFAULT_OIDC_ALG, DEFAULT_POOL_CAP, DEFAULT_REQUEST_DEADLINE,
-    DEFAULT_RUNTIME_ACTIVATION_TIMEOUT, DEFAULT_RUNTIME_CAPACITY_WAIT, DEFAULT_RUNTIME_IDLE_TTL,
-    DEFAULT_SHUTDOWN_GRACE, DEFAULT_SUBSCRIPTION_AUTH_RECHECK, DEFAULT_SUBSCRIPTION_LIMIT,
+    DEFAULT_MAINTENANCE_PARALLELISM, DEFAULT_OIDC_ALG, DEFAULT_POOL_CAP, DEFAULT_PREFLIGHT_BYTES,
+    DEFAULT_PREFLIGHT_REQUEST_LIMIT, DEFAULT_REQUEST_DEADLINE, DEFAULT_RUNTIME_ACTIVATION_TIMEOUT,
+    DEFAULT_RUNTIME_CAPACITY_WAIT, DEFAULT_RUNTIME_IDLE_TTL, DEFAULT_SHUTDOWN_GRACE,
+    DEFAULT_SUBSCRIPTION_AUTH_RECHECK, DEFAULT_SUBSCRIPTION_LIMIT,
     DEFAULT_SUBSCRIPTION_QUEUE_CAPACITY, DEFAULT_TASK_QUEUE_CAPACITY, DEFAULT_TASK_RETENTION_SECS,
     DEFAULT_TASK_SYNC_MAX_BYTES, TrustedCidr, deserialize_duration_secs, deserialize_hex_32,
     load_signup_plan_limits, optional_env, parse_csv, parse_env_or, parse_hex_32_env, require_env,
@@ -119,6 +120,10 @@ pub struct HttpConfig {
     pub allowed_hosts: Vec<String>,
     pub allowed_origins: Vec<String>,
     pub body_limit_bytes: usize,
+    #[serde(default = "default_preflight_request_limit")]
+    pub preflight_request_limit: usize,
+    #[serde(default = "default_preflight_bytes")]
+    pub preflight_bytes: usize,
     #[serde(deserialize_with = "deserialize_duration_secs")]
     pub request_deadline: Duration,
     #[serde(deserialize_with = "deserialize_duration_secs")]
@@ -177,6 +182,8 @@ impl fmt::Debug for HttpConfig {
             .field("allowed_hosts", &self.allowed_hosts)
             .field("allowed_origins", &self.allowed_origins)
             .field("body_limit_bytes", &self.body_limit_bytes)
+            .field("preflight_request_limit", &self.preflight_request_limit)
+            .field("preflight_bytes", &self.preflight_bytes)
             .field("request_deadline", &self.request_deadline)
             .field("shutdown_grace", &self.shutdown_grace)
             .field("pool_cap", &self.pool_cap)
@@ -357,6 +364,14 @@ fn build_local_browser_config(
     })
 }
 
+fn default_preflight_request_limit() -> usize {
+    DEFAULT_PREFLIGHT_REQUEST_LIMIT
+}
+
+fn default_preflight_bytes() -> usize {
+    DEFAULT_PREFLIGHT_BYTES
+}
+
 impl HttpConfig {
     /// Loads the HTTP config from process environment variables.
     pub fn from_env() -> Result<Self, MemoryError> {
@@ -370,6 +385,12 @@ impl HttpConfig {
         let allowed_origins = parse_csv("ALLOWED_ORIGINS")?;
         let body_limit_bytes: usize =
             parse_env_or("MEMORY_MCP_HTTP_BODY_LIMIT", DEFAULT_BODY_LIMIT_BYTES)?;
+        let preflight_request_limit = parse_env_or(
+            "MEMORY_MCP_HTTP_PREFLIGHT_REQUEST_LIMIT",
+            DEFAULT_PREFLIGHT_REQUEST_LIMIT,
+        )?;
+        let preflight_bytes =
+            parse_env_or("MEMORY_MCP_HTTP_PREFLIGHT_BYTES", DEFAULT_PREFLIGHT_BYTES)?;
         let request_deadline = Duration::from_secs(parse_env_or(
             "MEMORY_MCP_HTTP_REQUEST_DEADLINE_SECS",
             DEFAULT_REQUEST_DEADLINE.as_secs(),
@@ -648,6 +669,8 @@ impl HttpConfig {
             allowed_hosts,
             allowed_origins,
             body_limit_bytes,
+            preflight_request_limit,
+            preflight_bytes,
             request_deadline,
             shutdown_grace,
             pool_cap,
@@ -719,6 +742,8 @@ impl HttpConfig {
             allowed_hosts: vec!["localhost".into(), "127.0.0.1".into()],
             allowed_origins: vec!["http://localhost".into()],
             body_limit_bytes: DEFAULT_BODY_LIMIT_BYTES,
+            preflight_request_limit: DEFAULT_PREFLIGHT_REQUEST_LIMIT,
+            preflight_bytes: DEFAULT_PREFLIGHT_BYTES,
             request_deadline: DEFAULT_REQUEST_DEADLINE,
             shutdown_grace: DEFAULT_SHUTDOWN_GRACE,
             pool_cap: DEFAULT_POOL_CAP,
@@ -811,6 +836,8 @@ mod tests {
             "MEMORY_MCP_API_KEY_PEPPER",
             "MEMORY_MCP_HTTP_SIGNUP_MODE",
             "MEMORY_MCP_HTTP_BODY_LIMIT",
+            "MEMORY_MCP_HTTP_PREFLIGHT_REQUEST_LIMIT",
+            "MEMORY_MCP_HTTP_PREFLIGHT_BYTES",
             "MEMORY_MCP_HTTP_REQUEST_DEADLINE_SECS",
             "MEMORY_MCP_HTTP_SHUTDOWN_GRACE_SECS",
             "MEMORY_MCP_HTTP_TRUSTED_PROXY_CIDRS",
@@ -936,6 +963,14 @@ mod tests {
     #[test]
     fn default_for_test_validates() {
         validate_isolated(&HttpConfig::default_for_test()).expect("valid");
+    }
+
+    #[test]
+    fn http_config_defaults_preflight_capacity() {
+        let cfg = HttpConfig::default_for_test();
+
+        assert_eq!(cfg.preflight_request_limit, 20);
+        assert_eq!(cfg.preflight_bytes, 64 * 1024 * 1024);
     }
 
     #[test]
@@ -1141,6 +1176,9 @@ mod tests {
             ("MEMORY_MCP_HTTP_TASK_RETENTION_SECS", "3600".into()),
             ("MEMORY_MCP_HTTP_TASK_QUEUE_CAPACITY", "64".into()),
             ("MEMORY_MCP_HTTP_TASK_SYNC_MAX_BYTES", "4096".into()),
+            ("MEMORY_MCP_HTTP_BODY_LIMIT", "1048576".into()),
+            ("MEMORY_MCP_HTTP_PREFLIGHT_REQUEST_LIMIT", "2".into()),
+            ("MEMORY_MCP_HTTP_PREFLIGHT_BYTES", "2097152".into()),
         ]);
         let refs: Vec<(&str, &str)> = vars.iter().map(|(k, v)| (*k, v.as_str())).collect();
         with_env(&refs, || {
@@ -1154,7 +1192,42 @@ mod tests {
             assert_eq!(cfg.task_retention_secs, 3600);
             assert_eq!(cfg.task_queue_capacity, 64);
             assert_eq!(cfg.task_sync_max_bytes, 4096);
+            assert_eq!(cfg.preflight_request_limit, 2);
+            assert_eq!(cfg.preflight_bytes, 2 * 1024 * 1024);
         });
+    }
+
+    #[test]
+    fn http_config_rejects_zero_preflight_request_limit() {
+        let mut cfg = HttpConfig::default_for_test();
+        cfg.preflight_request_limit = 0;
+
+        assert!(matches!(
+            validate_isolated(&cfg),
+            Err(MemoryError::ConfigInvalid(message)) if message.contains("preflight")
+        ));
+    }
+
+    #[test]
+    fn http_config_rejects_preflight_bytes_below_body_limit() {
+        let mut cfg = HttpConfig::default_for_test();
+        cfg.preflight_bytes = cfg.body_limit_bytes - 1;
+
+        assert!(matches!(
+            validate_isolated(&cfg),
+            Err(MemoryError::ConfigInvalid(message)) if message.contains("preflight")
+        ));
+    }
+
+    #[test]
+    fn http_config_rejects_preflight_request_limit_above_semaphore_maximum() {
+        let mut cfg = HttpConfig::default_for_test();
+        cfg.preflight_request_limit = tokio::sync::Semaphore::MAX_PERMITS + 1;
+
+        assert!(matches!(
+            validate_isolated(&cfg),
+            Err(MemoryError::ConfigInvalid(message)) if message.contains("preflight")
+        ));
     }
 
     #[test]

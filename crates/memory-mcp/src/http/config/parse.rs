@@ -16,6 +16,8 @@ use crate::http::registry::models::PlanLimits;
 
 pub const DEFAULT_BIND: &str = "0.0.0.0:8080";
 pub const DEFAULT_BODY_LIMIT_BYTES: usize = 8 * 1024 * 1024; // 8 MiB
+pub const DEFAULT_PREFLIGHT_REQUEST_LIMIT: usize = 20;
+pub const DEFAULT_PREFLIGHT_BYTES: usize = 64 * 1024 * 1024; // 64 MiB
 pub const DEFAULT_REQUEST_DEADLINE: Duration = Duration::from_secs(120);
 pub const DEFAULT_SHUTDOWN_GRACE: Duration = Duration::from_secs(30);
 pub const DEFAULT_POOL_CAP: usize = 32;

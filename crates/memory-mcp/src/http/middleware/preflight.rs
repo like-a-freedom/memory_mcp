@@ -15,10 +15,12 @@
 use axum::http::{StatusCode, header};
 use axum::middleware::Next;
 use axum::response::{IntoResponse, Response};
+use bytes::{Bytes, BytesMut};
 use http_body_util::BodyExt;
 use serde_json::Value;
 use std::sync::Arc;
 
+use super::preflight_budget::{PreflightRefusal, PreflightReservation};
 use crate::http::HttpState;
 
 /// Whether a revision belongs to the legacy era: a known revision that still
@@ -147,6 +149,37 @@ pub(super) fn quota_denied_response(
     response
 }
 
+enum BodyCollectionError {
+    TooLarge,
+    CapacityExhausted,
+}
+
+async fn collect_bounded_body(
+    body: axum::body::Body,
+    body_limit_bytes: usize,
+    reservation: &mut PreflightReservation,
+) -> Result<Bytes, BodyCollectionError> {
+    let mut body = http_body_util::Limited::new(body, body_limit_bytes);
+    let mut collected = BytesMut::new();
+
+    while let Some(frame) = body.frame().await {
+        let frame = frame.map_err(|_| BodyCollectionError::TooLarge)?;
+        if let Ok(data) = frame.into_data() {
+            let total_bytes = collected
+                .len()
+                .checked_add(data.len())
+                .filter(|total| *total <= body_limit_bytes)
+                .ok_or(BodyCollectionError::TooLarge)?;
+            reservation
+                .try_reserve_through(total_bytes)
+                .map_err(|_| BodyCollectionError::CapacityExhausted)?;
+            collected.extend_from_slice(&data);
+        }
+    }
+
+    Ok(collected.freeze())
+}
+
 /// Validate all request data that can affect routing, auth ordering, or
 /// admission before any of those decisions are made. The body is restored
 /// after bounded collection so rmcp still owns protocol dispatch and framing.
@@ -194,21 +227,41 @@ pub async fn prevalidate_mcp(
         );
     }
 
-    if headers
+    let content_length = headers
         .get(header::CONTENT_LENGTH)
         .and_then(|value| value.to_str().ok())
-        .and_then(|value| value.parse::<usize>().ok())
-        .is_some_and(|length| length > state.config.body_limit_bytes)
-    {
+        .and_then(|value| value.parse::<usize>().ok());
+    if content_length.is_some_and(|length| length > state.config.body_limit_bytes) {
         return plain_error(StatusCode::PAYLOAD_TOO_LARGE, "request body too large");
     }
 
-    let (parts, body) = req.into_parts();
-    let body = http_body_util::Limited::new(body, state.config.body_limit_bytes);
-    let bytes = match body.collect().await {
-        Ok(collected) => collected.to_bytes(),
-        Err(_) => return plain_error(StatusCode::PAYLOAD_TOO_LARGE, "request body too large"),
+    let mut reservation = match state
+        .preflight_budget
+        .try_reserve(content_length.unwrap_or(0))
+    {
+        Ok(reservation) => reservation,
+        Err(PreflightRefusal::Requests | PreflightRefusal::Bytes) => {
+            return plain_error(
+                StatusCode::SERVICE_UNAVAILABLE,
+                "preflight buffering capacity exhausted",
+            );
+        }
     };
+
+    let (parts, body) = req.into_parts();
+    let bytes =
+        match collect_bounded_body(body, state.config.body_limit_bytes, &mut reservation).await {
+            Ok(bytes) => bytes,
+            Err(BodyCollectionError::TooLarge) => {
+                return plain_error(StatusCode::PAYLOAD_TOO_LARGE, "request body too large");
+            }
+            Err(BodyCollectionError::CapacityExhausted) => {
+                return plain_error(
+                    StatusCode::SERVICE_UNAVAILABLE,
+                    "preflight buffering capacity exhausted",
+                );
+            }
+        };
     let value: Value = match serde_json::from_slice(&bytes) {
         Ok(value) => value,
         Err(_) => return bad_request("invalid JSON-RPC request"),
@@ -322,9 +375,12 @@ pub async fn prevalidate_mcp(
         subscription: body_method == "subscriptions/listen",
         ingest_source_bytes: inline_ingest_source_bytes(body_method, &value),
     };
+    drop(value);
     let mut request = axum::http::Request::from_parts(parts, axum::body::Body::from(bytes));
     request.extensions_mut().insert(validated);
-    next.run(request).await
+    let response = next.run(request).await;
+    drop(reservation);
+    response
 }
 
 #[cfg(test)]

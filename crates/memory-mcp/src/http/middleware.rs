@@ -30,6 +30,7 @@ mod deadline;
 mod host_origin;
 mod local_deadline;
 mod preflight;
+pub(super) mod preflight_budget;
 mod sse_headers;
 
 // Public re-exports. Adding a new middleware should add it here and

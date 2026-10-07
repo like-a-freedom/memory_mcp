@@ -290,7 +290,15 @@ async fn load_20_active_tenants_under_expected_qps() {
     let evidence = summarize("load_20", &tenants, &all_requests);
 
     assert_eq!(evidence.tenant_count, TENANT_COUNT);
-    assert_eq!(evidence.error_count, 0, "load_20: errors in {evidence:?}");
+    let failed_statuses: Vec<u16> = all_requests
+        .iter()
+        .filter(|request| !request.success)
+        .map(|request| request.http_status)
+        .collect();
+    assert_eq!(
+        evidence.error_count, 0,
+        "load_20: errors in {evidence:?}; failed HTTP statuses: {failed_statuses:?}"
+    );
     assert_eq!(evidence.success_count, evidence.request_count);
     assert_isolation(&tenants, &explains);
 

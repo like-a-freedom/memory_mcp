@@ -46,6 +46,7 @@ pub struct HttpState {
     pub pool: Arc<runtime::pool::Pool>,
     pub shutdown: shutdown::ShutdownState,
     pub admission: Arc<runtime::pool::AdmissionGate>,
+    pub(crate) preflight_budget: Arc<middleware::preflight_budget::PreflightBudget>,
     pub registry: registry::RegistryHandle,
     #[cfg(feature = "control-plane")]
     pub(crate) identity_link_transactions: Arc<dyn crate::identity::api::IdentityLinkTransactions>,
@@ -188,6 +189,10 @@ impl HttpState {
             registry.ensure_plan(&signup_plan).await?;
         }
         let shutdown = shutdown::ShutdownState::new();
+        let preflight_budget = Arc::new(middleware::preflight_budget::PreflightBudget::new(
+            config.preflight_request_limit,
+            config.preflight_bytes,
+        )?);
         let pool = Arc::new(runtime::pool::Pool::from_http_config_with_shutdown(
             &config,
             Arc::new(registry.clone()),
@@ -394,6 +399,7 @@ impl HttpState {
                 config.global_request_limit,
                 config.subscription_limit,
             )),
+            preflight_budget,
             registry,
             #[cfg(feature = "control-plane")]
             identity_link_transactions,

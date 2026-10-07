@@ -366,6 +366,21 @@ belongs in each entry. The `http://localhost` values work only through the
 `local` method's loopback development escape hatch; a non-loopback deployment
 uses an `https://` base URL and matching origins.
 
+The HTTP profile bounds request bodies before parsing and ordinary admission.
+`MEMORY_MCP_HTTP_PREFLIGHT_REQUEST_LIMIT` defaults to 20 concurrent body
+reservations; `MEMORY_MCP_HTTP_PREFLIGHT_BYTES` defaults to 67108864 bytes
+(64 MiB) of accounted body bytes. A valid `Content-Length` is reserved before
+reading; missing or understated lengths are charged from observed body frames
+before those frames are copied into the preflight buffer. The byte budget must
+be at least `MEMORY_MCP_HTTP_BODY_LIMIT` (8 MiB by default). When the slot or
+byte budget is exhausted, the server returns
+`503 preflight buffering capacity exhausted`; slot and declared-length
+refusals happen before body polling, while an unknown or understated body can
+be refused after its frame is read but before that frame is copied. Earlier
+cheap header checks keep their existing `415`, `406`, and advertised-size `413`
+responses. Accounting covers raw bytes copied into preflight buffers, not
+transport-owned frames, JSON expansion, or allocator RSS.
+
 To add an identity provider to a running deployment, export the provider values
 and restart. The local method keeps working through the same restart:
 
@@ -1328,6 +1343,8 @@ seconds — a longer interval would let a revoked authorization keep streaming.
 | `MEMORY_MCP_HTTP_RUNTIME_CAPACITY_WAIT_MS` | milliseconds | `2000` | Maximum time a request waits for runtime capacity before returning `503` |
 | `MEMORY_MCP_HTTP_RUNTIME_ACTIVATION_TIMEOUT_SECS` | seconds | `30` | Maximum time the activator waits for a tenant runtime to become ready |
 | `MEMORY_MCP_HTTP_GLOBAL_REQUEST_LIMIT` | `u32` | `256` | Global concurrent ordinary-request admission budget |
+| `MEMORY_MCP_HTTP_PREFLIGHT_REQUEST_LIMIT` | `usize` | `20` | Concurrent MCP preflight body reservations |
+| `MEMORY_MCP_HTTP_PREFLIGHT_BYTES` | `usize` | `67108864` (64 MiB) | Aggregate accounted raw body bytes copied during preflight; not an RSS limit |
 | `MEMORY_MCP_HTTP_SUBSCRIPTION_LIMIT` | `u32` | `32` | Global concurrent `subscriptions/listen` admission budget (separate from ordinary requests) |
 | `MEMORY_MCP_HTTP_MAINTENANCE_PARALLELISM` | `usize` | `4` | Scheduler maintenance-job concurrency |
 | `MEMORY_MCP_HTTP_SUBSCRIPTION_QUEUE_CAPACITY` | `usize` | `64` | Bounded per-listener event queue; slow consumers are disconnected |
