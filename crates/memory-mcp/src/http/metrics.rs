@@ -44,8 +44,26 @@ pub fn install_recorder() -> Result<metrics_exporter_prometheus::PrometheusHandl
 /// recorder with a second listener.
 #[cfg(feature = "prometheus")]
 pub fn validate_no_listener_env() -> Result<(), MemoryError> {
+    // The decision is [`listener_env_conflict`]; this line is only the read. The
+    // environment is process-global, so a test that set the variable would race
+    // every other test in the binary — the rule is tested as a function of the
+    // value instead.
     match std::env::var(crate::observability::ENV_PROMETHEUS_LISTEN_ADDR) {
-        Ok(v) if !v.trim().is_empty() => Err(MemoryError::ConfigInvalid(format!(
+        Ok(raw) => listener_env_conflict(Some(&raw)),
+        Err(_) => listener_env_conflict(None),
+    }
+}
+
+/// Whether a configured stdio listener address conflicts with the HTTP profile.
+///
+/// Pure, so the rules are testable without touching the environment: unset and
+/// blank both mean "no listener configured" and are accepted, and any real
+/// value is refused — the HTTP profile serves metrics on its own router and
+/// cannot share the process-global recorder with a second listener.
+#[cfg(feature = "prometheus")]
+pub(crate) fn listener_env_conflict(raw: Option<&str>) -> Result<(), MemoryError> {
+    match raw.map(str::trim) {
+        Some(value) if !value.is_empty() => Err(MemoryError::ConfigInvalid(format!(
             "{} must not be set in the HTTP profile; metrics are served on /metrics",
             crate::observability::ENV_PROMETHEUS_LISTEN_ADDR
         ))),
@@ -86,6 +104,8 @@ pub async fn prometheus() -> (axum::http::StatusCode, &'static str) {
 
 #[cfg(test)]
 mod tests {
+    #[cfg(feature = "prometheus")]
+    use super::listener_env_conflict;
     #[cfg(feature = "prometheus")]
     #[tokio::test]
     async fn metrics_route_returns_prometheus_text() {
@@ -167,6 +187,36 @@ mod tests {
                  what its absence looks like: {exposition}"
             );
         }
+    }
+
+    /// A configured stdio listener is refused, and the message says why.
+    ///
+    /// The refusal is a startup error a person has to act on: the HTTP profile
+    /// serves metrics on its own router, so a second listener cannot share the
+    /// process-global recorder, and letting it through would fail later inside
+    /// the metrics crate with a message about recorder installation instead.
+    #[cfg(feature = "prometheus")]
+    #[test]
+    fn a_configured_stdio_listener_is_refused_in_http_mode() {
+        let error = listener_env_conflict(Some("127.0.0.1:9100"))
+            .expect_err("a configured listener conflicts with /metrics");
+
+        assert!(
+            error.to_string().contains("/metrics"),
+            "the error must say where metrics are served instead, so the fix is \
+             obvious: {error}"
+        );
+    }
+
+    /// Unset and blank are both accepted.
+    ///
+    /// Blank is a normal way to arrive here — a template that renders an empty
+    /// value — and refusing it would report a syntax error where there is none.
+    #[cfg(feature = "prometheus")]
+    #[test]
+    fn an_unset_or_blank_stdio_listener_is_accepted_in_http_mode() {
+        listener_env_conflict(None).expect("unset is not a conflict");
+        listener_env_conflict(Some("  ")).expect("a blank value is not a conflict");
     }
 
     /// The recorder is installed before anything else can fail.

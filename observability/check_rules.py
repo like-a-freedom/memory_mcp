@@ -33,6 +33,14 @@ SOURCES = [
 # these on a histogram family; they are not separate families.
 DERIVED = ("_sum", "_count", "_bucket")
 
+# Names reserved for test fixtures. A counter and a histogram pair needs real
+# names to record into, and those names end up as string literals in the test
+# that drives it — which the scan below reads as families the crate exports.
+# The prefix is the convention that keeps the two apart, stated here so the
+# exclusion is a rule rather than a special case: nothing this crate ships is
+# named `memory_test_`.
+TEST_FIXTURE_PREFIX = "memory_test_"
+
 
 def exported_families() -> set[str]:
     families: set[str] = set()
@@ -45,6 +53,7 @@ def exported_families() -> set[str]:
                 if (
                     quoted.startswith("memory_")
                     and quoted != "memory_"
+                    and not quoted.startswith(TEST_FIXTURE_PREFIX)
                     and not quoted.endswith("_")
                     and all(c.islower() or c.isdigit() or c == "_" for c in quoted)
                 ):

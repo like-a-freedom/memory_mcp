@@ -104,6 +104,14 @@ jobs:
             cargo check -p memory_mcp --all-targets --no-default-features \
               --features "${features},test-fixtures" --locked
           done
+          # `prometheus` alone: the orthogonal axis, and the one whose absence from
+          # this loop let a test in `observability.rs` reference a control-plane
+          # recorder and break a build that is perfectly legal. Every metrics
+          # test needs the features of the recorders it drives, and this is the
+          # check that keeps that requirement from being discovered locally.
+          echo "checking prometheus without default features"
+          cargo check -p memory_mcp --all-targets --no-default-features \
+            --features "prometheus,test-fixtures" --locked
       - name: Evaluation gate
         env:
           EVAL_PROFILE: ${{ inputs.release && 'release' || 'pr' }}

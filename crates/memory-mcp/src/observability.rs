@@ -4,6 +4,7 @@
 //! valid `MEMORY_PROMETHEUS_LISTEN_ADDR`, no socket opens and the
 //! `metrics` facade stays no-op. `127.0.0.1:0` is supported for tests.
 
+#[cfg(feature = "prometheus")]
 use std::net::SocketAddr;
 use std::time::Instant;
 
@@ -41,25 +42,6 @@ pub const METRIC_FS_WATCH_DEGRADED: &str = "memory_fs_watch_degraded";
 pub const METRIC_FS_WATCH_REVISION_DURATION_SECONDS: &str =
     "memory_fs_watch_revision_duration_seconds";
 
-/// The one place a count and a duration are emitted together.
-///
-/// Every timed thing here is a counter and a histogram carrying the same
-/// labels, so they are emitted as a pair: a count without a duration, or a
-/// duration without its count, is half a measurement, and it is the pair that
-/// makes a rate or a quantile answerable.
-///
-/// Labels are written out at the call site rather than taken as a slice
-/// because the `metrics` macros take them as macro arguments; a `&[(k, v)]`
-/// built by the caller would be a temporary the macro borrows past its
-/// lifetime. Concentrating that in one function is what stops every caller
-/// from solving it again, and from growing a second emission path that drifts.
-macro_rules! count_and_time {
-    ($counter:expr, $histogram:expr, $seconds:expr, $($name:literal => $value:expr),+ $(,)?) => {{
-        metrics::counter!($counter, $($name => $value),+).increment(1);
-        metrics::histogram!($histogram, $($name => $value),+).record($seconds);
-    }};
-}
-
 /// Record one background job: its outcome and how long it ran.
 ///
 /// Shared by every scheduler so a failing job is counted the same way wherever
@@ -82,12 +64,16 @@ macro_rules! count_and_time {
     )
 )]
 pub(crate) fn record_job_metric(pass: &'static str, outcome: &'static str, seconds: f64) {
-    count_and_time!(
+    // Through `count_timed`, like every other counter-and-histogram pair. A
+    // macro used to live here as well, so a timed thing had two spellings to
+    // choose from — one that emitted the pair itself, one that delegated — and a
+    // pair emitted by a new caller could pick the wrong one and drift from the
+    // single emission path the rest of the file shares.
+    count_timed(
         METRIC_BACKGROUND_JOBS_TOTAL,
         METRIC_BACKGROUND_JOB_DURATION_SECONDS,
         seconds,
-        "pass" => pass,
-        "outcome" => outcome,
+        &[("pass", pass), ("outcome", outcome)],
     );
     // Stamped here rather than at the schedulers, because every scheduler
     // already reports through this one function and a per-scheduler call is a
@@ -469,16 +455,15 @@ pub fn describe_metrics() {
         // two-argument one means "dimensionless". There is no `Option<Unit>`
         // form, so the choice is made here rather than by the dictionary.
         match (described.kind, described.unit) {
-            (MetricKind::Counter, Some(unit)) => {
-                metrics::describe_counter!(described.name, unit, help);
-            }
-            (MetricKind::Counter, None) => {
+            // The unit is dropped on purpose for the first two, because
+            // dimensionless is a rule over the dictionary rather than a per-family
+            // choice: `only_histograms_carry_a_unit` pins it across every entry,
+            // so a counter that later grows a unit fails that test instead of
+            // being described here without the unit nobody should have added.
+            (MetricKind::Counter, _) => {
                 metrics::describe_counter!(described.name, help);
             }
-            (MetricKind::Gauge, Some(unit)) => {
-                metrics::describe_gauge!(described.name, unit, help);
-            }
-            (MetricKind::Gauge, None) => {
+            (MetricKind::Gauge, _) => {
                 metrics::describe_gauge!(described.name, help);
             }
             (MetricKind::Histogram, Some(unit)) => {
@@ -583,23 +568,38 @@ pub fn shared_test_handle() -> Option<metrics_exporter_prometheus::PrometheusHan
         .clone()
 }
 
+/// Read the listener address, keeping the environment out of the rule.
+///
+/// The rule — unset and blank mean "no listener", a valid `ip:port` is the
+/// address, anything else is a configuration error naming the variable — is
+/// [`listener_addr_from`], which takes a value and returns a decision. Reading
+/// the process environment is a single line here so the rules themselves can be
+/// tested with plain inputs: environment variables are process-global, so a
+/// test that set one would be racing every other test in the binary.
 #[cfg(feature = "prometheus")]
 fn parse_listen_addr() -> Result<Option<SocketAddr>, MemoryError> {
     match std::env::var(ENV_PROMETHEUS_LISTEN_ADDR) {
-        Ok(raw) => {
-            let trimmed = raw.trim();
-            if trimmed.is_empty() {
-                return Ok(None);
-            }
-            let addr: SocketAddr = trimmed.parse().map_err(|_| {
-                MemoryError::ConfigInvalid(format!(
-                    "{ENV_PROMETHEUS_LISTEN_ADDR}='{trimmed}' is not a valid SocketAddr (use ip:port, e.g. 127.0.0.1:9100)"
-                ))
-            })?;
-            Ok(Some(addr))
-        }
-        Err(_) => Ok(None),
+        Ok(raw) => listener_addr_from(Some(&raw)),
+        Err(_) => listener_addr_from(None),
     }
+}
+
+/// The listener decision, as a pure function of the configured value.
+#[cfg(feature = "prometheus")]
+pub(crate) fn listener_addr_from(raw: Option<&str>) -> Result<Option<SocketAddr>, MemoryError> {
+    let Some(raw) = raw else {
+        return Ok(None);
+    };
+    let trimmed = raw.trim();
+    if trimmed.is_empty() {
+        return Ok(None);
+    }
+    let addr: SocketAddr = trimmed.parse().map_err(|_| {
+        MemoryError::ConfigInvalid(format!(
+            "{ENV_PROMETHEUS_LISTEN_ADDR}='{trimmed}' is not a valid SocketAddr (use ip:port, e.g. 127.0.0.1:9100)"
+        ))
+    })?;
+    Ok(Some(addr))
 }
 
 #[cfg(feature = "prometheus")]
@@ -617,18 +617,6 @@ fn install_with_addr(addr: SocketAddr) -> Result<(), MemoryError> {
         })?;
     describe_metrics();
     record_build_info();
-    Ok(())
-}
-
-#[cfg(not(feature = "prometheus"))]
-#[allow(dead_code)]
-fn parse_listen_addr() -> Result<Option<SocketAddr>, MemoryError> {
-    Ok(None)
-}
-
-#[cfg(not(feature = "prometheus"))]
-#[allow(dead_code)]
-fn install_with_addr(_addr: SocketAddr) -> Result<(), MemoryError> {
     Ok(())
 }
 
@@ -1145,7 +1133,17 @@ pub(crate) mod tests {
     /// and the two tests between them cover the whole list — a family added to
     /// `DESCRIPTIONS` is missing from one of them or the other until something
     /// records it.
+    ///
+    /// Gated on the full profile because the recorders it drives are: a sign-in
+    /// count belongs to the control plane, and registry reconciliation to the
+    /// HTTP profile. A narrower build is a legal build, but this test has no
+    /// honest claim about the families that build does not have.
     #[tokio::test]
+    #[cfg(all(
+        feature = "prometheus",
+        feature = "streamable-http",
+        feature = "control-plane"
+    ))]
     async fn every_declared_family_reaches_the_exposition() {
         use crate::knowledge::claims_policy::telemetry as claims_telemetry;
         use crate::knowledge::claims_policy::telemetry::{ClaimMatchMode, ClaimMetricStage};
@@ -1234,6 +1232,118 @@ pub(crate) mod tests {
              promised them, but nothing recorded into them: a declared family \
              no recorder writes is absent from every scrape, and a panel \
              reading it looks like a subsystem that is switched off: {missing:?}"
+        );
+    }
+
+    /// A listener address that parses is taken, and its port is kept verbatim.
+    ///
+    /// `127.0.0.1:0` is the interesting one: port zero means "any free port",
+    /// which is what the tests and a developer machine use, and a rule that
+    /// rejected it would have made the whole listener untestable.
+    #[cfg(feature = "prometheus")]
+    #[test]
+    fn a_configured_listener_address_is_the_one_that_was_configured() {
+        let addr = listener_addr_from(Some(" 127.0.0.1:0 "))
+            .expect("a valid address is not an error")
+            .expect("a configured address opens a listener");
+
+        assert_eq!(
+            addr,
+            "127.0.0.1:0"
+                .parse::<SocketAddr>()
+                .expect("the literal parses"),
+            "the address must be the configured one, whitespace and all"
+        );
+    }
+
+    /// Unset and blank both mean "no listener", and neither is an error.
+    ///
+    /// Blank is separated from unset because a deployment template that renders
+    /// an empty value is a normal way to end up here, and refusing it would send
+    /// an operator looking for a syntax error that is not one.
+    #[cfg(feature = "prometheus")]
+    #[test]
+    fn an_unset_or_blank_listener_address_means_no_listener() {
+        assert_eq!(
+            listener_addr_from(None).expect("unset is not an error"),
+            None,
+            "unset means no listener, not a failure"
+        );
+        assert_eq!(
+            listener_addr_from(Some("   ")).expect("blank is not an error"),
+            None,
+            "a blank value is the same as unset: an empty template variable is \
+             not a syntax error"
+        );
+    }
+
+    /// A malformed address is refused, and the message says which variable.
+    ///
+    /// The message quotes the offending value and names the variable, because
+    /// this is a startup error a person has to act on without a stack trace: the
+    /// two facts they need are which setting is wrong and what they put in it.
+    #[cfg(feature = "prometheus")]
+    #[test]
+    fn a_malformed_listener_address_names_the_variable_and_the_value() {
+        let error =
+            listener_addr_from(Some("localhost:9100")).expect_err("a hostname is not a SocketAddr");
+
+        let message = error.to_string();
+        assert!(
+            message.contains(ENV_PROMETHEUS_LISTEN_ADDR),
+            "the error must name the variable to change: {message}"
+        );
+        assert!(
+            message.contains("localhost:9100"),
+            "and quote the value that was rejected, so it can be found without \
+             reading the source: {message}"
+        );
+    }
+
+    /// No counter or gauge carries a unit.
+    ///
+    /// One-directional on purpose, and not an oversight: `describe_metrics`
+    /// drops the unit for both, so a unit added to a counter would be silently
+    /// discarded from the exposition. This is the only thing that notices.
+    /// A histogram without a unit is legitimate — a count of candidates has no
+    /// unit but is still a distribution — so the rule stops at the boundary.
+    ///
+    /// It is a dictionary invariant rather than a per-family check, so it also
+    /// covers the families written after this one.
+    #[test]
+    fn counters_and_gauges_are_dimensionless() {
+        for described in crate::shared::observability::DESCRIPTIONS {
+            if matches!(
+                described.kind,
+                crate::shared::observability::MetricKind::Histogram
+            ) {
+                continue;
+            }
+            assert!(
+                described.unit.is_none(),
+                "`{}` is a {:?}, and `describe_metrics` drops the unit for both: \
+                 a unit added here would never reach the exposition",
+                described.name,
+                described.kind
+            );
+        }
+    }
+
+    /// A label set the helper does not know is refused loudly.
+    ///
+    /// The alternative is a counter and a histogram recorded with different
+    /// labels, which no scrape would report and no panel would explain. The
+    /// guard is a `debug_assert`, so the test is gated the same way: in a
+    /// release build there is nothing here to catch.
+    #[cfg(all(debug_assertions, feature = "prometheus"))]
+    #[test]
+    #[should_panic(expected = "known label arity")]
+    fn an_unknown_label_arity_is_refused_rather_than_recorded() {
+        count_timed(
+            "memory_test_unmatched_counter",
+            "memory_test_unmatched_histogram",
+            0.01,
+            &[("a", "1"), ("b", "2"), ("c", "3"), ("d", "4")],
         );
     }
 
@@ -1617,13 +1727,6 @@ pub(crate) mod tests {
         );
     }
 
-    #[test]
-    #[cfg(not(feature = "prometheus"))]
-    fn install_is_noop_without_feature() {
-        // Without the feature, install always succeeds and never opens a socket.
-        install().expect("install succeeds without prometheus feature");
-    }
-
     /// A refusal branch is a fixed word. One carrying a subject, an issuer or
     /// an authorization code would be a disclosure, and a metrics backend
     /// outlives every request that could have supplied one.
@@ -1654,5 +1757,73 @@ pub(crate) mod tests {
                 "branch `{branch}` is declared but no call site emits it"
             );
         }
+    }
+}
+
+/// The no-recorder contract, in the build that has no recorder.
+///
+/// Outside the `prometheus` feature there is no exposition to assert against,
+/// so this module holds the one property that build still has: every recorder
+/// is callable and does nothing. It lives here rather than in the module above
+/// because that one does not compile in this configuration — which would leave
+/// the contract untested in exactly the build it is about.
+#[cfg(all(test, not(feature = "prometheus")))]
+mod without_a_recorder {
+    use super::*;
+
+    /// Installing without the feature is a no-op that always succeeds.
+    ///
+    /// This is the whole contract of a build that does not ask for metrics: the
+    /// call the composition root makes is still there, and it succeeds without
+    /// opening a socket or touching a recorder.
+    #[test]
+    fn install_is_a_no_op_without_the_feature() {
+        install().expect("install succeeds without the prometheus feature");
+    }
+
+    /// Every recorder is callable in a build that has no recorder installed.
+    ///
+    /// These call sites are not empty in this build: `record_auth_refusal`,
+    /// `record_runtime_refusal` and `shift_gauge` reach the `metrics` macros
+    /// unconditionally, and `count_timed` still checks its label arity. What the
+    /// macros do with a missing recorder is the facade's business, but *calling
+    /// into* it is this crate's, and that is the contract: a profile that never
+    /// installs a recorder still runs every one of these on its request path, so
+    /// a call site that grew an `.expect` on a global handle — or an unwrap on a
+    /// registry lookup — would pass every test in the metrics build, where a
+    /// recorder does exist, and take down the profile that installs none.
+    ///
+    /// `record_knowledge_write` is deliberately absent: its body is compiled out
+    /// without the feature, so calling it would cover nothing. So is
+    /// `install_recorder`, which only exists in the profile that has a recorder.
+    #[test]
+    fn every_recorder_is_safe_without_a_recorder_installed() {
+        record_auth_refusal("nonce");
+        record_runtime_refusal("quota");
+        record_job_metric("lease", "ok", 0.01);
+        shift_gauge("memory_test_gauge", 1.0);
+        count_timed(
+            "memory_test_counter",
+            "memory_test_histogram",
+            0.01,
+            &[("pass", "lease"), ("outcome", "ok")],
+        );
+        count_timed(
+            "memory_test_counter_three",
+            "memory_test_histogram_three",
+            0.01,
+            &[
+                ("route", "/metrics"),
+                ("method", "read"),
+                ("outcome", "2xx"),
+            ],
+        );
+        let mut metrics = OperationMetrics::new("ingest");
+        metrics.record_result("episodes", 1);
+        metrics.record_stock("active_facts", 1);
+        metrics.success();
+        drop(metrics);
+        let _stage = crate::shared::observability::StageTimer::new("ingest", "store_write");
+        drop(_stage);
     }
 }
