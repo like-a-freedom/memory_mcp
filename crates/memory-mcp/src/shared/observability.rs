@@ -30,6 +30,38 @@
 
 use std::time::Instant;
 
+/// Gauge: the build this exposition belongs to, carried as a `version` label.
+///
+/// The value is always 1 — the number carries no information, the label is the
+/// payload. It is the only series that answers "which version are these
+/// numbers from": a dashboard opened during a rollout, an alert firing against
+/// a release, or two versions running side by side telling themselves apart
+/// rather than appearing as one unexplained doubling of everything else.
+pub const METRIC_BUILD_INFO: &str = "memory_build_info";
+
+/// Sign-ins that completed, counted with no labels at all.
+///
+/// Deliberately the opposite of [`METRIC_AUTH_REFUSALS_TOTAL`]: a refusal
+/// needs its branch to be actionable, a sign-in needs nothing but the count,
+/// and every label it could carry — account, subject, tenant — would turn a
+/// traffic measure into a disclosure. Sign-ups cannot be told from sign-ins
+/// here; what is countable without naming anyone is that someone arrived.
+pub const METRIC_AUTH_SIGNINS_TOTAL: &str = "memory_auth_signins_total";
+
+/// When the newest knowledge was written, as seconds since the Unix epoch.
+///
+/// A timestamp, not a duration: the value is read as `time() - gauge`, because
+/// the question is "how old is what we know", and only the collector knows
+/// what "now" is — a duration measured inside the process would answer "how
+/// long since this process wrote something", which is a different question
+/// that happens to agree most of the time.
+///
+/// Written by the capture path only. A recall reads knowledge and leaves it
+/// as old as it was, and stamping on read would make a quiet service look
+/// fresh — the exact failure a freshness gauge exists to catch.
+pub const METRIC_KNOWLEDGE_LAST_WRITE_TIMESTAMP_SECONDS: &str =
+    "memory_knowledge_last_write_timestamp_seconds";
+
 /// Total logical operations by bounded operation and outcome.
 pub const METRIC_OPERATIONS_TOTAL: &str = "memory_operation_calls_total";
 /// Logical operation duration in seconds by bounded operation and outcome.
@@ -224,6 +256,40 @@ pub struct MetricDescription {
 
 /// Every family this crate exports, in the order a reader meets them.
 pub const DESCRIPTIONS: &[MetricDescription] = &[
+    MetricDescription {
+        name: METRIC_BUILD_INFO,
+        kind: MetricKind::Gauge,
+        unit: None,
+        help: "Build this exposition belongs to, as a version label; the \
+               value is always 1. Read the label, never the number, and read \
+               it per instance: two versions during a rollout are two series, \
+               not one series with a bigger number.",
+    },
+    MetricDescription {
+        name: METRIC_AUTH_SIGNINS_TOTAL,
+        kind: MetricKind::Counter,
+        unit: None,
+        help: "Sign-ins that completed and issued a session. No labels: an \
+               account, subject or tenant label would make this a disclosure \
+               rather than a traffic measure, so the count is all it carries. \
+               Read against memory_auth_refusals_total for arrivals; the \
+               refusal branch stays where the reason is.",
+    },
+    MetricDescription {
+        name: METRIC_KNOWLEDGE_LAST_WRITE_TIMESTAMP_SECONDS,
+        kind: MetricKind::Gauge,
+        // Deliberately no unit. A `seconds` unit makes Grafana render an epoch
+        // timestamp as an elapsed duration, which is off by decades and looks
+        // plausible; the panel that plots an age applies `dateTimeAsIso` and
+        // the age is computed in the query.
+        unit: None,
+        help: "Unix timestamp of the newest completed capture, in seconds. The \
+               age of what this service knows is `time()` minus this, and no \
+               other series can answer it: a counter that stopped growing \
+               still reports the last scrape as recent. Written only when \
+               knowledge lands, so a service that stopped learning looks as \
+               old as it is; absent until the first capture.",
+    },
     MetricDescription {
         name: METRIC_OPERATIONS_TOTAL,
         kind: MetricKind::Counter,

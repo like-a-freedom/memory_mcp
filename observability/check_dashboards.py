@@ -28,7 +28,12 @@ RULES = ROOT / "observability/recording_rules.yml"
 DASHBOARDS = ROOT / "observability/dashboards"
 
 sys.path.insert(0, str(ROOT / "observability"))
-from check_rules import exported_families  # noqa: E402
+from check_rules import (
+    bounded_vocabulary,
+    exported_families,
+    strip_strings,
+    unknown_label_values,
+)  # noqa: E402
 
 
 def recorded_series() -> set[str]:
@@ -187,6 +192,7 @@ def check_row_contents(path: pathlib.Path, row: dict, failures: list[str]) -> No
 def main() -> int:
     recorded = recorded_series()
     families = exported_families()
+    declared = bounded_vocabulary()
     known = recorded | families
 
     failures: list[str] = []
@@ -202,14 +208,18 @@ def main() -> int:
                 if not expr:
                     continue
                 panels_checked += 1
-                for name in re.findall(r"\b(memory:[a-z0-9_:]+)", expr):
+                # Quoted strings are label values, not series: a panel that
+                # filters `up{job="memory_mcp"}` must not be read as naming a
+                # metric called `memory_mcp`.
+                scanned = strip_strings(expr)
+                for name in re.findall(r"\b(memory:[a-z0-9_:]+)", scanned):
                     if name not in known:
                         title = panel.get("title", "<untitled>")
                         failures.append(
                             f"{path.name} / {title}: reads `{name}`, which is "
                             f"neither a recorded series nor an exported metric"
                         )
-                for metric in re.findall(r"\b(memory_[a-z0-9_]+)", expr):
+                for metric in re.findall(r"\b(memory_[a-z0-9_]+)", scanned):
                     base = metric
                     for suffix in ("_sum", "_count"):
                         if metric.endswith(suffix) and metric[: -len(suffix)] in known:
@@ -221,6 +231,17 @@ def main() -> int:
                             f"{path.name} / {title}: reads `{metric}`, which is "
                             f"neither a recorded series nor an exported metric"
                         )
+                # A filter on a label value the crate cannot emit matches
+                # nothing, so the panel renders empty — indistinguishable from
+                # a subsystem that is off, which is the failure this whole file
+                # exists to catch.
+                for value in unknown_label_values(expr, declared):
+                    title = panel.get("title", "<untitled>")
+                    failures.append(
+                        f"{path.name} / {title}: filters on `{value}`, which "
+                        f"the crate cannot emit, so this panel can only render "
+                        f"empty"
+                    )
 
     print(f"{len(recorded)} recorded series, {len(families)} exported families")
     print(f"{panels_checked} panel expressions checked")

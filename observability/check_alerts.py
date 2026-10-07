@@ -28,7 +28,12 @@ ROOT = pathlib.Path(__file__).resolve().parents[1]
 ALERTS = ROOT / "observability/alerts.yml"
 
 sys.path.insert(0, str(ROOT / "observability"))
-from check_rules import exported_families  # noqa: E402
+from check_rules import (
+    bounded_vocabulary,
+    exported_families,
+    strip_strings,
+    unknown_label_values,
+)  # noqa: E402
 
 DERIVED = ("_sum", "_count", "_bucket")
 
@@ -43,7 +48,9 @@ def recorded_series() -> set[str]:
 
 
 def check(expr: str, alert: str, known: set[str], failures: list[str]) -> None:
-    for metric in re.findall(r"\b(memory_[a-z0-9_]+)", expr):
+    # Strings first: a label value like `job="memory_mcp"` is a value, not a
+    # metric, and scanning it would fail every rule that filters by job.
+    for metric in re.findall(r"\b(memory_[a-z0-9_]+)", strip_strings(expr)):
         base = metric
         for suffix in DERIVED:
             if metric.endswith(suffix) and metric[: -len(suffix)] in known:
@@ -51,6 +58,15 @@ def check(expr: str, alert: str, known: set[str], failures: list[str]) -> None:
                 break
         if base not in known:
             failures.append(f"{alert}: reads `{metric}`, which is not exported")
+
+    # A filter on a value the crate cannot emit never matches, so the alert can
+    # only ever be silent — the failure nobody notices until it should have
+    # paged.
+    for value in unknown_label_values(expr, bounded_vocabulary()):
+        failures.append(
+            f"{alert}: filters on `{value}`, which the crate cannot emit, so "
+            f"this rule can never fire"
+        )
 
 
 def main() -> int:

@@ -1,7 +1,8 @@
 # Observability
 
-Two Grafana dashboards, thirty-one recording rules and fifteen alerts over the
-metrics the `streamable-http` profile exports on `/metrics`.
+Two Grafana dashboards, forty recording rules and eighteen alerts over the
+metrics the `streamable-http` profile exports on `/metrics`, plus the scrape
+configuration that gets those metrics to a collector in the first place.
 
 Everything here is generated or checked. The dashboards are built by
 `build_dashboards.py`, and three checkers stand in for `promtool`, which is
@@ -11,13 +12,17 @@ rather than keeping its own copy.
 
 ```
 observability/
-├── recording_rules.yml     31 rules in 9 groups
-├── alerts.yml              15 alerts in 6 groups
+├── recording_rules.yml     40 rules in 10 groups
+├── alerts.yml              18 alerts in 7 groups
+├── prometheus.yml          scrape + rule_files, for Prometheus
+├── vmagent/
+│   ├── vmagent.yml         what to scrape, for vmagent
+│   └── compose.yml         vmagent + VictoriaMetrics, one command
 ├── dashboards/
 │   ├── technical.json      RED, for whoever is on call
 │   └── product.json        for whoever owns the product
 ├── build_dashboards.py     regenerates the two JSON files
-├── check_rules.py          every rule reads a metric the crate exports
+├── check_rules.py          every rule reads a metric and a label value that exist
 ├── check_alerts.py         every alert is routable and names a real metric
 └── check_dashboards.py     every panel reads a series that exists
 ```
@@ -26,32 +31,42 @@ observability/
 
 The application needs no configuration for this to work — `/metrics` is on the
 same router as everything else, and the recorder is installed by the
-composition root. What this directory does not ship is the scrape
-configuration, because scrape targets are a property of a deployment and
-guessing one here would be wrong more often than right.
+composition root. What ships here is the *other* half: the scrape
+configuration, because a metric nothing collects is a metric nothing alerts
+on, and the two configurations below are the shapes deployments actually run.
 
-A minimal `prometheus.yml` for the bundled `docker-compose.yml`, with
-Prometheus running on the host:
+**vmagent + VictoriaMetrics** (the shape a multi-host deployment uses — the
+collector scrapes and remote-writes, the store only stores):
 
-```yaml
-scrape_configs:
-  - job_name: memory_mcp
-    static_configs:
-      - targets: ["localhost:8080"]
+```
+docker compose -f docker-compose.yml -f observability/vmagent/compose.yml up -d
 ```
 
-`docker-compose.yml` publishes `8080`, so the exposition is already reachable
-from the host. If Prometheus itself runs in a container, use
-`host.docker.internal:8080` on macOS and Windows, or the compose service name
-`memory_mcp:8080` when both are on the same network.
+Both files on one compose project share a network, so the target in
+`vmagent.yml` — `memory_mcp:8080`, the service name — resolves. Grafana reads
+the result as a Prometheus-type data source at `http://localhost:8428`.
 
-Scrape at 15 s: the summary window is five minutes, so a shorter interval buys
-resolution the window cannot hold, and a longer one misses the spikes the
-quantiles are computed over.
+**Prometheus alone** (one host, one process):
 
-Then import the two dashboards (Dashboards → New → Import → upload the JSON),
-and add `observability/recording_rules.yml` and `observability/alerts.yml` to
-`rule_files`.
+```
+prometheus --config.file=observability/prometheus.yml
+```
+
+`rule_files` paths resolve relative to the config file's own directory, so the
+two above are named as siblings and Prometheus has to be pointed at this file
+rather than at a copy of it elsewhere; its working directory does not matter. The bundled `docker-compose.yml` publishes
+`8080`, which is what the scrape target points at; from outside that network it
+is `localhost:8080` for a service on the host, or
+`host.docker.internal:8080` for a container reaching the host.
+
+Scrape at 15 s in both: the summary window is five minutes, so a shorter
+interval buys resolution the window cannot hold, and a longer one misses the
+spikes the quantiles are computed over.
+
+Then import the two dashboards (Dashboards → New → Import → upload the JSON).
+Alerting is deliberately not configured here — where alerts go is a
+deployment's decision (Alertmanager for Prometheus, vmalert for the vmagent
+stack), and both consume `alerts.yml` as it stands.
 
 Regenerating the dashboards after changing a rule name:
 
@@ -67,27 +82,31 @@ python3 observability/check_alerts.py
 | Question | Panel |
 |---|---|
 | Is the service working right now? | technical → *Overview — the four golden signals* |
+| Is anything being collected at all? | technical → *Collection health* |
 | What is slow? | technical → *HTTP latency* → *p95 by route* |
 | Is it getting slower, or was it always slow? | technical → *HTTP latency* → *Latency percentiles over time* |
 | Why is it slow? | technical → *Pipeline stages* |
 | Are we saturated? | technical → *Saturation* |
 | What is the service refusing, and why? | technical → *Runtime refusals*, *Authentication* |
 | Are background jobs keeping up? | technical → *Background jobs* |
-| Is knowledge accumulating? | product → *What exists*, *What was learned* |
+| Is knowledge accumulating? | product → *What exists*, *How it is growing*, *What was learned* |
+| How old is what it knows? | product → *How fresh is the knowledge* |
 | Where is the product dashboard from here? | the dashboard header links to `/d/memory_mcp-product` |
 | What are people asking it for? | product → *What people are doing* |
+| Is the memory being read, or only written? | product → *Context delivered* |
+| Is it learning anything per episode? | product → *What each episode yields* |
 | Is what it learned any good? | product → *Is the knowledge any good* |
-| Why can nobody sign in? | product → *Access and automation* |
+| Are people arriving, or being turned away? | product → *Access and automation* |
 
 The technical dashboard is ordered RED — rate, errors, duration above the
 fold, saturation below — because that is the order an on-call engineer reads
 in. Every row below the overview explains one of the four numbers above it.
 
 The product dashboard has **no latency percentiles at all**. Its reader's
-questions are whether the memory is growing, whether people are arriving, what
-they are doing and whether the knowledge is any good. A p99 answers none of
-them, and a dashboard that makes its reader wade past one to reach "how much
-did we learn this week" is a dashboard that gets skimmed.
+questions are whether the memory is growing, how old it is, whether people are
+arriving, what they ask it for, and whether the knowledge is any good. A p99
+answers none of them, and a dashboard that makes its reader wade past one to
+reach "how much did we learn this week" is a dashboard that gets skimmed.
 
 ## The SLO
 
@@ -120,11 +139,14 @@ an alert outliving its incident by the length of the long window.
 | `HighErrorRate` | page | 1h and 5m at 14.4× | 2% |
 | `SustainedErrorRate` | page | 6h and 30m at 6× | 5% |
 | `ErrorBudgetBurn` | ticket | 3d and 6h at 1× | 10% |
+| `ScrapeTargetDown` | page | 2m of `up == 0` | — |
 | `NoTraffic` | ticket | 15m of zero | — |
 | `HighLatency` | page | p95 over 5m above 2s | — |
 | `LatencyDegraded` | ticket | p95 over 5m above 1s | — |
 | `IngestFailureRate` | page | >10% of ingest failing | — |
 | `NoIngestActivity` | ticket | no ingest for 2h | — |
+| `KnowledgeStale` | ticket | capture traffic for 2h, nothing landed for 6h | — |
+| `WriteOnlyArchive` | ticket | capture for 7d, no recall for 24h | — |
 | `FilesystemIngestionStalled` | ticket | nothing processed for 1h | — |
 | `WatcherDegraded` | page | the one-way latch | — |
 | `BackgroundJobsFailing` | ticket | lease passes unhealthy 15m | — |
@@ -133,13 +155,16 @@ an alert outliving its incident by the length of the long window.
 | `ClaimProjectionFailing` | ticket | 15m of errors | — |
 | `SignupsRefused` | ticket | 1h of refusals | — |
 
-Three decisions worth stating, because each could reasonably have gone the
+Five decisions worth stating, because each could reasonably have gone the
 other way:
 
-- **No `BackendDown`.** There is no `up` series here: Prometheus generates
-  that, not the application, and this project ships no scrape configuration.
-  `NoTraffic` is the substitute — no requests *and* no errors means either idle
-  or unreachable, and both are worth knowing about.
+- **Liveness is two alerts, not one.** `ScrapeTargetDown` reads `up`, which
+  the *collector* generates and which therefore exists only where a scrape
+  configuration is installed; `NoTraffic` reads the application's own counter,
+  which exists everywhere. A dead service reads zero on both, and only `up`
+  says which zero it is — while a deployment with no collector at all has no
+  `up` series to read, which is why `NoTraffic` stays. Neither replaces the
+  other, and the pair is what separates "down" from "idle".
 - **`SignupsRefused` is a ticket, not a page.** A deployment closed to
   self-service sign-up refuses every attempt correctly and indefinitely. Paging
   about a configured setting is how a page channel stops being read. It is
@@ -147,8 +172,21 @@ other way:
 - **`WatcherDegraded` reads `max_over_time`, not `avg`.** The gauge is a
   one-way latch, and averaging a step function reports a fraction of a broken
   deployment.
+- **Freshness is stamped by the capture path, not derived from a counter.**
+  `memory_knowledge_last_write_timestamp_seconds` exists because no derived
+  query can answer it: `timestamp()` of a counter that stopped growing reports
+  the last *scrape*, and `increase()` reads "nothing new" whether the service
+  learned yesterday or has learned nothing for a week. The alternative —
+  deriving it in PromQL — was not available, so the stamp is. It is written by
+  capture operations only, which is what stops a busy read path from making an
+  unwritten store look fresh.
+- **`WriteOnlyArchive` uses `unless`, not `== 0` with a guard.** The case that
+  matters most is a deployment that has *never* been asked for context, where
+  the recall series does not exist at all. `or vector(0)` would turn that
+  absence into a zero and then compare it to zero — which fires on every
+  deployment where the feature is off, the one shape an alert must never have.
 
-## Seven figures that mislead if read naively
+## Nine figures that mislead if read naively
 
 Each of these is a place where the obvious query returns a number that is
 plausible and wrong. Every one is also stated in the metric's own `# HELP`
@@ -215,13 +253,33 @@ that instant", not "the server is idle". Read the trend across scrapes, never
 one sample: a single non-zero is one request caught mid-flight, and a value that
 *sticks* across consecutive scrapes is how many were in flight at once.
 
+**8. `memory_knowledge_last_write_timestamp_seconds` is a timestamp.** The age
+of the knowledge is `time()` minus it — a difference, in a query or in the rule
+that already does it. Read as a duration it is wrong by decades: 1.7 billion
+seconds is not "no age", it is a moment in 2026, and a `seconds` unit in a panel
+renders it as an elapsed time that looks entirely plausible. It is also absent
+until the first completed capture, which means *nothing has ever been learned* —
+not zero age.
+
+**9. `memory_auth_signins_total` counts arrivals, not users.** It carries no
+label at all, deliberately: an account, subject or tenant label would make it a
+disclosure rather than a traffic measure. So a first sign-up and a returning
+user are the same number, and active users, activation and retention are not
+derivable from it at all. Read it as "someone got in", and read the operation
+counters for what they then did.
+
 ## Deliberate gaps
 
 Things an operator might look for that are not here, and why.
 
-**No process metrics.** RSS, CPU and uptime come from the `metrics-process`
-crate, which is not a dependency. So there is nothing to correlate a latency
-spike against, and the *Saturation* row is the only saturation signal there is.
+**No process metrics.** RSS, CPU and uptime are deliberately not exported by
+the application. They are host and container figures, not application ones:
+`node_exporter` and `cAdvisor` already report them on their own dashboards, and
+a second copy inside this exposition would be a number kept in two places to
+keep in sync. So a latency spike is correlated against those dashboards rather
+than against a panel here, and the *Saturation* row carries what the
+application itself can saturate on — in-flight requests — which is the signal
+those dashboards do not have.
 
 **No per-tenant label.** A tenant label is unbounded in cardinality — it is one
 series per tenant, forever. The tenant fingerprint is in the logs, which is
@@ -230,9 +288,17 @@ fingerprint in hand.
 
 **No active-user or session metric.** Counting them means identifying users,
 and a metric carrying a user identifier is a disclosure rather than a
-measurement.
+measurement. `memory_auth_signins_total` is as close as this metrics surface
+gets: it counts sign-ins that completed, with no label, which answers "are
+people arriving" and nothing about who they are, how often they come back, or
+whether their first hour was worth anything.
 
-**No `up` series.** See *No `BackendDown`* above.
+**`up` is absent without a collector.** Prometheus or vmagent generates it,
+never the application, so a deployment that has installed neither of the
+scrape configurations above has no `up` series at all: the *Collection health*
+row reads *No data*, `ScrapeTargetDown` never evaluates, and `NoTraffic` —
+which reads the application's own counter — is the liveness signal that still
+works.
 
 **Filesystem ingestion panels are empty unless the feature is on.** The
 `memory_fs_watch_*` families exist only when the build carries `fs-watch` **and**
@@ -269,7 +335,8 @@ In order of likelihood:
    shows a flat zero rather than a gap — but a *raw* query will show nothing.
 4. **The scrape is not reaching the service.** `curl http://<host>:8080/metrics`
    should return an exposition. If it does not, nothing downstream of it works
-   and the dashboards are the least of it.
+   and the dashboards are the least of it — the *Collection health* row is the
+   same check as a panel, and `ScrapeTargetDown` is it as an alert.
 
 ## Verified against a running server
 
@@ -308,6 +375,12 @@ but they catch the failures that matter more in practice: a rule or panel
 naming a series that does not exist renders empty, and an empty panel is
 indistinguishable from a subsystem that is switched off.
 
+They also check the *label values* an expression filters on, against the
+`KNOWN_OPERATIONS` and `KNOWN_RESULTS` vocabulary in `observability.rs`. That
+one is quieter than a missing metric: `{operation="extrakt"}` parses, evaluates,
+matches nothing, and renders an empty panel that looks exactly like a subsystem
+that is off — with no name anywhere that could be wrong.
+
 ## Where the metrics are defined
 
 `crates/memory-mcp/src/shared/observability.rs` holds every name, kind, unit and
@@ -316,5 +389,5 @@ what lets a bounded context say what a measurement means without acquiring
 infrastructure, per ADR-0058.
 
 That file is the reference to read when a number on a dashboard is not what you
-expected. Each of the twenty-five families carries a `# HELP` line naming the
+expected. Each of the twenty-eight families carries a `# HELP` line naming the
 trap it has, and they render in `/metrics`.

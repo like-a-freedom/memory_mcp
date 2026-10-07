@@ -759,6 +759,12 @@ async fn issue_session(
         .store_session(policy, &session)
         .await?;
 
+    // After the store accepted it, so the counter answers "how many people
+    // got in" rather than "how many flows finished authenticating". No labels
+    // here on purpose: see `METRIC_AUTH_SIGNINS_TOTAL`.
+    #[cfg(feature = "prometheus")]
+    crate::observability::record_signin_success();
+
     let cookie = crate::control::session::build_session_cookie(cookie_value, &state.config);
     let mut headers = axum::http::header::HeaderMap::new();
     headers.insert(
@@ -1782,6 +1788,61 @@ mod browser_flow_tests {
         assert!(
             cookie.contains("__Host-memory_mcp_session="),
             "got: {cookie}"
+        );
+    }
+
+    /// A sign-in that succeeds is counted, and it is counted as a plain
+    /// number: no account, no subject, no tenant, nothing that would make the
+    /// counter a disclosure. It is the other half of
+    /// `memory_auth_refusals_total`, which is why the pair can be read as
+    /// "are people arriving" — a dashboard that lists only the ways people are
+    /// turned away answers the opposite question.
+    ///
+    /// Asserted as a rise rather than as an exact count, because the recorder
+    /// is process-global and the other sign-in flows in this module do not take
+    /// the metrics lock: a sibling flow signing in between the two readings can
+    /// only make the number grow, never shrink, so `after > before` cannot fail
+    /// for a reason that has nothing to do with this flow — and it still fails
+    /// when this flow records nothing, which is the defect this exists to
+    /// catch. `sample_bare` reading a value is itself a second assertion: a
+    /// labelled counter renders with braces and would read as absent, so the
+    /// "carries nothing identifying" half is checked, not merely claimed.
+    #[tokio::test]
+    #[cfg(feature = "prometheus")]
+    async fn a_completed_sign_in_is_counted_for_the_exporter() {
+        let provider = MockProvider::spawn(MockProviderConfig::default()).await;
+        let state = state_for(&provider, SignupMode::Open).await;
+        let router = build_router(state, None).expect("router builds");
+        let (flow_state, nonce) = start_sign_in(router.clone()).await;
+        provider.set_token_answer(TokenAnswer::IdToken(id_token_for(
+            &provider, "user-1", &nonce,
+        )));
+
+        let (exposition, before, after) = crate::observability::tests::exposed(|| async {
+            let signins = |exposition: &str| {
+                crate::observability::tests::sample_bare(
+                    exposition,
+                    crate::observability::METRIC_AUTH_SIGNINS_TOTAL,
+                )
+                .unwrap_or(0.0)
+            };
+            let before = signins(&crate::observability::tests::render());
+            get(
+                router,
+                &format!("/auth/oidc/callback?state={flow_state}&code=auth-code"),
+            )
+            .await;
+            let exposition = crate::observability::tests::render();
+            let after = signins(&exposition);
+            (exposition, before, after)
+        })
+        .await;
+
+        assert!(
+            after > before,
+            "a sign-in that issued a session must be counted, and counted \
+             without a label: the counter went {before} -> {after} across a \
+             completed sign-in: {exposition}"
         );
     }
 

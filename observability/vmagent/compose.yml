@@ -1,0 +1,59 @@
+# A local collector stack: vmagent scraping the service, VictoriaMetrics
+# keeping what it scraped.
+#
+# Two ways to run it, and which is right depends on where the service is:
+#
+#   # with the bundled docker-compose.yml, on one network (the target in
+#   # vmagent.yml is the service name, which only resolves there):
+#   docker compose -f docker-compose.yml -f observability/vmagent/compose.yml up -d
+#
+#   # this stack alone, against a service running on the host: change the
+#   # target in vmagent.yml to localhost:8080 first
+#   docker compose -f observability/vmagent/compose.yml up -d
+#
+# Grafana reads the result as a Prometheus-type data source at
+# http://localhost:8428 (from the host) or http://victoriametrics:8428 (from
+# another container). Nothing here runs an alerting engine: alerting is a
+# deployment's decision — vmalert with the same two rule files, or Prometheus
+# with them under `rule_files:` — and guessing its notifier here would be wrong
+# more often than right.
+
+services:
+  victoriametrics:
+    # Pinned. A collector and a store that drift apart on a `latest` pull is an
+    # outage nobody planned for, and the two are versioned together upstream.
+    image: victoriametrics/victoria-metrics:v1.153.0
+    command:
+      - --storageDataPath=/storage
+      # Matches the SLO's window: an alert reading thirty days of history must
+      # not find it aged out from under it.
+      - --retentionPeriod=30d
+      - --httpListenAddr=:8428
+    volumes:
+      - vmdata:/storage
+    ports:
+      - "8428:8428"
+
+  vmagent:
+    image: victoriametrics/vmagent:v1.153.0
+    depends_on:
+      - victoriametrics
+    command:
+      - --promscrape.config=/etc/vmagent/vmagent.yml
+      - --remoteWrite.url=http://victoriametrics:8428/api/v1/write
+      # Pending samples sit on this volume while the store is briefly
+      # unreachable, so a restart of VictoriaMetrics does not lose the window
+      # an on-call engineer is about to ask about.
+      - --remoteWrite.tmpDataPath=/vmagent-remotewrite
+      # vmagent's own status page and metrics — the collector's health is a
+      # separate question from the target's, and `up` only answers the second.
+      - --httpListenAddr=:8429
+    volumes:
+      - ./vmagent.yml:/etc/vmagent/vmagent.yml:ro
+      - vmagentdata:/vmagent-remotewrite
+    ports:
+      - "8429:8429"
+
+volumes:
+  vmdata:
+  vmagentdata:

@@ -302,6 +302,18 @@ groups:
             rate(memory_auth_refusals_total[15m])
           )
 
+      # Sign-ins that completed, next to the refusals above.
+      #
+      # No `sum by` here because the counter carries no labels at all, and an
+      # aggregation that names a label nothing has would invent one. Pairing the
+      # two is the point: refusals alone say who was turned away, and the sum of
+      # both is the only "are people arriving" this metrics surface can honestly
+      # answer — it still cannot distinguish a first sign-up from a return, and
+      # it does not try to.
+      - record: memory:auth_signins:rate15m
+        expr: |
+          rate(memory_auth_signins_total[15m])
+
   # ─── Claims ─────────────────────────────────────────────────────────────────
   - name: memory-claims
     interval: 30s
@@ -343,6 +355,132 @@ groups:
           clamp_min(
             sum(rate(memory_claim_candidates_considered_count[15m])),
             0.000001
+          )
+
+  # ─── Lifecycle ──────────────────────────────────────────────────────────────
+  #
+  # The recall-then-capture loop, and the two questions about it that no
+  # counter answers alone.
+  #
+  # Operations split by what they do to the store, not by how they are named:
+  # capture puts new knowledge in (`ingest`, `extract`), recall takes it out
+  # (`assemble_context`, plus the two reads that only make sense against
+  # existing knowledge — `resolve` and `explain`). Maintenance operations are
+  # in neither: they neither grow the knowledge nor serve a caller. Splitting
+  # by name alone would put a decay pass next to a capture and call the sum
+  # "traffic".
+  - name: memory-lifecycle
+    interval: 30s
+    rules:
+      # Recall, per second. This is the value moment: context delivered to an
+      # agent is what the product is for, and for an API-shaped product the
+      # calls processed are the closest thing to a north-star figure.
+      - record: memory:lifecycle:recall:rate15m
+        expr: |
+          sum by (operation) (
+            rate(memory_operation_calls_total{operation=~"assemble_context|explain|resolve"}[15m])
+          )
+
+      - record: memory:lifecycle:recall:rate15m_total
+        expr: |
+          sum(
+            rate(memory_operation_calls_total{operation=~"assemble_context|explain|resolve"}[15m])
+          )
+
+      # Capture, per second: knowledge entering the store, whatever the source.
+      # Includes the filesystem watcher, which reaches the store through the
+      # same ingest operation, so an unattended deployment counts here too.
+      - record: memory:lifecycle:capture:rate15m
+        expr: |
+          sum by (operation) (
+            rate(memory_operation_calls_total{operation=~"ingest|extract"}[15m])
+          )
+
+      - record: memory:lifecycle:capture:rate15m_total
+        expr: |
+          sum(
+            rate(memory_operation_calls_total{operation=~"ingest|extract"}[15m])
+          )
+
+      # Recalls per capture — the shape of the loop, not its size.
+      #
+      # Both sides are rates, so a deployment ten times busier than another does
+      # not read as ten times better at recalling.
+      #
+      # Absence is read rather than dropped, because the case that matters most
+      # is the one with no recall at all: a deployment whose only traffic is
+      # capture. `recall or capture * 0` puts the zero there explicitly, so the
+      # panel shows `0` — a write-only archive, visible — instead of *No data*,
+      # which would read as "not measured" for the one state the panel exists
+      # to show. A deployment with neither side stays absent, which is honest:
+      # there is no loop to describe.
+      #
+      # The floor on the denominator is what keeps capture that almost stopped
+      # from reading as infinitely good at recalling: a genuine "all recall, no
+      # capture" is large, which is the truth — what is stored is being used and
+      # nothing is coming in to replace it.
+      - record: memory:lifecycle:recalls_per_capture15m
+        expr: |
+          (
+            memory:lifecycle:recall:rate15m_total
+            or
+            (memory:lifecycle:capture:rate15m_total * 0)
+          )
+          /
+          clamp_min(memory:lifecycle:capture:rate15m_total, 0.000001)
+
+      # How old the newest knowledge is, in seconds.
+      #
+      # Derived here rather than in each panel because `time()` has to be read
+      # against the stamp, and a panel computing it once per pixel would draw a
+      # staircase — the age advancing one evaluation interval per refresh
+      # instead of continuously. The stamp itself is absent until the first
+      # capture, so this series is absent too: a deployment that has never
+      # learned anything has no age to report, and zero would claim it learned
+      # something at the epoch.
+      - record: memory:knowledge:age_seconds
+        expr: |
+          time() - max(memory_knowledge_last_write_timestamp_seconds)
+
+      # What one episode yields, over a day.
+      #
+      # Extraction yield is the question behind "is it learning anything": a
+      # rising fact count means the same as growing input if yield collapses.
+      #
+      # Both sides name their operation, because the results are not exclusive
+      # to extraction: `entities` is also recorded by `resolve`, so dividing
+      # extraction links by *all* entities would quietly dilute the ratio by
+      # every alias lookup the deployment ever did. Numerator from `extract`,
+      # denominator from `ingest`, because that is literally "what an episode
+      # yielded once it was extracted".
+      #
+      # `clamp_min` on the denominator reads a day with fewer than one episode
+      # as no yield rather than dividing by a fraction of an episode.
+      - record: memory:operation_results:facts_per_episode1d
+        expr: |
+          clamp_min(
+            sum(increase(memory_operation_results_total{operation="extract",result="facts"}[1d])),
+            0
+          )
+          /
+          clamp_min(
+            sum(increase(memory_operation_results_total{operation="ingest",result="episodes"}[1d])),
+            1
+          )
+
+      # Links per entity, over a day. The other half of yield: facts say what
+      # was found, links say whether it was connected to anything. Scoped to
+      # extraction on both sides, for the reason above.
+      - record: memory:operation_results:links_per_entity1d
+        expr: |
+          clamp_min(
+            sum(increase(memory_operation_results_total{operation="extract",result="links"}[1d])),
+            0
+          )
+          /
+          clamp_min(
+            sum(increase(memory_operation_results_total{operation="extract",result="entities"}[1d])),
+            1
           )
 
   # ─── Filesystem ingestion ───────────────────────────────────────────────────

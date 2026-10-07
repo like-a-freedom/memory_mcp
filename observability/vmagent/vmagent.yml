@@ -1,0 +1,52 @@
+# Scrape configuration for vmagent — the collector this service deploys with.
+#
+# vmagent is the binary; this file is only *what* to scrape, because the
+# remote-write destination belongs on the command line (`-remoteWrite.url`),
+# where a deployment points it at its own storage without editing a file under
+# version control. Run it as:
+#
+#   vmagent -promscrape.config=observability/vmagent/vmagent.yml \
+#           -remoteWrite.url=http://victoriametrics:8428/api/v1/write
+#
+# or use the compose file beside this one for a local stack. vmagent reads only
+# `global` and `scrape_configs` from this file — every other Prometheus section
+# is ignored, remote write included.
+
+global:
+  # Fifteen seconds, and the reason is the exporter's: every duration family is
+  # a summary over a five-minute window, so a longer interval misses the spikes
+  # the quantiles are computed over, and a shorter one buys resolution the
+  # window cannot hold.
+  scrape_interval: 15s
+  # Comfortably under the interval. A scrape still unfinished when this expires
+  # is a target not answering, which is what `up == 0` should come to mean —
+  # rather than "slow, but eventually".
+  scrape_timeout: 10s
+
+scrape_configs:
+  # The service itself. The name is not decoration: `job="memory_mcp"` is what
+  # the ScrapeTargetDown alert and the Collection health row filter on, so two
+  # collectors with different job names for the same service would have the
+  # alert read the wrong target.
+  - job_name: memory_mcp
+    metrics_path: /metrics
+    # Stated rather than inherited: changing the global default for another
+    # job must not silently change this one's resolution.
+    scrape_interval: 15s
+    # A ceiling on samples per scrape, not a rate limit. An exposition that
+    # starts emitting unbounded labels fails the scrape outright instead of
+    # quietly pushing a cardinality problem into the storage, where it is
+    # expensive and invisible. 50 000 is orders of magnitude above what this
+    # exposition produces — every label it has is bounded by construction
+    # (ADR-0005, ADR-0048) — so reaching it means a regression, not load.
+    sample_limit: 50000
+    # The collector's `job` and `instance` win over anything an exposition
+    # carries, so a service cannot rename its own target out of an alert.
+    honor_labels: false
+    static_configs:
+      # The compose service name: collector and service on one network resolve
+      # each other by name, which is what `docker compose -f docker-compose.yml
+      # -f observability/vmagent/compose.yml up -d` sets up. Outside that
+      # network it is `localhost:8080` for a service on the host, or
+      # `host.docker.internal:8080` for a container reaching the host.
+      - targets: ["memory_mcp:8080"]

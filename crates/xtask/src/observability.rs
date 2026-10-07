@@ -1,6 +1,6 @@
 //! Runs the observability checkers, so they stop drifting from the code.
 //!
-//! `observability/` holds 31 recording rules, 15 alerts, 4 dashboards and 4
+//! `observability/` holds 40 recording rules, 18 alerts, 2 dashboards and 4
 //! Python checkers. Nothing in the repository reached any of them: no
 //! workflow, no Makefile target, no cargo target. The checkers read local
 //! files and need no running Prometheus, so the only thing standing between

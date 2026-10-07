@@ -1,0 +1,45 @@
+# Prometheus: scrape and rules in one file.
+#
+# Prometheus stores what it scrapes itself and has no remote write, so this is
+# the alternative to the vmagent stack beside it — right for one host, where a
+# collector and a store would be two processes to run for one job:
+#
+#   prometheus --config.file=observability/prometheus.yml
+#
+# `rule_files` paths are resolved relative to *this file's* directory, so the
+# two below are named as siblings and Prometheus has to be pointed at this file
+# rather than at a copy of it somewhere else.
+#
+# Alerting is deliberately absent: where alerts go is a deployment's decision
+# (Alertmanager for this stack, vmalert for the vmagent one), and a notifier
+# address guessed here would be wrong more often than right. What the alerts
+# themselves are, and why they are shaped the way they are, is in
+# `observability/alerts.yml` and the README beside it.
+
+global:
+  # Fifteen seconds, matching the vmagent config, for the same reason: every
+  # duration family is a summary over a five-minute window, so a longer
+  # interval misses the spikes the quantiles are computed over, and a shorter
+  # one buys resolution the window cannot hold.
+  scrape_interval: 15s
+  scrape_timeout: 10s
+  # Every group in the two files below carries its own `interval: 30s`, so this
+  # only ever applies to a group added later without one — and a group without
+  # an interval that runs at Prometheus's one-minute default is a latency alert
+  # evaluating half as often as its window assumes.
+  evaluation_interval: 30s
+
+rule_files:
+  - recording_rules.yml
+  - alerts.yml
+
+scrape_configs:
+  # The job name is part of the contract: the ScrapeTargetDown alert and the
+  # Collection health row filter on `job="memory_mcp"`.
+  - job_name: memory_mcp
+    metrics_path: /metrics
+    static_configs:
+      # The bundled docker-compose.yml publishes 8080, so a Prometheus on the
+      # host reaches the exposition directly. From another container use the
+      # compose service name (`memory_mcp:8080`) on a shared network.
+      - targets: ["localhost:8080"]

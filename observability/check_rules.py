@@ -52,15 +52,72 @@ def exported_families() -> set[str]:
     return families
 
 
+def strip_strings(expr: str) -> str:
+    """Drop quoted string literals from an expression before reading names.
+
+    A string in PromQL is a value, never a metric: `job="memory_mcp"` matches
+    a label, `label_replace` writes into one. Read without this, that label
+    value scans as a family called `memory_mcp` — a name no rule or panel
+    could ever mean to read — and a correctly filtered expression fails the
+    check for a metric the crate does not export.
+    """
+    return re.sub(r'"[^"]*"', " ", expr)
+
+
+def bounded_vocabulary() -> dict[str, set[str]]:
+    """The `operation` and `result` label values the crate can emit.
+
+    Read out of the same source that declares them, because a filter on a value
+    the crate never emits is the quietest failure in this file: the expression
+    parses, the rule evaluates, and it matches nothing — so a panel shows *No
+    data* for a series that exists under a name one character away from the one
+    written. Nothing at runtime would report it.
+    """
+    declared: dict[str, set[str]] = {}
+    source = (ROOT / "crates/memory-mcp/src/observability.rs").read_text()
+    for label in ("KNOWN_OPERATIONS", "KNOWN_RESULTS"):
+        block = source.split(f"const {label}: &[&str] = &[", 1)
+        if len(block) < 2:
+            continue
+        body = block[1].split("]", 1)[0]
+        declared[label] = set(re.findall(r'"([a-z0-9_]+)"', body))
+    return {
+        "operation": declared.get("KNOWN_OPERATIONS", set()),
+        "result": declared.get("KNOWN_RESULTS", set()),
+    }
+
+
+def unknown_label_values(expr: str, declared: dict[str, set[str]]) -> list[str]:
+    """Label values an expression filters on that the crate cannot emit.
+
+    `operation="ingest"` and `operation=~"ingest|extract"` are both filters, and
+    both are checked; a value that is not in the declared vocabulary is a typo
+    or a rename that has not reached this file.
+    """
+    unknown: list[str] = []
+    for label, known in declared.items():
+        if not known:
+            continue
+        for alternatives in re.findall(rf'{label}=~"([^"]*)"', expr):
+            for value in alternatives.split("|"):
+                if value and value not in known:
+                    unknown.append(f"{label}=\"{value}\"")
+        for value in re.findall(rf'{label}="([^"]*)"', expr):
+            if value and value not in known:
+                unknown.append(f"{label}=\"{value}\"")
+    return unknown
+
+
 def referenced_metrics(expr: str) -> set[str]:
     """Every `memory_*` identifier a PromQL expression reads."""
-    return set(re.findall(r"\b(memory_[a-z0-9_]+)", expr))
+    return set(re.findall(r"\b(memory_[a-z0-9_]+)", strip_strings(expr)))
 
 
 def main() -> int:
     rules_path = ROOT / "observability/recording_rules.yml"
     document = yaml.safe_load(rules_path.read_text())
     families = exported_families()
+    declared = bounded_vocabulary()
 
     failures: list[str] = []
     recorded: set[str] = set()
@@ -80,6 +137,11 @@ def main() -> int:
                     failures.append(
                         f"{name}: reads `{metric}`, which the crate does not export"
                     )
+            for value in unknown_label_values(expr, declared):
+                failures.append(
+                    f"{name}: filters on `{value}`, which the crate cannot emit — "
+                    f"the expression parses and matches nothing"
+                )
 
             # A recording rule that records itself is a cycle.
             if name in referenced_metrics(expr):

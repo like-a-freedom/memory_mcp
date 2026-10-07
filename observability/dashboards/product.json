@@ -2,7 +2,7 @@
   "annotations": {
     "list": []
   },
-  "description": "What the system holds, what people ask it for, and what it learns. No latency percentiles: those answer an operational question, not a product one. For latency, saturation and failures, see the technical dashboard: /d/memory_mcp-technical.",
+  "description": "What the system holds, how fresh it is, what people ask it for, and what it learns. No latency percentiles: those answer an operational question, not a product one. For latency, saturation and failures, see the technical dashboard: /d/memory_mcp-technical.",
   "editable": true,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 1,
@@ -331,6 +331,332 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
+          "description": "How old the newest knowledge in the store is.\n\n**The number that decides whether any other number here can be trusted.** A memory service whose last write was three days ago still serves confident answers, from a world that has moved on \u2014 every other panel below can look perfectly healthy while this one climbs.\n\n**No data means nothing has ever been captured**, which is a different statement from 'zero' and the reason this panel cannot lie about a service that never learned anything.\n\nAbove an hour it is yellow and above a day red, which are the colours an on-call engineer reads as *stale*, not thresholds an alert enforces: `KnowledgeStale` additionally requires capture traffic in the last two hours, so a deployment nobody is using never turns this panel's colour into a page.",
+          "fieldConfig": {
+            "defaults": {
+              "unit": "dtdurations",
+              "color": {
+                "mode": "thresholds"
+              },
+              "mappings": [],
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green",
+                    "value": null
+                  },
+                  {
+                    "color": "yellow",
+                    "value": 3600
+                  },
+                  {
+                    "color": "red",
+                    "value": 86400
+                  }
+                ]
+              },
+              "decimals": 0
+            },
+            "overrides": []
+          },
+          "gridPos": {
+            "h": 7,
+            "w": 6,
+            "x": 0,
+            "y": 0
+          },
+          "id": 0,
+          "options": {
+            "colorMode": "value",
+            "graphMode": "none",
+            "justifyMode": "auto",
+            "orientation": "auto",
+            "reduceOptions": {
+              "calcs": [
+                "lastNotNull"
+              ],
+              "fields": "",
+              "values": false
+            },
+            "textMode": "auto"
+          },
+          "pluginVersion": "13.2.4",
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${datasource}"
+              },
+              "editorMode": "code",
+              "expr": "memory:knowledge:age_seconds",
+              "legendFormat": "",
+              "range": true,
+              "refId": "A"
+            }
+          ],
+          "title": "Knowledge age",
+          "type": "stat"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "description": "The same figure over time, which is the shape that tells a deployment apart from itself: a rising staircase is normal and expected between writes, and a staircase that never steps is capture that has stopped.\n\nNo threshold line is drawn on this panel \u2014 the colours on the stat beside it are the reading, and a second set of lines here would be the same numbers twice. Read the trend, not a single sample: the age only ever grows until the next write pulls it back.",
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "palette-classic"
+              },
+              "custom": {
+                "axisBorderShow": false,
+                "axisCenteredZero": false,
+                "axisLabel": "",
+                "axisPlacement": "auto",
+                "barAlignment": 0,
+                "drawStyle": "line",
+                "fillOpacity": 8,
+                "gradientMode": "none",
+                "hideFrom": {
+                  "legend": false,
+                  "tooltip": false,
+                  "viz": false
+                },
+                "insertNulls": false,
+                "lineInterpolation": "linear",
+                "lineWidth": 1,
+                "pointSize": 5,
+                "scaleDistribution": {
+                  "type": "linear"
+                },
+                "showPoints": "never",
+                "spanNulls": false,
+                "stacking": {
+                  "group": "A",
+                  "mode": "none"
+                },
+                "thresholdsStyle": {
+                  "mode": "off"
+                }
+              },
+              "mappings": [],
+              "min": 0,
+              "unit": "dtdurations"
+            },
+            "overrides": []
+          },
+          "gridPos": {
+            "h": 7,
+            "w": 10,
+            "x": 6,
+            "y": 0
+          },
+          "id": 0,
+          "options": {
+            "legend": {
+              "calcs": [
+                "lastNotNull",
+                "max"
+              ],
+              "displayMode": "table",
+              "placement": "right",
+              "showLegend": true
+            },
+            "tooltip": {
+              "mode": "multi",
+              "sort": "desc"
+            }
+          },
+          "pluginVersion": "13.2.4",
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${datasource}"
+              },
+              "editorMode": "code",
+              "expr": "memory:knowledge:age_seconds",
+              "legendFormat": "age",
+              "range": true,
+              "refId": "A"
+            }
+          ],
+          "title": "How fast the knowledge is ageing",
+          "type": "timeseries"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "description": "",
+          "gridPos": {
+            "h": 7,
+            "w": 8,
+            "x": 16,
+            "y": 0
+          },
+          "id": 0,
+          "options": {
+            "code": {
+              "language": "plaintext",
+              "showLineNumbers": false,
+              "showMiniMap": false
+            },
+            "content": "Nothing in the metrics above can answer it. A counter that stopped growing still reports the last scrape as recent, and `increase()` over a window reads *nothing new* whether the service learned yesterday or learned nothing at all \u2014 so a memory system that stopped learning a week ago has every symptom of one that stopped learning an hour ago.\n\nThe stamp is written by the capture path only, which is what makes it trustworthy: a recall reads knowledge and changes nothing, so a busy service nobody writes to ages visibly instead of looking permanently fresh.\n\nIt is also the signal a *reader* of this dashboard wants before any of the others: everything below describes a store whose freshness is the assumption they are all making.",
+            "mode": "markdown"
+          },
+          "pluginVersion": "13.2.4",
+          "title": "Why this row exists",
+          "type": "text"
+        }
+      ],
+      "title": "How fresh is the knowledge",
+      "type": "row"
+    },
+    {
+      "collapsed": true,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 2
+      },
+      "id": 0,
+      "panels": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "description": "The three levels from *What exists*, as curves rather than numbers.\n\n**A level answers 'how much', only a curve answers 'is it working'.** Facts flat while input keeps arriving is the shape extraction has stopped; facts flat *and* communities rising means the graph is fragmenting into smaller, more numerous clusters, which shows up as a search problem months before anyone reports one.\n\n**Step-like and sparse, and both are honest.** These levels are written by the lifecycle dashboard operation and by nothing else \u2014 so the curves are absent until someone opens the lifecycle view, and each step marks one such read. Read them as 'this is where the store stood at the last read', which is the same claim the four stats above make, and do not read the flat stretches as 'nothing changed': no read means no observation, not no change.",
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "palette-classic"
+              },
+              "custom": {
+                "axisBorderShow": false,
+                "axisCenteredZero": false,
+                "axisLabel": "",
+                "axisPlacement": "auto",
+                "barAlignment": 0,
+                "drawStyle": "line",
+                "fillOpacity": 8,
+                "gradientMode": "none",
+                "hideFrom": {
+                  "legend": false,
+                  "tooltip": false,
+                  "viz": false
+                },
+                "insertNulls": false,
+                "lineInterpolation": "linear",
+                "lineWidth": 1,
+                "pointSize": 5,
+                "scaleDistribution": {
+                  "type": "linear"
+                },
+                "showPoints": "never",
+                "spanNulls": false,
+                "stacking": {
+                  "group": "A",
+                  "mode": "none"
+                },
+                "thresholdsStyle": {
+                  "mode": "off"
+                }
+              },
+              "mappings": [],
+              "min": 0,
+              "unit": "short"
+            },
+            "overrides": []
+          },
+          "gridPos": {
+            "h": 8,
+            "w": 16,
+            "x": 0,
+            "y": 0
+          },
+          "id": 0,
+          "options": {
+            "legend": {
+              "calcs": [
+                "lastNotNull",
+                "mean"
+              ],
+              "displayMode": "table",
+              "placement": "right",
+              "showLegend": true
+            },
+            "tooltip": {
+              "mode": "multi",
+              "sort": "desc"
+            }
+          },
+          "pluginVersion": "13.2.4",
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${datasource}"
+              },
+              "editorMode": "code",
+              "expr": "max by (result) (memory_operation_stock{result=~\"active_facts|communities|archival_candidates\"})",
+              "legendFormat": "{{result}}",
+              "range": true,
+              "refId": "A"
+            }
+          ],
+          "title": "Stock over time",
+          "type": "timeseries"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "description": "",
+          "gridPos": {
+            "h": 8,
+            "w": 8,
+            "x": 16,
+            "y": 0
+          },
+          "id": 0,
+          "options": {
+            "code": {
+              "language": "plaintext",
+              "showLineNumbers": false,
+              "showMiniMap": false
+            },
+            "content": "The stock family is a **level, not a total** \u2014 which is why these curves can be compared across deployments and why they cannot be summed over time.\n\n**The archival backlog is the one to watch for direction.** It is the retention policy's own scoreboard: a standing non-zero means archiving is not being run, a rising line means the policy is falling behind what is being written, and a falling line to zero means the policy is doing its job.\n\nCommunities are counted, not sized: more communities with the same fact count is fragmentation, not enrichment.",
+            "mode": "markdown"
+          },
+          "pluginVersion": "13.2.4",
+          "title": "Reading a stock curve",
+          "type": "text"
+        }
+      ],
+      "title": "How it is growing",
+      "type": "row"
+    },
+    {
+      "collapsed": true,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 3
+      },
+      "id": 0,
+      "panels": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
           "description": "Which operations people and agents are actually calling. This is the adoption signal: a feature nobody calls is a feature nobody needs, and this is where that shows up before anyone says so.\n\nMeasured over MCP rather than HTTP, so it counts tool calls on the data plane and not only browser requests.",
           "fieldConfig": {
             "defaults": {
@@ -511,7 +837,278 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 2
+        "y": 4
+      },
+      "id": 0,
+      "panels": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "description": "The recall half of the loop, by operation: `assemble_context` is context handed to an agent, and with it `resolve` and `explain`, which only mean anything against knowledge that already exists.\n\n**This is the value moment, and for a service reached through MCP it is as close to a north-star figure as these metrics honestly get** \u2014 the calls that delivered something. Compare it against the capture row below: a store that grows while this stays flat is being written to and never read, which is the condition `WriteOnlyArchive` alerts on.",
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "palette-classic"
+              },
+              "custom": {
+                "axisBorderShow": false,
+                "axisCenteredZero": false,
+                "axisLabel": "",
+                "axisPlacement": "auto",
+                "barAlignment": 0,
+                "drawStyle": "line",
+                "fillOpacity": 8,
+                "gradientMode": "none",
+                "hideFrom": {
+                  "legend": false,
+                  "tooltip": false,
+                  "viz": false
+                },
+                "insertNulls": false,
+                "lineInterpolation": "linear",
+                "lineWidth": 1,
+                "pointSize": 5,
+                "scaleDistribution": {
+                  "type": "linear"
+                },
+                "showPoints": "never",
+                "spanNulls": false,
+                "stacking": {
+                  "group": "A",
+                  "mode": "none"
+                },
+                "thresholdsStyle": {
+                  "mode": "off"
+                }
+              },
+              "mappings": [],
+              "min": 0,
+              "unit": "ops"
+            },
+            "overrides": []
+          },
+          "gridPos": {
+            "h": 8,
+            "w": 9,
+            "x": 0,
+            "y": 0
+          },
+          "id": 0,
+          "options": {
+            "legend": {
+              "calcs": [
+                "mean",
+                "max"
+              ],
+              "displayMode": "table",
+              "placement": "right",
+              "showLegend": true
+            },
+            "tooltip": {
+              "mode": "multi",
+              "sort": "desc"
+            }
+          },
+          "pluginVersion": "13.2.4",
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${datasource}"
+              },
+              "editorMode": "code",
+              "expr": "memory:lifecycle:recall:rate15m",
+              "legendFormat": "{{operation}}",
+              "range": true,
+              "refId": "A"
+            }
+          ],
+          "title": "Context delivered, per second",
+          "type": "timeseries"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "description": "Both sides of the loop on one scale, with nothing left to the reader but the comparison.\n\nBoth are rates over the same window, so this compares *shape*, not size: a deployment ten times busier than another is not better at recalling, it is just bigger. Lines that cross are normal \u2014 recall bursts when an agent asks, capture arrives in batches. Lines that never cross are not.",
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "palette-classic"
+              },
+              "custom": {
+                "axisBorderShow": false,
+                "axisCenteredZero": false,
+                "axisLabel": "",
+                "axisPlacement": "auto",
+                "barAlignment": 0,
+                "drawStyle": "line",
+                "fillOpacity": 8,
+                "gradientMode": "none",
+                "hideFrom": {
+                  "legend": false,
+                  "tooltip": false,
+                  "viz": false
+                },
+                "insertNulls": false,
+                "lineInterpolation": "linear",
+                "lineWidth": 1,
+                "pointSize": 5,
+                "scaleDistribution": {
+                  "type": "linear"
+                },
+                "showPoints": "never",
+                "spanNulls": false,
+                "stacking": {
+                  "group": "A",
+                  "mode": "none"
+                },
+                "thresholdsStyle": {
+                  "mode": "off"
+                }
+              },
+              "mappings": [],
+              "min": 0,
+              "unit": "ops"
+            },
+            "overrides": []
+          },
+          "gridPos": {
+            "h": 8,
+            "w": 9,
+            "x": 9,
+            "y": 0
+          },
+          "id": 0,
+          "options": {
+            "legend": {
+              "calcs": [
+                "mean",
+                "max"
+              ],
+              "displayMode": "table",
+              "placement": "right",
+              "showLegend": true
+            },
+            "tooltip": {
+              "mode": "multi",
+              "sort": "desc"
+            }
+          },
+          "pluginVersion": "13.2.4",
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${datasource}"
+              },
+              "editorMode": "code",
+              "expr": "memory:lifecycle:recall:rate15m_total",
+              "legendFormat": "recall",
+              "range": true,
+              "refId": "A"
+            },
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${datasource}"
+              },
+              "editorMode": "code",
+              "expr": "memory:lifecycle:capture:rate15m_total",
+              "legendFormat": "capture",
+              "range": true,
+              "refId": "B"
+            }
+          ],
+          "title": "Recall against capture",
+          "type": "timeseries"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "description": "How many times knowledge was read back for every time it was written, over fifteen minutes.\n\n**Below one means storing more than reading** \u2014 where a memory system sits while an agent is still learning a project, and well above once it has context worth reusing. A very large number means recall with almost no capture: what is stored is being used and nothing is coming in to replace it.\n\nRead it as a shape, never as a target. It is a rate over a recent window, so a quiet half hour and a busy one differ by an order of magnitude on the same day.",
+          "fieldConfig": {
+            "defaults": {
+              "unit": "short",
+              "color": {
+                "mode": "thresholds"
+              },
+              "mappings": [],
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "red",
+                    "value": null
+                  },
+                  {
+                    "color": "yellow",
+                    "value": 1
+                  },
+                  {
+                    "color": "green",
+                    "value": 3
+                  }
+                ]
+              },
+              "decimals": 2
+            },
+            "overrides": []
+          },
+          "gridPos": {
+            "h": 8,
+            "w": 6,
+            "x": 18,
+            "y": 0
+          },
+          "id": 0,
+          "options": {
+            "colorMode": "value",
+            "graphMode": "none",
+            "justifyMode": "auto",
+            "orientation": "auto",
+            "reduceOptions": {
+              "calcs": [
+                "lastNotNull"
+              ],
+              "fields": "",
+              "values": false
+            },
+            "textMode": "auto"
+          },
+          "pluginVersion": "13.2.4",
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${datasource}"
+              },
+              "editorMode": "code",
+              "expr": "memory:lifecycle:recalls_per_capture15m",
+              "legendFormat": "",
+              "range": true,
+              "refId": "A"
+            }
+          ],
+          "title": "Recalls per capture",
+          "type": "stat"
+        }
+      ],
+      "title": "Context delivered",
+      "type": "row"
+    },
+    {
+      "collapsed": true,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 5
       },
       "id": 0,
       "panels": [
@@ -697,7 +1294,175 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 3
+        "y": 6
+      },
+      "id": 0,
+      "panels": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "description": "How much an episode is worth, over a day.\n\n**The counter-metric to the fact count.** A fact total that rises while this falls means the same extraction is being asked for more input and returning less per episode \u2014 more volume hiding worse understanding, which is invisible in the totals and obvious here.\n\nA day with fewer than one episode reads as no yield rather than a ratio of a fraction of an episode: the denominator is floored at one, so the number is honest about being thin.",
+          "fieldConfig": {
+            "defaults": {
+              "unit": "short",
+              "color": {
+                "mode": "thresholds"
+              },
+              "mappings": [],
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "text",
+                    "value": null
+                  }
+                ]
+              },
+              "decimals": 2
+            },
+            "overrides": []
+          },
+          "gridPos": {
+            "h": 7,
+            "w": 6,
+            "x": 0,
+            "y": 0
+          },
+          "id": 0,
+          "options": {
+            "colorMode": "value",
+            "graphMode": "none",
+            "justifyMode": "auto",
+            "orientation": "auto",
+            "reduceOptions": {
+              "calcs": [
+                "lastNotNull"
+              ],
+              "fields": "",
+              "values": false
+            },
+            "textMode": "auto"
+          },
+          "pluginVersion": "13.2.4",
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${datasource}"
+              },
+              "editorMode": "code",
+              "expr": "memory:operation_results:facts_per_episode1d",
+              "legendFormat": "",
+              "range": true,
+              "refId": "A"
+            }
+          ],
+          "title": "Facts per episode, last 24 hours",
+          "type": "stat"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "description": "Whether what was found is connected to anything, over a day.\n\nFacts say *what* was found; links say whether it landed in a graph or in a pile. Extraction that produces entities and almost no links is a product that stores text with names attached \u2014 which still answers a direct query and still fails the one an agent asks when it needs to know how two things relate.",
+          "fieldConfig": {
+            "defaults": {
+              "unit": "short",
+              "color": {
+                "mode": "thresholds"
+              },
+              "mappings": [],
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "text",
+                    "value": null
+                  }
+                ]
+              },
+              "decimals": 2
+            },
+            "overrides": []
+          },
+          "gridPos": {
+            "h": 7,
+            "w": 6,
+            "x": 6,
+            "y": 0
+          },
+          "id": 0,
+          "options": {
+            "colorMode": "value",
+            "graphMode": "none",
+            "justifyMode": "auto",
+            "orientation": "auto",
+            "reduceOptions": {
+              "calcs": [
+                "lastNotNull"
+              ],
+              "fields": "",
+              "values": false
+            },
+            "textMode": "auto"
+          },
+          "pluginVersion": "13.2.4",
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${datasource}"
+              },
+              "editorMode": "code",
+              "expr": "memory:operation_results:links_per_entity1d",
+              "legendFormat": "",
+              "range": true,
+              "refId": "A"
+            }
+          ],
+          "title": "Links per entity, last 24 hours",
+          "type": "stat"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "description": "",
+          "gridPos": {
+            "h": 7,
+            "w": 12,
+            "x": 12,
+            "y": 0
+          },
+          "id": 0,
+          "options": {
+            "code": {
+              "language": "plaintext",
+              "showLineNumbers": false,
+              "showMiniMap": false
+            },
+            "content": "Two rates over a day, each the produced kind divided by the produced kind.\n\n**Yield is a shape, not a score.** There is no target: it depends entirely on what is being ingested, and a codebase ingested once and a chat log ingested daily have nothing in common. What is worth watching is the *direction*, and it is worth watching against the input rather than on its own.\n\n**What it deliberately does not measure:** whether the facts are true, and whether recall found them. Correctness is the domain's own subject \u2014 the evaluation suite in `crates/eval-harness` is where that is answered \u2014 and retrieval quality needs a judged query set rather than a counter, so neither is pretended at here.\n\nBoth denominators are floored rather than divided by zero: a thin day reads as no yield, not as infinity.",
+            "mode": "markdown"
+          },
+          "pluginVersion": "13.2.4",
+          "title": "What yield is and is not",
+          "type": "text"
+        }
+      ],
+      "title": "What each episode yields",
+      "type": "row"
+    },
+    {
+      "collapsed": true,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 7
       },
       "id": 0,
       "panels": [
@@ -972,7 +1737,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 4
+        "y": 8
       },
       "id": 0,
       "panels": [
@@ -981,7 +1746,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "description": "The identity callback declining a sign-in, by reason.\n\n**These are refusals only \u2014 there is no success counter.** A completed sign-in is not recorded anywhere in the metrics, so the share of sign-ins that succeed cannot be computed from this and is deliberately absent rather than estimated. What is here is the *reasons people are being turned away*.\n\n`signup_invite_only` is a policy, not a fault: a deployment closed to self-service sign-up refuses every one of them, correctly.",
+          "description": "Sign-ins that completed and issued a session.\n\nThe other half of the refusal panel beside it, and the only 'are people arriving' this metrics surface can honestly answer. **It counts arrivals and nothing about who they are**: no account, no subject, no tenant label, because a metric carrying an identifier is a disclosure rather than a measurement.\n\nSo a first sign-up and a returning user are the same number here, and activation and retention are not on this dashboard at all. That is a deliberate limit, not an oversight \u2014 see *Reference*.",
           "fieldConfig": {
             "defaults": {
               "color": {
@@ -1026,8 +1791,95 @@
           },
           "gridPos": {
             "h": 8,
-            "w": 12,
+            "w": 8,
             "x": 0,
+            "y": 0
+          },
+          "id": 0,
+          "options": {
+            "legend": {
+              "calcs": [
+                "mean",
+                "max"
+              ],
+              "displayMode": "table",
+              "placement": "right",
+              "showLegend": true
+            },
+            "tooltip": {
+              "mode": "multi",
+              "sort": "desc"
+            }
+          },
+          "pluginVersion": "13.2.4",
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${datasource}"
+              },
+              "editorMode": "code",
+              "expr": "memory:auth_signins:rate15m",
+              "legendFormat": "sign-ins",
+              "range": true,
+              "refId": "A"
+            }
+          ],
+          "title": "Sign-ins, per second",
+          "type": "timeseries"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "description": "The identity callback declining a sign-in, by reason.\n\nRead against the sign-ins beside it: refusals without sign-ins mean a deployment nobody is getting into, and refusals *with* sign-ins mean a specific reason is turning away people who would otherwise have arrived.\n\n`signup_invite_only` is a policy, not a fault: a deployment closed to self-service sign-up refuses every one of them, correctly and indefinitely, which is why that alert is a ticket rather than a page.",
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "palette-classic"
+              },
+              "custom": {
+                "axisBorderShow": false,
+                "axisCenteredZero": false,
+                "axisLabel": "",
+                "axisPlacement": "auto",
+                "barAlignment": 0,
+                "drawStyle": "line",
+                "fillOpacity": 8,
+                "gradientMode": "none",
+                "hideFrom": {
+                  "legend": false,
+                  "tooltip": false,
+                  "viz": false
+                },
+                "insertNulls": false,
+                "lineInterpolation": "linear",
+                "lineWidth": 1,
+                "pointSize": 5,
+                "scaleDistribution": {
+                  "type": "linear"
+                },
+                "showPoints": "never",
+                "spanNulls": false,
+                "stacking": {
+                  "group": "A",
+                  "mode": "none"
+                },
+                "thresholdsStyle": {
+                  "mode": "off"
+                }
+              },
+              "mappings": [],
+              "min": 0,
+              "unit": "ops"
+            },
+            "overrides": []
+          },
+          "gridPos": {
+            "h": 8,
+            "w": 8,
+            "x": 8,
             "y": 0
           },
           "id": 0,
@@ -1068,7 +1920,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "description": "Episodes arriving automatically from the inbox.\n\nFor a product owner this is the quiet one: when it stops, knowledge stops accumulating and **nothing in the product says so** \u2014 there is no user-visible error, because no user asked for anything. The `failed` line growing is knowledge that has stopped arriving.\n\n*Empty unless the deployment set `MEMORY_INGESTION_INBOX`.*",
+          "description": "Episodes arriving automatically from the inbox.\n\nFor a product owner this is the quiet one: when it stops, knowledge stops accumulating and **nothing in the product says so** \u2014 there is no user-visible error, because no user asked for anything. The `failed` line growing is knowledge that has stopped arriving, and *How fresh is the knowledge* is where that shows up as an age.\n\n*Empty unless the deployment set `MEMORY_INGESTION_INBOX`.*",
           "fieldConfig": {
             "defaults": {
               "color": {
@@ -1113,8 +1965,8 @@
           },
           "gridPos": {
             "h": 8,
-            "w": 12,
-            "x": 12,
+            "w": 8,
+            "x": 16,
             "y": 0
           },
           "id": 0,
@@ -1160,7 +2012,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 5
+        "y": 9
       },
       "id": 0,
       "panels": [
@@ -1183,7 +2035,7 @@
               "showLineNumbers": false,
               "showMiniMap": false
             },
-            "content": "**There are no latency percentiles here, on purpose.** This dashboard answers product questions \u2014 is the memory growing, are people arriving, what are they doing, is the knowledge any good. A p99 answers none of them, and a dashboard that makes its reader wade past it to reach the useful number is one that gets skimmed. Latency lives on the technical dashboard, which links here.\n\n**Three figures that mislead if read naively:**\n\n1. *What exists* reads levels, not totals. These used to be added to a counter, so the metric was the sum of every inventory ever read \u2014 opening the dashboard grew it by the size of the store.\n2. *What was learned* reads an **increase over a window**, not a rate. The underlying family counts things produced; its rate is not a quantity anyone asks about.\n3. *Access and automation* counts **refusals only**. There is no success counter, so a sign-in success rate is not derivable from these metrics and is not shown.\n\n**Known gaps, deliberately:**\n\n- No per-tenant breakdown. A tenant label would be unbounded in cardinality; the tenant fingerprint is in the logs instead, where a high-cardinality field belongs.\n- No active-user or session metric. Counting them would mean identifying users, and a metric carrying a user identifier is a disclosure rather than a measurement.\n- Filesystem ingestion panels are empty unless the deployment set `MEMORY_INGESTION_INBOX` \u2014 off reads as 'off', not 'broken'.",
+            "content": "**There are no latency percentiles here, on purpose.** This dashboard answers product questions \u2014 is the memory growing, are people arriving, what are they doing, is the knowledge any good. A p99 answers none of them, and a dashboard that makes its reader wade past it to reach the useful number is one that gets skimmed. Latency lives on the technical dashboard, which links here.\n\n**Five figures that mislead if read naively:**\n\n1. *What exists* reads levels, not totals. These used to be added to a counter, so the metric was the sum of every inventory ever read \u2014 opening the dashboard grew it by the size of the store.\n2. *What was learned* reads an **increase over a window**, not a rate. The underlying family counts things produced; its rate is not a quantity anyone asks about.\n3. *Context delivered* splits operations by what they do to the store \u2014 capture (`ingest`, `extract`) against recall (`assemble_context`, `resolve`, `explain`) \u2014 and leaves maintenance passes in neither. Splitting by name alone would put a decay pass next to a capture and call the sum traffic.\n4. *What each episode yields* and *recalls per capture* are **rates over a recent window**, so a quiet half hour and a busy one differ by an order of magnitude on the same day. They are shapes to read, not numbers to hold.\n5. *Access and automation* counts **arrivals and refusals, never people**. A first sign-up and a returning user are the same number, and there is no label that could tell them apart without turning a traffic measure into a disclosure.\n\n**Known gaps, deliberately:**\n\n- No per-tenant breakdown. A tenant label would be unbounded in cardinality; the tenant fingerprint is in the logs instead, where a high-cardinality field belongs.\n- No active-user, activation or retention metric. Every one of them needs a user identifier to count, and this product's position is that a metric carrying one is a disclosure. Operations are counted instead: *Context delivered* is the closest honest stand-in, and it is a stand-in.\n- No token or cost-per-query figure. The models' usage is the caller's to measure; this service never sees the tokens it hands back, so a number here would be invented.\n- No retrieval-quality figure. Whether recall found the *right* facts needs a judged query set, which is what `crates/eval-harness` is for. A counter cannot answer it and is not pretending to.\n- Filesystem ingestion panels are empty unless the deployment set `MEMORY_INGESTION_INBOX` \u2014 off reads as 'off', not 'broken'.\n- *How fresh is the knowledge* reads no data until the first capture. That is not a zero age; it is a service that has never learned anything, which is the more urgent of the two states to be able to tell apart.",
             "mode": "markdown"
           },
           "pluginVersion": "13.2.4",

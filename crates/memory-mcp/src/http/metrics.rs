@@ -35,6 +35,7 @@ pub fn install_recorder() -> Result<metrics_exporter_prometheus::PrometheusHandl
     // the recorder through this function, and a description registered
     // elsewhere would leave `/metrics` bare in exactly the build that ships.
     crate::observability::describe_metrics();
+    crate::observability::record_build_info();
     Ok(handle)
 }
 
