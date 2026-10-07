@@ -331,7 +331,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "description": "How old the newest knowledge in the store is.\n\n**The number that decides whether any other number here can be trusted.** A memory service whose last write was three days ago still serves confident answers, from a world that has moved on \u2014 every other panel below can look perfectly healthy while this one climbs.\n\n**No data means nothing has ever been captured**, which is a different statement from 'zero' and the reason this panel cannot lie about a service that never learned anything.\n\nAbove an hour it is yellow and above a day red, which are the colours an on-call engineer reads as *stale*, not thresholds an alert enforces: `KnowledgeStale` additionally requires capture traffic in the last two hours, so a deployment nobody is using never turns this panel's colour into a page.",
+          "description": "How old the newest knowledge in the store is.\n\n**The number that decides whether any other number here can be trusted.** A memory service whose last write was three days ago still serves confident answers, from a world that has moved on \u2014 every other panel below can look perfectly healthy while this one climbs.\n\n**No data means nothing has ever been captured**, which is a different statement from 'zero' and the reason this panel cannot lie about a service that never learned anything.\n\nAbove an hour it is yellow and above a day red, which are the colours an on-call engineer reads as *stale*, not thresholds an alert enforces \u2014 and the alert's own threshold is six hours, so a panel sitting amber at seven is not a contradiction, it is the gap between noticing and paging. `KnowledgeStale` additionally requires capture traffic in the last two hours, from MCP calls or the inbox watcher, so a deployment nobody is using never turns this panel's colour into a ticket.",
           "fieldConfig": {
             "defaults": {
               "unit": "dtdurations",
@@ -504,7 +504,7 @@
               "showLineNumbers": false,
               "showMiniMap": false
             },
-            "content": "Nothing in the metrics above can answer it. A counter that stopped growing still reports the last scrape as recent, and `increase()` over a window reads *nothing new* whether the service learned yesterday or learned nothing at all \u2014 so a memory system that stopped learning a week ago has every symptom of one that stopped learning an hour ago.\n\nThe stamp is written by the capture path only, which is what makes it trustworthy: a recall reads knowledge and changes nothing, so a busy service nobody writes to ages visibly instead of looking permanently fresh.\n\nIt is also the signal a *reader* of this dashboard wants before any of the others: everything below describes a store whose freshness is the assumption they are all making.",
+            "content": "Nothing in the metrics above can answer it. A counter that stopped growing still reports the last scrape as recent, and `increase()` over a window reads *nothing new* whether the service learned yesterday or learned nothing at all \u2014 so a memory system that stopped learning a week ago has every symptom of one that stopped learning an hour ago.\n\nThe stamp is written by the two writes that add knowledge \u2014 the episode store and the extraction \u2014 which is what makes it trustworthy: a recall reads knowledge and changes nothing, so a busy service nobody writes to ages visibly instead of looking permanently fresh. Stamping it at the MCP tool instead would leave it absent on any deployment whose knowledge arrives unattended, which is the one deployment whose freshness matters most.\n\nIt is also the signal a *reader* of this dashboard wants before any of the others: everything below describes a store whose freshness is the assumption they are all making.",
             "mode": "markdown"
           },
           "pluginVersion": "13.2.4",
@@ -933,7 +933,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "description": "Both sides of the loop on one scale, with nothing left to the reader but the comparison.\n\nBoth are rates over the same window, so this compares *shape*, not size: a deployment ten times busier than another is not better at recalling, it is just bigger. Lines that cross are normal \u2014 recall bursts when an agent asks, capture arrives in batches. Lines that never cross are not.",
+          "description": "Both sides of the loop on one scale, with nothing left to the reader but the comparison.\n\n**Two capture lines, because capture has two doors.** `capture (asked for)` is MCP `ingest` and `extract` calls; `capture (inbox)` is episodes the filesystem watcher carried in without anyone asking. A deployment that only uses the watcher reads a flat capture (asked for) at zero and a live capture (inbox) \u2014 which is a working deployment, not an idle one.\n\nAll three are rates over the same window, so this compares *shape*, not size: a deployment ten times busier than another is not better at recalling, it is just bigger. Lines that cross are normal \u2014 recall bursts when an agent asks, capture arrives in batches. Lines that never cross are not.",
           "fieldConfig": {
             "defaults": {
               "color": {
@@ -1018,9 +1018,20 @@
               },
               "editorMode": "code",
               "expr": "memory:lifecycle:capture:rate15m_total",
-              "legendFormat": "capture",
+              "legendFormat": "capture (asked for)",
               "range": true,
               "refId": "B"
+            },
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${datasource}"
+              },
+              "editorMode": "code",
+              "expr": "memory:lifecycle:inbox_capture:rate15m_total",
+              "legendFormat": "capture (inbox)",
+              "range": true,
+              "refId": "C"
             }
           ],
           "title": "Recall against capture",
@@ -1031,7 +1042,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "description": "How many times knowledge was read back for every time it was written, over fifteen minutes.\n\n**Below one means storing more than reading** \u2014 where a memory system sits while an agent is still learning a project, and well above once it has context worth reusing. A very large number means recall with almost no capture: what is stored is being used and nothing is coming in to replace it.\n\nRead it as a shape, never as a target. It is a rate over a recent window, so a quiet half hour and a busy one differ by an order of magnitude on the same day.",
+          "description": "How many times knowledge was read back for every time it was written, over fifteen minutes.\n\n**Below one means storing more than reading** \u2014 where a memory system sits while an agent is still learning a project, and well above once it has context worth reusing. A very large number means recall with almost no capture: what is stored is being used and nothing is coming in to replace it.\n\n**Capture here is what callers asked for** \u2014 MCP ingest and extract. Inbox capture is a separate line on the panel above, so a watcher-fed deployment reads *No data* here rather than a ratio built on a denominator that does not exist. Zero with no recall is the write-only archive, shown rather than hidden behind a gap.\n\nRead it as a shape, never as a target. It is a rate over a recent window, so a quiet half hour and a busy one differ by an order of magnitude on the same day.",
           "fieldConfig": {
             "defaults": {
               "unit": "short",
@@ -1303,7 +1314,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "description": "How much an episode is worth, over a day.\n\n**The counter-metric to the fact count.** A fact total that rises while this falls means the same extraction is being asked for more input and returning less per episode \u2014 more volume hiding worse understanding, which is invisible in the totals and obvious here.\n\nA day with fewer than one episode reads as no yield rather than a ratio of a fraction of an episode: the denominator is floored at one, so the number is honest about being thin.",
+          "description": "How much an episode is worth, over a day.\n\n**The counter-metric to the fact count.** A fact total that rises while this falls means the same extraction is being asked for more input and returning less per episode \u2014 more volume hiding worse understanding, which is invisible in the totals and obvious here.\n\nA day with fewer than one ingested episode reads as no yield rather than a ratio of a fraction of an episode: the denominator is floored at one, so the number is honest about being thin.\n\n**Re-extracting an episode inflates it**: the denominator counts episodes as they were *ingested*, so extracting the same episode twice raises this without a second episode ever arriving. Read it as yield per ingested episode, which is what it is.",
           "fieldConfig": {
             "defaults": {
               "unit": "short",
@@ -1746,7 +1757,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "description": "Sign-ins that completed and issued a session.\n\nThe other half of the refusal panel beside it, and the only 'are people arriving' this metrics surface can honestly answer. **It counts arrivals and nothing about who they are**: no account, no subject, no tenant label, because a metric carrying an identifier is a disclosure rather than a measurement.\n\nSo a first sign-up and a returning user are the same number here, and activation and retention are not on this dashboard at all. That is a deliberate limit, not an oversight \u2014 see *Reference*.",
+          "description": "Sign-ins that completed and issued a session.\n\nThe other half of the refusal panel beside it: sign-ins through the OIDC browser flow that completed and issued a session. **It counts arrivals and nothing about who they are** \u2014 no account, no subject, no tenant label, because a metric carrying an identifier is a disclosure rather than a measurement.\n\nTwo honest limits, both deliberate. A first sign-up and a returning user are the same number, so activation and retention are not on this dashboard at all. And the local-admin sign-in path mints the same session cookie without being counted here, so this is the OIDC flow's arrivals, not the deployment's. See *Reference*.",
           "fieldConfig": {
             "defaults": {
               "color": {
@@ -2035,7 +2046,7 @@
               "showLineNumbers": false,
               "showMiniMap": false
             },
-            "content": "**There are no latency percentiles here, on purpose.** This dashboard answers product questions \u2014 is the memory growing, are people arriving, what are they doing, is the knowledge any good. A p99 answers none of them, and a dashboard that makes its reader wade past it to reach the useful number is one that gets skimmed. Latency lives on the technical dashboard, which links here.\n\n**Five figures that mislead if read naively:**\n\n1. *What exists* reads levels, not totals. These used to be added to a counter, so the metric was the sum of every inventory ever read \u2014 opening the dashboard grew it by the size of the store.\n2. *What was learned* reads an **increase over a window**, not a rate. The underlying family counts things produced; its rate is not a quantity anyone asks about.\n3. *Context delivered* splits operations by what they do to the store \u2014 capture (`ingest`, `extract`) against recall (`assemble_context`, `resolve`, `explain`) \u2014 and leaves maintenance passes in neither. Splitting by name alone would put a decay pass next to a capture and call the sum traffic.\n4. *What each episode yields* and *recalls per capture* are **rates over a recent window**, so a quiet half hour and a busy one differ by an order of magnitude on the same day. They are shapes to read, not numbers to hold.\n5. *Access and automation* counts **arrivals and refusals, never people**. A first sign-up and a returning user are the same number, and there is no label that could tell them apart without turning a traffic measure into a disclosure.\n\n**Known gaps, deliberately:**\n\n- No per-tenant breakdown. A tenant label would be unbounded in cardinality; the tenant fingerprint is in the logs instead, where a high-cardinality field belongs.\n- No active-user, activation or retention metric. Every one of them needs a user identifier to count, and this product's position is that a metric carrying one is a disclosure. Operations are counted instead: *Context delivered* is the closest honest stand-in, and it is a stand-in.\n- No token or cost-per-query figure. The models' usage is the caller's to measure; this service never sees the tokens it hands back, so a number here would be invented.\n- No retrieval-quality figure. Whether recall found the *right* facts needs a judged query set, which is what `crates/eval-harness` is for. A counter cannot answer it and is not pretending to.\n- Filesystem ingestion panels are empty unless the deployment set `MEMORY_INGESTION_INBOX` \u2014 off reads as 'off', not 'broken'.\n- *How fresh is the knowledge* reads no data until the first capture. That is not a zero age; it is a service that has never learned anything, which is the more urgent of the two states to be able to tell apart.",
+            "content": "**There are no latency percentiles here, on purpose.** This dashboard answers product questions \u2014 is the memory growing, are people arriving, what are they doing, is the knowledge any good. A p99 answers none of them, and a dashboard that makes its reader wade past it to reach the useful number is one that gets skimmed. Latency lives on the technical dashboard, which links here.\n\n**Five figures that mislead if read naively:**\n\n1. *What exists* reads levels, not totals. These used to be added to a counter, so the metric was the sum of every inventory ever read \u2014 opening the dashboard grew it by the size of the store.\n2. *What was learned* reads an **increase over a window**, not a rate. The underlying family counts things produced; its rate is not a quantity anyone asks about.\n3. *Context delivered* splits operations by what they do to the store \u2014 capture (`ingest`, `extract`) against recall (`assemble_context`, `resolve`, `explain`) \u2014 and leaves maintenance passes in neither. Splitting by name alone would put a decay pass next to a capture and call the sum traffic.\n4. *What each episode yields* and *recalls per capture* are **rates over a recent window**, so a quiet half hour and a busy one differ by an order of magnitude on the same day. They are shapes to read, not numbers to hold.\n5. *Access and automation* counts **arrivals and refusals through the OIDC flow, never people**. A first sign-up and a returning user are the same number, there is no label that could tell them apart without turning a traffic measure into a disclosure, and the local-admin path is not counted at all.\n\n**Known gaps, deliberately:**\n\n- No per-tenant breakdown. A tenant label would be unbounded in cardinality; the tenant fingerprint is in the logs instead, where a high-cardinality field belongs.\n- No active-user, activation or retention metric. Every one of them needs a user identifier to count, and this product's position is that a metric carrying one is a disclosure. Operations are counted instead: *Context delivered* is the closest honest stand-in, and it is a stand-in.\n- No token or cost-per-query figure. The tokens this service hands *back* are the caller's to measure \u2014 it never sees the model's bill for them, and what extraction spends internally belongs to the evaluation harness rather than to a product dashboard. A number here would be invented.\n- No retrieval-quality figure. Whether recall found the *right* facts needs a judged query set, which is what `crates/eval-harness` is for. A counter cannot answer it and is not pretending to.\n- Filesystem ingestion panels are empty unless the deployment set `MEMORY_INGESTION_INBOX` \u2014 off reads as 'off', not 'broken'.\n- *How fresh is the knowledge* reads no data until the first capture. That is not a zero age; it is a service that has never learned anything, which is the more urgent of the two states to be able to tell apart.",
             "mode": "markdown"
           },
           "pluginVersion": "13.2.4",

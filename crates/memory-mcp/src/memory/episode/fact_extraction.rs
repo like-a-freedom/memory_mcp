@@ -496,8 +496,19 @@ pub async fn extract_from_episode(
         None
     };
 
+    // Facts, entities, links and the edges between them were all written by
+    // the time control reaches here; an earlier `?` would have returned before
+    // this line, so the knowledge clock is stamped only for an extraction that
+    // actually persisted.
+    //
+    // Like the episode write in `memory::ingestion`, this is the shared funnel
+    // — the `extract` tool, the filesystem watcher and the projection pass all
+    // extract through this function — which is why the freshness gauge can be
+    // read at all on a deployment that never calls an MCP tool.
+    crate::observability::record_knowledge_write();
+
     Ok(ExtractResult {
-        episode_id: episode_id.to_string(),
+        episode_id: episode_id.to_owned(),
         entities,
         facts,
         links,

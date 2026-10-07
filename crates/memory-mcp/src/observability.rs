@@ -254,17 +254,6 @@ fn result_label(result: &str) -> &'static str {
         .unwrap_or("other")
 }
 
-/// Operations that put new knowledge into the store.
-///
-/// Only these make the knowledge newer. Recall, explanation, alias resolution
-/// and invalidation all read or retire it and leave it exactly as old as it
-/// was, and so does every lifecycle maintenance pass — which is why the list
-/// is short and explicit rather than "everything that is not a read": a
-/// knowledge archive that stops storing is broken, and a stamp that follows
-/// every other operation would hide exactly that.
-#[cfg(feature = "prometheus")]
-const CAPTURE_OPERATIONS: &[&str] = &["ingest", "extract"];
-
 /// Records one logical operation when dropped.
 ///
 /// The default outcome is `error`, which makes early returns and unexpected
@@ -287,10 +276,6 @@ impl OperationMetrics {
 
     pub(crate) fn success(&mut self) {
         self.outcome = "success";
-        #[cfg(feature = "prometheus")]
-        if CAPTURE_OPERATIONS.contains(&self.operation) {
-            record_knowledge_write();
-        }
     }
 
     /// Record work *produced* by this operation: a flow.
@@ -515,11 +500,16 @@ fn unix_seconds() -> f64 {
 /// Record that new knowledge has landed, at the moment it landed.
 ///
 /// The freshness question — "how old is what this service knows" — has no
-/// answer in any other series, so it gets one written by the path that knows:
-/// a capture that completed. A recall deliberately does not call this; see
-/// [`METRIC_KNOWLEDGE_LAST_WRITE_TIMESTAMP_SECONDS`].
-#[cfg(feature = "prometheus")]
+/// answer in any other series, so it gets one written by the paths that know:
+/// the episode write and the extraction write. Both are shared funnels every
+/// capture transport passes through, which is the only reason the gauge reads
+/// anything on a deployment that never calls an MCP tool.
+///
+/// Deliberately not called from [`OperationMetrics`]: a call that arrived and
+/// failed is traffic, not knowledge, and a stamp keyed to transport success
+/// would keep a broken capture loop looking freshly fed.
 pub(crate) fn record_knowledge_write() {
+    #[cfg(feature = "prometheus")]
     metrics::gauge!(METRIC_KNOWLEDGE_LAST_WRITE_TIMESTAMP_SECONDS).set(unix_seconds());
 }
 
@@ -528,8 +518,14 @@ pub(crate) fn record_knowledge_write() {
 /// Called where the session is issued rather than where the flow ends, so it
 /// counts sign-ins that actually produced a usable session and cannot double
 /// count a retry of a flow that failed after authentication.
-#[cfg(feature = "prometheus")]
+///
+/// Gated on `control-plane` because that is the only caller — the OIDC browser
+/// flow. The body is gated on `prometheus` separately, so a control-plane
+/// build without metrics records nothing and says so at the call site rather
+/// than by vanishing.
+#[cfg(feature = "control-plane")]
 pub(crate) fn record_signin_success() {
+    #[cfg(feature = "prometheus")]
     metrics::counter!(METRIC_AUTH_SIGNINS_TOTAL).increment(1);
 }
 
@@ -853,22 +849,21 @@ pub(crate) mod tests {
         assert!(output.contains("result=\"episodes\""));
     }
 
-    /// How old the newest knowledge is, as a timestamp.
+    /// A recorded write stamps the knowledge clock.
     ///
-    /// Freshness is what a memory product is trusted on, and no existing
-    /// series can answer it: `timestamp()` of a counter that stopped growing
-    /// reports the last *scrape*, so a service that stopped learning a day ago
-    /// looks as recently touched as one that learned a minute ago, and the
-    /// `increase()` rules read "nothing new" for both. The stamp therefore has
-    /// to be written by the path that knows knowledge actually landed — and
-    /// the moment it lands, not the moment it is read.
+    /// Freshness is what a memory product is trusted on, and no existing series
+    /// can answer it: `timestamp()` of a counter that stopped growing reports
+    /// the last *scrape*, so a service that stopped learning a day ago looks as
+    /// recently touched as one that learned a minute ago, and the `increase()`
+    /// rules read "nothing new" for both. The clock therefore has to be written
+    /// where knowledge lands — and stamped with the moment it landed, not the
+    /// moment it was read, or an age panel would show a staircase of its own
+    /// refresh.
     #[tokio::test]
-    async fn a_successful_capture_stamps_when_the_newest_knowledge_was_written() {
+    async fn a_recorded_write_stamps_the_knowledge_clock() {
         let (exposition, before, after) = exposed(|| async {
             let before = unix_seconds();
-            let mut metrics = OperationMetrics::new("ingest");
-            metrics.success();
-            drop(metrics);
+            record_knowledge_write();
             (render(), before, unix_seconds())
         })
         .await;
@@ -883,8 +878,9 @@ pub(crate) mod tests {
         let stamped = sample_bare(&exposition, METRIC_KNOWLEDGE_LAST_WRITE_TIMESTAMP_SECONDS)
             .unwrap_or_else(|| {
                 panic!(
-                    "a completed capture must stamp when the newest knowledge was \
-                     written; without it freshness is unreadable: {exposition}"
+                    "a knowledge write must stamp when it happened; without it \
+                     freshness is unreadable and every capture stops being \
+                     visible: {exposition}"
                 )
             });
         assert!(
@@ -894,47 +890,72 @@ pub(crate) mod tests {
         );
     }
 
-    /// A recall must leave the knowledge exactly as old as it was.
+    /// Only the two knowledge writes stamp the clock — a wiring lint, not a
+    /// scenario.
     ///
-    /// This is the failure a freshness gauge is bought to prevent: stamp on
-    /// read and a service nobody writes to looks permanently fresh, so the one
-    /// signal that distinguishes "learning all night" from "stopped learning a
-    /// week ago" reads healthy in both. The stamp belongs to capture, not to
-    /// the fact that something happened to run.
-    #[tokio::test]
-    async fn a_recall_leaves_the_knowledge_exactly_as_old_as_it_was() {
-        let (exposition, before, after) = exposed(|| async {
-            // A capture first, so the assertion compares two readings rather
-            // than two absences: with nothing stamped, `None == None` would
-            // pass against an implementation that stamps on every read.
-            let mut capture = OperationMetrics::new("ingest");
-            capture.success();
-            drop(capture);
+    /// It is a lint because the property is *where* a call sits across modules,
+    /// which no behavioural test can observe without a database behind every
+    /// path. The behaviour it protects is real: a stamp that also followed
+    /// recall, or one left on the MCP adapter, makes a service that is not
+    /// learning look freshly fed, and the first leaves the gauge absent for
+    /// every deployment whose knowledge arrives unattended — which is the whole
+    /// reason the gauge exists.
+    #[test]
+    fn only_the_knowledge_writes_stamp_the_clock() {
+        let writers = [
+            ("memory/ingestion.rs", include_str!("memory/ingestion.rs")),
+            (
+                "memory/episode/fact_extraction.rs",
+                include_str!("memory/episode/fact_extraction.rs"),
+            ),
+        ];
+        for (name, source) in writers {
+            assert!(
+                source.contains("record_knowledge_write()"),
+                "{name} is a knowledge write and must stamp the freshness \
+                 clock: without it the gauge reads absent on every deployment \
+                 that reaches the store through it"
+            );
+        }
 
-            let stamp = |exposition: &str| {
-                sample_bare(exposition, METRIC_KNOWLEDGE_LAST_WRITE_TIMESTAMP_SECONDS)
-            };
-            let before = stamp(&render());
-            let mut recall = OperationMetrics::new("assemble_context");
-            recall.success();
-            drop(recall);
-            let exposition = render();
-            let after = stamp(&exposition);
-            (exposition, before, after)
-        })
-        .await;
+        // The read paths must not stamp: each of these reads the knowledge the
+        // clock measures, and a stamp in any of them would make an idle service
+        // look fed. `resolve` also records `entities`, which is why it is on this
+        // list rather than being treated as a writer.
+        for (name, source) in [
+            ("memory/retrieval.rs", include_str!("memory/retrieval.rs")),
+            ("memory/lifecycle.rs", include_str!("memory/lifecycle.rs")),
+            (
+                "tools/assemble_context.rs",
+                include_str!("tools/assemble_context.rs"),
+            ),
+            ("tools/resolve.rs", include_str!("tools/resolve.rs")),
+            ("tools/explain.rs", include_str!("tools/explain.rs")),
+        ] {
+            assert!(
+                !source.contains("record_knowledge_write()"),
+                "{name} reads or maintains knowledge without adding any, so it \
+                 must not stamp the freshness clock — a read that refreshes it \
+                 makes a service that stopped learning look freshly fed"
+            );
+        }
 
+        // The transport adapter is where this used to live, and it is the
+        // tempting place to put it back: a call that arrived and failed is
+        // traffic, not knowledge. Scoped to the block itself, because this file
+        // also names the recorder — in its definition and in the test above.
+        let operation_metrics = include_str!("observability.rs")
+            .split("impl OperationMetrics")
+            .nth(1)
+            .unwrap_or_default()
+            .split("impl Drop for OperationMetrics")
+            .next()
+            .unwrap_or_default();
         assert!(
-            after.is_some(),
-            "the capture before it must have left a stamp to compare against, \
-             or this test cannot tell a recall that preserved it from one that \
-             had none to preserve: {exposition}"
-        );
-        assert_eq!(
-            after, before,
-            "assembling context read the knowledge and changed nothing, so the \
-             freshness stamp must be identical across it; a recall that stamps \
-             makes an idle service look freshly fed: {exposition}"
+            !operation_metrics.contains("record_knowledge_write()"),
+            "the freshness stamp belongs to the write that landed, not to the \
+             MCP call that asked for it: a capture that arrives and fails would \
+             otherwise keep the clock fresh"
         );
     }
 
@@ -989,11 +1010,20 @@ pub(crate) mod tests {
         // A family reaches the exposition only once something has recorded into
         // it, so each is emitted above; a description for a family no series
         // exists for would be invisible to a scrape anyway.
+        // `METRIC_BUILD_INFO` belongs here because the recorder install above
+        // stamps it, so this exposition does carry it. The sign-in counter and
+        // the freshness stamp are deliberately absent: a family reaches the
+        // exposition only once something records into it, and neither a store
+        // write nor an OIDC callback happens here. Each has a test that drives
+        // its own path — `a_completed_sign_in_is_counted_for_the_exporter` and
+        // `a_recorded_write_stamps_the_knowledge_clock` — and a family checked
+        // in a test that cannot produce it would only be a test of the list.
         for family in [
             METRIC_OPERATIONS_TOTAL,
             METRIC_OPERATION_DURATION_SECONDS,
             METRIC_OPERATION_RESULTS_TOTAL,
             METRIC_OPERATION_STOCK,
+            METRIC_BUILD_INFO,
         ] {
             assert!(
                 exposition.contains(&format!("# HELP {family} ")),
@@ -1013,11 +1043,11 @@ pub(crate) mod tests {
     /// What this covers is narrow, and the width matters: the shared handle
     /// stamps the build itself when it installs the recorder, so this proves
     /// that *a* recorder install stamps — not that both composition roots
-    /// remember to call [`record_build_info`]. A path that installed the
-    /// recorder and skipped the stamp would still fail this assertion's
-    /// sibling, `every_exported_family_carries_a_description`, but not this
-    /// one; keeping the two claims apart is why the wording does not claim
-    /// more than it reads.
+    /// remember to call [`record_build_info`]. That half is asserted where the
+    /// risk lives, in the HTTP composition root's own source-scan test
+    /// (`http::metrics::tests::the_recorder_installs_from_the_composition_root`),
+    /// which checks `install_recorder` next to the stamp. Keeping the two claims
+    /// apart is why this wording does not claim more than it reads.
     #[tokio::test]
     #[cfg(feature = "prometheus")]
     async fn the_exposition_identifies_the_build_it_came_from() {

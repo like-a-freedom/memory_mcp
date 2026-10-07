@@ -8,9 +8,10 @@
 #   vmagent -promscrape.config=observability/vmagent/vmagent.yml \
 #           -remoteWrite.url=http://victoriametrics:8428/api/v1/write
 #
-# or use the compose file beside this one for a local stack. vmagent reads only
-# `global` and `scrape_configs` from this file — every other Prometheus section
-# is ignored, remote write included.
+# or use the compose file beside this one for a local stack, which mounts this
+# file from the repository root (`VMAGENT_CONFIG` names it when the collector is
+# started on its own). vmagent reads only `global` and `scrape_configs` from
+# this file — every other Prometheus section is ignored, remote write included.
 
 global:
   # Fifteen seconds, and the reason is the exporter's: every duration family is

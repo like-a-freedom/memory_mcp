@@ -1,6 +1,6 @@
 # Observability
 
-Two Grafana dashboards, forty recording rules and eighteen alerts over the
+Two Grafana dashboards, forty-two recording rules and eighteen alerts over the
 metrics the `streamable-http` profile exports on `/metrics`, plus the scrape
 configuration that gets those metrics to a collector in the first place.
 
@@ -12,7 +12,7 @@ rather than keeping its own copy.
 
 ```
 observability/
-├── recording_rules.yml     40 rules in 10 groups
+├── recording_rules.yml     42 rules in 11 groups
 ├── alerts.yml              18 alerts in 7 groups
 ├── prometheus.yml          scrape + rule_files, for Prometheus
 ├── vmagent/
@@ -45,6 +45,20 @@ docker compose -f docker-compose.yml -f observability/vmagent/compose.yml up -d
 Both files on one compose project share a network, so the target in
 `vmagent.yml` — `memory_mcp:8080`, the service name — resolves. Grafana reads
 the result as a Prometheus-type data source at `http://localhost:8428`.
+
+To run the collector stack on its own, against a service on the host, the
+compose project directory becomes the collector file's own directory and the
+config path has to be named relative to it:
+
+```
+VMAGENT_CONFIG=./vmagent.yml docker compose -f observability/vmagent/compose.yml up -d
+```
+
+Compose resolves a relative bind source against the *project* directory, which
+is the directory of the first `-f` file — not the directory of the file the
+mount is written in. That is why the mount takes the path as a variable: the
+short `- src:dst:ro` form splits on `:` before interpolation runs and compose
+then reads the variable as a volume *name* and refuses to start.
 
 **Prometheus alone** (one host, one process):
 
@@ -389,5 +403,7 @@ what lets a bounded context say what a measurement means without acquiring
 infrastructure, per ADR-0058.
 
 That file is the reference to read when a number on a dashboard is not what you
-expected. Each of the twenty-eight families carries a `# HELP` line naming the
-trap it has, and they render in `/metrics`.
+expected. Every family in its `DESCRIPTIONS` list — twenty-eight of them —
+carries a `# HELP` line naming the trap it has, and they render in `/metrics`.
+(The checkers count twenty-nine names, because they also pick up a test's own
+string; the difference is that string, not a family.)

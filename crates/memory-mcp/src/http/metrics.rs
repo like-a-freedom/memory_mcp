@@ -143,6 +143,15 @@ mod tests {
             "a failure to install must be a startup error, not a silently \
              absent handle"
         );
+        // The build stamp rides on the same install, so a path that installs a
+        // recorder and forgets it leaves every dashboard readable and every
+        // incident review unable to say which release produced the numbers.
+        assert!(
+            include_str!("metrics.rs").contains("record_build_info()"),
+            "the HTTP composition root must stamp the build as it installs the \
+             recorder, or an incident review cannot tell which version a \
+             dashboard came from"
+        );
     }
 
     /// The handler answers from the handle rather than from its own default.

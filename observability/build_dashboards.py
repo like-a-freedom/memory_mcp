@@ -950,9 +950,12 @@ def product() -> dict:
             "lie about a service that never learned anything.\n\n"
             "Above an hour it is yellow and above a day red, which are the "
             "colours an on-call engineer reads as *stale*, not thresholds an "
-            "alert enforces: `KnowledgeStale` additionally requires capture "
-            "traffic in the last two hours, so a deployment nobody is using "
-            "never turns this panel's colour into a page.",
+            "alert enforces — and the alert's own threshold is six hours, so a "
+            "panel sitting amber at seven is not a contradiction, it is the gap "
+            "between noticing and paging. `KnowledgeStale` additionally "
+            "requires capture traffic in the last two hours, from MCP calls or "
+            "the inbox watcher, so a deployment nobody is using never turns "
+            "this panel's colour into a ticket.",
             thresholds=[
                 {"color": "green", "value": None},
                 {"color": "yellow", "value": 3600},
@@ -984,10 +987,13 @@ def product() -> dict:
             "service learned yesterday or learned nothing at all — so a memory "
             "system that stopped learning a week ago has every symptom of one "
             "that stopped learning an hour ago.\n\n"
-            "The stamp is written by the capture path only, which is what "
-            "makes it trustworthy: a recall reads knowledge and changes "
-            "nothing, so a busy service nobody writes to ages visibly instead "
-            "of looking permanently fresh.\n\n"
+            "The stamp is written by the two writes that add knowledge — the "
+            "episode store and the extraction — which is what makes it "
+            "trustworthy: a recall reads knowledge and changes nothing, so a "
+            "busy service nobody writes to ages visibly instead of looking "
+            "permanently fresh. Stamping it at the MCP tool instead would leave "
+            "it absent on any deployment whose knowledge arrives unattended, "
+            "which is the one deployment whose freshness matters most.\n\n"
             "It is also the signal a *reader* of this dashboard wants before "
             "any of the others: everything below describes a store whose "
             "freshness is the assumption they are all making.",
@@ -1098,14 +1104,21 @@ def product() -> dict:
             "Recall against capture",
             [
                 target("memory:lifecycle:recall:rate15m_total", "recall"),
-                target("memory:lifecycle:capture:rate15m_total", "capture"),
+                target("memory:lifecycle:capture:rate15m_total", "capture (asked for)"),
+                target("memory:lifecycle:inbox_capture:rate15m_total", "capture (inbox)"),
             ],
             (9, 8, 9, 8),
             "Both sides of the loop on one scale, with nothing left to the "
             "reader but the comparison.\n\n"
-            "Both are rates over the same window, so this compares *shape*, "
-            "not size: a deployment ten times busier than another is not "
-            "better at recalling, it is just bigger. Lines that cross are "
+            "**Two capture lines, because capture has two doors.** `capture "
+            "(asked for)` is MCP `ingest` and `extract` calls; `capture "
+            "(inbox)` is episodes the filesystem watcher carried in without "
+            "anyone asking. A deployment that only uses the watcher reads a "
+            "flat capture (asked for) at zero and a live capture (inbox) — "
+            "which is a working deployment, not an idle one.\n\n"
+            "All three are rates over the same window, so this compares "
+            "*shape*, not size: a deployment ten times busier than another is "
+            "not better at recalling, it is just bigger. Lines that cross are "
             "normal — recall bursts when an agent asks, capture arrives in "
             "batches. Lines that never cross are not.",
             unit="ops",
@@ -1123,6 +1136,11 @@ def product() -> dict:
             "above once it has context worth reusing. A very large number "
             "means recall with almost no capture: what is stored is being used "
             "and nothing is coming in to replace it.\n\n"
+            "**Capture here is what callers asked for** — MCP ingest and "
+            "extract. Inbox capture is a separate line on the panel above, so a "
+            "watcher-fed deployment reads *No data* here rather than a ratio "
+            "built on a denominator that does not exist. Zero with no recall is "
+            "the write-only archive, shown rather than hidden behind a gap.\n\n"
             "Read it as a shape, never as a target. It is a rate over a recent "
             "window, so a quiet half hour and a busy one differ by an order of "
             "magnitude on the same day.",
@@ -1177,9 +1195,13 @@ def product() -> dict:
             "for more input and returning less per episode — more volume "
             "hiding worse understanding, which is invisible in the totals and "
             "obvious here.\n\n"
-            "A day with fewer than one episode reads as no yield rather than a "
-            "ratio of a fraction of an episode: the denominator is floored at "
-            "one, so the number is honest about being thin.",
+            "A day with fewer than one ingested episode reads as no yield "
+            "rather than a ratio of a fraction of an episode: the denominator "
+            "is floored at one, so the number is honest about being thin.\n\n"
+            "**Re-extracting an episode inflates it**: the denominator counts "
+            "episodes as they were *ingested*, so extracting the same episode "
+            "twice raises this without a second episode ever arriving. Read it "
+            "as yield per ingested episode, which is what it is.",
             decimals=2,
         ),
         stat(
@@ -1271,14 +1293,16 @@ def product() -> dict:
             [target("memory:auth_signins:rate15m", "sign-ins")],
             (0, 8, 8, 8),
             "Sign-ins that completed and issued a session.\n\n"
-            "The other half of the refusal panel beside it, and the only "
-            "'are people arriving' this metrics surface can honestly answer. "
-            "**It counts arrivals and nothing about who they are**: no "
-            "account, no subject, no tenant label, because a metric carrying an "
-            "identifier is a disclosure rather than a measurement.\n\n"
-            "So a first sign-up and a returning user are the same number "
-            "here, and activation and retention are not on this dashboard at "
-            "all. That is a deliberate limit, not an oversight — see "
+            "The other half of the refusal panel beside it: sign-ins through "
+            "the OIDC browser flow that completed and issued a session. "
+            "**It counts arrivals and nothing about who they are** — no "
+            "account, no subject, no tenant label, because a metric carrying "
+            "an identifier is a disclosure rather than a measurement.\n\n"
+            "Two honest limits, both deliberate. A first sign-up and a "
+            "returning user are the same number, so activation and retention "
+            "are not on this dashboard at all. And the local-admin sign-in "
+            "path mints the same session cookie without being counted here, so "
+            "this is the OIDC flow's arrivals, not the deployment's. See "
             "*Reference*.",
             unit="ops",
             legend_calcs=["mean", "max"],
@@ -1347,10 +1371,12 @@ def product() -> dict:
                 "**rates over a recent window**, so a quiet half hour and a "
                 "busy one differ by an order of magnitude on the same day. "
                 "They are shapes to read, not numbers to hold.\n"
-                "5. *Access and automation* counts **arrivals and refusals, "
-                "never people**. A first sign-up and a returning user are the "
-                "same number, and there is no label that could tell them apart "
-                "without turning a traffic measure into a disclosure.\n\n"
+                "5. *Access and automation* counts **arrivals and refusals "
+                "through the OIDC flow, never people**. A first sign-up and a "
+                "returning user are the same number, there is no label that "
+                "could tell them apart without turning a traffic measure into "
+                "a disclosure, and the local-admin path is not counted at "
+                "all.\n\n"
                 "**Known gaps, deliberately:**\n\n"
                 "- No per-tenant breakdown. A tenant label would be unbounded in "
                 "cardinality; the tenant fingerprint is in the logs instead, "
@@ -1360,9 +1386,11 @@ def product() -> dict:
                 "position is that a metric carrying one is a disclosure. "
                 "Operations are counted instead: *Context delivered* is the "
                 "closest honest stand-in, and it is a stand-in.\n"
-                "- No token or cost-per-query figure. The models' usage is the "
-                "caller's to measure; this service never sees the tokens it "
-                "hands back, so a number here would be invented.\n"
+                "- No token or cost-per-query figure. The tokens this service "
+                "hands *back* are the caller's to measure — it never sees the "
+                "model's bill for them, and what extraction spends internally "
+                "belongs to the evaluation harness rather than to a product "
+                "dashboard. A number here would be invented.\n"
                 "- No retrieval-quality figure. Whether recall found the *right* "
                 "facts needs a judged query set, which is what "
                 "`crates/eval-harness` is for. A counter cannot answer it and "

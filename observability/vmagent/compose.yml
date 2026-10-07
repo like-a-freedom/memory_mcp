@@ -7,9 +7,14 @@
 #   # vmagent.yml is the service name, which only resolves there):
 #   docker compose -f docker-compose.yml -f observability/vmagent/compose.yml up -d
 #
-#   # this stack alone, against a service running on the host: change the
-#   # target in vmagent.yml to localhost:8080 first
-#   docker compose -f observability/vmagent/compose.yml up -d
+#   # this stack alone, against a service running on the host — point the
+#   # config at this directory, because the project directory is then the file's
+#   # own:
+#   VMAGENT_CONFIG=./vmagent.yml docker compose -f observability/vmagent/compose.yml up -d
+#
+# In both cases the target in vmagent.yml has to match where the service
+# actually is: `memory_mcp:8080` on the shared network, `localhost:8080` for a
+# service on the host, `host.docker.internal:8080` for a container reaching it.
 #
 # Grafana reads the result as a Prometheus-type data source at
 # http://localhost:8428 (from the host) or http://victoriametrics:8428 (from
@@ -49,8 +54,23 @@ services:
       # separate question from the target's, and `up` only answers the second.
       - --httpListenAddr=:8429
     volumes:
-      - ./vmagent.yml:/etc/vmagent/vmagent.yml:ro
-      - vmagentdata:/vmagent-remotewrite
+      # Long syntax, not short: the short form is split on `:` before
+      # interpolation runs, so a `${VAR:-path}` in the source position is
+      # parsed as a volume *name* and the stack refuses to start with
+      # "refers to undefined volume". Verified against compose 2.x, both
+      # invocations.
+      #
+      # The default is written for the combined invocation, where the project
+      # directory is the repository root — a relative bind source resolves
+      # against that directory, not against this file's own. Starting this file
+      # on its own therefore needs the override the header documents.
+      - type: bind
+        source: ${VMAGENT_CONFIG:-observability/vmagent/vmagent.yml}
+        target: /etc/vmagent/vmagent.yml
+        read_only: true
+      - type: volume
+        source: vmagentdata
+        target: /vmagent-remotewrite
     ports:
       - "8429:8429"
 

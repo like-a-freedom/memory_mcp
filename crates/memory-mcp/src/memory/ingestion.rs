@@ -194,22 +194,46 @@ impl IngestionService {
                 payload.insert("source_lineage".to_string(), json!(trimmed.to_string()));
             }
             let content = Value::Object(payload);
+            // Whether this call actually wrote. A duplicate is not new
+            // knowledge — including one the outbox reports as a swallowed
+            // duplicate error — and a freshness clock refreshed by a re-ingest
+            // of an unchanged source is exactly the "idle looks fed" failure
+            // the clock exists to catch.
             #[cfg(feature = "streamable-http")]
-            if self.outbox_enabled {
+            let wrote = if self.outbox_enabled {
                 match self
                     .episode_store
                     .create_with_event(&episode_id, content, "ui://memory/apps/ingestion_review")
                     .await
                 {
-                    Ok(()) => {}
-                    Err(error) if is_duplicate_episode_error(&error) => {}
+                    Ok(()) => true,
+                    Err(error) if is_duplicate_episode_error(&error) => false,
                     Err(error) => return Err(error),
                 }
             } else {
                 self.episode_store.create(&episode_id, content).await?;
-            }
+                true
+            };
             #[cfg(not(feature = "streamable-http"))]
-            self.episode_store.create(&episode_id, content).await?;
+            let wrote = {
+                self.episode_store.create(&episode_id, content).await?;
+                true
+            };
+
+            // The knowledge clock, stamped by the write that just landed and by
+            // nothing above it.
+            //
+            // It belongs here rather than in the MCP tool adapter because this
+            // is the one place every capture path passes through: the `ingest`
+            // tool, the lifecycle hooks, agent-memory capture and the
+            // filesystem watcher (`ingest_with_metadata`) all store their
+            // episode through this function. Stamped at the transport, the
+            // gauge would read absent for a deployment whose knowledge arrives
+            // unattended — precisely the one whose freshness nothing else would
+            // be able to check.
+            if wrote {
+                crate::observability::record_knowledge_write();
+            }
         } else {
             self.logger.log(
                 log_event(

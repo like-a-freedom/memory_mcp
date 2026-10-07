@@ -761,8 +761,10 @@ async fn issue_session(
 
     // After the store accepted it, so the counter answers "how many people
     // got in" rather than "how many flows finished authenticating". No labels
-    // here on purpose: see `METRIC_AUTH_SIGNINS_TOTAL`.
-    #[cfg(feature = "prometheus")]
+    // here on purpose: see `METRIC_AUTH_SIGNINS_TOTAL`, which is also why this
+    // call is unconditional within this module: the recorder is a no-op
+    // without the `prometheus` feature, and a cfg on the call site would leave
+    // it uncalled in exactly the builds a reader is least likely to notice.
     crate::observability::record_signin_success();
 
     let cookie = crate::control::session::build_session_cookie(cookie_value, &state.config);

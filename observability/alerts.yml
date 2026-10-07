@@ -267,25 +267,39 @@ groups:
   - name: memory-lifecycle
     interval: 30s
     rules:
-      # Capture attempts that never became knowledge.
+      # Capture that never became knowledge.
       #
       # Both halves matter, and the first is what makes this a product signal
       # rather than a restatement of `NoIngestActivity`. That rule asks whether
-      # anyone is calling ingest at all; this one asks whether the calls that
-      # are arriving are *landing*, which is the failure ingest errors cannot
+      # anyone is calling ingest at all; this one asks whether the capture that
+      # is arriving is *landing*, which is the failure ingest errors cannot
       # report — a door with nothing behind it counts as traffic. So the left
       # side is the traffic and the right side is the absence of learning, and a
       # deployment nobody is using fails the first and stays silent, which is
       # correct: an idle service is not a broken one.
       #
-      # The stamp is absent until the first successful capture, so a service
-      # that has never learned anything produces no age and no alert here.
-      # That case is `NoIngestActivity`'s, and it is a louder one.
+      # The traffic side counts both ways knowledge can arrive: MCP ingest and
+      # extract calls, and watcher revisions that were stored. Without the
+      # second half this alert is silently inert on a deployment whose knowledge
+      # arrives from the inbox — the profile with the least supervision and the
+      # most to lose from a capture loop that stopped.
+      #
+      # The stamp is absent until the first write, so a service that has never
+      # learned anything produces no age and no alert here. That case is
+      # `NoIngestActivity`'s, and it is a louder one.
       - alert: KnowledgeStale
         expr: |
           (
-            sum(rate(memory_operation_calls_total{operation=~"ingest|extract"}[2h])) > 0
-          )
+            (
+              sum(rate(memory_operation_calls_total{operation=~"ingest|extract"}[2h]))
+              or vector(0)
+            )
+            +
+            (
+              sum(rate(memory_fs_watch_revisions_total{outcome="processed"}[2h]))
+              or vector(0)
+            )
+          ) > 0
           and on()
           (
             memory:knowledge:age_seconds > 21600
@@ -315,7 +329,9 @@ groups:
       #
       # The recall set is the same three operations the lifecycle recording
       # rules and the product dashboard count, so a deployment whose only recall
-      # is `resolve` or `explain` is not a write-only archive. It is written
+      # is `resolve` or `explain` is not a write-only archive. The left side
+      # counts both ways knowledge arrives, MCP calls and stored watcher
+      # revisions, so an inbox-fed archive is recognised as one. It is written
       # against the raw counters rather than the `…:rate15m_total` rules
       # because the windows here are a week and a day, and borrowing a
       # fifteen-minute rate to answer a week-long question would answer a
@@ -329,8 +345,16 @@ groups:
       - alert: WriteOnlyArchive
         expr: |
           (
-            sum(rate(memory_operation_calls_total{operation=~"ingest|extract"}[7d])) > 0
-          )
+            (
+              sum(rate(memory_operation_calls_total{operation=~"ingest|extract"}[7d]))
+              or vector(0)
+            )
+            +
+            (
+              sum(rate(memory_fs_watch_revisions_total{outcome="processed"}[7d]))
+              or vector(0)
+            )
+          ) > 0
           unless on()
           (
             sum(

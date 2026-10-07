@@ -369,6 +369,14 @@ groups:
   # in neither: they neither grow the knowledge nor serve a caller. Splitting
   # by name alone would put a decay pass next to a capture and call the sum
   # "traffic".
+  #
+  # The catch is that the operation counters are counted at the MCP adapter, so
+  # a deployment whose knowledge arrives unattended — the filesystem watcher
+  # storing episodes through the ingestion service without an MCP call — moves
+  # the knowledge without moving anything below. That is what the inbox rules
+  # are for: they are the other half of "capture", kept as a separate series
+  # rather than folded in, because a summed capture cannot be read back to the
+  # path that produced it.
   - name: memory-lifecycle
     interval: 30s
     rules:
@@ -387,9 +395,8 @@ groups:
             rate(memory_operation_calls_total{operation=~"assemble_context|explain|resolve"}[15m])
           )
 
-      # Capture, per second: knowledge entering the store, whatever the source.
-      # Includes the filesystem watcher, which reaches the store through the
-      # same ingest operation, so an unattended deployment counts here too.
+      # Capture through MCP, per second: knowledge entering the store because a
+      # caller asked for it.
       - record: memory:lifecycle:capture:rate15m
         expr: |
           sum by (operation) (
@@ -402,23 +409,46 @@ groups:
             rate(memory_operation_calls_total{operation=~"ingest|extract"}[15m])
           )
 
+      # Capture that nobody asked for: episodes the filesystem watcher carried
+      # in from the inbox, by what happened to each revision.
+      #
+      # `processed` is the outcome that means the episode was stored, so it is
+      # the one comparable with the MCP capture above. `failed` beside it is the
+      # whole reason this series is here: a watcher that keeps failing produces
+      # capture traffic that never becomes knowledge, which is invisible in the
+      # operation counters because no operation runs.
+      - record: memory:lifecycle:inbox_capture:rate15m
+        expr: |
+          sum by (outcome) (
+            rate(memory_fs_watch_revisions_total[15m])
+          )
+
+      - record: memory:lifecycle:inbox_capture:rate15m_total
+        expr: |
+          sum(rate(memory_fs_watch_revisions_total{outcome="processed"}[15m]))
+
       # Recalls per capture — the shape of the loop, not its size.
       #
       # Both sides are rates, so a deployment ten times busier than another does
       # not read as ten times better at recalling.
       #
-      # Absence is read rather than dropped, because the case that matters most
-      # is the one with no recall at all: a deployment whose only traffic is
-      # capture. `recall or capture * 0` puts the zero there explicitly, so the
-      # panel shows `0` — a write-only archive, visible — instead of *No data*,
-      # which would read as "not measured" for the one state the panel exists
-      # to show. A deployment with neither side stays absent, which is honest:
-      # there is no loop to describe.
+      # Capture here is the MCP figure. Unattended inbox capture is a separate
+      # series on purpose, so a watcher-only deployment — where recall happens
+      # and no MCP capture series exists at all — reads *No data* rather than
+      # a number built on a denominator that does not exist. That is the honest
+      # reading of "this ratio is about what people asked for".
       #
-      # The floor on the denominator is what keeps capture that almost stopped
-      # from reading as infinitely good at recalling: a genuine "all recall, no
-      # capture" is large, which is the truth — what is stored is being used and
-      # nothing is coming in to replace it.
+      # Absence is read rather than dropped on the numerator, because the case
+      # that matters most is a deployment whose only traffic is capture:
+      # `recall or capture * 0` puts the zero there explicitly, so the panel
+      # shows `0` — a write-only archive, visible — instead of *No data*, which
+      # would read as "not measured" for the one state the panel exists to
+      # show. A deployment with neither side stays absent.
+      #
+      # The floor on the denominator, with the same `or vector(0)` treatment, is
+      # what keeps a capture that almost stopped from erasing the ratio: recall
+      # against no capture is large, which is the truth — what is stored is
+      # being used and nothing is coming in to replace it.
       - record: memory:lifecycle:recalls_per_capture15m
         expr: |
           (
@@ -427,17 +457,18 @@ groups:
             (memory:lifecycle:capture:rate15m_total * 0)
           )
           /
-          clamp_min(memory:lifecycle:capture:rate15m_total, 0.000001)
+          clamp_min(memory:lifecycle:capture:rate15m_total or vector(0), 0.000001)
 
       # How old the newest knowledge is, in seconds.
       #
-      # Derived here rather than in each panel because `time()` has to be read
-      # against the stamp, and a panel computing it once per pixel would draw a
-      # staircase — the age advancing one evaluation interval per refresh
-      # instead of continuously. The stamp itself is absent until the first
-      # capture, so this series is absent too: a deployment that has never
-      # learned anything has no age to report, and zero would claim it learned
-      # something at the epoch.
+      # Derived here rather than in each panel because `time()` is read against
+      # the stamp, and one evaluation per interval is cheaper than one per panel
+      # refresh. The cost of that choice is a staircase rather than a smooth
+      # ramp — the rule is evaluated every 30 s, so the age moves in 30-second
+      # steps — which the panel beside it says out loud. The stamp itself is
+      # absent until the first write, so this series is absent too: a
+      # deployment that has never learned anything has no age to report, and
+      # zero would claim it learned something at the epoch.
       - record: memory:knowledge:age_seconds
         expr: |
           time() - max(memory_knowledge_last_write_timestamp_seconds)
@@ -454,8 +485,15 @@ groups:
       # denominator from `ingest`, because that is literally "what an episode
       # yielded once it was extracted".
       #
-      # `clamp_min` on the denominator reads a day with fewer than one episode
-      # as no yield rather than dividing by a fraction of an episode.
+      # **Re-extraction inflates this.** `extract` accepts an episode that is
+      # already stored, so extracting the same episode N times raises the
+      # numerator while the ingested-episode denominator stays where it was.
+      # There is no extract-scoped episode count to divide by — nothing records
+      # one, and inventing a metric for it would be worse than documenting the
+      # skew. Read this as yield per *ingested* episode, which is what it is.
+      #
+      # `clamp_min` on the denominator reads a day with fewer than one ingested
+      # episode as no yield rather than dividing by a fraction of an episode.
       - record: memory:operation_results:facts_per_episode1d
         expr: |
           clamp_min(
@@ -470,7 +508,8 @@ groups:
 
       # Links per entity, over a day. The other half of yield: facts say what
       # was found, links say whether it was connected to anything. Scoped to
-      # extraction on both sides, for the reason above.
+      # extraction on both sides, for the reason above, and subject to the same
+      # re-extraction skew.
       - record: memory:operation_results:links_per_entity1d
         expr: |
           clamp_min(
