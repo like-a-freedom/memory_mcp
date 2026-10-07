@@ -85,42 +85,45 @@ def check_ref_ids(path: pathlib.Path, panel: dict, failures: list[str]) -> None:
 
 
 def check_layout(path: pathlib.Path, document: dict, failures: list[str]) -> None:
-    """Panels must not overlap, and rows must be stacked.
+    """Rows and their panels must fit the dashboard's shared grid.
 
-    Grafana attributes a panel to a row by *grid position*, not by the JSON
-    nesting, and it sorts the top level by `(y, x)`. So an expanded row whose
-    panels all carry `y: 0` — which is what the generator produced before this
-    check existed — imports cleanly and renders as thirty panels stacked on one
-    grid cell. Nothing in Grafana reports it.
-
-    Collapsed rows avoid the whole problem: the row takes one grid line and its
-    panels are drawn from the row's own list. That is what is asserted here.
+    Collapsed rows own a local grid and take one top-level grid line. An
+    expanded row's children use absolute dashboard coordinates, so the next
+    row starts after the last child rather than one line after the header.
+    Only the first row may be expanded; this keeps the overview visible while
+    preserving the existing collapsed-section behavior below it.
     """
     top = document["panels"]
     non_rows = [panel for panel in top if panel["type"] != "row"]
     if non_rows:
         failures.append(
             f"{path.name}: {len(non_rows)} panel(s) sit at the top level rather "
-            f"than inside a row; Grafana sorts by gridPos, so an expanded row's "
-            f"panels have to be positioned below it and the generator would "
-            f"have to track a running y — use a collapsed row instead"
+            f"than inside a row; keep panels grouped by their row"
+        )
+    if path.name == "product.json" and (
+        not top or top[0]["type"] != "row" or top[0].get("collapsed", True)
+    ):
+        failures.append(
+            "product.json: the first overview row must be expanded so the "
+            "product summary is visible when the dashboard opens"
         )
 
     positions: list[tuple[int, int]] = []
+    next_y = 0
     for index, panel in enumerate(top):
         if panel["type"] != "row":
             continue
         grid = panel["gridPos"]
-        if not panel.get("collapsed"):
+        collapsed = panel.get("collapsed", True)
+        if not collapsed and index != 0:
             failures.append(
-                f"{path.name} / {panel['title']}: row is not collapsed, so its "
-                f"panels are positioned on the shared grid where they can "
-                f"collide with the next row's"
+                f"{path.name} / {panel['title']}: only the first overview row "
+                f"may be expanded"
             )
-        if grid["y"] != index:
+        if grid["y"] != next_y:
             failures.append(
-                f"{path.name} / {panel['title']}: row y={grid['y']} at position "
-                f"{index}; rows must be one grid line apart in document order"
+                f"{path.name} / {panel['title']}: row y={grid['y']}; expected "
+                f"y={next_y} after the preceding row's occupied grid"
             )
         if grid["x"] + grid["w"] > 24:
             failures.append(
@@ -128,43 +131,59 @@ def check_layout(path: pathlib.Path, document: dict, failures: list[str]) -> Non
                 f"exceeds the 24-column grid"
             )
         positions.append((grid["y"], grid["x"]))
-        check_row_contents(path, panel, failures)
+        expanded = not collapsed
+        check_row_contents(path, panel, failures, expanded=expanded)
+
+        row_bottom = grid["y"] + grid["h"]
+        if expanded:
+            child_bottoms = [
+                child["gridPos"]["y"] + child["gridPos"]["h"]
+                for child in panel.get("panels", [])
+                if child["type"] != "row"
+            ]
+            next_y = max([row_bottom, *child_bottoms])
+        else:
+            next_y = row_bottom
 
     if positions != sorted(positions):
         failures.append(f"{path.name}: rows are not in ascending y order")
 
 
-def check_row_contents(path: pathlib.Path, row: dict, failures: list[str]) -> None:
-    """No two children of a row may share a cell, and a nested row is a row.
+def check_row_contents(
+    path: pathlib.Path,
+    row: dict,
+    failures: list[str],
+    *,
+    expanded: bool = False,
+) -> None:
+    """Check row children for bounds and collisions.
 
-    Grafana allows a row inside a row. The first version of this check treated
-    a nested row as a panel, so its children were never visited at all: a
-    layout with two overlapping panels inside a nested row reported nothing,
-    and a row pushed off the right edge of the grid reported nothing. Both are
-    silent — an unchecked layout is one nobody can trust.
-
-    Children must also sit on **one** grid band. A collapsed row whose children
-    span two bands is rendered by Grafana as a diagonal staircase — the
-    children come out in x order, one per line, and the declared second line is
-    lost — while a single-band row lays out correctly at any depth. Verified
-    against Grafana 13.2.3: a two-band row at row y=0 looked fine, the same
-    content at row y=9 did not, so a layout that only appears correct at the
-    top of a dashboard is not correct.
+    Collapsed rows use a local coordinate space and must stay on one band;
+    Grafana renders a multi-band collapsed row as a diagonal staircase. The
+    expanded overview uses the shared dashboard grid and may have multiple
+    bands, but its children must start below the row header. In either mode,
+    nested rows and panel cells are still checked recursively.
     """
     children = [child for child in row.get("panels", []) if child["type"] != "row"]
     bands = sorted({child["gridPos"]["y"] for child in children})
-    if len(bands) > 1:
+    if not expanded and len(bands) > 1:
         failures.append(
             f"{path.name} / {row['title']}: children sit on {len(bands)} grid "
-            f"bands (y={bands}); Grafana renders a multi-band row as a diagonal "
-            f"staircase — give the row a single band, or split it into one row "
-            f"per band"
+            f"bands (y={bands}); Grafana renders a multi-band collapsed row as "
+            f"a diagonal staircase — give the row a single band, or split it "
+            f"into one row per band"
         )
 
+    row_bottom = row["gridPos"]["y"] + row["gridPos"]["h"]
     occupied: dict[tuple[int, int], str] = {}
     for child in row.get("panels", []):
         child_grid = child["gridPos"]
         if child["type"] == "row":
+            if expanded:
+                failures.append(
+                    f"{path.name} / {row['title']}: expanded rows cannot contain "
+                    f"nested rows"
+                )
             check_row_contents(path, child, failures)
             continue
         if child_grid["x"] + child_grid["w"] > 24:
@@ -173,9 +192,15 @@ def check_row_contents(path: pathlib.Path, row: dict, failures: list[str]) -> No
                 f"x+w={child_grid['x'] + child_grid['w']} exceeds the "
                 f"24-column grid"
             )
-        # A cell is (row, column) within the section: a collapsed row is
-        # drawn in its own coordinate space, so two panels collide only if they
-        # share a row *and* a column.
+        if expanded and child_grid["y"] < row_bottom:
+            failures.append(
+                f"{path.name} / {row['title']} / {child['title']}: y="
+                f"{child_grid['y']} overlaps the expanded row header ending "
+                f"at y={row_bottom}"
+            )
+        # Expanded children use absolute dashboard coordinates; collapsed-row
+        # children use the row's local coordinate space. In both cases a cell is
+        # occupied by one panel at most.
         for row_offset in range(child_grid["h"]):
             for column in range(child_grid["x"], child_grid["x"] + child_grid["w"]):
                 cell = (child_grid["y"] + row_offset, column)
@@ -357,8 +382,8 @@ def main() -> int:
     if failures:
         return 1
     print(
-        "  every panel reads a series that exists, nothing overlaps, every "
-        "row is one band, and every query has its own RefId"
+        "  every panel reads a series that exists, rows fit the dashboard grid, "
+        "collapsed rows use one band, and every query has its own RefId"
     )
     return 0
 

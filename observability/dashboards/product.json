@@ -21,7 +21,7 @@
   ],
   "panels": [
     {
-      "collapsed": true,
+      "collapsed": false,
       "gridPos": {
         "h": 1,
         "w": 24,
@@ -58,9 +58,9 @@
           },
           "gridPos": {
             "h": 5,
-            "w": 4,
+            "w": 6,
             "x": 0,
-            "y": 0
+            "y": 1
           },
           "id": 0,
           "options": {
@@ -122,9 +122,9 @@
           },
           "gridPos": {
             "h": 5,
-            "w": 4,
-            "x": 4,
-            "y": 0
+            "w": 6,
+            "x": 6,
+            "y": 1
           },
           "id": 0,
           "options": {
@@ -186,9 +186,9 @@
           },
           "gridPos": {
             "h": 5,
-            "w": 4,
-            "x": 8,
-            "y": 0
+            "w": 6,
+            "x": 12,
+            "y": 1
           },
           "id": 0,
           "options": {
@@ -250,9 +250,9 @@
           },
           "gridPos": {
             "h": 5,
-            "w": 4,
-            "x": 12,
-            "y": 0
+            "w": 6,
+            "x": 18,
+            "y": 1
           },
           "id": 0,
           "options": {
@@ -291,41 +291,88 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "description": "",
+          "description": "The recall half of the loop, by operation: `assemble_context` is context handed to an agent, and with it `resolve` and `explain`, which only mean anything against knowledge that already exists.\n\n**This is the value moment, and for a service reached through MCP it is as close to a north-star figure as these metrics honestly get** \u2014 the calls that delivered something. Compare it against the capture row below: a store that grows while this stays flat is being written to and never read, which is the condition `WriteOnlyArchive` alerts on.",
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "palette-classic"
+              },
+              "custom": {
+                "axisBorderShow": false,
+                "axisCenteredZero": false,
+                "axisLabel": "",
+                "axisPlacement": "auto",
+                "barAlignment": 0,
+                "drawStyle": "line",
+                "fillOpacity": 8,
+                "gradientMode": "none",
+                "hideFrom": {
+                  "legend": false,
+                  "tooltip": false,
+                  "viz": false
+                },
+                "insertNulls": false,
+                "lineInterpolation": "linear",
+                "lineWidth": 1,
+                "pointSize": 5,
+                "scaleDistribution": {
+                  "type": "linear"
+                },
+                "showPoints": "never",
+                "spanNulls": false,
+                "stacking": {
+                  "group": "A",
+                  "mode": "none"
+                },
+                "thresholdsStyle": {
+                  "mode": "off"
+                }
+              },
+              "mappings": [],
+              "min": 0,
+              "unit": "ops"
+            },
+            "overrides": []
+          },
           "gridPos": {
-            "h": 5,
-            "w": 8,
-            "x": 16,
-            "y": 0
+            "h": 8,
+            "w": 16,
+            "x": 0,
+            "y": 6
           },
           "id": 0,
           "options": {
-            "code": {
-              "language": "plaintext",
-              "showLineNumbers": false,
-              "showMiniMap": false
+            "legend": {
+              "calcs": [
+                "mean",
+                "max"
+              ],
+              "displayMode": "table",
+              "placement": "right",
+              "showLegend": true
             },
-            "content": "The four numbers a product owner asks about first, all read as **levels** rather than totals.\n\nThat distinction is the whole reason the stock family exists. These figures used to be added to a counter, which made the metric the sum of every inventory ever read: opening the dashboard grew the number by the size of the store, and its rate reported dashboard traffic rather than growth in the data.\n\nA panel reading a *total* here would show knowledge growing every time someone looked at it.",
-            "mode": "markdown"
+            "tooltip": {
+              "mode": "multi",
+              "sort": "desc"
+            }
           },
           "pluginVersion": "13.2.4",
-          "title": "What this row is for",
-          "type": "text"
-        }
-      ],
-      "title": "What exists",
-      "type": "row"
-    },
-    {
-      "collapsed": true,
-      "gridPos": {
-        "h": 1,
-        "w": 24,
-        "x": 0,
-        "y": 1
-      },
-      "id": 0,
-      "panels": [
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${datasource}"
+              },
+              "editorMode": "code",
+              "expr": "memory:lifecycle:recall:rate15m",
+              "legendFormat": "{{operation}}",
+              "range": true,
+              "refId": "A"
+            }
+          ],
+          "title": "Context delivered, per second",
+          "type": "timeseries"
+        },
         {
           "datasource": {
             "type": "prometheus",
@@ -361,10 +408,10 @@
             "overrides": []
           },
           "gridPos": {
-            "h": 7,
-            "w": 6,
-            "x": 0,
-            "y": 0
+            "h": 8,
+            "w": 8,
+            "x": 16,
+            "y": 6
           },
           "id": 0,
           "options": {
@@ -397,7 +444,21 @@
           ],
           "title": "Knowledge age",
           "type": "stat"
-        },
+        }
+      ],
+      "title": "Overview",
+      "type": "row"
+    },
+    {
+      "collapsed": true,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 14
+      },
+      "id": 0,
+      "panels": [
         {
           "datasource": {
             "type": "prometheus",
@@ -448,8 +509,8 @@
           },
           "gridPos": {
             "h": 7,
-            "w": 10,
-            "x": 6,
+            "w": 16,
+            "x": 0,
             "y": 0
           },
           "id": 0,
@@ -521,7 +582,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 2
+        "y": 15
       },
       "id": 0,
       "panels": [
@@ -648,7 +709,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 3
+        "y": 16
       },
       "id": 0,
       "panels": [
@@ -837,97 +898,10 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 4
+        "y": 17
       },
       "id": 0,
       "panels": [
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "${datasource}"
-          },
-          "description": "The recall half of the loop, by operation: `assemble_context` is context handed to an agent, and with it `resolve` and `explain`, which only mean anything against knowledge that already exists.\n\n**This is the value moment, and for a service reached through MCP it is as close to a north-star figure as these metrics honestly get** \u2014 the calls that delivered something. Compare it against the capture row below: a store that grows while this stays flat is being written to and never read, which is the condition `WriteOnlyArchive` alerts on.",
-          "fieldConfig": {
-            "defaults": {
-              "color": {
-                "mode": "palette-classic"
-              },
-              "custom": {
-                "axisBorderShow": false,
-                "axisCenteredZero": false,
-                "axisLabel": "",
-                "axisPlacement": "auto",
-                "barAlignment": 0,
-                "drawStyle": "line",
-                "fillOpacity": 8,
-                "gradientMode": "none",
-                "hideFrom": {
-                  "legend": false,
-                  "tooltip": false,
-                  "viz": false
-                },
-                "insertNulls": false,
-                "lineInterpolation": "linear",
-                "lineWidth": 1,
-                "pointSize": 5,
-                "scaleDistribution": {
-                  "type": "linear"
-                },
-                "showPoints": "never",
-                "spanNulls": false,
-                "stacking": {
-                  "group": "A",
-                  "mode": "none"
-                },
-                "thresholdsStyle": {
-                  "mode": "off"
-                }
-              },
-              "mappings": [],
-              "min": 0,
-              "unit": "ops"
-            },
-            "overrides": []
-          },
-          "gridPos": {
-            "h": 8,
-            "w": 9,
-            "x": 0,
-            "y": 0
-          },
-          "id": 0,
-          "options": {
-            "legend": {
-              "calcs": [
-                "mean",
-                "max"
-              ],
-              "displayMode": "table",
-              "placement": "right",
-              "showLegend": true
-            },
-            "tooltip": {
-              "mode": "multi",
-              "sort": "desc"
-            }
-          },
-          "pluginVersion": "13.2.4",
-          "targets": [
-            {
-              "datasource": {
-                "type": "prometheus",
-                "uid": "${datasource}"
-              },
-              "editorMode": "code",
-              "expr": "memory:lifecycle:recall:rate15m",
-              "legendFormat": "{{operation}}",
-              "range": true,
-              "refId": "A"
-            }
-          ],
-          "title": "Context delivered, per second",
-          "type": "timeseries"
-        },
         {
           "datasource": {
             "type": "prometheus",
@@ -978,8 +952,8 @@
           },
           "gridPos": {
             "h": 8,
-            "w": 9,
-            "x": 9,
+            "w": 16,
+            "x": 0,
             "y": 0
           },
           "id": 0,
@@ -1073,8 +1047,8 @@
           },
           "gridPos": {
             "h": 8,
-            "w": 6,
-            "x": 18,
+            "w": 8,
+            "x": 16,
             "y": 0
           },
           "id": 0,
@@ -1119,7 +1093,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 5
+        "y": 18
       },
       "id": 0,
       "panels": [
@@ -1305,7 +1279,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 6
+        "y": 19
       },
       "id": 0,
       "panels": [
@@ -1473,7 +1447,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 7
+        "y": 20
       },
       "id": 0,
       "panels": [
@@ -1748,7 +1722,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 8
+        "y": 21
       },
       "id": 0,
       "panels": [
@@ -1936,7 +1910,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 9
+        "y": 22
       },
       "id": 0,
       "panels": [

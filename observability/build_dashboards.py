@@ -108,7 +108,7 @@ def stat(
             },
             "overrides": [],
         },
-        "gridPos": {"h": grid[1], "w": grid[2], "x": grid[0], "y": grid[1] and 0 or 0},
+        "gridPos": {"h": grid[1], "w": grid[2], "x": grid[0], "y": y},
         "id": 0,
         "options": {
             "colorMode": "value",
@@ -220,27 +220,23 @@ def timeseries(
     return panel
 
 
-def row(title: str, panels: list[dict]) -> dict:
-    """A collapsed row owning the panels beneath it.
+def row(
+    title: str,
+    panels: list[dict],
+    *,
+    collapsed: bool = True,
+    y: int = 0,
+) -> dict:
+    """A row owning the panels beneath it.
 
-    Collapsed, and the panels nested. This is the only arrangement that lays out
-    correctly without tracking a running `y` across the whole file:
-
-    - Grafana derives a panel's row from its position on the grid, not from the
-      JSON nesting, so an expanded row's panels have to sit *below* it in
-      `gridPos` — which means every panel's `y` depends on the height of every
-      row before it.
-    - Collapsing removes that dependency: the row occupies one grid line and
-      its panels are drawn from the row's own `panels` list, wherever they are
-      positioned inside it.
-
-    Both files import either way — the JSON is valid either way. The difference
-    is that an expanded arrangement with a stale `y` renders as overlapping
-    panels, which is exactly what happened before this was collapsed.
+    Collapsed rows own a local grid and take one dashboard grid line. An
+    expanded row shares the dashboard grid: its children need absolute `y`
+    positions below the row header, and the next top-level row must start after
+    the last child. `rows()` handles that cursor for following sections.
     """
     return {
-        "collapsed": True,
-        "gridPos": {"h": 1, "w": W_FULL, "x": 0, "y": 0},
+        "collapsed": collapsed,
+        "gridPos": {"h": 1, "w": W_FULL, "x": 0, "y": y},
         "id": 0,
         "panels": panels,
         "title": title,
@@ -248,10 +244,14 @@ def row(title: str, panels: list[dict]) -> dict:
     }
 
 
-def rows(titles: list[tuple[str, list[dict]]]) -> list[dict]:
-    """Stack collapsed rows, each one grid line apart."""
+def rows(
+    titles: list[tuple[str, list[dict]]],
+    *,
+    start_y: int = 0,
+) -> list[dict]:
+    """Stack collapsed rows, each one grid line apart from `start_y`."""
     return [
-        {**row(title, panels), "gridPos": {"h": 1, "w": W_FULL, "x": 0, "y": index}}
+        row(title, panels, y=start_y + index)
         for index, (title, panels) in enumerate(titles)
     ]
 
@@ -1106,96 +1106,87 @@ def product() -> dict:
             "Active facts",
             'max(memory_operation_stock{result="active_facts"})',
             "short",
-            (0, 5, 4, 5),
+            (0, 5, 6, 5),
             "Facts currently in the knowledge graph, as of the last lifecycle "
             "dashboard read.\n\n"
             "**A level, not a total.** Read the value; a rate here would tell "
             "you how often someone opened a dashboard.",
-            decimals= 0,
+            decimals=0,
+            y=1,
         ),
         stat(
             "Communities",
             'max(memory_operation_stock{result="communities"})',
             "short",
-            (4, 5, 4, 5),
+            (6, 5, 6, 5),
             "Detected communities in the knowledge graph. A rising number with a "
             "flat fact count means the graph is fragmenting — more, smaller "
             "clusters — which is worth knowing before it becomes a search "
             "problem.",
-            decimals= 0,
+            decimals=0,
+            y=1,
         ),
         stat(
             "Active relations",
             "memory:claim_relations:active",
             "short",
-            (8, 5, 4, 5),
+            (12, 5, 6, 5),
             "Claim relations currently stored. The structured layer over the "
             "facts on the left.\n\n"
             "**Under-reports by design**: a series exists only after its first "
             "write, so a schema with no relations of some outcome is absent "
             "rather than zero.",
             decimals=0,
+            y=1,
         ),
         stat(
             "Archival candidates",
             'max(memory_operation_stock{result="archival_candidates"})',
             "short",
-            (12, 5, 4, 5),
+            (18, 5, 6, 5),
             "Episodes old enough to archive but not yet archived. A standing "
             "non-zero here is a retention policy that is not being run; a "
             "sudden jump is old data arriving all at once.",
-            decimals= 0,
-        ),
-        text(
-            "What this row is for",
-            "The four numbers a product owner asks about first, all read as "
-            "**levels** rather than totals.\n\n"
-            "That distinction is the whole reason the stock family exists. These "
-            "figures used to be added to a counter, which made the metric the "
-            "sum of every inventory ever read: opening the dashboard grew the "
-            "number by the size of the store, and its rate reported dashboard "
-            "traffic rather than growth in the data.\n\n"
-            "A panel reading a *total* here would show knowledge growing every "
-            "time someone looked at it.",
-            (16, 5, 8, 5),
+            decimals=0,
+            y=1,
         ),
     ]
-    sections.append(("What exists", stock))
 
+    knowledge_age = stat(
+        "Knowledge age",
+        "memory:knowledge:age_seconds",
+        "dtdurations",
+        (16, 8, 8, 8),
+        "How old the newest knowledge in the store is.\n\n"
+        "**The number that decides whether any other number here can be "
+        "trusted.** A memory service whose last write was three days ago "
+        "still serves confident answers, from a world that has moved on — "
+        "every other panel below can look perfectly healthy while this one "
+        "climbs.\n\n"
+        "**No data means nothing has ever been captured**, which is a "
+        "different statement from 'zero' and the reason this panel cannot "
+        "lie about a service that never learned anything.\n\n"
+        "Above an hour it is yellow and above a day red, which are the "
+        "colours an on-call engineer reads as *stale*, not thresholds an "
+        "alert enforces — and the alert's own threshold is six hours, so a "
+        "panel sitting amber at seven is not a contradiction, it is the gap "
+        "between noticing and paging. `KnowledgeStale` additionally "
+        "requires capture traffic in the last two hours, from MCP calls or "
+        "the inbox watcher, so a deployment nobody is using never turns "
+        "this panel's colour into a ticket.",
+        thresholds=[
+            {"color": "green", "value": None},
+            {"color": "yellow", "value": 3600},
+            {"color": "red", "value": 86400},
+        ],
+        decimals=0,
+        y=6,
+    )
     freshness = [
-        stat(
-            "Knowledge age",
-            "memory:knowledge:age_seconds",
-            "dtdurations",
-            (0, 7, 6, 7),
-            "How old the newest knowledge in the store is.\n\n"
-            "**The number that decides whether any other number here can be "
-            "trusted.** A memory service whose last write was three days ago "
-            "still serves confident answers, from a world that has moved on — "
-            "every other panel below can look perfectly healthy while this one "
-            "climbs.\n\n"
-            "**No data means nothing has ever been captured**, which is a "
-            "different statement from 'zero' and the reason this panel cannot "
-            "lie about a service that never learned anything.\n\n"
-            "Above an hour it is yellow and above a day red, which are the "
-            "colours an on-call engineer reads as *stale*, not thresholds an "
-            "alert enforces — and the alert's own threshold is six hours, so a "
-            "panel sitting amber at seven is not a contradiction, it is the gap "
-            "between noticing and paging. `KnowledgeStale` additionally "
-            "requires capture traffic in the last two hours, from MCP calls or "
-            "the inbox watcher, so a deployment nobody is using never turns "
-            "this panel's colour into a ticket.",
-            thresholds=[
-                {"color": "green", "value": None},
-                {"color": "yellow", "value": 3600},
-                {"color": "red", "value": 86400},
-            ],
-            decimals=0,
-        ),
         timeseries(
             "How fast the knowledge is ageing",
             [target("memory:knowledge:age_seconds", "age")],
-            (6, 7, 10, 7),
+            (0, 7, 16, 7),
             "The same figure over time, which is the shape that tells a "
             "deployment apart from itself: a rising staircase is normal and "
             "expected between writes, and a staircase that never steps is "
@@ -1312,23 +1303,24 @@ def product() -> dict:
     ]
     sections.append(("What people are doing", activity))
 
+    context_delivered = timeseries(
+        "Context delivered, per second",
+        [target("memory:lifecycle:recall:rate15m", "{{operation}}")],
+        (0, 8, 16, 8),
+        "The recall half of the loop, by operation: `assemble_context` is "
+        "context handed to an agent, and with it `resolve` and `explain`, "
+        "which only mean anything against knowledge that already exists.\n\n"
+        "**This is the value moment, and for a service reached through "
+        "MCP it is as close to a north-star figure as these metrics "
+        "honestly get** — the calls that delivered something. Compare it "
+        "against the capture row below: a store that grows while this "
+        "stays flat is being written to and never read, which is the "
+        "condition `WriteOnlyArchive` alerts on.",
+        y=6,
+        unit="ops",
+        legend_calcs=["mean", "max"],
+    )
     delivered = [
-        timeseries(
-            "Context delivered, per second",
-            [target("memory:lifecycle:recall:rate15m", "{{operation}}")],
-            (0, 8, 9, 8),
-            "The recall half of the loop, by operation: `assemble_context` is "
-            "context handed to an agent, and with it `resolve` and `explain`, "
-            "which only mean anything against knowledge that already exists.\n\n"
-            "**This is the value moment, and for a service reached through "
-            "MCP it is as close to a north-star figure as these metrics "
-            "honestly get** — the calls that delivered something. Compare it "
-            "against the capture row below: a store that grows while this "
-            "stays flat is being written to and never read, which is the "
-            "condition `WriteOnlyArchive` alerts on.",
-            unit="ops",
-            legend_calcs=["mean", "max"],
-        ),
         timeseries(
             "Recall against capture",
             [
@@ -1336,7 +1328,7 @@ def product() -> dict:
                 target("memory:lifecycle:capture:rate15m_total", "capture (asked for)"),
                 target("memory:lifecycle:inbox_capture:rate15m_total", "capture (inbox)"),
             ],
-            (9, 8, 9, 8),
+            (0, 8, 16, 8),
             "Both sides of the loop on one scale, with nothing left to the "
             "reader but the comparison.\n\n"
             "**Two capture lines, because capture has two doors.** `capture "
@@ -1357,7 +1349,7 @@ def product() -> dict:
             "Recalls per capture",
             "memory:lifecycle:recalls_per_capture15m",
             "short",
-            (18, 8, 6, 8),
+            (16, 8, 8, 8),
             "How many times knowledge was read back for every time it was "
             "written, over fifteen minutes.\n\n"
             "**Below one means storing more than reading** — where a memory "
@@ -1625,13 +1617,23 @@ def product() -> dict:
         ],
     ))
 
+    overview = row(
+        "Overview",
+        [*stock, context_delivered, knowledge_age],
+        collapsed=False,
+    )
+    overview_bottom = max(
+        panel["gridPos"]["y"] + panel["gridPos"]["h"]
+        for panel in overview["panels"]
+    )
+
     return dashboard(
         "memory_mcp — product",
         "What the system holds, how fresh it is, what people ask it for, and "
         "what it learns. No latency percentiles: those answer an operational "
         "question, not a product one. For latency, saturation and failures, "
         f"see the technical dashboard: {CROSS_LINK['product'][0]}.",
-        rows(sections),
+        [overview, *rows(sections, start_y=overview_bottom)],
         tags=["memory_mcp", "product"],
         cross_link=(CROSS_LINK["product"][0], CROSS_LINK["product"][1]),
     )
