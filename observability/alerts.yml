@@ -375,6 +375,80 @@ groups:
             a batch importer) should silence this.
           dashboard: /d/memory_mcp-product/context-delivered
 
+  # ─── Background work ────────────────────────────────────────────────────────
+  #
+  # Two rules, because these passes do not share a cadence and one threshold
+  # cannot serve both ends of that. Lease renewal runs every second and
+  # embedding recovery every minute; archival runs every *day* by default. A
+  # single "two hours" budget would fire on the daily pass for all but two hours
+  # of every day, which is an alert that cries wolf on a healthy deployment and
+  # is therefore an alert nobody reads.
+  - name: memory-background-work
+    interval: 30s
+    rules:
+      # A frequent scheduler that stopped.
+      #
+      # The failure this catches emits nothing at all: no error, no refusal, no
+      # latency, because nothing is running to produce any. A pass counter cannot
+      # see it either — a scheduler running every minute and one that ran two
+      # hours ago both report the same total — so the age is the only series that
+      # can.
+      #
+      # Two hours against a one-second and a one-minute cadence is a wide margin
+      # on purpose: this fires when a scheduler has missed a hundred rounds, not
+      # when it was slow once.
+      #
+      # No `or vector(0)`, deliberately. A pass with no series has never run at
+      # all, and "has never run" is a deployment's configuration rather than a
+      # pass that went stale. It also means the first pass after a restart is
+      # silent for up to one interval — the trade for not alerting on every
+      # deployment where a scheduler is simply not enabled.
+      - alert: SchedulerStalled
+        expr: |
+          memory:background_job:run_age_seconds{pass=~"task|lease|embedding_backfill"} > 7200
+        for: 15m
+        labels:
+          severity: ticket
+        annotations:
+          summary: A frequently-scheduled background job has not run for two hours
+          description: >-
+            Lease renewal, durable tasks or embedding recovery last completed
+            over two hours ago, against cadences of seconds and a minute. Nothing
+            else reports this: the job is silent when it stops, its pass counter
+            is unchanged rather than wrong, and no request is failing because
+            nothing is being asked of it. Leases not renewed means requests
+            eventually find their lease gone; durable tasks not drained means the
+            work queue stops moving.
+          dashboard: /d/memory_mcp-technical/helicopter-view-is-it-still-running
+
+      # Maintenance that runs on a clock, judged against that clock.
+      #
+      # Decay defaults to hourly and archival to daily, so this budget is a day
+      # and a quarter-hour: enough that a healthy daily pass never reaches it,
+      # little enough that a maintenance pass dead for a day is an alert. A
+      # deployment that set a longer archival interval should widen this rule
+      # rather than silence it — the thing being reported is a promise the
+      # product makes, quietly broken.
+      - alert: MaintenanceNotRunning
+        expr: |
+          memory:background_job:run_age_seconds{pass=~"lifecycle_.*"} > 90000
+        for: 15m
+        labels:
+          severity: ticket
+        annotations:
+          summary: A maintenance pass has not run in more than a day
+          description: >-
+            Archival or decay last completed over a day ago. Nothing else reports
+            this, and nothing else would: the pass is silent when it stops, its
+            counter is unchanged rather than wrong, and no request is failing
+            because no request is involved. Archival not running means episodes
+            accumulate forever and the retention policy is a claim; decay not
+            running means superseded facts are never retired. Absent after a
+            restart until the pass first runs — for a daily pass that is up to a
+            day of silence, which is the honest cost of measuring the age from
+            inside the process that has to run it.
+          dashboard: /d/memory_mcp-technical/helicopter-view-is-it-still-running
+
   # ─── Ingestion ──────────────────────────────────────────────────────────────
   #
   # The product's own signals. An ingest that has stopped is invisible to a
@@ -468,7 +542,7 @@ groups:
     rules:
       - alert: BackgroundJobsFailing
         expr: |
-          memory:background_jobs:unhealthy_rate15m{job="lease"} > 0
+          memory:background_jobs:unhealthy_rate15m{pass="lease"} > 0
         for: 15m
         labels:
           severity: ticket

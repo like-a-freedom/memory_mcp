@@ -10,7 +10,7 @@
 //!     embedded, so a bundler that changes its output fails the build instead
 //!     of shipping a UI that cannot boot.
 //!   * `check-observability` runs the recording-rule, alert and dashboard
-//!     checkers, so 40 rules, 18 alerts and 2 dashboards cannot drift away
+//!     checkers, so 43 rules, 20 alerts and 2 dashboards cannot drift away
 //!     from the metrics the crate exports without anything noticing.
 //!
 //! Two of the three replaced Python tooling under `scripts/ci`; the

@@ -259,7 +259,7 @@ groups:
     rules:
       - record: memory:background_jobs:rate15m
         expr: |
-          sum by (job, outcome) (
+          sum by (pass, outcome) (
             rate(memory_background_jobs_total[15m])
           )
 
@@ -267,13 +267,27 @@ groups:
       # its job"; separating them is a panel choice, not an alert one.
       - record: memory:background_jobs:unhealthy_rate15m
         expr: |
-          sum by (job) (
+          sum by (pass) (
             rate(memory_background_jobs_total{outcome=~"error|degraded"}[15m])
           )
 
+      # How long since each job last ran without failing.
+      #
+      # The pass counter above cannot answer this: a scheduler running every
+      # minute and one that ran an hour ago and has not run since both report
+      # "however many passes so far". This is the question only a stopped
+      # scheduler can be caught by, and it is silent — no error, no refusal, no
+      # latency, because nothing is running to produce any.
+      #
+      # Absent until a job's first successful pass, which reads as "never ran"
+      # rather than as a job that has been idle since the epoch.
+      - record: memory:background_job:run_age_seconds
+        expr: |
+          time() - max by (pass) (memory_background_job_last_run_timestamp_seconds)
+
       - record: memory:background_job_duration:p95_5m
         expr: |
-          max by (job) (
+          max by (pass) (
             memory_background_job_duration_seconds{quantile="0.95"}
           )
 

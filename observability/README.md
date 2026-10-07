@@ -1,6 +1,6 @@
 # Observability
 
-Two Grafana dashboards, forty-two recording rules and eighteen alerts over the
+Two Grafana dashboards, forty-three recording rules and twenty alerts over the
 metrics the `streamable-http` profile exports on `/metrics`, plus the scrape
 configuration that gets those metrics to a collector in the first place.
 
@@ -12,8 +12,8 @@ rather than keeping its own copy.
 
 ```
 observability/
-├── recording_rules.yml     42 rules in 11 groups
-├── alerts.yml              18 alerts in 7 groups
+├── recording_rules.yml     43 rules in 10 groups
+├── alerts.yml              20 alerts in 8 groups
 ├── prometheus.yml          scrape + rule_files, for Prometheus
 ├── vmagent/
 │   ├── vmagent.yml         what to scrape, for vmagent
@@ -96,6 +96,9 @@ python3 observability/check_alerts.py
 | Question | Panel |
 |---|---|
 | Is the service working right now? | technical → *Overview — the four golden signals* |
+| Is anything red? | technical → *Helicopter view — every stage at a glance* |
+| What is failing? | technical → *Helicopter view — what is failing* |
+| Is anything still running? | technical → *Helicopter view — is it still running* |
 | Is anything being collected at all? | technical → *Collection health* |
 | What is slow? | technical → *HTTP latency* → *p95 by route* |
 | Is it getting slower, or was it always slow? | technical → *HTTP latency* → *Latency percentiles over time* |
@@ -160,6 +163,8 @@ an alert outliving its incident by the length of the long window.
 | `IngestFailureRate` | page | >10% of ingest failing | — |
 | `NoIngestActivity` | ticket | no ingest for 2h | — |
 | `KnowledgeStale` | ticket | capture traffic for 2h, nothing landed for 6h | — |
+| `SchedulerStalled` | ticket | frequent pass quiet for 2h | — |
+| `MaintenanceNotRunning` | ticket | lifecycle pass quiet for 25h | — |
 | `WriteOnlyArchive` | ticket | capture for 7d, no recall for 24h | — |
 | `FilesystemIngestionStalled` | ticket | nothing processed for 1h | — |
 | `WatcherDegraded` | page | the one-way latch | — |
@@ -183,6 +188,14 @@ other way:
   self-service sign-up refuses every attempt correctly and indefinitely. Paging
   about a configured setting is how a page channel stops being read. It is
   included because it is also what a *user* sees.
+- **Background staleness is two alerts, because these passes do not share a
+  cadence.** Lease renewal runs every second and archival every day; one "no pass
+  in two hours" budget would fire on the daily pass for all but two hours of
+  every day, and an alert that cries wolf on a healthy deployment is an alert
+  nobody reads. `SchedulerStalled` watches the frequent passes, and
+  `MaintenanceNotRunning` watches the lifecycle ones against a day and a
+  quarter-hour — the same reason the dashboard shows those three tiles twice,
+  once on each budget.
 - **`WatcherDegraded` reads `max_over_time`, not `avg`.** The gauge is a
   one-way latch, and averaging a step function reports a fraction of a broken
   deployment.
@@ -200,7 +213,7 @@ other way:
   absence into a zero and then compare it to zero — which fires on every
   deployment where the feature is off, the one shape an alert must never have.
 
-## Nine figures that mislead if read naively
+## Ten figures that mislead if read naively
 
 Each of these is a place where the obvious query returns a number that is
 plausible and wrong. Every one is also stated in the metric's own `# HELP`
@@ -275,7 +288,18 @@ renders it as an elapsed time that looks entirely plausible. It is also absent
 until the first completed capture, which means *nothing has ever been learned* —
 not zero age.
 
-**9. `memory_auth_signins_total` counts arrivals, not users.** It carries no
+**9. A label named `job` is the collector's, not the application's.** A scrape
+attaches its own `job_name` to every series, so an exposition that also emits
+`job` has it *renamed* to `exported_job` — with no error anywhere. Every
+`by (job)` aggregation collapses to the single scrape target, every
+`{job="lease"}` filter matches nothing, and the dashboards keep rendering: one
+merged series where five were meant, and an alert that can never fire. The
+background families therefore label their scheduler dimension **`pass`**, which
+is what the code calls a run of one, and a test in the crate fails if any family
+declares `job` again. Found by scraping a fixture — the panels looked correct
+and were reading the wrong thing.
+
+**10. `memory_auth_signins_total` counts arrivals, not users.** It carries no
 label at all, deliberately: an account, subject or tenant label would make it a
 disclosure rather than a traffic measure. So a first sign-up and a returning
 user are the same number, and active users, activation and retention are not
@@ -403,7 +427,7 @@ what lets a bounded context say what a measurement means without acquiring
 infrastructure, per ADR-0058.
 
 That file is the reference to read when a number on a dashboard is not what you
-expected. Every family in its `DESCRIPTIONS` list — twenty-eight of them —
+expected. Every family in its `DESCRIPTIONS` list — twenty-nine of them —
 carries a `# HELP` line naming the trap it has, and they render in `/metrics`.
-(The checkers count twenty-nine names, because they also pick up a test's own
+(The checkers count thirty names, because they also pick up a test's own
 string; the difference is that string, not a family.)

@@ -17,11 +17,12 @@ use crate::error::MemoryError;
 pub(crate) use crate::shared::observability::{DECLARED_REFUSAL_BRANCHES, DECLARED_STAGES};
 pub use crate::shared::observability::{
     METRIC_AUTH_REFUSALS_TOTAL, METRIC_AUTH_SIGNINS_TOTAL, METRIC_BACKGROUND_JOB_DURATION_SECONDS,
-    METRIC_BACKGROUND_JOBS_TOTAL, METRIC_BUILD_INFO, METRIC_HTTP_REQUEST_DURATION_SECONDS,
-    METRIC_HTTP_REQUESTS_INFLIGHT, METRIC_HTTP_REQUESTS_TOTAL,
-    METRIC_KNOWLEDGE_LAST_WRITE_TIMESTAMP_SECONDS, METRIC_OPERATION_DURATION_SECONDS,
-    METRIC_OPERATION_RESULTS_TOTAL, METRIC_OPERATION_STOCK, METRIC_OPERATIONS_TOTAL,
-    METRIC_PIPELINE_STAGE_DURATION_SECONDS, METRIC_RUNTIME_REFUSALS_TOTAL, StageTimer,
+    METRIC_BACKGROUND_JOB_LAST_RUN_TIMESTAMP_SECONDS, METRIC_BACKGROUND_JOBS_TOTAL,
+    METRIC_BUILD_INFO, METRIC_HTTP_REQUEST_DURATION_SECONDS, METRIC_HTTP_REQUESTS_INFLIGHT,
+    METRIC_HTTP_REQUESTS_TOTAL, METRIC_KNOWLEDGE_LAST_WRITE_TIMESTAMP_SECONDS,
+    METRIC_OPERATION_DURATION_SECONDS, METRIC_OPERATION_RESULTS_TOTAL, METRIC_OPERATION_STOCK,
+    METRIC_OPERATIONS_TOTAL, METRIC_PIPELINE_STAGE_DURATION_SECONDS, METRIC_RUNTIME_REFUSALS_TOTAL,
+    StageTimer,
 };
 
 /// Filesystem-watch metric family: revision outcomes.
@@ -64,6 +65,15 @@ macro_rules! count_and_time {
 /// Shared by every scheduler so a failing job is counted the same way wherever
 /// it runs, and so adding a scheduler cannot introduce a third spelling of
 /// "this failed".
+///
+/// The label is `pass`, not `job`, and that is not a style choice. `job` is the
+/// collector's own label: a scrape of this exposition with `job_name:
+/// memory_mcp` puts `job="memory_mcp"` on every series and renames the
+/// exposition's `job` to `exported_job`. Every `by (job)` aggregation would
+/// then collapse to the one scrape target, and every `{job="lease"}` filter
+/// would match nothing — silently, with the dashboards still rendering. The
+/// scheduler dimension is called `pass` here because that is what the code
+/// calls a run of one.
 #[cfg_attr(
     not(feature = "prometheus"),
     allow(
@@ -71,14 +81,30 @@ macro_rules! count_and_time {
         reason = "recorders have no caller without the HTTP profile"
     )
 )]
-pub(crate) fn record_job_metric(job: &'static str, outcome: &'static str, seconds: f64) {
+pub(crate) fn record_job_metric(pass: &'static str, outcome: &'static str, seconds: f64) {
     count_and_time!(
         METRIC_BACKGROUND_JOBS_TOTAL,
         METRIC_BACKGROUND_JOB_DURATION_SECONDS,
         seconds,
-        "job" => job,
+        "pass" => pass,
         "outcome" => outcome,
     );
+    // Stamped here rather than at the schedulers, because every scheduler
+    // already reports through this one function and a per-scheduler call is a
+    // fourth thing to remember when a new one is added.
+    //
+    // `degraded` stamps as well as `ok`: a degraded pass walked its tenants and
+    // some of them failed, which is a run — and its degradation is what the
+    // outcome label and the unhealthy rate are for. Only a pass that failed
+    // outright leaves the clock alone.
+    #[cfg(feature = "prometheus")]
+    if outcome != "error" {
+        metrics::gauge!(
+            METRIC_BACKGROUND_JOB_LAST_RUN_TIMESTAMP_SECONDS,
+            "pass" => pass,
+        )
+        .set(unix_seconds());
+    }
 }
 
 /// Record one authentication refusal on the identity callback.
@@ -957,6 +983,143 @@ pub(crate) mod tests {
              MCP call that asked for it: a capture that arrives and fails would \
              otherwise keep the clock fresh"
         );
+    }
+
+    /// A background pass stamps when it last ran.
+    ///
+    /// A pass counter answers "how many times did this run", which cannot tell a
+    /// scheduler that is running every minute from one that ran an hour ago and
+    /// has not run since — and the second is the failure nobody sees, because a
+    /// job that stops running reports no errors, no refusals and no latency. It
+    /// is the background half of the same question the knowledge clock answers
+    /// for captures: how long since anything happened.
+    #[tokio::test]
+    async fn a_background_pass_stamps_when_it_last_ran() {
+        let (exposition, before, after) = exposed(|| async {
+            let before = unix_seconds();
+            record_job_metric("lifecycle_decay", "ok", 0.01);
+            (render(), before, unix_seconds())
+        })
+        .await;
+
+        assert!(
+            exposition.contains(&format!(
+                "# HELP {METRIC_BACKGROUND_JOB_LAST_RUN_TIMESTAMP_SECONDS} "
+            )),
+            "the run stamp must be described: a panel author given only a name \
+             cannot tell a timestamp from a duration: {exposition}"
+        );
+        let series = format!(
+            "{METRIC_BACKGROUND_JOB_LAST_RUN_TIMESTAMP_SECONDS}{{pass=\"lifecycle_decay\"}}"
+        );
+        let stamped = sample_series(
+            &exposition,
+            METRIC_BACKGROUND_JOB_LAST_RUN_TIMESTAMP_SECONDS,
+            r#"pass="lifecycle_decay""#,
+        )
+        .unwrap_or_else(|| {
+            panic!(
+                "a completed pass must stamp when it ran, per job; without \
+                     it a scheduler that stopped is indistinguishable from one \
+                     that is simply quiet: {exposition}"
+            )
+        });
+        assert!(
+            (before..=after).contains(&stamped),
+            "the stamp must be the moment of the pass: expected \
+             {before}..={after}, got {stamped}: {exposition}"
+        );
+        assert!(
+            exposition.contains(&series),
+            "`{series}` is absent, so the age of this job cannot be read: \
+             {exposition}"
+        );
+    }
+
+    /// A pass that failed is not a pass that ran.
+    ///
+    /// This is the whole reason the stamp exists alongside the pass counter. If
+    /// a failure refreshed it, a job that fails every minute would look
+    /// permanently fresh — the alert would have nothing left to measure, and the
+    /// one signal that distinguishes "running and broken" from "running" would
+    /// be the one that lied.
+    #[tokio::test]
+    async fn a_failed_pass_does_not_refresh_when_the_job_last_ran() {
+        let (exposition, before, after) = exposed(|| async {
+            // One successful pass first, so the comparison is between two
+            // readings rather than between an absence and an absence.
+            record_job_metric("lease", "ok", 0.01);
+            let before = sample_series(
+                &render(),
+                METRIC_BACKGROUND_JOB_LAST_RUN_TIMESTAMP_SECONDS,
+                r#"pass="lease""#,
+            );
+            record_job_metric("lease", "error", 0.01);
+            let after = sample_series(
+                &render(),
+                METRIC_BACKGROUND_JOB_LAST_RUN_TIMESTAMP_SECONDS,
+                r#"pass="lease""#,
+            );
+            (render(), before, after)
+        })
+        .await;
+
+        assert!(
+            before.is_some(),
+            "the successful pass above must have left a stamp, or this test \
+             compares two absences and passes against an implementation that \
+             never stamps at all: {exposition}"
+        );
+        assert_eq!(
+            after, before,
+            "a failing pass stamped the same clock a successful one does, so a \
+             job that never succeeds looks permanently fresh: {exposition}"
+        );
+    }
+
+    /// No exposition may declare a `job` label — a lint, not a scenario.
+    ///
+    /// `job` belongs to the collector: a scrape attaches its own `job_name` to
+    /// every series and renames an exposition's `job` to `exported_job` when
+    /// `honor_labels` is false, which is the default and what the shipped scrape
+    /// configurations use. Nothing fails when that happens. `by (job)` collapses
+    /// to one target, `{job="lease"}` matches nothing, and a dashboard still
+    /// renders — one merged series where five were meant, an alert that can
+    /// never fire. Found the hard way, by scraping a fixture: the background
+    /// job panels looked fine and were reading the wrong thing.
+    ///
+    /// The file list mirrors the checkers' `SOURCES` in
+    /// `observability/check_rules.py`, which is the set of files that actually
+    /// declare a metric or a label. Listing files that declare no `metrics::`
+    /// call instead would have left the lint guarding nothing: the first version
+    /// of this test scanned `memory/ingestion.rs` and `memory/lifecycle.rs`,
+    /// neither of which records anything, and missed the three that do.
+    #[test]
+    fn no_metric_declares_a_job_label() {
+        for source in [
+            include_str!("observability.rs"),
+            include_str!("shared/observability.rs"),
+            include_str!("knowledge/claims_policy/telemetry.rs"),
+            include_str!("http/registry/provisioning.rs"),
+            include_str!("service/fs_watch/telemetry.rs"),
+        ] {
+            for (number, line) in source.lines().enumerate() {
+                let code = line.trim();
+                if code.starts_with("//") {
+                    continue;
+                }
+                assert!(
+                    !code.contains("\"job\""),
+                    "observability.rs:{} declares a `job` label: {code}\n\
+                     `job` is the collector's label and is renamed to \
+                     `exported_job` on scrape; name the dimension for what it \
+                     is (`pass`, `operation`, `route`) or every grouping and \
+                     filter written against it silently reads the scrape \
+                     target instead",
+                    number + 1,
+                );
+            }
+        }
     }
 
     /// A stock reported as a flow again is the original defect, and nothing

@@ -73,7 +73,7 @@ jobs:
           cargo clippy -p ui --target wasm32-unknown-unknown --all-targets --locked -- -D warnings
       - name: Observability rules, alerts and dashboards
         run: |
-          # 40 recording rules, 18 alerts and 2 dashboards — groups that
+          # 43 recording rules, 20 alerts and 2 dashboards — groups that
           # nothing reached: a rule reading a metric the crate no longer
           # exports evaluates to empty and never fires, and a panel naming a
           # deleted series renders empty, which is indistinguishable from a

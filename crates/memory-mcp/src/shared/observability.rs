@@ -86,15 +86,27 @@ pub const METRIC_OPERATION_STOCK: &str = "memory_operation_stock";
 /// the three need different fixes.
 pub const METRIC_PIPELINE_STAGE_DURATION_SECONDS: &str = "memory_pipeline_stage_duration_seconds";
 
-/// Counter: background job outcomes, by job family and outcome.
+/// Counter: background job outcomes, by pass family and outcome.
 ///
 /// A background job is the one failure class with no request attached: it
 /// cannot be seen in a status code, and it does not appear in the request
 /// metrics because it is not a request.
 pub const METRIC_BACKGROUND_JOBS_TOTAL: &str = "memory_background_jobs_total";
 
-/// Histogram: background job duration in seconds, by job family.
+/// Histogram: background job duration in seconds, by pass family.
 pub const METRIC_BACKGROUND_JOB_DURATION_SECONDS: &str = "memory_background_job_duration_seconds";
+
+/// When a background job last ran to completion, as seconds since the epoch.
+///
+/// A timestamp like the knowledge clock, and for the same reason: a pass counter
+/// says how many passes happened, which cannot distinguish a scheduler running
+/// every minute from one that ran an hour ago and has not run since — and a job
+/// that stops running is the silent kind, reporting no error anywhere.
+///
+/// Only a pass that did not fail stamps it, so the age it feeds separates
+/// "running and broken" from "running".
+pub const METRIC_BACKGROUND_JOB_LAST_RUN_TIMESTAMP_SECONDS: &str =
+    "memory_background_job_last_run_timestamp_seconds";
 
 /// Counter: authentication refusals, by surface and reason.
 pub const METRIC_AUTH_REFUSALS_TOTAL: &str = "memory_auth_refusals_total";
@@ -334,15 +346,32 @@ pub const DESCRIPTIONS: &[MetricDescription] = &[
         name: METRIC_BACKGROUND_JOBS_TOTAL,
         kind: MetricKind::Counter,
         unit: None,
-        help: "Background scheduler passes, by job and outcome. Timed from \
+        help: "Background scheduler passes, by pass and outcome. The label is \
+               named `pass` rather than `job` because `job` belongs to the \
+               collector: a scrape renames an exposition's `job` to \
+               `exported_job`, which silently collapses every `by (job)` \
+               grouping to one target. Timed from \
                when the job started running, not when it was scheduled, so \
                queue wait is not counted as work.",
+    },
+    MetricDescription {
+        name: METRIC_BACKGROUND_JOB_LAST_RUN_TIMESTAMP_SECONDS,
+        kind: MetricKind::Gauge,
+        // No unit, like the knowledge clock: this is a moment, not an elapsed
+        // time, and a duration unit would render an epoch as a plausible-
+        // looking interval. The age is `time()` minus the value.
+        unit: None,
+        help: "Unix timestamp of the last background pass that ran without \
+               failing, by pass. The age is `time()` minus this. A pass that \
+               failed does not stamp it, so a scheduler that keeps failing ages \
+               instead of looking fresh, and a job that never ran has no series \
+               here at all.",
     },
     MetricDescription {
         name: METRIC_BACKGROUND_JOB_DURATION_SECONDS,
         kind: MetricKind::Histogram,
         unit: Some(metrics::Unit::Seconds),
-        help: "Duration of a background job pass, by job and outcome.",
+        help: "Duration of a background job pass, by pass and outcome.",
     },
     MetricDescription {
         name: METRIC_AUTH_REFUSALS_TOTAL,

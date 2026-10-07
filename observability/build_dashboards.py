@@ -273,6 +273,72 @@ def text(title: str, body: str, grid: tuple[int, int, int, int], y: int = 0) -> 
     }
 
 
+def status_history(
+    title: str,
+    targets: list[dict],
+    grid: tuple[int, int, int, int],
+    description: str,
+    y: int = 0,
+    thresholds: list[dict] | None = None,
+    links: list[dict] | None = None,
+) -> dict:
+    """One row per series, coloured by value, across the selected range.
+
+    The tile grid answers "which stage is red right now"; this answers the
+    question a snapshot cannot — *for how long*, and whether something green now
+    was ever red. Each series is one row, so the panel is built for a bounded
+    set: Grafana's own suggestion supplier for this panel type declines to
+    render past thirty series, because past that the rows are thinner than the
+    labels on them.
+
+    The option names are the plugin's own (`showValue` as `auto`/`always`/
+    `never`, `rowHeight`, `colWidth`, `perPage`, plus the shared legend and
+    tooltip options), taken from the panel plugin rather than guessed, and an
+    option this panel does not have is left out rather than copied in from the
+    state timeline — consecutive equal values are merged there and are not
+    merged here, so the key would be a no-op that reads as intent.
+    """
+    panel = {
+        "datasource": DATASOURCE,
+        "description": description,
+        "fieldConfig": {
+            "defaults": {
+                "color": {"mode": "thresholds"},
+                "custom": {"fillOpacity": 80, "lineWidth": 1},
+                "mappings": [],
+                "unit": "s",
+            },
+            "overrides": [],
+        },
+        "gridPos": {"h": grid[1], "w": grid[2], "x": grid[0], "y": y},
+        "id": 0,
+        "options": {
+            "colWidth": 0.9,
+            "legend": {
+                "calcs": [],
+                "displayMode": "list",
+                "placement": "bottom",
+                "showLegend": False,
+            },
+            "perPage": 20,
+            "rowHeight": 0.85,
+            "showValue": "auto",
+            "tooltip": {"mode": "single", "sort": "none"},
+        },
+        "pluginVersion": "13.2.4",
+        "targets": targets,
+        "title": title,
+        "type": "status-history",
+    }
+    panel["fieldConfig"]["defaults"]["thresholds"] = {
+        "mode": "absolute",
+        "steps": thresholds or [{"color": "text", "value": None}],
+    }
+    if links:
+        panel["links"] = links
+    return panel
+
+
 def link(title: str, url_path: str) -> dict:
     """A panel link — to a row on this dashboard, or to the other one."""
     return {"targetBlank": False, "title": title, "url": url_path}
@@ -297,6 +363,231 @@ def technical() -> dict:
     responsible before they know whether anything is.
     """
     sections: list[tuple[str, list[dict]]] = []
+
+    # ─── The helicopter view ──────────────────────────────────────────────────
+    #
+    # Everything above the fold exists to answer one question in about five
+    # seconds: is anything red, and if so where. It is first because that is the
+    # question an on-call engineer opens a dashboard with, and a dashboard that
+    # makes them read a chart to find out has already lost them.
+    #
+    # Three widgets, in the order the questions come:
+    #
+    #   1. Every stage's latency, one tile each. Slowness is what a stage does
+    #      while it is in trouble, and it shows before any failure does.
+    #   2. Failures — per operation, and across everything that is not an
+    #      operation. This is the "is it red" widget, and it has to be one
+    #      glance rather than a reading.
+    #   3. Whether the parts nobody is watching are still running, and how long
+    #      stage latency has looked like this. Both answer questions a current
+    #      value cannot, because their failure mode is *absence*.
+    #
+    # What this deliberately does not show: per-stage failures. The stage timers
+    # measure duration and nothing else, so a stage tile is a latency reading
+    # and never a pass/fail. Failures are counted one level up — at the
+    # operation, and in the subsystems below. A tile coloured like a health
+    # check but reading latency would be worse than saying which it is.
+    stage_budget = [
+        {"color": "green", "value": None},
+        {"color": "yellow", "value": 1},
+        {"color": "red", "value": 3},
+    ]
+
+    every_stage = [
+        stat(
+            "Every stage and operation, p95",
+            "",
+            "s",
+            (0, 10, 24, 10),
+            "One tile per stage of the pipeline and one per operation, coloured "
+            "by how long the slowest of them has been taking.\n\n"
+            "**This is the one widget that answers \"is anything red\", and it "
+            "is one widget on purpose.** Every tile is a duration in the same "
+            "unit, so they can be read in any order and the colour is the "
+            "verdict: under a second green, up to three amber, beyond that red.\n\n"
+            "**These tiles triage; they do not alert.** No alert reads an "
+            "operation or stage p95 — the page on slow requests is over HTTP "
+            "latency, at two seconds, and it is on the row below. So an amber "
+            "tile here means \"look at this\" rather than \"someone was "
+            "paged\", which is the distinction an overview row has to keep: "
+            "tiles that page are tiles people learn to ignore.\n\n"
+            "**Two families read as one pipeline.** The short names are the "
+            "inside of an operation — `query_embedding`, `ann_search`, "
+            "`extraction`, `embedding_provider`, `store_write` — and the longer "
+            "ones are the operations themselves. A red inner stage under a "
+            "green operation is the case worth looking at: something inside was "
+            "slow enough to matter and was absorbed anyway.\n\n"
+            "**A stage that has never run is absent, not zero.** A deployment "
+            "that never assembles context has no `query_embedding` tile, which "
+            "is a different thing from a fast one.",
+            thresholds=stage_budget,
+            decimals=3,
+        ),
+    ]
+    every_stage[0]["targets"] = [
+        target(
+            'max by (operation) (memory_operation_duration_seconds{quantile="0.95"})',
+            "{{operation}}",
+            "A",
+        ),
+        target(
+            'max by (stage) (memory_pipeline_stage_duration_seconds{quantile="0.95"})',
+            "{{stage}}",
+            "B",
+        ),
+    ]
+    every_stage[0]["options"]["textMode"] = "value_and_name"
+    sections.append(("Helicopter view — every stage at a glance", every_stage))
+
+    what_is_failing = [
+        stat(
+            "Every operation, failure rate",
+            "",
+            "percentunit",
+            (0, 9, 12, 9),
+            "One tile per operation: the share of its calls that failed over "
+            "fifteen minutes.\n\n"
+            "**The red/green widget of this dashboard**, and the first thing to "
+            "read after the stage tiles above. Green is exactly zero, so any "
+            "failure at all turns a tile red — a memory operation that fails "
+            "is a caller that lost context it was promised, and for that the "
+            "existence of the failure matters more than its size.\n\n"
+            "Read it against traffic rather than alone: a high ratio on an "
+            "operation nobody calls is a rounding error, and a low one on the "
+            "operation everyone depends on is an incident.",
+            thresholds=[
+                {"color": "green", "value": None},
+                {"color": "red", "value": 0.0001},
+            ],
+            decimals=3,
+        ),
+        stat(
+            "Everything else, failures per second",
+            "",
+            "ops",
+            (12, 9, 12, 9),
+            "The failures that do not belong to an operation: background passes "
+            "that failed or degraded, claim projection errors, failed "
+            "filesystem revisions, sign-in refusals, runtime refusals and "
+            "registry drift.\n\n"
+            "**All of them per second, so they are comparable with each other "
+            "in a way the ratio tiles beside them are not** — a burst of "
+            "refusals and a steady trickle of failed revisions are different "
+            "problems and sit side by side here. Registry drift is per kind, "
+            "because its two kinds are different faults.\n\n"
+            "**Amber means *something* failed, not that a lot did.** These "
+            "series sit next to alerts that fire at any non-zero rate — "
+            "`ClaimProjectionFailing` and `RegistryInconsistent` both fire at "
+            "`> 0` — so amber here is what a page looks like before it is one. "
+            "Red at a tenth per second is a sustained failure rather than a "
+            "threshold worth matching.\n\n"
+            "This is also the only place the whole service's failure surface "
+            "fits in one glance: an operation that fails 0.1% of the time and a "
+            "watcher that has not processed a revision in an hour are both "
+            "visible from across the room.",
+            thresholds=[
+                {"color": "green", "value": None},
+                {"color": "yellow", "value": 0.0001},
+                {"color": "red", "value": 0.1},
+            ],
+            decimals=4,
+        ),
+    ]
+    what_is_failing[0]["targets"] = [
+        target("memory:operation_calls:error_ratio15m", "{{operation}}", "A"),
+    ]
+    what_is_failing[1]["targets"] = [
+        target("memory:background_jobs:unhealthy_rate15m", "background {{pass}}", "A"),
+        target(
+            'sum(rate(memory_claim_pipeline_total{reason_code="internal"}[15m]))',
+            "claim projection",
+            "B",
+        ),
+        target('memory:fs_watch_revisions:rate15m{outcome="failed"}', "failed revisions", "C"),
+        target("sum(memory:auth_refusals:rate15m)", "sign-in refusals", "D"),
+        target("sum(memory:runtime_refusals:rate15m)", "runtime refusals", "E"),
+        target(
+            "sum by (kind) (rate(memory_http_registry_reconciliation_total[15m]))",
+            "registry {{kind}}",
+            "F",
+        ),
+    ]
+    sections.append(("Helicopter view — what is failing", what_is_failing))
+
+    still_running = [
+        stat(
+            "Background jobs, since they last ran",
+            "memory:background_job:run_age_seconds",
+            "dtdurations",
+            (0, 9, 7, 9),
+            "How long since each background job last completed without "
+            "failing.\n\n"
+            "**The widget for the failure nobody sees.** A scheduler that stops "
+            "running produces no error, no refusal and no latency — nothing is "
+            "running to produce any — so no counter here can see it.\n\n"
+            "**One budget for every pass, and it is the lenient one**: a day "
+            "and a quarter of an hour, because archival runs daily by default "
+            "and a two-hour budget would leave its tile red for all but two "
+            "hours of every day. The three frequent schedulers get the budget "
+            "that actually suits them in the tile beside this one.\n\n"
+            "A failing pass does **not** refresh this clock, so a job that keeps "
+            "failing ages exactly like one that stopped — the same problem from "
+            "here, and the difference between them is on *Background jobs* "
+            "below.",
+            thresholds=[
+                {"color": "green", "value": None},
+                {"color": "yellow", "value": 90000},
+                {"color": "red", "value": 108000},
+            ],
+            decimals=0,
+        ),
+        stat(
+            "Frequent schedulers, since they last ran",
+            'memory:background_job:run_age_seconds{pass=~"task|lease|embedding_backfill"}',
+            "dtdurations",
+            (7, 9, 5, 9),
+            "Lease renewal, durable tasks and embedding recovery on the budget "
+            "their cadence deserves: amber at fifteen minutes, red at two "
+            "hours, against intervals of seconds and a minute.\n\n"
+            "**Without this tile, a stalled lease scheduler would take a day to "
+            "be noticed** — the budget above has to clear a daily pass, and a "
+            "budget loose enough for that is useless for a per-second one. The "
+            "three passes also appear in the tile beside this one; this is the "
+            "one that answers within minutes.\n\n"
+            "Absent when a pass has never run, which is a deployment that has "
+            "not enabled it rather than one that has lost it.",
+            thresholds=[
+                {"color": "green", "value": None},
+                {"color": "yellow", "value": 900},
+                {"color": "red", "value": 7200},
+            ],
+            decimals=0,
+        ),
+        status_history(
+            "Stage latency, over time",
+            [
+                target(
+                    'max by (stage) (memory_pipeline_stage_duration_seconds{quantile="0.95"})',
+                    "{{stage}}",
+                )
+            ],
+            (12, 9, 12, 9),
+            "Every stage in the pipeline as one row across the selected range, "
+            "coloured by the same budget as the tiles above.\n\n"
+            "**What a current value cannot answer: for how long.** A tile that "
+            "is green now may have been red an hour ago, and the run of colour "
+            "is what an incident review actually needs — a stage amber since "
+            "the deploy is a different problem from one that spiked and "
+            "recovered.\n\n"
+            "Five rows, the inner stages only: adding the operations would "
+            "double the rows for a coarser reading of the same thing.\n\n"
+            "**Gaps are gaps.** A stage nobody calls any more leaves blanks, "
+            "which is what a switched-off subsystem looks like and is not the "
+            "same thing as a fast one.",
+            thresholds=stage_budget,
+        ),
+    ]
+    sections.append(("Helicopter view — is it still running", still_running))
 
     overview = [
         stat(
@@ -543,7 +834,7 @@ def technical() -> dict:
     jobs = [
         timeseries(
             "Scheduler passes by outcome",
-            [target("memory:background_jobs:rate15m", "{{job}} · {{outcome}}")],
+            [target("memory:background_jobs:rate15m", "{{pass}} · {{outcome}}")],
             (0, 8, 8, 8),
             "Lease and task scheduler passes, by outcome. `degraded` is its own "
             "value and means the pass itself succeeded while some tenant's step "
@@ -554,7 +845,7 @@ def technical() -> dict:
         ),
         timeseries(
             "Unhealthy passes",
-            [target("memory:background_jobs:unhealthy_rate15m", "{{job}}")],
+            [target("memory:background_jobs:unhealthy_rate15m", "{{pass}}")],
             (8, 8, 8, 8),
             "Passes that failed or degraded, per scheduler. A steady non-zero "
             "line here is a subsystem that has been failing quietly for a while.",
@@ -563,7 +854,7 @@ def technical() -> dict:
         ),
         timeseries(
             "Job duration p95",
-            [target("memory:background_job_duration:p95_5m", "{{job}}")],
+            [target("memory:background_job_duration:p95_5m", "{{pass}}")],
             (16, 8, 8, 8),
             "How long one pass takes. Timed from when the job started running, "
             "not when it was scheduled, so queue wait is not counted as work.",
