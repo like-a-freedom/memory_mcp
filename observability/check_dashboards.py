@@ -192,11 +192,36 @@ def check_row_contents(path: pathlib.Path, row: dict, failures: list[str]) -> No
 # Families the crate records and deliberately does not chart, each with the
 # reason. A list rather than a heuristic: every entry is a decision somebody
 # made, and it has to be re-made when the family changes.
+_STDIO_ONLY = (
+    "recorded by the stdio-only filesystem watcher; the artifacts in this "
+    "directory describe the HTTP profile, which refuses MEMORY_INGESTION_INBOX "
+    "at startup and never wires a watcher, so a panel of it would be empty in "
+    "every deployment it is deployed to"
+)
 UNREAD_BY_DECISION = {
+    # Filesystem ingestion is the stdio-only path. `MEMORY_INGESTION_INBOX` is
+    # refused at startup in the HTTP profile, and the HTTP binary never wires a
+    # watcher, so a panel or rule over `memory_fs_watch_*` is empty in every
+    # deployment these artifacts describe. The families stay in `DESCRIPTIONS`
+    # because a stdio build still records them for an operator who brings their
+    # own Prometheus — deleting the vocabulary would make the exporter describe
+    # a family the code records.
+    #
+    # `queue_depth` carries a second reason, independent of the profile: it is set
+    # once at startup from a recovery pass and never updated, so it is a snapshot
+    # of what was queued when the process started. Charting it draws that snapshot
+    # as if it were a backlog.
+    "memory_fs_watch_revisions_total": _STDIO_ONLY,
+    "memory_fs_watch_retries_total": _STDIO_ONLY,
+    "memory_fs_watch_revision_duration_seconds": _STDIO_ONLY,
+    "memory_fs_watch_scan_files_total": _STDIO_ONLY,
+    "memory_fs_watch_inflight": _STDIO_ONLY,
+    "memory_fs_watch_degraded": _STDIO_ONLY,
     "memory_fs_watch_queue_depth": (
-        "set once at startup from a recovery pass and never updated, so a panel "
-        "of it would draw a snapshot as if it were a queue; the *Filesystem "
-        "ingestion — latency and caveats* row says so in prose"
+        _STDIO_ONLY
+        + " It is also set once at startup from a recovery pass and never "
+        "updated again, so a panel of it would draw a snapshot as if it were a "
+        "queue"
     ),
 }
 

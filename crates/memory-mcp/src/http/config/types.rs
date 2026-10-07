@@ -801,7 +801,7 @@ mod tests {
     // env-mutating tests in this module, which is the safety condition.
     static ENV_LOCK: Mutex<()> = Mutex::new(());
 
-    fn with_env<F: FnOnce()>(vars: &[(&str, &str)], f: F) {
+    fn with_env<T, F: FnOnce() -> T>(vars: &[(&str, &str)], f: F) -> T {
         let _g = ENV_LOCK.lock().unwrap_or_else(|e| e.into_inner());
         for k in [
             "MEMORY_MCP_HTTP_BIND",
@@ -856,6 +856,11 @@ mod tests {
             "MEMORY_MCP_HTTP_TASK_RETENTION_SECS",
             "MEMORY_MCP_HTTP_TASK_QUEUE_CAPACITY",
             "MEMORY_MCP_HTTP_TASK_SYNC_MAX_BYTES",
+            // Read by `validate()` for the stdio-only ingestion guard. A test
+            // that sets it and a sibling that calls `validate()` without the
+            // lock are the same race, so the variable belongs in this list for
+            // the same reason every other one does.
+            crate::config::fs_watch::ENV_INGESTION_INBOX,
         ] {
             // SAFETY: serialized by ENV_LOCK; no other thread reads these vars in tests.
             unsafe {
@@ -868,13 +873,30 @@ mod tests {
                 env::set_var(k, v);
             }
         }
-        f();
+        let result = f();
         for (k, _) in vars {
             // SAFETY: same as above.
             unsafe {
                 env::remove_var(k);
             }
         }
+        result
+    }
+
+    /// Validate a config with the process environment cleared and locked.
+    ///
+    /// `validate()` reads variables from the environment — the stdio-only
+    /// ingestion guard among them — and the environment is process-global. A
+    /// test that validates without this holds no lock, so a sibling setting one
+    /// of those variables under `ENV_LOCK` can land mid-call and the result
+    /// belongs to neither test. The guard test exposed this: sibling validation
+    /// tests failed while it temporarily set the inbox variable.
+    ///
+    /// Takes `&HttpConfig` rather than returning a closure to call inside
+    /// `with_env`, because nesting the two would deadlock on the same mutex:
+    /// the tests that pass a `vars` slice are already isolated.
+    fn validate_isolated(cfg: &HttpConfig) -> Result<(), MemoryError> {
+        with_env(&[], || cfg.validate())
     }
 
     fn base_required_env() -> Vec<(&'static str, String)> {
@@ -913,7 +935,7 @@ mod tests {
 
     #[test]
     fn default_for_test_validates() {
-        HttpConfig::default_for_test().validate().expect("valid");
+        validate_isolated(&HttpConfig::default_for_test()).expect("valid");
     }
 
     #[test]
@@ -1151,7 +1173,7 @@ mod tests {
         let mut cfg = HttpConfig::default_for_test();
         cfg.allowed_origins.clear();
         assert!(matches!(
-            cfg.validate(),
+            validate_isolated(&cfg),
             Err(MemoryError::ConfigInvalid(message)) if message.contains("ALLOWED_ORIGINS")
         ));
     }
@@ -1161,13 +1183,13 @@ mod tests {
         let mut cfg = HttpConfig::default_for_test();
         cfg.body_limit_bytes = 0;
         assert!(matches!(
-            cfg.validate(),
+            validate_isolated(&cfg),
             Err(MemoryError::ConfigInvalid(message)) if message.contains("BODY_LIMIT")
         ));
         let mut cfg = HttpConfig::default_for_test();
         cfg.request_deadline = std::time::Duration::ZERO;
         assert!(matches!(
-            cfg.validate(),
+            validate_isolated(&cfg),
             Err(MemoryError::ConfigInvalid(message)) if message.contains("deadline")
         ));
     }
@@ -1177,7 +1199,7 @@ mod tests {
         let mut cfg = HttpConfig::default_for_test();
         cfg.tenant_db = cfg.control_db.clone();
         assert!(matches!(
-            cfg.validate(),
+            validate_isolated(&cfg),
             Err(MemoryError::ConfigInvalid(message)) if message.contains("different namespace/database")
         ));
     }
@@ -1187,7 +1209,7 @@ mod tests {
         let mut cfg = HttpConfig::default_for_test();
         cfg.oidc_issuer.clear();
         assert!(matches!(
-            cfg.validate(),
+            validate_isolated(&cfg),
             Err(MemoryError::ConfigInvalid(message)) if message.contains("OIDC issuer")
         ));
     }
@@ -1197,7 +1219,7 @@ mod tests {
         let mut cfg = HttpConfig::default_for_test();
         cfg.oidc_allowed_alg = "none".into();
         assert!(matches!(
-            cfg.validate(),
+            validate_isolated(&cfg),
             Err(MemoryError::ConfigInvalid(message)) if message.contains("allowed algorithm")
         ));
     }
@@ -1211,7 +1233,7 @@ mod tests {
         for alg in ["auto", "RS384", "RS512"] {
             let mut cfg = HttpConfig::default_for_test();
             cfg.oidc_allowed_alg = alg.into();
-            cfg.validate()
+            validate_isolated(&cfg)
                 .unwrap_or_else(|error| panic!("{alg} must be accepted: {error}"));
         }
     }
@@ -1530,13 +1552,17 @@ mod tests {
     #[test]
     fn rejects_fs_watch_env_in_http_mode() {
         let mut vars = base_required_env();
-        vars.push(("SURREALDB_FS_WATCH_INBOX", "/tmp/inbox".to_string()));
+        vars.push((
+            crate::config::fs_watch::ENV_INGESTION_INBOX,
+            "/tmp/inbox".to_string(),
+        ));
         let refs: Vec<(&str, &str)> = vars.iter().map(|(k, v)| (*k, v.as_str())).collect();
         with_env(&refs, || {
             let cfg = HttpConfig::default_for_test();
             assert!(matches!(
                 cfg.validate(),
-                Err(MemoryError::ConfigInvalid(ref msg)) if msg.contains("SURREALDB_FS_WATCH_INBOX")
+                Err(MemoryError::ConfigInvalid(ref msg))
+                    if msg.contains(crate::config::fs_watch::ENV_INGESTION_INBOX)
             ));
         });
     }
@@ -1545,7 +1571,10 @@ mod tests {
     fn rejects_open_signup_without_quotas() {
         let mut cfg = HttpConfig::default_for_test();
         cfg.signup_mode = SignupMode::Open;
-        assert!(matches!(cfg.validate(), Err(MemoryError::ConfigInvalid(_))));
+        assert!(matches!(
+            validate_isolated(&cfg),
+            Err(MemoryError::ConfigInvalid(_))
+        ));
     }
 
     fn local_browser_config() -> LocalBrowserConfig {
@@ -1597,10 +1626,11 @@ mod tests {
     #[test]
     fn local_mode_valid_config_passes() {
         let cfg = valid_local_config();
+        let result = validate_isolated(&cfg);
         assert!(
-            cfg.validate().is_ok(),
+            result.is_ok(),
             "a complete local config must validate: {:?}",
-            cfg.validate().err()
+            result.err()
         );
         assert!(cfg.has_method(BrowserAuthMethod::Local));
         assert!(!cfg.has_method(BrowserAuthMethod::Oidc));
@@ -1635,7 +1665,7 @@ mod tests {
             let mut cfg = valid_local_config();
             mutate(&mut cfg);
             assert!(
-                matches!(cfg.validate(), Err(MemoryError::ConfigInvalid(ref msg)) if msg.contains(name)),
+                matches!(validate_isolated(&cfg), Err(MemoryError::ConfigInvalid(ref msg)) if msg.contains(name)),
                 "setting {name} must be rejected"
             );
         }
@@ -1646,7 +1676,7 @@ mod tests {
         let mut cfg = valid_local_config();
         cfg.operator_identity_allowlist = vec!["someone@example.com".into()];
         assert!(matches!(
-            cfg.validate(),
+            validate_isolated(&cfg),
             Err(MemoryError::ConfigInvalid(ref msg)) if msg.contains("operator identity allowlist")
         ));
     }
@@ -1656,7 +1686,7 @@ mod tests {
         let mut cfg = valid_local_config();
         cfg.signup_mode = SignupMode::Open;
         assert!(matches!(
-            cfg.validate(),
+            validate_isolated(&cfg),
             Err(MemoryError::ConfigInvalid(ref msg)) if msg.contains("'oidc' authentication method")
         ));
     }
@@ -1666,7 +1696,7 @@ mod tests {
         let mut cfg = valid_local_config();
         cfg.signup_plan_limits = None;
         assert!(matches!(
-            cfg.validate(),
+            validate_isolated(&cfg),
             Err(MemoryError::ConfigInvalid(ref msg)) if msg.contains("plan limits")
         ));
     }
@@ -1676,7 +1706,7 @@ mod tests {
         let mut cfg = valid_local_config();
         cfg.public_base_url = "http://example.com".into();
         assert!(matches!(
-            cfg.validate(),
+            validate_isolated(&cfg),
             Err(MemoryError::ConfigInvalid(ref msg)) if msg.contains("HTTPS")
         ));
     }
@@ -1695,7 +1725,7 @@ mod tests {
             cfg.public_base_url = url.into();
             assert!(
                 matches!(
-                    cfg.validate(),
+                    validate_isolated(&cfg),
                     Err(MemoryError::ConfigInvalid(ref msg)) if msg.contains("HTTPS")
                 ),
                 "{url} must not satisfy the loopback exception"
@@ -1715,7 +1745,7 @@ mod tests {
             let mut cfg = valid_local_config();
             cfg.public_base_url = url.into();
             assert!(
-                cfg.validate().is_ok(),
+                validate_isolated(&cfg).is_ok(),
                 "{url} must be an acceptable public base URL"
             );
         }
@@ -1729,6 +1759,6 @@ mod tests {
         let cfg = valid_local_config();
         assert!(cfg.oidc_issuer.is_empty());
         assert!(cfg.oidc_client_id.is_empty());
-        assert!(cfg.validate().is_ok());
+        assert!(validate_isolated(&cfg).is_ok());
     }
 }

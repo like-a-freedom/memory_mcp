@@ -496,45 +496,12 @@ groups:
       # can have: it is guaranteed to fire where there is nothing to report, and
       # it is silenced in exactly the deployment that should not need it.
       #
-      # Without the guard an absent series leaves the whole expression empty,
-      # `empty == 0` is empty, and the rule stays quiet — which is correct: a
-      # build without `fs-watch` has no inbox to have stalled. A test in the
-      # crate's own checker asserts the guard is absent for the same reason.
-      - alert: FilesystemIngestionStalled
-        expr: |
-          sum(rate(memory_fs_watch_revisions_total{outcome="processed"}[1h])) == 0
-          and
-          max(memory_fs_watch_inflight) == 0
-        for: 30m
-        labels:
-          severity: ticket
-          feature: fs-watch
-        annotations:
-          summary: Filesystem ingestion has processed nothing for an hour
-          description: >-
-            The inbox watcher is running — the in-flight gauge says something
-            is inflating it — but no revision has completed in an hour. The
-            second condition excludes a service that is simply idle with an
-            empty queue. Fires only when the build carries `fs-watch` and the
-            deployment set `MEMORY_INGESTION_INBOX`.
-          dashboard: /d/memory_mcp-technical/filesystem-ingestion
-
-      - alert: WatcherDegraded
-        expr: |
-          max(max_over_time(memory_fs_watch_degraded[1h])) == 1
-        labels:
-          severity: page
-          feature: fs-watch
-        annotations:
-          summary: The filesystem watcher has given up
-          description: >-
-            The backend exhausted its retries and the event bridge exited. This
-            is a one-way latch: nothing resets it, so filesystem ingestion is
-            off until the process restarts. Read with `max_over_time` rather
-            than `avg` — averaging a step function reports a fraction of a
-            broken deployment.
-          dashboard: /d/memory_mcp-technical/filesystem-ingestion
-          runbook: docs/operations/LIMITATIONS.md
+      # The two watcher alerts that used to sit here are gone rather than
+      # guarded: filesystem ingestion is the stdio-only path, `MEMORY_INGESTION_INBOX`
+      # is refused at startup in this profile, and the HTTP binary never wires a
+      # watcher, so `memory_fs_watch_*` can never have a series here. An alert on
+      # a family this profile cannot produce is not quiet — it is a rule nobody
+      # can test and nobody should trust.
 
   # ─── Subsystems ─────────────────────────────────────────────────────────────
   - name: memory-subsystems

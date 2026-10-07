@@ -503,7 +503,6 @@ def technical() -> dict:
             "claim projection",
             "B",
         ),
-        target('memory:fs_watch_revisions:rate15m{outcome="failed"}', "failed revisions", "C"),
         target("sum(memory:auth_refusals:rate15m)", "sign-in refusals", "D"),
         target("sum(memory:runtime_refusals:rate15m)", "runtime refusals", "E"),
         target(
@@ -1030,125 +1029,6 @@ def technical() -> dict:
     ]
     sections.append(("Claims", claims))
 
-    fswatch = [
-        stat(
-            "Watcher degraded",
-            "max(memory_fs_watch_degraded)",
-            "short",
-            (0, 8, 5, 8),
-            "Whether the watcher backend exhausted its retries.\n\n"
-            "**A one-way latch.** Once this reads 1 it stays 1 for the process "
-            "lifetime — the retry loop has returned and nothing can set it back. "
-            "A dashboard that averaged it would report a fraction of a broken "
-            "deployment; this reads the value as it stands. A `1` means "
-            "filesystem ingestion is off and knowledge from the inbox has "
-            "stopped arriving.\n\n"
-            "Exported from watcher startup, so a running watcher reads `0` and "
-            "reads *No data* only when no watcher ever started.",
-            thresholds=[
-                {"color": "green", "value": None},
-                {"color": "red", "value": 1},
-            ],
-            decimals=0,
-        ),
-        timeseries(
-            "Revisions by outcome",
-            [target("memory:fs_watch_revisions:rate15m", "{{outcome}}")],
-            (10, 8, 8, 8),
-            "Inbox files processed, by outcome. This is the product's "
-            "automatic ingestion path: a rising `failed` count is knowledge that "
-            "stopped arriving, and nothing else in this deployment says so.",
-            unit="ops",
-            legend_calcs=["mean", "max"],
-        ),
-        timeseries(
-            "Retries by stage and reason",
-            [target("memory:fs_watch_retries:rate15m", "{{stage}} · {{reason}}")],
-            (18, 8, 6, 8),
-            "Retries while processing a revision, by the stage that failed and "
-            "why. `timeout` is a single revision exceeding its attempt limit; "
-            "the failure classes separate a bad file from an unreachable store.",
-            unit="ops",
-            legend_calcs=["mean", "max"],
-        ),
-    ]
-    # One band per row. A collapsed row whose children span two bands renders
-    # as a diagonal staircase in Grafana once the row sits below the top of the
-    # dashboard: the children are laid out in x order, one per line, and the
-    # declared second line is lost. So the section's second line of panels
-    # becomes a second row instead — checked by check_dashboards.py.
-    fswatch_detail = [
-        timeseries(
-            "Revision latency p95",
-            [target("memory:fs_watch_revision_duration:p95_5m", "{{outcome}}")],
-            (0, 8, 11, 8),
-            "How long one revision takes. A single revision may run to its "
-            "attempt timeout, so the upper percentiles can sit well past the "
-            "last reported bucket — a high number here is often a timeout, not "
-            "a slow success.",
-            unit="s",
-            legend_calcs=["max", "lastNotNull"],
-        ),
-        text(
-            "Queue depth is not a backlog",
-            "`memory_fs_watch_queue_depth` is deliberately absent from this "
-            "dashboard.\n\n"
-            "It is set **once**, at startup, from a recovery pass, and never "
-            "updated again. It is a snapshot of what was queued when the process "
-            "started, not the queue as it is now — a backlog that has been "
-            "growing for an hour is invisible in it, and a panel showing it "
-            "would invite exactly the wrong conclusion.\n\n"
-            "There is no live backlog gauge in this build. The honest signal for "
-            "a stuck queue is the retry and degraded panels in the row above.\n\n"
-            "*These series exist only when the build carries `fs-watch` **and** "
-            "the deployment set `MEMORY_INGESTION_INBOX`. Without both, the "
-            "panels are empty — which reads as 'off', not 'broken'.*",
-            (16, 8, 8, 8),
-        ),
-    ]
-    sections.append(("Filesystem ingestion", fswatch))
-    # The live levels together, and what the last startup scan found. Both are
-    # levels or one-window increases rather than trends: a queue depth that has
-    # been growing for a week and one that grew once and drained look identical
-    # on a trend, and only the current number tells them apart.
-    fswatch.append(
-        stat(
-            "Revisions in flight",
-            "memory_fs_watch_inflight",
-            "short",
-            (5, 8, 5, 8),
-            "Revisions being processed right now.\n\n"
-            "The live half of the watcher: queue depth is what is *waiting*, "
-            "this is what is *worked on*, and the two move together when the "
-            "watcher keeps up. A depth that climbs while this stays flat means "
-            "revisions arrive faster than they finish.\n\n"
-            "*Empty unless the deployment set `MEMORY_INGESTION_INBOX`.*",
-            decimals=0,
-        )
-    )
-    fswatch_detail.append(
-        timeseries(
-            "Startup scan, last 24 hours",
-            [target("memory:fs_watch_scan_files:increase1d", "{{outcome}}")],
-            (11, 8, 5, 8),
-            "What the inbox scan found when the watcher last started, by "
-            "outcome.\n\n"
-            "**Read it as a one-shot, not a trend.** The scan runs once at "
-            "startup, so this panel is flat at zero on any day it did not run "
-            "and steps once on the day it did — which is the honest shape, and "
-            "the reason it says what the *last* scan did rather than how busy "
-            "the watcher is (the two panels above answer that).\n\n"
-            "`skipped_symlink` and the other skips are not failures. The split "
-            "that matters is a scan which enqueued nothing because everything "
-            "was skipped, against one that enqueued nothing because every read "
-            "failed.",
-            unit="short",
-            stack=True,
-            legend_calcs=["sum"],
-        )
-    )
-    sections.append(("Filesystem ingestion — latency and caveats", fswatch_detail))
-
     sections.append((
         "Reference",
         [
@@ -1672,21 +1552,6 @@ def product() -> dict:
             unit="ops",
             legend_calcs=["mean", "max"],
         ),
-        timeseries(
-            "Filesystem ingestion",
-            [target("memory:fs_watch_revisions:rate15m", "{{outcome}}")],
-            (16, 8, 8, 8),
-            "Episodes arriving automatically from the inbox.\n\n"
-            "For a product owner this is the quiet one: when it stops, "
-            "knowledge stops accumulating and **nothing in the product says "
-            "so** — there is no user-visible error, because no user asked for "
-            "anything. The `failed` line growing is knowledge that has stopped "
-            "arriving, and *How fresh is the knowledge* is where that shows "
-            "up as an age.\n\n"
-            "*Empty unless the deployment set `MEMORY_INGESTION_INBOX`.*",
-            unit="ops",
-            legend_calcs=["mean", "max"],
-        ),
     ]
     sections.append(("Access and automation", access))
 
@@ -1744,9 +1609,13 @@ def product() -> dict:
                 "facts needs a judged query set, which is what "
                 "`crates/eval-harness` is for. A counter cannot answer it and "
                 "is not pretending to.\n"
-                "- Filesystem ingestion panels are empty unless the deployment "
-                "set `MEMORY_INGESTION_INBOX` — off reads as 'off', not "
-                "'broken'.\n"
+                "- No ingestion figure for a filesystem inbox. Filesystem "
+                "ingestion is the stdio-only path, and this dashboard "
+                "describes the HTTP profile that cannot run it, so a panel "
+                "here would be empty in every SaaS deployment. Knowledge that "
+                "arrives through the `ingest` tool is already counted: it "
+                "shows up in *What was learned*, and its freshness in *How "
+                "fresh is the knowledge*.\n"
                 "- *How fresh is the knowledge* reads no data until the first "
                 "capture. That is not a zero age; it is a service that has "
                 "never learned anything, which is the more urgent of the two "

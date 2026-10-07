@@ -1,8 +1,17 @@
 # Observability
 
-Two Grafana dashboards, forty-five recording rules and twenty alerts over the
+Two Grafana dashboards, forty-one recording rules and eighteen alerts over the
 metrics the `streamable-http` profile exports on `/metrics`, plus the scrape
 configuration that gets those metrics to a collector in the first place.
+
+**These artifacts describe the HTTP SaaS profile, and only that profile.** The
+stdio deployment is a local single process with no metrics backend of its own, so
+a panel it cannot populate is not a panel that is useful in both places — it is a
+panel that is empty in the one place it is deployed. Anything the HTTP profile
+cannot produce is therefore absent from these files rather than conditional
+inside them: filesystem ingestion, the stdio-only watcher, is the worked example,
+and the seven `memory_fs_watch_*` families are named in the checker with that
+reason instead of being quietly skipped.
 
 Everything here is generated or checked. The dashboards are built by
 `build_dashboards.py`, and three checkers stand in for `promtool`, which is
@@ -12,8 +21,8 @@ rather than keeping its own copy.
 
 ```
 observability/
-├── recording_rules.yml     45 rules in 10 groups
-├── alerts.yml              20 alerts in 8 groups
+├── recording_rules.yml     41 rules in 9 groups
+├── alerts.yml              18 alerts in 8 groups
 ├── prometheus.yml          scrape + rule_files, for Prometheus
 ├── vmagent/
 │   ├── vmagent.yml         what to scrape, for vmagent
@@ -167,8 +176,6 @@ an alert outliving its incident by the length of the long window.
 | `SchedulerStalled` | ticket | frequent pass quiet for 2h | — |
 | `MaintenanceNotRunning` | ticket | lifecycle pass quiet for 25h | — |
 | `WriteOnlyArchive` | ticket | capture for 7d, no recall for 24h | — |
-| `FilesystemIngestionStalled` | ticket | nothing processed for 1h | — |
-| `WatcherDegraded` | page | the one-way latch | — |
 | `BackgroundJobsFailing` | ticket | lease passes unhealthy 15m | — |
 | `RuntimeRefusals` | page | >0.1/s for 10m | — |
 | `RegistryInconsistent` | ticket | 30m of drift | — |
@@ -339,19 +346,20 @@ row reads *No data*, `ScrapeTargetDown` never evaluates, and `NoTraffic` —
 which reads the application's own counter — is the liveness signal that still
 works.
 
-**Filesystem ingestion panels are empty unless the feature is on.** The
-`memory_fs_watch_*` families exist only when the build carries `fs-watch` **and**
-the deployment set `MEMORY_INGESTION_INBOX`. Without both, those panels show
-nothing — which reads as "off", not "broken", and the dashboards say so on the
-panels themselves.
+**Filesystem ingestion is not on these dashboards at all.** It is the
+stdio-only path: the HTTP profile refuses `MEMORY_INGESTION_INBOX` at startup,
+and the HTTP binary never wires a watcher, so `memory_fs_watch_*` can never have
+a series in a deployment these artifacts are deployed to. The families stay in
+`DESCRIPTIONS` — a stdio build still records them for an operator who brings
+their own Prometheus — and the seven names are listed in the checker with that
+reason, rather than left as silent gaps. Knowledge arriving through the `ingest`
+tool is a different path and is charted throughout.
 
-**`memory_fs_watch_queue_depth` is deliberately not plotted.** It is set once,
-at startup, from a recovery pass, and never updated again. It is a snapshot of
-what was queued when the process started, not the queue as it is now, and a
-backlog that has been growing for an hour is invisible in it. A panel showing
-it would invite exactly the wrong conclusion. There is no live backlog gauge in
-this build; the honest signal for a stuck queue is the retry and degraded
-panels.
+**`memory_fs_watch_queue_depth` carries a second reason to stay unplotted.** It is
+set once, at startup, from a recovery pass, and never updated again. It is a
+snapshot of what was queued when the process started, not the queue as it is now,
+and a backlog that has been growing for an hour is invisible in it. A panel
+showing it would invite exactly the wrong conclusion.
 
 **`memory_claim_relations_active` under-reports.** A series appears only after
 its first write, so a schema with no relations of some outcome is absent from
@@ -365,9 +373,10 @@ In order of likelihood:
 1. **The rule has not been evaluated yet.** Recording rules run on their group's
    interval, 30 s. A freshly started Prometheus shows gaps until each rule has
    fired once.
-2. **The feature is off.** Filesystem ingestion needs `fs-watch` and
-   `MEMORY_INGESTION_INBOX`; the HTTP families need the `streamable-http`
-   profile. An absent series means the feature is off, not that it is idle.
+2. **The feature is off.** The HTTP families need the `streamable-http` profile.
+   An absent series means the feature is off, not that it is idle. Filesystem
+   ingestion is not a case here any more: it is stdio-only and has no panel in
+   this set at all.
 3. **The series has never been written.** Prometheus series are created lazily
    per label set, so `outcome="5xx"` does not exist on a service that has never
    returned a 5xx. The rules that care use `or vector(0)`, so a recorded rule
@@ -417,10 +426,11 @@ indistinguishable from a subsystem that is switched off.
 They also catch a metric nobody reads. `check_dashboards.py` fails when the
 crate exports a family that no recording rule and no panel mentions — a metric
 scraped on every request, stored forever, informing no one: a cost with no
-benefit, and nothing in the pipeline notices. The one family in that position is
-listed in the checker with its reason — `memory_fs_watch_queue_depth` is set once
-at startup and never updated, so a panel of it would draw a snapshot as if it
-were a queue.
+benefit, and nothing in the pipeline notices. Seven families are in that position
+and each is listed in the checker with its reason: the six
+`memory_fs_watch_*` that record what the stdio-only watcher did, plus
+`memory_fs_watch_queue_depth`, which additionally is set once at startup and
+never updated, so a panel of it would draw a snapshot as if it were a queue.
 
 Coverage is enforced in the crate as well, in the other direction. A family can
 be declared, described, and never recorded — invisible from outside the process,

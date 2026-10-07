@@ -265,14 +265,24 @@ pub(super) fn validate(cfg: &HttpConfig) -> Result<(), MemoryError> {
                 .into(),
         ));
     }
-    // fs-watch is the stdio-only ingestion path. The
-    // HTTP SaaS profile must not enable it; a
-    // deployment that sets the env var while running
-    // the HTTP binary has misconfigured itself.
-    if std::env::var("SURREALDB_FS_WATCH_INBOX").is_ok() {
-        return Err(MemoryError::ConfigInvalid(
-            "SURREALDB_FS_WATCH_INBOX must not be set in the HTTP SaaS profile".into(),
-        ));
+    // fs-watch is the stdio-only ingestion path, and the HTTP binary never
+    // wires it: `start_fs_watch` is reached only from the stdio `serve`
+    // runtime. A deployment that sets the inbox while running the HTTP binary
+    // believes ingestion is automatic when nothing reads the directory, so it
+    // is refused at startup rather than discovered when knowledge stops
+    // arriving.
+    //
+    // The name is the one `config::fs_watch` reads, taken from its constant
+    // rather than spelled out. This guard used to reject
+    // `SURREALDB_FS_WATCH_INBOX`, which nothing in the crate reads — it
+    // refused a dead name and let the live one through, which is the shape of
+    // guard that passes its own test and enforces nothing.
+    if std::env::var(crate::config::fs_watch::ENV_INGESTION_INBOX).is_ok() {
+        return Err(MemoryError::ConfigInvalid(format!(
+            "{} must not be set in the HTTP SaaS profile: filesystem ingestion \
+             is stdio-only, and the HTTP binary does not read it",
+            crate::config::fs_watch::ENV_INGESTION_INBOX
+        )));
     }
     Ok(())
 }

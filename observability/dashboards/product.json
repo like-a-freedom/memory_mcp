@@ -1925,93 +1925,6 @@
           ],
           "title": "Sign-in refusals by reason",
           "type": "timeseries"
-        },
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "${datasource}"
-          },
-          "description": "Episodes arriving automatically from the inbox.\n\nFor a product owner this is the quiet one: when it stops, knowledge stops accumulating and **nothing in the product says so** \u2014 there is no user-visible error, because no user asked for anything. The `failed` line growing is knowledge that has stopped arriving, and *How fresh is the knowledge* is where that shows up as an age.\n\n*Empty unless the deployment set `MEMORY_INGESTION_INBOX`.*",
-          "fieldConfig": {
-            "defaults": {
-              "color": {
-                "mode": "palette-classic"
-              },
-              "custom": {
-                "axisBorderShow": false,
-                "axisCenteredZero": false,
-                "axisLabel": "",
-                "axisPlacement": "auto",
-                "barAlignment": 0,
-                "drawStyle": "line",
-                "fillOpacity": 8,
-                "gradientMode": "none",
-                "hideFrom": {
-                  "legend": false,
-                  "tooltip": false,
-                  "viz": false
-                },
-                "insertNulls": false,
-                "lineInterpolation": "linear",
-                "lineWidth": 1,
-                "pointSize": 5,
-                "scaleDistribution": {
-                  "type": "linear"
-                },
-                "showPoints": "never",
-                "spanNulls": false,
-                "stacking": {
-                  "group": "A",
-                  "mode": "none"
-                },
-                "thresholdsStyle": {
-                  "mode": "off"
-                }
-              },
-              "mappings": [],
-              "min": 0,
-              "unit": "ops"
-            },
-            "overrides": []
-          },
-          "gridPos": {
-            "h": 8,
-            "w": 8,
-            "x": 16,
-            "y": 0
-          },
-          "id": 0,
-          "options": {
-            "legend": {
-              "calcs": [
-                "mean",
-                "max"
-              ],
-              "displayMode": "table",
-              "placement": "right",
-              "showLegend": true
-            },
-            "tooltip": {
-              "mode": "multi",
-              "sort": "desc"
-            }
-          },
-          "pluginVersion": "13.2.4",
-          "targets": [
-            {
-              "datasource": {
-                "type": "prometheus",
-                "uid": "${datasource}"
-              },
-              "editorMode": "code",
-              "expr": "memory:fs_watch_revisions:rate15m",
-              "legendFormat": "{{outcome}}",
-              "range": true,
-              "refId": "A"
-            }
-          ],
-          "title": "Filesystem ingestion",
-          "type": "timeseries"
         }
       ],
       "title": "Access and automation",
@@ -2046,7 +1959,7 @@
               "showLineNumbers": false,
               "showMiniMap": false
             },
-            "content": "**There are no latency percentiles here, on purpose.** This dashboard answers product questions \u2014 is the memory growing, are people arriving, what are they doing, is the knowledge any good. A p99 answers none of them, and a dashboard that makes its reader wade past it to reach the useful number is one that gets skimmed. Latency lives on the technical dashboard, which links here.\n\n**Five figures that mislead if read naively:**\n\n1. *What exists* reads levels, not totals. These used to be added to a counter, so the metric was the sum of every inventory ever read \u2014 opening the dashboard grew it by the size of the store.\n2. *What was learned* reads an **increase over a window**, not a rate. The underlying family counts things produced; its rate is not a quantity anyone asks about.\n3. *Context delivered* splits operations by what they do to the store \u2014 capture (`ingest`, `extract`) against recall (`assemble_context`, `resolve`, `explain`) \u2014 and leaves maintenance passes in neither. Splitting by name alone would put a decay pass next to a capture and call the sum traffic.\n4. *What each episode yields* and *recalls per capture* are **rates over a recent window**, so a quiet half hour and a busy one differ by an order of magnitude on the same day. They are shapes to read, not numbers to hold.\n5. *Access and automation* counts **arrivals and refusals through the OIDC flow, never people**. A first sign-up and a returning user are the same number, there is no label that could tell them apart without turning a traffic measure into a disclosure, and the local-admin path is not counted at all.\n\n**Known gaps, deliberately:**\n\n- No per-tenant breakdown. A tenant label would be unbounded in cardinality; the tenant fingerprint is in the logs instead, where a high-cardinality field belongs.\n- No active-user, activation or retention metric. Every one of them needs a user identifier to count, and this product's position is that a metric carrying one is a disclosure. Operations are counted instead: *Context delivered* is the closest honest stand-in, and it is a stand-in.\n- No token or cost-per-query figure. The tokens this service hands *back* are the caller's to measure \u2014 it never sees the model's bill for them, and what extraction spends internally belongs to the evaluation harness rather than to a product dashboard. A number here would be invented.\n- No retrieval-quality figure. Whether recall found the *right* facts needs a judged query set, which is what `crates/eval-harness` is for. A counter cannot answer it and is not pretending to.\n- Filesystem ingestion panels are empty unless the deployment set `MEMORY_INGESTION_INBOX` \u2014 off reads as 'off', not 'broken'.\n- *How fresh is the knowledge* reads no data until the first capture. That is not a zero age; it is a service that has never learned anything, which is the more urgent of the two states to be able to tell apart.",
+            "content": "**There are no latency percentiles here, on purpose.** This dashboard answers product questions \u2014 is the memory growing, are people arriving, what are they doing, is the knowledge any good. A p99 answers none of them, and a dashboard that makes its reader wade past it to reach the useful number is one that gets skimmed. Latency lives on the technical dashboard, which links here.\n\n**Five figures that mislead if read naively:**\n\n1. *What exists* reads levels, not totals. These used to be added to a counter, so the metric was the sum of every inventory ever read \u2014 opening the dashboard grew it by the size of the store.\n2. *What was learned* reads an **increase over a window**, not a rate. The underlying family counts things produced; its rate is not a quantity anyone asks about.\n3. *Context delivered* splits operations by what they do to the store \u2014 capture (`ingest`, `extract`) against recall (`assemble_context`, `resolve`, `explain`) \u2014 and leaves maintenance passes in neither. Splitting by name alone would put a decay pass next to a capture and call the sum traffic.\n4. *What each episode yields* and *recalls per capture* are **rates over a recent window**, so a quiet half hour and a busy one differ by an order of magnitude on the same day. They are shapes to read, not numbers to hold.\n5. *Access and automation* counts **arrivals and refusals through the OIDC flow, never people**. A first sign-up and a returning user are the same number, there is no label that could tell them apart without turning a traffic measure into a disclosure, and the local-admin path is not counted at all.\n\n**Known gaps, deliberately:**\n\n- No per-tenant breakdown. A tenant label would be unbounded in cardinality; the tenant fingerprint is in the logs instead, where a high-cardinality field belongs.\n- No active-user, activation or retention metric. Every one of them needs a user identifier to count, and this product's position is that a metric carrying one is a disclosure. Operations are counted instead: *Context delivered* is the closest honest stand-in, and it is a stand-in.\n- No token or cost-per-query figure. The tokens this service hands *back* are the caller's to measure \u2014 it never sees the model's bill for them, and what extraction spends internally belongs to the evaluation harness rather than to a product dashboard. A number here would be invented.\n- No retrieval-quality figure. Whether recall found the *right* facts needs a judged query set, which is what `crates/eval-harness` is for. A counter cannot answer it and is not pretending to.\n- No ingestion figure for a filesystem inbox. Filesystem ingestion is the stdio-only path, and this dashboard describes the HTTP profile that cannot run it, so a panel here would be empty in every SaaS deployment. Knowledge that arrives through the `ingest` tool is already counted: it shows up in *What was learned*, and its freshness in *How fresh is the knowledge*.\n- *How fresh is the knowledge* reads no data until the first capture. That is not a zero age; it is a service that has never learned anything, which is the more urgent of the two states to be able to tell apart.",
             "mode": "markdown"
           },
           "pluginVersion": "13.2.4",
