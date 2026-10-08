@@ -13,7 +13,6 @@ use axum::extract::Request;
 use axum::middleware::Next;
 use axum::response::Response;
 use serde::Serialize;
-use tracing::Instrument;
 use uuid::Uuid;
 
 use crate::logging::{LogLevel, StdoutLogger};
@@ -84,12 +83,12 @@ pub(crate) async fn request_log(mut req: Request, next: Next) -> Response {
     // scrape would pin the gauge at one for the whole time it took to render an
     // exposition — which is exactly the signal the dashboard describes as
     // meaningful only when it is caught across several scrapes.
-    // The request's span carries the correlation id, so a foreign event raised
-    // while the request is in flight (the embedded database, an HTTP client)
-    // is rendered with `req=` and joins the access log. Our own events carry
-    // their fields explicitly; only foreign lines read the span.
-    let span = tracing::info_span!("http_request", req = %request_id);
-    let mut response = next.run(req).instrument(span).await;
+    // The correlation scope carries the request id, so every event the request
+    // emits — our own and a foreign dependency's — is rendered with `req=` and
+    // joins the access log. Producers never thread the id; they read the
+    // ambient context (ADR-0080).
+    let mut response =
+        crate::logging::correlation::scope(request_id.to_string(), next.run(req)).await;
     if let Ok(value) = axum::http::HeaderValue::from_str(&request_id.to_string()) {
         response.headers_mut().insert(REQUEST_ID_HEADER, value);
     }
@@ -597,6 +596,96 @@ mod tests {
             Some(supplied.to_string().as_str()),
             "a caller-supplied id must survive the middleware"
         );
+    }
+
+    /// The correlation id the middleware mints must be the one a handler sees,
+    /// so a handler's own logs and the access line carry the same `req`.
+    #[tokio::test]
+    async fn a_handler_sees_the_request_correlation_id() {
+        let seen: std::sync::Arc<std::sync::Mutex<Option<String>>> =
+            std::sync::Arc::new(std::sync::Mutex::new(None));
+        let handler_seen = seen.clone();
+        let mut svc = Router::new()
+            .route(
+                "/",
+                get(move || {
+                    let seen = handler_seen.clone();
+                    async move {
+                        *seen.lock().expect("seen") = crate::logging::correlation::current();
+                        "ok"
+                    }
+                }),
+            )
+            .layer(axum::middleware::from_fn(request_log));
+        let req = Request::builder()
+            .method("GET")
+            .uri("/")
+            .body(Body::empty())
+            .unwrap();
+        let resp = svc.call(req).await.unwrap();
+
+        let header = resp
+            .headers()
+            .get(REQUEST_ID_HEADER)
+            .and_then(|value| value.to_str().ok())
+            .expect("the response advertises its id")
+            .to_owned();
+        let captured = seen
+            .lock()
+            .expect("seen")
+            .clone()
+            .expect("the handler must see the request id");
+        assert_eq!(
+            captured, header,
+            "the handler's correlation id and the client's id must match"
+        );
+    }
+
+    /// A non-UUID `x-request-id` is discarded and regenerated, never stored —
+    /// the log-injection vector.
+    #[tokio::test]
+    async fn a_non_uuid_request_id_header_is_replaced() {
+        let seen: std::sync::Arc<std::sync::Mutex<Option<String>>> =
+            std::sync::Arc::new(std::sync::Mutex::new(None));
+        let handler_seen = seen.clone();
+        let mut svc = Router::new()
+            .route(
+                "/",
+                get(move || {
+                    let seen = handler_seen.clone();
+                    async move {
+                        *seen.lock().expect("seen") = crate::logging::correlation::current();
+                        "ok"
+                    }
+                }),
+            )
+            .layer(axum::middleware::from_fn(request_log));
+        let req = Request::builder()
+            .method("GET")
+            .uri("/")
+            .header(REQUEST_ID_HEADER, "not-a-uuid")
+            .body(Body::empty())
+            .unwrap();
+        let resp = svc.call(req).await.unwrap();
+
+        let header = resp
+            .headers()
+            .get(REQUEST_ID_HEADER)
+            .and_then(|value| value.to_str().ok())
+            .expect("the response advertises its id")
+            .to_owned();
+        assert_ne!(header, "not-a-uuid", "the header value must be discarded");
+        assert!(
+            Uuid::parse_str(&header).is_ok(),
+            "a fresh id must be a UUID: {header}"
+        );
+        let captured = seen
+            .lock()
+            .expect("seen")
+            .clone()
+            .expect("the handler must see the request id");
+        assert_eq!(captured, header, "the handler sees the regenerated id");
+        assert_ne!(captured, "not-a-uuid", "never the inbound value");
     }
 
     /// A scrape must not be counted as traffic.
