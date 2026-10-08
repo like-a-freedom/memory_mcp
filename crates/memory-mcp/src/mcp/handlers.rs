@@ -698,8 +698,27 @@ impl ServerHandler for MemoryMcp {
             return Ok(CallToolResponse::Task(CreateTaskResult::new(task)));
         }
 
+        // The HTTP transport runs each request on a task of its own, so the
+        // correlation scope the access-log middleware opens does not reach the
+        // tool. rmcp carries the HTTP request parts on the context, so recover
+        // the id there and run the dispatch under it: every event the tool
+        // emits then carries the same `req=` as the access line (ADR-0080).
+        // Under stdio there is no HTTP request, no id is recovered, and the tool
+        // mints its own per-call id as before.
+        #[cfg(feature = "streamable-http")]
+        let correlation_id = context
+            .extensions
+            .get::<http::request::Parts>()
+            .and_then(|parts| parts.extensions.get::<crate::http::logging::RequestId>())
+            .map(ToString::to_string);
+        #[cfg(not(feature = "streamable-http"))]
+        let correlation_id: Option<String> = None;
+
         let tcc = ToolCallContext::new(self, request, context);
-        self.tool_router.call(tcc).await
+        match correlation_id {
+            Some(id) => crate::logging::correlation::scope(id, self.tool_router.call(tcc)).await,
+            None => self.tool_router.call(tcc).await,
+        }
     }
 
     async fn get_task(
