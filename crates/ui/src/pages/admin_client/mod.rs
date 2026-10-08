@@ -178,9 +178,9 @@ pub fn AdminClientDetailPage(account_id: String) -> Element {
         if let Some(created) = state.secret.read().as_ref() {
             OneTimeSecret {
                 id: "new-key-secret",
-                title: "New key secret",
+                title: "API key created",
                 secret: created.secret.clone(),
-                detail: Some(format!("Key {} ({})", created.name, created.id)),
+                detail: Some(format!("Key: {}", created.name)),
                 on_dismiss: dismiss_secret,
             }
         }

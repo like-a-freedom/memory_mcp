@@ -8,8 +8,8 @@
  *   - one accent colour (teal) reserved for interactive affordances;
  *   - one corner-radius scale: panels 12px, controls 8px, no pill shapes;
  *   - colour is semantic: only error/danger, success and warning states carry hue;
- *   - motion is confined to focus, hover and press feedback and is fully
- *     suppressed under `prefers-reduced-motion`.
+ *   - motion is confined to control feedback and opted into only when the
+ *     operator has not requested reduced motion.
  *
  * Typography uses the platform UI stack deliberately. This is an Operate
  * surface, where matching the operator's own system outranks brand expression,
@@ -22,40 +22,45 @@
 :root {
     color-scheme: dark;
 
-    --bg: #0b0e13;
-    --surface: #12161d;
-    --surface-raised: #171c25;
-    --surface-sunken: #0e1218;
-    --surface-hover: #1e242f;
+    --bg: oklch(0.162900 0.011679 260.6134);
+    --surface: oklch(0.199308 0.015425 261.5830);
+    --surface-raised: oklch(0.225575 0.019150 262.1009);
+    --surface-sunken: oklch(0.180836 0.013931 258.3593);
+    --surface-hover: color-mix(in oklch, var(--surface-raised) 95%, var(--fg));
 
-    --border: #232a36;
-    --border-strong: #323b4a;
+    --border: oklch(0.283623 0.024301 261.1345);
+    --border-strong: oklch(0.350400 0.028947 260.5764);
 
-    --fg: #e7eaf0;
-    --fg-muted: #a7b1c2;
-    --fg-subtle: #8b96a5;
+    --fg: oklch(0.936483 0.008707 264.5207);
+    --fg-muted: oklch(0.757941 0.026838 261.1295);
+    --fg-subtle: oklch(0.669218 0.025602 256.1412);
 
-    --accent: #2fb8a6;
-    --accent-hover: #46cbb8;
-    --accent-text: #04211d;
-    --focus: #6fd7c9;
+    --accent: oklch(0.707509 0.116060 181.9146);
+    --accent-hover: color-mix(in oklch, var(--accent) 80%, oklch(1 0 none));
+    --accent-active: color-mix(in oklch, var(--accent) 90%, var(--accent-text));
+    --accent-text: oklch(0.224640 0.035605 182.4375);
+    --focus: oklch(0.812827 0.099517 184.0540);
 
-    --danger: #ff8b92;
-    --danger-bg: #241316;
-    --danger-hover: #331a1e;
-    --danger-border: #7a3038;
-    --danger-text: #2b0d10;
+    --danger: oklch(0.764815 0.140451 17.1225);
+    --danger-bg: oklch(0.211506 0.028545 8.3002);
+    --danger-hover: color-mix(in oklch, var(--danger-bg) 92%, var(--danger));
+    --danger-solid-hover: color-mix(in oklch, var(--danger) 80%, oklch(1 0 none));
+    --danger-active: color-mix(in oklch, var(--danger) 90%, var(--danger-text));
+    --danger-border: oklch(0.415643 0.103383 16.2294);
+    --danger-text: oklch(0.209352 0.049888 16.3565);
 
-    --success: #56d364;
-    --success-bg: #0f1f14;
-    --success-border: #2b6a38;
+    --success: oklch(0.771689 0.188035 145.4797);
+    --success-bg: oklch(0.220994 0.030726 153.2427);
+    --success-border: oklch(0.469729 0.102496 148.0505);
 
-    --warning: #e8b25c;
-    --warning-bg: #241c0f;
-    --warning-border: #6b5223;
+    --warning: oklch(0.796348 0.121000 77.1414);
+    --warning-bg: oklch(0.232082 0.026019 79.0783);
+    --warning-border: oklch(0.454526 0.071944 80.9577);
 
     --radius-panel: 12px;
     --radius-control: 8px;
+    --sticky-shadow-inline: 1px;
+    --page-gutter: clamp(1rem, 0.5rem + 2vw, 1.5rem);
 
     /* Spacing scale. Every gap, padding and margin in this file is one of these
        steps, so two blocks that should touch agree on where they touch. The
@@ -84,12 +89,7 @@
     --text-md: 1rem;       /* 16px — body copy and form controls (also the
                               iOS no-zoom floor; see the input rule below) */
     --text-lg: 1.25rem;    /* 20px — panel headings */
-    --text-xl: 1.75rem;    /* 28px — page titles */
-
-    /* The page title steps down one notch at phone widths. It is the one entry
-       that leaves the scale: a 28px title is the desktop reading distance, and
-       the same title on a phone held 30cm away is a banner rather than a name. */
-    --text-xl-sm: 1.5rem;  /* 24px — page titles below the tablet breakpoint */
+    --text-xl: clamp(1.5rem, 1.25rem + 1vw, 1.75rem); /* 24–28px — page titles */
 
     /* Leading, by role. Unitless, so it scales with the size it is paired with
        rather than freezing at one pixel value. */
@@ -103,7 +103,7 @@
     --font-mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas,
         "Liberation Mono", monospace;
 
-    --shadow-panel: 0 1px 2px rgb(0 0 0 / 40%);
+    --shadow-panel: 0 1px 2px color-mix(in oklch, oklch(0 0 none) 40%, transparent);
 }
 
 /* ═══ reset ════════════════════════════════════════════════════════════ */
@@ -116,14 +116,20 @@
 
 html {
     background-color: var(--bg);
+    scrollbar-gutter: stable;
     /* The WASM bundle cannot paint before it boots; painting the shell here is
        what stops the unstyled white flash on first load. */
     -webkit-text-size-adjust: 100%;
 }
 
+/* The CSP-safe modal uses [open], so :modal would never match this frame. */
+html:has(dialog.modal-layer[open]) {
+    overflow: clip;
+}
+
 body {
     margin: 0;
-    min-height: 100dvh;
+    min-block-size: 100dvh;
     background-color: var(--bg);
     color: var(--fg);
     font-family: var(--font-sans);
@@ -152,6 +158,7 @@ h1 {
     /* A page title is one or two lines. Balancing evens them out, so a client
        name that wraps does not leave one orphan word under it. */
     text-wrap: balance;
+    overflow-wrap: anywhere;
 }
 
 h2 {
@@ -172,7 +179,8 @@ h3 {
    557px line it never needed, which is why the hints below opt out. */
 p {
     margin: 0;
-    max-width: 68ch;
+    max-inline-size: 68ch;
+    overflow-wrap: anywhere;
     /* Avoids the single-word last line an operator reads as a stray. Not
        `balance`: that is for headings, and evening out a whole paragraph
        wastes the measure it is supposed to protect. */
@@ -182,7 +190,7 @@ p {
 ul,
 ol {
     margin: 0;
-    padding-left: var(--space-5);
+    padding-inline-start: var(--space-5);
 }
 
 a {
@@ -196,16 +204,18 @@ a {
     text-decoration-skip-ink: auto;
 }
 
-a:hover {
-    color: var(--accent-hover);
+@media (hover: hover) and (pointer: fine) {
+    a:hover {
+        color: var(--accent-hover);
+    }
 }
 
 /* The separator takes its spacing from the parent's `gap` like every other
    block-level sibling, so it cannot add a second rhythm on top of the page's. */
 hr {
     border: 0;
-    border-top: 1px solid var(--border);
-    width: 100%;
+    border-block-start: 1px solid var(--border);
+    inline-size: 100%;
     margin: 0;
 }
 
@@ -220,7 +230,8 @@ code {
     background-color: var(--surface-sunken);
     border: 1px solid var(--border);
     border-radius: var(--radius-control);
-    padding: 0.0625rem var(--space-2);
+    padding-block: 0.0625rem;
+    padding-inline: var(--space-2);
     overflow-wrap: break-word;
 }
 
@@ -234,7 +245,6 @@ td > code {
 :focus-visible {
     outline: 2px solid var(--focus);
     outline-offset: 2px;
-    border-radius: 2px;
 }
 
 ::selection {
@@ -244,11 +254,11 @@ td > code {
 
 .visually-hidden {
     position: absolute;
-    width: 1px;
-    height: 1px;
+    inline-size: 1px;
+    block-size: 1px;
     margin: -1px;
     padding: 0;
-    overflow: hidden;
+    overflow: clip;
     clip-path: inset(50%);
     white-space: nowrap;
     border: 0;
@@ -263,48 +273,66 @@ td > code {
 :root {
     --safe-inline-start: env(safe-area-inset-left, 0px);
     --safe-inline-end: env(safe-area-inset-right, 0px);
+    --safe-block-start: env(safe-area-inset-top, 0px);
+    --safe-block-end: env(safe-area-inset-bottom, 0px);
+}
+
+:root:dir(rtl) {
+    --safe-inline-start: env(safe-area-inset-right, 0px);
+    --safe-inline-end: env(safe-area-inset-left, 0px);
+    --sticky-shadow-inline: -1px;
 }
 
 .skip-link {
     position: absolute;
-    top: 0.5rem;
-    left: 0.5rem;
+    inset-block-start: 0.5rem;
+    inset-inline-start: 0.5rem;
     z-index: 10;
     transform: translateY(-200%);
     background-color: var(--accent);
     color: var(--accent-text);
     font-weight: 600;
     text-decoration: none;
-    padding: var(--space-2) var(--space-3);
+    padding-block: var(--space-2);
+    padding-inline: var(--space-3);
     border-radius: var(--radius-control);
 }
 
-.skip-link:focus {
+.skip-link:focus-visible {
     transform: translateY(0);
 }
 
-/* Reveal a focusable-but-offscreen target (the skip link's destination). */
-main:focus {
-    outline: none;
+@media (hover: hover) and (pointer: fine) {
+    .skip-link:hover {
+        background-color: var(--accent-hover);
+        color: var(--accent-text);
+    }
+}
+
+.skip-link:active {
+    background-color: var(--accent-active);
+    color: var(--accent-text);
 }
 
 .app-header {
-    border-bottom: 1px solid var(--border);
+    border-block-end: 1px solid var(--border);
     background-color: var(--surface);
 }
 
 .app-header-inner {
     display: flex;
+    flex-wrap: wrap;
     align-items: baseline;
     gap: var(--space-2);
-    max-width: 1120px;
-    margin: 0 auto;
+    max-inline-size: 1120px;
+    margin-block: 0;
+    margin-inline: auto;
     /* The side gutters carry the display's safe-area inset, so a notched device
        keeps the brand clear of the cutout. */
-    padding: var(--space-3)
-        calc(var(--space-6) + var(--safe-inline-end))
-        var(--space-3)
-        calc(var(--space-6) + var(--safe-inline-start));
+    padding-block-start: calc(var(--space-3) + var(--safe-block-start));
+    padding-block-end: var(--space-3);
+    padding-inline-start: calc(var(--page-gutter) + var(--safe-inline-start));
+    padding-inline-end: calc(var(--page-gutter) + var(--safe-inline-end));
 }
 
 .app-brand {
@@ -322,14 +350,15 @@ main:focus {
     display: flex;
     flex-direction: column;
     gap: var(--space-5);
-    max-width: 1120px;
-    margin: 0 auto;
+    max-inline-size: 1120px;
+    margin-block: 0;
+    margin-inline: auto;
     /* Same safe-area gutter as the header, so the two share one left edge on a
        notched device instead of the header sitting 24px outside the page. */
-    padding: var(--space-8)
-        calc(var(--space-6) + var(--safe-inline-end))
-        var(--space-10)
-        calc(var(--space-6) + var(--safe-inline-start));
+    padding-block-start: var(--space-8);
+    padding-block-end: calc(var(--space-10) + var(--safe-block-end));
+    padding-inline-start: calc(var(--page-gutter) + var(--safe-inline-start));
+    padding-inline-end: calc(var(--page-gutter) + var(--safe-inline-end));
 }
 
 /* Form-centric pages — sign-in, activation, account self-service, the 404 —
@@ -339,7 +368,7 @@ main:focus {
    leave a ragged right edge, and the column is equidistant from the
    viewport's edges at every width. */
 .container--narrow {
-    max-width: 37rem;
+    max-inline-size: 37rem;
 }
 
 /* A page's title with the one control that belongs to the whole page — back,
@@ -356,6 +385,10 @@ main:focus {
 .page-header > button,
 .page-header > a.button {
     flex: 0 0 auto;
+}
+
+.page-header > h1 {
+    min-inline-size: 0;
 }
 
 /* A column flex stretches its children. A button is as wide as its label
@@ -386,12 +419,14 @@ main:focus {
 .session-bar {
     display: flex;
     flex-wrap: wrap;
+    overflow-wrap: anywhere;
     align-items: center;
     gap: var(--space-2) var(--space-3);
     background-color: var(--surface);
     border: 1px solid var(--border);
     border-radius: var(--radius-panel);
-    padding: 0.625rem var(--space-3);
+    padding-block: 0.625rem;
+    padding-inline: var(--space-3);
     color: var(--fg-muted);
     font-size: var(--text-base);
 }
@@ -403,7 +438,7 @@ main:focus {
 
 /* Pushes the sign-out control to the trailing edge without a spacer element. */
 .session-bar > button {
-    margin-left: auto;
+    margin-inline-start: auto;
 }
 
 .session-expiry {
@@ -417,7 +452,7 @@ form {
     display: flex;
     flex-direction: column;
     gap: var(--space-4);
-    max-width: 34rem;
+    max-inline-size: 34rem;
 }
 
 /* A form's submit control is as wide as its label, not as wide as the form: a
@@ -455,10 +490,10 @@ input[type="text"],
 input[type="password"],
 input[type="number"],
 input[type="email"] {
-    width: 100%;
+    inline-size: 100%;
     /* One control height across the console: fields, buttons and links in a
        form row share the same box, so their tops and bottoms line up. */
-    min-height: 2.5rem;
+    min-block-size: 2.5rem;
     background-color: var(--surface-sunken);
     color: var(--fg);
     font-family: inherit;
@@ -469,23 +504,24 @@ input[type="email"] {
     line-height: var(--leading-snug);
     border: 1px solid var(--border-strong);
     border-radius: var(--radius-control);
-    padding: var(--space-2) 0.6875rem;
-    transition: border-color 120ms ease, background-color 120ms ease;
+    padding-block: var(--space-2);
+    padding-inline: 0.6875rem;
 }
 
 input::placeholder {
     color: var(--fg-subtle);
 }
 
-input[type="text"]:hover,
-input[type="password"]:hover,
-input[type="number"]:hover {
-    border-color: var(--fg-subtle);
+@media (hover: hover) and (pointer: fine) {
+    input:is([type="text"], [type="password"], [type="number"], [type="email"]):hover:not(:disabled):not([aria-disabled="true"]) {
+        border-color: var(--fg-subtle);
+    }
 }
 
 input[type="text"]:focus-visible,
 input[type="password"]:focus-visible,
-input[type="number"]:focus-visible {
+input[type="number"]:focus-visible,
+input[type="email"]:focus-visible {
     border-color: var(--accent);
     outline-offset: 0;
 }
@@ -503,8 +539,9 @@ input:disabled {
 }
 
 input[type="checkbox"] {
-    width: 1rem;
-    height: 1rem;
+    flex: 0 0 auto;
+    inline-size: 1.5rem;
+    block-size: 1.5rem;
     margin: 0;
     accent-color: var(--accent);
     /* A checkbox has no text of its own, but it is still a focusable form
@@ -518,6 +555,7 @@ input[type="checkbox"] {
     flex-direction: column;
     gap: var(--space-3);
     margin: 0;
+    min-inline-size: 0;
     padding: var(--space-3);
     border: 1px solid var(--border);
     border-radius: var(--radius-panel);
@@ -533,23 +571,27 @@ input[type="checkbox"] {
 
 .expiry > div {
     display: flex;
+    flex-wrap: wrap;
     align-items: center;
     gap: var(--space-2);
 }
 
 .expiry > div > label {
-    white-space: nowrap;
+    min-block-size: 1.5rem;
+    align-content: center;
 }
 
 /* The range hint beside the day count is an example, not a label, so it keeps
    the dimmer colour and is exempt from the label scale above. */
 .expiry > div > span {
+    flex: 1 1 8rem;
     color: var(--fg-subtle);
     font-size: var(--text-sm);
 }
 
 .expiry > div > input[type="number"] {
-    width: 7rem;
+    flex: 0 0 auto;
+    inline-size: min(100%, 7rem);
 }
 
 /* ═══ buttons ══════════════════════════════════════════════════════════ */
@@ -560,61 +602,60 @@ a.button {
     align-items: center;
     justify-content: center;
     gap: var(--space-1);
-    min-height: 2.5rem;
+    min-block-size: 2.5rem;
     background-color: var(--surface-raised);
     color: var(--fg);
     font-family: inherit;
     font-size: var(--text-base);
     font-weight: 500;
     line-height: var(--leading-tight);
-    white-space: nowrap;
+    white-space: normal;
+    text-wrap: balance;
     border: 1px solid var(--border-strong);
     border-radius: var(--radius-control);
-    padding: var(--space-2) var(--space-3);
+    padding-block: var(--space-2);
+    padding-inline: var(--space-3);
     cursor: pointer;
     text-decoration: none;
-    transition: background-color 120ms ease, border-color 120ms ease,
-        transform 60ms ease;
 }
 
-button:hover:not(:disabled),
-a.button:hover {
+@media (hover: hover) and (pointer: fine) {
+    button:hover:not(:disabled):not([aria-disabled="true"]),
+    a.button:hover:not([aria-disabled="true"]) {
+        background-color: var(--surface-hover);
+        border-color: var(--fg-subtle);
+        color: var(--fg);
+    }
+}
+
+button:active:not(:disabled):not([aria-disabled="true"]),
+a.button:active {
     background-color: var(--surface-hover);
     border-color: var(--fg-subtle);
-    color: var(--fg);
 }
 
-button:active:not(:disabled),
-a.button:active {
-    transform: translateY(1px);
-}
-
-button:focus-visible,
-a.button:focus-visible {
-    box-shadow: 0 0 0 3px rgb(111 215 201 / 22%);
-}
-
-button:disabled {
+button:disabled,
+button[aria-disabled="true"] {
     opacity: 0.5;
     cursor: not-allowed;
 }
 
-/* Primary: every <form> has exactly one submit control, so `type="submit"` is
-   the primary affordance and `type="button"` is always secondary. No page
-   carries two controls with the same intent — the one exception is the
-   one-time secret panel, whose Copy action is the panel's whole purpose and
-   therefore takes the same accent (`.secret > button:first-of-type` below). */
-button[type="submit"] {
+/* Forms have one submit action; dialogs name their primary action explicitly. */
+button[type="submit"],
+button.button--primary {
     background-color: var(--accent);
     color: var(--accent-text);
     font-weight: 600;
     border-color: var(--accent);
 }
 
-button[type="submit"]:hover:not(:disabled) {
-    background-color: var(--accent-hover);
-    border-color: var(--accent-hover);
-    color: var(--accent-text);
+@media (hover: hover) and (pointer: fine) {
+    button[type="submit"]:hover:not(:disabled):not([aria-disabled="true"]),
+    button.button--primary:hover:not(:disabled):not([aria-disabled="true"]) {
+        background-color: var(--accent-hover);
+        border-color: var(--accent-hover);
+        color: var(--accent-text);
+    }
 }
 
 /* Destructive controls. `button.danger` is a solid button that starts or
@@ -627,10 +668,12 @@ button.danger {
     border-color: var(--danger);
 }
 
-button.danger:hover:not(:disabled) {
-    background-color: #ffa3a8;
-    border-color: #ffa3a8;
-    color: var(--danger-text);
+@media (hover: hover) and (pointer: fine) {
+    button.danger:hover:not(:disabled):not([aria-disabled="true"]) {
+        background-color: var(--danger-solid-hover);
+        border-color: var(--danger-solid-hover);
+        color: var(--danger-text);
+    }
 }
 
 a.button.button--danger,
@@ -640,11 +683,13 @@ button.button--danger {
     border-color: var(--danger-border);
 }
 
-a.button.button--danger:hover,
-button.button--danger:hover:not(:disabled) {
-    background-color: var(--danger-hover);
-    border-color: var(--danger);
-    color: var(--danger);
+@media (hover: hover) and (pointer: fine) {
+    a.button.button--danger:hover:not([aria-disabled="true"]),
+    button.button--danger:hover:not(:disabled):not([aria-disabled="true"]) {
+        background-color: var(--danger-hover);
+        border-color: var(--danger);
+        color: var(--danger);
+    }
 }
 
 /* Destructive confirmation: the confirming control inside a `.confirm` block. */
@@ -654,26 +699,18 @@ button.button--danger:hover:not(:disabled) {
     border-color: var(--danger-border);
 }
 
-.confirm > button:first-of-type:hover:not(:disabled) {
-    background-color: var(--danger-hover);
-    border-color: var(--danger);
-    color: var(--danger);
+@media (hover: hover) and (pointer: fine) {
+    .confirm > button:first-of-type:hover:not(:disabled):not([aria-disabled="true"]) {
+        background-color: var(--danger-hover);
+        border-color: var(--danger);
+        color: var(--danger);
+    }
 }
 
-/* The one-time secret panel's primary act. `:first-of-type` is always the
-   Copy control — it is rendered before the close controls — so the safe action
-   keeps the accent while the lossy action stays secondary. */
-.secret > button:first-of-type {
-    background-color: var(--accent);
-    color: var(--accent-text);
-    font-weight: 600;
-    border-color: var(--accent);
-}
-
-.secret > button:first-of-type:hover:not(:disabled) {
-    background-color: var(--accent-hover);
-    border-color: var(--accent-hover);
-    color: var(--accent-text);
+button.button--danger:disabled {
+    background-color: var(--surface-raised);
+    color: var(--fg-muted);
+    border-color: var(--border-strong);
 }
 
 .actions {
@@ -686,7 +723,7 @@ button.button--danger:hover:not(:disabled) {
    takes the trailing edge — the same move `.session-bar > button` makes —
    instead of sitting beside "Back to status" as an equal sibling. */
 .actions--split > :last-child {
-    margin-left: auto;
+    margin-inline-start: auto;
 }
 
 /* Standing copy that is not a message about something that just happened, and
@@ -720,7 +757,8 @@ button.button--danger:hover:not(:disabled) {
 .warning,
 .status {
     border-radius: var(--radius-panel);
-    padding: 0.625rem var(--space-3);
+    padding-block: 0.625rem;
+    padding-inline: var(--space-3);
     font-size: var(--text-base);
 }
 
@@ -746,7 +784,8 @@ p.error {
 }
 
 .success > p {
-    margin: 0 0 var(--space-1);
+    margin: 0;
+    margin-block-end: var(--space-1);
 }
 
 .warning {
@@ -768,7 +807,7 @@ p.error {
 .hint {
     color: var(--fg-muted);
     font-size: var(--text-sm);
-    max-width: 60ch;
+    max-inline-size: 60ch;
 }
 
 .empty {
@@ -777,9 +816,10 @@ p.error {
     background-color: var(--surface);
     border: 1px dashed var(--border-strong);
     border-radius: var(--radius-panel);
-    padding: var(--space-6) var(--space-4);
+    padding-block: var(--space-6);
+    padding-inline: var(--space-4);
     text-align: center;
-    max-width: none;
+    max-inline-size: none;
 }
 
 /* The panel's closing rule. It is a structural divider, not prose, so it
@@ -789,9 +829,9 @@ p.error {
 .readiness {
     color: var(--fg-muted);
     font-size: var(--text-base);
-    border-top: 1px solid var(--border);
-    padding-top: var(--space-3);
-    max-width: none;
+    border-block-start: 1px solid var(--border);
+    padding-block-start: var(--space-3);
+    max-inline-size: none;
 }
 
 .status-stack {
@@ -805,8 +845,9 @@ p.error {
     display: inline-flex;
     align-items: center;
     gap: 0.4rem;
-    min-height: 1.75rem;
-    padding: 0.2rem var(--space-2);
+    min-block-size: 1.75rem;
+    padding-block: 0.2rem;
+    padding-inline: var(--space-2);
     border: 1px solid var(--border-strong);
     border-radius: var(--radius-control);
     font-size: var(--text-xs);
@@ -816,8 +857,8 @@ p.error {
 }
 
 .status-badge::before {
-    width: 0.45rem;
-    height: 0.45rem;
+    inline-size: 0.45rem;
+    block-size: 0.45rem;
     border-radius: 50%;
     background-color: currentColor;
     content: "";
@@ -849,9 +890,8 @@ p.error {
 .status-detail {
     color: var(--fg-muted);
     font-size: var(--text-sm);
-    /* A reason is prose, so it breaks at words; `anywhere` below is the
-       stronger break a value read character by character needs. */
-    overflow-wrap: break-word;
+    /* Also contain an unbroken backend reason inside its table cell. */
+    overflow-wrap: anywhere;
 }
 
 .timestamp {
@@ -864,12 +904,13 @@ p.error {
     background-color: var(--surface);
     border: 1px solid var(--border);
     border-radius: var(--radius-panel);
-    padding: var(--space-2) var(--space-3);
+    padding-block: var(--space-2);
+    padding-inline: var(--space-3);
     /* One sentence an operator reads once, beside what it governs. The prose
        measure above would cap it on the same 13px and strand the second clause
        on a line of its own; `balance` evens the two lines so neither carries a
        single orphan word. */
-    max-width: 70ch;
+    max-inline-size: 70ch;
     text-wrap: balance;
 }
 
@@ -898,15 +939,16 @@ section.client-state > button {
 }
 
 section > h2 {
-    padding-bottom: var(--space-3);
-    border-bottom: 1px solid var(--border);
+    padding-block-end: var(--space-3);
+    border-block-end: 1px solid var(--border);
 }
 
 /* ═══ tables ═══════════════════════════════════════════════════════════ */
 
 .table-scroll {
-    max-width: 100%;
+    max-inline-size: 100%;
     overflow-x: auto;
+    overscroll-behavior-x: contain;
     border: 1px solid var(--border);
     border-radius: var(--radius-panel);
     background-color: var(--surface);
@@ -924,7 +966,7 @@ section > h2 {
 }
 
 table {
-    width: 100%;
+    inline-size: 100%;
     border-collapse: collapse;
     background-color: var(--surface);
     border: 1px solid var(--border);
@@ -950,7 +992,7 @@ section > .table-scroll {
 }
 
 thead th {
-    text-align: left;
+    text-align: start;
     color: var(--fg-subtle);
     font-size: var(--text-xs);
     font-weight: 600;
@@ -963,8 +1005,9 @@ thead th {
     text-transform: uppercase;
     white-space: nowrap;
     background-color: var(--surface-raised);
-    border-bottom: 1px solid var(--border-strong);
-    padding: 0.625rem var(--space-3);
+    border-block-end: 1px solid var(--border-strong);
+    padding-block: 0.625rem;
+    padding-inline: var(--space-3);
 }
 
 /* One cell padding for every cell in a body row. `tbody th[scope="row"]` had its
@@ -976,14 +1019,15 @@ thead th {
    while the button hangs below it. */
 tbody td,
 tbody th[scope="row"] {
-    border-top: 1px solid var(--border);
-    padding: 0.625rem var(--space-3);
+    border-block-start: 1px solid var(--border);
+    padding-block: 0.625rem;
+    padding-inline: var(--space-3);
     vertical-align: middle;
     font-variant-numeric: tabular-nums;
 }
 
 tbody th[scope="row"] {
-    text-align: left;
+    text-align: start;
     font-weight: 500;
     color: var(--fg-subtle);
     white-space: nowrap;
@@ -992,18 +1036,25 @@ tbody th[scope="row"] {
 /* A highlight on a row that cannot be acted on is a promise the page does not
    keep, so only the tables with actions in them react to the pointer. A row
    holding a confirmation is not itself an action. */
-.data-table tbody tr:hover {
-    background-color: var(--surface-raised);
+@media (hover: hover) and (pointer: fine) {
+    .data-table tbody tr:hover {
+        background-color: var(--surface-raised);
+    }
 }
 
-.data-table tbody tr.confirm-row:hover {
-    background-color: transparent;
+@media (hover: hover) and (pointer: fine) {
+    .data-table tbody tr.confirm-row:hover {
+        background-color: transparent;
+    }
 }
 
 /* A key name wraps at its hyphens into four ragged lines at phone widths; the
    tables scroll, so the name column keeps its width instead. */
 .data-table tbody tr:not(.confirm-row) > td:first-child {
+    max-inline-size: 16rem;
     white-space: nowrap;
+    overflow: clip;
+    text-overflow: ellipsis;
 }
 
 /* A row action is not the page's primary control: it borrows the status
@@ -1011,8 +1062,9 @@ tbody th[scope="row"] {
    a column of them reads as row affordances rather than a column of banners.
    The confirmation row keeps the full-size pair — that pair is the decision. */
 .data-table tbody tr:not(.confirm-row) button {
-    min-height: 1.75rem;
-    padding: 0.2rem var(--space-2);
+    min-block-size: 1.75rem;
+    padding-block: 0.2rem;
+    padding-inline: var(--space-2);
     font-size: var(--text-sm);
 }
 
@@ -1020,9 +1072,9 @@ tbody th[scope="row"] {
    buttons form one line down the table instead of floating mid-cell. */
 .data-table thead th:last-child,
 .data-table tbody tr:not(.confirm-row) > td:last-child {
-    width: 1%;
+    inline-size: 1%;
     white-space: nowrap;
-    text-align: right;
+    text-align: end;
 }
 
 /* The name is the row's identity, so it stays in view while the wide table
@@ -1030,7 +1082,7 @@ tbody th[scope="row"] {
 .data-table thead th:first-child,
 .data-table tbody tr:not(.confirm-row) > td:first-child {
     position: sticky;
-    left: 0;
+    inset-inline-start: 0;
     z-index: 1;
 }
 
@@ -1040,14 +1092,16 @@ tbody th[scope="row"] {
 
 .data-table tbody tr:not(.confirm-row) > td:first-child {
     background-color: var(--surface);
-    box-shadow: 1px 0 0 var(--border);
+    box-shadow: var(--sticky-shadow-inline) 0 0 var(--border);
 }
 
 /* The pinned name paints its own background, so it follows the row's hover
    too: a sticky cell that stays dark on a highlighted row looks like a
    rendering fault. */
-.data-table tbody tr:not(.confirm-row):hover > td:first-child {
-    background-color: var(--surface-raised);
+@media (hover: hover) and (pointer: fine) {
+    .data-table tbody tr:not(.confirm-row):hover > td:first-child {
+        background-color: var(--surface-raised);
+    }
 }
 
 /* The confirmation panel fills the cell it is placed in, so the row reads as one
@@ -1058,15 +1112,15 @@ tbody th[scope="row"] {
 
 .confirm-row .confirm {
     border: 0;
-    border-top: 1px solid var(--warning-border);
+    border-block-start: 1px solid var(--warning-border);
     border-radius: 0;
-    width: 100%;
+    inline-size: 100%;
 }
 
 /* The shared 34rem measure is for a floating dialog, not for a block that
    continues a table row or answers a question inside a section. */
 section.client-state .confirm {
-    width: 100%;
+    inline-size: 100%;
 }
 
 /* The position summary and the pager that sits with it, below the rows it walks
@@ -1086,13 +1140,13 @@ section.client-state .confirm {
 /* The client list is wide; below the tablet breakpoint it scrolls rather than
    collapsing columns away from the operator. */
 .client-list {
-    min-width: 64rem;
+    min-inline-size: 64rem;
 }
 
 .client-list th:first-child,
 .client-list td:first-child {
     position: sticky;
-    left: 0;
+    inset-inline-start: 0;
     z-index: 1;
     background-color: var(--surface);
 }
@@ -1103,22 +1157,29 @@ section.client-state .confirm {
 
 .client-list td:first-child {
     font-weight: 500;
-    box-shadow: 1px 0 0 var(--border);
+    box-shadow: var(--sticky-shadow-inline) 0 0 var(--border);
 }
 
 /* The pinned first column paints its own background, so it has to follow the
    row's hover too: a sticky cell that stays dark on a highlighted row looks
    like a rendering fault. */
-.client-list tbody tr:hover td:first-child {
-    background-color: var(--surface-raised);
+@media (hover: hover) and (pointer: fine) {
+    .client-list tbody tr:hover td:first-child {
+        background-color: var(--surface-raised);
+    }
 }
 
 .client-list td:first-child a {
+    display: block;
+    overflow: clip;
+    text-overflow: ellipsis;
     text-decoration: none;
 }
 
-.client-list td:first-child a:hover {
-    text-decoration: underline;
+@media (hover: hover) and (pointer: fine) {
+    .client-list td:first-child a:hover {
+        text-decoration: underline;
+    }
 }
 
 /* ═══ dialogs, confirmations and the one-time secret ═══════════════════ */
@@ -1128,14 +1189,18 @@ dialog.modal-layer {
     inset: 0;
     z-index: 20;
     display: grid;
-    place-items: center;
-    width: 100%;
-    max-width: none;
-    height: 100%;
-    max-height: none;
+    place-items: safe center;
+    inline-size: 100%;
+    max-inline-size: none;
+    block-size: 100dvh;
+    max-block-size: none;
     margin: 0;
-    padding: var(--space-4);
-    background-color: rgb(11 14 19 / 82%);
+    padding-block-start: calc(var(--space-4) + var(--safe-block-start));
+    padding-block-end: calc(var(--space-4) + var(--safe-block-end));
+    padding-inline-start: calc(var(--space-4) + var(--safe-inline-start));
+    padding-inline-end: calc(var(--space-4) + var(--safe-inline-end));
+    /* Keep the source hue on the zero-alpha endpoint as well. */
+    background-color: color-mix(in oklch, var(--bg) 82%, oklch(from var(--bg) l c h / 0));
     border: 0;
     color: var(--fg);
 }
@@ -1149,10 +1214,26 @@ dialog.modal-layer {
     background-color: var(--surface-raised);
     border: 1px solid var(--border-strong);
     border-radius: var(--radius-panel);
-    width: min(100%, 34rem);
-    max-height: calc(100dvh - 2rem);
+    inline-size: min(100%, 34rem);
+    max-block-size: calc(100dvh - var(--space-8) - var(--safe-block-start) - var(--safe-block-end));
     overflow-y: auto;
+    overscroll-behavior-y: contain;
+    scrollbar-gutter: stable;
     padding: var(--space-5);
+}
+
+.modal-layer > :is(.dialog, .secret) {
+    min-block-size: 0;
+}
+
+.modal-layer > :is(.dialog, .secret) > * {
+    flex-shrink: 0;
+}
+
+.confirm {
+    max-block-size: none;
+    overflow: visible;
+    scrollbar-gutter: auto;
 }
 
 .dialog > h2 {
@@ -1170,7 +1251,7 @@ dialog.modal-layer {
 
 .confirm > button,
 .dialog > form > button,
-.secret > button {
+.secret-actions > button {
     align-self: flex-start;
 }
 
@@ -1195,24 +1276,78 @@ dialog.modal-layer {
    keeps its place beside the question instead of being pushed past the panel. */
 .confirm > p {
     flex: 1 1 22rem;
-    max-width: 28rem;
+    max-inline-size: 28rem;
     color: var(--warning);
 }
 
-/* The one-time secret is the highest-risk value this console ever renders: it
-   is visually quarantined and set in mono so it can be read aloud or retyped
-   without ambiguity. The deletion confirmation phrase is set the same way for
-   the same reason: it has to be copied or retyped exactly.
-
-   The heading keeps the ordinary foreground. A title is not a state: this used
-   to be the console's only coloured heading — decorative use of a semantic
-   token — and three amber elements at once left the one sentence that
-   genuinely is a warning with no colour left to distinguish it. */
+/* One-time delivery has three groups: the result, the copy field, and the exit.
+   Warning colour belongs to the one-time sentence, not the whole dialog. */
 .secret {
-    border-color: var(--warning-border);
+    inline-size: min(100%, 42rem);
+    gap: var(--space-4);
+    padding: var(--space-6);
 }
 
-.secret-value,
+.secret > .secret-detail {
+    font-size: var(--text-sm);
+    overflow-wrap: anywhere;
+}
+
+.secret-field {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2);
+    min-inline-size: 0;
+}
+
+.secret-field > label {
+    color: var(--fg);
+    font-size: var(--text-sm);
+    font-weight: 500;
+}
+
+.secret-copy-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: stretch;
+    gap: var(--space-2);
+    min-inline-size: 0;
+}
+
+.secret-copy-row > input.secret-value {
+    flex: 1 1 0;
+    min-inline-size: min(100%, 10ch);
+    inline-size: 100%;
+    font-family: var(--font-mono);
+    font-size: var(--text-sm);
+    color: var(--fg);
+    background-color: var(--surface-sunken);
+    border-style: solid;
+    user-select: all;
+}
+
+.secret-copy {
+    flex: 0 0 auto;
+    min-inline-size: 6rem;
+}
+
+.secret-copy-status {
+    color: var(--success);
+    font-size: var(--text-sm);
+}
+
+.secret-copy-status:empty {
+    display: none;
+}
+
+.secret-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: var(--space-2);
+    border-block-start: 1px solid var(--border-strong);
+    padding-block-start: var(--space-5);
+}
+
 .confirm-phrase {
     display: block;
     font-family: var(--font-mono);
@@ -1236,18 +1371,6 @@ dialog.modal-layer {
     background-color: transparent;
     padding: 0;
     font-size: inherit;
-}
-
-/* The delivery attestation: a successful copy checks it, and the operator who
-   captured the value by hand checks it themselves. The label wraps the box, so
-   the whole row is one target. */
-.secret-confirm {
-    display: flex;
-    align-items: center;
-    gap: var(--space-2);
-    color: var(--fg);
-    font-size: var(--text-base);
-    cursor: pointer;
 }
 
 /* The sentence explaining why a modal is open. Every modal renders one, so it
@@ -1291,7 +1414,8 @@ dialog.modal-layer {
 }
 
 .create-key > .field {
-    flex: 1 1 18rem;
+    flex: 999 1 18rem;
+    min-inline-size: min(100%, 18rem);
 }
 
 /* The hint is a sibling of the field and the button, not a field member: inside
@@ -1307,6 +1431,7 @@ dialog.modal-layer {
    so it opts back in: inheriting the column rule put the control level with
    the field's label and left the panel's lower half empty. */
 .create-key > button[type="submit"] {
+    flex: 1 1 auto;
     align-self: flex-end;
 }
 
@@ -1320,33 +1445,19 @@ dialog.modal-layer {
 /* ═══ responsive ═══════════════════════════════════════════════════════ */
 
 @media (max-width: 767px) {
-    .app-header-inner {
-        padding: var(--space-3)
-            calc(var(--space-4) + var(--safe-inline-end))
-            var(--space-3)
-            calc(var(--space-4) + var(--safe-inline-start));
-    }
-
     .container {
-        /* The safe-area inset is added, not replaced: a narrow gutter that
-           ignored the notch would put the content back under it. */
-        padding: var(--space-5)
-            calc(var(--space-4) + var(--safe-inline-end))
-            var(--space-8)
-            calc(var(--space-4) + var(--safe-inline-start));
+        padding-block-start: var(--space-5);
+        padding-block-end: calc(var(--space-8) + var(--safe-block-end));
         gap: var(--space-4);
     }
 
-    h1 {
-        font-size: var(--text-xl-sm);
-    }
-
     form {
-        max-width: none;
+        max-inline-size: none;
     }
 
-    .session-bar > button {
-        margin-left: 0;
+    .session-bar > button,
+    .actions--split > :last-child {
+        margin-inline-start: 0;
     }
 
     .actions {
@@ -1354,61 +1465,18 @@ dialog.modal-layer {
         align-items: stretch;
     }
 
-    /* Stacked full-width, the trailing margin would only shrink the target. */
-    .actions--split > :last-child {
-        margin-left: 0;
-    }
-
     .actions > button,
     .actions > a.button {
-        width: 100%;
+        inline-size: 100%;
     }
 
-    /* A thumb needs the whole width; a pointer does not. */
     form > button[type="submit"] {
         align-self: stretch;
     }
 
-    /* Touch targets: the desktop padding produces ~35px, which is above the
-       24px minimum but short of the 44px comfortably tappable size. */
-    button,
-    a.button {
-        min-height: 2.75rem;
-        padding: 0.625rem 0.875rem;
-    }
-
-    /* The compact row-action metrics win on specificity, so the touch target
-       has to be restored for them explicitly. */
-    .data-table tbody tr:not(.confirm-row) button {
-        min-height: 2.75rem;
-        padding: 0.625rem 0.875rem;
-    }
-
-    input[type="text"],
-    input[type="password"],
-    input[type="number"],
-    input[type="email"] {
-        min-height: 2.75rem;
-        /* The type size above is load-bearing here, not a desktop default: below
-           the iOS zoom floor the viewport zooms on focus and leaves the operator
-           looking at the wrong part of the form. Only the box grows at this
-           width — the type size must not come back down. */
-        font-size: var(--text-md);
-    }
-
-    /* A checkbox is its own target: the label beside it is clickable too, but at
-       this size the box itself has to meet the 24px minimum on its own. */
-    input[type="checkbox"] {
-        width: 1.5rem;
-        height: 1.5rem;
-    }
-
     section.client-metadata,
     section.client-state,
-    section.keys {
-        padding: 1rem;
-    }
-
+    section.keys,
     .dialog,
     .confirm,
     .secret,
@@ -1417,40 +1485,93 @@ dialog.modal-layer {
     .challenge-finish,
     .create-client,
     .create-key {
-        max-width: none;
-        padding: 1rem;
+        padding: var(--space-4);
     }
 
-    .create-key {
-        flex-direction: column;
-        align-items: stretch;
+    /* A pinned name must leave room to reach the scrolled row actions. */
+    .data-table tbody tr:not(.confirm-row) > td:first-child {
+        max-inline-size: min(8rem, 40vi);
     }
 
     .expiry > div > input[type="number"] {
-        width: 5.5rem;
+        inline-size: min(100%, 5.5rem);
     }
 
     .confirm > button,
     .dialog > form > button,
-    .secret > button {
+    .secret-actions > button {
         align-self: stretch;
+    }
+
+    .secret-copy-row > input.secret-value {
+        font-size: var(--text-md);
+    }
+
+    .secret-actions {
+        flex-direction: column;
+        padding-block-start: var(--space-4);
     }
 }
 
-/* ═══ reduced motion ═══════════════════════════════════════════════════ */
-
-@media (prefers-reduced-motion: reduce) {
-    *,
-    *::before,
-    *::after {
-        transition-duration: 0.01ms !important;
-        animation-duration: 0.01ms !important;
-        animation-iteration-count: 1 !important;
-        scroll-behavior: auto !important;
+/* Tap targets follow the input device, including a wide touch screen. */
+@media (any-pointer: coarse) {
+    button,
+    a.button,
+    .data-table tbody tr:not(.confirm-row) button {
+        min-block-size: 2.75rem;
+        padding-block: 0.625rem;
+        padding-inline: 0.875rem;
     }
 
-    button:active:not(:disabled),
-    a.button:active {
-        transform: none;
+    input:is([type="text"], [type="password"], [type="number"], [type="email"]) {
+        min-block-size: 2.75rem;
+    }
+
+    .expiry > div > label {
+        min-block-size: 2.75rem;
+    }
+
+    .client-list td:first-child a {
+        min-block-size: 2.75rem;
+        align-content: center;
+    }
+}
+
+/* Colour feedback remains instant when motion is reduced. */
+a:active {
+    color: var(--accent-hover);
+}
+
+button:is([type="submit"], .button--primary):active:not(:disabled):not([aria-disabled="true"]) {
+    background-color: var(--accent-active);
+    border-color: var(--accent-active);
+}
+
+button.danger:active:not(:disabled):not([aria-disabled="true"]) {
+    background-color: var(--danger-active);
+    border-color: var(--danger-active);
+    color: var(--danger-text);
+}
+
+:is(a.button.button--danger, button.button--danger, .confirm > button:first-of-type):active:not(:disabled):not([aria-disabled="true"]) {
+    background-color: var(--danger-hover);
+    border-color: var(--danger);
+    color: var(--danger);
+}
+
+/* Motion is scoped to the controls that actually move. */
+@media (prefers-reduced-motion: no-preference) {
+    input:is([type="text"], [type="password"], [type="number"], [type="email"]) {
+        transition: border-color 120ms ease, background-color 120ms ease;
+    }
+
+    button,
+    a.button {
+        transition: background-color 120ms ease, border-color 120ms ease, transform 60ms ease;
+    }
+
+    button:active:not(:disabled):not([aria-disabled="true"]),
+    a.button:active:not([aria-disabled="true"]) {
+        transform: translateY(1px);
     }
 }

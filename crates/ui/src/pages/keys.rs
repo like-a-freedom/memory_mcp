@@ -184,7 +184,7 @@ pub fn KeysPage() -> Element {
                                     tbody {
                                         for key in values.iter() {
                                             tr { key: "{key.id}",
-                                                td { "{key.name}" }
+                                                td { title: "{key.name}", "{key.name}" }
                                                 td { StatusBadge { value: key.status.clone() } }
                                                 td { Timestamp { value: key.created_at.clone() } }
                                                 td {
@@ -198,10 +198,14 @@ pub fn KeysPage() -> Element {
                                                     button {
                                                         r#type: "button",
                                                         class: "button--danger",
-                                                        disabled: pending_now,
+                                                        disabled: pending_now || key.status == "revoked",
                                                         onclick: {
                                                             let target = key.clone();
-                                                            move |_| revoke_target.set(Some(target.clone()))
+                                                            move |_| {
+                                                                if target.status != "revoked" && !*pending.peek() {
+                                                                    revoke_target.set(Some(target.clone()));
+                                                                }
+                                                            }
                                                         },
                                                         "Revoke…"
                                                     }
@@ -210,7 +214,7 @@ pub fn KeysPage() -> Element {
                                             // The confirmation sits under the row it asks
                                             // about: this list can be long, and a panel
                                             // after it appears off screen for most rows.
-                                            if confirming.as_deref() == Some(key.id.as_str()) {
+                                            if key.status != "revoked" && confirming.as_deref() == Some(key.id.as_str()) {
                                                 tr { class: "confirm-row",
                                                     td { colspan: "5",
                                                         div {
@@ -267,9 +271,9 @@ pub fn KeysPage() -> Element {
         if let Some(created) = new_key.read().as_ref() {
             OneTimeSecret {
                 id: "new-account-key",
-                title: "New API key",
+                title: "API key created",
                 secret: created.secret.clone(),
-                detail: Some(format!("Key {} ({})", created.name, created.id)),
+                detail: Some(format!("Key: {}", created.name)),
                 on_dismiss: move |_| {
                     let name = new_key.read().as_ref().map(|created| created.name.clone());
                     new_key.set(None);

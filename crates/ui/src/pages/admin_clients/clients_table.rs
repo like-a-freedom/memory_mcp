@@ -46,6 +46,7 @@ pub fn ClientsTable(items: Vec<ClientView>) -> Element {
                         tr { key: "{client.account_id}",
                             td {
                                 Link {
+                                    title: client.display_name.clone(),
                                     to: Route::AdminClientDetail {
                                         account_id: client.account_id.clone(),
                                     },

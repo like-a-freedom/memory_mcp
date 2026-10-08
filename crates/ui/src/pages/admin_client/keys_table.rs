@@ -58,7 +58,7 @@ pub fn KeysTable(
                 tbody {
                     for key in items {
                         tr { key: "{key.id}",
-                            td { "{key.name}" }
+                            td { title: "{key.name}", "{key.name}" }
                             td {
                                 StatusBadge {
                                     value: key.display_status(now_millis).label().to_owned(),

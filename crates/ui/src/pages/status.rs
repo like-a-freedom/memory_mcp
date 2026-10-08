@@ -66,27 +66,33 @@ pub fn StatusPage() -> Element {
                         }
                     },
                     Some(Ok(meta)) => rsx! {
-                        table {
-                            caption { class: "visually-hidden", "Account metadata" }
-                            tbody {
-                                tr { th { scope: "row", "ID" } td { code { "{meta.id}" } } }
-                                // Shown only when the provider asserted a name: an
-                                // unconditional row would leave an empty cell for
-                                // every account without one.
-                                if let Some(name) = meta.display_name.as_deref() {
-                                    tr {
-                                        th { scope: "row", "Display name" }
-                                        td { "{name}" }
+                        div {
+                            class: "table-scroll",
+                            role: "region",
+                            "aria-label": "Account metadata table",
+                            tabindex: "0",
+                            table {
+                                caption { class: "visually-hidden", "Account metadata" }
+                                tbody {
+                                    tr { th { scope: "row", "ID" } td { code { "{meta.id}" } } }
+                                    // Shown only when the provider asserted a name: an
+                                    // unconditional row would leave an empty cell for
+                                    // every account without one.
+                                    if let Some(name) = meta.display_name.as_deref() {
+                                        tr {
+                                            th { scope: "row", "Display name" }
+                                            td { "{name}" }
+                                        }
                                     }
-                                }
-                                tr {
-                                    th { scope: "row", "Status" }
-                                    td { StatusBadge { value: meta.status.clone() } }
-                                }
-                                tr { th { scope: "row", "Tenant" } td { code { "{meta.tenant_id}" } } }
-                                tr {
-                                    th { scope: "row", "Created" }
-                                    td { Timestamp { value: meta.created_at.clone() } }
+                                    tr {
+                                        th { scope: "row", "Status" }
+                                        td { StatusBadge { value: meta.status.clone() } }
+                                    }
+                                    tr { th { scope: "row", "Tenant" } td { code { "{meta.tenant_id}" } } }
+                                    tr {
+                                        th { scope: "row", "Created" }
+                                        td { Timestamp { value: meta.created_at.clone() } }
+                                    }
                                 }
                             }
                         }

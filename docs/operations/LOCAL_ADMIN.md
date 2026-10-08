@@ -382,10 +382,34 @@ working through.
 *There is no "are you sure you want to leave" guard on the client detail page.*
 While a secret is on screen the page content is `inert` behind the secret's own
 modal, so the way out of the page cannot be reached: the guard could never fire.
-The modal's own close gate is the guard: closing is refused until the clipboard
-has accepted the value or the operator confirms the key is saved ("I have saved
-this key"), so a stray Escape cannot lose a secret nobody has taken. The warning
-is stated in the panel itself.
+The modal states the one-time warning beside a read-only, selectable key field.
+"Copy" reports a successful clipboard write, and "Copy and close" dismisses
+only after that write succeeds. If the browser refuses clipboard access, the
+key stays visible with manual-copy guidance. "Close" and Escape dismiss directly
+so an operator who copied the key manually does not need an attestation checkbox.
+
+The current browser regressions are in `crates/ui/tests/api_keys.browser.mjs`.
+They load the compiled console under the shipped CSP with controlled account and
+admin APIs and fixture secrets. They cover table rounding, disabled revoked
+actions, copy and dismissal, clipboard refusal and pending writes, and shared
+CSS on sign-in, client list/detail and account pages. Layout cases include
+320–1280px widths, a short landscape viewport, 200% text, long names and reasons,
+wide touch input and RTL. They also check visible keyboard focus, small-text
+contrast, reduced-motion press feedback, modal scroll locking and reachable
+dialog exits. With Playwright and Chromium installed:
+
+```bash
+# From crates/ui; dx creates a public/ directory inside the output directory.
+dx bundle --platform web --package ui --locked --out-dir /tmp/memory-ui
+# From the repository root; the optional final argument saves screenshots.
+node crates/ui/tests/api_keys.browser.mjs /tmp/memory-ui/public
+```
+
+`MEMORY_MCP_PLAYWRIGHT_MODULE` can select an existing Playwright installation;
+`MEMORY_MCP_CHROMIUM_EXECUTABLE` can select an installed Chromium or Chrome.
+`MEMORY_MCP_BROWSER_FILTER` narrows case names, for example `css` or
+`landscape-css`. These fixture tests do not validate the real admin backend or
+establish visual coverage in Safari and Firefox.
 
 *Every modal frame takes focus as it opens, and no modal panel relies on
 `autofocus`.*
@@ -458,11 +482,9 @@ one. Three properties make it more than a smoke test:
   assertion would prove nothing. Escape reaches a `<dialog>` only while focus is
   inside it, so this is the executable form of the guarantee in §2.6 that the
   panel cannot strand the operator's focus on the document body.
-* It asserts the panel's **close gate**: while the value is untaken, Escape must
-  leave the panel open and warn, and only a proven or attested save may close it
-  and leave the page interactive again. That guard protects the one value the
-  backend cannot reissue, and until now it was described in prose with no
-  scenario covering it.
+* The retired harness asserted the panel's former **close gate**. The current
+  delivery flow has no attestation checkbox: Copy and close waits for a
+  successful clipboard write, while Close and Escape dismiss directly.
 * It asserts `navigator.clipboard.readText()` equals the secret that was just
   revealed, so a clipboard call that silently targets nothing fails. The runner
   registers the secret for redaction *before* any diagnostic can observe it, and
