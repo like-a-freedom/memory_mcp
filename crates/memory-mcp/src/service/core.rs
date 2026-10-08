@@ -893,14 +893,16 @@ mod tests {
     }
 
     #[test]
-    fn log_args_with_duration_adds_duration_ms_field() {
-        let args = crate::platform::log_event::log_args_with_duration(
-            json!({"scope": "org"}),
-            std::time::Duration::from_millis(42),
+    fn duration_ms_reports_whole_milliseconds() {
+        assert_eq!(
+            crate::platform::log_event::duration_ms(std::time::Duration::from_millis(42)),
+            42
         );
-
-        assert_eq!(args.get("scope").and_then(Value::as_str), Some("org"));
-        assert_eq!(args.get("duration_ms").and_then(Value::as_u64), Some(42));
+        // Sub-millisecond work rounds down to 0, never up to an invented 1ms.
+        assert_eq!(
+            crate::platform::log_event::duration_ms(std::time::Duration::from_micros(400)),
+            0
+        );
     }
 
     #[test]

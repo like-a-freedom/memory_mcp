@@ -21,7 +21,7 @@ use crate::models::{
     ContradictionWarning, Edge, EdgeOrigin, Episode, ExtractResult, ExtractedEntity, ExtractedFact,
     ExtractedLink, FactType,
 };
-use crate::platform::log_event::{log_args_with_duration, log_event};
+use crate::platform::log_event::{duration_ms, log_event};
 use crate::shared::temporal::now;
 
 #[derive(Debug, Default)]
@@ -439,7 +439,7 @@ pub async fn extract_from_episode(
     service.logger.log(
         log_event(
             "extract.from_episode.done",
-            log_args_with_duration(json!({"episode_id": episode_id}), timer.elapsed()),
+            json!({"episode_id": episode_id}),
             build_extract_log_result_with_metadata(
                 Some(&episode),
                 entities.len(),
@@ -451,7 +451,7 @@ pub async fn extract_from_episode(
             ),
             None,
             None,
-            None,
+            Some(duration_ms(timer.elapsed())),
         ),
         LogLevel::Info,
     );

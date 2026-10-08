@@ -191,7 +191,7 @@ fn log_remote_retry(
     event.insert("attempt".to_string(), json!(attempt));
     event.insert("max_attempts".to_string(), json!(max_attempts));
     event.insert("delay_ms".to_string(), json!(delay.as_millis() as u64));
-    event.insert("reason".to_string(), json!(message));
+    event.insert("error".to_string(), json!(message));
     crate::logging::emit(event, LogLevel::Warn);
 }
 

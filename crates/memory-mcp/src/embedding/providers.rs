@@ -156,7 +156,7 @@ fn validate_dimension_override(
                 json!("embedding.dimension_override_mismatch"),
             );
             event.insert(
-                "message".to_string(),
+                "error".to_string(),
                 json!(format!(
                     "SURREALDB_EMBEDDING_DIMENSION ({expected_dimension}) does not match \
                      provider dimension ({actual_dimension}), using provider dimension"

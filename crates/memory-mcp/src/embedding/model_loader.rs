@@ -27,7 +27,7 @@ pub fn is_model_cached_with_files(cache_dir: &Path, required: &[&str]) -> bool {
 fn log_message(logger: &StdoutLogger, level: LogLevel, msg: &str) {
     let mut event = HashMap::new();
     event.insert("op".to_string(), json!("embedding.model_loader"));
-    event.insert("message".to_string(), json!(msg));
+    event.insert("error".to_string(), json!(msg));
     logger.log(event, level);
 }
 

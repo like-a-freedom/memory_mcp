@@ -1024,14 +1024,11 @@ impl LoadedLfm2Gliner {
         self.logger.log(
             crate::platform::log_event::log_event(
                 "ner.vago.span_scores.done",
-                crate::platform::log_event::log_args_with_duration(
-                    serde_json::json!({"text_words": text_len}),
-                    timer.elapsed(),
-                ),
+                serde_json::json!({"text_words": text_len}),
                 serde_json::json!({"span_count": span_indices.len()}),
                 None,
                 None,
-                None,
+                Some(crate::platform::log_event::duration_ms(timer.elapsed())),
             ),
             crate::logging::LogLevel::Debug,
         );

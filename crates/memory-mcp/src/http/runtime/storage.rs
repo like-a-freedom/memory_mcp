@@ -336,7 +336,7 @@ fn log_tenant_embedding_degraded(namespace: &str, target_signature: &str, reason
         "target_signature".to_string(),
         serde_json::json!(target_signature),
     );
-    event.insert("reason".to_string(), serde_json::json!(reason));
+    event.insert("error".to_string(), serde_json::json!(reason));
     crate::logging::emit(event, crate::logging::LogLevel::Warn);
 }
 
@@ -708,7 +708,7 @@ fn log_index_reconcile(namespace: &str, existing: Option<usize>, target: usize, 
         serde_json::json!(existing),
     );
     event.insert("target_dimension".to_string(), serde_json::json!(target));
-    event.insert("reason".to_string(), serde_json::json!(reason));
+    event.insert("error".to_string(), serde_json::json!(reason));
     crate::logging::emit(event, crate::logging::LogLevel::Warn);
 }
 

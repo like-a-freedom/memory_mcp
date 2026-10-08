@@ -334,14 +334,14 @@ pub struct WarningEvent {
 }
 
 impl WarningEvent {
-    /// Build the event. `detail` is kept as one value because it is prose —
+    /// Build the event. The error text is kept as one value because it is prose —
     /// an error's `Display` — and splitting it on spaces would report a
     /// fragment as though it were the whole failure.
     #[must_use]
     pub fn new(op: &'static str, detail: &str) -> Self {
         let mut event = std::collections::HashMap::new();
         event.insert("op".into(), op.into());
-        event.insert("detail".into(), detail.to_string().into());
+        event.insert("error".into(), detail.to_string().into());
         Self { op, event }
     }
 
@@ -394,7 +394,7 @@ impl RequestWarning {
         crate::observability::record_runtime_refusal(self.op);
         let mut event = std::collections::HashMap::new();
         event.insert("op".into(), self.op.into());
-        event.insert("detail".into(), self.detail.into());
+        event.insert("error".into(), self.detail.into());
         event.insert("request_id".into(), self.request_id.to_string().into());
         logger.log(event, LogLevel::Warn);
     }
@@ -1136,7 +1136,7 @@ mod tests {
             recorded.iter().any(|line| {
                 line.contains(&format!("op={TEST_ONLY_OP}"))
                     && line.contains("WARN")
-                    && line.contains(r#"detail="tenant t1: disk is gone""#)
+                    && line.contains(r#"error="tenant t1: disk is gone""#)
             }),
             "a runtime warning must be a filterable, levelled line: {recorded:?}"
         );
@@ -1275,6 +1275,36 @@ mod tests {
                 .iter()
                 .any(|line| line.contains("op=http.quota.plan_load_failed")),
             "the warning must still be recorded: {recorded:?}"
+        );
+    }
+
+    /// Error text is one field name across the whole surface, so a collector
+    /// reads one query for every refusal and failure (ADR-0079 §4.1).
+    #[test]
+    fn a_request_warning_names_its_error_field() {
+        let sink = crate::logging::capture::install();
+        let id = Uuid::parse_str("11111111-2222-3333-4444-555555555555").unwrap();
+
+        RequestWarning::new(
+            "http.quota.plan_load_failed",
+            "registry unreachable",
+            RequestId(id),
+        )
+        .log_into(&StdoutLogger::from_env_with(|key| match key {
+            "RUST_LOG" => Some("warn".to_string()),
+            _ => None,
+        }));
+
+        let recorded = sink.lines();
+        assert!(
+            recorded
+                .iter()
+                .any(|line| line.contains("error=\"registry unreachable\"")),
+            "the warning must name an `error` field: {recorded:?}"
+        );
+        assert!(
+            !recorded.iter().any(|line| line.contains("detail=")),
+            "no event may use the old `detail` field: {recorded:?}"
         );
     }
 

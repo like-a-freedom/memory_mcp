@@ -8,7 +8,7 @@ use crate::knowledge::entity_extraction::NerScheduling;
 use crate::logging::LogLevel;
 use crate::memory::capabilities::deps::ExtractDeps;
 use crate::models::{EntityCandidate, ExtractedEntity};
-use crate::platform::log_event::{log_args_with_duration, log_event};
+use crate::platform::log_event::{duration_ms, log_event};
 use crate::shared::search::normalize_text;
 
 /// Extract entities from content.
@@ -78,7 +78,7 @@ pub async fn extract_entities(
     service.logger.log(
         log_event(
             "ner.extract.done",
-            log_args_with_duration(json!({"content_chars": content_chars}), timer.elapsed()),
+            json!({"content_chars": content_chars}),
             build_ner_log_result(
                 provider,
                 candidates.len(),
@@ -87,7 +87,7 @@ pub async fn extract_entities(
             ),
             None,
             None,
-            None,
+            Some(duration_ms(timer.elapsed())),
         ),
         LogLevel::Info,
     );
@@ -347,11 +347,11 @@ fn log_ner_error(
     service.logger.log(
         log_event(
             "ner.extract.error",
-            log_args_with_duration(json!({"content_chars": content_chars}), timer.elapsed()),
+            json!({"content_chars": content_chars}),
             build_ner_log_result(provider, 0, zero_shot_label_count, Some(&err.to_string())),
             None,
             None,
-            None,
+            Some(duration_ms(timer.elapsed())),
         ),
         LogLevel::Warn,
     );

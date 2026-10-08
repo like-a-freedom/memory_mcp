@@ -596,11 +596,11 @@ async fn generate_with_provider(
         logger.log(
             crate::platform::log_event::log_event(
                 "embedding.generate.skipped",
-                crate::platform::log_event::log_args_with_duration(args, timer.elapsed()),
+                args,
                 result,
                 None,
                 None,
-                None,
+                Some(crate::platform::log_event::duration_ms(timer.elapsed())),
             ),
             LogLevel::Debug,
         );
@@ -627,14 +627,14 @@ async fn generate_with_provider(
             logger.log(
                 crate::platform::log_event::log_event(
                     "embedding.generate.done",
-                    crate::platform::log_event::log_args_with_duration(args, timer.elapsed()),
+                    args,
                     crate::platform::log_event::build_embedding_log_result(
                         1,
                         Some(embedding.len()),
                     ),
                     None,
                     None,
-                    None,
+                    Some(crate::platform::log_event::duration_ms(timer.elapsed())),
                 ),
                 LogLevel::Info,
             );
@@ -648,11 +648,11 @@ async fn generate_with_provider(
             logger.log(
                 crate::platform::log_event::log_event(
                     "embedding.generate.error",
-                    crate::platform::log_event::log_args_with_duration(args, timer.elapsed()),
+                    args,
                     result,
                     None,
                     None,
-                    None,
+                    Some(crate::platform::log_event::duration_ms(timer.elapsed())),
                 ),
                 LogLevel::Warn,
             );
@@ -1068,6 +1068,27 @@ mod tests {
         );
         let result = service.generate_embedding("hello").await.unwrap();
         assert!(result.is_none());
+    }
+
+    /// The duration is a top-level token, not nested under `args`, so a
+    /// collector reads one placement for every operation (ADR-0079 §4.1).
+    #[tokio::test]
+    async fn a_generation_duration_is_a_top_level_token() {
+        let guard = crate::logging::capture::install();
+        let provider: Arc<dyn EmbeddingProvider> = Arc::new(ScriptedProvider::disabled(4));
+        let logger = StdoutLogger::new("debug");
+
+        generate_with_provider(&provider, &logger, "hello")
+            .await
+            .expect("a disabled provider is not an error");
+
+        let lines = guard.lines();
+        let line = lines
+            .iter()
+            .find(|line| line.contains("op=embedding.generate.skipped"))
+            .unwrap_or_else(|| panic!("the skip must be logged: {lines:?}"));
+        assert!(line.contains("duration_ms="), "top-level duration: {line}");
+        assert!(!line.contains("args.duration_ms"), "never nested: {line}");
     }
 
     /// The two adapters of `EmbeddingGeneration` both carry the input limit,

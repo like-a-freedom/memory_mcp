@@ -318,7 +318,7 @@ fn emit_preflight_log(
             serde_json::Value::String(request_id.to_string()),
         );
     }
-    crate::logging::StdoutLogger::from_env().log(event, crate::logging::LogLevel::Debug);
+    crate::logging::emit(event, crate::logging::LogLevel::Debug);
 }
 
 struct BodyCollectionFailure {

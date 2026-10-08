@@ -13,7 +13,7 @@ use crate::memory::capabilities::deps::ExtractDeps;
 use crate::memory::episode::build_extract_log_result;
 use crate::memory::episode::episode_from_record;
 use crate::models::{AccessPayload, ExtractResult};
-use crate::platform::log_event::log_args_with_duration;
+use crate::platform::log_event::duration_ms;
 use crate::platform::log_event::log_event;
 
 /// Capability for extracting entities, facts, and relationships.
@@ -54,7 +54,7 @@ impl ExtractCapability {
         deps.logger.log(
             log_event(
                 "extract",
-                log_args_with_duration(json!({"episode_id": episode_id}), timer.elapsed()),
+                json!({"episode_id": episode_id}),
                 build_extract_log_result(
                     episode.as_ref(),
                     payload.entities.len(),
@@ -64,7 +64,7 @@ impl ExtractCapability {
                 ),
                 access.as_ref(),
                 None,
-                None,
+                Some(duration_ms(timer.elapsed())),
             ),
             LogLevel::Info,
         );

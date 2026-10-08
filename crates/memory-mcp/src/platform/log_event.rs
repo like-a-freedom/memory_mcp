@@ -46,16 +46,14 @@ pub(crate) fn serialize_access(access: &AccessPayload) -> Value {
     })
 }
 
-/// Adds a `duration_ms` field to an args Value.
+/// The whole milliseconds `duration` names, saturating where the value does not
+/// fit a `u64`.
+///
+/// The duration travels top-level on the event, so this is the one conversion
+/// every `log_event` call site shares.
 #[must_use]
-pub fn log_args_with_duration(mut args: Value, duration: Duration) -> Value {
-    let duration_ms = u64::try_from(duration.as_millis()).unwrap_or(u64::MAX);
-    if let Some(map) = args.as_object_mut() {
-        map.insert("duration_ms".to_string(), json!(duration_ms));
-        args
-    } else {
-        json!({ "value": args, "duration_ms": duration_ms })
-    }
+pub fn duration_ms(duration: Duration) -> u64 {
+    u64::try_from(duration.as_millis()).unwrap_or(u64::MAX)
 }
 
 /// Builds a log result for embedding operations.

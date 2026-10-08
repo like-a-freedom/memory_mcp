@@ -829,16 +829,13 @@ impl GlinerEntityExtractor {
         self.loader.logger.log(
             crate::platform::log_event::log_event(
                 "ner.gliner.queue.done",
-                crate::platform::log_event::log_args_with_duration(
-                    serde_json::json!({}),
-                    queue_wait,
-                ),
+                serde_json::json!({}),
                 serde_json::json!({
                     "available_permits": self.inference_gate.available_permits()
                 }),
                 None,
                 None,
-                None,
+                Some(crate::platform::log_event::duration_ms(queue_wait)),
             ),
             crate::logging::LogLevel::Debug,
         );
@@ -1736,14 +1733,11 @@ pub(crate) fn build_span_scoring_log_event(
 ) -> HashMap<String, serde_json::Value> {
     crate::platform::log_event::log_event(
         "ner.gliner.span_scores.done",
-        crate::platform::log_event::log_args_with_duration(
-            serde_json::json!({"text_words": text_words}),
-            duration,
-        ),
+        serde_json::json!({"text_words": text_words}),
         serde_json::json!({"span_count": span_count}),
         None,
         None,
-        None,
+        Some(crate::platform::log_event::duration_ms(duration)),
     )
 }
 
