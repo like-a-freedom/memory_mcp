@@ -1141,14 +1141,16 @@ pub(crate) mod tests {
     /// records it.
     ///
     /// Gated on the full profile because the recorders it drives are: a sign-in
-    /// count belongs to the control plane, and registry reconciliation to the
-    /// HTTP profile. A narrower build is a legal build, but this test has no
-    /// honest claim about the families that build does not have.
+    /// count belongs to the control plane, registry reconciliation to the HTTP
+    /// profile, and the filesystem-watch telemetry facade to `fs-watch`. A
+    /// narrower build is a legal build, but this test has no honest claim about
+    /// the families that build does not have.
     #[tokio::test]
     #[cfg(all(
         feature = "prometheus",
         feature = "streamable-http",
-        feature = "control-plane"
+        feature = "control-plane",
+        feature = "fs_watch"
     ))]
     async fn every_declared_family_reaches_the_exposition() {
         use crate::knowledge::claims_policy::telemetry as claims_telemetry;
