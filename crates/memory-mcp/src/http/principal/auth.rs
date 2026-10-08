@@ -103,12 +103,26 @@ impl Authenticator {
     pub async fn authenticate_bearer(&self, header: &str) -> AuthDecision {
         let cred = match ApiKeyCredential::parse(header) {
             Ok(c) => c,
-            Err(_) => return AuthDecision::Deny,
+            Err(_) => {
+                crate::http::logging::log_auth_rejection(
+                    crate::http::logging::AuthRejection::Parse,
+                    None,
+                );
+                return AuthDecision::Deny;
+            }
         };
         if self.cache.get_negative(cred.key_id()) {
+            crate::http::logging::log_auth_rejection(
+                crate::http::logging::AuthRejection::CachedRejection,
+                None,
+            );
             return AuthDecision::Deny;
         }
         if !self.rate_limiter.allow(cred.key_id()) {
+            crate::http::logging::log_auth_rejection(
+                crate::http::logging::AuthRejection::RateLimited,
+                None,
+            );
             return AuthDecision::Deny;
         }
         let now = Utc::now();
@@ -202,6 +216,10 @@ impl Authenticator {
 
         if !verified {
             self.cache.put_negative(cred.key_id().to_string());
+            crate::http::logging::log_auth_rejection(
+                crate::http::logging::AuthRejection::VerifyFailed,
+                None,
+            );
             return AuthDecision::Deny;
         }
 
@@ -382,6 +400,69 @@ mod tests {
                 .iter()
                 .any(|line| line.contains("op=http.auth.touch_failed") && line.contains("DEBUG")),
             "the discarded telemetry failure must be recorded at DEBUG: {recorded:?}"
+        );
+    }
+
+    /// A rate-limited key is refused at `WARN` with a bounded reason, so an
+    /// operator can see refusals as a rate rather than reading the raw header.
+    #[tokio::test]
+    async fn a_rate_limited_key_is_logged_with_reason_rate_limited() {
+        // A well-formed credential: `ApiKeyCredential::parse` must accept it so
+        // the refusal reaches the rate limiter rather than the parse branch.
+        let credential = "mem_sk_ak_01234567-89ab-4cde-8f01-23456789abcd_Ab3defghij0123456789Ab3defghij0123456789";
+        // The limiter allows an unseen key once, so prime it — the second
+        // attempt within the window is the one refused.
+        let limiter = Arc::new(RateLimiter::new(4, Duration::from_secs(60), 1));
+        assert!(limiter.allow("ak_01234567-89ab-4cde-8f01-23456789abcd"));
+        let auth = Authenticator::new(
+            Arc::new(InMemoryStore::default()),
+            Arc::new(InMemoryStore::default()),
+            Arc::new(PrincipalCache::new(8)),
+            b"pepper".to_vec(),
+            limiter,
+        );
+        let sink = crate::logging::capture::install();
+
+        let decision = auth.authenticate_bearer(credential).await;
+
+        assert!(matches!(decision, AuthDecision::Deny));
+        let recorded = sink.lines();
+        assert!(
+            recorded
+                .iter()
+                .any(|line| line.contains("op=http.auth.rejected")
+                    && line.contains("reason=rate_limited")),
+            "the refusal must name its bounded reason: {recorded:?}"
+        );
+    }
+
+    /// The raw credential is never written, whatever the refusal.
+    #[tokio::test]
+    async fn a_refusal_line_never_contains_the_credential() {
+        const SECRET: &str = "Ab3defghij0123456789Ab3defghij0123456789";
+        let credential = format!("mem_sk_ak_01234567-89ab-4cde-8f01-23456789abcd_{SECRET}");
+        let auth = Authenticator::new(
+            Arc::new(InMemoryStore::default()),
+            Arc::new(InMemoryStore::default()),
+            Arc::new(PrincipalCache::new(8)),
+            b"pepper".to_vec(),
+            Arc::new(RateLimiter::new(4, Duration::from_secs(60), 100)),
+        );
+        let sink = crate::logging::capture::install();
+
+        let decision = auth.authenticate_bearer(&credential).await;
+
+        assert!(matches!(decision, AuthDecision::Deny));
+        let recorded = sink.lines();
+        assert!(
+            recorded
+                .iter()
+                .any(|line| line.contains("op=http.auth.rejected")),
+            "the refusal must be recorded: {recorded:?}"
+        );
+        assert!(
+            !recorded.iter().any(|line| line.contains(SECRET)),
+            "the raw credential must never be logged: {recorded:?}"
         );
     }
 

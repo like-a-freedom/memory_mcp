@@ -421,6 +421,61 @@ pub fn log_warn(op: &'static str, detail: &str) {
     WarningEvent::new(op, detail).log_into(&StdoutLogger::from_env());
 }
 
+/// The closed set of reasons a bearer credential is refused.
+///
+/// A closed enum rather than free text: the label is bounded by construction,
+/// and the reason is known at the refusal site. The last two mirror the two
+/// distinct `authenticate_bearer` branches — a negative-cache hit and a
+/// signature/secret mismatch.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum AuthRejection {
+    Missing,
+    BadScheme,
+    Parse,
+    RateLimited,
+    CachedRejection,
+    VerifyFailed,
+}
+
+impl AuthRejection {
+    pub(crate) fn as_str(self) -> &'static str {
+        match self {
+            Self::Missing => "missing",
+            Self::BadScheme => "bad_scheme",
+            Self::Parse => "parse",
+            Self::RateLimited => "rate_limited",
+            Self::CachedRejection => "cached_rejection",
+            Self::VerifyFailed => "verify_failed",
+        }
+    }
+}
+
+/// Record one refused bearer credential: the bounded `reason` and — when the
+/// layer that mints it is in scope — the request it answered.
+///
+/// The credential itself is never written: `reason` is the whole story, and a
+/// refusal is a `WARN` (a client a caller can correct), not a failure of this
+/// service. Mirrors [`RequestWarning::log_into`], counting the refusal once.
+pub(crate) fn log_auth_rejection(reason: AuthRejection, request_id: Option<&str>) {
+    crate::observability::record_auth_refusal("bearer", reason.as_str());
+    let mut event = std::collections::HashMap::new();
+    event.insert(
+        "op".to_string(),
+        serde_json::Value::String("http.auth.rejected".to_string()),
+    );
+    event.insert(
+        "reason".to_string(),
+        serde_json::Value::String(reason.as_str().to_string()),
+    );
+    if let Some(request_id) = request_id {
+        event.insert(
+            "request_id".to_string(),
+            serde_json::Value::String(request_id.to_string()),
+        );
+    }
+    crate::logging::emit(event, LogLevel::Warn);
+}
+
 /// Method-category grouping. URIs and headers never reach the log.
 fn categorize(method: &str) -> &'static str {
     match method {

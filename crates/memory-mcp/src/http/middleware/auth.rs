@@ -52,6 +52,10 @@ pub async fn authenticate(
         .get(axum::http::header::AUTHORIZATION)
         .and_then(|v| v.to_str().ok())
         .map(str::to_owned);
+    let request_id = req
+        .extensions()
+        .get::<crate::http::logging::RequestId>()
+        .map(|id| id.as_uuid().to_string());
     let decision = match header.as_deref() {
         Some(value) => {
             let mut parts = value.split_ascii_whitespace();
@@ -70,10 +74,22 @@ pub async fn authenticate(
                         other => other,
                     }
                 }
-                _ => AuthDecision::Deny,
+                _ => {
+                    crate::http::logging::log_auth_rejection(
+                        crate::http::logging::AuthRejection::BadScheme,
+                        request_id.as_deref(),
+                    );
+                    AuthDecision::Deny
+                }
             }
         }
-        None => AuthDecision::Deny,
+        None => {
+            crate::http::logging::log_auth_rejection(
+                crate::http::logging::AuthRejection::Missing,
+                request_id.as_deref(),
+            );
+            AuthDecision::Deny
+        }
     };
     let principal = match decision {
         AuthDecision::Allow(principal) => principal,
@@ -292,6 +308,35 @@ mod tests {
         assert!(
             resp.headers()
                 .contains_key(axum::http::header::WWW_AUTHENTICATE)
+        );
+    }
+
+    /// A missing or malformed bearer is logged with a bounded reason, so an
+    /// operator can see refusals as a rate instead of reading the raw header.
+    #[tokio::test]
+    async fn a_missing_bearer_is_logged_with_reason_missing() {
+        let state = crate::http::HttpState::default_for_test().await;
+        let mut svc = Router::new()
+            .route("/", post(accept_any))
+            .layer(axum::middleware::from_fn_with_state(state, authenticate));
+        let req = axum::http::Request::builder()
+            .method("POST")
+            .uri("/")
+            .body(axum::body::Body::empty())
+            .unwrap();
+        let sink = crate::logging::capture::install();
+
+        let resp = svc.call(req).await.unwrap();
+
+        assert_eq!(resp.status(), StatusCode::UNAUTHORIZED);
+        let recorded = sink.lines();
+        assert!(
+            recorded
+                .iter()
+                .any(|line| line.contains("op=http.auth.rejected")
+                    && line.contains("reason=missing")
+                    && line.contains("WARN")),
+            "the refusal must be recorded with its reason: {recorded:?}"
         );
     }
 

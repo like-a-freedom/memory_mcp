@@ -106,10 +106,10 @@ pub(crate) fn record_job_metric(pass: &'static str, outcome: &'static str, secon
         reason = "recorders have no caller without the HTTP profile"
     )
 )]
-pub(crate) fn record_auth_refusal(branch: &'static str) {
+pub(crate) fn record_auth_refusal(surface: &'static str, branch: &'static str) {
     metrics::counter!(
         METRIC_AUTH_REFUSALS_TOTAL,
-        "surface" => "oidc",
+        "surface" => surface,
         "branch" => branch,
     )
     .increment(1);
@@ -728,6 +728,25 @@ pub(crate) mod tests {
         );
     }
 
+    /// The refusal's `surface` is a bounded label: the bearer path and the OIDC
+    /// path do not share a series, so a refusal is attributable to the
+    /// credential kind as well as the branch.
+    #[tokio::test]
+    async fn the_auth_refusal_metric_surface_is_bounded() {
+        let exposition = exposed(|| async {
+            record_auth_refusal("bearer", "verify_failed");
+            render()
+        })
+        .await;
+
+        assert!(
+            exposition.contains(METRIC_AUTH_REFUSALS_TOTAL)
+                && exposition.contains(r#"surface="bearer""#)
+                && exposition.contains(r#"branch="verify_failed""#),
+            "the surface must be a bounded label: {exposition}"
+        );
+    }
+
     /// A stage timer must live in a block that closes before the work it names
     /// ends — otherwise it measures everything after it.
     ///
@@ -1175,7 +1194,7 @@ pub(crate) mod tests {
             let _ = crate::shared::observability::StageTimer::new("ingest", "store_write");
 
             record_job_metric("lease", "ok", 0.01);
-            record_auth_refusal("nonce");
+            record_auth_refusal("oidc", "nonce");
             record_runtime_refusal("quota");
             record_signin_success();
             record_knowledge_write();
@@ -1801,7 +1820,7 @@ mod without_a_recorder {
     /// `install_recorder`, which only exists in the profile that has a recorder.
     #[test]
     fn every_recorder_is_safe_without_a_recorder_installed() {
-        record_auth_refusal("nonce");
+        record_auth_refusal("oidc", "nonce");
         record_runtime_refusal("quota");
         record_job_metric("lease", "ok", 0.01);
         shift_gauge("memory_test_gauge", 1.0);

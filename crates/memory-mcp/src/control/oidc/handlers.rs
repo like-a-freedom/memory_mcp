@@ -58,7 +58,7 @@ fn rejection_event(
     // ones — and without this the only way to see a sign-in loop is to read
     // logs. The branch is the label because it is already a closed set of
     // static words, which is what keeps the series bounded.
-    crate::observability::record_auth_refusal(branch);
+    crate::observability::record_auth_refusal("oidc", branch);
     let mut event = std::collections::HashMap::new();
     event.insert("op".into(), "oidc.callback_rejected".into());
     event.insert("branch".into(), branch.into());
