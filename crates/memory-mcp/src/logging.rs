@@ -669,6 +669,7 @@ pub const HTTP_OPERATIONS: &[&str] = &[
     "http.runtime.binding_conflict",
     "http.auth.touch_failed",
     "http.auth.rejected",
+    "http.readiness.changed",
     "http.quota.plan_load_failed",
     "http.quota.reserve_failed",
     "http.task.bind_failed",

@@ -46,6 +46,10 @@ pub struct HttpState {
     pub pool: Arc<runtime::pool::Pool>,
     pub shutdown: shutdown::ShutdownState,
     pub admission: Arc<runtime::pool::AdmissionGate>,
+    /// The last readiness state `/health/ready` reported. A probe is cheap and
+    /// frequent; a *transition* is an event, so this cell holds the last
+    /// discriminant and the handler logs only when it changes.
+    pub(crate) readiness: ReadinessCell,
     pub(crate) preflight_budget: Arc<middleware::preflight_budget::PreflightBudget>,
     pub registry: registry::RegistryHandle,
     #[cfg(feature = "control-plane")]
@@ -90,6 +94,30 @@ pub struct HttpState {
 
 #[cfg(feature = "prometheus")]
 pub type MetricsHandle = metrics_exporter_prometheus::PrometheusHandle;
+
+/// The last readiness state reported by `/health/ready`.
+///
+/// The cell holds the last discriminant so a probe that finds the same state
+/// records nothing. Initialized to `None` — "unknown" — so the very first
+/// probe is itself a transition worth reporting.
+#[derive(Default)]
+pub(crate) struct ReadinessCell {
+    last: std::sync::Mutex<Option<&'static str>>,
+}
+
+impl ReadinessCell {
+    /// Record `state`, returning `true` when it differs from the last one
+    /// recorded — the caller logs only then. Atomic, so two concurrent probes
+    /// cannot both claim the same transition.
+    pub(crate) fn record(&self, state: &'static str) -> bool {
+        let mut last = crate::http::sync::recover_lock(&self.last);
+        if *last == Some(state) {
+            return false;
+        }
+        *last = Some(state);
+        true
+    }
+}
 
 /// The metrics parameter accepted by `HttpState::assemble`. Builds
 /// without the `prometheus` feature carry a zero-sized placeholder so
@@ -402,6 +430,7 @@ impl HttpState {
                 config.global_request_limit,
                 config.subscription_limit,
             )),
+            readiness: ReadinessCell::default(),
             preflight_budget,
             registry,
             #[cfg(feature = "control-plane")]
