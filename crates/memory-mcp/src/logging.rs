@@ -29,6 +29,8 @@ use tracing_subscriber::fmt::{FmtContext, FormattedFields, MakeWriter};
 use tracing_subscriber::layer::{Context, Filter, Layer, SubscriberExt};
 use tracing_subscriber::registry::LookupSpan;
 
+pub mod correlation;
+
 /// Log level for filtering log output.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub enum LogLevel {
