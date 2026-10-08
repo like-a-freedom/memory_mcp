@@ -323,12 +323,11 @@ fn smoke(programs: &[PathBuf], work: &Path) -> Result<()> {
     // configuration parser is where this binary has to be shown to reach.
     //
     // Both conditions are required, not just the exit code: `memory_mcp_http`
-    // exits `2` from three places — `config error:` for a missing deployment
-    // variable, `config invalid:` for a malformed one, and
-    // `validate_no_listener_env` for a listener variable set in a stdio-only
-    // context. An invalid bind reaches the third. The message is what proves
-    // the parser was reached and named the cause, so a binary that started and
-    // died for an unrelated reason cannot pass as a configuration check.
+    // exits `2` for every configuration failure, and a process that started and
+    // died for an unrelated reason would exit non-zero too. A startup failure is
+    // a structured `http.serve_failed` event on stderr rather than bare prose,
+    // so the event and the variable it names are what prove the parser was
+    // reached and named the cause.
     let mut command = Command::new(http);
     command
         .env_clear()
@@ -341,7 +340,10 @@ fn smoke(programs: &[PathBuf], work: &Path) -> Result<()> {
         .output()
         .map_err(|error| PackError::Smoke(format!("the HTTP binary did not run: {error}")))?;
     let stderr = String::from_utf8_lossy(&output.stderr);
-    if output.status.code() != Some(2) || !stderr.contains("config error:") {
+    if output.status.code() != Some(2)
+        || !stderr.contains("http.serve_failed")
+        || !stderr.contains("MEMORY_MCP_HTTP_BIND")
+    {
         return Err(PackError::Smoke(format!(
             "HTTP configuration smoke failed: status={:?}, stderr={stderr}",
             output.status.code()
@@ -729,7 +731,7 @@ fn main() {
 "##;
         let http_source = r#"
 fn main() {
-    eprintln!("config error: invalid bind");
+    eprintln!("ERROR  op=http.serve_failed  error=\"config invalid: MEMORY_MCP_HTTP_BIND\"");
     std::process::exit(2);
 }
 "#;
