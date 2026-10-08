@@ -175,14 +175,17 @@ impl DeletionRecoveryPort for RegistryDeletionRecoveryAdapter {
         lease: &DeletionLease,
     ) -> Result<(), MemoryError> {
         let provisioning = self.registry.provisioning();
-        let _ = provisioning
+        if let Err(error) = provisioning
             .release_provisioning_lease(
                 tenant_id,
                 &lease.owner_id,
                 &lease.lease_id,
                 lease.fencing_generation,
             )
-            .await;
+            .await
+        {
+            crate::logging::emit_best_effort_failure("http.lease.release_failed", &error);
+        }
         Ok(())
     }
 }

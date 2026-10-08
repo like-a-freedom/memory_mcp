@@ -351,7 +351,7 @@ pub async fn provision_one(
         if let Err(transient) = fault_injector.hit(FaultPoint::NamespaceCreated) {
             // Release the lease so the next worker re-claims
             // and re-runs the migration scripts.
-            let _ = store
+            if let Err(error) = store
                 .provisioning
                 .release_provisioning_lease(
                     tenant_id,
@@ -359,7 +359,10 @@ pub async fn provision_one(
                     &lease.lease_id,
                     lease.fencing_generation,
                 )
-                .await;
+                .await
+            {
+                crate::logging::emit_best_effort_failure("http.lease.release_failed", &error);
+            }
             return Err(transient);
         }
         let new_version = migrations
@@ -386,7 +389,7 @@ pub async fn provision_one(
             // partially-migrated tenant stuck in
             // `Migrating`.
             if matches!(error, MemoryError::Transient(_)) || is_lease_loss(&error) {
-                let _ = store
+                if let Err(release_error) = store
                     .provisioning
                     .release_provisioning_lease(
                         tenant_id,
@@ -394,14 +397,19 @@ pub async fn provision_one(
                         &lease.lease_id,
                         lease.fencing_generation,
                     )
-                    .await;
+                    .await
+                {
+                    crate::logging::emit_best_effort_failure(
+                        "http.lease.release_failed",
+                        &release_error,
+                    );
+                }
             } else if let Ok(Some(failed)) = store.find_tenant_by_id(tenant_id).await
                 && matches!(
                     failed.status,
                     TenantStatus::NamespaceCreating | TenantStatus::Migrating
                 )
-            {
-                let _ = transition_tenant_fenced(
+                && let Err(error) = transition_tenant_fenced(
                     &crate::provisioning::api::TenantLifecycle::new(&*store),
                     tenant_id,
                     failed.version,
@@ -409,7 +417,9 @@ pub async fn provision_one(
                     TenantStatus::Failed,
                     &lease,
                 )
-                .await;
+                .await
+            {
+                crate::logging::emit_best_effort_failure("http.lease.release_failed", &error);
             }
             return Err(error);
         }
@@ -423,7 +433,7 @@ pub async fn provision_one(
     if let Err(transient) = fault_injector.hit(FaultPoint::TenantMigrationsApplied) {
         // Transient: release the lease so the next worker
         // re-claims and finishes the Ready transition.
-        let _ = store
+        if let Err(error) = store
             .provisioning
             .release_provisioning_lease(
                 tenant_id,
@@ -431,7 +441,10 @@ pub async fn provision_one(
                 &lease.lease_id,
                 lease.fencing_generation,
             )
-            .await;
+            .await
+        {
+            crate::logging::emit_best_effort_failure("http.lease.release_failed", &error);
+        }
         return Err(transient);
     }
 
@@ -568,7 +581,7 @@ pub async fn run_due_provisioning_for(
         // faults so the recovery tick can re-claim without
         // waiting for the TTL.
         if let Err(transient) = fault_injector.hit(FaultPoint::ProvisioningLeaseClaimed) {
-            let _ = store
+            if let Err(error) = store
                 .provisioning
                 .release_provisioning_lease(
                     &tenant.id,
@@ -576,7 +589,10 @@ pub async fn run_due_provisioning_for(
                     &lease_id,
                     claim.fencing_generation,
                 )
-                .await;
+                .await
+            {
+                crate::logging::emit_best_effort_failure("http.lease.release_failed", &error);
+            }
             return Err(transient);
         }
         // Re-derive a typed `ProvisioningLease` for the
@@ -768,6 +784,99 @@ mod tests {
             heartbeat_at: lease.heartbeat_at,
         });
         store.write_tenant(&t).await.unwrap();
+    }
+
+    /// A provisioning store whose lease release always fails; everything else
+    /// succeeds. It proves the discarded release failure is recorded while the
+    /// caller still returns the original transient error.
+    struct ReleaseFails;
+
+    #[async_trait::async_trait]
+    impl ProvisioningStore for ReleaseFails {
+        async fn claim_provisioning(
+            &self,
+            _tenant_id: &str,
+            _owner_id: &str,
+            _lease_id: &str,
+            _lease_ttl_secs: i64,
+        ) -> Result<Option<ProvisioningLease>, MemoryError> {
+            Ok(None)
+        }
+
+        async fn release_provisioning_lease(
+            &self,
+            _tenant_id: &str,
+            _lease_owner_id: &str,
+            _lease_id: &str,
+            _fencing_generation: u64,
+        ) -> Result<(), MemoryError> {
+            Err(MemoryError::Storage("lease store unavailable".to_string()))
+        }
+
+        async fn heartbeat_provisioning(
+            &self,
+            _tenant_id: &str,
+            _owner_id: &str,
+            _lease_id: &str,
+            _fencing_generation: u64,
+            _heartbeat_at: chrono::DateTime<chrono::Utc>,
+            _expires_at: chrono::DateTime<chrono::Utc>,
+        ) -> Result<(), MemoryError> {
+            Ok(())
+        }
+
+        async fn list_due_provisioning(
+            &self,
+            _limit: usize,
+            _now: chrono::DateTime<chrono::Utc>,
+        ) -> Result<Vec<Tenant>, MemoryError> {
+            Ok(Vec::new())
+        }
+
+        async fn append_provisioning_event(
+            &self,
+            _tenant_id: &str,
+            _stage: &str,
+        ) -> Result<(), MemoryError> {
+            Ok(())
+        }
+    }
+
+    /// A lease release that fails is best-effort: provisioning still returns
+    /// the original transient error, and the discarded release failure is
+    /// recorded rather than lost.
+    #[tokio::test]
+    async fn a_failed_lease_release_is_logged() {
+        let store = Arc::new(InMemoryStore::default());
+        let tenant = reserved_tenant("ten_rel", "tns_ten_rel");
+        seed_reserved(&store, &tenant).await;
+        let lease = lease_for("ten_rel");
+        seed_with_lease(&store, "ten_rel", &lease).await;
+        let registry = crate::http::registry::RegistryStores::from_backend(store.clone());
+        let sink = crate::logging::capture::install();
+
+        let outcome = provision_one(
+            TenantAndProvisioning {
+                tenants: registry.tenants(),
+                provisioning: Arc::new(ReleaseFails),
+            },
+            "ten_rel",
+            lease,
+            Arc::new(NoopMigrations),
+            Arc::new(crate::platform::fault_injection::FailOnceAt::new(
+                FaultPoint::NamespaceCreated,
+            )),
+        )
+        .await;
+
+        assert!(outcome.is_err(), "the simulated transient propagates");
+        let recorded = sink.lines();
+        assert!(
+            recorded
+                .iter()
+                .any(|line| line.contains("op=http.lease.release_failed") && line.contains("WARN")),
+            "the discarded release failure must be recorded: {recorded:?}"
+        );
     }
 
     #[tokio::test]

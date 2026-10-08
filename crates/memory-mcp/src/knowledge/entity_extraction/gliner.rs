@@ -1644,11 +1644,16 @@ pub async fn build_from_store(
             Ok(extractor) => return Ok(extractor),
             Err(err) => {
                 // Persist rejection and try a known-good fallback.
-                let _ = store.reject_candidate(
+                if let Err(reject_error) = store.reject_candidate(
                     &CLASSIC_GLINER_SPEC,
                     &candidate.revision,
                     &err.to_string(),
-                );
+                ) {
+                    crate::logging::emit_best_effort_failure(
+                        "knowledge.reject_candidate_failed",
+                        &reject_error,
+                    );
+                }
                 if let Some(known_good) = inspected.known_good {
                     return build_known_good(native, context, &known_good).await;
                 }

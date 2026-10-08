@@ -384,9 +384,12 @@ async fn fail_cycle(
     } else {
         ProcessOutcome::FailedRetriesExhausted
     };
-    let _ = store
+    if let Err(error) = store
         .mark_failed_cycle(revision_id, owner, class, message, attempts, None)
-        .await;
+        .await
+    {
+        crate::logging::emit_best_effort_failure("fs_watch.mark_failed_failed", &error);
+    }
     outcome
 }
 
@@ -398,9 +401,12 @@ async fn fail_cycle_with_class(
     class: InboxFailureClass,
     message: &str,
 ) -> ProcessOutcome {
-    let _ = store
+    if let Err(error) = store
         .mark_failed_cycle(revision_id, owner, class, message, attempts, None)
-        .await;
+        .await
+    {
+        crate::logging::emit_best_effort_failure("fs_watch.mark_failed_failed", &error);
+    }
     ProcessOutcome::FailedNonRetryable
 }
 
@@ -519,6 +525,32 @@ mod tests {
             crate::memory::capabilities::deps::ExtractDeps::from(service),
             service.ingestion_service.clone(),
         )
+    }
+
+    /// A failure to record a failed cycle is best-effort: the returned outcome
+    /// is unchanged, and the discarded store error stops being invisible.
+    #[tokio::test]
+    async fn a_failed_mark_failed_cycle_is_logged() {
+        let sink = crate::logging::capture::install();
+        let db = Arc::new(
+            crate::service::mock_db::MockDbClient::new().expect_query_with(
+                |_sql| true,
+                |_sql, _vars| Err(MemoryError::Storage("store unavailable".to_string())),
+            ),
+        );
+        let store = InboxRevisionStoreClient::new(db, "org".to_string());
+        let revision_id = crate::models::inbox_revision::InboxRevisionId::from_hash("deadbeef");
+
+        let outcome = fail_cycle(&store, &revision_id, "owner", 3, false, "boom").await;
+
+        assert_eq!(outcome, ProcessOutcome::FailedRetriesExhausted);
+        let recorded = sink.lines();
+        assert!(
+            recorded.iter().any(
+                |line| line.contains("op=fs_watch.mark_failed_failed") && line.contains("WARN")
+            ),
+            "the discarded store failure must be recorded: {recorded:?}"
+        );
     }
 
     #[tokio::test]

@@ -595,6 +595,23 @@ pub fn emit(event: HashMap<String, Value>, level: LogLevel) {
     emit_traced(op, &event, level);
 }
 
+/// Record a failure a caller deliberately discarded, without changing its
+/// control flow.
+///
+/// A best-effort write (a telemetry touch, a lease cleanup, a bookkeeping
+/// marker) is still a fact worth seeing when it fails: the caller keeps its
+/// best-effort semantics, but the outcome stops being invisible. The event
+/// carries `op` and `error` like every other failure.
+pub(crate) fn emit_best_effort_failure(op: &str, error: &dyn std::fmt::Display) {
+    emit(
+        HashMap::from([
+            ("op".to_string(), Value::String(op.to_string())),
+            ("error".to_string(), Value::String(error.to_string())),
+        ]),
+        LogLevel::Warn,
+    );
+}
+
 /// Hand one recorded event to the `tracing` subscriber.
 fn emit_traced(op: &str, event: &HashMap<String, Value>, level: LogLevel) {
     install();
@@ -650,6 +667,7 @@ pub const HTTP_OPERATIONS: &[&str] = &[
     "http.runtime.activation_failed",
     "http.background_cleanup_secondary_failure",
     "http.runtime.binding_conflict",
+    "http.auth.touch_failed",
     "http.quota.plan_load_failed",
     "http.quota.reserve_failed",
     "http.task.bind_failed",
@@ -2514,6 +2532,25 @@ mod tests {
                 .iter()
                 .any(|line| line.contains("op=capture.probe")),
             "capture must see the emitted line"
+        );
+    }
+
+    /// The shared best-effort-failure event carries `op` and `error` at `WARN`.
+    /// Every site that discards a `Result` relies on this shape.
+    #[test]
+    fn a_best_effort_failure_names_its_operation_and_error() {
+        let sink = capture::install();
+
+        emit_best_effort_failure("db.migration_mark_failed", &"disk gone");
+
+        let recorded = sink.lines();
+        assert!(
+            recorded
+                .iter()
+                .any(|line| line.contains("op=db.migration_mark_failed")
+                    && line.contains("error=\"disk gone\"")
+                    && line.contains("WARN")),
+            "the shared helper must emit op and error at WARN: {recorded:?}"
         );
     }
 

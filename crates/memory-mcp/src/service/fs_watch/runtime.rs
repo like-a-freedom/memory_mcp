@@ -169,7 +169,9 @@ async fn discover_path(store: &InboxRevisionStoreClient, inbox: &Path, path: &Pa
         return;
     };
     let record = build_record(&prepared);
-    let _ = store.discover_prepared(&record).await;
+    if let Err(error) = store.discover_prepared(&record).await {
+        crate::logging::emit_best_effort_failure("fs_watch.discover_failed", &error);
+    }
 }
 
 /// Recursive startup scan of existing supported files.
@@ -215,7 +217,12 @@ async fn run_startup_scan(
                 Ok(CandidateOutcome::Ready(prepared)) => {
                     telemetry.record_scan_file("enqueued");
                     let record = build_record(&prepared);
-                    let _ = store.discover_prepared(&record).await;
+                    if let Err(error) = store.discover_prepared(&record).await {
+                        crate::logging::emit_best_effort_failure(
+                            "fs_watch.discover_failed",
+                            &error,
+                        );
+                    }
                 }
                 Ok(CandidateOutcome::Skipped(CandidateSkipReason::Symlink)) => {
                     telemetry.record_scan_file("skipped_symlink");
@@ -292,8 +299,12 @@ impl FsWatchRuntime {
         // Recovery: requeue failed revisions once per startup generation and
         // requeue expired leases from a previous crash.
         let generation = startup_generation();
-        let _ = store.requeue_failed_for_startup(&generation).await;
-        let _ = store.requeue_expired_leases().await;
+        if let Err(error) = store.requeue_failed_for_startup(&generation).await {
+            crate::logging::emit_best_effort_failure("fs_watch.recover_failed", &error);
+        }
+        if let Err(error) = store.requeue_expired_leases().await {
+            crate::logging::emit_best_effort_failure("fs_watch.recover_failed", &error);
+        }
 
         // Queue-depth gauge reflects the durable backlog after recovery.
         if let Ok(depth) = store.queue_depth().await {

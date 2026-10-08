@@ -208,8 +208,21 @@ impl Authenticator {
         // Update last_used_at with a monotonic/CAS registry write.
         // A transient telemetry timestamp failure must not turn an
         // already valid request into an authentication failure, and
-        // the raw secret is never written.
-        let _ = self.api_keys.touch_api_key(cred.key_id(), now).await;
+        // the raw secret is never written. The failure is still recorded —
+        // at `DEBUG`, because this write is pure telemetry — so a wedge in
+        // the key store is visible without turning it into a login outage.
+        if let Err(error) = self.api_keys.touch_api_key(cred.key_id(), now).await {
+            crate::logging::emit(
+                std::collections::HashMap::from([
+                    (
+                        "op".to_string(),
+                        serde_json::json!("http.auth.touch_failed"),
+                    ),
+                    ("error".to_string(), serde_json::json!(error.to_string())),
+                ]),
+                crate::logging::LogLevel::Debug,
+            );
+        }
         principal
             .map(AuthDecision::Allow)
             .unwrap_or(AuthDecision::Deny)
@@ -246,6 +259,7 @@ impl Authenticator {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::error::MemoryError;
     use crate::http::registry::models::{
         Account, AccountStatus, ApiKey, ApiKeyStatus, KeyedVerifier,
     };
@@ -259,6 +273,116 @@ mod tests {
             created_at: Utc::now(),
             display_name: None,
         }
+    }
+
+    /// An API-key store that returns one active key and whose telemetry touch
+    /// always fails — the discarded failure `authenticate_bearer` must record
+    /// without turning a valid request into a refusal.
+    struct TouchFails {
+        key: ApiKey,
+    }
+
+    #[async_trait::async_trait]
+    impl ApiKeyStore for TouchFails {
+        async fn find_api_key(&self, key_id: &str) -> Result<Option<ApiKey>, MemoryError> {
+            Ok((key_id == self.key.id).then(|| self.key.clone()))
+        }
+
+        async fn write_api_key(&self, _key: &ApiKey) -> Result<(), MemoryError> {
+            Ok(())
+        }
+
+        async fn list_api_keys(
+            &self,
+            _account_id: &str,
+        ) -> Result<Vec<crate::http::registry::models::ApiKeyMeta>, MemoryError> {
+            Ok(Vec::new())
+        }
+
+        async fn revoke_api_key(
+            &self,
+            _account_id: &str,
+            _key_id: &str,
+        ) -> Result<(), MemoryError> {
+            Ok(())
+        }
+
+        async fn touch_api_key(
+            &self,
+            _key_id: &str,
+            _used_at: DateTime<Utc>,
+        ) -> Result<(), MemoryError> {
+            Err(MemoryError::Storage("key store unavailable".to_string()))
+        }
+
+        async fn create_api_key_if_below_limit(
+            &self,
+            _key: &ApiKey,
+            _max_active: u32,
+        ) -> Result<(), MemoryError> {
+            Ok(())
+        }
+
+        async fn revoke_all_api_keys(&self, _account_id: &str) -> Result<u64, MemoryError> {
+            Ok(0)
+        }
+    }
+
+    /// A telemetry write that fails is recorded at `DEBUG` and the request is
+    /// still allowed: `touch_api_key` timestamps a key, and a wedge in that
+    /// write must not become a login outage. Before this, the failure was
+    /// discarded with no trace at all.
+    #[tokio::test]
+    async fn a_failed_telemetry_touch_is_logged_at_debug_and_still_allows() {
+        let pepper = b"pepper";
+        let secret = b"Ab3defghij0123456789Ab3defghij0123456789";
+        let key = ApiKey {
+            id: "ak_01234567-89ab-4cde-8f01-23456789abcd".into(),
+            account_id: "acct_1".into(),
+            name: "k1".into(),
+            verifier: KeyedVerifier::compute(pepper, secret),
+            status: ApiKeyStatus::Active,
+            created_at: Utc::now(),
+            expires_at: None,
+            last_used_at: None,
+            version: 1,
+        };
+        let stores =
+            crate::http::registry::RegistryStores::from_backend(Arc::new(InMemoryStore::default()));
+        stores
+            .accounts()
+            .write_account(&active_account("acct_1", "ten_1"))
+            .await
+            .unwrap();
+        let auth = Authenticator::new(
+            stores.accounts(),
+            Arc::new(TouchFails { key }),
+            Arc::new(PrincipalCache::new(8)),
+            pepper.to_vec(),
+            Arc::new(RateLimiter::new(4, Duration::from_secs(60), 100)),
+        );
+        let sink = crate::logging::capture::install();
+        let raw = format!(
+            "mem_sk_ak_01234567-89ab-4cde-8f01-23456789abcd_{}",
+            std::str::from_utf8(secret).unwrap()
+        );
+
+        let decision = crate::logging::capture::with_level("debug", || async {
+            auth.authenticate_bearer(&raw).await
+        })
+        .await;
+
+        assert!(
+            matches!(decision, AuthDecision::Allow(_)),
+            "a telemetry failure must not refuse a valid key"
+        );
+        let recorded = sink.lines();
+        assert!(
+            recorded
+                .iter()
+                .any(|line| line.contains("op=http.auth.touch_failed") && line.contains("DEBUG")),
+            "the discarded telemetry failure must be recorded at DEBUG: {recorded:?}"
+        );
     }
 
     #[tokio::test]

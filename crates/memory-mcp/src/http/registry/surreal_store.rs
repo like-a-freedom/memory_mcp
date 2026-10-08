@@ -1057,7 +1057,7 @@ impl SurrealRegistryStore {
 
             let execution = self.handle().query_json(&sql, None).await;
             if let Err(error) = execution {
-                let _ = self
+                if let Err(marker_error) = self
                     .handle()
                     .query_json(
                         "UPDATE type::record($table, $id) SET status = 'failed', error = $error, owner = NONE, lease_expires_at = NONE WHERE owner = $owner RETURN AFTER",
@@ -1068,7 +1068,13 @@ impl SurrealRegistryStore {
                             "error": error.to_string(),
                         })),
                     )
-                    .await;
+                    .await
+                {
+                    crate::logging::emit_best_effort_failure(
+                        "db.migration_mark_failed",
+                        &marker_error,
+                    );
+                }
                 return Err(map_storage_error("apply registry migration", error));
             }
             let completed = self

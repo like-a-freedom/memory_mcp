@@ -582,7 +582,11 @@ async fn apply_versioned_migration(
         Ok(())
     };
     if let Err(error) = execution {
-        let _ = mark_migration_failed(client, &record_id, &error.to_string(), namespace).await;
+        if let Err(mark_error) =
+            mark_migration_failed(client, &record_id, &error.to_string(), namespace).await
+        {
+            crate::logging::emit_best_effort_failure("db.migration_mark_failed", &mark_error);
+        }
         return Err(error);
     }
 
