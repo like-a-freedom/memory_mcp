@@ -45,7 +45,7 @@ pub async fn build_memory_service_from_env(
         startup_logger.log(event, crate::logging::LogLevel::Info);
     }
     let mut startup_event = std::collections::HashMap::new();
-    startup_event.insert("op".to_string(), serde_json::json!("startup"));
+    startup_event.insert("op".to_string(), serde_json::json!("main.config"));
     startup_event.insert(
         "db_mode".to_string(),
         serde_json::json!(if config.embedded {
@@ -82,7 +82,7 @@ pub async fn build_memory_service_from_env(
             let mut event = std::collections::HashMap::new();
             event.insert(
                 "op".to_string(),
-                serde_json::json!("startup.version_probe_failed"),
+                serde_json::json!("main.version_probe_failed"),
             );
             event.insert("error".to_string(), serde_json::json!(err.to_string()));
             startup_logger.log(event, crate::logging::LogLevel::Warn);

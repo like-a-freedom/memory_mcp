@@ -684,6 +684,51 @@ pub const HTTP_OPERATIONS: &[&str] = &[
     "http.preflight.large_body",
 ];
 
+/// The closed registry of operation-name namespaces ([ADR-0081]).
+///
+/// The first dot-separated segment of every emitted `op` must be a member. A
+/// new event picks an existing namespace; widening the list is a deliberate
+/// edit to the filter-key vocabulary, which is why the test below scans the
+/// source for names that the list cannot reach.
+pub const OP_NAMESPACES: &[&str] = &[
+    "assemble_context",
+    "app_command",
+    "cache",
+    "config",
+    "control",
+    "db",
+    "embedding",
+    "explain",
+    "extract",
+    "fs_watch",
+    "graph",
+    "http",
+    "ingest",
+    "invalidate",
+    "knowledge",
+    "lifecycle",
+    "main",
+    "ner",
+    "oidc",
+    "open_app",
+    "reembed",
+    "resolve",
+    "schema",
+    "triple_extraction",
+];
+
+/// The namespace an operation name belongs to: its first dot-separated segment.
+///
+/// A bare name (`extract`) is its own namespace with an implicit default event,
+/// so it is returned unchanged. Used by the registry lint below.
+#[cfg(test)]
+pub(crate) fn namespace_of(op: &str) -> &str {
+    match op.split_once('.') {
+        Some((namespace, _)) => namespace,
+        None => op,
+    }
+}
+
 /// Process-global file sink. When installed, all `StdoutLogger` instances
 /// write to this file instead of stderr. Set once at startup via
 /// [`install_log_file`]; never unset for the process lifetime.
@@ -1523,7 +1568,7 @@ mod tests {
     #[test]
     fn format_simple_event_contains_keys() {
         let mut event = HashMap::new();
-        event.insert("op".to_string(), json!("migrations"));
+        event.insert("op".to_string(), json!("schema.migrations"));
         event.insert("stage".to_string(), json!("start"));
         event.insert("source".to_string(), json!("filesystem"));
 
@@ -1538,7 +1583,7 @@ mod tests {
             "{line}"
         );
         assert!(!line.contains("req="), "no request id, no token: {line}");
-        assert!(line.contains("op=migrations"));
+        assert!(line.contains("op=schema.migrations"));
         assert!(line.contains("stage=start"));
         assert!(line.contains("source=filesystem"));
     }
@@ -2203,7 +2248,7 @@ mod tests {
         let subscriber = subscriber_with(buffer.clone(), LogFormat::Json);
         capture::with_level("info", || async {
             tracing::subscriber::with_default(subscriber, || {
-                tracing::warn!(target: LOG_TARGET, op = "x", attempt = 3, ratio = 1.5, ok = true);
+                tracing::warn!(target: LOG_TARGET, op = "main.x", attempt = 3, ratio = 1.5, ok = true);
             });
         })
         .await;
@@ -2470,5 +2515,261 @@ mod tests {
                 .any(|line| line.contains("op=capture.probe")),
             "capture must see the emitted line"
         );
+    }
+
+    /// The first segment of every emitted operation name must be a member of
+    /// [`OP_NAMESPACES`]; a name outside the registry is a filter key no
+    /// documented directive can select ([ADR-0081]).
+    ///
+    /// This is a lint, not scenario coverage (AGENTS.md): it reads the source
+    /// through the idioms this codebase emits operations with — an `op` key
+    /// value, an `op:` struct field, a native `op =`, a `format!` template's
+    /// static prefix, and the first argument of the log helpers — rather than
+    /// parsing Rust. A producer that builds an `op` some other way is not
+    /// seen; the registry and ADR-0081 stay the contract.
+    #[test]
+    fn every_emitted_operation_names_a_registered_namespace() {
+        let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("src");
+        let mut drift = Vec::new();
+        for path in rust_sources(&root) {
+            let source = std::fs::read_to_string(&path).expect("source reads");
+            for op in op_literals(&source) {
+                if !OP_NAMESPACES.contains(&namespace_of(&op)) {
+                    drift.push(format!("{}: {op}", path.display()));
+                }
+            }
+        }
+        drift.sort();
+        drift.dedup();
+        assert!(
+            drift.is_empty(),
+            "these operations name a namespace outside OP_NAMESPACES (ADR-0081): {drift:?}"
+        );
+    }
+
+    #[test]
+    fn op_namespaces_are_lowercase_snake_case_and_unique() {
+        let mut seen = std::collections::BTreeSet::new();
+        for namespace in OP_NAMESPACES {
+            let mut chars = namespace.chars();
+            assert!(
+                matches!(chars.next(), Some(c) if c.is_ascii_lowercase())
+                    && chars.all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '_'),
+                "`{namespace}` is not lowercase snake_case"
+            );
+            assert!(seen.insert(*namespace), "`{namespace}` is registered twice");
+        }
+    }
+
+    /// The idiom detector proves it recognises the shapes the codebase writes,
+    /// so the lint above is not passing by collecting nothing.
+    #[test]
+    fn an_operation_is_recognized_by_the_idioms_that_emit_it() {
+        for (before, literal, expected) in [
+            (
+                "x.insert(\"op\".to_string(), json!(",
+                "main.done",
+                Some("main.done"),
+            ),
+            (
+                "ctx.record(ToolEvent { op: ",
+                "main.start",
+                Some("main.start"),
+            ),
+            ("json!({\"op\": ", "main.event", Some("main.event")),
+            (
+                "tracing::warn!(target: LOG_TARGET, op = ",
+                "main.native",
+                Some("main.native"),
+            ),
+            (
+                "log_event(",
+                "extract.from_episode.start",
+                Some("extract.from_episode.start"),
+            ),
+            (
+                "x.insert(\"op\".to_string(), Value::String(format!(",
+                "db.{op_name}.retry",
+                Some("db"),
+            ),
+            ("let message = ", "not an operation", None),
+        ] {
+            assert_eq!(
+                classify_op(before, literal),
+                expected.map(str::to_string),
+                "before: {before:?}, literal: {literal:?}"
+            );
+        }
+    }
+
+    /// Every operation name in one source file, found by the idioms above.
+    fn op_literals(source: &str) -> Vec<String> {
+        let bytes = source.as_bytes();
+        let mut ops = Vec::new();
+        let mut i = 0;
+        while i < bytes.len() {
+            if bytes[i] == b'r'
+                && let Some(end) = raw_string_end(bytes, i)
+            {
+                i = end;
+                continue;
+            }
+            if bytes[i] != b'"' || is_char_literal(bytes, i) {
+                i += 1;
+                continue;
+            }
+            let start = i + 1;
+            let mut j = start;
+            while j < bytes.len() {
+                match bytes[j] {
+                    b'\\' => j += 2,
+                    b'"' => break,
+                    _ => j += 1,
+                }
+            }
+            if j >= bytes.len() {
+                break;
+            }
+            if let Some(op) = classify_op(&source[..i], &source[start..j]) {
+                ops.push(op);
+            }
+            i = j + 1;
+        }
+        ops
+    }
+
+    /// The byte after a raw string beginning at `i`, if one begins there.
+    fn raw_string_end(bytes: &[u8], i: usize) -> Option<usize> {
+        let mut j = i + 1;
+        let mut hashes = 0;
+        while j < bytes.len() && bytes[j] == b'#' {
+            hashes += 1;
+            j += 1;
+        }
+        if j >= bytes.len() || bytes[j] != b'"' {
+            return None;
+        }
+        j += 1;
+        while j < bytes.len() {
+            if bytes[j] == b'"' {
+                let mut k = j + 1;
+                let mut seen = 0;
+                while seen < hashes && k < bytes.len() && bytes[k] == b'#' {
+                    seen += 1;
+                    k += 1;
+                }
+                if seen == hashes {
+                    return Some(k);
+                }
+            }
+            j += 1;
+        }
+        Some(bytes.len())
+    }
+
+    /// `'"'` — the double-quote character literal — is not the start of a string.
+    fn is_char_literal(bytes: &[u8], i: usize) -> bool {
+        i > 0 && i + 1 < bytes.len() && bytes[i - 1] == b'\'' && bytes[i + 1] == b'\''
+    }
+
+    /// The operation a string literal names, by the code that precedes it, or
+    /// `None` when the literal is not an operation.
+    fn classify_op(before: &str, literal: &str) -> Option<String> {
+        let compact: String = before.chars().filter(|c| !c.is_whitespace()).collect();
+        // The last 200 characters — sliced on a char boundary, since the source
+        // is UTF-8 and a fixed byte cut can split a multi-byte character.
+        let start = compact
+            .char_indices()
+            .rev()
+            .nth(199)
+            .map(|(i, _)| i)
+            .unwrap_or(0);
+        let window = &compact[start..];
+
+        for call in [
+            "log_event(",
+            "log_claim_event(",
+            "log_op(",
+            "WarningEvent::new(",
+            "RequestWarning::new(",
+        ] {
+            if window.ends_with(call) {
+                return Some(literal.to_string());
+            }
+        }
+
+        if let Some(without_format) = window.strip_suffix("format!(") {
+            if !is_op_position(without_format) {
+                return None;
+            }
+            let static_prefix = literal.split('{').next().unwrap_or("");
+            let static_prefix = static_prefix.trim_end_matches('.');
+            return (!static_prefix.is_empty()).then(|| static_prefix.to_string());
+        }
+
+        is_op_position(window).then(|| literal.to_string())
+    }
+
+    /// Whether the text immediately before a literal is an `op` position: an
+    /// `op` key whose value is only wrappers away from the literal.
+    fn is_op_position(text: &str) -> bool {
+        for marker in ["\"op\".to_string(),", "\"op\".into(),", "\"op\":"] {
+            if let Some(idx) = text.rfind(marker)
+                && is_wrapper_chain(&text[idx + marker.len()..])
+            {
+                return true;
+            }
+        }
+        for marker in ["op:", "op="] {
+            if let Some(idx) = text.rfind(marker)
+                && !text[..idx]
+                    .chars()
+                    .next_back()
+                    .is_some_and(|c| c.is_ascii_alphanumeric() || c == '_')
+                && is_wrapper_chain(&text[idx + marker.len()..])
+            {
+                return true;
+            }
+        }
+        false
+    }
+
+    /// Whether the text between an `op` key and the literal is only value
+    /// wrappers, so `json!("x")` reads as an op and `json!(count)` does not.
+    fn is_wrapper_chain(mut tail: &str) -> bool {
+        const WRAPPERS: [&str; 6] = [
+            "serde_json::Value::String(",
+            "serde_json::json!(",
+            "Value::String(",
+            "String::from(",
+            "format!(",
+            "json!(",
+        ];
+        loop {
+            match WRAPPERS.iter().find_map(|w| tail.strip_prefix(w)) {
+                Some(rest) => tail = rest,
+                None => return tail.is_empty(),
+            }
+        }
+    }
+
+    /// Every `*.rs` under `root`, recursively.
+    fn rust_sources(root: &std::path::Path) -> Vec<std::path::PathBuf> {
+        let mut out = Vec::new();
+        let mut stack = vec![root.to_path_buf()];
+        while let Some(dir) = stack.pop() {
+            let Ok(entries) = std::fs::read_dir(&dir) else {
+                continue;
+            };
+            for entry in entries.flatten() {
+                let path = entry.path();
+                if path.is_dir() {
+                    stack.push(path);
+                } else if path.extension().is_some_and(|e| e == "rs") {
+                    out.push(path);
+                }
+            }
+        }
+        out
     }
 }

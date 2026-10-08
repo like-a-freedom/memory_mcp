@@ -27,7 +27,7 @@ pub(crate) fn build_startup_versions_event(
     server_version: Option<&str>,
 ) -> std::collections::HashMap<String, serde_json::Value> {
     let mut m = std::collections::HashMap::new();
-    m.insert("op".to_string(), serde_json::json!("startup.versions"));
+    m.insert("op".to_string(), serde_json::json!("main.versions"));
     m.insert(
         "client_version".to_string(),
         serde_json::json!(client_version),
@@ -345,7 +345,7 @@ mod tests {
     #[test]
     fn build_startup_versions_event_includes_both_versions() {
         let evt = build_startup_versions_event("0.1.0", Some("SurrealDB 3.0.0"));
-        assert_eq!(evt.get("op").unwrap().as_str(), Some("startup.versions"));
+        assert_eq!(evt.get("op").unwrap().as_str(), Some("main.versions"));
         assert_eq!(evt.get("client_version").unwrap().as_str(), Some("0.1.0"));
         assert_eq!(
             evt.get("surrealdb_server_version").unwrap().as_str(),
@@ -356,7 +356,7 @@ mod tests {
     #[test]
     fn build_startup_versions_event_omits_server_when_none() {
         let evt = build_startup_versions_event("0.1.0", None);
-        assert_eq!(evt.get("op").unwrap().as_str(), Some("startup.versions"));
+        assert_eq!(evt.get("op").unwrap().as_str(), Some("main.versions"));
         assert_eq!(evt.get("client_version").unwrap().as_str(), Some("0.1.0"));
         assert!(!evt.contains_key("surrealdb_server_version"));
     }

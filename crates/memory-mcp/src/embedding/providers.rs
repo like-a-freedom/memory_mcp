@@ -151,7 +151,10 @@ fn validate_dimension_override(
         Some(expected_dimension) if expected_dimension != actual_dimension => {
             use std::collections::HashMap;
             let mut event = HashMap::new();
-            event.insert("op".to_string(), json!("dimension_override_mismatch"));
+            event.insert(
+                "op".to_string(),
+                json!("embedding.dimension_override_mismatch"),
+            );
             event.insert(
                 "message".to_string(),
                 json!(format!(
@@ -343,7 +346,7 @@ pub(crate) fn cosine_similarity(left: &[f64], right: &[f64]) -> f64 {
         let mut event = HashMap::new();
         event.insert(
             "op".to_string(),
-            json!("cosine_similarity.dimension_mismatch"),
+            json!("embedding.cosine_similarity_mismatch"),
         );
         event.insert("left_dim".to_string(), json!(left.len()));
         event.insert("right_dim".to_string(), json!(right.len()));

@@ -31,7 +31,9 @@ use std::time::Instant;
 #[cfg(feature = "streamable-http")]
 use std::time::{Duration, Instant};
 
-use super::error::{error_data_log_level, mcp_error};
+#[cfg(feature = "mcp-apps")]
+use super::error::error_data_log_level;
+use super::error::mcp_error;
 use super::params::*;
 use super::response::{AppCommandResult, OpenAppResult, ToolResponse};
 use super::session;

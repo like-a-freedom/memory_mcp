@@ -346,7 +346,7 @@ pub async fn extract_from_episode(
 
     service.logger.log(
         log_event(
-            "extract_from_episode.start",
+            "extract.from_episode.start",
             json!({"episode_id": episode_id}),
             json!({}),
             None,
@@ -438,7 +438,7 @@ pub async fn extract_from_episode(
 
     service.logger.log(
         log_event(
-            "extract_from_episode.done",
+            "extract.from_episode.done",
             log_args_with_duration(json!({"episode_id": episode_id}), timer.elapsed()),
             build_extract_log_result_with_metadata(
                 Some(&episode),

@@ -460,14 +460,14 @@ mod tests {
     #[test]
     fn log_event_creates_expected_structure() {
         let event = log_event(
-            "test_op",
+            "main.test",
             json!({"key": "value"}),
             json!({"result": "ok"}),
             None,
             None,
             None,
         );
-        assert_eq!(event.get("op").unwrap().as_str(), Some("test_op"));
+        assert_eq!(event.get("op").unwrap().as_str(), Some("main.test"));
         assert_eq!(
             event.get("args").unwrap().get("key").unwrap().as_str(),
             Some("value")
@@ -487,7 +487,7 @@ mod tests {
             transport: None,
             content_type: None,
         };
-        let event = log_event("test_op", json!({}), json!({}), Some(&access), None, None);
+        let event = log_event("main.test", json!({}), json!({}), Some(&access), None, None);
         let access_event = event.get("access").unwrap();
         assert_eq!(
             access_event.get("caller_id").unwrap().as_str(),
@@ -855,7 +855,7 @@ mod tests {
             transport: Some("grpc".to_string()),
             content_type: Some("application/grpc".to_string()),
         };
-        let event = log_event("test_op", json!({}), json!({}), Some(&access), None, None);
+        let event = log_event("main.test", json!({}), json!({}), Some(&access), None, None);
         let access_val = event.get("access").unwrap();
         assert_eq!(
             access_val.get("caller_id").unwrap().as_str(),
@@ -888,7 +888,7 @@ mod tests {
 
     #[test]
     fn log_event_without_access_context_omits_access_field() {
-        let event = log_event("test_op", json!({}), json!({}), None, None, None);
+        let event = log_event("main.test", json!({}), json!({}), None, None, None);
         assert!(!event.contains_key("access"));
     }
 

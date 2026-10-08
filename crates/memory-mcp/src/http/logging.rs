@@ -1362,6 +1362,9 @@ mod tests {
                     include_str!("middleware/acquire_runtime.rs"),
                     include_str!("middleware/preflight.rs"),
                     include_str!("logging.rs"),
+                    include_str!("health.rs"),
+                    include_str!("principal/auth.rs"),
+                    include_str!("../bin/memory_mcp_http.rs"),
                 ] {
                     for line in source.lines() {
                         // A line that is a comment is documentation, not an emit.
