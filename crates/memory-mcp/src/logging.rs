@@ -2368,24 +2368,30 @@ mod tests {
 
         capture::with_level("error", || async {
             let mut event = HashMap::new();
-            event.insert("op".to_string(), json!("probe.warn"));
+            event.insert("op".to_string(), json!("cache.emit_governed"));
             emit(event, LogLevel::Warn);
         })
         .await;
         assert!(
-            !guard.lines().iter().any(|line| line.contains("probe.warn")),
+            !guard
+                .lines()
+                .iter()
+                .any(|line| line.contains("cache.emit_governed")),
             "RUST_LOG=error must silence a warn map event"
         );
 
         guard.clear();
         capture::with_level("info", || async {
             let mut event = HashMap::new();
-            event.insert("op".to_string(), json!("probe.warn"));
+            event.insert("op".to_string(), json!("cache.emit_governed"));
             emit(event, LogLevel::Warn);
         })
         .await;
         assert!(
-            guard.lines().iter().any(|line| line.contains("probe.warn")),
+            guard
+                .lines()
+                .iter()
+                .any(|line| line.contains("cache.emit_governed")),
             "RUST_LOG=info must admit a warn map event"
         );
     }
@@ -2399,16 +2405,22 @@ mod tests {
     #[tokio::test]
     async fn a_loggers_own_level_is_not_overridden_by_rust_log() {
         let guard = capture::install();
+        // A distinct op per test: every live capture receives every rendered
+        // line, so two tests sharing this literal would read each other's
+        // emission through their overlapping guards. See `TEST_ONLY_OP`.
         capture::with_level("error", || async {
             let logger = StdoutLogger::new("warn");
             let mut event = HashMap::new();
-            event.insert("op".to_string(), json!("probe.warn"));
+            event.insert("op".to_string(), json!("cache.logger_level"));
             logger.log(event, LogLevel::Warn);
         })
         .await;
 
         assert!(
-            guard.lines().iter().any(|line| line.contains("probe.warn")),
+            guard
+                .lines()
+                .iter()
+                .any(|line| line.contains("cache.logger_level")),
             "a warn-level logger's warn event must still be emitted under RUST_LOG=error"
         );
     }
