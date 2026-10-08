@@ -22,6 +22,14 @@ pub async fn ingest<T: ToolContext>(
     ctx: &T,
     params: IngestParams,
 ) -> Result<ToolResponse<String>, MemoryError> {
+    let id = crate::logging::correlation::current().unwrap_or_else(next_request_id);
+    crate::logging::correlation::scope(id, ingest_inner(ctx, params)).await
+}
+
+async fn ingest_inner<T: ToolContext>(
+    ctx: &T,
+    params: IngestParams,
+) -> Result<ToolResponse<String>, MemoryError> {
     let mut operation_metrics = crate::observability::OperationMetrics::new("ingest");
     let t_ref = parse_datetime(&params.t_ref).ok_or_else(|| {
         MemoryError::Validation(format!(
@@ -43,14 +51,12 @@ pub async fn ingest<T: ToolContext>(
     };
 
     let timer = Instant::now();
-    let request_id = next_request_id();
     let source_id = request.source_id.clone();
     ctx.record(ToolEvent {
         op: "ingest.start",
         args: json!({"source_type": &request.source_type, "source_id": &source_id}),
         result: json!({}),
         level: LogLevel::Info,
-        request_id: Some(request_id.clone()),
         duration: None,
     });
 
@@ -71,7 +77,6 @@ pub async fn ingest<T: ToolContext>(
                 args: json!({"source_id": &source_id}),
                 result: json!({"episode_id": &episode_id}),
                 level: LogLevel::Info,
-                request_id: Some(request_id),
                 duration: Some(timer.elapsed()),
             });
             Ok(ToolResponse::success_with_guidance(
@@ -87,7 +92,6 @@ pub async fn ingest<T: ToolContext>(
                 args: json!({"source_id": &source_id}),
                 result: json!({"error": err.to_string()}),
                 level: LogLevel::Warn,
-                request_id: Some(request_id),
                 duration: Some(timer.elapsed()),
             });
             Err(err)
@@ -107,12 +111,16 @@ mod tests {
     /// the tool ever grows a call to it.
     struct StubContext {
         episode_id: String,
-        events: Mutex<Vec<&'static str>>,
+        /// `(op, the correlation id in force when the tool recorded it)`.
+        events: Mutex<Vec<(&'static str, Option<String>)>>,
     }
 
     impl ToolContext for StubContext {
         fn record(&self, event: ToolEvent) {
-            self.events.lock().expect("event log").push(event.op);
+            self.events
+                .lock()
+                .expect("event log")
+                .push((event.op, crate::logging::correlation::current()));
         }
 
         async fn ingest(
@@ -236,6 +244,48 @@ mod tests {
         assert_eq!(
             response.result, episode_id,
             "the result must be the canonical id the guidance refers to"
+        );
+    }
+
+    /// A tool adopts the ambient correlation id, so its events join the request
+    /// that is already in flight instead of minting a second, unjoinable id.
+    #[tokio::test]
+    async fn a_tool_adopts_an_ambient_request_id() {
+        let ctx = StubContext {
+            episode_id: "episode:d1a2438bcfb3380ffb913ec4".to_string(),
+            events: Mutex::new(Vec::new()),
+        };
+
+        crate::logging::correlation::scope("req_x", ingest(&ctx, params()))
+            .await
+            .expect("ingest should succeed");
+
+        let events = ctx.events.lock().expect("event log");
+        assert!(!events.is_empty(), "the tool records lifecycle events");
+        assert!(
+            events.iter().all(|(_, id)| id.as_deref() == Some("req_x")),
+            "every event must carry the ambient id: {events:?}"
+        );
+    }
+
+    /// With no ambient id — stdio, a direct call in a test — the tool mints a
+    /// per-call `req_NNNN`, preserving the existing stdio behaviour.
+    #[tokio::test]
+    async fn a_tool_mints_an_id_when_none_is_ambient() {
+        let ctx = StubContext {
+            episode_id: "episode:d1a2438bcfb3380ffb913ec4".to_string(),
+            events: Mutex::new(Vec::new()),
+        };
+
+        ingest(&ctx, params()).await.expect("ingest should succeed");
+
+        let events = ctx.events.lock().expect("event log");
+        assert!(!events.is_empty());
+        assert!(
+            events
+                .iter()
+                .all(|(_, id)| id.as_deref().is_some_and(|id| id.starts_with("req_"))),
+            "a tool with no ambient id must mint one: {events:?}"
         );
     }
 }

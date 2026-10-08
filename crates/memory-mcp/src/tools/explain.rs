@@ -23,6 +23,14 @@ pub async fn explain<T: ToolContext>(
     ctx: &T,
     params: ExplainParams,
 ) -> Result<ToolResponse<serde_json::Value>, MemoryError> {
+    let id = crate::logging::correlation::current().unwrap_or_else(next_request_id);
+    crate::logging::correlation::scope(id, explain_inner(ctx, params)).await
+}
+
+async fn explain_inner<T: ToolContext>(
+    ctx: &T,
+    params: ExplainParams,
+) -> Result<ToolResponse<serde_json::Value>, MemoryError> {
     let mut operation_metrics = crate::observability::OperationMetrics::new("explain");
     let access = AccessPayload::default();
     let context_pack =
@@ -34,13 +42,11 @@ pub async fn explain<T: ToolContext>(
     };
 
     let timer = Instant::now();
-    let request_id = next_request_id();
     ctx.record(ToolEvent {
         op: "explain.start",
         args: json!({"count": request.context_pack.len()}),
         result: json!({}),
         level: LogLevel::Info,
-        request_id: Some(request_id.clone()),
         duration: None,
     });
 
@@ -51,7 +57,6 @@ pub async fn explain<T: ToolContext>(
                 args: json!({}),
                 result: json!({"count": explanations.len()}),
                 level: LogLevel::Info,
-                request_id: Some(request_id.clone()),
                 duration: Some(timer.elapsed()),
             });
             let count = explanations.len();
@@ -85,7 +90,6 @@ pub async fn explain<T: ToolContext>(
                 args: json!({}),
                 result: json!({"error": err.to_string()}),
                 level: LogLevel::Warn,
-                request_id: Some(request_id),
                 duration: Some(timer.elapsed()),
             });
             Err(err)

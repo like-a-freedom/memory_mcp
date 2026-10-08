@@ -23,6 +23,14 @@ pub async fn assemble_context<T: ToolContext>(
     ctx: &T,
     params: AssembleContextParams,
 ) -> Result<ToolResponse<serde_json::Value>, MemoryError> {
+    let id = crate::logging::correlation::current().unwrap_or_else(next_request_id);
+    crate::logging::correlation::scope(id, assemble_context_inner(ctx, params)).await
+}
+
+async fn assemble_context_inner<T: ToolContext>(
+    ctx: &T,
+    params: AssembleContextParams,
+) -> Result<ToolResponse<serde_json::Value>, MemoryError> {
     let mut operation_metrics = crate::observability::OperationMetrics::new("assemble_context");
     let compact = params.compact;
     let as_of = if params.as_of.trim().is_empty() {
@@ -47,13 +55,11 @@ pub async fn assemble_context<T: ToolContext>(
     };
 
     let timer = Instant::now();
-    let request_id = next_request_id();
     ctx.record(ToolEvent {
         op: "assemble_context.start",
         args: json!({"query": request.query}),
         result: json!({}),
         level: LogLevel::Info,
-        request_id: Some(request_id.clone()),
         duration: None,
     });
 
@@ -64,7 +70,6 @@ pub async fn assemble_context<T: ToolContext>(
                 args: json!({}),
                 result: json!({"count": results.len()}),
                 level: LogLevel::Info,
-                request_id: Some(request_id.clone()),
                 duration: Some(timer.elapsed()),
             });
             let count = results.len();
@@ -98,7 +103,6 @@ pub async fn assemble_context<T: ToolContext>(
                 args: json!({}),
                 result: json!({"error": err.to_string()}),
                 level: LogLevel::Warn,
-                request_id: Some(request_id),
                 duration: Some(timer.elapsed()),
             });
             Err(err)

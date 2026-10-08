@@ -18,6 +18,14 @@ pub async fn invalidate<T: ToolContext>(
     ctx: &T,
     params: InvalidateParams,
 ) -> Result<ToolResponse<String>, MemoryError> {
+    let id = crate::logging::correlation::current().unwrap_or_else(next_request_id);
+    crate::logging::correlation::scope(id, invalidate_inner(ctx, params)).await
+}
+
+async fn invalidate_inner<T: ToolContext>(
+    ctx: &T,
+    params: InvalidateParams,
+) -> Result<ToolResponse<String>, MemoryError> {
     let mut operation_metrics = crate::observability::OperationMetrics::new("invalidate");
     let access = AccessPayload::default();
     let t_invalid = parse_datetime(&params.t_invalid).ok_or_else(|| {
@@ -37,14 +45,12 @@ pub async fn invalidate<T: ToolContext>(
     };
 
     let timer = Instant::now();
-    let request_id = next_request_id();
     let fact_id = request.fact_id.clone();
     ctx.record(ToolEvent {
         op: "invalidate.start",
         args: json!({"fact_id": &fact_id}),
         result: json!({}),
         level: LogLevel::Info,
-        request_id: Some(request_id.clone()),
         duration: None,
     });
 
@@ -57,7 +63,6 @@ pub async fn invalidate<T: ToolContext>(
                 args: json!({"fact_id": &fact_id}),
                 result: json!({"status": "invalidated"}),
                 level: LogLevel::Info,
-                request_id: Some(request_id),
                 duration: Some(timer.elapsed()),
             });
             Ok(ToolResponse::success_with_guidance(
@@ -71,7 +76,6 @@ pub async fn invalidate<T: ToolContext>(
                 args: json!({"fact_id": &fact_id}),
                 result: json!({"error": err.to_string()}),
                 level: LogLevel::Warn,
-                request_id: Some(request_id),
                 duration: Some(timer.elapsed()),
             });
             Err(err)

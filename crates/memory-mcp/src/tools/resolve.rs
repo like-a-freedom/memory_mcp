@@ -17,6 +17,14 @@ pub async fn resolve<T: ToolContext>(
     ctx: &T,
     params: ResolveParams,
 ) -> Result<ToolResponse<String>, MemoryError> {
+    let id = crate::logging::correlation::current().unwrap_or_else(next_request_id);
+    crate::logging::correlation::scope(id, resolve_inner(ctx, params)).await
+}
+
+async fn resolve_inner<T: ToolContext>(
+    ctx: &T,
+    params: ResolveParams,
+) -> Result<ToolResponse<String>, MemoryError> {
     let mut operation_metrics = crate::observability::OperationMetrics::new("resolve");
     let access = AccessPayload::default();
     let candidate = EntityCandidate {
@@ -26,13 +34,11 @@ pub async fn resolve<T: ToolContext>(
     };
 
     let timer = Instant::now();
-    let request_id = next_request_id();
     ctx.record(ToolEvent {
         op: "resolve.start",
         args: json!({"entity_type": candidate.entity_type, "canonical": candidate.canonical_name}),
         result: json!({}),
         level: LogLevel::Info,
-        request_id: Some(request_id.clone()),
         duration: None,
     });
 
@@ -45,7 +51,6 @@ pub async fn resolve<T: ToolContext>(
                 args: json!({}),
                 result: json!({"entity_id": &entity_id}),
                 level: LogLevel::Info,
-                request_id: Some(request_id),
                 duration: Some(timer.elapsed()),
             });
             Ok(ToolResponse::success_with_guidance(
@@ -59,7 +64,6 @@ pub async fn resolve<T: ToolContext>(
                 args: json!({}),
                 result: json!({"error": err.to_string()}),
                 level: LogLevel::Warn,
-                request_id: Some(request_id),
                 duration: Some(timer.elapsed()),
             });
             Err(err)

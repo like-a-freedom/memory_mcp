@@ -337,12 +337,6 @@ impl MemoryMcp {
         self.service.retained_cache_bytes().await
     }
 
-    #[cfg(feature = "mcp-apps")]
-    /// Generates a monotonically increasing request id like `req_0001`.
-    fn next_request_id(&self) -> String {
-        crate::tools::request_id::next_request_id()
-    }
-
     fn build_server_config() -> ServerConfig {
         ServerConfig::new(
             ServerCapabilities::builder()
@@ -993,56 +987,57 @@ impl MemoryMcp {
 
         #[cfg(feature = "mcp-apps")]
         {
-            let p = params.0;
-            let timer = Instant::now(); // open_app
-            let request_id = self.next_request_id();
-            let app = Self::normalize_public_app_name(&p.app)
-                .ok_or_else(|| Self::invalid_params(format!("Unknown app: {}", p.app)))?;
+            let id = crate::logging::correlation::current()
+                .unwrap_or_else(crate::tools::request_id::next_request_id);
+            crate::logging::correlation::scope(id, async move {
+                let p = params.0;
+                let timer = Instant::now(); // open_app
+                let app = Self::normalize_public_app_name(&p.app)
+                    .ok_or_else(|| Self::invalid_params(format!("Unknown app: {}", p.app)))?;
 
-            self.service.log_tool_event(
-                "open_app.start",
-                json!({"app": app}),
-                json!({}),
-                LogLevel::Info,
-                Some(&request_id),
-            );
+                self.service.log_tool_event(
+                    "open_app.start",
+                    json!({"app": app}),
+                    json!({}),
+                    LogLevel::Info,
+                );
 
-            let result = match app {
-                "inspector" => self.open_inspector_app(&p).await,
-                "diff" => self.open_diff_app(&p).await,
-                "ingestion_review" => self.open_ingestion_review_app(&p).await,
-                "lifecycle" => self.open_lifecycle_app(&p).await,
-                "graph" => self.open_graph_app(&p).await,
-                _ => Err(Self::invalid_params(format!("Unknown app: {}", p.app))),
-            };
+                let result = match app {
+                    "inspector" => self.open_inspector_app(&p).await,
+                    "diff" => self.open_diff_app(&p).await,
+                    "ingestion_review" => self.open_ingestion_review_app(&p).await,
+                    "lifecycle" => self.open_lifecycle_app(&p).await,
+                    "graph" => self.open_graph_app(&p).await,
+                    _ => Err(Self::invalid_params(format!("Unknown app: {}", p.app))),
+                };
 
-            match result {
-                Ok(opened) => {
-                    self.service.log_tool_event_with_duration(
-                        "open_app.done",
-                        json!({"app": app}),
-                        json!({"session_id": opened.session_id, "resource_uri": opened.resource_uri}),
-                        LogLevel::Info,
-                        timer.elapsed(),
-                        Some(&request_id),
-                    );
-                    Ok(Json(ToolResponse::success_with_guidance(
-                        opened,
-                        "Read the returned `resource_uri` to view this session, or continue it with `app_command` using `session_id`. To refresh, re-read the same `resource_uri`; do not call `open_app` again — that opens a new session.",
-                    )))
+                match result {
+                    Ok(opened) => {
+                        self.service.log_tool_event_with_duration(
+                            "open_app.done",
+                            json!({"app": app}),
+                            json!({"session_id": opened.session_id, "resource_uri": opened.resource_uri}),
+                            LogLevel::Info,
+                            timer.elapsed(),
+                        );
+                        Ok(Json(ToolResponse::success_with_guidance(
+                            opened,
+                            "Read the returned `resource_uri` to view this session, or continue it with `app_command` using `session_id`. To refresh, re-read the same `resource_uri`; do not call `open_app` again — that opens a new session.",
+                        )))
+                    }
+                    Err(err) => {
+                        self.service.log_tool_event_with_duration(
+                            "open_app.error",
+                            json!({"app": app}),
+                            json!({"error": err.to_string()}),
+                            LogLevel::Warn,
+                            timer.elapsed(),
+                        );
+                        Err(err)
+                    }
                 }
-                Err(err) => {
-                    self.service.log_tool_event_with_duration(
-                        "open_app.error",
-                        json!({"app": app}),
-                        json!({"error": err.to_string()}),
-                        LogLevel::Warn,
-                        timer.elapsed(),
-                        Some(&request_id),
-                    );
-                    Err(err)
-                }
-            }
+            })
+            .await
         }
     }
 
@@ -1063,89 +1058,90 @@ impl MemoryMcp {
 
         #[cfg(feature = "mcp-apps")]
         {
-            let p = params.0;
-            let timer = Instant::now();
-            let request_id = self.next_request_id();
-            self.service.log_tool_event(
-                "app_command.start",
-                json!({"session_id": p.session_id, "action": p.action}),
-                json!({}),
-                LogLevel::Info,
-                Some(&request_id),
-            );
+            let id = crate::logging::correlation::current()
+                .unwrap_or_else(crate::tools::request_id::next_request_id);
+            crate::logging::correlation::scope(id, async move {
+                let p = params.0;
+                let timer = Instant::now();
+                self.service.log_tool_event(
+                    "app_command.start",
+                    json!({"session_id": p.session_id, "action": p.action}),
+                    json!({}),
+                    LogLevel::Info,
+                );
 
-            let input = AppCommandInput {
-                action: p.action.clone(),
-                item_ids: p.item_ids.clone(),
-                target_ids: p.target_ids.clone(),
-                target_id: p.target_id.clone(),
-                item_id: p.item_id.clone(),
-                patch_json: p.patch_json.clone(),
-                reason: p.reason.clone(),
-                dry_run: p.dry_run.unwrap_or(false),
-                confirmed: p.confirmed.unwrap_or(false),
-                format: p.format.clone(),
-                direction: p.direction.clone(),
-                depth: p.depth,
-            };
-            let outcome = {
-                #[cfg(all(feature = "streamable-http", feature = "mcp-apps"))]
-                if self.durable_app_sessions.is_some() {
-                    self.execute_durable_app_command(&p.session_id, input).await
-                } else {
-                    crate::service::apps::session_lifecycle::execute_app_command(
-                        &self.service,
-                        &self.session_manager,
-                        &p.session_id,
-                        input,
-                    )
-                    .await
-                    .map_err(mcp_error)
-                }
-                #[cfg(not(feature = "streamable-http"))]
-                {
-                    crate::service::apps::session_lifecycle::execute_app_command(
-                        &self.service,
-                        &self.session_manager,
-                        &p.session_id,
-                        input,
-                    )
-                    .await
-                    .map_err(mcp_error)
-                }
-            };
+                let input = AppCommandInput {
+                    action: p.action.clone(),
+                    item_ids: p.item_ids.clone(),
+                    target_ids: p.target_ids.clone(),
+                    target_id: p.target_id.clone(),
+                    item_id: p.item_id.clone(),
+                    patch_json: p.patch_json.clone(),
+                    reason: p.reason.clone(),
+                    dry_run: p.dry_run.unwrap_or(false),
+                    confirmed: p.confirmed.unwrap_or(false),
+                    format: p.format.clone(),
+                    direction: p.direction.clone(),
+                    depth: p.depth,
+                };
+                let outcome = {
+                    #[cfg(all(feature = "streamable-http", feature = "mcp-apps"))]
+                    if self.durable_app_sessions.is_some() {
+                        self.execute_durable_app_command(&p.session_id, input).await
+                    } else {
+                        crate::service::apps::session_lifecycle::execute_app_command(
+                            &self.service,
+                            &self.session_manager,
+                            &p.session_id,
+                            input,
+                        )
+                        .await
+                        .map_err(mcp_error)
+                    }
+                    #[cfg(not(feature = "streamable-http"))]
+                    {
+                        crate::service::apps::session_lifecycle::execute_app_command(
+                            &self.service,
+                            &self.session_manager,
+                            &p.session_id,
+                            input,
+                        )
+                        .await
+                        .map_err(mcp_error)
+                    }
+                };
 
-            match outcome {
-                Ok(command_result) => {
-                    self.service.log_tool_event_with_duration(
-                        "app_command.done",
-                        json!({"session_id": p.session_id, "action": command_result.action}),
-                        json!({
-                            "app": command_result.app,
-                            "ok": command_result.ok,
-                            "refresh_required": command_result.refresh_required,
-                        }),
-                        LogLevel::Info,
-                        timer.elapsed(),
-                        Some(&request_id),
-                    );
-                    Ok(Json(ToolResponse::success_with_guidance(
-                        command_result,
-                        "Continue this session with `app_command`; re-read the same `resource_uri` when `refresh_required=true`. Do not call `open_app` again to refresh — that opens a new session.",
-                    )))
+                match outcome {
+                    Ok(command_result) => {
+                        self.service.log_tool_event_with_duration(
+                            "app_command.done",
+                            json!({"session_id": p.session_id, "action": command_result.action}),
+                            json!({
+                                "app": command_result.app,
+                                "ok": command_result.ok,
+                                "refresh_required": command_result.refresh_required,
+                            }),
+                            LogLevel::Info,
+                            timer.elapsed(),
+                        );
+                        Ok(Json(ToolResponse::success_with_guidance(
+                            command_result,
+                            "Continue this session with `app_command`; re-read the same `resource_uri` when `refresh_required=true`. Do not call `open_app` again to refresh — that opens a new session.",
+                        )))
+                    }
+                    Err(err) => {
+                        self.service.log_tool_event_with_duration(
+                            "app_command.error",
+                            json!({"session_id": p.session_id, "action": p.action}),
+                            json!({"error": err.to_string()}),
+                            LogLevel::Warn,
+                            timer.elapsed(),
+                        );
+                        Err(err)
+                    }
                 }
-                Err(err) => {
-                    self.service.log_tool_event_with_duration(
-                        "app_command.error",
-                        json!({"session_id": p.session_id, "action": p.action}),
-                        json!({"error": err.to_string()}),
-                        LogLevel::Warn,
-                        timer.elapsed(),
-                        Some(&request_id),
-                    );
-                    Err(err)
-                }
-            }
+            })
+            .await
         }
     }
 

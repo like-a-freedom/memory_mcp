@@ -22,6 +22,14 @@ pub async fn extract<T: ToolContext>(
     ctx: &T,
     params: ExtractParams,
 ) -> Result<ToolResponse<ExtractResult>, MemoryError> {
+    let id = crate::logging::correlation::current().unwrap_or_else(next_request_id);
+    crate::logging::correlation::scope(id, extract_inner(ctx, params)).await
+}
+
+async fn extract_inner<T: ToolContext>(
+    ctx: &T,
+    params: ExtractParams,
+) -> Result<ToolResponse<ExtractResult>, MemoryError> {
     let mut operation_metrics = crate::observability::OperationMetrics::new("extract");
     let access = AccessPayload::default();
     let episode_id = normalize_optional_string(params.episode_id);
@@ -32,14 +40,12 @@ pub async fn extract<T: ToolContext>(
     let t_ref = params.t_ref;
     let zero_shot_labels = params.zero_shot_labels;
     let timer = Instant::now();
-    let request_id = next_request_id();
 
     ctx.record(ToolEvent {
         op: "extract.start",
         args: json!({"episode_id": &episode_id, "has_content": content.is_some() || text.is_some()}),
         result: json!({}),
         level: LogLevel::Info,
-        request_id: Some(request_id.clone()),
         duration: None,
     });
 
@@ -50,7 +56,6 @@ pub async fn extract<T: ToolContext>(
             args: json!({"episode_id": &episode_id, "has_content": true}),
             result: json!({"error": message}),
             level: LogLevel::Warn,
-            request_id: Some(request_id.clone()),
             duration: Some(timer.elapsed()),
         });
         return Err(MemoryError::Validation(message.to_string()));
@@ -65,7 +70,6 @@ pub async fn extract<T: ToolContext>(
             args: json!({"episode_id": &episode_id, "has_content": true}),
             result: json!({"error": message}),
             level: LogLevel::Warn,
-            request_id: Some(request_id.clone()),
             duration: Some(timer.elapsed()),
         });
         return Err(MemoryError::Validation(message.to_string()));
@@ -78,7 +82,6 @@ pub async fn extract<T: ToolContext>(
             args: json!({"episode_id": &episode_id, "has_content": false}),
             result: json!({"error": message}),
             level: LogLevel::Warn,
-            request_id: Some(request_id.clone()),
             duration: Some(timer.elapsed()),
         });
         return Err(MemoryError::Validation(message.to_string()));
@@ -114,7 +117,6 @@ pub async fn extract<T: ToolContext>(
                     args: json!({"episode_id": episode_id}),
                     result: log_result,
                     level: LogLevel::Info,
-                    request_id: Some(request_id.clone()),
                     duration: Some(timer.elapsed()),
                 });
                 let guidance = extract_guidance(&result);
@@ -126,7 +128,6 @@ pub async fn extract<T: ToolContext>(
                     args: json!({"episode_id": episode_id}),
                     result: json!({"error": err.to_string()}),
                     level: LogLevel::Warn,
-                    request_id: Some(request_id.clone()),
                     duration: Some(timer.elapsed()),
                 });
                 return Err(err);
@@ -194,7 +195,6 @@ pub async fn extract<T: ToolContext>(
                         args: json!({"episode_id": &episode_id}),
                         result: log_result,
                         level: LogLevel::Info,
-                        request_id: Some(request_id.clone()),
                         duration: Some(timer.elapsed()),
                     });
                     let guidance = extract_guidance(&result);
@@ -206,7 +206,6 @@ pub async fn extract<T: ToolContext>(
                         args: json!({}),
                         result: json!({"error": err.to_string()}),
                         level: LogLevel::Warn,
-                        request_id: Some(request_id.clone()),
                         duration: Some(timer.elapsed()),
                     });
                     Err(err)
@@ -219,7 +218,6 @@ pub async fn extract<T: ToolContext>(
                 args: json!({}),
                 result: json!({"error": err.to_string()}),
                 level: LogLevel::Warn,
-                request_id: Some(request_id),
                 duration: Some(timer.elapsed()),
             });
             Err(err)

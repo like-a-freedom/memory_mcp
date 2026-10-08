@@ -33,7 +33,6 @@ pub struct ToolEvent {
     pub args: Value,
     pub result: Value,
     pub level: LogLevel,
-    pub request_id: Option<String>,
     pub duration: Option<Duration>,
 }
 

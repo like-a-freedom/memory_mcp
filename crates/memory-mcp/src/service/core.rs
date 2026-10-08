@@ -103,16 +103,11 @@ impl MemoryService {
 
     /// Public helper for tool-level logging.
     #[cfg_attr(not(feature = "mcp-apps"), allow(dead_code))]
-    pub(crate) fn log_tool_event(
-        &self,
-        op: &str,
-        args: Value,
-        result: Value,
-        level: LogLevel,
-        request_id: Option<&str>,
-    ) {
+    pub(crate) fn log_tool_event(&self, op: &str, args: Value, result: Value, level: LogLevel) {
+        // The request id is the ambient one, stamped on by the formatter
+        // (ADR-0080); the tool layer no longer threads its own.
         self.logger
-            .log(log_event(op, args, result, None, request_id, None), level);
+            .log(log_event(op, args, result, None, None, None), level);
     }
 
     /// Public helper for tool-level logging with duration.
@@ -124,11 +119,10 @@ impl MemoryService {
         result: Value,
         level: LogLevel,
         duration: std::time::Duration,
-        request_id: Option<&str>,
     ) {
         let duration_ms = u64::try_from(duration.as_millis()).unwrap_or(u64::MAX);
         self.logger.log(
-            log_event(op, args, result, None, request_id, Some(duration_ms)),
+            log_event(op, args, result, None, None, Some(duration_ms)),
             level,
         );
     }

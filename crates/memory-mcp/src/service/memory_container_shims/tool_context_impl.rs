@@ -21,15 +21,8 @@ impl ToolContext for crate::service::MemoryService {
                 event.result,
                 event.level,
                 duration,
-                event.request_id.as_deref(),
             ),
-            None => self.log_tool_event(
-                event.op,
-                event.args,
-                event.result,
-                event.level,
-                event.request_id.as_deref(),
-            ),
+            None => self.log_tool_event(event.op, event.args, event.result, event.level),
         }
     }
 
