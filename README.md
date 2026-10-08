@@ -22,6 +22,7 @@ It is designed for workflows where agents need more than short-lived chat contex
 - [Quick start](#quick-start)
 - [Remote deployment](#remote-deployment)
 - [Configuration](#configuration)
+- [Logging](#logging)
 - [MCP tools](#mcp-tools)
 - [Development](#development)
 - [Testing](#testing)
@@ -2052,6 +2053,19 @@ comma-separated `module::path=level` list — for example
 diagnosis.
 
 When `MEMORY_LOG_FILE` is set to a non-empty path, all structured log events are written to that file instead of stderr. This is useful for MCP hosts that do not expose the server's stderr. The file is opened in append mode (no rotation); the parent directory must already exist. If the file cannot be opened, a warning is emitted to stderr and logging continues there.
+
+## Logging
+
+Events are one line each, on stderr (or in `MEMORY_LOG_FILE`);
+[Configuration](#configuration) lists the variables that steer them. Two facts
+are worth knowing at a glance. An `op` is a pinned registry name, so
+`RUST_LOG=extract=debug` or `RUST_LOG=http=error` is a complete dial rather than
+a guess at a module path. And every unit of work carries one correlation id, so
+its access line and every event it caused share a `req=`.
+
+The operator contract — the level policy, the registry, the configuration table,
+and how to follow one request — is
+[`docs/operations/LOGGING.md`](docs/operations/LOGGING.md).
 
 ## MCP tools
 

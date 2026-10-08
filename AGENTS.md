@@ -110,6 +110,27 @@ cargo run --features streamable-http --bin memory_mcp_http  # Start SaaS HTTP se
 6. **Feature flags are additive** — the current default is `["fs-watch"]`; every other feature is opt-in and features must not imply each other implicitly
 7. **Errors are thiserror-based** — `MemoryError` with descriptive variants
 
+## Logging Conventions
+
+- **Levels** ([ADR-0079](docs/adr/0079-log-level-policy.md)): `ERROR` is a
+  failed unit of work or a risk to integrity; `WARN` is handled/degraded or a
+  client refusal; `INFO` is a business event or a state change; `DEBUG`/`TRACE`
+  are diagnostics. A failure's level comes from `MemoryError::log_level()`, not a
+  hardcoded level at the call site.
+- **Names** ([ADR-0081](docs/adr/0081-operation-naming-contract.md)):
+  `op = <namespace>[.<event>]`, where `<namespace>` is a member of the pinned
+  `OP_NAMESPACES` registry in `src/logging.rs`. A source lint checks every
+  emitted `op`.
+- **Fields**: `error` is the one name for error text; `request_id` is the
+  ambient correlation id ([ADR-0080](docs/adr/0080-one-request-identity.md)),
+  stamped by the formatter; `duration_ms` is top-level only.
+- **Emit** through one of the facades — `emit`, `logger.log`, or a native
+  `tracing` event. Never `println!`; a failure after `logging::install()` goes
+  through the logger, not `eprintln!`.
+- **Secrets**: never log credentials, keys, tokens, or raw memory content.
+
+See [`docs/operations/LOGGING.md`](docs/operations/LOGGING.md) for the runbook.
+
 ## Agent Memory Lifecycle
 
 Recall-then-capture loop. Memory supports decisions but does not replace live verification.
