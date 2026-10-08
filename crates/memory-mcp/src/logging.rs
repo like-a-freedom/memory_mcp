@@ -1349,7 +1349,7 @@ pub mod capture {
     }
 
     /// One region at a time for every `with_level` caller. See `with_level`.
-    static SERIAL: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(());
+    pub(crate) static SERIAL: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(());
 
     /// Restores the previous override when dropped, including on unwind.
     ///
@@ -1419,12 +1419,12 @@ mod tests {
     use super::*;
     use serde_json::json;
 
-    /// Serialises the two tests that assert on the override stack's absolute
-    /// contents. It is process-global, so they would otherwise interleave and
-    /// each would see the other's directive.
-    fn override_lock() -> std::sync::MutexGuard<'static, ()> {
-        static LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
-        LOCK.lock().unwrap_or_else(|poison| poison.into_inner())
+    /// Serialises every test that asserts on the override stack's absolute
+    /// contents against the `with_level` callers that push to that same stack.
+    /// It is the lock `with_level` holds, so an absolute-contents assertion
+    /// cannot read a sibling test's directive as though it were its own.
+    async fn override_lock() -> tokio::sync::MutexGuard<'static, ()> {
+        capture::SERIAL.lock().await
     }
 
     /// An override must be removed by identity, not by position.
@@ -1440,9 +1440,9 @@ mod tests {
     /// Driven here in the order that breaks it: the outer override outlives the
     /// inner one, so a positional pop removes the wrong entry and the outer
     /// test is left seeing the inner one's level.
-    #[test]
-    fn an_override_is_removed_by_identity_not_by_position() {
-        let _held = override_lock();
+    #[tokio::test]
+    async fn an_override_is_removed_by_identity_not_by_position() {
+        let _held = override_lock().await;
         // Distinct directives per test: the stack is process-global and the
         // harness runs tests in parallel, so two tests sharing a value would
         // remove each other's entry and both would be wrong.
@@ -1473,9 +1473,9 @@ mod tests {
 
     /// The order that actually broke: an override installed *outside* another
     /// that is dropped last.
-    #[test]
-    fn an_outer_override_outliving_an_inner_one_is_restored_correctly() {
-        let _held = override_lock();
+    #[tokio::test]
+    async fn an_outer_override_outliving_an_inner_one_is_restored_correctly() {
+        let _held = override_lock().await;
         let inner_first = capture::LevelOverride::install("probe.b=error");
         // Installed second, so a positional pop on its drop would take
         // `probe.b=error` and leave `probe.b=info` behind.
