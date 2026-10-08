@@ -127,7 +127,7 @@ async fn extract_inner<T: ToolContext>(
                     op: "extract.error",
                     args: json!({"episode_id": episode_id}),
                     result: json!({"error": err.to_string()}),
-                    level: LogLevel::Warn,
+                    level: err.log_level(),
                     duration: Some(timer.elapsed()),
                 });
                 return Err(err);
@@ -205,7 +205,7 @@ async fn extract_inner<T: ToolContext>(
                         op: "extract.error",
                         args: json!({}),
                         result: json!({"error": err.to_string()}),
-                        level: LogLevel::Warn,
+                        level: err.log_level(),
                         duration: Some(timer.elapsed()),
                     });
                     Err(err)
@@ -217,7 +217,7 @@ async fn extract_inner<T: ToolContext>(
                 op: "extract.error",
                 args: json!({}),
                 result: json!({"error": err.to_string()}),
-                level: LogLevel::Warn,
+                level: err.log_level(),
                 duration: Some(timer.elapsed()),
             });
             Err(err)

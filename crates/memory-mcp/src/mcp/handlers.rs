@@ -31,7 +31,7 @@ use std::time::Instant;
 #[cfg(feature = "streamable-http")]
 use std::time::{Duration, Instant};
 
-use super::error::mcp_error;
+use super::error::{error_data_log_level, mcp_error};
 use super::params::*;
 use super::response::{AppCommandResult, OpenAppResult, ToolResponse};
 use super::session;
@@ -1030,7 +1030,7 @@ impl MemoryMcp {
                             "open_app.error",
                             json!({"app": app}),
                             json!({"error": err.to_string()}),
-                            LogLevel::Warn,
+                            error_data_log_level(&err),
                             timer.elapsed(),
                         );
                         Err(err)
@@ -1134,7 +1134,7 @@ impl MemoryMcp {
                             "app_command.error",
                             json!({"session_id": p.session_id, "action": p.action}),
                             json!({"error": err.to_string()}),
-                            LogLevel::Warn,
+                            error_data_log_level(&err),
                             timer.elapsed(),
                         );
                         Err(err)

@@ -8,7 +8,6 @@
 //! `Storage` / `Transient` errors include `retryable: true`.
 
 use rmcp::ErrorData;
-#[cfg(test)]
 use rmcp::model::ErrorCode;
 use serde_json::{Value, json};
 
@@ -35,6 +34,24 @@ pub(crate) fn tool_error(
         "explanation": explanation.into(),
     });
     ErrorData::new(code, message.into(), Some(data))
+}
+
+/// The level an outbound MCP error earns, per ADR-0079 §4.1.
+///
+/// The app tools log a transport error: by the time the `.error` event is
+/// written the domain `MemoryError` has already been converted to
+/// `ErrorData`, so the class is gone. The JSON-RPC code is what remains.
+/// `INVALID_PARAMS` and `INVALID_REQUEST` are the refusal class the caller
+/// can act on — a `WARN`; anything else is a server-side failure and earns
+/// an `ERROR`.
+#[cfg_attr(not(feature = "mcp-apps"), allow(dead_code))]
+pub(crate) fn error_data_log_level(err: &ErrorData) -> crate::logging::LogLevel {
+    use crate::logging::LogLevel;
+    if err.code == ErrorCode::INVALID_PARAMS || err.code == ErrorCode::INVALID_REQUEST {
+        LogLevel::Warn
+    } else {
+        LogLevel::Error
+    }
 }
 
 /// Converts a `MemoryError` into a structured MCP `ErrorData` response.
@@ -531,5 +548,25 @@ mod tests {
         assert_eq!(data["missing_id"], "x");
         assert!(data.get("guidance").is_some());
         assert!(data.get("explanation").is_some());
+    }
+
+    /// The app tools classify an outbound error by its JSON-RPC code: a
+    /// refusal the caller can act on is a `WARN`, a server-side failure an
+    /// `ERROR`.
+    #[test]
+    fn app_tool_refusals_log_at_warn_and_server_failures_at_error() {
+        use crate::logging::LogLevel;
+        assert_eq!(
+            error_data_log_level(&ErrorData::invalid_params("unknown app", None)),
+            LogLevel::Warn,
+        );
+        assert_eq!(
+            error_data_log_level(&ErrorData::invalid_request("conflict", None)),
+            LogLevel::Warn,
+        );
+        assert_eq!(
+            error_data_log_level(&ErrorData::internal_error("disk", None)),
+            LogLevel::Error,
+        );
     }
 }

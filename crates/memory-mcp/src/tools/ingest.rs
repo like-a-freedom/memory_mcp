@@ -91,7 +91,7 @@ async fn ingest_inner<T: ToolContext>(
                 op: "ingest.error",
                 args: json!({"source_id": &source_id}),
                 result: json!({"error": err.to_string()}),
-                level: LogLevel::Warn,
+                level: err.log_level(),
                 duration: Some(timer.elapsed()),
             });
             Err(err)
@@ -111,16 +111,19 @@ mod tests {
     /// the tool ever grows a call to it.
     struct StubContext {
         episode_id: String,
-        /// `(op, the correlation id in force when the tool recorded it)`.
-        events: Mutex<Vec<(&'static str, Option<String>)>>,
+        /// When set, the one capability returns this error instead of succeeding.
+        fail_with: Option<MemoryError>,
+        /// `(op, correlation id in force, level)` for each recorded event.
+        events: Mutex<Vec<(&'static str, Option<String>, LogLevel)>>,
     }
 
     impl ToolContext for StubContext {
         fn record(&self, event: ToolEvent) {
-            self.events
-                .lock()
-                .expect("event log")
-                .push((event.op, crate::logging::correlation::current()));
+            self.events.lock().expect("event log").push((
+                event.op,
+                crate::logging::correlation::current(),
+                event.level,
+            ));
         }
 
         async fn ingest(
@@ -128,7 +131,10 @@ mod tests {
             _request: IngestRequest,
             _access: Option<AccessPayload>,
         ) -> Result<String, MemoryError> {
-            Ok(self.episode_id.clone())
+            match &self.fail_with {
+                Some(error) => Err(error.clone()),
+                None => Ok(self.episode_id.clone()),
+            }
         }
 
         async fn extract(
@@ -204,6 +210,7 @@ mod tests {
         // the mistake.
         let ctx = StubContext {
             episode_id: "episode:d1a2438bcfb3380ffb913ec4".to_string(),
+            fail_with: None,
             events: Mutex::new(Vec::new()),
         };
 
@@ -236,6 +243,7 @@ mod tests {
         let episode_id = "episode:d1a2438bcfb3380ffb913ec4";
         let ctx = StubContext {
             episode_id: episode_id.to_string(),
+            fail_with: None,
             events: Mutex::new(Vec::new()),
         };
 
@@ -253,6 +261,7 @@ mod tests {
     async fn a_tool_adopts_an_ambient_request_id() {
         let ctx = StubContext {
             episode_id: "episode:d1a2438bcfb3380ffb913ec4".to_string(),
+            fail_with: None,
             events: Mutex::new(Vec::new()),
         };
 
@@ -263,7 +272,9 @@ mod tests {
         let events = ctx.events.lock().expect("event log");
         assert!(!events.is_empty(), "the tool records lifecycle events");
         assert!(
-            events.iter().all(|(_, id)| id.as_deref() == Some("req_x")),
+            events
+                .iter()
+                .all(|(_, id, _)| id.as_deref() == Some("req_x")),
             "every event must carry the ambient id: {events:?}"
         );
     }
@@ -274,6 +285,7 @@ mod tests {
     async fn a_tool_mints_an_id_when_none_is_ambient() {
         let ctx = StubContext {
             episode_id: "episode:d1a2438bcfb3380ffb913ec4".to_string(),
+            fail_with: None,
             events: Mutex::new(Vec::new()),
         };
 
@@ -284,8 +296,51 @@ mod tests {
         assert!(
             events
                 .iter()
-                .all(|(_, id)| id.as_deref().is_some_and(|id| id.starts_with("req_"))),
+                .all(|(_, id, _)| id.as_deref().is_some_and(|id| id.starts_with("req_"))),
             "a tool with no ambient id must mint one: {events:?}"
         );
+    }
+
+    /// A failed unit of work is classified by the error, not by the callsite:
+    /// a storage failure is an `ERROR` that needs attention.
+    #[tokio::test]
+    async fn a_tool_internal_failure_logs_at_error() {
+        let ctx = StubContext {
+            episode_id: String::new(),
+            fail_with: Some(MemoryError::Storage("disk unavailable".to_string())),
+            events: Mutex::new(Vec::new()),
+        };
+
+        ingest(&ctx, params())
+            .await
+            .expect_err("a storage failure propagates to the caller");
+
+        let events = ctx.events.lock().expect("event log");
+        let (_, _, level) = events
+            .iter()
+            .find(|(op, _, _)| *op == "ingest.error")
+            .expect("the failure is recorded");
+        assert_eq!(*level, LogLevel::Error, "a storage failure is an ERROR");
+    }
+
+    /// A handled refusal is not a failure of this service, so it stays a `WARN`.
+    #[tokio::test]
+    async fn a_tool_validation_failure_logs_at_warn() {
+        let ctx = StubContext {
+            episode_id: String::new(),
+            fail_with: Some(MemoryError::Validation("bad input".to_string())),
+            events: Mutex::new(Vec::new()),
+        };
+
+        ingest(&ctx, params())
+            .await
+            .expect_err("a validation failure propagates to the caller");
+
+        let events = ctx.events.lock().expect("event log");
+        let (_, _, level) = events
+            .iter()
+            .find(|(op, _, _)| *op == "ingest.error")
+            .expect("the refusal is recorded");
+        assert_eq!(*level, LogLevel::Warn, "a refusal is a WARN");
     }
 }

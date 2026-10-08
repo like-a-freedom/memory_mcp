@@ -61,6 +61,35 @@ pub enum MemoryError {
     Unavailable(String),
 }
 
+impl MemoryError {
+    /// The severity this error earns on a log record, per ADR-0079 §4.1.
+    ///
+    /// The error class decides, not the callsite. A failed unit of work or a
+    /// risk to integrity — storage, a transient failure that survived its
+    /// retries, a missing or invalid configuration, an unservable request — is
+    /// an `ERROR` that needs attention. A handled refusal — not found, invalid
+    /// input, a conflicting capture, an exhausted budget, a model still
+    /// loading, a rejected credential — is a `WARN`: the caller was told, and
+    /// nothing on our side is broken.
+    #[must_use]
+    pub fn log_level(&self) -> crate::logging::LogLevel {
+        use crate::logging::LogLevel;
+        match self {
+            MemoryError::Storage(_)
+            | MemoryError::Transient(_)
+            | MemoryError::ConfigMissing(_)
+            | MemoryError::ConfigInvalid(_)
+            | MemoryError::Unavailable(_) => LogLevel::Error,
+            MemoryError::NotFound(_)
+            | MemoryError::Validation(_)
+            | MemoryError::Conflict(_)
+            | MemoryError::BudgetExhausted(_)
+            | MemoryError::ModelNotReady(_)
+            | MemoryError::Auth(_) => LogLevel::Warn,
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -77,5 +106,36 @@ mod tests {
                 .to_string()
                 .starts_with("unavailable:")
         );
+    }
+
+    /// The level follows the error class, so a failure is never logged at the
+    /// same severity as a refusal.
+    #[test]
+    fn a_failed_unit_of_work_is_an_error() {
+        use crate::logging::LogLevel;
+        for error in [
+            MemoryError::Storage("x".into()),
+            MemoryError::Transient("x".into()),
+            MemoryError::ConfigMissing("x".into()),
+            MemoryError::ConfigInvalid("x".into()),
+            MemoryError::Unavailable("x".into()),
+        ] {
+            assert_eq!(error.log_level(), LogLevel::Error, "{error:?}");
+        }
+    }
+
+    #[test]
+    fn a_handled_refusal_is_a_warning() {
+        use crate::logging::LogLevel;
+        for error in [
+            MemoryError::NotFound("x".into()),
+            MemoryError::Validation("x".into()),
+            MemoryError::Conflict("x".into()),
+            MemoryError::BudgetExhausted("x".into()),
+            MemoryError::ModelNotReady("x".into()),
+            MemoryError::Auth("x".into()),
+        ] {
+            assert_eq!(error.log_level(), LogLevel::Warn, "{error:?}");
+        }
     }
 }

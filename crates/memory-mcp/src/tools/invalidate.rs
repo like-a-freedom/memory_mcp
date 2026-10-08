@@ -75,7 +75,7 @@ async fn invalidate_inner<T: ToolContext>(
                 op: "invalidate.error",
                 args: json!({"fact_id": &fact_id}),
                 result: json!({"error": err.to_string()}),
-                level: LogLevel::Warn,
+                level: err.log_level(),
                 duration: Some(timer.elapsed()),
             });
             Err(err)

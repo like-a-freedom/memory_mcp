@@ -102,7 +102,7 @@ async fn assemble_context_inner<T: ToolContext>(
                 op: "assemble_context.error",
                 args: json!({}),
                 result: json!({"error": err.to_string()}),
-                level: LogLevel::Warn,
+                level: err.log_level(),
                 duration: Some(timer.elapsed()),
             });
             Err(err)

@@ -89,7 +89,7 @@ async fn explain_inner<T: ToolContext>(
                 op: "explain.error",
                 args: json!({}),
                 result: json!({"error": err.to_string()}),
-                level: LogLevel::Warn,
+                level: err.log_level(),
                 duration: Some(timer.elapsed()),
             });
             Err(err)
