@@ -251,7 +251,7 @@ impl Drop for HttpServerFixture {
     }
 }
 
-fn build_env(config: &HttpServerConfig, storage_url: &str) -> Vec<(String, String)> {
+pub fn build_env(config: &HttpServerConfig, storage_url: &str) -> Vec<(String, String)> {
     let zeros = "0".repeat(64);
     let effective_auth_methods = config
         .extra_env

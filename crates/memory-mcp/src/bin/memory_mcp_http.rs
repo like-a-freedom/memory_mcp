@@ -10,6 +10,26 @@ use memory_mcp::http::runtime::{bootstrap, signal as signal_watcher};
 use memory_mcp::http::server;
 use memory_mcp::logging::StdoutLogger;
 
+/// Record a failure that happens after logging is installed.
+///
+/// Before `install()` there is no sink to log through, so the pre-install
+/// configuration errors above keep `eprintln!`. Everything after the subscriber
+/// exists — a bind failure, a cleanup failure — goes through the same sink,
+/// level and format as the rest of the process, so it joins the stream an
+/// operator already collects.
+fn log_failure(op: &str, error: &dyn std::fmt::Display) {
+    memory_mcp::logging::emit(
+        std::collections::HashMap::from([
+            ("op".to_string(), serde_json::Value::String(op.to_string())),
+            (
+                "error".to_string(),
+                serde_json::Value::String(error.to_string()),
+            ),
+        ]),
+        memory_mcp::logging::LogLevel::Error,
+    );
+}
+
 #[tokio::main]
 async fn main() -> ExitCode {
     let logger = StdoutLogger::from_env();
@@ -39,7 +59,7 @@ async fn main() -> ExitCode {
     let mut runtime = match bootstrap::build_state(&cfg, &logger).await {
         Ok(r) => r,
         Err((code, msg)) => {
-            eprintln!("{msg}");
+            log_failure("http.serve_failed", &msg);
             return code;
         }
     };
@@ -47,19 +67,19 @@ async fn main() -> ExitCode {
 
     #[cfg(feature = "test-fixtures")]
     if let Err(err) = memory_mcp::http::test_bootstrap::apply_test_bootstrap(&state).await {
-        eprintln!("test bootstrap error: {err}");
+        log_failure("http.serve_failed", &err);
         return ExitCode::from(2);
     }
 
     #[cfg(feature = "test-fixtures")]
     if let Err(err) = memory_mcp::http::test_bootstrap::apply_test_seed_reserved(&state).await {
-        eprintln!("test seed reserved error: {err}");
+        log_failure("http.serve_failed", &err);
         return ExitCode::from(2);
     }
 
     #[cfg(all(feature = "test-fixtures", feature = "control-plane"))]
     if let Err(err) = memory_mcp::http::test_bootstrap::apply_test_seed_session(&state).await {
-        eprintln!("test seed session error: {err}");
+        log_failure("http.serve_failed", &err);
         return ExitCode::from(2);
     }
 
@@ -137,7 +157,7 @@ async fn main() -> ExitCode {
     {
         Ok(hooks) => hooks,
         Err(err) => {
-            eprintln!("scheduler config error: {err}");
+            log_failure("http.serve_failed", &err);
             return ExitCode::from(2);
         }
     };
@@ -150,7 +170,7 @@ async fn main() -> ExitCode {
     let router = match router::build_router(state.clone(), Some(runtime.fault_injector.clone())) {
         Ok(router) => router,
         Err(err) => {
-            eprintln!("router config error: {err}");
+            log_failure("http.serve_failed", &err);
             return ExitCode::from(2);
         }
     };
@@ -166,16 +186,16 @@ async fn main() -> ExitCode {
 
     match serve_result {
         Err(err) => {
-            eprintln!("server error: {err}");
+            log_failure("http.serve_failed", &err);
             if let Err(cleanup_error) = background_cleanup {
-                eprintln!("background cleanup error after server failure: {cleanup_error}");
+                log_failure("http.serve_failed", &cleanup_error);
             }
             ExitCode::FAILURE
         }
         Ok(()) => match background_cleanup {
             Ok(()) => ExitCode::SUCCESS,
             Err(err) => {
-                eprintln!("background cleanup error: {err}");
+                log_failure("http.serve_failed", &err);
                 ExitCode::FAILURE
             }
         },

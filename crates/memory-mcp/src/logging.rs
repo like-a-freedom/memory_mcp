@@ -670,6 +670,7 @@ pub const HTTP_OPERATIONS: &[&str] = &[
     "http.auth.touch_failed",
     "http.auth.rejected",
     "http.readiness.changed",
+    "http.serve_failed",
     "http.quota.plan_load_failed",
     "http.quota.reserve_failed",
     "http.task.bind_failed",
