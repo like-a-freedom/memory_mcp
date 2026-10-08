@@ -18,7 +18,8 @@ use axum::response::{IntoResponse, Response};
 use bytes::{Bytes, BytesMut};
 use http_body_util::BodyExt;
 use serde_json::Value;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex, OnceLock};
+use std::time::{Duration, Instant};
 
 use super::preflight_budget::{PreflightRefusal, PreflightReservation};
 use crate::http::HttpState;
@@ -149,35 +150,228 @@ pub(super) fn quota_denied_response(
     response
 }
 
-enum BodyCollectionError {
-    TooLarge,
-    CapacityExhausted,
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum PreflightOutcome {
+    FullyCollected,
+    RequestCapacityRefused,
+    AggregateByteCapacityRefused,
+    BodyLimitRefused,
+    BodyReadError,
+}
+
+pub(crate) struct PreflightObservation {
+    pub(crate) declared_content_length_bytes: Option<u64>,
+    pub(crate) observed_body_bytes: u64,
+    pub(crate) outcome: PreflightOutcome,
+}
+
+impl PreflightOutcome {
+    pub(crate) fn refusal_reason(self) -> Option<&'static str> {
+        match self {
+            Self::RequestCapacityRefused => Some("request_capacity"),
+            Self::AggregateByteCapacityRefused => Some("aggregate_byte_capacity"),
+            Self::BodyLimitRefused => Some("body_limit"),
+            Self::FullyCollected | Self::BodyReadError => None,
+        }
+    }
+}
+
+fn record_preflight_observation(observation: PreflightObservation, request_id: Option<uuid::Uuid>) {
+    if observation.outcome == PreflightOutcome::FullyCollected {
+        metrics::histogram!(crate::shared::observability::METRIC_HTTP_PREFLIGHT_BODY_BYTES)
+            .record(observation.observed_body_bytes as f64);
+    }
+    let log_kind = match observation.outcome {
+        PreflightOutcome::RequestCapacityRefused => Some(PreflightLogKind::RequestCapacity),
+        PreflightOutcome::AggregateByteCapacityRefused => {
+            Some(PreflightLogKind::AggregateByteCapacity)
+        }
+        PreflightOutcome::BodyLimitRefused => Some(PreflightLogKind::BodyLimit),
+        PreflightOutcome::FullyCollected
+            if observation.observed_body_bytes >= LARGE_BODY_LOG_THRESHOLD_BYTES =>
+        {
+            Some(PreflightLogKind::LargeBody)
+        }
+        PreflightOutcome::FullyCollected | PreflightOutcome::BodyReadError => None,
+    };
+    if let Some(reason) = observation.outcome.refusal_reason() {
+        metrics::counter!(
+            crate::shared::observability::METRIC_HTTP_PREFLIGHT_REFUSALS_TOTAL,
+            "reason" => reason
+        )
+        .increment(1);
+    }
+    if let Some(log_kind) = log_kind {
+        log_preflight_observation(log_kind, observation, request_id);
+    }
+}
+
+const LARGE_BODY_LOG_THRESHOLD_BYTES: u64 = 65_536;
+const PREFLIGHT_LOG_INTERVAL: Duration = Duration::from_secs(1);
+
+#[derive(Clone, Copy)]
+enum PreflightLogKind {
+    RequestCapacity,
+    AggregateByteCapacity,
+    BodyLimit,
+    LargeBody,
+}
+
+impl PreflightLogKind {
+    fn slot(self) -> usize {
+        match self {
+            Self::RequestCapacity => 0,
+            Self::AggregateByteCapacity => 1,
+            Self::BodyLimit => 2,
+            Self::LargeBody => 3,
+        }
+    }
+
+    fn operation(self) -> &'static str {
+        match self {
+            Self::LargeBody => "http.preflight.large_body",
+            Self::RequestCapacity | Self::AggregateByteCapacity | Self::BodyLimit => {
+                "http.preflight.refused"
+            }
+        }
+    }
+}
+
+struct PreflightLogRateLimiter {
+    last_emitted: [Option<Instant>; 4],
+}
+
+impl PreflightLogRateLimiter {
+    fn new() -> Self {
+        Self {
+            last_emitted: [None; 4],
+        }
+    }
+
+    fn allow_at(&mut self, slot: usize, now: Instant) -> bool {
+        let allowed = self.last_emitted[slot].is_none_or(|last| {
+            now.checked_duration_since(last)
+                .is_some_and(|elapsed| elapsed >= PREFLIGHT_LOG_INTERVAL)
+        });
+        if allowed {
+            self.last_emitted[slot] = Some(now);
+        }
+        allowed
+    }
+}
+
+static PREFLIGHT_LOG_RATE_LIMITER: OnceLock<Mutex<PreflightLogRateLimiter>> = OnceLock::new();
+
+fn log_preflight_observation(
+    kind: PreflightLogKind,
+    observation: PreflightObservation,
+    request_id: Option<uuid::Uuid>,
+) {
+    let slot = kind.slot();
+    let limiter =
+        PREFLIGHT_LOG_RATE_LIMITER.get_or_init(|| Mutex::new(PreflightLogRateLimiter::new()));
+    let should_log = limiter
+        .lock()
+        .map(|mut limiter| limiter.allow_at(slot, Instant::now()))
+        .unwrap_or(false);
+    if should_log {
+        emit_preflight_log(kind, observation, request_id);
+    }
+}
+
+fn emit_preflight_log(
+    kind: PreflightLogKind,
+    observation: PreflightObservation,
+    request_id: Option<uuid::Uuid>,
+) {
+    let mut event = std::collections::HashMap::with_capacity(5);
+    event.insert(
+        "op".to_owned(),
+        serde_json::Value::String(kind.operation().to_owned()),
+    );
+    event.insert(
+        "outcome".to_owned(),
+        serde_json::Value::String(
+            match observation.outcome {
+                PreflightOutcome::FullyCollected => "fully_collected",
+                PreflightOutcome::RequestCapacityRefused => "request_capacity",
+                PreflightOutcome::AggregateByteCapacityRefused => "aggregate_byte_capacity",
+                PreflightOutcome::BodyLimitRefused => "body_limit",
+                PreflightOutcome::BodyReadError => "body_read_error",
+            }
+            .to_owned(),
+        ),
+    );
+    event.insert(
+        "observed_body_bytes".to_owned(),
+        serde_json::Value::from(observation.observed_body_bytes),
+    );
+    if let Some(declared_content_length_bytes) = observation.declared_content_length_bytes {
+        event.insert(
+            "declared_content_length_bytes".to_owned(),
+            serde_json::Value::from(declared_content_length_bytes),
+        );
+    }
+    if let Some(request_id) = request_id {
+        event.insert(
+            "request_id".to_owned(),
+            serde_json::Value::String(request_id.to_string()),
+        );
+    }
+    crate::logging::StdoutLogger::from_env().log(event, crate::logging::LogLevel::Debug);
+}
+
+struct BodyCollectionFailure {
+    observed_body_bytes: u64,
+    outcome: PreflightOutcome,
 }
 
 async fn collect_bounded_body(
     body: axum::body::Body,
     body_limit_bytes: usize,
     reservation: &mut PreflightReservation,
-) -> Result<Bytes, BodyCollectionError> {
+) -> Result<(Bytes, u64), BodyCollectionFailure> {
     let mut body = http_body_util::Limited::new(body, body_limit_bytes);
     let mut collected = BytesMut::new();
+    let mut observed_body_bytes = 0_u64;
 
     while let Some(frame) = body.frame().await {
-        let frame = frame.map_err(|_| BodyCollectionError::TooLarge)?;
+        let frame = match frame {
+            Ok(frame) => frame,
+            Err(error) => {
+                let outcome = if error.is::<http_body_util::LengthLimitError>() {
+                    PreflightOutcome::BodyLimitRefused
+                } else {
+                    PreflightOutcome::BodyReadError
+                };
+                return Err(BodyCollectionFailure {
+                    observed_body_bytes,
+                    outcome,
+                });
+            }
+        };
         if let Ok(data) = frame.into_data() {
+            observed_body_bytes =
+                observed_body_bytes.saturating_add(u64::try_from(data.len()).unwrap_or(u64::MAX));
             let total_bytes = collected
                 .len()
                 .checked_add(data.len())
                 .filter(|total| *total <= body_limit_bytes)
-                .ok_or(BodyCollectionError::TooLarge)?;
+                .ok_or(BodyCollectionFailure {
+                    observed_body_bytes,
+                    outcome: PreflightOutcome::BodyLimitRefused,
+                })?;
             reservation
                 .try_reserve_through(total_bytes)
-                .map_err(|_| BodyCollectionError::CapacityExhausted)?;
+                .map_err(|_| BodyCollectionFailure {
+                    observed_body_bytes,
+                    outcome: PreflightOutcome::AggregateByteCapacityRefused,
+                })?;
             collected.extend_from_slice(&data);
         }
     }
 
-    Ok(collected.freeze())
+    Ok((collected.freeze(), observed_body_bytes))
 }
 
 /// Validate all request data that can affect routing, auth ordering, or
@@ -227,11 +421,25 @@ pub async fn prevalidate_mcp(
         );
     }
 
+    let request_id = req
+        .extensions()
+        .get::<crate::http::logging::RequestId>()
+        .map(crate::http::logging::RequestId::as_uuid);
     let content_length = headers
         .get(header::CONTENT_LENGTH)
         .and_then(|value| value.to_str().ok())
         .and_then(|value| value.parse::<usize>().ok());
+    let declared_content_length_bytes =
+        content_length.and_then(|length| u64::try_from(length).ok());
     if content_length.is_some_and(|length| length > state.config.body_limit_bytes) {
+        record_preflight_observation(
+            PreflightObservation {
+                declared_content_length_bytes,
+                observed_body_bytes: 0,
+                outcome: PreflightOutcome::BodyLimitRefused,
+            },
+            request_id,
+        );
         return plain_error(StatusCode::PAYLOAD_TOO_LARGE, "request body too large");
     }
 
@@ -240,7 +448,19 @@ pub async fn prevalidate_mcp(
         .try_reserve(content_length.unwrap_or(0))
     {
         Ok(reservation) => reservation,
-        Err(PreflightRefusal::Requests | PreflightRefusal::Bytes) => {
+        Err(refusal) => {
+            let outcome = match refusal {
+                PreflightRefusal::Requests => PreflightOutcome::RequestCapacityRefused,
+                PreflightRefusal::Bytes => PreflightOutcome::AggregateByteCapacityRefused,
+            };
+            record_preflight_observation(
+                PreflightObservation {
+                    declared_content_length_bytes,
+                    observed_body_bytes: 0,
+                    outcome,
+                },
+                request_id,
+            );
             return plain_error(
                 StatusCode::SERVICE_UNAVAILABLE,
                 "preflight buffering capacity exhausted",
@@ -249,19 +469,48 @@ pub async fn prevalidate_mcp(
     };
 
     let (parts, body) = req.into_parts();
-    let bytes =
-        match collect_bounded_body(body, state.config.body_limit_bytes, &mut reservation).await {
-            Ok(bytes) => bytes,
-            Err(BodyCollectionError::TooLarge) => {
-                return plain_error(StatusCode::PAYLOAD_TOO_LARGE, "request body too large");
-            }
-            Err(BodyCollectionError::CapacityExhausted) => {
-                return plain_error(
+    let bytes = match collect_bounded_body(body, state.config.body_limit_bytes, &mut reservation)
+        .await
+    {
+        Ok((bytes, observed_body_bytes)) => {
+            record_preflight_observation(
+                PreflightObservation {
+                    declared_content_length_bytes,
+                    observed_body_bytes,
+                    outcome: PreflightOutcome::FullyCollected,
+                },
+                request_id,
+            );
+            bytes
+        }
+        Err(failure) => {
+            record_preflight_observation(
+                PreflightObservation {
+                    declared_content_length_bytes,
+                    observed_body_bytes: failure.observed_body_bytes,
+                    outcome: failure.outcome,
+                },
+                request_id,
+            );
+            let (status, message) = match failure.outcome {
+                PreflightOutcome::BodyLimitRefused => {
+                    (StatusCode::PAYLOAD_TOO_LARGE, "request body too large")
+                }
+                PreflightOutcome::AggregateByteCapacityRefused => (
                     StatusCode::SERVICE_UNAVAILABLE,
                     "preflight buffering capacity exhausted",
-                );
-            }
-        };
+                ),
+                PreflightOutcome::BodyReadError => {
+                    (StatusCode::PAYLOAD_TOO_LARGE, "request body too large")
+                }
+                PreflightOutcome::FullyCollected | PreflightOutcome::RequestCapacityRefused => (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    "preflight collection failed",
+                ),
+            };
+            return plain_error(status, message);
+        }
+    };
     let value: Value = match serde_json::from_slice(&bytes) {
         Ok(value) => value,
         Err(_) => return bad_request("invalid JSON-RPC request"),
@@ -825,5 +1074,145 @@ mod tests {
         let response = dispatch(request).await;
         assert_eq!(response.status(), StatusCode::BAD_REQUEST);
         assert!(response_body(response).await.contains("MCP name"));
+    }
+}
+
+#[cfg(test)]
+mod observation_tests {
+    use std::time::{Duration, Instant};
+
+    use super::{
+        PreflightLogKind, PreflightLogRateLimiter, PreflightObservation, PreflightOutcome,
+        emit_preflight_log, record_preflight_observation,
+    };
+
+    #[test]
+    fn refusal_reason_uses_closed_vocabulary() {
+        assert_eq!(
+            PreflightOutcome::RequestCapacityRefused.refusal_reason(),
+            Some("request_capacity")
+        );
+        assert_eq!(
+            PreflightOutcome::AggregateByteCapacityRefused.refusal_reason(),
+            Some("aggregate_byte_capacity")
+        );
+        assert_eq!(
+            PreflightOutcome::BodyLimitRefused.refusal_reason(),
+            Some("body_limit")
+        );
+        assert_eq!(PreflightOutcome::FullyCollected.refusal_reason(), None);
+        assert_eq!(PreflightOutcome::BodyReadError.refusal_reason(), None);
+    }
+
+    #[test]
+    fn preflight_log_rate_limit_is_fixed_and_bounded() {
+        let mut limiter = PreflightLogRateLimiter::new();
+        let start = Instant::now();
+        let one_second_early = start + Duration::from_millis(999);
+        let one_second_later = start + Duration::from_secs(1);
+
+        assert!(limiter.allow_at(PreflightLogKind::RequestCapacity.slot(), start));
+        assert!(!limiter.allow_at(PreflightLogKind::RequestCapacity.slot(), one_second_early));
+        assert!(limiter.allow_at(
+            PreflightLogKind::AggregateByteCapacity.slot(),
+            one_second_early
+        ));
+        assert!(limiter.allow_at(PreflightLogKind::BodyLimit.slot(), start));
+        assert!(limiter.allow_at(PreflightLogKind::LargeBody.slot(), start));
+        assert!(limiter.allow_at(PreflightLogKind::RequestCapacity.slot(), one_second_later));
+    }
+
+    #[tokio::test]
+    async fn large_body_log_requires_fully_collected_threshold() {
+        let sink = crate::logging::capture::install();
+        let below_threshold = uuid::Uuid::from_u128(101);
+        let at_threshold = uuid::Uuid::from_u128(102);
+        let refused = uuid::Uuid::from_u128(103);
+        let read_error = uuid::Uuid::from_u128(104);
+
+        crate::logging::capture::with_level("http.preflight=debug", || async {
+            record_preflight_observation(
+                PreflightObservation {
+                    declared_content_length_bytes: None,
+                    observed_body_bytes: 65_535,
+                    outcome: PreflightOutcome::FullyCollected,
+                },
+                Some(below_threshold),
+            );
+            record_preflight_observation(
+                PreflightObservation {
+                    declared_content_length_bytes: None,
+                    observed_body_bytes: 65_536,
+                    outcome: PreflightOutcome::FullyCollected,
+                },
+                Some(at_threshold),
+            );
+            record_preflight_observation(
+                PreflightObservation {
+                    declared_content_length_bytes: None,
+                    observed_body_bytes: 65_536,
+                    outcome: PreflightOutcome::BodyLimitRefused,
+                },
+                Some(refused),
+            );
+            record_preflight_observation(
+                PreflightObservation {
+                    declared_content_length_bytes: None,
+                    observed_body_bytes: 65_536,
+                    outcome: PreflightOutcome::BodyReadError,
+                },
+                Some(read_error),
+            );
+        })
+        .await;
+
+        let lines = sink.lines();
+        let large_body_lines: Vec<_> = lines
+            .iter()
+            .filter(|line| line.contains("http.preflight.large_body"))
+            .collect();
+        assert_eq!(large_body_lines.len(), 1, "{lines:?}");
+        assert!(large_body_lines[0].contains(&at_threshold.to_string()));
+        assert!(!large_body_lines[0].contains(&below_threshold.to_string()));
+        assert!(!large_body_lines[0].contains(&refused.to_string()));
+        assert!(!large_body_lines[0].contains(&read_error.to_string()));
+        assert!(large_body_lines[0].contains("fully_collected"));
+    }
+
+    #[tokio::test]
+    async fn preflight_refusal_log_contains_only_allowlisted_fields() {
+        let sink = crate::logging::capture::install();
+        let observation = PreflightObservation {
+            declared_content_length_bytes: Some(8),
+            observed_body_bytes: 0,
+            outcome: PreflightOutcome::BodyLimitRefused,
+        };
+        let request_id = uuid::Uuid::from_u128(1);
+
+        // The process-wide rate limiter is tested separately; exercise the same
+        // emitter directly so a parallel refusal cannot consume this sample.
+        crate::logging::capture::with_level("http.preflight=debug", || async {
+            emit_preflight_log(PreflightLogKind::BodyLimit, observation, Some(request_id));
+        })
+        .await;
+
+        let lines = sink.lines();
+        let expected_request = format!("req={request_id}");
+        let event = lines.iter().find(|line| {
+            line.contains("http.preflight.refused") && line.contains(&expected_request)
+        });
+        let event = event.unwrap_or_else(|| panic!("preflight refusal debug event: {lines:?}"));
+        let event = event.replace("\u{1b}[0m", "");
+        assert!(event.contains("body_limit"), "{event}");
+        assert!(event.contains("declared_content_length_bytes=8"), "{event}");
+        assert!(event.contains("observed_body_bytes=0"), "{event}");
+        assert!(
+            event.contains("req=00000000-0000-0000-0000-000000000001"),
+            "{event}"
+        );
+        assert!(!event.contains("header-secret"), "{event}");
+        assert!(!event.contains("body-secret"), "{event}");
+        assert!(!event.contains("x-private-header"), "{event}");
+        assert!(!event.contains("/mcp"), "{event}");
     }
 }

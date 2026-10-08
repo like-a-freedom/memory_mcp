@@ -7,7 +7,12 @@
 //! error.
 
 #[cfg(feature = "prometheus")]
+use std::time::Duration;
+
+#[cfg(feature = "prometheus")]
 use crate::error::MemoryError;
+#[cfg(feature = "prometheus")]
+use crate::http::runtime::memory_snapshot::{HttpMemorySnapshot, HttpMemorySnapshotSource};
 
 /// Install the process-wide recorder and return its render handle.
 ///
@@ -18,7 +23,7 @@ use crate::error::MemoryError;
 #[cfg(feature = "prometheus")]
 pub fn install_recorder() -> Result<metrics_exporter_prometheus::PrometheusHandle, MemoryError> {
     let handle = metrics_exporter_prometheus::PrometheusBuilder::new()
-        .set_bucket_duration(crate::observability::SUMMARY_WINDOW)
+        .set_bucket_duration(crate::observability::SUMMARY_BUCKET_DURATION)
         .map_err(|err| {
             MemoryError::ConfigInvalid(format!(
                 "failed to set the summary window for /metrics: {err}"
@@ -37,6 +42,85 @@ pub fn install_recorder() -> Result<metrics_exporter_prometheus::PrometheusHandl
     crate::observability::describe_metrics();
     crate::observability::record_build_info();
     Ok(handle)
+}
+
+/// Runs the Prometheus summary upkeep independently of `/metrics` scrapes.
+///
+/// The scrape handler only renders current exporter state; it must not be the
+/// clock that expires old summary buckets, because a quiet deployment may not
+/// be scraped for minutes at a time.
+#[cfg(feature = "prometheus")]
+pub(crate) fn spawn_upkeep(
+    handle: metrics_exporter_prometheus::PrometheusHandle,
+    cancel: tokio_util::sync::CancellationToken,
+    snapshot_source: std::sync::Arc<HttpMemorySnapshotSource>,
+) -> tokio::task::JoinHandle<()> {
+    tokio::spawn(async move {
+        let mut interval = tokio::time::interval(Duration::from_secs(5));
+        interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
+        loop {
+            tokio::select! {
+                _ = cancel.cancelled() => break,
+                _ = interval.tick() => {
+                    handle.run_upkeep();
+                    let snapshot = snapshot_source.capture().await;
+                    record_memory_snapshot(snapshot);
+                },
+            }
+        }
+    })
+}
+
+/// Test-fixture tick source for the upkeep loop. Acknowledging a tick proves
+/// upkeep ran before a test renders the exposition, without waiting five seconds.
+#[cfg(all(feature = "prometheus", feature = "test-fixtures"))]
+pub fn spawn_upkeep_with_ticks(
+    handle: metrics_exporter_prometheus::PrometheusHandle,
+    cancel: tokio_util::sync::CancellationToken,
+    mut ticks: tokio::sync::mpsc::UnboundedReceiver<tokio::sync::oneshot::Sender<()>>,
+    snapshot_source: std::sync::Arc<HttpMemorySnapshotSource>,
+) -> tokio::task::JoinHandle<()> {
+    tokio::spawn(async move {
+        loop {
+            tokio::select! {
+                _ = cancel.cancelled() => break,
+                tick = ticks.recv() => match tick {
+                    Some(acknowledge) => {
+                        handle.run_upkeep();
+                        let snapshot = snapshot_source.capture().await;
+                        record_memory_snapshot(snapshot);
+                        let _ = acknowledge.send(());
+                    }
+                    None => break,
+                },
+            }
+        }
+    })
+}
+
+#[cfg(feature = "prometheus")]
+fn record_memory_snapshot(snapshot: HttpMemorySnapshot) {
+    use crate::shared::observability::{
+        METRIC_HTTP_BACKGROUND_EMBEDDING_ADMITTED_TASKS,
+        METRIC_HTTP_BACKGROUND_EMBEDDING_RETAINED_BYTES,
+        METRIC_HTTP_BACKGROUND_EMBEDDING_RUNNING_TASKS, METRIC_HTTP_CONTEXT_CACHE_ACCOUNTED_BYTES,
+        METRIC_HTTP_PREFLIGHT_RESERVED_BYTES, METRIC_HTTP_PREFLIGHT_RESERVED_REQUESTS,
+        METRIC_HTTP_QUERY_CACHE_ACCOUNTED_BYTES, METRIC_HTTP_TENANT_RUNTIME_COUNT,
+    };
+
+    metrics::gauge!(METRIC_HTTP_PREFLIGHT_RESERVED_REQUESTS).set(snapshot.reserved_requests as f64);
+    metrics::gauge!(METRIC_HTTP_PREFLIGHT_RESERVED_BYTES).set(snapshot.reserved_bytes as f64);
+    metrics::gauge!(METRIC_HTTP_TENANT_RUNTIME_COUNT).set(snapshot.resident_runtime_count as f64);
+    metrics::gauge!(METRIC_HTTP_CONTEXT_CACHE_ACCOUNTED_BYTES)
+        .set(snapshot.context_cache_accounted_bytes as f64);
+    metrics::gauge!(METRIC_HTTP_QUERY_CACHE_ACCOUNTED_BYTES)
+        .set(snapshot.query_cache_accounted_bytes as f64);
+    metrics::gauge!(METRIC_HTTP_BACKGROUND_EMBEDDING_ADMITTED_TASKS)
+        .set(snapshot.background_embedding_admitted_tasks as f64);
+    metrics::gauge!(METRIC_HTTP_BACKGROUND_EMBEDDING_RUNNING_TASKS)
+        .set(snapshot.background_embedding_running_tasks as f64);
+    metrics::gauge!(METRIC_HTTP_BACKGROUND_EMBEDDING_RETAINED_BYTES)
+        .set(snapshot.background_embedding_retained_bytes as f64);
 }
 
 /// Reject the stdio-profile listener env var in HTTP mode: the HTTP

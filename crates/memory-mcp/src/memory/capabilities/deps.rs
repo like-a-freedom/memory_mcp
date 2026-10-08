@@ -16,15 +16,14 @@
 
 use std::sync::Arc;
 
-use tokio::sync::{RwLock, Semaphore};
-
-use lru::LruCache;
+use tokio::sync::Semaphore;
 
 use crate::knowledge::claims::ClaimStore;
 use crate::knowledge::claims_policy::projection::ClaimService;
 use crate::knowledge::entity_resolution::EntityResolver;
 use crate::knowledge::entity_service::EntityService;
 use crate::logging::StdoutLogger;
+use crate::memory::context_cache::ContextCache;
 use crate::memory::explanation::ExplanationService;
 use crate::memory::ingestion::IngestionService;
 use crate::platform::rate_limiter::RateLimiter;
@@ -54,14 +53,7 @@ pub(crate) struct ExtractDeps {
     pub(crate) embedding_service: crate::embedding::service::EmbeddingService,
     pub(crate) fact_service: crate::knowledge::fact_service::FactService,
     pub(crate) claim_service: ClaimService,
-    pub(crate) context_cache: Arc<
-        RwLock<
-            LruCache<
-                crate::platform::context_cache_key::CacheKey,
-                Vec<crate::models::AssembledContextItem>,
-            >,
-        >,
-    >,
+    pub(crate) context_cache: ContextCache,
     pub(crate) rate_limiter: Arc<RateLimiter>,
     #[cfg(feature = "streamable-http")]
     pub(crate) outbox_enabled: bool,
@@ -213,14 +205,7 @@ pub(crate) struct InvalidateDeps {
     pub(crate) active_namespace: String,
     pub(crate) rate_limiter: Arc<RateLimiter>,
     pub(crate) claim_store: Option<Arc<dyn ClaimStore>>,
-    pub(crate) context_cache: Arc<
-        RwLock<
-            LruCache<
-                crate::platform::context_cache_key::CacheKey,
-                Vec<crate::models::AssembledContextItem>,
-            >,
-        >,
-    >,
+    pub(crate) context_cache: ContextCache,
     #[cfg(feature = "streamable-http")]
     pub(crate) outbox_enabled: bool,
 }

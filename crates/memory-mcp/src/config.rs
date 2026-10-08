@@ -6,6 +6,7 @@ mod embedding;
 pub mod fs_watch;
 mod helpers;
 mod lifecycle;
+pub mod memory;
 pub(crate) mod ner;
 pub mod secrets;
 mod surreal;
@@ -15,9 +16,11 @@ pub use constants::*;
 pub use embedding::{EmbeddingConfig, EmbeddingProviderKind, build_embedding_signature};
 pub use fs_watch::{ENV_INGESTION_INBOX, FsWatchConfig};
 pub use lifecycle::LifecycleConfig;
+pub use memory::CacheLimits;
 pub use ner::{
-    GlinerDeviceKind, ModelBackedNerConfig, NativeGlinerConfig, NerConfig, NerExtractorConfig,
-    NerExtractorKind, SELECTOR_CLASSIC_GLINER, SELECTOR_SAUKRAUT_LFM25,
+    DEFAULT_ANNO_MAX_INPUT_BYTES, GlinerDeviceKind, MAX_ANNO_INPUT_BYTES, ModelBackedNerConfig,
+    NativeGlinerConfig, NerConfig, NerExtractorConfig, NerExtractorKind, SELECTOR_CLASSIC_GLINER,
+    SELECTOR_SAUKRAUT_LFM25,
 };
 pub(crate) use surreal::StorageBackend;
 pub use surreal::{ActiveNamespace, SurrealConfig, SurrealConfigBuilder};

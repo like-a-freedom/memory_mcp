@@ -24,7 +24,6 @@ pub(crate) fn spawn_archival_worker(
     active_namespace: String,
     logger: crate::logging::StdoutLogger,
     policy: crate::memory::lifecycle_workers::LifecyclePolicy,
-    claim_service: crate::knowledge::claims_policy::projection::ClaimService,
     interval_secs: u64,
     age_days: u32,
     shutdown: CancellationToken,
@@ -58,7 +57,7 @@ pub(crate) fn spawn_archival_worker(
                     active_namespace: &active_namespace,
                     logger: &logger,
                     policy,
-                    claim_service: &claim_service,
+                    claim_store: None,
                 },
                 age_days,
             )

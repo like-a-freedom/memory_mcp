@@ -146,11 +146,11 @@ pub fn normalized_edge_record(record: &Value) -> Value {
     json!({
         "edge_id": map
             .get("edge_id")
-            .and_then(json_string)
-            .or_else(|| map.get("id").and_then(json_string)),
-        "in": map.get("in").and_then(json_string),
+            .and_then(string_from_value)
+            .or_else(|| map.get("id").and_then(string_from_value)),
+        "in": map.get("in").and_then(string_from_value),
         "relation": map.get("relation").and_then(json_string),
-        "out": map.get("out").and_then(json_string),
+        "out": map.get("out").and_then(string_from_value),
         "origin": map.get("origin").cloned().unwrap_or(Value::Null),
         "confidence": map.get("confidence").cloned().unwrap_or(Value::Null),
         "t_valid": map.get("t_valid").cloned().unwrap_or(Value::Null),

@@ -350,7 +350,13 @@ impl Pool {
         config: &crate::http::config::HttpConfig,
         registry: Arc<crate::http::registry::RegistryHandle>,
     ) -> Self {
-        Self::from_http_config_with_shutdown(config, registry, ShutdownState::new(), None)
+        Self::from_http_config_with_shutdown(
+            config,
+            registry,
+            ShutdownState::new(),
+            None,
+            Arc::new(crate::embedding::providers::task_runner::BackgroundTaskRunner::new()),
+        )
     }
 
     /// As [`Pool::from_http_config`], sharing the instance's shutdown signal
@@ -361,6 +367,7 @@ impl Pool {
         registry: Arc<crate::http::registry::RegistryHandle>,
         shutdown: ShutdownState,
         deployment_policy: Option<crate::http::runtime::bootstrap::DeploymentPolicy>,
+        background_task_runner: Arc<crate::embedding::providers::task_runner::BackgroundTaskRunner>,
     ) -> Self {
         let per_tenant_concurrency = config
             .signup_plan_limits
@@ -368,8 +375,10 @@ impl Pool {
             .map_or(DEFAULT_PER_TENANT_CONCURRENCY, |limits| {
                 limits.per_tenant_request_concurrency
             });
-        let mut options = crate::http::runtime::storage::RuntimeOptions::from_http_config(config);
+        let mut options = crate::http::runtime::storage::RuntimeOptions::from_http_config(config)
+            .with_background_task_runner(background_task_runner);
         if let Some(policy) = deployment_policy {
+            options = options.with_cache_limits(policy.cache_limits);
             options = options.with_lifecycle_config(policy.lifecycle);
             options = options.with_query_logging(
                 policy.query_logging_enabled,
@@ -409,6 +418,24 @@ impl Pool {
         self.cap
     }
 
+    /// Clone the bounded set of currently resident runtimes.
+    ///
+    /// Loading and failed slots do not own runtimes. The pool lock is held only
+    /// while these at-most-`cap` handles are cloned; callers may await owner
+    /// snapshots after this method returns without blocking eviction.
+    pub(crate) fn resident_runtime_handles(&self) -> Vec<Arc<TenantRuntime>> {
+        self.lock_state()
+            .iter()
+            .filter_map(|(_, slot)| match &slot.state {
+                SlotState::Ready { runtime } | SlotState::Draining { runtime } => {
+                    Some(Arc::clone(runtime))
+                }
+                SlotState::Absent | SlotState::Loading | SlotState::Failed { .. } => None,
+            })
+            .collect()
+    }
+
+    /// Take the slot bookkeeping lock.  Poisoning is ignored rather than propagated: every critical section here is a few field writes with no fallible step, so a panic elsewhere cannot leave the map inconsistent, and refusing every later request because an unrelated task panicked would turn one failure into an outage.
     /// Take the slot bookkeeping lock.
     ///
     /// Poisoning is ignored rather than propagated: every critical section here
@@ -1904,6 +1931,32 @@ mod tests {
             .expect("the capacity waiter recovers after the pin is released")
             .expect("the waiting tenant acquires");
         assert_eq!(acquired.runtime().tenant_id, "ten_capacity");
+    }
+
+    #[tokio::test]
+    async fn resident_runtime_handles_exclude_loading_and_include_ready() {
+        let (pool, harness) = pool_over_blocking_factory(1).await;
+        let acquisition_pool = Arc::clone(&pool);
+        let runtime_spec = spec("ten_snapshot_loading", "tns_snapshot_loading");
+        let acquisition = tokio::spawn(async move {
+            acquisition_pool
+                .acquire_spec_with_limit(&runtime_spec, 4)
+                .await
+        });
+
+        harness.wait_until_entered().await;
+        assert!(
+            pool.resident_runtime_handles().is_empty(),
+            "a Loading slot does not yet retain a runtime"
+        );
+
+        harness.release_one();
+        let guard = acquisition
+            .await
+            .expect("activation task joins")
+            .expect("runtime activates");
+        drop(guard);
+        assert_eq!(pool.resident_runtime_handles().len(), 1);
     }
 
     #[tokio::test]

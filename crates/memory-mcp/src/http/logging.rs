@@ -1271,6 +1271,7 @@ mod tests {
                     include_str!("registry/provisioning.rs"),
                     include_str!("config/validate.rs"),
                     include_str!("middleware/acquire_runtime.rs"),
+                    include_str!("middleware/preflight.rs"),
                     include_str!("logging.rs"),
                 ] {
                     for line in source.lines() {
@@ -1287,7 +1288,7 @@ mod tests {
                         let name = &rest[..end];
                         // A bare namespace is this file's own prefix check, and a
                         // name with a space is prose rather than an operation.
-                        if name.contains(' ') || name.ends_with('.') {
+                        if name.contains(' ') || name.contains('=') || name.ends_with('.') {
                             continue;
                         }
                         // The test fixture's own name, not an operation the

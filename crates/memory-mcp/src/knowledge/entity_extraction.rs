@@ -46,6 +46,11 @@ pub trait EntityExtractor: Send + Sync {
         "unknown"
     }
 
+    /// Maximum input size enforced by this extractor, if it has a backend-specific limit.
+    fn max_input_bytes(&self) -> Option<usize> {
+        None
+    }
+
     /// Declares where extraction must execute.
     fn scheduling(&self) -> NerScheduling;
 

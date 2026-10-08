@@ -652,6 +652,7 @@ pub const HTTP_OPERATIONS: &[&str] = &[
     "http.lease.provision_failed",
     "http.lease.release_failed",
     "http.runtime.activation_failed",
+    "http.background_cleanup_secondary_failure",
     "http.runtime.binding_conflict",
     "http.quota.plan_load_failed",
     "http.quota.reserve_failed",
@@ -683,6 +684,8 @@ pub const HTTP_OPERATIONS: &[&str] = &[
     "http.tenant_embedding_index_reconcile_failed",
     "http.lifecycle.decay_failed",
     "http.lifecycle.archival_failed",
+    "http.preflight.refused",
+    "http.preflight.large_body",
 ];
 
 /// Process-global file sink. When installed, all `StdoutLogger` instances
@@ -1820,6 +1823,19 @@ mod tests {
             !logger.is_event_enabled(LogLevel::Debug, "http.request"),
             "an unnamed subsystem must not inherit a named subsystem's level"
         );
+    }
+
+    #[test]
+    fn preflight_debug_directive_selects_only_preflight_operations() {
+        let logger = StdoutLogger::from_env_with(|key| match key {
+            "RUST_LOG" => Some("http.preflight=debug".to_string()),
+            _ => None,
+        });
+
+        assert!(logger.is_event_enabled(LogLevel::Debug, "http.preflight.refused"));
+        assert!(logger.is_event_enabled(LogLevel::Debug, "http.preflight.large_body"));
+        assert!(!logger.is_event_enabled(LogLevel::Debug, "http.request"));
+        assert!(logger.is_event_enabled(LogLevel::Info, "http.request"));
     }
 
     /// A subsystem name matches whole segments. `ner` selects `ner.extract` and

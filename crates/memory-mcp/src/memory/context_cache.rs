@@ -2,12 +2,12 @@
 
 use std::sync::Arc;
 
-use lru::LruCache;
 use tokio::sync::RwLock;
 
-use crate::models::AssembledContextItem;
-
-pub use crate::platform::context_cache_key::{CacheKey, CacheView};
+pub use crate::platform::context_cache::{
+    CacheGeneration, CacheInsertOutcome, ContextCacheLookup, ContextCacheState,
+};
+pub use crate::platform::context_cache_key::{CacheKey, CacheView, InvalidateContextCache};
 pub use invalidation::invalidate_cache;
 
 pub(crate) mod invalidation;
@@ -15,17 +15,14 @@ pub(crate) mod invalidation;
 /// The assembled-context cache, shared by the capabilities that build
 /// context and the ports that need to invalidate it. Naming the type
 /// keeps it from being spelled out at every port that carries it.
-pub type ContextCache = Arc<RwLock<LruCache<CacheKey, Vec<AssembledContextItem>>>>;
+pub type ContextCache = Arc<RwLock<ContextCacheState>>;
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use chrono::{TimeZone, Utc};
-    use lru::LruCache;
     use serde_json::json;
     use std::num::NonZeroUsize;
-    use std::sync::Arc;
-    use tokio::sync::RwLock;
 
     use crate::models::AssembledContextItem;
 
@@ -118,8 +115,10 @@ mod tests {
 
     #[tokio::test]
     async fn invalidate_cache_clears_all_process_local_entries() {
-        let cache: Arc<RwLock<LruCache<CacheKey, Vec<AssembledContextItem>>>> =
-            Arc::new(RwLock::new(LruCache::new(NonZeroUsize::new(10).unwrap())));
+        let cache = Arc::new(RwLock::new(ContextCacheState::new(
+            NonZeroUsize::new(10).unwrap(),
+            NonZeroUsize::new(16 * 1024 * 1024).unwrap(),
+        )));
         let cutoff = Utc::now();
         let key1 = CacheKey::new("query1", cutoff, 5, &[], CacheView::default(), None);
         let key2 = CacheKey::new("query2", cutoff, 5, &[], CacheView::default(), None);
@@ -137,15 +136,30 @@ mod tests {
                 retrieval_tier: None,
                 ..Default::default()
             };
-            guard.put(key1.clone(), vec![item("fact:1")]);
-            guard.put(key2.clone(), vec![item("fact:2")]);
+            let generation = match guard.lookup(&key1) {
+                ContextCacheLookup::Miss(generation) => generation,
+                ContextCacheLookup::Hit(_) => panic!("new cache cannot contain a hit"),
+            };
+            assert_eq!(
+                guard.insert(generation, key1.clone(), &[item("fact:1")]),
+                CacheInsertOutcome::Stored
+            );
+            let generation = match guard.lookup(&key2) {
+                ContextCacheLookup::Miss(generation) => generation,
+                ContextCacheLookup::Hit(_) => panic!("second key cannot already be cached"),
+            };
+            assert_eq!(
+                guard.insert(generation, key2.clone(), &[item("fact:2")]),
+                CacheInsertOutcome::Stored
+            );
         }
 
         invalidate_cache(&cache).await;
 
         let mut guard = cache.write().await;
-        assert!(guard.get(&key1).is_none());
-        assert!(guard.get(&key2).is_none());
-        assert!(guard.is_empty());
+        assert!(matches!(guard.lookup(&key1), ContextCacheLookup::Miss(_)));
+        assert!(matches!(guard.lookup(&key2), ContextCacheLookup::Miss(_)));
+        assert_eq!(guard.len(), 0);
+        assert_eq!(guard.accounted_bytes(), 0);
     }
 }

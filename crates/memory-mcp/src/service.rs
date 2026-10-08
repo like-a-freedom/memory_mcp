@@ -113,6 +113,6 @@ pub use query::{normalize_dt, normalize_text, now};
 pub use reembed::ReembedSummary;
 
 pub(crate) use crate::embedding::runtime::{
-    CachedQueryEmbedding, DEFAULT_QUERY_EMBEDDING_CACHE_SIZE, is_remote_embedding_provider,
+    DEFAULT_QUERY_EMBEDDING_CACHE_SIZE, is_remote_embedding_provider,
 };
 pub(crate) use startup::EmbeddingActivationMode;

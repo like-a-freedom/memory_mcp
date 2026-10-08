@@ -765,7 +765,7 @@ mod tests {
         assert_eq!(config.password, "root");
         assert!(matches!(
             config.ner.extractor,
-            super::super::ner::NerExtractorConfig::Anno
+            super::super::ner::NerExtractorConfig::Anno { .. }
         ));
         assert_eq!(
             config.embedding.provider,

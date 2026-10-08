@@ -24,6 +24,7 @@ pub struct RuntimeOptions {
     pub task_retention_secs: i64,
     pub task_queue_capacity: usize,
     pub task_sync_max_bytes: usize,
+    pub cache_limits: crate::config::CacheLimits,
     /// The fault injector the scheduler copies into the task worker.
     /// Production uses [`NoFaults`]; tests substitute a `FailOnceAt`.
     pub fault_injector: Arc<dyn FaultInjector>,
@@ -53,6 +54,8 @@ pub struct RuntimeOptions {
     /// The claim-reconciliation config copied from the deployment policy
     /// (`MEMORY_CLAIM_*`), applied to every tenant service.
     pub claim_config: crate::config::claims::ClaimConfig,
+    /// One process-owned retry runner shared by every tenant runtime.
+    pub background_task_runner: Arc<crate::embedding::providers::task_runner::BackgroundTaskRunner>,
 }
 
 /// The deployment-level embedding identity one tenant runtime starts from.
@@ -89,6 +92,7 @@ impl std::fmt::Debug for RuntimeOptions {
             .field("task_retention_secs", &self.task_retention_secs)
             .field("task_queue_capacity", &self.task_queue_capacity)
             .field("task_sync_max_bytes", &self.task_sync_max_bytes)
+            .field("cache_limits", &self.cache_limits)
             .field("fault_injector", &"<dyn FaultInjector>")
             .field("embedding_policy", &self.embedding_policy)
             .field(
@@ -97,6 +101,7 @@ impl std::fmt::Debug for RuntimeOptions {
             )
             .field("entity_extractor", &self.entity_extractor.is_some())
             .field("lifecycle_config", &self.lifecycle_config)
+            .field("background_task_runner", &"<shared runner>")
             .finish()
     }
 }
@@ -107,6 +112,7 @@ impl Default for RuntimeOptions {
             task_retention_secs: crate::http::config::DEFAULT_TASK_RETENTION_SECS as i64,
             task_queue_capacity: crate::http::config::DEFAULT_TASK_QUEUE_CAPACITY,
             task_sync_max_bytes: crate::http::config::DEFAULT_TASK_SYNC_MAX_BYTES,
+            cache_limits: crate::config::CacheLimits::profile_default(),
             fault_injector: Arc::new(NoFaults),
             embedding_policy: None,
             embedding_similarity_threshold: crate::config::DEFAULT_EMBEDDING_SIMILARITY_THRESHOLD,
@@ -115,6 +121,9 @@ impl Default for RuntimeOptions {
             query_logging_enabled: false,
             query_log_retention_days: crate::config::DEFAULT_QUERY_LOG_RETENTION_DAYS,
             claim_config: crate::config::claims::ClaimConfig::default(),
+            background_task_runner: Arc::new(
+                crate::embedding::providers::task_runner::BackgroundTaskRunner::new(),
+            ),
         }
     }
 }
@@ -151,6 +160,19 @@ impl RuntimeOptions {
     /// eliminate.
     pub fn with_embedding_policy(mut self, policy: EmbeddingPolicy) -> Self {
         self.embedding_policy = Some(policy);
+        self
+    }
+
+    pub fn with_background_task_runner(
+        mut self,
+        runner: Arc<crate::embedding::providers::task_runner::BackgroundTaskRunner>,
+    ) -> Self {
+        self.background_task_runner = runner;
+        self
+    }
+
+    pub fn with_cache_limits(mut self, cache_limits: crate::config::CacheLimits) -> Self {
+        self.cache_limits = cache_limits;
         self
     }
 
@@ -198,6 +220,12 @@ pub struct TenantRuntime {
     /// never rebound.
     pub tenant_db: Arc<SurrealDbClient>,
     pub mcp_service: MemoryMcp,
+}
+
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct TenantRetainedResources {
+    pub(crate) context_cache_accounted_bytes: usize,
+    pub(crate) query_cache_accounted_bytes: usize,
 }
 
 /// What one tenant namespace resolved to: the provider it may use, and the
@@ -389,19 +417,22 @@ impl TenantRuntime {
             None => Arc::new(crate::knowledge::entity_extraction::AnnoEntityExtractor::new()?)
                 as Arc<dyn EntityExtractor>,
         };
-        let mut service = crate::service::MemoryService::new_with_embedding_provider(
-            tenant_db.clone(),
-            namespace.clone(),
-            crate::logging::StdoutLogger::directives_from_env(),
-            100, // rate_limit_rps; access-payload limiter remains separate
-            100, // rate_limit_burst
-            embedding.provider.clone(),
-            options.embedding_similarity_threshold,
-            entity_extractor,
-        )?
-        .with_http_outbox()
-        .with_query_logging_enabled(options.query_logging_enabled)
-        .with_query_log_retention_days(options.query_log_retention_days);
+        let mut service =
+            crate::service::MemoryService::new_with_embedding_provider_and_cache_limits(
+                tenant_db.clone(),
+                namespace.clone(),
+                crate::logging::StdoutLogger::directives_from_env(),
+                100, // rate_limit_rps; access-payload limiter remains separate
+                100, // rate_limit_burst
+                embedding.provider.clone(),
+                options.embedding_similarity_threshold,
+                entity_extractor,
+                options.cache_limits,
+            )?
+            .with_background_task_runner(options.background_task_runner.clone())
+            .with_http_outbox()
+            .with_query_logging_enabled(options.query_logging_enabled)
+            .with_query_log_retention_days(options.query_log_retention_days);
         service.lifecycle_config = options.lifecycle_config.clone();
         // The stdio composition root applies the same config the same way;
         // without it every HTTP tenant ran on the claim defaults no matter
@@ -457,6 +488,15 @@ impl TenantRuntime {
             tenant_db,
             mcp_service,
         })
+    }
+
+    pub(crate) async fn retained_resource_snapshot(&self) -> TenantRetainedResources {
+        let (context_cache_accounted_bytes, query_cache_accounted_bytes) =
+            self.mcp_service.retained_cache_bytes().await;
+        TenantRetainedResources {
+            context_cache_accounted_bytes,
+            query_cache_accounted_bytes,
+        }
     }
 }
 
@@ -737,6 +777,116 @@ mod tests {
         assert!(!Arc::ptr_eq(&r_a.tenant_db, &r_b.tenant_db));
     }
 
+    #[tokio::test]
+    async fn tenant_runtimes_share_the_injected_background_embedding_runner() {
+        let runner =
+            Arc::new(crate::embedding::providers::task_runner::BackgroundTaskRunner::new());
+        let options = RuntimeOptions::default().with_background_task_runner(runner.clone());
+
+        let db_a = Surreal::new::<Mem>(()).await.unwrap();
+        db_a.use_ns("tenant_runner_a")
+            .use_db("memory")
+            .await
+            .unwrap();
+        let client_a = Arc::new(SurrealDbClient::from_prebound_mem(
+            db_a,
+            "tenant_runner_a",
+            "error",
+        ));
+        let runtime_a = TenantRuntime::from_bound_client_with_runtime_options(
+            &tenant("ten_runner_a", "tenant_runner_a"),
+            client_a,
+            crate::operations::quota::QuotaPlan::default(),
+            options.clone(),
+        )
+        .await
+        .unwrap();
+
+        let db_b = Surreal::new::<Mem>(()).await.unwrap();
+        db_b.use_ns("tenant_runner_b")
+            .use_db("memory")
+            .await
+            .unwrap();
+        let client_b = Arc::new(SurrealDbClient::from_prebound_mem(
+            db_b,
+            "tenant_runner_b",
+            "error",
+        ));
+        let runtime_b = TenantRuntime::from_bound_client_with_runtime_options(
+            &tenant("ten_runner_b", "tenant_runner_b"),
+            client_b,
+            crate::operations::quota::QuotaPlan::default(),
+            options,
+        )
+        .await
+        .unwrap();
+
+        assert!(Arc::ptr_eq(
+            &runtime_a.mcp_service.service().task_runner,
+            &runner
+        ));
+        assert!(Arc::ptr_eq(
+            &runtime_b.mcp_service.service().task_runner,
+            &runner
+        ));
+        assert!(Arc::ptr_eq(
+            &runtime_a.mcp_service.service().task_runner,
+            &runtime_b.mcp_service.service().task_runner
+        ));
+    }
+
+    #[tokio::test]
+    async fn tenant_runtime_uses_the_context_cache_byte_budget_from_options() {
+        let db = Surreal::new::<Mem>(()).await.unwrap();
+        db.use_ns("tenant_cache").use_db("memory").await.unwrap();
+        let client = Arc::new(SurrealDbClient::from_prebound_mem(
+            db,
+            "tenant_cache",
+            "error",
+        ));
+        let limits = crate::config::CacheLimits {
+            context_bytes: std::num::NonZeroUsize::new(1).unwrap(),
+            query_bytes: std::num::NonZeroUsize::new(1).unwrap(),
+        };
+        let runtime = TenantRuntime::from_bound_client_with_runtime_options(
+            &tenant("ten_cache", "tenant_cache"),
+            client,
+            crate::operations::quota::QuotaPlan::default(),
+            RuntimeOptions::default().with_cache_limits(limits),
+        )
+        .await
+        .unwrap();
+        let service = runtime.mcp_service.service();
+        let mut cache = service.context_cache.write().await;
+        let key = crate::platform::context_cache_key::CacheKey::new(
+            "query",
+            Utc::now(),
+            5,
+            &[],
+            crate::platform::context_cache_key::CacheView::default(),
+            None,
+        );
+        let generation = match cache.lookup(&key) {
+            crate::memory::context_cache::ContextCacheLookup::Miss(generation) => generation,
+            crate::memory::context_cache::ContextCacheLookup::Hit(_) => {
+                panic!("new tenant cache cannot contain a hit")
+            }
+        };
+
+        assert_eq!(
+            cache.insert(
+                generation,
+                key,
+                &[crate::models::AssembledContextItem {
+                    content: "a retained result".to_string(),
+                    ..Default::default()
+                }],
+            ),
+            crate::memory::context_cache::CacheInsertOutcome::Oversized
+        );
+        assert!(cache.is_empty());
+    }
+
     /// The regression this file's wiring exists for: the HTTP tenant root
     /// used to call `MemoryService::new`, which hardcodes
     /// `DisabledEmbeddingProvider`. An operator who configured
@@ -754,6 +904,10 @@ mod tests {
             "tenant_embed",
             "error",
         ));
+        client
+            .apply_migrations_impl("tenant_embed")
+            .await
+            .expect("tenant schema migrations");
 
         let signature = crate::config::build_embedding_signature(
             "openai-compatible",

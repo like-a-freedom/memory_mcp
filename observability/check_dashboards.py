@@ -20,12 +20,141 @@ import json
 import pathlib
 import re
 import sys
+from dataclasses import dataclass
 
 import yaml
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 RULES = ROOT / "observability/recording_rules.yml"
 DASHBOARDS = ROOT / "observability/dashboards"
+EXTERNAL_METRICS = ROOT / "observability/external_metrics.yml"
+
+
+@dataclass(frozen=True)
+class MetricSpec:
+    exporter: str
+    required_matchers: dict[str, str]
+    allowed_matchers: dict[str, frozenset[str]]
+
+
+@dataclass(frozen=True)
+class ExternalMetricContract:
+    metrics: dict[str, MetricSpec]
+
+
+EXTERNAL_METRIC_NAME = re.compile(
+    r"\b(?:container_memory_[a-zA-Z0-9_]+|node_memory_[a-zA-Z0-9_]+)"
+)
+EXTERNAL_MATCHER = re.compile(
+    r'\s*([a-zA-Z_][a-zA-Z0-9_]*)\s*(=|!=|=~|!~)\s*("(?:[^"\\\\]|\\\\.)*")'
+)
+EXTERNAL_NAME_SELECTOR = re.compile(
+    r'__name__\s*(=|!=|=~|!~)\s*("(?:[^"\\\\]|\\\\.)*")'
+)
+ZERO_VECTOR_FALLBACK = re.compile(r"\bor\s+vector\s*\(\s*0(?:\.0+)?\s*\)", re.IGNORECASE)
+LEGEND_LABEL = re.compile(r"\s*(?:\$labels\.)?([a-zA-Z_][a-zA-Z0-9_]*)\s*")
+IDENTIFYING_EXTERNAL_LABELS = frozenset(
+    {
+        "cluster",
+        "container",
+        "container_id",
+        "container_name",
+        "host",
+        "hostname",
+        "id",
+        "instance",
+        "machine",
+        "machine_id",
+        "name",
+        "namespace",
+        "node",
+        "node_name",
+        "pod",
+        "pod_name",
+        "tenant",
+        "tenant_id",
+    }
+)
+
+
+def load_external_metric_contract(
+    path: pathlib.Path = EXTERNAL_METRICS,
+) -> ExternalMetricContract | None:
+    if not path.is_file():
+        return None
+
+    document = yaml.safe_load(path.read_text())
+    if (
+        not isinstance(document, dict)
+        or set(document) != {"metrics"}
+        or not isinstance(document["metrics"], list)
+        or not document["metrics"]
+    ):
+        raise ValueError("external metric contract has an invalid schema")
+
+    metrics: dict[str, MetricSpec] = {}
+    for entry in document["metrics"]:
+        if not isinstance(entry, dict) or set(entry) != {
+            "name",
+            "exporter",
+            "required_matchers",
+            "allowed_matchers",
+        }:
+            raise ValueError("external metric contract has an invalid schema")
+
+        name = entry["name"]
+        exporter = entry["exporter"]
+        required_matchers = entry["required_matchers"]
+        allowed_matchers = entry["allowed_matchers"]
+        expected_exporter = None
+        if isinstance(name, str):
+            if name.startswith("container_memory_"):
+                expected_exporter = "cadvisor"
+            elif name.startswith("node_memory_"):
+                expected_exporter = "node_exporter"
+        if (
+            not isinstance(name, str)
+            or EXTERNAL_METRIC_NAME.fullmatch(name) is None
+            or expected_exporter is None
+            or exporter != expected_exporter
+            or name in metrics
+            or not isinstance(required_matchers, dict)
+            or not required_matchers
+            or not isinstance(allowed_matchers, dict)
+        ):
+            raise ValueError("external metric contract has an invalid schema")
+
+        normalized_allowed: dict[str, frozenset[str]] = {}
+        for label, values in allowed_matchers.items():
+            if (
+                not isinstance(label, str)
+                or re.fullmatch(r"[a-zA-Z_][a-zA-Z0-9_]*", label) is None
+                or label in IDENTIFYING_EXTERNAL_LABELS
+                or not isinstance(values, (list, set))
+                or not values
+                or any(not isinstance(value, str) or not value for value in values)
+            ):
+                raise ValueError("external metric contract has an invalid selector")
+            normalized_allowed[label] = frozenset(values)
+
+        if any(
+            not isinstance(label, str)
+            or not isinstance(value, str)
+            or label not in normalized_allowed
+            or value not in normalized_allowed[label]
+            for label, value in required_matchers.items()
+        ):
+            raise ValueError("external metric contract has an invalid selector")
+
+        metrics[name] = MetricSpec(
+            exporter=exporter,
+            required_matchers=required_matchers,
+            allowed_matchers=normalized_allowed,
+        )
+
+    return ExternalMetricContract(metrics=metrics)
+
+
 
 sys.path.insert(0, str(ROOT / "observability"))
 from check_rules import (
@@ -60,6 +189,155 @@ def panel_titles(panel: dict) -> list[tuple[str, str]]:
         (panel.get("title", "<untitled>"), target.get("expr", ""))
         for target in panel.get("targets", [])
     ]
+
+
+def _external_selector(
+    expr: str, start: int
+) -> tuple[dict[str, tuple[str, str]] | None, str | None]:
+    selector = re.match(r"\s*\{([^{}]*)\}", expr[start:])
+    if selector is None:
+        return None, "external metric requires a literal selector"
+
+    body = selector.group(1)
+    matchers: dict[str, tuple[str, str]] = {}
+    cursor = 0
+    while cursor < len(body):
+        matcher = EXTERNAL_MATCHER.match(body, cursor)
+        if matcher is None:
+            return None, "external metric selector has unsupported syntax"
+        label, operator, quoted_value = matcher.groups()
+        try:
+            value = json.loads(quoted_value)
+        except json.JSONDecodeError:
+            return None, "external metric selector has an invalid string value"
+        if label in matchers:
+            return None, f"external metric selector repeats matcher `{label}`"
+        matchers[label] = (operator, value)
+        cursor = matcher.end()
+        if cursor < len(body):
+            if body[cursor] != ",":
+                return None, "external metric selector requires comma-separated matchers"
+            cursor += 1
+            if cursor == len(body):
+                return None, "external metric selector has unsupported syntax"
+    return matchers, None
+
+
+def validate_external_expression(
+    expr: str, contract: ExternalMetricContract | None
+) -> list[str]:
+    errors = []
+    for name_match in EXTERNAL_NAME_SELECTOR.finditer(expr):
+        operator, quoted_name = name_match.groups()
+        try:
+            selected_name = json.loads(quoted_name)
+        except json.JSONDecodeError:
+            continue
+        if (
+            operator != "="
+            or "container_memory_" in selected_name
+            or "node_memory_" in selected_name
+        ):
+            errors.append(
+                "external metric family selector via `__name__` is unsupported"
+            )
+
+    scanned = strip_strings(expr)
+    has_zero_fallback = ZERO_VECTOR_FALLBACK.search(scanned) is not None
+    for match in EXTERNAL_METRIC_NAME.finditer(scanned):
+        metric_name = match.group(0)
+        if has_zero_fallback:
+            errors.append(
+                f"{metric_name}: external metric query must not add a zero fallback"
+            )
+        if contract is None or metric_name not in contract.metrics:
+            errors.append(f"unverified external metric family `{metric_name}`")
+            continue
+
+        matchers, parse_error = _external_selector(expr, match.end())
+        if parse_error is not None:
+            errors.append(f"{metric_name}: {parse_error}")
+            continue
+        spec = contract.metrics[metric_name]
+        assert matchers is not None
+        for label, expected_value in spec.required_matchers.items():
+            actual_matcher = matchers.get(label)
+            if actual_matcher is None:
+                errors.append(f"{metric_name}: missing required matcher `{label}`")
+            elif (
+                actual_matcher[0] == "="
+                and actual_matcher[1] != expected_value
+                and actual_matcher[1] in spec.allowed_matchers.get(label, frozenset())
+            ):
+                errors.append(
+                    f'{metric_name}: required matcher `{label}` must equal '
+                    f'"{expected_value}"'
+                )
+        for label, (operator, value) in matchers.items():
+            if label in IDENTIFYING_EXTERNAL_LABELS:
+                errors.append(
+                    f"{metric_name}: identifying selector label `{label}` is forbidden"
+                )
+                continue
+            if operator != "=":
+                errors.append(
+                    f"{metric_name}: external selector requires exact equality"
+                )
+            allowed_values = spec.allowed_matchers.get(label)
+            if allowed_values is None:
+                errors.append(f"{metric_name}: unverified selector label `{label}`")
+            elif value not in allowed_values:
+                errors.append(
+                    f"{metric_name}: unverified selector value for `{label}`"
+                )
+    return errors
+
+
+def _panel_targets(panel: dict):
+    if isinstance(panel.get("panels"), list):
+        for child in panel["panels"]:
+            yield from _panel_targets(child)
+    else:
+        yield from panel.get("targets", [])
+
+
+def validate_dashboard_external_metrics(
+    document: dict, contract: ExternalMetricContract | None
+) -> list[str]:
+    errors = []
+    for panel in document.get("panels", []):
+        for target in _panel_targets(panel):
+            expr = target.get("expr", "")
+            errors.extend(validate_external_expression(expr, contract))
+            metric_names = {
+                match.group(0)
+                for match in EXTERNAL_METRIC_NAME.finditer(strip_strings(expr))
+            }
+            if not metric_names:
+                continue
+
+            legend_format = target.get("legendFormat", "")
+            for template in re.findall(r"\{\{(.*?)\}\}", legend_format):
+                label_match = LEGEND_LABEL.fullmatch(template)
+                if label_match is None:
+                    errors.extend(
+                        f"{name}: unsupported external legend template"
+                        for name in sorted(metric_names)
+                    )
+                    continue
+                label = label_match.group(1)
+                for name in sorted(metric_names):
+                    if label in IDENTIFYING_EXTERNAL_LABELS:
+                        errors.append(
+                            f"{name}: identifying legend label `{label}` is forbidden"
+                        )
+                    elif (
+                        contract is None
+                        or name not in contract.metrics
+                        or label not in contract.metrics[name].allowed_matchers
+                    ):
+                        errors.append(f"{name}: unverified legend label `{label}`")
+    return errors
 
 
 def check_ref_ids(path: pathlib.Path, panel: dict, failures: list[str]) -> None:
@@ -312,6 +590,12 @@ def _charted_names(recorded: set[str], families: set[str]) -> set[str]:
 
 
 def main() -> int:
+    try:
+        external_contract = load_external_metric_contract()
+    except (OSError, UnicodeError, ValueError, yaml.YAMLError):
+        print("FAIL external metric contract is invalid or unreadable")
+        return 1
+
     recorded = recorded_series()
     families = exported_families()
     declared = bounded_vocabulary()
@@ -322,6 +606,8 @@ def main() -> int:
 
     for path in sorted(DASHBOARDS.glob("*.json")):
         document = json.loads(path.read_text())
+        for error in validate_dashboard_external_metrics(document, external_contract):
+            failures.append(f"{path.name}: {error}")
         check_layout(path, document, failures)
         for panel in document["panels"]:
             check_ref_ids(path, panel, failures)

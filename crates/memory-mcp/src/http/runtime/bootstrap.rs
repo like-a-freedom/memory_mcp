@@ -31,6 +31,114 @@ pub struct HttpRuntime {
     /// §7.1, §13) and its dimension probe is a network round trip.
     /// Per-namespace eligibility is still decided per tenant at activation.
     pub deployment_policy: DeploymentPolicy,
+    /// Process-wide detached embedding worker coordinator shared with every tenant.
+    pub(crate) background_task_runner:
+        Arc<crate::embedding::providers::task_runner::BackgroundTaskRunner>,
+    background_upkeep_cancel: tokio_util::sync::CancellationToken,
+    background_upkeep: Option<tokio::task::JoinHandle<()>>,
+}
+
+impl HttpRuntime {
+    /// Cancel and join the deployment-owned upkeep and embedding workers.
+    ///
+    /// `deadline` is an absolute post-serve cleanup deadline. The serving grace
+    /// period has already elapsed independently before this method is called.
+    pub async fn join_background_tasks(
+        &mut self,
+        deadline: tokio::time::Instant,
+    ) -> Result<(), crate::error::MemoryError> {
+        let upkeep = self.background_upkeep.take();
+        let runner_for_shutdown = self.background_task_runner.clone();
+        let coordinator_join = self.background_task_runner.join_until(deadline);
+        let upkeep_join = join_upkeep_until(upkeep, deadline);
+
+        join_background_owners(
+            &self.background_upkeep_cancel,
+            move || runner_for_shutdown.shutdown(),
+            coordinator_join,
+            upkeep_join,
+        )
+        .await
+    }
+}
+
+async fn join_background_owners<C, U>(
+    cancel_upkeep: &tokio_util::sync::CancellationToken,
+    shutdown_coordinator: impl FnOnce(),
+    coordinator_join: C,
+    upkeep_join: U,
+) -> Result<(), crate::error::MemoryError>
+where
+    C: std::future::Future<Output = Result<(), crate::error::MemoryError>>,
+    U: std::future::Future<Output = Result<(), crate::error::MemoryError>>,
+{
+    cancel_upkeep.cancel();
+    shutdown_coordinator();
+    let (coordinator_result, upkeep_result) = tokio::join!(coordinator_join, upkeep_join);
+
+    match (coordinator_result, upkeep_result) {
+        (Ok(()), Ok(())) => Ok(()),
+        (Err(error), Ok(())) | (Ok(()), Err(error)) => Err(error),
+        (Err(error), Err(secondary)) => {
+            log_secondary_cleanup_failure("metrics_upkeep", &secondary);
+            Err(error)
+        }
+    }
+}
+
+async fn join_upkeep_until(
+    upkeep: Option<tokio::task::JoinHandle<()>>,
+    deadline: tokio::time::Instant,
+) -> Result<(), crate::error::MemoryError> {
+    let Some(mut upkeep) = upkeep else {
+        return Ok(());
+    };
+    match tokio::time::timeout_at(deadline, &mut upkeep).await {
+        Ok(Ok(())) => Ok(()),
+        Ok(Err(error)) => Err(crate::error::MemoryError::Storage(format!(
+            "metrics upkeep task failed while joining: {error}"
+        ))),
+        Err(_) => {
+            upkeep.abort();
+            let _ = upkeep.await;
+            Err(crate::error::MemoryError::Storage(
+                "metrics upkeep task exceeded shutdown deadline; task aborted".to_string(),
+            ))
+        }
+    }
+}
+
+fn log_secondary_cleanup_failure(owner: &str, error: &crate::error::MemoryError) {
+    let mut event = std::collections::HashMap::new();
+    event.insert(
+        "op".to_string(),
+        serde_json::json!("http.background_cleanup_secondary_failure"),
+    );
+    event.insert("owner".to_string(), serde_json::json!(owner));
+    event.insert("error".to_string(), serde_json::json!(error.to_string()));
+    crate::logging::emit(event, crate::logging::LogLevel::Error);
+}
+
+/// Test-fixture seam for verifying the shared shutdown ordering without
+/// constructing production storage or a process-global recorder.
+#[cfg(feature = "test-fixtures")]
+pub async fn join_background_owners_for_test<C, U>(
+    cancel_upkeep: tokio_util::sync::CancellationToken,
+    shutdown_coordinator: impl FnOnce(),
+    coordinator_join: C,
+    upkeep_join: U,
+) -> Result<(), crate::error::MemoryError>
+where
+    C: std::future::Future<Output = Result<(), crate::error::MemoryError>>,
+    U: std::future::Future<Output = Result<(), crate::error::MemoryError>>,
+{
+    join_background_owners(
+        &cancel_upkeep,
+        shutdown_coordinator,
+        coordinator_join,
+        upkeep_join,
+    )
+    .await
 }
 
 /// The deployment-level embedding and entity-extractor policy.
@@ -41,6 +149,7 @@ pub struct DeploymentPolicy {
     pub embedding: Option<EmbeddingPolicy>,
     pub entity_extractor: Option<Arc<dyn EntityExtractor>>,
     pub lifecycle: crate::config::LifecycleConfig,
+    pub cache_limits: crate::config::CacheLimits,
     /// `EMBEDDINGS_AUTO_RECOVERY`: whether the backfill scheduler job scans
     /// tenants at all.
     ///
@@ -90,6 +199,10 @@ pub async fn resolve_deployment_policy(logger: &StdoutLogger) -> Result<Deployme
     // deployment still has to know what its gate says.
     let embedding_config = crate::config::EmbeddingConfig::from_env()
         .map_err(|err| format!("embedding config error: {err}"))?;
+    let cache_limits = crate::config::CacheLimits::from_env(
+        crate::config::memory::DEFAULT_HTTP_CONTEXT_CACHE_BYTES,
+    )
+    .map_err(|err| format!("cache config error: {err}"))?;
     let embedding = resolve_embedding_policy(logger).await?;
     let lifecycle = crate::config::LifecycleConfig::from_env();
     let entity_extractor = resolve_entity_extractor(logger, embedding.is_some()).await?;
@@ -109,6 +222,7 @@ pub async fn resolve_deployment_policy(logger: &StdoutLogger) -> Result<Deployme
         embedding,
         entity_extractor,
         lifecycle,
+        cache_limits,
         auto_recovery: embedding_config.auto_recovery,
         query_logging_enabled,
         query_log_retention_days,
@@ -237,6 +351,7 @@ pub async fn build_state(
     let metrics_handle = None;
 
     let fault_injector: Arc<dyn FaultInjector> = load_fault_injector();
+    let metrics_upkeep_handle = metrics_handle.clone();
 
     // Resolve the deployment policy before the state is assembled: the pool
     // holds the `RuntimeOptions` every tenant runtime is built from, so the
@@ -261,6 +376,8 @@ pub async fn build_state(
         logger.log(event, crate::logging::LogLevel::Info);
     }
 
+    let background_task_runner =
+        Arc::new(crate::embedding::providers::task_runner::BackgroundTaskRunner::new());
     let composition =
         match HttpProductionComposition::connect_with_injector(cfg, fault_injector.clone()).await {
             Ok(c) => c,
@@ -277,6 +394,7 @@ pub async fn build_state(
         metrics_handle,
         None,
         Some(deployment_policy.clone()),
+        background_task_runner.clone(),
     )
     .await
     {
@@ -288,11 +406,34 @@ pub async fn build_state(
             ));
         }
     };
+    let background_upkeep_cancel = tokio_util::sync::CancellationToken::new();
+    #[cfg(feature = "prometheus")]
+    let memory_snapshot_source = Arc::new(
+        crate::http::runtime::memory_snapshot::HttpMemorySnapshotSource::new(
+            Arc::clone(&state.pool),
+            Arc::clone(&state.preflight_budget),
+            Arc::clone(&background_task_runner),
+        ),
+    );
+    #[cfg(feature = "prometheus")]
+    let background_upkeep = metrics_upkeep_handle.map(|handle| {
+        crate::http::metrics::spawn_upkeep(
+            handle,
+            background_upkeep_cancel.clone(),
+            memory_snapshot_source,
+        )
+    });
+    #[cfg(not(feature = "prometheus"))]
+    let background_upkeep = None;
+
     Ok(HttpRuntime {
         state,
         tenant_migrations: composition.tenant_migrations,
         fault_injector: composition.fault_injector,
         deployment_policy,
+        background_task_runner,
+        background_upkeep_cancel,
+        background_upkeep,
     })
 }
 
@@ -451,6 +592,8 @@ mod tests {
         let policy = deployment_policy_for_env(&[
             ("QUERY_LOGGING_ENABLED", Some("true")),
             ("QUERY_LOG_RETENTION_DAYS", Some("7")),
+            ("MEMORY_CONTEXT_CACHE_BYTES", Some("4194304")),
+            ("MEMORY_QUERY_EMBEDDING_CACHE_BYTES", Some("2097152")),
         ]);
 
         assert!(
@@ -461,6 +604,8 @@ mod tests {
             policy.query_log_retention_days, 7,
             "QUERY_LOG_RETENTION_DAYS must reach the policy, not the 90-day default"
         );
+        assert_eq!(policy.cache_limits.context_bytes.get(), 4_194_304);
+        assert_eq!(policy.cache_limits.query_bytes.get(), 2_097_152);
     }
 
     /// `EMBEDDINGS_SIMILARITY_THRESHOLD` was parsed by `EmbeddingConfig` and
@@ -508,6 +653,24 @@ mod tests {
         );
     }
 
+    #[test]
+    fn cache_budgets_default_to_http_profile_values() {
+        let policy = deployment_policy_for_env(&[
+            ("MEMORY_CONTEXT_CACHE_BYTES", None),
+            ("MEMORY_QUERY_EMBEDDING_CACHE_BYTES", None),
+        ]);
+
+        assert_eq!(policy.cache_limits.context_bytes.get(), 4 * 1024 * 1024);
+        assert_eq!(policy.cache_limits.query_bytes.get(), 2 * 1024 * 1024);
+    }
+
+    #[test]
+    fn zero_cache_budget_fails_http_startup_with_variable_name() {
+        let error = deployment_policy_for_env_err(&[("MEMORY_CONTEXT_CACHE_BYTES", Some("0"))]);
+
+        assert!(error.contains("MEMORY_CONTEXT_CACHE_BYTES"), "{error}");
+    }
+
     /// [`deployment_policy_for_env`] for the error path: the policy must not
     /// resolve when the claim config is invalid.
     fn deployment_policy_for_env_err(vars: &[(&str, Option<&str>)]) -> String {
@@ -519,7 +682,7 @@ mod tests {
                 .expect("runtime")
                 .block_on(resolve_deployment_policy(&logger));
             match resolved {
-                Ok(_) => panic!("an invalid claim config must not resolve a policy"),
+                Ok(_) => panic!("invalid deployment config must not resolve a policy"),
                 Err(err) => err,
             }
         })

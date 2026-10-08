@@ -33,6 +33,10 @@ impl KnowledgeStoreClient {
         }
     }
 
+    pub(crate) fn from_bound(db: BoundDbClient) -> Self {
+        Self { db }
+    }
+
     /// Facts matching a query at query-time with bi-temporal and fact-type filters.
     pub async fn select_facts_filtered(
         &self,
@@ -79,13 +83,14 @@ impl KnowledgeStoreClient {
         limit: usize,
     ) -> Result<Vec<Value>, MemoryError> {
         let sql = format!(
-            "SELECT * FROM fact \
+            "SELECT {} FROM fact \
              WHERE fact_id IN ( \
                SELECT source_fact_id FROM triple \
                WHERE (predicate CONTAINS $query OR object CONTAINS $query OR subject CONTAINS $query) \
              ) \
                AND {BI_TEMPORAL_WHERE} \
-             LIMIT $limit"
+             LIMIT $limit",
+            crate::knowledge::queries::NONSEMANTIC_FACT_PROJECTION,
         );
         let vars = json!({
             "query": query_text,
@@ -142,7 +147,7 @@ impl KnowledgeStoreClient {
     ) -> Result<Vec<Value>, MemoryError> {
         let query_literal = crate::knowledge::queries::surreal_string_literal(query);
         let sql = format!(
-            "SELECT *, search::score(1) AS ft_score FROM community WHERE summary @1@ {query_literal} \
+            "SELECT community_id, summary, member_entities, updated_at, search::score(1) AS ft_score FROM community WHERE summary @1@ {query_literal} \
              ORDER BY ft_score DESC, summary ASC LIMIT 25"
         );
         let vars = json!({ "query": query });
@@ -165,5 +170,64 @@ impl KnowledgeStoreClient {
             limit,
         );
         self.db.query_rows(&sql, Some(vars)).await
+    }
+}
+
+#[async_trait::async_trait]
+impl crate::knowledge::api::FactEmbeddingMetadataReadPort for KnowledgeStoreClient {
+    async fn count_facts(&self) -> Result<usize, MemoryError> {
+        let response = self
+            .db
+            .query("SELECT count() AS count FROM fact GROUP ALL", None)
+            .await?;
+        let row = response
+            .as_array()
+            .and_then(|rows| rows.first())
+            .ok_or_else(|| MemoryError::Storage("fact count query returned no row".to_string()))?;
+        let count = row.get("count").and_then(Value::as_u64).ok_or_else(|| {
+            MemoryError::Storage("fact count query returned an invalid count".to_string())
+        })?;
+        usize::try_from(count)
+            .map_err(|_| MemoryError::Storage("fact count does not fit usize".to_string()))
+    }
+
+    async fn sample_stored_embedding_dimensions(
+        &self,
+        sample_size: usize,
+    ) -> Result<Vec<usize>, MemoryError> {
+        if sample_size == 0 {
+            return Ok(Vec::new());
+        }
+        let limit = i64::try_from(sample_size).map_err(|_| {
+            MemoryError::Validation("embedding metadata sample size is too large".to_string())
+        })?;
+        let response = self
+            .db
+            .query(
+                "SELECT array::len(embedding) AS dimension FROM fact \
+                 WHERE embedding IS NOT NONE AND embedding IS NOT NULL \
+                 ORDER BY id ASC LIMIT $limit",
+                Some(json!({"limit": limit})),
+            )
+            .await?;
+        let rows = response.as_array().ok_or_else(|| {
+            MemoryError::Storage("embedding dimension query returned invalid rows".to_string())
+        })?;
+        rows.iter()
+            .map(|row| {
+                let dimension = row
+                    .get("dimension")
+                    .and_then(Value::as_u64)
+                    .ok_or_else(|| {
+                        MemoryError::Storage(
+                            "embedding dimension query returned a non-integer dimension"
+                                .to_string(),
+                        )
+                    })?;
+                usize::try_from(dimension).map_err(|_| {
+                    MemoryError::Storage("embedding dimension does not fit usize".to_string())
+                })
+            })
+            .collect()
     }
 }

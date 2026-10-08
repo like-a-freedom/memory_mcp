@@ -15,6 +15,7 @@
 use chrono::{DateTime, Utc};
 
 use crate::error::MemoryError;
+use crate::memory::lifecycle_workers::LifecycleHandles;
 use crate::models::{AssembledContextItem, ExtractResult};
 
 /// Episode ingestion dependency.
@@ -294,4 +295,27 @@ pub async fn invalidate_fact(
     }
     port.invalidate_assembled_context().await?;
     Ok(())
+}
+
+/// Run one memory-owned confidence-decay pass using its narrow lifecycle handles.
+pub async fn run_decay(
+    handles: &LifecycleHandles<'_>,
+    threshold: f64,
+    half_life_days: f64,
+) -> Result<usize, MemoryError> {
+    crate::memory::lifecycle_workers::decay::run_decay_pass(handles, threshold, half_life_days)
+        .await
+}
+
+/// Run one memory-owned episode archival pass using its narrow lifecycle handles.
+pub async fn run_archival(
+    handles: &LifecycleHandles<'_>,
+    age_days: u32,
+) -> Result<usize, MemoryError> {
+    crate::memory::lifecycle_workers::archival::run_archival_pass(handles, age_days).await
+}
+
+/// Rebuild communities through the knowledge-owned graph store.
+pub async fn rebuild_communities(handles: &LifecycleHandles<'_>) -> Result<usize, MemoryError> {
+    crate::memory::lifecycle_workers::run_community_rebuild_pass(handles).await
 }

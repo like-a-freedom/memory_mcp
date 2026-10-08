@@ -57,3 +57,49 @@ fn identity_changes_when_the_database_changes() {
     other_database.database = "other".into();
     assert_ne!(base, other_database.identity());
 }
+
+#[cfg(feature = "test-fixtures")]
+#[tokio::test]
+async fn idle_pool_eviction_releases_runtime_before_same_tenant_reactivation() {
+    use std::sync::Arc;
+    use std::time::Duration;
+
+    use memory_mcp::http::config::HttpConfig;
+    use memory_mcp::http::test_state::HttpStateTestBuilder;
+
+    let mut config = HttpConfig::default_for_test();
+    config.runtime_idle_ttl = Duration::ZERO;
+    let state = HttpStateTestBuilder::new()
+        .await
+        .with_config(config)
+        .build()
+        .await
+        .expect("test HTTP state builds");
+    let runtime_spec = spec("ten_eviction", "tns_eviction");
+
+    let old_guard = state
+        .pool
+        .acquire_spec_with_limit(&runtime_spec, 4)
+        .await
+        .expect("first tenant runtime activates");
+    let old_generation = Arc::downgrade(old_guard.runtime());
+    assert_eq!(old_guard.runtime().tenant_id, runtime_spec.tenant_id);
+    drop(old_guard);
+
+    assert_eq!(state.pool.evict_idle().await, 1);
+    assert!(
+        old_generation.upgrade().is_none(),
+        "idle eviction releases the prior runtime generation"
+    );
+
+    let new_guard = state
+        .pool
+        .acquire_spec_with_limit(&runtime_spec, 4)
+        .await
+        .expect("same tenant can activate after eviction");
+    assert_eq!(new_guard.runtime().tenant_id, runtime_spec.tenant_id);
+    assert!(
+        !old_generation.ptr_eq(&Arc::downgrade(new_guard.runtime())),
+        "reactivation creates a distinct tenant runtime generation"
+    );
+}

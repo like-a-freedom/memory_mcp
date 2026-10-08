@@ -19,23 +19,38 @@ pub(crate) fn build(
     _context: super::NerBuildContext,
 ) -> BackendBoxFuture {
     Box::pin(async move {
-        if !matches!(config, crate::config::NerExtractorConfig::Anno) {
+        let crate::config::NerExtractorConfig::Anno { max_input_bytes } = config else {
             return Err(MemoryError::ConfigInvalid(
                 "anno::build requires NER_EXTRACTOR=anno".to_string(),
             ));
-        }
-        Ok(std::sync::Arc::new(AnnoEntityExtractor::new()?) as std::sync::Arc<dyn EntityExtractor>)
+        };
+        Ok(
+            std::sync::Arc::new(AnnoEntityExtractor::with_max_input_bytes(max_input_bytes)?)
+                as std::sync::Arc<dyn EntityExtractor>,
+        )
     })
 }
 
 /// Extracts entity candidates with `anno`'s stacked NER model.
 pub struct AnnoEntityExtractor {
     model: StackedNER,
+    max_input_bytes: usize,
 }
 
 impl AnnoEntityExtractor {
     /// Creates a new anno-backed extractor.
     pub fn new() -> Result<Self, MemoryError> {
+        Self::with_max_input_bytes(crate::config::DEFAULT_ANNO_MAX_INPUT_BYTES)
+    }
+
+    /// Creates an extractor with an explicit whole-input UTF-8 byte limit.
+    pub fn with_max_input_bytes(max_input_bytes: usize) -> Result<Self, MemoryError> {
+        if !(1..=crate::config::MAX_ANNO_INPUT_BYTES).contains(&max_input_bytes) {
+            return Err(MemoryError::ConfigInvalid(format!(
+                "ANNO_MAX_INPUT_BYTES must be between 1 and {}",
+                crate::config::MAX_ANNO_INPUT_BYTES
+            )));
+        }
         // Build the dependency-light rule stack explicitly. With anno's
         // `onnx` feature enabled, `StackedNER::default()` becomes
         // cache- and download-sensitive (it probes BERT/NuNER/GLiNER ONNX
@@ -47,6 +62,7 @@ impl AnnoEntityExtractor {
                 .layer(RegexNER::new())
                 .layer(HeuristicNER::new())
                 .build(),
+            max_input_bytes,
         })
     }
 }
@@ -63,11 +79,16 @@ impl EntityExtractor for AnnoEntityExtractor {
         "anno"
     }
 
+    fn max_input_bytes(&self) -> Option<usize> {
+        Some(self.max_input_bytes)
+    }
+
     fn scheduling(&self) -> super::NerScheduling {
         scheduling()
     }
 
     async fn extract_candidates(&self, content: &str) -> Result<Vec<EntityCandidate>, MemoryError> {
+        crate::knowledge::api::validate_entity_extraction_input(self, content)?;
         if content.trim().is_empty() {
             return Ok(Vec::new());
         }
@@ -118,6 +139,86 @@ mod tests {
     use std::collections::HashSet;
 
     use super::*;
+
+    #[tokio::test]
+    async fn anno_adapter_rejects_input_over_explicit_byte_limit() {
+        let extractor = AnnoEntityExtractor::with_max_input_bytes(8)
+            .expect("test limit is within the supported range");
+        let input = "123456789";
+
+        let error = extractor
+            .extract_candidates(input)
+            .await
+            .expect_err("input over the explicit limit must be refused");
+
+        assert!(matches!(
+            &error,
+            MemoryError::Validation(message)
+                if message == "entity extraction input too large: provider=anno actual_bytes=9 max_bytes=8"
+        ));
+        assert!(!error.to_string().contains(input));
+    }
+
+    #[tokio::test]
+    async fn anno_accepts_exact_byte_limit() {
+        let extractor = AnnoEntityExtractor::with_max_input_bytes(8)
+            .expect("test limit is within the supported range");
+
+        assert!(extractor.extract_candidates("12345678").await.is_ok());
+    }
+
+    #[tokio::test]
+    async fn anno_counts_utf8_bytes_not_characters() {
+        let extractor = AnnoEntityExtractor::with_max_input_bytes(8)
+            .expect("test limit is within the supported range");
+        let input = "é".repeat(5);
+
+        let error = extractor
+            .extract_candidates(&input)
+            .await
+            .expect_err("five two-byte characters exceed an eight-byte limit");
+
+        assert!(matches!(
+            error,
+            MemoryError::Validation(message)
+                if message == "entity extraction input too large: provider=anno actual_bytes=10 max_bytes=8"
+        ));
+    }
+
+    #[tokio::test]
+    async fn anno_rejects_oversized_whitespace_before_empty_shortcut() {
+        let extractor = AnnoEntityExtractor::with_max_input_bytes(8)
+            .expect("test limit is within the supported range");
+
+        let error = extractor
+            .extract_candidates("         ")
+            .await
+            .expect_err("oversized whitespace must be refused before empty-input handling");
+
+        assert!(matches!(
+            error,
+            MemoryError::Validation(message)
+                if message == "entity extraction input too large: provider=anno actual_bytes=9 max_bytes=8"
+        ));
+    }
+
+    #[tokio::test]
+    async fn anno_labels_path_obeys_same_limit() {
+        let extractor = AnnoEntityExtractor::with_max_input_bytes(8)
+            .expect("test limit is within the supported range");
+        let labels = vec!["person".to_string()];
+
+        let error = extractor
+            .extract_candidates_with_labels("123456789", &labels)
+            .await
+            .expect_err("labels path must enforce the extractor input limit");
+
+        assert!(matches!(
+            error,
+            MemoryError::Validation(message)
+                if message == "entity extraction input too large: provider=anno actual_bytes=9 max_bytes=8"
+        ));
+    }
 
     #[tokio::test]
     async fn anno_extractor_finds_person_names() {

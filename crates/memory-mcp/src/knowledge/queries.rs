@@ -18,6 +18,10 @@ use crate::storage::GraphDirection;
 use crate::storage::helpers::normalize_surreal_json;
 use crate::storage::queries::build_set_assignments;
 
+pub(crate) const NONSEMANTIC_FACT_PROJECTION: &str = "fact_id, fact_type, content, quote, source_episode, t_valid, t_ingested, \
+     t_invalid, t_invalid_ingested, confidence, index_keys, access_count, last_accessed, \
+     entity_links, scope, policy_tags, provenance";
+
 /// The temporal columns a fact carries, and an edge's, which are the same.
 pub const FACT_TEMPORAL_FIELDS: &[&str] = &[
     "t_valid",
@@ -92,11 +96,11 @@ pub fn build_select_facts_filtered_query(
         // doubles; SurrealDB 3.0 uses the escaped literal in MATCHES above.
         vars.insert("query".to_string(), json!(query));
         format!(
-            "SELECT *, search::score(1) AS ft_score FROM fact WHERE {base_where} AND (content @1@ {query_literal} OR index_keys @1@ {query_literal}) ORDER BY ft_score DESC, t_valid DESC, fact_id ASC LIMIT $limit"
+            "SELECT {NONSEMANTIC_FACT_PROJECTION}, search::score(1) AS ft_score FROM fact WHERE {base_where} AND (content @1@ {query_literal} OR index_keys @1@ {query_literal}) ORDER BY ft_score DESC, t_valid DESC, fact_id ASC LIMIT $limit"
         )
     } else {
         format!(
-            "SELECT * FROM fact WHERE {base_where} ORDER BY t_valid DESC, fact_id ASC LIMIT $limit"
+            "SELECT {NONSEMANTIC_FACT_PROJECTION} FROM fact WHERE {base_where} ORDER BY t_valid DESC, fact_id ASC LIMIT $limit"
         )
     };
 
@@ -137,7 +141,7 @@ pub fn build_select_facts_by_entity_links_query(
 ) -> (String, Value) {
     (
         format!(
-            "SELECT * FROM fact WHERE {BI_TEMPORAL_WHERE} AND entity_links CONTAINSANY $entity_links ORDER BY t_valid DESC LIMIT $limit"
+            "SELECT {NONSEMANTIC_FACT_PROJECTION} FROM fact WHERE {BI_TEMPORAL_WHERE} AND entity_links CONTAINSANY $entity_links ORDER BY t_valid DESC LIMIT $limit"
         ),
         json!({
             "cutoff": cutoff,
@@ -220,7 +224,27 @@ pub fn build_select_edge_neighbors_query(
 
     (
         format!(
-            "SELECT * FROM edge WHERE {node_field} = <record> $node_id AND {BI_TEMPORAL_WHERE} ORDER BY in ASC, out ASC, t_valid DESC"
+            "SELECT in, out, relation FROM edge WHERE {node_field} = <record> $node_id AND {BI_TEMPORAL_WHERE} ORDER BY in ASC, out ASC, t_valid DESC"
+        ),
+        json!({"node_id": node_id, "cutoff": cutoff}),
+    )
+}
+
+/// Build the graph-app projection: unlike retrieval's neighbor walk, the app
+/// needs a stable edge ID and summary metadata so it can open edge details.
+pub fn build_select_graph_edge_neighbors_query(
+    node_id: &str,
+    cutoff: &str,
+    direction: GraphDirection,
+) -> (String, Value) {
+    let node_field = match direction {
+        GraphDirection::Incoming => "out",
+        GraphDirection::Outgoing => "in",
+    };
+
+    (
+        format!(
+            "SELECT edge_id, id, in, out, relation, origin, confidence, t_valid, t_ingested FROM edge WHERE {node_field} = <record> $node_id AND {BI_TEMPORAL_WHERE} ORDER BY in ASC, out ASC, t_valid DESC"
         ),
         json!({"node_id": node_id, "cutoff": cutoff}),
     )
@@ -288,7 +312,8 @@ mod tests {
         assert!(sql.contains("content @1@ \"Alice \\\"launch\\\"\""));
         assert!(sql.contains("index_keys @1@ \"Alice \\\"launch\\\"\""));
         assert!(!sql.contains("@1@ $query"));
-        assert!(!sql.contains("scope"));
+        assert!(!sql.contains("WHERE scope"));
+        assert!(!sql.contains("AND scope"));
         assert!(!sql.contains("project"));
         assert_eq!(vars["limit"], 10);
     }

@@ -205,7 +205,10 @@ pub async fn build_memory_service_from_env(
             (None, None)
         };
     let runtime_provider = embedding_provider.clone();
-    let mut service = MemoryService::new_with_embedding_provider(
+    let cache_limits = crate::config::CacheLimits::from_env(
+        crate::config::memory::DEFAULT_LOCAL_CONTEXT_CACHE_BYTES,
+    )?;
+    let mut service = MemoryService::new_with_embedding_provider_and_cache_limits(
         db_client.clone(),
         config.active_namespace().as_str().to_string(),
         config.log_level,
@@ -214,6 +217,7 @@ pub async fn build_memory_service_from_env(
         embedding_provider,
         config.embedding.similarity_threshold,
         entity_extractor,
+        cache_limits,
     )?
     .with_query_logging_enabled(config.query_logging_enabled)
     .with_query_log_retention_days(config.query_log_retention_days);

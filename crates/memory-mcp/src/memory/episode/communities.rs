@@ -11,45 +11,14 @@ use crate::knowledge::community::{
 use crate::memory::capabilities::deps::ExtractDeps;
 use crate::shared::temporal::normalize_dt;
 use crate::shared::temporal::now;
-use crate::shared::temporal::parse_iso;
 use crate::storage::GraphDirection;
 use crate::storage::value_helpers::unwrap_string;
 
-use super::edges::StoredEdgeVersion;
-
-fn stored_edge_version_for_community(record: &Value) -> Option<StoredEdgeVersion> {
+fn community_edge_endpoints(record: &Value) -> Option<(String, String)> {
     let map = record.as_object()?;
-    let edge_id = map
-        .get("edge_id")
-        .and_then(unwrap_string)
-        .or_else(|| map.get("id").and_then(unwrap_string))?;
-
-    Some(StoredEdgeVersion {
-        edge_id,
-        in_id: map.get("in").and_then(unwrap_string)?,
-        relation: map.get("relation").and_then(unwrap_string)?,
-        out_id: map.get("out").and_then(unwrap_string)?,
-        t_valid: map
-            .get("t_valid")
-            .and_then(unwrap_string)
-            .as_deref()
-            .and_then(parse_iso)?,
-        t_ingested: map
-            .get("t_ingested")
-            .and_then(unwrap_string)
-            .as_deref()
-            .and_then(parse_iso)?,
-        t_invalid: map
-            .get("t_invalid")
-            .and_then(unwrap_string)
-            .as_deref()
-            .and_then(parse_iso),
-        t_invalid_ingested: map
-            .get("t_invalid_ingested")
-            .and_then(unwrap_string)
-            .as_deref()
-            .and_then(parse_iso),
-    })
+    let in_id = map.get("in").and_then(unwrap_string)?;
+    let out_id = map.get("out").and_then(unwrap_string)?;
+    Some((in_id, out_id))
 }
 
 /// Update community memberships after entity changes.
@@ -127,10 +96,10 @@ pub(crate) async fn collect_connected_entity_component(
             .select_edge_neighbors(&current, &cutoff, direction)
             .await?;
 
-            for edge in edges.iter().filter_map(stored_edge_version_for_community) {
+            for (in_id, out_id) in edges.iter().filter_map(community_edge_endpoints) {
                 let neighbor = match direction {
-                    GraphDirection::Incoming => edge.in_id,
-                    GraphDirection::Outgoing => edge.out_id,
+                    GraphDirection::Incoming => in_id,
+                    GraphDirection::Outgoing => out_id,
                 };
 
                 if is_entity_id(&neighbor) {
@@ -184,20 +153,16 @@ mod tests {
     use super::*;
 
     #[test]
-    fn stored_edge_version_for_community_handles_record_id_endpoints() {
+    fn community_edge_endpoints_accept_minimal_neighbor_projection() {
         let record = json!({
-            "edge_id": "edge:test",
             "in": {"RecordId": {"table": "entity", "key": "alice"}},
-            "relation": "met",
-            "out": {"RecordId": {"table": "entity", "key": "bob"}},
-            "t_valid": "2026-04-11T16:00:00Z",
-            "t_ingested": "2026-04-11T16:00:01Z"
+            "out": {"RecordId": {"table": "episode", "key": "meeting"}},
+            "relation": "mentioned_in"
         });
 
-        let stored =
-            stored_edge_version_for_community(&record).expect("stored community edge version");
-
-        assert_eq!(stored.in_id, "entity:alice");
-        assert_eq!(stored.out_id, "entity:bob");
+        assert_eq!(
+            community_edge_endpoints(&record),
+            Some(("entity:alice".to_string(), "episode:meeting".to_string()))
+        );
     }
 }

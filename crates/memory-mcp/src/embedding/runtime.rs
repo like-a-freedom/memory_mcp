@@ -1,5 +1,5 @@
 use std::sync::Arc;
-use std::time::{Duration, Instant};
+use std::time::Duration;
 
 use crate::error::MemoryError;
 
@@ -33,12 +33,6 @@ pub(crate) const DEFAULT_BACKGROUND_EMBEDDING_ATTEMPTS: u32 = 3;
 pub(crate) const DEFAULT_BACKGROUND_EMBEDDING_INITIAL_DELAY_MS: u64 = 750;
 pub(crate) const DEFAULT_QUERY_EMBEDDING_CACHE_SIZE: usize = 128;
 pub(crate) const DEFAULT_QUERY_EMBEDDING_CACHE_TTL_SECS: u64 = 300;
-
-#[derive(Debug, Clone)]
-pub(crate) struct CachedQueryEmbedding {
-    pub(crate) embedding: Vec<f64>,
-    pub(crate) expires_at: Instant,
-}
 
 #[must_use]
 pub(crate) fn is_remote_embedding_provider(provider_name: &str) -> bool {

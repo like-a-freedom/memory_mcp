@@ -20,22 +20,23 @@ use crate::pack::PackError;
 const SCRIPT_TIMEOUT: Duration = Duration::from_secs(10);
 const POLL_INTERVAL: Duration = Duration::from_millis(20);
 
-/// The four scripts, in the order they must run.
+/// The dashboard build, checkers, and regression suite in execution order.
 ///
 /// `build_dashboards` goes first because it regenerates the committed JSON and
-/// the other three read it. A checker run against a stale dashboard proves
+/// the other scripts read it. A checker run against a stale dashboard proves
 /// nothing about the dashboard that ships.
 const SCRIPTS: &[&str] = &[
     "build_dashboards.py",
     "check_rules.py",
     "check_alerts.py",
     "check_dashboards.py",
+    "tests/test_external_metrics.py",
 ];
 
-/// Run every checker in `scripts_dir`.
+/// Run every checker and regression script in `scripts_dir`.
 ///
 /// The order is `SCRIPTS` and the first failure stops the run, because the
-/// later checkers read what the earlier ones produce.
+/// later scripts rely on the files produced by the earlier ones.
 pub fn run(scripts_dir: &Path) -> Result<(), PackError> {
     for script in SCRIPTS {
         run_one(scripts_dir, script)?;
@@ -190,10 +191,12 @@ mod tests {
     }
 
     fn complete_scripts(dir: &Path) {
+        std::fs::create_dir_all(dir.join("tests")).expect("tests directory");
         write_script(dir, SCRIPTS[0], "print('dashboards built')\n");
         write_script(dir, SCRIPTS[1], "print('rules ok')\n");
         write_script(dir, SCRIPTS[2], "print('alerts ok')\n");
         write_script(dir, SCRIPTS[3], "print('dashboards ok')\n");
+        write_script(dir, SCRIPTS[4], "print('external metrics ok')\n");
     }
 
     #[test]
@@ -242,6 +245,23 @@ mod tests {
         let dir = tempfile::tempdir().expect("temp dir");
         complete_scripts(dir.path());
         assert!(run(dir.path()).is_ok());
+    }
+
+    #[test]
+    fn external_metric_contract_suite_is_required() {
+        let dir = tempfile::tempdir().expect("temp dir");
+        complete_scripts(dir.path());
+        std::fs::remove_file(dir.path().join("tests/test_external_metrics.py"))
+            .expect("remove external metrics suite");
+
+        let error = run(dir.path())
+            .expect_err("the external metrics regression suite is part of the gate")
+            .to_string();
+
+        assert!(
+            error.contains("tests/test_external_metrics.py") && error.contains("missing"),
+            "got: {error}"
+        );
     }
 
     #[test]

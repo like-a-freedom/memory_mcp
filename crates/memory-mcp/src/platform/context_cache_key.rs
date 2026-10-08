@@ -88,25 +88,3 @@ pub trait InvalidateContextCache {
         &self,
     ) -> std::pin::Pin<Box<dyn std::future::Future<Output = ()> + Send + '_>>;
 }
-
-impl InvalidateContextCache
-    for std::sync::Arc<
-        tokio::sync::RwLock<lru::LruCache<CacheKey, Vec<crate::models::AssembledContextItem>>>,
-    >
-{
-    fn invalidate_context_cache(
-        &self,
-    ) -> std::pin::Pin<Box<dyn std::future::Future<Output = ()> + Send + '_>> {
-        Box::pin(async move {
-            let mut guard = self.write().await;
-            let count = guard.len();
-            guard.clear();
-            if count > 0 {
-                let mut event = std::collections::HashMap::new();
-                event.insert("op".to_string(), serde_json::json!("cache.invalidate"));
-                event.insert("invalidated_count".to_string(), serde_json::json!(count));
-                crate::logging::emit(event, crate::logging::LogLevel::Trace);
-            }
-        })
-    }
-}

@@ -15,7 +15,8 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use memory_mcp::config::{
-    GlinerDeviceKind, ModelBackedNerConfig, NerConfig, NerExtractorConfig, NerExtractorKind,
+    DEFAULT_ANNO_MAX_INPUT_BYTES, GlinerDeviceKind, ModelBackedNerConfig, NerConfig,
+    NerExtractorConfig, NerExtractorKind,
 };
 use memory_mcp::logging::StdoutLogger;
 use memory_mcp::service::{
@@ -185,7 +186,9 @@ pub async fn build_extractor_from_root(
         NerExtractorKind::Anno => Some(
             create_entity_extractor(
                 &NerConfig {
-                    extractor: NerExtractorConfig::Anno,
+                    extractor: NerExtractorConfig::Anno {
+                        max_input_bytes: DEFAULT_ANNO_MAX_INPUT_BYTES,
+                    },
                 },
                 env!("CARGO_MANIFEST_DIR"),
                 &logger(),

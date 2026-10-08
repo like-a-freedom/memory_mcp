@@ -10,7 +10,7 @@ use std::sync::Arc;
 
 use crate::config::LifecycleConfig;
 use crate::error::MemoryError;
-use crate::memory::lifecycle_workers::{self, LifecycleHandles, LifecyclePolicy};
+use crate::memory::lifecycle_workers::{LifecycleHandles, LifecyclePolicy};
 use crate::service::MemoryService;
 
 pub use crate::memory::lifecycle_workers::LifecycleBackgroundWorkerRuntime;
@@ -22,13 +22,23 @@ pub fn handles_from<'a>(service: &'a MemoryService) -> LifecycleHandles<'a> {
         active_namespace: &service.active_namespace,
         logger: &service.logger,
         policy: service.lifecycle_policy(),
-        claim_service: &service.claim_service,
+        claim_store: Some(service.claim_service.store.clone()),
+    }
+}
+
+fn handles_without_claim_store_from(service: &MemoryService) -> LifecycleHandles<'_> {
+    LifecycleHandles {
+        db_client: service.db_client.clone(),
+        active_namespace: &service.active_namespace,
+        logger: &service.logger,
+        policy: service.lifecycle_policy(),
+        claim_store: None,
     }
 }
 
 /// Runs one archival pass over a service.
 pub async fn archival_pass(service: &MemoryService, age_days: u32) -> Result<usize, MemoryError> {
-    lifecycle_workers::archival::run_archival_pass(&handles_from(service), age_days).await
+    crate::memory::api::run_archival(&handles_without_claim_store_from(service), age_days).await
 }
 
 /// Runs one decay pass over a service.
@@ -37,13 +47,12 @@ pub async fn decay_pass(
     threshold: f64,
     half_life_days: f64,
 ) -> Result<usize, MemoryError> {
-    lifecycle_workers::decay::run_decay_pass(&handles_from(service), threshold, half_life_days)
-        .await
+    crate::memory::api::run_decay(&handles_from(service), threshold, half_life_days).await
 }
 
 /// Rebuilds the community table from all currently active edges.
 pub async fn run_community_rebuild_pass(service: &MemoryService) -> Result<usize, MemoryError> {
-    lifecycle_workers::run_community_rebuild_pass(&handles_from(service)).await
+    crate::memory::api::rebuild_communities(&handles_without_claim_store_from(service)).await
 }
 
 /// Spawns all three lifecycle workers against `service` with the given
@@ -62,13 +71,13 @@ pub fn spawn_all_for_test(
     let db_client: Arc<dyn crate::storage::DbClient> = service.db_client.clone();
     let namespace = service.active_namespace.clone();
     let logger = service.logger.clone();
-    let claim_service = service.claim_service.clone();
+    let claim_store = service.claim_service.store.clone();
     runtime.spawn_decay(
         db_client.clone(),
         namespace.clone(),
         logger.clone(),
         policy,
-        claim_service.clone(),
+        claim_store,
         interval_secs,
         threshold,
         half_life_days,
@@ -78,18 +87,10 @@ pub fn spawn_all_for_test(
         namespace.clone(),
         logger.clone(),
         policy,
-        claim_service.clone(),
         interval_secs,
         age_days,
     );
-    runtime.spawn_community(
-        db_client,
-        namespace,
-        logger,
-        policy,
-        claim_service,
-        interval_secs,
-    );
+    runtime.spawn_community(db_client, namespace, logger, policy, interval_secs);
     runtime
 }
 
@@ -109,43 +110,31 @@ pub fn spawn_workers_from_config(
     let db_client: Arc<dyn crate::storage::DbClient> = service.db_client.clone();
     let namespace = service.active_namespace.clone();
     let logger = service.logger.clone();
-    let claim_service = service.claim_service.clone();
-
-    let port = || {
-        (
-            db_client.clone(),
-            namespace.clone(),
-            logger.clone(),
-            policy,
-            claim_service.clone(),
-        )
-    };
-
-    let (db, ns, log, pol, claims) = port();
     runtime.spawn_decay(
-        db,
-        ns,
-        log,
-        pol,
-        claims,
+        db_client.clone(),
+        namespace.clone(),
+        logger.clone(),
+        policy,
+        service.claim_service.store.clone(),
         config.decay_interval_secs,
         policy.decay_confidence_threshold,
         policy.decay_half_life_days,
     );
-
-    let (db, ns, log, pol, claims) = port();
     runtime.spawn_archival(
-        db,
-        ns,
-        log,
-        pol,
-        claims,
+        db_client.clone(),
+        namespace.clone(),
+        logger.clone(),
+        policy,
         config.archival_interval_secs,
         policy.archival_age_days,
     );
-
-    let (db, ns, log, pol, claims) = port();
-    runtime.spawn_community(db, ns, log, pol, claims, config.archival_interval_secs);
+    runtime.spawn_community(
+        db_client,
+        namespace,
+        logger,
+        policy,
+        config.archival_interval_secs,
+    );
 
     let mut event = std::collections::HashMap::new();
     event.insert(

@@ -66,11 +66,17 @@ pub fn scheduler_job_with_policy(
     let options_for_job = options.clone();
     let policy_for_job = policy.clone();
     Arc::new(move |registry| {
-        let options = options_for_job.clone();
+        let mut options = options_for_job.clone();
         let embedding = policy_for_job
             .as_ref()
             .and_then(|policy| policy.embedding.as_ref())
             .cloned();
+        if let Some(entity_extractor) = policy_for_job
+            .as_ref()
+            .and_then(|policy| policy.entity_extractor.clone())
+        {
+            options = options.with_entity_extractor(entity_extractor);
+        }
         let injector = options.fault_injector.clone();
         Box::pin(async move {
             retry_reconcile_and_retain_with_policy(&registry, options, injector, embedding).await
@@ -143,13 +149,17 @@ async fn retry_reconcile_and_retain_with_policy(
         }
         match execute_one_task(
             &task_store,
-            db,
-            &tenant.namespace_binding.namespace,
-            &fault_injector,
-            embedding.as_ref(),
-            // Production always extracts through the real tool; a stub is
-            // supplied only by the test seam, which passes it in directly.
-            None,
+            TaskExecutionContext {
+                db,
+                namespace: &tenant.namespace_binding.namespace,
+                fault_injector: fault_injector.as_ref(),
+                embedding: embedding.as_ref(),
+                // Production always extracts through the real tool; a stub is
+                // supplied only by the test seam, which passes it in directly.
+                extractor: None,
+                entity_extractor: options.entity_extractor.clone(),
+                cache_limits: options.cache_limits,
+            },
         )
         .await
         {
@@ -181,13 +191,19 @@ async fn retry_reconcile_and_retain_with_policy(
     Ok(())
 }
 
+struct TaskExecutionContext<'a> {
+    db: Arc<SurrealDbClient>,
+    namespace: &'a str,
+    fault_injector: &'a dyn FaultInjector,
+    embedding: Option<&'a crate::http::runtime::storage::EmbeddingPolicy>,
+    extractor: Option<&'a ExtractorFn>,
+    entity_extractor: Option<Arc<dyn crate::knowledge::entity_extraction::EntityExtractor>>,
+    cache_limits: crate::config::CacheLimits,
+}
+
 async fn execute_one_task(
     task_store: &DurableTaskStore,
-    db: Arc<SurrealDbClient>,
-    namespace: &str,
-    fault_injector: &Arc<dyn FaultInjector>,
-    embedding: Option<&crate::http::runtime::storage::EmbeddingPolicy>,
-    extractor: Option<&ExtractorFn>,
+    execution: TaskExecutionContext<'_>,
 ) -> Result<(), MemoryError> {
     let replica_id = crate::http::leases::scheduler::replica_id();
     let Some(handle) = task_store.claim_next_due(&replica_id).await? else {
@@ -195,7 +211,7 @@ async fn execute_one_task(
     };
     // Hit after the claim is durable. The next worker sees a
     // `Running` row with an expired lease and reclaims it.
-    fault_injector.hit(FaultPoint::TaskClaimed)?;
+    execution.fault_injector.hit(FaultPoint::TaskClaimed)?;
     let record = task_store.load(&handle.task_id).await?.ok_or_else(|| {
         MemoryError::NotFound(format!("task {} disappeared after claim", handle.task_id))
     })?;
@@ -203,24 +219,13 @@ async fn execute_one_task(
         return task_store.cancel_before_commit_fenced(&handle).await;
     }
     match record.kind.as_str() {
-        TASK_KIND_EXTRACT => {
-            execute_extract_task(
-                task_store,
-                db,
-                namespace,
-                &handle,
-                &record,
-                fault_injector,
-                extractor,
-            )
-            .await
-        }
+        TASK_KIND_EXTRACT => execute_extract_task(task_store, &handle, &record, execution).await,
         TASK_KIND_REEMBED => {
             // A reembed needs the deployment's provider. A tick with no policy
             // has none to force-enable, so the row fails loudly rather than
             // being decoded as an extraction or silently rewritten with a
             // degraded provider.
-            let Some(policy) = embedding else {
+            let Some(policy) = execution.embedding else {
                 return task_store
                     .fail_fenced(
                         &handle,
@@ -231,7 +236,15 @@ async fn execute_one_task(
                     )
                     .await;
             };
-            execute_reembed_task(task_store, db, namespace, &handle, &record, policy).await
+            execute_reembed_task(
+                task_store,
+                execution.db,
+                execution.namespace,
+                &handle,
+                &record,
+                policy,
+            )
+            .await
         }
         // Fail closed. An unrecognised kind is never decoded as whichever
         // payload happens to fit: the only two kinds that exist are the two
@@ -257,12 +270,9 @@ async fn execute_one_task(
 /// [`crate::tools::params::ExtractParams`] and runs the real `extract` tool.
 async fn execute_extract_task(
     task_store: &DurableTaskStore,
-    db: Arc<SurrealDbClient>,
-    namespace: &str,
     handle: &crate::http::tasks::state::TaskHandle,
     record: &crate::http::tasks::state::TenantTaskRecord,
-    fault_injector: &Arc<dyn FaultInjector>,
-    extractor: Option<&ExtractorFn>,
+    execution: TaskExecutionContext<'_>,
 ) -> Result<(), MemoryError> {
     let params: crate::tools::params::ExtractParams = serde_json::from_value(record.params.clone())
         .map_err(|error| {
@@ -274,17 +284,31 @@ async fn execute_extract_task(
     // after this point — the artifact commit boundary, the fault points, the
     // fenced terminal write — is shared, which is the whole reason the seam is
     // an argument rather than a second copy of the function.
-    let extraction: Result<serde_json::Value, MemoryError> = match extractor {
+    let extraction: Result<serde_json::Value, MemoryError> = match execution.extractor {
         Some(stub) => stub(params).await,
         None => {
-            let service = crate::service::MemoryService::new(
-                db,
-                namespace.to_owned(),
-                crate::logging::StdoutLogger::directives_from_env(),
-                100,
-                100,
-            )?
-            .with_http_outbox();
+            let entity_extractor = match execution.entity_extractor {
+                Some(extractor) => extractor,
+                None => Arc::new(crate::knowledge::entity_extraction::AnnoEntityExtractor::new()?)
+                    as Arc<dyn crate::knowledge::entity_extraction::EntityExtractor>,
+            };
+            let embedding_provider =
+                Arc::new(crate::embedding::providers::DisabledEmbeddingProvider::new(
+                    crate::config::DEFAULT_EMBEDDING_DIMENSION,
+                ));
+            let service =
+                crate::service::MemoryService::new_with_embedding_provider_and_cache_limits(
+                    execution.db,
+                    execution.namespace.to_owned(),
+                    crate::logging::StdoutLogger::directives_from_env(),
+                    100,
+                    100,
+                    embedding_provider,
+                    crate::config::DEFAULT_EMBEDDING_SIMILARITY_THRESHOLD,
+                    entity_extractor,
+                    execution.cache_limits,
+                )?
+                .with_http_outbox();
             crate::tools::extract(&service, params)
                 .await
                 .and_then(|result| {
@@ -302,7 +326,9 @@ async fn execute_extract_task(
             // Hit after the artifact row is committed. The next
             // worker sees the artifact via `reconcile_artifacts`
             // and projects the completed terminal state.
-            fault_injector.hit(FaultPoint::TaskArtifactCommitted)?;
+            execution
+                .fault_injector
+                .hit(FaultPoint::TaskArtifactCommitted)?;
             let cancelled_after_commit = task_store
                 .load(&handle.task_id)
                 .await?
@@ -311,7 +337,7 @@ async fn execute_extract_task(
                 .complete_fenced(handle, value, cancelled_after_commit)
                 .await?;
             // Hit after the terminal state is committed.
-            fault_injector.hit(FaultPoint::TaskCompleted)?;
+            execution.fault_injector.hit(FaultPoint::TaskCompleted)?;
             Ok(())
         }
         Err(error) => {
@@ -725,6 +751,31 @@ pub async fn execute_one_task_for_test(
     execute_one_task_with_policy(task_store, db, namespace, &fault_injector, extractor, None).await
 }
 
+/// Runs a real durable extraction through the configured extractor, so the
+/// test can cover deployment input limits without invoking a local model.
+#[cfg(any(test, feature = "test-fixtures"))]
+pub async fn execute_one_task_with_entity_extractor_for_test(
+    task_store: &DurableTaskStore,
+    db: Arc<SurrealDbClient>,
+    namespace: &str,
+    fault_injector: Arc<dyn FaultInjector>,
+    entity_extractor: Arc<dyn crate::knowledge::entity_extraction::EntityExtractor>,
+) -> Result<(), MemoryError> {
+    execute_one_task(
+        task_store,
+        TaskExecutionContext {
+            db,
+            namespace,
+            fault_injector: fault_injector.as_ref(),
+            embedding: None,
+            extractor: None,
+            entity_extractor: Some(entity_extractor),
+            cache_limits: crate::config::CacheLimits::profile_default(),
+        },
+    )
+    .await
+}
+
 /// The same seam, carrying the deployment's embedding policy so a `reembed`
 /// row reaches the real executor with a provider it can force-enable.
 ///
@@ -741,11 +792,15 @@ pub async fn execute_one_task_with_policy(
 ) -> Result<(), MemoryError> {
     execute_one_task(
         task_store,
-        db,
-        namespace,
-        fault_injector,
-        embedding_policy,
-        Some(&extractor),
+        TaskExecutionContext {
+            db,
+            namespace,
+            fault_injector: fault_injector.as_ref(),
+            embedding: embedding_policy,
+            extractor: Some(&extractor),
+            entity_extractor: None,
+            cache_limits: crate::config::CacheLimits::profile_default(),
+        },
     )
     .await
 }

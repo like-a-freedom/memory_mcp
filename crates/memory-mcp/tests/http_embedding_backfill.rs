@@ -99,6 +99,7 @@ fn deployment_policy_from(embedding: EmbeddingPolicy, auto_recovery: bool) -> De
         embedding: Some(embedding),
         entity_extractor: None,
         lifecycle: memory_mcp::config::LifecycleConfig::default(),
+        cache_limits: memory_mcp::config::CacheLimits::profile_default(),
         auto_recovery,
         query_logging_enabled: false,
         query_log_retention_days: memory_mcp::config::DEFAULT_QUERY_LOG_RETENTION_DAYS,

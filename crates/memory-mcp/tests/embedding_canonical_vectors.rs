@@ -179,6 +179,93 @@ async fn repeating_the_current_signature_is_a_no_op() {
 }
 
 #[tokio::test]
+async fn late_commit_after_cancellation_is_idempotent() {
+    struct CommitThenWaitPort {
+        stored_signature: Mutex<Option<String>>,
+        writes: Mutex<usize>,
+        committed: Mutex<Option<tokio::sync::oneshot::Sender<()>>>,
+    }
+
+    #[async_trait::async_trait]
+    impl CanonicalVectorPort for CommitThenWaitPort {
+        async fn stored_fact_vector(&self, _fact_id: &str) -> Result<StoredVector, MemoryError> {
+            Ok(
+                match self
+                    .stored_signature
+                    .lock()
+                    .expect("signature lock")
+                    .clone()
+                {
+                    Some(signature) => StoredVector::Present { signature },
+                    None => StoredVector::Absent,
+                },
+            )
+        }
+
+        async fn apply_fact_vector(
+            &self,
+            _fact_id: &str,
+            _vector: Vec<f64>,
+            identity: VectorIdentity,
+            _at: DateTime<Utc>,
+            _policy: VectorWritePolicy,
+        ) -> Result<VectorApplication, MemoryError> {
+            *self.stored_signature.lock().expect("signature lock") = Some(identity.signature);
+            *self.writes.lock().expect("write count lock") += 1;
+            if let Some(committed) = self.committed.lock().expect("commit lock").take() {
+                let _ = committed.send(());
+            }
+            std::future::pending().await
+        }
+    }
+
+    let (committed_tx, committed_rx) = tokio::sync::oneshot::channel();
+    let port = Arc::new(CommitThenWaitPort {
+        stored_signature: Mutex::new(None),
+        writes: Mutex::new(0),
+        committed: Mutex::new(Some(committed_tx)),
+    });
+    let identity = target("sig-a", 3);
+    let first_port = port.clone();
+    let first = tokio::spawn(async move {
+        update_canonical_vector(
+            first_port.as_ref(),
+            "fact:f1",
+            vec![0.1, 0.2, 0.3],
+            &identity,
+            fixed_at(),
+            VectorWritePolicy::ReplaceStale,
+        )
+        .await
+    });
+    tokio::time::timeout(std::time::Duration::from_secs(5), committed_rx)
+        .await
+        .expect("owner commit happens before response")
+        .expect("commit signal is sent");
+
+    first.abort();
+    assert!(
+        first
+            .await
+            .expect_err("cancelled task is joined")
+            .is_cancelled()
+    );
+    let retry = update_canonical_vector(
+        port.as_ref(),
+        "fact:f1",
+        vec![0.4, 0.5, 0.6],
+        &target("sig-a", 3),
+        fixed_at(),
+        VectorWritePolicy::ReplaceStale,
+    )
+    .await
+    .expect("retry sees the committed target signature");
+
+    assert_eq!(retry, VectorApplication::AlreadyCurrent);
+    assert_eq!(*port.writes.lock().expect("write count lock"), 1);
+}
+
+#[tokio::test]
 async fn a_changed_signature_rewrites_the_record() {
     let port = RecordingPort::fresh();
 

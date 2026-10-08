@@ -14,6 +14,38 @@
 use serde_json::Value;
 
 use crate::error::MemoryError;
+use crate::knowledge::entity_extraction::EntityExtractor;
+
+/// Refuses extraction inputs that exceed the selected extractor's whole-input limit.
+pub fn validate_entity_extraction_input(
+    extractor: &(impl EntityExtractor + ?Sized),
+    content: &str,
+) -> Result<(), MemoryError> {
+    let Some(max_bytes) = extractor.max_input_bytes() else {
+        return Ok(());
+    };
+    let actual_bytes = content.len();
+    if actual_bytes > max_bytes {
+        return Err(MemoryError::Validation(format!(
+            "entity extraction input too large: provider={} actual_bytes={} max_bytes={}",
+            extractor.provider_name(),
+            actual_bytes,
+            max_bytes,
+        )));
+    }
+    Ok(())
+}
+
+/// Startup metadata reads owned by the knowledge context.
+#[async_trait::async_trait]
+pub trait FactEmbeddingMetadataReadPort: Send + Sync {
+    async fn count_facts(&self) -> Result<usize, MemoryError>;
+
+    async fn sample_stored_embedding_dimensions(
+        &self,
+        sample_size: usize,
+    ) -> Result<Vec<usize>, MemoryError>;
+}
 
 /// A read that knowledge is willing to serve, named by owner
 /// rather than by table string.

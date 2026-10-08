@@ -362,6 +362,10 @@ pub async fn extract_from_episode(
     let episode = episode_from_record(&record)
         .ok_or_else(|| MemoryError::NotFound("episode_id not found".into()))?;
 
+    crate::knowledge::api::validate_entity_extraction_input(
+        service.entity_extractor.as_ref(),
+        &episode.content,
+    )?;
     let entity_extraction_content = sanitized_content_for_entity_extraction(&episode.content);
     let entities = extract_entities(
         service,

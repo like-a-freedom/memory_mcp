@@ -7,12 +7,9 @@
 
 use std::sync::Arc;
 
-use lru::LruCache;
-
-use tokio::sync::RwLock;
-
 use crate::error::MemoryError;
 use crate::logging::StdoutLogger;
+use crate::memory::context_cache::ContextCache;
 use crate::platform::rate_limiter::RateLimiter;
 
 /// What the `assemble_context` pipeline needs.
@@ -46,14 +43,7 @@ pub struct AssembleContextDeps {
     /// provider trait has no embed operation, so the service stays as the
     /// port for the one caller that needs one.
     pub(crate) embedding_service: crate::embedding::service::EmbeddingService,
-    pub(crate) context_cache: Arc<
-        RwLock<
-            LruCache<
-                crate::platform::context_cache_key::CacheKey,
-                Vec<crate::models::AssembledContextItem>,
-            >,
-        >,
-    >,
+    pub(crate) context_cache: ContextCache,
     pub(crate) query_logging_enabled: bool,
     pub(crate) query_log_retention_days: u32,
     pub(crate) rate_limiter: Arc<RateLimiter>,

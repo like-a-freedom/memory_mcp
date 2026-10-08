@@ -6,22 +6,22 @@
 use std::sync::Arc;
 use std::time::Instant;
 
-use lru::LruCache;
 use serde_json::json;
-use tokio::sync::{Mutex, RwLock};
+use tokio::sync::Mutex;
 
 use crate::embedding::providers::EmbeddingProvider;
-use crate::embedding::providers::task_runner::BackgroundTaskRunner;
-use crate::embedding::runtime::CachedQueryEmbedding;
+use crate::embedding::providers::task_runner::{BackgroundAdmissionError, BackgroundTaskRunner};
+use crate::embedding::query_cache::QueryEmbeddingCacheState;
 use crate::error::MemoryError;
 use crate::logging::{LogLevel, StdoutLogger};
-use crate::models::AssembledContextItem;
-use crate::platform::context_cache_key::{CacheKey, InvalidateContextCache};
+use crate::memory::context_cache::ContextCache;
+use crate::platform::context_cache_key::InvalidateContextCache;
 use crate::storage::{BoundDbClient, DbClient};
 
 /// Maximum input length accepted by embedding providers. Inputs longer than
 /// this are truncated before being sent to the provider.
 const MAX_EMBEDDING_INPUT_CHARS: usize = 8_000;
+const MAX_BACKGROUND_QUERY_INPUT_BYTES: usize = 65_536;
 
 /// Owns all embedding generation, caching, and background retry logic.
 ///
@@ -41,8 +41,8 @@ pub(crate) struct EmbeddingService {
     current_embedding_signature: Option<String>,
     current_embedding_model: Option<String>,
     current_embedding_dimension: Option<usize>,
-    context_cache: Arc<RwLock<LruCache<CacheKey, Vec<AssembledContextItem>>>>,
-    query_embedding_cache: Arc<Mutex<LruCache<String, CachedQueryEmbedding>>>,
+    context_cache: ContextCache,
+    query_embedding_cache: Arc<Mutex<QueryEmbeddingCacheState>>,
     task_runner: Arc<BackgroundTaskRunner>,
 }
 
@@ -57,8 +57,8 @@ impl EmbeddingService {
         current_embedding_signature: Option<String>,
         current_embedding_model: Option<String>,
         current_embedding_dimension: Option<usize>,
-        context_cache: Arc<RwLock<LruCache<CacheKey, Vec<AssembledContextItem>>>>,
-        query_embedding_cache: Arc<Mutex<LruCache<String, CachedQueryEmbedding>>>,
+        context_cache: ContextCache,
+        query_embedding_cache: Arc<Mutex<QueryEmbeddingCacheState>>,
         task_runner: Arc<BackgroundTaskRunner>,
     ) -> Self {
         Self {
@@ -151,8 +151,7 @@ impl EmbeddingService {
             }
             Ok(None) => Ok(None),
             Err(err) if self.should_defer_embedding_retry(&err) => {
-                self.enqueue_background_query_embedding(input.to_string())
-                    .await;
+                self.enqueue_background_query_embedding(input).await;
                 Ok(None)
             }
             Err(err) => Err(err),
@@ -162,15 +161,7 @@ impl EmbeddingService {
     pub(crate) async fn cached_query_embedding(&self, input: &str) -> Option<Vec<f64>> {
         let cache_key = self.query_embedding_cache_key(input);
         let mut cache = self.query_embedding_cache.lock().await;
-        let now = std::time::Instant::now();
-        if let Some(entry) = cache.get(&cache_key).cloned() {
-            if entry.expires_at > now {
-                return Some(entry.embedding);
-            }
-            cache.pop(&cache_key);
-        }
-
-        None
+        cache.get(&cache_key, std::time::Instant::now())
     }
 
     /// Enqueues a background fact-embedding retry after a transient provider
@@ -182,18 +173,35 @@ impl EmbeddingService {
         input: String,
     ) {
         let task_key = self.background_fact_task_key(&namespace, &fact_id);
-        if !self.try_reserve_background_embedding_task(&task_key).await {
-            self.logger.log(
-                std::collections::HashMap::from([
-                    ("op".to_string(), json!("embedding.background_deduped")),
-                    ("kind".to_string(), json!("fact")),
-                    ("namespace".to_string(), json!(namespace)),
-                    ("fact_id".to_string(), json!(fact_id)),
-                ]),
-                LogLevel::Debug,
-            );
+        let provider_input_bytes = effective_embedding_input_bytes(&input);
+        let retained_bytes = provider_input_bytes
+            .checked_add(namespace.len())
+            .and_then(|bytes| bytes.checked_add(fact_id.len()))
+            .and_then(|bytes| bytes.checked_add(task_key.len()));
+        let Some(retained_bytes) = retained_bytes else {
+            self.log_background_refusal("fact", BackgroundAdmissionError::ByteCapacity);
             return;
-        }
+        };
+        let reservation = match self.task_runner.try_admit(&task_key, retained_bytes) {
+            Ok(reservation) => reservation,
+            Err(BackgroundAdmissionError::Duplicate) => {
+                self.logger.log(
+                    std::collections::HashMap::from([
+                        ("op".to_string(), json!("embedding.background_deduped")),
+                        ("kind".to_string(), json!("fact")),
+                        ("namespace".to_string(), json!(namespace)),
+                        ("fact_id".to_string(), json!(fact_id)),
+                    ]),
+                    LogLevel::Debug,
+                );
+                return;
+            }
+            Err(reason) => {
+                self.log_background_refusal("fact", reason);
+                return;
+            }
+        };
+        let provider_input = effective_embedding_input(&input);
 
         self.logger.log(
             std::collections::HashMap::from([
@@ -201,22 +209,24 @@ impl EmbeddingService {
                 ("kind".to_string(), json!("fact")),
                 ("namespace".to_string(), json!(namespace.clone())),
                 ("fact_id".to_string(), json!(fact_id.clone())),
+                ("input_bytes".to_string(), json!(input.len())),
+                ("retained_bytes".to_string(), json!(retained_bytes)),
             ]),
             LogLevel::Info,
         );
 
-        // Self-terminating task: `run_background_fact_embedding_task` runs a
-        // bounded retry loop (DEFAULT_BACKGROUND_EMBEDDING_ATTEMPTS) and exits
-        // on success, `Ok(None)`, or a non-retryable error. It is not an
-        // infinite loop, so no CancellationToken is needed. The `task_runner`
-        // reservation is released when the task completes. The clone freezes
-        // the embedding policy state at spawn time.
         let service = self.clone();
-        tokio::spawn(async move {
-            service
-                .run_background_fact_embedding_task(task_key, namespace, fact_id, input)
-                .await;
-        });
+        if let Err(reason) = self
+            .task_runner
+            .spawn(reservation, async move {
+                service
+                    .run_background_fact_embedding_task(namespace, fact_id, provider_input)
+                    .await;
+            })
+            .await
+        {
+            self.log_background_refusal("fact", reason);
+        }
     }
 
     fn background_fact_task_key(&self, namespace: &str, fact_id: &str) -> String {
@@ -251,60 +261,77 @@ impl EmbeddingService {
 
     async fn store_query_embedding(&self, input: &str, embedding: Vec<f64>) {
         let cache_key = self.query_embedding_cache_key(input);
+        self.store_query_embedding_by_key(cache_key, embedding)
+            .await;
+    }
+
+    async fn store_query_embedding_by_key(&self, cache_key: String, embedding: Vec<f64>) {
         let mut cache = self.query_embedding_cache.lock().await;
-        cache.put(
-            cache_key,
-            crate::embedding::runtime::CachedQueryEmbedding {
-                embedding,
-                expires_at: std::time::Instant::now()
-                    + crate::embedding::runtime::query_embedding_cache_ttl(),
-            },
-        );
+        let _outcome = cache.insert(cache_key, embedding, std::time::Instant::now());
     }
 
     async fn background_embedding_task_inflight(&self, task_key: &str) -> bool {
         self.task_runner.is_inflight(task_key).await
     }
 
-    async fn try_reserve_background_embedding_task(&self, task_key: &str) -> bool {
-        self.task_runner.try_reserve(task_key).await
-    }
-
-    async fn enqueue_background_query_embedding(&self, input: String) {
-        let task_key = self.background_query_task_key(&input);
-        if !self.try_reserve_background_embedding_task(&task_key).await {
-            self.logger.log(
-                std::collections::HashMap::from([
-                    ("op".to_string(), json!("embedding.background_deduped")),
-                    ("kind".to_string(), json!("query")),
-                    ("input_chars".to_string(), json!(input.chars().count())),
-                ]),
-                LogLevel::Debug,
-            );
+    async fn enqueue_background_query_embedding(&self, input: &str) {
+        if input.len() > MAX_BACKGROUND_QUERY_INPUT_BYTES {
+            self.log_background_refusal("query", BackgroundAdmissionError::Oversized);
             return;
         }
+
+        let provider_input_bytes = effective_embedding_input_bytes(input);
+        let cache_key = self.query_embedding_cache_key(input);
+        let task_key = self.background_query_task_key(input);
+        let retained_bytes = provider_input_bytes
+            .checked_add(cache_key.len())
+            .and_then(|bytes| bytes.checked_add(task_key.len()));
+        let Some(retained_bytes) = retained_bytes else {
+            self.log_background_refusal("query", BackgroundAdmissionError::ByteCapacity);
+            return;
+        };
+        let reservation = match self.task_runner.try_admit(&task_key, retained_bytes) {
+            Ok(reservation) => reservation,
+            Err(reason) => {
+                self.log_background_refusal("query", reason);
+                return;
+            }
+        };
+        let provider_input = effective_embedding_input(input);
 
         self.logger.log(
             std::collections::HashMap::from([
                 ("op".to_string(), json!("embedding.background_enqueued")),
                 ("kind".to_string(), json!("query")),
-                ("input_chars".to_string(), json!(input.chars().count())),
+                ("input_bytes".to_string(), json!(input.len())),
+                ("retained_bytes".to_string(), json!(retained_bytes)),
             ]),
             LogLevel::Info,
         );
 
-        // Self-terminating task: `run_background_query_embedding_task` runs a
-        // bounded retry loop (DEFAULT_BACKGROUND_EMBEDDING_ATTEMPTS) and exits
-        // on success, `Ok(None)`, or a non-retryable error. It is not an
-        // infinite loop, so no CancellationToken is needed. The `task_runner`
-        // reservation is released when the task completes. The clone freezes
-        // the embedding policy state at spawn time.
         let service = self.clone();
-        tokio::spawn(async move {
-            service
-                .run_background_query_embedding_task(task_key, input)
-                .await;
-        });
+        if let Err(reason) = self
+            .task_runner
+            .spawn(reservation, async move {
+                service
+                    .run_background_query_embedding_task(provider_input, cache_key)
+                    .await;
+            })
+            .await
+        {
+            self.log_background_refusal("query", reason);
+        }
+    }
+
+    fn log_background_refusal(&self, kind: &str, reason: BackgroundAdmissionError) {
+        self.logger.log(
+            std::collections::HashMap::from([
+                ("op".to_string(), json!("embedding.background_refused")),
+                ("kind".to_string(), json!(kind)),
+                ("reason".to_string(), json!(format!("{reason:?}"))),
+            ]),
+            LogLevel::Debug,
+        );
     }
 
     // ─── Background task execution ──────────────────────────────────────
@@ -313,7 +340,6 @@ impl EmbeddingService {
 
     async fn run_background_fact_embedding_task(
         self,
-        task_key: String,
         namespace: String,
         fact_id: String,
         input: String,
@@ -321,7 +347,6 @@ impl EmbeddingService {
         let outcome = self
             .run_background_fact_embedding_task_inner(&namespace, &fact_id, &input)
             .await;
-        self.release_background_embedding_task(&task_key).await;
 
         if let Err(err) = outcome {
             self.logger.log(
@@ -388,16 +413,17 @@ impl EmbeddingService {
         Ok(())
     }
 
-    async fn run_background_query_embedding_task(self, task_key: String, input: String) {
-        let outcome = self.run_background_query_embedding_task_inner(&input).await;
-        self.release_background_embedding_task(&task_key).await;
+    async fn run_background_query_embedding_task(self, input: String, cache_key: String) {
+        let outcome = self
+            .run_background_query_embedding_task_inner(&input, cache_key)
+            .await;
 
         if let Err(err) = outcome {
             self.logger.log(
                 std::collections::HashMap::from([
                     ("op".to_string(), json!("embedding.background_failed")),
                     ("kind".to_string(), json!("query")),
-                    ("input_chars".to_string(), json!(input.chars().count())),
+                    ("input_bytes".to_string(), json!(input.len())),
                     ("error".to_string(), json!(err.to_string())),
                 ]),
                 LogLevel::Warn,
@@ -408,11 +434,13 @@ impl EmbeddingService {
     async fn run_background_query_embedding_task_inner(
         &self,
         input: &str,
+        cache_key: String,
     ) -> Result<(), MemoryError> {
         for attempt in 1..=crate::embedding::runtime::DEFAULT_BACKGROUND_EMBEDDING_ATTEMPTS {
             match self.generate_embedding(input).await {
                 Ok(Some(embedding)) => {
-                    self.store_query_embedding(input, embedding).await;
+                    self.store_query_embedding_by_key(cache_key, embedding)
+                        .await;
                     self.logger.log(
                         std::collections::HashMap::from([
                             ("op".to_string(), json!("embedding.background_succeeded")),
@@ -505,14 +533,21 @@ impl EmbeddingService {
             signature: self.current_embedding_signature.clone()?,
         })
     }
-
-    async fn release_background_embedding_task(&self, task_key: &str) {
-        self.task_runner.release(task_key).await;
-    }
 }
 
 /// Generate one vector, or `None` when the provider is disabled.
 ///
+fn effective_embedding_input_bytes(input: &str) -> usize {
+    input
+        .char_indices()
+        .nth(MAX_EMBEDDING_INPUT_CHARS)
+        .map_or(input.len(), |(byte_index, _)| byte_index)
+}
+
+fn effective_embedding_input(input: &str) -> String {
+    input.chars().take(MAX_EMBEDDING_INPUT_CHARS).collect()
+}
+
 /// Free rather than only a method on [`EmbeddingService`] because two
 /// adapters need it and only one of them is the service. The input limit,
 /// the enabled check, the stage timer and the four log events all live
@@ -696,13 +731,12 @@ mod tests {
     use std::sync::atomic::{AtomicUsize, Ordering};
 
     use async_trait::async_trait;
-    use lru::LruCache;
     use serde_json::json;
     use tokio::sync::{Mutex, RwLock};
 
     use super::*;
     use crate::embedding::providers::task_runner::BackgroundTaskRunner;
-    use crate::embedding::runtime::CachedQueryEmbedding;
+    use crate::embedding::query_cache::QueryEmbeddingCacheState;
     use crate::error::MemoryError;
     use crate::logging::StdoutLogger;
     use crate::service::mock_db::MockDbClient;
@@ -802,20 +836,38 @@ mod tests {
         }
     }
 
+    fn make_query_cache() -> Arc<Mutex<QueryEmbeddingCacheState>> {
+        Arc::new(Mutex::new(QueryEmbeddingCacheState::new(
+            std::num::NonZeroUsize::new(8).unwrap(),
+            std::num::NonZeroUsize::new(2 * 1024 * 1024).unwrap(),
+            crate::embedding::runtime::query_embedding_cache_ttl(),
+        )))
+    }
+
     fn make_service(
         provider: Arc<dyn EmbeddingProvider>,
         signature: Option<&str>,
         runner: Arc<BackgroundTaskRunner>,
     ) -> EmbeddingService {
-        let context_cache = Arc::new(RwLock::new(LruCache::new(
-            std::num::NonZeroUsize::new(8).unwrap(),
-        )));
-        let query_embedding_cache = Arc::new(Mutex::new(LruCache::new(
-            std::num::NonZeroUsize::new(8).unwrap(),
-        )));
+        make_service_in_namespace("org", provider, signature, runner)
+    }
+
+    fn make_service_in_namespace(
+        namespace: &str,
+        provider: Arc<dyn EmbeddingProvider>,
+        signature: Option<&str>,
+        runner: Arc<BackgroundTaskRunner>,
+    ) -> EmbeddingService {
+        let context_cache = Arc::new(RwLock::new(
+            crate::platform::context_cache::ContextCacheState::new(
+                std::num::NonZeroUsize::new(8).unwrap(),
+                std::num::NonZeroUsize::new(16 * 1024 * 1024).unwrap(),
+            ),
+        ));
+        let query_embedding_cache = make_query_cache();
         EmbeddingService::new(
             Arc::new(MockDbClient::new()),
-            "org",
+            namespace,
             StdoutLogger::new("warn"),
             provider,
             0.8,
@@ -860,6 +912,89 @@ mod tests {
         assert_ne!(
             with_sig.background_fact_task_key("org", "some input"),
             with_sig.background_query_task_key("some input")
+        );
+    }
+
+    #[tokio::test]
+    async fn same_fact_id_in_distinct_namespaces_is_not_deduplicated() {
+        struct BlockingProvider {
+            started: std::sync::Mutex<Option<tokio::sync::oneshot::Sender<()>>>,
+            release: Mutex<Option<tokio::sync::oneshot::Receiver<()>>>,
+        }
+
+        #[async_trait]
+        impl EmbeddingProvider for BlockingProvider {
+            fn is_enabled(&self) -> bool {
+                true
+            }
+
+            fn provider_name(&self) -> &'static str {
+                "openai-compatible"
+            }
+
+            fn dimension(&self) -> usize {
+                4
+            }
+
+            async fn embed(&self, _input: &str) -> Result<Vec<f64>, MemoryError> {
+                if let Some(started) = self.started.lock().expect("started lock").take() {
+                    let _ = started.send(());
+                }
+                if let Some(release) = self.release.lock().await.take() {
+                    let _ = release.await;
+                }
+                Ok(vec![0.0; 4])
+            }
+        }
+
+        let runner = Arc::new(BackgroundTaskRunner::new());
+        let (started_tx, started_rx) = tokio::sync::oneshot::channel();
+        let (release_tx, release_rx) = tokio::sync::oneshot::channel();
+        let provider = Arc::new(BlockingProvider {
+            started: std::sync::Mutex::new(Some(started_tx)),
+            release: Mutex::new(Some(release_rx)),
+        });
+        let tenant_a = make_service_in_namespace(
+            "tenant-a",
+            provider.clone(),
+            Some("signature-a"),
+            runner.clone(),
+        );
+        let tenant_b =
+            make_service_in_namespace("tenant-b", provider, Some("signature-a"), runner.clone());
+
+        tenant_a
+            .enqueue_background_fact_embedding(
+                "tenant-a".to_string(),
+                "fact:shared".to_string(),
+                "tenant A fact".to_string(),
+            )
+            .await;
+        tokio::time::timeout(std::time::Duration::from_secs(5), started_rx)
+            .await
+            .expect("tenant A provider call starts")
+            .expect("provider sends start signal");
+        tenant_b
+            .enqueue_background_fact_embedding(
+                "tenant-b".to_string(),
+                "fact:shared".to_string(),
+                "tenant B fact".to_string(),
+            )
+            .await;
+
+        assert_eq!(
+            runner.resource_snapshot().admitted_tasks,
+            2,
+            "the same fact record key in two namespaces must occupy distinct admissions"
+        );
+        let _ = release_tx.send(());
+        runner
+            .join_until(tokio::time::Instant::now() + std::time::Duration::from_secs(5))
+            .await
+            .expect("both namespace-specific retries join");
+        assert_eq!(
+            runner.resource_snapshot(),
+            crate::embedding::providers::task_runner::BackgroundTaskSnapshot::default()
         );
     }
 
@@ -1036,6 +1171,59 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn same_query_signature_uses_cached_embedding_once() {
+        let provider = Arc::new(ScriptedProvider::new(4));
+        let service = make_service(
+            provider.clone(),
+            Some("signature-a"),
+            Arc::new(BackgroundTaskRunner::new()),
+        );
+
+        let first = service
+            .generate_query_embedding_with_background("repeat this query")
+            .await
+            .expect("first provider call should succeed");
+        let second = service
+            .generate_query_embedding_with_background("repeat this query")
+            .await
+            .expect("cached lookup should succeed");
+
+        assert_eq!(second, first);
+        assert_eq!(provider.calls(), 1);
+    }
+
+    #[tokio::test]
+    async fn different_provider_signature_never_reuses_embedding() {
+        let shared_cache = make_query_cache();
+        let provider_a = Arc::new(ScriptedProvider::new(4));
+        let provider_b = Arc::new(ScriptedProvider::new(4));
+        let mut service_a = make_service(
+            provider_a.clone(),
+            Some("signature-a"),
+            Arc::new(BackgroundTaskRunner::new()),
+        );
+        let mut service_b = make_service(
+            provider_b.clone(),
+            Some("signature-b"),
+            Arc::new(BackgroundTaskRunner::new()),
+        );
+        service_a.query_embedding_cache = shared_cache.clone();
+        service_b.query_embedding_cache = shared_cache;
+
+        service_a
+            .generate_query_embedding_with_background("same normalized query")
+            .await
+            .expect("first signature should produce an embedding");
+        service_b
+            .generate_query_embedding_with_background("same normalized query")
+            .await
+            .expect("second signature should produce its own embedding");
+
+        assert_eq!(provider_a.calls(), 1);
+        assert_eq!(provider_b.calls(), 1);
+    }
+
+    #[tokio::test]
     async fn query_embedding_uses_cache_and_defers_inflight_tasks() {
         let provider = Arc::new(ScriptedProvider::new(4));
         let runner = Arc::new(BackgroundTaskRunner::new());
@@ -1060,13 +1248,371 @@ mod tests {
         // A new input that is already reserved as an inflight background task
         // is deferred (Ok(None)) instead of racing the provider.
         let task_key = service.background_query_task_key("deferred input");
-        assert!(runner.try_reserve(&task_key).await);
+        let _reservation = runner
+            .try_admit(&task_key, 0)
+            .expect("query retry is reserved");
         let deferred = service
             .generate_query_embedding_with_background("deferred input")
             .await
             .unwrap();
         assert!(deferred.is_none());
         assert_eq!(provider.calls(), 1);
+    }
+
+    #[tokio::test]
+    async fn fact_retry_retains_only_bounded_input_and_owns_running_work() {
+        struct BlockingProvider {
+            started: std::sync::Mutex<Option<tokio::sync::oneshot::Sender<String>>>,
+            release: Mutex<Option<tokio::sync::oneshot::Receiver<()>>>,
+        }
+
+        #[async_trait]
+        impl EmbeddingProvider for BlockingProvider {
+            fn is_enabled(&self) -> bool {
+                true
+            }
+
+            fn provider_name(&self) -> &'static str {
+                "openai-compatible"
+            }
+
+            fn dimension(&self) -> usize {
+                4
+            }
+
+            async fn embed(&self, input: &str) -> Result<Vec<f64>, MemoryError> {
+                if let Some(started) = self.started.lock().expect("started lock").take() {
+                    let _ = started.send(input.to_owned());
+                }
+                if let Some(release) = self.release.lock().await.take() {
+                    let _ = release.await;
+                }
+                Ok(vec![0.0; 4])
+            }
+        }
+
+        let namespace = "org";
+        let fact_id = "fact:123";
+        let (started_tx, started_rx) = tokio::sync::oneshot::channel();
+        let (release_tx, release_rx) = tokio::sync::oneshot::channel();
+        let runner = Arc::new(BackgroundTaskRunner::new());
+        let service = make_service(
+            Arc::new(BlockingProvider {
+                started: std::sync::Mutex::new(Some(started_tx)),
+                release: Mutex::new(Some(release_rx)),
+            }),
+            Some("signature-a"),
+            runner.clone(),
+        );
+        let input = "é".repeat(9_000);
+        let task_key = service.background_fact_task_key(namespace, fact_id);
+        let expected_retained_bytes =
+            "é".repeat(8_000).len() + namespace.len() + fact_id.len() + task_key.len();
+
+        service
+            .enqueue_background_fact_embedding(namespace.to_string(), fact_id.to_string(), input)
+            .await;
+        let provider_input = tokio::time::timeout(std::time::Duration::from_secs(5), started_rx)
+            .await
+            .expect("background fact provider call starts")
+            .expect("provider sends its input");
+
+        assert_eq!(provider_input, "é".repeat(8_000));
+        assert_eq!(
+            runner.resource_snapshot(),
+            crate::embedding::providers::task_runner::BackgroundTaskSnapshot {
+                admitted_tasks: 1,
+                running_tasks: 1,
+                retained_bytes: expected_retained_bytes,
+            }
+        );
+
+        let _ = release_tx.send(());
+        runner
+            .join_until(tokio::time::Instant::now() + std::time::Duration::from_secs(5))
+            .await
+            .expect("background fact task joins");
+        assert_eq!(
+            runner.resource_snapshot(),
+            crate::embedding::providers::task_runner::BackgroundTaskSnapshot::default()
+        );
+    }
+
+    #[tokio::test]
+    async fn multibyte_input_is_accounted_by_utf8_bytes() {
+        struct BlockingProvider {
+            started: std::sync::Mutex<Option<tokio::sync::oneshot::Sender<String>>>,
+            release: Mutex<Option<tokio::sync::oneshot::Receiver<()>>>,
+        }
+
+        #[async_trait]
+        impl EmbeddingProvider for BlockingProvider {
+            fn is_enabled(&self) -> bool {
+                true
+            }
+
+            fn provider_name(&self) -> &'static str {
+                "openai-compatible"
+            }
+
+            fn dimension(&self) -> usize {
+                4
+            }
+
+            async fn embed(&self, input: &str) -> Result<Vec<f64>, MemoryError> {
+                if let Some(started) = self.started.lock().expect("started lock").take() {
+                    let _ = started.send(input.to_owned());
+                }
+                if let Some(release) = self.release.lock().await.take() {
+                    let _ = release.await;
+                }
+                Ok(vec![0.0; 4])
+            }
+        }
+
+        let (started_tx, started_rx) = tokio::sync::oneshot::channel();
+        let (release_tx, release_rx) = tokio::sync::oneshot::channel();
+        let runner = Arc::new(BackgroundTaskRunner::new());
+        let service = make_service(
+            Arc::new(BlockingProvider {
+                started: std::sync::Mutex::new(Some(started_tx)),
+                release: Mutex::new(Some(release_rx)),
+            }),
+            Some("signature-a"),
+            runner.clone(),
+        );
+        let input = "é".repeat(12);
+        let cache_key = service.query_embedding_cache_key(&input);
+        let task_key = service.background_query_task_key(&input);
+        let expected_retained_bytes = input.len() + cache_key.len() + task_key.len();
+
+        service.enqueue_background_query_embedding(&input).await;
+        let provider_input = tokio::time::timeout(std::time::Duration::from_secs(5), started_rx)
+            .await
+            .expect("background provider call starts")
+            .expect("provider sends its input");
+
+        assert_eq!(provider_input, input);
+        assert_eq!(
+            runner.resource_snapshot().retained_bytes,
+            expected_retained_bytes
+        );
+
+        let _ = release_tx.send(());
+        runner
+            .join_until(tokio::time::Instant::now() + std::time::Duration::from_secs(5))
+            .await
+            .expect("background provider task joins");
+    }
+
+    #[tokio::test]
+    async fn long_query_uses_original_normalized_identity_not_provider_prefix() {
+        struct RecordingRemoteProvider {
+            calls: AtomicUsize,
+            background_input: std::sync::Mutex<Option<String>>,
+        }
+
+        #[async_trait]
+        impl EmbeddingProvider for RecordingRemoteProvider {
+            fn is_enabled(&self) -> bool {
+                true
+            }
+
+            fn provider_name(&self) -> &'static str {
+                "openai-compatible"
+            }
+
+            fn dimension(&self) -> usize {
+                4
+            }
+
+            async fn embed(&self, input: &str) -> Result<Vec<f64>, MemoryError> {
+                if self.calls.fetch_add(1, Ordering::SeqCst) == 0 {
+                    return Err(MemoryError::Transient("synthetic outage".to_string()));
+                }
+                *self.background_input.lock().expect("background input lock") =
+                    Some(input.to_owned());
+                Ok(vec![0.25; 4])
+            }
+        }
+
+        let provider = Arc::new(RecordingRemoteProvider {
+            calls: AtomicUsize::new(0),
+            background_input: std::sync::Mutex::new(None),
+        });
+        let runner = Arc::new(BackgroundTaskRunner::new());
+        let service = make_service(provider.clone(), Some("signature-a"), runner.clone());
+        let original = "x".repeat(8_001);
+
+        assert!(
+            service
+                .generate_query_embedding_with_background(&original)
+                .await
+                .expect("transient query failure is deferred")
+                .is_none()
+        );
+        runner
+            .join_until(tokio::time::Instant::now() + std::time::Duration::from_secs(5))
+            .await
+            .expect("background query retry joins");
+
+        assert_eq!(
+            provider
+                .background_input
+                .lock()
+                .expect("background input lock")
+                .as_deref(),
+            Some("x".repeat(8_000).as_str())
+        );
+        assert!(service.cached_query_embedding(&original).await.is_some());
+        assert!(
+            service
+                .cached_query_embedding(&"x".repeat(8_000))
+                .await
+                .is_none()
+        );
+    }
+
+    #[tokio::test]
+    async fn provider_outage_does_not_grow_admitted_resources() {
+        let runner = Arc::new(BackgroundTaskRunner::new());
+        let service = make_service(
+            Arc::new(ScriptedRemoteProvider(AtomicUsize::new(100))),
+            None,
+            runner.clone(),
+        );
+
+        assert!(
+            service
+                .generate_query_embedding_with_background("same outage query")
+                .await
+                .expect("first transient provider error is deferred")
+                .is_none()
+        );
+        assert!(
+            service
+                .generate_query_embedding_with_background("same outage query")
+                .await
+                .expect("in-flight retry avoids another provider call")
+                .is_none()
+        );
+        assert!(
+            service
+                .generate_query_embedding_with_background("same outage query")
+                .await
+                .expect("repeated outage does not enqueue another retry")
+                .is_none()
+        );
+        let snapshot = runner.resource_snapshot();
+
+        assert_eq!(snapshot.admitted_tasks, 1);
+        assert!(snapshot.running_tasks <= 1);
+        assert!(snapshot.retained_bytes <= 262_144);
+        runner.shutdown();
+        runner
+            .join_until(tokio::time::Instant::now() + std::time::Duration::from_secs(5))
+            .await
+            .expect("shutdown cancels the outage retry");
+        assert_eq!(runner.resource_snapshot(), Default::default());
+    }
+
+    #[tokio::test]
+    async fn refused_request_spawns_no_waiter() {
+        let provider = Arc::new(ScriptedRemoteProvider(AtomicUsize::new(100)));
+        let runner = Arc::new(BackgroundTaskRunner::with_limits(
+            crate::embedding::providers::task_runner::BackgroundEmbeddingLimits {
+                max_admitted_tasks: 0,
+                ..Default::default()
+            },
+        ));
+        let service = make_service(provider.clone(), None, runner.clone());
+
+        assert!(
+            service
+                .generate_query_embedding_with_background("retry refused")
+                .await
+                .expect("transient foreground failure remains deferred")
+                .is_none()
+        );
+        assert_eq!(provider.0.load(Ordering::SeqCst), 99);
+        assert_eq!(
+            runner.resource_snapshot(),
+            crate::embedding::providers::task_runner::BackgroundTaskSnapshot::default()
+        );
+
+        runner.shutdown();
+        runner
+            .join_until(tokio::time::Instant::now() + std::time::Duration::from_secs(5))
+            .await
+            .expect("refused work creates no tracked waiter");
+    }
+
+    #[tokio::test]
+    async fn query_at_background_byte_limit_is_admitted() {
+        struct PendingProvider;
+
+        #[async_trait]
+        impl EmbeddingProvider for PendingProvider {
+            fn is_enabled(&self) -> bool {
+                true
+            }
+
+            fn provider_name(&self) -> &'static str {
+                "openai-compatible"
+            }
+
+            fn dimension(&self) -> usize {
+                4
+            }
+
+            async fn embed(&self, _input: &str) -> Result<Vec<f64>, MemoryError> {
+                std::future::pending().await
+            }
+        }
+
+        let runner = Arc::new(BackgroundTaskRunner::new());
+        let service = make_service(Arc::new(PendingProvider), None, runner.clone());
+        let input = "é".repeat(32_768);
+        assert_eq!(input.len(), 65_536);
+
+        service.enqueue_background_query_embedding(&input).await;
+
+        assert_eq!(runner.resource_snapshot().admitted_tasks, 1);
+        assert!(runner.resource_snapshot().retained_bytes <= 262_144);
+        runner.shutdown();
+        runner
+            .join_until(tokio::time::Instant::now() + std::time::Duration::from_secs(5))
+            .await
+            .expect("shutdown cancels the bounded query retry");
+        assert_eq!(runner.resource_snapshot(), Default::default());
+    }
+
+    #[tokio::test]
+    async fn oversized_query_does_not_admit_background_retry() {
+        let provider = Arc::new(ScriptedRemoteProvider(AtomicUsize::new(100)));
+        let runner = Arc::new(BackgroundTaskRunner::new());
+        let service = make_service(provider.clone(), None, runner.clone());
+        let input = "é".repeat(32_769);
+
+        assert!(
+            service
+                .generate_query_embedding_with_background(&input)
+                .await
+                .expect("foreground transient failure remains deferred")
+                .is_none()
+        );
+        assert_eq!(input.len(), 65_538);
+        assert_eq!(provider.0.load(Ordering::SeqCst), 99);
+        assert_eq!(
+            runner.resource_snapshot(),
+            crate::embedding::providers::task_runner::BackgroundTaskSnapshot::default()
+        );
+
+        runner.shutdown();
+        runner
+            .join_until(tokio::time::Instant::now() + std::time::Duration::from_secs(5))
+            .await
+            .expect("no background query work remains");
     }
 
     #[tokio::test]
@@ -1105,21 +1651,17 @@ mod tests {
         let cache_key = service.query_embedding_cache_key("ttl probe");
         {
             let mut cache = service.query_embedding_cache.lock().await;
-            // Expired entry must be evicted, not served.
-            cache.put(
-                cache_key.clone(),
-                CachedQueryEmbedding {
-                    embedding: vec![1.0; 4],
-                    expires_at: std::time::Instant::now() - std::time::Duration::from_secs(1),
-                },
+            let insertion_time = std::time::Instant::now()
+                - crate::embedding::runtime::query_embedding_cache_ttl()
+                - std::time::Duration::from_secs(1);
+            assert_eq!(
+                cache.insert(cache_key.clone(), vec![1.0; 4], insertion_time),
+                crate::embedding::query_cache::QueryCacheInsertOutcome::Stored
             );
         }
         assert!(service.cached_query_embedding("ttl probe").await.is_none());
-        let mut cache = service.query_embedding_cache.lock().await;
-        assert!(
-            cache.get(&cache_key).is_none(),
-            "expired entry must be evicted"
-        );
+        let cache = service.query_embedding_cache.lock().await;
+        assert!(cache.is_empty(), "expired entry must be purged");
     }
 
     #[tokio::test]
@@ -1143,12 +1685,13 @@ mod tests {
             Some("sig-a".to_string()),
             Some("test-model".to_string()),
             Some(4),
-            Arc::new(RwLock::new(LruCache::new(
-                std::num::NonZeroUsize::new(8).unwrap(),
-            ))),
-            Arc::new(Mutex::new(LruCache::new(
-                std::num::NonZeroUsize::new(8).unwrap(),
-            ))),
+            Arc::new(RwLock::new(
+                crate::platform::context_cache::ContextCacheState::new(
+                    std::num::NonZeroUsize::new(8).unwrap(),
+                    std::num::NonZeroUsize::new(16 * 1024 * 1024).unwrap(),
+                ),
+            )),
+            make_query_cache(),
             Arc::new(BackgroundTaskRunner::new()),
         );
 

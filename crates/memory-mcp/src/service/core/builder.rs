@@ -1,7 +1,5 @@
 use std::sync::Arc;
 
-use lru::LruCache;
-
 use crate::config::SurrealConfig;
 use crate::embedding::providers::{DisabledEmbeddingProvider, EmbeddingProvider};
 use crate::embedding::runtime::EmbeddingRuntimeState;
@@ -34,7 +32,7 @@ pub struct MemoryService {
     pub(crate) embedding_similarity_threshold: f64,
     pub(crate) task_runner: Arc<crate::embedding::providers::task_runner::BackgroundTaskRunner>,
     pub(crate) query_embedding_cache:
-        Arc<tokio::sync::Mutex<LruCache<String, crate::service::CachedQueryEmbedding>>>,
+        Arc<tokio::sync::Mutex<crate::embedding::query_cache::QueryEmbeddingCacheState>>,
     pub(crate) query_logging_enabled: bool,
     pub(crate) query_log_retention_days: u32,
     pub(crate) entity_resolver: crate::knowledge::entity_resolution::EntityResolver,
@@ -78,6 +76,7 @@ pub(super) struct ServiceBuildConfig {
     pub(super) rate_limit_rps: i32,
     pub(super) rate_limit_burst: i32,
     pub(super) cache_size: usize,
+    pub(super) cache_limits: crate::config::CacheLimits,
     pub(super) embedding_similarity_threshold: f64,
 }
 
@@ -112,7 +111,7 @@ impl MemoryServiceDependencies {
             embedding_provider: Arc::new(DisabledEmbeddingProvider::new(
                 crate::config::DEFAULT_EMBEDDING_DIMENSION,
             )),
-            triple_extractor: Arc::new(RuleBasedTripleExtractor::new()),
+            triple_extractor: RuleBasedTripleExtractor::shared(),
         })
     }
 
@@ -131,7 +130,7 @@ impl MemoryServiceDependencies {
             db_client,
             entity_extractor,
             embedding_provider,
-            triple_extractor: Arc::new(RuleBasedTripleExtractor::new()),
+            triple_extractor: RuleBasedTripleExtractor::shared(),
         }
     }
 }
@@ -175,6 +174,24 @@ impl MemoryService {
         rate_limit_rps: i32,
         rate_limit_burst: i32,
     ) -> Result<Self, MemoryError> {
+        Self::new_with_cache_limits(
+            db_client,
+            active_namespace,
+            log_level,
+            rate_limit_rps,
+            rate_limit_burst,
+            crate::config::CacheLimits::profile_default(),
+        )
+    }
+
+    pub(crate) fn new_with_cache_limits(
+        db_client: Arc<dyn DbClient>,
+        active_namespace: String,
+        log_level: String,
+        rate_limit_rps: i32,
+        rate_limit_burst: i32,
+        cache_limits: crate::config::CacheLimits,
+    ) -> Result<Self, MemoryError> {
         Self::build(
             MemoryServiceDependencies::with_db_client(db_client)?,
             active_namespace,
@@ -183,6 +200,7 @@ impl MemoryService {
                 rate_limit_rps,
                 rate_limit_burst,
                 cache_size: crate::service::CONTEXT_CACHE_SIZE,
+                cache_limits,
                 embedding_similarity_threshold:
                     crate::config::DEFAULT_EMBEDDING_SIMILARITY_THRESHOLD,
             },
@@ -190,6 +208,7 @@ impl MemoryService {
     }
 
     #[allow(clippy::too_many_arguments)]
+    #[cfg_attr(not(feature = "streamable-http"), allow(dead_code))]
     pub(crate) fn new_with_embedding_provider(
         db_client: Arc<dyn DbClient>,
         active_namespace: String,
@@ -199,6 +218,31 @@ impl MemoryService {
         embedding_provider: Arc<dyn EmbeddingProvider>,
         embedding_similarity_threshold: f64,
         entity_extractor: Arc<dyn EntityExtractor>,
+    ) -> Result<Self, MemoryError> {
+        Self::new_with_embedding_provider_and_cache_limits(
+            db_client,
+            active_namespace,
+            log_level,
+            rate_limit_rps,
+            rate_limit_burst,
+            embedding_provider,
+            embedding_similarity_threshold,
+            entity_extractor,
+            crate::config::CacheLimits::profile_default(),
+        )
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    pub(crate) fn new_with_embedding_provider_and_cache_limits(
+        db_client: Arc<dyn DbClient>,
+        active_namespace: String,
+        log_level: String,
+        rate_limit_rps: i32,
+        rate_limit_burst: i32,
+        embedding_provider: Arc<dyn EmbeddingProvider>,
+        embedding_similarity_threshold: f64,
+        entity_extractor: Arc<dyn EntityExtractor>,
+        cache_limits: crate::config::CacheLimits,
     ) -> Result<Self, MemoryError> {
         Self::build(
             MemoryServiceDependencies::with_db_and_providers(
@@ -212,6 +256,7 @@ impl MemoryService {
                 rate_limit_rps,
                 rate_limit_burst,
                 cache_size: crate::service::CONTEXT_CACHE_SIZE,
+                cache_limits,
                 embedding_similarity_threshold,
             },
         )
@@ -275,7 +320,12 @@ impl MemoryService {
             entity_service,
             fact_service,
             explanation_service,
-            context_cache: Arc::new(tokio::sync::RwLock::new(LruCache::new(cache_size))),
+            context_cache: Arc::new(tokio::sync::RwLock::new(
+                crate::platform::context_cache::ContextCacheState::new(
+                    cache_size,
+                    build_config.cache_limits.context_bytes,
+                ),
+            )),
             entity_extractor: dependencies.entity_extractor,
             embedding_runtime_state: Arc::new(std::sync::RwLock::new(EmbeddingRuntimeState::new(
                 dependencies.embedding_provider,
@@ -287,9 +337,13 @@ impl MemoryService {
             task_runner: Arc::new(
                 crate::embedding::providers::task_runner::BackgroundTaskRunner::new(),
             ),
-            query_embedding_cache: Arc::new(tokio::sync::Mutex::new(LruCache::new(
-                query_embedding_cache_size,
-            ))),
+            query_embedding_cache: Arc::new(tokio::sync::Mutex::new(
+                crate::embedding::query_cache::QueryEmbeddingCacheState::new(
+                    query_embedding_cache_size,
+                    build_config.cache_limits.query_bytes,
+                    crate::embedding::runtime::query_embedding_cache_ttl(),
+                ),
+            )),
             query_logging_enabled: false,
             query_log_retention_days: crate::config::DEFAULT_QUERY_LOG_RETENTION_DAYS,
             entity_resolver: crate::knowledge::entity_resolution::EntityResolver::new(
@@ -323,6 +377,17 @@ impl MemoryService {
         self.entity_service = self.entity_service.with_outbox();
         self.fact_service = self.fact_service.with_outbox();
         self.outbox_enabled = true;
+        self
+    }
+
+    /// Install the composition-owned runner for detached embedding retries.
+    #[cfg(feature = "streamable-http")]
+    #[must_use]
+    pub(crate) fn with_background_task_runner(
+        mut self,
+        runner: Arc<crate::embedding::providers::task_runner::BackgroundTaskRunner>,
+    ) -> Self {
+        self.task_runner = runner;
         self
     }
 

@@ -369,31 +369,18 @@ pub fn install() -> Result<(), MemoryError> {
     Ok(())
 }
 
-/// How much history a summary's quantiles are computed over.
+/// Duration of one rolling summary bucket. The exporter multiplies this by
+/// [`summary_buckets`] to get the full quantile window.
 ///
-/// The exporter's default is three buckets of twenty seconds — about a minute.
-/// That is short enough that a percentile decays to nothing within a minute of
-/// the last request, which makes it useless for alerting: a rule reading
-/// "p95 above two seconds" would fire on a spike and clear before anyone could
-/// look, and a long window cannot be reconstructed from it because the
-/// observations behind it are gone.
-///
-/// Five minutes is chosen to match the shortest window the recording rules and
-/// alerts claim. A quantile can only be as old as the window the exporter was
-/// given; naming a recording rule `p95_5m` over a one-minute quantile would be
-/// a lie the panel cannot detect.
-///
-/// Buckets are *not* configured, which is what would switch the exporter from
-/// summaries to `_bucket` exposition process-wide and cost every duration
-/// metric its quantile series.
+/// Five 60-second buckets provide the five-minute history claimed by the
+/// recording rules while letting observations roll out one minute at a time.
+/// Buckets are *not* configured, which would switch the exporter from summaries
+/// to `_bucket` exposition process-wide and cost every duration metric its
+/// quantile series.
 #[cfg(feature = "prometheus")]
-pub const SUMMARY_WINDOW: std::time::Duration = std::time::Duration::from_secs(5 * 60);
+pub const SUMMARY_BUCKET_DURATION: std::time::Duration = std::time::Duration::from_secs(60);
 
-/// Number of buckets the summary window is divided into.
-///
-/// Together with [`SUMMARY_WINDOW`] this fixes the rolling width at one minute
-/// per bucket: observations roll out a minute at a time rather than all at
-/// once, so a percentile degrades gradually instead of falling off a cliff.
+/// Number of rolling buckets in each summary's quantile window.
 ///
 /// A function rather than a `const` because `NonZeroU32::new` is not const on
 /// this toolchain. The value is fixed at compile time either way, and the
@@ -419,21 +406,21 @@ pub fn summary_buckets() -> std::num::NonZeroU32 {
 /// keep the default.
 #[test]
 #[cfg(feature = "prometheus")]
-fn the_summary_window_covers_the_windows_the_rules_claim() {
+fn summary_bucket_duration_and_count_make_the_claimed_five_minute_window() {
     assert_eq!(
-        SUMMARY_WINDOW,
-        std::time::Duration::from_secs(5 * 60),
-        "the shortest latency window any recording rule names is 5m"
+        SUMMARY_BUCKET_DURATION,
+        std::time::Duration::from_secs(60),
+        "each summary bucket rolls out after one minute"
     );
-    assert!(
-        summary_buckets().get() >= 2,
-        "more than one bucket, or the window is a single step rather than a \
-         rolling one: a percentile would fall off a cliff instead of degrading"
+    assert_eq!(
+        summary_buckets().get(),
+        5,
+        "the recording rules require a five-minute rolling window"
     );
-    assert!(
-        SUMMARY_WINDOW.as_secs() / u64::from(summary_buckets().get()) <= 60,
-        "a bucket should roll out in about a minute: wider and a percentile \
-         lingers on stale observations, narrower and it is noise"
+    assert_eq!(
+        SUMMARY_BUCKET_DURATION * summary_buckets().get(),
+        std::time::Duration::from_secs(300),
+        "bucket duration is multiplied by bucket count exactly once"
     );
 }
 
@@ -554,8 +541,8 @@ pub fn shared_test_handle() -> Option<metrics_exporter_prometheus::PrometheusHan
     HANDLE
         .get_or_init(|| {
             let handle = metrics_exporter_prometheus::PrometheusBuilder::new()
-                .set_bucket_duration(SUMMARY_WINDOW)
-                .expect("SUMMARY_WINDOW is non-zero")
+                .set_bucket_duration(SUMMARY_BUCKET_DURATION)
+                .expect("SUMMARY_BUCKET_DURATION is non-zero")
                 .set_bucket_count(summary_buckets())
                 .install_recorder()
                 .ok();
@@ -605,8 +592,8 @@ pub(crate) fn listener_addr_from(raw: Option<&str>) -> Result<Option<SocketAddr>
 #[cfg(feature = "prometheus")]
 fn install_with_addr(addr: SocketAddr) -> Result<(), MemoryError> {
     metrics_exporter_prometheus::PrometheusBuilder::new()
-        .set_bucket_duration(SUMMARY_WINDOW)
-        .expect("SUMMARY_WINDOW is non-zero")
+        .set_bucket_duration(SUMMARY_BUCKET_DURATION)
+        .expect("SUMMARY_BUCKET_DURATION is non-zero")
         .set_bucket_count(summary_buckets())
         .with_http_listener(addr)
         .install()
@@ -1152,11 +1139,25 @@ pub(crate) mod tests {
         use crate::service::fs_watch::processor::ProcessOutcome;
         use crate::service::fs_watch::telemetry::FsWatchTelemetry;
 
-        // Families the HTTP middleware owns; covered by its own test.
-        const HTTP_MIDDLEWARE: [&str; 3] = [
+        // These families are written by HTTP middleware or periodic owner
+        // upkeep. Dedicated integration tests exercise those production writers
+        // rather than recording synthetic samples here.
+        const HTTP_MIDDLEWARE: [&str; 5] = [
             METRIC_HTTP_REQUESTS_TOTAL,
             METRIC_HTTP_REQUEST_DURATION_SECONDS,
             METRIC_HTTP_REQUESTS_INFLIGHT,
+            crate::shared::observability::METRIC_HTTP_PREFLIGHT_BODY_BYTES,
+            crate::shared::observability::METRIC_HTTP_PREFLIGHT_REFUSALS_TOTAL,
+        ];
+        const HTTP_OWNER_SNAPSHOT: [&str; 8] = [
+            crate::shared::observability::METRIC_HTTP_PREFLIGHT_RESERVED_REQUESTS,
+            crate::shared::observability::METRIC_HTTP_PREFLIGHT_RESERVED_BYTES,
+            crate::shared::observability::METRIC_HTTP_TENANT_RUNTIME_COUNT,
+            crate::shared::observability::METRIC_HTTP_CONTEXT_CACHE_ACCOUNTED_BYTES,
+            crate::shared::observability::METRIC_HTTP_QUERY_CACHE_ACCOUNTED_BYTES,
+            crate::shared::observability::METRIC_HTTP_BACKGROUND_EMBEDDING_ADMITTED_TASKS,
+            crate::shared::observability::METRIC_HTTP_BACKGROUND_EMBEDDING_RUNNING_TASKS,
+            crate::shared::observability::METRIC_HTTP_BACKGROUND_EMBEDDING_RETAINED_BYTES,
         ];
 
         let exposition = exposed(|| async {
@@ -1223,7 +1224,9 @@ pub(crate) mod tests {
             .iter()
             .map(|described| described.name)
             .filter(|name| {
-                !exposition.contains(&format!("# HELP {name} ")) && !HTTP_MIDDLEWARE.contains(name)
+                !exposition.contains(&format!("# HELP {name} "))
+                    && !HTTP_MIDDLEWARE.contains(name)
+                    && !HTTP_OWNER_SNAPSHOT.contains(name)
             })
             .collect();
         assert!(

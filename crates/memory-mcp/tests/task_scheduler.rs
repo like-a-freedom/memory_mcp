@@ -21,10 +21,13 @@ use memory_mcp::error::MemoryError;
 use memory_mcp::http::registry::RegistryHandle;
 use memory_mcp::http::tasks::DurableTaskTestDriver;
 use memory_mcp::http::tasks::scheduler::{
-    execute_one_task_for_test, run_task_heartbeated_for_test, scheduler_job_with_options,
+    execute_one_task_for_test, execute_one_task_with_entity_extractor_for_test,
+    run_task_heartbeated_for_test, scheduler_job_with_options,
 };
 use memory_mcp::http::tasks::state::{TASK_KIND_EXTRACT, TASK_KIND_REEMBED, TaskState, TaskStore};
 use memory_mcp::http::tasks::worker::DurableTaskStore;
+use memory_mcp::service::memory_container_shims::memory_capabilities_ingest::IngestCapability;
+use memory_mcp::storage::table_scope::{KnowledgeTables, ReleaseOwnedTable};
 use memory_mcp::storage::{BoundDbClient, DbClient, SurrealDbClient};
 
 use chrono::Utc;
@@ -137,6 +140,69 @@ async fn a_due_task_completes_after_a_successful_extraction() {
 
     let observed = h.store.load(&task_id).await.expect("load");
     assert_eq!(observed.expect("task present").state, TaskState::Completed);
+}
+
+#[tokio::test]
+async fn durable_extract_uses_the_configured_anno_input_limit()
+-> Result<(), Box<dyn std::error::Error>> {
+    let h = harness().await;
+    h.client
+        .apply_migrations_impl(&h.namespace)
+        .await
+        .expect("memory schema migrations");
+    let service = memory_mcp::service::MemoryService::new(
+        h.client.clone(),
+        h.namespace.clone(),
+        "error".to_string(),
+        100,
+        100,
+    )?;
+    let episode_id = IngestCapability::ingest_from_service(
+        &service,
+        memory_mcp::models::IngestRequest {
+            source_type: "meeting".to_string(),
+            source_id: "durable-anno-limit".to_string(),
+            content: "Alice Smith met Bob Jones".to_string(),
+            t_ref: Utc::now(),
+            t_ingested: None,
+            policy_tags: vec![],
+        },
+        None,
+    )
+    .await?;
+    let task_id = h
+        .store
+        .enqueue(
+            TASK_KIND_EXTRACT,
+            "fp-durable-anno-limit",
+            episode_params(&episode_id),
+        )
+        .await?;
+    let extractor = Arc::new(
+        memory_mcp::knowledge::entity_extraction::AnnoEntityExtractor::with_max_input_bytes(8)?,
+    );
+
+    execute_one_task_with_entity_extractor_for_test(
+        &h.store,
+        h.client.clone(),
+        &h.namespace,
+        no_faults(),
+        extractor,
+    )
+    .await?;
+
+    let task = h.store.load(&task_id).await?.expect("task row remains");
+    assert_eq!(task.state, TaskState::Failed);
+    for table in ["fact", "entity", "edge", "entity_extraction_projection"] {
+        assert!(
+            h.client
+                .select_table(KnowledgeTables::table(table), &h.namespace)
+                .await?
+                .is_empty(),
+            "oversized durable extraction must not write to {table}"
+        );
+    }
+    Ok(())
 }
 
 #[tokio::test]

@@ -136,6 +136,33 @@ pub const METRIC_HTTP_REQUEST_DURATION_SECONDS: &str = "memory_http_request_dura
 /// on-call engineer asks before anything else when latency climbs.
 pub const METRIC_HTTP_REQUESTS_INFLIGHT: &str = "memory_http_requests_inflight";
 
+/// Histogram: fully collected HTTP preflight body bytes, before JSON decoding.
+pub const METRIC_HTTP_PREFLIGHT_BODY_BYTES: &str = "memory_http_preflight_body_bytes";
+
+/// Counter: bounded HTTP preflight capacity and body-limit refusals by reason.
+pub const METRIC_HTTP_PREFLIGHT_REFUSALS_TOTAL: &str = "memory_http_preflight_refusals_total";
+
+/// Current HTTP preflight request reservations.
+pub const METRIC_HTTP_PREFLIGHT_RESERVED_REQUESTS: &str = "memory_http_preflight_reserved_requests";
+/// Current HTTP preflight byte reservations.
+pub const METRIC_HTTP_PREFLIGHT_RESERVED_BYTES: &str = "memory_http_preflight_reserved_bytes";
+/// Ready or draining tenant runtimes resident in the HTTP pool.
+pub const METRIC_HTTP_TENANT_RUNTIME_COUNT: &str = "memory_http_tenant_runtime_count";
+/// Owner-accounted context-cache bytes in resident HTTP runtimes.
+pub const METRIC_HTTP_CONTEXT_CACHE_ACCOUNTED_BYTES: &str =
+    "memory_http_context_cache_accounted_bytes";
+/// Owner-accounted query-cache bytes in resident HTTP runtimes.
+pub const METRIC_HTTP_QUERY_CACHE_ACCOUNTED_BYTES: &str = "memory_http_query_cache_accounted_bytes";
+/// Admitted tasks in the process-wide background embedding coordinator.
+pub const METRIC_HTTP_BACKGROUND_EMBEDDING_ADMITTED_TASKS: &str =
+    "memory_http_background_embedding_admitted_tasks";
+/// Running tasks in the process-wide background embedding coordinator.
+pub const METRIC_HTTP_BACKGROUND_EMBEDDING_RUNNING_TASKS: &str =
+    "memory_http_background_embedding_running_tasks";
+/// Retained bytes in the process-wide background embedding coordinator.
+pub const METRIC_HTTP_BACKGROUND_EMBEDDING_RETAINED_BYTES: &str =
+    "memory_http_background_embedding_retained_bytes";
+
 /// Measures one named stage of a pipeline.
 ///
 /// A guard rather than a pair of calls around a block, because a stage is often
@@ -413,6 +440,70 @@ pub const DESCRIPTIONS: &[MetricDescription] = &[
                only sees a non-zero value when it lands inside a request, so a \
                flat zero is the normal case and not evidence of an idle \
                server.",
+    },
+    MetricDescription {
+        name: METRIC_HTTP_PREFLIGHT_BODY_BYTES,
+        kind: MetricKind::Histogram,
+        unit: Some(metrics::Unit::Bytes),
+        help: "Bytes exposed to the HTTP preflight collector for a fully \
+               collected request body, including malformed JSON. Partial, \
+               refused, read-error and cancelled bodies are not observed.",
+    },
+    MetricDescription {
+        name: METRIC_HTTP_PREFLIGHT_REFUSALS_TOTAL,
+        kind: MetricKind::Counter,
+        unit: None,
+        help: "HTTP preflight refusals by closed reason: request capacity, \
+               aggregate byte capacity or per-body limit. Body stream errors \
+               are not capacity refusals.",
+    },
+    MetricDescription {
+        name: METRIC_HTTP_PREFLIGHT_RESERVED_REQUESTS,
+        kind: MetricKind::Gauge,
+        unit: None,
+        help: "HTTP preflight requests with a live body reservation",
+    },
+    MetricDescription {
+        name: METRIC_HTTP_PREFLIGHT_RESERVED_BYTES,
+        kind: MetricKind::Gauge,
+        unit: None,
+        help: "Bytes currently reserved in the HTTP preflight budget",
+    },
+    MetricDescription {
+        name: METRIC_HTTP_TENANT_RUNTIME_COUNT,
+        kind: MetricKind::Gauge,
+        unit: None,
+        help: "Resident ready or draining tenant runtimes",
+    },
+    MetricDescription {
+        name: METRIC_HTTP_CONTEXT_CACHE_ACCOUNTED_BYTES,
+        kind: MetricKind::Gauge,
+        unit: None,
+        help: "Owner-accounted bytes in context caches of resident runtimes",
+    },
+    MetricDescription {
+        name: METRIC_HTTP_QUERY_CACHE_ACCOUNTED_BYTES,
+        kind: MetricKind::Gauge,
+        unit: None,
+        help: "Owner-accounted bytes in query caches of resident runtimes",
+    },
+    MetricDescription {
+        name: METRIC_HTTP_BACKGROUND_EMBEDDING_ADMITTED_TASKS,
+        kind: MetricKind::Gauge,
+        unit: None,
+        help: "Background embedding tasks admitted by the process-wide coordinator",
+    },
+    MetricDescription {
+        name: METRIC_HTTP_BACKGROUND_EMBEDDING_RUNNING_TASKS,
+        kind: MetricKind::Gauge,
+        unit: None,
+        help: "Background embedding tasks currently running",
+    },
+    MetricDescription {
+        name: METRIC_HTTP_BACKGROUND_EMBEDDING_RETAINED_BYTES,
+        kind: MetricKind::Gauge,
+        unit: None,
+        help: "Bytes retained by admitted background embedding tasks",
     },
     // The families below are declared in their own modules but described here,
     // with the rest of the vocabulary: a panel author reading `/metrics` has no

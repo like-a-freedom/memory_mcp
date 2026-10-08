@@ -7,6 +7,9 @@ use super::constants::*;
 use super::helpers::parse_env;
 use crate::error::MemoryError;
 
+pub const MAX_ANNO_INPUT_BYTES: usize = 1_048_576;
+pub const DEFAULT_ANNO_MAX_INPUT_BYTES: usize = MAX_ANNO_INPUT_BYTES;
+
 /// Exact selector for `VAGOsolutions/SauerkrautLM-LFM2.5-GLiNER`.
 pub const SELECTOR_SAUKRAUT_LFM25: &str = "VAGOsolutions/SauerkrautLM-LFM2.5-GLiNER";
 
@@ -71,8 +74,8 @@ pub struct NativeGlinerConfig {
 /// understands, so irrelevant overrides are rejected structurally.
 #[derive(Debug, Clone)]
 pub enum NerExtractorConfig {
-    /// Lightweight Anno rules; no model controls.
-    Anno,
+    /// Lightweight Anno rules with their explicit whole-input byte limit.
+    Anno { max_input_bytes: usize },
     /// Regex heuristics; no model controls.
     Regex,
     /// Explicit Anno NuNER ONNX backend.
@@ -88,7 +91,7 @@ impl NerExtractorConfig {
     #[must_use]
     pub fn kind(&self) -> NerExtractorKind {
         match self {
-            Self::Anno => NerExtractorKind::Anno,
+            Self::Anno { .. } => NerExtractorKind::Anno,
             Self::Regex => NerExtractorKind::Regex,
             Self::AnnoOnnx(_) => NerExtractorKind::AnnoOnnx,
             Self::ClassicGliner(_) => NerExtractorKind::ClassicGliner,
@@ -107,7 +110,9 @@ pub struct NerConfig {
 impl Default for NerConfig {
     fn default() -> Self {
         Self {
-            extractor: NerExtractorConfig::Anno,
+            extractor: NerExtractorConfig::Anno {
+                max_input_bytes: DEFAULT_ANNO_MAX_INPUT_BYTES,
+            },
         }
     }
 }
@@ -166,6 +171,16 @@ fn parse_nonzero_usize(var_name: &str, default: usize) -> Result<usize, MemoryEr
     if value == 0 {
         return Err(MemoryError::ConfigInvalid(format!(
             "{var_name} must be greater than zero"
+        )));
+    }
+    Ok(value)
+}
+
+fn parse_anno_max_input_bytes() -> Result<usize, MemoryError> {
+    let value = parse_env::<usize>("ANNO_MAX_INPUT_BYTES")?.unwrap_or(DEFAULT_ANNO_MAX_INPUT_BYTES);
+    if !(1..=MAX_ANNO_INPUT_BYTES).contains(&value) {
+        return Err(MemoryError::ConfigInvalid(format!(
+            "ANNO_MAX_INPUT_BYTES must be between 1 and {MAX_ANNO_INPUT_BYTES}"
         )));
     }
     Ok(value)
@@ -258,6 +273,12 @@ const NATIVE_GLINER_VARS: &[&str] = &[
 ];
 
 fn reject_irrelevant_settings(kind: NerExtractorKind) -> Result<(), MemoryError> {
+    if kind != NerExtractorKind::Anno && env::var_os("ANNO_MAX_INPUT_BYTES").is_some() {
+        return Err(MemoryError::ConfigInvalid(
+            "ANNO_MAX_INPUT_BYTES is irrelevant unless NER_EXTRACTOR selects anno".to_string(),
+        ));
+    }
+
     match kind {
         NerExtractorKind::Anno | NerExtractorKind::Regex => {
             for var in MODEL_BACKED_VARS.iter().chain(NATIVE_GLINER_VARS) {
@@ -301,7 +322,9 @@ impl NerConfig {
             .unwrap_or_else(|| "anno".to_string());
 
         let extractor = match selector.as_str() {
-            "anno" => NerExtractorConfig::Anno,
+            "anno" => NerExtractorConfig::Anno {
+                max_input_bytes: parse_anno_max_input_bytes()?,
+            },
             "regex" => NerExtractorConfig::Regex,
             "anno-onnx" => NerExtractorConfig::AnnoOnnx(model_backed_config()?),
             SELECTOR_CLASSIC_GLINER => NerExtractorConfig::ClassicGliner(native_gliner_config()?),
@@ -326,6 +349,7 @@ mod tests {
 
     const NER_ENV_KEYS: &[&str] = &[
         "NER_EXTRACTOR",
+        "ANNO_MAX_INPUT_BYTES",
         "NER_CACHE_DIR",
         "NER_LABELS",
         "NER_THRESHOLD",
@@ -376,7 +400,12 @@ mod tests {
     fn empty_env_selects_lightweight_anno() {
         with_ner_env(&[], || {
             let config = NerConfig::from_env().expect("default config");
-            assert!(matches!(config.extractor, NerExtractorConfig::Anno));
+            assert!(matches!(
+                config.extractor,
+                NerExtractorConfig::Anno {
+                    max_input_bytes: DEFAULT_ANNO_MAX_INPUT_BYTES
+                }
+            ));
         });
     }
 

@@ -830,6 +830,139 @@ def technical() -> dict:
     collection.append(build_version)
     sections.append(("Collection health", collection))
 
+    preflight_panels = [
+        timeseries(
+            "Fully collected body size p95",
+            [
+                target(
+                    'memory_http_preflight_body_bytes{quantile="0.95"}',
+                    "p95",
+                )
+            ],
+            (0, 8, 12, 0),
+            "The 95th percentile of fully collected request body bytes. This is "
+            "an exporter summary, not a histogram: the family exposes quantile "
+            "lines plus `_sum` and `_count`, with no `_bucket` or `le` label. "
+            "Fully collected malformed JSON is included; partial, refused, "
+            "read-error and cancelled bodies are not.",
+            unit="bytes",
+            legend_calcs=["lastNotNull", "max"],
+        ),
+        timeseries(
+            "Preflight refusals by reason",
+            [
+                target(
+                    "sum by (reason) (rate(memory_http_preflight_refusals_total[5m]))",
+                    "{{reason}}",
+                )
+            ],
+            (12, 8, 12, 0),
+            "The rate of bounded preflight refusals. The only reasons are "
+            "`request_capacity`, `aggregate_byte_capacity` and `body_limit`; "
+            "body stream errors are not counted as capacity refusals.",
+            unit="ops",
+            legend_calcs=["mean", "max"],
+        ),
+    ]
+    reservation_panels = [
+        stat(
+            "Reserved preflight requests",
+            "memory_http_preflight_reserved_requests",
+            "short",
+            (0, 6, 8, 0),
+            "Request slots currently held while HTTP preflight collects bodies. "
+            "Refreshed by the existing upkeep worker, not by scrapes.",
+            decimals=0,
+        ),
+        stat(
+            "Reserved preflight bytes",
+            "memory_http_preflight_reserved_bytes",
+            "bytes",
+            (8, 6, 8, 0),
+            "Bytes charged to the process-wide preflight budget. This is the "
+            "reservation ledger, not exact resident body memory or RSS.",
+            decimals=0,
+        ),
+        stat(
+            "Resident tenant runtimes",
+            "memory_http_tenant_runtime_count",
+            "short",
+            (16, 6, 8, 0),
+            "Ready or draining runtimes resident in the bounded pool. Loading "
+            "slots and failed activations are not counted.",
+            decimals=0,
+        ),
+    ]
+    cache_panels = [
+        timeseries(
+            "Resident cache-accounted bytes",
+            [
+                target("memory_http_context_cache_accounted_bytes", "context cache"),
+                target("memory_http_query_cache_accounted_bytes", "query cache"),
+            ],
+            (0, 8, 24, 0),
+            "Owner-accounted context and query cache estimates summed over "
+            "resident runtimes. These owner estimates are not complete heap "
+            "accounting or process RSS.",
+            unit="bytes",
+            legend_calcs=["max", "lastNotNull"],
+        ),
+    ]
+    background_panels = [
+        timeseries(
+            "Background embedding task counts",
+            [
+                target(
+                    "memory_http_background_embedding_admitted_tasks",
+                    "admitted",
+                ),
+                target(
+                    "memory_http_background_embedding_running_tasks",
+                    "running",
+                ),
+            ],
+            (0, 8, 12, 0),
+            "Admitted and currently running work from the one process-wide "
+            "background embedding coordinator. These are not summed per tenant.",
+            unit="short",
+            legend_calcs=["max", "lastNotNull"],
+        ),
+        timeseries(
+            "Background embedding retained bytes",
+            [
+                target(
+                    "memory_http_background_embedding_retained_bytes",
+                    "retained input",
+                )
+            ],
+            (12, 8, 12, 0),
+            "Input bytes retained by admitted background embedding work in the "
+            "process-wide coordinator. This owner ledger is not full heap or RSS.",
+            unit="bytes",
+            legend_calcs=["max", "lastNotNull"],
+        ),
+    ]
+    interpretation_panels = [
+        text(
+            "How to read these gauges",
+            "These are bounded owner-accounting gauges, not process memory. They "
+            "cover only the preflight budget, resident runtime caches and the "
+            "background task coordinator; allocator retention, SDK/database "
+            "internals and other heap are outside them. **Do not add them and "
+            "call the result RSS.** Use controlled `xtask` process sampling for "
+            "`VmRSS`/`VmSwap`, and keep host/container exporter values separate.",
+            (0, 8, 24, 0),
+        ),
+    ]
+    http_memory = [
+        row("Preflight body collection", preflight_panels),
+        row("Preflight reservations and runtimes", reservation_panels),
+        row("Resident runtime caches", cache_panels),
+        row("Background embedding coordinator", background_panels),
+        row("Accounting limits", interpretation_panels),
+    ]
+    sections.append(("HTTP memory diagnostics", http_memory))
+
     jobs = [
         timeseries(
             "Scheduler passes by outcome",

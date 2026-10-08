@@ -161,34 +161,37 @@ async fn assemble_context_inner(
     };
 
     // --- Cache check ---
-    if let Some(cached) = pipeline::check_cache(ctx, &params.cache_key).await {
-        track_fact_accesses(ctx, &cached, &params.access).await;
+    let cache_generation = match pipeline::check_cache(ctx, &params.cache_key).await {
+        crate::platform::context_cache::ContextCacheLookup::Hit(cached) => {
+            track_fact_accesses(ctx, &cached, &params.access).await;
 
-        ctx.logger.log(
-            log_event(
-                "assemble_context.cache_hit",
-                json!({"namespace": params.namespace, "query": request.query}),
-                json!({"count": cached.len()}),
-                Some(&params.access),
-                None,
-                None,
-            ),
-            LogLevel::Info,
-        );
+            ctx.logger.log(
+                log_event(
+                    "assemble_context.cache_hit",
+                    json!({"namespace": params.namespace, "query": request.query}),
+                    json!({"count": cached.len()}),
+                    Some(&params.access),
+                    None,
+                    None,
+                ),
+                LogLevel::Info,
+            );
 
-        let latency_ms = started_at.elapsed().as_secs_f64() * 1000.0;
-        logging::maybe_record_query_log(
-            ctx,
-            &request,
-            &cached,
-            true,
-            latency_ms,
-            &params.access,
-            &query_log_diagnostics,
-        )
-        .await;
-        return Ok(cached);
-    }
+            let latency_ms = started_at.elapsed().as_secs_f64() * 1000.0;
+            logging::maybe_record_query_log(
+                ctx,
+                &request,
+                &cached,
+                true,
+                latency_ms,
+                &params.access,
+                &query_log_diagnostics,
+            )
+            .await;
+            return Ok(cached);
+        }
+        crate::platform::context_cache::ContextCacheLookup::Miss(generation) => generation,
+    };
 
     ctx.logger.log(
         log_event(
@@ -336,13 +339,19 @@ async fn assemble_context_inner(
     );
 
     track_fact_accesses(ctx, &results, &params.access).await;
-    pipeline::store_cache(ctx, params.cache_key.clone(), &results).await;
+    let cache_insert =
+        pipeline::store_cache(ctx, cache_generation, params.cache_key.clone(), &results).await;
+    let cache_status = match cache_insert {
+        crate::platform::context_cache::CacheInsertOutcome::Stored => "stored",
+        crate::platform::context_cache::CacheInsertOutcome::Oversized => "oversized",
+        crate::platform::context_cache::CacheInsertOutcome::StaleGeneration => "stale_generation",
+    };
 
     ctx.logger.log(
         log_event(
             "assemble_context.cache_set",
             json!({"namespace": params.namespace, "query": request.query, "budget": request.budget}),
-            json!({"count": results.len()}),
+            json!({"count": results.len(), "status": cache_status}),
             Some(&params.access),
             None,
             None,

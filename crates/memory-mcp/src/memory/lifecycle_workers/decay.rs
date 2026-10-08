@@ -24,7 +24,7 @@ pub(crate) fn spawn_decay_worker(
     active_namespace: String,
     logger: crate::logging::StdoutLogger,
     policy: crate::memory::lifecycle_workers::LifecyclePolicy,
-    claim_service: crate::knowledge::claims_policy::projection::ClaimService,
+    claim_store: Arc<dyn crate::knowledge::claims::ClaimStore>,
     interval_secs: u64,
     threshold: f64,
     half_life_days: f64,
@@ -57,7 +57,7 @@ pub(crate) fn spawn_decay_worker(
                     active_namespace: &active_namespace,
                     logger: &logger,
                     policy,
-                    claim_service: &claim_service,
+                    claim_store: Some(claim_store.clone()),
                 },
                 threshold,
                 half_life_days,
@@ -102,6 +102,9 @@ pub(crate) async fn run_decay_pass(
     half_life_days: f64,
 ) -> Result<usize, MemoryError> {
     let now = Utc::now();
+    let claim_store = service.claim_store.as_ref().ok_or_else(|| {
+        MemoryError::ConfigInvalid("lifecycle decay requires a claim store".to_string())
+    })?;
     let mut invalidated = 0;
 
     let facts = service
@@ -152,9 +155,7 @@ pub(crate) async fn run_decay_pass(
             // (fact + derived claims) to the close owner. Both `t_invalid`
             // and `t_invalid_ingested` are closed together and the reason is
             // persisted — no raw `DbClient` update here.
-            service
-                .claim_service()
-                .store
+            claim_store
                 .retract_fact_and_claims(crate::knowledge::claims::RetractFactAndClaimsRequest {
                     fact_id: &crate::models::FactId::from(fact_id),
                     retract_reason: "confidence_decay",

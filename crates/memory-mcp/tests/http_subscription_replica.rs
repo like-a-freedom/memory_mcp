@@ -254,3 +254,259 @@ async fn cross_tenant_subscription_is_rejected() {
         );
     assert!(matches!(err, memory_mcp::error::MemoryError::Auth(_)));
 }
+
+#[tokio::test]
+async fn subscription_eviction_releases_unrelated_tenant_runtime_dependencies() {
+    use std::time::Duration;
+
+    use async_trait::async_trait;
+    use axum::body::Body;
+    use http_body_util::BodyExt;
+    use memory_mcp::error::MemoryError;
+    use memory_mcp::http::config::HttpConfig;
+    use memory_mcp::http::principal::AuthenticatedPrincipal;
+    use memory_mcp::http::principal::auth::{Authenticator, RateLimiter};
+    use memory_mcp::http::principal::cache::PrincipalCache;
+    use memory_mcp::http::registry::models::{
+        Account, AccountStatus, ApiKey, ApiKeyStatus, KeyedVerifier,
+    };
+    use memory_mcp::http::registry::storage::{AccountStore, ApiKeyStore, InMemoryStore};
+    use memory_mcp::http::subscriptions::SubscriptionStore;
+    use memory_mcp::http::test_state::HttpStateTestBuilder;
+    use memory_mcp::tenancy::api::{TenantLifecycleStatus, TenantRuntimeSpec};
+    use serde_json::{Value, json};
+    use tokio::sync::Notify;
+    use tokio_util::sync::CancellationToken;
+
+    struct DropProbeSubscriptionStore {
+        started: Arc<Notify>,
+        dropped: Arc<Notify>,
+    }
+
+    impl Drop for DropProbeSubscriptionStore {
+        fn drop(&mut self) {
+            self.dropped.notify_one();
+        }
+    }
+
+    #[async_trait]
+    impl SubscriptionStore for DropProbeSubscriptionStore {
+        async fn current_sequence(&self) -> Result<u64, MemoryError> {
+            self.started.notify_one();
+            Ok(0)
+        }
+
+        async fn next_batch(
+            &self,
+            _after_sequence: u64,
+            _filter: &ValidatedSubscriptionFilter,
+        ) -> Result<Vec<TenantChangeEvent>, MemoryError> {
+            Ok(Vec::new())
+        }
+    }
+
+    let mut http_config = HttpConfig::default_for_test();
+    http_config.runtime_idle_ttl = Duration::ZERO;
+    let state = HttpStateTestBuilder::new()
+        .await
+        .with_config(http_config)
+        .build()
+        .await
+        .expect("HTTP test state builds");
+    let runtime_spec = TenantRuntimeSpec {
+        tenant_id: "tenant_subscription".to_string(),
+        namespace: "ns_subscription".to_string(),
+        database: "memory".to_string(),
+        plan_version: 1,
+        schema_version: 7,
+        status: TenantLifecycleStatus::Ready,
+    };
+    let operation = state
+        .pool
+        .acquire_spec_with_limit(&runtime_spec, 4)
+        .await
+        .expect("tenant runtime activates");
+    let runtime_weak = Arc::downgrade(operation.runtime());
+    let service_weak = Arc::downgrade(&operation.runtime().mcp_service.service());
+
+    let registry = Arc::new(InMemoryStore::default());
+    let account = Account {
+        id: "account_subscription".to_string(),
+        status: AccountStatus::Active,
+        tenant_id: "tenant_subscription".to_string(),
+        created_at: chrono::Utc::now(),
+        display_name: None,
+    };
+    let api_key = ApiKey {
+        id: "key_subscription".to_string(),
+        account_id: account.id.clone(),
+        name: "ownership test".to_string(),
+        verifier: KeyedVerifier([0; 32]),
+        status: ApiKeyStatus::Active,
+        created_at: chrono::Utc::now(),
+        expires_at: None,
+        last_used_at: None,
+        version: 0,
+    };
+    AccountStore::write_account(registry.as_ref(), &account)
+        .await
+        .expect("seed authenticated account");
+    ApiKeyStore::write_api_key(registry.as_ref(), &api_key)
+        .await
+        .expect("seed active subscription key");
+    let authenticator = Arc::new(Authenticator::new(
+        registry.clone(),
+        registry,
+        Arc::new(PrincipalCache::new(8)),
+        Vec::new(),
+        Arc::new(RateLimiter::new(8, Duration::from_secs(1), 32)),
+    ));
+    let principal = AuthenticatedPrincipal::ApiKey {
+        account: Arc::new(account),
+        key_id: api_key.id,
+    };
+
+    let store_started = Arc::new(Notify::new());
+    let store_dropped = Arc::new(Notify::new());
+    let subscription_store = Arc::new(DropProbeSubscriptionStore {
+        started: store_started.clone(),
+        dropped: store_dropped.clone(),
+    });
+    let store_weak = Arc::downgrade(&subscription_store);
+    let shutdown = CancellationToken::new();
+    let handler = operation
+        .runtime()
+        .mcp_service
+        .clone()
+        .with_tenant_id("tenant_subscription")
+        .with_durable_subscriptions(subscription_store.clone())
+        .with_subscription_authorization(principal, authenticator.clone())
+        .with_subscription_limits(4, Duration::from_secs(60));
+    drop(operation);
+    let filter = rmcp::model::SubscriptionFilter::builder()
+        .resource_subscription("ui://memory/apps/graph")
+        .build();
+    let mut params =
+        serde_json::to_value(rmcp::model::SubscriptionsListenRequestParams::new(filter))
+            .expect("serialize listen parameters");
+    params["_meta"] = json!({
+        "io.modelcontextprotocol/protocolVersion": "2026-07-28",
+        "io.modelcontextprotocol/clientInfo": {"name": "ownership-test", "version": "0.0.0"},
+        "io.modelcontextprotocol/clientCapabilities": {}
+    });
+
+    let request = axum::http::Request::builder()
+        .method("POST")
+        .uri("/mcp")
+        .header("host", "localhost")
+        .header("content-type", "application/json")
+        .header("accept", "application/json, text/event-stream")
+        .header("mcp-protocol-version", "2026-07-28")
+        .header("mcp-method", "subscriptions/listen")
+        .body(Body::from(
+            json!({
+                "jsonrpc": "2.0",
+                "id": 31,
+                "method": "subscriptions/listen",
+                "params": params
+            })
+            .to_string(),
+        ))
+        .expect("subscription request builds");
+    let response = memory_mcp::http::transport::forward_subscription_for_test(
+        handler,
+        request,
+        HttpConfig::default_for_test(),
+        shutdown.clone(),
+    )
+    .await;
+    assert_eq!(response.status(), axum::http::StatusCode::OK);
+    let mut body = response.into_body();
+    let first_frame = tokio::time::timeout(Duration::from_secs(2), body.frame())
+        .await
+        .expect("stream acknowledgment arrives")
+        .expect("the response starts an SSE stream")
+        .expect("SSE frame is valid");
+    let first_data = first_frame
+        .into_data()
+        .expect("the first SSE response is a data frame");
+    let ack = std::str::from_utf8(&first_data).expect("ack frame is UTF-8");
+    let ack_json: Value = serde_json::from_str(
+        ack.strip_prefix("data: ")
+            .expect("ack frame uses SSE data framing")
+            .trim(),
+    )
+    .expect("ack frame contains JSON");
+    assert_eq!(
+        ack_json["params"]["notifications"]["resourceSubscriptions"][0],
+        "ui://memory/apps/graph"
+    );
+    tokio::time::timeout(Duration::from_secs(2), store_started.notified())
+        .await
+        .expect("the live subscription enters its durable polling loop");
+
+    drop(subscription_store);
+    drop(authenticator);
+
+    assert_eq!(state.pool.evict_idle().await, 1);
+    assert!(
+        runtime_weak.upgrade().is_none(),
+        "idle eviction releases the prior tenant runtime"
+    );
+    assert!(
+        service_weak.upgrade().is_none(),
+        "an active stream must not retain the evicted tenant service generation"
+    );
+    let reactivated = state
+        .pool
+        .acquire_spec_with_limit(&runtime_spec, 4)
+        .await
+        .expect("same tenant runtime reactivates while subscription remains active");
+    let reactivated_service_weak = Arc::downgrade(&reactivated.runtime().mcp_service.service());
+    assert!(
+        !service_weak.ptr_eq(&reactivated_service_weak),
+        "reactivation uses a distinct tenant service generation"
+    );
+    drop(reactivated);
+    assert!(
+        store_weak.upgrade().is_some(),
+        "the stream keeps its subscription store alive while polling"
+    );
+    assert!(
+        service_weak.upgrade().is_none(),
+        "the active subscription owns its narrow dependencies, not MemoryService"
+    );
+
+    assert_eq!(state.pool.evict_idle().await, 1);
+    assert!(
+        reactivated_service_weak.upgrade().is_none(),
+        "a later idle generation is also released while the old stream is active"
+    );
+    let reactivated_again = state
+        .pool
+        .acquire_spec_with_limit(&runtime_spec, 4)
+        .await
+        .expect("the tenant can reactivate repeatedly during an older stream");
+    assert!(
+        !reactivated_service_weak.ptr_eq(&Arc::downgrade(
+            &reactivated_again.runtime().mcp_service.service()
+        )),
+        "each reactivation creates a new tenant service generation"
+    );
+    drop(reactivated_again);
+    assert_eq!(state.pool.evict_idle().await, 1);
+    assert!(
+        reactivated_service_weak.upgrade().is_none(),
+        "repeated eviction does not leave duplicate service generations alive"
+    );
+
+    shutdown.cancel();
+    tokio::time::timeout(Duration::from_secs(2), store_dropped.notified())
+        .await
+        .expect("server shutdown releases the subscription store");
+    assert!(
+        store_weak.upgrade().is_none(),
+        "the subscription store is released when its stream ends"
+    );
+    drop(body);
+}

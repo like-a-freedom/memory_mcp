@@ -154,6 +154,7 @@ impl HttpState {
             _metrics_handle,
             browser_policy_override,
             None,
+            Arc::new(crate::embedding::providers::task_runner::BackgroundTaskRunner::new()),
         )
         .await
     }
@@ -170,6 +171,7 @@ impl HttpState {
         _metrics_handle: AssembleMetrics,
         browser_policy_override: Option<crate::http::registry::models::BrowserPolicyFence>,
         deployment_policy: Option<runtime::bootstrap::DeploymentPolicy>,
+        background_task_runner: Arc<crate::embedding::providers::task_runner::BackgroundTaskRunner>,
     ) -> Result<Arc<Self>, crate::error::MemoryError> {
         // The `free` plan backs the data plane: tenants created by signup, and
         // tenants that predate this change, carry `plan_version 1`, and the data
@@ -198,6 +200,7 @@ impl HttpState {
             Arc::new(registry.clone()),
             shutdown.clone(),
             deployment_policy,
+            background_task_runner,
         ));
         // Each consumer below is handed the owner traits it uses, not the
         // registry. One handle is still built above, but nothing below reaches

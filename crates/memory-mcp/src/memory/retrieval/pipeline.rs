@@ -33,6 +33,7 @@ use super::semantic::{CollectSemanticFactsRequest, collect_semantic_facts};
 use super::temporal::{CollectTemporalFactsRequest, collect_temporal_facts, infer_temporal_window};
 use super::triple::collect_triple_facts;
 use super::types::RankedContextFact;
+use crate::platform::context_cache::{CacheGeneration, CacheInsertOutcome, ContextCacheLookup};
 use crate::platform::context_cache_key::{CacheKey, CacheView};
 
 // ─── Parameter preparation and cache operations ──────────────────────────
@@ -133,19 +134,20 @@ pub(super) async fn prepare_context_params(
 pub(super) async fn check_cache(
     service: &RetrievalContext,
     cache_key: &CacheKey,
-) -> Option<Vec<AssembledContextItem>> {
+) -> ContextCacheLookup {
     let mut cache = service.context_cache.write().await;
-    cache.get(cache_key).cloned()
+    cache.lookup(cache_key)
 }
 
 /// Stores results in the context cache.
 pub(super) async fn store_cache(
     service: &RetrievalContext,
+    generation: CacheGeneration,
     cache_key: CacheKey,
     results: &[AssembledContextItem],
-) {
+) -> CacheInsertOutcome {
     let mut cache = service.context_cache.write().await;
-    cache.put(cache_key, results.to_vec());
+    cache.insert(generation, cache_key, results)
 }
 
 /// Logs the start of context assembly.

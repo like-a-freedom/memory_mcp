@@ -40,6 +40,19 @@ impl MemoryService {
         )
     }
 
+    #[cfg(feature = "streamable-http")]
+    pub(crate) async fn retained_cache_bytes(&self) -> (usize, usize) {
+        let context_bytes = {
+            let cache = self.context_cache.read().await;
+            cache.accounted_bytes()
+        };
+        let query_bytes = {
+            let cache = self.query_embedding_cache.lock().await;
+            cache.accounted_bytes()
+        };
+        (context_bytes, query_bytes)
+    }
+
     pub(crate) fn embedding_runtime_snapshot(
         &self,
     ) -> crate::embedding::runtime::EmbeddingRuntimeState {

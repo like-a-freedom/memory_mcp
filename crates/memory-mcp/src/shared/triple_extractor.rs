@@ -77,6 +77,14 @@ impl Default for RuleBasedTripleExtractor {
 }
 
 impl RuleBasedTripleExtractor {
+    /// Returns the process-wide immutable instance for built-in production use.
+    #[must_use]
+    pub fn shared() -> std::sync::Arc<Self> {
+        static SHARED: std::sync::LazyLock<std::sync::Arc<RuleBasedTripleExtractor>> =
+            std::sync::LazyLock::new(|| std::sync::Arc::new(RuleBasedTripleExtractor::new()));
+        std::sync::Arc::clone(&SHARED)
+    }
+
     /// Create a new extractor with all built-in patterns.
     pub fn new() -> Self {
         // Patterns: list of (regex, predicate_name)
@@ -217,6 +225,33 @@ fn has_cyrillic(s: &str) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn built_in_shared_extractor_is_reused() {
+        let first = RuleBasedTripleExtractor::shared();
+        let second = RuleBasedTripleExtractor::shared();
+
+        assert!(std::sync::Arc::ptr_eq(&first, &second));
+    }
+
+    #[tokio::test]
+    async fn concurrent_shared_extractions_preserve_fact_identity_and_language() {
+        let extractor = RuleBasedTripleExtractor::shared();
+        let (english, russian) = tokio::join!(
+            extractor.extract("Alice Smith works at Acme Corp", "fact:english"),
+            extractor.extract("Иван Петров работает в Газпроме", "fact:russian"),
+        );
+        let english = english.expect("English extraction should succeed");
+        let russian = russian.expect("Russian extraction should succeed");
+
+        assert_eq!(english.len(), 1);
+        assert_eq!(english[0].source_fact_id, "fact:english");
+        assert_eq!(english[0].predicate, "works_at");
+        assert_eq!(russian.len(), 1);
+        assert_eq!(russian[0].source_fact_id, "fact:russian");
+        assert_eq!(russian[0].predicate, "works_at");
+        assert_eq!(russian[0].object, "Газпром");
+    }
 
     #[tokio::test]
     async fn extract_works_at_triple() {

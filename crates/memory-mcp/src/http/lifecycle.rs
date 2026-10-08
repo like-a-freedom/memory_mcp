@@ -147,13 +147,11 @@ async fn run_walk(
     Ok(())
 }
 
-/// Build the maintenance service for one tenant and run one pass against it.
+/// Build narrow lifecycle dependencies for one tenant and run one pass.
 ///
-/// The service is built the way the embedding backfill builds its own: the
-/// deployment's log directives, the lifecycle policy and the claim config the
-/// composition root resolved. `handles_from` reads the claim service, so a
-/// lifecycle pass that ignored the rollout stage would reconcile claims under
-/// the wrong one.
+/// This path intentionally does not construct a MemoryService: lifecycle work
+/// needs storage, logging, policy, and the claim store for decay, but not NER,
+/// embedding, retrieval, or request caches.
 async fn run_tenant(
     db: &Arc<SurrealDbClient>,
     tenant: &Tenant,
@@ -161,35 +159,46 @@ async fn run_tenant(
     pass: Pass,
 ) -> Result<(), MemoryError> {
     let namespace = tenant.namespace_binding.namespace.clone();
-    let mut service = crate::service::MemoryService::new(
-        Arc::clone(db) as Arc<dyn crate::storage::client::DbClient>,
-        namespace,
-        crate::logging::StdoutLogger::directives_from_env(),
-        100, // rate_limit_rps; a maintenance pass is not request traffic
-        100, // rate_limit_burst
-    )?;
-    service.lifecycle_config = policy.lifecycle.clone();
-    service.claim_service = service
-        .claim_service
-        .clone()
-        .with_config(policy.claim_config.clone());
+    let db_client = Arc::clone(db) as Arc<dyn crate::storage::DbClient>;
+    let log_level = crate::logging::StdoutLogger::directives_from_env();
+    let logger = crate::logging::StdoutLogger::new(&log_level);
+    let handles = match pass {
+        Pass::Decay => {
+            let claim_store: Arc<dyn crate::knowledge::claims::ClaimStore> =
+                Arc::new(crate::knowledge::claims::SurrealClaimStore::new(
+                    db_client.clone(),
+                    namespace.clone(),
+                ));
+            crate::bootstrap::http_maintenance::lifecycle_handles(
+                db_client,
+                &namespace,
+                &logger,
+                &policy.lifecycle,
+                claim_store,
+            )
+        }
+        Pass::ArchivalAndCommunity => {
+            crate::bootstrap::http_maintenance::lifecycle_handles_without_claim_store(
+                db_client,
+                &namespace,
+                &logger,
+                &policy.lifecycle,
+            )
+        }
+    };
 
     match pass {
         Pass::Decay => {
-            crate::platform::lifecycle_runtime::decay_pass(
-                &service,
+            crate::memory::api::run_decay(
+                &handles,
                 policy.lifecycle.decay_confidence_threshold,
                 policy.lifecycle.decay_half_life_days,
             )
             .await?;
         }
         Pass::ArchivalAndCommunity => {
-            crate::platform::lifecycle_runtime::archival_pass(
-                &service,
-                policy.lifecycle.archival_age_days,
-            )
-            .await?;
-            crate::platform::lifecycle_runtime::run_community_rebuild_pass(&service).await?;
+            crate::memory::api::run_archival(&handles, policy.lifecycle.archival_age_days).await?;
+            crate::memory::api::rebuild_communities(&handles).await?;
         }
     }
     Ok(())
@@ -201,6 +210,8 @@ mod tests {
     use crate::http::registry::RegistryHandle;
     use crate::http::registry::models::{NamespaceBinding, Tenant, TenantStatus};
     use crate::storage::client::{DbClient, SurrealDbClient};
+    use crate::storage::table_scope::ReleaseOwnedTable;
+    use std::process::Command;
 
     fn tenant(namespace: &str) -> Tenant {
         Tenant {
@@ -224,6 +235,7 @@ mod tests {
             embedding: None,
             entity_extractor: None,
             lifecycle,
+            cache_limits: crate::config::CacheLimits::profile_default(),
             auto_recovery: false,
             query_logging_enabled: false,
             query_log_retention_days: crate::config::DEFAULT_QUERY_LOG_RETENTION_DAYS,
@@ -299,6 +311,259 @@ mod tests {
             .expect("read fact")
             .expect("fact exists");
         fact.get("t_invalid").is_some()
+    }
+
+    #[tokio::test]
+    async fn http_decay_retracts_claims_atomically_without_extractor_construction() {
+        const PROBE: &str = "MEMORY_HTTP_LIFECYCLE_TEST_PROBE";
+        if std::env::var_os(PROBE).is_some() {
+            let namespace = "tns_lifecycle_no_ner";
+            let (_registry, db) = provision(namespace).await;
+            seed_decayed_fact(&db, namespace, "fact:lifecycle_no_ner").await;
+
+            let result = run_tenant(
+                &db,
+                &tenant(namespace),
+                &policy(decay_enabled()),
+                Pass::Decay,
+            )
+            .await;
+            assert!(
+                result.is_ok(),
+                "HTTP decay must not initialize unrelated NER configuration: {result:?}"
+            );
+            let stored = db
+                .select_one("fact:lifecycle_no_ner", namespace)
+                .await
+                .expect("read retracted fact")
+                .expect("fact remains stored for audit");
+            assert!(stored.get("t_invalid").is_some());
+            assert!(stored.get("t_invalid_ingested").is_some());
+            return;
+        }
+
+        let output =
+            Command::new(std::env::current_exe().expect("unit-test executable is available"))
+                .env_clear()
+                .env(PROBE, "1")
+                .env("ENTITY_FUZZY_THRESHOLD", "not-a-number")
+                .arg("http_decay_retracts_claims_atomically_without_extractor_construction")
+                .output()
+                .expect("isolated lifecycle probe should start");
+        assert!(
+            output.status.success(),
+            "isolated lifecycle probe failed:\n{}\n{}",
+            String::from_utf8_lossy(&output.stdout),
+            String::from_utf8_lossy(&output.stderr)
+        );
+    }
+
+    #[tokio::test]
+    async fn http_archival_remains_namespace_scoped_without_ner_dependency() {
+        const PROBE: &str = "MEMORY_HTTP_ARCHIVAL_TEST_PROBE";
+        if std::env::var_os(PROBE).is_some() {
+            let registry = RegistryHandle::in_memory_with_default_mem_engine().await;
+            let engine = registry
+                .tenant_engine_optional()
+                .expect("in-memory tenant engine is wired");
+            let db_a = engine.clone().bind_to_test_namespace("ns_archive_a").await;
+            let db_b = engine.bind_to_test_namespace("ns_archive_b").await;
+            for (db, namespace) in [(&db_a, "ns_archive_a"), (&db_b, "ns_archive_b")] {
+                db.apply_migrations(namespace)
+                    .await
+                    .expect("tenant migrations apply");
+            }
+            for (db, namespace, episode_id, source_id, age_days) in [
+                (&db_a, "ns_archive_a", "episode:old", "old-source", 150),
+                (&db_b, "ns_archive_b", "episode:recent", "recent-source", 10),
+            ] {
+                let timestamp = crate::shared::temporal::normalize_dt(
+                    chrono::Utc::now() - chrono::Duration::days(age_days),
+                );
+                db.create(
+                    episode_id,
+                    serde_json::json!({
+                        "episode_id": episode_id,
+                        "source_type": "meeting",
+                        "source_id": source_id,
+                        "content": "synthetic archival fixture",
+                        "t_ref": timestamp,
+                        "t_ingested": timestamp,
+                        "scope": namespace,
+                        "visibility_scope": "public",
+                        "policy_tags": [],
+                        "status": "active",
+                        "archived_at": null,
+                    }),
+                    namespace,
+                    crate::memory::queries::EPISODE_TEMPORAL_FIELDS,
+                )
+                .await
+                .expect("seed episode");
+            }
+
+            let result = run_tenant(
+                &db_a,
+                &tenant("ns_archive_a"),
+                &policy(decay_enabled()),
+                Pass::ArchivalAndCommunity,
+            )
+            .await;
+            assert!(
+                result.is_ok(),
+                "HTTP archival must not initialize unrelated NER configuration: {result:?}"
+            );
+            let old = db_a
+                .select_one("episode:old", "ns_archive_a")
+                .await
+                .expect("read old episode")
+                .expect("old episode remains present");
+            let recent = db_b
+                .select_one("episode:recent", "ns_archive_b")
+                .await
+                .expect("read recent episode")
+                .expect("recent episode remains present");
+            assert_eq!(old.get("status"), Some(&serde_json::json!("archived")));
+            assert_eq!(recent.get("status"), Some(&serde_json::json!("active")));
+            return;
+        }
+
+        let output =
+            Command::new(std::env::current_exe().expect("unit-test executable is available"))
+                .env_clear()
+                .env(PROBE, "1")
+                .env("ENTITY_FUZZY_THRESHOLD", "not-a-number")
+                .arg("http_archival_remains_namespace_scoped_without_ner_dependency")
+                .output()
+                .expect("isolated archival probe should start");
+        assert!(
+            output.status.success(),
+            "isolated archival probe failed:\n{}\n{}",
+            String::from_utf8_lossy(&output.stdout),
+            String::from_utf8_lossy(&output.stderr)
+        );
+    }
+
+    #[tokio::test]
+    async fn http_community_rebuild_preserves_result_identity_and_summary() {
+        const PROBE: &str = "MEMORY_HTTP_COMMUNITY_TEST_PROBE";
+        if std::env::var_os(PROBE).is_some() {
+            let namespace = "tns_http_community_narrow";
+            let (_registry, db) = provision(namespace).await;
+            let entities = [
+                ("entity:community_alice", "Alice Smith"),
+                ("entity:community_bob", "Bob Jones"),
+                ("entity:community_carol", "Carol White"),
+            ];
+            for (entity_id, canonical_name) in entities {
+                db.create(
+                    entity_id,
+                    serde_json::json!({
+                        "entity_id": entity_id,
+                        "entity_type": "person",
+                        "canonical_name": canonical_name,
+                        "canonical_name_normalized": crate::shared::search::normalize_text(canonical_name),
+                        "aliases": [],
+                    }),
+                    namespace,
+                    crate::knowledge::queries::ENTITY_TEMPORAL_FIELDS,
+                )
+                .await
+                .expect("seed entity");
+            }
+            let graph =
+                crate::knowledge::graph_store::KnowledgeGraphStore::new(db.clone(), namespace);
+            let t_valid = crate::shared::temporal::normalize_dt(chrono::Utc::now());
+            for (edge_id, from_id, to_id) in [
+                (
+                    "edge:community-alice-bob",
+                    "entity:community_alice",
+                    "entity:community_bob",
+                ),
+                (
+                    "edge:community-bob-carol",
+                    "entity:community_bob",
+                    "entity:community_carol",
+                ),
+            ] {
+                graph
+                    .relate_edge(
+                        edge_id,
+                        from_id,
+                        to_id,
+                        serde_json::json!({
+                            "edge_id": edge_id,
+                            "relation": "knows",
+                            "origin": "inferred",
+                            "strength": 1.0,
+                            "confidence": 0.8,
+                            "provenance": {},
+                            "t_valid": t_valid,
+                            "t_ingested": t_valid,
+                        }),
+                    )
+                    .await
+                    .expect("seed edge");
+            }
+
+            let result = run_tenant(
+                &db,
+                &tenant(namespace),
+                &policy(decay_enabled()),
+                Pass::ArchivalAndCommunity,
+            )
+            .await;
+            assert!(
+                result.is_ok(),
+                "HTTP community rebuild must not initialize unrelated NER configuration: {result:?}"
+            );
+            let before = db
+                .select_table(
+                    crate::storage::table_scope::KnowledgeTables::table("community"),
+                    namespace,
+                )
+                .await
+                .expect("read rebuilt community");
+            assert_eq!(before.len(), 1);
+            let community_id = before[0]["community_id"].clone();
+            let summary = before[0]["summary"].clone();
+            assert_eq!(summary, "Alice Smith, Bob Jones, Carol White");
+
+            run_tenant(
+                &db,
+                &tenant(namespace),
+                &policy(decay_enabled()),
+                Pass::ArchivalAndCommunity,
+            )
+            .await
+            .expect("second HTTP maintenance pass succeeds");
+            let after = db
+                .select_table(
+                    crate::storage::table_scope::KnowledgeTables::table("community"),
+                    namespace,
+                )
+                .await
+                .expect("read rebuilt community again");
+            assert_eq!(after.len(), 1);
+            assert_eq!(after[0]["community_id"], community_id);
+            assert_eq!(after[0]["summary"], summary);
+            return;
+        }
+
+        let output =
+            Command::new(std::env::current_exe().expect("unit-test executable is available"))
+                .env_clear()
+                .env(PROBE, "1")
+                .env("ENTITY_FUZZY_THRESHOLD", "not-a-number")
+                .arg("http_community_rebuild_preserves_result_identity_and_summary")
+                .output()
+                .expect("isolated community probe should start");
+        assert!(
+            output.status.success(),
+            "isolated community probe failed:\n{}\n{}",
+            String::from_utf8_lossy(&output.stdout),
+            String::from_utf8_lossy(&output.stderr)
+        );
     }
 
     /// The whole point of the job: an enabled deployment runs decay over the

@@ -378,6 +378,7 @@ mod tests {
             }),
             entity_extractor: None,
             lifecycle: crate::config::LifecycleConfig::default(),
+            cache_limits: crate::config::CacheLimits::profile_default(),
             auto_recovery,
             query_logging_enabled: false,
             query_log_retention_days: crate::config::DEFAULT_QUERY_LOG_RETENTION_DAYS,

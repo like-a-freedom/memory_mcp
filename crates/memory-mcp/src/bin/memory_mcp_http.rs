@@ -36,14 +36,14 @@ async fn main() -> ExitCode {
         eprintln!("{msg}");
         return ExitCode::from(2);
     }
-    let runtime = match bootstrap::build_state(&cfg, &logger).await {
+    let mut runtime = match bootstrap::build_state(&cfg, &logger).await {
         Ok(r) => r,
         Err((code, msg)) => {
             eprintln!("{msg}");
             return code;
         }
     };
-    let state = runtime.state;
+    let state = runtime.state.clone();
 
     #[cfg(feature = "test-fixtures")]
     if let Err(err) = memory_mcp::http::test_bootstrap::apply_test_bootstrap(&state).await {
@@ -79,6 +79,7 @@ async fn main() -> ExitCode {
     .map(|hooks| {
         let task_options =
             memory_mcp::http::runtime::storage::RuntimeOptions::from_http_config(&cfg)
+                .with_cache_limits(runtime.deployment_policy.cache_limits)
                 .with_fault_injector(runtime.fault_injector.clone());
         // The app-session pass walks the durable session table, which only
         // exists under `mcp-apps` (`runtime/storage.rs` wires the durable
@@ -154,15 +155,29 @@ async fn main() -> ExitCode {
         }
     };
     bootstrap::emit_startup_log(&logger, &cfg);
-    let server_result = server::serve(cfg, router, state.shutdown.clone()).await;
+    let background_cleanup_grace = cfg.shutdown_grace;
+    let serve_result = server::serve(cfg, router, state.shutdown.clone()).await;
     state.admission.close();
     state.shutdown.begin();
     scheduler.join().await;
-    match server_result {
-        Ok(()) => ExitCode::SUCCESS,
+    let background_cleanup = runtime
+        .join_background_tasks(tokio::time::Instant::now() + background_cleanup_grace)
+        .await;
+
+    match serve_result {
         Err(err) => {
             eprintln!("server error: {err}");
+            if let Err(cleanup_error) = background_cleanup {
+                eprintln!("background cleanup error after server failure: {cleanup_error}");
+            }
             ExitCode::FAILURE
         }
+        Ok(()) => match background_cleanup {
+            Ok(()) => ExitCode::SUCCESS,
+            Err(err) => {
+                eprintln!("background cleanup error: {err}");
+                ExitCode::FAILURE
+            }
+        },
     }
 }

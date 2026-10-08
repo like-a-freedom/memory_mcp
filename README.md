@@ -1005,6 +1005,7 @@ operator configuration and are listed under
 | --- | --- | --- | --- |
 | `ALLOWED_HOSTS` | HTTP ingress | Yes | [Streamable HTTP](#streamable-http-environment-variables) |
 | `ALLOWED_ORIGINS` | HTTP ingress | Yes | [Streamable HTTP](#streamable-http-environment-variables) |
+| `ANNO_MAX_INPUT_BYTES` | NER | No | [Advanced runtime overrides](#advanced-runtime-overrides) |
 | `EMBEDDINGS_API_KEY` | Embeddings | No | [Advanced runtime overrides](#advanced-runtime-overrides) |
 | `EMBEDDINGS_AUTO_RECOVERY` | Embeddings | No | [Advanced runtime overrides](#advanced-runtime-overrides) |
 | `EMBEDDINGS_BASE_URL` | Embeddings | No | [Advanced runtime overrides](#advanced-runtime-overrides) |
@@ -1030,6 +1031,8 @@ operator configuration and are listed under
 | `MEMORY_CLAIM_INLINE_BUDGET_MS` | Claim reconciliation | No | [Advanced runtime overrides](#advanced-runtime-overrides) |
 | `MEMORY_CLAIM_INLINE_CANDIDATE_LIMIT` | Claim reconciliation | No | [Advanced runtime overrides](#advanced-runtime-overrides) |
 | `MEMORY_CLAIM_ROLLOUT_STAGE` | Claim reconciliation | No | [Advanced runtime overrides](#advanced-runtime-overrides) |
+| `MEMORY_CONTEXT_CACHE_BYTES` | Memory cache | No | [Advanced runtime overrides](#advanced-runtime-overrides) |
+| `MEMORY_QUERY_EMBEDDING_CACHE_BYTES` | Memory cache | No | [Advanced runtime overrides](#advanced-runtime-overrides) |
 | `MEMORY_HOOK_CONTENT` | Hooks | No | [Agent memory lifecycle hooks](#agent-memory-lifecycle-hooks) |
 | `MEMORY_HOOK_MAX_TRANSCRIPT_LINES` | Hooks | No | [Agent memory lifecycle hooks](#agent-memory-lifecycle-hooks) |
 | `MEMORY_HOOK_POLICY_TAGS` | Hooks | No | [Agent memory lifecycle hooks](#agent-memory-lifecycle-hooks) |
@@ -1067,6 +1070,8 @@ operator configuration and are listed under
 | `MEMORY_MCP_HTTP_OPERATOR_IDENTITIES` | HTTP auth | No | [Streamable HTTP](#streamable-http-environment-variables) |
 | `MEMORY_MCP_HTTP_PER_TENANT_REQUEST_CONCURRENCY` | Plan limits | Conditional | [Streamable HTTP](#streamable-http-environment-variables) |
 | `MEMORY_MCP_HTTP_POOL_CAP` | HTTP limits | No | [Streamable HTTP](#streamable-http-environment-variables) |
+| `MEMORY_MCP_HTTP_PREFLIGHT_BYTES` | HTTP limits | No | [Streamable HTTP](#streamable-http-environment-variables) |
+| `MEMORY_MCP_HTTP_PREFLIGHT_REQUEST_LIMIT` | HTTP limits | No | [Streamable HTTP](#streamable-http-environment-variables) |
 | `MEMORY_MCP_HTTP_PUBLIC_BASE_URL` | HTTP ingress | Yes | [Streamable HTTP](#streamable-http-environment-variables) |
 | `MEMORY_MCP_HTTP_REQUEST_DEADLINE_SECS` | HTTP limits | No | [Streamable HTTP](#streamable-http-environment-variables) |
 | `MEMORY_MCP_HTTP_REPLICA_ID` | HTTP limits | No | [Streamable HTTP](#streamable-http-environment-variables) |
@@ -1187,6 +1192,8 @@ The following settings are optional for power users. They are read by the same e
 | --- | --- | --- | --- |
 | `RUST_LOG` | string | `info` | Logging level. A comma-separated list of directives: a bare level (`trace`, `debug`, `info`, `warn`, `error`; `warning` aliases `warn`) sets the default, and `prefix=level` sets it for the events whose `op` starts with that prefix at a dot boundary. The most specific prefix wins, and an unparseable directive is ignored rather than taking the rest of the list with it. An unknown level falls back to `info`. Example: `RUST_LOG=info,oidc=debug,ner=warn` turns the OIDC callback up without turning up the extraction pipeline. It selects this service's events only: third-party `tracing` output (the embedded database, HTTP clients) is capped at `warn` and is not raised by this variable |
 | `MEMORY_LOG_FORMAT` | `text` \| `json` | `text` | Output encoding. `text` is the single human-readable line; `json` is newline-delimited JSON, one object per event, for a log collector. Read at startup, in **both** profiles; an unknown value falls back to `text` |
+| `MEMORY_CONTEXT_CACHE_BYTES` | positive unsigned integer | `4194304` HTTP; `16777216` stdio/local | Maximum estimated retained bytes per context cache. HTTP applies the budget independently to each tenant runtime; stdio/local applies it to its single service. The estimate counts owned capacities and fixed node allowances, not exact RSS. Oversized results are returned normally but bypass cache retention; zero is a startup error |
+| `MEMORY_QUERY_EMBEDDING_CACHE_BYTES` | positive unsigned integer | `2097152` | Maximum estimated retained bytes in the query-embedding cache. HTTP applies the budget independently to each tenant runtime; stdio/local applies it to its single service. This is retained-size accounting, not RSS; zero is a startup error |
 | `MEMORY_LOG_COLOR` | `auto` \| `always` \| `never` | `auto` | ANSI colour. `auto` colours only when stderr is a colour-capable terminal; `always` forces it; `never` disables it. `NO_COLOR` (set and non-empty) and `TERM=dumb` also disable colour, and a file sink (`MEMORY_LOG_FILE`) is never coloured |
 | `MEMORY_LOG_TARGETS` | comma-separated `target=level` list | unset | Levels for **third-party** `tracing` output (the embedded database, HTTP clients), which is otherwise capped at `warn`. A comma-separated list of `module::path=level` directives, e.g. `surrealdb=info,tokio=warn`. Kept separate from `RUST_LOG`, which selects this service's `op` prefixes; a malformed list is ignored |
 | `MEMORY_LOG_FILE` | path | unset | Write log events to this file instead of stderr, in **both** profiles (the HTTP binary installs the sink before it reads configuration); the file is created if missing (parent directory must exist), opened in append mode, and flushed after every line; colour is disabled for the file; on open failure the process falls back to stderr with a warning |
@@ -1210,6 +1217,7 @@ The following settings are optional for power users. They are read by the same e
 | `EMBEDDINGS_AUTO_RECOVERY` | boolean | `true` | Enable automatic in-process recovery after a failed remote startup preflight; set `false` for explicit opt-out. In the **HTTP** profile this additionally gates the per-tenant backfill scheduler job — only `1`/`true`/`yes` are true, and `auto` is not. See [Streamable HTTP environment variables](#streamable-http-environment-variables) |
 | `EMBEDDINGS_SIMILARITY_THRESHOLD` | floating-point number | `0.7` | Minimum cosine similarity for semantic matches |
 | `EMBEDDINGS_API_KEY` | string | unset | Optional bearer token for OpenAI-compatible providers |
+| `ANNO_MAX_INPUT_BYTES` | integer in `1..=1048576` | `1048576` | Maximum whole-input UTF-8 byte length for `NER_EXTRACTOR=anno`. Larger input is refused without truncation or chunking; persisted oversized episodes remain stored but extraction does not write facts, entities, edges, or an extraction projection. An explicit override with another extractor is a startup error. Use `65536` for the constrained memory profile |
 | `NER_EXTRACTOR` | string enum | `anno` (unset) | Entity extraction backend selector. Closed catalog: `anno` (lightweight, download-free), `regex` (project-owned deterministic), `anno-onnx` (Anno NuNER ONNX, local-path only), `urchade/gliner_multi-v2.1` (classic Candle GLiNER), `VAGOsolutions/SauerkrautLM-LFM2.5-GLiNER` (native Candle LFM2 GLiNER). Unknown values and arbitrary repository IDs are rejected. The removed `NER_PROVIDER` and `NER_MODEL` variables fail with migration guidance if present |
 | `NER_CACHE_DIR` | path | `<data>/models/ner` | Artifact store root for model-backed extractors (Anno ONNX, classic GLiNER, VAGO LFM2) |
 | `NER_LABELS` | comma-separated list | `person`, `company`, `location`, `product`, `event`, `technology` | Runtime labels for model-backed extractors; trimmed, lowercased, deduplicated in first-declared order |
@@ -1241,6 +1249,8 @@ Read only by the `memory_mcp_http` binary built with the `streamable-http` featu
 | `ALLOWED_ORIGINS` | comma-separated list | unset | Required for production. Wildcard values are rejected; missing `Origin` is allowed only for non-browser MCP clients, present `Origin` must match |
 | `MEMORY_MCP_HTTP_TRUSTED_PROXY_CIDRS` | comma-separated `CIDR` list | unset | Trusted reverse-proxy CIDRs for forwarded `Host`/`Origin`; if unset, the values are ignored entirely |
 | `MEMORY_MCP_HTTP_BODY_LIMIT` | bytes | `8388608` (8 MiB) | Maximum request body size; oversized bodies return `413` |
+| `MEMORY_MCP_HTTP_PREFLIGHT_REQUEST_LIMIT` | `usize` | `20` | Process-wide concurrent MCP preflight body reservations. Admission does not wait; exhaustion returns `503` |
+| `MEMORY_MCP_HTTP_PREFLIGHT_BYTES` | bytes | `67108864` (64 MiB) | Process-wide budget for raw body bytes reserved and charged during preflight; not an RSS limit. A request that cannot reserve its declared or observed bytes returns `503` |
 | `MEMORY_MCP_HTTP_REQUEST_DEADLINE_SECS` | seconds | `120` | Ordinary request handler deadline; does not apply to `subscriptions/listen` |
 | `MEMORY_MCP_HTTP_SHUTDOWN_GRACE_SECS` | seconds | `30` | Time the server waits for in-flight requests and SSE streams during shutdown |
 
@@ -1353,6 +1363,34 @@ seconds — a longer interval would let a revoked authorization keep streaming.
 | `MEMORY_MCP_HTTP_TASK_QUEUE_CAPACITY` | `usize` | `256` | Bounded durable Task queue capacity |
 | `MEMORY_MCP_HTTP_TASK_SYNC_MAX_BYTES` | `usize` | `1048576` (1 MiB) | Preflight size limit: `extract` work above this returns a preflight rejection for clients that did not advertise Tasks |
 | `MEMORY_MCP_HTTP_REPLICA_ID` | string | unset (falls back to process PID) | Stable replica identity. Set in multi-replica deployments; the PID fallback is safe only for a single process |
+
+#### Constrained memory profile
+
+These are explicit constrained-profile values, not binary defaults or a process-RSS guarantee. The cache budgets are per resident tenant runtime; their sum can grow with the runtime pool.
+
+| Scope | Setting | Value |
+| --- | --- | --- |
+| Request body | `MEMORY_MCP_HTTP_BODY_LIMIT` | `1048576` bytes (1 MiB) |
+| Preflight admission | `MEMORY_MCP_HTTP_PREFLIGHT_REQUEST_LIMIT` | `2` requests process-wide |
+| Preflight admission | `MEMORY_MCP_HTTP_PREFLIGHT_BYTES` | `2097152` bytes process-wide |
+| Tenant runtime pool | `MEMORY_MCP_HTTP_POOL_CAP` | `2` |
+| Runtime idle eviction | `MEMORY_MCP_HTTP_RUNTIME_IDLE_TTL_SECS` | `120` seconds |
+| Subscriptions | `MEMORY_MCP_HTTP_SUBSCRIPTION_LIMIT` | `2` process-wide |
+| Maintenance | `MEMORY_MCP_HTTP_MAINTENANCE_PARALLELISM` | `1` |
+| Tenant plan | `MEMORY_MCP_HTTP_PER_TENANT_REQUEST_CONCURRENCY` | `8` ordinary requests per tenant; not a process-wide or memory cap |
+| Context cache | `MEMORY_CONTEXT_CACHE_BYTES` | `4194304` bytes (4 MiB) per runtime |
+| Query embedding cache | `MEMORY_QUERY_EMBEDDING_CACHE_BYTES` | `2097152` bytes (2 MiB) per runtime |
+| Anno extraction input | `ANNO_MAX_INPUT_BYTES` | `65536` UTF-8 bytes |
+
+The process-wide background embedding runner is bounded separately: at most `8` admitted jobs, `1` running job, `262144` accounted retained bytes, and a `60`-second admission-to-completion deadline. These are runner limits, not tenant-level environment overrides.
+
+Refusals preserve the resource boundary rather than silently truncating work:
+
+- A body above `MEMORY_MCP_HTTP_BODY_LIMIT` returns HTTP `413`. A preflight slot or aggregate-byte budget refusal returns HTTP `503` immediately without waiting; when a body stream has no trustworthy declared length, a `503` may occur after observing a frame but before copying it. Under overload, that refusal can precede JSON parsing and therefore take precedence over a malformed-request `400`.
+- An Anno input above `ANNO_MAX_INPUT_BYTES` is refused as a whole: it is not truncated or chunked. If the source episode was already ingested, it remains stored, but extraction writes no facts, entities, edges, or extraction projection for that attempt.
+- An oversized context-cache result is still returned but is not retained. A rejected background embedding retry does not remove its durable fact; backfill remains the recovery path.
+
+The budgets cover only the owners named above. They do not bound every database/SDK allocation, allocator retention, total process RSS, or host/container memory. See [the HTTP memory baseline and acceptance status](docs/performance/HTTP_MEMORY_BASELINE.md) before interpreting them as a memory reduction.
 
 **Embeddings (deployment-level)**
 

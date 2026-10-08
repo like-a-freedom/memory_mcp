@@ -95,8 +95,12 @@ impl GraphSessionState {
 pub fn edge_neighbor(record: &Value, direction: GraphDirection) -> Option<String> {
     let map = record.as_object()?;
     match direction {
-        GraphDirection::Incoming => map.get("in").and_then(|v| v.as_str()).map(String::from),
-        GraphDirection::Outgoing => map.get("out").and_then(|v| v.as_str()).map(String::from),
+        GraphDirection::Incoming => map
+            .get("in")
+            .and_then(crate::storage::value_helpers::string_from_value),
+        GraphDirection::Outgoing => map
+            .get("out")
+            .and_then(crate::storage::value_helpers::string_from_value),
     }
 }
 
@@ -151,7 +155,7 @@ pub async fn graph_path_snapshot(
 
         for direction in [GraphDirection::Outgoing, GraphDirection::Incoming] {
             let records = store
-                .select_edge_neighbors(&current, &cutoff_iso, direction)
+                .select_graph_edge_neighbors(&current, &cutoff_iso, direction)
                 .await?;
             for record in records {
                 let Some(neighbor) = edge_neighbor(&record, direction) else {
@@ -223,7 +227,7 @@ pub async fn graph_neighbor_expansion(
         for node_id in &frontier {
             for graph_direction in &directions {
                 for record in store
-                    .select_edge_neighbors(node_id, &cutoff_iso, *graph_direction)
+                    .select_graph_edge_neighbors(node_id, &cutoff_iso, *graph_direction)
                     .await?
                 {
                     if let Some(neighbor) = edge_neighbor(&record, *graph_direction) {

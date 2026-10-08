@@ -1,9 +1,285 @@
 mod common;
 
 use chrono::{Duration, TimeZone, Utc};
-use memory_mcp::models::{AssembleContextRequest, Provenance};
+use memory_mcp::knowledge::{KnowledgeGraphStore, KnowledgeStoreClient};
+use memory_mcp::models::{AccessPayload, AssembleContextRequest, EdgeAttributes, Provenance};
 use memory_mcp::service::memory_container_shims::memory_capabilities_assemble_context::AssembleContextCapability;
 use memory_mcp::service::memory_container_shims::memory_capabilities_resolve::ResolveCapability;
+use memory_mcp::storage::{ContextFactQuery, DbClient, GraphDirection};
+use serde_json::json;
+
+#[tokio::test]
+async fn nonsemantic_fact_read_omits_embedding_and_preserves_recall()
+-> Result<(), Box<dyn std::error::Error>> {
+    let (service, db_client) = common::make_service_with_client().await;
+    let t_ref = Utc::now() - Duration::days(1);
+    let visible_provenance = Provenance::extraction(
+        "episode:redwood-visible",
+        "document",
+        "redwood-visible-source",
+        "manual",
+    );
+    let visible_fact_id = service
+        .add_fact(
+            "note",
+            "Redwood memory cache remains bounded to 4 MiB",
+            "Redwood memory cache remains bounded",
+            "episode:redwood-visible",
+            t_ref,
+            0.9,
+            vec![],
+            vec!["team:alpha".to_string()],
+            visible_provenance.clone(),
+        )
+        .await?;
+    let hidden_fact_id = service
+        .add_fact(
+            "note",
+            "Redwood memory cache remains bounded to 8 MiB",
+            "Redwood memory cache remains bounded",
+            "episode:redwood-hidden",
+            t_ref,
+            0.9,
+            vec![],
+            vec!["team:beta".to_string()],
+            Provenance::extraction(
+                "episode:redwood-hidden",
+                "document",
+                "redwood-hidden-source",
+                "manual",
+            ),
+        )
+        .await?;
+    for fact_id in [&visible_fact_id, &hidden_fact_id] {
+        db_client
+            .update(fact_id, json!({"embedding": vec![0.25; 1536]}), "org", &[])
+            .await?;
+    }
+
+    let store = KnowledgeStoreClient::new(db_client.clone(), "org");
+    let cutoff = (Utc::now() + Duration::seconds(1)).to_rfc3339();
+    let rows = store
+        .select_facts_filtered(ContextFactQuery {
+            cutoff: &cutoff,
+            query_contains: Some("Redwood memory"),
+            limit: 10,
+            fact_types: &[],
+        })
+        .await?;
+    assert_eq!(rows.len(), 2);
+    let visible_row = rows
+        .iter()
+        .find(|row| {
+            row.get("fact_id").and_then(serde_json::Value::as_str) == Some(visible_fact_id.as_str())
+        })
+        .expect("visible fact should be in the lexical result");
+    assert!(visible_row.get("embedding").is_none());
+    assert_eq!(visible_row.get("policy_tags"), Some(&json!(["team:alpha"])));
+    assert_eq!(
+        visible_row.get("provenance"),
+        Some(&visible_provenance.to_json_value())
+    );
+    let full_response = db_client
+        .query(
+            "SELECT * FROM fact WHERE fact_id = $fact_id",
+            Some(json!({"fact_id": visible_fact_id})),
+            "org",
+        )
+        .await?;
+    let full_rows: Vec<serde_json::Value> = serde_json::from_value(full_response)?;
+    let full_row = full_rows
+        .iter()
+        .find(|row| {
+            row.get("fact_id").and_then(serde_json::Value::as_str) == Some(visible_fact_id.as_str())
+        })
+        .expect("full fact row exists for the same synthetic fact");
+    let full_row_bytes = serde_json::to_vec(full_row)?.len();
+    let projected_row_bytes = serde_json::to_vec(visible_row)?.len();
+    assert!(
+        projected_row_bytes < full_row_bytes,
+        "projection should reduce this row's decoded JSON size: full={full_row_bytes} projected={projected_row_bytes}"
+    );
+
+    let recalled = AssembleContextCapability::assemble_context_from_service(
+        &service,
+        AssembleContextRequest {
+            query: "Redwood memory".to_string(),
+            as_of: None,
+            budget: 10,
+            fact_types: vec![],
+            view_mode: None,
+            window_start: None,
+            window_end: None,
+            access: Some(AccessPayload {
+                allowed_tags: Some(vec!["team:alpha".to_string()]),
+                caller_id: None,
+                session_vars: None,
+                transport: None,
+                content_type: None,
+            }),
+            compact: false,
+        },
+    )
+    .await?;
+
+    assert_eq!(recalled.len(), 1);
+    assert_eq!(recalled[0].fact_id, visible_fact_id);
+    assert_eq!(recalled[0].source_episode, "episode:redwood-visible");
+    assert_eq!(
+        recalled[0].content,
+        "Redwood memory cache remains bounded to 4 MiB"
+    );
+    assert_eq!(
+        recalled[0].provenance["source_id"],
+        "redwood-visible-source"
+    );
+    assert!(!recalled.iter().any(|item| item.fact_id == hidden_fact_id));
+    Ok(())
+}
+
+#[tokio::test]
+async fn graph_edge_projection_preserves_parser_fallback_identity()
+-> Result<(), Box<dyn std::error::Error>> {
+    let (service, db_client) = common::make_service_with_client().await;
+    common::seed_entity(
+        &db_client,
+        "org",
+        "entity:edge-source",
+        "person",
+        "Source Person",
+        &[],
+    )
+    .await;
+    common::seed_entity(
+        &db_client,
+        "org",
+        "entity:edge-target",
+        "person",
+        "Target Person",
+        &[],
+    )
+    .await;
+    service
+        .relate(
+            "entity:edge-source",
+            "knows",
+            "entity:edge-target",
+            EdgeAttributes::inferred(),
+        )
+        .await?;
+
+    let graph_store = KnowledgeGraphStore::new(db_client, "org");
+    let cutoff = (Utc::now() + Duration::seconds(1)).to_rfc3339();
+    let edges = graph_store
+        .select_edge_neighbors("entity:edge-source", &cutoff, GraphDirection::Outgoing)
+        .await?;
+
+    assert_eq!(edges.len(), 1);
+    let edge = &edges[0];
+    assert!(
+        edge.get("in").is_some(),
+        "fallback identity needs the in endpoint"
+    );
+    assert!(
+        edge.get("out").is_some(),
+        "fallback identity needs the out endpoint"
+    );
+    assert_eq!(
+        edge.get("relation").and_then(serde_json::Value::as_str),
+        Some("knows")
+    );
+    assert!(
+        edge.get("provenance").is_none(),
+        "graph traversal does not consume edge provenance"
+    );
+    Ok(())
+}
+
+#[tokio::test]
+async fn graph_app_expansion_preserves_edge_identity_and_details()
+-> Result<(), Box<dyn std::error::Error>> {
+    let (service, db_client) = common::make_service_with_client().await;
+    let source_id = common::resolve_entity(&service, "person", "Graph Source").await?;
+    let target_id = common::resolve_entity(&service, "person", "Graph Target").await?;
+    service
+        .relate(&source_id, "knows", &target_id, EdgeAttributes::inferred())
+        .await?;
+
+    let graph_store = KnowledgeGraphStore::new(db_client, "org");
+    let expansion = memory_mcp::service::apps::graph_neighbor_expansion(
+        &graph_store,
+        &source_id,
+        "outgoing",
+        1,
+        Utc::now() + Duration::seconds(1),
+    )
+    .await?;
+    let edge = expansion["edges"][0].clone();
+    let edge_id = edge["edge_id"].as_str().unwrap_or_else(|| {
+        panic!("graph expansion must retain the edge id used by open_edge_details: {expansion}")
+    });
+
+    assert_eq!(edge["in"], json!(source_id));
+    assert_eq!(edge["out"], json!(target_id));
+    assert_eq!(edge["origin"], json!("inferred"));
+    assert!(edge["confidence"].as_f64().is_some());
+    assert!(edge["t_valid"].as_str().is_some());
+    assert!(edge["t_ingested"].as_str().is_some());
+    let details = graph_store
+        .select_edge(edge_id)
+        .await?
+        .expect("the edge id returned by expansion must open its stored details");
+    assert_eq!(details["edge_id"], json!(edge_id));
+    Ok(())
+}
+
+#[tokio::test]
+async fn community_summary_match_returns_only_required_projection()
+-> Result<(), Box<dyn std::error::Error>> {
+    let memory = common::TestMemory::new(false).await;
+    let entity_id = "entity:redwood-member".to_string();
+    common::seed_entity(
+        &memory.db_client,
+        "org",
+        &entity_id,
+        "project",
+        "Redwood",
+        &[],
+    )
+    .await;
+    common::seed_community(
+        &memory.db_client,
+        "org",
+        "community:redwood",
+        &[entity_id],
+        "Redwood memory cache cluster",
+        Utc::now(),
+    )
+    .await;
+    let store = KnowledgeStoreClient::new(memory.db_client.clone(), "org");
+
+    let rows = store
+        .select_communities_matching_summary("Redwood memory")
+        .await?;
+
+    assert_eq!(rows.len(), 1);
+    let row = rows[0]
+        .as_object()
+        .expect("community query returns object rows");
+    assert_eq!(row.len(), 5);
+    assert_eq!(
+        row.get("community_id").and_then(serde_json::Value::as_str),
+        Some("community:redwood")
+    );
+    assert_eq!(
+        row.get("summary").and_then(serde_json::Value::as_str),
+        Some("Redwood memory cache cluster")
+    );
+    assert!(row.get("member_entities").is_some());
+    assert!(row.get("updated_at").is_some());
+    assert!(row.get("ft_score").is_some());
+    Ok(())
+}
 
 /// Integration test: verifies that multi-word queries work through the full
 /// SurrealDB stack (embedded) with the configured full-text analyzer.

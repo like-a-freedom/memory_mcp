@@ -3,6 +3,8 @@
 #[cfg(feature = "control-plane")]
 use std::sync::Arc;
 
+#[cfg(feature = "streamable-http")]
+pub(crate) mod http_maintenance;
 #[cfg(feature = "control-plane")]
 pub mod integration;
 pub mod stdio;

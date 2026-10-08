@@ -13,11 +13,10 @@ inside them: filesystem ingestion, the stdio-only watcher, is the worked example
 and the seven `memory_fs_watch_*` families are named in the checker with that
 reason instead of being quietly skipped.
 
-Everything here is generated or checked. The dashboards are built by
-`build_dashboards.py`, and three checkers stand in for `promtool`, which is
-not installed and wants a `sudo chown` of the whole Homebrew prefix to be.
-None of them can go stale: each reads the metric list out of the Rust sources
-rather than keeping its own copy.
+Everything here is generated or checked. `build_dashboards.py` regenerates the
+JSON, three checkers validate the rules, alerts and panels against Rust exports,
+and a standard-library `unittest` suite exercises the external metric contract.
+Run `cargo run -p xtask -- check-observability` to execute the full gate.
 
 ```
 observability/
@@ -33,8 +32,10 @@ observability/
 ├── build_dashboards.py     regenerates the two JSON files
 ├── check_rules.py          every rule reads a metric and a label value that exist
 ├── check_alerts.py         every alert is routable and names a real metric
-└── check_dashboards.py     every panel reads a real series, and no family is
-                            read by nothing
+├── check_dashboards.py     every panel reads a real series, external selectors
+                            fail closed, and no family is read by nothing
+└── tests/
+    └── test_external_metrics.py  synthetic contract and nested-row regressions
 ```
 
 ## Getting it running
@@ -85,7 +86,11 @@ is `localhost:8080` for a service on the host, or
 
 Scrape at 15 s in both: the summary window is five minutes, so a shorter
 interval buys resolution the window cannot hold, and a longer one misses the
-spikes the quantiles are computed over.
+spikes the quantiles are computed over. The HTTP process advances the exporter's
+summary buckets every five seconds independently of scraping; `/metrics` is not
+the clock that expires old observations. On shutdown, the process cancels and
+joins this upkeep task alongside detached embedding work after the HTTP server
+drain.
 
 Then import the two dashboards (Dashboards → New → Import → upload the JSON).
 Alerting is deliberately not configured here — where alerts go is a
@@ -99,7 +104,22 @@ python3 observability/build_dashboards.py
 python3 observability/check_rules.py
 python3 observability/check_dashboards.py
 python3 observability/check_alerts.py
+python3 observability/tests/test_external_metrics.py
 ```
+
+## External metric boundary
+
+`node_exporter` reports host-level resources; cAdvisor reports container-level
+resources. Neither source measures this process's `VmRSS`, `VmSwap`, or Rust
+heap attribution. Process-level memory evidence must come from the controlled
+Linux `xtask` sampler and workload protocol, not from host/container panels.
+
+The secured VictoriaMetrics inventory has not verified safe external metric
+families and selectors, so no external contract or exporter-backed dashboard
+panels are checked in. The checker rejects external families until a verified
+contract is supplied; synthetic unit fixtures validate that fail-closed
+behavior but are not evidence about a live deployment. A direct exporter
+access failure does not establish that a series is absent from VictoriaMetrics.
 
 ## Which dashboard answers which question
 
@@ -110,6 +130,7 @@ python3 observability/check_alerts.py
 | What is failing? | technical → *Helicopter view — what is failing* |
 | Is anything still running? | technical → *Helicopter view — is it still running* |
 | Is anything being collected at all? | technical → *Collection health* |
+| What does the HTTP process account for in its bounded owners? | technical → *HTTP memory diagnostics* |
 | What is slow? | technical → *HTTP latency* → *p95 by route* |
 | Is it getting slower, or was it always slow? | technical → *HTTP latency* → *Latency percentiles over time* |
 | Why is it slow? | technical → *Pipeline stages* |
@@ -128,6 +149,11 @@ python3 observability/check_alerts.py
 The technical dashboard is ordered RED — rate, errors, duration above the
 fold, saturation below — because that is the order an on-call engineer reads
 in. Every row below the overview explains one of the four numbers above it.
+The *HTTP memory diagnostics* row follows collection health. It charts the
+preflight summary/refusal metrics and the bounded owner gauges; those gauges are
+not complete heap accounting or process RSS. Host/container panels remain absent
+until Task 15's external metric inventory has verified safe selectors. Use the
+controlled process sampler for `VmRSS`/`VmSwap`.
 
 The product dashboard has **no latency percentiles at all**. Its reader's
 questions are whether the memory is growing, how old it is, whether people are
@@ -323,9 +349,36 @@ the application. They are host and container figures, not application ones:
 `node_exporter` and `cAdvisor` already report them on their own dashboards, and
 a second copy inside this exposition would be a number kept in two places to
 keep in sync. So a latency spike is correlated against those dashboards rather
-than against a panel here, and the *Saturation* row carries what the
+rather than against a panel here, and the *Saturation* row carries what the
 application itself can saturate on — in-flight requests — which is the signal
 those dashboards do not have.
+
+**HTTP preflight and resource metrics.** `memory_http_preflight_body_bytes` is a
+no-label summary of fully collected request bodies, including malformed JSON;
+partial, refused, read-error and cancelled bodies are excluded.
+`memory_http_preflight_refusals_total` counts only the closed reasons
+`request_capacity`, `aggregate_byte_capacity` and `body_limit`.
+
+The HTTP profile also samples preflight reservations, resident tenant runtimes,
+cache-accounted bytes and process-wide background embedding task counts/bytes on
+the existing five-second upkeep tick:
+
+| Metric | Meaning |
+| --- | --- |
+| `memory_http_preflight_reserved_requests` | Body collectors currently holding a request reservation |
+| `memory_http_preflight_reserved_bytes` | Bytes charged to the shared preflight budget; not exact resident body memory |
+| `memory_http_tenant_runtime_count` | Ready or draining runtimes resident in the bounded pool |
+| `memory_http_context_cache_accounted_bytes` | Context-cache owner estimates summed across resident runtimes |
+| `memory_http_query_cache_accounted_bytes` | Query-cache owner estimates summed across resident runtimes |
+| `memory_http_background_embedding_admitted_tasks` | Admitted tasks in the one process-wide embedding coordinator |
+| `memory_http_background_embedding_running_tasks` | Currently running tasks in that coordinator |
+| `memory_http_background_embedding_retained_bytes` | Input bytes retained by admitted tasks in that coordinator |
+
+These are no-label gauges: they contain no tenant or cache payload identity, and
+they cover only resources represented by those owners. They are not complete heap
+accounting, process RSS, swap, or a proxy for either. Use the controlled `xtask`
+process sampler and host/container exporters for those separate measurement
+levels; do not add the owner gauges together and call the result RSS.
 
 **No per-tenant label.** A tenant label is unbounded in cardinality — it is one
 series per tenant, forever. The tenant fingerprint is in the logs, which is
@@ -404,6 +457,10 @@ RocksDB store, serving real requests, rather than reasoned about:
   lifecycle inventory is a gauge (`memory_operation_stock`), so opening a
   dashboard cannot inflate a counter.
 - Every family that appeared carried its `# HELP` line.
+- After the upkeep tick, all eight HTTP resource gauges appear with `# HELP` and
+  `# TYPE` metadata, including zero-valued owners; the gauges are refreshed
+  without a scrape and the preflight reservation gauge returns to zero after its
+  reservation is released.
 
 The claim families need traffic that exercises claim reconciliation before
 they appear, which is why a fresh server's exposition carries the HTTP and

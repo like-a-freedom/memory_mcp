@@ -154,11 +154,16 @@ pub async fn mcp_handler(
                 state.config.subscription_auth_recheck,
             );
     }
-    let svc = build_mcp_service(
-        move || Ok(request_handler.clone()),
-        build_server_config(&state.config, state.shutdown.token()),
-    );
-    let response = forward(svc, req).await;
+    let shutdown = state.shutdown.token();
+    let server_config = build_server_config(&state.config, shutdown.clone());
+    let response = dispatch_mcp_request(
+        request_handler,
+        req,
+        is_subscription,
+        shutdown,
+        server_config,
+    )
+    .await;
     let (parts, body) = response.into_parts();
     // Shared ownership is intentional: tower/axum layers may clone
     // request extensions. The resources are released when the final
@@ -181,13 +186,62 @@ fn is_subscription_request(req: &Request) -> bool {
         })
 }
 
+async fn dispatch_mcp_request(
+    request_handler: crate::mcp::handlers::MemoryMcp,
+    req: Request,
+    is_subscription: bool,
+    shutdown: CancellationToken,
+    server_config: StreamableHttpServerConfig,
+) -> Response {
+    if is_subscription {
+        let subscription_handler = request_handler.subscription_stream_handler(shutdown);
+        let svc = build_mcp_service(move || Ok(subscription_handler.clone()), server_config);
+        forward(svc, req).await
+    } else {
+        let svc = build_mcp_service(move || Ok(request_handler.clone()), server_config);
+        forward(svc, req).await
+    }
+}
+
+/// Drive the production dispatch seam from a black-box test with a validated
+/// resource-subscription request. The MCP method itself is still sent through
+/// rmcp; only the upstream validation middleware is represented by its result.
+#[cfg(all(feature = "streamable-http", feature = "test-fixtures"))]
+#[doc(hidden)]
+pub async fn forward_subscription_for_test(
+    request_handler: crate::mcp::handlers::MemoryMcp,
+    mut req: Request,
+    http_config: HttpConfig,
+    shutdown: CancellationToken,
+) -> Response {
+    req.extensions_mut()
+        .insert(super::middleware::ValidatedMcpRequest {
+            method: "subscriptions/listen".to_owned(),
+            subscription: true,
+            ingest_source_bytes: None,
+        });
+    let is_subscription = is_subscription_request(&req);
+    let server_config = build_server_config(&http_config, shutdown.clone());
+    dispatch_mcp_request(
+        request_handler,
+        req,
+        is_subscription,
+        shutdown,
+        server_config,
+    )
+    .await
+}
+
 /// Forward path shared by `mcp_handler` and the future pool-aware
 /// variant. Type-erases the axum body, calls the rmcp service,
 /// re-wraps the box body. `StreamableHttpService::Error = Infallible`.
-pub async fn forward(
-    mut svc: StreamableHttpService<crate::mcp::handlers::MemoryMcp, NeverSessionManager>,
+pub async fn forward<H>(
+    mut svc: StreamableHttpService<H, NeverSessionManager>,
     req: Request,
-) -> Response {
+) -> Response
+where
+    H: rmcp::ServerHandler + Clone + Send + 'static,
+{
     let (parts, body) = req.into_parts();
     let http_req: http::Request<axum::body::Body> = http::Request::from_parts(parts, body);
     match <_ as tower_service::Service<http::Request<axum::body::Body>>>::call(&mut svc, http_req)

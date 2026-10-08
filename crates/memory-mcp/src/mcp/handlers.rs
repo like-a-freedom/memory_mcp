@@ -281,6 +281,16 @@ impl MemoryMcp {
         self
     }
 
+    #[cfg(feature = "streamable-http")]
+    pub(crate) fn subscription_stream_handler(
+        &self,
+        shutdown: tokio_util::sync::CancellationToken,
+    ) -> SubscriptionMcp {
+        SubscriptionMcp {
+            deps: SubscriptionStreamDeps::from_memory_mcp(self, shutdown),
+        }
+    }
+
     /// Attach the bounded synchronous extraction policy for clients without
     /// the Tasks capability.
     #[cfg(feature = "streamable-http")]
@@ -322,6 +332,11 @@ impl MemoryMcp {
         self.service.clone()
     }
 
+    #[cfg(feature = "streamable-http")]
+    pub(crate) async fn retained_cache_bytes(&self) -> (usize, usize) {
+        self.service.retained_cache_bytes().await
+    }
+
     #[cfg(feature = "mcp-apps")]
     /// Generates a monotonically increasing request id like `req_0001`.
     fn next_request_id(&self) -> String {
@@ -343,6 +358,14 @@ impl MemoryMcp {
     /// when `mcp-apps` is compiled. Does not advertise MRTR, roots,
     /// sampling, elicitation, prompts-change, or tool-list-change.
     fn build_http_server_config(&self) -> ServerConfig {
+        #[cfg(feature = "streamable-http")]
+        let subscriptions_enabled = self.subscription_store.is_some();
+        #[cfg(not(feature = "streamable-http"))]
+        let subscriptions_enabled = false;
+        Self::build_http_server_config_for(subscriptions_enabled)
+    }
+
+    fn build_http_server_config_for(subscriptions_enabled: bool) -> ServerConfig {
         let builder = ServerCapabilities::builder().enable_tools().enable_tasks();
         #[cfg(feature = "mcp-apps")]
         let builder = {
@@ -350,13 +373,15 @@ impl MemoryMcp {
             // Advertise resource subscriptions only when
             // the durable subscription backend is attached.
             #[cfg(feature = "streamable-http")]
-            let b = if self.subscription_store.is_some() {
+            let b = if subscriptions_enabled {
                 b.enable_resources_subscribe()
             } else {
                 b
             };
             b
         };
+        #[cfg(not(all(feature = "streamable-http", feature = "mcp-apps")))]
+        let _ = subscriptions_enabled;
         ServerConfig::new(builder.build()).with_instructions(Self::SERVER_INSTRUCTIONS)
     }
 
@@ -401,6 +426,157 @@ async fn ensure_subscription_authorization(
     }
 }
 
+#[cfg(feature = "streamable-http")]
+fn accepted_subscription_filter(
+    has_store: bool,
+    tenant_id: Option<&str>,
+    requested: &rmcp::model::SubscriptionFilter,
+) -> Option<rmcp::model::SubscriptionFilter> {
+    if !has_store {
+        return None;
+    }
+    let tenant_id = tenant_id?;
+    crate::http::subscriptions::ValidatedSubscriptionFilter::for_tenant(tenant_id, requested)
+        .ok()
+        .map(|filter| filter.to_rmcp_filter())
+}
+
+fn supported_mcp_protocol_versions() -> std::borrow::Cow<'static, [rmcp::model::ProtocolVersion]> {
+    std::borrow::Cow::Borrowed(rmcp::model::ProtocolVersion::KNOWN_VERSIONS)
+}
+
+#[cfg(feature = "streamable-http")]
+#[derive(Clone)]
+struct SubscriptionStreamDeps {
+    store: Option<Arc<dyn crate::http::subscriptions::SubscriptionStore>>,
+    principal: Option<crate::http::principal::AuthenticatedPrincipal>,
+    authenticator: Option<Arc<crate::http::principal::auth::Authenticator>>,
+    tenant_id: Option<String>,
+    shutdown: tokio_util::sync::CancellationToken,
+    queue_capacity: usize,
+    auth_recheck: Duration,
+}
+
+#[cfg(feature = "streamable-http")]
+impl SubscriptionStreamDeps {
+    fn from_memory_mcp(handler: &MemoryMcp, shutdown: tokio_util::sync::CancellationToken) -> Self {
+        Self {
+            store: handler.subscription_store.clone(),
+            principal: handler.subscription_principal.clone(),
+            authenticator: handler.subscription_authenticator.clone(),
+            tenant_id: handler.tenant_id.clone(),
+            shutdown,
+            queue_capacity: handler.subscription_queue_capacity,
+            auth_recheck: handler.subscription_auth_recheck,
+        }
+    }
+}
+
+#[cfg(feature = "streamable-http")]
+#[derive(Clone)]
+pub(crate) struct SubscriptionMcp {
+    deps: SubscriptionStreamDeps,
+}
+
+#[cfg(feature = "streamable-http")]
+async fn listen_to_subscriptions(
+    deps: SubscriptionStreamDeps,
+    context: rmcp::service::SubscriptionContext,
+) -> Result<(), ErrorData> {
+    let Some(store) = deps.store else {
+        return Err(ErrorData::method_not_found::<
+            rmcp::model::SubscriptionsListenRequestMethod,
+        >());
+    };
+    let Some(principal) = deps.principal else {
+        return Err(ErrorData::internal_error(
+            "subscription principal missing",
+            None,
+        ));
+    };
+    let Some(authenticator) = deps.authenticator else {
+        return Err(ErrorData::internal_error(
+            "subscription authenticator missing",
+            None,
+        ));
+    };
+    let Some(tenant_id) = deps.tenant_id else {
+        return Err(ErrorData::internal_error(
+            "subscription tenant binding missing",
+            None,
+        ));
+    };
+    let filter = crate::http::subscriptions::ValidatedSubscriptionFilter::for_tenant(
+        tenant_id,
+        context.accepted(),
+    )
+    .map_err(|error| ErrorData::invalid_params(error.to_string(), None))?;
+
+    ensure_subscription_authorization(&authenticator, &principal).await?;
+    store
+        .validate_filter(&filter)
+        .await
+        .map_err(|error| ErrorData::invalid_params(error.to_string(), None))?;
+    let mut cursor = tokio::time::timeout(Duration::from_secs(5), store.current_sequence())
+        .await
+        .map_err(|_| ErrorData::internal_error("subscription sequence read timed out", None))?
+        .map_err(|error| ErrorData::internal_error(error.to_string(), None))?;
+
+    let mut last_auth_check = Instant::now();
+    let mut queue = crate::http::subscriptions::stream::CoalescingQueue::new(deps.queue_capacity);
+    let mut poll_tick = tokio::time::interval(Duration::from_secs(1));
+    loop {
+        tokio::select! {
+            _ = context.cancelled() => return Ok(()),
+            _ = deps.shutdown.cancelled() => return Ok(()),
+            _ = poll_tick.tick() => {
+                if last_auth_check.elapsed() >= deps.auth_recheck {
+                    ensure_subscription_authorization(&authenticator, &principal).await?;
+                    last_auth_check = Instant::now();
+                }
+                let batch = tokio::time::timeout(
+                    Duration::from_secs(5),
+                    store.next_batch(cursor, &filter),
+                )
+                .await
+                .map_err(|_| ErrorData::internal_error(
+                    "subscription outbox read timed out",
+                    None,
+                ))?
+                .map_err(|error| ErrorData::internal_error(error.to_string(), None))?;
+                for event in batch {
+                    cursor = cursor.max(event.sequence);
+                    queue.push(event).map_err(|_| {
+                        ErrorData::internal_error(
+                            "subscription disconnected: slow consumer",
+                            None,
+                        )
+                    })?;
+                }
+                while let Some(event) = queue.pop_front() {
+                    if last_auth_check.elapsed() >= deps.auth_recheck {
+                        ensure_subscription_authorization(&authenticator, &principal).await?;
+                        last_auth_check = Instant::now();
+                    }
+                    tokio::select! {
+                        _ = context.cancelled() => return Ok(()),
+                        _ = deps.shutdown.cancelled() => return Ok(()),
+                        result = crate::http::subscriptions::stream::send_invalidation_with_timeout(
+                            context.sink(),
+                            event,
+                        ) => {
+                            result.map_err(|error| ErrorData::internal_error(
+                                error.to_string(),
+                                None,
+                            ))?;
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
 async fn extract_response(
     service: Arc<MemoryService>,
     params: ExtractParams,
@@ -437,7 +613,7 @@ impl ServerHandler for MemoryMcp {
     fn supported_protocol_versions(
         &self,
     ) -> std::borrow::Cow<'static, [rmcp::model::ProtocolVersion]> {
-        std::borrow::Cow::Borrowed(rmcp::model::ProtocolVersion::KNOWN_VERSIONS)
+        supported_mcp_protocol_versions()
     }
 
     async fn call_tool(
@@ -669,11 +845,11 @@ impl ServerHandler for MemoryMcp {
         &self,
         requested: &rmcp::model::SubscriptionFilter,
     ) -> Option<rmcp::model::SubscriptionFilter> {
-        self.subscription_store.as_ref()?;
-        let tenant_id = self.tenant_id.as_deref()?;
-        crate::http::subscriptions::ValidatedSubscriptionFilter::for_tenant(tenant_id, requested)
-            .ok()
-            .map(|filter| filter.to_rmcp_filter())
+        accepted_subscription_filter(
+            self.subscription_store.is_some(),
+            self.tenant_id.as_deref(),
+            requested,
+        )
     }
 
     #[cfg(feature = "streamable-http")]
@@ -683,106 +859,46 @@ impl ServerHandler for MemoryMcp {
     ) -> impl std::future::Future<Output = Result<(), rmcp::ErrorData>>
     + rmcp::service::MaybeSendFuture
     + '_ {
-        let store = self.subscription_store.clone();
-        let principal = self.subscription_principal.clone();
-        let authenticator = self.subscription_authenticator.clone();
-        let tenant_id = self.tenant_id.clone();
-        async move {
-            let Some(store) = store else {
-                return Err(rmcp::ErrorData::method_not_found::<
-                    rmcp::model::SubscriptionsListenRequestMethod,
-                >());
-            };
-            let Some(principal) = principal else {
-                return Err(rmcp::ErrorData::internal_error(
-                    "subscription principal missing",
-                    None,
-                ));
-            };
-            let Some(authenticator) = authenticator else {
-                return Err(rmcp::ErrorData::internal_error(
-                    "subscription authenticator missing",
-                    None,
-                ));
-            };
-            let Some(tenant_id) = tenant_id else {
-                return Err(rmcp::ErrorData::internal_error(
-                    "subscription tenant binding missing",
-                    None,
-                ));
-            };
-            let filter = crate::http::subscriptions::ValidatedSubscriptionFilter::for_tenant(
-                tenant_id,
-                context.accepted(),
-            )
-            .map_err(|error| rmcp::ErrorData::invalid_params(error.to_string(), None))?;
+        let deps = SubscriptionStreamDeps::from_memory_mcp(
+            self,
+            tokio_util::sync::CancellationToken::new(),
+        );
+        async move { listen_to_subscriptions(deps, context).await }
+    }
+}
 
-            ensure_subscription_authorization(&authenticator, &principal).await?;
-            store
-                .validate_filter(&filter)
-                .await
-                .map_err(|error| rmcp::ErrorData::invalid_params(error.to_string(), None))?;
-            let mut cursor = tokio::time::timeout(Duration::from_secs(5), store.current_sequence())
-                .await
-                .map_err(|_| {
-                    rmcp::ErrorData::internal_error("subscription sequence read timed out", None)
-                })?
-                .map_err(|error| rmcp::ErrorData::internal_error(error.to_string(), None))?;
+#[cfg(feature = "streamable-http")]
+impl rmcp::ServerHandler for SubscriptionMcp {
+    fn get_info(&self) -> ServerConfig {
+        MemoryMcp::build_http_server_config_for(self.deps.store.is_some())
+            .with_protocol_version(PROTOCOL_VERSION_2026_07_28)
+    }
 
-            let mut last_auth_check = Instant::now();
-            let mut queue = crate::http::subscriptions::stream::CoalescingQueue::new(
-                self.subscription_queue_capacity,
-            );
-            let mut poll_tick = tokio::time::interval(Duration::from_secs(1));
-            loop {
-                tokio::select! {
-                    _ = context.cancelled() => return Ok(()),
-                    _ = poll_tick.tick() => {
-                        if last_auth_check.elapsed() >= self.subscription_auth_recheck {
-                            ensure_subscription_authorization(&authenticator, &principal).await?;
-                            last_auth_check = Instant::now();
-                        }
-                        let batch = tokio::time::timeout(
-                            Duration::from_secs(5),
-                            store.next_batch(cursor, &filter),
-                        )
-                        .await
-                        .map_err(|_| rmcp::ErrorData::internal_error(
-                            "subscription outbox read timed out",
-                            None,
-                        ))?
-                        .map_err(|error| rmcp::ErrorData::internal_error(error.to_string(), None))?;
-                        for event in batch {
-                            cursor = cursor.max(event.sequence);
-                            queue.push(event).map_err(|_| {
-                                rmcp::ErrorData::internal_error(
-                                    "subscription disconnected: slow consumer",
-                                    None,
-                                )
-                            })?;
-                        }
-                        while let Some(event) = queue.pop_front() {
-                            if last_auth_check.elapsed() >= self.subscription_auth_recheck {
-                                ensure_subscription_authorization(&authenticator, &principal).await?;
-                                last_auth_check = Instant::now();
-                            }
-                            tokio::select! {
-                                _ = context.cancelled() => return Ok(()),
-                                result = crate::http::subscriptions::stream::send_invalidation_with_timeout(
-                                    context.sink(),
-                                    event,
-                                ) => {
-                                    result.map_err(|error| rmcp::ErrorData::internal_error(
-                                        error.to_string(),
-                                        None,
-                                    ))?;
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
+    fn supported_protocol_versions(
+        &self,
+    ) -> std::borrow::Cow<'static, [rmcp::model::ProtocolVersion]> {
+        supported_mcp_protocol_versions()
+    }
+
+    fn accepted_subscription_filter(
+        &self,
+        requested: &rmcp::model::SubscriptionFilter,
+    ) -> Option<rmcp::model::SubscriptionFilter> {
+        accepted_subscription_filter(
+            self.deps.store.is_some(),
+            self.deps.tenant_id.as_deref(),
+            requested,
+        )
+    }
+
+    fn listen(
+        &self,
+        context: rmcp::service::SubscriptionContext,
+    ) -> impl std::future::Future<Output = Result<(), rmcp::ErrorData>>
+    + rmcp::service::MaybeSendFuture
+    + '_ {
+        let deps = self.deps.clone();
+        async move { listen_to_subscriptions(deps, context).await }
     }
 }
 

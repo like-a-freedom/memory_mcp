@@ -11,8 +11,15 @@ use crate::error::MemoryError;
 /// collected by MCP preflight before ordinary admission runs.
 pub struct PreflightBudget {
     requests: Arc<Semaphore>,
+    request_limit: usize,
     byte_limit: usize,
     reserved_bytes: AtomicUsize,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct PreflightResourceSnapshot {
+    pub(crate) reserved_requests: usize,
+    pub(crate) reserved_bytes: usize,
 }
 
 /// The capacity that prevented a preflight reservation.
@@ -40,9 +47,19 @@ impl PreflightBudget {
 
         Ok(Self {
             requests: Arc::new(Semaphore::new(request_limit)),
+            request_limit,
             byte_limit,
             reserved_bytes: AtomicUsize::new(0),
         })
+    }
+
+    pub(crate) fn resource_snapshot(&self) -> PreflightResourceSnapshot {
+        PreflightResourceSnapshot {
+            reserved_requests: self
+                .request_limit
+                .saturating_sub(self.requests.available_permits()),
+            reserved_bytes: self.reserved_bytes.load(Ordering::Acquire),
+        }
     }
 
     pub fn try_reserve(
@@ -193,6 +210,29 @@ mod tests {
             .expect("checked byte-ledger growth fits exactly");
         drop(first);
         assert!(budget.try_reserve(usize::MAX).is_ok());
+    }
+
+    #[test]
+    fn resource_snapshot_tracks_reserved_requests_and_bytes() {
+        let budget = Arc::new(PreflightBudget::new(2, 20).expect("valid budget"));
+        let initial = budget.resource_snapshot();
+        assert_eq!(initial.reserved_requests, 0);
+        assert_eq!(initial.reserved_bytes, 0);
+
+        let first = budget.try_reserve(7).expect("first reservation fits");
+        let second = budget.try_reserve(4).expect("second reservation fits");
+        let reserved = budget.resource_snapshot();
+        assert_eq!(reserved.reserved_requests, 2);
+        assert_eq!(reserved.reserved_bytes, 11);
+
+        drop(first);
+        let partially_released = budget.resource_snapshot();
+        assert_eq!(partially_released.reserved_requests, 1);
+        assert_eq!(partially_released.reserved_bytes, 4);
+        drop(second);
+        let released = budget.resource_snapshot();
+        assert_eq!(released.reserved_requests, 0);
+        assert_eq!(released.reserved_bytes, 0);
     }
 
     #[test]

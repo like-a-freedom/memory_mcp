@@ -11,6 +11,7 @@
 //! tool with no stated owner, which is the thing this separation
 //! exists to prevent.
 
+pub mod context_cache;
 pub mod context_cache_key;
 pub mod durable_work;
 pub mod fault_injection;

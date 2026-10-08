@@ -172,6 +172,20 @@ impl KnowledgeGraphStore {
         self.db.query_rows(&sql, Some(vars)).await
     }
 
+    /// Graph-app neighbors retain the identity and display metadata needed by
+    /// path snapshots, expansions, and the `open_edge_details` command.
+    pub async fn select_graph_edge_neighbors(
+        &self,
+        node_id: &str,
+        cutoff: &str,
+        direction: GraphDirection,
+    ) -> Result<Vec<Value>, MemoryError> {
+        let (sql, vars) = crate::knowledge::queries::build_select_graph_edge_neighbors_query(
+            node_id, cutoff, direction,
+        );
+        self.db.query_rows(&sql, Some(vars)).await
+    }
+
     /// Active (not-yet-invalidated) facts linked to an episode.
     ///
     /// The fact table is knowledge-owned; this method moved to

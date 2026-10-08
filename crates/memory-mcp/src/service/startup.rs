@@ -1,6 +1,6 @@
-use crate::embedding::providers::embedding_from_value;
 use crate::error::MemoryError;
-use crate::storage::table_scope::{KnowledgeTables, ReleaseOwnedTable};
+use crate::knowledge::KnowledgeStoreClient;
+use crate::knowledge::api::FactEmbeddingMetadataReadPort;
 use crate::storage::{BoundDbClient, DbClient};
 use std::sync::Arc;
 
@@ -60,7 +60,9 @@ pub(crate) async fn load_embedding_state(
 }
 
 pub(crate) async fn count_facts(db: &BoundDbClient) -> Result<usize, MemoryError> {
-    Ok(db.select_table(KnowledgeTables::table("fact")).await?.len())
+    KnowledgeStoreClient::from_bound(db.clone())
+        .count_facts()
+        .await
 }
 
 pub(crate) async fn count_facts_missing_embeddings(
@@ -75,14 +77,9 @@ pub(crate) async fn sample_stored_embedding_dimensions(
     db: &BoundDbClient,
     sample_size: usize,
 ) -> Result<Vec<usize>, MemoryError> {
-    Ok(db
-        .select_table(KnowledgeTables::table("fact"))
-        .await?
-        .into_iter()
-        .filter_map(|record| record.get("embedding").and_then(embedding_from_value))
-        .map(|embedding| embedding.len())
-        .take(sample_size)
-        .collect())
+    KnowledgeStoreClient::from_bound(db.clone())
+        .sample_stored_embedding_dimensions(sample_size)
+        .await
 }
 
 pub(crate) async fn write_bootstrap_ready_state(
@@ -631,6 +628,17 @@ mod tests {
         // produce. They must be rewritten, which only `reembed` can do.
         let decision =
             decide_embedding_startup("main", None, &[768usize], 12, 0, "embsig:new", 384);
+        assert!(matches!(
+            decision,
+            EmbeddingStartupDecision::DisableSemantic { .. }
+        ));
+    }
+
+    #[test]
+    fn mixed_dimensions_preserve_startup_refusal_or_recovery() {
+        let decision =
+            decide_embedding_startup("main", None, &[1536, 2048], 12, 0, "embsig:new", 1536);
+
         assert!(matches!(
             decision,
             EmbeddingStartupDecision::DisableSemantic { .. }

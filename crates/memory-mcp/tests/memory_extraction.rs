@@ -1,13 +1,22 @@
 //! Memory extraction use case: rate-limit first, verify the
 //! episode exists, then delegate the extraction itself.
 
+mod common;
+
 use std::sync::{Arc, Mutex};
+
+use chrono::Utc;
+use memory_mcp::models::IngestRequest;
+use memory_mcp::service::memory_container_shims::memory_capabilities_extract::ExtractCapability;
+use memory_mcp::service::memory_container_shims::memory_capabilities_ingest::IngestCapability;
+use memory_mcp::storage::{DbClient, SurrealDbClient};
 
 use memory_mcp::MemoryError;
 use memory_mcp::memory::api::{
     EpisodeExtractionPort, ExtractCommand, ExtractedEpisode, RateLimitPort, extract_from_episode,
 };
 use memory_mcp::models::ExtractResult;
+use serde_json::Value;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 struct ExtractionCall {
@@ -167,6 +176,67 @@ async fn an_extraction_with_nothing_to_report_is_still_a_success() {
 
     assert_eq!(result.result, ExtractResult::default());
     assert!(result.result.entities.is_empty() && result.result.facts.is_empty());
+}
+
+async fn table_count(
+    db_client: &SurrealDbClient,
+    table: &str,
+) -> Result<usize, Box<dyn std::error::Error>> {
+    let statement = format!("SELECT count() AS count FROM {table} GROUP ALL");
+    let result = db_client.query(&statement, None, "org").await?;
+    let rows: Vec<Value> = serde_json::from_value(result)?;
+    Ok(rows
+        .first()
+        .and_then(|row| row.get("count"))
+        .and_then(Value::as_i64)
+        .unwrap_or(0) as usize)
+}
+
+#[tokio::test]
+async fn oversized_persisted_episode_is_rejected_before_extraction_writes()
+-> Result<(), Box<dyn std::error::Error>> {
+    const OVERSIZED_EPISODE_BYTES: usize = 1_048_580;
+    let memory = common::TestMemory::new(false).await;
+    let content = "# Decisions:\n".repeat(80_660);
+    assert_eq!(content.len(), OVERSIZED_EPISODE_BYTES);
+
+    let episode_id = IngestCapability::ingest_from_service(
+        &memory.service,
+        IngestRequest {
+            source_type: "chat".to_string(),
+            source_id: "oversized-owner-test".to_string(),
+            content,
+            t_ref: Utc::now(),
+            t_ingested: None,
+            policy_tags: Vec::new(),
+        },
+        None,
+    )
+    .await?;
+    let before = (
+        table_count(&memory.db_client, "fact").await?,
+        table_count(&memory.db_client, "entity").await?,
+        table_count(&memory.db_client, "edge").await?,
+        table_count(&memory.db_client, "entity_extraction_projection").await?,
+    );
+
+    let error = ExtractCapability::extract_from_service(&memory.service, &episode_id, None, None)
+        .await
+        .expect_err("the original stored episode exceeds Anno's maximum input");
+
+    assert!(matches!(
+        &error,
+        MemoryError::Validation(message)
+            if message == "entity extraction input too large: provider=anno actual_bytes=1048580 max_bytes=1048576"
+    ));
+    let after = (
+        table_count(&memory.db_client, "fact").await?,
+        table_count(&memory.db_client, "entity").await?,
+        table_count(&memory.db_client, "edge").await?,
+        table_count(&memory.db_client, "entity_extraction_projection").await?,
+    );
+    assert_eq!(after, before, "refusal must not write extraction outputs");
+    Ok(())
 }
 
 #[tokio::test]

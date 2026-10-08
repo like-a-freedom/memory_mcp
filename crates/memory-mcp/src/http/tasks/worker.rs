@@ -38,6 +38,11 @@ pub const RETENTION_SECS: i64 = 7 * 24 * 60 * 60;
 /// horizon so a long pass and a short one are covered by the same window.
 pub(crate) const TASK_LEASE_TTL_SECS: i64 = 60;
 
+struct ArtifactCursor {
+    after_key: String,
+    upper_key: String,
+}
+
 #[derive(Clone)]
 pub struct DurableTaskStore {
     pub(crate) db: Arc<BoundDbClient>,
@@ -414,14 +419,16 @@ impl TaskStore for DurableTaskStore {
     }
 
     async fn reconcile_artifacts(&self) -> Result<u64, MemoryError> {
-        let result = self
+        const PAGE_SIZE: i64 = 64;
+
+        let upper_result = self
             .db
             .query(
-                "SELECT * FROM task_artifact WHERE tenant_id = $tenant_id AND state = 'committed'",
+                "SELECT id FROM task_artifact WHERE tenant_id = $tenant_id AND state = 'committed' ORDER BY id DESC LIMIT 1",
                 Some(json!({"tenant_id": self.tenant_id.as_str()})),
             )
             .await;
-        let result = match result {
+        let upper_result = match upper_result {
             Ok(result) => result,
             Err(MemoryError::Storage(message))
                 if message.contains("task_artifact") && message.contains("does not exist") =>
@@ -430,33 +437,104 @@ impl TaskStore for DurableTaskStore {
             }
             Err(error) => return Err(error),
         };
-        let artifacts: Vec<Value> = serde_json::from_value(result).map_err(|error| {
-            MemoryError::Storage(format!("task artifact reconciliation: {error}"))
-        })?;
+        let upper_rows: Vec<Value> = serde_json::from_value(upper_result)
+            .map_err(|error| MemoryError::Storage(format!("task artifact upper bound: {error}")))?;
+        let Some(upper_key) = upper_rows
+            .first()
+            .and_then(|row| row.get("id"))
+            .and_then(record_id_str)
+        else {
+            return Ok(0);
+        };
+        let mut cursor = ArtifactCursor {
+            after_key: String::new(),
+            upper_key,
+        };
         let mut reconciled = 0;
-        for artifact in artifacts {
-            let Some(task_id) = artifact.get("task_id").and_then(Value::as_str) else {
-                continue;
-            };
-            let fact_ids = artifact
-                .get("fact_ids")
-                .cloned()
-                .unwrap_or_else(|| json!([]));
-            let episode_id = artifact.get("episode_id").cloned().unwrap_or(Value::Null);
-            let result = self
-                .db
-                .query(
-                    "UPDATE tenant_task SET state = 'completed', result = $result, version = version + 1, updated_at = time::now() WHERE id = type::record('tenant_task', $task_id) AND tenant_id = $tenant_id AND state IN ['queued', 'running', 'cancel_requested'] RETURN AFTER",
-                    Some(json!({
-                        "task_id": task_id,
+
+        loop {
+            let (sql, vars) = if cursor.after_key.is_empty() {
+                (
+                    "SELECT id, task_id, episode_id, fact_ids FROM task_artifact \
+                     WHERE tenant_id = $tenant_id AND state = 'committed' \
+                     AND id <= type::record('task_artifact', $upper_key) \
+                     ORDER BY id ASC LIMIT $limit",
+                    json!({
                         "tenant_id": self.tenant_id.as_str(),
-                        "result": {"episode_id": episode_id, "fact_ids": fact_ids},
-                    })),
+                        "upper_key": cursor.upper_key,
+                        "limit": PAGE_SIZE,
+                    }),
                 )
-                .await?;
-            let rows: Vec<Value> = serde_json::from_value(result)
-                .map_err(|error| MemoryError::Storage(format!("task artifact update: {error}")))?;
-            reconciled += u64::from(!rows.is_empty());
+            } else {
+                (
+                    "SELECT id, task_id, episode_id, fact_ids FROM task_artifact \
+                     WHERE tenant_id = $tenant_id AND state = 'committed' \
+                     AND id > type::record('task_artifact', $after_key) \
+                     AND id <= type::record('task_artifact', $upper_key) \
+                     ORDER BY id ASC LIMIT $limit",
+                    json!({
+                        "tenant_id": self.tenant_id.as_str(),
+                        "after_key": cursor.after_key,
+                        "upper_key": cursor.upper_key,
+                        "limit": PAGE_SIZE,
+                    }),
+                )
+            };
+            let result = self.db.query(sql, Some(vars)).await?;
+            let artifacts: Vec<Value> = serde_json::from_value(result)
+                .map_err(|error| MemoryError::Storage(format!("task artifact page: {error}")))?;
+            if artifacts.is_empty() {
+                break;
+            }
+            if artifacts.len() > PAGE_SIZE as usize {
+                return Err(MemoryError::Storage(
+                    "task artifact page exceeded its configured row bound".to_string(),
+                ));
+            }
+
+            let last_key = artifacts
+                .last()
+                .and_then(|artifact| artifact.get("id"))
+                .and_then(record_id_str)
+                .ok_or_else(|| {
+                    MemoryError::Storage("task artifact page has no record id".to_string())
+                })?;
+            if (!cursor.after_key.is_empty() && last_key <= cursor.after_key)
+                || last_key > cursor.upper_key
+            {
+                return Err(MemoryError::Storage(
+                    "task artifact cursor did not advance within its upper bound".to_string(),
+                ));
+            }
+
+            for artifact in &artifacts {
+                let Some(task_id) = artifact.get("task_id").and_then(Value::as_str) else {
+                    continue;
+                };
+                let fact_ids = artifact
+                    .get("fact_ids")
+                    .cloned()
+                    .unwrap_or_else(|| json!([]));
+                let episode_id = artifact.get("episode_id").cloned().unwrap_or(Value::Null);
+                let result = self
+                    .db
+                    .query(
+                        "UPDATE tenant_task SET state = 'completed', result = $result, version = version + 1, updated_at = time::now() WHERE id = type::record('tenant_task', $task_id) AND tenant_id = $tenant_id AND state IN ['queued', 'running', 'cancel_requested'] RETURN AFTER",
+                        Some(json!({
+                            "task_id": task_id,
+                            "tenant_id": self.tenant_id.as_str(),
+                            "result": {"episode_id": episode_id, "fact_ids": fact_ids},
+                        })),
+                    )
+                    .await?;
+                let rows: Vec<Value> = serde_json::from_value(result).map_err(|error| {
+                    MemoryError::Storage(format!("task artifact update: {error}"))
+                })?;
+                reconciled += u64::from(!rows.is_empty());
+            }
+
+            cursor.after_key = last_key;
+            drop(artifacts);
         }
         Ok(reconciled)
     }

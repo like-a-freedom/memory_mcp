@@ -154,12 +154,22 @@ mod tests {
         );
         {
             let mut guard = svc.context_cache.write().await;
-            guard.put(
-                cache_key.clone(),
-                vec![crate::models::AssembledContextItem {
-                    fact_id: "fact:2".into(),
-                    ..Default::default()
-                }],
+            let generation = match guard.lookup(&cache_key) {
+                crate::memory::context_cache::ContextCacheLookup::Miss(generation) => generation,
+                crate::memory::context_cache::ContextCacheLookup::Hit(_) => {
+                    panic!("new cache cannot contain a hit")
+                }
+            };
+            assert_eq!(
+                guard.insert(
+                    generation,
+                    cache_key.clone(),
+                    &[crate::models::AssembledContextItem {
+                        fact_id: "fact:2".into(),
+                        ..Default::default()
+                    }],
+                ),
+                crate::memory::context_cache::CacheInsertOutcome::Stored
             );
         }
 
@@ -168,10 +178,11 @@ mod tests {
             .unwrap();
 
         let mut guard = svc.context_cache.write().await;
-        assert!(
-            guard.get(&cache_key).is_none(),
-            "cache should be invalidated for scope 'team'"
-        );
+        assert!(matches!(
+            guard.lookup(&cache_key),
+            crate::memory::context_cache::ContextCacheLookup::Miss(_)
+        ));
+        assert_eq!(guard.accounted_bytes(), 0);
     }
 
     #[tokio::test]

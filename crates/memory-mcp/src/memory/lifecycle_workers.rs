@@ -18,14 +18,15 @@ use crate::config::LifecycleConfig;
 /// Decay, archival and community rebuild are all background hygiene
 /// jobs: they read the database through the bound namespace, log what
 /// they do, and otherwise talk to whichever context owns the table
-/// they are working on. That is four things, not twenty-nine, so they
-/// take this instead of the whole container.
+/// they are working on. Its core is four things, not twenty-nine; the
+/// decay pass additionally requires knowledge's atomic-retraction port.
 pub struct LifecycleHandles<'a> {
     pub(crate) db_client: Arc<dyn crate::storage::DbClient>,
     pub(crate) active_namespace: &'a str,
     pub(crate) logger: &'a crate::logging::StdoutLogger,
     pub(crate) policy: LifecyclePolicy,
-    pub(crate) claim_service: &'a crate::knowledge::claims_policy::projection::ClaimService,
+    /// Present only for decay; archival and community passes do not retain it.
+    pub(crate) claim_store: Option<Arc<dyn crate::knowledge::claims::ClaimStore>>,
 }
 
 impl<'a> LifecycleHandles<'a> {
@@ -43,18 +44,6 @@ impl<'a> LifecycleHandles<'a> {
             self.db_client.clone(),
             self.active_namespace.to_string(),
         )
-    }
-
-    /// The knowledge-owned claim service, for retraction.
-    ///
-    /// Decay invalidates a fact by retracting it, and per ADR-0039 the
-    /// retraction and its derived claims are one atomic operation owned
-    /// by knowledge. The pass asks knowledge to do that; it does not
-    /// write the fact or claim tables itself.
-    pub(crate) fn claim_service(
-        &self,
-    ) -> &crate::knowledge::claims_policy::projection::ClaimService {
-        self.claim_service
     }
 
     /// The knowledge-owned graph store.
@@ -153,7 +142,7 @@ impl LifecycleBackgroundWorkerRuntime {
         active_namespace: String,
         logger: crate::logging::StdoutLogger,
         policy: LifecyclePolicy,
-        claim_service: crate::knowledge::claims_policy::projection::ClaimService,
+        claim_store: Arc<dyn crate::knowledge::claims::ClaimStore>,
         interval_secs: u64,
         threshold: f64,
         half_life_days: f64,
@@ -163,7 +152,7 @@ impl LifecycleBackgroundWorkerRuntime {
             active_namespace,
             logger,
             policy,
-            claim_service,
+            claim_store,
             interval_secs,
             threshold,
             half_life_days,
@@ -189,7 +178,6 @@ impl LifecycleBackgroundWorkerRuntime {
         active_namespace: String,
         logger: crate::logging::StdoutLogger,
         policy: LifecyclePolicy,
-        claim_service: crate::knowledge::claims_policy::projection::ClaimService,
         interval_secs: u64,
         age_days: u32,
     ) {
@@ -198,7 +186,6 @@ impl LifecycleBackgroundWorkerRuntime {
             active_namespace,
             logger,
             policy,
-            claim_service,
             interval_secs,
             age_days,
             self.shutdown.clone(),
@@ -218,7 +205,6 @@ impl LifecycleBackgroundWorkerRuntime {
         active_namespace: String,
         logger: crate::logging::StdoutLogger,
         policy: LifecyclePolicy,
-        claim_service: crate::knowledge::claims_policy::projection::ClaimService,
         interval_secs: u64,
     ) {
         let handle = spawn_community_worker(
@@ -226,7 +212,6 @@ impl LifecycleBackgroundWorkerRuntime {
             active_namespace,
             logger,
             policy,
-            claim_service,
             interval_secs,
             self.shutdown.clone(),
         );
