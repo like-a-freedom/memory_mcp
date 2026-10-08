@@ -12,11 +12,10 @@ use memory_mcp::logging::StdoutLogger;
 
 /// Record a failure that happens after logging is installed.
 ///
-/// Before `install()` there is no sink to log through, so the pre-install
-/// configuration errors above keep `eprintln!`. Everything after the subscriber
-/// exists — a bind failure, a cleanup failure — goes through the same sink,
-/// level and format as the rest of the process, so it joins the stream an
-/// operator already collects.
+/// The subscriber is installed before configuration is read, so every failure
+/// from that point — a config parse, a validation, a bind failure, a cleanup
+/// failure — goes through the same sink, level and format as the rest of the
+/// process, and joins the stream an operator already collects.
 fn log_failure(op: &str, error: &dyn std::fmt::Display) {
     memory_mcp::logging::emit(
         std::collections::HashMap::from([
@@ -44,16 +43,16 @@ async fn main() -> ExitCode {
     let cfg = match HttpConfig::from_env() {
         Ok(c) => c,
         Err(err) => {
-            eprintln!("config error: {err}");
+            log_failure("http.serve_failed", &err);
             return ExitCode::from(2);
         }
     };
     if let Err(err) = cfg.validate() {
-        eprintln!("config invalid: {err}");
+        log_failure("http.serve_failed", &err);
         return ExitCode::from(2);
     }
     if let Err(msg) = bootstrap::validate_no_listener_env() {
-        eprintln!("{msg}");
+        log_failure("http.serve_failed", &msg);
         return ExitCode::from(2);
     }
     let mut runtime = match bootstrap::build_state(&cfg, &logger).await {

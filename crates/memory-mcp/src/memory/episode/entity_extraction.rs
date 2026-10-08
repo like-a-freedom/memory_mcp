@@ -37,16 +37,27 @@ pub async fn extract_entities(
             let content_owned = content.to_string();
             let zero_shot_labels = zero_shot_labels.map(<[String]>::to_vec);
             let handle = tokio::runtime::Handle::current();
+            // A blocking-pool worker is a task of its own, so the ambient
+            // correlation id does not cross the boundary. Capture it here and
+            // re-enter the scope inside, so the extractor's own events (`ner.*`)
+            // carry the same `req=` as the request that awaited them.
+            let correlation_id = crate::logging::correlation::current();
 
             tokio::task::spawn_blocking(move || {
                 handle.block_on(async move {
-                    match zero_shot_labels {
-                        Some(labels) => {
-                            extractor
-                                .extract_candidates_with_labels(&content_owned, &labels)
-                                .await
+                    let extract = async move {
+                        match zero_shot_labels {
+                            Some(labels) => {
+                                extractor
+                                    .extract_candidates_with_labels(&content_owned, &labels)
+                                    .await
+                            }
+                            None => extractor.extract_candidates(&content_owned).await,
                         }
-                        None => extractor.extract_candidates(&content_owned).await,
+                    };
+                    match correlation_id {
+                        Some(id) => crate::logging::correlation::scope(id, extract).await,
+                        None => extract.await,
                     }
                 })
             })

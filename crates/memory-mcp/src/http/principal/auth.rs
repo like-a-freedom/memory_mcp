@@ -103,13 +103,11 @@ impl Authenticator {
     pub async fn authenticate_bearer(&self, header: &str) -> AuthDecision {
         let cred = match ApiKeyCredential::parse(header) {
             Ok(c) => c,
-            Err(_) => {
-                crate::http::logging::log_auth_rejection(
-                    crate::http::logging::AuthRejection::Parse,
-                    None,
-                );
-                return AuthDecision::Deny;
-            }
+            // Not shaped like an API key. This is not a refusal yet: the
+            // credential may be an OAuth access token, which the caller resolves
+            // after this returns `NotApplicable`. Logging here would count every
+            // successful OAuth request as an authentication failure (ADR-0080).
+            Err(_) => return AuthDecision::NotApplicable,
         };
         if self.cache.get_negative(cred.key_id()) {
             crate::http::logging::log_auth_rejection(
@@ -484,8 +482,11 @@ mod tests {
         assert!(limiter.allow("ak_2"));
     }
 
+    /// A credential that is not shaped like an API key is `NotApplicable`, not
+    /// `Deny`: the caller may still accept it as an OAuth access token, and
+    /// logging it here would count every successful OAuth request as a refusal.
     #[tokio::test]
-    async fn unparseable_header_returns_deny() {
+    async fn unparseable_header_is_not_an_api_key() {
         let stores =
             crate::http::registry::RegistryStores::from_backend(Arc::new(InMemoryStore::default()));
         let auth = Authenticator::new(
@@ -496,7 +497,7 @@ mod tests {
             Arc::new(RateLimiter::new(4, Duration::from_secs(60), 100)),
         );
         let d = auth.authenticate_bearer("not-a-key").await;
-        assert!(matches!(d, AuthDecision::Deny));
+        assert!(matches!(d, AuthDecision::NotApplicable));
     }
 
     #[tokio::test]

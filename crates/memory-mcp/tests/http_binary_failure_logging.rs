@@ -11,6 +11,8 @@ mod common;
 
 use std::io::Read;
 use std::process::{Command, Stdio};
+use std::sync::mpsc;
+use std::time::Duration;
 
 use common::http_server::{HttpServerConfig, TestTenant, build_env};
 
@@ -44,13 +46,23 @@ fn serve_failed_is_structured() {
     }
 
     let mut child = command.spawn().expect("spawn memory_mcp_http");
-    let mut stderr = String::new();
-    child
-        .stderr
-        .take()
-        .expect("stderr piped")
-        .read_to_string(&mut stderr)
-        .expect("read server stderr");
+    let mut stderr_pipe = child.stderr.take().expect("stderr piped");
+    // Read on a thread with a bound: a regression that stops the server from
+    // exiting must fail the test in seconds, not hang it.
+    let (tx, rx) = mpsc::channel();
+    std::thread::spawn(move || {
+        let mut buf = String::new();
+        let _ = stderr_pipe.read_to_string(&mut buf);
+        let _ = tx.send(buf);
+    });
+    let stderr = match rx.recv_timeout(Duration::from_secs(20)) {
+        Ok(buf) => buf,
+        Err(_) => {
+            let _ = child.kill();
+            let _ = child.wait();
+            panic!("the failing server did not close its stderr within 20s");
+        }
+    };
     let status = child.wait().expect("reap memory_mcp_http");
     drop(listener);
 

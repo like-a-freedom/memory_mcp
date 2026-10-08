@@ -68,6 +68,16 @@ old spelling must be updated:
 | `extract_from_episode.start` | `extract.from_episode.start` |
 | `extract_from_episode.done` | `extract.from_episode.done` |
 
+### Renamed fields
+
+Two field spellings were consolidated, so a saved query or dashboard that named
+an old one must be updated:
+
+| Old | New |
+|---|---|
+| `detail` | `error` |
+| a duration nested under `args` | `duration_ms`, top-level |
+
 ## Fields
 
 - `op` — the operation name (above).

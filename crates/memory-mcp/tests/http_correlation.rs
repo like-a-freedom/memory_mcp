@@ -13,6 +13,7 @@ mod common;
 
 use std::io::{BufRead, BufReader, Read};
 use std::process::{Child, Command, Stdio};
+use std::time::Duration;
 
 use common::http_server::{HttpServerConfig, TestTenant, build_env, modern_meta};
 use serde_json::json;
@@ -20,8 +21,14 @@ use serde_json::json;
 const BOOTSTRAP_KEY: &str =
     "mem_sk_ak_01234567-89ab-4cde-8f01-23456789abcd_conformancesuite0123456789abcdef";
 
-/// Kill the child on every exit path, so a failed assertion cannot leak the
-/// server process and hold the harness open.
+/// Bounds every wait, so a startup or shutdown regression fails the test in
+/// seconds instead of hanging CI.
+const STARTUP_TIMEOUT: Duration = Duration::from_secs(10);
+const REQUEST_TIMEOUT: Duration = Duration::from_secs(10);
+const STDERR_TIMEOUT: Duration = Duration::from_secs(10);
+
+/// Kill the child on every exit path, so a failed assertion or a timed-out wait
+/// cannot leak the server process.
 struct KillOnDrop(Child);
 
 impl Drop for KillOnDrop {
@@ -53,7 +60,9 @@ async fn a_tool_event_shares_the_access_lines_request_id() {
     let stdout = child.0.stdout.take().expect("stdout piped");
     let stderr = child.0.stderr.take().expect("stderr piped");
 
-    let addr = tokio::task::spawn_blocking(move || {
+    // On timeout the guard drops and kills the child, which unblocks the reader
+    // with EOF, so the blocking task ends rather than leaking.
+    let reader = tokio::task::spawn_blocking(move || {
         let mut reader = BufReader::new(stdout);
         let mut line = String::new();
         loop {
@@ -65,9 +74,12 @@ async fn a_tool_event_shares_the_access_lines_request_id() {
                 return addr.trim().to_string();
             }
         }
-    })
-    .await
-    .expect("join stdout reader");
+    });
+    let addr = match tokio::time::timeout(STARTUP_TIMEOUT, reader).await {
+        Ok(Ok(addr)) => addr,
+        Ok(Err(join)) => panic!("the stdout reader failed: {join}"),
+        Err(_) => panic!("the server did not report its bound address within 10s"),
+    };
 
     let body = json!({
         "jsonrpc": "2.0",
@@ -84,7 +96,10 @@ async fn a_tool_event_shares_the_access_lines_request_id() {
             "_meta": modern_meta(),
         },
     });
-    let response = reqwest::Client::new()
+    let response = reqwest::Client::builder()
+        .timeout(REQUEST_TIMEOUT)
+        .build()
+        .expect("reqwest client")
         .post(format!("http://{addr}/mcp"))
         .header("content-type", "application/json")
         .header("accept", "application/json, text/event-stream")
@@ -111,14 +126,17 @@ async fn a_tool_event_shares_the_access_lines_request_id() {
     // the pipe; killing the server lets the read reach EOF.
     child.0.kill().expect("kill server");
     let _ = child.0.wait();
-    let log = tokio::task::spawn_blocking(move || {
+    let reader = tokio::task::spawn_blocking(move || {
         let mut log = String::new();
         let mut reader = BufReader::new(stderr);
         let _ = reader.read_to_string(&mut log);
         log
-    })
-    .await
-    .expect("join stderr reader");
+    });
+    let log = match tokio::time::timeout(STDERR_TIMEOUT, reader).await {
+        Ok(Ok(log)) => log,
+        Ok(Err(join)) => panic!("the stderr reader failed: {join}"),
+        Err(_) => panic!("the server's stderr did not reach EOF within 10s of the kill"),
+    };
 
     let tool_line = log
         .lines()

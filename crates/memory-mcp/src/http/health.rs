@@ -16,6 +16,22 @@ pub async fn live() -> &'static str {
     "ok"
 }
 
+/// The level a readiness transition earns (ADR-0079 §4.1).
+///
+/// Losing readiness is an actionable failure, so an unreachable registry is the
+/// `ERROR` the policy puts “loss of readiness” at. The states the process
+/// enters on purpose are not failures: coming back up or stopping on a signal
+/// is a state change at `INFO`, and a closed admission gate is degraded at
+/// `WARN`. Pure, so the policy is exercised without a registry fault seam.
+fn readiness_level(state: &str) -> crate::logging::LogLevel {
+    use crate::logging::LogLevel;
+    match state {
+        "ready" | "shutting_down" => LogLevel::Info,
+        "admission_closed" => LogLevel::Warn,
+        _ => LogLevel::Error,
+    }
+}
+
 pub async fn ready(State(state): State<Arc<HttpState>>) -> impl IntoResponse {
     let (status, readiness) = if state.shutdown.is_shutting_down() {
         (StatusCode::SERVICE_UNAVAILABLE, "shutting_down")
@@ -30,11 +46,6 @@ pub async fn ready(State(state): State<Arc<HttpState>>) -> impl IntoResponse {
     // state actually changed, so a 15-second liveness poll does not flood the
     // stream and a real change is not buried in it.
     if state.readiness.record(readiness) {
-        let level = if readiness == "ready" {
-            crate::logging::LogLevel::Info
-        } else {
-            crate::logging::LogLevel::Warn
-        };
         crate::logging::emit(
             std::collections::HashMap::from([
                 (
@@ -46,7 +57,7 @@ pub async fn ready(State(state): State<Arc<HttpState>>) -> impl IntoResponse {
                     serde_json::Value::String(readiness.to_string()),
                 ),
             ]),
-            level,
+            readiness_level(readiness),
         );
     }
     let body = json!({"status": readiness}).to_string();
@@ -120,5 +131,17 @@ mod tests {
                     && line.contains("WARN")),
             "a degraded transition must be logged at WARN: {recorded:?}"
         );
+    }
+
+    /// The level follows the policy, not the fact of a 503: an unreachable
+    /// registry is the “loss of readiness” that belongs at ERROR, while the
+    /// states the process enters on purpose stay calm (ADR-0079 §4.1).
+    #[test]
+    fn readiness_transitions_follow_the_level_policy() {
+        use crate::logging::LogLevel;
+        assert_eq!(readiness_level("ready"), LogLevel::Info);
+        assert_eq!(readiness_level("shutting_down"), LogLevel::Info);
+        assert_eq!(readiness_level("admission_closed"), LogLevel::Warn);
+        assert_eq!(readiness_level("registry_unreachable"), LogLevel::Error);
     }
 }

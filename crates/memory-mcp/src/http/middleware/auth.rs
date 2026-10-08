@@ -63,15 +63,31 @@ pub async fn authenticate(
                 (Some(scheme), Some(credentials), None)
                     if scheme.eq_ignore_ascii_case("Bearer") =>
                 {
-                    match state.authenticator.authenticate_bearer(credentials).await {
-                        // Not an API key: fall through to the OAuth
-                        // resource-server path, which accepts an access token
-                        // issued by the deployment's OIDC provider.
-                        AuthDecision::Deny => match oauth_bearer(&state, credentials).await {
-                            Some(principal) => AuthDecision::Allow(principal),
-                            None => AuthDecision::Deny,
-                        },
-                        other => other,
+                    let api_key = state.authenticator.authenticate_bearer(credentials).await;
+                    match api_key {
+                        AuthDecision::Allow(principal) => AuthDecision::Allow(principal),
+                        // Not a valid API key. An access token issued by the
+                        // deployment's OIDC provider may still be valid, so the
+                        // refusal is not final until the OAuth path also
+                        // declines. `Deny` logged and counted its bounded reason
+                        // inside the authenticator; `NotApplicable` did not, so
+                        // it is logged and counted here — once — on the final
+                        // denial, never on a request OAuth goes on to accept.
+                        other => {
+                            let not_an_api_key = matches!(other, AuthDecision::NotApplicable);
+                            match oauth_bearer(&state, credentials).await {
+                                Some(principal) => AuthDecision::Allow(principal),
+                                None => {
+                                    if not_an_api_key {
+                                        crate::http::logging::log_auth_rejection(
+                                            crate::http::logging::AuthRejection::Parse,
+                                            request_id.as_deref(),
+                                        );
+                                    }
+                                    AuthDecision::Deny
+                                }
+                            }
+                        }
                     }
                 }
                 _ => {
@@ -557,6 +573,7 @@ mod tests {
         }));
         let router = crate::http::router::build_router(state, None).expect("router builds");
 
+        let sink = crate::logging::capture::install();
         let response = post_mcp_with_bearer(router, &token).await;
 
         assert_ne!(
@@ -569,6 +586,26 @@ mod tests {
                 .headers()
                 .contains_key(axum::http::header::WWW_AUTHENTICATE),
             "an authenticated request must not carry the bearer challenge"
+        );
+        // A credential the API-key path cannot parse is not a refusal: it may
+        // be an access token, and this one is. Counting it as a refusal would
+        // make every successful OAuth request look like an authentication
+        // failure. The check is tied to this request's own id, so a parallel
+        // test's refusal line cannot satisfy or break it.
+        let request_id = response
+            .headers()
+            .get("x-request-id")
+            .and_then(|value| value.to_str().ok())
+            .expect("the response carries the request id")
+            .to_string();
+        assert!(
+            !sink.lines().iter().any(|line| {
+                line.contains("op=http.auth.rejected")
+                    && line.contains(&format!("req={request_id}"))
+            }),
+            "an accepted OAuth token must not be logged as a refusal for its own \
+             request {request_id}: {:?}",
+            sink.lines()
         );
     }
 
@@ -613,12 +650,24 @@ mod tests {
         }));
         let router = crate::http::router::build_router(state, None).expect("router builds");
 
+        let sink = crate::logging::capture::install();
         let response = post_mcp_with_bearer(router, &token).await;
 
         assert_eq!(
             response.status(),
             StatusCode::UNAUTHORIZED,
             "a deployment with no OIDC method must accept no access token"
+        );
+        // With the OAuth path inert, the denial is final, so the refusal is
+        // logged and counted here — once — with its bounded reason.
+        assert!(
+            sink.lines()
+                .iter()
+                .any(|line| line.contains("op=http.auth.rejected")
+                    && line.contains("reason=parse")
+                    && line.contains("WARN")),
+            "a final denial of a non-API-key credential must be a logged refusal: {:?}",
+            sink.lines()
         );
     }
 }

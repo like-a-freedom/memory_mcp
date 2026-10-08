@@ -2732,6 +2732,11 @@ mod tests {
             "log_op(",
             "WarningEvent::new(",
             "RequestWarning::new(",
+            // Wrappers introduced with the coverage work: a literal first
+            // argument is an operation name here too, and the runbook promises
+            // every emitted `op` is checked.
+            "emit_best_effort_failure(",
+            "log_failure(",
         ] {
             if window.ends_with(call) {
                 return Some(literal.to_string());
