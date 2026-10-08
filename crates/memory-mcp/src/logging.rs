@@ -25,7 +25,7 @@ use tracing::{
 };
 use tracing_subscriber::filter::Targets;
 use tracing_subscriber::fmt::format::{FormatEvent, FormatFields, Writer};
-use tracing_subscriber::fmt::{FmtContext, FormattedFields, MakeWriter};
+use tracing_subscriber::fmt::{FmtContext, MakeWriter};
 use tracing_subscriber::layer::{Context, Filter, Layer, SubscriberExt};
 use tracing_subscriber::registry::LookupSpan;
 
@@ -263,28 +263,32 @@ where
 {
     fn format_event(
         &self,
-        ctx: &FmtContext<'_, S, N>,
+        _ctx: &FmtContext<'_, S, N>,
         mut writer: Writer<'_>,
         event: &Event<'_>,
     ) -> fmt::Result {
         let ts = Utc::now().to_rfc3339_opts(SecondsFormat::Micros, true);
         let level = from_tracing_level(event.metadata().level());
         let ansi = writer.has_ansi_escapes();
+        let request_id = correlation::current();
 
         let mut visitor = EventVisitor::default();
         event.record(&mut visitor);
 
         let line = if let Some(payload) = visitor.payload.as_deref() {
-            let event: HashMap<String, Value> = serde_json::from_str(payload).unwrap_or_default();
+            let mut event: HashMap<String, Value> =
+                serde_json::from_str(payload).unwrap_or_default();
+            inject_request_id(&mut event, request_id.as_deref());
             self.render(&event, level, &ts, ansi)
         } else if visitor.op.is_some() {
-            let event: HashMap<String, Value> = visitor.fields.iter().cloned().collect();
+            let mut event: HashMap<String, Value> = visitor.fields.iter().cloned().collect();
+            inject_request_id(&mut event, request_id.as_deref());
             self.render(&event, level, &ts, ansi)
         } else {
             render_foreign(
                 event.metadata().target(),
                 &visitor.fields,
-                &span_fields(ctx),
+                request_id.as_deref(),
                 level,
                 &ts,
                 ansi,
@@ -299,37 +303,29 @@ where
     }
 }
 
-/// The formatted fields of the active spans, outermost first.
+/// Stamp the ambient correlation id on an event that names none.
 ///
-/// A foreign event is rendered with this so a dependency warning raised during
-/// a request carries that request's correlation id and joins the access log.
-/// Our own events carry their fields explicitly and ignore it.
-fn span_fields<S, N>(ctx: &FmtContext<'_, S, N>) -> String
-where
-    S: Subscriber + for<'lookup> LookupSpan<'lookup>,
-    N: for<'writer> FormatFields<'writer> + 'static,
-{
-    let Some(scope) = ctx.event_scope() else {
-        return String::new();
+/// Injection is additive: an event that already carries a `request_id` — the
+/// HTTP access log, preflight — keeps it. The formatter is the one place that
+/// knows the ambient id, so producers never thread it through their signatures
+/// ([ADR-0080](../../../docs/adr/0080-one-request-identity.md)).
+fn inject_request_id(event: &mut HashMap<String, Value>, request_id: Option<&str>) {
+    let Some(request_id) = request_id else {
+        return;
     };
-    let mut parts = Vec::new();
-    for span in scope.from_root() {
-        let extensions = span.extensions();
-        if let Some(fields) = extensions.get::<FormattedFields<N>>() {
-            let rendered = fields.to_string();
-            if !rendered.is_empty() {
-                parts.push(rendered);
-            }
-        }
+    if !event.contains_key("request_id") {
+        event.insert(
+            "request_id".to_string(),
+            Value::String(request_id.to_string()),
+        );
     }
-    parts.join(" ")
 }
 
 /// Render a foreign (`tracing`-originated) event in the same shape.
 fn render_foreign(
     target: &str,
     fields: &[(String, Value)],
-    span_context: &str,
+    request_id: Option<&str>,
     level: LogLevel,
     ts: &str,
     ansi: bool,
@@ -343,9 +339,12 @@ fn render_foreign(
     match format {
         LogFormat::Text => {
             let level_text = level_field(level, ansi);
-            let mut parts = Vec::with_capacity(fields.len());
+            let mut parts = Vec::with_capacity(fields.len() + 1);
             if let Some(message) = message {
                 parts.push(message);
+            }
+            if let Some(request_id) = request_id {
+                parts.push(key_token("req", &quote_if_needed(request_id), ansi));
             }
             for (key, value) in fields {
                 if key == "message" {
@@ -357,22 +356,17 @@ fn render_foreign(
                     ansi,
                 ));
             }
-            let span_prefix = if span_context.is_empty() {
-                String::new()
-            } else {
-                format!("{span_context} ")
-            };
             let separator = if parts.is_empty() { "" } else { " " };
-            format!(
-                "{ts} {level_text} {span_prefix}{target}:{separator}{}",
-                parts.join(" ")
-            )
+            format!("{ts} {level_text} {target}:{separator}{}", parts.join(" "))
         }
         LogFormat::Json => {
             let mut object = serde_json::Map::with_capacity(fields.len() + 3);
             object.insert("target".to_string(), Value::String(target.to_string()));
-            if !span_context.is_empty() {
-                object.insert("span".to_string(), Value::String(span_context.to_string()));
+            if let Some(request_id) = request_id {
+                object.insert(
+                    "request_id".to_string(),
+                    Value::String(request_id.to_string()),
+                );
             }
             let mut mapped = serde_json::Map::with_capacity(fields.len());
             for (key, value) in fields {
@@ -2240,47 +2234,63 @@ mod tests {
         assert!(line.contains("count=8"), "{line}");
     }
 
-    /// A foreign event inherits the active span's fields, so a dependency
-    /// warning raised while a request is in flight carries that request's
-    /// correlation id and joins the access log. Our own events keep printing
-    /// their explicit fields and are not enriched from the span.
-    #[test]
-    fn a_foreign_event_carries_its_span_fields() {
+    /// The ambient correlation id lands on an own event that names none.
+    #[tokio::test]
+    async fn an_own_event_without_a_request_id_gets_the_ambient_one() {
         let buffer = SharedBuf::default();
         let subscriber = subscriber_with(buffer.clone(), LogFormat::Text);
-        tracing::subscriber::with_default(subscriber, || {
-            let span = tracing::info_span!("http_request", req = %"req_from_span");
-            let _entered = span.enter();
-            tracing::warn!(target: "surrealdb::kvs", message = "level-0 slowdown");
-        });
+        crate::logging::correlation::scope("req_x", async move {
+            tracing::subscriber::with_default(subscriber, || {
+                tracing::event!(
+                    target: LOG_TARGET,
+                    tracing::Level::INFO,
+                    payload = r#"{"op":"ingest.done"}"#
+                );
+            });
+        })
+        .await;
 
         let line = buffer.contents();
-        assert!(
-            line.contains("req=req_from_span"),
-            "the span's request id must be rendered on the foreign line: {line}"
-        );
-        assert!(line.contains("surrealdb::kvs:"), "{line}");
+        assert!(line.contains("req=req_x"), "{line}");
+        assert!(line.contains("op=ingest.done"), "{line}");
+    }
 
-        // Our own event in the same span is not enriched from the span: its
-        // `req` comes from its payload only, so the span's does not leak in.
-        let own = SharedBuf::default();
-        let subscriber = subscriber_with(own.clone(), LogFormat::Text);
-        tracing::subscriber::with_default(subscriber, || {
-            let span = tracing::info_span!("http_request", req = "req_from_span");
-            let _entered = span.enter();
-            tracing::event!(
-                target: LOG_TARGET,
-                tracing::Level::INFO,
-                op = "cache.invalidate",
-                payload = r#"{"op":"cache.invalidate","request_id":"req_payload"}"#
-            );
-        });
-        let own_line = own.contents();
-        assert!(own_line.contains("req=req_payload"), "{own_line}");
-        assert!(
-            !own_line.contains("req_from_span"),
-            "our events must not take the span's req: {own_line}"
-        );
+    /// An event that already carries a `request_id` keeps it.
+    #[tokio::test]
+    async fn an_explicit_request_id_is_not_overwritten() {
+        let buffer = SharedBuf::default();
+        let subscriber = subscriber_with(buffer.clone(), LogFormat::Text);
+        crate::logging::correlation::scope("req_ambient", async move {
+            tracing::subscriber::with_default(subscriber, || {
+                tracing::event!(
+                    target: LOG_TARGET,
+                    tracing::Level::INFO,
+                    payload = r#"{"op":"ingest.done","request_id":"req_own"}"#
+                );
+            });
+        })
+        .await;
+
+        let line = buffer.contents();
+        assert!(line.contains("req=req_own"), "{line}");
+        assert!(!line.contains("req_ambient"), "{line}");
+    }
+
+    /// A foreign event is stamped with the ambient id, not an active span.
+    #[tokio::test]
+    async fn a_foreign_event_carries_the_ambient_request_id() {
+        let buffer = SharedBuf::default();
+        let subscriber = subscriber_with(buffer.clone(), LogFormat::Text);
+        crate::logging::correlation::scope("req_x", async move {
+            tracing::subscriber::with_default(subscriber, || {
+                tracing::warn!(target: "surrealdb::kvs", message = "level-0 slowdown");
+            });
+        })
+        .await;
+
+        let line = buffer.contents();
+        assert!(line.contains("req=req_x"), "{line}");
+        assert!(line.contains("surrealdb::kvs:"), "{line}");
     }
 
     /// The `Targets` policy keeps third-party noise below its default out while
