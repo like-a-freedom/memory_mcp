@@ -1150,7 +1150,7 @@ pub(crate) mod tests {
         feature = "prometheus",
         feature = "streamable-http",
         feature = "control-plane",
-        feature = "fs_watch"
+        feature = "fs-watch"
     ))]
     async fn every_declared_family_reaches_the_exposition() {
         use crate::knowledge::claims_policy::telemetry as claims_telemetry;
