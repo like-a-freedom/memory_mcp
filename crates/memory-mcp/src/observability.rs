@@ -57,7 +57,7 @@ pub const METRIC_FS_WATCH_REVISION_DURATION_SECONDS: &str =
 /// scheduler dimension is called `pass` here because that is what the code
 /// calls a run of one.
 #[cfg_attr(
-    not(feature = "prometheus"),
+    not(feature = "streamable-http"),
     allow(
         dead_code,
         reason = "recorders have no caller without the HTTP profile"
@@ -100,7 +100,7 @@ pub(crate) fn record_job_metric(pass: &'static str, outcome: &'static str, secon
 /// identifiers that turn a metric into a disclosure, and the audit trail
 /// already carries them under a keyed fingerprint.
 #[cfg_attr(
-    not(feature = "prometheus"),
+    not(feature = "streamable-http"),
     allow(
         dead_code,
         reason = "recorders have no caller without the HTTP profile"
@@ -117,7 +117,7 @@ pub(crate) fn record_auth_refusal(surface: &'static str, branch: &'static str) {
 
 /// Record one request-scoped refusal from the HTTP runtime.
 #[cfg_attr(
-    not(feature = "prometheus"),
+    not(feature = "streamable-http"),
     allow(
         dead_code,
         reason = "recorders have no caller without the HTTP profile"
@@ -133,7 +133,7 @@ pub(crate) fn record_runtime_refusal(op: &'static str) {
 /// completing at once must not lose each other's update, and a gauge that
 /// undercounts is worse than one that is slightly late.
 #[cfg_attr(
-    not(feature = "prometheus"),
+    not(feature = "streamable-http"),
     allow(
         dead_code,
         reason = "recorders have no caller without the HTTP profile"
@@ -181,7 +181,7 @@ pub(crate) fn observe(
 /// label borrows from a request — a registry outlives the request that
 /// produced it.
 #[cfg_attr(
-    not(feature = "prometheus"),
+    not(feature = "streamable-http"),
     allow(
         dead_code,
         reason = "recorders have no caller without the HTTP profile"
