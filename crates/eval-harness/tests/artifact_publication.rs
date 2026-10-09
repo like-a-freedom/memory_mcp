@@ -41,6 +41,7 @@ fn artifact(case_id: &str, run_id: &str) -> RunArtifact {
             git_commit: None,
             evaluator_versions: std::collections::BTreeMap::new(),
             profile_digest: "test".into(),
+            suite_fingerprints: std::collections::BTreeMap::new(),
         },
         budget_status: Some(budget_status),
         issues: vec![],

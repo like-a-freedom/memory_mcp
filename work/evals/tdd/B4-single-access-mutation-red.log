@@ -1,0 +1,21 @@
+   Compiling eval-harness v0.1.0 (/Users/solovey/Documents/Codex/2026-10-08/memory-retrieval-quality/crates/eval-harness)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 2.04s
+     Running unittests src/lib.rs (target/debug/deps/eval_harness-1f4b8f47e4f84b53)
+
+running 1 test
+
+thread 'domain::tests::one_access_failure_overrides_a_passing_high_precision_gate' (21158022) panicked at crates/eval-harness/src/domain.rs:517:9:
+assertion `left == right` failed
+  left: Passed
+ right: QualityFailed
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+test domain::tests::one_access_failure_overrides_a_passing_high_precision_gate ... FAILED
+
+failures:
+
+failures:
+    domain::tests::one_access_failure_overrides_a_passing_high_precision_gate
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 185 filtered out; finished in 0.00s
+
+error: test failed, to rerun pass `-p eval-harness --lib`

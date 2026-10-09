@@ -13,6 +13,14 @@ use crate::tools::parsers::parse_datetime;
 use crate::tools::request_id::next_request_id;
 use crate::tools::response::ToolResponse;
 
+fn context_guidance(has_items: bool) -> &'static str {
+    if has_items {
+        "Call explain if you need provenance-ready citations for selected items."
+    } else {
+        "No sufficient matching context was found. Refine the query or verify primary sources."
+    }
+}
+
 /// Assemble the most relevant active memory context for a query.
 ///
 /// The result field is serialized to [`serde_json::Value`] inside this
@@ -73,6 +81,7 @@ async fn assemble_context_inner<T: ToolContext>(
                 duration: Some(timer.elapsed()),
             });
             let count = results.len();
+            let guidance = context_guidance(count > 0);
             operation_metrics.record_result("items", count);
             // Under compact mode, omit `quote` and slim `rationale` via the
             // serde adapters reading the thread-local CompactGuard. The guard
@@ -84,17 +93,9 @@ async fn assemble_context_inner<T: ToolContext>(
             };
             operation_metrics.success();
             if compact {
-                Ok(ToolResponse::complete_list_compact(
-                    value,
-                    count,
-                    "Call explain if you need provenance-ready citations for selected items.",
-                ))
+                Ok(ToolResponse::complete_list_compact(value, count, guidance))
             } else {
-                Ok(ToolResponse::complete_list(
-                    value,
-                    count,
-                    "Call explain if you need provenance-ready citations for selected items.",
-                ))
+                Ok(ToolResponse::complete_list(value, count, guidance))
             }
         }
         Err(err) => {

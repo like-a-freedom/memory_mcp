@@ -232,6 +232,39 @@ pub fn build_select_edge_neighbors_query(
 
 /// Build the graph-app projection: unlike retrieval's neighbor walk, the app
 /// needs a stable edge ID and summary metadata so it can open edge details.
+pub fn build_select_edge_neighbors_for_entities_query(
+    entity_ids: &[String],
+    cutoff: &str,
+) -> (String, Value) {
+    let mut vars = serde_json::Map::new();
+    vars.insert("cutoff".to_string(), json!(cutoff));
+
+    if entity_ids.is_empty() {
+        return (
+            format!("SELECT in, out, relation FROM edge WHERE false AND {BI_TEMPORAL_WHERE}"),
+            Value::Object(vars),
+        );
+    }
+
+    let predicates = entity_ids
+        .iter()
+        .enumerate()
+        .map(|(index, entity_id)| {
+            let variable = format!("entity_{index}");
+            vars.insert(variable.clone(), json!(entity_id));
+            format!("(in = <record> ${variable} OR out = <record> ${variable})")
+        })
+        .collect::<Vec<_>>()
+        .join(" OR ");
+
+    (
+        format!(
+            "SELECT in, out, relation FROM edge WHERE ({predicates}) AND {BI_TEMPORAL_WHERE} ORDER BY in ASC, out ASC, t_valid DESC"
+        ),
+        Value::Object(vars),
+    )
+}
+
 pub fn build_select_graph_edge_neighbors_query(
     node_id: &str,
     cutoff: &str,

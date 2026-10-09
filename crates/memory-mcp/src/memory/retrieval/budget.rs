@@ -1,5 +1,6 @@
 use crate::models::AssembledContextItem;
 
+use super::admission::{build_query_evidence, episode_candidate_is_admitted};
 use super::filtering;
 use super::params::DefaultContextParams;
 use super::ranking::default_episode_fallback_rationale;
@@ -66,7 +67,9 @@ pub(super) async fn collect_episode_fallback_items(
     .await?;
 
     let query_terms = crate::shared::search::search_query_terms(query);
+    let query_evidence = build_query_evidence(Some(query), Vec::new(), params.query_flags);
     let mut episodes = filtering::filter_episodes_by_constraints(episode_records, params.access);
+    episodes.retain(|episode| episode_candidate_is_admitted(&query_evidence, &episode.content));
 
     episodes.sort_by(|left, right| {
         super::lexical::lexical_query_score_for_text(&right.content, &query_terms)
@@ -125,6 +128,7 @@ mod tests {
     fn make_ranked(fact: Fact, tier: RetrievalTier) -> RankedContextFact {
         RankedContextFact {
             fact,
+            evidence: crate::memory::retrieval::types::CandidateEvidence::default(),
             rationale: "test".into(),
             retrieval_tier: tier,
             fusion_score: 0.5,
@@ -152,6 +156,7 @@ mod tests {
             rationale: String::new(),
             retrieval_tier: None,
             reconciliation: None,
+            retrieval_evidence: None,
         }
     }
 
@@ -304,6 +309,7 @@ mod tests {
 
         RankedContextFact {
             fact,
+            evidence: crate::memory::retrieval::types::CandidateEvidence::default(),
             rationale: "test rationale".to_string(),
             retrieval_tier: RetrievalTier::Direct,
             fusion_score,

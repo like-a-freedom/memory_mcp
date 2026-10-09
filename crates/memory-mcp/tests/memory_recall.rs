@@ -46,6 +46,7 @@ fn item(fact_id: &str) -> AssembledContextItem {
         rationale: "tier=direct".to_owned(),
         retrieval_tier: Some("direct".to_owned()),
         reconciliation: None,
+        retrieval_evidence: None,
     }
 }
 

@@ -634,7 +634,7 @@ async fn test_multiword_query_retrieval_quality() {
         .await
         .expect("add fact 3");
 
-    let ctx = AssembleContextCapability::assemble_context_from_service(
+    let unsupported_ctx = AssembleContextCapability::assemble_context_from_service(
         &service,
         memory_mcp::models::AssembleContextRequest {
             query: "Delta Enrollment".to_string(),
@@ -651,8 +651,30 @@ async fn test_multiword_query_retrieval_quality() {
     .await
     .expect("assemble Delta Enrollment");
     assert!(
-        !ctx.is_empty(),
-        "Delta Enrollment: expected matches for non-adjacent multi-word query"
+        unsupported_ctx.is_empty(),
+        "one shared anchor term does not support an unrelated multiword query"
+    );
+
+    let ctx = AssembleContextCapability::assemble_context_from_service(
+        &service,
+        memory_mcp::models::AssembleContextRequest {
+            query: "Delta port 13000".to_string(),
+            as_of: None,
+            budget: 10,
+            fact_types: vec![],
+            view_mode: None,
+            window_start: None,
+            window_end: None,
+            access: None,
+            compact: false,
+        },
+    )
+    .await
+    .expect("assemble non-adjacent Delta port query");
+    assert!(
+        ctx.iter()
+            .any(|item| item.content.contains("gateway service on port 13000")),
+        "two or more distributed terms should retrieve the supporting Delta fact: {ctx:?}"
     );
 
     let ctx2 = AssembleContextCapability::assemble_context_from_service(
@@ -897,7 +919,7 @@ async fn test_assemble_context_graph_results_include_anchor_and_hop_trace() {
     let items = AssembleContextCapability::assemble_context_from_service(
         &service,
         memory_mcp::models::AssembleContextRequest {
-            query: "Alice Stone".to_string(),
+            query: "What is Alice Stone connected to?".to_string(),
             as_of: None,
             budget: 5,
             fact_types: vec![],
@@ -1097,7 +1119,7 @@ async fn test_queryful_assemble_context_skips_unrelated_recent_experience_and_te
         &service,
         memory_mcp::models::AssembleContextRequest {
             query: "requirements created July 2025".to_string(),
-            as_of: Some(Utc.with_ymd_and_hms(2026, 4, 13, 12, 0, 0).unwrap()),
+            as_of: Some(Utc::now() + chrono::Duration::minutes(5)),
             budget: 10,
             fact_types: vec![],
             view_mode: None,
@@ -1152,7 +1174,7 @@ async fn test_explicit_month_year_query_drops_out_of_window_summary_without_temp
         &service,
         memory_mcp::models::AssembleContextRequest {
             query: "Platform planning notes July 2025".to_string(),
-            as_of: Some(Utc.with_ymd_and_hms(2026, 4, 13, 12, 0, 0).unwrap()),
+            as_of: Some(Utc::now() + chrono::Duration::minutes(5)),
             budget: 5,
             fact_types: vec![],
             view_mode: None,
@@ -1213,7 +1235,7 @@ async fn test_query_prefers_matching_episode_content_over_irrelevant_fact_fallba
         &service,
         memory_mcp::models::AssembleContextRequest {
             query: "Platform planning notes July 2025".to_string(),
-            as_of: Some(Utc.with_ymd_and_hms(2026, 4, 13, 12, 0, 0).unwrap()),
+            as_of: Some(Utc::now() + chrono::Duration::minutes(5)),
             budget: 5,
             fact_types: vec![],
             view_mode: None,
@@ -1282,7 +1304,7 @@ async fn test_assemble_context_returns_extracted_meeting_summary_fact_for_matchi
         &service,
         memory_mcp::models::AssembleContextRequest {
             query: "help kickoff documentation localization terminology".to_string(),
-            as_of: Some(Utc.with_ymd_and_hms(2026, 4, 13, 12, 0, 0).unwrap()),
+            as_of: Some(Utc::now() + chrono::Duration::minutes(5)),
             budget: 10,
             fact_types: vec![],
             view_mode: None,
@@ -1351,7 +1373,7 @@ async fn test_assemble_context_extracts_facts_from_ad_hoc_markdown_summary() {
         &service,
         memory_mcp::models::AssembleContextRequest {
             query: "regional launch approved south market september 30".to_string(),
-            as_of: Some(Utc.with_ymd_and_hms(2026, 4, 13, 12, 0, 0).unwrap()),
+            as_of: Some(Utc::now() + chrono::Duration::minutes(5)),
             budget: 10,
             fact_types: vec![],
             view_mode: None,
@@ -1377,7 +1399,7 @@ async fn test_assemble_context_extracts_facts_from_ad_hoc_markdown_summary() {
         &service,
         memory_mcp::models::AssembleContextRequest {
             query: "continue platform 1.5 development".to_string(),
-            as_of: Some(Utc.with_ymd_and_hms(2026, 4, 13, 12, 0, 0).unwrap()),
+            as_of: Some(Utc::now() + chrono::Duration::minutes(5)),
             budget: 10,
             fact_types: vec![],
             view_mode: None,
@@ -1440,7 +1462,7 @@ async fn test_assemble_context_prefers_extracted_fact_from_thematic_markdown_sum
         &service,
         memory_mcp::models::AssembleContextRequest {
             query: "finalize phased rollout checklist".to_string(),
-            as_of: Some(Utc.with_ymd_and_hms(2026, 4, 13, 12, 0, 0).unwrap()),
+            as_of: Some(Utc::now() + chrono::Duration::minutes(5)),
             budget: 10,
             fact_types: vec![],
             view_mode: None,
@@ -1500,7 +1522,7 @@ async fn test_assemble_context_keeps_extracted_presentation_summary_facts_for_br
         &service,
         memory_mcp::models::AssembleContextRequest {
             query: "suite alpha beta gamma shared platform q3 2026 roadmap rollout controls versioning graphical rules".to_string(),
-            as_of: Some(Utc.with_ymd_and_hms(2026, 4, 13, 12, 0, 0).unwrap()),
+            as_of: Some(Utc::now() + chrono::Duration::minutes(5)),
             budget: 10,
             fact_types: vec![],
             view_mode: None,
@@ -1527,7 +1549,7 @@ async fn test_assemble_context_keeps_extracted_presentation_summary_facts_for_br
 #[tokio::test]
 async fn test_assemble_context_prefers_anchor_backed_result_over_generic_overlap_noise() {
     let service = common::make_service().await;
-    let cutoff = Utc.with_ymd_and_hms(2026, 4, 13, 12, 0, 0).unwrap();
+    let cutoff = Utc::now() + chrono::Duration::minutes(5);
 
     let anchor_fact_id = service
         .add_fact(
@@ -1577,7 +1599,7 @@ async fn test_assemble_context_prefers_anchor_backed_result_over_generic_overlap
     let items = AssembleContextCapability::assemble_context_from_service(
         &service,
         memory_mcp::models::AssembleContextRequest {
-            query: "openshift rollout controls".to_string(),
+            query: "openshift migration rollout controls".to_string(),
             as_of: Some(cutoff),
             budget: 3,
             fact_types: vec![],

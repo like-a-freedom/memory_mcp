@@ -1,0 +1,19 @@
+   Compiling eval-harness v0.1.0 (/Users/solovey/Documents/Codex/2026-10-08/memory-retrieval-quality/crates/eval-harness)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 2.07s
+     Running unittests src/lib.rs (target/debug/deps/eval_harness-1f4b8f47e4f84b53)
+
+running 1 test
+
+thread 'suites::retrieval_quality::scoring::tests::gold_keys_cannot_use_the_reserved_unknown_result_prefix' (21156627) panicked at crates/eval-harness/src/suites/retrieval_quality/scoring.rs:172:18:
+reserved runtime key prefix must be rejected: ()
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+test suites::retrieval_quality::scoring::tests::gold_keys_cannot_use_the_reserved_unknown_result_prefix ... FAILED
+
+failures:
+
+failures:
+    suites::retrieval_quality::scoring::tests::gold_keys_cannot_use_the_reserved_unknown_result_prefix
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 184 filtered out; finished in 0.00s
+
+error: test failed, to rerun pass `-p eval-harness --lib`

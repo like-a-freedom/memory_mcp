@@ -12,6 +12,7 @@ use crate::knowledge::claims::{
     ClaimCandidateQuery, CommitReconciliationPageRequest, JobCounters, LeaseJobRequest,
 };
 use crate::models::claim::{ClaimJob, ClaimJobKind, ClaimJobState};
+use crate::platform::context_cache_key::InvalidateContextCache;
 
 use super::projection::ClaimService;
 
@@ -30,13 +31,18 @@ impl ClaimWorkerRuntime {
         }
     }
 
-    pub(crate) async fn spawn_worker(&self, claim_service: ClaimService, worker_id: String) {
+    pub(crate) async fn spawn_worker(
+        &self,
+        claim_service: ClaimService,
+        worker_id: String,
+        cache_invalidator: Arc<dyn InvalidateContextCache>,
+    ) {
         let shutdown = self.shutdown.clone();
         let handle = tokio::spawn(async move {
             loop {
                 tokio::select! {
                     _ = shutdown.cancelled() => break,
-                    outcome = run_next_leased_job(&claim_service, &worker_id) => {
+                    outcome = run_next_leased_job(&claim_service, &worker_id, cache_invalidator.as_ref()) => {
                         match outcome {
                             Ok(true) => continue,
                             Ok(false) => {}
@@ -73,6 +79,7 @@ impl ClaimWorkerRuntime {
 pub(crate) async fn run_next_leased_job(
     claim_service: &ClaimService,
     worker_id: &str,
+    cache_invalidator: &dyn InvalidateContextCache,
 ) -> Result<bool, MemoryError> {
     let lease_request = LeaseJobRequest {
         lease_owner: worker_id,
@@ -81,16 +88,20 @@ pub(crate) async fn run_next_leased_job(
     let job = claim_service.store.lease_next_job(lease_request).await?;
     match job {
         Some(job) => {
-            process_job(claim_service, &job).await?;
+            process_job(claim_service, &job, cache_invalidator).await?;
             Ok(true)
         }
         None => Ok(false),
     }
 }
 
-async fn process_job(claim_service: &ClaimService, job: &ClaimJob) -> Result<(), MemoryError> {
+async fn process_job(
+    claim_service: &ClaimService,
+    job: &ClaimJob,
+    cache_invalidator: &dyn InvalidateContextCache,
+) -> Result<(), MemoryError> {
     match job.kind {
-        ClaimJobKind::Reconcile => reconcile_page(claim_service, job).await,
+        ClaimJobKind::Reconcile => reconcile_page(claim_service, job, cache_invalidator).await,
         ClaimJobKind::Backfill => {
             let last = super::backfill::run_backfill_page(
                 claim_service,
@@ -163,11 +174,16 @@ pub(crate) async fn reconcile_claim_inline(
         owning,
         claim_service.config.inline_candidate_limit,
         Some(claim_service.config.inline_budget),
+        None,
     )
     .await
 }
 
-async fn reconcile_page(claim_service: &ClaimService, job: &ClaimJob) -> Result<(), MemoryError> {
+async fn reconcile_page(
+    claim_service: &ClaimService,
+    job: &ClaimJob,
+    cache_invalidator: &dyn InvalidateContextCache,
+) -> Result<(), MemoryError> {
     let claim_id = match &job.claim_id {
         Some(id) => id.clone(),
         None => return Ok(()),
@@ -197,6 +213,7 @@ async fn reconcile_page(claim_service: &ClaimService, job: &ClaimJob) -> Result<
         owning,
         claim_service.config.candidate_page_size,
         None,
+        Some(cache_invalidator),
     )
     .await
 }
@@ -215,6 +232,7 @@ async fn reconcile_page_with_owning(
     owning: crate::models::claim::Claim,
     limit: usize,
     budget: Option<std::time::Duration>,
+    cache_invalidator: Option<&dyn InvalidateContextCache>,
 ) -> Result<(), MemoryError> {
     let page_start = std::time::Instant::now();
     let slot_fp = owning.slot_fingerprint.clone();
@@ -247,6 +265,9 @@ async fn reconcile_page_with_owning(
             .store
             .commit_reconciliation_page(request)
             .await?;
+        if let Some(cache_invalidator) = cache_invalidator {
+            cache_invalidator.invalidate_context_cache().await;
+        }
         super::telemetry::record_pipeline_duration(
             super::telemetry::ClaimMetricStage::Reconcile,
             owning.schema_family,
@@ -389,6 +410,9 @@ async fn reconcile_page_with_owning(
         .store
         .commit_reconciliation_page(request)
         .await?;
+    if let Some(cache_invalidator) = cache_invalidator {
+        cache_invalidator.invalidate_context_cache().await;
+    }
 
     // Reconciliation metrics (no-op without a recorder).
     let page_outcome = if relations.is_empty() {
@@ -438,7 +462,10 @@ async fn reconcile_page_with_owning(
 
 #[cfg(test)]
 mod tests {
-    use std::sync::{Arc, Mutex};
+    use std::sync::{
+        Arc, Mutex,
+        atomic::{AtomicUsize, Ordering},
+    };
 
     use async_trait::async_trait;
 
@@ -448,16 +475,19 @@ mod tests {
     use crate::knowledge::claims::{
         ActiveRelationCount, BackfillFactQuery, ClaimCandidateQuery, ClaimStore,
         ClaimsForFactsQuery, CommitReconciliationPageRequest, LeaseJobRequest,
-        PersistProjectionRequest, RelationsByFactQuery, RelationsByFactResult,
-        RelationsForFactsQuery, RetractFactAndClaimsRequest,
+        PersistProjectionRequest, RelationsForFactsQuery, RetractFactAndClaimsRequest,
     };
-    use crate::models::claim::{Claim, ClaimJob, ClaimRelation, ClaimRelationOutcome};
-    use crate::models::{EpisodeId, FactId};
+    use crate::models::claim::{
+        Claim, ClaimJob, ClaimJobKind, ClaimJobState, ClaimRelation, ClaimRelationOutcome,
+    };
+    use crate::models::{ClaimJobId, EpisodeId, FactId};
 
     #[derive(Default)]
     struct RecordingClaimStore {
         claims: Mutex<Vec<Claim>>,
         relations: Mutex<Vec<ClaimRelation>>,
+        leased_job: Mutex<Option<ClaimJob>>,
+        committed_pages: AtomicUsize,
     }
 
     #[async_trait]
@@ -470,7 +500,7 @@ mod tests {
             &self,
             _request: LeaseJobRequest<'_>,
         ) -> Result<Option<ClaimJob>, MemoryError> {
-            Ok(None)
+            Ok(self.leased_job.lock().unwrap().take())
         }
 
         async fn persist_projection(
@@ -520,13 +550,6 @@ mod tests {
             Ok(vec![])
         }
 
-        async fn select_relations_by_fact(
-            &self,
-            _query: RelationsByFactQuery<'_>,
-        ) -> Result<RelationsByFactResult, MemoryError> {
-            Ok(RelationsByFactResult::default())
-        }
-
         async fn count_active_relations(&self) -> Result<Vec<ActiveRelationCount>, MemoryError> {
             Ok(vec![])
         }
@@ -549,12 +572,110 @@ mod tests {
             &self,
             request: CommitReconciliationPageRequest<'_>,
         ) -> Result<(), MemoryError> {
+            self.committed_pages.fetch_add(1, Ordering::SeqCst);
             self.relations
                 .lock()
                 .unwrap()
                 .extend(request.relations.iter().cloned());
             Ok(())
         }
+    }
+
+    struct CommitAwareInvalidator {
+        store: Arc<RecordingClaimStore>,
+        calls: AtomicUsize,
+    }
+
+    impl crate::platform::context_cache_key::InvalidateContextCache for CommitAwareInvalidator {
+        fn invalidate_context_cache(
+            &self,
+        ) -> std::pin::Pin<Box<dyn std::future::Future<Output = ()> + Send + '_>> {
+            Box::pin(async move {
+                assert_eq!(
+                    self.store.committed_pages.load(Ordering::SeqCst),
+                    1,
+                    "the durable reconciliation page must commit before cache invalidation"
+                );
+                self.calls.fetch_add(1, Ordering::SeqCst);
+            })
+        }
+    }
+
+    #[tokio::test]
+    async fn successful_background_reconciliation_invalidates_after_commit() {
+        let store = Arc::new(RecordingClaimStore::default());
+        let service = ClaimService::new(store.clone()).with_config(ClaimConfig {
+            rollout_stage: ClaimRolloutStage::Relations,
+            ..Default::default()
+        });
+        let policy_tags = vec!["source:chat".to_string()];
+        let facts = [
+            FactId::from("fact:worker-cache-old"),
+            FactId::from("fact:worker-cache-new"),
+        ];
+
+        for (index, fact_id) in facts.iter().enumerate() {
+            let episode_id = EpisodeId::from(format!("episode:worker-cache-{index}"));
+            service
+                .after_fact_persisted(&FactPersistedParams {
+                    namespace: "main",
+                    fact_id,
+                    source_episode_id: &episode_id,
+                    fact_type: "note",
+                    content: "status is active",
+                    policy_tags: &policy_tags,
+                    entity_links: &[],
+                    t_valid: chrono::Utc::now(),
+                    source_lineage: Some("lineage:worker-cache"),
+                })
+                .await
+                .expect("both facts should project through the ordinary claim path");
+        }
+
+        let owning = store
+            .claims
+            .lock()
+            .unwrap()
+            .first()
+            .cloned()
+            .expect("the source fact should produce a persisted claim");
+        store.committed_pages.store(0, Ordering::SeqCst);
+        store.relations.lock().unwrap().clear();
+        *store.leased_job.lock().unwrap() = Some(ClaimJob {
+            job_id: ClaimJobId::from_raw("claim_job:worker-cache-reconcile".to_string()),
+            kind: ClaimJobKind::Reconcile,
+            namespace: "main".to_string(),
+            source_fact_id: Some(owning.source_fact_id.clone()),
+            claim_id: Some(owning.claim_id.clone()),
+            extractor_fingerprint: owning.extractor_fingerprint.clone(),
+            evaluator_fingerprint: None,
+            status: ClaimJobState::Leased,
+            cursor: None,
+            lease_owner: Some("worker".to_string()),
+            lease_expires_at: None,
+            processed: 0,
+            succeeded: 0,
+            skipped: 0,
+            failed: 0,
+            retry_count: 0,
+            last_error: None,
+            created_at: chrono::Utc::now(),
+            started_at: None,
+            updated_at: chrono::Utc::now(),
+            completed_at: None,
+        });
+        let invalidator = CommitAwareInvalidator {
+            store: store.clone(),
+            calls: AtomicUsize::new(0),
+        };
+
+        let did_work = super::run_next_leased_job(&service, "worker", &invalidator)
+            .await
+            .expect("the leased reconciliation page should commit");
+
+        assert!(did_work);
+        assert_eq!(store.committed_pages.load(Ordering::SeqCst), 1);
+        assert_eq!(invalidator.calls.load(Ordering::SeqCst), 1);
     }
 
     #[tokio::test]

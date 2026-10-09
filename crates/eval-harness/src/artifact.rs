@@ -26,6 +26,9 @@ pub struct RunFingerprint {
     pub configuration_hash: String,
     pub git_commit: Option<String>,
     pub evaluator_versions: BTreeMap<String, String>,
+    /// Resolved corpus, model and index identities supplied by suites after they run.
+    #[serde(default)]
+    pub suite_fingerprints: BTreeMap<String, BTreeMap<String, String>>,
     pub profile_digest: String,
 }
 
@@ -113,8 +116,32 @@ impl RunFingerprint {
             )]
             .into_iter()
             .collect(),
+            suite_fingerprints: BTreeMap::new(),
             profile_digest,
         }
+    }
+
+    /// Attaches identities resolved during suite execution and includes them
+    /// in the compatibility hash used to reject mismatched baselines.
+    pub fn with_suite_fingerprints(
+        mut self,
+        suite_fingerprints: BTreeMap<String, BTreeMap<String, String>>,
+    ) -> Self {
+        let mut hasher = sha2::Sha256::new();
+        hasher.update(self.configuration_hash.as_bytes());
+        for (suite_id, values) in &suite_fingerprints {
+            hasher.update([0]);
+            hasher.update(suite_id.as_bytes());
+            for (name, value) in values {
+                hasher.update([0]);
+                hasher.update(name.as_bytes());
+                hasher.update([0]);
+                hasher.update(value.as_bytes());
+            }
+        }
+        self.configuration_hash = hex::encode(hasher.finalize());
+        self.suite_fingerprints = suite_fingerprints;
+        self
     }
 
     #[cfg(test)]
@@ -131,6 +158,7 @@ impl RunFingerprint {
             configuration_hash: "test".into(),
             git_commit: None,
             evaluator_versions: BTreeMap::new(),
+            suite_fingerprints: BTreeMap::new(),
             profile_digest: "test".into(),
         }
     }
@@ -175,6 +203,7 @@ pub enum GateFailureReason {
     MissingBaseline,
     IncompatibleBaseline,
     MissingMetric,
+    NonFiniteMetric,
     None,
 }
 
@@ -360,6 +389,7 @@ impl RunArtifact {
                 configuration_hash: "test".into(),
                 git_commit: None,
                 evaluator_versions: BTreeMap::new(),
+                suite_fingerprints: BTreeMap::new(),
                 profile_digest: "test".into(),
             },
             budget_status: Some(budget_val),

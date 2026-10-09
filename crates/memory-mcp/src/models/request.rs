@@ -291,6 +291,23 @@ pub struct ClaimRelationSummary {
     pub evaluator_version: String,
 }
 
+/// Optional evidence explaining why a fact passed retrieval admission.
+///
+/// This is emitted only in verbose `assemble_context` responses. It reports
+/// candidate evidence and the admission policy, not answer confidence.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub struct RetrievalEvidence {
+    pub policy_version: String,
+    pub admission_basis: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub semantic_similarity: Option<f64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub graph_anchor_origin: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub hop_count: Option<usize>,
+}
+
 /// A ranked context item returned by the MCP `assemble_context` tool.
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "snake_case")]
@@ -335,6 +352,13 @@ pub struct AssembledContextItem {
         skip_serializing_if = "crate::tools::compact::skip_if_none_or_compact"
     )]
     pub reconciliation: Option<ClaimReconciliationMetadata>,
+    /// Why this fact passed retrieval admission. Omitted in compact mode to
+    /// preserve the response-size contract.
+    #[serde(
+        default,
+        skip_serializing_if = "crate::tools::compact::skip_if_none_or_compact"
+    )]
+    pub retrieval_evidence: Option<RetrievalEvidence>,
 }
 
 impl IngestRequest {

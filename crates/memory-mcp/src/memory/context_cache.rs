@@ -20,11 +20,12 @@ pub type ContextCache = Arc<RwLock<ContextCacheState>>;
 #[cfg(test)]
 mod tests {
     use super::*;
-    use chrono::{TimeZone, Utc};
+    use chrono::{TimeZone, Timelike, Utc};
     use serde_json::json;
     use std::num::NonZeroUsize;
 
     use crate::models::AssembledContextItem;
+    use crate::platform::context_cache_key::CacheCutoff;
 
     #[test]
     fn cache_key_new_normalizes_query() {
@@ -38,7 +39,7 @@ mod tests {
     fn cache_key_new_buckets_cutoff_to_five_minutes() {
         let cutoff = Utc.with_ymd_and_hms(2024, 1, 1, 12, 34, 45).unwrap();
         let key = CacheKey::new("query", cutoff, 5, &[], CacheView::default(), None);
-        assert_eq!(key.cutoff, "2024-01-01T12:30:00Z");
+        assert_eq!(key.cutoff, "current:2024-01-01T12:30:00Z");
     }
 
     #[test]
@@ -73,6 +74,90 @@ mod tests {
 
         assert_eq!(view.window_start.as_deref(), Some("2024-01-01T12:30:00Z"));
         assert_eq!(view.window_end.as_deref(), Some("2024-01-01T13:00:00Z"));
+    }
+
+    #[test]
+    fn explicit_historical_cutoffs_in_one_bucket_have_distinct_keys() {
+        let earlier = Utc.with_ymd_and_hms(2024, 1, 1, 12, 31, 10).unwrap();
+        let later = Utc.with_ymd_and_hms(2024, 1, 1, 12, 33, 20).unwrap();
+        let earlier_key = CacheKey::new(
+            "query",
+            CacheCutoff::HistoricalExact(earlier),
+            5,
+            &[],
+            CacheView::default(),
+            None,
+        );
+        let later_key = CacheKey::new(
+            "query",
+            CacheCutoff::HistoricalExact(later),
+            5,
+            &[],
+            CacheView::default(),
+            None,
+        );
+
+        assert_ne!(earlier_key, later_key);
+    }
+
+    #[test]
+    fn current_and_historical_keys_do_not_alias_at_the_same_instant() {
+        let cutoff = Utc.with_ymd_and_hms(2024, 1, 1, 12, 31, 10).unwrap();
+        let current = CacheKey::new(
+            "query",
+            CacheCutoff::CurrentBucket(cutoff),
+            5,
+            &[],
+            CacheView::default(),
+            None,
+        );
+        let historical = CacheKey::new(
+            "query",
+            CacheCutoff::HistoricalExact(cutoff),
+            5,
+            &[],
+            CacheView::default(),
+            None,
+        );
+
+        assert_ne!(current, historical);
+    }
+
+    #[test]
+    fn explicit_historical_window_bounds_remain_exact() {
+        let first_start = Utc
+            .with_ymd_and_hms(2024, 1, 1, 12, 31, 10)
+            .unwrap()
+            .with_nanosecond(123_000_000)
+            .unwrap();
+        let second_start = Utc
+            .with_ymd_and_hms(2024, 1, 1, 12, 31, 20)
+            .unwrap()
+            .with_nanosecond(456_000_000)
+            .unwrap();
+        let cutoff = Utc.with_ymd_and_hms(2024, 1, 1, 12, 40, 0).unwrap();
+        let first = CacheView::new_with_cutoff(
+            Some("timeline"),
+            Some(first_start),
+            None,
+            CacheCutoff::HistoricalExact(cutoff),
+        );
+        let second = CacheView::new_with_cutoff(
+            Some("timeline"),
+            Some(second_start),
+            None,
+            CacheCutoff::HistoricalExact(cutoff),
+        );
+
+        assert_ne!(first, second);
+        assert_eq!(
+            first.window_start.as_deref(),
+            Some("2024-01-01T12:31:10.123+00:00")
+        );
+        assert_eq!(
+            second.window_start.as_deref(),
+            Some("2024-01-01T12:31:20.456+00:00")
+        );
     }
 
     #[test]

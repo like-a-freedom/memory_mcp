@@ -256,6 +256,46 @@ impl SurrealDbClient {
         active_namespace: &str,
         log_level: &str,
     ) -> Result<Self, MemoryError> {
+        Self::connect_in_memory_with_embedding_dimension(
+            database,
+            active_namespace,
+            log_level,
+            crate::config::DEFAULT_EMBEDDING_DIMENSION,
+        )
+        .await
+    }
+
+    /// Connects an isolated in-memory database using the actual configured
+    /// provider dimension. Available only to the evaluation-support build so
+    /// acceptance runs exercise an ANN index matching the production model.
+    #[cfg(feature = "eval-support")]
+    pub async fn connect_in_memory_with_dimension(
+        database: &str,
+        active_namespace: &str,
+        log_level: &str,
+        fact_embedding_dimension: usize,
+    ) -> Result<Self, MemoryError> {
+        Self::connect_in_memory_with_embedding_dimension(
+            database,
+            active_namespace,
+            log_level,
+            fact_embedding_dimension,
+        )
+        .await
+    }
+
+    async fn connect_in_memory_with_embedding_dimension(
+        database: &str,
+        active_namespace: &str,
+        log_level: &str,
+        fact_embedding_dimension: usize,
+    ) -> Result<Self, MemoryError> {
+        if fact_embedding_dimension == 0 {
+            return Err(MemoryError::ConfigInvalid(
+                "embedding dimension must be greater than zero".into(),
+            ));
+        }
+
         let db = Surreal::new::<Mem>(())
             .await
             .map_err(|err| MemoryError::Storage(format!("SurrealDB memory init failed: {err}")))?;
@@ -268,7 +308,7 @@ impl SurrealDbClient {
             engine: DbEngine::Mem(Arc::new(db)),
             active_namespace: active_namespace.to_string(),
             logger: StdoutLogger::new(log_level),
-            fact_embedding_dimension: crate::config::DEFAULT_EMBEDDING_DIMENSION,
+            fact_embedding_dimension,
         })
     }
 
@@ -1345,6 +1385,37 @@ mod tests {
 
         let error = result.expect_err("later statement error must not be ignored");
         assert!(error.to_string().contains("memory_fts"));
+    }
+
+    #[cfg(feature = "eval-support")]
+    #[tokio::test]
+    async fn in_memory_client_uses_the_configured_embedding_dimension() {
+        let client = SurrealDbClient::connect_in_memory_with_dimension(
+            "eval_dimension",
+            "main",
+            "warn",
+            384,
+        )
+        .await
+        .expect("in-memory client connects");
+
+        assert_eq!(client.migration_embedding_dimension(), 384);
+    }
+
+    #[cfg(feature = "eval-support")]
+    #[tokio::test]
+    async fn in_memory_client_rejects_a_zero_embedding_dimension() {
+        let result = SurrealDbClient::connect_in_memory_with_dimension(
+            "eval_zero_dimension",
+            "main",
+            "warn",
+            0,
+        )
+        .await;
+
+        assert!(
+            matches!(result, Err(MemoryError::ConfigInvalid(message)) if message.contains("dimension must be greater than zero"))
+        );
     }
 
     #[tokio::test]

@@ -30,11 +30,13 @@ use crate::error::MemoryError;
 use crate::platform::log_event::log_event;
 use crate::shared::temporal::normalize_dt;
 
+mod admission;
 mod alias_expansion;
 mod budget;
 mod community;
+mod currency;
 mod experience;
-mod filtering;
+pub(crate) mod filtering;
 pub(crate) mod graph;
 pub(crate) mod graph_reads;
 pub(crate) mod graph_surprising;
@@ -312,7 +314,14 @@ async fn assemble_context_inner(
         }
     }
 
-    attach_reconciliation(ctx, &mut results).await?;
+    let duplicate_groups = attach_reconciliation(
+        ctx,
+        &mut results,
+        params.cutoff,
+        params.access.allowed_tags.clone().unwrap_or_default(),
+    )
+    .await?;
+    results = ranking::deduplicate_admitted_view(results, &duplicate_groups);
     // Post-assembly, before the cache: a cached list must carry the reorder
     // already, because a cache hit returns before any post-processing.
     results = ranking::demote_superseded(ranking::DemoteSupersededRequest { items: &results });
@@ -393,7 +402,9 @@ async fn assemble_context_inner(
 async fn attach_reconciliation(
     ctx: &RetrievalContext,
     items: &mut [AssembledContextItem],
-) -> Result<(), MemoryError> {
+    cutoff: chrono::DateTime<chrono::Utc>,
+    policy_tags: Vec<String>,
+) -> Result<Vec<std::collections::BTreeSet<String>>, MemoryError> {
     // Dedup on the borrow, not on a fresh `FactId` per item: this runs on
     // every cache miss, and allocating one String per element to discover an
     // id is already in the set is pure waste. One allocation per *distinct*
@@ -407,17 +418,29 @@ async fn attach_reconciliation(
         .collect();
 
     if fact_ids.is_empty() {
-        return Ok(());
+        return Ok(Vec::new());
     }
 
-    let read = crate::knowledge::api::relations_for_facts(&*ctx.relation_read, &fact_ids).await?;
+    let temporal = crate::knowledge::api::temporal_relations(
+        &*ctx.relation_read,
+        crate::knowledge::api::TemporalRelationsQuery {
+            fact_ids: fact_ids.clone(),
+            cutoff,
+            policy_tags,
+            counterpart_limit: crate::knowledge::api::TEMPORAL_RELATION_MAX_COUNTERPARTS,
+            max_relation_depth: 1,
+        },
+    )
+    .await?;
+    let read = crate::knowledge::api::visible_temporal_relations_for_facts(&temporal, &fact_ids);
+    let duplicate_groups = crate::knowledge::api::duplicate_fact_groups(&read);
     if read.relations.is_empty() {
-        return Ok(());
+        return Ok(duplicate_groups);
     }
 
     let by_fact = crate::knowledge::api::reconciliation_metadata_by_fact(&read);
     if by_fact.is_empty() {
-        return Ok(());
+        return Ok(duplicate_groups);
     }
 
     for item in items.iter_mut() {
@@ -426,7 +449,7 @@ async fn attach_reconciliation(
         }
     }
 
-    Ok(())
+    Ok(duplicate_groups)
 }
 
 #[cfg(test)]
@@ -851,7 +874,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn assemble_context_prefers_direct_lexical_matches_over_newer_community_expansion() {
+    async fn assemble_context_rejects_one_term_graph_expansion_for_content_query() {
         let service = crate::service::MemoryService::new(
             Arc::new(
                 crate::service::mock_db::MockDbClient::new()
@@ -933,20 +956,12 @@ mod tests {
         .await
         .expect("assemble context");
 
-        assert_eq!(results.len(), 2);
+        assert_eq!(results.len(), 1);
         assert_eq!(results[0].fact_id, "fact:direct");
         assert!(
             results[0].rationale.contains("lexical"),
             "direct lexical result should explain itself as a lexical match, got: {}",
             results[0].rationale
-        );
-        assert_eq!(results[1].fact_id, "fact:community");
-        assert!(
-            results[1].retrieval_tier.as_deref() == Some("graph")
-                || results[1].rationale.contains("community:atlas"),
-            "secondary expansion should remain the community-linked fact, even if graph expansion surfaces it first; got tier={:?} rationale={}",
-            results[1].retrieval_tier,
-            results[1].rationale
         );
     }
 
@@ -1046,6 +1061,18 @@ mod tests {
         assert_eq!(results.len(), 2);
         assert_eq!(results[0].fact_id, "fact:alpha");
         assert!(results[0].rationale.contains("community:alpha"));
+        assert_eq!(
+            results[0].provenance["retrieval_admission"]["basis"],
+            "community_summary"
+        );
+        assert_eq!(
+            results[0].provenance["retrieval_admission"]["community"]["community_id"],
+            "community:alpha"
+        );
+        assert_eq!(
+            results[0].provenance["retrieval_admission"]["community"]["matched_summary_terms"],
+            json!(["launch", "workstream"])
+        );
         assert_eq!(results[1].fact_id, "fact:beta");
     }
 
@@ -1442,6 +1469,31 @@ mod tests {
         )
         .await;
 
+        let stored_records = crate::knowledge::KnowledgeStoreClient::new(db_client.clone(), "org")
+            .select_active_facts(500)
+            .await
+            .expect("read seeded facts back from embedded storage");
+        let direct_topic_facts = super::filtering::filter_facts_by_constraints(
+            stored_records,
+            &crate::models::AccessPayload::default(),
+            &[],
+        );
+        let query_evidence = super::admission::build_query_evidence(
+            Some("Which venue would work best for my conference?"),
+            Vec::new(),
+            &super::query_mode::QueryFlags::default(),
+        );
+        let repeated_topics = super::experience::repeated_topic_evidence_for_query(
+            &query_evidence,
+            &direct_topic_facts,
+        );
+        assert!(
+            repeated_topics
+                .iter()
+                .any(|topic| { topic.term == "hotel" && topic.supporting_fact_ids.len() == 2 }),
+            "embedded readback should retain the repeated hotel topic and both direct source facts"
+        );
+
         let service = crate::service::MemoryService::new(
             db_client,
             "org".to_string(),
@@ -1474,5 +1526,17 @@ mod tests {
 
         assert_eq!(results.len(), 1);
         assert_eq!(results[0].fact_id, "fact:experience");
+        assert_eq!(
+            results[0].provenance["retrieval_admission"]["basis"],
+            "repeated_topic"
+        );
+        assert_eq!(
+            results[0].provenance["retrieval_admission"]["repeated_topic"]["matched_repeated_topics"],
+            json!(["hotel"])
+        );
+        assert_eq!(
+            results[0].provenance["retrieval_admission"]["repeated_topic"]["supporting_fact_ids"],
+            json!(["fact:conference-hotel", "fact:conference-hotel-shape"])
+        );
     }
 }

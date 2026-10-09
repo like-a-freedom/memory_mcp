@@ -61,14 +61,27 @@ impl EpisodeContextStore {
     pub async fn select_episodes_via_entity(
         &self,
         entity_id: &str,
+        allowed_tags: Option<&[String]>,
     ) -> Result<Vec<Value>, MemoryError> {
-        let sql = "SELECT * FROM episode WHERE episode_id IN (\
-                   SELECT VALUE source_episode FROM fact WHERE fact_id IN (\
-                   SELECT VALUE type::string(out) FROM edge \
-                   WHERE in = <record> $entity_id AND relation = 'involved_in')) \
-                   ORDER BY t_ref DESC LIMIT 10";
-        self.db
-            .query_rows(sql, Some(json!({ "entity_id": entity_id })))
-            .await
+        let (fact_access_clause, episode_access_clause) = if allowed_tags.is_some() {
+            (
+                " AND (policy_tags IS NONE OR policy_tags IS NULL OR policy_tags = [] OR policy_tags CONTAINSANY $allowed_tags)",
+                " AND (policy_tags IS NONE OR policy_tags IS NULL OR policy_tags = [] OR policy_tags CONTAINSANY $allowed_tags)",
+            )
+        } else {
+            ("", "")
+        };
+        let sql = format!(
+            "SELECT * FROM episode WHERE episode_id IN (\
+             SELECT VALUE source_episode FROM fact WHERE fact_id IN (\
+             SELECT VALUE type::string(out) FROM edge \
+             WHERE in = <record> $entity_id AND relation = 'involved_in'){fact_access_clause}){episode_access_clause} \
+             ORDER BY t_ref DESC LIMIT 10"
+        );
+        let vars = match allowed_tags {
+            Some(tags) => json!({ "entity_id": entity_id, "allowed_tags": tags }),
+            None => json!({ "entity_id": entity_id }),
+        };
+        self.db.query_rows(&sql, Some(vars)).await
     }
 }

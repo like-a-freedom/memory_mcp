@@ -16,7 +16,7 @@ use memory_mcp::service::memory_container_shims::memory_capabilities_ingest::Ing
 
 use chrono::Utc;
 use memory_mcp::models::EdgeAttributes;
-use memory_mcp::models::{ExplainItem, ExplainRequest, IngestRequest, Provenance};
+use memory_mcp::models::{AccessPayload, ExplainItem, ExplainRequest, IngestRequest, Provenance};
 use memory_mcp::storage::DbClient;
 use serde_json::json;
 
@@ -355,6 +355,133 @@ async fn explain_includes_linked_episodes_via_shared_entity() {
     let has_linked = item.all_sources.iter().any(|s| s.relationship == "linked");
     assert!(has_direct, "Should have a direct provenance source");
     assert!(has_linked, "Should have a linked provenance source");
+}
+
+#[tokio::test]
+async fn explain_returns_all_allowed_lineage_without_restricted_sources() {
+    let (service, db_client) = common::make_service_with_client().await;
+    let t_ref = Utc::now();
+    let scope = "org";
+    let entity_id = memory_mcp::service::deterministic_entity_id("person", "Alice Smith");
+    let mut source_ids = std::collections::BTreeMap::new();
+
+    for (key, episode_tag, fact_tag, content) in [
+        (
+            "lineage-a",
+            "visible",
+            "visible",
+            "Alice Smith approved a contract",
+        ),
+        (
+            "lineage-b",
+            "visible",
+            "visible",
+            "Alice Smith reviewed a contract",
+        ),
+        (
+            "lineage-c",
+            "visible",
+            "restricted",
+            "Alice Smith discussed a confidential contract",
+        ),
+        (
+            "lineage-d",
+            "restricted",
+            "visible",
+            "Alice Smith archived a contract",
+        ),
+    ] {
+        let episode_id = IngestCapability::ingest_from_service(
+            &service,
+            IngestRequest {
+                source_type: "email".into(),
+                source_id: key.into(),
+                content: content.into(),
+                t_ref,
+                t_ingested: None,
+                policy_tags: vec![episode_tag.into()],
+            },
+            None,
+        )
+        .await
+        .expect("ingest linked source episode");
+        let fact_id = service
+            .add_fact(
+                "note",
+                content,
+                content,
+                &episode_id,
+                t_ref,
+                0.9,
+                vec![entity_id.clone()],
+                vec![fact_tag.into()],
+                Provenance::agent_observation(&episode_id),
+            )
+            .await
+            .expect("add linked fact");
+        let edge_id =
+            memory_mcp::service::deterministic_edge_id(&entity_id, "involved_in", &fact_id, t_ref);
+        memory_mcp::knowledge::KnowledgeGraphStore::new(db_client.clone(), scope)
+            .relate_edge(
+                &edge_id,
+                &entity_id,
+                &fact_id,
+                json!({
+                    "edge_id": edge_id,
+                    "relation": "involved_in",
+                    "strength": 0.8,
+                    "confidence": 0.85,
+                    "provenance": {"source_episode": episode_id},
+                    "t_valid": memory_mcp::service::normalize_dt(t_ref),
+                    "t_ingested": memory_mcp::service::normalize_dt(t_ref),
+                }),
+            )
+            .await
+            .expect("relate fact to shared entity");
+        source_ids.insert(key, (episode_id, fact_id));
+    }
+
+    let (direct_episode_id, direct_fact_id) = source_ids.get("lineage-a").unwrap();
+    let request = ExplainRequest {
+        context_pack: vec![ExplainItem {
+            fact_id: Some(direct_fact_id.clone()),
+            content: "Alice Smith approved a contract".into(),
+            quote: "Alice Smith approved a contract".into(),
+            source_episode: direct_episode_id.clone(),
+            t_ref: None,
+            t_ingested: None,
+            provenance: json!({"source_episode": direct_episode_id}),
+            citation_context: None,
+            all_sources: vec![],
+            graph_insights: None,
+            fact_age_days: None,
+            decayed_confidence: None,
+            ingestion_method: None,
+        }],
+        compact: false,
+    };
+    let access = AccessPayload {
+        allowed_tags: Some(vec!["visible".into()]),
+        ..AccessPayload::default()
+    };
+
+    let result = ExplainCapability::explain_from_service(&service, request, Some(access))
+        .await
+        .expect("explain completed");
+
+    let sources = result[0]
+        .all_sources
+        .iter()
+        .map(|source| source.episode_id.as_str())
+        .collect::<std::collections::BTreeSet<_>>();
+    assert_eq!(
+        sources,
+        std::collections::BTreeSet::from([
+            source_ids.get("lineage-a").unwrap().0.as_str(),
+            source_ids.get("lineage-b").unwrap().0.as_str(),
+        ]),
+        "explain should return every accessible lineage episode and no restricted one"
+    );
 }
 
 #[tokio::test]

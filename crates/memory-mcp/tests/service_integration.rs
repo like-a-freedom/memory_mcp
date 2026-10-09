@@ -262,7 +262,7 @@ async fn test_service_add_fact_and_assemble_context() {
         .unwrap();
 
     let request = memory_mcp::models::AssembleContextRequest {
-        query: "ARR metric".to_string(),
+        query: "ARR reached $5M Q4 2023".to_string(),
         as_of: Some(Utc::now()),
         budget: 10,
         fact_types: vec![],
@@ -937,7 +937,7 @@ async fn test_service_assemble_context_does_not_record_query_log_when_disabled_b
         &service,
         memory_mcp::models::AssembleContextRequest {
             query: "default disabled query logging".to_string(),
-            as_of: Some(Utc.with_ymd_and_hms(2026, 4, 8, 12, 0, 0).unwrap()),
+            as_of: Some(Utc::now() + chrono::Duration::minutes(5)),
             budget: 5,
             fact_types: vec![],
             view_mode: None,
@@ -985,7 +985,7 @@ async fn test_service_assemble_context_records_query_log_with_tier_latency_and_r
         &service,
         memory_mcp::models::AssembleContextRequest {
             query: "query analytics retrieval".to_string(),
-            as_of: Some(Utc.with_ymd_and_hms(2026, 4, 8, 12, 0, 0).unwrap()),
+            as_of: Some(Utc::now() + chrono::Duration::minutes(5)),
             budget: 5,
             fact_types: vec![],
             view_mode: None,
@@ -1025,7 +1025,7 @@ async fn test_service_assemble_context_records_query_log_with_tier_latency_and_r
     );
     assert_eq!(
         row.get("retrieval_tier").and_then(|value| value.as_str()),
-        Some("fallback")
+        Some("direct")
     );
     assert_eq!(
         row.get("cache_hit").and_then(json_bool),
@@ -1123,7 +1123,7 @@ async fn test_service_assemble_context_records_query_log_for_cache_hit_queries()
 
     let request = memory_mcp::models::AssembleContextRequest {
         query: "cache hit analytics retrieval".to_string(),
-        as_of: Some(Utc.with_ymd_and_hms(2026, 4, 8, 12, 0, 0).unwrap()),
+        as_of: Some(Utc::now() + chrono::Duration::minutes(5)),
         budget: 5,
         fact_types: vec![],
         view_mode: None,
@@ -1202,7 +1202,7 @@ async fn test_service_assemble_context_prunes_query_logs_older_than_default_rete
         &service,
         memory_mcp::models::AssembleContextRequest {
             query: "default retention pruning".to_string(),
-            as_of: Some(Utc.with_ymd_and_hms(2026, 4, 8, 13, 5, 0).unwrap()),
+            as_of: Some(Utc::now() + chrono::Duration::minutes(5)),
             budget: 5,
             fact_types: vec![],
             view_mode: None,
@@ -1277,7 +1277,7 @@ async fn test_service_assemble_context_honors_custom_query_log_retention_days() 
         &service,
         memory_mcp::models::AssembleContextRequest {
             query: "custom retention pruning".to_string(),
-            as_of: Some(Utc.with_ymd_and_hms(2026, 4, 8, 14, 5, 0).unwrap()),
+            as_of: Some(Utc::now() + chrono::Duration::minutes(5)),
             budget: 5,
             fact_types: vec![],
             view_mode: None,
@@ -1514,7 +1514,7 @@ async fn assemble_context_graph_expansion_returns_anchor_neighbor_fact() {
     let items = AssembleContextCapability::assemble_context_from_service(
         &service,
         memory_mcp::models::AssembleContextRequest {
-            query: "Alice Stone".to_string(),
+            query: "What is Alice Stone connected to?".to_string(),
             as_of: None,
             budget: 5,
             fact_types: vec![],

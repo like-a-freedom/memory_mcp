@@ -1,7 +1,7 @@
 //! Experience fact retrieval and appending.
 
 use super::fact_decayed_confidence;
-use std::collections::{HashMap, HashSet};
+use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 
 use chrono::{DateTime, Utc};
 
@@ -12,6 +12,7 @@ use crate::shared::temporal::normalize_dt;
 
 use super::filtering::{compare_facts_by_recency, fact_is_active_at, filter_facts_by_constraints};
 use super::lexical::{lexical_query_overlap_for_fact, lexical_query_score_for_fact};
+use super::types::RepeatedTopicEvidence;
 
 const REPEATED_TOPIC_MATCH_BOOST: f64 = 5.0;
 
@@ -64,6 +65,63 @@ pub(crate) fn expand_experience_query_terms(
     }
 
     expanded
+}
+
+pub(crate) fn repeated_topic_evidence_for_query(
+    query: &super::admission::QueryEvidence,
+    direct_facts: &[Fact],
+) -> Vec<RepeatedTopicEvidence> {
+    if query.content_terms.is_empty() {
+        return Vec::new();
+    }
+
+    let query_terms = query.content_terms.iter().cloned().collect::<HashSet<_>>();
+    let mut supporting_facts = BTreeMap::<String, BTreeSet<String>>::new();
+    for fact in direct_facts
+        .iter()
+        .filter(|fact| fact.fact_type != FactType::Experience.as_str())
+        .take(5)
+    {
+        let content_terms = search_query_terms(&fact.content)
+            .into_iter()
+            .collect::<HashSet<_>>();
+        if !content_terms.iter().any(|term| query_terms.contains(term)) {
+            continue;
+        }
+
+        let mut fact_terms = content_terms;
+        for index_key in &fact.index_keys {
+            fact_terms.extend(search_query_terms(index_key));
+        }
+        for term in fact_terms {
+            if !query_terms.contains(&term) {
+                supporting_facts
+                    .entry(term)
+                    .or_default()
+                    .insert(fact.fact_id.clone());
+            }
+        }
+    }
+
+    let mut topics = supporting_facts
+        .into_iter()
+        .filter(|(_, fact_ids)| fact_ids.len() >= 2)
+        .collect::<Vec<_>>();
+    topics.sort_by(|(left_term, left_ids), (right_term, right_ids)| {
+        right_ids
+            .len()
+            .cmp(&left_ids.len())
+            .then_with(|| left_term.cmp(right_term))
+    });
+
+    topics
+        .into_iter()
+        .take(6)
+        .map(|(term, fact_ids)| RepeatedTopicEvidence {
+            term,
+            supporting_fact_ids: fact_ids.into_iter().collect(),
+        })
+        .collect()
 }
 
 pub(crate) async fn collect_recent_experience_facts(
@@ -301,5 +359,60 @@ mod tests {
         ];
         let expanded = expand_experience_query_terms(&["query".to_string()], &facts);
         assert_eq!(expanded, vec!["query".to_string()]);
+    }
+
+    #[test]
+    fn repeated_topic_evidence_requires_two_query_grounded_direct_facts() {
+        let query = super::super::admission::build_query_evidence(
+            Some("Which venue would work best for my conference?"),
+            Vec::new(),
+            &super::super::query_mode::QueryFlags::default(),
+        );
+        let mut first = make_fact(
+            "I'm heading to a conference next month and need to book a hotel.",
+            vec![],
+        );
+        first.fact_type = FactType::Note.as_str().to_string();
+        first.fact_id = "fact:conference-hotel".to_string();
+        let mut second = make_fact(
+            "For the conference, I want a hotel that is not too tall.",
+            vec![],
+        );
+        second.fact_type = FactType::Note.as_str().to_string();
+        second.fact_id = "fact:conference-hotel-shape".to_string();
+        let mut experience = make_fact(
+            "I usually prefer quieter hotels away from the city center.",
+            vec!["hotel".to_string(), "conference".to_string()],
+        );
+        experience.fact_id = "fact:experience".to_string();
+
+        let evidence = repeated_topic_evidence_for_query(&query, &[first, second, experience]);
+
+        let hotel = evidence
+            .iter()
+            .find(|topic| topic.term == "hotel")
+            .expect("the repeated hotel topic should be recorded");
+        assert_eq!(
+            hotel.supporting_fact_ids,
+            vec![
+                "fact:conference-hotel".to_string(),
+                "fact:conference-hotel-shape".to_string()
+            ]
+        );
+    }
+
+    #[test]
+    fn repeated_topic_evidence_ignores_direct_facts_without_a_query_anchor() {
+        let query = super::super::admission::build_query_evidence(
+            Some("conference venue"),
+            Vec::new(),
+            &super::super::query_mode::QueryFlags::default(),
+        );
+        let mut first = make_fact("Hotel preferences mention quiet rooms.", vec![]);
+        first.fact_type = FactType::Note.as_str().to_string();
+        let mut second = make_fact("Hotels should be away from nightlife.", vec![]);
+        second.fact_type = FactType::Note.as_str().to_string();
+
+        assert!(repeated_topic_evidence_for_query(&query, &[first, second]).is_empty());
     }
 }

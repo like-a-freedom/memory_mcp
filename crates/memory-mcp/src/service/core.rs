@@ -172,7 +172,11 @@ impl MemoryService {
         let runtime = crate::knowledge::claims_policy::worker::ClaimWorkerRuntime::new();
         let worker_id = format!("claim-worker-{}", std::process::id());
         runtime
-            .spawn_worker(self.claim_service.clone(), worker_id)
+            .spawn_worker(
+                self.claim_service.clone(),
+                worker_id,
+                Arc::new(self.context_cache.clone()),
+            )
             .await;
         runtime
     }

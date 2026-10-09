@@ -134,6 +134,11 @@ impl EmbeddingConfig {
             parse_env::<usize>("EMBEDDINGS_MAX_TOKENS")?.unwrap_or(DEFAULT_EMBEDDING_MAX_TOKENS);
         let similarity_threshold = parse_env::<f64>("EMBEDDINGS_SIMILARITY_THRESHOLD")?
             .unwrap_or(DEFAULT_EMBEDDING_SIMILARITY_THRESHOLD);
+        if !similarity_threshold.is_finite() || !(-1.0..=1.0).contains(&similarity_threshold) {
+            return Err(MemoryError::ConfigInvalid(
+                "EMBEDDINGS_SIMILARITY_THRESHOLD must be finite and within [-1, 1]".to_string(),
+            ));
+        }
         let model_dir = env::var("EMBEDDINGS_MODEL_DIR").ok();
         let recovery_interval_secs = parse_env::<u64>("EMBEDDINGS_RECOVERY_INTERVAL_SECS")?
             .unwrap_or(DEFAULT_EMBEDDING_RECOVERY_INTERVAL_SECS);
@@ -486,5 +491,45 @@ mod tests {
                 ));
             },
         );
+    }
+
+    #[test]
+    fn embedding_config_rejects_non_finite_or_out_of_range_similarity_thresholds() {
+        for threshold in ["NaN", "inf", "-inf", "1.01", "-1.01"] {
+            with_env_vars(
+                &[
+                    ("EMBEDDINGS_ENABLED", Some("false")),
+                    ("EMBEDDINGS_PROVIDER", None),
+                    ("EMBEDDINGS_SIMILARITY_THRESHOLD", Some(threshold)),
+                ],
+                || {
+                    assert!(matches!(
+                        EmbeddingConfig::from_env(),
+                        Err(MemoryError::ConfigInvalid(message))
+                            if message.contains("EMBEDDINGS_SIMILARITY_THRESHOLD")
+                    ));
+                },
+            );
+        }
+    }
+
+    #[test]
+    fn embedding_config_accepts_cosine_similarity_boundaries() {
+        for threshold in ["-1", "1"] {
+            with_env_vars(
+                &[
+                    ("EMBEDDINGS_ENABLED", Some("false")),
+                    ("EMBEDDINGS_PROVIDER", None),
+                    ("EMBEDDINGS_SIMILARITY_THRESHOLD", Some(threshold)),
+                ],
+                || {
+                    let config = EmbeddingConfig::from_env().expect("valid cosine boundary");
+                    assert_eq!(
+                        config.similarity_threshold,
+                        threshold.parse::<f64>().unwrap()
+                    );
+                },
+            );
+        }
     }
 }

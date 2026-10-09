@@ -1,0 +1,22 @@
+   Compiling eval-harness v0.1.0 (/Users/solovey/Documents/Codex/2026-10-08/memory-retrieval-quality/crates/eval-harness)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 2.09s
+     Running unittests src/lib.rs (target/debug/deps/eval_harness-1f4b8f47e4f84b53)
+
+running 2 tests
+test domain::tests::case_outcome_rejects_non_finite_metrics ... ok
+
+thread 'gate::tests::non_finite_suite_summary_metric_is_invalid_at_release_gate' (21156316) panicked at crates/eval-harness/src/gate.rs:314:9:
+assertion `left == right` failed
+  left: Passed
+ right: Invalid
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+test gate::tests::non_finite_suite_summary_metric_is_invalid_at_release_gate ... FAILED
+
+failures:
+
+failures:
+    gate::tests::non_finite_suite_summary_metric_is_invalid_at_release_gate
+
+test result: FAILED. 1 passed; 1 failed; 0 ignored; 0 measured; 183 filtered out; finished in 0.00s
+
+error: test failed, to rerun pass `-p eval-harness --lib`

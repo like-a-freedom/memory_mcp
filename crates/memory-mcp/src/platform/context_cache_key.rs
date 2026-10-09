@@ -7,7 +7,40 @@
 use chrono::{DateTime, Utc};
 
 use crate::shared::search::normalize_text;
-use crate::shared::temporal::bucket_to_five_minutes;
+use crate::shared::temporal::{bucket_to_five_minutes, normalize_dt};
+
+/// Cache identity for a temporal cutoff. Current requests intentionally share
+/// a short freshness bucket; an explicit historical request must identify the
+/// exact instant whose view it asks for.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum CacheCutoff {
+    CurrentBucket(DateTime<Utc>),
+    HistoricalExact(DateTime<Utc>),
+}
+
+impl CacheCutoff {
+    fn identity(self) -> String {
+        match self {
+            Self::CurrentBucket(cutoff) => {
+                format!("current:{}", bucket_to_five_minutes(cutoff))
+            }
+            Self::HistoricalExact(cutoff) => format!("historical:{}", normalize_dt(cutoff)),
+        }
+    }
+
+    fn window_identity(self, bound: DateTime<Utc>) -> String {
+        match self {
+            Self::CurrentBucket(_) => bucket_to_five_minutes(bound),
+            Self::HistoricalExact(_) => normalize_dt(bound),
+        }
+    }
+}
+
+impl From<DateTime<Utc>> for CacheCutoff {
+    fn from(cutoff: DateTime<Utc>) -> Self {
+        Self::CurrentBucket(cutoff)
+    }
+}
 
 /// Cache key for context assembly results.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -41,6 +74,22 @@ impl CacheView {
             window_end: window_end.map(bucket_to_five_minutes),
         }
     }
+
+    /// Build a view key with the same temporal precision as the request
+    /// cutoff. Historical windows must not collide after time bucketing.
+    #[must_use]
+    pub fn new_with_cutoff(
+        view_mode: Option<&str>,
+        window_start: Option<DateTime<Utc>>,
+        window_end: Option<DateTime<Utc>>,
+        cutoff: CacheCutoff,
+    ) -> Self {
+        Self {
+            view_mode: view_mode.map(ToString::to_string),
+            window_start: window_start.map(|bound| cutoff.window_identity(bound)),
+            window_end: window_end.map(|bound| cutoff.window_identity(bound)),
+        }
+    }
 }
 
 impl CacheKey {
@@ -48,12 +97,13 @@ impl CacheKey {
     #[must_use]
     pub fn new(
         query: &str,
-        cutoff: DateTime<Utc>,
+        cutoff: impl Into<CacheCutoff>,
         budget: i32,
         fact_types: &[String],
         view: CacheView,
         tags: Option<Vec<String>>,
     ) -> Self {
+        let cutoff = cutoff.into();
         let mut tags = tags;
         if let Some(ref mut tag_list) = tags {
             tag_list.sort();
@@ -63,7 +113,7 @@ impl CacheKey {
         fact_types.dedup();
         Self {
             query: normalize_text(query),
-            cutoff: bucket_to_five_minutes(cutoff),
+            cutoff: cutoff.identity(),
             budget,
             fact_types,
             view,
@@ -76,7 +126,7 @@ impl CacheKey {
 /// cache can clear it without depending on the context that fills it. The
 /// embedding service writes a vector and then clears the cache, and that
 /// is not a dependency from embedding onto memory.
-pub trait InvalidateContextCache {
+pub trait InvalidateContextCache: Send + Sync {
     /// Invalidate all cached context results for the process-bound
     /// namespace.
     ///

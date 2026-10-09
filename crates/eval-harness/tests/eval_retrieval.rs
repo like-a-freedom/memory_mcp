@@ -120,6 +120,23 @@ fn retrieval_fixture_provides_diversity_coverage() {
     );
 }
 
+#[test]
+#[should_panic(expected = "retrieval launcher requires every case to pass")]
+fn retrieval_launcher_rejects_a_quality_failed_case() {
+    use eval_harness::{CaseStatus, CorpusSplit, EvalCaseOutcome, EvalMode, LabelTrust};
+
+    let failed = EvalCaseOutcome::new(
+        "local-retrieval",
+        "injected-quality-failure",
+        EvalMode::RetrievalOnly,
+        CorpusSplit::Development,
+        LabelTrust::Weak,
+        CaseStatus::QualityFailed,
+    );
+
+    assert_retrieval_cases_passed(&[failed], 1);
+}
+
 /// Thin launcher that delegates to the eval-harness retrieval suite.
 /// Run with: cargo test --test eval_retrieval harness_retrieval_suite -- --ignored --exact
 #[tokio::test]
@@ -128,6 +145,7 @@ async fn harness_retrieval_suite() {
     use eval_harness::{EvalProfile, EvalSuite, RetrievalSuite, RunContext};
 
     let suite = RetrievalSuite::new().expect("load retrieval suite");
+    let expected_cases = suite.expected_case_ids().len();
     let context = RunContext {
         profile: EvalProfile::Pr,
     };
@@ -153,9 +171,36 @@ async fn harness_retrieval_suite() {
         failed,
         invalid
     );
+    for outcome in outcomes
+        .iter()
+        .filter(|outcome| outcome.status != eval_harness::CaseStatus::Passed)
+    {
+        eprintln!(
+            "harness_retrieval_case: key={:?} status={:?} failures={:?} invalid_reason={:?}",
+            outcome.case_key, outcome.status, outcome.failures, outcome.invalid_reason
+        );
+    }
 
+    assert_retrieval_cases_passed(&outcomes, expected_cases);
+}
+
+fn assert_retrieval_cases_passed(
+    outcomes: &[eval_harness::EvalCaseOutcome],
+    expected_cases: usize,
+) {
+    assert_eq!(
+        outcomes.len(),
+        expected_cases,
+        "retrieval launcher requires exact declared case coverage"
+    );
     assert!(
-        invalid == 0,
-        "harness retrieval suite has {invalid} invalid cases"
+        !outcomes.is_empty(),
+        "retrieval launcher must not pass an empty suite"
+    );
+    assert!(
+        outcomes
+            .iter()
+            .all(|outcome| outcome.status == eval_harness::CaseStatus::Passed),
+        "retrieval launcher requires every case to pass; quality-failed or invalid cases remain visible"
     );
 }

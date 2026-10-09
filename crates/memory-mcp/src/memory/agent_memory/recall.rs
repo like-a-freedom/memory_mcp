@@ -472,6 +472,7 @@ mod orchestrator_tests {
             rationale: "rationale".to_string(),
             retrieval_tier: None,
             reconciliation: None,
+            retrieval_evidence: None,
         }
     }
 

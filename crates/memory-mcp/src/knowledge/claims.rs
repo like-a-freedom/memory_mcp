@@ -55,14 +55,6 @@ pub(crate) trait ClaimStore: Send + Sync {
         query: RelationsForFactsQuery<'_>,
     ) -> Result<Vec<ClaimRelation>, MemoryError>;
 
-    /// Relations whose claims are sourced from the given facts, with each
-    /// side's direction already resolved to a fact id. A relation whose
-    /// `t_invalid_ingested` is set is omitted entirely.
-    async fn select_relations_by_fact(
-        &self,
-        query: RelationsByFactQuery<'_>,
-    ) -> Result<RelationsByFactResult, MemoryError>;
-
     async fn count_active_relations(&self) -> Result<Vec<ActiveRelationCount>, MemoryError>;
 
     async fn select_facts_for_backfill(
@@ -80,6 +72,48 @@ pub(crate) trait ClaimStore: Send + Sync {
         &self,
         request: CommitReconciliationPageRequest<'_>,
     ) -> Result<(), MemoryError>;
+}
+
+/// Bounded storage reads used by the knowledge-owned temporal relation use case.
+/// Each method is set-based; callers cannot issue caller-named table reads.
+#[async_trait]
+pub(crate) trait TemporalRelationReadStore: Send + Sync {
+    async fn claims_by_facts_at(
+        &self,
+        fact_ids: &[FactId],
+        cutoff: &str,
+        limit: usize,
+    ) -> Result<Vec<Claim>, MemoryError>;
+
+    async fn claims_by_ids_at(
+        &self,
+        claim_ids: &[String],
+        cutoff: &str,
+        limit: usize,
+    ) -> Result<Vec<Claim>, MemoryError>;
+
+    async fn relations_by_claim_ids_at(
+        &self,
+        claim_ids: &[String],
+        cutoff: &str,
+        limit: usize,
+    ) -> Result<Vec<ClaimRelation>, MemoryError>;
+
+    async fn facts_by_ids_at(
+        &self,
+        fact_ids: &[String],
+        cutoff: &str,
+        limit: usize,
+    ) -> Result<Vec<TemporalCounterpartFact>, MemoryError>;
+}
+
+/// Minimal persisted metadata needed to decide whether a counterpart may be
+/// traversed. Relation reads must not hydrate or deserialize fact content.
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+pub(crate) struct TemporalCounterpartFact {
+    pub fact_id: FactId,
+    #[serde(default)]
+    pub policy_tags: Vec<String>,
 }
 
 // ─── Request/Response Types ───────────────────────────────────────────────────
@@ -131,13 +165,15 @@ pub(crate) struct RelationForFact {
     pub evaluator_version: String,
     pub predecessor_fact_id: Option<FactId>,
     pub successor_fact_id: Option<FactId>,
-    pub predecessor_source_episode_id: Option<EpisodeId>,
-    pub successor_source_episode_id: Option<EpisodeId>,
+    /// Relation participants among the facts explicitly included in the read.
+    /// A counterpart outside that set is deliberately not hydrated here.
+    pub participants: Vec<RelationParticipant>,
 }
 
-/// Query for relations whose claims are sourced from the given facts.
-pub(crate) struct RelationsByFactQuery<'a> {
-    pub fact_ids: &'a [FactId],
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct RelationParticipant {
+    pub fact_id: FactId,
+    pub source_episode_id: EpisodeId,
 }
 
 /// Result of a [`ClaimStore::select_relations_by_fact`] call.
@@ -233,6 +269,188 @@ impl SurrealClaimStore {
         } else {
             "SELECT * FROM claim WHERE slot_fingerprint = $slot_fp AND (identity_version = $identity_version OR ($identity_version = 'legacy' AND identity_version IS NONE)) ORDER BY claim_id LIMIT $limit"
         }
+    }
+
+    async fn select_temporal_claims_by_facts(
+        &self,
+        fact_ids: &[FactId],
+        cutoff: &str,
+        limit: usize,
+    ) -> Result<Vec<Claim>, MemoryError> {
+        if fact_ids.is_empty() || limit == 0 {
+            return Ok(vec![]);
+        }
+        let ids = fact_ids.iter().map(ToString::to_string).collect::<Vec<_>>();
+        let sql = "SELECT * FROM claim WHERE source_fact_id IN $fact_ids \
+                   AND (t_ingested IS NONE OR t_ingested IS NULL OR t_ingested <= type::datetime($cutoff)) \
+                   AND (t_invalid_ingested IS NONE OR t_invalid_ingested IS NULL OR t_invalid_ingested > type::datetime($cutoff)) \
+                   AND (valid_from IS NONE OR valid_from IS NULL OR valid_from <= type::datetime($cutoff)) \
+                   AND (valid_to IS NONE OR valid_to IS NULL OR valid_to > type::datetime($cutoff)) \
+                   ORDER BY source_fact_id ASC, claim_id ASC LIMIT $limit";
+        let result = self
+            .db
+            .query(
+                sql,
+                Some(serde_json::json!({
+                    "fact_ids": ids,
+                    "cutoff": cutoff,
+                    "limit": limit,
+                })),
+            )
+            .await?;
+        Self::deserialize_vec(result)
+            .into_iter()
+            .map(|value| {
+                serde_json::from_value(value)
+                    .map_err(|error| MemoryError::Storage(format!("claim deser: {error}")))
+            })
+            .collect()
+    }
+
+    async fn select_temporal_claims_by_ids(
+        &self,
+        claim_ids: &[String],
+        cutoff: &str,
+        limit: usize,
+    ) -> Result<Vec<Claim>, MemoryError> {
+        if claim_ids.is_empty() || limit == 0 {
+            return Ok(vec![]);
+        }
+        let sql = "SELECT * FROM claim WHERE claim_id IN $claim_ids \
+                   AND (t_ingested IS NONE OR t_ingested IS NULL OR t_ingested <= type::datetime($cutoff)) \
+                   AND (t_invalid_ingested IS NONE OR t_invalid_ingested IS NULL OR t_invalid_ingested > type::datetime($cutoff)) \
+                   AND (valid_from IS NONE OR valid_from IS NULL OR valid_from <= type::datetime($cutoff)) \
+                   AND (valid_to IS NONE OR valid_to IS NULL OR valid_to > type::datetime($cutoff)) \
+                   ORDER BY claim_id ASC LIMIT $limit";
+        let result = self
+            .db
+            .query(
+                sql,
+                Some(serde_json::json!({
+                    "claim_ids": claim_ids,
+                    "cutoff": cutoff,
+                    "limit": limit,
+                })),
+            )
+            .await?;
+        Self::deserialize_vec(result)
+            .into_iter()
+            .map(|value| {
+                serde_json::from_value(value)
+                    .map_err(|error| MemoryError::Storage(format!("claim deser: {error}")))
+            })
+            .collect()
+    }
+
+    async fn select_temporal_relations_by_claim_ids(
+        &self,
+        claim_ids: &[String],
+        cutoff: &str,
+        limit: usize,
+    ) -> Result<Vec<ClaimRelation>, MemoryError> {
+        if claim_ids.is_empty() || limit == 0 {
+            return Ok(vec![]);
+        }
+        let sql = "SELECT * FROM claim_relation \
+                   WHERE (left_claim_id IN $claim_ids OR right_claim_id IN $claim_ids) \
+                   AND (t_ingested IS NONE OR t_ingested IS NULL OR t_ingested <= type::datetime($cutoff)) \
+                   AND (t_invalid_ingested IS NONE OR t_invalid_ingested IS NULL OR t_invalid_ingested > type::datetime($cutoff)) \
+                   ORDER BY claim_relation_id ASC LIMIT $limit";
+        let result = self
+            .db
+            .query(
+                sql,
+                Some(serde_json::json!({
+                    "claim_ids": claim_ids,
+                    "cutoff": cutoff,
+                    "limit": limit,
+                })),
+            )
+            .await?;
+        Self::deserialize_vec(result)
+            .into_iter()
+            .map(|value| {
+                serde_json::from_value(value)
+                    .map_err(|error| MemoryError::Storage(format!("relation deser: {error}")))
+            })
+            .collect()
+    }
+
+    async fn select_temporal_facts_by_ids(
+        &self,
+        fact_ids: &[String],
+        cutoff: &str,
+        limit: usize,
+    ) -> Result<Vec<TemporalCounterpartFact>, MemoryError> {
+        if fact_ids.is_empty() || limit == 0 {
+            return Ok(vec![]);
+        }
+        let visibility = crate::shared::temporal::visibility_clause("$cutoff");
+        let sql = format!(
+            "SELECT fact_id, policy_tags FROM fact WHERE fact_id IN $fact_ids AND {visibility} ORDER BY fact_id ASC LIMIT $limit"
+        );
+        let result = self
+            .db
+            .query(
+                &sql,
+                Some(serde_json::json!({
+                    "fact_ids": fact_ids,
+                    "cutoff": cutoff,
+                    "limit": limit,
+                })),
+            )
+            .await?;
+        Self::deserialize_vec(result)
+            .into_iter()
+            .map(|value| {
+                serde_json::from_value(value).map_err(|error| {
+                    MemoryError::Storage(format!("counterpart metadata deser: {error}"))
+                })
+            })
+            .collect()
+    }
+}
+
+#[async_trait]
+impl TemporalRelationReadStore for SurrealClaimStore {
+    async fn claims_by_facts_at(
+        &self,
+        fact_ids: &[FactId],
+        cutoff: &str,
+        limit: usize,
+    ) -> Result<Vec<Claim>, MemoryError> {
+        self.select_temporal_claims_by_facts(fact_ids, cutoff, limit)
+            .await
+    }
+
+    async fn claims_by_ids_at(
+        &self,
+        claim_ids: &[String],
+        cutoff: &str,
+        limit: usize,
+    ) -> Result<Vec<Claim>, MemoryError> {
+        self.select_temporal_claims_by_ids(claim_ids, cutoff, limit)
+            .await
+    }
+
+    async fn relations_by_claim_ids_at(
+        &self,
+        claim_ids: &[String],
+        cutoff: &str,
+        limit: usize,
+    ) -> Result<Vec<ClaimRelation>, MemoryError> {
+        self.select_temporal_relations_by_claim_ids(claim_ids, cutoff, limit)
+            .await
+    }
+
+    async fn facts_by_ids_at(
+        &self,
+        fact_ids: &[String],
+        cutoff: &str,
+        limit: usize,
+    ) -> Result<Vec<TemporalCounterpartFact>, MemoryError> {
+        self.select_temporal_facts_by_ids(fact_ids, cutoff, limit)
+            .await
     }
 }
 
@@ -399,97 +617,6 @@ impl ClaimStore for SurrealClaimStore {
             .collect()
     }
 
-    async fn select_relations_by_fact(
-        &self,
-        query: RelationsByFactQuery<'_>,
-    ) -> Result<RelationsByFactResult, MemoryError> {
-        if query.fact_ids.is_empty() {
-            return Ok(RelationsByFactResult::default());
-        }
-
-        // Resolve the caller's fact ids to their claims first, so direction is
-        // read from the columns the evaluator wrote rather than inferred from
-        // the unordered left/right storage pair.
-        let claims = self
-            .select_claims_for_facts(ClaimsForFactsQuery {
-                fact_ids: query.fact_ids,
-            })
-            .await?;
-
-        let mut claims_by_fact: std::collections::HashMap<FactId, Vec<String>> =
-            std::collections::HashMap::with_capacity(query.fact_ids.len());
-        let mut fact_of_claim: std::collections::HashMap<String, &Claim> =
-            std::collections::HashMap::with_capacity(claims.len());
-        for claim in &claims {
-            claims_by_fact
-                .entry(claim.source_fact_id.clone())
-                .or_default()
-                .push(claim.claim_id.to_string());
-            fact_of_claim.insert(claim.claim_id.to_string(), claim);
-        }
-
-        if fact_of_claim.is_empty() {
-            return Ok(RelationsByFactResult {
-                relations: vec![],
-                claims_by_fact,
-            });
-        }
-
-        // `IN` against the resolved claim ids, not the fact ids: a relation is
-        // linked to claims, and only after resolving them do we know which
-        // relations belong to the caller's facts.
-        let claim_ids: Vec<&str> = fact_of_claim.keys().map(String::as_str).collect();
-        let sql = "SELECT * FROM claim_relation WHERE (left_claim_id IN $claim_ids OR right_claim_id IN $claim_ids) AND (t_invalid_ingested IS NONE OR t_invalid_ingested IS NULL)";
-        let vars = serde_json::json!({"claim_ids": claim_ids});
-        let result = self.db.query(sql, Some(vars)).await?;
-        let records = Self::deserialize_vec(result);
-
-        let mut relations = Vec::with_capacity(records.len());
-        for record in records {
-            let relation: ClaimRelation = serde_json::from_value(record)
-                .map_err(|e| MemoryError::Storage(format!("relation deser: {e}")))?;
-
-            // Direction exists only for outcomes that name a winner, per the
-            // enum's own rule. Deriving it from left/right would invent a
-            // winner for Contradiction.
-            let directed = relation.outcome.has_direction();
-            let (predecessor_fact_id, successor_fact_id, pred_episode, succ_episode) = if directed {
-                let pred = relation
-                    .predecessor_claim_id
-                    .as_ref()
-                    .and_then(|id| fact_of_claim.get(id.as_ref()));
-                let succ = relation
-                    .successor_claim_id
-                    .as_ref()
-                    .and_then(|id| fact_of_claim.get(id.as_ref()));
-                (
-                    pred.map(|c| c.source_fact_id.clone()),
-                    succ.map(|c| c.source_fact_id.clone()),
-                    pred.map(|c| c.source_episode_id.clone()),
-                    succ.map(|c| c.source_episode_id.clone()),
-                )
-            } else {
-                (None, None, None, None)
-            };
-
-            relations.push(RelationForFact {
-                relation_id: relation.claim_relation_id.to_string(),
-                outcome: relation.outcome,
-                reason_code: relation.reason_code,
-                evaluator_version: relation.evaluator_version,
-                predecessor_fact_id,
-                successor_fact_id,
-                predecessor_source_episode_id: pred_episode,
-                successor_source_episode_id: succ_episode,
-            });
-        }
-
-        Ok(RelationsByFactResult {
-            relations,
-            claims_by_fact,
-        })
-    }
-
     async fn count_active_relations(&self) -> Result<Vec<ActiveRelationCount>, MemoryError> {
         let sql = "SELECT schema_family, outcome, count() AS count FROM claim_relation WHERE t_invalid_ingested IS NONE OR t_invalid_ingested IS NULL GROUP BY schema_family, outcome";
         let result = self.db.query(sql, None).await?;
@@ -623,7 +750,10 @@ impl ClaimStore for SurrealClaimStore {
 
 #[cfg(test)]
 mod tests {
-    use std::sync::{Arc, Mutex};
+    use std::sync::{
+        Arc, Mutex,
+        atomic::{AtomicUsize, Ordering},
+    };
 
     use super::*;
     use crate::models::claim::ClaimIdentityVersion;
@@ -683,6 +813,87 @@ mod tests {
         );
         db.apply_migrations("org").await.expect("migrations");
         SurrealClaimStore::new(db, "org")
+    }
+
+    struct QueryCountingDbClient {
+        inner: Arc<dyn DbClient>,
+        query_count: Arc<AtomicUsize>,
+    }
+
+    #[async_trait]
+    impl DbClient for QueryCountingDbClient {
+        async fn select_one(
+            &self,
+            record_id: &str,
+            namespace: &str,
+        ) -> Result<Option<Value>, MemoryError> {
+            self.inner.select_one(record_id, namespace).await
+        }
+
+        async fn select_table(
+            &self,
+            table: crate::storage::table_scope::OwnedTable,
+            namespace: &str,
+        ) -> Result<Vec<Value>, MemoryError> {
+            self.inner.select_table(table, namespace).await
+        }
+
+        async fn create(
+            &self,
+            record_id: &str,
+            content: Value,
+            namespace: &str,
+            temporal_fields: &[&str],
+        ) -> Result<Value, MemoryError> {
+            self.inner
+                .create(record_id, content, namespace, temporal_fields)
+                .await
+        }
+
+        async fn update(
+            &self,
+            record_id: &str,
+            content: Value,
+            namespace: &str,
+            temporal_fields: &[&str],
+        ) -> Result<Value, MemoryError> {
+            self.inner
+                .update(record_id, content, namespace, temporal_fields)
+                .await
+        }
+
+        async fn query(
+            &self,
+            sql: &str,
+            vars: Option<Value>,
+            namespace: &str,
+        ) -> Result<Value, MemoryError> {
+            self.query_count.fetch_add(1, Ordering::SeqCst);
+            self.inner.query(sql, vars, namespace).await
+        }
+
+        async fn apply_migrations(&self, namespace: &str) -> Result<(), MemoryError> {
+            self.inner.apply_migrations(namespace).await
+        }
+    }
+
+    async fn embedded_counting_claim_store() -> (SurrealClaimStore, Arc<AtomicUsize>) {
+        let db = Arc::new(
+            crate::storage::SurrealDbClient::connect_in_memory_with_namespaces(
+                "claim_temporal_relation_test",
+                &["org".to_string()],
+                "error",
+            )
+            .await
+            .expect("embedded db"),
+        );
+        db.apply_migrations("org").await.expect("migrations");
+        let query_count = Arc::new(AtomicUsize::new(0));
+        let db_client: Arc<dyn DbClient> = Arc::new(QueryCountingDbClient {
+            inner: db,
+            query_count: Arc::clone(&query_count),
+        });
+        (SurrealClaimStore::new(db_client, "org"), query_count)
     }
 
     #[tokio::test]
@@ -1210,6 +1421,73 @@ mod tests {
             .expect("seed relation");
     }
 
+    fn test_fact(
+        fact_id: &str,
+        episode_id: &str,
+        content: &str,
+        at: chrono::DateTime<chrono::Utc>,
+        policy_tags: &[&str],
+    ) -> crate::models::Fact {
+        crate::models::Fact {
+            fact_id: fact_id.to_string(),
+            fact_type: "explicit".to_string(),
+            content: content.to_string(),
+            quote: content.to_string(),
+            source_episode: episode_id.to_string(),
+            t_valid: at,
+            t_ingested: at,
+            t_invalid: None,
+            t_invalid_ingested: None,
+            confidence: 1.0,
+            index_keys: vec![],
+            access_count: 0,
+            last_accessed: None,
+            entity_links: vec![],
+            scope: "org".to_string(),
+            policy_tags: policy_tags.iter().map(|tag| tag.to_string()).collect(),
+            provenance: crate::models::Provenance::extraction(
+                episode_id, "test", episode_id, "test",
+            ),
+            ft_score: 0.0,
+        }
+    }
+
+    async fn seed_fact(store: &SurrealClaimStore, fact: &crate::models::Fact) {
+        let mut content = SurrealClaimStore::serialize(fact).expect("serialize fact");
+        if let Some(object) = content.as_object_mut() {
+            object.remove("ft_score");
+        }
+        store
+            .db
+            .create(
+                &fact.fact_id,
+                content,
+                crate::knowledge::queries::FACT_TEMPORAL_FIELDS,
+            )
+            .await
+            .expect("seed fact");
+    }
+
+    async fn read_temporal_relations_for_facts(
+        store: &SurrealClaimStore,
+        fact_ids: Vec<FactId>,
+    ) -> RelationsByFactResult {
+        let cutoff = chrono::Utc::now() + chrono::Duration::hours(1);
+        let batch = crate::knowledge::api::temporal_relations_from_store(
+            store,
+            crate::knowledge::api::TemporalRelationsQuery {
+                fact_ids: fact_ids.clone(),
+                cutoff,
+                policy_tags: vec![],
+                counterpart_limit: 32,
+                max_relation_depth: 1,
+            },
+        )
+        .await
+        .expect("temporal relation query succeeds");
+        crate::knowledge::api::visible_temporal_relations_for_facts(&batch, &fact_ids)
+    }
+
     #[tokio::test]
     async fn maps_supersession_direction_to_facts() {
         let store = embedded_claim_store().await;
@@ -1237,12 +1515,11 @@ mod tests {
         )
         .await;
 
-        let result = store
-            .select_relations_by_fact(RelationsByFactQuery {
-                fact_ids: &[FactId::from("fact:old"), FactId::from("fact:new")],
-            })
-            .await
-            .expect("query succeeds");
+        let result = read_temporal_relations_for_facts(
+            &store,
+            vec![FactId::from("fact:old"), FactId::from("fact:new")],
+        )
+        .await;
         let relations = &result.relations;
 
         assert_eq!(relations.len(), 1, "exactly one relation expected");
@@ -1260,14 +1537,14 @@ mod tests {
             Some(FactId::from("fact:new")),
             "successor is the fact whose claim replaced it"
         );
-        assert_eq!(
-            relations[0].predecessor_source_episode_id,
-            Some(EpisodeId::from("ep:old"))
-        );
-        assert_eq!(
-            relations[0].successor_source_episode_id,
-            Some(EpisodeId::from("ep:new"))
-        );
+        assert!(relations[0].participants.iter().any(|participant| {
+            participant.fact_id == FactId::from("fact:old")
+                && participant.source_episode_id == EpisodeId::from("ep:old")
+        }));
+        assert!(relations[0].participants.iter().any(|participant| {
+            participant.fact_id == FactId::from("fact:new")
+                && participant.source_episode_id == EpisodeId::from("ep:new")
+        }));
     }
 
     #[tokio::test]
@@ -1295,12 +1572,11 @@ mod tests {
         )
         .await;
 
-        let result = store
-            .select_relations_by_fact(RelationsByFactQuery {
-                fact_ids: &[FactId::from("fact:old2"), FactId::from("fact:new2")],
-            })
-            .await
-            .expect("query succeeds");
+        let result = read_temporal_relations_for_facts(
+            &store,
+            vec![FactId::from("fact:old2"), FactId::from("fact:new2")],
+        )
+        .await;
         let relations = &result.relations;
 
         assert!(
@@ -1334,12 +1610,11 @@ mod tests {
         )
         .await;
 
-        let result = store
-            .select_relations_by_fact(RelationsByFactQuery {
-                fact_ids: &[FactId::from("fact:a"), FactId::from("fact:b")],
-            })
-            .await
-            .expect("query succeeds");
+        let result = read_temporal_relations_for_facts(
+            &store,
+            vec![FactId::from("fact:a"), FactId::from("fact:b")],
+        )
+        .await;
         let relations = &result.relations;
 
         assert_eq!(relations.len(), 1, "the contradiction is still reported");
@@ -1379,17 +1654,445 @@ mod tests {
         )
         .await;
 
-        let result = store
-            .select_relations_by_fact(RelationsByFactQuery {
-                fact_ids: &[FactId::from("fact:absent")],
-            })
-            .await
-            .expect("query succeeds");
+        let result =
+            read_temporal_relations_for_facts(&store, vec![FactId::from("fact:absent")]).await;
         let relations = &result.relations;
 
         assert!(
             relations.is_empty(),
             "a fact id the query does not drive must not produce a phantom entry"
+        );
+    }
+
+    #[tokio::test]
+    async fn temporal_relation_reads_apply_relation_ingestion_cutoff() {
+        use chrono::TimeZone;
+
+        let store = embedded_claim_store().await;
+        let ingested = chrono::Utc.with_ymd_and_hms(2026, 1, 10, 0, 0, 0).unwrap();
+        let invalidated = chrono::Utc.with_ymd_and_hms(2026, 1, 20, 0, 0, 0).unwrap();
+        let before_invalidation = chrono::Utc.with_ymd_and_hms(2026, 1, 15, 0, 0, 0).unwrap();
+        let after_invalidation = chrono::Utc.with_ymd_and_hms(2026, 1, 25, 0, 0, 0).unwrap();
+
+        let mut predecessor = fact_claim("historical-old", "fact:historical-old", "ep:old");
+        predecessor.t_ingested = ingested;
+        let mut successor = fact_claim("historical-new", "fact:historical-new", "ep:new");
+        successor.t_ingested = ingested;
+        seed_claims(&store, vec![predecessor, successor]).await;
+
+        let mut relation = fact_relation(
+            "historical",
+            "historical-old",
+            "historical-new",
+            crate::models::claim::ClaimRelationOutcome::Supersession,
+            Some("historical-old"),
+            Some("historical-new"),
+            Some(invalidated),
+        );
+        relation.t_ingested = ingested;
+        relation.evaluated_at = ingested;
+        seed_relation(&store, &relation).await;
+        seed_fact(
+            &store,
+            &test_fact("fact:historical-old", "ep:old", "old fact", ingested, &[]),
+        )
+        .await;
+        seed_fact(
+            &store,
+            &test_fact("fact:historical-new", "ep:new", "new fact", ingested, &[]),
+        )
+        .await;
+
+        let before_ingestion = crate::knowledge::api::temporal_relations_from_store(
+            &store,
+            crate::knowledge::api::TemporalRelationsQuery {
+                fact_ids: vec![FactId::from("fact:historical-old")],
+                cutoff: chrono::Utc.with_ymd_and_hms(2026, 1, 5, 0, 0, 0).unwrap(),
+                policy_tags: vec![],
+                counterpart_limit: 32,
+                max_relation_depth: 1,
+            },
+        )
+        .await
+        .expect("pre-ingestion relation query succeeds");
+        assert!(before_ingestion.relations.is_empty());
+        assert!(before_ingestion.counterpart_facts.is_empty());
+
+        let before = crate::knowledge::api::temporal_relations_from_store(
+            &store,
+            crate::knowledge::api::TemporalRelationsQuery {
+                fact_ids: vec![FactId::from("fact:historical-old")],
+                cutoff: before_invalidation,
+                policy_tags: vec![],
+                counterpart_limit: 32,
+                max_relation_depth: 1,
+            },
+        )
+        .await
+        .expect("historical relation query succeeds");
+        assert_eq!(before.relations.len(), 1);
+        assert_eq!(before.counterpart_facts.len(), 1);
+        assert_eq!(
+            before.relations[0].successor_fact_id,
+            Some(FactId::from("fact:historical-new"))
+        );
+
+        let after = crate::knowledge::api::temporal_relations_from_store(
+            &store,
+            crate::knowledge::api::TemporalRelationsQuery {
+                fact_ids: vec![FactId::from("fact:historical-old")],
+                cutoff: after_invalidation,
+                policy_tags: vec![],
+                counterpart_limit: 32,
+                max_relation_depth: 1,
+            },
+        )
+        .await
+        .expect("current relation query succeeds");
+        assert!(after.relations.is_empty());
+        assert!(after.counterpart_facts.is_empty());
+    }
+
+    #[tokio::test]
+    async fn temporal_relation_reads_do_not_hydrate_policy_denied_counterparts() {
+        use chrono::TimeZone;
+
+        let store = embedded_claim_store().await;
+        let cutoff = chrono::Utc.with_ymd_and_hms(2026, 2, 1, 0, 0, 0).unwrap();
+        let mut predecessor = fact_claim("visible-old", "fact:visible-old", "ep:visible-old");
+        predecessor.t_ingested = cutoff;
+        let mut successor = fact_claim("private-new", "fact:private-new", "ep:private-new");
+        successor.t_ingested = cutoff;
+        successor.policy_tags = vec!["private".to_string()];
+        let mut public_claim_private_fact = fact_claim(
+            "public-claim-private-fact",
+            "fact:private-fact",
+            "ep:private-fact",
+        );
+        public_claim_private_fact.t_ingested = cutoff;
+        seed_claims(
+            &store,
+            vec![predecessor, successor, public_claim_private_fact],
+        )
+        .await;
+
+        seed_fact(
+            &store,
+            &test_fact(
+                "fact:visible-old",
+                "ep:visible-old",
+                "visible source fact",
+                cutoff,
+                &[],
+            ),
+        )
+        .await;
+        seed_fact(
+            &store,
+            &test_fact(
+                "fact:private-fact",
+                "ep:private-fact",
+                "private fact-level counterpart content",
+                cutoff,
+                &["private"],
+            ),
+        )
+        .await;
+        seed_fact(
+            &store,
+            &test_fact(
+                "fact:private-new",
+                "ep:private-new",
+                "private counterpart content",
+                cutoff,
+                &["private"],
+            ),
+        )
+        .await;
+        let mut relation = fact_relation(
+            "policy-filtered",
+            "visible-old",
+            "private-new",
+            crate::models::claim::ClaimRelationOutcome::Supersession,
+            Some("visible-old"),
+            Some("private-new"),
+            None,
+        );
+        relation.t_ingested = cutoff;
+        relation.evaluated_at = cutoff;
+        seed_relation(&store, &relation).await;
+        let mut fact_denied_relation = fact_relation(
+            "fact-policy-filtered",
+            "visible-old",
+            "public-claim-private-fact",
+            crate::models::claim::ClaimRelationOutcome::Supersession,
+            Some("visible-old"),
+            Some("public-claim-private-fact"),
+            None,
+        );
+        fact_denied_relation.t_ingested = cutoff;
+        fact_denied_relation.evaluated_at = cutoff;
+        seed_relation(&store, &fact_denied_relation).await;
+
+        let result = crate::knowledge::api::temporal_relations_from_store(
+            &store,
+            crate::knowledge::api::TemporalRelationsQuery {
+                fact_ids: vec![FactId::from("fact:visible-old")],
+                cutoff,
+                policy_tags: vec!["public".to_string()],
+                counterpart_limit: 32,
+                max_relation_depth: 1,
+            },
+        )
+        .await
+        .expect("policy-filtered relation query succeeds");
+
+        assert!(
+            result
+                .counterpart_facts
+                .iter()
+                .all(|fact| fact.fact_id != FactId::from("fact:private-new"))
+        );
+        assert!(
+            result
+                .counterpart_facts
+                .iter()
+                .all(|fact| !fact.policy_tags.iter().any(|tag| tag == "private")),
+            "policy-denied tags must not enter the traversable counterpart set"
+        );
+        assert!(
+            result
+                .unresolved_fact_ids
+                .contains(&FactId::from("fact:private-new"))
+        );
+        assert!(
+            result
+                .unresolved_fact_ids
+                .contains(&FactId::from("fact:private-fact"))
+        );
+        assert_eq!(result.relations.len(), 2);
+        assert!(
+            result
+                .relations
+                .iter()
+                .all(|relation| relation.successor_fact_id.is_none())
+        );
+        assert!(
+            result
+                .relations
+                .iter()
+                .all(|relation| relation.participants.len() == 1)
+        );
+    }
+
+    #[tokio::test]
+    async fn temporal_relation_hydration_caps_counterparts_and_batches_database_reads() {
+        use chrono::TimeZone;
+
+        let (store, query_count) = embedded_counting_claim_store().await;
+        let cutoff = chrono::Utc.with_ymd_and_hms(2026, 3, 1, 0, 0, 0).unwrap();
+        let mut root = fact_claim("batch-root", "fact:batch-root", "ep:batch-root");
+        root.t_ingested = cutoff;
+        let mut claims = vec![root];
+        let mut relations = Vec::new();
+        let mut facts = Vec::new();
+
+        for index in 0..33 {
+            let suffix = format!("{index:02}");
+            let claim_id = format!("batch-counterpart-{suffix}");
+            let fact_id = format!("fact:{claim_id}");
+            let episode_id = format!("ep:{claim_id}");
+            let mut claim = fact_claim(&claim_id, &fact_id, &episode_id);
+            claim.t_ingested = cutoff;
+            claims.push(claim);
+
+            let mut relation = fact_relation(
+                &format!("batch-relation-{suffix}"),
+                "batch-root",
+                &claim_id,
+                crate::models::claim::ClaimRelationOutcome::Contradiction,
+                None,
+                None,
+                None,
+            );
+            relation.t_ingested = cutoff;
+            relation.evaluated_at = cutoff;
+            relations.push(relation);
+            facts.push(test_fact(
+                &fact_id,
+                &episode_id,
+                &format!("counterpart content {suffix}"),
+                cutoff,
+                &[],
+            ));
+        }
+
+        seed_claims(&store, claims).await;
+        for relation in &relations {
+            seed_relation(&store, relation).await;
+        }
+        for fact in &facts {
+            seed_fact(&store, fact).await;
+        }
+        query_count.store(0, Ordering::SeqCst);
+
+        let result = crate::knowledge::api::temporal_relations_from_store(
+            &store,
+            crate::knowledge::api::TemporalRelationsQuery {
+                fact_ids: vec![FactId::from("fact:batch-root")],
+                cutoff,
+                policy_tags: vec![],
+                counterpart_limit: 100,
+                max_relation_depth: 1,
+            },
+        )
+        .await
+        .expect("batch relation read succeeds");
+
+        assert_eq!(
+            result.counterpart_facts.len(),
+            crate::knowledge::api::TEMPORAL_RELATION_MAX_COUNTERPARTS
+        );
+        assert!(result.truncated, "overflow must be explicit");
+        assert_eq!(query_count.load(Ordering::SeqCst), 4);
+    }
+
+    #[tokio::test]
+    async fn temporal_relation_reader_withholds_rows_below_evidence_stage() {
+        use chrono::TimeZone;
+
+        let store = embedded_claim_store().await;
+        let cutoff = chrono::Utc.with_ymd_and_hms(2026, 4, 1, 0, 0, 0).unwrap();
+        let mut predecessor = fact_claim("stage-old", "fact:stage-old", "ep:stage-old");
+        predecessor.t_ingested = cutoff;
+        let mut successor = fact_claim("stage-new", "fact:stage-new", "ep:stage-new");
+        successor.t_ingested = cutoff;
+        seed_claims(&store, vec![predecessor, successor]).await;
+        seed_fact(
+            &store,
+            &test_fact("fact:stage-old", "ep:stage-old", "old", cutoff, &[]),
+        )
+        .await;
+        seed_fact(
+            &store,
+            &test_fact("fact:stage-new", "ep:stage-new", "new", cutoff, &[]),
+        )
+        .await;
+        let mut relation = fact_relation(
+            "stage-gated",
+            "stage-old",
+            "stage-new",
+            crate::models::claim::ClaimRelationOutcome::Supersession,
+            Some("stage-old"),
+            Some("stage-new"),
+            None,
+        );
+        relation.t_ingested = cutoff;
+        relation.evaluated_at = cutoff;
+        seed_relation(&store, &relation).await;
+
+        let db = Arc::clone(&store.db.db);
+        let shadow_reader =
+            crate::knowledge::api::SurrealRelationReader::new(Arc::clone(&db), "org", false);
+        let shadow = crate::knowledge::api::RelationReadPort::temporal_relations(
+            &shadow_reader,
+            crate::knowledge::api::TemporalRelationsQuery {
+                fact_ids: vec![FactId::from("fact:stage-old")],
+                cutoff,
+                policy_tags: vec![],
+                counterpart_limit: 32,
+                max_relation_depth: 1,
+            },
+        )
+        .await
+        .expect("shadow stage read succeeds");
+        assert!(shadow.relations.is_empty());
+        assert!(shadow.counterpart_facts.is_empty());
+
+        let enabled_reader = crate::knowledge::api::SurrealRelationReader::new(db, "org", true);
+        let enabled = crate::knowledge::api::RelationReadPort::temporal_relations(
+            &enabled_reader,
+            crate::knowledge::api::TemporalRelationsQuery {
+                fact_ids: vec![FactId::from("fact:stage-old")],
+                cutoff,
+                policy_tags: vec![],
+                counterpart_limit: 32,
+                max_relation_depth: 1,
+            },
+        )
+        .await
+        .expect("evidence stage read succeeds");
+        assert_eq!(enabled.relations.len(), 1);
+        assert_eq!(enabled.counterpart_facts.len(), 1);
+    }
+
+    #[tokio::test]
+    async fn temporal_relation_traversal_stops_at_four_hops() {
+        use chrono::TimeZone;
+
+        let (store, query_count) = embedded_counting_claim_store().await;
+        let cutoff = chrono::Utc.with_ymd_and_hms(2026, 5, 1, 0, 0, 0).unwrap();
+        let mut claims = Vec::new();
+        let mut facts = Vec::new();
+        let mut relations = Vec::new();
+        for index in 0..6 {
+            let name = format!("depth-{index}");
+            let fact_id = format!("fact:{name}");
+            let episode_id = format!("ep:{name}");
+            let mut claim = fact_claim(&name, &fact_id, &episode_id);
+            claim.t_ingested = cutoff;
+            claims.push(claim);
+            facts.push(test_fact(&fact_id, &episode_id, &name, cutoff, &[]));
+        }
+        for index in 0..5 {
+            let mut relation = fact_relation(
+                &format!("depth-edge-{index}"),
+                &format!("depth-{index}"),
+                &format!("depth-{}", index + 1),
+                crate::models::claim::ClaimRelationOutcome::Contradiction,
+                None,
+                None,
+                None,
+            );
+            relation.t_ingested = cutoff;
+            relation.evaluated_at = cutoff;
+            relations.push(relation);
+        }
+
+        seed_claims(&store, claims).await;
+        for fact in &facts {
+            seed_fact(&store, fact).await;
+        }
+        for relation in &relations {
+            seed_relation(&store, relation).await;
+        }
+        query_count.store(0, Ordering::SeqCst);
+
+        let result = crate::knowledge::api::temporal_relations_from_store(
+            &store,
+            crate::knowledge::api::TemporalRelationsQuery {
+                fact_ids: vec![FactId::from("fact:depth-0")],
+                cutoff,
+                policy_tags: vec![],
+                counterpart_limit: 32,
+                max_relation_depth: 12,
+            },
+        )
+        .await
+        .expect("bounded-depth relation read succeeds");
+
+        assert_eq!(
+            result.counterpart_facts.len(),
+            crate::knowledge::api::TEMPORAL_RELATION_MAX_DEPTH
+        );
+        assert_eq!(
+            result.relations.len(),
+            crate::knowledge::api::TEMPORAL_RELATION_MAX_DEPTH
+        );
+        assert!(result.truncated);
+        assert_eq!(
+            query_count.load(Ordering::SeqCst),
+            crate::knowledge::api::TEMPORAL_RELATION_MAX_DEPTH * 4
         );
     }
 }

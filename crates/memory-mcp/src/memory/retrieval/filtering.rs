@@ -2,7 +2,7 @@
 
 use std::collections::HashSet;
 
-use serde_json::Value;
+use serde_json::{Map, Value};
 
 use crate::knowledge::fact_parsing::fact_from_record;
 use crate::memory::record_parsing::episode_from_record;
@@ -80,15 +80,44 @@ pub(crate) fn fact_record_allowed(
     fact_record_matches_type(record, fact_types) && fact_record_allowed_by_policy(record, access)
 }
 
+pub(crate) fn fact_record_allowed_object(
+    record: &Map<String, Value>,
+    access: &AccessPayload,
+    fact_types: &[String],
+) -> bool {
+    let type_allowed = fact_types.is_empty()
+        || record
+            .get("fact_type")
+            .and_then(json_string)
+            .is_some_and(|fact_type| fact_types.iter().any(|expected| expected == fact_type));
+    type_allowed && policy_tags_allowed_in_object(record, access)
+}
+
 fn fact_record_allowed_by_policy(record: &Value, access: &AccessPayload) -> bool {
-    let Some(tags) = raw_object(record)
-        .and_then(|map| map.get("policy_tags"))
+    raw_object(record).is_none_or(|object| policy_tags_allowed_in_object(object, access))
+}
+
+fn policy_tags_allowed_in_object(record: &Map<String, Value>, access: &AccessPayload) -> bool {
+    let Some(tags) = record
+        .get("policy_tags")
         .and_then(raw_array)
         .map(|values| values.iter().filter_map(json_string).collect::<Vec<_>>())
     else {
         return true;
     };
+    policy_tags_allowed(&tags, access)
+}
 
+pub(crate) fn fact_allowed_by_access(fact: &Fact, access: &AccessPayload) -> bool {
+    let tags = fact
+        .policy_tags
+        .iter()
+        .map(String::as_str)
+        .collect::<Vec<_>>();
+    policy_tags_allowed(&tags, access)
+}
+
+fn policy_tags_allowed(tags: &[&str], access: &AccessPayload) -> bool {
     if tags.is_empty() {
         return true;
     }
@@ -125,28 +154,15 @@ pub(crate) fn episode_record_allowed(record: &Value, access: &AccessPayload) -> 
     episode_record_allowed_by_policy(record, access)
 }
 
+pub(crate) fn episode_record_allowed_object(
+    record: &Map<String, Value>,
+    access: &AccessPayload,
+) -> bool {
+    policy_tags_allowed_in_object(record, access)
+}
+
 fn episode_record_allowed_by_policy(record: &Value, access: &AccessPayload) -> bool {
-    let Some(tags) = raw_object(record)
-        .and_then(|map| map.get("policy_tags"))
-        .and_then(raw_array)
-        .map(|values| values.iter().filter_map(json_string).collect::<Vec<_>>())
-    else {
-        return true;
-    };
-
-    if tags.is_empty() {
-        return true;
-    }
-
-    let Some(allowed_tags) = &access.allowed_tags else {
-        return true;
-    };
-
-    let allowed = allowed_tags
-        .iter()
-        .map(String::as_str)
-        .collect::<HashSet<_>>();
-    tags.iter().any(|tag| allowed.contains(tag))
+    raw_object(record).is_none_or(|object| policy_tags_allowed_in_object(object, access))
 }
 
 pub(crate) fn fact_record_matches_type(record: &Value, fact_types: &[String]) -> bool {

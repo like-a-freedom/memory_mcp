@@ -1524,6 +1524,7 @@ mod tests {
             "provenance",
             "rationale",
             "retrieval_tier",
+            "retrieval_evidence",
         ] {
             assert!(properties.contains_key(key), "missing property {key}");
         }

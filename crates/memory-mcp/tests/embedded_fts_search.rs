@@ -726,10 +726,10 @@ async fn embedded_resolve_finds_entity_by_alias() -> Result<(), Box<dyn std::err
 /// snowball stemmer, so Russian queries matched on raw substring only.
 #[tokio::test]
 async fn embedded_fts_finds_russian_content() -> Result<(), Box<dyn std::error::Error>> {
-    let service = common::make_service().await;
+    let (service, db_client) = common::make_service_with_client().await;
     let t = Utc::now() - Duration::days(1);
 
-    service
+    let fact_id = service
         .add_fact(
             "note",
             // Use an inflected object form so a stemmer has work to do;
@@ -745,6 +745,21 @@ async fn embedded_fts_finds_russian_content() -> Result<(), Box<dyn std::error::
         )
         .await?;
 
+    let (sql, vars) = memory_mcp::knowledge::queries::build_select_facts_filtered_query(
+        &Utc::now().to_rfc3339(),
+        Some("Газпром"),
+        10,
+        &[],
+    );
+    let native_matches = db_client.query(&sql, Some(vars), "org").await?;
+    assert!(
+        native_matches
+            .as_array()
+            .is_some_and(|rows| rows.iter().any(|row| {
+                row.get("fact_id").and_then(serde_json::Value::as_str) == Some(fact_id.as_str())
+            })),
+        "native SurrealDB FTS must match the inflected Russian fact before admission"
+    );
     let ctx = AssembleContextCapability::assemble_context_from_service(
         &service,
         AssembleContextRequest {

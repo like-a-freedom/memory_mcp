@@ -34,7 +34,9 @@ use super::temporal::{CollectTemporalFactsRequest, collect_temporal_facts, infer
 use super::triple::collect_triple_facts;
 use super::types::RankedContextFact;
 use crate::platform::context_cache::{CacheGeneration, CacheInsertOutcome, ContextCacheLookup};
-use crate::platform::context_cache_key::{CacheKey, CacheView};
+use crate::platform::context_cache_key::{CacheCutoff, CacheKey, CacheView};
+
+const DIRECT_RETRIEVAL_CANDIDATE_FLOOR: i32 = 5;
 
 // ─── Parameter preparation and cache operations ──────────────────────────
 
@@ -60,6 +62,10 @@ pub(super) async fn prepare_context_params(
     access_opt: Option<AccessPayload>,
 ) -> Result<PreparedContextParams, MemoryError> {
     let cutoff = request.as_of.unwrap_or_else(crate::shared::temporal::now);
+    let cache_cutoff = match request.as_of {
+        Some(cutoff) => CacheCutoff::HistoricalExact(cutoff),
+        None => CacheCutoff::CurrentBucket(cutoff),
+    };
     let access = access_opt.unwrap_or(AccessPayload {
         allowed_tags: None,
         caller_id: None,
@@ -105,13 +111,14 @@ pub(super) async fn prepare_context_params(
     let resolved_view_mode_opt = resolved_view_mode.as_option_str().map(str::to_string);
     let cache_key = CacheKey::new(
         &request.query,
-        cutoff,
+        cache_cutoff,
         request.budget,
         &request.fact_types,
-        CacheView::new(
+        CacheView::new_with_cutoff(
             resolved_view_mode.as_option_str(),
             request.window_start,
             request.window_end,
+            cache_cutoff,
         ),
         access.allowed_tags.clone(),
     );
@@ -227,9 +234,84 @@ pub(super) async fn assemble_default_context(
     // here so future changes can target a single phase
     // without disturbing the others.
     let channels = retrieve_fact_channels(service, &params).await?;
+    let mut query_evidence = super::admission::build_query_evidence(
+        params.raw_query_opt,
+        Vec::new(),
+        params.query_flags,
+    );
+    query_evidence.repeated_topics = super::experience::repeated_topic_evidence_for_query(
+        &query_evidence,
+        &channels.direct_facts,
+    );
     let ranked = rank_fact_channels(service, &params, channels).await?;
-    let selection = select_context_facts(service, &params, ranked).await?;
+    let admission_policy = super::admission::AdmissionPolicy::new(
+        service.embedding_service.embedding_similarity_threshold(),
+        params.cutoff,
+        params.access,
+    );
+    let ranked =
+        super::admission::admit_ranked_candidates(&query_evidence, ranked, &admission_policy);
+    let current_query = query_evidence.intent == super::admission::AdmissionIntent::Current;
+    let ranked = project_current_candidates(service, &params, &query_evidence, ranked).await?;
+    let selection = select_context_facts(service, &params, ranked, current_query).await?;
     finalize_with_first_person_appenders(&params, selection).await
+}
+
+async fn project_current_candidates(
+    service: &RetrievalContext,
+    params: &DefaultContextParams<'_>,
+    query: &super::admission::QueryEvidence,
+    ranked: Vec<RankedContextFact>,
+) -> Result<Vec<RankedContextFact>, MemoryError> {
+    if query.intent != super::admission::AdmissionIntent::Current || ranked.is_empty() {
+        return Ok(ranked);
+    }
+
+    let fact_ids = ranked
+        .iter()
+        .map(|candidate| crate::models::FactId::from(candidate.fact.fact_id.as_str()))
+        .collect::<Vec<_>>();
+    let relations = crate::knowledge::api::temporal_relations(
+        &*service.relation_read,
+        crate::knowledge::api::TemporalRelationsQuery {
+            fact_ids: fact_ids.clone(),
+            cutoff: params.cutoff,
+            policy_tags: params.access.allowed_tags.clone().unwrap_or_default(),
+            counterpart_limit: crate::knowledge::api::TEMPORAL_RELATION_MAX_COUNTERPARTS,
+            max_relation_depth: crate::knowledge::api::TEMPORAL_RELATION_MAX_DEPTH,
+        },
+    )
+    .await?;
+    let projection = super::currency::project_current_candidates(query, &fact_ids, &relations);
+    let current_ids = projection
+        .fact_ids
+        .iter()
+        .map(ToString::to_string)
+        .collect::<HashSet<_>>();
+    let retained = ranked
+        .into_iter()
+        .filter(|candidate| current_ids.contains(&candidate.fact.fact_id))
+        .collect::<Vec<_>>();
+
+    if projection.currency_unknown {
+        service.logger.log(
+            log_event(
+                "assemble_context.current_projection",
+                json!({"namespace": params.namespace}),
+                json!({
+                    "currency": "unknown",
+                    "retained_candidates": retained.len(),
+                    "truncated": relations.truncated,
+                }),
+                Some(params.access),
+                None,
+                None,
+            ),
+            LogLevel::Debug,
+        );
+    }
+
+    Ok(retained)
 }
 
 /// The four fact channels produced by `retrieve_fact_channels`
@@ -243,8 +325,8 @@ struct RetrievedFactChannels {
     temporal_facts: Vec<crate::models::Fact>,
     expanded_facts: Vec<crate::models::Fact>,
     graph_facts: Vec<crate::memory::retrieval::graph::GraphCandidate>,
-    community_facts: Vec<(crate::models::Fact, String, f64)>,
-    semantic_facts: Vec<(crate::models::Fact, String)>,
+    community_facts: Vec<super::types::CommunityFactCandidate>,
+    semantic_facts: Vec<super::types::SemanticCandidate>,
     direct_retrieval_tier: RetrievalTier,
 }
 
@@ -278,7 +360,7 @@ async fn retrieve_fact_channels(
         FactQueryParams {
             cutoff_iso: params.cutoff_iso,
             query_opt: params.query_opt,
-            limit: params.budget,
+            limit: params.budget.max(DIRECT_RETRIEVAL_CANDIDATE_FLOOR),
             fact_types: params.fact_types,
         },
     )
@@ -400,6 +482,11 @@ async fn retrieve_fact_channels(
             .map(|fact| fact.fact_id.clone())
             .collect();
 
+        let graph_query_evidence =
+            super::admission::build_query_evidence(Some(query), Vec::new(), params.query_flags);
+        let admitted_graph_seeds =
+            super::graph::admitted_graph_seed_facts(&graph_query_evidence, &direct_facts);
+
         graph_facts = collect_graph_facts(
             service,
             CollectGraphFactsRequest {
@@ -408,7 +495,7 @@ async fn retrieve_fact_channels(
                 access: params.access,
                 fact_types: params.fact_types,
                 direct_fact_ids: &direct_fact_ids,
-                lexical_facts: &direct_facts,
+                lexical_facts: &admitted_graph_seeds,
                 max_hops: params.query_flags.max_graph_hops(),
                 budget: params.budget,
             },
@@ -423,6 +510,25 @@ async fn retrieve_fact_channels(
             .map(|fact| fact.fact_id.clone())
             .collect();
 
+        // A lexical query can return a fact from one matching word even
+        // though it does not independently pass admission. Keep those IDs
+        // eligible for a stronger, separately evidenced community-summary
+        // path. Ranking fuses the duplicate by fact ID and carries its typed
+        // community evidence onto the same candidate.
+        let independently_grounded_ids = direct_facts
+            .iter()
+            .chain(temporal_facts.iter())
+            .chain(expanded_facts.iter())
+            .chain(graph_facts.iter().map(|candidate| &candidate.fact))
+            .filter(|fact| {
+                super::admission::episode_candidate_is_admitted(
+                    &graph_query_evidence,
+                    &fact.content,
+                )
+            })
+            .map(|fact| fact.fact_id.clone())
+            .collect::<HashSet<_>>();
+
         community_facts = collect_community_facts(
             service,
             CollectCommunityFactsRequest {
@@ -430,7 +536,7 @@ async fn retrieve_fact_channels(
                 query,
                 access: params.access,
                 fact_types: params.fact_types,
-                direct_fact_ids: &all_direct_ids,
+                direct_fact_ids: &independently_grounded_ids,
                 budget: params.budget,
             },
         )
@@ -442,7 +548,7 @@ async fn retrieve_fact_channels(
             .chain(
                 community_facts
                     .iter()
-                    .map(|(fact, _, _)| fact.fact_id.clone()),
+                    .map(|candidate| candidate.fact.fact_id.clone()),
             )
             .collect::<HashSet<_>>();
 
@@ -549,8 +655,14 @@ async fn select_context_facts(
     service: &RetrievalContext,
     params: &DefaultContextParams<'_>,
     mut ranked_facts: Vec<RankedContextFact>,
+    current_query: bool,
 ) -> Result<SelectedContext, MemoryError> {
-    let episode_fallback_items = if let Some(query) = params.query_opt {
+    // Episodic fallback has no fact-level reconciliation identity. It cannot
+    // prove that a statement remains current, so it must not bypass the
+    // relation projection for a current-intent query.
+    let episode_fallback_items = if current_query {
+        Vec::new()
+    } else if let Some(query) = params.query_opt {
         collect_episode_fallback_items(service, params, query).await?
     } else {
         Vec::new()
@@ -744,6 +856,7 @@ mod tests {
     ) -> RankedContextFact {
         RankedContextFact {
             fact: create_test_fact(fact_id, content, t_valid),
+            evidence: crate::memory::retrieval::types::CandidateEvidence::default(),
             rationale: "test rationale".to_string(),
             retrieval_tier: tier,
             fusion_score: 1.0,

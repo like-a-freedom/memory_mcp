@@ -7,10 +7,12 @@ use serde_json::Value;
 use crate::error::MemoryError;
 use crate::knowledge::community::parse_community_record;
 use crate::models::Fact;
+use crate::shared::search::search_query_terms;
 use crate::storage::GraphDirection;
 use crate::storage::value_helpers::{json_f64, json_string};
 
 use super::filtering::{compare_facts_by_recency, filter_facts_by_constraints};
+use super::types::{CommunityAdmissionEvidence, CommunityFactCandidate};
 
 pub(crate) struct CollectCommunityFactsRequest<'a> {
     pub(crate) cutoff_iso: &'a str,
@@ -26,6 +28,7 @@ pub(crate) struct CommunityMatch {
     pub(crate) rank: usize,
     pub(crate) community_id: String,
     pub(crate) summary: String,
+    pub(crate) member_entity_id: String,
 }
 
 #[derive(Debug)]
@@ -39,7 +42,7 @@ pub(crate) struct StoredCommunitySummary {
 pub(crate) async fn collect_community_facts(
     service: &crate::memory::retrieval::RetrievalContext,
     request: CollectCommunityFactsRequest<'_>,
-) -> Result<Vec<(Fact, String, f64)>, MemoryError> {
+) -> Result<Vec<CommunityFactCandidate>, MemoryError> {
     let matched_communities = find_matching_communities(service, request.query).await?;
     if matched_communities.is_empty() {
         return Ok(Vec::new());
@@ -66,12 +69,14 @@ pub(crate) async fn collect_community_facts(
                 .iter()
                 .cloned()
                 .map(move |entity_id| {
+                    let member_entity_id = entity_id.clone();
                     (
                         entity_id,
                         CommunityMatch {
                             rank,
                             community_id: community.community_id.clone(),
                             summary: community.summary.clone(),
+                            member_entity_id,
                         },
                     )
                 })
@@ -105,15 +110,20 @@ pub(crate) async fn collect_community_facts(
 
     let mut ranked_facts = Vec::new();
     for fact in facts.into_iter().take(request.budget.max(1) as usize) {
-        let rationale = best_community_match(&fact, &community_summary_by_member).map_or_else(
-            || format!("matched community summary for query=\"{}\"", request.query),
-            |matched| {
-                format!(
-                    "matched community summary for query=\"{}\" via {}: {}",
-                    request.query, matched.community_id, matched.summary
-                )
-            },
+        let Some(matched_community) = best_community_match(&fact, &community_summary_by_member)
+        else {
+            continue;
+        };
+        let rationale = format!(
+            "matched community summary for query=\"{}\" via {}: {}",
+            request.query, matched_community.community_id, matched_community.summary
         );
+        let evidence = CommunityAdmissionEvidence {
+            community_id: matched_community.community_id.clone(),
+            member_entity_id: matched_community.member_entity_id.clone(),
+            summary_terms: search_query_terms(&matched_community.summary),
+            matched_summary_terms: Vec::new(),
+        };
         let origin_factor = community_origin_factor_for_fact(
             service,
             request.cutoff_iso,
@@ -122,7 +132,12 @@ pub(crate) async fn collect_community_facts(
             &mut entity_origin_factor_cache,
         )
         .await?;
-        ranked_facts.push((fact, rationale, origin_factor));
+        ranked_facts.push(CommunityFactCandidate {
+            fact,
+            rationale,
+            origin_factor,
+            evidence,
+        });
     }
 
     Ok(ranked_facts)
@@ -417,6 +432,7 @@ mod tests {
                 rank: 5,
                 community_id: "c:5".into(),
                 summary: "bad".into(),
+                member_entity_id: "e:1".into(),
             },
         );
         matches.insert(
@@ -425,6 +441,7 @@ mod tests {
                 rank: 1,
                 community_id: "c:1".into(),
                 summary: "good".into(),
+                member_entity_id: "e:2".into(),
             },
         );
         let result = best_community_match(&fact, &matches).expect("should find match");

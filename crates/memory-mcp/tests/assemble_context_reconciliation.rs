@@ -12,6 +12,7 @@ mod common;
 use chrono::{TimeZone, Utc};
 use memory_mcp::models::AssembleContextRequest;
 use memory_mcp::service::memory_container_shims::memory_capabilities_assemble_context::AssembleContextCapability;
+use memory_mcp::storage::DbClient;
 
 fn request(query: &str) -> AssembleContextRequest {
     AssembleContextRequest {
@@ -157,6 +158,54 @@ async fn exposes_supersession_on_the_predecessor_item() {
             .is_empty(),
         "claim_ids must be populated from the persisted claims, not left empty"
     );
+
+    // Replay the same persisted relation at a cutoff before a later-known
+    // transaction-time invalidation. This must use the relation's historical
+    // visibility, even though the current row now carries an invalidation.
+    let historical_cutoff = Utc::now() + chrono::Duration::hours(1);
+    let invalidated_at = historical_cutoff + chrono::Duration::minutes(10);
+    let relation_id = summary.relation_id.clone();
+    tm.db_client
+        .query(
+            "UPDATE claim_relation SET t_invalid_ingested = type::datetime($invalidated_at) WHERE claim_relation_id = $relation_id",
+            Some(serde_json::json!({
+                "invalidated_at": invalidated_at.to_rfc3339(),
+                "relation_id": relation_id,
+            })),
+            "org",
+        )
+        .await
+        .expect("write transaction-time invalidation");
+    let persisted_relation = tm
+        .db_client
+        .select_one(&relation_id, "org")
+        .await
+        .expect("read back relation invalidation");
+    assert!(
+        persisted_relation
+            .as_ref()
+            .and_then(|record| record.get("t_invalid_ingested"))
+            .is_some_and(|value| !value.is_null())
+    );
+
+    let mut historical_request = request("ARR");
+    historical_request.as_of = Some(historical_cutoff);
+    let historical_items =
+        AssembleContextCapability::assemble_context_from_service(&service, historical_request)
+            .await
+            .expect("historical context should assemble");
+    assert!(
+        historical_items.iter().any(|item| {
+            item.reconciliation.as_ref().is_some_and(|metadata| {
+                metadata.relations.iter().any(|relation| {
+                    relation.relation_id == relation_id
+                        && relation.outcome
+                            == memory_mcp::models::claim::ClaimRelationOutcome::Supersession
+                })
+            })
+        }),
+        "a relation invalidated after as_of must remain visible in that historical pack"
+    );
 }
 
 #[tokio::test]
@@ -185,6 +234,164 @@ async fn leaves_reconciliation_none_when_no_relation_exists() {
         items.iter().all(|item| item.reconciliation.is_none()),
         "a fact in no relation must keep reconciliation at None rather than Some(empty)"
     );
+}
+
+#[tokio::test]
+async fn deduplicates_identical_facts_only_after_persisted_duplicate_relation() {
+    let tm = common::TestMemory::new(false).await;
+    let service = common::exposing_claims(tm.service).expect("evidence is a valid stage");
+
+    common::ingest_lineage_episode(
+        &service,
+        &tm.db_client,
+        "episode:duplicate-a",
+        "fs:docs/duplicate-a.md:aaaa",
+        "fs:docs/duplicate-a.md",
+        "ARR is legacy",
+        Utc.with_ymd_and_hms(2026, 6, 1, 10, 0, 0).unwrap(),
+    )
+    .await;
+    common::ingest_lineage_episode(
+        &service,
+        &tm.db_client,
+        "episode:duplicate-b",
+        "fs:docs/duplicate-b.md:bbbb",
+        "fs:docs/duplicate-b.md",
+        "ARR is legacy",
+        Utc.with_ymd_and_hms(2026, 6, 2, 10, 0, 0).unwrap(),
+    )
+    .await;
+
+    assert!(wait_for_duplicate_relations(&tm.db_client, 1).await);
+    let duplicate_count = active_duplicate_relation_count(&tm.db_client).await;
+    assert!(
+        duplicate_count > 0,
+        "the production ingest and reconciliation path must persist a Duplicate before testing view dedup"
+    );
+
+    let items = AssembleContextCapability::assemble_context_from_service(&service, request("ARR"))
+        .await
+        .expect("context should assemble");
+
+    assert_eq!(
+        active_duplicate_relation_count(&tm.db_client).await,
+        duplicate_count,
+        "view dedup is read-only and must not create or invalidate claim relations"
+    );
+
+    assert_eq!(
+        items.len(),
+        1,
+        "only exact-content facts joined by visible persisted Duplicate evidence should collapse"
+    );
+    assert_eq!(items[0].content, "ARR is legacy");
+    let relation = items[0]
+        .reconciliation
+        .as_ref()
+        .and_then(|metadata| {
+            metadata.relations.iter().find(|relation| {
+                matches!(
+                    relation.outcome,
+                    memory_mcp::models::claim::ClaimRelationOutcome::Duplicate
+                )
+            })
+        })
+        .expect("the representative retains the persisted Duplicate evidence");
+    assert!(
+        relation
+            .counterpart_source_episode_id
+            .as_deref()
+            .is_some_and(|episode_id| episode_id.starts_with("episode:")),
+        "the visible relation evidence retains the other source episode"
+    );
+}
+
+#[tokio::test]
+async fn duplicate_metadata_does_not_expose_an_unselected_counterpart() {
+    let tm = common::TestMemory::new(false).await;
+    let service = common::exposing_claims(tm.service).expect("evidence is a valid stage");
+
+    common::ingest_lineage_episode(
+        &service,
+        &tm.db_client,
+        "episode:hidden-duplicate-a",
+        "fs:docs/hidden-duplicate-a.md:aaaa",
+        "fs:docs/hidden-duplicate-a.md",
+        "ARR is legacy",
+        Utc.with_ymd_and_hms(2026, 6, 1, 10, 0, 0).unwrap(),
+    )
+    .await;
+    common::ingest_lineage_episode(
+        &service,
+        &tm.db_client,
+        "episode:hidden-duplicate-b",
+        "fs:docs/hidden-duplicate-b.md:bbbb",
+        "fs:docs/hidden-duplicate-b.md",
+        "ARR is legacy",
+        Utc.with_ymd_and_hms(2026, 6, 2, 10, 0, 0).unwrap(),
+    )
+    .await;
+    assert!(wait_for_duplicate_relations(&tm.db_client, 1).await);
+
+    let mut one_item_request = request("ARR");
+    one_item_request.budget = 1;
+    let items =
+        AssembleContextCapability::assemble_context_from_service(&service, one_item_request)
+            .await
+            .expect("context should assemble");
+
+    assert_eq!(items.len(), 1);
+    let duplicate = items[0]
+        .reconciliation
+        .as_ref()
+        .and_then(|metadata| {
+            metadata.relations.iter().find(|relation| {
+                matches!(
+                    relation.outcome,
+                    memory_mcp::models::claim::ClaimRelationOutcome::Duplicate
+                )
+            })
+        })
+        .expect("the selected fact may disclose its visible relation");
+    assert_eq!(
+        duplicate.counterpart_source_episode_id, None,
+        "the relation reader must not hydrate or disclose the unselected fact's source episode"
+    );
+}
+
+async fn wait_for_duplicate_relations(
+    db_client: &memory_mcp::storage::SurrealDbClient,
+    want: usize,
+) -> bool {
+    tokio::time::timeout(std::time::Duration::from_secs(5), async {
+        loop {
+            if active_duplicate_relation_count(db_client).await >= want {
+                return true;
+            }
+            tokio::task::yield_now().await;
+        }
+    })
+    .await
+    .unwrap_or(false)
+}
+
+async fn active_duplicate_relation_count(
+    db_client: &memory_mcp::storage::SurrealDbClient,
+) -> usize {
+    let rows = db_client
+        .query(
+            "SELECT count() AS cnt FROM claim_relation WHERE outcome = 'duplicate' AND (t_invalid_ingested IS NONE OR t_invalid_ingested IS NULL)",
+            None,
+            "org",
+        )
+        .await
+        .expect("count active duplicate relations");
+    serde_json::from_value::<Vec<serde_json::Value>>(rows)
+        .ok()
+        .and_then(|rows| rows.first().cloned())
+        .and_then(|row| row.get("cnt").and_then(serde_json::Value::as_i64))
+        .unwrap_or_default()
+        .max(0) as usize
 }
 
 #[tokio::test]
@@ -250,6 +457,17 @@ async fn withholds_relations_below_the_evidence_stage() {
             items.iter().all(|item| item.reconciliation.is_none()),
             "{stage} must not disclose relations through assemble_context, got {} disclosures",
             items.iter().filter(|i| i.reconciliation.is_some()).count()
+        );
+
+        let current = AssembleContextCapability::assemble_context_from_service(
+            &service,
+            request("latest ARR"),
+        )
+        .await
+        .expect("current query should assemble under every rollout stage");
+        assert!(
+            current.is_empty(),
+            "{stage} withholds relation evidence, so currentness is unknown and no candidate may be presented as current"
         );
     }
 }
@@ -355,14 +573,21 @@ async fn assemble_pair(
     common::wait_for_supersessions(db_client, 1).await;
     let supersessions = common::supersession_count(db_client).await;
 
-    let items =
-        AssembleContextCapability::assemble_context_from_service(service, request("ARR legacy"))
-            .await
-            .expect("context should assemble");
+    // Both revisions contain the same explicit subject. This asks for the
+    // subject's memory and keeps this scenario focused on relation ordering;
+    // a multi-term query for only the predecessor must not pull in a successor
+    // that has no independent query support under the retrieval-quality gate.
+    let items = AssembleContextCapability::assemble_context_from_service(service, request("ARR"))
+        .await
+        .expect("context should assemble");
     assert!(
         items.len() >= 2,
-        "both revisions must be in the pack, got {}",
-        items.len()
+        "both revisions must be in the pack, got {}: {:?}",
+        items.len(),
+        items
+            .iter()
+            .map(|item| (&item.fact_id, &item.content, &item.reconciliation))
+            .collect::<Vec<_>>()
     );
 
     let leader = items[0].content.clone();

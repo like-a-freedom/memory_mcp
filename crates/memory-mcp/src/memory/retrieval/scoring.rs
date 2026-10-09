@@ -2,7 +2,7 @@ use std::collections::HashSet;
 
 use serde_json::json;
 
-use crate::models::{AssembledContextItem, Fact};
+use crate::models::{AssembledContextItem, Fact, RetrievalEvidence};
 use crate::shared::search_lexical::matched_query_terms_for_fact;
 
 use super::ranking;
@@ -16,6 +16,7 @@ pub(super) fn ranked_fact_to_item(
     let relevance = ranking::normalized_relevance_score(&ranked);
     let ranking::RankedContextFact {
         fact,
+        evidence,
         rationale,
         retrieval_tier,
         grounding_score: grounding,
@@ -25,6 +26,24 @@ pub(super) fn ranked_fact_to_item(
         ..
     } = ranked;
     let confidence = decay_fn(&fact, cutoff);
+    let rationale = rationale_with_final_relevance(rationale, relevance);
+    let retrieval_evidence = evidence.admission_basis.map(|basis| RetrievalEvidence {
+        policy_version: "retrieval-admission-v1".to_string(),
+        admission_basis: basis.as_str().to_string(),
+        semantic_similarity: evidence.semantic_similarity,
+        graph_anchor_origin: evidence
+            .graph_anchor_origin
+            .as_ref()
+            .map(|origin| match origin {
+                crate::memory::retrieval::types::GraphAnchorOrigin::QueryEntity { .. } => {
+                    "query_entity".to_string()
+                }
+                crate::memory::retrieval::types::GraphAnchorOrigin::AdmittedSeed { .. } => {
+                    "admitted_seed".to_string()
+                }
+            }),
+        hop_count: evidence.hop_count,
+    });
 
     // Build provenance output: start with structured fields, then add
     // query-time enrichment (matched_query_terms, graph_trace).
@@ -44,12 +63,51 @@ pub(super) fn ranked_fact_to_item(
                 "graph_trace".to_string(),
                 json!({
                     "anchor_entity_id": trace.anchor_entity_id,
+                    "anchor_origin": match &trace.anchor_origin {
+                        crate::memory::retrieval::types::GraphAnchorOrigin::QueryEntity { entity_id } => {
+                            json!({"kind": "query_entity", "entity_id": entity_id})
+                        }
+                        crate::memory::retrieval::types::GraphAnchorOrigin::AdmittedSeed { fact_id } => {
+                            json!({"kind": "admitted_seed", "fact_id": fact_id})
+                        }
+                    },
                     "anchor_canonical_name": trace.anchor_canonical_name,
                     "hop_count": trace.hop_count,
                     "path": trace.path,
                 }),
             );
         }
+        map.insert(
+            "retrieval_admission".to_string(),
+            json!({
+                "policy_version": "retrieval-admission-v1",
+                "basis": evidence.admission_basis.map(|basis| basis.as_str()),
+                "matched_content_terms": evidence.matched_content_terms,
+                "matched_index_key_terms": evidence.matched_index_key_terms,
+                "matched_references": evidence.matched_references,
+                "resolved_entity_ids": evidence.resolved_entity_ids,
+                "semantic_similarity": evidence.semantic_similarity,
+                "graph_anchor_origin": evidence.graph_anchor_origin.as_ref().map(|origin| match origin {
+                    crate::memory::retrieval::types::GraphAnchorOrigin::QueryEntity { entity_id } => {
+                        json!({"kind": "query_entity", "entity_id": entity_id})
+                    }
+                    crate::memory::retrieval::types::GraphAnchorOrigin::AdmittedSeed { fact_id } => {
+                        json!({"kind": "admitted_seed", "fact_id": fact_id})
+                    }
+                }),
+                "hop_count": evidence.hop_count,
+                "community": evidence.community.as_ref().map(|community| json!({
+                    "community_id": community.community_id,
+                    "member_entity_id": community.member_entity_id,
+                    "matched_summary_terms": community.matched_summary_terms,
+                })),
+                "repeated_topic": evidence.repeated_topic.as_ref().map(|topic| json!({
+                    "matched_query_index_terms": topic.matched_query_index_terms,
+                    "matched_repeated_topics": topic.matched_repeated_topics,
+                    "supporting_fact_ids": topic.supporting_fact_ids,
+                })),
+            }),
+        );
     }
 
     AssembledContextItem {
@@ -65,7 +123,22 @@ pub(super) fn ranked_fact_to_item(
         rationale,
         retrieval_tier: Some(retrieval_tier.as_str().to_string()),
         reconciliation: None,
+        retrieval_evidence,
     }
+}
+
+fn rationale_with_final_relevance(mut rationale: String, relevance: f64) -> String {
+    let Some(label_start) = rationale.find("relevance=") else {
+        return rationale;
+    };
+    let value_start = label_start + "relevance=".len();
+    let value_end = rationale[value_start..]
+        .find(char::is_whitespace)
+        .map_or(rationale.len(), |offset| value_start + offset);
+    if rationale[value_start..value_end].parse::<f64>().is_ok() {
+        rationale.replace_range(value_start..value_end, &format!("{relevance:.2}"));
+    }
+    rationale
 }
 
 pub(super) fn selected_fact_matched_terms(
@@ -125,6 +198,7 @@ mod tests {
     ) -> ranking::RankedContextFact {
         ranking::RankedContextFact {
             fact,
+            evidence: crate::memory::retrieval::types::CandidateEvidence::default(),
             rationale: "test".into(),
             retrieval_tier: tier,
             fusion_score: 0.5,
@@ -360,6 +434,9 @@ mod tests {
     fn ranked_fact_to_item_handles_graph_trace() {
         let trace = GraphTrace {
             anchor_entity_id: "e:42".to_string(),
+            anchor_origin: crate::memory::retrieval::types::GraphAnchorOrigin::QueryEntity {
+                entity_id: "e:42".to_string(),
+            },
             anchor_canonical_name: "Acme".to_string(),
             hop_count: 1,
             path: vec!["e:42".to_string(), "e:99".to_string()],

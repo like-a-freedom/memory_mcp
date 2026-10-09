@@ -1,4 +1,4 @@
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 use std::path::PathBuf;
 use std::time::{Duration, Instant};
 
@@ -29,6 +29,9 @@ pub trait EvalSuite: Send + Sync {
     fn mode(&self) -> EvalMode;
     fn expected_case_ids(&self) -> &[EvalCaseId];
     fn reducer(&self) -> &dyn SuiteReducer;
+    fn fingerprint_metadata(&self) -> BTreeMap<String, String> {
+        BTreeMap::new()
+    }
     async fn run(&self, context: &RunContext) -> Vec<EvalCaseOutcome>;
 }
 
@@ -111,6 +114,7 @@ impl Runner {
         let mut all_outcomes = Vec::new();
         let mut expected_cases = Vec::new();
         let mut suite_summaries = Vec::new();
+        let mut suite_fingerprints = BTreeMap::new();
         let mut issues = request.issues.clone();
 
         for (suite_index, suite) in selected_suites.into_iter().enumerate() {
@@ -131,6 +135,10 @@ impl Runner {
 
             let suite_started = Instant::now();
             let outcomes = suite.run(&context).await;
+            let fingerprint_metadata = suite.fingerprint_metadata();
+            if !fingerprint_metadata.is_empty() {
+                suite_fingerprints.insert(suite.id().to_string(), fingerprint_metadata);
+            }
             progress.suite_finished(
                 position,
                 suite_total,
@@ -175,6 +183,11 @@ impl Runner {
         expected_cases.dedup();
 
         let duration_ms = started.elapsed().as_millis() as u64;
+        let mut fingerprint =
+            crate::RunFingerprint::capture_with_profile(Some(&request.manifest_path));
+        if !suite_fingerprints.is_empty() {
+            fingerprint = fingerprint.with_suite_fingerprints(suite_fingerprints);
+        }
 
         let budget_status = if request.manifest.time_budget_seconds > 0 {
             let budget_ms = request.manifest.time_budget_seconds * 1000;
@@ -215,17 +228,13 @@ impl Runner {
                 outcomes: all_outcomes.clone(),
                 suite_summaries: suite_summaries.clone(),
                 gates: vec![],
-                fingerprint: crate::RunFingerprint::capture_with_profile(Some(
-                    &request.manifest_path,
-                )),
+                fingerprint: fingerprint.clone(),
                 budget_status: None,
                 verdict: crate::domain::RunVerdict::default(),
                 issues: vec![],
             },
             request.baseline.as_ref(),
         )?;
-
-        let fingerprint = crate::RunFingerprint::capture_with_profile(Some(&request.manifest_path));
 
         let budget = budget_status.unwrap_or(GateStatus::Invalid);
         let verdict = derive_run_verdict(&all_outcomes, &gates, budget.clone(), &issues);
@@ -266,6 +275,7 @@ mod tests {
         expected_ids: Vec<EvalCaseId>,
         outcomes: Vec<EvalCaseOutcome>,
         reducer: CountReducer,
+        fingerprint_metadata: BTreeMap<String, String>,
     }
 
     impl StaticSuite {
@@ -283,6 +293,37 @@ mod tests {
                 expected_ids: vec![EvalCaseId::parse(case_id).unwrap()],
                 outcomes: vec![outcome],
                 reducer: CountReducer::new(id),
+                fingerprint_metadata: BTreeMap::new(),
+            }
+        }
+
+        fn with_fingerprint(mut self, key: &str, value: &str) -> Self {
+            self.fingerprint_metadata.insert(key.into(), value.into());
+            self
+        }
+
+        fn with_case_count(id: &str, count: usize) -> Self {
+            let expected_ids: Vec<_> = (0..count)
+                .map(|index| EvalCaseId::parse(format!("case-{index}")).unwrap())
+                .collect();
+            let outcomes = (0..count)
+                .map(|index| {
+                    EvalCaseOutcome::new(
+                        id,
+                        format!("case-{index}"),
+                        EvalMode::Lifecycle,
+                        CorpusSplit::Test,
+                        LabelTrust::Reviewed,
+                        CaseStatus::Passed,
+                    )
+                })
+                .collect();
+            Self {
+                id: id.to_string(),
+                expected_ids,
+                outcomes,
+                reducer: CountReducer::new(id),
+                fingerprint_metadata: BTreeMap::new(),
             }
         }
     }
@@ -303,6 +344,10 @@ mod tests {
 
         fn reducer(&self) -> &dyn SuiteReducer {
             &self.reducer
+        }
+
+        fn fingerprint_metadata(&self) -> BTreeMap<String, String> {
+            self.fingerprint_metadata.clone()
         }
 
         async fn run(&self, _context: &RunContext) -> Vec<EvalCaseOutcome> {
@@ -367,6 +412,14 @@ mod tests {
         }
     }
 
+    fn request_with_expected_coverage(suite_id: &str, exact_cases: usize) -> RunRequest {
+        let mut request = request(&[suite_id], BTreeSet::new());
+        request.manifest.profile = EvalProfile::Release;
+        request.manifest.suites[0].expected_coverage =
+            Some(crate::profile::ExpectedCoverage { exact_cases });
+        request
+    }
+
     #[tokio::test]
     async fn progress_reports_only_selected_suites_in_order() {
         let runner = Runner::new(vec![
@@ -398,5 +451,56 @@ mod tests {
             .unwrap();
 
         assert_eq!(artifact.outcomes.len(), 1);
+    }
+
+    #[tokio::test]
+    async fn run_persists_suite_fingerprints_in_the_artifact() {
+        let suite = StaticSuite::new("suite", "case-1")
+            .with_fingerprint("embedding_signature", "embsig:resolved-model");
+        let artifact = Runner::new(vec![Box::new(suite)])
+            .run(&request(&["suite"], BTreeSet::new()))
+            .await
+            .expect("run completes");
+
+        assert_eq!(
+            artifact.fingerprint.suite_fingerprints["suite"]["embedding_signature"],
+            "embsig:resolved-model"
+        );
+    }
+
+    #[tokio::test]
+    async fn release_run_rejects_47_cases_when_exact_coverage_is_48() {
+        let runner = Runner::new(vec![Box::new(StaticSuite::with_case_count(
+            "retrieval-quality",
+            47,
+        ))]);
+
+        let artifact = runner
+            .run(&request_with_expected_coverage("retrieval-quality", 48))
+            .await
+            .expect("the invalid coverage artifact remains inspectable");
+
+        assert_eq!(artifact.verdict, crate::domain::RunVerdict::Invalid);
+        assert_eq!(artifact.outcomes.len(), 47);
+        assert_eq!(artifact.issues.len(), 1);
+        assert_eq!(artifact.issues[0].stage, RunStage::Coverage);
+    }
+
+    #[tokio::test]
+    async fn release_run_rejects_49_cases_when_exact_coverage_is_48() {
+        let runner = Runner::new(vec![Box::new(StaticSuite::with_case_count(
+            "retrieval-quality",
+            49,
+        ))]);
+
+        let artifact = runner
+            .run(&request_with_expected_coverage("retrieval-quality", 48))
+            .await
+            .expect("the invalid coverage artifact remains inspectable");
+
+        assert_eq!(artifact.verdict, crate::domain::RunVerdict::Invalid);
+        assert_eq!(artifact.outcomes.len(), 49);
+        assert_eq!(artifact.issues.len(), 1);
+        assert_eq!(artifact.issues[0].stage, RunStage::Coverage);
     }
 }

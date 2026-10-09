@@ -144,7 +144,7 @@ async fn assemble_context_when_fact_is_invalid_after_cutoff_then_old_view_keeps_
 /// 3. the stale item carries the relation that demoted it, so the reader can
 ///    see *why* rather than guessing.
 #[tokio::test]
-async fn corrected_fact_supersedes_the_stale_value_in_the_latest_view() {
+async fn correction_reorders_but_preserves_stale_value_when_both_match_query() {
     let (service, db_client) = common::make_service_with_client().await;
     let service = common::exposing_claims(service).expect("evidence is a valid stage");
 
@@ -182,7 +182,7 @@ async fn corrected_fact_supersedes_the_stale_value_in_the_latest_view() {
     let items = AssembleContextCapability::assemble_context_from_service(
         &service,
         AssembleContextRequest {
-            query: "ARR legacy".into(),
+            query: "ARR".into(),
             as_of: None,
             budget: 10,
             fact_types: vec![],
@@ -196,7 +196,15 @@ async fn corrected_fact_supersedes_the_stale_value_in_the_latest_view() {
     .await
     .expect("context should assemble");
 
-    assert_eq!(items.len(), 2, "both revisions must be in the pack");
+    assert_eq!(
+        items.len(),
+        2,
+        "both revisions must be in the pack; observed={:?}",
+        items
+            .iter()
+            .map(|item| (&item.fact_id, &item.content))
+            .collect::<Vec<_>>()
+    );
 
     // 1. The stale value does not lead.
     assert_ne!(
@@ -208,6 +216,15 @@ async fn corrected_fact_supersedes_the_stale_value_in_the_latest_view() {
     assert!(
         items.iter().any(|item| item.content == "ARR is legacy"),
         "the superseded value remains retrievable for provenance — correction never deletes"
+    );
+
+    let successor = items
+        .iter()
+        .find(|item| item.content == "ARR is supersedes")
+        .expect("the corrected counterpart is present");
+    assert_eq!(
+        successor.provenance["retrieval_admission"]["basis"], "lexical",
+        "the shared subject independently supports both versions"
     );
 
     // 3. The stale item explains itself.

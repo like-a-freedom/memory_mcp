@@ -79,10 +79,13 @@ impl ExplanationService {
         request: ExplainRequest,
         access: Option<AccessPayload>,
     ) -> Result<Vec<ExplainItem>, MemoryError> {
+        let access_policy = access.clone().unwrap_or_default();
+
         // --- Phase 1: resolve episodes / facts, collect all entity_links ---
         struct ResolvedItem {
             item: ExplainItem,
             episode: Option<crate::models::Episode>,
+            fact_record: Option<serde_json::Map<String, Value>>,
             entity_links: Vec<String>,
         }
 
@@ -105,37 +108,55 @@ impl ExplanationService {
                 Ok(record) => record,
                 Err(error) => provenance_lookup_error(error)?,
             };
+            let record = record.filter(|record| {
+                crate::memory::retrieval::filtering::episode_record_allowed_object(
+                    record,
+                    &access_policy,
+                )
+            });
             let episode = record
                 .as_ref()
                 .and_then(crate::memory::record_parsing::episode_from_record);
 
-            let entity_links = if let Some(ref fact_id) = item.fact_id {
+            let fact_record = if let Some(ref fact_id) = item.fact_id {
                 // Same policy for the fact side: an id that names
                 // another kind contributes no entity links.
                 let fact_record = match self.find_fact_record(fact_id).await {
                     Ok(record) => record,
                     Err(error) => provenance_lookup_error(error)?,
                 };
-                let links = fact_record
-                    .and_then(|r| {
-                        r.get("entity_links").and_then(|v| v.as_array()).map(|arr| {
-                            arr.iter()
-                                .filter_map(|v| v.as_str().map(String::from))
+                fact_record.filter(|record| {
+                    crate::memory::retrieval::filtering::fact_record_allowed_object(
+                        record,
+                        &access_policy,
+                        &[],
+                    )
+                })
+            } else {
+                None
+            };
+            let entity_links = fact_record
+                .as_ref()
+                .and_then(|record| {
+                    record
+                        .get("entity_links")
+                        .and_then(|value| value.as_array())
+                        .map(|links| {
+                            links
+                                .iter()
+                                .filter_map(|value| value.as_str().map(String::from))
                                 .collect::<Vec<_>>()
                         })
-                    })
-                    .unwrap_or_default();
-                for link in &links {
-                    all_entity_links.insert(link.clone());
-                }
-                links
-            } else {
-                Vec::new()
-            };
+                })
+                .unwrap_or_default();
+            for link in &entity_links {
+                all_entity_links.insert(link.clone());
+            }
 
             resolved.push(ResolvedItem {
                 item,
                 episode,
+                fact_record,
                 entity_links,
             });
         }
@@ -152,6 +173,7 @@ impl ExplanationService {
         for resolved_item in resolved {
             // Track fact access regardless of whether the episode is found
             if let Some(ref fact_id) = resolved_item.item.fact_id
+                && resolved_item.fact_record.is_some()
                 && let Err(err) = self.record_fact_access(fact_id, 3).await
             {
                 self.logger.log(
@@ -168,7 +190,17 @@ impl ExplanationService {
             }
 
             let Some(episode) = resolved_item.episode else {
-                explanations.push(resolved_item.item);
+                let mut item = resolved_item.item;
+                item.provenance = json!({});
+                item.citation_context = None;
+                item.all_sources.clear();
+                item.graph_insights = None;
+                item.t_ref = None;
+                item.t_ingested = None;
+                item.fact_age_days = None;
+                item.decayed_confidence = None;
+                item.ingestion_method = None;
+                explanations.push(item);
                 continue;
             };
 
@@ -176,6 +208,7 @@ impl ExplanationService {
                 .collect_provenance_sources_cached(
                     &episode,
                     &resolved_item.entity_links,
+                    &access_policy,
                     &mut episode_via_entity_cache,
                 )
                 .await?;
@@ -191,10 +224,7 @@ impl ExplanationService {
             let mut decayed_confidence: Option<f64> = None;
             let mut ingestion_method: Option<String> = None;
 
-            if let Some(fact_id) = &resolved_item.item.fact_id
-                && let Ok(fact_record) = self.find_fact_record(fact_id).await
-                && let Some(record) = &fact_record
-            {
+            if let Some(record) = resolved_item.fact_record.as_ref() {
                 let prov_value = record.get("provenance").cloned().unwrap_or(Value::Null);
                 let fact_prov = Provenance::from_json_value(&prov_value);
                 if let Some(map) = explain_provenance.as_object_mut() {
@@ -313,13 +343,17 @@ impl ExplanationService {
     async fn find_episodes_via_entity(
         &self,
         entity_id: &str,
+        access: &AccessPayload,
     ) -> Result<Vec<crate::models::Episode>, MemoryError> {
         let rows = crate::memory::EpisodeContextStore::from_bound(self.db.clone())
-            .select_episodes_via_entity(entity_id)
+            .select_episodes_via_entity(entity_id, access.allowed_tags.as_deref())
             .await?;
 
         let episodes: Vec<crate::models::Episode> = rows
             .iter()
+            .filter(|value| {
+                crate::memory::retrieval::filtering::episode_record_allowed(value, access)
+            })
             .filter_map(|value| {
                 let obj = value.as_object()?;
                 crate::memory::record_parsing::episode_from_record(obj)
@@ -453,6 +487,7 @@ impl ExplanationService {
         &self,
         primary_episode: &crate::models::Episode,
         entity_links: &[String],
+        access: &AccessPayload,
         cache: &mut HashMap<String, Vec<crate::models::Episode>>,
     ) -> Result<Vec<ProvenanceSource>, MemoryError> {
         let mut sources = Vec::new();
@@ -471,7 +506,7 @@ impl ExplanationService {
             let linked_episodes = if let Some(cached) = cache.get(entity_id) {
                 cached.clone()
             } else {
-                let episodes = self.find_episodes_via_entity(entity_id).await?;
+                let episodes = self.find_episodes_via_entity(entity_id, access).await?;
                 cache.insert(entity_id.clone(), episodes.clone());
                 episodes
             };

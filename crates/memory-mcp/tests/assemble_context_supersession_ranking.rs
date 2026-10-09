@@ -32,7 +32,7 @@ fn request(query: &str) -> AssembleContextRequest {
 }
 
 #[tokio::test]
-async fn demotes_predecessor_below_successor_in_an_assembled_pack() {
+async fn content_query_does_not_rescue_a_successor_without_query_evidence() {
     let tm = common::TestMemory::new(false).await;
     let service = common::exposing_claims(tm.service).expect("evidence is a valid stage");
 
@@ -62,53 +62,89 @@ async fn demotes_predecessor_below_successor_in_an_assembled_pack() {
         "the pipeline must produce a supersession before ordering can be tested"
     );
 
-    // Query terms favour the older item, so the un-reordered pack would lead
-    // with it and the assertion below cannot pass on its own merits.
+    // Under the retrieval admission contract, this content query supports the
+    // predecessor with both terms but the successor with only ARR. A persisted
+    // relation may explain the selected fact, but it cannot grant the
+    // unsupported successor an admission bypass.
     let items =
         AssembleContextCapability::assemble_context_from_service(&service, request("ARR legacy"))
             .await
             .expect("context should assemble");
 
-    let rank = |id: &str| {
-        items
-            .iter()
-            .position(|item| item.fact_id == id)
-            .unwrap_or_else(|| panic!("{id} must be in the pack"))
-    };
+    assert_eq!(
+        items.len(),
+        1,
+        "the relation must not append a successor that failed independent admission"
+    );
+    assert!(
+        items[0].content.contains("legacy"),
+        "the only admitted result is the directly supported predecessor"
+    );
+}
 
-    let superseded = items
+#[tokio::test]
+async fn current_query_returns_only_the_persisted_successor() {
+    let tm = common::TestMemory::new(false).await;
+    let service = common::exposing_claims(tm.service).expect("evidence is a valid stage");
+
+    common::ingest_lineage_episode(
+        &service,
+        &tm.db_client,
+        "episode:current-1",
+        "fs:docs/current.md:aaaa",
+        "fs:docs/current.md",
+        "ARR is legacy",
+        Utc.with_ymd_and_hms(2026, 6, 1, 10, 0, 0).unwrap(),
+    )
+    .await;
+    common::ingest_lineage_episode(
+        &service,
+        &tm.db_client,
+        "episode:current-2",
+        "fs:docs/current.md:bbbb",
+        "fs:docs/current.md",
+        "ARR is supersedes",
+        Utc.with_ymd_and_hms(2026, 6, 2, 10, 0, 0).unwrap(),
+    )
+    .await;
+    assert!(
+        common::wait_for_supersessions(&tm.db_client, 1).await,
+        "current projection must be driven by a relation persisted by reconciliation"
+    );
+
+    let all_revisions =
+        AssembleContextCapability::assemble_context_from_service(&service, request("ARR"))
+            .await
+            .expect("ordinary context should assemble");
+    let successor_id = all_revisions
         .iter()
-        .find(|item| {
-            item.reconciliation.as_ref().is_some_and(|metadata| {
-                metadata.relations.iter().any(|relation| {
-                    relation.superseded_by_fact_id.is_some()
-                        && matches!(
-                            relation.outcome,
-                            memory_mcp::models::claim::ClaimRelationOutcome::Supersession
-                        )
+        .find_map(|item| {
+            item.reconciliation.as_ref().and_then(|metadata| {
+                metadata.relations.iter().find_map(|relation| {
+                    matches!(
+                        relation.outcome,
+                        memory_mcp::models::claim::ClaimRelationOutcome::Supersession
+                    )
+                    .then(|| relation.superseded_by_fact_id.clone())
+                    .flatten()
                 })
             })
         })
-        .expect("the pack carries the supersession relation");
+        .expect("the persisted relation identifies the actual successor");
 
-    let successor = superseded
-        .reconciliation
-        .as_ref()
-        .unwrap()
-        .relations
-        .iter()
-        .find_map(|relation| relation.superseded_by_fact_id.clone())
-        .expect("the losing item names its replacement");
+    let mut current_request = request("latest ARR");
+    current_request.budget = 1;
+    let current =
+        AssembleContextCapability::assemble_context_from_service(&service, current_request)
+            .await
+            .expect("current context should assemble");
 
     assert_eq!(
-        items.len(),
-        2,
-        "both facts must be in the pack, or the budget decides this test instead of the policy"
-    );
-    assert!(
-        rank(&successor) < rank(&superseded.fact_id),
-        "successor must outrank predecessor, got successor at {} and predecessor at {}",
-        rank(&successor),
-        rank(&superseded.fact_id)
+        current
+            .iter()
+            .map(|item| item.fact_id.as_str())
+            .collect::<Vec<_>>(),
+        vec![successor_id.as_str()],
+        "a current request must return the persisted successor, not its predecessor"
     );
 }

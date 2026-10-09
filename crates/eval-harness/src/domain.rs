@@ -485,6 +485,49 @@ mod tests {
     }
 
     #[test]
+    fn one_access_failure_overrides_a_passing_high_precision_gate() {
+        let passing_case = EvalCaseOutcome::new(
+            "retrieval-quality",
+            "grounded-positive",
+            EvalMode::RetrievalOnly,
+            CorpusSplit::Test,
+            LabelTrust::Reviewed,
+            CaseStatus::Passed,
+        );
+        let mut access_failure = EvalCaseOutcome::new(
+            "retrieval-quality",
+            "denied-source-leak",
+            EvalMode::RetrievalOnly,
+            CorpusSplit::Test,
+            LabelTrust::Reviewed,
+            CaseStatus::QualityFailed,
+        );
+        access_failure
+            .failures
+            .push("denied source was returned".into());
+        let high_precision_gate = crate::artifact::GateDecision {
+            suite_id: "retrieval-quality".into(),
+            metric: "precision_macro".into(),
+            observed: 0.99,
+            hard_floor: Some(0.95),
+            baseline: None,
+            regression_budget: None,
+            status: crate::artifact::GateStatus::Passed,
+            reason: crate::artifact::GateFailureReason::None,
+        };
+
+        assert_eq!(
+            derive_run_verdict(
+                &[passing_case, access_failure],
+                &[high_precision_gate],
+                crate::artifact::GateStatus::Passed,
+                &[],
+            ),
+            RunVerdict::QualityFailed
+        );
+    }
+
+    #[test]
     fn case_outcome_invalid_requires_reason() {
         let outcome = EvalCaseOutcome {
             case_key: CaseKey::parse("test", "case-1").unwrap(),

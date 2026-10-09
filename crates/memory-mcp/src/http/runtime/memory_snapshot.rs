@@ -214,6 +214,7 @@ mod tests {
                 rationale: key.to_owned(),
                 retrieval_tier: None,
                 reconciliation: None,
+                retrieval_evidence: None,
             };
             assert_eq!(
                 context.insert(generation, cache_key, &[item]),

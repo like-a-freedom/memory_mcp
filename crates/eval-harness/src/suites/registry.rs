@@ -7,9 +7,7 @@
 
 use crate::error::EvalError;
 use crate::profile::SuiteDecl;
-use crate::reducer::{
-    ClassificationReducer, CountReducer, RatioReducer, RetrievalReducer, SuiteReducer,
-};
+use crate::reducer::{ClassificationReducer, CountReducer, RatioReducer, SuiteReducer};
 use crate::runner::EvalSuite;
 use crate::suites::end_to_end::E2E_SPECS;
 use crate::suites::lifecycle::LIFECYCLE_SPECS;
@@ -21,7 +19,12 @@ use crate::suites::response_size::ResponseSizeReducer;
 /// invalid counts, no fabricated metrics).
 pub fn reducer_for(suite_id: &str) -> Box<dyn SuiteReducer> {
     match suite_id {
-        "local-retrieval" => Box::new(RetrievalReducer::new("local-retrieval", 5)),
+        "local-retrieval" => {
+            Box::new(crate::suites::retrieval::LocalRetrievalDiagnosticReducer::new())
+        }
+        "retrieval-quality" => {
+            Box::new(crate::suites::retrieval_quality::RetrievalQualityReducer::new())
+        }
         "extraction" => Box::new(ClassificationReducer::new("extraction", "entity")),
         "claim-reconciliation" => {
             Box::new(ClassificationReducer::new("claim-reconciliation", "claim"))
@@ -46,6 +49,9 @@ pub fn reducer_for(suite_id: &str) -> Box<dyn SuiteReducer> {
 /// empty-suite issue and continue).
 pub fn build_suite(decl: &SuiteDecl) -> Result<Option<Box<dyn EvalSuite>>, EvalError> {
     match decl.id.as_str() {
+        "retrieval-quality" => Ok(Some(Box::new(
+            crate::suites::retrieval_quality::RetrievalQualitySuite::from_decl(decl)?,
+        ))),
         "local-retrieval" => Ok(Some(Box::new(
             crate::suites::retrieval::LocalRetrievalSuite::new()?,
         ))),
@@ -144,6 +150,10 @@ mod tests {
                 "{id} must have a registered reducer"
             );
         }
+        assert_eq!(
+            reducer_for("retrieval-quality").suite_id().as_str(),
+            "retrieval-quality"
+        );
         // external-retrieval needs a prepared corpus root to build.
         assert!(build_suite(&decl("external-retrieval")).is_err());
     }
@@ -155,6 +165,11 @@ mod tests {
         assert_eq!(summaries.len(), 1);
         assert_eq!(summaries[0].suite_id, "nope");
         assert_eq!(summaries[0].total, 0);
+    }
+
+    #[test]
+    fn retrieval_quality_suite_requires_an_explicit_corpus_root() {
+        assert!(build_suite(&decl("retrieval-quality")).is_err());
     }
 
     /// The merged-artifact guarantee holds only while `reducer_for`

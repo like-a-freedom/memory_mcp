@@ -87,7 +87,7 @@ fn default_min_recall_at_k() -> f64 {
     1.0
 }
 
-fn fixture_path() -> PathBuf {
+pub(super) fn fixture_path() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/retrieval_cases.json")
 }
 

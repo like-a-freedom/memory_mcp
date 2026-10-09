@@ -3,11 +3,20 @@
 use chrono::{DateTime, Utc};
 use serde_json::Value;
 
+use super::filtering::{fact_is_active_at, fact_record_allowed};
+use super::types::SemanticCandidate;
 use crate::embedding::providers::embedding_from_value;
 use crate::error::MemoryError;
-use crate::models::Fact;
 
-use super::filtering::{fact_is_active_at, fact_record_allowed};
+fn validate_semantic_similarity(similarity: f64, fact_id: &str) -> Result<(), MemoryError> {
+    if similarity.is_finite() && (-1.0..=1.0).contains(&similarity) {
+        return Ok(());
+    }
+
+    Err(MemoryError::Storage(format!(
+        "semantic score for fact {fact_id} is outside the cosine range [-1, 1]"
+    )))
+}
 
 pub(crate) struct CollectSemanticFactsRequest<'a> {
     pub(crate) cutoff: DateTime<Utc>,
@@ -21,7 +30,7 @@ pub(crate) struct CollectSemanticFactsRequest<'a> {
 pub(crate) async fn collect_semantic_facts(
     service: &crate::memory::retrieval::RetrievalContext,
     request: CollectSemanticFactsRequest<'_>,
-) -> Result<Vec<(Fact, String)>, MemoryError> {
+) -> Result<Vec<SemanticCandidate>, MemoryError> {
     // The two stages a semantic retrieval spends its time in. Without them the
     // only number is the total, and a query that is slow could be waiting on
     // the embedding provider or on the vector index — two problems with
@@ -120,6 +129,8 @@ pub(crate) async fn collect_semantic_facts(
                 }
             });
 
+        validate_semantic_similarity(similarity, &fact.fact_id)?;
+
         if similarity < service.embedding_service.embedding_similarity_threshold() {
             continue;
         }
@@ -138,14 +149,13 @@ pub(crate) async fn collect_semantic_facts(
     Ok(ranked_facts
         .into_iter()
         .take(request.budget.max(1) as usize)
-        .map(|(similarity, fact)| {
-            (
-                fact,
-                format!(
-                    "matched semantic similarity={similarity:.3} for query=\"{}\"",
-                    request.query
-                ),
-            )
+        .map(|(similarity, fact)| SemanticCandidate {
+            fact,
+            rationale: format!(
+                "matched semantic similarity={similarity:.3} for query=\"{}\"",
+                request.query
+            ),
+            similarity,
         })
         .collect())
 }
@@ -153,10 +163,134 @@ pub(crate) async fn collect_semantic_facts(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::collections::HashMap;
+    use std::sync::Arc;
+    use std::sync::atomic::{AtomicUsize, Ordering};
+
+    use crate::embedding::providers::EmbeddingProvider;
     use crate::embedding::providers::cosine_similarity;
     use crate::memory::retrieval::filtering;
-    use crate::models::Fact;
+    use crate::models::{Fact, Provenance};
+    use crate::storage::{DbClient, SurrealDbClient};
+    use async_trait::async_trait;
     use chrono::TimeZone;
+
+    static NEXT_DB_ID: AtomicUsize = AtomicUsize::new(1);
+
+    struct BoundaryProvider {
+        embeddings: HashMap<String, Vec<f64>>,
+    }
+
+    #[async_trait]
+    impl EmbeddingProvider for BoundaryProvider {
+        fn is_enabled(&self) -> bool {
+            true
+        }
+
+        fn provider_name(&self) -> &'static str {
+            "semantic-boundary-component"
+        }
+
+        fn dimension(&self) -> usize {
+            1536
+        }
+
+        async fn embed(&self, input: &str) -> Result<Vec<f64>, MemoryError> {
+            self.embeddings.get(input).cloned().ok_or_else(|| {
+                MemoryError::Validation(format!(
+                    "component provider has no vector for input of {} bytes",
+                    input.len()
+                ))
+            })
+        }
+    }
+
+    fn boundary_vector(similarity: f64) -> Vec<f64> {
+        let mut vector = vec![0.0; 1536];
+        vector[0] = similarity;
+        vector[1] = (1.0 - similarity * similarity).sqrt();
+        vector
+    }
+
+    async fn collect_threshold_boundary_candidates() -> (String, String, Vec<SemanticCandidate>) {
+        let id = NEXT_DB_ID.fetch_add(1, Ordering::Relaxed);
+        let db_name = format!("semantic_threshold_component_{id}");
+        let db = Arc::new(
+            SurrealDbClient::connect_in_memory(&db_name, "main", "warn")
+                .await
+                .expect("connect isolated semantic test database"),
+        );
+        db.apply_migrations("main")
+            .await
+            .expect("apply production migrations");
+
+        let query = "quantum tarantula tariffs".to_string();
+        let below_content = "A violet marmot crossed the glacier below the floor.";
+        let at_floor_content = "A silver badger crossed the valley at the floor.";
+        let mut query_vector = vec![0.0; 1536];
+        query_vector[0] = 1.0;
+        let embeddings = HashMap::from([
+            (
+                format!("note\n{below_content}\n{below_content}"),
+                boundary_vector(0.699),
+            ),
+            (
+                format!("note\n{at_floor_content}\n{at_floor_content}"),
+                boundary_vector(0.7),
+            ),
+            (query.clone(), query_vector),
+        ]);
+        let service = crate::service::MemoryService::new_with_embedding_provider(
+            db.clone() as Arc<dyn DbClient>,
+            "main".to_string(),
+            "warn".to_string(),
+            50,
+            100,
+            Arc::new(BoundaryProvider { embeddings }),
+            0.7,
+            Arc::new(crate::service::AnnoEntityExtractor::new().expect("anno extractor")),
+        )
+        .expect("construct service with controlled component provider");
+        let mut fact_ids = Vec::new();
+        for content in [below_content, at_floor_content] {
+            fact_ids.push(
+                service
+                    .add_fact(
+                        "note",
+                        content,
+                        content,
+                        "episode:semantic-component",
+                        Utc::now(),
+                        0.9,
+                        Vec::new(),
+                        Vec::new(),
+                        Provenance::agent_observation("episode:semantic-component"),
+                    )
+                    .await
+                    .expect("write component fact through production fact service"),
+            );
+        }
+
+        let deps: crate::memory::retrieval::RetrievalContext = (&service).into();
+        let cutoff = Utc::now();
+        let access = crate::models::AccessPayload::default();
+        let excluded_fact_ids = std::collections::HashSet::new();
+        let candidates = collect_semantic_facts(
+            &deps,
+            CollectSemanticFactsRequest {
+                cutoff,
+                query: &query,
+                access: &access,
+                fact_types: &[],
+                excluded_fact_ids: &excluded_fact_ids,
+                budget: 8,
+            },
+        )
+        .await
+        .expect("run production ANN collection and threshold filtering");
+
+        (fact_ids[0].clone(), fact_ids[1].clone(), candidates)
+    }
 
     fn make_fact(t_valid: chrono::DateTime<Utc>, t_invalid: Option<chrono::DateTime<Utc>>) -> Fact {
         Fact {
@@ -260,5 +394,32 @@ mod tests {
         let b: Vec<f64> = vec![];
         let sim = cosine_similarity(&a, &b);
         assert_eq!(sim, 0.0);
+    }
+
+    #[test]
+    fn semantic_similarity_validation_rejects_non_finite_and_out_of_range_scores() {
+        for similarity in [f64::NAN, f64::INFINITY, f64::NEG_INFINITY, -1.01, 1.01] {
+            assert!(validate_semantic_similarity(similarity, "fact:test").is_err());
+        }
+        assert!(validate_semantic_similarity(-1.0, "fact:test").is_ok());
+        assert!(validate_semantic_similarity(1.0, "fact:test").is_ok());
+    }
+
+    #[tokio::test]
+    async fn ann_threshold_rejects_0699_and_admits_exactly_0700() {
+        let (below_floor_id, at_floor_id, candidates) =
+            collect_threshold_boundary_candidates().await;
+        let candidate_ids = candidates
+            .iter()
+            .map(|candidate| candidate.fact.fact_id.as_str())
+            .collect::<Vec<_>>();
+
+        assert!(!candidate_ids.contains(&below_floor_id.as_str()));
+        assert!(candidate_ids.contains(&at_floor_id.as_str()));
+        let admitted = candidates
+            .iter()
+            .find(|candidate| candidate.fact.fact_id == at_floor_id)
+            .expect("exact-threshold candidate is present");
+        assert!((admitted.similarity - 0.7).abs() <= 1e-9);
     }
 }

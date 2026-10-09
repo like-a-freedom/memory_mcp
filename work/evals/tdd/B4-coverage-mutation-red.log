@@ -1,0 +1,28 @@
+   Compiling eval-harness v0.1.0 (/Users/solovey/Documents/Codex/2026-10-08/memory-retrieval-quality/crates/eval-harness)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 2.06s
+     Running unittests src/lib.rs (target/debug/deps/eval_harness-1f4b8f47e4f84b53)
+
+running 2 tests
+
+thread 'runner::tests::release_run_rejects_47_cases_when_exact_coverage_is_48' (21158998) panicked at crates/eval-harness/src/runner.rs:448:9:
+assertion `left == right` failed
+  left: Passed
+ right: Invalid
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+thread 'runner::tests::release_run_rejects_49_cases_when_exact_coverage_is_48' (21158999) panicked at crates/eval-harness/src/runner.rs:466:9:
+assertion `left == right` failed
+  left: Passed
+ right: Invalid
+test runner::tests::release_run_rejects_47_cases_when_exact_coverage_is_48 ... FAILED
+test runner::tests::release_run_rejects_49_cases_when_exact_coverage_is_48 ... FAILED
+
+failures:
+
+failures:
+    runner::tests::release_run_rejects_47_cases_when_exact_coverage_is_48
+    runner::tests::release_run_rejects_49_cases_when_exact_coverage_is_48
+
+test result: FAILED. 0 passed; 2 failed; 0 ignored; 0 measured; 186 filtered out; finished in 0.17s
+
+error: test failed, to rerun pass `-p eval-harness --lib`

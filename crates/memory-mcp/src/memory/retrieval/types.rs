@@ -24,6 +24,92 @@ pub(crate) enum RetrievalTier {
     EpisodeFallback,
 }
 
+/// One fact returned by the semantic channel with its original ANN score.
+#[derive(Debug, Clone)]
+pub(crate) struct SemanticCandidate {
+    pub(crate) fact: Fact,
+    pub(crate) rationale: String,
+    pub(crate) similarity: f64,
+}
+
+/// Evidence attached to one candidate identity and carried through fusion.
+#[derive(Debug, Clone, Default)]
+pub(crate) struct CandidateEvidence {
+    pub(crate) matched_content_terms: Vec<String>,
+    pub(crate) matched_index_key_terms: Vec<String>,
+    pub(crate) matched_references: Vec<String>,
+    pub(crate) resolved_entity_ids: Vec<String>,
+    pub(crate) native_full_text_match: bool,
+    pub(crate) semantic_similarity: Option<f64>,
+    pub(crate) graph_anchor_origin: Option<GraphAnchorOrigin>,
+    pub(crate) hop_count: Option<usize>,
+    pub(crate) community: Option<CommunityAdmissionEvidence>,
+    pub(crate) repeated_topic: Option<RepeatedTopicAdmissionEvidence>,
+    pub(crate) admission_basis: Option<AdmissionBasis>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct CommunityAdmissionEvidence {
+    pub(crate) community_id: String,
+    pub(crate) member_entity_id: String,
+    pub(crate) summary_terms: Vec<String>,
+    pub(crate) matched_summary_terms: Vec<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct RepeatedTopicEvidence {
+    pub(crate) term: String,
+    pub(crate) supporting_fact_ids: Vec<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct RepeatedTopicAdmissionEvidence {
+    pub(crate) matched_query_index_terms: Vec<String>,
+    pub(crate) matched_repeated_topics: Vec<String>,
+    pub(crate) supporting_fact_ids: Vec<String>,
+}
+
+#[derive(Debug, Clone)]
+pub(crate) struct CommunityFactCandidate {
+    pub(crate) fact: Fact,
+    pub(crate) rationale: String,
+    pub(crate) origin_factor: f64,
+    pub(crate) evidence: CommunityAdmissionEvidence,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum AdmissionBasis {
+    Browse,
+    Lexical,
+    Reference,
+    Entity,
+    Semantic,
+    GraphRelationship,
+    CommunitySummary,
+    RepeatedTopic,
+}
+
+impl AdmissionBasis {
+    pub(crate) fn as_str(self) -> &'static str {
+        match self {
+            Self::Browse => "browse",
+            Self::Lexical => "lexical",
+            Self::Reference => "reference",
+            Self::Entity => "entity",
+            Self::Semantic => "semantic",
+            Self::GraphRelationship => "graph_relationship",
+            Self::CommunitySummary => "community_summary",
+            Self::RepeatedTopic => "repeated_topic",
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) enum GraphAnchorOrigin {
+    QueryEntity { entity_id: String },
+    AdmittedSeed { fact_id: String },
+}
+
 impl RetrievalTier {
     pub(crate) fn as_str(self) -> &'static str {
         match self {
@@ -55,6 +141,7 @@ impl RetrievalTier {
 #[derive(Debug, Clone)]
 pub(crate) struct RankedContextFact {
     pub(crate) fact: Fact,
+    pub(crate) evidence: CandidateEvidence,
     pub(crate) rationale: String,
     pub(crate) retrieval_tier: RetrievalTier,
     pub(crate) fusion_score: f64,

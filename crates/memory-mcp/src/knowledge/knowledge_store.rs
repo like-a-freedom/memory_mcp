@@ -126,6 +126,18 @@ impl KnowledgeStoreClient {
         self.db.query_rows(&sql, Some(vars)).await
     }
 
+    /// Active edges touching a batch of entities during graph retrieval.
+    pub async fn select_edge_neighbors_for_entities(
+        &self,
+        entity_ids: &[String],
+        cutoff: &str,
+    ) -> Result<Vec<Value>, MemoryError> {
+        let (sql, vars) = crate::knowledge::queries::build_select_edge_neighbors_for_entities_query(
+            entity_ids, cutoff,
+        );
+        self.db.query_rows(&sql, Some(vars)).await
+    }
+
     /// Entities matching a batch of normalized names (alias-resolution hot path).
     pub async fn select_entities_batch(
         &self,

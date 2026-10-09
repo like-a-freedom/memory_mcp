@@ -1,7 +1,7 @@
 //! Ranking and MMR-based selection of context facts.
 
 use std::cmp::Ordering;
-use std::collections::{HashMap, HashSet, hash_map::Entry};
+use std::collections::{BTreeSet, HashMap, HashSet, hash_map::Entry};
 
 use chrono::{DateTime, Utc};
 
@@ -43,7 +43,9 @@ const DEEP_GRAPH_WEIGHT: f64 = 0.55;
 // Shared candidate types live in `types` so collectors depend on types, not on
 // the ranker module (Card 7). Re-exported here for the ranking module's own use
 // and for any caller that historically imported through `ranking`.
-pub(crate) use super::types::{RankedContextFact, RetrievalTier};
+pub(crate) use super::types::{
+    CandidateEvidence, RankedContextFact, RetrievalTier, SemanticCandidate,
+};
 
 fn merge_graph_trace(
     existing: &mut Option<crate::memory::retrieval::graph::GraphTrace>,
@@ -64,6 +66,13 @@ fn merge_graph_trace(
 
     if should_replace {
         *existing = Some(incoming);
+    }
+}
+
+fn sync_graph_evidence_from_trace(candidate: &mut RankedContextFact) {
+    if let Some(trace) = &candidate.graph_trace {
+        candidate.evidence.graph_anchor_origin = Some(trace.anchor_origin.clone());
+        candidate.evidence.hop_count = Some(trace.hop_count);
     }
 }
 
@@ -130,6 +139,7 @@ fn should_replace_canonical_fact(existing: &Fact, incoming: &Fact) -> bool {
 }
 
 fn merge_ranked_duplicate(existing: &mut RankedContextFact, incoming: RankedContextFact) {
+    let same_fact_id = existing.fact.fact_id == incoming.fact.fact_id;
     let incoming_trace = incoming.graph_trace.clone();
     let incoming_terms = incoming.matched_query_terms.clone();
     let incoming_rationale = incoming.rationale.clone();
@@ -137,6 +147,15 @@ fn merge_ranked_duplicate(existing: &mut RankedContextFact, incoming: RankedCont
     existing.fusion_score = existing.fusion_score.max(incoming.fusion_score);
     existing.source_priority = existing.source_priority.min(incoming.source_priority);
     existing.semantic_available = existing.semantic_available || incoming.semantic_available;
+    if same_fact_id {
+        existing.evidence.semantic_similarity = match (
+            existing.evidence.semantic_similarity,
+            incoming.evidence.semantic_similarity,
+        ) {
+            (Some(current), Some(incoming)) => Some(current.max(incoming)),
+            (current, incoming) => current.or(incoming),
+        };
+    }
     existing.merge_scoring_fields(
         incoming.decayed_confidence,
         incoming.query_alignment_factor,
@@ -152,14 +171,18 @@ fn merge_ranked_duplicate(existing: &mut RankedContextFact, incoming: RankedCont
 
     if should_replace_canonical_fact(&existing.fact, &incoming.fact) {
         existing.fact = incoming.fact;
+        if !same_fact_id {
+            existing.evidence = incoming.evidence;
+        }
     }
+    sync_graph_evidence_from_trace(existing);
 }
 
 pub(crate) struct BuildRankedContextFactsRequest<'a> {
     pub(crate) lexical_facts: Vec<(Fact, RetrievalTier)>,
     pub(crate) graph_facts: Vec<GraphCandidate>,
-    pub(crate) community_facts: Vec<(Fact, String, f64)>,
-    pub(crate) semantic_facts: Vec<(Fact, String)>,
+    pub(crate) community_facts: Vec<super::types::CommunityFactCandidate>,
+    pub(crate) semantic_facts: Vec<SemanticCandidate>,
     pub(crate) query_opt: Option<&'a str>,
     pub(crate) semantic_available: bool,
     pub(crate) cutoff: DateTime<Utc>,
@@ -186,6 +209,8 @@ pub(crate) fn build_ranked_context_facts(
 
     for (rank, (fact, retrieval_tier)) in lexical_facts.into_iter().enumerate() {
         let fact_id = fact.fact_id.clone();
+        let native_full_text_match = retrieval_tier == RetrievalTier::Direct
+            && query_opt.is_some_and(|query| !query.trim().is_empty());
         let confidence = decayed_fn(&fact, cutoff);
         let lexical_score = lexical_fusion_score(rank, &fact, &lexical_query_terms);
         let query_alignment_factor = query_alignment(&fact);
@@ -196,6 +221,9 @@ pub(crate) fn build_ranked_context_facts(
             .and_modify(|candidate| {
                 candidate.fusion_score += lexical_score;
                 candidate.source_priority = 0;
+                if native_full_text_match {
+                    candidate.evidence.native_full_text_match = true;
+                }
                 candidate.merge_scoring_fields(
                     confidence,
                     query_alignment_factor,
@@ -226,6 +254,10 @@ pub(crate) fn build_ranked_context_facts(
                     default_direct_rationale(query_opt, cutoff),
                 ),
                 fact,
+                evidence: CandidateEvidence {
+                    native_full_text_match,
+                    ..CandidateEvidence::default()
+                },
                 retrieval_tier,
                 fusion_score: lexical_score,
                 source_priority: 0,
@@ -255,6 +287,7 @@ pub(crate) fn build_ranked_context_facts(
                 &matched_terms,
             );
             merge_graph_trace(&mut existing.graph_trace, Some(candidate.trace));
+            sync_graph_evidence_from_trace(existing);
             continue;
         }
 
@@ -272,6 +305,11 @@ pub(crate) fn build_ranked_context_facts(
             fact_id,
             RankedContextFact {
                 fact: candidate.fact,
+                evidence: CandidateEvidence {
+                    graph_anchor_origin: Some(candidate.trace.anchor_origin.clone()),
+                    hop_count: Some(candidate.trace.hop_count),
+                    ..CandidateEvidence::default()
+                },
                 rationale,
                 retrieval_tier: RetrievalTier::GraphExpanded,
                 fusion_score: weighted_rank,
@@ -286,13 +324,19 @@ pub(crate) fn build_ranked_context_facts(
         );
     }
 
-    for (rank, (fact, rationale, graph_origin_factor)) in community_facts.into_iter().enumerate() {
+    for (rank, community_candidate) in community_facts.into_iter().enumerate() {
+        let super::types::CommunityFactCandidate {
+            fact,
+            rationale,
+            origin_factor,
+            evidence,
+        } = community_candidate;
         let fact_id = fact.fact_id.clone();
         let confidence = decayed_fn(&fact, cutoff);
         let query_alignment_factor = query_alignment(&fact);
         let grounding_score = grounding(&fact);
         let matched_terms = matched_terms_for_fact(query_opt, &fact);
-        let weighted_rank = reciprocal_rank(rank) * graph_origin_factor.clamp(0.0, 1.0);
+        let weighted_rank = reciprocal_rank(rank) * origin_factor.clamp(0.0, 1.0);
         if let Some(candidate) = ranked_by_fact_id.get_mut(&fact_id) {
             candidate.fusion_score += weighted_rank;
             candidate.merge_scoring_fields(
@@ -301,6 +345,7 @@ pub(crate) fn build_ranked_context_facts(
                 grounding_score,
                 &matched_terms,
             );
+            candidate.evidence.community.get_or_insert(evidence);
             continue;
         }
 
@@ -318,6 +363,10 @@ pub(crate) fn build_ranked_context_facts(
             fact_id,
             RankedContextFact {
                 fact,
+                evidence: CandidateEvidence {
+                    community: Some(evidence),
+                    ..CandidateEvidence::default()
+                },
                 rationale,
                 retrieval_tier: RetrievalTier::GraphExpanded,
                 fusion_score: weighted_rank,
@@ -332,7 +381,12 @@ pub(crate) fn build_ranked_context_facts(
         );
     }
 
-    for (rank, (fact, rationale)) in semantic_facts.into_iter().enumerate() {
+    for (rank, semantic_candidate) in semantic_facts.into_iter().enumerate() {
+        let SemanticCandidate {
+            fact,
+            rationale,
+            similarity,
+        } = semantic_candidate;
         let fact_id = fact.fact_id.clone();
         let confidence = decayed_fn(&fact, cutoff);
         let query_alignment_factor = query_alignment(&fact);
@@ -340,6 +394,12 @@ pub(crate) fn build_ranked_context_facts(
         let matched_terms = matched_terms_for_fact(query_opt, &fact);
         if let Some(candidate) = ranked_by_fact_id.get_mut(&fact_id) {
             candidate.fusion_score += reciprocal_rank(rank);
+            candidate.evidence.semantic_similarity = Some(
+                candidate
+                    .evidence
+                    .semantic_similarity
+                    .map_or(similarity, |current| current.max(similarity)),
+            );
             candidate.merge_scoring_fields(
                 confidence,
                 query_alignment_factor,
@@ -363,6 +423,10 @@ pub(crate) fn build_ranked_context_facts(
             fact_id,
             RankedContextFact {
                 fact,
+                evidence: CandidateEvidence {
+                    semantic_similarity: Some(similarity),
+                    ..CandidateEvidence::default()
+                },
                 rationale,
                 retrieval_tier: RetrievalTier::SemanticExpanded,
                 fusion_score: reciprocal_rank(rank),
@@ -1323,6 +1387,96 @@ pub(crate) fn demote_superseded(request: DemoteSupersededRequest<'_>) -> Vec<Ass
     out
 }
 
+/// Collapse exact-content facts only when the relation reader supplied a
+/// visible persisted Duplicate group. Response order selects the representative;
+/// independent relation summaries are retained on it.
+pub(crate) fn deduplicate_admitted_view(
+    items: Vec<AssembledContextItem>,
+    duplicate_groups: &[BTreeSet<String>],
+) -> Vec<AssembledContextItem> {
+    let mut parent = HashMap::<String, String>::new();
+    for group in duplicate_groups.iter().filter(|group| group.len() > 1) {
+        let mut ids = group.iter();
+        let Some(first) = ids.next() else { continue };
+        parent.entry(first.clone()).or_insert_with(|| first.clone());
+        for id in ids {
+            parent.entry(id.clone()).or_insert_with(|| id.clone());
+            union_duplicate_roots(&mut parent, first, id);
+        }
+    }
+
+    if parent.is_empty() {
+        return items;
+    }
+
+    let mut selected = Vec::<AssembledContextItem>::with_capacity(items.len());
+    let mut selected_by_identity = HashMap::<(String, String), usize>::new();
+    for item in items {
+        let Some(root) = duplicate_root(&parent, &item.fact_id) else {
+            selected.push(item);
+            continue;
+        };
+        let identity = (root, normalize_text(&item.content));
+        if let Some(index) = selected_by_identity.get(&identity).copied() {
+            merge_duplicate_reconciliation(&mut selected[index], item);
+        } else {
+            selected_by_identity.insert(identity, selected.len());
+            selected.push(item);
+        }
+    }
+
+    selected
+}
+
+fn duplicate_root(parent: &HashMap<String, String>, id: &str) -> Option<String> {
+    let mut root = parent.get(id)?.clone();
+    while let Some(next) = parent.get(&root) {
+        if next == &root {
+            break;
+        }
+        root = next.clone();
+    }
+    Some(root)
+}
+
+fn union_duplicate_roots(parent: &mut HashMap<String, String>, left: &str, right: &str) {
+    let left_root = duplicate_root(parent, left).unwrap_or_else(|| left.to_string());
+    let right_root = duplicate_root(parent, right).unwrap_or_else(|| right.to_string());
+    if left_root == right_root {
+        return;
+    }
+
+    let (root, child) = if left_root < right_root {
+        (left_root, right_root)
+    } else {
+        (right_root, left_root)
+    };
+    parent.insert(child, root);
+}
+
+fn merge_duplicate_reconciliation(
+    representative: &mut AssembledContextItem,
+    duplicate: AssembledContextItem,
+) {
+    let Some(duplicate_metadata) = duplicate.reconciliation else {
+        return;
+    };
+    let Some(representative_metadata) = representative.reconciliation.as_mut() else {
+        representative.reconciliation = Some(duplicate_metadata);
+        return;
+    };
+
+    for relation in duplicate_metadata.relations {
+        if !representative_metadata
+            .relations
+            .iter()
+            .any(|existing| existing.relation_id == relation.relation_id)
+        {
+            representative_metadata.relations.push(relation);
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1343,6 +1497,15 @@ mod tests {
         AssembledContextItem {
             fact_id: fact_id.to_string(),
             content: format!("content of {fact_id}"),
+            ..Default::default()
+        }
+    }
+
+    fn item_with_content(fact_id: &str, content: &str) -> AssembledContextItem {
+        AssembledContextItem {
+            fact_id: fact_id.to_string(),
+            content: content.to_string(),
+            source_episode: format!("episode:{fact_id}"),
             ..Default::default()
         }
     }
@@ -1445,6 +1608,79 @@ mod tests {
     }
 
     #[test]
+    fn deduplicates_normalized_identical_content_only_with_visible_duplicate_group() {
+        let mut representative = item_with_content("fact:a", "ARR is legacy");
+        representative.reconciliation = Some(ClaimReconciliationMetadata {
+            claim_ids: vec!["claim:a".to_string()],
+            relations: vec![ClaimRelationSummary {
+                relation_id: "claim_relation:ab".to_string(),
+                outcome: ClaimRelationOutcome::Duplicate,
+                counterpart_source_episode_id: Some("episode:b".to_string()),
+                superseded_by_fact_id: None,
+                reason_code: "duplicate".to_string(),
+                evaluator_version: "test".to_string(),
+            }],
+        });
+        let mut duplicate = item_with_content("fact:b", " arr   IS legacy ");
+        duplicate.reconciliation = Some(ClaimReconciliationMetadata {
+            claim_ids: vec!["claim:b".to_string()],
+            relations: vec![ClaimRelationSummary {
+                relation_id: "claim_relation:ab".to_string(),
+                outcome: ClaimRelationOutcome::Duplicate,
+                counterpart_source_episode_id: Some("episode:a".to_string()),
+                superseded_by_fact_id: None,
+                reason_code: "duplicate".to_string(),
+                evaluator_version: "test".to_string(),
+            }],
+        });
+
+        let deduplicated = deduplicate_admitted_view(
+            vec![representative, duplicate],
+            &[BTreeSet::from(["fact:a".to_string(), "fact:b".to_string()])],
+        );
+
+        assert_eq!(order(&deduplicated), vec!["fact:a"]);
+        assert_eq!(deduplicated[0].source_episode, "episode:fact:a");
+        assert_eq!(
+            deduplicated[0]
+                .reconciliation
+                .as_ref()
+                .expect("representative retains relation metadata")
+                .relations
+                .len(),
+            1,
+            "the same persisted relation is represented once"
+        );
+    }
+
+    #[test]
+    fn keeps_identical_content_when_no_visible_duplicate_group_exists() {
+        let items = vec![
+            item_with_content("fact:a", "ARR is legacy"),
+            item_with_content("fact:b", "ARR is legacy"),
+        ];
+
+        let deduplicated = deduplicate_admitted_view(items, &[]);
+
+        assert_eq!(order(&deduplicated), vec!["fact:a", "fact:b"]);
+    }
+
+    #[test]
+    fn keeps_different_content_even_when_facts_share_a_duplicate_group() {
+        let items = vec![
+            item_with_content("fact:a", "ARR is legacy"),
+            item_with_content("fact:b", "ARR is current"),
+        ];
+
+        let deduplicated = deduplicate_admitted_view(
+            items,
+            &[BTreeSet::from(["fact:a".to_string(), "fact:b".to_string()])],
+        );
+
+        assert_eq!(order(&deduplicated), vec!["fact:a", "fact:b"]);
+    }
+
+    #[test]
     fn correction_demotes_the_same_way_supersession_does() {
         let before = vec![
             item_with_relation(
@@ -1501,6 +1737,92 @@ mod tests {
         let twice = demote_superseded(DemoteSupersededRequest { items: &once });
 
         assert_eq!(order(&once), order(&twice));
+    }
+
+    #[test]
+    fn ranked_graph_candidate_carries_anchor_provenance_into_admission() {
+        let cutoff = Utc::now();
+        let mut fact = create_test_fact("fact:graph-related", cutoff);
+        fact.content = "An unrelated note without lexical overlap.".to_string();
+        fact.entity_links = vec!["entity:atlas".to_string()];
+        let origin = super::super::types::GraphAnchorOrigin::QueryEntity {
+            entity_id: "entity:alice".to_string(),
+        };
+        let trace = super::super::graph::GraphTrace {
+            anchor_entity_id: "entity:alice".to_string(),
+            anchor_origin: origin.clone(),
+            anchor_canonical_name: "Alice".to_string(),
+            hop_count: 2,
+            path: vec![
+                "entity:alice".to_string(),
+                "entity:atlas".to_string(),
+                "entity:related".to_string(),
+            ],
+        };
+        let ranked = build_ranked_context_facts(
+            BuildRankedContextFactsRequest {
+                lexical_facts: Vec::new(),
+                graph_facts: vec![GraphCandidate {
+                    fact,
+                    rationale: "relationship path".to_string(),
+                    origin_factor: 1.0,
+                    trace,
+                }],
+                community_facts: Vec::new(),
+                semantic_facts: Vec::new(),
+                query_opt: Some("What is the connection path between Alice and Atlas?"),
+                semantic_available: false,
+                cutoff,
+            },
+            |_, _| 0.8,
+        );
+        assert_eq!(ranked.len(), 1);
+        assert_eq!(ranked[0].evidence.graph_anchor_origin, Some(origin));
+        assert_eq!(ranked[0].evidence.hop_count, Some(2));
+
+        let query = super::super::admission::build_query_evidence(
+            Some("What is the connection path between Alice and Atlas?"),
+            Vec::new(),
+            &super::super::query_mode::QueryFlags {
+                wants_graph_path: true,
+                ..super::super::query_mode::QueryFlags::default()
+            },
+        );
+        let access = crate::models::AccessPayload::default();
+        let policy = super::super::admission::AdmissionPolicy::new(0.7, cutoff, &access);
+        assert_eq!(
+            super::super::admission::evaluate_candidate(&query, &ranked[0], &policy),
+            super::super::admission::AdmissionDecision::Admit(
+                super::super::types::AdmissionBasis::GraphRelationship
+            )
+        );
+    }
+
+    #[test]
+    fn canonical_fact_replacement_preserves_graph_anchor_evidence() {
+        let cutoff = Utc::now();
+        let origin = super::super::types::GraphAnchorOrigin::AdmittedSeed {
+            fact_id: "fact:seed".to_string(),
+        };
+        let mut existing =
+            create_ranked_test_fact("fact:old", "episode:old", cutoff, 0.4, 0.1, 0, &[]);
+        existing.graph_trace = Some(super::super::graph::GraphTrace {
+            anchor_entity_id: "entity:alice".to_string(),
+            anchor_origin: origin.clone(),
+            anchor_canonical_name: "Alice".to_string(),
+            hop_count: 1,
+            path: vec!["entity:alice".to_string(), "entity:bob".to_string()],
+        });
+        sync_graph_evidence_from_trace(&mut existing);
+
+        let mut incoming =
+            create_ranked_test_fact("fact:new", "episode:new", cutoff, 0.5, 0.8, 0, &[]);
+        incoming.fact.fact_type = "experience".to_string();
+        merge_ranked_duplicate(&mut existing, incoming);
+
+        assert_eq!(existing.fact.fact_id, "fact:new");
+        assert_eq!(existing.evidence.graph_anchor_origin, Some(origin));
+        assert_eq!(existing.evidence.hop_count, Some(1));
     }
 
     #[test]
@@ -1561,6 +1883,7 @@ mod tests {
 
         RankedContextFact {
             fact,
+            evidence: CandidateEvidence::default(),
             rationale: "test rationale".to_string(),
             retrieval_tier: RetrievalTier::Direct,
             fusion_score,
@@ -1623,6 +1946,95 @@ mod tests {
     }
 
     #[test]
+    fn raw_similarity_survives_fusion_with_a_lexical_candidate() {
+        use crate::memory::retrieval::types::SemanticCandidate;
+
+        let cutoff = fixed_temporal_cutoff();
+        let fact = create_test_fact("fact:semantic-fusion", cutoff);
+        let ranked = build_ranked_context_facts(
+            BuildRankedContextFactsRequest {
+                lexical_facts: vec![(fact.clone(), RetrievalTier::Direct)],
+                graph_facts: Vec::new(),
+                community_facts: Vec::new(),
+                semantic_facts: vec![SemanticCandidate {
+                    fact,
+                    rationale: "semantic retrieval".into(),
+                    similarity: 0.82,
+                }],
+                query_opt: Some("specific configuration question"),
+                semantic_available: true,
+                cutoff,
+            },
+            |_, _| 0.9,
+        );
+
+        assert_eq!(ranked.len(), 1);
+        assert_eq!(ranked[0].evidence.semantic_similarity, Some(0.82));
+    }
+
+    #[test]
+    fn semantic_evidence_stays_with_its_fact_id_when_content_deduplicates() {
+        let cutoff = fixed_temporal_cutoff();
+        let mut retained = create_ranked_test_fact(
+            "fact:retained",
+            "episode:retained",
+            cutoff,
+            1.0,
+            4.0,
+            0,
+            &[],
+        );
+        let mut incoming = create_ranked_test_fact(
+            "fact:incoming",
+            "episode:incoming",
+            cutoff,
+            0.5,
+            2.0,
+            0,
+            &[],
+        );
+        retained.fact.content = "same content".into();
+        incoming.fact.content = "same content".into();
+        incoming.evidence.semantic_similarity = Some(0.82);
+
+        merge_ranked_duplicate(&mut retained, incoming);
+
+        assert_eq!(retained.fact.fact_id, "fact:retained");
+        assert_eq!(retained.evidence.semantic_similarity, None);
+    }
+
+    #[test]
+    fn semantic_evidence_moves_only_with_a_replaced_canonical_fact() {
+        let cutoff = fixed_temporal_cutoff();
+        let mut retained = create_ranked_test_fact(
+            "fact:retained",
+            "episode:retained",
+            cutoff,
+            1.0,
+            2.0,
+            0,
+            &[],
+        );
+        let mut incoming = create_ranked_test_fact(
+            "fact:incoming",
+            "episode:incoming",
+            cutoff,
+            0.5,
+            4.0,
+            0,
+            &[],
+        );
+        retained.fact.content = "same content".into();
+        incoming.fact.content = "same content".into();
+        incoming.evidence.semantic_similarity = Some(0.82);
+
+        merge_ranked_duplicate(&mut retained, incoming);
+
+        assert_eq!(retained.fact.fact_id, "fact:incoming");
+        assert_eq!(retained.evidence.semantic_similarity, Some(0.82));
+    }
+
+    #[test]
     fn build_ranked_context_facts_weights_graph_results_by_origin_factor() {
         let cutoff = Utc::now();
 
@@ -1636,16 +2048,34 @@ mod tests {
                 lexical_facts: Vec::new(),
                 graph_facts: Vec::new(),
                 community_facts: vec![
-                    (
-                        inferred,
-                        "matched community summary via community:beta".to_string(),
-                        0.2,
-                    ),
-                    (
-                        extracted,
-                        "matched community summary via community:alpha".to_string(),
-                        1.0,
-                    ),
+                    super::super::types::CommunityFactCandidate {
+                        fact: inferred,
+                        rationale: "matched community summary via community:beta".to_string(),
+                        origin_factor: 0.2,
+                        evidence: super::super::types::CommunityAdmissionEvidence {
+                            community_id: "community:beta".to_string(),
+                            member_entity_id: "entity:beta".to_string(),
+                            summary_terms: vec!["launch".to_string(), "workstream".to_string()],
+                            matched_summary_terms: vec![
+                                "launch".to_string(),
+                                "workstream".to_string(),
+                            ],
+                        },
+                    },
+                    super::super::types::CommunityFactCandidate {
+                        fact: extracted,
+                        rationale: "matched community summary via community:alpha".to_string(),
+                        origin_factor: 1.0,
+                        evidence: super::super::types::CommunityAdmissionEvidence {
+                            community_id: "community:alpha".to_string(),
+                            member_entity_id: "entity:alpha".to_string(),
+                            summary_terms: vec!["launch".to_string(), "workstream".to_string()],
+                            matched_summary_terms: vec![
+                                "launch".to_string(),
+                                "workstream".to_string(),
+                            ],
+                        },
+                    },
                 ],
                 semantic_facts: Vec::new(),
                 query_opt: Some("launch workstream"),

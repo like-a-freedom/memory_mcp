@@ -15,6 +15,18 @@ fn find_observed_metric(
         .next()
 }
 
+fn has_non_finite_gate_value(
+    observed: f64,
+    hard_floor: Option<f64>,
+    baseline: Option<f64>,
+    regression_budget: Option<f64>,
+) -> bool {
+    !observed.is_finite()
+        || hard_floor.is_some_and(|value| !value.is_finite())
+        || baseline.is_some_and(|value| !value.is_finite())
+        || regression_budget.is_some_and(|value| !value.is_finite())
+}
+
 pub fn evaluate_gates(
     gate_decls: &[GateDecl],
     artifact: &RunArtifact,
@@ -34,6 +46,25 @@ pub fn evaluate_gates(
         };
 
         let baseline_value = baseline.and_then(|b| find_observed_metric(b, &decl.target));
+
+        if has_non_finite_gate_value(
+            observed,
+            decl.hard_floor,
+            baseline_value,
+            decl.regression_budget,
+        ) {
+            decisions.push(GateDecision {
+                suite_id: decl.target.suite_id.clone(),
+                metric: decl.target.metric.clone(),
+                observed,
+                hard_floor: decl.hard_floor,
+                baseline: baseline_value,
+                regression_budget: decl.regression_budget,
+                status: GateStatus::Invalid,
+                reason: GateFailureReason::NonFiniteMetric,
+            });
+            continue;
+        }
 
         if decl.baseline_required && baseline_value.is_none() {
             decisions.push(GateDecision {
@@ -115,6 +146,19 @@ pub fn evaluate_metric_gate(
     baseline: Option<f64>,
     regression_budget: Option<f64>,
 ) -> GateDecision {
+    if has_non_finite_gate_value(observed, hard_floor, baseline, regression_budget) {
+        return GateDecision {
+            suite_id: String::new(),
+            metric: String::new(),
+            observed,
+            hard_floor,
+            baseline,
+            regression_budget,
+            status: GateStatus::Invalid,
+            reason: GateFailureReason::NonFiniteMetric,
+        };
+    }
+
     if let Some(floor) = hard_floor
         && observed < floor
     {
@@ -204,5 +248,75 @@ mod tests {
         let decision = evaluate_missing_metric("end-to-end", "context_match_rate");
         assert_eq!(decision.status, GateStatus::Invalid);
         assert_eq!(decision.reason, GateFailureReason::MissingMetric);
+    }
+
+    #[test]
+    fn nan_gate_observation_is_invalid() {
+        let decision = evaluate_metric_gate(f64::NAN, Some(0.95), None, None);
+
+        assert_eq!(decision.status, GateStatus::Invalid);
+        assert_eq!(decision.reason, GateFailureReason::NonFiniteMetric);
+    }
+
+    #[test]
+    fn positive_infinity_gate_observation_is_invalid() {
+        let decision = evaluate_metric_gate(f64::INFINITY, Some(0.95), None, None);
+
+        assert_eq!(decision.status, GateStatus::Invalid);
+        assert_eq!(decision.reason, GateFailureReason::NonFiniteMetric);
+    }
+
+    #[test]
+    fn negative_infinity_gate_observation_is_invalid() {
+        let decision = evaluate_metric_gate(f64::NEG_INFINITY, Some(0.95), None, None);
+
+        assert_eq!(decision.status, GateStatus::Invalid);
+        assert_eq!(decision.reason, GateFailureReason::NonFiniteMetric);
+    }
+
+    #[test]
+    fn non_finite_suite_summary_metric_is_invalid_at_release_gate() {
+        let outcome = crate::domain::EvalCaseOutcome::new(
+            "retrieval-quality",
+            "case-1",
+            crate::domain::EvalMode::RetrievalOnly,
+            crate::domain::CorpusSplit::Test,
+            crate::domain::LabelTrust::Reviewed,
+            crate::domain::CaseStatus::Passed,
+        );
+        let mut artifact = RunArtifact::fixture(
+            vec![outcome],
+            vec![crate::domain::EvalCaseId::parse("case-1").expect("valid case id")],
+        );
+        artifact
+            .suite_summaries
+            .push(crate::artifact::SuiteSummary {
+                suite_id: "retrieval-quality".into(),
+                mode: crate::domain::EvalMode::RetrievalOnly,
+                total: 1,
+                passed: 1,
+                quality_failed: 0,
+                invalid: 0,
+                metrics: std::collections::BTreeMap::from([("precision_macro".into(), f64::NAN)]),
+            });
+        let gate = GateDecl {
+            target: crate::profile::GateTarget {
+                suite_id: "retrieval-quality".into(),
+                metric: "precision_macro".into(),
+                mode: None,
+                split: None,
+                label_trust: None,
+            },
+            hard_floor: Some(0.95),
+            regression_budget: None,
+            baseline_required: false,
+        };
+
+        let decision = evaluate_gates(&[gate], &artifact, None)
+            .expect("gate evaluation succeeds")
+            .remove(0);
+
+        assert_eq!(decision.status, GateStatus::Invalid);
+        assert_eq!(decision.reason, GateFailureReason::NonFiniteMetric);
     }
 }

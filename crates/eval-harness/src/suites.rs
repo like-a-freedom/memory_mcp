@@ -11,6 +11,7 @@ pub mod registry;
 pub mod response_size;
 pub mod retrieval;
 pub(crate) mod retrieval_cases;
+pub mod retrieval_quality;
 
 pub use action_grounding::ActionGroundingSuite;
 pub use capacity::CapacitySuite;
@@ -59,6 +60,7 @@ mod tests {
         "lifecycle.rs",
         "ner_quality.rs",
         "poisoning.rs",
+        "retrieval_quality.rs",
         "response_size.rs",
         "retrieval.rs",
     ];

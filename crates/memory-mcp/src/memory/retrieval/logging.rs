@@ -273,6 +273,7 @@ mod tests {
             rationale: rationale.into(),
             retrieval_tier: retrieval_tier.map(str::to_string),
             reconciliation: None,
+            retrieval_evidence: None,
         }
     }
 

@@ -160,6 +160,7 @@ pub(super) fn maybe_append_first_person_ranked_fact_item(
     let candidate = ranked_candidates
         .iter()
         .filter_map(|ranked| {
+            ranked.evidence.admission_basis?;
             if seen_fact_ids.contains(ranked.fact.fact_id.as_str())
                 || seen_source_episodes.contains(ranked.fact.source_episode.as_str())
             {
@@ -597,6 +598,10 @@ mod tests {
 
         RankedContextFact {
             fact,
+            evidence: crate::memory::retrieval::types::CandidateEvidence {
+                admission_basis: Some(crate::memory::retrieval::types::AdmissionBasis::Lexical),
+                ..crate::memory::retrieval::types::CandidateEvidence::default()
+            },
             rationale: "test rationale".to_string(),
             retrieval_tier: RetrievalTier::Direct,
             fusion_score,
@@ -948,6 +953,41 @@ mod tests {
                 .get("episode_rescue_used")
                 .and_then(serde_json::Value::as_bool),
             Some(true)
+        );
+    }
+
+    #[test]
+    fn first_person_fact_rescue_skips_candidate_without_admission_evidence() {
+        let query = "I'm planning a weekend getaway and want something creatively fulfilling. What would you suggest?";
+        let query_terms = crate::shared::search::search_query_terms(query);
+        let fact_time = chrono::DateTime::parse_from_rfc3339("2026-04-13T09:00:00Z")
+            .expect("fact timestamp")
+            .with_timezone(&chrono::Utc);
+        let mut candidate = create_ranked_test_fact(
+            "fact:unadmitted",
+            "episode:unadmitted",
+            fact_time,
+            0.2,
+            1.0,
+            0,
+            &[],
+        );
+        candidate.fact.content = "User: It helped me understand what I truly want.".to_string();
+        candidate.evidence.admission_basis = None;
+
+        let mut results = Vec::new();
+        maybe_append_first_person_ranked_fact_item(
+            &mut results,
+            &[candidate],
+            Some(query),
+            &query_terms,
+            3,
+            fact_time,
+        );
+
+        assert!(
+            results.is_empty(),
+            "rescue must not turn an unadmitted candidate into output"
         );
     }
 }
