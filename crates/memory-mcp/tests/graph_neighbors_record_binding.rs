@@ -59,3 +59,55 @@ async fn neighbor_query_plan_is_index_scan_on_edge_in() {
     assert!(plan.contains("IndexScan"), "{plan}");
     assert!(plan.contains("edge_in"), "{plan}");
 }
+
+#[tokio::test]
+async fn triple_lookup_finds_only_the_matching_edge() {
+    let (service, db_client) = common::make_service_with_client().await;
+    common::seed_entity(
+        &db_client,
+        "org",
+        "entity:trip-a",
+        "person",
+        "Trip Ada",
+        &[],
+    )
+    .await;
+    common::seed_entity(
+        &db_client,
+        "org",
+        "entity:trip-c",
+        "person",
+        "Trip Cal",
+        &[],
+    )
+    .await;
+    service
+        .relate(
+            "entity:trip-a",
+            "knows",
+            "entity:trip-c",
+            EdgeAttributes::inferred(),
+        )
+        .await
+        .expect("knows edge");
+    service
+        .relate(
+            "entity:trip-a",
+            "owns",
+            "entity:trip-c",
+            EdgeAttributes::inferred(),
+        )
+        .await
+        .expect("owns edge");
+    let store = memory_mcp::knowledge::KnowledgeGraphStore::new(db_client, "org");
+    let hits = store
+        .select_edges_for_triple("entity:trip-a", "knows", "entity:trip-c")
+        .await
+        .expect("dedup lookup");
+    assert_eq!(
+        hits.len(),
+        1,
+        "dedup lookup must return only the matching edge: {hits:?}"
+    );
+    assert_eq!(hits[0]["relation"], "knows");
+}

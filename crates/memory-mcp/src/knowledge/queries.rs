@@ -279,6 +279,43 @@ pub fn build_select_graph_edge_neighbors_query(
     )
 }
 
+/// Binds both ends of an exact-triple lookup so each stays index-safe.
+///
+/// Every fact write probes for an identical edge through this, so a TableScan
+/// here is paid twice per write. See `bind_record_equality` for why the
+/// two-part binding matters.
+pub fn build_select_edges_for_triple_query(
+    in_id: &str,
+    relation: &str,
+    out_id: &str,
+) -> (String, Value) {
+    let mut vars = serde_json::Map::from_iter([("relation".to_string(), json!(relation))]);
+    match (split_record_id(in_id), split_record_id(out_id)) {
+        (Some((in_table, in_key)), Some((out_table, out_key))) => {
+            vars.insert("in_table".to_string(), json!(in_table));
+            vars.insert("in_key".to_string(), json!(in_key));
+            vars.insert("out_table".to_string(), json!(out_table));
+            vars.insert("out_key".to_string(), json!(out_key));
+            (
+                "SELECT * FROM edge WHERE in = type::record($in_table, $in_key) \
+                 AND relation = $relation AND out = type::record($out_table, $out_key)"
+                    .to_string(),
+                Value::Object(vars),
+            )
+        }
+        _ => {
+            vars.insert("in_id".to_string(), json!(in_id));
+            vars.insert("out_id".to_string(), json!(out_id));
+            (
+                "SELECT * FROM edge WHERE in = <record> $in_id AND relation = $relation \
+                 AND out = <record> $out_id"
+                    .to_string(),
+                Value::Object(vars),
+            )
+        }
+    }
+}
+
 pub fn build_relate_edge_query(
     edge_id: &str,
     from_id: &str,
@@ -287,34 +324,68 @@ pub fn build_relate_edge_query(
 ) -> (String, Value) {
     let normalized = normalize_surreal_json(&content);
     let edge_record_literal = record_literal(edge_id);
+    let (endpoint_bindings, endpoint_vars) = bind_record_endpoints(from_id, to_id);
 
     if let Value::Object(map) = normalized {
         let (assignments, mut vars) = build_set_assignments(FACT_TEMPORAL_FIELDS, map);
         let all_assignments = assignments;
         vars.insert("edge_id".to_string(), json!(edge_id));
-        vars.insert("in_id".to_string(), json!(from_id));
-        vars.insert("out_id".to_string(), json!(to_id));
+        vars.extend(endpoint_vars);
 
         (
             format!(
-                "LET $in = <record> $in_id; LET $out = <record> $out_id; RELATE $in -> {edge_record_literal} -> $out SET {} RETURN *",
+                "{endpoint_bindings} RELATE $in -> {edge_record_literal} -> $out SET {} RETURN *",
                 all_assignments.join(", ")
             ),
             Value::Object(vars),
         )
     } else {
+        let mut vars = endpoint_vars;
+        vars.insert("edge_id".to_string(), json!(edge_id));
+        vars.insert("content".to_string(), normalized);
+
         (
             format!(
-                "LET $in = <record> $in_id; LET $out = <record> $out_id; RELATE $in -> {edge_record_literal} -> $out SET content = $content RETURN *"
+                "{endpoint_bindings} RELATE $in -> {edge_record_literal} -> $out SET content = $content RETURN *"
             ),
-            json!({
-                "edge_id": edge_id,
-                "in_id": from_id,
-                "out_id": to_id,
-                "content": normalized,
-            }),
+            Value::Object(vars),
         )
     }
+}
+
+/// Binds `$in`/`$out` for a RELATE, constructing both records in-query.
+///
+/// The `<record>` cast cannot be used here: it parses its input as a
+/// record-id literal, so a key is truncated at the first character outside
+/// `[A-Za-z0-9_]` and `entity:trip-a` is stored as the key `trip`. The edge
+/// would then point at a record no entity is stored under, which is exactly
+/// what `tests/record_id_integrity.rs` pins. A value that is not a record id
+/// keeps the cast, because there is no table/key pair to bind.
+fn bind_record_endpoints(from_id: &str, to_id: &str) -> (String, serde_json::Map<String, Value>) {
+    let mut vars = serde_json::Map::new();
+    let from = match split_record_id(from_id) {
+        Some((table, key)) => {
+            vars.insert("in_table".to_string(), json!(table));
+            vars.insert("in_key".to_string(), json!(key));
+            "type::record($in_table, $in_key)".to_string()
+        }
+        None => {
+            vars.insert("in_id".to_string(), json!(from_id));
+            "<record> $in_id".to_string()
+        }
+    };
+    let to = match split_record_id(to_id) {
+        Some((table, key)) => {
+            vars.insert("out_table".to_string(), json!(table));
+            vars.insert("out_key".to_string(), json!(key));
+            "type::record($out_table, $out_key)".to_string()
+        }
+        None => {
+            vars.insert("out_id".to_string(), json!(to_id));
+            "<record> $out_id".to_string()
+        }
+    };
+    (format!("LET $in = {from}; LET $out = {to};"), vars)
 }
 
 fn record_literal(record_id: &str) -> String {
@@ -407,6 +478,63 @@ mod tests {
         );
         assert!(sql.contains("<record> $node_id"), "{sql}");
         assert_eq!(vars["node_id"], "noid");
+    }
+
+    #[test]
+    fn relate_query_builds_endpoints_in_query_not_by_cast() {
+        let (sql, vars) = build_relate_edge_query(
+            "edge:abc",
+            "entity:trip-a",
+            "entity:trip-c",
+            json!({"relation": "knows"}),
+        );
+        assert!(
+            sql.contains("LET $in = type::record($in_table, $in_key);"),
+            "{sql}"
+        );
+        assert!(
+            sql.contains("LET $out = type::record($out_table, $out_key);"),
+            "{sql}"
+        );
+        assert!(!sql.contains("<record>"), "{sql}");
+        assert_eq!(vars["in_key"], "trip-a");
+        assert_eq!(vars["out_key"], "trip-c");
+    }
+
+    #[test]
+    fn relate_query_keeps_cast_for_an_unsplit_endpoint() {
+        let (sql, vars) = build_relate_edge_query(
+            "edge:abc",
+            "noid",
+            "entity:trip-c",
+            json!({"relation": "knows"}),
+        );
+        assert!(sql.contains("LET $in = <record> $in_id;"), "{sql}");
+        assert_eq!(vars["in_id"], "noid");
+    }
+
+    #[test]
+    fn triple_lookup_binds_record_parts_for_both_ends() {
+        let (sql, vars) =
+            build_select_edges_for_triple_query("entity:trip-a", "knows", "entity:trip-c");
+        assert!(
+            sql.contains("in = type::record($in_table, $in_key)"),
+            "{sql}"
+        );
+        assert!(
+            sql.contains("out = type::record($out_table, $out_key)"),
+            "{sql}"
+        );
+        assert!(!sql.contains("<record>"), "{sql}");
+        assert_eq!(vars["relation"], "knows");
+        assert_eq!(vars["out_key"], "trip-c");
+    }
+
+    #[test]
+    fn triple_lookup_falls_back_to_cast_for_unsplit_ids() {
+        let (sql, vars) = build_select_edges_for_triple_query("noid", "knows", "entity:trip-c");
+        assert!(sql.contains("in = <record> $in_id"), "{sql}");
+        assert_eq!(vars["in_id"], "noid");
     }
 
     #[test]

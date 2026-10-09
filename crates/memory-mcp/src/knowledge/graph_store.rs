@@ -229,10 +229,9 @@ impl KnowledgeGraphStore {
         relation: &str,
         out_id: &str,
     ) -> Result<Vec<Value>, MemoryError> {
-        let sql = "SELECT * FROM edge WHERE in = <record> $in_id AND relation = $relation \
-                   AND out = <record> $out_id";
-        let vars = json!({ "in_id": in_id, "relation": relation, "out_id": out_id });
-        self.db.query_rows(sql, Some(vars)).await
+        let (sql, vars) =
+            crate::knowledge::queries::build_select_edges_for_triple_query(in_id, relation, out_id);
+        self.db.query_rows(&sql, Some(vars)).await
     }
 
     /// Link two records through an edge in the Active Namespace.
