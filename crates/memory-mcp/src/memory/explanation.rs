@@ -377,6 +377,19 @@ impl ExplanationService {
 
         let budget = crate::platform::traversal_budget::GraphTraversalBudget::EXPLAIN;
         let cutoff = now();
+        // Read the communities once for the whole batch. The surprising-connection
+        // scan needs them to seed each entity's community membership, and loading
+        // them per linked entity meant up to eight full `community` table reads
+        // inside a single explain request.
+        let communities = self
+            .knowledge_graph_store()
+            .select_communities()
+            .await?
+            .into_iter()
+            .filter_map(|record| {
+                crate::memory::retrieval::graph_reads::graph_community_from_value(&record)
+            })
+            .collect::<Vec<_>>();
         let hub_entities = crate::memory::retrieval::graph_reads::find_hub_entities(
             self,
             cutoff,
@@ -398,7 +411,11 @@ impl ExplanationService {
         for entity_id in linked_entities {
             for connection in
                 crate::memory::retrieval::graph_surprising::find_surprising_connections(
-                    self, &entity_id, 3, budget,
+                    self,
+                    &entity_id,
+                    3,
+                    budget,
+                    &communities,
                 )
                 .await?
             {
@@ -593,6 +610,96 @@ mod tests {
         assert!(
             result.is_ok(),
             "well-formed id must pass validation: {result:?}"
+        );
+    }
+
+    /// Counts every read of the `community` table.
+    #[derive(Default)]
+    struct CountingDbClient {
+        community_selects: std::sync::atomic::AtomicUsize,
+    }
+
+    #[async_trait::async_trait]
+    impl crate::storage::client::DbClient for CountingDbClient {
+        async fn select_one(
+            &self,
+            record_id: &str,
+            _ns: &str,
+        ) -> Result<Option<Value>, MemoryError> {
+            Ok(Some(
+                json!({"entity_id": record_id, "canonical_name": record_id}),
+            ))
+        }
+
+        async fn select_table(
+            &self,
+            table: crate::storage::table_scope::OwnedTable,
+            _ns: &str,
+        ) -> Result<Vec<Value>, MemoryError> {
+            if table.as_str() == "community" {
+                self.community_selects
+                    .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+            }
+            Ok(vec![])
+        }
+
+        async fn create(
+            &self,
+            _: &str,
+            _: Value,
+            _: &str,
+            _: &[&str],
+        ) -> Result<Value, MemoryError> {
+            Ok(Value::Null)
+        }
+
+        async fn update(
+            &self,
+            _: &str,
+            _: Value,
+            _: &str,
+            _: &[&str],
+        ) -> Result<Value, MemoryError> {
+            Ok(Value::Null)
+        }
+
+        async fn query(
+            &self,
+            sql: &str,
+            _vars: Option<Value>,
+            _ns: &str,
+        ) -> Result<Value, MemoryError> {
+            if sql.contains("FROM edge") {
+                Ok(Value::Array(Vec::new()))
+            } else {
+                Ok(Value::Null)
+            }
+        }
+
+        async fn apply_migrations(&self, _ns: &str) -> Result<(), MemoryError> {
+            Ok(())
+        }
+    }
+
+    #[tokio::test]
+    async fn explain_batch_fetches_communities_once() {
+        let db = Arc::new(CountingDbClient::default());
+        let svc = ExplanationService::new(db.clone(), StdoutLogger::new("warn"), "org".to_string());
+        let insights = svc
+            .build_graph_insights_batched(&[
+                "entity:a".to_string(),
+                "entity:b".to_string(),
+                "entity:c".to_string(),
+            ])
+            .await
+            .expect("insights")
+            .expect("batch has linked entities");
+        assert!(insights.hub_entities.is_empty() && insights.surprising_connections.is_empty());
+        assert_eq!(
+            db.community_selects
+                .load(std::sync::atomic::Ordering::Relaxed),
+            1,
+            "one community load per batch, not one per entity"
         );
     }
 }
