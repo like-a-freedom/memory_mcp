@@ -19,7 +19,7 @@ use crate::shared::record::split_record_id;
 use crate::storage::table_scope::{MemoryTables, ReleaseOwnedTable};
 use std::sync::Arc;
 
-use serde_json::{Value, json};
+use serde_json::Value;
 
 use crate::error::MemoryError;
 use crate::storage::{BoundDbClient, DbClient};
@@ -75,18 +75,12 @@ impl EpisodeContextStore {
         entity_id: &str,
     ) -> Result<Vec<Value>, MemoryError> {
         let Some((entity_table, entity_key)) = split_record_id(entity_id) else {
-            // Not a record id, so there is no indexable bound to build. The
-            // value cannot name an edge endpoint either, so it matches nothing;
-            // the cast below is kept only so this branch keeps its old shape.
-            let sql = "SELECT * FROM episode WHERE episode_id IN (\
-                       SELECT VALUE source_episode FROM fact WHERE fact_id IN (\
-                       SELECT VALUE type::string(out) FROM edge \
-                       WHERE in = <record> $entity_id AND relation = 'involved_in')) \
-                       ORDER BY t_ref DESC LIMIT 10";
-            return self
-                .db
-                .query_rows(sql, Some(json!({ "entity_id": entity_id })))
-                .await;
+            // Not a record id, so there is no table/key pair to bind an index
+            // bound from. Such a value cannot be an edge endpoint either — every
+            // endpoint is written as a record from its two parts — so it matches
+            // no edges and therefore no episodes. Answering empty is also what
+            // the previous single nested-`IN` query returned for these values.
+            return Ok(Vec::new());
         };
 
         let (fact_ids_sql, fact_ids_vars) =

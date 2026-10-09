@@ -1,8 +1,9 @@
 //! SurrealDB query builders for the memory domain.
 //!
-//! One builder: the episode-content fallback that context assembly runs when
-//! no fact matched. It lived in `storage::queries` because that is where the
-//! other SQL was, which is the same reason it was in the wrong place.
+//! The episode-content fallback that context assembly runs when no fact
+//! matched, and the three bounded lookups that resolve episodes linked to an
+//! entity. They lived in `storage::queries` because that is where the other
+//! SQL was, which is the same reason they were in the wrong place.
 
 use serde_json::{Value, json};
 

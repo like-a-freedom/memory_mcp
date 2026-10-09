@@ -233,28 +233,43 @@ pub fn build_select_edge_neighbors_query(
     )
 }
 
-/// Binds `{field} = <record value>` so the predicate stays index-safe.
+/// Binds one side of a record-equality predicate and returns its SQL operand.
 ///
-/// SurrealDB 3.3.0 folds `<record> $param` to a literal after index
-/// selection and answers with a TableScan; `type::record($table, $key)`
-/// over two bound strings is an IndexScan at plan time. A value that is not
-/// a record id keeps the cast, because there is no table/key pair to bind.
-fn bind_record_equality(field: &str, value: &str, cutoff: &str) -> (String, Value) {
-    let mut vars = serde_json::Map::from_iter([("cutoff".to_string(), json!(cutoff))]);
+/// On SurrealDB 3.3.0 a `<record> $param` cast folds to a literal *after*
+/// index selection and is answered with a TableScan; `type::record($table,
+/// $key)` over two bound strings is an IndexScan at plan time. The cast also
+/// parses its input as a record-id literal and truncates the key at the first
+/// character outside `[A-Za-z0-9_]`, so it can silently name the wrong record.
+/// A value that is not a record id has no table/key pair to bind and keeps the
+/// cast.
+///
+/// `var_prefix` names the bound variables: `{prefix}_table`/`{prefix}_key` on
+/// the split path, `{prefix}_id` on the fallback. Both callers that need a
+/// two-sided predicate (the triple lookup and the RELATE endpoints) use `in`
+/// and `out`; the single-sided neighbor predicates use `node`.
+fn bind_record_operand(
+    value: &str,
+    var_prefix: &str,
+    vars: &mut serde_json::Map<String, Value>,
+) -> String {
     match split_record_id(value) {
         Some((table, key)) => {
-            vars.insert("node_table".to_string(), json!(table));
-            vars.insert("node_key".to_string(), json!(key));
-            (
-                format!("{field} = type::record($node_table, $node_key)"),
-                Value::Object(vars),
-            )
+            vars.insert(format!("{var_prefix}_table"), json!(table));
+            vars.insert(format!("{var_prefix}_key"), json!(key));
+            format!("type::record(${var_prefix}_table, ${var_prefix}_key)")
         }
         None => {
-            vars.insert("node_id".to_string(), json!(value));
-            (format!("{field} = <record> $node_id"), Value::Object(vars))
+            vars.insert(format!("{var_prefix}_id"), json!(value));
+            format!("<record> ${var_prefix}_id")
         }
     }
+}
+
+/// Binds `{field} = <record value>` so the predicate stays index-safe.
+fn bind_record_equality(field: &str, value: &str, cutoff: &str) -> (String, Value) {
+    let mut vars = serde_json::Map::from_iter([("cutoff".to_string(), json!(cutoff))]);
+    let operand = bind_record_operand(value, "node", &mut vars);
+    (format!("{field} = {operand}"), Value::Object(vars))
 }
 
 /// Build the graph-app projection: unlike retrieval's neighbor walk, the app
@@ -282,7 +297,7 @@ pub fn build_select_graph_edge_neighbors_query(
 /// Binds both ends of an exact-triple lookup so each stays index-safe.
 ///
 /// Every fact write probes for an identical edge through this, so a TableScan
-/// here is paid twice per write. See `bind_record_equality` for why the
+/// here is paid twice per write. See `bind_record_operand` for why the
 /// two-part binding matters.
 pub fn build_select_edges_for_triple_query(
     in_id: &str,
@@ -290,30 +305,14 @@ pub fn build_select_edges_for_triple_query(
     out_id: &str,
 ) -> (String, Value) {
     let mut vars = serde_json::Map::from_iter([("relation".to_string(), json!(relation))]);
-    match (split_record_id(in_id), split_record_id(out_id)) {
-        (Some((in_table, in_key)), Some((out_table, out_key))) => {
-            vars.insert("in_table".to_string(), json!(in_table));
-            vars.insert("in_key".to_string(), json!(in_key));
-            vars.insert("out_table".to_string(), json!(out_table));
-            vars.insert("out_key".to_string(), json!(out_key));
-            (
-                "SELECT * FROM edge WHERE in = type::record($in_table, $in_key) \
-                 AND relation = $relation AND out = type::record($out_table, $out_key)"
-                    .to_string(),
-                Value::Object(vars),
-            )
-        }
-        _ => {
-            vars.insert("in_id".to_string(), json!(in_id));
-            vars.insert("out_id".to_string(), json!(out_id));
-            (
-                "SELECT * FROM edge WHERE in = <record> $in_id AND relation = $relation \
-                 AND out = <record> $out_id"
-                    .to_string(),
-                Value::Object(vars),
-            )
-        }
-    }
+    let in_operand = bind_record_operand(in_id, "in", &mut vars);
+    let out_operand = bind_record_operand(out_id, "out", &mut vars);
+    (
+        format!(
+            "SELECT * FROM edge WHERE in = {in_operand} AND relation = $relation AND out = {out_operand}"
+        ),
+        Value::Object(vars),
+    )
 }
 
 pub fn build_relate_edge_query(
@@ -359,32 +358,12 @@ pub fn build_relate_edge_query(
 /// record-id literal, so a key is truncated at the first character outside
 /// `[A-Za-z0-9_]` and `entity:trip-a` is stored as the key `trip`. The edge
 /// would then point at a record no entity is stored under, which is exactly
-/// what `tests/record_id_integrity.rs` pins. A value that is not a record id
-/// keeps the cast, because there is no table/key pair to bind.
+/// what `tests/record_id_integrity.rs` pins. See `bind_record_operand` for the
+/// binding rule.
 fn bind_record_endpoints(from_id: &str, to_id: &str) -> (String, serde_json::Map<String, Value>) {
     let mut vars = serde_json::Map::new();
-    let from = match split_record_id(from_id) {
-        Some((table, key)) => {
-            vars.insert("in_table".to_string(), json!(table));
-            vars.insert("in_key".to_string(), json!(key));
-            "type::record($in_table, $in_key)".to_string()
-        }
-        None => {
-            vars.insert("in_id".to_string(), json!(from_id));
-            "<record> $in_id".to_string()
-        }
-    };
-    let to = match split_record_id(to_id) {
-        Some((table, key)) => {
-            vars.insert("out_table".to_string(), json!(table));
-            vars.insert("out_key".to_string(), json!(key));
-            "type::record($out_table, $out_key)".to_string()
-        }
-        None => {
-            vars.insert("out_id".to_string(), json!(to_id));
-            "<record> $out_id".to_string()
-        }
-    };
+    let from = bind_record_operand(from_id, "in", &mut vars);
+    let to = bind_record_operand(to_id, "out", &mut vars);
     (format!("LET $in = {from}; LET $out = {to};"), vars)
 }
 

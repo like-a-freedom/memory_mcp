@@ -663,7 +663,7 @@ mod tests {
                     let incoming = sql.contains("WHERE out =");
                     let node_id = vars
                         .as_ref()
-                        .map(crate::shared::record::node_id_from_vars)
+                        .map(crate::shared::record::bound_node_id)
                         .unwrap_or_default();
                     let mk = |from_id: &str, relation: &str, to_id: &str| {
                         json!({

@@ -255,7 +255,6 @@ mod tests {
         #[derive(Default)]
         struct BudgetedGraphDbClient {
             neighbor_queries: AtomicUsize,
-            community_selects: AtomicUsize,
         }
 
         #[async_trait]
@@ -276,20 +275,15 @@ mod tests {
                 table: crate::storage::table_scope::OwnedTable,
                 _namespace: &str,
             ) -> Result<Vec<Value>, MemoryError> {
-                if table.as_str() == "community" {
-                    self.community_selects.fetch_add(1, Ordering::Relaxed);
-                    return Ok((0..256)
-                        .map(|idx| {
-                            json!({
-                                "community_id": format!("community:{idx}"),
-                                "summary": format!("Community {idx}"),
-                                "member_entities": [format!("entity:{idx}")],
-                                "updated_at": "2026-04-15T00:00:00Z",
-                            })
-                        })
-                        .collect());
-                }
-
+                // The scan receives its communities as a parameter, so it must
+                // never reach for the table itself. Making that a panic, rather
+                // than a counter the test reads afterwards, means the failure
+                // lands on the offending call rather than on a later assertion.
+                assert_ne!(
+                    table.as_str(),
+                    "community",
+                    "the scan must not read the community table itself"
+                );
                 Ok(vec![])
             }
 
@@ -329,7 +323,7 @@ mod tests {
                     }
                     let node_id = vars
                         .as_ref()
-                        .map(crate::shared::record::node_id_from_vars)
+                        .map(crate::shared::record::bound_node_id)
                         .unwrap_or_default();
                     let next_edge = if let Some(idx) = node_id.strip_prefix("entity:") {
                         json!({
@@ -367,6 +361,9 @@ mod tests {
         )
         .expect("service");
 
+        // The communities the batch resolved once, passed in as the scan's
+        // input. Building 256 of them keeps the traversal budget, not the
+        // membership data, the thing under test.
         let communities = (0..256)
             .map(|idx| {
                 json!({
@@ -387,12 +384,6 @@ mod tests {
         )
         .await
         .expect("connections");
-
-        assert_eq!(
-            db.community_selects.load(Ordering::Relaxed),
-            0,
-            "the scan must not read the community table itself"
-        );
 
         assert!(
             db.neighbor_queries.load(Ordering::Relaxed)

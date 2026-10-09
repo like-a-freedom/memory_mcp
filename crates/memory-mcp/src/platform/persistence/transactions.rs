@@ -78,6 +78,58 @@ where
     with_db_retry_policy(op_name, &DbRetryPolicy::default(), logger, f).await
 }
 
+/// Backoff for `attempt`, doubling from the policy's initial delay up to 64x.
+fn backoff_delay(policy: &DbRetryPolicy, attempt: u32) -> Duration {
+    policy
+        .initial_delay
+        .saturating_mul(1 << attempt.saturating_sub(1).min(6))
+}
+
+/// Logs one retry decision and sleeps for the backoff.
+///
+/// `kind` is `retry` for a transient error or `timeout` for an expired attempt.
+/// `error` is present only for the transient case: a timeout already carries
+/// its elapsed budget and attempt count, while a conflict's message is what an
+/// operator needs to act on.
+async fn log_retry_and_backoff(
+    logger: &StdoutLogger,
+    op_name: &str,
+    kind: &str,
+    attempt: u32,
+    max_attempts: u32,
+    delay: Duration,
+    error: Option<&MemoryError>,
+) {
+    let mut fields = HashMap::from([
+        (
+            "op".to_string(),
+            serde_json::Value::String(format!("db.{op_name}.{kind}")),
+        ),
+        (
+            "attempt".to_string(),
+            serde_json::Value::Number(serde_json::Number::from(attempt)),
+        ),
+        (
+            "delay_ms".to_string(),
+            serde_json::Value::Number(serde_json::Number::from(
+                delay.as_millis().min(u128::from(u64::MAX)) as u64,
+            )),
+        ),
+        (
+            "max_attempts".to_string(),
+            serde_json::Value::Number(serde_json::Number::from(max_attempts)),
+        ),
+    ]);
+    if let Some(err) = error {
+        fields.insert(
+            "error".to_string(),
+            serde_json::Value::String(err.to_string()),
+        );
+    }
+    logger.log(fields, LogLevel::Warn);
+    tokio::time::sleep(delay).await;
+}
+
 /// Runs a fallible database operation under an explicit retry policy.
 ///
 /// Each individual attempt is guarded by `policy.per_attempt_timeout` to
@@ -105,37 +157,17 @@ where
                 if attempt >= policy.attempts || !is_transient_db_error(&err) {
                     return Err(err);
                 }
-                let delay = policy
-                    .initial_delay
-                    .saturating_mul(1 << attempt.saturating_sub(1).min(6));
-                logger.log(
-                    HashMap::from([
-                        (
-                            "op".to_string(),
-                            serde_json::Value::String(format!("db.{op_name}.retry")),
-                        ),
-                        (
-                            "attempt".to_string(),
-                            serde_json::Value::Number(serde_json::Number::from(attempt)),
-                        ),
-                        (
-                            "delay_ms".to_string(),
-                            serde_json::Value::Number(serde_json::Number::from(
-                                delay.as_millis().min(u128::from(u64::MAX)) as u64,
-                            )),
-                        ),
-                        (
-                            "max_attempts".to_string(),
-                            serde_json::Value::Number(serde_json::Number::from(policy.attempts)),
-                        ),
-                        (
-                            "error".to_string(),
-                            serde_json::Value::String(err.to_string()),
-                        ),
-                    ]),
-                    LogLevel::Warn,
-                );
-                tokio::time::sleep(delay).await;
+                let delay = backoff_delay(policy, attempt);
+                log_retry_and_backoff(
+                    logger,
+                    op_name,
+                    "retry",
+                    attempt,
+                    policy.attempts,
+                    delay,
+                    Some(&err),
+                )
+                .await;
             }
             Err(_elapsed) => {
                 attempt += 1;
@@ -145,35 +177,17 @@ where
                         policy.per_attempt_timeout.as_secs()
                     )));
                 }
-                let delay = policy
-                    .initial_delay
-                    .saturating_mul(1 << attempt.saturating_sub(1).min(6));
-                logger.log(
-                    HashMap::from([
-                        (
-                            "op".to_string(),
-                            serde_json::Value::String(format!("db.{op_name}.timeout")),
-                        ),
-                        (
-                            "attempt".to_string(),
-                            serde_json::Value::Number(serde_json::Number::from(attempt)),
-                        ),
-                        (
-                            "delay_ms".to_string(),
-                            serde_json::Value::Number(serde_json::Number::from(
-                                delay.as_millis().min(u128::from(u64::MAX)) as u64,
-                            )),
-                        ),
-                        (
-                            "max_attempts".to_string(),
-                            serde_json::Value::Number(serde_json::Number::from(
-                                policy.timeout_attempts,
-                            )),
-                        ),
-                    ]),
-                    LogLevel::Warn,
-                );
-                tokio::time::sleep(delay).await;
+                let delay = backoff_delay(policy, attempt);
+                log_retry_and_backoff(
+                    logger,
+                    op_name,
+                    "timeout",
+                    attempt,
+                    policy.timeout_attempts,
+                    delay,
+                    None,
+                )
+                .await;
             }
         }
     }
@@ -308,14 +322,11 @@ mod tests {
     async fn transient_conflicts_still_get_three_attempts() {
         let calls = Arc::new(AtomicU32::new(0));
         let counter = calls.clone();
-        let policy = DbRetryPolicy {
-            attempts: 3,
-            timeout_attempts: 1,
-            initial_delay: Duration::from_millis(1),
-            per_attempt_timeout: Duration::from_secs(30),
-        };
+        // `fast_policy(1)` keeps the transient budget at 3 while making the
+        // per-attempt timeout small; the closure returns an error rather than
+        // stalling, so the timeout arm never fires.
         let result: Result<i32, MemoryError> =
-            with_db_retry_policy("test_op", &policy, &logger(), || {
+            with_db_retry_policy("test_op", &fast_policy(1), &logger(), || {
                 let counter = counter.clone();
                 async move {
                     counter.fetch_add(1, Ordering::SeqCst);

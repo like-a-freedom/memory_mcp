@@ -1106,7 +1106,7 @@ mod tests {
                         |_sql, vars| {
                             let node_id = vars
                                 .as_ref()
-                                .map(|v| crate::shared::record::node_id_from_vars(v))
+                                .map(|v| crate::shared::record::bound_node_id(v))
                                 .unwrap_or_default();
                             Ok(Value::Array(match node_id.as_str() {
                                 "entity:alpha" => vec![json!({

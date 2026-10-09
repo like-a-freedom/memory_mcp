@@ -24,18 +24,16 @@ pub(crate) fn split_record_id(record_id: &str) -> Option<(&str, &str)> {
     Some((table, key))
 }
 
-/// Reads back the record id a query builder bound.
+/// Reads back the node record id a graph-neighbor builder bound.
 ///
-/// A builder that could split the id binds `node_table`/`node_key`; one that
-/// could not falls back to binding `node_id`. Test doubles standing in for a
-/// graph read key on the node being looked up, and this returns it under either
-/// shape so they need not care which path the builder took.
+/// Test doubles standing in for a graph read key their fixture on the node
+/// being looked up, which the builder binds as `node_table`/`node_key`. Only
+/// that shape is read: an id that could not be split is bound as `node_id` and
+/// is not a record id, so returning `""` for it keeps a double from silently
+/// accepting the fallback path when the test means to exercise the record one.
 #[cfg(test)]
 #[must_use]
-pub(crate) fn node_id_from_vars(vars: &serde_json::Value) -> String {
-    if let Some(id) = vars.get("node_id").and_then(serde_json::Value::as_str) {
-        return id.to_string();
-    }
+pub(crate) fn bound_node_id(vars: &serde_json::Value) -> String {
     match (
         vars.get("node_table").and_then(serde_json::Value::as_str),
         vars.get("node_key").and_then(serde_json::Value::as_str),
@@ -47,7 +45,7 @@ pub(crate) fn node_id_from_vars(vars: &serde_json::Value) -> String {
 
 #[cfg(test)]
 mod tests {
-    use super::{node_id_from_vars, split_record_id};
+    use super::{bound_node_id, split_record_id};
 
     #[test]
     fn split_record_id_splits_on_first_colon_and_keeps_remainder() {
@@ -62,11 +60,10 @@ mod tests {
     }
 
     #[test]
-    fn node_id_from_vars_reads_either_binding_shape() {
+    fn bound_node_id_rebuilds_the_split_binding_and_ignores_the_cast() {
         let split = serde_json::json!({"node_table": "entity", "node_key": "odd:key"});
-        assert_eq!(node_id_from_vars(&split), "entity:odd:key");
-        let cast = serde_json::json!({"node_id": "noid"});
-        assert_eq!(node_id_from_vars(&cast), "noid");
-        assert_eq!(node_id_from_vars(&serde_json::json!({})), "");
+        assert_eq!(bound_node_id(&split), "entity:odd:key");
+        assert_eq!(bound_node_id(&serde_json::json!({"node_id": "noid"})), "");
+        assert_eq!(bound_node_id(&serde_json::json!({})), "");
     }
 }
