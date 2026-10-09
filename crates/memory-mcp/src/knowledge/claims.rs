@@ -937,7 +937,7 @@ mod tests {
         // catalog entry is chosen by position, not by count.
         let migrations = crate::storage::migrations::versioned_migrations();
         let last = migrations.last().unwrap();
-        assert_eq!(last.file_name, "053_context_lookup_indexes.surql");
+        assert_eq!(last.file_name, "054_query_index_coverage.surql");
     }
 
     #[test]

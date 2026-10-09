@@ -272,6 +272,19 @@ fn bind_record_equality(field: &str, value: &str, cutoff: &str) -> (String, Valu
     (format!("{field} = {operand}"), Value::Object(vars))
 }
 
+/// Finds an entity by one of its aliases.
+///
+/// `CONTAINSANY [$alias]` rather than `CONTAINS $alias`: on SurrealDB 3.3.0 a
+/// `CONTAINS` membership test is never served by an index, while `CONTAINSANY`
+/// over a one-element array is served by the array-element index
+/// `entity_aliases` (`FIELDS aliases.*`). The two are the same membership test.
+pub fn build_select_entity_by_alias_query(alias: &str) -> (String, Value) {
+    (
+        "SELECT entity_id FROM entity WHERE aliases CONTAINSANY [$alias] LIMIT 1".to_string(),
+        json!({ "alias": alias }),
+    )
+}
+
 /// Build the graph-app projection: unlike retrieval's neighbor walk, the app
 /// needs a stable edge ID and summary metadata so it can open edge details.
 pub fn build_select_graph_edge_neighbors_query(
@@ -414,6 +427,14 @@ mod tests {
         assert_eq!(vars["cutoff"], json!("2026-05-13T00:00:00Z"));
         assert_eq!(vars["limit"], json!(250));
         assert_eq!(vars["start"], json!(500));
+    }
+
+    #[test]
+    fn entity_by_alias_uses_containsany_so_the_element_index_can_serve_it() {
+        let (sql, vars) = build_select_entity_by_alias_query("al");
+        assert!(sql.contains("aliases CONTAINSANY [$alias]"), "{sql}");
+        assert!(!sql.contains("CONTAINS $alias"), "{sql}");
+        assert_eq!(vars["alias"], "al");
     }
 
     #[test]

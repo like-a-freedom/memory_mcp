@@ -45,19 +45,17 @@ impl EntityStoreClient {
     /// Find an entity ID by searching aliases. Returns `None` if no entity
     /// matches.
     ///
-    /// NOTE: `entity_aliases` is a plain (non-FULLTEXT) index on the
-    /// `aliases` array, so the FTS operator `@1@` would silently match
-    /// nothing. `CONTAINS` is SurrealDB's array-membership operator and is
-    /// index-aware.
+    /// The query uses `CONTAINSANY` over a one-element array, not `CONTAINS`:
+    /// on SurrealDB 3.3.0 `CONTAINS` is never served by an index, while
+    /// `CONTAINSANY` is served by the `entity_aliases` array-element index
+    /// (`FIELDS aliases.*`). See `build_select_entity_by_alias_query`.
     pub(crate) async fn find_entity_id_by_alias(
         &self,
         normalized_alias: &str,
     ) -> Result<Option<String>, MemoryError> {
-        let sql = "SELECT entity_id FROM entity WHERE aliases CONTAINS $alias LIMIT 1";
-        let rows = self
-            .db
-            .query_rows(sql, Some(json!({ "alias": normalized_alias })))
-            .await?;
+        let (sql, vars) =
+            crate::knowledge::queries::build_select_entity_by_alias_query(normalized_alias);
+        let rows = self.db.query_rows(&sql, Some(vars)).await?;
         Ok(rows.first().and_then(entity_id_from_record))
     }
 

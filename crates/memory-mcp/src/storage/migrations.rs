@@ -164,6 +164,10 @@ pub fn versioned_migrations() -> &'static [MigrationScript] {
             file_name: "053_context_lookup_indexes.surql",
             sql: include_str!("../../migrations/053_context_lookup_indexes.surql"),
         },
+        MigrationScript {
+            file_name: "054_query_index_coverage.surql",
+            sql: include_str!("../../migrations/054_query_index_coverage.surql"),
+        },
         // NOTE: SaaS-specific migrations (040+) are NOT registered here.
         // They are applied separately by the HTTP profile's provisioning
         // path (SurrealRegistryStore::connect / connect_in_memory).
