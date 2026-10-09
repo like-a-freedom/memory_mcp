@@ -11,6 +11,7 @@
 
 use serde_json::{Value, json};
 
+use crate::shared::record::split_record_id;
 use crate::shared::temporal::{
     BI_TEMPORAL_WHERE, visibility_clause as build_fact_visibility_clause,
 };
@@ -222,12 +223,38 @@ pub fn build_select_edge_neighbors_query(
         GraphDirection::Outgoing => "in",
     };
 
+    let (predicate, vars) = bind_record_equality(node_field, node_id, cutoff);
+
     (
         format!(
-            "SELECT in, out, relation FROM edge WHERE {node_field} = <record> $node_id AND {BI_TEMPORAL_WHERE} ORDER BY in ASC, out ASC, t_valid DESC"
+            "SELECT in, out, relation FROM edge WHERE {predicate} AND {BI_TEMPORAL_WHERE} ORDER BY in ASC, out ASC, t_valid DESC"
         ),
-        json!({"node_id": node_id, "cutoff": cutoff}),
+        vars,
     )
+}
+
+/// Binds `{field} = <record value>` so the predicate stays index-safe.
+///
+/// SurrealDB 3.3.0 folds `<record> $param` to a literal after index
+/// selection and answers with a TableScan; `type::record($table, $key)`
+/// over two bound strings is an IndexScan at plan time. A value that is not
+/// a record id keeps the cast, because there is no table/key pair to bind.
+fn bind_record_equality(field: &str, value: &str, cutoff: &str) -> (String, Value) {
+    let mut vars = serde_json::Map::from_iter([("cutoff".to_string(), json!(cutoff))]);
+    match split_record_id(value) {
+        Some((table, key)) => {
+            vars.insert("node_table".to_string(), json!(table));
+            vars.insert("node_key".to_string(), json!(key));
+            (
+                format!("{field} = type::record($node_table, $node_key)"),
+                Value::Object(vars),
+            )
+        }
+        None => {
+            vars.insert("node_id".to_string(), json!(value));
+            (format!("{field} = <record> $node_id"), Value::Object(vars))
+        }
+    }
 }
 
 /// Build the graph-app projection: unlike retrieval's neighbor walk, the app
@@ -242,11 +269,13 @@ pub fn build_select_graph_edge_neighbors_query(
         GraphDirection::Outgoing => "in",
     };
 
+    let (predicate, vars) = bind_record_equality(node_field, node_id, cutoff);
+
     (
         format!(
-            "SELECT edge_id, id, in, out, relation, origin, confidence, t_valid, t_ingested FROM edge WHERE {node_field} = <record> $node_id AND {BI_TEMPORAL_WHERE} ORDER BY in ASC, out ASC, t_valid DESC"
+            "SELECT edge_id, id, in, out, relation, origin, confidence, t_valid, t_ingested FROM edge WHERE {predicate} AND {BI_TEMPORAL_WHERE} ORDER BY in ASC, out ASC, t_valid DESC"
         ),
-        json!({"node_id": node_id, "cutoff": cutoff}),
+        vars,
     )
 }
 
@@ -335,6 +364,49 @@ mod tests {
         assert_eq!(vars["cutoff"], json!("2026-05-13T00:00:00Z"));
         assert_eq!(vars["limit"], json!(250));
         assert_eq!(vars["start"], json!(500));
+    }
+
+    #[test]
+    fn edge_neighbors_binds_record_parts_not_cast() {
+        let (sql, vars) = build_select_edge_neighbors_query(
+            "entity:abc-123",
+            "2026-01-01T00:00:00Z",
+            GraphDirection::Outgoing,
+        );
+        assert!(
+            sql.contains("= type::record($node_table, $node_key)"),
+            "{sql}"
+        );
+        assert!(!sql.contains("<record>"), "cast must be gone: {sql}");
+        assert_eq!(vars["node_table"], "entity");
+        assert_eq!(vars["node_key"], "abc-123");
+    }
+
+    #[test]
+    fn graph_edge_neighbors_binds_record_parts() {
+        let (sql, vars) = build_select_graph_edge_neighbors_query(
+            "fact:x9",
+            "2026-01-01T00:00:00Z",
+            GraphDirection::Incoming,
+        );
+        assert!(
+            sql.contains("= type::record($node_table, $node_key)"),
+            "{sql}"
+        );
+        assert!(!sql.contains("<record>"), "cast must be gone: {sql}");
+        assert_eq!(vars["node_table"], "fact");
+        assert_eq!(vars["node_key"], "x9");
+    }
+
+    #[test]
+    fn neighbors_query_falls_back_to_cast_for_unsplit_id() {
+        let (sql, vars) = build_select_edge_neighbors_query(
+            "noid",
+            "2026-01-01T00:00:00Z",
+            GraphDirection::Incoming,
+        );
+        assert!(sql.contains("<record> $node_id"), "{sql}");
+        assert_eq!(vars["node_id"], "noid");
     }
 
     #[test]
