@@ -662,7 +662,8 @@ mod tests {
                     }
                     let incoming = sql.contains("WHERE out =");
                     let node_id = vars
-                        .and_then(|vars| vars["node_id"].as_str().map(str::to_string))
+                        .as_ref()
+                        .map(crate::shared::record::node_id_from_vars)
                         .unwrap_or_default();
                     let mk = |from_id: &str, relation: &str, to_id: &str| {
                         json!({

@@ -333,7 +333,8 @@ mod tests {
                         return Ok(Value::Array(Vec::new()));
                     }
                     let node_id = vars
-                        .and_then(|vars| vars["node_id"].as_str().map(str::to_string))
+                        .as_ref()
+                        .map(crate::shared::record::node_id_from_vars)
                         .unwrap_or_default();
                     let next_edge = if let Some(idx) = node_id.strip_prefix("entity:") {
                         json!({

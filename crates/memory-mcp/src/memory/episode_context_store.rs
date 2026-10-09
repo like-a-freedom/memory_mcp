@@ -11,6 +11,11 @@
 //! boundary that would be arbitrary. See
 //! `docs/architecture/decisions/0001-typed-record-accessors.md`.
 
+use crate::memory::queries::{
+    build_select_episodes_by_ids_query, build_select_fact_ids_via_entity_query,
+    build_select_source_episodes_via_facts_query,
+};
+use crate::shared::record::split_record_id;
 use crate::storage::table_scope::{MemoryTables, ReleaseOwnedTable};
 use std::sync::Arc;
 
@@ -58,17 +63,62 @@ impl EpisodeContextStore {
     /// Episodes linked to an entity through the fact→edge graph
     /// (`entity ←edge← fact →episode`), newest first (graph-shaped
     /// read-model queries belong to this store).
+    ///
+    /// Resolved as three bounded lookups — fact ids from `edge`, then
+    /// `source_episode` from `fact`, then the episode rows — rather than one
+    /// query nesting two `IN (subquery)` layers. On SurrealDB 3.3.0 a nested
+    /// `IN` is answered with a table scan of the outer table even when the
+    /// inner predicates are indexable, so the single-query shape read whole
+    /// tables per call. See the 2026-10-09 query-performance plan, Appendix A.
     pub async fn select_episodes_via_entity(
         &self,
         entity_id: &str,
     ) -> Result<Vec<Value>, MemoryError> {
-        let sql = "SELECT * FROM episode WHERE episode_id IN (\
-                   SELECT VALUE source_episode FROM fact WHERE fact_id IN (\
-                   SELECT VALUE type::string(out) FROM edge \
-                   WHERE in = <record> $entity_id AND relation = 'involved_in')) \
-                   ORDER BY t_ref DESC LIMIT 10";
-        self.db
-            .query_rows(sql, Some(json!({ "entity_id": entity_id })))
-            .await
+        let Some((entity_table, entity_key)) = split_record_id(entity_id) else {
+            // Not a record id, so there is no indexable bound to build. The
+            // value cannot name an edge endpoint either, so it matches nothing;
+            // the cast below is kept only so this branch keeps its old shape.
+            let sql = "SELECT * FROM episode WHERE episode_id IN (\
+                       SELECT VALUE source_episode FROM fact WHERE fact_id IN (\
+                       SELECT VALUE type::string(out) FROM edge \
+                       WHERE in = <record> $entity_id AND relation = 'involved_in')) \
+                       ORDER BY t_ref DESC LIMIT 10";
+            return self
+                .db
+                .query_rows(sql, Some(json!({ "entity_id": entity_id })))
+                .await;
+        };
+
+        let (fact_ids_sql, fact_ids_vars) =
+            build_select_fact_ids_via_entity_query(entity_table, entity_key);
+        let fact_rows = self
+            .db
+            .query_rows(&fact_ids_sql, Some(fact_ids_vars))
+            .await?;
+        let fact_ids = fact_rows
+            .iter()
+            .filter_map(|row| row["fact_id"].as_str().map(str::to_string))
+            .collect::<Vec<_>>();
+        if fact_ids.is_empty() {
+            return Ok(Vec::new());
+        }
+
+        let (episodes_sql, episodes_vars) = build_select_source_episodes_via_facts_query(&fact_ids);
+        let episode_id_rows = self
+            .db
+            .query_rows(&episodes_sql, Some(episodes_vars))
+            .await?;
+        let episode_ids = episode_id_rows
+            .iter()
+            .filter_map(|row| row.get("source_episode"))
+            .filter(|value| !value.is_null())
+            .cloned()
+            .collect::<Vec<_>>();
+        if episode_ids.is_empty() {
+            return Ok(Vec::new());
+        }
+
+        let (rows_sql, rows_vars) = build_select_episodes_by_ids_query(&episode_ids);
+        self.db.query_rows(&rows_sql, Some(rows_vars)).await
     }
 }
