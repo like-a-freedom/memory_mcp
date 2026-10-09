@@ -1,7 +1,7 @@
 //! Record-id round-trip integrity for graph writes.
 //!
 //! A record id written into the `entity` table and the same id used as an edge
-//! endpoint must denote one and the same record. On SurrealDB 3.3.0 the
+//! endpoint must denote one and the same record. On SurrealDB 3.3 the
 //! `<record> $param` cast parses its input as a record-id *literal* and
 //! truncates at the first character outside `[A-Za-z0-9_]`, so
 //! `entity:trip-a` resolves to the key `trip`. Reads built on

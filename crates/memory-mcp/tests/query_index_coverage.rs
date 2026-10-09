@@ -81,3 +81,17 @@ async fn entity_by_alias_uses_the_element_index() {
     let plan = plan_for(&*db, &sql, vars).await;
     assert_indexed(&plan, "entity_aliases", "entity by alias");
 }
+
+#[tokio::test]
+async fn facts_by_source_episode_use_the_provenance_index() {
+    let (_service, db) = common::make_service_with_client().await;
+    // The fact→episode provenance lookup (`fact_access_store`, and the
+    // graph-store fact read) filters on `source_episode`.
+    let plan = plan_for(
+        &*db,
+        "SELECT * FROM fact WHERE source_episode = $episode_id LIMIT 5",
+        serde_json::json!({ "episode_id": "episode:x" }),
+    )
+    .await;
+    assert_indexed(&plan, "fact_source_episode", "facts by source episode");
+}

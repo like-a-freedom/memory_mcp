@@ -1,6 +1,6 @@
 //! Splitting a record id into the table and key halves an index bound needs.
 //!
-//! On SurrealDB 3.3.0 a `<record> $param` cast folds to a literal *after*
+//! On SurrealDB 3.3 a `<record> $param` cast folds to a literal *after*
 //! index selection, so the planner emits a TableScan for the predicate's
 //! table. Binding the two halves separately and constructing the record
 //! in-query with `type::record($table, $key)` produces an IndexScan at plan

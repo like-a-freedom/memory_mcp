@@ -49,3 +49,13 @@ Registered in `storage::migrations::versioned_migrations()` after 053; `latest_r
 
 - `entity` prefix lookup (`string::starts_with(canonical_name_normalized, $p)`) is unindexable in SurrealDB; would need a different search structure.
 - Entity↔fact links are stored twice — as `fact.entity_links` and as `involved_in` edges — and `add_fact` writes only the array while extraction writes both. Unifying them is a data-model change worth its own plan.
+
+## Follow-up review pass (same day)
+
+A review against the original timeout report added:
+
+- **Readiness gate**: the five new indexes were added to `required_schema_indexes`, so a silent index-build failure now fails startup (`storage/migrations.rs`).
+- **Request-deadline-aware retry** (`platform/request_budget.rs`): the HTTP deadline middleware installs an ambient deadline; the DB retry loop narrows each attempt to the time the request has left, so a stalled query answers within the budget instead of running out a fixed 30s attempt and retrying into cancellation. The client-side per-attempt timeout default is unchanged (30s) — lowering it to a p99 value is an operator decision deferred to the runbook, because a blanket change would risk slow maintenance queries.
+- **Explain fan-out**: each distinct episode and fact id is now resolved once per `explain` call (was once per item, plus a second fact fetch in the provenance phase), via per-call caches in `memory/explanation.rs`. Parallelising phases (`join_all`) was not done: it would raise concurrent DB load, the opposite of the goal, and the dedup already removes the duplicate work.
+- **Compose memory limits** (`docker-compose.yml`): `mem_limit` on both services, env-overridable (`SURREALDB_MEM_LIMIT`, `MEMORY_MCP_MEM_LIMIT`), addressing the host-swap part of the report.
+

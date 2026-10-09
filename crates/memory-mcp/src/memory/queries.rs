@@ -56,7 +56,7 @@ pub const EPISODE_TEMPORAL_FIELDS: &[&str] = &["t_ref", "t_ingested", "archived_
 /// Stage 1 of the episode-via-entity read: the fact ids an entity is linked to.
 ///
 /// Bound as two parts and constructed in-query because a `<record>` cast does
-/// not survive index selection on SurrealDB 3.3.0. See the 2026-10-09
+/// not survive index selection on SurrealDB 3.3. See the 2026-10-09
 /// query-performance plan, Appendix A.
 pub fn build_select_fact_ids_via_entity_query(
     entity_table: &str,

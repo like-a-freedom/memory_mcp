@@ -85,6 +85,19 @@ fn backoff_delay(policy: &DbRetryPolicy, attempt: u32) -> Duration {
         .saturating_mul(1 << attempt.saturating_sub(1).min(6))
 }
 
+/// The budget for one attempt: the policy's per-attempt timeout, narrowed to
+/// whatever is left before an ambient request deadline when there is one.
+///
+/// A request-serving path installs a deadline (see
+/// [`crate::platform::request_budget`]); without one — CLI, embedded, tests —
+/// this is exactly the configured per-attempt timeout.
+fn attempt_budget(policy: &DbRetryPolicy) -> Duration {
+    match crate::platform::request_budget::remaining() {
+        Some(remaining) => remaining.min(policy.per_attempt_timeout),
+        None => policy.per_attempt_timeout,
+    }
+}
+
 /// Logs one retry decision and sleeps for the backoff.
 ///
 /// `kind` is `retry` for a transient error or `timeout` for an expired attempt.
@@ -150,7 +163,8 @@ where
 {
     let mut attempt = 0u32;
     loop {
-        match tokio::time::timeout(policy.per_attempt_timeout, f()).await {
+        let budget = attempt_budget(policy);
+        match tokio::time::timeout(budget, f()).await {
             Ok(Ok(value)) => return Ok(value),
             Ok(Err(err)) => {
                 attempt += 1;
@@ -174,7 +188,7 @@ where
                 if attempt >= policy.timeout_attempts {
                     return Err(MemoryError::Storage(format!(
                         "db.{op_name}: timed out after {}s ({attempt} attempts)",
-                        policy.per_attempt_timeout.as_secs()
+                        budget.as_secs_f64()
                     )));
                 }
                 let delay = backoff_delay(policy, attempt);
@@ -340,5 +354,37 @@ mod tests {
             other => panic!("expected the last storage error, got {other:?}"),
         }
         assert_eq!(calls.load(Ordering::SeqCst), 3);
+    }
+
+    #[tokio::test]
+    async fn ambient_deadline_narrows_the_attempt_budget() {
+        // A per-attempt timeout of 30s, but only 80ms of request left: the
+        // stalled operation must answer within the request budget, not after a
+        // full 30s attempt (and not after two of them).
+        let policy = DbRetryPolicy {
+            attempts: 3,
+            timeout_attempts: 3,
+            initial_delay: Duration::from_millis(1),
+            per_attempt_timeout: Duration::from_secs(30),
+        };
+        let started = std::time::Instant::now();
+        let result: Result<i32, MemoryError> = crate::platform::request_budget::scope(
+            started + Duration::from_millis(80),
+            with_db_retry_policy("test_op", &policy, &logger(), || async {
+                tokio::time::sleep(Duration::from_secs(30)).await;
+                Ok(0)
+            }),
+        )
+        .await;
+        let message = match result {
+            Err(MemoryError::Storage(message)) => message,
+            other => panic!("expected a timeout storage error, got {other:?}"),
+        };
+        assert!(message.contains("timed out"), "{message}");
+        assert!(
+            started.elapsed() < Duration::from_secs(2),
+            "must stop at the ambient deadline, not the 30s per-attempt cap: {:?}",
+            started.elapsed()
+        );
     }
 }

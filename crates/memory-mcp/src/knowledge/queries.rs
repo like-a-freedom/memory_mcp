@@ -235,7 +235,7 @@ pub fn build_select_edge_neighbors_query(
 
 /// Binds one side of a record-equality predicate and returns its SQL operand.
 ///
-/// On SurrealDB 3.3.0 a `<record> $param` cast folds to a literal *after*
+/// On SurrealDB 3.3 a `<record> $param` cast folds to a literal *after*
 /// index selection and is answered with a TableScan; `type::record($table,
 /// $key)` over two bound strings is an IndexScan at plan time. The cast also
 /// parses its input as a record-id literal and truncates the key at the first
@@ -274,7 +274,7 @@ fn bind_record_equality(field: &str, value: &str, cutoff: &str) -> (String, Valu
 
 /// Finds an entity by one of its aliases.
 ///
-/// `CONTAINSANY [$alias]` rather than `CONTAINS $alias`: on SurrealDB 3.3.0 a
+/// `CONTAINSANY [$alias]` rather than `CONTAINS $alias`: on SurrealDB 3.3 a
 /// `CONTAINS` membership test is never served by an index, while `CONTAINSANY`
 /// over a one-element array is served by the array-element index
 /// `entity_aliases` (`FIELDS aliases.*`). The two are the same membership test.

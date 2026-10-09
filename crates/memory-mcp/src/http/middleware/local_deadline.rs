@@ -23,7 +23,13 @@ pub async fn local_admin_deadline(
     next: Next,
 ) -> Response {
     let deadline = state.config.request_deadline;
-    match tokio::time::timeout(deadline, next.run(req)).await {
+    let deadline_at = std::time::Instant::now() + deadline;
+    match tokio::time::timeout(
+        deadline,
+        crate::platform::request_budget::scope(deadline_at, next.run(req)),
+    )
+    .await
+    {
         Ok(response) => response,
         Err(_elapsed) => {
             let mut response = (

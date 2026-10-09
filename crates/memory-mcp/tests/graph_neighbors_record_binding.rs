@@ -55,7 +55,7 @@ async fn neighbor_query_plan_is_index_scan_on_edge_in() {
     let plan = plan.to_string();
     // Ruling: the plan tree is asserted as substrings of the serialized value
     // because its exact shape is version-specific; this pair is the
-    // observable index-usage signal (verified on the v3.3.0 image).
+    // observable index-usage signal (verified on the v3.3 image).
     assert!(plan.contains("IndexScan"), "{plan}");
     assert!(plan.contains("edge_in"), "{plan}");
 }

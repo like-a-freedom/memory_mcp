@@ -83,11 +83,16 @@ impl ExplanationService {
         struct ResolvedItem {
             item: ExplainItem,
             episode: Option<crate::models::Episode>,
+            fact_record: crate::storage::RecordLookup,
             entity_links: Vec<String>,
         }
 
         let mut resolved = Vec::with_capacity(request.context_pack.len());
         let mut all_entity_links: HashSet<String> = HashSet::new();
+        // One resolve per distinct id for the whole call: several items routinely
+        // cite the same episode (the seed of a context pack) or the same fact.
+        let mut episode_cache: HashMap<String, Option<crate::models::Episode>> = HashMap::new();
+        let mut fact_cache: HashMap<String, crate::storage::RecordLookup> = HashMap::new();
 
         for item in request.context_pack {
             if item.source_episode.is_empty() {
@@ -101,22 +106,38 @@ impl ExplanationService {
             // episode id that no longer exists. The owner-scoped
             // accessor refuses the cross-kind read; this absorbs
             // the refusal rather than failing the whole pack.
-            let record = match self.find_episode_record(&item.source_episode).await {
-                Ok(record) => record,
-                Err(error) => provenance_lookup_error(error)?,
-            };
-            let episode = record
-                .as_ref()
-                .and_then(crate::memory::record_parsing::episode_from_record);
-
-            let entity_links = if let Some(ref fact_id) = item.fact_id {
-                // Same policy for the fact side: an id that names
-                // another kind contributes no entity links.
-                let fact_record = match self.find_fact_record(fact_id).await {
+            let episode = if let Some(cached) = episode_cache.get(&item.source_episode) {
+                cached.clone()
+            } else {
+                let record = match self.find_episode_record(&item.source_episode).await {
                     Ok(record) => record,
                     Err(error) => provenance_lookup_error(error)?,
                 };
+                let episode = record
+                    .as_ref()
+                    .and_then(crate::memory::record_parsing::episode_from_record);
+                episode_cache.insert(item.source_episode.clone(), episode.clone());
+                episode
+            };
+
+            // The fact record is resolved once and kept for Phase 3, which
+            // needs the same record for its provenance merge.
+            let mut fact_record: crate::storage::RecordLookup = None;
+            let entity_links = if let Some(ref fact_id) = item.fact_id {
+                // Same policy for the fact side: an id that names
+                // another kind contributes no entity links.
+                fact_record = if let Some(cached) = fact_cache.get(fact_id) {
+                    cached.clone()
+                } else {
+                    let record = match self.find_fact_record(fact_id).await {
+                        Ok(record) => record,
+                        Err(error) => provenance_lookup_error(error)?,
+                    };
+                    fact_cache.insert(fact_id.clone(), record.clone());
+                    record
+                };
                 let links = fact_record
+                    .as_ref()
                     .and_then(|r| {
                         r.get("entity_links").and_then(|v| v.as_array()).map(|arr| {
                             arr.iter()
@@ -136,6 +157,7 @@ impl ExplanationService {
             resolved.push(ResolvedItem {
                 item,
                 episode,
+                fact_record,
                 entity_links,
             });
         }
@@ -191,10 +213,7 @@ impl ExplanationService {
             let mut decayed_confidence: Option<f64> = None;
             let mut ingestion_method: Option<String> = None;
 
-            if let Some(fact_id) = &resolved_item.item.fact_id
-                && let Ok(fact_record) = self.find_fact_record(fact_id).await
-                && let Some(record) = &fact_record
-            {
+            if let Some(record) = &resolved_item.fact_record {
                 let prov_value = record.get("provenance").cloned().unwrap_or(Value::Null);
                 let fact_prov = Provenance::from_json_value(&prov_value);
                 if let Some(map) = explain_provenance.as_object_mut() {
@@ -703,6 +722,156 @@ mod tests {
                 .load(std::sync::atomic::Ordering::Relaxed),
             1,
             "one community load per batch, not one per entity"
+        );
+    }
+
+    /// Records every `select_one` id so a test can assert how many times an
+    /// item's episode or fact was fetched.
+    #[derive(Default)]
+    struct LookupCountingDbClient {
+        selected_ids: std::sync::Mutex<Vec<String>>,
+    }
+
+    impl LookupCountingDbClient {
+        fn select_one_count(&self, id: &str) -> usize {
+            self.selected_ids
+                .lock()
+                .expect("lock")
+                .iter()
+                .filter(|seen| seen.as_str() == id)
+                .count()
+        }
+    }
+
+    #[async_trait::async_trait]
+    impl crate::storage::client::DbClient for LookupCountingDbClient {
+        async fn select_one(
+            &self,
+            record_id: &str,
+            _ns: &str,
+        ) -> Result<Option<Value>, MemoryError> {
+            self.selected_ids
+                .lock()
+                .expect("lock")
+                .push(record_id.to_string());
+            if let Some(key) = record_id.strip_prefix("episode:") {
+                Ok(Some(json!({
+                    "episode_id": record_id,
+                    "source_type": "email",
+                    "source_id": format!("src-{key}"),
+                    "content": format!("content {key}"),
+                    "t_ref": "2026-01-01T00:00:00Z",
+                    "t_ingested": "2026-01-01T00:00:00Z",
+                })))
+            } else if record_id.starts_with("fact:") {
+                Ok(Some(json!({
+                    "fact_id": record_id,
+                    "entity_links": [],
+                    "provenance": {},
+                    "t_valid": "2026-01-01T00:00:00Z",
+                    "confidence": 1.0,
+                    "fact_type": "note",
+                })))
+            } else {
+                Ok(None)
+            }
+        }
+
+        async fn select_table(
+            &self,
+            _table: crate::storage::table_scope::OwnedTable,
+            _ns: &str,
+        ) -> Result<Vec<Value>, MemoryError> {
+            Ok(vec![])
+        }
+
+        async fn create(
+            &self,
+            _: &str,
+            _: Value,
+            _: &str,
+            _: &[&str],
+        ) -> Result<Value, MemoryError> {
+            Ok(Value::Null)
+        }
+
+        async fn update(
+            &self,
+            _: &str,
+            _: Value,
+            _: &str,
+            _: &[&str],
+        ) -> Result<Value, MemoryError> {
+            Ok(Value::Null)
+        }
+
+        async fn query(
+            &self,
+            sql: &str,
+            _vars: Option<Value>,
+            _ns: &str,
+        ) -> Result<Value, MemoryError> {
+            if sql.contains("FROM edge") {
+                Ok(Value::Array(Vec::new()))
+            } else {
+                Ok(Value::Null)
+            }
+        }
+
+        async fn apply_migrations(&self, _ns: &str) -> Result<(), MemoryError> {
+            Ok(())
+        }
+    }
+
+    fn explain_item(episode: &str, fact: &str) -> ExplainItem {
+        ExplainItem {
+            fact_id: Some(fact.to_string()),
+            content: "item".to_string(),
+            source_episode: episode.to_string(),
+            ..Default::default()
+        }
+    }
+
+    #[tokio::test]
+    async fn explain_fetches_each_unique_episode_and_fact_once() {
+        let db = Arc::new(LookupCountingDbClient::default());
+        let svc = ExplanationService::new(db.clone(), StdoutLogger::new("warn"), "org".to_string());
+        // Two items share an episode and a fact; a third uses a distinct pair.
+        // Each unique id must be resolved once for the whole call, however many
+        // items reference it.
+        svc.explain(
+            ExplainRequest {
+                context_pack: vec![
+                    explain_item("episode:e1", "fact:f1"),
+                    explain_item("episode:e1", "fact:f1"),
+                    explain_item("episode:e2", "fact:f2"),
+                ],
+                compact: true,
+            },
+            None,
+        )
+        .await
+        .expect("explain");
+
+        assert_eq!(
+            db.select_one_count("episode:e1"),
+            1,
+            "shared episode fetched once"
+        );
+        assert_eq!(
+            db.select_one_count("episode:e2"),
+            1,
+            "distinct episode fetched once"
+        );
+        assert_eq!(
+            db.select_one_count("fact:f1"),
+            1,
+            "shared fact fetched once"
+        );
+        assert_eq!(
+            db.select_one_count("fact:f2"),
+            1,
+            "distinct fact fetched once"
         );
     }
 }

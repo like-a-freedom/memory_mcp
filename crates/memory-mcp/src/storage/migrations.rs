@@ -982,7 +982,12 @@ fn required_schema_fields(table: &str) -> &'static [&'static str] {
 
 fn required_schema_indexes(table: &str) -> &'static [&'static str] {
     match table {
-        "episode" => &["episode_source_id", "episode_project"],
+        "episode" => &[
+            "episode_source_id",
+            "episode_project",
+            "episode_episode_id",
+            "episode_t_ref",
+        ],
         "entity" => &[
             "entity_canonical_name",
             "entity_canonical_name_normalized",
@@ -995,6 +1000,8 @@ fn required_schema_indexes(table: &str) -> &'static [&'static str] {
             "fact_project",
             "fact_project_type",
             "fact_claim_backfill_cursor_idx",
+            "fact_source_episode",
+            "fact_t_valid",
         ],
         "edge" => &[
             "edge_relation",
@@ -1002,6 +1009,7 @@ fn required_schema_indexes(table: &str) -> &'static [&'static str] {
             "edge_out",
             "edge_from_to_idx",
             "edge_temporal_idx",
+            "edge_t_valid",
         ],
         "community" => &["community_summary_search", "community_members"],
         "query_log" => &[

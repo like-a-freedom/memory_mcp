@@ -66,7 +66,7 @@ impl EpisodeContextStore {
     ///
     /// Resolved as three bounded lookups — fact ids from `edge`, then
     /// `source_episode` from `fact`, then the episode rows — rather than one
-    /// query nesting two `IN (subquery)` layers. On SurrealDB 3.3.0 a nested
+    /// query nesting two `IN (subquery)` layers. On SurrealDB 3.3 a nested
     /// `IN` is answered with a table scan of the outer table even when the
     /// inner predicates are indexable, so the single-query shape read whole
     /// tables per call. See the 2026-10-09 query-performance plan, Appendix A.

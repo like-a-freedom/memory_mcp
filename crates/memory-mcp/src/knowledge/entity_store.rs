@@ -46,7 +46,7 @@ impl EntityStoreClient {
     /// matches.
     ///
     /// The query uses `CONTAINSANY` over a one-element array, not `CONTAINS`:
-    /// on SurrealDB 3.3.0 `CONTAINS` is never served by an index, while
+    /// on SurrealDB 3.3 `CONTAINS` is never served by an index, while
     /// `CONTAINSANY` is served by the `entity_aliases` array-element index
     /// (`FIELDS aliases.*`). See `build_select_entity_by_alias_query`.
     pub(crate) async fn find_entity_id_by_alias(
