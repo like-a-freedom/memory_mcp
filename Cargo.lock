@@ -2732,6 +2732,7 @@ dependencies = [
  "criterion",
  "csv",
  "hex",
+ "libc",
  "memory_mcp",
  "reqwest 0.13.5",
  "serde",
