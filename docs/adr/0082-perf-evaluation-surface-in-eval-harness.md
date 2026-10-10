@@ -48,7 +48,7 @@ read by a reader that knows v2.
 ### Pinned-host gate policy
 
 Absolute-value regression gates only apply between artifacts produced on the
-same host tag. `host_tag != baseline.host_tag` → `Invalid("host tag
+same host tag. `host_tag != baseline.host_tag` → `Invalid("host_tag
 mismatch")`, never a best-effort comparison; a differing measured `os`/`arch`
 fingerprint is `Invalid("host platform mismatch")` (ADR-0034: PR runners may
 check gross timeouts and integrity, never absolute latency). CI wiring: the PR
@@ -116,7 +116,10 @@ It writes `target/perf/perf-weekly.json`, uploads it with `if: always()`,
 and compares against the committed
 `evals/perf/baselines/perf-weekly-dev-m2.json`. The setup action is
 deliberately skipped: the pinned runner provides its own toolchain
-(`rust-toolchain.toml` pins the channel) and builds natively.
+(`rust-toolchain.toml` pins the channel) and builds natively. Runner
+provisioning must register the runner with the label `perf-dev-m2`
+(`actions-runner --labels perf-dev-m2`) before the variable is set —
+otherwise the job only queues with no eligible runner.
 
 `host_tag` is operator-asserted — the harness cannot measure the machine's
 identity — so the control is layered: the CLI rejects a `--host-tag` that

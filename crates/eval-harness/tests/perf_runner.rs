@@ -1,4 +1,5 @@
 use eval_harness::perf::artifact::{self, sha256_hex};
+use eval_harness::perf::db_observer::MAX_TEMPLATES;
 use eval_harness::perf::domain::ARTIFACT_SCHEMA;
 use eval_harness::perf::profile::{DriverKind, PerfProfile, ScenarioId, ScenarioSpec, load};
 use eval_harness::perf::runner::{RunOptions, run_profile};
@@ -161,7 +162,7 @@ async fn runner_catalog_does_not_fragment_record_ids() {
     );
     assert!(
         !record.sql.iter().any(|t| t.template_hash == "(overflow)"),
-        "record-id fragmentation would overflow the 64-template cap: {:?}",
+        "record-id fragmentation would overflow the {MAX_TEMPLATES}-template cap: {:?}",
         record
             .sql
             .iter()
@@ -169,7 +170,7 @@ async fn runner_catalog_does_not_fragment_record_ids() {
             .collect::<Vec<_>>()
     );
     assert!(
-        record.sql.len() < 64,
+        record.sql.len() < MAX_TEMPLATES,
         "distinct templates stay under the cap: {}",
         record.sql.len()
     );

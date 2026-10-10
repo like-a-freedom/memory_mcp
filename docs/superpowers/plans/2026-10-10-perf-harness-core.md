@@ -362,7 +362,7 @@ CLI: memory-perf run --profile <p> --artifact <a> [--baseline <b>] [--update-bas
 - Create: `evals/perf/baselines/perf-weekly-<host_tag>.json`, `evals/perf/results/README.md`
 - Modify: `docs/evals/README.md`, `docs/performance/` — создать `PERF_HARNESS.md` (короткий runbook)
 
-- [ ] **Step 1:** На заявленной pinned-машине: `cargo run -p eval-harness --bin memory-perf --locked -- run --profile evals/perf/profiles/perf-weekly.json --artifact target/perf/weekly.json --host-tag dev-m2 --update-baseline evals/perf/baselines/perf-weekly-dev-m2.json`.
+- [ ] **Step 1:** На заявленной pinned-машине: зарегистрировать runner с label `perf-dev-m2` (`actions-runner --labels perf-dev-m2`) до выставления repo-переменной; затем `cargo run -p eval-harness --bin memory-perf --locked -- run --profile evals/perf/profiles/perf-weekly.json --artifact target/perf/weekly.json --host-tag dev-m2 --update-baseline evals/perf/baselines/perf-weekly-dev-m2.json`.
 - [ ] **Step 2:** Проверить baseline-артефакт глазами (перцентили непустые, SQL-каталог содержит `EpisodeWrite`/`AnnSearch`/`FactWrite`, resources Some) — это human-gate, не автоматический тест (ADR-0073).
 - [ ] **Step 3:** Закоммитить baseline + положить полный weekly.json в `evals/perf/results/2026-10-XX/` (полный размер выборок — в `target/`, в git — артефакт целиком: выборки cap не введён в v1).
 - [ ] **Step 4:** Runbook `docs/performance/PERF_HARNESS.md`: команды, host_tag-политика, конвенция «обе цифры RSS (ps + footprint)», где читать SQL-каталог, как обновлять baseline (только с dated rationale, по образцу BASELINE_REVIEW). `docs/evals/README.md`: одна строка-секция Perf + ссылка.
