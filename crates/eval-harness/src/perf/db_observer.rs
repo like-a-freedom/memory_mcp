@@ -1,4 +1,4 @@
-//! harness-side SQL template ledger
+//! SQL template ledger: bounded observation, normalization, classification.
 
 use std::collections::BTreeMap;
 use std::sync::{Arc, Mutex};
@@ -211,15 +211,43 @@ impl QueryObserver for QueryLedger {
     }
 }
 
-/// SQL → `(template, template_hash)`: literals → `?`, numbers → `#`,
-/// whitespace collapsed. Literals are replaced before numbers so digits
-/// inside a literal never leak into the template.
+/// SQL → `(template, template_hash)`: string literals → `?`, record ids and
+/// other hex runs of 8+ characters → `#`, remaining digit runs → `#`,
+/// whitespace collapsed. Literals are replaced first so digits inside a
+/// literal never leak; hex runs collapse next so content-addressed record
+/// ids (`episode:<sha256>`, `edge:<hex>`) cannot fragment one statement
+/// shape into a template per record and swallow the cap.
 pub fn normalize_sql(sql: &str) -> (String, String) {
     let no_literals = replace_literals(sql);
-    let no_numbers = replace_digits(&no_literals);
+    let no_ids = replace_hex_runs(&no_literals);
+    let no_numbers = replace_digits(&no_ids);
     let template = no_numbers.split_whitespace().collect::<Vec<_>>().join(" ");
     let hash = sha256_hex(template.as_bytes());
     (template, hash[..16].to_owned())
+}
+
+fn replace_hex_runs(s: &str) -> String {
+    fn flush(run: &mut String, out: &mut String) {
+        if run.len() >= 8 {
+            out.push('#');
+        } else {
+            out.push_str(run);
+        }
+        run.clear();
+    }
+
+    let mut out = String::with_capacity(s.len());
+    let mut run = String::new();
+    for c in s.chars() {
+        if c.is_ascii_hexdigit() {
+            run.push(c);
+        } else {
+            flush(&mut run, &mut out);
+            out.push(c);
+        }
+    }
+    flush(&mut run, &mut out);
+    out
 }
 
 fn replace_literals(sql: &str) -> String {
@@ -300,6 +328,19 @@ mod tests {
         assert_eq!(t1, "CREATE episode:# SET note = ?");
         assert_eq!(t1, t2);
         assert_eq!(h1, h2);
+    }
+
+    #[test]
+    fn record_ids_collapse_into_one_template() {
+        let (t1, h1) = normalize_sql("CREATE episode:f39a8c21b0e4d5a6c7b8e9f0 SET content = 'x'");
+        let (t2, h2) = normalize_sql("CREATE episode:0123456789abcdef01234567 SET content = 'y'");
+        assert_eq!(t1, "CREATE episode:# SET content = ?");
+        assert_eq!(t1, t2);
+        assert_eq!(h1, h2);
+        let (edge1, _) = normalize_sql("SELECT * FROM edge WHERE in = edge:deadbeefcafe0123");
+        let (edge2, _) = normalize_sql("SELECT * FROM edge WHERE in = edge:0000111122223333");
+        assert_eq!(edge1, "SELECT * FROM edge WHERE in = edge:#");
+        assert_eq!(edge1, edge2);
     }
 
     #[test]

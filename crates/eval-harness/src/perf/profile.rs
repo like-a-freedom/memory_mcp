@@ -134,12 +134,9 @@ fn validate(profile: &PerfProfile) -> Result<(), PerfError> {
     }
     for spec in &profile.scenarios {
         if !matches!(spec.driver, DriverKind::InProcess) {
-            let name = match spec.driver {
-                DriverKind::Stdio => "stdio",
-                DriverKind::Http => "http",
-                DriverKind::InProcess => unreachable!(),
-            };
-            return Err(PerfError::UnsupportedDriver(name.to_owned()));
+            return Err(PerfError::UnsupportedDriver(
+                driver_name(spec.driver).to_owned(),
+            ));
         }
         if spec.scales.is_empty() {
             return Err(PerfError::Validation(format!(
@@ -159,6 +156,12 @@ fn validate(profile: &PerfProfile) -> Result<(), PerfError> {
                 spec.id.as_str()
             )));
         }
+        if spec.id == ScenarioId::AssembleScale && spec.queries.unwrap_or(0) == 0 {
+            return Err(PerfError::Validation(format!(
+                "scenario {}: queries must be greater than zero",
+                spec.id.as_str()
+            )));
+        }
     }
     for gate in &profile.gates {
         if !gate.max_ratio.is_finite() || gate.max_ratio <= 0.0 {
@@ -167,15 +170,33 @@ fn validate(profile: &PerfProfile) -> Result<(), PerfError> {
                 gate.scenario.as_str()
             )));
         }
+        if !profile
+            .scenarios
+            .iter()
+            .any(|spec| spec.id == gate.scenario)
+        {
+            return Err(PerfError::Validation(format!(
+                "gate {}: scenario {} is not in this profile",
+                gate.scenario.as_str(),
+                gate.scenario.as_str()
+            )));
+        }
     }
     Ok(())
+}
+
+fn driver_name(driver: DriverKind) -> &'static str {
+    match driver {
+        DriverKind::InProcess => "in_process",
+        DriverKind::Stdio => "stdio",
+        DriverKind::Http => "http",
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::perf::PerfError;
-    use std::io::Write;
 
     const HAPPY: &str = r#"{
         "schema": "memory-mcp-perf-profile/v1",
@@ -204,18 +225,20 @@ mod tests {
         ]
     }"#;
 
-    fn write_temp(content: &str) -> std::path::PathBuf {
+    /// Writes `content` to a temp profile file and returns the directory
+    /// guard together with the path, so callers must hold `_dir` while the
+    /// file is read — no `mem::forget`, no leaked directories.
+    fn write_temp(content: &str) -> (tempfile::TempDir, std::path::PathBuf) {
         let dir = tempfile::tempdir().expect("tempdir");
         let path = dir.path().join("profile.json");
-        let mut file = std::fs::File::create(&path).expect("create");
-        file.write_all(content.as_bytes()).expect("write");
-        std::mem::forget(dir);
-        path
+        std::fs::write(&path, content).expect("write");
+        (dir, path)
     }
 
     #[test]
     fn happy_path_reads_all_fields() {
-        let profile = load(&write_temp(HAPPY)).expect("happy path loads");
+        let (_dir, path) = write_temp(HAPPY);
+        let profile = load(&path).expect("happy path loads");
         assert_eq!(profile.name, "pr-smoke");
         assert_eq!(profile.budget_seconds, 300);
         assert_eq!(profile.host_tag, "dev-m2");
@@ -238,14 +261,16 @@ mod tests {
     #[test]
     fn unknown_schema_version_is_schema_error() {
         let content = HAPPY.replace("memory-mcp-perf-profile/v1", "memory-mcp-perf-profile/v2");
-        let err = load(&write_temp(&content)).expect_err("v2 must not load");
+        let (_dir, path) = write_temp(&content);
+        let err = load(&path).expect_err("v2 must not load");
         assert!(matches!(err, PerfError::Schema(_)), "got {err:?}");
     }
 
     #[test]
     fn stdio_driver_is_unsupported() {
         let content = HAPPY.replace("in_process", "stdio");
-        let err = load(&write_temp(&content)).expect_err("stdio rejected");
+        let (_dir, path) = write_temp(&content);
+        let err = load(&path).expect_err("stdio rejected");
         assert!(
             matches!(&err, PerfError::UnsupportedDriver(d) if d == "stdio"),
             "got {err:?}"
@@ -255,35 +280,71 @@ mod tests {
     #[test]
     fn zero_budget_seconds_is_validation_error() {
         let content = HAPPY.replace("\"budget_seconds\": 300", "\"budget_seconds\": 0");
-        let err = load(&write_temp(&content)).expect_err("zero budget rejected");
+        let (_dir, path) = write_temp(&content);
+        let err = load(&path).expect_err("zero budget rejected");
         assert!(matches!(err, PerfError::Validation(_)), "got {err:?}");
     }
 
     #[test]
     fn empty_scales_are_validation_error() {
         let content = HAPPY.replace("\"scales\": [10]", "\"scales\": []");
-        let err = load(&write_temp(&content)).expect_err("empty scales rejected");
+        let (_dir, path) = write_temp(&content);
+        let err = load(&path).expect_err("empty scales rejected");
         assert!(matches!(err, PerfError::Validation(_)), "got {err:?}");
     }
 
     #[test]
     fn non_monotonic_scales_are_validation_error() {
         let content = HAPPY.replace("\"scales\": [10]", "\"scales\": [100, 10]");
-        let err = load(&write_temp(&content)).expect_err("descending scales rejected");
+        let (_dir, path) = write_temp(&content);
+        let err = load(&path).expect_err("descending scales rejected");
         assert!(matches!(err, PerfError::Validation(_)), "got {err:?}");
     }
 
     #[test]
     fn unknown_scenario_id_is_validation_error() {
         let content = HAPPY.replace("ingest-scale", "quantum-flux");
-        let err = load(&write_temp(&content)).expect_err("unknown id rejected");
+        let (_dir, path) = write_temp(&content);
+        let err = load(&path).expect_err("unknown id rejected");
         assert!(matches!(err, PerfError::Validation(_)), "got {err:?}");
     }
 
     #[test]
     fn gate_direction_defaults_to_lower_is_better() {
         let content = HAPPY.replace(",\n                \"direction\": \"higher_is_better\"", "");
-        let profile = load(&write_temp(&content)).expect("loads without direction");
+        let (_dir, path) = write_temp(&content);
+        let profile = load(&path).expect("loads without direction");
         assert_eq!(profile.gates[0].direction, GateDirection::LowerIsBetter);
+    }
+
+    #[test]
+    fn assemble_scale_requires_queries() {
+        let content = HAPPY
+            .replace("\"id\": \"ingest-scale\"", "\"id\": \"assemble-scale\"")
+            .replace(
+                "\"scenario\": \"ingest-scale\"",
+                "\"scenario\": \"assemble-scale\"",
+            )
+            .replace("\"queries\": 5", "\"queries\": 0");
+        let (_dir, path) = write_temp(&content);
+        let err = load(&path).expect_err("assemble-scale needs queries");
+        assert!(
+            matches!(&err, PerfError::Validation(m) if m.contains("queries")),
+            "got {err:?}"
+        );
+    }
+
+    #[test]
+    fn gate_scenario_must_exist_in_profile() {
+        let content = HAPPY.replace(
+            "\"scenario\": \"ingest-scale\"",
+            "\"scenario\": \"assemble-scale\"",
+        );
+        let (_dir, path) = write_temp(&content);
+        let err = load(&path).expect_err("gate scenario must be present");
+        assert!(
+            matches!(&err, PerfError::Validation(m) if m.contains("gate")),
+            "got {err:?}"
+        );
     }
 }

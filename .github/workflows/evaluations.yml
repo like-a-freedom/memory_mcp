@@ -42,17 +42,6 @@ jobs:
     - name: Record NER fixture prerequisite
       if: vars.MEMORY_NER_FIXTURES_PROVISIONED != 'true'
       run: echo 'NER quality not executed; run make eval-ner-quality on a host with the pinned model fixtures.' >> "$GITHUB_STEP_SUMMARY"
-    - name: Run weekly perf profile
-      # Guarded by the pinned-host variable: gates compare against the
-      # committed dev-m2 baseline, so an unpinned host would only report
-      # host_tag mismatches as Invalid noise (ADR-0082).
-      if: vars.MEMORY_PERF_PINNED_HOST == 'true'
-      run: |
-        cargo run -p eval-harness --bin memory-perf --locked -- run \
-          --profile evals/perf/profiles/perf-weekly.json \
-          --artifact uploads/perf-weekly.json \
-          --baseline evals/perf/baselines/perf-weekly-dev-m2.json \
-          --host-tag dev-m2
     - name: Upload nightly artifact
       if: always()
       uses: actions/upload-artifact@v7
@@ -60,6 +49,36 @@ jobs:
         name: eval-nightly-artifact
         path: target/evals/*.json
         retention-days: 30
+
+  perf-weekly:
+    name: Weekly perf profile
+    # Pinned-host control (ADR-0082): skipped until the repo variable is set,
+    # and when set it runs only on the self-hosted machine whose identity the
+    # committed baseline was recorded from — never on a GitHub-hosted runner.
+    if: vars.MEMORY_PERF_PINNED_HOST == 'true'
+    runs-on: self-hosted
+    timeout-minutes: 60
+    # No setup action: the pinned runner provides its own toolchain (the
+    # workspace rust-toolchain.toml pins the channel), and a native build
+    # needs neither a target triple nor the cross-compile environment.
+    steps:
+    - uses: actions/checkout@v7.0.1
+    - name: Run weekly perf profile
+      run: |
+        cargo run -p eval-harness --bin memory-perf --locked -- run \
+          --profile evals/perf/profiles/perf-weekly.json \
+          --artifact target/perf/perf-weekly.json \
+          --baseline evals/perf/baselines/perf-weekly-dev-m2.json \
+          --host-tag dev-m2
+    - name: Upload perf artifacts
+      if: always()
+      uses: actions/upload-artifact@v7
+      with:
+        name: perf-weekly
+        path: target/perf/*.json
+        if-no-files-found: warn
+        retention-days: 30
+
   benchmark-nightly:
     name: CPU benchmark profiles
     runs-on: ubuntu-latest

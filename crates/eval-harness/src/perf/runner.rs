@@ -33,6 +33,9 @@ static ENV_LOCK: Mutex<()> = Mutex::new(());
 
 /// Applies the profile `env` map before any worker thread exists.
 ///
+/// Console output (`eprintln!`) is deliberate here: this runs during process
+/// setup, before `logging::install()`, so the harness prints directly.
+///
 /// # Safety
 ///
 /// `std::env::set_var` is unsafe in edition 2024: mutating the process
@@ -163,12 +166,16 @@ async fn run_scenario(spec: &ScenarioSpec, scale: u32) -> (String, ScenarioRecor
     let total = spec.warmup.saturating_add(spec.iterations);
     for iteration in 0..total {
         let evidence = run.run(&env, iteration).await;
+        // Warm-up latencies are discarded, but their failures are evidence
+        // health too — invalid reasons cover the whole scenario.
         invalid_reasons.extend(evidence.invalid_reasons);
         if iteration >= spec.warmup {
             samples.extend(evidence.latencies_us);
         }
     }
     let after = env.sampler.sample();
+    // The ledger snapshot intentionally spans warm-up and fixture SQL: the
+    // catalog describes what the scenario executed, not just what it timed.
     let sql = env.ledger.snapshot();
 
     let resources = match (before, after) {

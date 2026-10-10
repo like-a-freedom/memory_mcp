@@ -79,6 +79,17 @@ fn execute(cli: Cli) -> i32 {
             return 2;
         }
     };
+    // `host_tag` is operator-asserted, not measured: the cross-check keeps a
+    // run from recording a machine identity the profile was not written for
+    // (ADR-0082, pinned-host control).
+    if perf_profile.host_tag != host_tag {
+        eprintln!(
+            "error: --host-tag {host_tag} does not match profile host_tag {} (profile {})",
+            perf_profile.host_tag,
+            profile_path.display()
+        );
+        return 2;
+    }
     let digest = match std::fs::read(&profile_path) {
         Ok(bytes) => artifact::sha256_hex(&bytes),
         Err(err) => {

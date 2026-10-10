@@ -1,6 +1,6 @@
 //! In-process scenario execution: one capability call per measurement.
 //!
-//! `run()` performs exactly one iteration; the runner (Task 9) decides which
+//! `run()` performs exactly one iteration; the runner decides which
 //! iterations are warm-up (discarded) and which are recorded. Scenarios never
 //! exclude warm-up themselves.
 

@@ -52,6 +52,9 @@ pub fn throughput_eps(total_us: u64, episodes: u32) -> Option<f64> {
 
 /// log2-log2 least-squares slope of value vs scale; fewer than 3 points, or
 /// any non-positive coordinate, has no exponent.
+///
+/// Reserved for external trend tooling: v1 gates compare against a baseline
+/// artifact and do not consume exponents yet.
 pub fn scaling_exponent(points: &[(f64, f64)]) -> Option<f64> {
     if points.len() < 3 {
         return None;
@@ -96,6 +99,9 @@ pub fn latency_key(scenario: &str, stat: GateMetric) -> String {
 }
 
 /// Artifact key for a SQL class aggregate: `"sql.{class}"`.
+///
+/// Reserved for gate metrics over SQL classes; v1 verdicts do not key on it
+/// yet, but the key shape is fixed here so tooling can rely on it.
 pub fn sql_key(class: &str) -> String {
     format!("sql.{class}")
 }

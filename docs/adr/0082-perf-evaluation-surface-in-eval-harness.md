@@ -102,9 +102,21 @@ mismatches are `Invalid`, never an optimistic default.
 `make perf-smoke` runs the `perf-pr-smoke` profile with host tag
 `MEMORY_PERF_HOST_TAG` (default `local`) and is the `quality` job's perf step
 in `ci.yml`; the workflow uploads `target/perf/*.json` with `if: always()`.
-The weekly `perf-weekly` run lives in `evaluations.yml` behind the repository
-variable `MEMORY_PERF_PINNED_HOST == 'true'`: its gates compare against the
-committed `evals/perf/baselines/perf-weekly-dev-m2.json`, so it only produces
-signal on the host whose tag matches the baseline — any other host would
-report a `host_tag` mismatch as `Invalid`. The variable stays unset until the
-baseline is committed.
+
+The weekly run is a dedicated `perf-weekly` job in `evaluations.yml`, not a
+step inside the nightly evaluation job: absolute latency is never measured
+on a GitHub-hosted runner. The job is gated twice — the repository variable
+`MEMORY_PERF_PINNED_HOST == 'true'` (unset until the baseline is committed
+and the runner is provisioned) and `runs-on: self-hosted`. It writes
+`target/perf/perf-weekly.json`, uploads it with `if: always()`, and compares
+against the committed `evals/perf/baselines/perf-weekly-dev-m2.json`. The
+setup action is deliberately skipped: the pinned runner provides its own
+toolchain (`rust-toolchain.toml` pins the channel) and builds natively.
+
+`host_tag` is operator-asserted — the harness cannot measure the machine's
+identity — so the control is layered: the CLI rejects a `--host-tag` that
+does not match the profile's `host_tag` (a run cannot claim a machine the
+profile was not written for), the artifact/baseline `host_tag` mismatch
+turns every gate `Invalid`, and the job itself only ever executes on the
+pinned self-hosted runner behind the variable. The variable stays unset
+until the baseline is committed.

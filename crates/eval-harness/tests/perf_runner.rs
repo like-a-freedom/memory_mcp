@@ -61,6 +61,18 @@ async fn runner_writes_artifact_with_recorded_latency_and_passes() {
         "warmup iteration discarded; one recorded iteration at scale 2 = 2 ingests"
     );
     assert!(written.duration_ms > 0, "run took measurable time");
+    let classes: std::collections::BTreeSet<&str> =
+        record.sql.iter().map(|t| t.class.as_str()).collect();
+    for expected in ["EpisodeWrite", "ProvenanceRead"] {
+        assert!(
+            classes.contains(expected),
+            "SQL catalog must record {expected}, got {classes:?}"
+        );
+    }
+    assert!(
+        !record.sql.iter().any(|t| t.template_hash == "(overflow)"),
+        "scale-2 catalog must stay under the template cap"
+    );
     assert!(
         matches!(outcome.verdict, PerfVerdict::Passed),
         "no baseline means gates are skipped: {:?}",

@@ -2,8 +2,10 @@
   "schema": "memory-mcp-perf-profile/v1",
   "name": "tiny",
   "budget_seconds": 60,
-  "host_tag": "test",
-  "env": {},
+  "host_tag": "cli-test",
+  "env": {
+    "NER_EXTRACTOR": "regex"
+  },
   "scenarios": [
     {
       "id": "ingest-scale",
@@ -61,5 +63,13 @@
       "warmup": 0
     }
   ],
-  "gates": []
+  "gates": [
+    {
+      "scenario": "ingest-scale",
+      "metric": "p95_us",
+      "max_ratio": 1.25,
+      "min_samples": 1,
+      "direction": "lower_is_better"
+    }
+  ]
 }

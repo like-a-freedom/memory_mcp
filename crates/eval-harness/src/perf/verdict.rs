@@ -1,7 +1,7 @@
-//! Regression verdict vs baseline
+//! Regression verdict vs baseline.
 //!
-//! Task 9 wires the runner-level verdict (budget, evidence health); baseline
-//! gate evaluation arrives in Task 10.
+//! The runner merges its own failure reasons (budget, evidence health) with
+//! this gate evaluation; see `runner::run_profile` for the merge order.
 
 use super::artifact::PerfArtifact;
 use super::domain::ScenarioRecord;
