@@ -96,3 +96,15 @@ Semantics mirror the quality runner: the artifact is always written; the exit
 code comes from the verdict — `passed → 0`, `regressed → 1`, `invalid → 2`.
 Empty sample sets, a required-but-unavailable sampler, and host/schema
 mismatches are `Invalid`, never an optimistic default.
+
+### CI wiring and the pinned-host variable
+
+`make perf-smoke` runs the `perf-pr-smoke` profile with host tag
+`MEMORY_PERF_HOST_TAG` (default `local`) and is the `quality` job's perf step
+in `ci.yml`; the workflow uploads `target/perf/*.json` with `if: always()`.
+The weekly `perf-weekly` run lives in `evaluations.yml` behind the repository
+variable `MEMORY_PERF_PINNED_HOST == 'true'`: its gates compare against the
+committed `evals/perf/baselines/perf-weekly-dev-m2.json`, so it only produces
+signal on the host whose tag matches the baseline — any other host would
+report a `host_tag` mismatch as `Invalid`. The variable stays unset until the
+baseline is committed.

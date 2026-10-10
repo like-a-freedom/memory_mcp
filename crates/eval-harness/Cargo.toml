@@ -14,6 +14,10 @@ path = "src/lib.rs"
 name = "memory-eval"
 path = "src/main.rs"
 
+[[bin]]
+name = "memory-perf"
+path = "src/perf_main.rs"
+
 [dependencies]
 memory_mcp = { path = "../memory-mcp", features = ["eval-support"] }
 async-trait.workspace = true

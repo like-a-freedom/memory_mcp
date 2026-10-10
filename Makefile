@@ -10,8 +10,12 @@
 #     variable is PRESENT, while `ner_metal` requires the literal value "1". A
 #     Metal CI job that sets any other truthy value silently skips. Always 1.
 #
+#   MEMORY_PERF_HOST_TAG      Host tag for `perf-smoke` (default local).
+#     A pinned-baseline workflow overrides it to the baseline's host_tag.
+#
 # Invoked by a workflow:
 #
+#   perf-smoke           ci.yml `quality` (the pr-smoke perf profile)
 #   eval-response-size   ci.yml `quality`, evaluations.yml
 #   eval-ner-quality     evaluations.yml
 #   bench-check          evaluations.yml (compiles every bench target)
@@ -31,7 +35,16 @@
 #   cargo run -p eval-harness --bin memory-eval -- run \
 #     --profile evals/profiles/<name>.json --artifact target/evals/<name>.json
 
-.PHONY: eval-response-size eval-ner-quality bench-check bench-cpu bench-cpu-core bench-metal
+MEMORY_PERF_HOST_TAG ?= local
+
+.PHONY: perf-smoke eval-response-size eval-ner-quality bench-check bench-cpu bench-cpu-core bench-metal
+
+perf-smoke:
+	@mkdir -p target/perf
+	cargo run -p eval-harness --bin memory-perf --locked -- run \
+		--profile evals/perf/profiles/perf-pr-smoke.json \
+		--artifact target/perf/pr-smoke.json \
+		--host-tag $(MEMORY_PERF_HOST_TAG)
 
 eval-response-size:
 	@mkdir -p target/evals

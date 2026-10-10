@@ -1,0 +1,40 @@
+{
+  "schema": "memory-mcp-perf-profile/v1",
+  "name": "perf-weekly",
+  "budget_seconds": 1800,
+  "host_tag": "dev-m2",
+  "env": {},
+  "scenarios": [
+    {
+      "id": "ingest-scale",
+      "driver": "in_process",
+      "scales": [10, 100],
+      "iterations": 3,
+      "warmup": 1
+    },
+    {
+      "id": "assemble-scale",
+      "driver": "in_process",
+      "scales": [10, 100],
+      "iterations": 3,
+      "warmup": 1,
+      "queries": 5
+    }
+  ],
+  "gates": [
+    {
+      "scenario": "assemble-scale",
+      "metric": "p95_us",
+      "max_ratio": 1.25,
+      "min_samples": 5,
+      "direction": "lower_is_better"
+    },
+    {
+      "scenario": "ingest-scale",
+      "metric": "throughput_eps",
+      "max_ratio": 1.25,
+      "min_samples": 5,
+      "direction": "higher_is_better"
+    }
+  ]
+}

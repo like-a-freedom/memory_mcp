@@ -231,7 +231,12 @@ async fn corpus_fixture(
     let mut fact_ids = Vec::new();
     for i in 0..scale {
         let source_id = format!("perf-fixture-{}-{}-{}", scenario.as_str(), scale, i);
-        let content = format!("Perf fixture {i}: Alice from Berlin founded Acme Corp with Bob.");
+        // Fact heuristics (metric/promise), not NER, produce the fact ids that
+        // explain/invalidate need; entity-only prose yields an empty corpus.
+        let content = format!(
+            "Perf fixture {i}: ARR grew to ${}M. I will send the update by Friday.",
+            3 + i
+        );
         let episode_id = ingest_one(env, source_id, content, fixture_t_ref()).await?;
         episode_ids.push(episode_id);
     }

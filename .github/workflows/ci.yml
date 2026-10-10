@@ -119,11 +119,18 @@ jobs:
           mkdir -p target/evals
           cargo run -p eval-harness --bin memory-eval --locked -- run --profile "evals/profiles/$EVAL_PROFILE.json" --artifact "target/evals/$EVAL_PROFILE.json" --baseline "evals/baselines/one-active-namespace-$EVAL_PROFILE.json"
           make eval-response-size
+      - name: Perf smoke
+        run: make perf-smoke
       - uses: actions/upload-artifact@v7
         if: always()
         with:
           name: evaluation
           path: target/evals/*.json
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: perf-smoke
+          path: target/perf/*.json
 
   native:
     needs: quality

@@ -2,6 +2,7 @@
 
 use std::collections::BTreeMap;
 use std::path::PathBuf;
+use std::sync::Mutex;
 use std::time::{Duration, Instant};
 
 use super::artifact::{self, PerfArtifact};
@@ -25,6 +26,45 @@ pub struct RunOptions {
 pub struct RunOutcome {
     pub artifact: PerfArtifact,
     pub verdict: PerfVerdict,
+}
+
+/// Serializes profile env application within one process.
+static ENV_LOCK: Mutex<()> = Mutex::new(());
+
+/// Applies the profile `env` map before any worker thread exists.
+///
+/// # Safety
+///
+/// `std::env::set_var` is unsafe in edition 2024: mutating the process
+/// environment while another thread reads it is undefined behavior. The
+/// `memory-perf` process calls this while still single-threaded — after
+/// argument parsing and before the tokio runtime spawns its thread pool —
+/// so no other thread can race the mutation, and the map is applied before
+/// the first `PerfEnv::connect()` reads NER configuration. `ENV_LOCK`
+/// serializes repeated application within one process. Callers violate this
+/// contract if they call `apply_env` from a multithreaded context, which is
+/// why `run_profile` itself never touches the environment.
+pub fn apply_env(vars: &BTreeMap<String, String>) {
+    if vars.is_empty() {
+        return;
+    }
+    let _guard = ENV_LOCK
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner());
+    for (key, value) in vars {
+        match std::env::var(key) {
+            Ok(existing) if existing != *value => {
+                eprintln!(
+                    "WARN: perf env {key}: overriding shell value '{existing}' with profile \
+                     value '{value}' — the profile wins so runs stay reproducible"
+                );
+            }
+            Ok(_) => {}
+            Err(_) => eprintln!("perf env: {key}={value} (set before first thread pool)"),
+        }
+        // SAFETY: see the caller contract above — single-threaded phase.
+        unsafe { std::env::set_var(key, value) };
+    }
 }
 
 /// Runs every scenario of `profile` in profile order (determinism), discards

@@ -1,0 +1,65 @@
+{
+  "schema": "memory-mcp-perf-profile/v1",
+  "name": "tiny",
+  "budget_seconds": 60,
+  "host_tag": "test",
+  "env": {},
+  "scenarios": [
+    {
+      "id": "ingest-scale",
+      "driver": "in_process",
+      "scales": [
+        2
+      ],
+      "iterations": 1,
+      "warmup": 0
+    },
+    {
+      "id": "assemble-scale",
+      "driver": "in_process",
+      "scales": [
+        2
+      ],
+      "iterations": 1,
+      "warmup": 0,
+      "queries": 2
+    },
+    {
+      "id": "latency-extract",
+      "driver": "in_process",
+      "scales": [
+        2
+      ],
+      "iterations": 1,
+      "warmup": 0
+    },
+    {
+      "id": "latency-resolve",
+      "driver": "in_process",
+      "scales": [
+        2
+      ],
+      "iterations": 1,
+      "warmup": 0
+    },
+    {
+      "id": "latency-explain",
+      "driver": "in_process",
+      "scales": [
+        2
+      ],
+      "iterations": 1,
+      "warmup": 0
+    },
+    {
+      "id": "latency-invalidate",
+      "driver": "in_process",
+      "scales": [
+        2
+      ],
+      "iterations": 1,
+      "warmup": 0
+    }
+  ],
+  "gates": []
+}
