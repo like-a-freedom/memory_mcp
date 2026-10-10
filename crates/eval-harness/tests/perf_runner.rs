@@ -112,3 +112,65 @@ async fn exhausted_budget_writes_artifact_and_invalid_verdict() {
         other => panic!("expected Invalid, got {other:?}"),
     }
 }
+
+const EXTRACT_PROFILE_JSON: &str = r#"{
+  "schema": "memory-mcp-perf-profile/v1",
+  "name": "runner-catalog-test",
+  "budget_seconds": 60,
+  "host_tag": "test",
+  "scenarios": [
+    {
+      "id": "latency-extract",
+      "driver": "in_process",
+      "scales": [2],
+      "iterations": 1,
+      "warmup": 1
+    }
+  ]
+}"#;
+
+/// Runner-level regression guard for record-id fragmentation: the extract
+/// pipeline writes content-sha record ids inline, and before hex
+/// normalization every statement shape went unique — 64 templates plus one
+/// `(overflow)` row at scale 2. The normalizer unit test pins the formula;
+/// this pins the observed catalog.
+#[tokio::test]
+async fn runner_catalog_does_not_fragment_record_ids() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let profile_path = dir.path().join("profile.json");
+    std::fs::write(&profile_path, EXTRACT_PROFILE_JSON).expect("write profile");
+    let profile = load(&profile_path).expect("valid profile");
+
+    let opts = options(dir.path(), "artifact.json");
+    let artifact_path = opts.artifact_path.clone();
+    let outcome = run_profile(&profile, "catalog-digest", opts).await;
+    assert!(
+        matches!(outcome.verdict, PerfVerdict::Passed),
+        "run must be healthy: {:?}",
+        outcome.verdict
+    );
+
+    let written = artifact::read(&artifact_path).expect("artifact is readable");
+    let record = written
+        .scenarios
+        .get("latency-extract-2")
+        .expect("extract scenario record");
+    assert!(
+        record.sql.iter().any(|t| t.class == "FactWrite"),
+        "extract must record FactWrite in the catalog"
+    );
+    assert!(
+        !record.sql.iter().any(|t| t.template_hash == "(overflow)"),
+        "record-id fragmentation would overflow the 64-template cap: {:?}",
+        record
+            .sql
+            .iter()
+            .map(|t| &t.template_hash)
+            .collect::<Vec<_>>()
+    );
+    assert!(
+        record.sql.len() < 64,
+        "distinct templates stay under the cap: {}",
+        record.sql.len()
+    );
+}

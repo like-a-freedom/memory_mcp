@@ -45,6 +45,14 @@ pub fn evaluate(
             baseline.host.host_tag, artifact.host.host_tag
         )]);
     }
+    // The tag is operator-asserted; the platform fingerprint is measured, so
+    // a tag agreeing across different machines still fails here.
+    if baseline.host.os != artifact.host.os || baseline.host.arch != artifact.host.arch {
+        return PerfVerdict::Invalid(vec![format!(
+            "host platform mismatch: baseline {}/{} != current {}/{}",
+            baseline.host.os, baseline.host.arch, artifact.host.os, artifact.host.arch
+        )]);
+    }
 
     let mut invalid: Vec<String> = Vec::new();
     let mut regressed: Vec<String> = Vec::new();
@@ -279,6 +287,20 @@ mod tests {
         match evaluate(&profile, &current, Some(&baseline)) {
             PerfVerdict::Invalid(reasons) => {
                 assert!(reasons[0].contains("host_tag mismatch"), "{reasons:?}")
+            }
+            other => panic!("expected Invalid, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn host_platform_mismatch_is_invalid() {
+        let profile = profile_with_gates(vec![]);
+        let mut current = artifact("host-a", single(100));
+        let baseline = artifact("host-a", single(100));
+        current.host.os = "linux".to_owned();
+        match evaluate(&profile, &current, Some(&baseline)) {
+            PerfVerdict::Invalid(reasons) => {
+                assert!(reasons[0].contains("host platform mismatch"), "{reasons:?}")
             }
             other => panic!("expected Invalid, got {other:?}"),
         }

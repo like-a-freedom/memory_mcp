@@ -11,7 +11,8 @@
 #     Metal CI job that sets any other truthy value silently skips. Always 1.
 #
 #   MEMORY_PERF_HOST_TAG      Host tag for `perf-smoke` (default local).
-#     A pinned-baseline workflow overrides it to the baseline's host_tag.
+#     Must equal the profile's host_tag (perf-pr-smoke.json: local);
+#     memory-perf rejects a mismatch with exit 2.
 #
 # Invoked by a workflow:
 #

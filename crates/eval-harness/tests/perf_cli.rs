@@ -12,6 +12,10 @@ fn fixture() -> PathBuf {
 fn run_memory_perf(args: &[&OsStr]) -> std::process::Output {
     Command::new(env!("CARGO_BIN_EXE_memory-perf"))
         .args(args)
+        // The profile-env assertion must not depend on the ambient shell:
+        // with NER_EXTRACTOR removed, apply_env always takes the set-branch
+        // and prints, regardless of what the test process inherited.
+        .env_remove("NER_EXTRACTOR")
         .output()
         .expect("spawn memory-perf")
 }

@@ -53,10 +53,12 @@ jobs:
   perf-weekly:
     name: Weekly perf profile
     # Pinned-host control (ADR-0082): skipped until the repo variable is set,
-    # and when set it runs only on the self-hosted machine whose identity the
-    # committed baseline was recorded from — never on a GitHub-hosted runner.
+    # and when set it runs only on the self-hosted runner labelled for the
+    # baseline machine — never on a GitHub-hosted runner and never on some
+    # other self-hosted runner. The label is part of the runner provisioning
+    # for the baseline host.
     if: vars.MEMORY_PERF_PINNED_HOST == 'true'
-    runs-on: self-hosted
+    runs-on: [self-hosted, perf-dev-m2]
     timeout-minutes: 60
     # No setup action: the pinned runner provides its own toolchain (the
     # workspace rust-toolchain.toml pins the channel), and a native build

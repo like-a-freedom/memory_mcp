@@ -54,8 +54,10 @@ pub trait QueryObserver: Send + Sync + 'static { fn observe(&self, obs: &SqlObse
 
 Harness side (`perf/db_observer.rs`):
 
-- `normalize_sql`: literals → `?`, numbers → `#`, whitespace collapsed;
-  literals normalized before numbers so digits inside literals do not leak.
+- `normalize_sql`: literals → `?`, hex runs of 8+ characters (record ids
+  like `episode:<sha256>`) → `#`, remaining digit runs → `#`, whitespace
+  collapsed; literals first so digits inside them do not leak, hex runs
+  before digits so content-addressed ids cannot fragment a template.
 - Template cap `MAX_TEMPLATES = 64`; beyond, observations merge into a single
   `(overflow)` accumulator. Artifact key-space never grows with data.
 - `QueryClass`: closed enum (`EpisodeWrite`, `FactWrite`, `EntityUpsert`,
@@ -122,7 +124,8 @@ any other schema with `PerfError::Schema`.
 ## Verdicts
 
 `Passed` / `Regressed(Vec<String>)` / `Invalid(Vec<String>)`; exit 0/1/2.
-With a baseline: host-tag mismatch → Invalid; per gate — sample count <
+With a baseline: host-tag mismatch or measured os/arch mismatch → Invalid;
+per gate — sample count <
 `min_samples` → Invalid; baseline metric missing → Invalid; ratio beyond
 `max_ratio` → Regressed (direction-aware). Without baseline: gates skipped
 (first run defines the baseline; `--update-baseline` copies the artifact).
@@ -131,7 +134,9 @@ With a baseline: host-tag mismatch → Invalid; per gate — sample count <
 
 - `make perf-smoke` (PR): `perf-pr-smoke.json`, integrity-only, any host;
   artifact uploaded `if: always()`.
-- Weekly (`evaluations.yml`): `perf-weekly.json` with gates, guarded by
+- Weekly (`evaluations.yml`): a dedicated `perf-weekly` job (not a nightly
+  step) running `perf-weekly.json` with gates on
+  `runs-on: [self-hosted, perf-dev-m2]`, guarded by
   `vars.MEMORY_PERF_PINNED_HOST == 'true'`, baseline from
   `evals/perf/baselines/`.
 
