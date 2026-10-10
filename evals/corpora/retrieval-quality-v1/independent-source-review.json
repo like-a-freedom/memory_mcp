@@ -1,0 +1,444 @@
+{
+  "schema_version": "memory-retrieval-source-only-review/v1",
+  "reviewer_phase": "Before inspecting any prediction artifact or code",
+  "read_files": [
+    "evals/corpora/retrieval-quality-v1/retrieval-quality.json",
+    "evals/corpora/retrieval-quality-v1/sources.json",
+    "evals/corpora/retrieval-quality-v1/label-review.json",
+    "evals/corpora/retrieval-quality-v1/README.md",
+    "work/evals/native-preparation/selection.json",
+    "work/evals/upstream/locomo/3eb6f2c585f5e1699204e3c3bdf7adc5c28cb376/locomo10.json"
+  ],
+  "input_sha256": {
+    "evals/corpora/retrieval-quality-v1/retrieval-quality.json": "612f410f0a7aface69c52ed16c678dc7cc1960479cd9eb0a851f305f850b8a8f",
+    "evals/corpora/retrieval-quality-v1/sources.json": "d15c8312e6a961b14d89ed81ede74ae01042b5a8b75cd64bbcbc1d9786421f33",
+    "evals/corpora/retrieval-quality-v1/label-review.json": "dff015a2a1ffeb176fb0f04011454c322dbb56828678544628dbac2efe1d7fbe",
+    "work/evals/native-preparation/selection.json": "0cebf57a296c112774bc64ba279d07f5a32451e1bc5a68177fb9ba54e9c655b0"
+  },
+  "allowed_binding_corrections": [
+    {
+      "case_id": "logging-original",
+      "action": "prohibited_to_allowed",
+      "bindings": [
+        {
+          "key": "http-plan:note:ca50e98513e3",
+          "source_key": "http-plan",
+          "content": "Task 16: Add low-overhead HTTP and retained-resource diagnostics: DEBUG operations are http.preflight.refused and http.preflight.large_body, added to logging::HTTP_OPERATIONS; operators enable only these with RUST_LOG=http.preflight=debug. Logs use the validated existing RequestId when present, parsed numeric declared length, observed prefix bytes and closed outcome only—no request method/path, tenant fingerprint, arbitrary header or content. Emit large-body events only for fully collected bodies >=65536 B. Rate-limit each fixed event/reason to at most one log per second; refusal counters remain exact. Apply the rate limit before allocating/serializing the event."
+        },
+        {
+          "key": "logging-request:experience:98575917d45f",
+          "source_key": "logging-request",
+          "content": "Every unit of work carries a correlation id. In the HTTP profile it is the\nrequest's `x-request-id` (honoured when supplied, minted otherwise) and is\nadvertised back on the response; in the stdio profile it is a per-call\n`req_NNNN`. The formatter stamps the ambient id onto every event that does not\ncarry its own, so each line of one request — the access log line, a tool line, a\ndownstream warning — reads with the same `req=` and follows with a single\nfilter:\n\n```bash\ngrep 'req=<id>' memory-mcp.log\n```\n\nThe HTTP response echoes the id on `x-request-id`, and a control-plane error\nenvelope carries it as `correlation_id` — a client quoting either names the same\nvalue the log line shows."
+        },
+        {
+          "key": "raw:http-plan",
+          "source_key": "http-plan",
+          "content": "### Task 16: Add low-overhead HTTP and retained-resource diagnostics\n\n- `memory_http_preflight_body_bytes` is recorded through the existing `metrics::histogram!` facade, with no labels, exactly once after body collection completes and before JSON decoding. This includes fully collected malformed JSON because those bytes were actually buffered. Partial, refused, stream-error and cancelled bodies do not enter the distribution.\n- DEBUG operations are `http.preflight.refused` and `http.preflight.large_body`, added to `logging::HTTP_OPERATIONS`; operators enable only these with `RUST_LOG=http.preflight=debug`. Logs use the validated existing `RequestId` when present, parsed numeric declared length, observed prefix bytes and closed outcome only—no request method/path, tenant fingerprint, arbitrary header or content. Emit large-body events only for fully collected bodies >=65536 B. Rate-limit each fixed event/reason to at most one log per second; refusal counters remain exact. Apply the rate limit before allocating/serializing the event."
+        },
+        {
+          "key": "raw:logging-request",
+          "source_key": "logging-request",
+          "content": "Every unit of work carries a correlation id. In the HTTP profile it is the\nrequest's `x-request-id` (honoured when supplied, minted otherwise) and is\nadvertised back on the response; in the stdio profile it is a per-call\n`req_NNNN`. The formatter stamps the ambient id onto every event that does not\ncarry its own, so each line of one request — the access log line, a tool line, a\ndownstream warning — reads with the same `req=` and follows with a single\nfilter:\n\n```bash\ngrep 'req=<id>' memory-mcp.log\n```\n\nThe HTTP response echoes the id on `x-request-id`, and a control-plane error\nenvelope carries it as `correlation_id` — a client quoting either names the same\nvalue the log line shows."
+        }
+      ],
+      "source_only_reason": "The broad setup/tracing/configuration query benefits from ambient correlation-id stamping and the concrete per-subsystem tracing directive, DEBUG operations and structured field policy. The raw http-plan contains that useful paragraph. Its separate metric-only binding http-plan:note:3a82a1450071 remains prohibited for this query."
+    },
+    {
+      "case_id": "logging-sink",
+      "action": "prohibited_to_allowed",
+      "bindings": [
+        {
+          "key": "logging-config:experience:d1c94b8339d1",
+          "source_key": "logging-config",
+          "content": "| Variable | Meaning |\n|---|---|\n| `RUST_LOG` | Level and per-subsystem directives. A bare level sets the default (`info`); `prefix=level` sets a subsystem. The most specific prefix wins. |\n| `MEMORY_LOG_FORMAT` | `text` (default, human-readable, one line per event) or `json` (NDJSON, one object per event). |\n| `MEMORY_LOG_COLOR` | `always`, `never`, or anything else for auto (colour only on a colour-capable terminal, and never for a file sink). `NO_COLOR` set and non-empty disables colour. |\n| `MEMORY_LOG_TARGETS` | Third-party `tracing` targets to raise, comma-separated `target=level`. Quiet by default; can never drop this service's own events. |\n| `MEMORY_LOG_FILE` | Append the stream to this file instead of stderr. A blank value means \"unset\". |\n\n`RUST_LOG` examples:\n\n```\nRUST_LOG=info                       # default\nRUST_LOG=extract=debug              # one subsystem\nRUST_LOG=http=error,info            # quiet the HTTP surface, keep the rest\nRUST_LOG=fs_watch=trace,http=debug  # two subsystems, the most specific rule wins\n```"
+        },
+        {
+          "key": "raw:logging-config",
+          "source_key": "logging-config",
+          "content": "| Variable | Meaning |\n|---|---|\n| `RUST_LOG` | Level and per-subsystem directives. A bare level sets the default (`info`); `prefix=level` sets a subsystem. The most specific prefix wins. |\n| `MEMORY_LOG_FORMAT` | `text` (default, human-readable, one line per event) or `json` (NDJSON, one object per event). |\n| `MEMORY_LOG_COLOR` | `always`, `never`, or anything else for auto (colour only on a colour-capable terminal, and never for a file sink). `NO_COLOR` set and non-empty disables colour. |\n| `MEMORY_LOG_TARGETS` | Third-party `tracing` targets to raise, comma-separated `target=level`. Quiet by default; can never drop this service's own events. |\n| `MEMORY_LOG_FILE` | Append the stream to this file instead of stderr. A blank value means \"unset\". |\n\n`RUST_LOG` examples:\n\n```\nRUST_LOG=info                       # default\nRUST_LOG=extract=debug              # one subsystem\nRUST_LOG=http=error,info            # quiet the HTTP surface, keep the rest\nRUST_LOG=fs_watch=trace,http=debug  # two subsystems, the most specific rule wins\n```"
+        }
+      ],
+      "source_only_reason": "MEMORY_LOG_FILE selects the file destination instead of stderr and blank means unset: this directly constrains where diagnostic events are written."
+    },
+    {
+      "case_id": "logging-config",
+      "action": "prohibited_to_allowed",
+      "bindings": [
+        {
+          "key": "logging-sink:note:3f3f5ac57b49",
+          "source_key": "logging-sink",
+          "content": "Events are written to **stderr** — or to `MEMORY_LOG_FILE` when set — one event\nper line. Under the stdio transport stdout carries MCP protocol framing, so\nnothing is ever written there. The sink, format and colour are read once, when\nthe subscriber is installed at startup."
+        },
+        {
+          "key": "raw:logging-sink",
+          "source_key": "logging-sink",
+          "content": "Events are written to **stderr** — or to `MEMORY_LOG_FILE` when set — one event\nper line. Under the stdio transport stdout carries MCP protocol framing, so\nnothing is ever written there. The sink, format and colour are read once, when\nthe subscriber is installed at startup."
+        }
+      ],
+      "source_only_reason": "The sink excerpt states that format and colour are read only once when the subscriber is installed, a material constraint on applying the requested configuration."
+    },
+    {
+      "case_id": "locomo-conv-26-082",
+      "action": "prohibited_to_allowed",
+      "bindings": [
+        {
+          "key": "D2:1:note:7718f550b891",
+          "source_key": "D2:1",
+          "content": "Melanie: Hey Caroline, since we last chatted, I've had a lot of things happening to me. I ran a charity race for mental health last Saturday – it was really rewarding. Really made me think about taking care of our minds."
+        },
+        {
+          "key": "raw:D2:1",
+          "source_key": "D2:1",
+          "content": "Melanie: Hey Caroline, since we last chatted, I've had a lot of things happening to me. I ran a charity race for mental health last Saturday – it was really rewarding. Really made me think about taking care of our minds."
+        }
+      ],
+      "source_only_reason": "The race participant explicitly says the charity race was for mental health. This is direct answer support, not merely the same topic."
+    },
+    {
+      "case_id": "locomo-conv-30-002",
+      "action": "prohibited_to_allowed",
+      "bindings": [
+        {
+          "key": "D2:11:note:fc1c64593cca",
+          "source_key": "D2:11",
+          "content": "Gina: Believe in yourself, Jon! The process may be tough, but you got this. Push through and it'll be worth it. Don't forget to take breaks and dance it out when you need to destress!"
+        },
+        {
+          "key": "D2:12:note:5fc88cb321a5",
+          "source_key": "D2:12",
+          "content": "Jon: Glad I have you in my corner! Gotta make time to dance and vent, that's for sure. We'll make it through this - hang in there!"
+        },
+        {
+          "key": "raw:D2:11",
+          "source_key": "D2:11",
+          "content": "Gina: Believe in yourself, Jon! The process may be tough, but you got this. Push through and it'll be worth it. Don't forget to take breaks and dance it out when you need to destress!"
+        },
+        {
+          "key": "raw:D2:12",
+          "source_key": "D2:12",
+          "content": "Jon: Glad I have you in my corner! Gotta make time to dance and vent, that's for sure. We'll make it through this - hang in there!"
+        }
+      ],
+      "source_only_reason": "Gina explicitly recommends dancing to destress; Jon replies that he must make time to dance and vent. These corroborate the actual requested coping activity. They do not replace the independent evidence of Gina's own preference in D1:7."
+    },
+    {
+      "case_id": "locomo-conv-41-065",
+      "action": "prohibited_to_allowed",
+      "bindings": [
+        {
+          "key": "D1:6:experience:12e5b84b9b12",
+          "source_key": "D1:6",
+          "content": "John: Yeah Maria, I'm really hoping to get into local politics. I love helping the community and making it a better place."
+        },
+        {
+          "key": "D1:10:note:e5eaefd674fa",
+          "source_key": "D1:10",
+          "content": "John: Growing up, I saw how lack of education and crumbling infrastructure affected my neighborhood. I don't want future generations to go through that, so I think schools and infrastructure should be funded properly. Here's a pic of a school last year, after they got the funding."
+        },
+        {
+          "key": "D1:12:note:e8960e9dcf1b",
+          "source_key": "D1:12",
+          "content": "John: It enabled needed repairs and renovations, making the learning environment safer and more modern for students."
+        },
+        {
+          "key": "D2:4:note:8cbca7d95d5c",
+          "source_key": "D2:4",
+          "content": "John: I just talked to someone who shared some amazing stories. It really fired up my passion to make education better in our area."
+        },
+        {
+          "key": "D2:5:note:fa5d48adfc5c",
+          "source_key": "D2:5",
+          "content": "Maria: Wow, John! Hearing that can really make an impact and get us fired up to make a difference. It's great to hear that you're feeling motivated to make improvements to our community's education!"
+        },
+        {
+          "key": "raw:D1:6",
+          "source_key": "D1:6",
+          "content": "John: Yeah Maria, I'm really hoping to get into local politics. I love helping the community and making it a better place."
+        },
+        {
+          "key": "raw:D1:10",
+          "source_key": "D1:10",
+          "content": "John: Growing up, I saw how lack of education and crumbling infrastructure affected my neighborhood. I don't want future generations to go through that, so I think schools and infrastructure should be funded properly. Here's a pic of a school last year, after they got the funding."
+        },
+        {
+          "key": "raw:D1:12",
+          "source_key": "D1:12",
+          "content": "John: It enabled needed repairs and renovations, making the learning environment safer and more modern for students."
+        },
+        {
+          "key": "raw:D2:4",
+          "source_key": "D2:4",
+          "content": "John: I just talked to someone who shared some amazing stories. It really fired up my passion to make education better in our area."
+        },
+        {
+          "key": "raw:D2:5",
+          "source_key": "D2:5",
+          "content": "Maria: Wow, John! Hearing that can really make an impact and get us fired up to make a difference. It's great to hear that you're feeling motivated to make improvements to our community's education!"
+        }
+      ],
+      "source_only_reason": "D1:6 establishes the local-politics frame; D1:10 explicitly advocates education/infrastructure funding; D1:12 specifies the school improvements being discussed; D2:4 and D2:5 directly corroborate the education focus. Generic encouragement and unrelated family/hobby details remain prohibited, including D2:6 without its antecedent."
+    },
+    {
+      "case_id": "locomo-conv-42-096",
+      "action": "prohibited_to_allowed",
+      "bindings": [
+        {
+          "key": "D1:17:experience:4be7e49d3c4f",
+          "source_key": "D1:17",
+          "content": "Nate: Oh cool! I might check that one out some time soon! I do love watching classics."
+        },
+        {
+          "key": "raw:D1:17",
+          "source_key": "D1:17",
+          "content": "Nate: Oh cool! I might check that one out some time soon! I do love watching classics."
+        }
+      ],
+      "source_only_reason": "Nate explicitly says he loves watching classics, which is an additional movie-type preference that usefully qualifies an answer claiming action/science fiction are the only types he enjoys. Keep D1:13 required for the requested primary genres; the mere movie-watching hobby D1:11 remains prohibited."
+    },
+    {
+      "case_id": "locomo-conv-43-071",
+      "action": "prohibited_to_allowed",
+      "bindings": [
+        {
+          "key": "D1:3:note:77a7f4157565",
+          "source_key": "D1:3",
+          "content": "John: That's great! I just signed with a new team - excited for the season!"
+        },
+        {
+          "key": "D1:4:note:0dae3735cd17",
+          "source_key": "D1:4",
+          "content": "Tim: Woohoo! Congrats on the new team. Which team did you sign with?"
+        },
+        {
+          "key": "raw:D1:3",
+          "source_key": "D1:3",
+          "content": "John: That's great! I just signed with a new team - excited for the season!"
+        },
+        {
+          "key": "raw:D1:4",
+          "source_key": "D1:4",
+          "content": "Tim: Woohoo! Congrats on the new team. Which team did you sign with?"
+        }
+      ],
+      "source_only_reason": "D1:3 asserts the signing event; D1:4 is the exact question to which the bare team name in D1:5 responds. Unlike generic chitchat, these establish the requested signed-with relation and date context."
+    },
+    {
+      "case_id": "locomo-conv-44-000",
+      "action": "prohibited_to_allowed",
+      "bindings": [
+        {
+          "key": "D1:3:note:c56f4e15cde7",
+          "source_key": "D1:3",
+          "content": "Audrey: Congrats on the new job! So I got these new collars and tags for my dogs - so cute!"
+        },
+        {
+          "key": "D2:1:note:6b1a270ca420",
+          "source_key": "D2:1",
+          "content": "Audrey: Hey Andrew, I got a surprise for you! We adopted another puppy called Pixie. She's SO cute! Isn't she just the cutest?"
+        },
+        {
+          "key": "raw:D1:3",
+          "source_key": "D1:3",
+          "content": "Audrey: Congrats on the new job! So I got these new collars and tags for my dogs - so cute!"
+        },
+        {
+          "key": "raw:D2:1",
+          "source_key": "D2:1",
+          "content": "Audrey: Hey Andrew, I got a surprise for you! We adopted another puppy called Pixie. She's SO cute! Isn't she just the cutest?"
+        }
+      ],
+      "source_only_reason": "D1:3 identifies the animals owned as dogs, resolving them in D1:7. D2:1 records a later additional puppy, which distinguishes the first three from the later adoption and guards against answering with the April 2023 date."
+    },
+    {
+      "case_id": "locomo-conv-47-067",
+      "action": "prohibited_to_allowed",
+      "bindings": [
+        {
+          "key": "D1:10:note:8b33bf259b5a",
+          "source_key": "D1:10",
+          "content": "James: I haven’t worked with any other programming languages, but I hope to work in the future."
+        },
+        {
+          "key": "raw:D1:10",
+          "source_key": "D1:10",
+          "content": "James: I haven’t worked with any other programming languages, but I hope to work in the future."
+        }
+      ],
+      "source_only_reason": "The explicit statement that James has not worked with any other programming languages constrains the requested list. It is useful negative evidence despite containing no language name."
+    },
+    {
+      "case_id": "locomo-conv-49-083",
+      "action": "prohibited_to_allowed",
+      "bindings": [
+        {
+          "key": "D1:4:note:6332b9523368",
+          "source_key": "D1:4",
+          "content": "Evan: My old prius broke down, decided to get it repaired and sell it. Glad you asked, we went to Rockies, check it out."
+        },
+        {
+          "key": "raw:D1:4",
+          "source_key": "D1:4",
+          "content": "Evan: My old prius broke down, decided to get it repaired and sell it. Glad you asked, we went to Rockies, check it out."
+        }
+      ],
+      "source_only_reason": "This establishes the old Prius breakdown and replacement context in the query, disambiguating the new Prius in D1:2 from the old one. It is useful even though the same binding also describes the Rockies trip."
+    },
+    {
+      "case_id": "locomo-conv-50-071",
+      "action": "prohibited_to_allowed",
+      "bindings": [
+        {
+          "key": "D1:9:promise:bc4e8e5809d1",
+          "source_key": "D1:9",
+          "content": "Calvin: I'm heading there next month. I'll be staying in such a nice place while I'm there.\n\n"
+        },
+        {
+          "key": "raw:D1:9",
+          "source_key": "D1:9",
+          "content": "Calvin: I'm heading there next month. I'll be staying in such a nice place while I'm there.\n\n"
+        }
+      ],
+      "source_only_reason": "The planned departure next month constrains the time frame of the stay; it distinguishes a future plan from an ongoing stay. D1:15 remains required for duration."
+    },
+    {
+      "case_id": "locomo-conv-50-001",
+      "action": "prohibited_to_allowed",
+      "bindings": [
+        {
+          "key": "D1:11:note:72d90bb8d28a",
+          "source_key": "D1:11",
+          "content": "Calvin: Wow, my agent found me this awesome place, so thankful!"
+        },
+        {
+          "key": "D2:5:note:7b04027d2489",
+          "source_key": "D2:5",
+          "content": "Calvin: Woohoo! I finally got myself this beauty. Here's a pic from yesterday when I took it for a ride. Can't believe I'm actually driving it. Definitely what I deserve after all this hard work. Every time I step in, it's like an adrenaline rush!"
+        },
+        {
+          "key": "D2:17:note:ca783de83729",
+          "source_key": "D2:17",
+          "content": "Calvin: Got a new ride and wrote some new tunes - had a few studio sessions last week and I'm excited to collaborate. Can't wait to share it with everyone!"
+        },
+        {
+          "key": "raw:D1:11",
+          "source_key": "D1:11",
+          "content": "Calvin: Wow, my agent found me this awesome place, so thankful!"
+        },
+        {
+          "key": "raw:D2:5",
+          "source_key": "D2:5",
+          "content": "Calvin: Woohoo! I finally got myself this beauty. Here's a pic from yesterday when I took it for a ride. Can't believe I'm actually driving it. Definitely what I deserve after all this hard work. Every time I step in, it's like an adrenaline rush!"
+        },
+        {
+          "key": "raw:D2:17",
+          "source_key": "D2:17",
+          "content": "Calvin: Got a new ride and wrote some new tunes - had a few studio sessions last week and I'm excited to collaborate. Can't wait to share it with everyone!"
+        }
+      ],
+      "source_only_reason": "D1:11 supplies acquisition/provenance context for the newly found place; D2:5 and D2:17 explicitly corroborate the new vehicle acquisition. None of these text-only bindings establish Ferrari 488 GTB. The unrelated music portion does not license unrelated extracted music facts."
+    },
+    {
+      "case_id": "locomo-conv-42-002",
+      "action": "prohibited_to_allowed",
+      "bindings": [
+        {
+          "key": "D1:16:note:5ec99cca7cb3",
+          "source_key": "D1:16",
+          "content": "Joanna: Yeah, totally! Have you seen this romantic drama that's all about memory and relationships? It's such a good one."
+        },
+        {
+          "key": "raw:D1:16",
+          "source_key": "D1:16",
+          "content": "Joanna: Yeah, totally! Have you seen this romantic drama that's all about memory and relationships? It's such a good one."
+        }
+      ],
+      "source_only_reason": "D1:16 is the antecedent of that movie in D1:18 and describes the recommended romantic drama about memory/relationships. It is useful referent context, but the existing text-only population still does not establish the queried exact title; see the separate source-grounding defect."
+    }
+  ],
+  "required_group_corrections": [
+    {
+      "case_id": "http-task-16",
+      "required_evidence_groups": [
+        [
+          "http-plan:note:3a82a1450071",
+          "raw:http-plan"
+        ],
+        [
+          "http-plan:note:ca50e98513e3",
+          "raw:http-plan"
+        ]
+      ],
+      "reason": "Body measurements and emitted diagnostics are distinct requirements; the current single OR group accepts either half. A raw episode contains both and may satisfy both groups."
+    },
+    {
+      "case_id": "http-task-short",
+      "required_evidence_groups": [
+        [
+          "http-plan:note:3a82a1450071",
+          "raw:http-plan"
+        ],
+        [
+          "http-plan:note:ca50e98513e3",
+          "raw:http-plan"
+        ]
+      ],
+      "reason": "Body measurements and emitted diagnostics are distinct requirements; the current single OR group accepts either half. A raw episode contains both and may satisfy both groups."
+    },
+    {
+      "case_id": "http-task-paraphrase",
+      "required_evidence_groups": [
+        [
+          "http-plan:note:3a82a1450071",
+          "raw:http-plan"
+        ],
+        [
+          "http-plan:note:ca50e98513e3",
+          "raw:http-plan"
+        ]
+      ],
+      "reason": "Body measurements and emitted diagnostics are distinct requirements; the current single OR group accepts either half. A raw episode contains both and may satisfy both groups."
+    },
+    {
+      "case_id": "locomo-conv-26-082",
+      "required_evidence_groups": [
+        [
+          "D2:2:note:99ef91838172",
+          "raw:D2:2",
+          "D2:1:note:7718f550b891",
+          "raw:D2:1"
+        ]
+      ],
+      "reason": "Either explicit mental-health-race passage independently supports the answer; using either must not count as a miss."
+    },
+    {
+      "case_id": "locomo-conv-43-071",
+      "required_evidence_groups": [
+        [
+          "D1:5:note:914bfd7d441a",
+          "raw:D1:5"
+        ],
+        [
+          "D1:3:note:77a7f4157565",
+          "raw:D1:3",
+          "D1:4:note:0dae3735cd17",
+          "raw:D1:4"
+        ]
+      ],
+      "reason": "The bare team name establishes identity; a second passage connects it to the signing event. Session t_ref alone does not establish that relation."
+    },
+    {
+      "case_id": "locomo-conv-44-000",
+      "required_evidence_groups": [
+        [
+          "D1:7:note:f614ef957f02",
+          "raw:D1:7"
+        ],
+        [
+          "D1:3:note:c56f4e15cde7",
+          "raw:D1:3"
+        ]
+      ],
+      "reason": "D1:7 provides duration and the three names but only pronouns for the animal. D1:3 supplies the dogs antecedent. Preserve the approximate-year caveat."
+    }
+  ]
+}

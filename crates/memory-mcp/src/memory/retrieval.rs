@@ -46,6 +46,7 @@ mod params;
 mod pipeline;
 mod query_mode;
 mod ranking;
+mod reranking;
 mod rescue;
 mod scoring;
 mod semantic;
@@ -314,6 +315,16 @@ async fn assemble_context_inner(
         }
     }
 
+    let timeline_mode = params.resolved_view_mode_opt.as_deref() == Some("timeline")
+        || (params.resolved_view_mode_opt.is_none() && params.query_flags.wants_timeline);
+    results = reranking::filter_items(
+        ctx,
+        &request.query,
+        results,
+        request.budget.max(1) as usize,
+        timeline_mode,
+    )
+    .await?;
     let duplicate_groups = attach_reconciliation(
         ctx,
         &mut results,
@@ -322,9 +333,11 @@ async fn assemble_context_inner(
     )
     .await?;
     results = ranking::deduplicate_admitted_view(results, &duplicate_groups);
-    // Post-assembly, before the cache: a cached list must carry the reorder
-    // already, because a cache hit returns before any post-processing.
-    results = ranking::demote_superseded(ranking::DemoteSupersededRequest { items: &results });
+    if !timeline_mode {
+        // Post-assembly, before the cache: a cached list must carry the reorder
+        // already, because a cache hit returns before any post-processing.
+        results = ranking::demote_superseded(ranking::DemoteSupersededRequest { items: &results });
+    }
 
     // --- Results logging, access tracking, cache store ---
     ctx.logger.log(
@@ -459,7 +472,7 @@ mod tests {
     use crate::service::EmbeddingProvider;
     use crate::storage::DbClient;
     use async_trait::async_trait;
-    use chrono::Utc;
+    use chrono::{TimeZone, Utc};
     use serde_json::{Value, json};
     use std::sync::Arc;
     use std::sync::atomic::{AtomicUsize, Ordering};
@@ -1300,6 +1313,128 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn assemble_context_preserves_timeline_order_after_reranking() {
+        let db = crate::service::mock_db::MockDbClient::new().expect_query_with(
+            |sql| sql.contains("search::score"),
+            |_sql, _vars| {
+                Ok(json!([
+                    {
+                        "fact_id": "fact:timeline-early",
+                        "fact_type": "note",
+                        "content": "Atlas project kickoff: early checkpoint completed.",
+                        "quote": "early checkpoint completed",
+                        "source_episode": "episode:timeline-early",
+                        "t_valid": "2026-01-10T10:00:00Z",
+                        "t_ingested": "2026-01-10T10:00:00Z",
+                        "scope": "org",
+                        "entity_links": [],
+                        "policy_tags": [],
+                        "provenance": {"source_episode": "episode:timeline-early"},
+                        "ft_score": 10.0
+                    },
+                    {
+                        "fact_id": "fact:timeline-late",
+                        "fact_type": "note",
+                        "content": "Atlas project launch: late checkpoint completed.",
+                        "quote": "late checkpoint completed",
+                        "source_episode": "episode:timeline-late",
+                        "t_valid": "2026-02-10T10:00:00Z",
+                        "t_ingested": "2026-02-10T10:00:00Z",
+                        "scope": "org",
+                        "entity_links": [],
+                        "policy_tags": [],
+                        "provenance": {"source_episode": "episode:timeline-late"},
+                        "ft_score": 9.0
+                    }
+                ]))
+            },
+        );
+
+        struct TimelineRerankingProvider;
+
+        #[async_trait]
+        impl EmbeddingProvider for TimelineRerankingProvider {
+            fn is_enabled(&self) -> bool {
+                true
+            }
+
+            fn provider_name(&self) -> &'static str {
+                "timeline-test"
+            }
+
+            fn dimension(&self) -> usize {
+                DEFAULT_EMBEDDING_DIMENSION
+            }
+
+            async fn embed(&self, _input: &str) -> Result<Vec<f64>, MemoryError> {
+                let mut embedding = vec![0.0; DEFAULT_EMBEDDING_DIMENSION];
+                embedding[0] = 1.0;
+                Ok(embedding)
+            }
+
+            async fn rerank(
+                &self,
+                _query: &str,
+                documents: &[String],
+            ) -> Result<Option<Vec<f64>>, MemoryError> {
+                Ok(Some(
+                    documents
+                        .iter()
+                        .map(|document| {
+                            if document.contains("late checkpoint") {
+                                2.0
+                            } else {
+                                1.0
+                            }
+                        })
+                        .collect(),
+                ))
+            }
+
+            fn reranking_signature(&self) -> Option<&str> {
+                Some("timeline-test-reranker-v1")
+            }
+        }
+
+        let service = crate::service::MemoryService::new_with_embedding_provider(
+            Arc::new(db),
+            "org".to_string(),
+            "warn".to_string(),
+            50,
+            100,
+            Arc::new(TimelineRerankingProvider),
+            crate::config::DEFAULT_EMBEDDING_SIMILARITY_THRESHOLD,
+            Arc::new(crate::service::AnnoEntityExtractor::new().expect("anno extractor")),
+        )
+        .expect("service");
+
+        let results = assemble_context(
+            &crate::memory::retrieval_deps::AssembleContextDeps::from(&service),
+            crate::models::AssembleContextRequest {
+                query: "Atlas project timeline".to_string(),
+                as_of: Some(Utc.with_ymd_and_hms(2026, 3, 1, 0, 0, 0).unwrap()),
+                budget: 5,
+                fact_types: vec![],
+                view_mode: Some("timeline".to_string()),
+                window_start: None,
+                window_end: None,
+                access: None,
+                compact: crate::tools::parsers::default_compact(),
+            },
+        )
+        .await
+        .expect("assemble timeline context");
+
+        assert_eq!(
+            results
+                .iter()
+                .map(|item| item.fact_id.as_str())
+                .collect::<Vec<_>>(),
+            ["fact:timeline-early", "fact:timeline-late"]
+        );
+    }
+
+    #[tokio::test]
     async fn community_expansion_returns_empty_when_no_entity_links_match() {
         // Every method of the old hand-written fake returned the default a
         // bare `MockDbClient` returns — `None`, `vec![]`, `Value::Null`, `Ok(())`
@@ -1481,6 +1616,7 @@ mod tests {
         let query_evidence = super::admission::build_query_evidence(
             Some("Which venue would work best for my conference?"),
             Vec::new(),
+            &[],
             &super::query_mode::QueryFlags::default(),
         );
         let repeated_topics = super::experience::repeated_topic_evidence_for_query(

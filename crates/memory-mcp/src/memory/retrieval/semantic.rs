@@ -80,7 +80,14 @@ pub(crate) async fn collect_semantic_facts(
         return Ok(Vec::new());
     }
 
-    let search_limit = request.budget.max(1) * 4;
+    // A small response is not a first-stage relevance guarantee. Keep the
+    // ANN candidate pool bounded while giving an enabled cross-encoder room
+    // to correct first-stage ordering errors.
+    let search_limit = super::reranking::candidate_pool_limit(
+        request.budget.max(1) as usize,
+        service.embedding_provider.reranking_signature().is_some(),
+    )
+    .min(i32::MAX as usize) as i32;
 
     let fact_records = {
         let _search_stage =
@@ -148,7 +155,7 @@ pub(crate) async fn collect_semantic_facts(
 
     Ok(ranked_facts
         .into_iter()
-        .take(request.budget.max(1) as usize)
+        .take(search_limit as usize)
         .map(|(similarity, fact)| SemanticCandidate {
             fact,
             rationale: format!(
@@ -212,7 +219,10 @@ mod tests {
         vector
     }
 
-    async fn collect_threshold_boundary_candidates() -> (String, String, Vec<SemanticCandidate>) {
+    async fn collect_component_candidates(
+        first_similarity: f64,
+        budget: i32,
+    ) -> (String, String, Vec<SemanticCandidate>) {
         let id = NEXT_DB_ID.fetch_add(1, Ordering::Relaxed);
         let db_name = format!("semantic_threshold_component_{id}");
         let db = Arc::new(
@@ -232,7 +242,7 @@ mod tests {
         let embeddings = HashMap::from([
             (
                 format!("note\n{below_content}\n{below_content}"),
-                boundary_vector(0.699),
+                boundary_vector(first_similarity),
             ),
             (
                 format!("note\n{at_floor_content}\n{at_floor_content}"),
@@ -283,7 +293,7 @@ mod tests {
                 access: &access,
                 fact_types: &[],
                 excluded_fact_ids: &excluded_fact_ids,
-                budget: 8,
+                budget,
             },
         )
         .await
@@ -408,7 +418,7 @@ mod tests {
     #[tokio::test]
     async fn ann_threshold_rejects_0699_and_admits_exactly_0700() {
         let (below_floor_id, at_floor_id, candidates) =
-            collect_threshold_boundary_candidates().await;
+            collect_component_candidates(0.699, 8).await;
         let candidate_ids = candidates
             .iter()
             .map(|candidate| candidate.fact.fact_id.as_str())
@@ -421,5 +431,17 @@ mod tests {
             .find(|candidate| candidate.fact.fact_id == at_floor_id)
             .expect("exact-threshold candidate is present");
         assert!((admitted.similarity - 0.7).abs() <= 1e-9);
+    }
+
+    #[tokio::test]
+    async fn ann_candidate_pool_survives_until_fusion_before_response_budget() {
+        // Integration scenario: actual production ANN adapter over an isolated
+        // embedded database, controlled vectors only to establish ordering.
+        let (_, _, candidates) = collect_component_candidates(0.8, 1).await;
+        assert_eq!(
+            candidates.len(),
+            2,
+            "the response budget must not discard candidates before admission and fusion"
+        );
     }
 }

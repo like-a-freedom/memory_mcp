@@ -1,5 +1,6 @@
 pub(crate) mod cases;
 pub(crate) mod scoring;
+mod trace;
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::{Path, PathBuf};
@@ -17,10 +18,13 @@ use crate::profile::SuiteDecl;
 use crate::reducer::SuiteReducer;
 use crate::runner::{EvalSuite, RunContext};
 use cases::{
-    NativePreparationManifest, QualityCase, QualityCorpusManifest, QualityExpectation,
-    QualityFactBinding, QualityObservation, RuntimeRetrievalIdentity, SourceBundleEntry,
+    EvidenceKind, NativePreparationManifest, QualityCase, QualityCorpusManifest,
+    QualityExpectation, QualityFactBinding, QualityObservation, RuntimeRetrievalIdentity,
+    SourceBundleEntry, SourceEpisode,
 };
 use scoring::score_quality;
+
+const RETRIEVAL_QUALITY_MODE: EvalMode = EvalMode::EndToEnd;
 
 pub(crate) struct RetrievalQualityReducer {
     suite_id: SuiteId,
@@ -140,9 +144,7 @@ impl SuiteReducer for RetrievalQualityReducer {
             suite_id: self.suite_id.as_str().to_string(),
             mode: outcomes
                 .first()
-                .map_or(crate::domain::EvalMode::RetrievalOnly, |outcome| {
-                    outcome.mode
-                }),
+                .map_or(RETRIEVAL_QUALITY_MODE, |outcome| outcome.mode),
             total,
             passed,
             quality_failed,
@@ -265,6 +267,8 @@ struct RetrievalRuntime {
     index_signature: String,
     extractor_fingerprint: String,
     claim_stage: String,
+    model_files_sha256: BTreeMap<String, String>,
+    reranking_signature: Option<String>,
 }
 
 impl RetrievalRuntime {
@@ -282,8 +286,31 @@ impl RetrievalRuntime {
         .map_err(|_| "a real embedding provider could not be initialized")?;
         let claim_stage =
             std::env::var("MEMORY_CLAIM_ROLLOUT_STAGE").unwrap_or_else(|_| "disabled".into());
+        let mut model_files_sha256 = BTreeMap::new();
+        if resolved.provider_label == "local-candle" {
+            use std::io::Read;
+            let directory = std::env::var("EMBEDDINGS_MODEL_DIR")
+                .map_err(|_| "native local evaluation requires an explicit model directory")?;
+            for file in ["config.json", "tokenizer.json", "model.safetensors"] {
+                let mut input = std::fs::File::open(Path::new(&directory).join(file))
+                    .map_err(|_| "native model identity file could not be read")?;
+                let mut digest = sha2::Sha256::new();
+                let mut buffer = [0_u8; 8192];
+                loop {
+                    let count = input
+                        .read(&mut buffer)
+                        .map_err(|_| "native model hashing failed")?;
+                    if count == 0 {
+                        break;
+                    }
+                    digest.update(&buffer[..count]);
+                }
+                model_files_sha256.insert(file.to_owned(), hex::encode(digest.finalize()));
+            }
+        }
 
         Ok(Self {
+            reranking_signature: resolved.provider.reranking_signature().map(str::to_owned),
             provider: resolved.provider,
             provider_label: resolved.provider_label,
             model: resolved.model,
@@ -293,6 +320,7 @@ impl RetrievalRuntime {
             index_signature: resolved.index_signature,
             extractor_fingerprint: resolved.extractor_fingerprint,
             claim_stage,
+            model_files_sha256,
         })
     }
 
@@ -315,8 +343,90 @@ impl RetrievalRuntime {
             self.extractor_fingerprint.clone(),
         );
         values.insert("claim_rollout_stage".into(), self.claim_stage.clone());
+        if let Some(identity) = &self.reranking_signature {
+            values.insert("reranking_signature".into(), identity.clone());
+        }
+        for (file, digest) in &self.model_files_sha256 {
+            values.insert(format!("model_file_sha256.{file}"), digest.clone());
+        }
         values
     }
+}
+
+/// Produces persisted native extraction facts without queries, gold labels or
+/// retrieval predictions. Labels are reviewed separately against raw sources.
+pub async fn prepare_native_inventory(source_path: &Path) -> Result<serde_json::Value, EvalError> {
+    let bytes = std::fs::read(source_path).map_err(|source| EvalError::Io {
+        path: source_path.to_path_buf(),
+        source,
+    })?;
+    let bundle: Vec<SourceBundleEntry> = serde_json::from_slice(&bytes)
+        .map_err(|error| EvalError::InvalidInput(format!("invalid source bundle: {error}")))?;
+    if bundle.is_empty() {
+        return Err(EvalError::InvalidInput(
+            "source bundle must not be empty".into(),
+        ));
+    }
+    let mut cases = BTreeMap::<String, Vec<SourceEpisode>>::new();
+    for entry in bundle {
+        if entry.case_id.trim().is_empty()
+            || entry.source.key.trim().is_empty()
+            || entry.source.content.trim().is_empty()
+            || entry.source.source_id.trim().is_empty()
+            || entry.source.source_type.trim().is_empty()
+        {
+            return Err(EvalError::InvalidInput("incomplete source episode".into()));
+        }
+        let sources = cases.entry(entry.case_id).or_default();
+        if sources.iter().any(|source| source.key == entry.source.key) {
+            return Err(EvalError::InvalidInput("duplicate source key".into()));
+        }
+        if sources
+            .iter()
+            .any(|source| source.source_id == entry.source.source_id)
+        {
+            return Err(EvalError::InvalidInput("duplicate source id".into()));
+        }
+        sources.push(entry.source);
+    }
+    let runtime = RetrievalRuntime::from_environment()
+        .await
+        .map_err(|error| EvalError::InvalidConfig(error.into()))?;
+    let mut inventories = Vec::new();
+    for (index, (case_id, sources)) in cases.into_iter().enumerate() {
+        let state = prepare_native_sources(&sources, &runtime, index)
+            .await
+            .map_err(|error| EvalError::InvalidInput(error.into()))?;
+        let mut facts = Vec::new();
+        for source in &sources {
+            let episode_id = &state.episode_ids[&source.key];
+            let extracted_ids = &state.extracted_fact_ids[&source.key];
+            for fact in state.facts.iter().filter(|fact| {
+                fact.source_episode == *episode_id && extracted_ids.contains(&fact.fact_id)
+            }) {
+                facts.push(serde_json::json!({
+                    "episode_key": source.key, "fact_type":fact.fact_type,
+                    "content":fact.content,
+                }));
+            }
+        }
+        inventories.push(serde_json::json!({"case_id":case_id, "facts":facts}));
+    }
+    Ok(serde_json::json!({
+        "native_preparation": {
+            "schema_version":"memory-mcp-native-preparation/v1",
+            "source_bundle_sha256":hex::encode(sha2::Sha256::digest(&bytes)),
+            "provider_label":runtime.provider_label, "model":runtime.model,
+            "embedding_signature":runtime.signature, "embedding_dimension":runtime.dimension,
+            "similarity_threshold":runtime.similarity_threshold,
+            "index_signature":runtime.index_signature,
+            "extractor_fingerprint":runtime.extractor_fingerprint,
+            "claim_rollout_stage":runtime.claim_stage,
+            "model_files_sha256":runtime.model_files_sha256,
+            "reranking_signature":runtime.reranking_signature,
+        },
+        "inventories":inventories,
+    }))
 }
 
 fn verify_source_bundle(
@@ -378,7 +488,7 @@ impl EvalSuite for RetrievalQualitySuite {
     }
 
     fn mode(&self) -> EvalMode {
-        EvalMode::RetrievalOnly
+        RETRIEVAL_QUALITY_MODE
     }
 
     fn expected_case_ids(&self) -> &[EvalCaseId] {
@@ -414,6 +524,8 @@ impl EvalSuite for RetrievalQualitySuite {
             index_signature: &runtime.index_signature,
             extractor_fingerprint: &runtime.extractor_fingerprint,
             claim_rollout_stage: &runtime.claim_stage,
+            model_files_sha256: &runtime.model_files_sha256,
+            reranking_signature: runtime.reranking_signature.as_deref(),
         };
         if let Err(reason) = self.native_preparation.validate_runtime(&runtime_identity) {
             self.update_fingerprint([("provider_status".into(), "incompatible".into())]);
@@ -434,9 +546,12 @@ async fn run_native_case(
     case_index: usize,
 ) -> EvalCaseOutcome {
     let started = Instant::now();
-    let result = run_native_case_inner(case, runtime, case_index).await;
+    let traced = Arc::new(trace::TracedProvider::new(runtime.provider.clone()));
+    let mut diagnostic_runtime = runtime.clone();
+    diagnostic_runtime.provider = traced.clone();
+    let result = run_native_case_inner(case, &diagnostic_runtime, case_index).await;
     let mut outcome = match result {
-        Ok((scores, evidence)) => {
+        Ok((scores, evidence, observations)) => {
             let failures = quality_failures(case, &scores);
             let status = if failures.is_empty() {
                 CaseStatus::Passed
@@ -446,12 +561,15 @@ async fn run_native_case(
             let mut outcome = EvalCaseOutcome::new(
                 "retrieval-quality",
                 case.id.clone(),
-                EvalMode::RetrievalOnly,
+                RETRIEVAL_QUALITY_MODE,
                 case.split,
                 case.label_trust,
                 status,
             );
             outcome.failures = failures;
+            if !outcome.failures.is_empty() {
+                outcome.failures.push(observations);
+            }
             for (name, metric_evidence) in evidence {
                 outcome.metrics.extend(render_case_metrics(
                     &metric_evidence,
@@ -464,19 +582,33 @@ async fn run_native_case(
         }
         Err(reason) => invalid_outcome(case, reason),
     };
+    if !outcome.failures.is_empty() {
+        outcome.failures.push(format!(
+            "native reranking candidates: {}",
+            serde_json::json!(traced.drain())
+        ));
+    }
     outcome.duration_ms = u64::try_from(started.elapsed().as_millis()).unwrap_or(u64::MAX);
     outcome
 }
 
-async fn run_native_case_inner(
-    case: &QualityCase,
+struct NativeSourceState {
+    service: memory_mcp::service::MemoryService,
+    facts: Vec<memory_mcp::models::Fact>,
+    episodes: Vec<memory_mcp::models::Episode>,
+    episode_ids: BTreeMap<String, String>,
+    extracted_fact_ids: BTreeMap<String, BTreeSet<String>>,
+    snapshots: BTreeMap<String, chrono::DateTime<chrono::Utc>>,
+}
+
+async fn prepare_native_sources(
+    sources: &[SourceEpisode],
     runtime: &RetrievalRuntime,
     case_index: usize,
-) -> Result<(scoring::QualityScores, BTreeMap<String, MetricEvidence>), &'static str> {
+) -> Result<NativeSourceState, &'static str> {
     use memory_mcp::knowledge::api::{KnowledgeReadPort, KnowledgeReadScope};
     use memory_mcp::knowledge::infra::KnowledgeReadAdapter;
-    use memory_mcp::models::{AssembleContextRequest, IngestRequest};
-    use memory_mcp::service::memory_container_shims::memory_capabilities_assemble_context::AssembleContextCapability as ServiceAssembleContextCapability;
+    use memory_mcp::models::IngestRequest;
     use memory_mcp::service::memory_container_shims::memory_capabilities_extract::ExtractCapability as ServiceExtractCapability;
     use memory_mcp::service::memory_container_shims::memory_capabilities_ingest::IngestCapability as ServiceIngestCapability;
     use memory_mcp::storage::{DbClient, SurrealDbClient};
@@ -510,7 +642,8 @@ async fn run_native_case_inner(
 
     let mut episode_ids = BTreeMap::new();
     let mut extracted_fact_ids = BTreeMap::<String, BTreeSet<String>>::new();
-    for source in &case.sources {
+    let mut snapshots = BTreeMap::new();
+    for source in sources {
         let mut request = IngestRequest::builder()
             .source_type(source.source_type.clone())
             .source_id(source.source_id.clone())
@@ -530,6 +663,7 @@ async fn run_native_case_inner(
             ServiceExtractCapability::extract_from_service(&service, &episode_id, None, None)
                 .await
                 .map_err(|_| "native extraction failed")?;
+        snapshots.insert(source.key.clone(), chrono::Utc::now());
         episode_ids.insert(source.key.clone(), episode_id);
         extracted_fact_ids.insert(
             source.key.clone(),
@@ -542,6 +676,20 @@ async fn run_native_case_inner(
     }
 
     let readback = KnowledgeReadAdapter::new(db, "main");
+    let episode_rows = readback
+        .read_scope(KnowledgeReadScope::Episodes)
+        .await
+        .map_err(|_| "persisted episode readback failed")?;
+    let episodes = episode_rows
+        .iter()
+        .map(|row| {
+            row.get("Object")
+                .unwrap_or(row)
+                .as_object()
+                .and_then(memory_mcp::memory::record_parsing::episode_from_record)
+        })
+        .collect::<Option<Vec<_>>>()
+        .ok_or("persisted episode readback contained an invalid record")?;
     let fact_rows = readback
         .read_scope(KnowledgeReadScope::Facts)
         .await
@@ -552,6 +700,40 @@ async fn run_native_case_inner(
         .collect::<Option<Vec<_>>>()
         .ok_or("persisted fact readback contained an invalid fact record")?;
 
+    Ok(NativeSourceState {
+        service,
+        facts,
+        episodes,
+        episode_ids,
+        extracted_fact_ids,
+        snapshots,
+    })
+}
+
+async fn run_native_case_inner(
+    case: &QualityCase,
+    runtime: &RetrievalRuntime,
+    case_index: usize,
+) -> Result<
+    (
+        scoring::QualityScores,
+        BTreeMap<String, MetricEvidence>,
+        String,
+    ),
+    &'static str,
+> {
+    use memory_mcp::models::AssembleContextRequest;
+    use memory_mcp::service::memory_container_shims::memory_capabilities_assemble_context::AssembleContextCapability as ServiceAssembleContextCapability;
+
+    let NativeSourceState {
+        service,
+        facts,
+        episodes,
+        episode_ids,
+        extracted_fact_ids,
+        snapshots,
+    } = prepare_native_sources(&case.sources, runtime, case_index).await?;
+
     let mut actual_id_by_gold_key = BTreeMap::new();
     for binding in &case.bindings {
         resolve_binding(
@@ -559,6 +741,7 @@ async fn run_native_case_inner(
             &episode_ids,
             &extracted_fact_ids,
             &facts,
+            &episodes,
             &mut actual_id_by_gold_key,
         )?;
     }
@@ -568,7 +751,10 @@ async fn run_native_case_inner(
         AssembleContextRequest {
             query: case.query.clone(),
             fact_types: case.fact_types.clone(),
-            as_of: Some(case.as_of),
+            as_of: match &case.snapshot_after_source {
+                Some(key) => Some(*snapshots.get(key).ok_or("unknown source snapshot")?),
+                None => case.as_of,
+            },
             budget: i32::try_from(case.budget)
                 .map_err(|_| "case budget is outside the supported range")?,
             view_mode: case.view_mode.clone(),
@@ -602,7 +788,19 @@ async fn run_native_case_inner(
     let scores = score_quality(&expectation, &observation)
         .map_err(|_| "quality oracle rejected its own validated case")?;
     let evidence = quality_evidence(case, &scores, &ranked_keys, &expectation);
-    Ok((scores, evidence))
+    let observations = serde_json::to_string(
+        &items
+            .iter()
+            .zip(&ranked_keys)
+            .map(|(item, key)| serde_json::json!({"gold_key":key,"item":item}))
+            .collect::<Vec<_>>(),
+    )
+    .map_err(|_| "native observation serialization failed")?;
+    Ok((
+        scores,
+        evidence,
+        format!("native selected evidence: {observations}"),
+    ))
 }
 
 fn resolve_binding(
@@ -610,11 +808,25 @@ fn resolve_binding(
     episode_ids: &BTreeMap<String, String>,
     extracted_fact_ids: &BTreeMap<String, BTreeSet<String>>,
     facts: &[memory_mcp::models::Fact],
+    episodes: &[memory_mcp::models::Episode],
     actual_id_by_gold_key: &mut BTreeMap<String, String>,
 ) -> Result<(), &'static str> {
     let episode_id = episode_ids
         .get(&binding.episode_key)
         .ok_or("gold binding references a source that was not ingested")?;
+    if binding.kind == EvidenceKind::Episode {
+        if !episodes
+            .iter()
+            .any(|episode| episode.episode_id == *episode_id && episode.content == binding.content)
+        {
+            return Err("episode binding does not match the persisted source");
+        }
+        actual_id_by_gold_key.insert(
+            binding.key.clone(),
+            format!("episode_fallback:{episode_id}"),
+        );
+        return Ok(());
+    }
     let candidates = facts
         .iter()
         .filter(|fact| {
@@ -724,7 +936,7 @@ fn invalid_outcome(case: &QualityCase, reason: &str) -> EvalCaseOutcome {
     let mut outcome = EvalCaseOutcome::new(
         "retrieval-quality",
         case.id.clone(),
-        EvalMode::RetrievalOnly,
+        RETRIEVAL_QUALITY_MODE,
         case.split,
         case.label_trust,
         CaseStatus::Invalid,
@@ -753,7 +965,7 @@ mod reducer_tests {
         let mut outcome = EvalCaseOutcome::new(
             "retrieval-quality",
             case_id,
-            EvalMode::RetrievalOnly,
+            RETRIEVAL_QUALITY_MODE,
             CorpusSplit::Test,
             LabelTrust::Reviewed,
             CaseStatus::Passed,
@@ -774,7 +986,8 @@ mod reducer_tests {
             label_trust: LabelTrust::Reviewed,
             query: "What is the answer?".into(),
             budget: 5,
-            as_of: timestamp,
+            as_of: Some(timestamp),
+            snapshot_after_source: None,
             tags: vec!["contract".into()],
             fact_types: vec![],
             view_mode: None,
@@ -788,6 +1001,32 @@ mod reducer_tests {
             expect_empty,
             expected_order: None,
         }
+    }
+
+    #[test]
+    fn native_retrieval_quality_labels_every_artifact_end_to_end() {
+        let corpus_root =
+            Path::new(env!("CARGO_MANIFEST_DIR")).join("../../evals/corpora/retrieval-quality-v1");
+        let suite = RetrievalQualitySuite::from_decl(&SuiteDecl {
+            id: "retrieval-quality".into(),
+            mode: None,
+            corpus_root: Some(corpus_root.to_string_lossy().into_owned()),
+            expected_coverage: Some(crate::profile::ExpectedCoverage { exact_cases: 37 }),
+        })
+        .expect("the pinned native retrieval corpus loads");
+
+        assert_eq!(suite.mode(), EvalMode::EndToEnd);
+        assert_eq!(
+            invalid_outcome(&case(false), "provider unavailable").mode,
+            EvalMode::EndToEnd
+        );
+        assert_eq!(
+            RetrievalQualityReducer::new()
+                .reduce(&[])
+                .expect("empty reducer output remains attributable")[0]
+                .mode,
+            EvalMode::EndToEnd
+        );
     }
 
     #[test]
@@ -997,6 +1236,8 @@ mod source_bundle_tests {
                 index_signature: "indexsig:test".into(),
                 extractor_fingerprint: "anno".into(),
                 claim_rollout_stage: "disabled".into(),
+                model_files_sha256: BTreeMap::new(),
+                reranking_signature: None,
             },
             cases: vec![QualityCase {
                 id: "case-1".into(),
@@ -1004,7 +1245,8 @@ mod source_bundle_tests {
                 label_trust: LabelTrust::Reviewed,
                 query: "What is the user's preference?".into(),
                 budget: 5,
-                as_of: timestamp,
+                as_of: Some(timestamp),
+                snapshot_after_source: None,
                 tags: vec!["preference".into()],
                 fact_types: vec![],
                 view_mode: None,
@@ -1068,6 +1310,8 @@ mod source_bundle_tests {
                 index_signature: "indexsig:test".into(),
                 extractor_fingerprint: "anno".into(),
                 claim_rollout_stage: "disabled".into(),
+                model_files_sha256: BTreeMap::new(),
+                reranking_signature: None,
             },
             cases: vec![QualityCase {
                 id: "case-1".into(),
@@ -1075,7 +1319,8 @@ mod source_bundle_tests {
                 label_trust: LabelTrust::Reviewed,
                 query: "What is the user's preference?".into(),
                 budget: 5,
-                as_of: timestamp,
+                as_of: Some(timestamp),
+                snapshot_after_source: None,
                 tags: vec!["preference".into()],
                 fact_types: vec![],
                 view_mode: None,
@@ -1115,6 +1360,8 @@ mod source_bundle_tests {
                 index_signature: "indexsig:test".into(),
                 extractor_fingerprint: "anno".into(),
                 claim_rollout_stage: "disabled".into(),
+                model_files_sha256: BTreeMap::new(),
+                reranking_signature: None,
             },
             cases: vec![],
         };
@@ -1150,6 +1397,8 @@ mod source_bundle_tests {
                 index_signature: "indexsig:test".into(),
                 extractor_fingerprint: "anno".into(),
                 claim_rollout_stage: "disabled".into(),
+                model_files_sha256: BTreeMap::new(),
+                reranking_signature: None,
             },
             cases: vec![],
         };

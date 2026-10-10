@@ -1,0 +1,1947 @@
+{
+  "schema_version": "memory-mcp-eval/v2",
+  "run_id": "run-1791540726",
+  "profile": "pr",
+  "started_at": "2026-10-09T10:12:06.369216Z",
+  "duration_ms": 4054,
+  "expected_case_ids": [],
+  "expected_cases": [
+    {
+      "suite_id": "local-retrieval",
+      "case_id": "first-person-rescue-profile"
+    },
+    {
+      "suite_id": "local-retrieval",
+      "case_id": "graph-anchor-alice-neighbor"
+    },
+    {
+      "suite_id": "local-retrieval",
+      "case_id": "ret-001"
+    },
+    {
+      "suite_id": "local-retrieval",
+      "case_id": "ret-002"
+    },
+    {
+      "suite_id": "local-retrieval",
+      "case_id": "ret-003"
+    },
+    {
+      "suite_id": "local-retrieval",
+      "case_id": "ret-004"
+    },
+    {
+      "suite_id": "local-retrieval",
+      "case_id": "ret-005"
+    },
+    {
+      "suite_id": "local-retrieval",
+      "case_id": "ret-006"
+    },
+    {
+      "suite_id": "local-retrieval",
+      "case_id": "ret-007"
+    },
+    {
+      "suite_id": "local-retrieval",
+      "case_id": "ret-008"
+    },
+    {
+      "suite_id": "local-retrieval",
+      "case_id": "ret-009"
+    },
+    {
+      "suite_id": "local-retrieval",
+      "case_id": "ret-010"
+    },
+    {
+      "suite_id": "local-retrieval",
+      "case_id": "ret-011"
+    },
+    {
+      "suite_id": "local-retrieval",
+      "case_id": "ret-012"
+    },
+    {
+      "suite_id": "local-retrieval",
+      "case_id": "ret-013"
+    },
+    {
+      "suite_id": "local-retrieval",
+      "case_id": "ret-014"
+    },
+    {
+      "suite_id": "local-retrieval",
+      "case_id": "ret-015"
+    },
+    {
+      "suite_id": "local-retrieval",
+      "case_id": "ret-016"
+    },
+    {
+      "suite_id": "local-retrieval",
+      "case_id": "ret-017"
+    },
+    {
+      "suite_id": "local-retrieval",
+      "case_id": "ret-018"
+    },
+    {
+      "suite_id": "local-retrieval",
+      "case_id": "ret-019"
+    },
+    {
+      "suite_id": "local-retrieval",
+      "case_id": "ret-020"
+    },
+    {
+      "suite_id": "local-retrieval",
+      "case_id": "ret-021"
+    },
+    {
+      "suite_id": "local-retrieval",
+      "case_id": "ret-022"
+    },
+    {
+      "suite_id": "local-retrieval",
+      "case_id": "ret-023"
+    },
+    {
+      "suite_id": "local-retrieval",
+      "case_id": "ret-024"
+    },
+    {
+      "suite_id": "local-retrieval",
+      "case_id": "ret-025"
+    },
+    {
+      "suite_id": "local-retrieval",
+      "case_id": "ret-026"
+    },
+    {
+      "suite_id": "local-retrieval",
+      "case_id": "ret-027"
+    },
+    {
+      "suite_id": "local-retrieval",
+      "case_id": "ret-028"
+    },
+    {
+      "suite_id": "local-retrieval",
+      "case_id": "ret-029"
+    },
+    {
+      "suite_id": "local-retrieval",
+      "case_id": "ret-030"
+    },
+    {
+      "suite_id": "local-retrieval",
+      "case_id": "ret-031"
+    },
+    {
+      "suite_id": "local-retrieval",
+      "case_id": "ret-032"
+    },
+    {
+      "suite_id": "local-retrieval",
+      "case_id": "ret-033"
+    },
+    {
+      "suite_id": "local-retrieval",
+      "case_id": "ret-034"
+    },
+    {
+      "suite_id": "local-retrieval",
+      "case_id": "ret-035"
+    },
+    {
+      "suite_id": "local-retrieval",
+      "case_id": "ret-036"
+    },
+    {
+      "suite_id": "local-retrieval",
+      "case_id": "ret-037"
+    },
+    {
+      "suite_id": "local-retrieval",
+      "case_id": "ret-038"
+    },
+    {
+      "suite_id": "local-retrieval",
+      "case_id": "ret-039"
+    },
+    {
+      "suite_id": "local-retrieval",
+      "case_id": "ret-040"
+    },
+    {
+      "suite_id": "local-retrieval",
+      "case_id": "ret-041"
+    },
+    {
+      "suite_id": "local-retrieval",
+      "case_id": "ret-042"
+    },
+    {
+      "suite_id": "local-retrieval",
+      "case_id": "ret-043"
+    },
+    {
+      "suite_id": "local-retrieval",
+      "case_id": "ret-044"
+    },
+    {
+      "suite_id": "local-retrieval",
+      "case_id": "ret-045"
+    },
+    {
+      "suite_id": "local-retrieval",
+      "case_id": "ret-046"
+    },
+    {
+      "suite_id": "local-retrieval",
+      "case_id": "ret-047"
+    },
+    {
+      "suite_id": "local-retrieval",
+      "case_id": "ret-048"
+    },
+    {
+      "suite_id": "local-retrieval",
+      "case_id": "ret-049"
+    },
+    {
+      "suite_id": "local-retrieval",
+      "case_id": "ret-050"
+    },
+    {
+      "suite_id": "local-retrieval",
+      "case_id": "ret-056"
+    },
+    {
+      "suite_id": "local-retrieval",
+      "case_id": "ret-057"
+    },
+    {
+      "suite_id": "local-retrieval",
+      "case_id": "ret-058"
+    },
+    {
+      "suite_id": "local-retrieval",
+      "case_id": "ret-059"
+    },
+    {
+      "suite_id": "local-retrieval",
+      "case_id": "ret-060"
+    },
+    {
+      "suite_id": "local-retrieval",
+      "case_id": "ret-061"
+    },
+    {
+      "suite_id": "local-retrieval",
+      "case_id": "ret-062"
+    },
+    {
+      "suite_id": "local-retrieval",
+      "case_id": "ret-063"
+    },
+    {
+      "suite_id": "local-retrieval",
+      "case_id": "timeline-auto-atlas-history"
+    }
+  ],
+  "outcomes": [
+    {
+      "case_key": {
+        "suite_id": "local-retrieval",
+        "case_id": "first-person-rescue-profile"
+      },
+      "mode": "retrieval_only",
+      "split": "development",
+      "label_trust": "weak",
+      "status": "passed",
+      "metrics": {
+        "legacy_v1_mrr_at_budget": 1.0,
+        "legacy_v1_required_group_recall_at_budget": 1.0,
+        "legacy_v1_top_1_hit_rate_at_budget": 1.0
+      },
+      "evidence": {
+        "retrieval": {
+          "kind": "retrieval",
+          "relevant": 1,
+          "hits_at_k": 1,
+          "first_relevant_rank": 1,
+          "cutoff": 2
+        }
+      },
+      "failures": [],
+      "duration_ms": 71,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "local-retrieval",
+        "case_id": "graph-anchor-alice-neighbor"
+      },
+      "mode": "retrieval_only",
+      "split": "development",
+      "label_trust": "weak",
+      "status": "passed",
+      "metrics": {
+        "legacy_v1_mrr_at_budget": 1.0,
+        "legacy_v1_required_group_recall_at_budget": 1.0,
+        "legacy_v1_top_1_hit_rate_at_budget": 1.0
+      },
+      "evidence": {
+        "retrieval": {
+          "kind": "retrieval",
+          "relevant": 1,
+          "hits_at_k": 1,
+          "first_relevant_rank": 1,
+          "cutoff": 5
+        }
+      },
+      "failures": [],
+      "duration_ms": 54,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "local-retrieval",
+        "case_id": "ret-001"
+      },
+      "mode": "retrieval_only",
+      "split": "development",
+      "label_trust": "weak",
+      "status": "passed",
+      "metrics": {
+        "legacy_v1_mrr_at_budget": 1.0,
+        "legacy_v1_required_group_recall_at_budget": 1.0,
+        "legacy_v1_top_1_hit_rate_at_budget": 1.0
+      },
+      "evidence": {
+        "retrieval": {
+          "kind": "retrieval",
+          "relevant": 1,
+          "hits_at_k": 1,
+          "first_relevant_rank": 1,
+          "cutoff": 5
+        }
+      },
+      "failures": [],
+      "duration_ms": 111,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "local-retrieval",
+        "case_id": "ret-002"
+      },
+      "mode": "retrieval_only",
+      "split": "development",
+      "label_trust": "weak",
+      "status": "passed",
+      "metrics": {
+        "legacy_v1_mrr_at_budget": 1.0,
+        "legacy_v1_required_group_recall_at_budget": 1.0,
+        "legacy_v1_top_1_hit_rate_at_budget": 1.0
+      },
+      "evidence": {
+        "retrieval": {
+          "kind": "retrieval",
+          "relevant": 1,
+          "hits_at_k": 1,
+          "first_relevant_rank": 1,
+          "cutoff": 5
+        }
+      },
+      "failures": [],
+      "duration_ms": 71,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "local-retrieval",
+        "case_id": "ret-003"
+      },
+      "mode": "retrieval_only",
+      "split": "development",
+      "label_trust": "weak",
+      "status": "passed",
+      "metrics": {
+        "legacy_v1_mrr_at_budget": 1.0,
+        "legacy_v1_required_group_recall_at_budget": 1.0,
+        "legacy_v1_top_1_hit_rate_at_budget": 1.0
+      },
+      "evidence": {
+        "retrieval": {
+          "kind": "retrieval",
+          "relevant": 1,
+          "hits_at_k": 1,
+          "first_relevant_rank": 1,
+          "cutoff": 5
+        }
+      },
+      "failures": [],
+      "duration_ms": 75,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "local-retrieval",
+        "case_id": "ret-004"
+      },
+      "mode": "retrieval_only",
+      "split": "development",
+      "label_trust": "weak",
+      "status": "passed",
+      "metrics": {
+        "legacy_v1_mrr_at_budget": 1.0,
+        "legacy_v1_required_group_recall_at_budget": 1.0,
+        "legacy_v1_top_1_hit_rate_at_budget": 1.0
+      },
+      "evidence": {
+        "retrieval": {
+          "kind": "retrieval",
+          "relevant": 1,
+          "hits_at_k": 1,
+          "first_relevant_rank": 1,
+          "cutoff": 5
+        }
+      },
+      "failures": [],
+      "duration_ms": 78,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "local-retrieval",
+        "case_id": "ret-005"
+      },
+      "mode": "retrieval_only",
+      "split": "development",
+      "label_trust": "weak",
+      "status": "passed",
+      "metrics": {
+        "legacy_v1_mrr_at_budget": 1.0,
+        "legacy_v1_required_group_recall_at_budget": 1.0,
+        "legacy_v1_top_1_hit_rate_at_budget": 1.0
+      },
+      "evidence": {
+        "retrieval": {
+          "kind": "retrieval",
+          "relevant": 1,
+          "hits_at_k": 1,
+          "first_relevant_rank": 1,
+          "cutoff": 5
+        }
+      },
+      "failures": [],
+      "duration_ms": 61,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "local-retrieval",
+        "case_id": "ret-006"
+      },
+      "mode": "retrieval_only",
+      "split": "development",
+      "label_trust": "weak",
+      "status": "passed",
+      "metrics": {
+        "legacy_v1_mrr_at_budget": 1.0,
+        "legacy_v1_required_group_recall_at_budget": 1.0,
+        "legacy_v1_top_1_hit_rate_at_budget": 1.0
+      },
+      "evidence": {
+        "retrieval": {
+          "kind": "retrieval",
+          "relevant": 1,
+          "hits_at_k": 1,
+          "first_relevant_rank": 1,
+          "cutoff": 5
+        }
+      },
+      "failures": [],
+      "duration_ms": 64,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "local-retrieval",
+        "case_id": "ret-007"
+      },
+      "mode": "retrieval_only",
+      "split": "development",
+      "label_trust": "weak",
+      "status": "passed",
+      "metrics": {
+        "legacy_v1_mrr_at_budget": 1.0,
+        "legacy_v1_required_group_recall_at_budget": 1.0,
+        "legacy_v1_top_1_hit_rate_at_budget": 1.0
+      },
+      "evidence": {
+        "retrieval": {
+          "kind": "retrieval",
+          "relevant": 1,
+          "hits_at_k": 1,
+          "first_relevant_rank": 1,
+          "cutoff": 5
+        }
+      },
+      "failures": [],
+      "duration_ms": 61,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "local-retrieval",
+        "case_id": "ret-008"
+      },
+      "mode": "retrieval_only",
+      "split": "development",
+      "label_trust": "weak",
+      "status": "passed",
+      "metrics": {
+        "legacy_v1_mrr_at_budget": 1.0,
+        "legacy_v1_required_group_recall_at_budget": 1.0,
+        "legacy_v1_top_1_hit_rate_at_budget": 1.0
+      },
+      "evidence": {
+        "retrieval": {
+          "kind": "retrieval",
+          "relevant": 1,
+          "hits_at_k": 1,
+          "first_relevant_rank": 1,
+          "cutoff": 5
+        }
+      },
+      "failures": [],
+      "duration_ms": 64,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "local-retrieval",
+        "case_id": "ret-009"
+      },
+      "mode": "retrieval_only",
+      "split": "development",
+      "label_trust": "weak",
+      "status": "passed",
+      "metrics": {
+        "legacy_v1_mrr_at_budget": 1.0,
+        "legacy_v1_required_group_recall_at_budget": 1.0,
+        "legacy_v1_top_1_hit_rate_at_budget": 1.0
+      },
+      "evidence": {
+        "retrieval": {
+          "kind": "retrieval",
+          "relevant": 1,
+          "hits_at_k": 1,
+          "first_relevant_rank": 1,
+          "cutoff": 5
+        }
+      },
+      "failures": [],
+      "duration_ms": 62,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "local-retrieval",
+        "case_id": "ret-010"
+      },
+      "mode": "retrieval_only",
+      "split": "development",
+      "label_trust": "weak",
+      "status": "passed",
+      "metrics": {
+        "legacy_v1_mrr_at_budget": 1.0,
+        "legacy_v1_required_group_recall_at_budget": 1.0,
+        "legacy_v1_top_1_hit_rate_at_budget": 1.0
+      },
+      "evidence": {
+        "retrieval": {
+          "kind": "retrieval",
+          "relevant": 1,
+          "hits_at_k": 1,
+          "first_relevant_rank": 1,
+          "cutoff": 5
+        }
+      },
+      "failures": [],
+      "duration_ms": 61,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "local-retrieval",
+        "case_id": "ret-011"
+      },
+      "mode": "retrieval_only",
+      "split": "development",
+      "label_trust": "weak",
+      "status": "passed",
+      "metrics": {
+        "legacy_v1_mrr_at_budget": 1.0,
+        "legacy_v1_required_group_recall_at_budget": 1.0,
+        "legacy_v1_top_1_hit_rate_at_budget": 1.0
+      },
+      "evidence": {
+        "retrieval": {
+          "kind": "retrieval",
+          "relevant": 1,
+          "hits_at_k": 1,
+          "first_relevant_rank": 1,
+          "cutoff": 5
+        }
+      },
+      "failures": [],
+      "duration_ms": 61,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "local-retrieval",
+        "case_id": "ret-012"
+      },
+      "mode": "retrieval_only",
+      "split": "development",
+      "label_trust": "weak",
+      "status": "passed",
+      "metrics": {
+        "legacy_v1_mrr_at_budget": 1.0,
+        "legacy_v1_required_group_recall_at_budget": 1.0,
+        "legacy_v1_top_1_hit_rate_at_budget": 1.0
+      },
+      "evidence": {
+        "retrieval": {
+          "kind": "retrieval",
+          "relevant": 1,
+          "hits_at_k": 1,
+          "first_relevant_rank": 1,
+          "cutoff": 5
+        }
+      },
+      "failures": [],
+      "duration_ms": 56,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "local-retrieval",
+        "case_id": "ret-013"
+      },
+      "mode": "retrieval_only",
+      "split": "development",
+      "label_trust": "weak",
+      "status": "passed",
+      "metrics": {
+        "legacy_v1_mrr_at_budget": 1.0,
+        "legacy_v1_required_group_recall_at_budget": 1.0,
+        "legacy_v1_top_1_hit_rate_at_budget": 1.0
+      },
+      "evidence": {
+        "retrieval": {
+          "kind": "retrieval",
+          "relevant": 1,
+          "hits_at_k": 1,
+          "first_relevant_rank": 1,
+          "cutoff": 5
+        }
+      },
+      "failures": [],
+      "duration_ms": 62,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "local-retrieval",
+        "case_id": "ret-014"
+      },
+      "mode": "retrieval_only",
+      "split": "development",
+      "label_trust": "weak",
+      "status": "passed",
+      "metrics": {
+        "legacy_v1_mrr_at_budget": 1.0,
+        "legacy_v1_required_group_recall_at_budget": 1.0,
+        "legacy_v1_top_1_hit_rate_at_budget": 1.0
+      },
+      "evidence": {
+        "retrieval": {
+          "kind": "retrieval",
+          "relevant": 1,
+          "hits_at_k": 1,
+          "first_relevant_rank": 1,
+          "cutoff": 5
+        }
+      },
+      "failures": [],
+      "duration_ms": 62,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "local-retrieval",
+        "case_id": "ret-015"
+      },
+      "mode": "retrieval_only",
+      "split": "development",
+      "label_trust": "weak",
+      "status": "passed",
+      "metrics": {
+        "legacy_v1_mrr_at_budget": 1.0,
+        "legacy_v1_required_group_recall_at_budget": 1.0,
+        "legacy_v1_top_1_hit_rate_at_budget": 1.0
+      },
+      "evidence": {
+        "retrieval": {
+          "kind": "retrieval",
+          "relevant": 1,
+          "hits_at_k": 1,
+          "first_relevant_rank": 1,
+          "cutoff": 5
+        }
+      },
+      "failures": [],
+      "duration_ms": 70,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "local-retrieval",
+        "case_id": "ret-016"
+      },
+      "mode": "retrieval_only",
+      "split": "development",
+      "label_trust": "weak",
+      "status": "passed",
+      "metrics": {
+        "legacy_v1_mrr_at_budget": 1.0,
+        "legacy_v1_required_group_recall_at_budget": 1.0,
+        "legacy_v1_top_1_hit_rate_at_budget": 1.0
+      },
+      "evidence": {
+        "retrieval": {
+          "kind": "retrieval",
+          "relevant": 1,
+          "hits_at_k": 1,
+          "first_relevant_rank": 1,
+          "cutoff": 5
+        }
+      },
+      "failures": [],
+      "duration_ms": 68,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "local-retrieval",
+        "case_id": "ret-017"
+      },
+      "mode": "retrieval_only",
+      "split": "development",
+      "label_trust": "weak",
+      "status": "passed",
+      "metrics": {
+        "legacy_v1_mrr_at_budget": 1.0,
+        "legacy_v1_required_group_recall_at_budget": 1.0,
+        "legacy_v1_top_1_hit_rate_at_budget": 1.0
+      },
+      "evidence": {
+        "retrieval": {
+          "kind": "retrieval",
+          "relevant": 1,
+          "hits_at_k": 1,
+          "first_relevant_rank": 1,
+          "cutoff": 5
+        }
+      },
+      "failures": [],
+      "duration_ms": 68,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "local-retrieval",
+        "case_id": "ret-018"
+      },
+      "mode": "retrieval_only",
+      "split": "development",
+      "label_trust": "weak",
+      "status": "passed",
+      "metrics": {
+        "legacy_v1_mrr_at_budget": 1.0,
+        "legacy_v1_required_group_recall_at_budget": 1.0,
+        "legacy_v1_top_1_hit_rate_at_budget": 1.0
+      },
+      "evidence": {
+        "retrieval": {
+          "kind": "retrieval",
+          "relevant": 1,
+          "hits_at_k": 1,
+          "first_relevant_rank": 1,
+          "cutoff": 5
+        }
+      },
+      "failures": [],
+      "duration_ms": 70,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "local-retrieval",
+        "case_id": "ret-019"
+      },
+      "mode": "retrieval_only",
+      "split": "development",
+      "label_trust": "weak",
+      "status": "passed",
+      "metrics": {
+        "legacy_v1_mrr_at_budget": 1.0,
+        "legacy_v1_required_group_recall_at_budget": 1.0,
+        "legacy_v1_top_1_hit_rate_at_budget": 1.0
+      },
+      "evidence": {
+        "retrieval": {
+          "kind": "retrieval",
+          "relevant": 1,
+          "hits_at_k": 1,
+          "first_relevant_rank": 1,
+          "cutoff": 5
+        }
+      },
+      "failures": [],
+      "duration_ms": 69,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "local-retrieval",
+        "case_id": "ret-020"
+      },
+      "mode": "retrieval_only",
+      "split": "development",
+      "label_trust": "weak",
+      "status": "passed",
+      "metrics": {
+        "legacy_v1_mrr_at_budget": 1.0,
+        "legacy_v1_required_group_recall_at_budget": 1.0,
+        "legacy_v1_top_1_hit_rate_at_budget": 1.0
+      },
+      "evidence": {
+        "retrieval": {
+          "kind": "retrieval",
+          "relevant": 1,
+          "hits_at_k": 1,
+          "first_relevant_rank": 1,
+          "cutoff": 5
+        }
+      },
+      "failures": [],
+      "duration_ms": 63,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "local-retrieval",
+        "case_id": "ret-021"
+      },
+      "mode": "retrieval_only",
+      "split": "development",
+      "label_trust": "weak",
+      "status": "passed",
+      "metrics": {
+        "legacy_v1_mrr_at_budget": 1.0,
+        "legacy_v1_required_group_recall_at_budget": 1.0,
+        "legacy_v1_top_1_hit_rate_at_budget": 1.0
+      },
+      "evidence": {
+        "retrieval": {
+          "kind": "retrieval",
+          "relevant": 1,
+          "hits_at_k": 1,
+          "first_relevant_rank": 1,
+          "cutoff": 5
+        }
+      },
+      "failures": [],
+      "duration_ms": 67,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "local-retrieval",
+        "case_id": "ret-022"
+      },
+      "mode": "retrieval_only",
+      "split": "development",
+      "label_trust": "weak",
+      "status": "passed",
+      "metrics": {
+        "legacy_v1_mrr_at_budget": 1.0,
+        "legacy_v1_required_group_recall_at_budget": 1.0,
+        "legacy_v1_top_1_hit_rate_at_budget": 1.0
+      },
+      "evidence": {
+        "retrieval": {
+          "kind": "retrieval",
+          "relevant": 1,
+          "hits_at_k": 1,
+          "first_relevant_rank": 1,
+          "cutoff": 5
+        }
+      },
+      "failures": [],
+      "duration_ms": 52,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "local-retrieval",
+        "case_id": "ret-023"
+      },
+      "mode": "retrieval_only",
+      "split": "development",
+      "label_trust": "weak",
+      "status": "passed",
+      "metrics": {
+        "legacy_v1_mrr_at_budget": 1.0,
+        "legacy_v1_required_group_recall_at_budget": 1.0,
+        "legacy_v1_top_1_hit_rate_at_budget": 1.0
+      },
+      "evidence": {
+        "retrieval": {
+          "kind": "retrieval",
+          "relevant": 1,
+          "hits_at_k": 1,
+          "first_relevant_rank": 1,
+          "cutoff": 5
+        }
+      },
+      "failures": [],
+      "duration_ms": 65,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "local-retrieval",
+        "case_id": "ret-024"
+      },
+      "mode": "retrieval_only",
+      "split": "development",
+      "label_trust": "weak",
+      "status": "passed",
+      "metrics": {
+        "legacy_v1_mrr_at_budget": 1.0,
+        "legacy_v1_required_group_recall_at_budget": 1.0,
+        "legacy_v1_top_1_hit_rate_at_budget": 1.0
+      },
+      "evidence": {
+        "retrieval": {
+          "kind": "retrieval",
+          "relevant": 1,
+          "hits_at_k": 1,
+          "first_relevant_rank": 1,
+          "cutoff": 5
+        }
+      },
+      "failures": [],
+      "duration_ms": 63,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "local-retrieval",
+        "case_id": "ret-025"
+      },
+      "mode": "retrieval_only",
+      "split": "development",
+      "label_trust": "weak",
+      "status": "passed",
+      "metrics": {
+        "legacy_v1_mrr_at_budget": 1.0,
+        "legacy_v1_required_group_recall_at_budget": 1.0,
+        "legacy_v1_top_1_hit_rate_at_budget": 1.0
+      },
+      "evidence": {
+        "retrieval": {
+          "kind": "retrieval",
+          "relevant": 1,
+          "hits_at_k": 1,
+          "first_relevant_rank": 1,
+          "cutoff": 5
+        }
+      },
+      "failures": [],
+      "duration_ms": 63,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "local-retrieval",
+        "case_id": "ret-026"
+      },
+      "mode": "retrieval_only",
+      "split": "development",
+      "label_trust": "weak",
+      "status": "passed",
+      "metrics": {
+        "legacy_v1_mrr_at_budget": 1.0,
+        "legacy_v1_required_group_recall_at_budget": 1.0,
+        "legacy_v1_top_1_hit_rate_at_budget": 1.0
+      },
+      "evidence": {
+        "retrieval": {
+          "kind": "retrieval",
+          "relevant": 1,
+          "hits_at_k": 1,
+          "first_relevant_rank": 1,
+          "cutoff": 5
+        }
+      },
+      "failures": [],
+      "duration_ms": 66,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "local-retrieval",
+        "case_id": "ret-027"
+      },
+      "mode": "retrieval_only",
+      "split": "development",
+      "label_trust": "weak",
+      "status": "passed",
+      "metrics": {
+        "legacy_v1_mrr_at_budget": 1.0,
+        "legacy_v1_required_group_recall_at_budget": 1.0,
+        "legacy_v1_top_1_hit_rate_at_budget": 1.0
+      },
+      "evidence": {
+        "retrieval": {
+          "kind": "retrieval",
+          "relevant": 1,
+          "hits_at_k": 1,
+          "first_relevant_rank": 1,
+          "cutoff": 5
+        }
+      },
+      "failures": [],
+      "duration_ms": 62,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "local-retrieval",
+        "case_id": "ret-028"
+      },
+      "mode": "retrieval_only",
+      "split": "development",
+      "label_trust": "weak",
+      "status": "passed",
+      "metrics": {
+        "legacy_v1_mrr_at_budget": 1.0,
+        "legacy_v1_required_group_recall_at_budget": 1.0,
+        "legacy_v1_top_1_hit_rate_at_budget": 1.0
+      },
+      "evidence": {
+        "retrieval": {
+          "kind": "retrieval",
+          "relevant": 1,
+          "hits_at_k": 1,
+          "first_relevant_rank": 1,
+          "cutoff": 5
+        }
+      },
+      "failures": [],
+      "duration_ms": 60,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "local-retrieval",
+        "case_id": "ret-029"
+      },
+      "mode": "retrieval_only",
+      "split": "development",
+      "label_trust": "weak",
+      "status": "passed",
+      "metrics": {
+        "legacy_v1_mrr_at_budget": 1.0,
+        "legacy_v1_required_group_recall_at_budget": 1.0,
+        "legacy_v1_top_1_hit_rate_at_budget": 1.0
+      },
+      "evidence": {
+        "retrieval": {
+          "kind": "retrieval",
+          "relevant": 1,
+          "hits_at_k": 1,
+          "first_relevant_rank": 1,
+          "cutoff": 5
+        }
+      },
+      "failures": [],
+      "duration_ms": 63,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "local-retrieval",
+        "case_id": "ret-030"
+      },
+      "mode": "retrieval_only",
+      "split": "development",
+      "label_trust": "weak",
+      "status": "passed",
+      "metrics": {
+        "legacy_v1_mrr_at_budget": 1.0,
+        "legacy_v1_required_group_recall_at_budget": 1.0,
+        "legacy_v1_top_1_hit_rate_at_budget": 1.0
+      },
+      "evidence": {
+        "retrieval": {
+          "kind": "retrieval",
+          "relevant": 1,
+          "hits_at_k": 1,
+          "first_relevant_rank": 1,
+          "cutoff": 5
+        }
+      },
+      "failures": [],
+      "duration_ms": 60,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "local-retrieval",
+        "case_id": "ret-031"
+      },
+      "mode": "retrieval_only",
+      "split": "development",
+      "label_trust": "weak",
+      "status": "passed",
+      "metrics": {
+        "legacy_v1_mrr_at_budget": 1.0,
+        "legacy_v1_required_group_recall_at_budget": 1.0,
+        "legacy_v1_top_1_hit_rate_at_budget": 1.0
+      },
+      "evidence": {
+        "retrieval": {
+          "kind": "retrieval",
+          "relevant": 1,
+          "hits_at_k": 1,
+          "first_relevant_rank": 1,
+          "cutoff": 5
+        }
+      },
+      "failures": [],
+      "duration_ms": 61,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "local-retrieval",
+        "case_id": "ret-032"
+      },
+      "mode": "retrieval_only",
+      "split": "development",
+      "label_trust": "weak",
+      "status": "passed",
+      "metrics": {
+        "legacy_v1_mrr_at_budget": 1.0,
+        "legacy_v1_required_group_recall_at_budget": 1.0,
+        "legacy_v1_top_1_hit_rate_at_budget": 1.0
+      },
+      "evidence": {
+        "retrieval": {
+          "kind": "retrieval",
+          "relevant": 1,
+          "hits_at_k": 1,
+          "first_relevant_rank": 1,
+          "cutoff": 5
+        }
+      },
+      "failures": [],
+      "duration_ms": 62,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "local-retrieval",
+        "case_id": "ret-033"
+      },
+      "mode": "retrieval_only",
+      "split": "development",
+      "label_trust": "weak",
+      "status": "passed",
+      "metrics": {
+        "legacy_v1_mrr_at_budget": 1.0,
+        "legacy_v1_required_group_recall_at_budget": 1.0,
+        "legacy_v1_top_1_hit_rate_at_budget": 1.0
+      },
+      "evidence": {
+        "retrieval": {
+          "kind": "retrieval",
+          "relevant": 1,
+          "hits_at_k": 1,
+          "first_relevant_rank": 1,
+          "cutoff": 5
+        }
+      },
+      "failures": [],
+      "duration_ms": 57,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "local-retrieval",
+        "case_id": "ret-034"
+      },
+      "mode": "retrieval_only",
+      "split": "development",
+      "label_trust": "weak",
+      "status": "passed",
+      "metrics": {
+        "legacy_v1_mrr_at_budget": 1.0,
+        "legacy_v1_required_group_recall_at_budget": 1.0,
+        "legacy_v1_top_1_hit_rate_at_budget": 1.0
+      },
+      "evidence": {
+        "retrieval": {
+          "kind": "retrieval",
+          "relevant": 1,
+          "hits_at_k": 1,
+          "first_relevant_rank": 1,
+          "cutoff": 5
+        }
+      },
+      "failures": [],
+      "duration_ms": 58,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "local-retrieval",
+        "case_id": "ret-035"
+      },
+      "mode": "retrieval_only",
+      "split": "development",
+      "label_trust": "weak",
+      "status": "passed",
+      "metrics": {
+        "legacy_v1_mrr_at_budget": 1.0,
+        "legacy_v1_required_group_recall_at_budget": 1.0,
+        "legacy_v1_top_1_hit_rate_at_budget": 1.0
+      },
+      "evidence": {
+        "retrieval": {
+          "kind": "retrieval",
+          "relevant": 1,
+          "hits_at_k": 1,
+          "first_relevant_rank": 1,
+          "cutoff": 5
+        }
+      },
+      "failures": [],
+      "duration_ms": 66,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "local-retrieval",
+        "case_id": "ret-036"
+      },
+      "mode": "retrieval_only",
+      "split": "development",
+      "label_trust": "weak",
+      "status": "passed",
+      "metrics": {
+        "legacy_v1_mrr_at_budget": 1.0,
+        "legacy_v1_required_group_recall_at_budget": 1.0,
+        "legacy_v1_top_1_hit_rate_at_budget": 1.0
+      },
+      "evidence": {
+        "retrieval": {
+          "kind": "retrieval",
+          "relevant": 1,
+          "hits_at_k": 1,
+          "first_relevant_rank": 1,
+          "cutoff": 5
+        }
+      },
+      "failures": [],
+      "duration_ms": 60,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "local-retrieval",
+        "case_id": "ret-037"
+      },
+      "mode": "retrieval_only",
+      "split": "development",
+      "label_trust": "weak",
+      "status": "passed",
+      "metrics": {
+        "legacy_v1_mrr_at_budget": 1.0,
+        "legacy_v1_required_group_recall_at_budget": 1.0,
+        "legacy_v1_top_1_hit_rate_at_budget": 1.0
+      },
+      "evidence": {
+        "retrieval": {
+          "kind": "retrieval",
+          "relevant": 1,
+          "hits_at_k": 1,
+          "first_relevant_rank": 1,
+          "cutoff": 5
+        }
+      },
+      "failures": [],
+      "duration_ms": 56,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "local-retrieval",
+        "case_id": "ret-038"
+      },
+      "mode": "retrieval_only",
+      "split": "development",
+      "label_trust": "weak",
+      "status": "passed",
+      "metrics": {
+        "legacy_v1_mrr_at_budget": 1.0,
+        "legacy_v1_required_group_recall_at_budget": 1.0,
+        "legacy_v1_top_1_hit_rate_at_budget": 1.0
+      },
+      "evidence": {
+        "retrieval": {
+          "kind": "retrieval",
+          "relevant": 1,
+          "hits_at_k": 1,
+          "first_relevant_rank": 1,
+          "cutoff": 5
+        }
+      },
+      "failures": [],
+      "duration_ms": 63,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "local-retrieval",
+        "case_id": "ret-039"
+      },
+      "mode": "retrieval_only",
+      "split": "development",
+      "label_trust": "weak",
+      "status": "passed",
+      "metrics": {
+        "legacy_v1_mrr_at_budget": 1.0,
+        "legacy_v1_required_group_recall_at_budget": 1.0,
+        "legacy_v1_top_1_hit_rate_at_budget": 1.0
+      },
+      "evidence": {
+        "retrieval": {
+          "kind": "retrieval",
+          "relevant": 1,
+          "hits_at_k": 1,
+          "first_relevant_rank": 1,
+          "cutoff": 5
+        }
+      },
+      "failures": [],
+      "duration_ms": 64,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "local-retrieval",
+        "case_id": "ret-040"
+      },
+      "mode": "retrieval_only",
+      "split": "development",
+      "label_trust": "weak",
+      "status": "passed",
+      "metrics": {
+        "legacy_v1_mrr_at_budget": 1.0,
+        "legacy_v1_required_group_recall_at_budget": 1.0,
+        "legacy_v1_top_1_hit_rate_at_budget": 1.0
+      },
+      "evidence": {
+        "retrieval": {
+          "kind": "retrieval",
+          "relevant": 1,
+          "hits_at_k": 1,
+          "first_relevant_rank": 1,
+          "cutoff": 5
+        }
+      },
+      "failures": [],
+      "duration_ms": 57,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "local-retrieval",
+        "case_id": "ret-041"
+      },
+      "mode": "retrieval_only",
+      "split": "development",
+      "label_trust": "weak",
+      "status": "passed",
+      "metrics": {
+        "legacy_v1_mrr_at_budget": 1.0,
+        "legacy_v1_required_group_recall_at_budget": 1.0,
+        "legacy_v1_top_1_hit_rate_at_budget": 1.0
+      },
+      "evidence": {
+        "retrieval": {
+          "kind": "retrieval",
+          "relevant": 1,
+          "hits_at_k": 1,
+          "first_relevant_rank": 1,
+          "cutoff": 5
+        }
+      },
+      "failures": [],
+      "duration_ms": 60,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "local-retrieval",
+        "case_id": "ret-042"
+      },
+      "mode": "retrieval_only",
+      "split": "development",
+      "label_trust": "weak",
+      "status": "passed",
+      "metrics": {
+        "legacy_v1_mrr_at_budget": 1.0,
+        "legacy_v1_required_group_recall_at_budget": 1.0,
+        "legacy_v1_top_1_hit_rate_at_budget": 1.0
+      },
+      "evidence": {
+        "retrieval": {
+          "kind": "retrieval",
+          "relevant": 1,
+          "hits_at_k": 1,
+          "first_relevant_rank": 1,
+          "cutoff": 5
+        }
+      },
+      "failures": [],
+      "duration_ms": 61,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "local-retrieval",
+        "case_id": "ret-043"
+      },
+      "mode": "retrieval_only",
+      "split": "development",
+      "label_trust": "weak",
+      "status": "passed",
+      "metrics": {
+        "legacy_v1_mrr_at_budget": 1.0,
+        "legacy_v1_required_group_recall_at_budget": 1.0,
+        "legacy_v1_top_1_hit_rate_at_budget": 1.0
+      },
+      "evidence": {
+        "retrieval": {
+          "kind": "retrieval",
+          "relevant": 1,
+          "hits_at_k": 1,
+          "first_relevant_rank": 1,
+          "cutoff": 5
+        }
+      },
+      "failures": [],
+      "duration_ms": 62,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "local-retrieval",
+        "case_id": "ret-044"
+      },
+      "mode": "retrieval_only",
+      "split": "development",
+      "label_trust": "weak",
+      "status": "passed",
+      "metrics": {
+        "legacy_v1_mrr_at_budget": 1.0,
+        "legacy_v1_required_group_recall_at_budget": 1.0,
+        "legacy_v1_top_1_hit_rate_at_budget": 1.0
+      },
+      "evidence": {
+        "retrieval": {
+          "kind": "retrieval",
+          "relevant": 1,
+          "hits_at_k": 1,
+          "first_relevant_rank": 1,
+          "cutoff": 5
+        }
+      },
+      "failures": [],
+      "duration_ms": 61,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "local-retrieval",
+        "case_id": "ret-045"
+      },
+      "mode": "retrieval_only",
+      "split": "development",
+      "label_trust": "weak",
+      "status": "passed",
+      "metrics": {
+        "legacy_v1_mrr_at_budget": 1.0,
+        "legacy_v1_required_group_recall_at_budget": 1.0,
+        "legacy_v1_top_1_hit_rate_at_budget": 1.0
+      },
+      "evidence": {
+        "retrieval": {
+          "kind": "retrieval",
+          "relevant": 1,
+          "hits_at_k": 1,
+          "first_relevant_rank": 1,
+          "cutoff": 5
+        }
+      },
+      "failures": [],
+      "duration_ms": 56,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "local-retrieval",
+        "case_id": "ret-046"
+      },
+      "mode": "retrieval_only",
+      "split": "development",
+      "label_trust": "weak",
+      "status": "passed",
+      "metrics": {
+        "legacy_v1_mrr_at_budget": 1.0,
+        "legacy_v1_required_group_recall_at_budget": 1.0,
+        "legacy_v1_top_1_hit_rate_at_budget": 1.0
+      },
+      "evidence": {
+        "retrieval": {
+          "kind": "retrieval",
+          "relevant": 1,
+          "hits_at_k": 1,
+          "first_relevant_rank": 1,
+          "cutoff": 5
+        }
+      },
+      "failures": [],
+      "duration_ms": 59,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "local-retrieval",
+        "case_id": "ret-047"
+      },
+      "mode": "retrieval_only",
+      "split": "development",
+      "label_trust": "weak",
+      "status": "passed",
+      "metrics": {
+        "legacy_v1_mrr_at_budget": 1.0,
+        "legacy_v1_required_group_recall_at_budget": 1.0,
+        "legacy_v1_top_1_hit_rate_at_budget": 1.0
+      },
+      "evidence": {
+        "retrieval": {
+          "kind": "retrieval",
+          "relevant": 1,
+          "hits_at_k": 1,
+          "first_relevant_rank": 1,
+          "cutoff": 5
+        }
+      },
+      "failures": [],
+      "duration_ms": 61,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "local-retrieval",
+        "case_id": "ret-048"
+      },
+      "mode": "retrieval_only",
+      "split": "development",
+      "label_trust": "weak",
+      "status": "passed",
+      "metrics": {
+        "legacy_v1_mrr_at_budget": 1.0,
+        "legacy_v1_required_group_recall_at_budget": 1.0,
+        "legacy_v1_top_1_hit_rate_at_budget": 1.0
+      },
+      "evidence": {
+        "retrieval": {
+          "kind": "retrieval",
+          "relevant": 1,
+          "hits_at_k": 1,
+          "first_relevant_rank": 1,
+          "cutoff": 5
+        }
+      },
+      "failures": [],
+      "duration_ms": 56,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "local-retrieval",
+        "case_id": "ret-049"
+      },
+      "mode": "retrieval_only",
+      "split": "development",
+      "label_trust": "weak",
+      "status": "passed",
+      "metrics": {
+        "legacy_v1_mrr_at_budget": 1.0,
+        "legacy_v1_required_group_recall_at_budget": 1.0,
+        "legacy_v1_top_1_hit_rate_at_budget": 1.0
+      },
+      "evidence": {
+        "retrieval": {
+          "kind": "retrieval",
+          "relevant": 1,
+          "hits_at_k": 1,
+          "first_relevant_rank": 1,
+          "cutoff": 5
+        }
+      },
+      "failures": [],
+      "duration_ms": 58,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "local-retrieval",
+        "case_id": "ret-050"
+      },
+      "mode": "retrieval_only",
+      "split": "development",
+      "label_trust": "weak",
+      "status": "passed",
+      "metrics": {
+        "legacy_v1_mrr_at_budget": 1.0,
+        "legacy_v1_required_group_recall_at_budget": 1.0,
+        "legacy_v1_top_1_hit_rate_at_budget": 1.0
+      },
+      "evidence": {
+        "retrieval": {
+          "kind": "retrieval",
+          "relevant": 1,
+          "hits_at_k": 1,
+          "first_relevant_rank": 1,
+          "cutoff": 5
+        }
+      },
+      "failures": [],
+      "duration_ms": 63,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "local-retrieval",
+        "case_id": "ret-056"
+      },
+      "mode": "retrieval_only",
+      "split": "development",
+      "label_trust": "weak",
+      "status": "passed",
+      "metrics": {
+        "legacy_v1_mrr_at_budget": 1.0,
+        "legacy_v1_required_group_recall_at_budget": 1.0,
+        "legacy_v1_top_1_hit_rate_at_budget": 1.0
+      },
+      "evidence": {
+        "retrieval": {
+          "kind": "retrieval",
+          "relevant": 1,
+          "hits_at_k": 1,
+          "first_relevant_rank": 1,
+          "cutoff": 5
+        }
+      },
+      "failures": [],
+      "duration_ms": 60,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "local-retrieval",
+        "case_id": "ret-057"
+      },
+      "mode": "retrieval_only",
+      "split": "development",
+      "label_trust": "weak",
+      "status": "passed",
+      "metrics": {
+        "legacy_v1_mrr_at_budget": 1.0,
+        "legacy_v1_required_group_recall_at_budget": 1.0,
+        "legacy_v1_top_1_hit_rate_at_budget": 1.0
+      },
+      "evidence": {
+        "retrieval": {
+          "kind": "retrieval",
+          "relevant": 1,
+          "hits_at_k": 1,
+          "first_relevant_rank": 1,
+          "cutoff": 5
+        }
+      },
+      "failures": [],
+      "duration_ms": 59,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "local-retrieval",
+        "case_id": "ret-058"
+      },
+      "mode": "retrieval_only",
+      "split": "development",
+      "label_trust": "weak",
+      "status": "passed",
+      "metrics": {
+        "legacy_v1_mrr_at_budget": 1.0,
+        "legacy_v1_required_group_recall_at_budget": 1.0,
+        "legacy_v1_top_1_hit_rate_at_budget": 1.0
+      },
+      "evidence": {
+        "retrieval": {
+          "kind": "retrieval",
+          "relevant": 1,
+          "hits_at_k": 1,
+          "first_relevant_rank": 1,
+          "cutoff": 5
+        }
+      },
+      "failures": [],
+      "duration_ms": 63,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "local-retrieval",
+        "case_id": "ret-059"
+      },
+      "mode": "retrieval_only",
+      "split": "development",
+      "label_trust": "weak",
+      "status": "passed",
+      "metrics": {
+        "legacy_v1_mrr_at_budget": 1.0,
+        "legacy_v1_required_group_recall_at_budget": 1.0,
+        "legacy_v1_top_1_hit_rate_at_budget": 1.0
+      },
+      "evidence": {
+        "retrieval": {
+          "kind": "retrieval",
+          "relevant": 1,
+          "hits_at_k": 1,
+          "first_relevant_rank": 1,
+          "cutoff": 5
+        }
+      },
+      "failures": [],
+      "duration_ms": 64,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "local-retrieval",
+        "case_id": "ret-060"
+      },
+      "mode": "retrieval_only",
+      "split": "development",
+      "label_trust": "weak",
+      "status": "passed",
+      "metrics": {
+        "legacy_v1_mrr_at_budget": 1.0,
+        "legacy_v1_required_group_recall_at_budget": 1.0,
+        "legacy_v1_top_1_hit_rate_at_budget": 1.0
+      },
+      "evidence": {
+        "retrieval": {
+          "kind": "retrieval",
+          "relevant": 1,
+          "hits_at_k": 1,
+          "first_relevant_rank": 1,
+          "cutoff": 5
+        }
+      },
+      "failures": [],
+      "duration_ms": 64,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "local-retrieval",
+        "case_id": "ret-061"
+      },
+      "mode": "retrieval_only",
+      "split": "development",
+      "label_trust": "weak",
+      "status": "passed",
+      "metrics": {
+        "legacy_v1_mrr_at_budget": 1.0,
+        "legacy_v1_required_group_recall_at_budget": 1.0,
+        "legacy_v1_top_1_hit_rate_at_budget": 1.0
+      },
+      "evidence": {
+        "retrieval": {
+          "kind": "retrieval",
+          "relevant": 4,
+          "hits_at_k": 4,
+          "first_relevant_rank": 1,
+          "cutoff": 6
+        }
+      },
+      "failures": [],
+      "duration_ms": 120,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "local-retrieval",
+        "case_id": "ret-062"
+      },
+      "mode": "retrieval_only",
+      "split": "development",
+      "label_trust": "weak",
+      "status": "passed",
+      "metrics": {
+        "legacy_v1_mrr_at_budget": 1.0,
+        "legacy_v1_required_group_recall_at_budget": 1.0,
+        "legacy_v1_top_1_hit_rate_at_budget": 1.0
+      },
+      "evidence": {
+        "retrieval": {
+          "kind": "retrieval",
+          "relevant": 4,
+          "hits_at_k": 4,
+          "first_relevant_rank": 1,
+          "cutoff": 6
+        }
+      },
+      "failures": [],
+      "duration_ms": 100,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "local-retrieval",
+        "case_id": "ret-063"
+      },
+      "mode": "retrieval_only",
+      "split": "development",
+      "label_trust": "weak",
+      "status": "passed",
+      "metrics": {
+        "legacy_v1_mrr_at_budget": 1.0,
+        "legacy_v1_required_group_recall_at_budget": 1.0,
+        "legacy_v1_top_1_hit_rate_at_budget": 1.0
+      },
+      "evidence": {
+        "retrieval": {
+          "kind": "retrieval",
+          "relevant": 4,
+          "hits_at_k": 4,
+          "first_relevant_rank": 1,
+          "cutoff": 6
+        }
+      },
+      "failures": [],
+      "duration_ms": 118,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "local-retrieval",
+        "case_id": "timeline-auto-atlas-history"
+      },
+      "mode": "retrieval_only",
+      "split": "development",
+      "label_trust": "weak",
+      "status": "passed",
+      "metrics": {
+        "legacy_v1_mrr_at_budget": 1.0,
+        "legacy_v1_required_group_recall_at_budget": 1.0,
+        "legacy_v1_top_1_hit_rate_at_budget": 1.0
+      },
+      "evidence": {
+        "retrieval": {
+          "kind": "retrieval",
+          "relevant": 2,
+          "hits_at_k": 2,
+          "first_relevant_rank": 1,
+          "cutoff": 5
+        }
+      },
+      "failures": [],
+      "duration_ms": 66,
+      "attempts": 1
+    }
+  ],
+  "suite_summaries": [
+    {
+      "suite_id": "local-retrieval",
+      "mode": "retrieval_only",
+      "total": 61,
+      "passed": 61,
+      "quality_failed": 0,
+      "invalid": 0,
+      "metrics": {
+        "legacy_v1_mrr_at_budget": 1.0,
+        "legacy_v1_rank_applicable_cases": 61.0,
+        "legacy_v1_recall_applicable_groups": 71.0,
+        "legacy_v1_required_group_recall_at_budget": 1.0,
+        "legacy_v1_top_1_hit_rate_at_budget": 1.0
+      }
+    }
+  ],
+  "gates": [],
+  "fingerprint": {
+    "rust_version": "rustc 1.99.0 (b940084d7 2026-09-28)",
+    "os_arch": "macos/aarch64",
+    "package_version": "0.1.0",
+    "build_profile": "debug",
+    "enabled_features": [],
+    "provider": null,
+    "model": null,
+    "device": null,
+    "configuration_hash": "304be1feefb263a14aa19c510ef15299f0a3bb6c4c485adea9236889dddae19d",
+    "git_commit": "8b1c1ed5086cdaa968889329f1ff82a6d4ce33c2",
+    "evaluator_versions": {
+      "eval-harness": "0.1.0"
+    },
+    "suite_fingerprints": {
+      "local-retrieval": {
+        "fixture_sha256": "e291234ed715d5bdae1810fb28f456b5b998fbd5ed410116c1bd1bba4d49fca6",
+        "label_trust": "weak",
+        "metric_version": "local-retrieval-v1-legacy-diagnostic"
+      }
+    },
+    "profile_digest": "451655db741f5eac670f9ba30b89740c78e8e47e1e3558b987b957802d3acdda"
+  },
+  "budget_status": "passed",
+  "verdict": "passed",
+  "issues": []
+}

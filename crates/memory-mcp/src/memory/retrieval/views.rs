@@ -83,6 +83,7 @@ where
                     "source_type": episode.source_type,
                     "source_id": episode.source_id,
                     "episode_fallback": true,
+                    "reference_time": episode.t_ref,
                 }),
                 rationale: format!(
                     "tier={} fts={:.2} access_count=0 confidence={:.2} grounding={:.2} semantic={} {}",

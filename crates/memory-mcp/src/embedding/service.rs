@@ -7,6 +7,7 @@ use std::sync::Arc;
 use std::time::Instant;
 
 use serde_json::json;
+use sha2::{Digest, Sha256};
 use tokio::sync::Mutex;
 
 use crate::embedding::providers::EmbeddingProvider;
@@ -22,6 +23,37 @@ use crate::storage::{BoundDbClient, DbClient};
 /// this are truncated before being sent to the provider.
 const MAX_EMBEDDING_INPUT_CHARS: usize = 8_000;
 const MAX_BACKGROUND_QUERY_INPUT_BYTES: usize = 65_536;
+const MAX_RELEVANCE_CACHE_ENTRIES: usize = 1024;
+
+#[derive(Default)]
+struct RelevanceCache {
+    scores: std::collections::HashMap<[u8; 32], f64>,
+    insertion_order: std::collections::VecDeque<[u8; 32]>,
+}
+
+impl RelevanceCache {
+    fn insert(&mut self, key: [u8; 32], value: f64) {
+        if self.scores.contains_key(&key) {
+            return;
+        }
+        if self.scores.len() == MAX_RELEVANCE_CACHE_ENTRIES
+            && let Some(oldest) = self.insertion_order.pop_front()
+        {
+            self.scores.remove(&oldest);
+        }
+        self.scores.insert(key, value);
+        self.insertion_order.push_back(key);
+    }
+}
+
+fn relevance_key(signature: &str, query: &str, document: &str) -> [u8; 32] {
+    let mut hash = Sha256::new();
+    for part in [signature, query, document] {
+        hash.update((part.len() as u64).to_le_bytes());
+        hash.update(part.as_bytes());
+    }
+    hash.finalize().into()
+}
 
 /// Owns all embedding generation, caching, and background retry logic.
 ///
@@ -44,6 +76,7 @@ pub(crate) struct EmbeddingService {
     context_cache: ContextCache,
     query_embedding_cache: Arc<Mutex<QueryEmbeddingCacheState>>,
     task_runner: Arc<BackgroundTaskRunner>,
+    relevance_cache: Arc<Mutex<RelevanceCache>>,
 }
 
 impl EmbeddingService {
@@ -72,11 +105,77 @@ impl EmbeddingService {
             context_cache,
             query_embedding_cache,
             task_runner,
+            relevance_cache: Arc::new(Mutex::new(RelevanceCache::default())),
         }
     }
 
     pub(crate) fn embedding_provider(&self) -> &Arc<dyn EmbeddingProvider> {
         &self.embedding_provider
+    }
+
+    pub(crate) async fn rerank(
+        &self,
+        query: &str,
+        documents: &[String],
+    ) -> Result<Option<Vec<f64>>, MemoryError> {
+        let provider = &self.embedding_provider;
+        let Some(signature) = provider.reranking_signature().map(str::to_owned) else {
+            return provider.rerank(query, documents).await;
+        };
+        if !provider.reranking_admission_floor().is_finite() {
+            return Err(MemoryError::Validation(
+                "nonfinite reranking boundary".into(),
+            ));
+        }
+        let keys = documents
+            .iter()
+            .map(|doc| relevance_key(&signature, query, doc))
+            .collect::<Vec<_>>();
+        let mut result = vec![None; documents.len()];
+        let mut missing = Vec::new();
+        let mut missing_positions = std::collections::HashMap::new();
+        {
+            let cache = self.relevance_cache.lock().await;
+            for (index, key) in keys.iter().enumerate() {
+                if let Some(value) = cache.scores.get(key) {
+                    result[index] = Some(*value);
+                } else if !missing_positions.contains_key(key) {
+                    missing_positions.insert(*key, missing.len());
+                    missing.push(documents[index].clone());
+                }
+            }
+        }
+        if !missing.is_empty() {
+            let values = provider.rerank(query, &missing).await?.ok_or_else(|| {
+                MemoryError::Validation("configured reranker returned no evidence".into())
+            })?;
+            if provider.reranking_signature() != Some(signature.as_str())
+                || values.len() != missing.len()
+                || values.iter().any(|score| !score.is_finite())
+            {
+                return Err(MemoryError::Validation(
+                    "invalid reranking identity, cardinality or finite scores".into(),
+                ));
+            }
+            let mut cache = self.relevance_cache.lock().await;
+            for key in &keys {
+                if let Some(position) = missing_positions.get(key) {
+                    cache.insert(*key, values[*position]);
+                }
+            }
+            for (index, key) in keys.iter().enumerate() {
+                if let Some(position) = missing_positions.get(key) {
+                    result[index] = Some(values[*position]);
+                }
+            }
+        }
+        let result = result
+            .into_iter()
+            .map(|value| {
+                value.ok_or_else(|| MemoryError::Validation("missing relevance evidence".into()))
+            })
+            .collect::<Result<Vec<_>, _>>()?;
+        Ok(Some(result))
     }
 
     pub(crate) fn embedding_similarity_threshold(&self) -> f64 {
@@ -106,7 +205,13 @@ impl EmbeddingService {
         &self,
         input: &str,
     ) -> Result<Option<Vec<f64>>, MemoryError> {
-        generate_with_provider(&self.embedding_provider, &self.logger, input).await
+        generate_with_provider(
+            &self.embedding_provider,
+            &self.logger,
+            input,
+            EmbeddingPurpose::Document,
+        )
+        .await
     }
 
     pub(crate) async fn generate_query_embedding_with_background(
@@ -144,7 +249,14 @@ impl EmbeddingService {
             return Ok(None);
         }
 
-        match self.generate_embedding(input).await {
+        match generate_with_provider(
+            &self.embedding_provider,
+            &self.logger,
+            input,
+            EmbeddingPurpose::Query,
+        )
+        .await
+        {
             Ok(Some(embedding)) => {
                 self.store_query_embedding(input, embedding.clone()).await;
                 Ok(Some(embedding))
@@ -437,7 +549,14 @@ impl EmbeddingService {
         cache_key: String,
     ) -> Result<(), MemoryError> {
         for attempt in 1..=crate::embedding::runtime::DEFAULT_BACKGROUND_EMBEDDING_ATTEMPTS {
-            match self.generate_embedding(input).await {
+            match generate_with_provider(
+                &self.embedding_provider,
+                &self.logger,
+                input,
+                EmbeddingPurpose::Query,
+            )
+            .await
+            {
                 Ok(Some(embedding)) => {
                     self.store_query_embedding_by_key(cache_key, embedding)
                         .await;
@@ -554,10 +673,17 @@ fn effective_embedding_input(input: &str) -> String {
 /// here, and a second implementation of any of them would be a second
 /// place to forget one — which is what `service/embedding_recovery.rs`
 /// was doing when it called `provider.embed()` directly.
+#[derive(Clone, Copy)]
+enum EmbeddingPurpose {
+    Document,
+    Query,
+}
+
 async fn generate_with_provider(
     embedding_provider: &Arc<dyn EmbeddingProvider>,
     logger: &StdoutLogger,
     input: &str,
+    purpose: EmbeddingPurpose,
 ) -> Result<Option<Vec<f64>>, MemoryError> {
     let effective_input: String = if input.len() > MAX_EMBEDDING_INPUT_CHARS {
         let truncated: String = input.chars().take(MAX_EMBEDDING_INPUT_CHARS).collect();
@@ -620,7 +746,10 @@ async fn generate_with_provider(
     let embedded = {
         let _provider_stage =
             crate::shared::observability::StageTimer::new("extract", "embedding_provider");
-        embedding_provider.embed(&effective_input).await
+        match purpose {
+            EmbeddingPurpose::Document => embedding_provider.embed(&effective_input).await,
+            EmbeddingPurpose::Query => embedding_provider.embed_query(&effective_input).await,
+        }
     };
     match embedded {
         Ok(embedding) => {
@@ -706,7 +835,13 @@ impl crate::embedding::api::EmbeddingGeneration for ProviderGeneration {
         input: &str,
     ) -> Result<crate::embedding::api::GenerationOutcome, MemoryError> {
         Ok(to_generation_outcome(
-            generate_with_provider(&self.provider, &self.logger, input).await?,
+            generate_with_provider(
+                &self.provider,
+                &self.logger,
+                input,
+                EmbeddingPurpose::Document,
+            )
+            .await?,
         ))
     }
 }
@@ -740,6 +875,237 @@ mod tests {
     use crate::error::MemoryError;
     use crate::logging::StdoutLogger;
     use crate::service::mock_db::MockDbClient;
+
+    struct RelevanceProbe {
+        calls: AtomicUsize,
+        fail_after_first: bool,
+        reject_duplicates: bool,
+    }
+    #[async_trait]
+    impl EmbeddingProvider for RelevanceProbe {
+        fn is_enabled(&self) -> bool {
+            true
+        }
+        fn provider_name(&self) -> &'static str {
+            "relevance-probe"
+        }
+        fn dimension(&self) -> usize {
+            4
+        }
+        async fn embed(&self, _: &str) -> Result<Vec<f64>, MemoryError> {
+            Ok(vec![0.0; 4])
+        }
+        fn reranking_signature(&self) -> Option<&str> {
+            Some("reranksig:probe-v1")
+        }
+        async fn rerank(
+            &self,
+            _: &str,
+            documents: &[String],
+        ) -> Result<Option<Vec<f64>>, MemoryError> {
+            if self.calls.fetch_add(1, Ordering::SeqCst) > 0 && self.fail_after_first {
+                return Err(MemoryError::Transient("inference unavailable".into()));
+            }
+            if self.reject_duplicates
+                && documents
+                    .iter()
+                    .collect::<std::collections::HashSet<_>>()
+                    .len()
+                    != documents.len()
+            {
+                return Err(MemoryError::Validation("duplicate inference work".into()));
+            }
+            Ok(Some(
+                documents
+                    .iter()
+                    .map(|doc| if doc == "beta" { 2.0 } else { 1.0 })
+                    .collect(),
+            ))
+        }
+    }
+
+    #[tokio::test]
+    async fn exact_relevance_input_reuses_verified_evidence_after_backend_outage() {
+        let provider = Arc::new(RelevanceProbe {
+            calls: AtomicUsize::new(0),
+            fail_after_first: true,
+            reject_duplicates: false,
+        });
+        let service = make_service(provider, None, Arc::new(BackgroundTaskRunner::new()));
+        assert_eq!(
+            service
+                .rerank("query", &["alpha".into()])
+                .await
+                .expect("warm native evidence"),
+            Some(vec![1.0])
+        );
+        assert_eq!(
+            service
+                .rerank("query", &["alpha".into()])
+                .await
+                .expect("reuse exact immutable evidence"),
+            Some(vec![1.0])
+        );
+    }
+
+    #[tokio::test]
+    async fn repeated_relevance_documents_are_scored_once_and_keep_caller_order() {
+        let provider = Arc::new(RelevanceProbe {
+            calls: AtomicUsize::new(0),
+            fail_after_first: false,
+            reject_duplicates: true,
+        });
+        let service = make_service(provider, None, Arc::new(BackgroundTaskRunner::new()));
+        assert_eq!(
+            service
+                .rerank("query", &["alpha".into(), "beta".into(), "alpha".into()])
+                .await
+                .expect("unique inference"),
+            Some(vec![1.0, 2.0, 1.0])
+        );
+    }
+
+    struct MalformedRelevance(Vec<f64>);
+    #[async_trait]
+    impl EmbeddingProvider for MalformedRelevance {
+        fn is_enabled(&self) -> bool {
+            true
+        }
+        fn provider_name(&self) -> &'static str {
+            "malformed-relevance"
+        }
+        fn dimension(&self) -> usize {
+            4
+        }
+        async fn embed(&self, _: &str) -> Result<Vec<f64>, MemoryError> {
+            Ok(vec![0.0; 4])
+        }
+        fn reranking_signature(&self) -> Option<&str> {
+            Some("reranksig:malformed-v1")
+        }
+        async fn rerank(&self, _: &str, _: &[String]) -> Result<Option<Vec<f64>>, MemoryError> {
+            Ok(Some(self.0.clone()))
+        }
+    }
+
+    #[tokio::test]
+    async fn nonfinite_relevance_is_refused_before_it_can_be_cached() {
+        let service = make_service(
+            Arc::new(MalformedRelevance(vec![f64::NAN])),
+            None,
+            Arc::new(BackgroundTaskRunner::new()),
+        );
+        assert!(matches!(
+            service.rerank("query", &["alpha".into()]).await,
+            Err(MemoryError::Validation(_))
+        ));
+    }
+
+    #[tokio::test]
+    async fn mismatched_relevance_cardinality_is_refused_before_cache_insertion() {
+        let service = make_service(
+            Arc::new(MalformedRelevance(vec![1.0, 2.0])),
+            None,
+            Arc::new(BackgroundTaskRunner::new()),
+        );
+        assert!(matches!(
+            service.rerank("query", &["alpha".into()]).await,
+            Err(MemoryError::Validation(_))
+        ));
+    }
+
+    #[tokio::test]
+    async fn changed_query_bytes_do_not_reuse_cached_relevance() {
+        let service = make_service(
+            Arc::new(RelevanceProbe {
+                calls: AtomicUsize::new(0),
+                fail_after_first: true,
+                reject_duplicates: false,
+            }),
+            None,
+            Arc::new(BackgroundTaskRunner::new()),
+        );
+        service
+            .rerank("query", &["alpha".into()])
+            .await
+            .expect("warm evidence");
+        assert!(matches!(
+            service.rerank("query ", &["alpha".into()]).await,
+            Err(MemoryError::Transient(_))
+        ));
+    }
+
+    #[tokio::test]
+    async fn changed_document_bytes_do_not_reuse_cached_relevance() {
+        let service = make_service(
+            Arc::new(RelevanceProbe {
+                calls: AtomicUsize::new(0),
+                fail_after_first: true,
+                reject_duplicates: false,
+            }),
+            None,
+            Arc::new(BackgroundTaskRunner::new()),
+        );
+        service
+            .rerank("query", &["alpha".into()])
+            .await
+            .expect("warm evidence");
+        assert!(matches!(
+            service.rerank("query", &["alpha ".into()]).await,
+            Err(MemoryError::Transient(_))
+        ));
+    }
+
+    #[tokio::test]
+    async fn bounded_relevance_cache_evicts_the_oldest_exact_input() {
+        let service = make_service(
+            Arc::new(RelevanceProbe {
+                calls: AtomicUsize::new(0),
+                fail_after_first: true,
+                reject_duplicates: false,
+            }),
+            None,
+            Arc::new(BackgroundTaskRunner::new()),
+        );
+        let docs = (0..1025)
+            .map(|i| format!("document-{i}"))
+            .collect::<Vec<_>>();
+        service
+            .rerank("query", &docs)
+            .await
+            .expect("warm bounded evidence");
+        assert!(matches!(
+            service.rerank("query", &["document-0".into()]).await,
+            Err(MemoryError::Transient(_))
+        ));
+    }
+
+    #[tokio::test]
+    async fn bounded_relevance_cache_preserves_the_newest_exact_input() {
+        let service = make_service(
+            Arc::new(RelevanceProbe {
+                calls: AtomicUsize::new(0),
+                fail_after_first: true,
+                reject_duplicates: false,
+            }),
+            None,
+            Arc::new(BackgroundTaskRunner::new()),
+        );
+        let docs = (0..1025)
+            .map(|i| format!("document-{i}"))
+            .collect::<Vec<_>>();
+        service
+            .rerank("query", &docs)
+            .await
+            .expect("warm bounded evidence");
+        assert_eq!(
+            service
+                .rerank("query", &["document-1024".into()])
+                .await
+                .expect("retained newest evidence"),
+            Some(vec![1.0])
+        );
+    }
 
     /// Deterministic provider: returns a fixed-dimension vector whose first
     /// component encodes the input, so tests can distinguish calls.
@@ -1078,7 +1444,7 @@ mod tests {
         let provider: Arc<dyn EmbeddingProvider> = Arc::new(ScriptedProvider::disabled(4));
         let logger = StdoutLogger::new("debug");
 
-        generate_with_provider(&provider, &logger, "hello")
+        generate_with_provider(&provider, &logger, "hello", EmbeddingPurpose::Document)
             .await
             .expect("a disabled provider is not an error");
 
@@ -1189,6 +1555,40 @@ mod tests {
         let result = service.generate_embedding("hello").await;
         assert!(matches!(result, Err(MemoryError::Storage(_))));
         assert_eq!(provider.calls(), 1);
+    }
+
+    #[tokio::test]
+    async fn query_generation_uses_query_purpose_instead_of_document_generation() {
+        struct AsymmetricProvider;
+        #[async_trait]
+        impl EmbeddingProvider for AsymmetricProvider {
+            fn is_enabled(&self) -> bool {
+                true
+            }
+            fn provider_name(&self) -> &'static str {
+                "asymmetric-component"
+            }
+            fn dimension(&self) -> usize {
+                4
+            }
+            async fn embed(&self, _: &str) -> Result<Vec<f64>, MemoryError> {
+                Ok(vec![0.0, 1.0, 0.0, 0.0])
+            }
+            async fn embed_query(&self, _: &str) -> Result<Vec<f64>, MemoryError> {
+                Ok(vec![1.0, 0.0, 0.0, 0.0])
+            }
+        }
+        let service = make_service(
+            Arc::new(AsymmetricProvider),
+            None,
+            Arc::new(BackgroundTaskRunner::new()),
+        );
+        let result = service
+            .generate_query_embedding_with_background("correlation identifier")
+            .await
+            .expect("query generation")
+            .expect("query vector");
+        assert_eq!(result, vec![1.0, 0.0, 0.0, 0.0]);
     }
 
     #[tokio::test]

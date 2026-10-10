@@ -8,6 +8,7 @@ use super::{EmbeddingProvider, MemoryError};
 
 #[derive(Clone)]
 pub(super) struct LocalCandleEmbeddingProvider {
+    reranker: Option<Arc<super::reranker::CandleReranker>>,
     _model_name: String,
     dimension: usize,
     max_tokens: usize,
@@ -23,6 +24,8 @@ impl LocalCandleEmbeddingProvider {
         dimension: usize,
         max_tokens: usize,
         model_dir: &std::path::Path,
+        reranker_model_dir: Option<&std::path::Path>,
+        reranker_admission_floor: f64,
     ) -> Result<Self, MemoryError> {
         let tokenizer_path = model_dir.join("tokenizer.json");
         let config_path = model_dir.join("config.json");
@@ -51,6 +54,10 @@ impl LocalCandleEmbeddingProvider {
             .map_err(|e| MemoryError::Storage(format!("failed to build bert model: {e}")))?;
 
         Ok(Self {
+            reranker: reranker_model_dir
+                .map(|dir| super::reranker::CandleReranker::load(dir, reranker_admission_floor))
+                .transpose()?
+                .map(Arc::new),
             _model_name: model_name.to_string(),
             dimension,
             max_tokens,
@@ -60,8 +67,8 @@ impl LocalCandleEmbeddingProvider {
         })
     }
 
-    fn embed_inner(&self, input: &str) -> Result<Vec<f64>, MemoryError> {
-        let prefixed = format!("query: {input}");
+    fn embed_inner(&self, input: &str, prefix: &str) -> Result<Vec<f64>, MemoryError> {
+        let prefixed = format!("{prefix}: {input}");
 
         let encoding = self
             .tokenizer
@@ -135,7 +142,7 @@ impl LocalCandleEmbeddingProvider {
         Ok(vec_f32.into_iter().map(f64::from).collect())
     }
 
-    fn embed_sync(&self, input: &str) -> Result<Vec<f64>, MemoryError> {
+    fn embed_sync(&self, input: &str, prefix: &str) -> Result<Vec<f64>, MemoryError> {
         const E5_PREFIX_TOKENS: usize = 2;
 
         let encoding = self
@@ -144,12 +151,12 @@ impl LocalCandleEmbeddingProvider {
             .map_err(|e| MemoryError::Storage(format!("tokenization failed: {e}")))?;
 
         if encoding.get_ids().len() + E5_PREFIX_TOKENS <= self.max_tokens {
-            return self.embed_inner(input);
+            return self.embed_inner(input, prefix);
         }
 
         let chunk_size = ((self.max_tokens as f64) * 0.8) as usize;
         if chunk_size == 0 {
-            return self.embed_inner(input);
+            return self.embed_inner(input, prefix);
         }
         let overlap = (((chunk_size as f64) * 0.1) as usize).min(chunk_size.saturating_sub(1));
         let token_ids = encoding.get_ids().to_vec();
@@ -161,7 +168,7 @@ impl LocalCandleEmbeddingProvider {
                 .tokenizer
                 .decode(&chunk_ids, true)
                 .map_err(|e| MemoryError::Storage(format!("decode failed: {e}")))?;
-            embeddings.push(self.embed_inner(&chunk_text)?);
+            embeddings.push(self.embed_inner(&chunk_text, prefix)?);
         }
 
         mean_pool_embeddings(&embeddings)
@@ -257,6 +264,31 @@ fn mean_pool_embeddings(embeddings: &[Vec<f64>]) -> Result<Vec<f64>, MemoryError
 
 #[async_trait]
 impl EmbeddingProvider for LocalCandleEmbeddingProvider {
+    fn reranking_admission_floor(&self) -> f64 {
+        self.reranker
+            .as_ref()
+            .map_or(0.0, |model| model.admission_floor())
+    }
+    fn reranking_signature(&self) -> Option<&str> {
+        self.reranker.as_ref().map(|reranker| reranker.signature())
+    }
+    async fn rerank(
+        &self,
+        query: &str,
+        documents: &[String],
+    ) -> Result<Option<Vec<f64>>, MemoryError> {
+        let Some(reranker) = &self.reranker else {
+            return Ok(None);
+        };
+        let reranker = reranker.clone();
+        let query = query.to_string();
+        let documents = documents.to_vec();
+        tokio::task::spawn_blocking(move || reranker.score(&query, &documents))
+            .await
+            .map_err(|error| MemoryError::Storage(format!("reranker task failed: {error}")))?
+            .map(Some)
+    }
+
     fn is_enabled(&self) -> bool {
         true
     }
@@ -272,7 +304,14 @@ impl EmbeddingProvider for LocalCandleEmbeddingProvider {
     async fn embed(&self, input: &str) -> Result<Vec<f64>, MemoryError> {
         let provider = self.clone();
         let input_owned = input.to_string();
-        tokio::task::spawn_blocking(move || provider.embed_sync(&input_owned))
+        tokio::task::spawn_blocking(move || provider.embed_sync(&input_owned, "passage"))
+            .await
+            .map_err(|e| MemoryError::Storage(format!("embedding task panicked: {e}")))?
+    }
+    async fn embed_query(&self, input: &str) -> Result<Vec<f64>, MemoryError> {
+        let provider = self.clone();
+        let input_owned = input.to_string();
+        tokio::task::spawn_blocking(move || provider.embed_sync(&input_owned, "query"))
             .await
             .map_err(|e| MemoryError::Storage(format!("embedding task panicked: {e}")))?
     }
@@ -440,8 +479,14 @@ mod tests {
         write_minimal_bert_config(&dir.path().join("config.json"));
         write_minimal_prefixed_bert_weights(&dir.path().join("model.safetensors"));
 
-        let result =
-            LocalCandleEmbeddingProvider::new("test/model", TEST_HIDDEN_SIZE, 384, dir.path());
+        let result = LocalCandleEmbeddingProvider::new(
+            "test/model",
+            TEST_HIDDEN_SIZE,
+            384,
+            dir.path(),
+            None,
+            0.0,
+        );
 
         if let Err(error) = result {
             panic!("expected prefixed bert weights to load successfully, got {error}");

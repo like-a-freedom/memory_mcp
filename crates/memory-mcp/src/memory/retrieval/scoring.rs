@@ -52,6 +52,9 @@ pub(super) fn ranked_fact_to_item(
         provenance = json!({});
     }
     if let Some(map) = provenance.as_object_mut() {
+        if let Some(reranking) = &evidence.reranking {
+            map.insert("reranking".to_string(), reranking.clone());
+        }
         if !matched_query_terms.is_empty() {
             map.insert(
                 "matched_query_terms".to_string(),

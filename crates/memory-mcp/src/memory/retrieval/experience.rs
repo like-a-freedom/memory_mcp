@@ -366,6 +366,7 @@ mod tests {
         let query = super::super::admission::build_query_evidence(
             Some("Which venue would work best for my conference?"),
             Vec::new(),
+            &[],
             &super::super::query_mode::QueryFlags::default(),
         );
         let mut first = make_fact(
@@ -406,6 +407,7 @@ mod tests {
         let query = super::super::admission::build_query_evidence(
             Some("conference venue"),
             Vec::new(),
+            &[],
             &super::super::query_mode::QueryFlags::default(),
         );
         let mut first = make_fact("Hotel preferences mention quiet rooms.", vec![]);

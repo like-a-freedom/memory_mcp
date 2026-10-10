@@ -329,4 +329,68 @@ mod tests {
             ]
         );
     }
+
+    #[test]
+    fn retrieval_quality_is_a_hard_gate_in_pr_release_and_nightly() {
+        let pr = ProfileManifest::parse(include_str!("../../../evals/profiles/pr.json"))
+            .expect("PR profile must load");
+        let release = ProfileManifest::parse(include_str!("../../../evals/profiles/release.json"))
+            .expect("release profile must load");
+        let nightly = ProfileManifest::parse(include_str!("../../../evals/profiles/nightly.json"))
+            .expect("nightly profile must load");
+        let retrieval_quality = ProfileManifest::parse(include_str!(
+            "../../../evals/profiles/retrieval_quality.json"
+        ))
+        .expect("retrieval-quality profile must load");
+
+        assert_retrieval_quality_hard_gate_contract(&pr);
+        assert_retrieval_quality_hard_gate_contract(&release);
+        assert_retrieval_quality_hard_gate_contract(&nightly);
+        assert_eq!(retrieval_quality.profile, EvalProfile::Nightly);
+        assert_eq!(retrieval_quality.time_budget_seconds, 3600);
+        assert_eq!(retrieval_quality.suites.len(), 1);
+        assert_eq!(retrieval_quality.suites[0].id, "retrieval-quality");
+        assert_eq!(retrieval_quality.gates.len(), 6);
+    }
+
+    fn assert_retrieval_quality_hard_gate_contract(profile: &ProfileManifest) {
+        let suite = profile
+            .suites
+            .iter()
+            .find(|suite| suite.id == "retrieval-quality")
+            .expect("profile must run the native retrieval-quality suite");
+        assert_eq!(
+            suite
+                .expected_coverage
+                .as_ref()
+                .expect("retrieval-quality coverage must be exact")
+                .exact_cases,
+            37
+        );
+        assert_eq!(
+            profile
+                .gates
+                .iter()
+                .filter(|gate| gate.target.suite_id == "retrieval-quality")
+                .count(),
+            6
+        );
+        assert_retrieval_quality_gate(profile, "precision_macro");
+        assert_retrieval_quality_gate(profile, "required_group_recall");
+        assert_retrieval_quality_gate(profile, "unknown_abstention_rate");
+        assert_retrieval_quality_gate(profile, "answerable_non_abstention_rate");
+        assert_retrieval_quality_gate(profile, "duplicate_free_rate");
+        assert_retrieval_quality_gate(profile, "prohibited_free_rate");
+    }
+
+    fn assert_retrieval_quality_gate(profile: &ProfileManifest, metric: &str) {
+        let gate = profile
+            .gates
+            .iter()
+            .find(|gate| {
+                gate.target.suite_id == "retrieval-quality" && gate.target.metric == metric
+            })
+            .unwrap_or_else(|| panic!("retrieval-quality gate is missing {metric}"));
+        assert_eq!(gate.hard_floor, Some(1.0), "wrong floor for {metric}");
+    }
 }

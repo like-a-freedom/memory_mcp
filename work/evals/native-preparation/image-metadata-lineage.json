@@ -1,0 +1,1156 @@
+{
+  "policy": "Every image-bearing turn from both full sessions; fields verbatim from pinned upstream JSON; no question/answer used for inclusion.",
+  "changes": [
+    {
+      "case_id": "locomo-conv-26-082",
+      "source_key": "D1:5",
+      "metadata_fields": [
+        "blip_caption",
+        "query",
+        "img_url"
+      ]
+    },
+    {
+      "case_id": "locomo-conv-26-082",
+      "source_key": "D1:12",
+      "metadata_fields": [
+        "blip_caption",
+        "query",
+        "img_url"
+      ]
+    },
+    {
+      "case_id": "locomo-conv-26-082",
+      "source_key": "D2:10",
+      "metadata_fields": [
+        "blip_caption",
+        "query",
+        "img_url"
+      ]
+    },
+    {
+      "case_id": "locomo-conv-26-000",
+      "source_key": "D1:5",
+      "metadata_fields": [
+        "blip_caption",
+        "query",
+        "img_url"
+      ]
+    },
+    {
+      "case_id": "locomo-conv-26-000",
+      "source_key": "D1:12",
+      "metadata_fields": [
+        "blip_caption",
+        "query",
+        "img_url"
+      ]
+    },
+    {
+      "case_id": "locomo-conv-26-000",
+      "source_key": "D2:10",
+      "metadata_fields": [
+        "blip_caption",
+        "query",
+        "img_url"
+      ]
+    },
+    {
+      "case_id": "locomo-conv-30-002",
+      "source_key": "D1:14",
+      "metadata_fields": [
+        "blip_caption",
+        "query",
+        "img_url"
+      ]
+    },
+    {
+      "case_id": "locomo-conv-30-002",
+      "source_key": "D1:17",
+      "metadata_fields": [
+        "blip_caption",
+        "query",
+        "img_url"
+      ]
+    },
+    {
+      "case_id": "locomo-conv-30-002",
+      "source_key": "D1:19",
+      "metadata_fields": [
+        "blip_caption"
+      ]
+    },
+    {
+      "case_id": "locomo-conv-30-002",
+      "source_key": "D1:20",
+      "metadata_fields": [
+        "blip_caption",
+        "query",
+        "img_url"
+      ]
+    },
+    {
+      "case_id": "locomo-conv-30-002",
+      "source_key": "D1:24",
+      "metadata_fields": [
+        "blip_caption",
+        "query",
+        "img_url"
+      ]
+    },
+    {
+      "case_id": "locomo-conv-30-002",
+      "source_key": "D2:1",
+      "metadata_fields": [
+        "blip_caption"
+      ]
+    },
+    {
+      "case_id": "locomo-conv-30-002",
+      "source_key": "D2:4",
+      "metadata_fields": [
+        "blip_caption",
+        "query",
+        "img_url"
+      ]
+    },
+    {
+      "case_id": "locomo-conv-30-000",
+      "source_key": "D1:14",
+      "metadata_fields": [
+        "blip_caption",
+        "query",
+        "img_url"
+      ]
+    },
+    {
+      "case_id": "locomo-conv-30-000",
+      "source_key": "D1:17",
+      "metadata_fields": [
+        "blip_caption",
+        "query",
+        "img_url"
+      ]
+    },
+    {
+      "case_id": "locomo-conv-30-000",
+      "source_key": "D1:19",
+      "metadata_fields": [
+        "blip_caption"
+      ]
+    },
+    {
+      "case_id": "locomo-conv-30-000",
+      "source_key": "D1:20",
+      "metadata_fields": [
+        "blip_caption",
+        "query",
+        "img_url"
+      ]
+    },
+    {
+      "case_id": "locomo-conv-30-000",
+      "source_key": "D1:24",
+      "metadata_fields": [
+        "blip_caption",
+        "query",
+        "img_url"
+      ]
+    },
+    {
+      "case_id": "locomo-conv-30-000",
+      "source_key": "D2:1",
+      "metadata_fields": [
+        "blip_caption"
+      ]
+    },
+    {
+      "case_id": "locomo-conv-30-000",
+      "source_key": "D2:4",
+      "metadata_fields": [
+        "blip_caption",
+        "query",
+        "img_url"
+      ]
+    },
+    {
+      "case_id": "locomo-conv-41-065",
+      "source_key": "D1:10",
+      "metadata_fields": [
+        "blip_caption",
+        "query",
+        "img_url"
+      ]
+    },
+    {
+      "case_id": "locomo-conv-41-065",
+      "source_key": "D2:10",
+      "metadata_fields": [
+        "blip_caption",
+        "query",
+        "img_url"
+      ]
+    },
+    {
+      "case_id": "locomo-conv-41-065",
+      "source_key": "D2:14",
+      "metadata_fields": [
+        "blip_caption",
+        "query",
+        "img_url"
+      ]
+    },
+    {
+      "case_id": "locomo-conv-41-065",
+      "source_key": "D2:20",
+      "metadata_fields": [
+        "blip_caption",
+        "query",
+        "img_url"
+      ]
+    },
+    {
+      "case_id": "locomo-conv-41-065",
+      "source_key": "D2:23",
+      "metadata_fields": [
+        "blip_caption"
+      ]
+    },
+    {
+      "case_id": "locomo-conv-41-001",
+      "source_key": "D1:10",
+      "metadata_fields": [
+        "blip_caption",
+        "query",
+        "img_url"
+      ]
+    },
+    {
+      "case_id": "locomo-conv-41-001",
+      "source_key": "D2:10",
+      "metadata_fields": [
+        "blip_caption",
+        "query",
+        "img_url"
+      ]
+    },
+    {
+      "case_id": "locomo-conv-41-001",
+      "source_key": "D2:14",
+      "metadata_fields": [
+        "blip_caption",
+        "query",
+        "img_url"
+      ]
+    },
+    {
+      "case_id": "locomo-conv-41-001",
+      "source_key": "D2:20",
+      "metadata_fields": [
+        "blip_caption",
+        "query",
+        "img_url"
+      ]
+    },
+    {
+      "case_id": "locomo-conv-41-001",
+      "source_key": "D2:23",
+      "metadata_fields": [
+        "blip_caption"
+      ]
+    },
+    {
+      "case_id": "locomo-conv-42-096",
+      "source_key": "D1:16",
+      "metadata_fields": [
+        "blip_caption",
+        "query",
+        "img_url"
+      ]
+    },
+    {
+      "case_id": "locomo-conv-42-096",
+      "source_key": "D1:18",
+      "metadata_fields": [
+        "blip_caption",
+        "query",
+        "img_url"
+      ]
+    },
+    {
+      "case_id": "locomo-conv-42-096",
+      "source_key": "D2:3",
+      "metadata_fields": [
+        "blip_caption",
+        "query",
+        "img_url"
+      ]
+    },
+    {
+      "case_id": "locomo-conv-42-096",
+      "source_key": "D2:10",
+      "metadata_fields": [
+        "blip_caption",
+        "query",
+        "img_url"
+      ]
+    },
+    {
+      "case_id": "locomo-conv-42-002",
+      "source_key": "D1:16",
+      "metadata_fields": [
+        "blip_caption",
+        "query",
+        "img_url"
+      ]
+    },
+    {
+      "case_id": "locomo-conv-42-002",
+      "source_key": "D1:18",
+      "metadata_fields": [
+        "blip_caption",
+        "query",
+        "img_url"
+      ]
+    },
+    {
+      "case_id": "locomo-conv-42-002",
+      "source_key": "D2:3",
+      "metadata_fields": [
+        "blip_caption",
+        "query",
+        "img_url"
+      ]
+    },
+    {
+      "case_id": "locomo-conv-42-002",
+      "source_key": "D2:10",
+      "metadata_fields": [
+        "blip_caption",
+        "query",
+        "img_url"
+      ]
+    },
+    {
+      "case_id": "locomo-conv-43-071",
+      "source_key": "D1:7",
+      "metadata_fields": [
+        "blip_caption",
+        "query",
+        "img_url"
+      ]
+    },
+    {
+      "case_id": "locomo-conv-43-071",
+      "source_key": "D1:8",
+      "metadata_fields": [
+        "blip_caption"
+      ]
+    },
+    {
+      "case_id": "locomo-conv-43-071",
+      "source_key": "D1:9",
+      "metadata_fields": [
+        "blip_caption",
+        "query",
+        "img_url"
+      ]
+    },
+    {
+      "case_id": "locomo-conv-43-071",
+      "source_key": "D1:13",
+      "metadata_fields": [
+        "blip_caption"
+      ]
+    },
+    {
+      "case_id": "locomo-conv-43-071",
+      "source_key": "D1:14",
+      "metadata_fields": [
+        "blip_caption",
+        "query",
+        "img_url"
+      ]
+    },
+    {
+      "case_id": "locomo-conv-43-071",
+      "source_key": "D1:15",
+      "metadata_fields": [
+        "blip_caption"
+      ]
+    },
+    {
+      "case_id": "locomo-conv-43-071",
+      "source_key": "D1:17",
+      "metadata_fields": [
+        "blip_caption"
+      ]
+    },
+    {
+      "case_id": "locomo-conv-43-071",
+      "source_key": "D2:7",
+      "metadata_fields": [
+        "blip_caption",
+        "query",
+        "img_url"
+      ]
+    },
+    {
+      "case_id": "locomo-conv-43-071",
+      "source_key": "D2:14",
+      "metadata_fields": [
+        "blip_caption",
+        "query",
+        "img_url"
+      ]
+    },
+    {
+      "case_id": "locomo-conv-44-061",
+      "source_key": "D1:5",
+      "metadata_fields": [
+        "blip_caption",
+        "img_url"
+      ]
+    },
+    {
+      "case_id": "locomo-conv-44-061",
+      "source_key": "D1:16",
+      "metadata_fields": [
+        "blip_caption",
+        "query",
+        "img_url"
+      ]
+    },
+    {
+      "case_id": "locomo-conv-44-061",
+      "source_key": "D2:1",
+      "metadata_fields": [
+        "blip_caption",
+        "query",
+        "img_url"
+      ]
+    },
+    {
+      "case_id": "locomo-conv-44-061",
+      "source_key": "D2:5",
+      "metadata_fields": [
+        "blip_caption",
+        "query",
+        "img_url"
+      ]
+    },
+    {
+      "case_id": "locomo-conv-44-061",
+      "source_key": "D2:7",
+      "metadata_fields": [
+        "blip_caption",
+        "query",
+        "img_url"
+      ]
+    },
+    {
+      "case_id": "locomo-conv-44-061",
+      "source_key": "D2:9",
+      "metadata_fields": [
+        "blip_caption",
+        "query",
+        "img_url"
+      ]
+    },
+    {
+      "case_id": "locomo-conv-44-061",
+      "source_key": "D2:16",
+      "metadata_fields": [
+        "blip_caption",
+        "query",
+        "img_url"
+      ]
+    },
+    {
+      "case_id": "locomo-conv-44-061",
+      "source_key": "D2:17",
+      "metadata_fields": [
+        "blip_caption",
+        "img_url"
+      ]
+    },
+    {
+      "case_id": "locomo-conv-44-061",
+      "source_key": "D2:18",
+      "metadata_fields": [
+        "blip_caption",
+        "query",
+        "img_url"
+      ]
+    },
+    {
+      "case_id": "locomo-conv-44-061",
+      "source_key": "D2:20",
+      "metadata_fields": [
+        "blip_caption",
+        "query",
+        "img_url"
+      ]
+    },
+    {
+      "case_id": "locomo-conv-44-000",
+      "source_key": "D1:5",
+      "metadata_fields": [
+        "blip_caption",
+        "img_url"
+      ]
+    },
+    {
+      "case_id": "locomo-conv-44-000",
+      "source_key": "D1:16",
+      "metadata_fields": [
+        "blip_caption",
+        "query",
+        "img_url"
+      ]
+    },
+    {
+      "case_id": "locomo-conv-44-000",
+      "source_key": "D2:1",
+      "metadata_fields": [
+        "blip_caption",
+        "query",
+        "img_url"
+      ]
+    },
+    {
+      "case_id": "locomo-conv-44-000",
+      "source_key": "D2:5",
+      "metadata_fields": [
+        "blip_caption",
+        "query",
+        "img_url"
+      ]
+    },
+    {
+      "case_id": "locomo-conv-44-000",
+      "source_key": "D2:7",
+      "metadata_fields": [
+        "blip_caption",
+        "query",
+        "img_url"
+      ]
+    },
+    {
+      "case_id": "locomo-conv-44-000",
+      "source_key": "D2:9",
+      "metadata_fields": [
+        "blip_caption",
+        "query",
+        "img_url"
+      ]
+    },
+    {
+      "case_id": "locomo-conv-44-000",
+      "source_key": "D2:16",
+      "metadata_fields": [
+        "blip_caption",
+        "query",
+        "img_url"
+      ]
+    },
+    {
+      "case_id": "locomo-conv-44-000",
+      "source_key": "D2:17",
+      "metadata_fields": [
+        "blip_caption",
+        "img_url"
+      ]
+    },
+    {
+      "case_id": "locomo-conv-44-000",
+      "source_key": "D2:18",
+      "metadata_fields": [
+        "blip_caption",
+        "query",
+        "img_url"
+      ]
+    },
+    {
+      "case_id": "locomo-conv-44-000",
+      "source_key": "D2:20",
+      "metadata_fields": [
+        "blip_caption",
+        "query",
+        "img_url"
+      ]
+    },
+    {
+      "case_id": "locomo-conv-47-067",
+      "source_key": "D1:8",
+      "metadata_fields": [
+        "blip_caption",
+        "query",
+        "img_url"
+      ]
+    },
+    {
+      "case_id": "locomo-conv-47-067",
+      "source_key": "D1:12",
+      "metadata_fields": [
+        "blip_caption",
+        "query",
+        "img_url"
+      ]
+    },
+    {
+      "case_id": "locomo-conv-47-067",
+      "source_key": "D1:16",
+      "metadata_fields": [
+        "blip_caption"
+      ]
+    },
+    {
+      "case_id": "locomo-conv-47-067",
+      "source_key": "D1:18",
+      "metadata_fields": [
+        "blip_caption",
+        "query",
+        "img_url"
+      ]
+    },
+    {
+      "case_id": "locomo-conv-47-067",
+      "source_key": "D1:20",
+      "metadata_fields": [
+        "blip_caption",
+        "query",
+        "img_url"
+      ]
+    },
+    {
+      "case_id": "locomo-conv-47-067",
+      "source_key": "D1:23",
+      "metadata_fields": [
+        "blip_caption"
+      ]
+    },
+    {
+      "case_id": "locomo-conv-47-067",
+      "source_key": "D2:15",
+      "metadata_fields": [
+        "blip_caption",
+        "query",
+        "img_url"
+      ]
+    },
+    {
+      "case_id": "locomo-conv-47-067",
+      "source_key": "D2:17",
+      "metadata_fields": [
+        "blip_caption",
+        "query",
+        "img_url"
+      ]
+    },
+    {
+      "case_id": "locomo-conv-47-001",
+      "source_key": "D1:8",
+      "metadata_fields": [
+        "blip_caption",
+        "query",
+        "img_url"
+      ]
+    },
+    {
+      "case_id": "locomo-conv-47-001",
+      "source_key": "D1:12",
+      "metadata_fields": [
+        "blip_caption",
+        "query",
+        "img_url"
+      ]
+    },
+    {
+      "case_id": "locomo-conv-47-001",
+      "source_key": "D1:16",
+      "metadata_fields": [
+        "blip_caption"
+      ]
+    },
+    {
+      "case_id": "locomo-conv-47-001",
+      "source_key": "D1:18",
+      "metadata_fields": [
+        "blip_caption",
+        "query",
+        "img_url"
+      ]
+    },
+    {
+      "case_id": "locomo-conv-47-001",
+      "source_key": "D1:20",
+      "metadata_fields": [
+        "blip_caption",
+        "query",
+        "img_url"
+      ]
+    },
+    {
+      "case_id": "locomo-conv-47-001",
+      "source_key": "D1:23",
+      "metadata_fields": [
+        "blip_caption"
+      ]
+    },
+    {
+      "case_id": "locomo-conv-47-001",
+      "source_key": "D2:15",
+      "metadata_fields": [
+        "blip_caption",
+        "query",
+        "img_url"
+      ]
+    },
+    {
+      "case_id": "locomo-conv-47-001",
+      "source_key": "D2:17",
+      "metadata_fields": [
+        "blip_caption",
+        "query",
+        "img_url"
+      ]
+    },
+    {
+      "case_id": "locomo-conv-48-015",
+      "source_key": "D1:5",
+      "metadata_fields": [
+        "blip_caption",
+        "query",
+        "img_url"
+      ]
+    },
+    {
+      "case_id": "locomo-conv-48-015",
+      "source_key": "D1:6",
+      "metadata_fields": [
+        "blip_caption",
+        "query",
+        "img_url"
+      ]
+    },
+    {
+      "case_id": "locomo-conv-48-015",
+      "source_key": "D1:8",
+      "metadata_fields": [
+        "blip_caption",
+        "query",
+        "img_url"
+      ]
+    },
+    {
+      "case_id": "locomo-conv-48-015",
+      "source_key": "D2:1",
+      "metadata_fields": [
+        "blip_caption"
+      ]
+    },
+    {
+      "case_id": "locomo-conv-48-015",
+      "source_key": "D2:3",
+      "metadata_fields": [
+        "blip_caption",
+        "query",
+        "img_url"
+      ]
+    },
+    {
+      "case_id": "locomo-conv-48-015",
+      "source_key": "D2:7",
+      "metadata_fields": [
+        "blip_caption",
+        "query",
+        "img_url"
+      ]
+    },
+    {
+      "case_id": "locomo-conv-48-015",
+      "source_key": "D2:11",
+      "metadata_fields": [
+        "blip_caption",
+        "query",
+        "img_url"
+      ]
+    },
+    {
+      "case_id": "locomo-conv-48-015",
+      "source_key": "D2:15",
+      "metadata_fields": [
+        "blip_caption",
+        "query",
+        "img_url"
+      ]
+    },
+    {
+      "case_id": "locomo-conv-48-015",
+      "source_key": "D2:17",
+      "metadata_fields": [
+        "blip_caption"
+      ]
+    },
+    {
+      "case_id": "locomo-conv-48-015",
+      "source_key": "D2:20",
+      "metadata_fields": [
+        "blip_caption",
+        "query",
+        "img_url"
+      ]
+    },
+    {
+      "case_id": "locomo-conv-48-015",
+      "source_key": "D2:22",
+      "metadata_fields": [
+        "blip_caption",
+        "query",
+        "img_url"
+      ]
+    },
+    {
+      "case_id": "locomo-conv-48-015",
+      "source_key": "D2:26",
+      "metadata_fields": [
+        "blip_caption",
+        "query",
+        "img_url"
+      ]
+    },
+    {
+      "case_id": "locomo-conv-48-000",
+      "source_key": "D1:5",
+      "metadata_fields": [
+        "blip_caption",
+        "query",
+        "img_url"
+      ]
+    },
+    {
+      "case_id": "locomo-conv-48-000",
+      "source_key": "D1:6",
+      "metadata_fields": [
+        "blip_caption",
+        "query",
+        "img_url"
+      ]
+    },
+    {
+      "case_id": "locomo-conv-48-000",
+      "source_key": "D1:8",
+      "metadata_fields": [
+        "blip_caption",
+        "query",
+        "img_url"
+      ]
+    },
+    {
+      "case_id": "locomo-conv-48-000",
+      "source_key": "D2:1",
+      "metadata_fields": [
+        "blip_caption"
+      ]
+    },
+    {
+      "case_id": "locomo-conv-48-000",
+      "source_key": "D2:3",
+      "metadata_fields": [
+        "blip_caption",
+        "query",
+        "img_url"
+      ]
+    },
+    {
+      "case_id": "locomo-conv-48-000",
+      "source_key": "D2:7",
+      "metadata_fields": [
+        "blip_caption",
+        "query",
+        "img_url"
+      ]
+    },
+    {
+      "case_id": "locomo-conv-48-000",
+      "source_key": "D2:11",
+      "metadata_fields": [
+        "blip_caption",
+        "query",
+        "img_url"
+      ]
+    },
+    {
+      "case_id": "locomo-conv-48-000",
+      "source_key": "D2:15",
+      "metadata_fields": [
+        "blip_caption",
+        "query",
+        "img_url"
+      ]
+    },
+    {
+      "case_id": "locomo-conv-48-000",
+      "source_key": "D2:17",
+      "metadata_fields": [
+        "blip_caption"
+      ]
+    },
+    {
+      "case_id": "locomo-conv-48-000",
+      "source_key": "D2:20",
+      "metadata_fields": [
+        "blip_caption",
+        "query",
+        "img_url"
+      ]
+    },
+    {
+      "case_id": "locomo-conv-48-000",
+      "source_key": "D2:22",
+      "metadata_fields": [
+        "blip_caption",
+        "query",
+        "img_url"
+      ]
+    },
+    {
+      "case_id": "locomo-conv-48-000",
+      "source_key": "D2:26",
+      "metadata_fields": [
+        "blip_caption",
+        "query",
+        "img_url"
+      ]
+    },
+    {
+      "case_id": "locomo-conv-49-083",
+      "source_key": "D1:3",
+      "metadata_fields": [
+        "blip_caption"
+      ]
+    },
+    {
+      "case_id": "locomo-conv-49-083",
+      "source_key": "D1:4",
+      "metadata_fields": [
+        "blip_caption",
+        "query",
+        "img_url"
+      ]
+    },
+    {
+      "case_id": "locomo-conv-49-083",
+      "source_key": "D1:7",
+      "metadata_fields": [
+        "blip_caption",
+        "query",
+        "img_url"
+      ]
+    },
+    {
+      "case_id": "locomo-conv-49-083",
+      "source_key": "D1:11",
+      "metadata_fields": [
+        "blip_caption",
+        "query",
+        "img_url"
+      ]
+    },
+    {
+      "case_id": "locomo-conv-49-083",
+      "source_key": "D1:14",
+      "metadata_fields": [
+        "blip_caption",
+        "query",
+        "img_url"
+      ]
+    },
+    {
+      "case_id": "locomo-conv-49-083",
+      "source_key": "D2:1",
+      "metadata_fields": [
+        "blip_caption",
+        "query",
+        "img_url"
+      ]
+    },
+    {
+      "case_id": "locomo-conv-49-002",
+      "source_key": "D1:3",
+      "metadata_fields": [
+        "blip_caption"
+      ]
+    },
+    {
+      "case_id": "locomo-conv-49-002",
+      "source_key": "D1:4",
+      "metadata_fields": [
+        "blip_caption",
+        "query",
+        "img_url"
+      ]
+    },
+    {
+      "case_id": "locomo-conv-49-002",
+      "source_key": "D1:7",
+      "metadata_fields": [
+        "blip_caption",
+        "query",
+        "img_url"
+      ]
+    },
+    {
+      "case_id": "locomo-conv-49-002",
+      "source_key": "D1:11",
+      "metadata_fields": [
+        "blip_caption",
+        "query",
+        "img_url"
+      ]
+    },
+    {
+      "case_id": "locomo-conv-49-002",
+      "source_key": "D1:14",
+      "metadata_fields": [
+        "blip_caption",
+        "query",
+        "img_url"
+      ]
+    },
+    {
+      "case_id": "locomo-conv-49-002",
+      "source_key": "D2:1",
+      "metadata_fields": [
+        "blip_caption",
+        "query",
+        "img_url"
+      ]
+    },
+    {
+      "case_id": "locomo-conv-50-071",
+      "source_key": "D1:3",
+      "metadata_fields": [
+        "blip_caption",
+        "query",
+        "img_url"
+      ]
+    },
+    {
+      "case_id": "locomo-conv-50-071",
+      "source_key": "D1:9",
+      "metadata_fields": [
+        "blip_caption",
+        "query",
+        "img_url"
+      ]
+    },
+    {
+      "case_id": "locomo-conv-50-071",
+      "source_key": "D1:16",
+      "metadata_fields": [
+        "blip_caption",
+        "img_url"
+      ]
+    },
+    {
+      "case_id": "locomo-conv-50-071",
+      "source_key": "D2:5",
+      "metadata_fields": [
+        "blip_caption",
+        "query",
+        "img_url"
+      ]
+    },
+    {
+      "case_id": "locomo-conv-50-071",
+      "source_key": "D2:8",
+      "metadata_fields": [
+        "blip_caption",
+        "query",
+        "img_url"
+      ]
+    },
+    {
+      "case_id": "locomo-conv-50-071",
+      "source_key": "D2:10",
+      "metadata_fields": [
+        "blip_caption",
+        "query",
+        "img_url"
+      ]
+    },
+    {
+      "case_id": "locomo-conv-50-071",
+      "source_key": "D2:12",
+      "metadata_fields": [
+        "blip_caption",
+        "query",
+        "img_url"
+      ]
+    },
+    {
+      "case_id": "locomo-conv-50-001",
+      "source_key": "D1:3",
+      "metadata_fields": [
+        "blip_caption",
+        "query",
+        "img_url"
+      ]
+    },
+    {
+      "case_id": "locomo-conv-50-001",
+      "source_key": "D1:9",
+      "metadata_fields": [
+        "blip_caption",
+        "query",
+        "img_url"
+      ]
+    },
+    {
+      "case_id": "locomo-conv-50-001",
+      "source_key": "D1:16",
+      "metadata_fields": [
+        "blip_caption",
+        "img_url"
+      ]
+    },
+    {
+      "case_id": "locomo-conv-50-001",
+      "source_key": "D2:5",
+      "metadata_fields": [
+        "blip_caption",
+        "query",
+        "img_url"
+      ]
+    },
+    {
+      "case_id": "locomo-conv-50-001",
+      "source_key": "D2:8",
+      "metadata_fields": [
+        "blip_caption",
+        "query",
+        "img_url"
+      ]
+    },
+    {
+      "case_id": "locomo-conv-50-001",
+      "source_key": "D2:10",
+      "metadata_fields": [
+        "blip_caption",
+        "query",
+        "img_url"
+      ]
+    },
+    {
+      "case_id": "locomo-conv-50-001",
+      "source_key": "D2:12",
+      "metadata_fields": [
+        "blip_caption",
+        "query",
+        "img_url"
+      ]
+    }
+  ]
+}

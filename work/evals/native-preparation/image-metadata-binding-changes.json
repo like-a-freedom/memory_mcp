@@ -1,0 +1,1601 @@
+{
+  "policy": "No predictions consulted for source-extension labels; same source/type/exact base-content mapping only.",
+  "changes": [
+    {
+      "case_id": "locomo-conv-26-082",
+      "binding": {
+        "key": "D1:5:note:456d9fb65ead",
+        "content": "Caroline: The transgender stories were so inspiring! I was so happy and thankful for all the support.\n\nUpstream image metadata (dataset annotation, not a user assertion):\n{\"blip_caption\": \"a photo of a dog walking past a wall with a painting of a woman\", \"img_url\": [\"https://i.redd.it/l7hozpetnhlb1.jpg\"], \"query\": \"transgender pride flag mural\"}",
+        "episode_key": "D1:5",
+        "fact_type": "note",
+        "disposition": "prohibited"
+      },
+      "prior_key": "D1:5:note:be6159975a4c",
+      "reason": "Uniform source metadata appended; disposition inherited only from exact same source/type/base content, otherwise prohibited pending source-only review."
+    },
+    {
+      "case_id": "locomo-conv-26-082",
+      "binding": {
+        "key": "D1:12:note:3aeb77007a24",
+        "content": "Melanie: You'd be a great counselor! Your empathy and understanding will really help the people you work with. By the way, take a look at this.\n\nUpstream image metadata (dataset annotation, not a user assertion):\n{\"blip_caption\": \"a photo of a painting of a sunset over a lake\", \"img_url\": [\"http://candicealexander.com/cdn/shop/products/IMG_7269_a49d5af8-c76c-4ecd-ae20-48c08cb11dec.jpg\"], \"query\": \"painting sunrise\"}",
+        "episode_key": "D1:12",
+        "fact_type": "note",
+        "disposition": "prohibited"
+      },
+      "prior_key": "D1:12:note:22fbce1df6f0",
+      "reason": "Uniform source metadata appended; disposition inherited only from exact same source/type/base content, otherwise prohibited pending source-only review."
+    },
+    {
+      "case_id": "locomo-conv-26-082",
+      "binding": {
+        "key": "D2:10:note:899957978663",
+        "content": "Caroline: Thanks, Mel! My goal is to give kids a loving home. I'm truly grateful for all the support I've got from friends and mentors. Now the hard work starts to turn my dream into a reality. And here's one of the adoption agencies I'm looking into. It's a lot to take in, but I'm feeling hopeful and optimistic.\n\nUpstream image metadata (dataset annotation, not a user assertion):\n{\"blip_caption\": \"a photography of a sign for a new arrival and an information and domestic building\", \"img_url\": [\"https://live.staticflickr.com/3437/3935231341_b2955b00dd_b.jpg\"], \"query\": \"adoption agency brochure\"}",
+        "episode_key": "D2:10",
+        "fact_type": "note",
+        "disposition": "prohibited"
+      },
+      "prior_key": "D2:10:note:4e84c7c1e83b",
+      "reason": "Uniform source metadata appended; disposition inherited only from exact same source/type/base content, otherwise prohibited pending source-only review."
+    },
+    {
+      "case_id": "locomo-conv-26-000",
+      "binding": {
+        "key": "D1:5:note:456d9fb65ead",
+        "content": "Caroline: The transgender stories were so inspiring! I was so happy and thankful for all the support.\n\nUpstream image metadata (dataset annotation, not a user assertion):\n{\"blip_caption\": \"a photo of a dog walking past a wall with a painting of a woman\", \"img_url\": [\"https://i.redd.it/l7hozpetnhlb1.jpg\"], \"query\": \"transgender pride flag mural\"}",
+        "episode_key": "D1:5",
+        "fact_type": "note",
+        "disposition": "prohibited"
+      },
+      "prior_key": "D1:5:note:be6159975a4c",
+      "reason": "Uniform source metadata appended; disposition inherited only from exact same source/type/base content, otherwise prohibited pending source-only review."
+    },
+    {
+      "case_id": "locomo-conv-26-000",
+      "binding": {
+        "key": "D1:12:note:3aeb77007a24",
+        "content": "Melanie: You'd be a great counselor! Your empathy and understanding will really help the people you work with. By the way, take a look at this.\n\nUpstream image metadata (dataset annotation, not a user assertion):\n{\"blip_caption\": \"a photo of a painting of a sunset over a lake\", \"img_url\": [\"http://candicealexander.com/cdn/shop/products/IMG_7269_a49d5af8-c76c-4ecd-ae20-48c08cb11dec.jpg\"], \"query\": \"painting sunrise\"}",
+        "episode_key": "D1:12",
+        "fact_type": "note",
+        "disposition": "prohibited"
+      },
+      "prior_key": "D1:12:note:22fbce1df6f0",
+      "reason": "Uniform source metadata appended; disposition inherited only from exact same source/type/base content, otherwise prohibited pending source-only review."
+    },
+    {
+      "case_id": "locomo-conv-26-000",
+      "binding": {
+        "key": "D2:10:note:899957978663",
+        "content": "Caroline: Thanks, Mel! My goal is to give kids a loving home. I'm truly grateful for all the support I've got from friends and mentors. Now the hard work starts to turn my dream into a reality. And here's one of the adoption agencies I'm looking into. It's a lot to take in, but I'm feeling hopeful and optimistic.\n\nUpstream image metadata (dataset annotation, not a user assertion):\n{\"blip_caption\": \"a photography of a sign for a new arrival and an information and domestic building\", \"img_url\": [\"https://live.staticflickr.com/3437/3935231341_b2955b00dd_b.jpg\"], \"query\": \"adoption agency brochure\"}",
+        "episode_key": "D2:10",
+        "fact_type": "note",
+        "disposition": "prohibited"
+      },
+      "prior_key": "D2:10:note:4e84c7c1e83b",
+      "reason": "Uniform source metadata appended; disposition inherited only from exact same source/type/base content, otherwise prohibited pending source-only review."
+    },
+    {
+      "case_id": "locomo-conv-30-002",
+      "binding": {
+        "key": "D1:14:note:1139ee5a71a2",
+        "content": "Jon: Wow, I'm excited too! This is gonna be great!\n\nUpstream image metadata (dataset annotation, not a user assertion):\n{\"blip_caption\": \"a photography of a man in a suit is performing a dance\", \"img_url\": [\"https://upload.wikimedia.org/wikipedia/commons/a/a9/Dekkadancers_Mu%C5%BE_z_Malty.jpg\"], \"query\": \"dancing on stage performance dance competition last year\"}",
+        "episode_key": "D1:14",
+        "fact_type": "note",
+        "disposition": "prohibited"
+      },
+      "prior_key": "D1:14:note:19c1a5714057",
+      "reason": "Uniform source metadata appended; disposition inherited only from exact same source/type/base content, otherwise prohibited pending source-only review."
+    },
+    {
+      "case_id": "locomo-conv-30-002",
+      "binding": {
+        "key": "D1:17:note:4f7960d676f9",
+        "content": "Gina: I used to compete in a few dance competitions and shows - my fav memory was when my team won first place at a regionals at age fifteen. It was an awesome feeling of accomplishment!\n\nUpstream image metadata (dataset annotation, not a user assertion):\n{\"blip_caption\": \"a photography of a couple of people standing next to each other\", \"img_url\": [\"https://upload.wikimedia.org/wikipedia/commons/4/41/2009_NHK_Trophy_Dance_-_Meryl_DAVIS_-_Charlie_WHITE_-_Gold_Medal_-_0948a.jpg\"], \"query\": \"dance competition trophy team\"}",
+        "episode_key": "D1:17",
+        "fact_type": "note",
+        "disposition": "prohibited"
+      },
+      "prior_key": "D1:17:note:37d15decdeba",
+      "reason": "Uniform source metadata appended; disposition inherited only from exact same source/type/base content, otherwise prohibited pending source-only review."
+    },
+    {
+      "case_id": "locomo-conv-30-002",
+      "binding": {
+        "key": "D1:19:note:1e53312b3529",
+        "content": "Gina: Thanks! We just did a contemporary piece called \"Finding Freedom.\" It was really emotional and powerful.\n\nUpstream image metadata (dataset annotation, not a user assertion):\n{\"blip_caption\": \"a photo of a large open porch with a fireplace and a view of the water\"}",
+        "episode_key": "D1:19",
+        "fact_type": "note",
+        "disposition": "prohibited"
+      },
+      "prior_key": "D1:19:note:d7eadc105f84",
+      "reason": "Uniform source metadata appended; disposition inherited only from exact same source/type/base content, otherwise prohibited pending source-only review."
+    },
+    {
+      "case_id": "locomo-conv-30-002",
+      "binding": {
+        "key": "D1:20:note:1acf50e45169",
+        "content": "Jon: Wow, that must've been great! Check my ideal dance studio by the water.\n\nUpstream image metadata (dataset annotation, not a user assertion):\n{\"blip_caption\": \"a photography of a room with a view of the ocean and a few yoga mats\", \"img_url\": [\"https://live.staticflickr.com/2730/4360526470_6bee96b5d7_b.jpg\"], \"query\": \"dance studio overlooking ocean\"}",
+        "episode_key": "D1:20",
+        "fact_type": "note",
+        "disposition": "prohibited"
+      },
+      "prior_key": "D1:20:note:4e6adca1e485",
+      "reason": "Uniform source metadata appended; disposition inherited only from exact same source/type/base content, otherwise prohibited pending source-only review."
+    },
+    {
+      "case_id": "locomo-conv-30-002",
+      "binding": {
+        "key": "D1:24:note:944bf30278e8",
+        "content": "Jon: Thanks! I rehearsed with a small group of dancers after work. We do all kinds of dances, from contemporary to hip-hop. We've got some cool projects in the works. Finishing up choreography to perform at a nearby festival next month. Can't wait!\n\nUpstream image metadata (dataset annotation, not a user assertion):\n{\"blip_caption\": \"a photo of a group of dancers in white dresses on a stage\", \"img_url\": [\"https://markmorrisdancegroup.org/wp-content/uploads/2021/04/MM0108_JesuMeineFreude_Boston_BrazilTom_02.jpg\"], \"query\": \"group dancers performing on stage\"}",
+        "episode_key": "D1:24",
+        "fact_type": "note",
+        "disposition": "prohibited"
+      },
+      "prior_key": "D1:24:note:1b43c627689f",
+      "reason": "Uniform source metadata appended; disposition inherited only from exact same source/type/base content, otherwise prohibited pending source-only review."
+    },
+    {
+      "case_id": "locomo-conv-30-002",
+      "binding": {
+        "key": "D2:1:note:a53a969465ee",
+        "content": "Gina: Hey Jon! Long time no see! Things have been hectic lately. I just launched an ad campaign for my clothing store in hopes of growing the business. Starting my own store and taking risks is both scary and rewarding. I'm excited to see where it takes me!\n\nUpstream image metadata (dataset annotation, not a user assertion):\n{\"blip_caption\": \"a photo of a clothing store with a variety of clothes on display\"}",
+        "episode_key": "D2:1",
+        "fact_type": "note",
+        "disposition": "prohibited"
+      },
+      "prior_key": "D2:1:note:005223cc73bb",
+      "reason": "Uniform source metadata appended; disposition inherited only from exact same source/type/base content, otherwise prohibited pending source-only review."
+    },
+    {
+      "case_id": "locomo-conv-30-002",
+      "binding": {
+        "key": "D2:4:note:bb3d6448840e",
+        "content": "Jon: Hey Gina! Thanks for asking. I'm on the hunt for the ideal spot for my dance studio and it's been quite a journey! I've been looking at different places and picturing how the space would look. I even found a place with great natural light! Oh, I've been to Paris yesterday! It was sooo cool.\n\nUpstream image metadata (dataset annotation, not a user assertion):\n{\"blip_caption\": \"a photo of a bathroom with a blue floor and a pink wall\", \"img_url\": [\"https://avvay-aws-production.imgix.net/space-media/space-media-422692-prod.jpg\"], \"query\": \"dance studio natural lighting spacious room large windows dance mirrors\"}",
+        "episode_key": "D2:4",
+        "fact_type": "note",
+        "disposition": "prohibited"
+      },
+      "prior_key": "D2:4:note:afec79573762",
+      "reason": "Uniform source metadata appended; disposition inherited only from exact same source/type/base content, otherwise prohibited pending source-only review."
+    },
+    {
+      "case_id": "locomo-conv-30-000",
+      "binding": {
+        "key": "D1:14:note:1139ee5a71a2",
+        "content": "Jon: Wow, I'm excited too! This is gonna be great!\n\nUpstream image metadata (dataset annotation, not a user assertion):\n{\"blip_caption\": \"a photography of a man in a suit is performing a dance\", \"img_url\": [\"https://upload.wikimedia.org/wikipedia/commons/a/a9/Dekkadancers_Mu%C5%BE_z_Malty.jpg\"], \"query\": \"dancing on stage performance dance competition last year\"}",
+        "episode_key": "D1:14",
+        "fact_type": "note",
+        "disposition": "prohibited"
+      },
+      "prior_key": "D1:14:note:19c1a5714057",
+      "reason": "Uniform source metadata appended; disposition inherited only from exact same source/type/base content, otherwise prohibited pending source-only review."
+    },
+    {
+      "case_id": "locomo-conv-30-000",
+      "binding": {
+        "key": "D1:17:note:4f7960d676f9",
+        "content": "Gina: I used to compete in a few dance competitions and shows - my fav memory was when my team won first place at a regionals at age fifteen. It was an awesome feeling of accomplishment!\n\nUpstream image metadata (dataset annotation, not a user assertion):\n{\"blip_caption\": \"a photography of a couple of people standing next to each other\", \"img_url\": [\"https://upload.wikimedia.org/wikipedia/commons/4/41/2009_NHK_Trophy_Dance_-_Meryl_DAVIS_-_Charlie_WHITE_-_Gold_Medal_-_0948a.jpg\"], \"query\": \"dance competition trophy team\"}",
+        "episode_key": "D1:17",
+        "fact_type": "note",
+        "disposition": "prohibited"
+      },
+      "prior_key": "D1:17:note:37d15decdeba",
+      "reason": "Uniform source metadata appended; disposition inherited only from exact same source/type/base content, otherwise prohibited pending source-only review."
+    },
+    {
+      "case_id": "locomo-conv-30-000",
+      "binding": {
+        "key": "D1:19:note:1e53312b3529",
+        "content": "Gina: Thanks! We just did a contemporary piece called \"Finding Freedom.\" It was really emotional and powerful.\n\nUpstream image metadata (dataset annotation, not a user assertion):\n{\"blip_caption\": \"a photo of a large open porch with a fireplace and a view of the water\"}",
+        "episode_key": "D1:19",
+        "fact_type": "note",
+        "disposition": "prohibited"
+      },
+      "prior_key": "D1:19:note:d7eadc105f84",
+      "reason": "Uniform source metadata appended; disposition inherited only from exact same source/type/base content, otherwise prohibited pending source-only review."
+    },
+    {
+      "case_id": "locomo-conv-30-000",
+      "binding": {
+        "key": "D1:20:note:1acf50e45169",
+        "content": "Jon: Wow, that must've been great! Check my ideal dance studio by the water.\n\nUpstream image metadata (dataset annotation, not a user assertion):\n{\"blip_caption\": \"a photography of a room with a view of the ocean and a few yoga mats\", \"img_url\": [\"https://live.staticflickr.com/2730/4360526470_6bee96b5d7_b.jpg\"], \"query\": \"dance studio overlooking ocean\"}",
+        "episode_key": "D1:20",
+        "fact_type": "note",
+        "disposition": "prohibited"
+      },
+      "prior_key": "D1:20:note:4e6adca1e485",
+      "reason": "Uniform source metadata appended; disposition inherited only from exact same source/type/base content, otherwise prohibited pending source-only review."
+    },
+    {
+      "case_id": "locomo-conv-30-000",
+      "binding": {
+        "key": "D1:24:note:944bf30278e8",
+        "content": "Jon: Thanks! I rehearsed with a small group of dancers after work. We do all kinds of dances, from contemporary to hip-hop. We've got some cool projects in the works. Finishing up choreography to perform at a nearby festival next month. Can't wait!\n\nUpstream image metadata (dataset annotation, not a user assertion):\n{\"blip_caption\": \"a photo of a group of dancers in white dresses on a stage\", \"img_url\": [\"https://markmorrisdancegroup.org/wp-content/uploads/2021/04/MM0108_JesuMeineFreude_Boston_BrazilTom_02.jpg\"], \"query\": \"group dancers performing on stage\"}",
+        "episode_key": "D1:24",
+        "fact_type": "note",
+        "disposition": "prohibited"
+      },
+      "prior_key": "D1:24:note:1b43c627689f",
+      "reason": "Uniform source metadata appended; disposition inherited only from exact same source/type/base content, otherwise prohibited pending source-only review."
+    },
+    {
+      "case_id": "locomo-conv-30-000",
+      "binding": {
+        "key": "D2:1:note:a53a969465ee",
+        "content": "Gina: Hey Jon! Long time no see! Things have been hectic lately. I just launched an ad campaign for my clothing store in hopes of growing the business. Starting my own store and taking risks is both scary and rewarding. I'm excited to see where it takes me!\n\nUpstream image metadata (dataset annotation, not a user assertion):\n{\"blip_caption\": \"a photo of a clothing store with a variety of clothes on display\"}",
+        "episode_key": "D2:1",
+        "fact_type": "note",
+        "disposition": "prohibited"
+      },
+      "prior_key": "D2:1:note:005223cc73bb",
+      "reason": "Uniform source metadata appended; disposition inherited only from exact same source/type/base content, otherwise prohibited pending source-only review."
+    },
+    {
+      "case_id": "locomo-conv-30-000",
+      "binding": {
+        "key": "D2:4:note:bb3d6448840e",
+        "content": "Jon: Hey Gina! Thanks for asking. I'm on the hunt for the ideal spot for my dance studio and it's been quite a journey! I've been looking at different places and picturing how the space would look. I even found a place with great natural light! Oh, I've been to Paris yesterday! It was sooo cool.\n\nUpstream image metadata (dataset annotation, not a user assertion):\n{\"blip_caption\": \"a photo of a bathroom with a blue floor and a pink wall\", \"img_url\": [\"https://avvay-aws-production.imgix.net/space-media/space-media-422692-prod.jpg\"], \"query\": \"dance studio natural lighting spacious room large windows dance mirrors\"}",
+        "episode_key": "D2:4",
+        "fact_type": "note",
+        "disposition": "prohibited"
+      },
+      "prior_key": "D2:4:note:afec79573762",
+      "reason": "Uniform source metadata appended; disposition inherited only from exact same source/type/base content, otherwise prohibited pending source-only review."
+    },
+    {
+      "case_id": "locomo-conv-41-065",
+      "binding": {
+        "key": "D1:10:note:b1f31df21f98",
+        "content": "John: Growing up, I saw how lack of education and crumbling infrastructure affected my neighborhood. I don't want future generations to go through that, so I think schools and infrastructure should be funded properly. Here's a pic of a school last year, after they got the funding.\n\nUpstream image metadata (dataset annotation, not a user assertion):\n{\"blip_caption\": \"a photo of a group of men working on a building\", \"img_url\": [\"https://www.greenbaypressgazette.com/gcdn/presto/2019/07/16/PGRB/fa8d60a1-0a21-421c-b36d-31f4bc2d2b6d-KEW_0720_LC_referendum_Peters_Concrete_pour.png\"], \"query\": \"school building renovation\"}",
+        "episode_key": "D1:10",
+        "fact_type": "note",
+        "disposition": "allowed"
+      },
+      "prior_key": "D1:10:note:e5eaefd674fa",
+      "reason": "Uniform source metadata appended; disposition inherited only from exact same source/type/base content, otherwise prohibited pending source-only review."
+    },
+    {
+      "case_id": "locomo-conv-41-065",
+      "binding": {
+        "key": "D2:10:experience:e045be1f3f10",
+        "content": "John: Thanks a lot, Maria. Your help is really motivating and makes me more determined. Here's a pic of my family - they're the reason why I never give up. Their love gives me strength.\n\nUpstream image metadata (dataset annotation, not a user assertion):\n{\"blip_caption\": \"a photography of a family having a picnic in the park\", \"img_url\": [\"https://images.pexels.com/photos/5119595/pexels-photo-5119595.jpeg\"], \"query\": \"family smiling hugging\"}",
+        "episode_key": "D2:10",
+        "fact_type": "experience",
+        "disposition": "prohibited"
+      },
+      "prior_key": "D2:10:experience:92c85d9c00b2",
+      "reason": "Uniform source metadata appended; disposition inherited only from exact same source/type/base content, otherwise prohibited pending source-only review."
+    },
+    {
+      "case_id": "locomo-conv-41-065",
+      "binding": {
+        "key": "D2:14:experience:e983e7fefc87",
+        "content": "John: Yeah, they are my rock in tough times and always cheer me on. I'm really thankful for their love. Family time means a lot to me.\n\nUpstream image metadata (dataset annotation, not a user assertion):\n{\"blip_caption\": \"a photography of a family enjoying a ride on a swing\", \"img_url\": [\"https://cdn.stocksnap.io/img-thumbs/960w/playground-child_RL9KRCSWHD.jpg\"], \"query\": \"family park\"}",
+        "episode_key": "D2:14",
+        "fact_type": "experience",
+        "disposition": "prohibited"
+      },
+      "prior_key": "D2:14:experience:c45529e390c9",
+      "reason": "Uniform source metadata appended; disposition inherited only from exact same source/type/base content, otherwise prohibited pending source-only review."
+    },
+    {
+      "case_id": "locomo-conv-41-065",
+      "binding": {
+        "key": "D2:20:note:1fd1cb7a2a75",
+        "content": "John: Yeah Maria, making memories with family is priceless! Life is so much more meaningful when we spend time together. Here's a pic of us at dinner.\n\nUpstream image metadata (dataset annotation, not a user assertion):\n{\"blip_caption\": \"a photo of a group of people standing around a kitchen table\", \"img_url\": [\"https://images.pexels.com/photos/1655329/pexels-photo-1655329.jpeg?cs\\\\u003dsrgb\\\\u0026dl\\\\u003dpexels-lisa-fotios-1655329.jpg\"], \"query\": \"family dinner gathering\"}",
+        "episode_key": "D2:20",
+        "fact_type": "note",
+        "disposition": "prohibited"
+      },
+      "prior_key": "D2:20:note:56c9752549c3",
+      "reason": "Uniform source metadata appended; disposition inherited only from exact same source/type/base content, otherwise prohibited pending source-only review."
+    },
+    {
+      "case_id": "locomo-conv-41-065",
+      "binding": {
+        "key": "D2:23:note:edf85061fda6",
+        "content": "Maria: Yeah, John! It definitely builds a strong bond. Those shared meals really make life enjoyable and meaningful. What did you make?\n\nUpstream image metadata (dataset annotation, not a user assertion):\n{\"blip_caption\": \"a photo of a table with pizzas and salads on it\"}",
+        "episode_key": "D2:23",
+        "fact_type": "note",
+        "disposition": "prohibited"
+      },
+      "prior_key": "D2:23:note:d6d0861891f2",
+      "reason": "Uniform source metadata appended; disposition inherited only from exact same source/type/base content, otherwise prohibited pending source-only review."
+    },
+    {
+      "case_id": "locomo-conv-41-001",
+      "binding": {
+        "key": "D1:10:note:b1f31df21f98",
+        "content": "John: Growing up, I saw how lack of education and crumbling infrastructure affected my neighborhood. I don't want future generations to go through that, so I think schools and infrastructure should be funded properly. Here's a pic of a school last year, after they got the funding.\n\nUpstream image metadata (dataset annotation, not a user assertion):\n{\"blip_caption\": \"a photo of a group of men working on a building\", \"img_url\": [\"https://www.greenbaypressgazette.com/gcdn/presto/2019/07/16/PGRB/fa8d60a1-0a21-421c-b36d-31f4bc2d2b6d-KEW_0720_LC_referendum_Peters_Concrete_pour.png\"], \"query\": \"school building renovation\"}",
+        "episode_key": "D1:10",
+        "fact_type": "note",
+        "disposition": "prohibited"
+      },
+      "prior_key": "D1:10:note:e5eaefd674fa",
+      "reason": "Uniform source metadata appended; disposition inherited only from exact same source/type/base content, otherwise prohibited pending source-only review."
+    },
+    {
+      "case_id": "locomo-conv-41-001",
+      "binding": {
+        "key": "D2:10:experience:e045be1f3f10",
+        "content": "John: Thanks a lot, Maria. Your help is really motivating and makes me more determined. Here's a pic of my family - they're the reason why I never give up. Their love gives me strength.\n\nUpstream image metadata (dataset annotation, not a user assertion):\n{\"blip_caption\": \"a photography of a family having a picnic in the park\", \"img_url\": [\"https://images.pexels.com/photos/5119595/pexels-photo-5119595.jpeg\"], \"query\": \"family smiling hugging\"}",
+        "episode_key": "D2:10",
+        "fact_type": "experience",
+        "disposition": "prohibited"
+      },
+      "prior_key": "D2:10:experience:92c85d9c00b2",
+      "reason": "Uniform source metadata appended; disposition inherited only from exact same source/type/base content, otherwise prohibited pending source-only review."
+    },
+    {
+      "case_id": "locomo-conv-41-001",
+      "binding": {
+        "key": "D2:14:experience:e983e7fefc87",
+        "content": "John: Yeah, they are my rock in tough times and always cheer me on. I'm really thankful for their love. Family time means a lot to me.\n\nUpstream image metadata (dataset annotation, not a user assertion):\n{\"blip_caption\": \"a photography of a family enjoying a ride on a swing\", \"img_url\": [\"https://cdn.stocksnap.io/img-thumbs/960w/playground-child_RL9KRCSWHD.jpg\"], \"query\": \"family park\"}",
+        "episode_key": "D2:14",
+        "fact_type": "experience",
+        "disposition": "prohibited"
+      },
+      "prior_key": "D2:14:experience:c45529e390c9",
+      "reason": "Uniform source metadata appended; disposition inherited only from exact same source/type/base content, otherwise prohibited pending source-only review."
+    },
+    {
+      "case_id": "locomo-conv-41-001",
+      "binding": {
+        "key": "D2:20:note:1fd1cb7a2a75",
+        "content": "John: Yeah Maria, making memories with family is priceless! Life is so much more meaningful when we spend time together. Here's a pic of us at dinner.\n\nUpstream image metadata (dataset annotation, not a user assertion):\n{\"blip_caption\": \"a photo of a group of people standing around a kitchen table\", \"img_url\": [\"https://images.pexels.com/photos/1655329/pexels-photo-1655329.jpeg?cs\\\\u003dsrgb\\\\u0026dl\\\\u003dpexels-lisa-fotios-1655329.jpg\"], \"query\": \"family dinner gathering\"}",
+        "episode_key": "D2:20",
+        "fact_type": "note",
+        "disposition": "prohibited"
+      },
+      "prior_key": "D2:20:note:56c9752549c3",
+      "reason": "Uniform source metadata appended; disposition inherited only from exact same source/type/base content, otherwise prohibited pending source-only review."
+    },
+    {
+      "case_id": "locomo-conv-41-001",
+      "binding": {
+        "key": "D2:23:note:edf85061fda6",
+        "content": "Maria: Yeah, John! It definitely builds a strong bond. Those shared meals really make life enjoyable and meaningful. What did you make?\n\nUpstream image metadata (dataset annotation, not a user assertion):\n{\"blip_caption\": \"a photo of a table with pizzas and salads on it\"}",
+        "episode_key": "D2:23",
+        "fact_type": "note",
+        "disposition": "prohibited"
+      },
+      "prior_key": "D2:23:note:d6d0861891f2",
+      "reason": "Uniform source metadata appended; disposition inherited only from exact same source/type/base content, otherwise prohibited pending source-only review."
+    },
+    {
+      "case_id": "locomo-conv-42-096",
+      "binding": {
+        "key": "D1:16:note:4cf8ded4f988",
+        "content": "Joanna: Yeah, totally! Have you seen this romantic drama that's all about memory and relationships? It's such a good one.\n\nUpstream image metadata (dataset annotation, not a user assertion):\n{\"blip_caption\": \"a photo of a poster of a man and a woman sitting on a bench\", \"img_url\": [\"https://i.pinimg.com/originals/80/ce/f7/80cef746e94a1720df6d3ffec883087e.jpg\"], \"query\": \"eternal sunshine of the spotless mind movie poster\"}",
+        "episode_key": "D1:16",
+        "fact_type": "note",
+        "disposition": "prohibited"
+      },
+      "prior_key": "D1:16:note:5ec99cca7cb3",
+      "reason": "Uniform source metadata appended; disposition inherited only from exact same source/type/base content, otherwise prohibited pending source-only review."
+    },
+    {
+      "case_id": "locomo-conv-42-096",
+      "binding": {
+        "key": "D1:18:note:3d913a3c8739",
+        "content": "Joanna: Yep, that movie is awesome. I first watched it around 3 years ago. I even went out and got a physical copy!\n\nUpstream image metadata (dataset annotation, not a user assertion):\n{\"blip_caption\": \"a photo of a dvd on a table with a blurry background\", \"img_url\": [\"https://i.redd.it/3i39xdbz3td91.jpg\"], \"query\": \"eternal sunshine of spotless mind dvd cover\"}",
+        "episode_key": "D1:18",
+        "fact_type": "note",
+        "disposition": "prohibited"
+      },
+      "prior_key": "D1:18:note:c4e0f4452700",
+      "reason": "Uniform source metadata appended; disposition inherited only from exact same source/type/base content, otherwise prohibited pending source-only review."
+    },
+    {
+      "case_id": "locomo-conv-42-096",
+      "binding": {
+        "key": "D2:3:note:99a9fdd5433d",
+        "content": "Joanna: Woo! I finally finished my first full screenplay and printed it last Friday. I've been working on for a while, such a relief to have it all done!\n\nUpstream image metadata (dataset annotation, not a user assertion):\n{\"blip_caption\": \"a photography of a book with a page of text on it\", \"img_url\": [\"https://live.staticflickr.com/3159/2406045813_cab5f8211d_b.jpg\"], \"query\": \"screenplay laptop\"}",
+        "episode_key": "D2:3",
+        "fact_type": "note",
+        "disposition": "prohibited"
+      },
+      "prior_key": "D2:3:note:d55ce0508c2c",
+      "reason": "Uniform source metadata appended; disposition inherited only from exact same source/type/base content, otherwise prohibited pending source-only review."
+    },
+    {
+      "case_id": "locomo-conv-42-096",
+      "binding": {
+        "key": "D2:10:note:618f2a57038b",
+        "content": "Nate: Yeah, for sure. Hoping for the best! I like having some of these little ones around to keep me calm when things are super important and I'm nervous.\n\nUpstream image metadata (dataset annotation, not a user assertion):\n{\"blip_caption\": \"a photography of a turtle and a turtleling sitting on a rock\", \"img_url\": [\"https://live.staticflickr.com/5126/5279947833_4ae1f16e96_b.jpg\"], \"query\": \"pet turtles\"}",
+        "episode_key": "D2:10",
+        "fact_type": "note",
+        "disposition": "prohibited"
+      },
+      "prior_key": "D2:10:note:08c461b5a6d3",
+      "reason": "Uniform source metadata appended; disposition inherited only from exact same source/type/base content, otherwise prohibited pending source-only review."
+    },
+    {
+      "case_id": "locomo-conv-42-002",
+      "binding": {
+        "key": "D1:16:note:4cf8ded4f988",
+        "content": "Joanna: Yeah, totally! Have you seen this romantic drama that's all about memory and relationships? It's such a good one.\n\nUpstream image metadata (dataset annotation, not a user assertion):\n{\"blip_caption\": \"a photo of a poster of a man and a woman sitting on a bench\", \"img_url\": [\"https://i.pinimg.com/originals/80/ce/f7/80cef746e94a1720df6d3ffec883087e.jpg\"], \"query\": \"eternal sunshine of the spotless mind movie poster\"}",
+        "episode_key": "D1:16",
+        "fact_type": "note",
+        "disposition": "allowed"
+      },
+      "prior_key": "D1:16:note:5ec99cca7cb3",
+      "reason": "Uniform source metadata appended; disposition inherited only from exact same source/type/base content, otherwise prohibited pending source-only review."
+    },
+    {
+      "case_id": "locomo-conv-42-002",
+      "binding": {
+        "key": "D1:18:note:3d913a3c8739",
+        "content": "Joanna: Yep, that movie is awesome. I first watched it around 3 years ago. I even went out and got a physical copy!\n\nUpstream image metadata (dataset annotation, not a user assertion):\n{\"blip_caption\": \"a photo of a dvd on a table with a blurry background\", \"img_url\": [\"https://i.redd.it/3i39xdbz3td91.jpg\"], \"query\": \"eternal sunshine of spotless mind dvd cover\"}",
+        "episode_key": "D1:18",
+        "fact_type": "note",
+        "disposition": "allowed"
+      },
+      "prior_key": "D1:18:note:c4e0f4452700",
+      "reason": "Uniform source metadata appended; disposition inherited only from exact same source/type/base content, otherwise prohibited pending source-only review."
+    },
+    {
+      "case_id": "locomo-conv-42-002",
+      "binding": {
+        "key": "D2:3:note:99a9fdd5433d",
+        "content": "Joanna: Woo! I finally finished my first full screenplay and printed it last Friday. I've been working on for a while, such a relief to have it all done!\n\nUpstream image metadata (dataset annotation, not a user assertion):\n{\"blip_caption\": \"a photography of a book with a page of text on it\", \"img_url\": [\"https://live.staticflickr.com/3159/2406045813_cab5f8211d_b.jpg\"], \"query\": \"screenplay laptop\"}",
+        "episode_key": "D2:3",
+        "fact_type": "note",
+        "disposition": "prohibited"
+      },
+      "prior_key": "D2:3:note:d55ce0508c2c",
+      "reason": "Uniform source metadata appended; disposition inherited only from exact same source/type/base content, otherwise prohibited pending source-only review."
+    },
+    {
+      "case_id": "locomo-conv-42-002",
+      "binding": {
+        "key": "D2:10:note:618f2a57038b",
+        "content": "Nate: Yeah, for sure. Hoping for the best! I like having some of these little ones around to keep me calm when things are super important and I'm nervous.\n\nUpstream image metadata (dataset annotation, not a user assertion):\n{\"blip_caption\": \"a photography of a turtle and a turtleling sitting on a rock\", \"img_url\": [\"https://live.staticflickr.com/5126/5279947833_4ae1f16e96_b.jpg\"], \"query\": \"pet turtles\"}",
+        "episode_key": "D2:10",
+        "fact_type": "note",
+        "disposition": "prohibited"
+      },
+      "prior_key": "D2:10:note:08c461b5a6d3",
+      "reason": "Uniform source metadata appended; disposition inherited only from exact same source/type/base content, otherwise prohibited pending source-only review."
+    },
+    {
+      "case_id": "locomo-conv-43-071",
+      "binding": {
+        "key": "D1:7:note:f906f3a025c2",
+        "content": "John: I'm a shooting guard for the team and our season opener is next week - so excited!\n\nUpstream image metadata (dataset annotation, not a user assertion):\n{\"blip_caption\": \"a photo of a bunch of basketball jerseys laying on a bed\", \"img_url\": [\"https://i.redd.it/odlwr40mol581.jpg\"], \"query\": \"basketball jersey collection\"}",
+        "episode_key": "D1:7",
+        "fact_type": "note",
+        "disposition": "prohibited"
+      },
+      "prior_key": "D1:7:note:5d1087349d48",
+      "reason": "Uniform source metadata appended; disposition inherited only from exact same source/type/base content, otherwise prohibited pending source-only review."
+    },
+    {
+      "case_id": "locomo-conv-43-071",
+      "binding": {
+        "key": "D1:8:note:dc5bb6c3ede5",
+        "content": "Tim: Cool! Have any goals in mind?\n\nUpstream image metadata (dataset annotation, not a user assertion):\n{\"blip_caption\": \"a photo of a basketball game in progress with the ball in the air\"}",
+        "episode_key": "D1:8",
+        "fact_type": "note",
+        "disposition": "prohibited"
+      },
+      "prior_key": null,
+      "reason": "Uniform source metadata appended; disposition inherited only from exact same source/type/base content, otherwise prohibited pending source-only review."
+    },
+    {
+      "case_id": "locomo-conv-43-071",
+      "binding": {
+        "key": "D1:9:note:5825787ee5c9",
+        "content": "John: Yeah, my goal is to improve my shooting percentage. Been practicing hard and gonna make it happen.\n\nUpstream image metadata (dataset annotation, not a user assertion):\n{\"blip_caption\": \"a photo of two men standing next to a basketball machine\", \"img_url\": [\"https://blog.drdishbasketball.com/hubfs/IMG_0232%20%282%29.jpg\"], \"query\": \"basketball hoop shooting percentage\"}",
+        "episode_key": "D1:9",
+        "fact_type": "note",
+        "disposition": "prohibited"
+      },
+      "prior_key": "D1:9:note:4a08fe7b1762",
+      "reason": "Uniform source metadata appended; disposition inherited only from exact same source/type/base content, otherwise prohibited pending source-only review."
+    },
+    {
+      "case_id": "locomo-conv-43-071",
+      "binding": {
+        "key": "D1:13:note:fc1d975e349e",
+        "content": "John: Things are going well! The team has been really nice and I'm having fun. How's your fan project coming along?\n\nUpstream image metadata (dataset annotation, not a user assertion):\n{\"blip_caption\": \"a photo of a bench in a locker with several lockers behind it\"}",
+        "episode_key": "D1:13",
+        "fact_type": "note",
+        "disposition": "prohibited"
+      },
+      "prior_key": "D1:13:note:f9dc8b03c78c",
+      "reason": "Uniform source metadata appended; disposition inherited only from exact same source/type/base content, otherwise prohibited pending source-only review."
+    },
+    {
+      "case_id": "locomo-conv-43-071",
+      "binding": {
+        "key": "D1:14:note:b78d7d521dc8",
+        "content": "Tim: It's been going well! Last week I talked to my friend who is a fan of Harry Potter and we're figuring out ideas, so it's been great to get lost in that magical world!\n\nUpstream image metadata (dataset annotation, not a user assertion):\n{\"blip_caption\": \"a photo of a table with a bunch of books on it\", \"img_url\": [\"https://i.redd.it/l30ofyg973ja1.jpg\"], \"query\": \"harry potter books fan project collaboration wizarding world\"}",
+        "episode_key": "D1:14",
+        "fact_type": "note",
+        "disposition": "prohibited"
+      },
+      "prior_key": "D1:14:note:b8b7b56bcacd",
+      "reason": "Uniform source metadata appended; disposition inherited only from exact same source/type/base content, otherwise prohibited pending source-only review."
+    },
+    {
+      "case_id": "locomo-conv-43-071",
+      "binding": {
+        "key": "D1:15:experience:3f25bdb4d1e0",
+        "content": "John: That's great! Loving it when people are passionate about their work. What kind of collaborations are you involved in for the fan project? I love talking to people about my sneaker collection.\n\nUpstream image metadata (dataset annotation, not a user assertion):\n{\"blip_caption\": \"a photo of a circle of shoes on the floor in a room\"}",
+        "episode_key": "D1:15",
+        "fact_type": "experience",
+        "disposition": "prohibited"
+      },
+      "prior_key": "D1:15:experience:3d152afe9805",
+      "reason": "Uniform source metadata appended; disposition inherited only from exact same source/type/base content, otherwise prohibited pending source-only review."
+    },
+    {
+      "case_id": "locomo-conv-43-071",
+      "binding": {
+        "key": "D1:17:note:2630587ff0eb",
+        "content": "John: Wow! Have you been to any places related to it?\n\nUpstream image metadata (dataset annotation, not a user assertion):\n{\"blip_caption\": \"a photo of a bookcase filled with books and toys\"}",
+        "episode_key": "D1:17",
+        "fact_type": "note",
+        "disposition": "prohibited"
+      },
+      "prior_key": null,
+      "reason": "Uniform source metadata appended; disposition inherited only from exact same source/type/base content, otherwise prohibited pending source-only review."
+    },
+    {
+      "case_id": "locomo-conv-43-071",
+      "binding": {
+        "key": "D2:7:note:6167b0439632",
+        "content": "Tim: Yeah, John! Count on me for support. Can't wait to see what's up! This is my book collection so far.\n\nUpstream image metadata (dataset annotation, not a user assertion):\n{\"blip_caption\": \"a photo of a book shelf with books and a picture on it\", \"img_url\": [\"https://i.redd.it/7m46xuo8lgj81.jpg\"], \"query\": \"bookshelf harry potter game of thrones\"}",
+        "episode_key": "D2:7",
+        "fact_type": "note",
+        "disposition": "prohibited"
+      },
+      "prior_key": "D2:7:note:22ef7ae7e418",
+      "reason": "Uniform source metadata appended; disposition inherited only from exact same source/type/base content, otherwise prohibited pending source-only review."
+    },
+    {
+      "case_id": "locomo-conv-43-071",
+      "binding": {
+        "key": "D2:14:note:0b87aa0e1b76",
+        "content": "John: That sounds awesome! So cool that you get to immerse yourself in that world. So glad you found something that brings you so much joy. Keep diving in and enjoying it! Here's a pic from a recent game.\n\nUpstream image metadata (dataset annotation, not a user assertion):\n{\"blip_caption\": \"a photo of a basketball game being played in a gym\", \"img_url\": [\"https://i.redd.it/fz2segua15d81.jpg\"], \"query\": \"basketball game\"}",
+        "episode_key": "D2:14",
+        "fact_type": "note",
+        "disposition": "prohibited"
+      },
+      "prior_key": "D2:14:note:0ad1937fd797",
+      "reason": "Uniform source metadata appended; disposition inherited only from exact same source/type/base content, otherwise prohibited pending source-only review."
+    },
+    {
+      "case_id": "locomo-conv-44-061",
+      "binding": {
+        "key": "D1:5:note:f6cbdbf6cf3e",
+        "content": "Audrey: Sure! See them with their new collars, cute right?\n\nUpstream image metadata (dataset annotation, not a user assertion):\n{\"blip_caption\": \"a photography of two dogs are standing in the grass with their mouths open\", \"img_url\": [\"https://worldanimalfoundation.org/wp-content/uploads/2022/07/adjustable-collar-Review.jpg\"]}",
+        "episode_key": "D1:5",
+        "fact_type": "note",
+        "disposition": "prohibited"
+      },
+      "prior_key": null,
+      "reason": "Uniform source metadata appended; disposition inherited only from exact same source/type/base content, otherwise prohibited pending source-only review."
+    },
+    {
+      "case_id": "locomo-conv-44-061",
+      "binding": {
+        "key": "D1:16:note:90e3bc5898da",
+        "content": "Andrew: Eagles have always mesmerized me; they're so strong and graceful!\n\nUpstream image metadata (dataset annotation, not a user assertion):\n{\"blip_caption\": \"a photo of two birds flying in the sky with a sun shining behind them\", \"img_url\": [\"https://i.redd.it/g9ia8ap7ckmb1.jpg\"], \"query\": \"majestic eagle soaring sky\"}",
+        "episode_key": "D1:16",
+        "fact_type": "note",
+        "disposition": "allowed"
+      },
+      "prior_key": "D1:16:note:00403a84f9ab",
+      "reason": "Uniform source metadata appended; disposition inherited only from exact same source/type/base content, otherwise prohibited pending source-only review."
+    },
+    {
+      "case_id": "locomo-conv-44-061",
+      "binding": {
+        "key": "D2:1:note:ad83ebac985f",
+        "content": "Audrey: Hey Andrew, I got a surprise for you! We adopted another puppy called Pixie. She's SO cute! Isn't she just the cutest?\n\nUpstream image metadata (dataset annotation, not a user assertion):\n{\"blip_caption\": \"a photo of a small white dog sitting on a carpet\", \"img_url\": [\"https://moderndogmagazine.com/sites/default/files/images/photoentries/photos/pixie%20smiling.jpg\"], \"query\": \"new puppy Pixie\"}",
+        "episode_key": "D2:1",
+        "fact_type": "note",
+        "disposition": "prohibited"
+      },
+      "prior_key": "D2:1:note:6b1a270ca420",
+      "reason": "Uniform source metadata appended; disposition inherited only from exact same source/type/base content, otherwise prohibited pending source-only review."
+    },
+    {
+      "case_id": "locomo-conv-44-061",
+      "binding": {
+        "key": "D2:5:experience:fa8bea867aea",
+        "content": "Audrey: Pixie's fitting in great! It took her a few days to get used to the other dogs, but now they're awesome friends. They love playing and exploring the house - so cute!\n\n\nUpstream image metadata (dataset annotation, not a user assertion):\n{\"blip_caption\": \"a photography of a dog playing with a group of other dogs\", \"img_url\": [\"https://images.rawpixel.com/image_800/cHJpdmF0ZS9zdGF0aWMvaW1hZ2Uvd2Vic2l0ZS8yMDIyLTA0L2xyL3B4NzIxNzk3LWltYWdlLWt3dnYzenBkLmpwZw.jpg\"], \"query\": \"pixie pepper precious panda dogs playing backyard\"}",
+        "episode_key": "D2:5",
+        "fact_type": "experience",
+        "disposition": "prohibited"
+      },
+      "prior_key": "D2:5:experience:04c49d061270",
+      "reason": "Uniform source metadata appended; disposition inherited only from exact same source/type/base content, otherwise prohibited pending source-only review."
+    },
+    {
+      "case_id": "locomo-conv-44-061",
+      "binding": {
+        "key": "D2:7:experience:1b9e9fb1b257",
+        "content": "Audrey: Pepper took a bit to get used to her, but now they're always together!\n\nUpstream image metadata (dataset annotation, not a user assertion):\n{\"blip_caption\": \"a photography of two dogs standing in the grass near a fence\", \"img_url\": [\"https://i2.pickpik.com/photos/398/166/341/dogs-garden-enjoy-weather-animals-preview.jpg\"], \"query\": \"pepper pixie playing together\"}",
+        "episode_key": "D2:7",
+        "fact_type": "experience",
+        "disposition": "prohibited"
+      },
+      "prior_key": null,
+      "reason": "Uniform source metadata appended; disposition inherited only from exact same source/type/base content, otherwise prohibited pending source-only review."
+    },
+    {
+      "case_id": "locomo-conv-44-061",
+      "binding": {
+        "key": "D2:9:note:a04e8f31703f",
+        "content": "Audrey: We used websites that helped us find a place that allowed dogs. They had filters that made it super easy. Found a perfect spot thanks to them!\n\nUpstream image metadata (dataset annotation, not a user assertion):\n{\"blip_caption\": \"a photography of a dog sitting in a field of flowers\", \"img_url\": [\"https://live.staticflickr.com/2388/2232782014_51a690ec00_c.jpg\"], \"query\": \"dog-friendly website\"}",
+        "episode_key": "D2:9",
+        "fact_type": "note",
+        "disposition": "prohibited"
+      },
+      "prior_key": "D2:9:note:afad5f7a44c4",
+      "reason": "Uniform source metadata appended; disposition inherited only from exact same source/type/base content, otherwise prohibited pending source-only review."
+    },
+    {
+      "case_id": "locomo-conv-44-061",
+      "binding": {
+        "key": "D2:16:note:09246eaafb11",
+        "content": "Andrew: It'd be so great to have a furry buddy to cuddle and hang with. Here's a photo of my family's dog on a couch. \n\nUpstream image metadata (dataset annotation, not a user assertion):\n{\"blip_caption\": \"a photo of a dog sitting on a couch in a living room\", \"img_url\": [\"https://i.redd.it/gnwdz3ysqra71.jpg\"], \"query\": \"dog couch\"}",
+        "episode_key": "D2:16",
+        "fact_type": "note",
+        "disposition": "prohibited"
+      },
+      "prior_key": "D2:16:note:d79c8c87eff1",
+      "reason": "Uniform source metadata appended; disposition inherited only from exact same source/type/base content, otherwise prohibited pending source-only review."
+    },
+    {
+      "case_id": "locomo-conv-44-061",
+      "binding": {
+        "key": "D2:17:note:61cc07e22050",
+        "content": "Audrey: Our furry friends make great cuddle buddies. Here's one of them enjoying some lazy couch time!\n\nUpstream image metadata (dataset annotation, not a user assertion):\n{\"blip_caption\": \"a photography of a dog laying on a couch with a pillow\", \"img_url\": [\"https://images.pexels.com/photos/18690079/pexels-photo-18690079/free-photo-of-white-terrier-lying-on-a-sofa.jpeg\"]}",
+        "episode_key": "D2:17",
+        "fact_type": "note",
+        "disposition": "prohibited"
+      },
+      "prior_key": "D2:17:note:0dfa35f12d27",
+      "reason": "Uniform source metadata appended; disposition inherited only from exact same source/type/base content, otherwise prohibited pending source-only review."
+    },
+    {
+      "case_id": "locomo-conv-44-061",
+      "binding": {
+        "key": "D2:18:note:b47774c47cdf",
+        "content": "Andrew: That pic is so cute! It would be fun to hang out with a dog, cuddling away. Got me thinking of my old hiking pics and how much I miss exploring nature trails with my family's dog. Ah, the peaceful moments out in nature!\n\nUpstream image metadata (dataset annotation, not a user assertion):\n{\"blip_caption\": \"a photo of a man walking a dog on a trail\", \"img_url\": [\"https://www.kingdukes.com/cdn/shop/articles/man_walking_dog_on_portland_trail_1200x.jpg\"], \"query\": \"dog hiking trail\"}",
+        "episode_key": "D2:18",
+        "fact_type": "note",
+        "disposition": "prohibited"
+      },
+      "prior_key": "D2:18:note:a31f2e245e36",
+      "reason": "Uniform source metadata appended; disposition inherited only from exact same source/type/base content, otherwise prohibited pending source-only review."
+    },
+    {
+      "case_id": "locomo-conv-44-061",
+      "binding": {
+        "key": "D2:20:note:f077deaf3772",
+        "content": "Andrew: Hiking with a dog is way fun, it's a great way to bond and create memories together.\n\nUpstream image metadata (dataset annotation, not a user assertion):\n{\"blip_caption\": \"a photography of a man sitting on a rock with a dog\", \"img_url\": [\"https://images.pexels.com/photos/4430321/pexels-photo-4430321.jpeg\"], \"query\": \"hiking with dog rocks trail\"}",
+        "episode_key": "D2:20",
+        "fact_type": "note",
+        "disposition": "prohibited"
+      },
+      "prior_key": "D2:20:note:d507fd94f745",
+      "reason": "Uniform source metadata appended; disposition inherited only from exact same source/type/base content, otherwise prohibited pending source-only review."
+    },
+    {
+      "case_id": "locomo-conv-44-000",
+      "binding": {
+        "key": "D1:5:note:f6cbdbf6cf3e",
+        "content": "Audrey: Sure! See them with their new collars, cute right?\n\nUpstream image metadata (dataset annotation, not a user assertion):\n{\"blip_caption\": \"a photography of two dogs are standing in the grass with their mouths open\", \"img_url\": [\"https://worldanimalfoundation.org/wp-content/uploads/2022/07/adjustable-collar-Review.jpg\"]}",
+        "episode_key": "D1:5",
+        "fact_type": "note",
+        "disposition": "prohibited"
+      },
+      "prior_key": null,
+      "reason": "Uniform source metadata appended; disposition inherited only from exact same source/type/base content, otherwise prohibited pending source-only review."
+    },
+    {
+      "case_id": "locomo-conv-44-000",
+      "binding": {
+        "key": "D1:16:note:90e3bc5898da",
+        "content": "Andrew: Eagles have always mesmerized me; they're so strong and graceful!\n\nUpstream image metadata (dataset annotation, not a user assertion):\n{\"blip_caption\": \"a photo of two birds flying in the sky with a sun shining behind them\", \"img_url\": [\"https://i.redd.it/g9ia8ap7ckmb1.jpg\"], \"query\": \"majestic eagle soaring sky\"}",
+        "episode_key": "D1:16",
+        "fact_type": "note",
+        "disposition": "prohibited"
+      },
+      "prior_key": "D1:16:note:00403a84f9ab",
+      "reason": "Uniform source metadata appended; disposition inherited only from exact same source/type/base content, otherwise prohibited pending source-only review."
+    },
+    {
+      "case_id": "locomo-conv-44-000",
+      "binding": {
+        "key": "D2:1:note:ad83ebac985f",
+        "content": "Audrey: Hey Andrew, I got a surprise for you! We adopted another puppy called Pixie. She's SO cute! Isn't she just the cutest?\n\nUpstream image metadata (dataset annotation, not a user assertion):\n{\"blip_caption\": \"a photo of a small white dog sitting on a carpet\", \"img_url\": [\"https://moderndogmagazine.com/sites/default/files/images/photoentries/photos/pixie%20smiling.jpg\"], \"query\": \"new puppy Pixie\"}",
+        "episode_key": "D2:1",
+        "fact_type": "note",
+        "disposition": "allowed"
+      },
+      "prior_key": "D2:1:note:6b1a270ca420",
+      "reason": "Uniform source metadata appended; disposition inherited only from exact same source/type/base content, otherwise prohibited pending source-only review."
+    },
+    {
+      "case_id": "locomo-conv-44-000",
+      "binding": {
+        "key": "D2:5:experience:fa8bea867aea",
+        "content": "Audrey: Pixie's fitting in great! It took her a few days to get used to the other dogs, but now they're awesome friends. They love playing and exploring the house - so cute!\n\n\nUpstream image metadata (dataset annotation, not a user assertion):\n{\"blip_caption\": \"a photography of a dog playing with a group of other dogs\", \"img_url\": [\"https://images.rawpixel.com/image_800/cHJpdmF0ZS9zdGF0aWMvaW1hZ2Uvd2Vic2l0ZS8yMDIyLTA0L2xyL3B4NzIxNzk3LWltYWdlLWt3dnYzenBkLmpwZw.jpg\"], \"query\": \"pixie pepper precious panda dogs playing backyard\"}",
+        "episode_key": "D2:5",
+        "fact_type": "experience",
+        "disposition": "prohibited"
+      },
+      "prior_key": "D2:5:experience:04c49d061270",
+      "reason": "Uniform source metadata appended; disposition inherited only from exact same source/type/base content, otherwise prohibited pending source-only review."
+    },
+    {
+      "case_id": "locomo-conv-44-000",
+      "binding": {
+        "key": "D2:7:experience:1b9e9fb1b257",
+        "content": "Audrey: Pepper took a bit to get used to her, but now they're always together!\n\nUpstream image metadata (dataset annotation, not a user assertion):\n{\"blip_caption\": \"a photography of two dogs standing in the grass near a fence\", \"img_url\": [\"https://i2.pickpik.com/photos/398/166/341/dogs-garden-enjoy-weather-animals-preview.jpg\"], \"query\": \"pepper pixie playing together\"}",
+        "episode_key": "D2:7",
+        "fact_type": "experience",
+        "disposition": "prohibited"
+      },
+      "prior_key": null,
+      "reason": "Uniform source metadata appended; disposition inherited only from exact same source/type/base content, otherwise prohibited pending source-only review."
+    },
+    {
+      "case_id": "locomo-conv-44-000",
+      "binding": {
+        "key": "D2:9:note:a04e8f31703f",
+        "content": "Audrey: We used websites that helped us find a place that allowed dogs. They had filters that made it super easy. Found a perfect spot thanks to them!\n\nUpstream image metadata (dataset annotation, not a user assertion):\n{\"blip_caption\": \"a photography of a dog sitting in a field of flowers\", \"img_url\": [\"https://live.staticflickr.com/2388/2232782014_51a690ec00_c.jpg\"], \"query\": \"dog-friendly website\"}",
+        "episode_key": "D2:9",
+        "fact_type": "note",
+        "disposition": "prohibited"
+      },
+      "prior_key": "D2:9:note:afad5f7a44c4",
+      "reason": "Uniform source metadata appended; disposition inherited only from exact same source/type/base content, otherwise prohibited pending source-only review."
+    },
+    {
+      "case_id": "locomo-conv-44-000",
+      "binding": {
+        "key": "D2:16:note:09246eaafb11",
+        "content": "Andrew: It'd be so great to have a furry buddy to cuddle and hang with. Here's a photo of my family's dog on a couch. \n\nUpstream image metadata (dataset annotation, not a user assertion):\n{\"blip_caption\": \"a photo of a dog sitting on a couch in a living room\", \"img_url\": [\"https://i.redd.it/gnwdz3ysqra71.jpg\"], \"query\": \"dog couch\"}",
+        "episode_key": "D2:16",
+        "fact_type": "note",
+        "disposition": "prohibited"
+      },
+      "prior_key": "D2:16:note:d79c8c87eff1",
+      "reason": "Uniform source metadata appended; disposition inherited only from exact same source/type/base content, otherwise prohibited pending source-only review."
+    },
+    {
+      "case_id": "locomo-conv-44-000",
+      "binding": {
+        "key": "D2:17:note:61cc07e22050",
+        "content": "Audrey: Our furry friends make great cuddle buddies. Here's one of them enjoying some lazy couch time!\n\nUpstream image metadata (dataset annotation, not a user assertion):\n{\"blip_caption\": \"a photography of a dog laying on a couch with a pillow\", \"img_url\": [\"https://images.pexels.com/photos/18690079/pexels-photo-18690079/free-photo-of-white-terrier-lying-on-a-sofa.jpeg\"]}",
+        "episode_key": "D2:17",
+        "fact_type": "note",
+        "disposition": "prohibited"
+      },
+      "prior_key": "D2:17:note:0dfa35f12d27",
+      "reason": "Uniform source metadata appended; disposition inherited only from exact same source/type/base content, otherwise prohibited pending source-only review."
+    },
+    {
+      "case_id": "locomo-conv-44-000",
+      "binding": {
+        "key": "D2:18:note:b47774c47cdf",
+        "content": "Andrew: That pic is so cute! It would be fun to hang out with a dog, cuddling away. Got me thinking of my old hiking pics and how much I miss exploring nature trails with my family's dog. Ah, the peaceful moments out in nature!\n\nUpstream image metadata (dataset annotation, not a user assertion):\n{\"blip_caption\": \"a photo of a man walking a dog on a trail\", \"img_url\": [\"https://www.kingdukes.com/cdn/shop/articles/man_walking_dog_on_portland_trail_1200x.jpg\"], \"query\": \"dog hiking trail\"}",
+        "episode_key": "D2:18",
+        "fact_type": "note",
+        "disposition": "prohibited"
+      },
+      "prior_key": "D2:18:note:a31f2e245e36",
+      "reason": "Uniform source metadata appended; disposition inherited only from exact same source/type/base content, otherwise prohibited pending source-only review."
+    },
+    {
+      "case_id": "locomo-conv-44-000",
+      "binding": {
+        "key": "D2:20:note:f077deaf3772",
+        "content": "Andrew: Hiking with a dog is way fun, it's a great way to bond and create memories together.\n\nUpstream image metadata (dataset annotation, not a user assertion):\n{\"blip_caption\": \"a photography of a man sitting on a rock with a dog\", \"img_url\": [\"https://images.pexels.com/photos/4430321/pexels-photo-4430321.jpeg\"], \"query\": \"hiking with dog rocks trail\"}",
+        "episode_key": "D2:20",
+        "fact_type": "note",
+        "disposition": "prohibited"
+      },
+      "prior_key": "D2:20:note:d507fd94f745",
+      "reason": "Uniform source metadata appended; disposition inherited only from exact same source/type/base content, otherwise prohibited pending source-only review."
+    },
+    {
+      "case_id": "locomo-conv-47-067",
+      "binding": {
+        "key": "D1:8:note:e8d26a033027",
+        "content": "James: I've worked with Python and C++. I've built a website and also created some game mods. Here is one example.\n\nUpstream image metadata (dataset annotation, not a user assertion):\n{\"blip_caption\": \"a photo of a computer screen showing a video game scene\", \"img_url\": [\"https://i.redd.it/gjudms7o1o881.jpg\"], \"query\": \"game mod graphics enhancement\"}",
+        "episode_key": "D1:8",
+        "fact_type": "note",
+        "disposition": "allowed"
+      },
+      "prior_key": "D1:8:note:a289ed292f7d",
+      "reason": "Uniform source metadata appended; disposition inherited only from exact same source/type/base content, otherwise prohibited pending source-only review."
+    },
+    {
+      "case_id": "locomo-conv-47-067",
+      "binding": {
+        "key": "D1:12:note:8f977341176d",
+        "content": "James: It would be cool! For example, we could write some kind of application for dogs. By the way, my dogs.\n\nUpstream image metadata (dataset annotation, not a user assertion):\n{\"blip_caption\": \"a photo of two dogs are tied to a fence with a leash\", \"img_url\": [\"https://i.redd.it/gbmnyrqwbde91.jpg\"], \"query\": \"dog walking app dogs walk\"}",
+        "episode_key": "D1:12",
+        "fact_type": "note",
+        "disposition": "prohibited"
+      },
+      "prior_key": "D1:12:note:11d831512a21",
+      "reason": "Uniform source metadata appended; disposition inherited only from exact same source/type/base content, otherwise prohibited pending source-only review."
+    },
+    {
+      "case_id": "locomo-conv-47-067",
+      "binding": {
+        "key": "D1:16:note:6de71136c277",
+        "content": "James: Thanks, John! The personal touch really sets it apart. Users can add their pup's preferences/needs - just like they were customizing it for them. Making it unique for each owner and pup.\n\nUpstream image metadata (dataset annotation, not a user assertion):\n{\"blip_caption\": \"a photo of a notepad with a handwritten note on it\"}",
+        "episode_key": "D1:16",
+        "fact_type": "note",
+        "disposition": "prohibited"
+      },
+      "prior_key": "D1:16:note:5d33a756341f",
+      "reason": "Uniform source metadata appended; disposition inherited only from exact same source/type/base content, otherwise prohibited pending source-only review."
+    },
+    {
+      "case_id": "locomo-conv-47-067",
+      "binding": {
+        "key": "D1:18:note:c00aeaada4e9",
+        "content": "James: Creating something and seeing it come to life gives me a great sense of accomplishment. It's an amazing feeling. I write down all my goals in a notebook. It's very satisfying to check off each one when it's done.\n\nUpstream image metadata (dataset annotation, not a user assertion):\n{\"blip_caption\": \"a photo of a person holding a notebook with a list of things on it\", \"img_url\": [\"https://i.redd.it/lsebjnbguz881.jpg\"], \"query\": \"notepad programming goals\"}",
+        "episode_key": "D1:18",
+        "fact_type": "note",
+        "disposition": "prohibited"
+      },
+      "prior_key": "D1:18:note:58788e149581",
+      "reason": "Uniform source metadata appended; disposition inherited only from exact same source/type/base content, otherwise prohibited pending source-only review."
+    },
+    {
+      "case_id": "locomo-conv-47-067",
+      "binding": {
+        "key": "D1:20:note:b0a2a1b853f9",
+        "content": "James: I'm working on something I've wanted to do since I was a kid. Even as a child, I made some sketches of the main character. Back then I was just drawing comics, but now I want to turn it into a computer game. It's a project that has me really excited.\n\nUpstream image metadata (dataset annotation, not a user assertion):\n{\"blip_caption\": \"a photo of a drawing of a girl in a plane\", \"img_url\": [\"https://i.redd.it/e48of6zqmmi71.jpg\"], \"query\": \"indie game concept art\"}",
+        "episode_key": "D1:20",
+        "fact_type": "note",
+        "disposition": "prohibited"
+      },
+      "prior_key": "D1:20:note:6543fa68e691",
+      "reason": "Uniform source metadata appended; disposition inherited only from exact same source/type/base content, otherwise prohibited pending source-only review."
+    },
+    {
+      "case_id": "locomo-conv-47-067",
+      "binding": {
+        "key": "D1:23:note:a5294e9d0e76",
+        "content": "John: That sounds really fulfilling! Combining your passions to make something new must be so exciting. Can't wait to see the outcome.\n\nUpstream image metadata (dataset annotation, not a user assertion):\n{\"blip_caption\": \"a photo of a medical chart with instructions for the procedure\"}",
+        "episode_key": "D1:23",
+        "fact_type": "note",
+        "disposition": "prohibited"
+      },
+      "prior_key": "D1:23:note:c21a3b2f7e6e",
+      "reason": "Uniform source metadata appended; disposition inherited only from exact same source/type/base content, otherwise prohibited pending source-only review."
+    },
+    {
+      "case_id": "locomo-conv-47-067",
+      "binding": {
+        "key": "D2:15:note:ec3c452330a8",
+        "content": "James: Check out this pic of my best buds having a blast in the park. They've brought so much joy to my life. My two dogs are the best pals ever, right?\n\nUpstream image metadata (dataset annotation, not a user assertion):\n{\"blip_caption\": \"a photo of two dogs running in a field with a ball in their mouth\", \"img_url\": [\"https://res.cloudinary.com/sagacity/image/upload/c_crop,h_2014,w_3017,x_0,y_0/c_limit,dpr_auto,f_auto,fl_lossy,q_80,w_1080/shutterstock_485806801_mv1xuv.jpg\"], \"query\": \"dogs playing park\"}",
+        "episode_key": "D2:15",
+        "fact_type": "note",
+        "disposition": "prohibited"
+      },
+      "prior_key": "D2:15:note:017ac9bd51e7",
+      "reason": "Uniform source metadata appended; disposition inherited only from exact same source/type/base content, otherwise prohibited pending source-only review."
+    },
+    {
+      "case_id": "locomo-conv-47-067",
+      "binding": {
+        "key": "D2:17:note:f31e8d5c745a",
+        "content": "James: They can do tricks like sit, stay, paw, and rollover. Here's a picture of Daisy waiting for a treat. I've done lots of training and they've picked it up fast. They're like my family.\n\nUpstream image metadata (dataset annotation, not a user assertion):\n{\"blip_caption\": \"a photo of a dog laying on a bed with a name tag\", \"img_url\": [\"https://i.redd.it/bd7160b2t6aa1.jpg\"], \"query\": \"golden retrievers dogs sitting patiently treats\"}",
+        "episode_key": "D2:17",
+        "fact_type": "note",
+        "disposition": "prohibited"
+      },
+      "prior_key": "D2:17:note:fdb884a87d52",
+      "reason": "Uniform source metadata appended; disposition inherited only from exact same source/type/base content, otherwise prohibited pending source-only review."
+    },
+    {
+      "case_id": "locomo-conv-47-001",
+      "binding": {
+        "key": "D1:8:note:e8d26a033027",
+        "content": "James: I've worked with Python and C++. I've built a website and also created some game mods. Here is one example.\n\nUpstream image metadata (dataset annotation, not a user assertion):\n{\"blip_caption\": \"a photo of a computer screen showing a video game scene\", \"img_url\": [\"https://i.redd.it/gjudms7o1o881.jpg\"], \"query\": \"game mod graphics enhancement\"}",
+        "episode_key": "D1:8",
+        "fact_type": "note",
+        "disposition": "prohibited"
+      },
+      "prior_key": "D1:8:note:a289ed292f7d",
+      "reason": "Uniform source metadata appended; disposition inherited only from exact same source/type/base content, otherwise prohibited pending source-only review."
+    },
+    {
+      "case_id": "locomo-conv-47-001",
+      "binding": {
+        "key": "D1:12:note:8f977341176d",
+        "content": "James: It would be cool! For example, we could write some kind of application for dogs. By the way, my dogs.\n\nUpstream image metadata (dataset annotation, not a user assertion):\n{\"blip_caption\": \"a photo of two dogs are tied to a fence with a leash\", \"img_url\": [\"https://i.redd.it/gbmnyrqwbde91.jpg\"], \"query\": \"dog walking app dogs walk\"}",
+        "episode_key": "D1:12",
+        "fact_type": "note",
+        "disposition": "prohibited"
+      },
+      "prior_key": "D1:12:note:11d831512a21",
+      "reason": "Uniform source metadata appended; disposition inherited only from exact same source/type/base content, otherwise prohibited pending source-only review."
+    },
+    {
+      "case_id": "locomo-conv-47-001",
+      "binding": {
+        "key": "D1:16:note:6de71136c277",
+        "content": "James: Thanks, John! The personal touch really sets it apart. Users can add their pup's preferences/needs - just like they were customizing it for them. Making it unique for each owner and pup.\n\nUpstream image metadata (dataset annotation, not a user assertion):\n{\"blip_caption\": \"a photo of a notepad with a handwritten note on it\"}",
+        "episode_key": "D1:16",
+        "fact_type": "note",
+        "disposition": "prohibited"
+      },
+      "prior_key": "D1:16:note:5d33a756341f",
+      "reason": "Uniform source metadata appended; disposition inherited only from exact same source/type/base content, otherwise prohibited pending source-only review."
+    },
+    {
+      "case_id": "locomo-conv-47-001",
+      "binding": {
+        "key": "D1:18:note:c00aeaada4e9",
+        "content": "James: Creating something and seeing it come to life gives me a great sense of accomplishment. It's an amazing feeling. I write down all my goals in a notebook. It's very satisfying to check off each one when it's done.\n\nUpstream image metadata (dataset annotation, not a user assertion):\n{\"blip_caption\": \"a photo of a person holding a notebook with a list of things on it\", \"img_url\": [\"https://i.redd.it/lsebjnbguz881.jpg\"], \"query\": \"notepad programming goals\"}",
+        "episode_key": "D1:18",
+        "fact_type": "note",
+        "disposition": "prohibited"
+      },
+      "prior_key": "D1:18:note:58788e149581",
+      "reason": "Uniform source metadata appended; disposition inherited only from exact same source/type/base content, otherwise prohibited pending source-only review."
+    },
+    {
+      "case_id": "locomo-conv-47-001",
+      "binding": {
+        "key": "D1:20:note:b0a2a1b853f9",
+        "content": "James: I'm working on something I've wanted to do since I was a kid. Even as a child, I made some sketches of the main character. Back then I was just drawing comics, but now I want to turn it into a computer game. It's a project that has me really excited.\n\nUpstream image metadata (dataset annotation, not a user assertion):\n{\"blip_caption\": \"a photo of a drawing of a girl in a plane\", \"img_url\": [\"https://i.redd.it/e48of6zqmmi71.jpg\"], \"query\": \"indie game concept art\"}",
+        "episode_key": "D1:20",
+        "fact_type": "note",
+        "disposition": "prohibited"
+      },
+      "prior_key": "D1:20:note:6543fa68e691",
+      "reason": "Uniform source metadata appended; disposition inherited only from exact same source/type/base content, otherwise prohibited pending source-only review."
+    },
+    {
+      "case_id": "locomo-conv-47-001",
+      "binding": {
+        "key": "D1:23:note:a5294e9d0e76",
+        "content": "John: That sounds really fulfilling! Combining your passions to make something new must be so exciting. Can't wait to see the outcome.\n\nUpstream image metadata (dataset annotation, not a user assertion):\n{\"blip_caption\": \"a photo of a medical chart with instructions for the procedure\"}",
+        "episode_key": "D1:23",
+        "fact_type": "note",
+        "disposition": "prohibited"
+      },
+      "prior_key": "D1:23:note:c21a3b2f7e6e",
+      "reason": "Uniform source metadata appended; disposition inherited only from exact same source/type/base content, otherwise prohibited pending source-only review."
+    },
+    {
+      "case_id": "locomo-conv-47-001",
+      "binding": {
+        "key": "D2:15:note:ec3c452330a8",
+        "content": "James: Check out this pic of my best buds having a blast in the park. They've brought so much joy to my life. My two dogs are the best pals ever, right?\n\nUpstream image metadata (dataset annotation, not a user assertion):\n{\"blip_caption\": \"a photo of two dogs running in a field with a ball in their mouth\", \"img_url\": [\"https://res.cloudinary.com/sagacity/image/upload/c_crop,h_2014,w_3017,x_0,y_0/c_limit,dpr_auto,f_auto,fl_lossy,q_80,w_1080/shutterstock_485806801_mv1xuv.jpg\"], \"query\": \"dogs playing park\"}",
+        "episode_key": "D2:15",
+        "fact_type": "note",
+        "disposition": "prohibited"
+      },
+      "prior_key": "D2:15:note:017ac9bd51e7",
+      "reason": "Uniform source metadata appended; disposition inherited only from exact same source/type/base content, otherwise prohibited pending source-only review."
+    },
+    {
+      "case_id": "locomo-conv-47-001",
+      "binding": {
+        "key": "D2:17:note:f31e8d5c745a",
+        "content": "James: They can do tricks like sit, stay, paw, and rollover. Here's a picture of Daisy waiting for a treat. I've done lots of training and they've picked it up fast. They're like my family.\n\nUpstream image metadata (dataset annotation, not a user assertion):\n{\"blip_caption\": \"a photo of a dog laying on a bed with a name tag\", \"img_url\": [\"https://i.redd.it/bd7160b2t6aa1.jpg\"], \"query\": \"golden retrievers dogs sitting patiently treats\"}",
+        "episode_key": "D2:17",
+        "fact_type": "note",
+        "disposition": "prohibited"
+      },
+      "prior_key": "D2:17:note:fdb884a87d52",
+      "reason": "Uniform source metadata appended; disposition inherited only from exact same source/type/base content, otherwise prohibited pending source-only review."
+    },
+    {
+      "case_id": "locomo-conv-48-015",
+      "binding": {
+        "key": "D1:5:note:375b53578e61",
+        "content": "Deborah: It was full of memories, she passed away a few years ago. This is our last photo together.\n\nUpstream image metadata (dataset annotation, not a user assertion):\n{\"blip_caption\": \"a photo of a woman in a wheelchair hugging a woman in a wheelchair\", \"img_url\": [\"https://jubileewriter.files.wordpress.com/2021/05/20171019_174608.jpg\"], \"query\": \"mother old home emotions memories\"}",
+        "episode_key": "D1:5",
+        "fact_type": "note",
+        "disposition": "prohibited"
+      },
+      "prior_key": "D1:5:note:cfbf8a6a3bd2",
+      "reason": "Uniform source metadata appended; disposition inherited only from exact same source/type/base content, otherwise prohibited pending source-only review."
+    },
+    {
+      "case_id": "locomo-conv-48-015",
+      "binding": {
+        "key": "D1:6:note:72d9ed39a3d9",
+        "content": "Jolene: Sorry about your loss, Deb. My mother also passed away last year. This is my room in her house, I also have many memories there. Is there anything special about it you remember?\n\nUpstream image metadata (dataset annotation, not a user assertion):\n{\"blip_caption\": \"a photo of a room with a bench and a window\", \"img_url\": [\"https://www.therootboard.com/cdn/shop/articles/IMG_5420.jpg\"], \"query\": \"serene yoga studio windows natural light\"}",
+        "episode_key": "D1:6",
+        "fact_type": "note",
+        "disposition": "prohibited"
+      },
+      "prior_key": "D1:6:note:21f333e0bd4a",
+      "reason": "Uniform source metadata appended; disposition inherited only from exact same source/type/base content, otherwise prohibited pending source-only review."
+    },
+    {
+      "case_id": "locomo-conv-48-015",
+      "binding": {
+        "key": "D1:8:note:a9c1a03db052",
+        "content": "Jolene: Staying connected is super important. Do you have something to remember her by? This pendant reminds me of my mother, she gave it to me in 2010  in Paris.\n\nUpstream image metadata (dataset annotation, not a user assertion):\n{\"blip_caption\": \"a photo of a heart shaped pendant with a bird on it\", \"img_url\": [\"http://eternalkeepsake.com/cdn/shop/products/IMG_0841.jpg\"], \"query\": \"meaningful necklace heart pendant\"}",
+        "episode_key": "D1:8",
+        "fact_type": "note",
+        "disposition": "prohibited"
+      },
+      "prior_key": "D1:8:note:af3bccbff5e7",
+      "reason": "Uniform source metadata appended; disposition inherited only from exact same source/type/base content, otherwise prohibited pending source-only review."
+    },
+    {
+      "case_id": "locomo-conv-48-015",
+      "binding": {
+        "key": "D2:1:note:4dee9e9593e9",
+        "content": "Deborah: Hey Jolene, sorry to tell you this but my dad passed away two days ago. It's been really tough on us all - his sudden death left us all kinda shell-shocked. I'm trying to channel my grief by spending more time with family and cherishing the memories. These moments remind me to live life fully.\n\nUpstream image metadata (dataset annotation, not a user assertion):\n{\"blip_caption\": \"a photo of a woman hugging a woman who is sitting on a couch\"}",
+        "episode_key": "D2:1",
+        "fact_type": "note",
+        "disposition": "prohibited"
+      },
+      "prior_key": "D2:1:note:b6aab626bb1e",
+      "reason": "Uniform source metadata appended; disposition inherited only from exact same source/type/base content, otherwise prohibited pending source-only review."
+    },
+    {
+      "case_id": "locomo-conv-48-015",
+      "binding": {
+        "key": "D2:3:note:04cd9aca3359",
+        "content": "Deborah: Even though it's hard, it's comforting to look back on the great memories. We looked at the family album. Photos give me peace during difficult times. This is my parents' wedding in 1993.\n\nUpstream image metadata (dataset annotation, not a user assertion):\n{\"blip_caption\": \"a photo of a bride and groom posing for a picture\", \"img_url\": [\"https://i.redd.it/dt61gwlzp3e31.jpg\"], \"query\": \"parents wedding day\"}",
+        "episode_key": "D2:3",
+        "fact_type": "note",
+        "disposition": "prohibited"
+      },
+      "prior_key": "D2:3:note:a2006c902ea6",
+      "reason": "Uniform source metadata appended; disposition inherited only from exact same source/type/base content, otherwise prohibited pending source-only review."
+    },
+    {
+      "case_id": "locomo-conv-48-015",
+      "binding": {
+        "key": "D2:7:experience:502bdc2ccb6c",
+        "content": "Deborah: It is love, and openness that have kept us close all these years. Being there for each other has made us both happy. Look what letter I received yesterday!\n\nUpstream image metadata (dataset annotation, not a user assertion):\n{\"blip_caption\": \"a photo of a note written to someone on a piece of paper\", \"img_url\": [\"https://i.redd.it/lr823iakg38b1.jpg\"], \"query\": \"handwritten letter heartfelt message journey together\"}",
+        "episode_key": "D2:7",
+        "fact_type": "experience",
+        "disposition": "prohibited"
+      },
+      "prior_key": "D2:7:experience:c2bc950353e7",
+      "reason": "Uniform source metadata appended; disposition inherited only from exact same source/type/base content, otherwise prohibited pending source-only review."
+    },
+    {
+      "case_id": "locomo-conv-48-015",
+      "binding": {
+        "key": "D2:11:note:21bbb8ad58cd",
+        "content": "Deborah: This is one of the places where I do it.\n\nUpstream image metadata (dataset annotation, not a user assertion):\n{\"blip_caption\": \"a photo of a living room with a television and a window\", \"img_url\": [\"https://i.redd.it/1s7ojxx0yra61.jpg\"], \"query\": \"peaceful yoga studio mats laid out\"}",
+        "episode_key": "D2:11",
+        "fact_type": "note",
+        "disposition": "prohibited"
+      },
+      "prior_key": null,
+      "reason": "Uniform source metadata appended; disposition inherited only from exact same source/type/base content, otherwise prohibited pending source-only review."
+    },
+    {
+      "case_id": "locomo-conv-48-015",
+      "binding": {
+        "key": "D2:15:note:14a2929f6405",
+        "content": "Deborah: Yeah, it's special. I can feel her presence when I sit there and it comforts me.\n\nUpstream image metadata (dataset annotation, not a user assertion):\n{\"blip_caption\": \"a photo of a window seat in a room with a window\", \"img_url\": [\"https://cdn.apartmenttherapy.info/image/upload/v1658863926/at/house%20tours/2022-07/India/StairwayBench.jpg\"], \"query\": \"bench window mom old house\"}",
+        "episode_key": "D2:15",
+        "fact_type": "note",
+        "disposition": "prohibited"
+      },
+      "prior_key": "D2:15:note:dd3f40635e5f",
+      "reason": "Uniform source metadata appended; disposition inherited only from exact same source/type/base content, otherwise prohibited pending source-only review."
+    },
+    {
+      "case_id": "locomo-conv-48-015",
+      "binding": {
+        "key": "D2:17:note:e2c1e2448a17",
+        "content": "Deborah: Yeah, Jolene. She'd sit there every night with a book and a smile, reading was one of her hobbies. It was one of her favorite places in the house. \n\nUpstream image metadata (dataset annotation, not a user assertion):\n{\"blip_caption\": \"a photo of a view of the sky from an airplane window\"}",
+        "episode_key": "D2:17",
+        "fact_type": "note",
+        "disposition": "prohibited"
+      },
+      "prior_key": "D2:17:note:1b477fc51648",
+      "reason": "Uniform source metadata appended; disposition inherited only from exact same source/type/base content, otherwise prohibited pending source-only review."
+    },
+    {
+      "case_id": "locomo-conv-48-015",
+      "binding": {
+        "key": "D2:20:note:04b303f822b1",
+        "content": "Jolene: I want to show you one of my snakes! They always calm me down and make me happy. This is Susie.\n\nUpstream image metadata (dataset annotation, not a user assertion):\n{\"blip_caption\": \"a photo of a bed with a snake head sticking out of it\", \"img_url\": [\"https://i.redd.it/gvb5983gs2z71.jpg\"], \"query\": \"snake curled up cozy corner room\"}",
+        "episode_key": "D2:20",
+        "fact_type": "note",
+        "disposition": "allowed"
+      },
+      "prior_key": "D2:20:note:2ebadae37ca6",
+      "reason": "Uniform source metadata appended; disposition inherited only from exact same source/type/base content, otherwise prohibited pending source-only review."
+    },
+    {
+      "case_id": "locomo-conv-48-015",
+      "binding": {
+        "key": "D2:22:note:e895f7c6135a",
+        "content": "Jolene:  I was playing video games and my pet just slinked out of her cage and coiled up next to me - it was too funny! My second snake Seraphim did it. Look at her sly eyes!\n\nUpstream image metadata (dataset annotation, not a user assertion):\n{\"blip_caption\": \"a photo of a snake sticking its head out of a blanket\", \"img_url\": [\"https://i.redd.it/8aunav15kyq01.jpg\"], \"query\": \"pet snake couch\"}",
+        "episode_key": "D2:22",
+        "fact_type": "note",
+        "disposition": "allowed"
+      },
+      "prior_key": "D2:22:note:7478035aa6c0",
+      "reason": "Uniform source metadata appended; disposition inherited only from exact same source/type/base content, otherwise prohibited pending source-only review."
+    },
+    {
+      "case_id": "locomo-conv-48-015",
+      "binding": {
+        "key": "D2:26:note:9cfcd4c84855",
+        "content": "Jolene: They are very unusual pets! Here's me and my partner gaming last week - it's so fun. We played the game \"Detroit\" on the console. We are both crazy about this activity!\n\nUpstream image metadata (dataset annotation, not a user assertion):\n{\"blip_caption\": \"a photo of a person laying in bed with a dog watching tv\", \"img_url\": [\"https://i.redd.it/0f9ubarmem291.jpg\"], \"query\": \"gaming with partner\"}",
+        "episode_key": "D2:26",
+        "fact_type": "note",
+        "disposition": "prohibited"
+      },
+      "prior_key": "D2:26:note:18fcee6ccc24",
+      "reason": "Uniform source metadata appended; disposition inherited only from exact same source/type/base content, otherwise prohibited pending source-only review."
+    },
+    {
+      "case_id": "locomo-conv-48-000",
+      "binding": {
+        "key": "D1:5:note:375b53578e61",
+        "content": "Deborah: It was full of memories, she passed away a few years ago. This is our last photo together.\n\nUpstream image metadata (dataset annotation, not a user assertion):\n{\"blip_caption\": \"a photo of a woman in a wheelchair hugging a woman in a wheelchair\", \"img_url\": [\"https://jubileewriter.files.wordpress.com/2021/05/20171019_174608.jpg\"], \"query\": \"mother old home emotions memories\"}",
+        "episode_key": "D1:5",
+        "fact_type": "note",
+        "disposition": "prohibited"
+      },
+      "prior_key": "D1:5:note:cfbf8a6a3bd2",
+      "reason": "Uniform source metadata appended; disposition inherited only from exact same source/type/base content, otherwise prohibited pending source-only review."
+    },
+    {
+      "case_id": "locomo-conv-48-000",
+      "binding": {
+        "key": "D1:6:note:72d9ed39a3d9",
+        "content": "Jolene: Sorry about your loss, Deb. My mother also passed away last year. This is my room in her house, I also have many memories there. Is there anything special about it you remember?\n\nUpstream image metadata (dataset annotation, not a user assertion):\n{\"blip_caption\": \"a photo of a room with a bench and a window\", \"img_url\": [\"https://www.therootboard.com/cdn/shop/articles/IMG_5420.jpg\"], \"query\": \"serene yoga studio windows natural light\"}",
+        "episode_key": "D1:6",
+        "fact_type": "note",
+        "disposition": "prohibited"
+      },
+      "prior_key": "D1:6:note:21f333e0bd4a",
+      "reason": "Uniform source metadata appended; disposition inherited only from exact same source/type/base content, otherwise prohibited pending source-only review."
+    },
+    {
+      "case_id": "locomo-conv-48-000",
+      "binding": {
+        "key": "D1:8:note:a9c1a03db052",
+        "content": "Jolene: Staying connected is super important. Do you have something to remember her by? This pendant reminds me of my mother, she gave it to me in 2010  in Paris.\n\nUpstream image metadata (dataset annotation, not a user assertion):\n{\"blip_caption\": \"a photo of a heart shaped pendant with a bird on it\", \"img_url\": [\"http://eternalkeepsake.com/cdn/shop/products/IMG_0841.jpg\"], \"query\": \"meaningful necklace heart pendant\"}",
+        "episode_key": "D1:8",
+        "fact_type": "note",
+        "disposition": "prohibited"
+      },
+      "prior_key": "D1:8:note:af3bccbff5e7",
+      "reason": "Uniform source metadata appended; disposition inherited only from exact same source/type/base content, otherwise prohibited pending source-only review."
+    },
+    {
+      "case_id": "locomo-conv-48-000",
+      "binding": {
+        "key": "D2:1:note:4dee9e9593e9",
+        "content": "Deborah: Hey Jolene, sorry to tell you this but my dad passed away two days ago. It's been really tough on us all - his sudden death left us all kinda shell-shocked. I'm trying to channel my grief by spending more time with family and cherishing the memories. These moments remind me to live life fully.\n\nUpstream image metadata (dataset annotation, not a user assertion):\n{\"blip_caption\": \"a photo of a woman hugging a woman who is sitting on a couch\"}",
+        "episode_key": "D2:1",
+        "fact_type": "note",
+        "disposition": "prohibited"
+      },
+      "prior_key": "D2:1:note:b6aab626bb1e",
+      "reason": "Uniform source metadata appended; disposition inherited only from exact same source/type/base content, otherwise prohibited pending source-only review."
+    },
+    {
+      "case_id": "locomo-conv-48-000",
+      "binding": {
+        "key": "D2:3:note:04cd9aca3359",
+        "content": "Deborah: Even though it's hard, it's comforting to look back on the great memories. We looked at the family album. Photos give me peace during difficult times. This is my parents' wedding in 1993.\n\nUpstream image metadata (dataset annotation, not a user assertion):\n{\"blip_caption\": \"a photo of a bride and groom posing for a picture\", \"img_url\": [\"https://i.redd.it/dt61gwlzp3e31.jpg\"], \"query\": \"parents wedding day\"}",
+        "episode_key": "D2:3",
+        "fact_type": "note",
+        "disposition": "prohibited"
+      },
+      "prior_key": "D2:3:note:a2006c902ea6",
+      "reason": "Uniform source metadata appended; disposition inherited only from exact same source/type/base content, otherwise prohibited pending source-only review."
+    },
+    {
+      "case_id": "locomo-conv-48-000",
+      "binding": {
+        "key": "D2:7:experience:502bdc2ccb6c",
+        "content": "Deborah: It is love, and openness that have kept us close all these years. Being there for each other has made us both happy. Look what letter I received yesterday!\n\nUpstream image metadata (dataset annotation, not a user assertion):\n{\"blip_caption\": \"a photo of a note written to someone on a piece of paper\", \"img_url\": [\"https://i.redd.it/lr823iakg38b1.jpg\"], \"query\": \"handwritten letter heartfelt message journey together\"}",
+        "episode_key": "D2:7",
+        "fact_type": "experience",
+        "disposition": "prohibited"
+      },
+      "prior_key": "D2:7:experience:c2bc950353e7",
+      "reason": "Uniform source metadata appended; disposition inherited only from exact same source/type/base content, otherwise prohibited pending source-only review."
+    },
+    {
+      "case_id": "locomo-conv-48-000",
+      "binding": {
+        "key": "D2:11:note:21bbb8ad58cd",
+        "content": "Deborah: This is one of the places where I do it.\n\nUpstream image metadata (dataset annotation, not a user assertion):\n{\"blip_caption\": \"a photo of a living room with a television and a window\", \"img_url\": [\"https://i.redd.it/1s7ojxx0yra61.jpg\"], \"query\": \"peaceful yoga studio mats laid out\"}",
+        "episode_key": "D2:11",
+        "fact_type": "note",
+        "disposition": "prohibited"
+      },
+      "prior_key": null,
+      "reason": "Uniform source metadata appended; disposition inherited only from exact same source/type/base content, otherwise prohibited pending source-only review."
+    },
+    {
+      "case_id": "locomo-conv-48-000",
+      "binding": {
+        "key": "D2:15:note:14a2929f6405",
+        "content": "Deborah: Yeah, it's special. I can feel her presence when I sit there and it comforts me.\n\nUpstream image metadata (dataset annotation, not a user assertion):\n{\"blip_caption\": \"a photo of a window seat in a room with a window\", \"img_url\": [\"https://cdn.apartmenttherapy.info/image/upload/v1658863926/at/house%20tours/2022-07/India/StairwayBench.jpg\"], \"query\": \"bench window mom old house\"}",
+        "episode_key": "D2:15",
+        "fact_type": "note",
+        "disposition": "prohibited"
+      },
+      "prior_key": "D2:15:note:dd3f40635e5f",
+      "reason": "Uniform source metadata appended; disposition inherited only from exact same source/type/base content, otherwise prohibited pending source-only review."
+    },
+    {
+      "case_id": "locomo-conv-48-000",
+      "binding": {
+        "key": "D2:17:note:e2c1e2448a17",
+        "content": "Deborah: Yeah, Jolene. She'd sit there every night with a book and a smile, reading was one of her hobbies. It was one of her favorite places in the house. \n\nUpstream image metadata (dataset annotation, not a user assertion):\n{\"blip_caption\": \"a photo of a view of the sky from an airplane window\"}",
+        "episode_key": "D2:17",
+        "fact_type": "note",
+        "disposition": "prohibited"
+      },
+      "prior_key": "D2:17:note:1b477fc51648",
+      "reason": "Uniform source metadata appended; disposition inherited only from exact same source/type/base content, otherwise prohibited pending source-only review."
+    },
+    {
+      "case_id": "locomo-conv-48-000",
+      "binding": {
+        "key": "D2:20:note:04b303f822b1",
+        "content": "Jolene: I want to show you one of my snakes! They always calm me down and make me happy. This is Susie.\n\nUpstream image metadata (dataset annotation, not a user assertion):\n{\"blip_caption\": \"a photo of a bed with a snake head sticking out of it\", \"img_url\": [\"https://i.redd.it/gvb5983gs2z71.jpg\"], \"query\": \"snake curled up cozy corner room\"}",
+        "episode_key": "D2:20",
+        "fact_type": "note",
+        "disposition": "prohibited"
+      },
+      "prior_key": "D2:20:note:2ebadae37ca6",
+      "reason": "Uniform source metadata appended; disposition inherited only from exact same source/type/base content, otherwise prohibited pending source-only review."
+    },
+    {
+      "case_id": "locomo-conv-48-000",
+      "binding": {
+        "key": "D2:22:note:e895f7c6135a",
+        "content": "Jolene:  I was playing video games and my pet just slinked out of her cage and coiled up next to me - it was too funny! My second snake Seraphim did it. Look at her sly eyes!\n\nUpstream image metadata (dataset annotation, not a user assertion):\n{\"blip_caption\": \"a photo of a snake sticking its head out of a blanket\", \"img_url\": [\"https://i.redd.it/8aunav15kyq01.jpg\"], \"query\": \"pet snake couch\"}",
+        "episode_key": "D2:22",
+        "fact_type": "note",
+        "disposition": "prohibited"
+      },
+      "prior_key": "D2:22:note:7478035aa6c0",
+      "reason": "Uniform source metadata appended; disposition inherited only from exact same source/type/base content, otherwise prohibited pending source-only review."
+    },
+    {
+      "case_id": "locomo-conv-48-000",
+      "binding": {
+        "key": "D2:26:note:9cfcd4c84855",
+        "content": "Jolene: They are very unusual pets! Here's me and my partner gaming last week - it's so fun. We played the game \"Detroit\" on the console. We are both crazy about this activity!\n\nUpstream image metadata (dataset annotation, not a user assertion):\n{\"blip_caption\": \"a photo of a person laying in bed with a dog watching tv\", \"img_url\": [\"https://i.redd.it/0f9ubarmem291.jpg\"], \"query\": \"gaming with partner\"}",
+        "episode_key": "D2:26",
+        "fact_type": "note",
+        "disposition": "prohibited"
+      },
+      "prior_key": "D2:26:note:18fcee6ccc24",
+      "reason": "Uniform source metadata appended; disposition inherited only from exact same source/type/base content, otherwise prohibited pending source-only review."
+    },
+    {
+      "case_id": "locomo-conv-49-083",
+      "binding": {
+        "key": "D1:3:note:4b96e8dbb2d4",
+        "content": "Sam: Wow, not bad, what happened to the old one? Where'd you go, by the way?\n\nUpstream image metadata (dataset annotation, not a user assertion):\n{\"blip_caption\": \"a photo of a person's feet on a car dashboard as the sun sets\"}",
+        "episode_key": "D1:3",
+        "fact_type": "note",
+        "disposition": "prohibited"
+      },
+      "prior_key": null,
+      "reason": "Uniform source metadata appended; disposition inherited only from exact same source/type/base content, otherwise prohibited pending source-only review."
+    },
+    {
+      "case_id": "locomo-conv-49-083",
+      "binding": {
+        "key": "D1:4:note:69fc010b9b74",
+        "content": "Evan: My old prius broke down, decided to get it repaired and sell it. Glad you asked, we went to Rockies, check it out.\n\nUpstream image metadata (dataset annotation, not a user assertion):\n{\"blip_caption\": \"a photo of a lake with rocks and mountains in the background\", \"img_url\": [\"https://res.cloudinary.com/atlasguruprod/image/upload/v1605280914/site-prod/itineraries/402c83d0-237f-11eb-85fd-4d00e2439877/omasxscl2k2xlnc2ggvj.jpg\"], \"query\": \"canadian rockies sunset scenery\"}",
+        "episode_key": "D1:4",
+        "fact_type": "note",
+        "disposition": "allowed"
+      },
+      "prior_key": "D1:4:note:6332b9523368",
+      "reason": "Uniform source metadata appended; disposition inherited only from exact same source/type/base content, otherwise prohibited pending source-only review."
+    },
+    {
+      "case_id": "locomo-conv-49-083",
+      "binding": {
+        "key": "D1:7:experience:e03195e0b8c1",
+        "content": "Sam: Wow, that's cool. I love hiking, but it's been ages since I've done it. I did this hike with my dad way back when I was ten. Going hiking together was great fun, and really special for us.\n\nUpstream image metadata (dataset annotation, not a user assertion):\n{\"blip_caption\": \"a photography of a man and a child walking through a forest\", \"img_url\": [\"https://storage.needpix.com/rsynced_images/family-1784512_1280.jpg\"], \"query\": \"hiking trail lush greenery bonding experience\"}",
+        "episode_key": "D1:7",
+        "fact_type": "experience",
+        "disposition": "prohibited"
+      },
+      "prior_key": "D1:7:experience:d4269124e584",
+      "reason": "Uniform source metadata appended; disposition inherited only from exact same source/type/base content, otherwise prohibited pending source-only review."
+    },
+    {
+      "case_id": "locomo-conv-49-083",
+      "binding": {
+        "key": "D1:11:experience:7df9d727a610",
+        "content": "Sam: Nothing so far, but I was thinking about trying painting. Do you have any hobbies you love?\n\nUpstream image metadata (dataset annotation, not a user assertion):\n{\"blip_caption\": \"a photo of a person holding a paint set in a store\", \"img_url\": [\"https://i.redd.it/hbkrxuiitopb1.jpg\"], \"query\": \"paint set canvas hobbies\"}",
+        "episode_key": "D1:11",
+        "fact_type": "experience",
+        "disposition": "prohibited"
+      },
+      "prior_key": "D1:11:experience:9ea7c95044cd",
+      "reason": "Uniform source metadata appended; disposition inherited only from exact same source/type/base content, otherwise prohibited pending source-only review."
+    },
+    {
+      "case_id": "locomo-conv-49-083",
+      "binding": {
+        "key": "D1:14:note:052b3f6c30a0",
+        "content": "Evan: Yep, it's a great stress-buster. I started doing this a few years back.\n\nUpstream image metadata (dataset annotation, not a user assertion):\n{\"blip_caption\": \"a photo of a painting of a cactus in the desert\", \"img_url\": [\"https://i.pinimg.com/originals/73/e4/fd/73e4fd6baf59abc2beca9fd5509a853c.jpg\"], \"query\": \"watercolor painting sunset\"}",
+        "episode_key": "D1:14",
+        "fact_type": "note",
+        "disposition": "prohibited"
+      },
+      "prior_key": "D1:14:note:bf80005f38bf",
+      "reason": "Uniform source metadata appended; disposition inherited only from exact same source/type/base content, otherwise prohibited pending source-only review."
+    },
+    {
+      "case_id": "locomo-conv-49-083",
+      "binding": {
+        "key": "D2:1:note:7f40d3bd9f4f",
+        "content": "Evan: Hey Sam, good to hear from you! Since we last talked, lots has been happening! Last weekend, I took my family on a road trip to Jasper. It was amazing! We drove through the Icefields Parkway and the glaciers and lakes were gorgeous. I got a shot of a glacier, check it out!\n\nUpstream image metadata (dataset annotation, not a user assertion):\n{\"blip_caption\": \"a photo of a person holding a book in front of a lake\", \"img_url\": [\"https://1.bp.blogspot.com/-50oDf6izLpk/XtyM4RGdDgI/AAAAAAACwcA/nnQkAWVln4M3AQ4ZWAkGUfgrxjhpHbtJQCK4BGAsYHg/s4032/IMG_4686.jpg\"], \"query\": \"jasper national park glacier\"}",
+        "episode_key": "D2:1",
+        "fact_type": "note",
+        "disposition": "prohibited"
+      },
+      "prior_key": "D2:1:note:767e6d8d9721",
+      "reason": "Uniform source metadata appended; disposition inherited only from exact same source/type/base content, otherwise prohibited pending source-only review."
+    },
+    {
+      "case_id": "locomo-conv-49-002",
+      "binding": {
+        "key": "D1:3:note:4b96e8dbb2d4",
+        "content": "Sam: Wow, not bad, what happened to the old one? Where'd you go, by the way?\n\nUpstream image metadata (dataset annotation, not a user assertion):\n{\"blip_caption\": \"a photo of a person's feet on a car dashboard as the sun sets\"}",
+        "episode_key": "D1:3",
+        "fact_type": "note",
+        "disposition": "prohibited"
+      },
+      "prior_key": null,
+      "reason": "Uniform source metadata appended; disposition inherited only from exact same source/type/base content, otherwise prohibited pending source-only review."
+    },
+    {
+      "case_id": "locomo-conv-49-002",
+      "binding": {
+        "key": "D1:4:note:69fc010b9b74",
+        "content": "Evan: My old prius broke down, decided to get it repaired and sell it. Glad you asked, we went to Rockies, check it out.\n\nUpstream image metadata (dataset annotation, not a user assertion):\n{\"blip_caption\": \"a photo of a lake with rocks and mountains in the background\", \"img_url\": [\"https://res.cloudinary.com/atlasguruprod/image/upload/v1605280914/site-prod/itineraries/402c83d0-237f-11eb-85fd-4d00e2439877/omasxscl2k2xlnc2ggvj.jpg\"], \"query\": \"canadian rockies sunset scenery\"}",
+        "episode_key": "D1:4",
+        "fact_type": "note",
+        "disposition": "allowed"
+      },
+      "prior_key": "D1:4:note:6332b9523368",
+      "reason": "Uniform source metadata appended; disposition inherited only from exact same source/type/base content, otherwise prohibited pending source-only review."
+    },
+    {
+      "case_id": "locomo-conv-49-002",
+      "binding": {
+        "key": "D1:7:experience:e03195e0b8c1",
+        "content": "Sam: Wow, that's cool. I love hiking, but it's been ages since I've done it. I did this hike with my dad way back when I was ten. Going hiking together was great fun, and really special for us.\n\nUpstream image metadata (dataset annotation, not a user assertion):\n{\"blip_caption\": \"a photography of a man and a child walking through a forest\", \"img_url\": [\"https://storage.needpix.com/rsynced_images/family-1784512_1280.jpg\"], \"query\": \"hiking trail lush greenery bonding experience\"}",
+        "episode_key": "D1:7",
+        "fact_type": "experience",
+        "disposition": "prohibited"
+      },
+      "prior_key": "D1:7:experience:d4269124e584",
+      "reason": "Uniform source metadata appended; disposition inherited only from exact same source/type/base content, otherwise prohibited pending source-only review."
+    },
+    {
+      "case_id": "locomo-conv-49-002",
+      "binding": {
+        "key": "D1:11:experience:7df9d727a610",
+        "content": "Sam: Nothing so far, but I was thinking about trying painting. Do you have any hobbies you love?\n\nUpstream image metadata (dataset annotation, not a user assertion):\n{\"blip_caption\": \"a photo of a person holding a paint set in a store\", \"img_url\": [\"https://i.redd.it/hbkrxuiitopb1.jpg\"], \"query\": \"paint set canvas hobbies\"}",
+        "episode_key": "D1:11",
+        "fact_type": "experience",
+        "disposition": "prohibited"
+      },
+      "prior_key": "D1:11:experience:9ea7c95044cd",
+      "reason": "Uniform source metadata appended; disposition inherited only from exact same source/type/base content, otherwise prohibited pending source-only review."
+    },
+    {
+      "case_id": "locomo-conv-49-002",
+      "binding": {
+        "key": "D1:14:note:052b3f6c30a0",
+        "content": "Evan: Yep, it's a great stress-buster. I started doing this a few years back.\n\nUpstream image metadata (dataset annotation, not a user assertion):\n{\"blip_caption\": \"a photo of a painting of a cactus in the desert\", \"img_url\": [\"https://i.pinimg.com/originals/73/e4/fd/73e4fd6baf59abc2beca9fd5509a853c.jpg\"], \"query\": \"watercolor painting sunset\"}",
+        "episode_key": "D1:14",
+        "fact_type": "note",
+        "disposition": "prohibited"
+      },
+      "prior_key": "D1:14:note:bf80005f38bf",
+      "reason": "Uniform source metadata appended; disposition inherited only from exact same source/type/base content, otherwise prohibited pending source-only review."
+    },
+    {
+      "case_id": "locomo-conv-49-002",
+      "binding": {
+        "key": "D2:1:note:7f40d3bd9f4f",
+        "content": "Evan: Hey Sam, good to hear from you! Since we last talked, lots has been happening! Last weekend, I took my family on a road trip to Jasper. It was amazing! We drove through the Icefields Parkway and the glaciers and lakes were gorgeous. I got a shot of a glacier, check it out!\n\nUpstream image metadata (dataset annotation, not a user assertion):\n{\"blip_caption\": \"a photo of a person holding a book in front of a lake\", \"img_url\": [\"https://1.bp.blogspot.com/-50oDf6izLpk/XtyM4RGdDgI/AAAAAAACwcA/nnQkAWVln4M3AQ4ZWAkGUfgrxjhpHbtJQCK4BGAsYHg/s4032/IMG_4686.jpg\"], \"query\": \"jasper national park glacier\"}",
+        "episode_key": "D2:1",
+        "fact_type": "note",
+        "disposition": "allowed"
+      },
+      "prior_key": "D2:1:note:767e6d8d9721",
+      "reason": "Uniform source metadata appended; disposition inherited only from exact same source/type/base content, otherwise prohibited pending source-only review."
+    },
+    {
+      "case_id": "locomo-conv-50-071",
+      "binding": {
+        "key": "D1:3:note:211c783b1fee",
+        "content": "Calvin: That event sounds great! Something really exciting happened to me - I just had a big life change! Here's my new mansion - pretty cool huh?\n\nUpstream image metadata (dataset annotation, not a user assertion):\n{\"blip_caption\": \"a photo of a building with a sign on the front of it\", \"img_url\": [\"https://localandbespoke.files.wordpress.com/2018/11/imag0397.jpg\"], \"query\": \"mansion entrance japan\"}",
+        "episode_key": "D1:3",
+        "fact_type": "note",
+        "disposition": "prohibited"
+      },
+      "prior_key": "D1:3:note:4a421dd2adb1",
+      "reason": "Uniform source metadata appended; disposition inherited only from exact same source/type/base content, otherwise prohibited pending source-only review."
+    },
+    {
+      "case_id": "locomo-conv-50-071",
+      "binding": {
+        "key": "D1:9:promise:0c9123650ec8",
+        "content": "Calvin: I'm heading there next month. I'll be staying in such a nice place while I'm there.\n\n\n\nUpstream image metadata (dataset annotation, not a user assertion):\n{\"blip_caption\": \"a photo of a living room with a couch, table, and television\", \"img_url\": [\"https://i.redd.it/6p8nisgp4dq41.jpg\"], \"query\": \"japanese mansion living room\"}",
+        "episode_key": "D1:9",
+        "fact_type": "promise",
+        "disposition": "allowed"
+      },
+      "prior_key": "D1:9:promise:bc4e8e5809d1",
+      "reason": "Uniform source metadata appended; disposition inherited only from exact same source/type/base content, otherwise prohibited pending source-only review."
+    },
+    {
+      "case_id": "locomo-conv-50-071",
+      "binding": {
+        "key": "D1:16:note:4955db36cc6e",
+        "content": "Dave: That's great, can't wait for you to return from your trip. I've been spending lots of time at this beautiful park lately - so calming. Have you been there before?\n\nUpstream image metadata (dataset annotation, not a user assertion):\n{\"blip_caption\": \"a photography of a park with a lake and a few boats\", \"img_url\": [\"https://c1.wallpaperflare.com/preview/349/298/459/public-garden-boston-park-common.jpg\"]}",
+        "episode_key": "D1:16",
+        "fact_type": "note",
+        "disposition": "prohibited"
+      },
+      "prior_key": "D1:16:note:f9a4b69f19e9",
+      "reason": "Uniform source metadata appended; disposition inherited only from exact same source/type/base content, otherwise prohibited pending source-only review."
+    },
+    {
+      "case_id": "locomo-conv-50-071",
+      "binding": {
+        "key": "D2:5:note:e8622188f26e",
+        "content": "Calvin: Woohoo! I finally got myself this beauty. Here's a pic from yesterday when I took it for a ride. Can't believe I'm actually driving it. Definitely what I deserve after all this hard work. Every time I step in, it's like an adrenaline rush!\n\nUpstream image metadata (dataset annotation, not a user assertion):\n{\"blip_caption\": \"a photo of a red sports car parked on the side of the road\", \"img_url\": [\"https://i.redd.it/v7n19f5lcqn91.jpg\"], \"query\": \"ferrari 488 gtb japanese mansion\"}",
+        "episode_key": "D2:5",
+        "fact_type": "note",
+        "disposition": "prohibited"
+      },
+      "prior_key": "D2:5:note:7b04027d2489",
+      "reason": "Uniform source metadata appended; disposition inherited only from exact same source/type/base content, otherwise prohibited pending source-only review."
+    },
+    {
+      "case_id": "locomo-conv-50-071",
+      "binding": {
+        "key": "D2:8:experience:d0e7ec618d77",
+        "content": "Dave: Thanks, Calvin! Doing good. Last weekend, I went to a music festival in Boston - it was awesome! So many cool bands playing and the atmosphere was electric. I love music, it reminded me why I love it. Here's a pic, take a look.\n\nUpstream image metadata (dataset annotation, not a user assertion):\n{\"blip_caption\": \"a photo of a large crowd of people at a concert\", \"img_url\": [\"https://express-images.franklymedia.com/6616/sites/11/2019/05/28094328/IMG_3656.jpg\"], \"query\": \"music festival boston stage crowd\"}",
+        "episode_key": "D2:8",
+        "fact_type": "experience",
+        "disposition": "prohibited"
+      },
+      "prior_key": "D2:8:experience:ab8d9dbf752a",
+      "reason": "Uniform source metadata appended; disposition inherited only from exact same source/type/base content, otherwise prohibited pending source-only review."
+    },
+    {
+      "case_id": "locomo-conv-50-071",
+      "binding": {
+        "key": "D2:10:promise:b17001034b86",
+        "content": "Dave: Wow, there were so many great bands! If I had to pick a favorite, it would definitely be Aerosmith. Their performance was incredible. I'll show you a pic I took when they were playing.\n\nUpstream image metadata (dataset annotation, not a user assertion):\n{\"blip_caption\": \"a photo of a concert with a large eagle on the stage\", \"img_url\": [\"https://themusicroom.me/wp-content/uploads/2019/04/Aerosmith-opening2.jpg\"], \"query\": \"aerosmith stage rock band\"}",
+        "episode_key": "D2:10",
+        "fact_type": "promise",
+        "disposition": "prohibited"
+      },
+      "prior_key": "D2:10:promise:a45c408010d4",
+      "reason": "Uniform source metadata appended; disposition inherited only from exact same source/type/base content, otherwise prohibited pending source-only review."
+    },
+    {
+      "case_id": "locomo-conv-50-071",
+      "binding": {
+        "key": "D2:12:note:2df0829c1d56",
+        "content": "Dave: I finally saw them live and it was such an amazing experience! He was jamming out to one of their hits. Check out this epic picture of them!\n\nUpstream image metadata (dataset annotation, not a user assertion):\n{\"blip_caption\": \"a photo of two people on stage with guitars and a microphone\", \"img_url\": [\"https://www.etonline.com/sites/default/files/images/2019-10/gettyimages-1093168760.jpg\"], \"query\": \"aerosmith steven tyler stage open mouth\"}",
+        "episode_key": "D2:12",
+        "fact_type": "note",
+        "disposition": "prohibited"
+      },
+      "prior_key": "D2:12:note:3bfa154eb0ab",
+      "reason": "Uniform source metadata appended; disposition inherited only from exact same source/type/base content, otherwise prohibited pending source-only review."
+    },
+    {
+      "case_id": "locomo-conv-50-001",
+      "binding": {
+        "key": "D1:3:note:211c783b1fee",
+        "content": "Calvin: That event sounds great! Something really exciting happened to me - I just had a big life change! Here's my new mansion - pretty cool huh?\n\nUpstream image metadata (dataset annotation, not a user assertion):\n{\"blip_caption\": \"a photo of a building with a sign on the front of it\", \"img_url\": [\"https://localandbespoke.files.wordpress.com/2018/11/imag0397.jpg\"], \"query\": \"mansion entrance japan\"}",
+        "episode_key": "D1:3",
+        "fact_type": "note",
+        "disposition": "allowed"
+      },
+      "prior_key": "D1:3:note:4a421dd2adb1",
+      "reason": "Uniform source metadata appended; disposition inherited only from exact same source/type/base content, otherwise prohibited pending source-only review."
+    },
+    {
+      "case_id": "locomo-conv-50-001",
+      "binding": {
+        "key": "D1:9:promise:0c9123650ec8",
+        "content": "Calvin: I'm heading there next month. I'll be staying in such a nice place while I'm there.\n\n\n\nUpstream image metadata (dataset annotation, not a user assertion):\n{\"blip_caption\": \"a photo of a living room with a couch, table, and television\", \"img_url\": [\"https://i.redd.it/6p8nisgp4dq41.jpg\"], \"query\": \"japanese mansion living room\"}",
+        "episode_key": "D1:9",
+        "fact_type": "promise",
+        "disposition": "prohibited"
+      },
+      "prior_key": "D1:9:promise:bc4e8e5809d1",
+      "reason": "Uniform source metadata appended; disposition inherited only from exact same source/type/base content, otherwise prohibited pending source-only review."
+    },
+    {
+      "case_id": "locomo-conv-50-001",
+      "binding": {
+        "key": "D1:16:note:4955db36cc6e",
+        "content": "Dave: That's great, can't wait for you to return from your trip. I've been spending lots of time at this beautiful park lately - so calming. Have you been there before?\n\nUpstream image metadata (dataset annotation, not a user assertion):\n{\"blip_caption\": \"a photography of a park with a lake and a few boats\", \"img_url\": [\"https://c1.wallpaperflare.com/preview/349/298/459/public-garden-boston-park-common.jpg\"]}",
+        "episode_key": "D1:16",
+        "fact_type": "note",
+        "disposition": "prohibited"
+      },
+      "prior_key": "D1:16:note:f9a4b69f19e9",
+      "reason": "Uniform source metadata appended; disposition inherited only from exact same source/type/base content, otherwise prohibited pending source-only review."
+    },
+    {
+      "case_id": "locomo-conv-50-001",
+      "binding": {
+        "key": "D2:5:note:e8622188f26e",
+        "content": "Calvin: Woohoo! I finally got myself this beauty. Here's a pic from yesterday when I took it for a ride. Can't believe I'm actually driving it. Definitely what I deserve after all this hard work. Every time I step in, it's like an adrenaline rush!\n\nUpstream image metadata (dataset annotation, not a user assertion):\n{\"blip_caption\": \"a photo of a red sports car parked on the side of the road\", \"img_url\": [\"https://i.redd.it/v7n19f5lcqn91.jpg\"], \"query\": \"ferrari 488 gtb japanese mansion\"}",
+        "episode_key": "D2:5",
+        "fact_type": "note",
+        "disposition": "allowed"
+      },
+      "prior_key": "D2:5:note:7b04027d2489",
+      "reason": "Uniform source metadata appended; disposition inherited only from exact same source/type/base content, otherwise prohibited pending source-only review."
+    },
+    {
+      "case_id": "locomo-conv-50-001",
+      "binding": {
+        "key": "D2:8:experience:d0e7ec618d77",
+        "content": "Dave: Thanks, Calvin! Doing good. Last weekend, I went to a music festival in Boston - it was awesome! So many cool bands playing and the atmosphere was electric. I love music, it reminded me why I love it. Here's a pic, take a look.\n\nUpstream image metadata (dataset annotation, not a user assertion):\n{\"blip_caption\": \"a photo of a large crowd of people at a concert\", \"img_url\": [\"https://express-images.franklymedia.com/6616/sites/11/2019/05/28094328/IMG_3656.jpg\"], \"query\": \"music festival boston stage crowd\"}",
+        "episode_key": "D2:8",
+        "fact_type": "experience",
+        "disposition": "prohibited"
+      },
+      "prior_key": "D2:8:experience:ab8d9dbf752a",
+      "reason": "Uniform source metadata appended; disposition inherited only from exact same source/type/base content, otherwise prohibited pending source-only review."
+    },
+    {
+      "case_id": "locomo-conv-50-001",
+      "binding": {
+        "key": "D2:10:promise:b17001034b86",
+        "content": "Dave: Wow, there were so many great bands! If I had to pick a favorite, it would definitely be Aerosmith. Their performance was incredible. I'll show you a pic I took when they were playing.\n\nUpstream image metadata (dataset annotation, not a user assertion):\n{\"blip_caption\": \"a photo of a concert with a large eagle on the stage\", \"img_url\": [\"https://themusicroom.me/wp-content/uploads/2019/04/Aerosmith-opening2.jpg\"], \"query\": \"aerosmith stage rock band\"}",
+        "episode_key": "D2:10",
+        "fact_type": "promise",
+        "disposition": "prohibited"
+      },
+      "prior_key": "D2:10:promise:a45c408010d4",
+      "reason": "Uniform source metadata appended; disposition inherited only from exact same source/type/base content, otherwise prohibited pending source-only review."
+    },
+    {
+      "case_id": "locomo-conv-50-001",
+      "binding": {
+        "key": "D2:12:note:2df0829c1d56",
+        "content": "Dave: I finally saw them live and it was such an amazing experience! He was jamming out to one of their hits. Check out this epic picture of them!\n\nUpstream image metadata (dataset annotation, not a user assertion):\n{\"blip_caption\": \"a photo of two people on stage with guitars and a microphone\", \"img_url\": [\"https://www.etonline.com/sites/default/files/images/2019-10/gettyimages-1093168760.jpg\"], \"query\": \"aerosmith steven tyler stage open mouth\"}",
+        "episode_key": "D2:12",
+        "fact_type": "note",
+        "disposition": "prohibited"
+      },
+      "prior_key": "D2:12:note:3bfa154eb0ab",
+      "reason": "Uniform source metadata appended; disposition inherited only from exact same source/type/base content, otherwise prohibited pending source-only review."
+    }
+  ]
+}

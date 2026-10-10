@@ -38,6 +38,15 @@ use crate::platform::context_cache_key::{CacheCutoff, CacheKey, CacheView};
 
 const DIRECT_RETRIEVAL_CANDIDATE_FLOOR: i32 = 5;
 
+fn retrieval_candidate_limit(service: &RetrievalContext, response_budget: i32) -> i32 {
+    super::reranking::candidate_pool_limit(
+        response_budget.max(1) as usize,
+        service.embedding_provider.reranking_signature().is_some(),
+    )
+    .max(DIRECT_RETRIEVAL_CANDIDATE_FLOOR as usize)
+    .min(i32::MAX as usize) as i32
+}
+
 // ─── Parameter preparation and cache operations ──────────────────────────
 
 /// Prepared parameters for context assembly, extracted from the request
@@ -198,12 +207,13 @@ pub(super) enum FallbackDecision {
 /// Strategy object for the episode-rescue tier fallback.
 ///
 /// Encapsulates the decision `assemble_default_context` makes when the
-/// episode-content tier should replace the ranked-fact tiers: when episode
-/// overlap out-scores every ranked candidate (see
-/// [`super::budget::should_prefer_episode_content`]). The companion decision —
-/// ranking produced nothing for a query — is guarded in the pipeline before
-/// selection; both branches of the fallback are covered by this strategy's
-/// unit tests.
+/// episode-content tier should replace the ranked-fact tiers. The episode pack
+/// must preserve every query term represented by the selected fact pack;
+/// comparable same-model reranker evidence or stronger lexical coverage then
+/// decides the winner (see [`super::budget::should_prefer_episode_content`]).
+/// The companion decision — ranking produced nothing for a query — is guarded
+/// in the pipeline before selection; both branches of the fallback are covered
+/// by this strategy's unit tests.
 #[derive(Debug, Clone, Copy, Default)]
 pub(super) struct EpisodeFallbackStrategy;
 
@@ -234,11 +244,33 @@ pub(super) async fn assemble_default_context(
     // here so future changes can target a single phase
     // without disturbing the others.
     let channels = retrieve_fact_channels(service, &params).await?;
+    let (subject_ids, mentioned_names) = super::alias_expansion::resolve_entity_subject(
+        service,
+        params.raw_query_opt.unwrap_or_default(),
+    )
+    .await?;
     let mut query_evidence = super::admission::build_query_evidence(
         params.raw_query_opt,
-        Vec::new(),
+        subject_ids,
+        &mentioned_names,
         params.query_flags,
     );
+    if !query_evidence.resolved_entity_ids.is_empty()
+        && query_evidence.intent == super::admission::AdmissionIntent::Content
+    {
+        query_evidence.intent = super::admission::AdmissionIntent::Entity;
+    }
+    if query_evidence.intent == super::admission::AdmissionIntent::Content {
+        // A mentioned person's name identifies the subject, but does not
+        // supply evidence for the attribute asked about that person.
+        let subject_terms = mentioned_names
+            .iter()
+            .flat_map(|name| crate::shared::search::search_query_terms(name))
+            .collect::<HashSet<_>>();
+        query_evidence
+            .content_terms
+            .retain(|term| !subject_terms.contains(term));
+    }
     query_evidence.repeated_topics = super::experience::repeated_topic_evidence_for_query(
         &query_evidence,
         &channels.direct_facts,
@@ -251,6 +283,16 @@ pub(super) async fn assemble_default_context(
     );
     let ranked =
         super::admission::admit_ranked_candidates(&query_evidence, ranked, &admission_policy);
+    let ranked = ranked
+        .into_iter()
+        .take(retrieval_candidate_limit(service, params.budget) as usize)
+        .collect();
+    let ranked = super::reranking::filter_candidates(
+        service,
+        params.raw_query_opt.unwrap_or_default(),
+        ranked,
+    )
+    .await?;
     let current_query = query_evidence.intent == super::admission::AdmissionIntent::Current;
     let ranked = project_current_candidates(service, &params, &query_evidence, ranked).await?;
     let selection = select_context_facts(service, &params, ranked, current_query).await?;
@@ -355,12 +397,13 @@ async fn retrieve_fact_channels(
     service: &RetrievalContext,
     params: &DefaultContextParams<'_>,
 ) -> Result<RetrievedFactChannels, MemoryError> {
+    let candidate_limit = retrieval_candidate_limit(service, params.budget);
     let lexical_result = select_fact_records_for_query(
         service,
         FactQueryParams {
             cutoff_iso: params.cutoff_iso,
             query_opt: params.query_opt,
-            limit: params.budget.max(DIRECT_RETRIEVAL_CANDIDATE_FLOOR),
+            limit: candidate_limit,
             fact_types: params.fact_types,
         },
     )
@@ -385,7 +428,7 @@ async fn retrieve_fact_channels(
                 query,
                 access: params.access,
                 fact_types: params.fact_types,
-                budget: params.budget,
+                budget: candidate_limit,
             },
         )
         .await?;
@@ -406,7 +449,7 @@ async fn retrieve_fact_channels(
                 FactQueryParams {
                     cutoff_iso: params.cutoff_iso,
                     query_opt: Some(expanded_query),
-                    limit: params.budget,
+                    limit: candidate_limit,
                     fact_types: params.fact_types,
                 },
             )
@@ -438,7 +481,7 @@ async fn retrieve_fact_channels(
             RecentExperienceRequest {
                 cutoff: params.cutoff,
                 access: params.access,
-                budget: params.budget,
+                budget: candidate_limit,
                 fact_types: params.fact_types,
             },
             &experience_query_terms,
@@ -459,7 +502,7 @@ async fn retrieve_fact_channels(
 
         // Triple-expanded facts: facts linked via matching triples.
         let triple_facts =
-            collect_triple_facts(service, params.cutoff_iso, query, params.budget).await?;
+            collect_triple_facts(service, params.cutoff_iso, query, candidate_limit).await?;
         for fact in triple_facts {
             if !base_direct_ids.contains(&fact.fact_id) {
                 expanded_facts.push(fact);
@@ -482,8 +525,12 @@ async fn retrieve_fact_channels(
             .map(|fact| fact.fact_id.clone())
             .collect();
 
-        let graph_query_evidence =
-            super::admission::build_query_evidence(Some(query), Vec::new(), params.query_flags);
+        let graph_query_evidence = super::admission::build_query_evidence(
+            Some(query),
+            Vec::new(),
+            &[],
+            params.query_flags,
+        );
         let admitted_graph_seeds =
             super::graph::admitted_graph_seed_facts(&graph_query_evidence, &direct_facts);
 
@@ -497,18 +544,10 @@ async fn retrieve_fact_channels(
                 direct_fact_ids: &direct_fact_ids,
                 lexical_facts: &admitted_graph_seeds,
                 max_hops: params.query_flags.max_graph_hops(),
-                budget: params.budget,
+                budget: candidate_limit,
             },
         )
         .await?;
-
-        let all_direct_ids: HashSet<_> = direct_facts
-            .iter()
-            .chain(temporal_facts.iter())
-            .chain(expanded_facts.iter())
-            .chain(graph_facts.iter().map(|candidate| &candidate.fact))
-            .map(|fact| fact.fact_id.clone())
-            .collect();
 
         // A lexical query can return a fact from one matching word even
         // though it does not independently pass admission. Keep those IDs
@@ -521,9 +560,10 @@ async fn retrieve_fact_channels(
             .chain(expanded_facts.iter())
             .chain(graph_facts.iter().map(|candidate| &candidate.fact))
             .filter(|fact| {
-                super::admission::episode_candidate_is_admitted(
+                super::admission::episode_candidate_is_admitted_at_reference_time(
                     &graph_query_evidence,
                     &fact.content,
+                    Some(fact.t_valid),
                 )
             })
             .map(|fact| fact.fact_id.clone())
@@ -537,30 +577,23 @@ async fn retrieve_fact_channels(
                 access: params.access,
                 fact_types: params.fact_types,
                 direct_fact_ids: &independently_grounded_ids,
-                budget: params.budget,
+                budget: candidate_limit,
             },
         )
         .await?;
-
-        let excluded_fact_ids = all_direct_ids
-            .iter()
-            .cloned()
-            .chain(
-                community_facts
-                    .iter()
-                    .map(|candidate| candidate.fact.fact_id.clone()),
-            )
-            .collect::<HashSet<_>>();
 
         semantic_facts = collect_semantic_facts(
             service,
             CollectSemanticFactsRequest {
                 cutoff: params.cutoff,
-                query,
+                query: params.raw_query_opt.unwrap_or(query),
                 access: params.access,
                 fact_types: params.fact_types,
-                excluded_fact_ids: &excluded_fact_ids,
-                budget: params.budget,
+                // Fusion needs the ANN score even for facts discovered by
+                // lexical, graph or community channels. Deduplication belongs
+                // to ranking, after the independent evidence is combined.
+                excluded_fact_ids: &HashSet::new(),
+                budget: candidate_limit,
             },
         )
         .await?;
@@ -657,13 +690,23 @@ async fn select_context_facts(
     mut ranked_facts: Vec<RankedContextFact>,
     current_query: bool,
 ) -> Result<SelectedContext, MemoryError> {
+    let timeline_mode = params.resolved_view_mode == Some("timeline")
+        || (params.resolved_view_mode.is_none() && params.query_flags.wants_timeline);
     // Episodic fallback has no fact-level reconciliation identity. It cannot
     // prove that a statement remains current, so it must not bypass the
     // relation projection for a current-intent query.
     let episode_fallback_items = if current_query {
         Vec::new()
     } else if let Some(query) = params.query_opt {
-        collect_episode_fallback_items(service, params, query).await?
+        let items = collect_episode_fallback_items(service, params, query).await?;
+        super::reranking::filter_items(
+            service,
+            params.raw_query_opt.unwrap_or(query),
+            items,
+            params.budget.max(1) as usize,
+            timeline_mode,
+        )
+        .await?
     } else {
         Vec::new()
     };
@@ -687,8 +730,6 @@ async fn select_context_facts(
 
     apply_time_window(&mut ranked_facts, params.window_start, params.window_end);
     let ranked_candidates = ranked_facts.clone();
-    let timeline_mode = params.resolved_view_mode == Some("timeline")
-        || (params.resolved_view_mode.is_none() && params.query_flags.wants_timeline);
     let selected_ranked = if timeline_mode {
         sort_ranked_context_facts_for_timeline(&mut ranked_facts);
         ranked_facts

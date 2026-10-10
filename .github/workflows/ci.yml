@@ -112,9 +112,27 @@ jobs:
           echo "checking prometheus without default features"
           cargo check -p memory_mcp --all-targets --no-default-features \
             --features "prometheus,test-fixtures" --locked
+      - name: Cache immutable evaluation models
+        uses: actions/cache@v4
+        with:
+          path: target/eval-models
+          key: eval-models-${{ runner.os }}-${{ hashFiles('evals/models/multilingual-e5-small.json', 'evals/models/mmarco-minilm.json') }}
+      - name: Prepare and verify native evaluation models
+        # Every cache hit is hashed again. A missing/partial/corrupt model fails
+        # this step rather than turning native quality into a lexical proxy.
+        run: |
+          cargo run -p eval-harness --bin memory-eval --locked -- prepare-model --manifest evals/models/multilingual-e5-small.json --output-root target/eval-models
+          cargo run -p eval-harness --bin memory-eval --locked -- prepare-model --manifest evals/models/mmarco-minilm.json --output-root target/eval-models
       - name: Evaluation gate
         env:
           EVAL_PROFILE: ${{ inputs.release && 'release' || 'pr' }}
+          EMBEDDINGS_ENABLED: 'true'
+          EMBEDDINGS_PROVIDER: local-candle
+          EMBEDDINGS_MODEL: intfloat/multilingual-e5-small
+          EMBEDDINGS_MODEL_DIR: target/eval-models/intfloat--multilingual-e5-small/614241f622f53c4eeff9890bdc4f31cfecc418b3
+          RETRIEVAL_RERANKER_MODEL_DIR: target/eval-models/cross-encoder--mmarco-mMiniLMv2-L12-H384-v1/1427fd652930e4ba29e8149678df786c240d8825
+          RETRIEVAL_RERANKER_ADMISSION_FLOOR: '0'
+          MEMORY_CLAIM_ROLLOUT_STAGE: evidence
         run: |
           mkdir -p target/evals
           cargo run -p eval-harness --bin memory-eval --locked -- run --profile "evals/profiles/$EVAL_PROFILE.json" --artifact "target/evals/$EVAL_PROFILE.json" --baseline "evals/baselines/one-active-namespace-$EVAL_PROFILE.json"

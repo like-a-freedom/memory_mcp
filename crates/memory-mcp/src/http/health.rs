@@ -80,6 +80,7 @@ mod tests {
         // receives every rendered line, so two tests emitting readiness
         // transitions would read each other's.
         let _serialized = crate::logging::capture::SERIAL.lock().await;
+        let _level = crate::logging::capture::LevelOverride::install("info");
         let state = HttpState::default_for_test().await;
         let sink = crate::logging::capture::install();
 
@@ -112,6 +113,7 @@ mod tests {
     #[tokio::test]
     async fn a_degraded_probe_logs_the_degraded_state() {
         let _serialized = crate::logging::capture::SERIAL.lock().await;
+        let _level = crate::logging::capture::LevelOverride::install("info");
         let state = HttpState::default_for_test().await;
         // The first probe reaches `ready`, so the next refusal is a real
         // transition rather than the initial unknown -> degraded one.

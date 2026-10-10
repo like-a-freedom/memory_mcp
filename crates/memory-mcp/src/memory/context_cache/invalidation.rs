@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::future::Future;
 
 use serde_json::json;
 
@@ -18,6 +19,20 @@ pub async fn invalidate_cache(cache: &ContextCache) {
         // forced on, so the documented dial governs it like every other event.
         crate::logging::emit(event, LogLevel::Trace);
     }
+}
+
+/// Invalidate cached results after an operation that can change assembled context.
+///
+/// A caller may invalidate once when source data is persisted, then allow a
+/// derived projection to finish. This final invalidation removes any result
+/// assembled and cached while that projection was in flight.
+pub async fn invalidate_after<F, T>(cache: &ContextCache, operation: F) -> T
+where
+    F: Future<Output = T>,
+{
+    let output = operation.await;
+    invalidate_cache(cache).await;
+    output
 }
 
 impl InvalidateContextCache for ContextCache {

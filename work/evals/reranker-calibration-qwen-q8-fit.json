@@ -1,0 +1,254 @@
+{
+  "configured_operating_point": {
+    "f1": 0.9411764705882353,
+    "false_negative": 1,
+    "false_positive": 0,
+    "floor": 0.0,
+    "precision": 1.0,
+    "recall": 0.8888888888888888,
+    "true_negative": 36,
+    "true_positive": 8
+  },
+  "dataset_sha256": "b8cf99fda65c8e072efbba318dde0bcd4b3ad242033c91a175b3e52305f0f0d3",
+  "observations": [
+    {
+      "id": "e47becba:answer",
+      "relevance_logit": 0.4602470397949219,
+      "relevant": true
+    },
+    {
+      "id": "e47becba:non-answer:0:0",
+      "relevance_logit": -6.422155380249023,
+      "relevant": false
+    },
+    {
+      "id": "e47becba:non-answer:1:0",
+      "relevance_logit": -6.797628402709961,
+      "relevant": false
+    },
+    {
+      "id": "e47becba:non-answer:1:2",
+      "relevance_logit": -7.537578582763672,
+      "relevant": false
+    },
+    {
+      "id": "118b2229:answer",
+      "relevance_logit": 3.553173065185547,
+      "relevant": true
+    },
+    {
+      "id": "118b2229:non-answer:0:0",
+      "relevance_logit": -8.33565616607666,
+      "relevant": false
+    },
+    {
+      "id": "118b2229:non-answer:5:0",
+      "relevance_logit": -7.6734819412231445,
+      "relevant": false
+    },
+    {
+      "id": "118b2229:non-answer:13:6",
+      "relevance_logit": -8.091889381408691,
+      "relevant": false
+    },
+    {
+      "id": "51a45a95:non-answer:8:6",
+      "relevance_logit": -8.563640594482422,
+      "relevant": false
+    },
+    {
+      "id": "51a45a95:non-answer:18:2",
+      "relevance_logit": -7.836758613586426,
+      "relevant": false
+    },
+    {
+      "id": "51a45a95:non-answer:30:0",
+      "relevance_logit": -7.607024192810059,
+      "relevant": false
+    },
+    {
+      "id": "58bf7951:non-answer:1:2",
+      "relevance_logit": -4.014728546142578,
+      "relevant": false
+    },
+    {
+      "id": "58bf7951:non-answer:2:4",
+      "relevance_logit": -6.514261245727539,
+      "relevant": false
+    },
+    {
+      "id": "58bf7951:non-answer:2:6",
+      "relevance_logit": -7.974978446960449,
+      "relevant": false
+    },
+    {
+      "id": "1e043500:answer",
+      "relevance_logit": 4.476987838745117,
+      "relevant": true
+    },
+    {
+      "id": "1e043500:non-answer:5:0",
+      "relevance_logit": -8.7350435256958,
+      "relevant": false
+    },
+    {
+      "id": "1e043500:non-answer:5:2",
+      "relevance_logit": -6.425729751586914,
+      "relevant": false
+    },
+    {
+      "id": "1e043500:non-answer:5:6",
+      "relevance_logit": -8.365394592285156,
+      "relevant": false
+    },
+    {
+      "id": "c5e8278d:answer",
+      "relevance_logit": 3.3459606170654297,
+      "relevant": true
+    },
+    {
+      "id": "c5e8278d:non-answer:4:0",
+      "relevance_logit": -4.135782241821289,
+      "relevant": false
+    },
+    {
+      "id": "c5e8278d:non-answer:8:0",
+      "relevance_logit": -5.84956169128418,
+      "relevant": false
+    },
+    {
+      "id": "c5e8278d:non-answer:10:2",
+      "relevance_logit": -6.629386901855469,
+      "relevant": false
+    },
+    {
+      "id": "6ade9755:answer",
+      "relevance_logit": 2.145475387573242,
+      "relevant": true
+    },
+    {
+      "id": "6ade9755:non-answer:7:4",
+      "relevance_logit": -7.365230560302734,
+      "relevant": false
+    },
+    {
+      "id": "6ade9755:non-answer:34:6",
+      "relevance_logit": -7.723156929016113,
+      "relevant": false
+    },
+    {
+      "id": "6ade9755:non-answer:0:0",
+      "relevance_logit": -10.38526725769043,
+      "relevant": false
+    },
+    {
+      "id": "6f9b354f:answer",
+      "relevance_logit": 4.28935432434082,
+      "relevant": true
+    },
+    {
+      "id": "6f9b354f:non-answer:0:0",
+      "relevance_logit": -6.327430725097656,
+      "relevant": false
+    },
+    {
+      "id": "6f9b354f:non-answer:0:2",
+      "relevance_logit": -6.830279350280762,
+      "relevant": false
+    },
+    {
+      "id": "6f9b354f:non-answer:0:4",
+      "relevance_logit": -7.866873741149902,
+      "relevant": false
+    },
+    {
+      "id": "58ef2f1c:non-answer:8:2",
+      "relevance_logit": -5.387411117553711,
+      "relevant": false
+    },
+    {
+      "id": "58ef2f1c:non-answer:44:0",
+      "relevance_logit": -8.976587295532227,
+      "relevant": false
+    },
+    {
+      "id": "58ef2f1c:non-answer:44:8",
+      "relevance_logit": -5.194973945617676,
+      "relevant": false
+    },
+    {
+      "id": "f8c5f88b:answer",
+      "relevance_logit": 6.076906204223633,
+      "relevant": true
+    },
+    {
+      "id": "f8c5f88b:non-answer:2:0",
+      "relevance_logit": -6.936408996582031,
+      "relevant": false
+    },
+    {
+      "id": "f8c5f88b:non-answer:2:2",
+      "relevance_logit": -6.5595808029174805,
+      "relevant": false
+    },
+    {
+      "id": "f8c5f88b:non-answer:2:4",
+      "relevance_logit": -8.397557258605957,
+      "relevant": false
+    },
+    {
+      "id": "5d3d2817:answer",
+      "relevance_logit": -2.90218448638916,
+      "relevant": true
+    },
+    {
+      "id": "5d3d2817:non-answer:16:2",
+      "relevance_logit": -4.788119316101074,
+      "relevant": false
+    },
+    {
+      "id": "5d3d2817:non-answer:18:0",
+      "relevance_logit": -4.948158264160156,
+      "relevant": false
+    },
+    {
+      "id": "5d3d2817:non-answer:0:0",
+      "relevance_logit": -6.908726692199707,
+      "relevant": false
+    },
+    {
+      "id": "7527f7e2:answer",
+      "relevance_logit": 6.055225372314453,
+      "relevant": true
+    },
+    {
+      "id": "7527f7e2:non-answer:0:6",
+      "relevance_logit": -7.878053665161133,
+      "relevant": false
+    },
+    {
+      "id": "7527f7e2:non-answer:26:2",
+      "relevance_logit": -8.174652099609375,
+      "relevant": false
+    },
+    {
+      "id": "7527f7e2:non-answer:39:4",
+      "relevance_logit": -6.692574501037598,
+      "relevant": false
+    }
+  ],
+  "operating_point": {
+    "f1": 1.0,
+    "false_negative": 0,
+    "false_positive": 0,
+    "floor": -3.458456516265869,
+    "precision": 1.0,
+    "recall": 1.0,
+    "true_negative": 36,
+    "true_positive": 9
+  },
+  "reranking_signature": "reranksig:c4f9287e60b4e152db62300fa185df16b9a750dfdfd4d0893907d8da12ac4fac",
+  "schema_version": "memory-reranker-calibration-result/v1",
+  "selection_rule": "maximum development F1 on interior score-gap midpoints; ties by precision, recall, then higher floor",
+  "source_sha256": "d6f21ea9d60a0d56f34a05b609c79c88a451d2ae03597821ea3d5a9678c3a442"
+}

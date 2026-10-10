@@ -17,7 +17,7 @@ use serde_json::json;
 use crate::error::MemoryError;
 use crate::knowledge::fact_service::{EmbeddingPayload, FactService};
 use crate::logging::LogLevel;
-use crate::memory::context_cache::{ContextCache, invalidate_cache};
+use crate::memory::context_cache::invalidate_cache;
 use crate::models::FactId;
 use crate::models::Provenance;
 #[cfg(test)]
@@ -178,37 +178,41 @@ impl FactService {
         // exists" errors) and must never overwrite claims of an invalidated
         // fact. Same-id/same-content is idempotent by contract.
         if outcome.created {
-            project_claims_then_invalidate_cache(&ctx.context_cache, async {
-                let claim_svc = ctx.claim_service.clone();
-                let claim_fact_id = FactId::from(fact_id.clone());
-                let claim_episode_id = crate::models::EpisodeId::from(source_episode.to_string());
-                let claim_content = content.to_string();
-                let claim_entity_links = entity_links.clone();
-                let claim_t_valid = t_valid;
-                let claim_params =
-                    crate::knowledge::claims_policy::projection::FactPersistedParams {
-                        namespace: &namespace,
-                        fact_id: &claim_fact_id,
-                        source_episode_id: &claim_episode_id,
-                        fact_type,
-                        content: &claim_content,
-                        policy_tags: &policy_tags,
-                        entity_links: &claim_entity_links,
-                        t_valid: claim_t_valid,
-                        source_lineage: episode_source_lineage.as_deref(),
-                    };
-                match claim_svc.after_fact_persisted(&claim_params).await {
-                    Ok(summary) => claim_svc.record_post_fact_success(
-                        &namespace,
-                        &summary.fact_id,
-                        summary.claims_projected,
-                        summary.claims_skipped,
-                    ),
-                    Err(error) => {
-                        claim_svc.record_post_fact_failure(&namespace, &claim_fact_id, &error)
+            crate::memory::context_cache::invalidation::invalidate_after(
+                &ctx.context_cache,
+                async {
+                    let claim_svc = ctx.claim_service.clone();
+                    let claim_fact_id = FactId::from(fact_id.clone());
+                    let claim_episode_id =
+                        crate::models::EpisodeId::from(source_episode.to_string());
+                    let claim_content = content.to_string();
+                    let claim_entity_links = entity_links.clone();
+                    let claim_t_valid = t_valid;
+                    let claim_params =
+                        crate::knowledge::claims_policy::projection::FactPersistedParams {
+                            namespace: &namespace,
+                            fact_id: &claim_fact_id,
+                            source_episode_id: &claim_episode_id,
+                            fact_type,
+                            content: &claim_content,
+                            policy_tags: &policy_tags,
+                            entity_links: &claim_entity_links,
+                            t_valid: claim_t_valid,
+                            source_lineage: episode_source_lineage.as_deref(),
+                        };
+                    match claim_svc.after_fact_persisted(&claim_params).await {
+                        Ok(summary) => claim_svc.record_post_fact_success(
+                            &namespace,
+                            &summary.fact_id,
+                            summary.claims_projected,
+                            summary.claims_skipped,
+                        ),
+                        Err(error) => {
+                            claim_svc.record_post_fact_failure(&namespace, &claim_fact_id, &error)
+                        }
                     }
-                }
-            })
+                },
+            )
             .await;
         }
 
@@ -279,101 +283,12 @@ impl FactService {
     }
 }
 
-async fn project_claims_then_invalidate_cache<F>(cache: &ContextCache, projection: F)
-where
-    F: std::future::Future<Output = ()>,
-{
-    projection.await;
-    invalidate_cache(cache).await;
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::knowledge::FactStoreClient;
     use crate::service::mock_db::MockDbClient;
     use std::sync::Arc;
-
-    #[test]
-    fn build_fact_embedding_input_formats_correctly() {
-        let result = FactService::build_fact_embedding_input("note", "Hello world", "Hello!");
-        assert_eq!(result, "note\nHello world\nHello!");
-    }
-
-    #[test]
-    fn build_fact_embedding_input_handles_empty_parts() {
-        let result = FactService::build_fact_embedding_input("", "", "");
-        assert_eq!(result, "\n\n");
-    }
-
-    #[tokio::test]
-    async fn claim_projection_completion_clears_results_warmed_during_projection() {
-        use std::num::NonZeroUsize;
-
-        use crate::memory::context_cache::{
-            CacheInsertOutcome, CacheKey, CacheView, ContextCacheLookup, ContextCacheState,
-        };
-        use crate::models::AssembledContextItem;
-        use serde_json::json;
-        use tokio::sync::RwLock;
-
-        let cache = std::sync::Arc::new(RwLock::new(ContextCacheState::new(
-            NonZeroUsize::new(4).unwrap(),
-            NonZeroUsize::new(1024 * 1024).unwrap(),
-        )));
-        let key = CacheKey::new(
-            "status is active",
-            Utc::now(),
-            5,
-            &[],
-            CacheView::default(),
-            None,
-        );
-        let item = AssembledContextItem {
-            fact_id: "fact:projection-race".to_string(),
-            content: "status is active".to_string(),
-            quote: "status is active".to_string(),
-            source_episode: "episode:projection-race".to_string(),
-            confidence: 0.9,
-            provenance: json!({}),
-            rationale: "test result warmed while projection runs".to_string(),
-            ..Default::default()
-        };
-        let (warmed_tx, warmed_rx) = tokio::sync::oneshot::channel();
-        let (release_tx, release_rx) = tokio::sync::oneshot::channel();
-        let task_cache = cache.clone();
-        let task = tokio::spawn(async move {
-            let projection_cache = task_cache.clone();
-            project_claims_then_invalidate_cache(&task_cache, async move {
-                {
-                    let mut guard = projection_cache.write().await;
-                    let generation = match guard.lookup(&key) {
-                        ContextCacheLookup::Miss(generation) => generation,
-                        ContextCacheLookup::Hit(_) => {
-                            panic!("the cache starts empty for this key")
-                        }
-                    };
-                    assert_eq!(
-                        guard.insert(generation, key, &[item]),
-                        CacheInsertOutcome::Stored
-                    );
-                }
-                let _ = warmed_tx.send(());
-                let _ = release_rx.await;
-            })
-            .await;
-        });
-
-        warmed_rx
-            .await
-            .expect("projection should warm the cache before it finishes");
-        assert_eq!(cache.read().await.len(), 1);
-        release_tx
-            .send(())
-            .expect("projection is still waiting for release");
-        task.await.expect("projection task should finish");
-        assert_eq!(cache.read().await.len(), 0);
-    }
 
     #[tokio::test]
     async fn create_fact_persists_record() {

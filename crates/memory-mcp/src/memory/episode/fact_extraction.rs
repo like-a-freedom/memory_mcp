@@ -34,7 +34,12 @@ pub(crate) struct FactExtractionOutcome {
 fn source_type_supports_summary_fallback(source_type: &str) -> bool {
     matches!(
         source_type,
-        "requirement" | "task_tracking" | "stakeholder_mapping" | "customer_engagement" | "email"
+        "requirement"
+            | "task_tracking"
+            | "stakeholder_mapping"
+            | "customer_engagement"
+            | "email"
+            | "conversation"
     ) || source_type.ends_with("_summary")
 }
 
@@ -44,6 +49,20 @@ pub(super) fn should_extract_note_fact(episode: &Episode, facts: &[ExtractedFact
     }
 
     let supported_source_type = source_type_supports_summary_fallback(&episode.source_type);
+    if episode.source_type == "conversation" {
+        let has_statement =
+            episode
+                .content
+                .split_inclusive(['.', '!', '?', '\n'])
+                .any(|sentence| {
+                    let sentence = sentence.trim();
+                    !sentence.ends_with('?')
+                        && crate::shared::search::search_query_terms(sentence).len() >= 3
+                });
+        if !has_statement {
+            return false;
+        }
+    }
 
     supported_source_type && is_summary_like_note_candidate(&episode.content)
 }

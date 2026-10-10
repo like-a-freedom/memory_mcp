@@ -223,8 +223,8 @@ async fn correction_reorders_but_preserves_stale_value_when_both_match_query() {
         .find(|item| item.content == "ARR is supersedes")
         .expect("the corrected counterpart is present");
     assert_eq!(
-        successor.provenance["retrieval_admission"]["basis"], "lexical",
-        "the shared subject independently supports both versions"
+        successor.provenance["retrieval_admission"]["basis"], "entity",
+        "the exactly resolved bare ARR subject independently supports both versions"
     );
 
     // 3. The stale item explains itself.

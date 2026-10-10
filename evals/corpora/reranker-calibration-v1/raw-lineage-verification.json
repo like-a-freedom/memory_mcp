@@ -1,0 +1,413 @@
+{
+  "raw_sha256": "d6f21ea9d60a0d56f34a05b609c79c88a451d2ae03597821ea3d5a9678c3a442",
+  "raw_cases": 500,
+  "reviewed_pairs": 45,
+  "lineage": [
+    {
+      "pair_id": "e47becba:answer",
+      "raw_case_position": 0,
+      "session_position": 51,
+      "turn_position": 4,
+      "full_user_turn_preserved": true,
+      "has_answer": true,
+      "raw_document_sha256": "657bbe8f6ec78b61631b7bd8085684e9335f726ad916be34a2b14381c33955a6"
+    },
+    {
+      "pair_id": "e47becba:non-answer:0:0",
+      "raw_case_position": 0,
+      "session_position": 0,
+      "turn_position": 0,
+      "full_user_turn_preserved": true,
+      "has_answer": false,
+      "raw_document_sha256": "bbc0d5f2b7f59ebc62c4ef6d4fcccbcd42adcf40c84688f4ab998c659a0248d2"
+    },
+    {
+      "pair_id": "e47becba:non-answer:1:0",
+      "raw_case_position": 0,
+      "session_position": 1,
+      "turn_position": 0,
+      "full_user_turn_preserved": true,
+      "has_answer": false,
+      "raw_document_sha256": "a9ecc5edde6d67ab392aed5ad5121a4c647b1c66008123ff77ac7840550b6f05"
+    },
+    {
+      "pair_id": "e47becba:non-answer:1:2",
+      "raw_case_position": 0,
+      "session_position": 1,
+      "turn_position": 2,
+      "full_user_turn_preserved": true,
+      "has_answer": false,
+      "raw_document_sha256": "598e02fe09d33401b272f8a91a1f95b9483d1d1aca492eca9549fd1ea7647fa8"
+    },
+    {
+      "pair_id": "118b2229:answer",
+      "raw_case_position": 1,
+      "session_position": 7,
+      "turn_position": 8,
+      "full_user_turn_preserved": true,
+      "has_answer": true,
+      "raw_document_sha256": "4c772c5acfb930568132563bdf98b045408f3aa49a390e4eccccb223adf87212"
+    },
+    {
+      "pair_id": "118b2229:non-answer:0:0",
+      "raw_case_position": 1,
+      "session_position": 0,
+      "turn_position": 0,
+      "full_user_turn_preserved": true,
+      "has_answer": false,
+      "raw_document_sha256": "d23352101e95403e1cb76dcd1384c242c7fa36bc7162a0f78ee32811104a9f1c"
+    },
+    {
+      "pair_id": "118b2229:non-answer:5:0",
+      "raw_case_position": 1,
+      "session_position": 5,
+      "turn_position": 0,
+      "full_user_turn_preserved": true,
+      "has_answer": false,
+      "raw_document_sha256": "340f805332e7bfe08af7e408d3efb132d4f364431602796f97db1eea99c861e7"
+    },
+    {
+      "pair_id": "118b2229:non-answer:13:6",
+      "raw_case_position": 1,
+      "session_position": 13,
+      "turn_position": 6,
+      "full_user_turn_preserved": true,
+      "has_answer": false,
+      "raw_document_sha256": "659521f2d847e06ab48c3fc82a06dd6a5226e23c93ab06073d48851a0300fc87"
+    },
+    {
+      "pair_id": "51a45a95:non-answer:8:6",
+      "raw_case_position": 2,
+      "session_position": 8,
+      "turn_position": 6,
+      "full_user_turn_preserved": true,
+      "has_answer": false,
+      "raw_document_sha256": "3b6dc0c85bd6ad6e9703dfef3a6360e1ea96b52b8793cafc73d46d744869a936"
+    },
+    {
+      "pair_id": "51a45a95:non-answer:18:2",
+      "raw_case_position": 2,
+      "session_position": 18,
+      "turn_position": 2,
+      "full_user_turn_preserved": true,
+      "has_answer": false,
+      "raw_document_sha256": "8ef7abcb6a18e385aebc648fc8a7d916eaac6b4ee705b466fe1675cd2df34849"
+    },
+    {
+      "pair_id": "51a45a95:non-answer:30:0",
+      "raw_case_position": 2,
+      "session_position": 30,
+      "turn_position": 0,
+      "full_user_turn_preserved": true,
+      "has_answer": false,
+      "raw_document_sha256": "197ec313651c6072acd612ff84543611a75db171d63057675d05791d1f646319"
+    },
+    {
+      "pair_id": "58bf7951:non-answer:1:2",
+      "raw_case_position": 3,
+      "session_position": 1,
+      "turn_position": 2,
+      "full_user_turn_preserved": true,
+      "has_answer": false,
+      "raw_document_sha256": "f914377a28085919e34bdebad3c9d7203d37fe5a508abc263e18cb659a5bef70"
+    },
+    {
+      "pair_id": "58bf7951:non-answer:2:4",
+      "raw_case_position": 3,
+      "session_position": 2,
+      "turn_position": 4,
+      "full_user_turn_preserved": true,
+      "has_answer": false,
+      "raw_document_sha256": "959d9b1dcba7d69aeac49de079df8a1bbf2118dbb9ea7dbb7a4b7af85e58495d"
+    },
+    {
+      "pair_id": "58bf7951:non-answer:2:6",
+      "raw_case_position": 3,
+      "session_position": 2,
+      "turn_position": 6,
+      "full_user_turn_preserved": true,
+      "has_answer": false,
+      "raw_document_sha256": "7c5ff3393152803f41d96b3fd2fabbf57f2e519bab39d09f3742006ec027a9ad"
+    },
+    {
+      "pair_id": "1e043500:answer",
+      "raw_case_position": 4,
+      "session_position": 13,
+      "turn_position": 2,
+      "full_user_turn_preserved": true,
+      "has_answer": true,
+      "raw_document_sha256": "ecded4de83614d33e25a72a7f012288ca995ba45b7ff8aa7cfc63eb94e64b69d"
+    },
+    {
+      "pair_id": "1e043500:non-answer:5:0",
+      "raw_case_position": 4,
+      "session_position": 5,
+      "turn_position": 0,
+      "full_user_turn_preserved": true,
+      "has_answer": false,
+      "raw_document_sha256": "c38efd696ca4578d0d3b368207166eac8994d63948726bba52ab7eb7ce58e984"
+    },
+    {
+      "pair_id": "1e043500:non-answer:5:2",
+      "raw_case_position": 4,
+      "session_position": 5,
+      "turn_position": 2,
+      "full_user_turn_preserved": true,
+      "has_answer": false,
+      "raw_document_sha256": "ada52d2f1d2267c980ff0da4d3eaadf56feba8de56cfd9901cfa0c748c82ef67"
+    },
+    {
+      "pair_id": "1e043500:non-answer:5:6",
+      "raw_case_position": 4,
+      "session_position": 5,
+      "turn_position": 6,
+      "full_user_turn_preserved": true,
+      "has_answer": false,
+      "raw_document_sha256": "d4195900bf16dc7f3efb2983140cbf88ffd94ec5810b035aa7513bf85a046bcf"
+    },
+    {
+      "pair_id": "c5e8278d:answer",
+      "raw_case_position": 5,
+      "session_position": 36,
+      "turn_position": 0,
+      "full_user_turn_preserved": true,
+      "has_answer": true,
+      "raw_document_sha256": "481e00d5d22914a8d307b74b4f2f64308f8677272bd4a16e320602c95cfb884e"
+    },
+    {
+      "pair_id": "c5e8278d:non-answer:4:0",
+      "raw_case_position": 5,
+      "session_position": 4,
+      "turn_position": 0,
+      "full_user_turn_preserved": true,
+      "has_answer": false,
+      "raw_document_sha256": "306bfce8acd8c9d0c5b4c43ea11ffedd7b9345c1ae6ff886f0b148d75d3d2d81"
+    },
+    {
+      "pair_id": "c5e8278d:non-answer:8:0",
+      "raw_case_position": 5,
+      "session_position": 8,
+      "turn_position": 0,
+      "full_user_turn_preserved": true,
+      "has_answer": false,
+      "raw_document_sha256": "412382bf391c84ff13e8878e3afeaab9cf9362f2e6f0d6c26b19d7f6bd16108f"
+    },
+    {
+      "pair_id": "c5e8278d:non-answer:10:2",
+      "raw_case_position": 5,
+      "session_position": 10,
+      "turn_position": 2,
+      "full_user_turn_preserved": true,
+      "has_answer": false,
+      "raw_document_sha256": "0c141c0d211ca163a4a03e06ec930bf25550b98ef5599d7062037b4013f58b57"
+    },
+    {
+      "pair_id": "6ade9755:answer",
+      "raw_case_position": 6,
+      "session_position": 50,
+      "turn_position": 4,
+      "full_user_turn_preserved": true,
+      "has_answer": true,
+      "raw_document_sha256": "2af2b8aae709a31a036ae0acb9594243b0f88be057d6153df82b71997e1ce862"
+    },
+    {
+      "pair_id": "6ade9755:non-answer:7:4",
+      "raw_case_position": 6,
+      "session_position": 7,
+      "turn_position": 4,
+      "full_user_turn_preserved": true,
+      "has_answer": false,
+      "raw_document_sha256": "7cd957a151282a06b981f20dec5ccf53c0b62654f200fc9b8f2cd23e6e617d42"
+    },
+    {
+      "pair_id": "6ade9755:non-answer:34:6",
+      "raw_case_position": 6,
+      "session_position": 34,
+      "turn_position": 6,
+      "full_user_turn_preserved": true,
+      "has_answer": false,
+      "raw_document_sha256": "cbed66a9893ea82dc0d0e476c11abbe21faa9124541a77ae3a1351c7ac7e8143"
+    },
+    {
+      "pair_id": "6ade9755:non-answer:0:0",
+      "raw_case_position": 6,
+      "session_position": 0,
+      "turn_position": 0,
+      "full_user_turn_preserved": true,
+      "has_answer": false,
+      "raw_document_sha256": "3496229911ef673272b94ccb8400c2c1e8f1a60fcd6bb1f27f506267829f3f1d"
+    },
+    {
+      "pair_id": "6f9b354f:answer",
+      "raw_case_position": 7,
+      "session_position": 37,
+      "turn_position": 2,
+      "full_user_turn_preserved": true,
+      "has_answer": true,
+      "raw_document_sha256": "df9bacac021454abf58295a5eeb020108624b4cc00d1593f295b33a007a0f0e1"
+    },
+    {
+      "pair_id": "6f9b354f:non-answer:0:0",
+      "raw_case_position": 7,
+      "session_position": 0,
+      "turn_position": 0,
+      "full_user_turn_preserved": true,
+      "has_answer": false,
+      "raw_document_sha256": "e058aa5cc83598fef093e8ff0e5db23561152db8e459142a52a71b2d37691fa3"
+    },
+    {
+      "pair_id": "6f9b354f:non-answer:0:2",
+      "raw_case_position": 7,
+      "session_position": 0,
+      "turn_position": 2,
+      "full_user_turn_preserved": true,
+      "has_answer": false,
+      "raw_document_sha256": "4bcca6e7f494a78d7825043d807adf94b994e2fd5dabce7ee9539d2d89ba9c33"
+    },
+    {
+      "pair_id": "6f9b354f:non-answer:0:4",
+      "raw_case_position": 7,
+      "session_position": 0,
+      "turn_position": 4,
+      "full_user_turn_preserved": true,
+      "has_answer": false,
+      "raw_document_sha256": "a43dd861c5842ed0015947c368b2e50c1ff77846a05ea43fb42571046e054e45"
+    },
+    {
+      "pair_id": "58ef2f1c:non-answer:8:2",
+      "raw_case_position": 8,
+      "session_position": 8,
+      "turn_position": 2,
+      "full_user_turn_preserved": true,
+      "has_answer": false,
+      "raw_document_sha256": "6e73965ad32b998821220ea45c6cd4cca78da9132ebcf9f201ae9f2e60cf08f9"
+    },
+    {
+      "pair_id": "58ef2f1c:non-answer:44:0",
+      "raw_case_position": 8,
+      "session_position": 44,
+      "turn_position": 0,
+      "full_user_turn_preserved": true,
+      "has_answer": false,
+      "raw_document_sha256": "f08eb3b5077836012fdd812e1e85f418e5a709362a6653ab40d83acc712a837e"
+    },
+    {
+      "pair_id": "58ef2f1c:non-answer:44:8",
+      "raw_case_position": 8,
+      "session_position": 44,
+      "turn_position": 8,
+      "full_user_turn_preserved": true,
+      "has_answer": false,
+      "raw_document_sha256": "5faf64f854fc31c45745720050f2d3e22fe0e287489ffa48137411a16f8aef15"
+    },
+    {
+      "pair_id": "f8c5f88b:answer",
+      "raw_case_position": 9,
+      "session_position": 27,
+      "turn_position": 4,
+      "full_user_turn_preserved": true,
+      "has_answer": true,
+      "raw_document_sha256": "a2c6ca6ddb52f7b2dcf00367b57b0efa232f54c01f122a207e488363d474184c"
+    },
+    {
+      "pair_id": "f8c5f88b:non-answer:2:0",
+      "raw_case_position": 9,
+      "session_position": 2,
+      "turn_position": 0,
+      "full_user_turn_preserved": true,
+      "has_answer": false,
+      "raw_document_sha256": "8a9903ea731781e1e517edd043c89b070f3b69d3e32e700dc322133369f115cb"
+    },
+    {
+      "pair_id": "f8c5f88b:non-answer:2:2",
+      "raw_case_position": 9,
+      "session_position": 2,
+      "turn_position": 2,
+      "full_user_turn_preserved": true,
+      "has_answer": false,
+      "raw_document_sha256": "6bce8a5977bffe3a4287b08f9ff4f61ea581e619ea884ddcafc2d97a42e774ee"
+    },
+    {
+      "pair_id": "f8c5f88b:non-answer:2:4",
+      "raw_case_position": 9,
+      "session_position": 2,
+      "turn_position": 4,
+      "full_user_turn_preserved": true,
+      "has_answer": false,
+      "raw_document_sha256": "989395a0f1c6685ac174c7b16f4601ab6d9431b2c3ee0fb5b6b7056d2482e1be"
+    },
+    {
+      "pair_id": "5d3d2817:answer",
+      "raw_case_position": 10,
+      "session_position": 26,
+      "turn_position": 4,
+      "full_user_turn_preserved": true,
+      "has_answer": true,
+      "raw_document_sha256": "75f42d52962dcf3b404825c87d8b917eee7d2c138c43bddf9d7dbb3f6c5bb28b"
+    },
+    {
+      "pair_id": "5d3d2817:non-answer:16:2",
+      "raw_case_position": 10,
+      "session_position": 16,
+      "turn_position": 2,
+      "full_user_turn_preserved": true,
+      "has_answer": false,
+      "raw_document_sha256": "2cdaec2cd651b8d7bf4f77bc68a61de9aa94e0b074ee402cccc5b44e90f22529"
+    },
+    {
+      "pair_id": "5d3d2817:non-answer:18:0",
+      "raw_case_position": 10,
+      "session_position": 18,
+      "turn_position": 0,
+      "full_user_turn_preserved": true,
+      "has_answer": false,
+      "raw_document_sha256": "66280cf23623026f9b957d1613d39f2ae190d48a65ffac39131405701233b636"
+    },
+    {
+      "pair_id": "5d3d2817:non-answer:0:0",
+      "raw_case_position": 10,
+      "session_position": 0,
+      "turn_position": 0,
+      "full_user_turn_preserved": true,
+      "has_answer": false,
+      "raw_document_sha256": "fab983b7110ff96157885361386925c7589a0fa4303946a4e68d8123394ad4f1"
+    },
+    {
+      "pair_id": "7527f7e2:answer",
+      "raw_case_position": 11,
+      "session_position": 15,
+      "turn_position": 2,
+      "full_user_turn_preserved": true,
+      "has_answer": true,
+      "raw_document_sha256": "59ec2115fbf009a0e1b8260fa9a72b510b1528bdaf8fb16f8e6f3e14aa7a1528"
+    },
+    {
+      "pair_id": "7527f7e2:non-answer:0:6",
+      "raw_case_position": 11,
+      "session_position": 0,
+      "turn_position": 6,
+      "full_user_turn_preserved": true,
+      "has_answer": false,
+      "raw_document_sha256": "c1f473119e7a67e156ddda6c2fce7c79d19a15fea902817a965a031713837ff0"
+    },
+    {
+      "pair_id": "7527f7e2:non-answer:26:2",
+      "raw_case_position": 11,
+      "session_position": 26,
+      "turn_position": 2,
+      "full_user_turn_preserved": true,
+      "has_answer": false,
+      "raw_document_sha256": "dd55a9aa0ba6329839e0efe544858600b88679d73a295688c69439f49c50048c"
+    },
+    {
+      "pair_id": "7527f7e2:non-answer:39:4",
+      "raw_case_position": 11,
+      "session_position": 39,
+      "turn_position": 4,
+      "full_user_turn_preserved": true,
+      "has_answer": false,
+      "raw_document_sha256": "195e3e9c2ea43cd10c8b2c4455b432b2ec148da987da7fec9051ae666ee33b1e"
+    }
+  ],
+  "scope": "Independent raw readback of exact full user turn bytes; labels remain source-reviewed by separate reviewer before model scores"
+}

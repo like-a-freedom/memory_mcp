@@ -148,3 +148,75 @@ async fn current_query_returns_only_the_persisted_successor() {
         "a current request must return the persisted successor, not its predecessor"
     );
 }
+
+#[tokio::test]
+async fn timeline_keeps_persisted_predecessor_before_its_successor() {
+    let tm = common::TestMemory::new(false).await;
+    let service = common::exposing_claims(tm.service).expect("evidence is a valid stage");
+
+    common::ingest_lineage_episode(
+        &service,
+        &tm.db_client,
+        "episode:timeline-1",
+        "fs:docs/timeline.md:aaaa",
+        "fs:docs/timeline.md",
+        "ARR is legacy",
+        Utc.with_ymd_and_hms(2026, 6, 1, 10, 0, 0).unwrap(),
+    )
+    .await;
+    common::ingest_lineage_episode(
+        &service,
+        &tm.db_client,
+        "episode:timeline-2",
+        "fs:docs/timeline.md:bbbb",
+        "fs:docs/timeline.md",
+        "ARR is supersedes",
+        Utc.with_ymd_and_hms(2026, 6, 2, 10, 0, 0).unwrap(),
+    )
+    .await;
+    assert!(
+        common::wait_for_supersessions(&tm.db_client, 1).await,
+        "the production reconciliation pipeline must persist the supersession"
+    );
+
+    let mut timeline_request = request("ARR");
+    timeline_request.view_mode = Some("timeline".to_string());
+    let items =
+        AssembleContextCapability::assemble_context_from_service(&service, timeline_request)
+            .await
+            .expect("timeline should assemble");
+
+    let predecessor_position = items
+        .iter()
+        .position(|item| item.content.contains("legacy"))
+        .expect("the timeline retains the predecessor fact");
+    let successor_position = items
+        .iter()
+        .position(|item| item.content.contains("supersedes"))
+        .expect("the timeline retains the successor fact");
+    let persisted_successor_id = items
+        .iter()
+        .find_map(|item| {
+            item.reconciliation.as_ref().and_then(|metadata| {
+                metadata.relations.iter().find_map(|relation| {
+                    matches!(
+                        relation.outcome,
+                        memory_mcp::models::claim::ClaimRelationOutcome::Supersession
+                    )
+                    .then(|| relation.superseded_by_fact_id.clone())
+                    .flatten()
+                })
+            })
+        })
+        .expect("the assembled item exposes the persisted successor identity");
+    assert!(
+        items
+            .iter()
+            .any(|item| item.fact_id == persisted_successor_id),
+        "the persisted successor is present in the timeline"
+    );
+    assert!(
+        predecessor_position < successor_position,
+        "the timeline remains chronological even when reconciliation marks the predecessor as superseded"
+    );
+}

@@ -1,0 +1,45 @@
+{
+  "model": "mradermacher/Qwen3-Reranker-0.6B-GGUF",
+  "revision": "6727da811d2cc45b078b744bffaaab122a0691da",
+  "license": "Apache-2.0",
+  "files": [
+    {
+      "path": "config.json",
+      "bytes": 727,
+      "sha256": "d479c427a9ca5295218063d4f9aca4f297ab4ac27487cca7af42c84643d51ef0",
+      "source": {
+        "model": "Qwen/Qwen3-Reranker-0.6B",
+        "revision": "e61197ed45024b0ed8a2d74b80b4d909f1255473",
+        "path": "config.json",
+        "license": "Apache-2.0"
+      }
+    },
+    {
+      "path": "tokenizer.json",
+      "bytes": 11422654,
+      "sha256": "aeb13307a71acd8fe81861d94ad54ab689df773318809eed3cbe794b4492dae4",
+      "source": {
+        "model": "Qwen/Qwen3-Reranker-0.6B",
+        "revision": "e61197ed45024b0ed8a2d74b80b4d909f1255473",
+        "path": "tokenizer.json",
+        "license": "Apache-2.0"
+      }
+    },
+    {
+      "path": "model.gguf",
+      "bytes": 639150752,
+      "sha256": "c525a7449243f690a7062e6377d6cf5adbb289354bd4316312367cd20e187ab7",
+      "source": {
+        "model": "mradermacher/Qwen3-Reranker-0.6B-GGUF",
+        "revision": "6727da811d2cc45b078b744bffaaab122a0691da",
+        "path": "Qwen3-Reranker-0.6B.Q8_0.gguf",
+        "license": "Apache-2.0"
+      }
+    },
+    {
+      "path": "README.md",
+      "bytes": 3472,
+      "sha256": "d67493aaea840751d3025367373787bea51259d36744ae4428789c5b16b4e698"
+    }
+  ]
+}

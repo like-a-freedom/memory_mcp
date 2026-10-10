@@ -18,6 +18,13 @@
     {
       "id": "external-retrieval",
       "corpus_root": "evals/corpora/eval-mini"
+    },
+    {
+      "id": "retrieval-quality",
+      "corpus_root": "evals/corpora/retrieval-quality-v1",
+      "expected_coverage": {
+        "exact_cases": 37
+      }
     }
   ],
   "gates": [
@@ -28,6 +35,48 @@
       },
       "hard_floor": 1.0,
       "baseline_required": false
+    },
+    {
+      "target": {
+        "suite_id": "retrieval-quality",
+        "metric": "precision_macro"
+      },
+      "hard_floor": 1.0
+    },
+    {
+      "target": {
+        "suite_id": "retrieval-quality",
+        "metric": "required_group_recall"
+      },
+      "hard_floor": 1.0
+    },
+    {
+      "target": {
+        "suite_id": "retrieval-quality",
+        "metric": "unknown_abstention_rate"
+      },
+      "hard_floor": 1.0
+    },
+    {
+      "target": {
+        "suite_id": "retrieval-quality",
+        "metric": "answerable_non_abstention_rate"
+      },
+      "hard_floor": 1.0
+    },
+    {
+      "target": {
+        "suite_id": "retrieval-quality",
+        "metric": "duplicate_free_rate"
+      },
+      "hard_floor": 1.0
+    },
+    {
+      "target": {
+        "suite_id": "retrieval-quality",
+        "metric": "prohibited_free_rate"
+      },
+      "hard_floor": 1.0
     }
   ]
 }

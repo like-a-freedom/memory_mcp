@@ -1,0 +1,292 @@
+{
+  "review_phase": "raw-source review before first native retrieval run",
+  "corrections": [
+    {
+      "case_id": "locomo-conv-48-015",
+      "upstream_evidence": [
+        "D2:20",
+        "D2:22",
+        "D2:24"
+      ],
+      "required_evidence": [
+        "D2:20",
+        "D2:22"
+      ],
+      "reason": "D2:20 states snake Susie; D2:22 states second snake Seraphim. D2:24 gives purchase date/location and is not needed to identify pets. No retrieval predictions inspected."
+    }
+  ],
+  "public_selection": [
+    {
+      "case_id": "locomo-conv-26-082",
+      "sample_id": "conv-26",
+      "qa_index": 82,
+      "qa": {
+        "question": "What did the charity race raise awareness for?",
+        "answer": "mental health",
+        "evidence": [
+          "D2:2"
+        ],
+        "category": 4
+      },
+      "context": "all turns in sessions 1 and 2"
+    },
+    {
+      "case_id": "locomo-conv-26-000",
+      "sample_id": "conv-26",
+      "qa_index": 0,
+      "qa": {
+        "question": "When did Caroline go to the LGBTQ support group?",
+        "answer": "7 May 2023",
+        "evidence": [
+          "D1:3"
+        ],
+        "category": 2
+      },
+      "context": "all turns in sessions 1 and 2"
+    },
+    {
+      "case_id": "locomo-conv-30-002",
+      "sample_id": "conv-30",
+      "qa_index": 2,
+      "qa": {
+        "question": "How do Jon and Gina both like to destress?",
+        "answer": "by dancing",
+        "evidence": [
+          "D1:7",
+          "D1:6"
+        ],
+        "category": 4
+      },
+      "context": "all turns in sessions 1 and 2"
+    },
+    {
+      "case_id": "locomo-conv-30-000",
+      "sample_id": "conv-30",
+      "qa_index": 0,
+      "qa": {
+        "question": "When Jon has lost his job as a banker?",
+        "answer": "19 January, 2023",
+        "evidence": [
+          "D1:2"
+        ],
+        "category": 2
+      },
+      "context": "all turns in sessions 1 and 2"
+    },
+    {
+      "case_id": "locomo-conv-41-065",
+      "sample_id": "conv-41",
+      "qa_index": 65,
+      "qa": {
+        "question": "What is John's main focus in local politics?",
+        "answer": "Improving education and infrastructure",
+        "evidence": [
+          "D1:8"
+        ],
+        "category": 4
+      },
+      "context": "all turns in sessions 1 and 2"
+    },
+    {
+      "case_id": "locomo-conv-41-001",
+      "sample_id": "conv-41",
+      "qa_index": 1,
+      "qa": {
+        "question": "When did Maria donate her car?",
+        "answer": "21 December 2022",
+        "evidence": [
+          "D2:1"
+        ],
+        "category": 2
+      },
+      "context": "all turns in sessions 1 and 2"
+    },
+    {
+      "case_id": "locomo-conv-42-096",
+      "sample_id": "conv-42",
+      "qa_index": 96,
+      "qa": {
+        "question": "What type of movies does Nate enjoy watching the most?",
+        "answer": "action and sci-fi",
+        "evidence": [
+          "D1:13"
+        ],
+        "category": 4
+      },
+      "context": "all turns in sessions 1 and 2"
+    },
+    {
+      "case_id": "locomo-conv-42-002",
+      "sample_id": "conv-42",
+      "qa_index": 2,
+      "qa": {
+        "question": "When did Joanna first watch \"Eternal Sunshine of the Spotless Mind?",
+        "answer": "2019",
+        "evidence": [
+          "D1:18"
+        ],
+        "category": 2
+      },
+      "context": "all turns in sessions 1 and 2"
+    },
+    {
+      "case_id": "locomo-conv-43-071",
+      "sample_id": "conv-43",
+      "qa_index": 71,
+      "qa": {
+        "question": "Which team did John sign with on 21 May, 2023?",
+        "answer": "The Minnesota Wolves",
+        "evidence": [
+          "D1:5"
+        ],
+        "category": 4
+      },
+      "context": "all turns in sessions 1 and 2"
+    },
+    {
+      "case_id": "locomo-conv-44-061",
+      "sample_id": "conv-44",
+      "qa_index": 61,
+      "qa": {
+        "question": "Which specific type of bird mesmerizes Andrew?",
+        "answer": "Eagles",
+        "evidence": [
+          "D1:16"
+        ],
+        "category": 4
+      },
+      "context": "all turns in sessions 1 and 2"
+    },
+    {
+      "case_id": "locomo-conv-44-000",
+      "sample_id": "conv-44",
+      "qa_index": 0,
+      "qa": {
+        "question": "Which year did Audrey adopt the first three of her dogs?",
+        "answer": "2020",
+        "evidence": [
+          "D1:7"
+        ],
+        "category": 2
+      },
+      "context": "all turns in sessions 1 and 2"
+    },
+    {
+      "case_id": "locomo-conv-47-067",
+      "sample_id": "conv-47",
+      "qa_index": 67,
+      "qa": {
+        "question": "What programming languages has James worked with?",
+        "answer": "Python and C++",
+        "evidence": [
+          "D1:8"
+        ],
+        "category": 4
+      },
+      "context": "all turns in sessions 1 and 2"
+    },
+    {
+      "case_id": "locomo-conv-47-001",
+      "sample_id": "conv-47",
+      "qa_index": 1,
+      "qa": {
+        "question": "Which recreational activity was James pursuing on March 16, 2022?",
+        "answer": "bowling",
+        "evidence": [
+          "D1:26"
+        ],
+        "category": 2
+      },
+      "context": "all turns in sessions 1 and 2"
+    },
+    {
+      "case_id": "locomo-conv-48-015",
+      "sample_id": "conv-48",
+      "qa_index": 15,
+      "qa": {
+        "question": "What pets does Jolene have?",
+        "answer": "snakes",
+        "evidence": [
+          "D2:20",
+          "D2:22",
+          "D2:24"
+        ],
+        "category": 4
+      },
+      "context": "all turns in sessions 1 and 2"
+    },
+    {
+      "case_id": "locomo-conv-48-000",
+      "sample_id": "conv-48",
+      "qa_index": 0,
+      "qa": {
+        "question": "What kind of project was Jolene working on in the beginning of January 2023?",
+        "answer": "electricity engineering project",
+        "evidence": [
+          "D1:2"
+        ],
+        "category": 2
+      },
+      "context": "all turns in sessions 1 and 2"
+    },
+    {
+      "case_id": "locomo-conv-49-083",
+      "sample_id": "conv-49",
+      "qa_index": 83,
+      "qa": {
+        "question": "What type of car did Evan get after his old Prius broke down?",
+        "answer": "new Prius",
+        "evidence": [
+          "D1:2"
+        ],
+        "category": 4
+      },
+      "context": "all turns in sessions 1 and 2"
+    },
+    {
+      "case_id": "locomo-conv-49-002",
+      "sample_id": "conv-49",
+      "qa_index": 2,
+      "qa": {
+        "question": "Where has Evan been on roadtrips with his family?",
+        "answer": "Rockies, Jasper",
+        "evidence": [
+          "D1:2",
+          "D1:4",
+          "D2:1"
+        ],
+        "category": 1
+      },
+      "context": "all turns in sessions 1 and 2"
+    },
+    {
+      "case_id": "locomo-conv-50-071",
+      "sample_id": "conv-50",
+      "qa_index": 71,
+      "qa": {
+        "question": "How long did Calvin plan to stay in Japan?",
+        "answer": "A few months",
+        "evidence": [
+          "D1:15"
+        ],
+        "category": 4
+      },
+      "context": "all turns in sessions 1 and 2"
+    },
+    {
+      "case_id": "locomo-conv-50-001",
+      "sample_id": "conv-50",
+      "qa_index": 1,
+      "qa": {
+        "question": "What items did Calvin buy in March 2023?",
+        "answer": "mansion in Japan, luxury car Ferrari 488 GTB",
+        "evidence": [
+          "D1:3",
+          "D2:1"
+        ],
+        "category": 1
+      },
+      "context": "all turns in sessions 1 and 2"
+    }
+  ]
+}

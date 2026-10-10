@@ -13,6 +13,7 @@ use crate::storage::value_helpers::json_f64;
 
 mod local;
 pub(crate) mod remote;
+mod reranker;
 pub(crate) mod task_runner;
 
 use local::LocalCandleEmbeddingProvider;
@@ -38,8 +39,33 @@ pub trait EmbeddingProvider: Send + Sync {
     /// Expected embedding dimension.
     fn dimension(&self) -> usize;
 
-    /// Requests an embedding vector for the supplied input text.
+    /// Embeds a stored document. Providers may use an asymmetric document prefix.
     async fn embed(&self, input: &str) -> Result<Vec<f64>, MemoryError>;
+
+    /// Embeds a retrieval query. Symmetric providers share document generation.
+    async fn embed_query(&self, input: &str) -> Result<Vec<f64>, MemoryError> {
+        self.embed(input).await
+    }
+
+    /// Optional query/passage cross-encoder evidence. Scores are raw logits;
+    /// zero is the fixed relevance admission boundary, not a cosine threshold.
+    async fn rerank(
+        &self,
+        _query: &str,
+        _documents: &[String],
+    ) -> Result<Option<Vec<f64>>, MemoryError> {
+        Ok(None)
+    }
+
+    /// Immutable model and input contract identity of optional reranking.
+    fn reranking_signature(&self) -> Option<&str> {
+        None
+    }
+
+    /// Operator-selected boundary, fitted on independent development evidence.
+    fn reranking_admission_floor(&self) -> f64 {
+        0.0
+    }
 }
 
 /// Provider implementation used when embeddings are disabled.
@@ -234,6 +260,12 @@ pub(crate) async fn resolve_embedding_target_identity(
     config: &EmbeddingConfig,
     data_dir: &str,
 ) -> Result<ResolvedEmbeddingTarget, MemoryError> {
+    if config.reranker_model_dir.is_some() && config.provider != EmbeddingProviderKind::LocalCandle
+    {
+        return Err(MemoryError::ConfigInvalid(
+            "RETRIEVAL_RERANKER_MODEL_DIR requires the local-candle provider".into(),
+        ));
+    }
     let dimension = resolve_embedding_dimension(config, data_dir).await?;
     let signature = build_embedding_signature(
         config.provider_label(),
@@ -293,6 +325,11 @@ pub(crate) async fn create_embedding_provider_with_dimension(
                 resolved_dimension,
                 config.max_tokens,
                 &resolved_dir,
+                config
+                    .reranker_model_dir
+                    .as_deref()
+                    .map(std::path::Path::new),
+                config.reranker_admission_floor,
             )?) as Arc<dyn EmbeddingProvider>)
         }
         EmbeddingProviderKind::OpenAiCompatible => {

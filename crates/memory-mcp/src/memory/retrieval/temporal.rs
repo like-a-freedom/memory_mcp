@@ -141,7 +141,18 @@ fn normalize_temporal_token(token: &str) -> String {
         .to_ascii_lowercase()
 }
 
-fn month_number(token: &str) -> Option<u32> {
+fn day_of_month(token: &str) -> Option<u32> {
+    let digits = ["st", "nd", "rd", "th"]
+        .iter()
+        .find_map(|suffix| token.strip_suffix(suffix))
+        .unwrap_or(token);
+    digits
+        .parse::<u32>()
+        .ok()
+        .filter(|day| (1..=31).contains(day))
+}
+
+pub(super) fn month_number(token: &str) -> Option<u32> {
     match token {
         "january" => Some(1),
         "february" => Some(2),
@@ -330,7 +341,47 @@ pub(crate) fn infer_temporal_window(query: &str, cutoff: DateTime<Utc>) -> Optio
             continue;
         }
 
+        if let Some(day) = day_of_month(token)
+            && let Some(month) = tokens.get(index + 1).and_then(|next| month_number(next))
+        {
+            let explicit_year = tokens
+                .get(index + 2)
+                .filter(|next| is_four_digit_year(next))
+                .and_then(|next| next.parse::<i32>().ok());
+            let year = explicit_year.or(shared_year).unwrap_or(cutoff.year());
+            if let Some(date) = NaiveDate::from_ymd_opt(year, month, day) {
+                ranges.push((date, date));
+            }
+            index += if explicit_year.is_some() { 3 } else { 2 };
+            continue;
+        }
+
         if let Some(month) = month_number(token) {
+            let day_after_month = tokens.get(index + 1).and_then(|next| day_of_month(next));
+            let day_before_month = index
+                .checked_sub(1)
+                .and_then(|previous| tokens.get(previous))
+                .and_then(|previous| day_of_month(previous));
+            if let Some(day) = day_after_month.or(day_before_month) {
+                let year_index = index + if day_after_month.is_some() { 2 } else { 1 };
+                let explicit_year = tokens
+                    .get(year_index)
+                    .filter(|next| is_four_digit_year(next))
+                    .and_then(|next| next.parse::<i32>().ok());
+                let year = explicit_year.or(shared_year).unwrap_or(cutoff.year());
+                if let Some(date) = NaiveDate::from_ymd_opt(year, month, day) {
+                    ranges.push((date, date));
+                }
+                index += if day_after_month.is_some() {
+                    if explicit_year.is_some() { 3 } else { 2 }
+                } else if explicit_year.is_some() {
+                    2
+                } else {
+                    1
+                };
+                continue;
+            }
+
             let next_year = tokens
                 .get(index + 1)
                 .filter(|next| is_four_digit_year(next))
@@ -412,6 +463,24 @@ pub(crate) fn infer_temporal_window(query: &str, cutoff: DateTime<Utc>) -> Optio
         start: start_of_day(start_date),
         end: end_of_day(end_date),
     })
+}
+
+pub(crate) fn relative_event_date_matches(
+    content: &str,
+    source_time: DateTime<Utc>,
+    window: &TemporalWindow,
+) -> bool {
+    let start = window.start.date_naive();
+    let end = window.end.date_naive();
+
+    content
+        .split_whitespace()
+        .map(normalize_temporal_token)
+        .filter_map(|token| relative_day_shift(&token))
+        .any(|shift| {
+            let event_date = source_time.date_naive() + chrono::Duration::days(shift);
+            event_date >= start && event_date <= end
+        })
 }
 
 fn month_date_range(year: i32, month: u32) -> (NaiveDate, NaiveDate) {
@@ -507,7 +576,8 @@ pub(crate) async fn collect_temporal_facts(
             .into_iter()
             .filter(|fact| fact_is_active_at(fact, request.cutoff))
             .filter(|fact| {
-                fact.t_valid >= temporal_window.start && fact.t_valid <= temporal_window.end
+                (fact.t_valid >= temporal_window.start && fact.t_valid <= temporal_window.end)
+                    || relative_event_date_matches(&fact.content, fact.t_valid, &temporal_window)
             })
             .collect::<Vec<_>>();
 
@@ -792,6 +862,60 @@ mod tests {
         assert_eq!(window.start.date_naive().day(), 15);
         assert_eq!(window.start.date_naive().month(), 3);
         assert_eq!(window.end.date_naive().day(), 15);
+    }
+
+    #[test]
+    fn infer_temporal_window_natural_month_day_year_is_one_day() {
+        let window = infer_temporal_window("March 16, 2022", test_cutoff())
+            .expect("should return the requested day");
+
+        assert_eq!(window.start.date_naive().to_string(), "2022-03-16");
+        assert_eq!(window.end.date_naive().to_string(), "2022-03-16");
+    }
+
+    #[test]
+    fn infer_temporal_window_natural_day_month_year_is_one_day() {
+        let window = infer_temporal_window("on 21 May, 2023", test_cutoff())
+            .expect("should return the requested day");
+
+        assert_eq!(window.start.date_naive().to_string(), "2023-05-21");
+        assert_eq!(window.end.date_naive().to_string(), "2023-05-21");
+    }
+
+    #[test]
+    fn infer_temporal_window_natural_day_month_year_day_one_is_one_day() {
+        let window = infer_temporal_window("on 1 May, 2023", test_cutoff())
+            .expect("should return the requested day");
+
+        assert_eq!(window.start.date_naive().to_string(), "2023-05-01");
+        assert_eq!(window.end.date_naive().to_string(), "2023-05-01");
+    }
+
+    #[test]
+    fn infer_temporal_window_natural_day_month_year_day_two_is_one_day() {
+        let window = infer_temporal_window("on 2 May, 2023", test_cutoff())
+            .expect("should return the requested day");
+
+        assert_eq!(window.start.date_naive().to_string(), "2023-05-02");
+        assert_eq!(window.end.date_naive().to_string(), "2023-05-02");
+    }
+
+    #[test]
+    fn infer_temporal_window_natural_day_month_year_day_three_is_one_day() {
+        let window = infer_temporal_window("on 3 May, 2023", test_cutoff())
+            .expect("should return the requested day");
+
+        assert_eq!(window.start.date_naive().to_string(), "2023-05-03");
+        assert_eq!(window.end.date_naive().to_string(), "2023-05-03");
+    }
+
+    #[test]
+    fn infer_temporal_window_natural_day_month_year_day_four_is_one_day() {
+        let window = infer_temporal_window("on 4 May, 2023", test_cutoff())
+            .expect("should return the requested day");
+
+        assert_eq!(window.start.date_naive().to_string(), "2023-05-04");
+        assert_eq!(window.end.date_naive().to_string(), "2023-05-04");
     }
 
     #[test]

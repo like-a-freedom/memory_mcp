@@ -215,6 +215,16 @@ fn build_lexical_fallback_queries(query_terms: &[String]) -> Vec<String> {
 fn standalone_temporal_fallback_terms(query_terms: &[String]) -> HashSet<&str> {
     let mut terms = HashSet::new();
 
+    for window in query_terms.windows(3) {
+        let date = window.join(" ");
+        if ["%B %d %Y", "%d %B %Y", "%Y %m %d"]
+            .iter()
+            .any(|format| chrono::NaiveDate::parse_from_str(&date, format).is_ok())
+        {
+            terms.extend(window.iter().map(String::as_str));
+        }
+    }
+
     for window in query_terms.windows(2) {
         let [left, right] = window else {
             continue;

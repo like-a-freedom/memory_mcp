@@ -1,19 +1,21 @@
-# Retrieval-quality plan completion status
+# Retrieval-quality implementation status
 
-The code and local TDD plan slices are implemented. Native retrieval-quality acceptance is still incomplete, so the overall plan is not 100% complete.
+The engineering changes are not release-accepted: the source-reviewed 37-case development corpus still fails four of six unchanged 1.0 quality gates. This is not an official full LoCoMo or LongMemEval score. Corpus labels, queries, source sessions, model identities, and gates were not changed to make a run pass.
 
-| Slice | Local status | Evidence boundary |
-|---|---|---|
-| Scoring contract and eval-harness suite | Green | Full eval-harness package; no source corpus score claimed |
-| Semantic evidence, threshold boundary, provider outage | Green | Controlled component provider and embedded SurrealDB |
-| Candidate admission, fallback/rescue, graph, community/repeated-topic | Green | Library and production-assembly tests |
-| Duplicate view and explain provenance access | Green | Persisted relation and embedded-store integration tests |
-| Wire contract and error/guidance behavior | Green | Production serialization and error-path tests |
-| Temporal relations and historical projection | Green | Embedded-store and production-assembly tests |
-| Exact cache identity and mutation invalidation | Green | Unit, embedded-store, and barrier-controlled tests |
-| Strict eval coverage, finite metrics, access gates | Green | Full harness suite plus deliberate mutation failures |
-| Frozen native retrieval-quality corpus and release score | Pending | No retrieval-quality.json source bundle and no matching native provider/index signature are present |
+## Native evidence and decision
 
-The existing 61-case diagnostic has four known recall misses and is diagnostic only. It is not relabeled or used as acceptance. Controlled embeddings validate mechanics and boundaries; they do not stand in for a real model.
+`native-r42-action-grounding.json` is the retained implementation baseline: 37/37 expected outcomes, 0 invalid, 25 passed, 12 quality failures. Its metrics are precision 0.8906, required-group recall 0.6304, unknown abstention 1.0000, answerable non-abstention 0.9375, duplicate-free 1.0000, and prohibited-free 0.9459. Only unknown abstention and duplicate-free meet their 1.0 floors. A fresh final-worktree release run (`release-final-duration.json`) reproduced these 37 native outcomes and all six metrics exactly, so the retained retrieval behavior has now been rechecked end to end.
 
-To close the last gate without weakening it, add an independently reviewed, licensed, immutable retrieval corpus with query/evidence/prohibited labels and source lineage; record its revision and checksums; prepare the corpus using the actual provider/model and index; pin the provider/model, embedding, index, extractor, and claim-stage signatures; then run the retrieval-quality suite with exact coverage and the fail-closed PR/release thresholds. The current checkout has no provider configuration for that native run.
+`native-r45-candidate-diagnostics.json` is a later valid experiment with a common reranked fact/episode pool: 37/37 expected, 0 invalid, 26 passed and 11 quality failures. Required-group recall rose to 0.6739, but precision fell to 0.8698 and prohibited-free fell to 0.9189. Four gates remained red. The common-pool code and its dependent controlled tests were reverted. The artifact remains to document the rejected approach and contains the unchanged query, candidate document and raw score for failed cases. r43 lacked the required model environment and is invalid; it is not a quality score.
+
+The diagnostic trace shows two distinct problems. Several required source turns never reach reranking; other correct turns reach it but receive negative scores while distractors score higher. For example, the second HTTP warning and two Calvin source turns were not scored at all, while Jon/Gina, road-trip and logging evidence received negative scores. This supports further work on bounded source-context retrieval and evidence ranking, with source/session identity, ACL and temporal boundaries preserved. It does not justify lowering the model floor, rewriting gold labels, or accepting extra prohibited evidence.
+
+## Runtime limits
+
+The valid native runs r42/r44/r45 took 203.143/204.151/214.404 seconds respectively against a 3600-second limit. A complete 150-case PR profile with a temporary 86400-second budget took 217.19 wall seconds (214.789 seconds reported by the harness), with 0 invalid outcomes. On the final worktree, the tracked PR profile produced 150 outcomes, 0 invalid, 136 passed and 14 quality failures in 239.42 wall seconds (237.043 harness seconds). The final release profile produced 154 outcomes, 0 invalid, 140 passed and 14 quality failures in 220.84 wall seconds (210.914 harness seconds). Both final profiles reproduced the same native 25/37 result and four red gates; each also had two quality failures in the older local-retrieval suite. The tracked PR/release/nightly budgets are 600/1200/3600 seconds. Every observed run had ample budget and failed on quality rather than time; the tracked limits remain unchanged.
+
+## Verification and remaining gate
+
+The full production test package passed after the revert: 1,867 library tests, 0 failed, 1 pre-existing ignored diagnostic, plus integration and doctest targets. The ignored pinned-E5 diagnostic was run explicitly with its model bundle and passed. The full eval-harness package passed: 220 library tests plus integrations. All 12 real filesystem-watcher integration tests pass, including renamed-directory lineage. Strict workspace Clippy, formatting and staged/unstaged diff checks passed. The final targeted semantic-quality test after reverting the common pool passed 34/34, with the same diagnostic ignored by default. Independent spec and standards reviews found no remaining P0/P1 implementation issue; the spec review identified and resolved the r42/r45 reporting distinction.
+
+Native acceptance remains incomplete. A future change must first reproduce one of the remaining source-grounded failures, add a failure-first production test for candidate availability or contextual relevance, then rerun the complete unchanged native suite and all six strict gates. A passing controlled-provider test alone cannot close this gate. No remote CI success, push, merge or deployment is claimed.

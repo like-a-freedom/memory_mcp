@@ -1,0 +1,84 @@
+{
+  "schema_version": "memory-mcp-source-only-review-extension/v1",
+  "reviewer_phase": "New calendar cases adjudicated from source text before native retrieval predictions",
+  "input_sha256": {
+    "evals/corpora/retrieval-quality-v1/retrieval-quality.json": "76d2d89f758aac366139f0b032f8cd4fff2cdd88ace95819af5f4e804d5eaac8",
+    "evals/corpora/retrieval-quality-v1/sources.json": "8da56b0665758a44e7413c3bbd875395b44d9bbb6c22a0bac1f3bea21b6b565b"
+  },
+  "case_reviews": [
+    {
+      "case_id": "timeline-atlas-q2-reverse-quarter",
+      "query": "What changed in Atlas during 2026 Q2?",
+      "expected_empty": false,
+      "allowed_source_keys": [
+        "atlas-q2-release"
+      ],
+      "prohibited_source_keys": [
+        "trackly-q1-release"
+      ],
+      "required_support_groups": [
+        [
+          "raw:atlas-q2-release"
+        ]
+      ],
+      "reason": "The Atlas release note explicitly states both the Atlas project and the Q2 2026 reporting-cache migration; the Trackly note is a different project and quarter."
+    },
+    {
+      "case_id": "timeline-atlas-q1-cross-project-abstention",
+      "query": "Show the timeline of Atlas changes during Q1 2026.",
+      "expected_empty": true,
+      "allowed_source_keys": [],
+      "prohibited_source_keys": [
+        "atlas-q2-release",
+        "trackly-q1-release"
+      ],
+      "required_support_groups": [],
+      "reason": "Neither source supports an Atlas change in Q1: Atlas is explicitly Q2 and Trackly is explicitly Q1. Project identity and period must be jointly supported; mixing the two notes is a false answer."
+    }
+  ],
+  "budget_boundary_review": {
+    "case_id": "logging-sink",
+    "budget": 1,
+    "query": "Where does the Memory MCP stdio server write diagnostic events?",
+    "source_evidence": [
+      "logging-sink: note and source episode, with the configuration note reviewed as supplemental context"
+    ],
+    "reason": "The previously source-reviewed case has one decisive sink answer and an unchanged complete nine-source case population. A one-item response budget exercises the native small-budget contract without changing its query, source or evidence labels."
+  },
+  "prediction_artifacts_inspected_for_new_cases": false,
+  "native_inventory_sha256": "b47a0c3f10946d0d01763122346e2c967d0fa79be4924a50c1d544e5ab2a58e9",
+  "native_facts_reviewed_without_predictions": [
+    {
+      "case_id": "timeline-atlas-q1-cross-project-abstention",
+      "facts": [
+        {
+          "content": "Atlas reporting release note, 30 June 2026: During Q2 2026, the reporting service replaced its single-file cache with sharded Parquet. The rollout completed on 27 June.",
+          "episode_key": "atlas-q2-release",
+          "fact_type": "note"
+        },
+        {
+          "content": "Trackly route editor release note, 31 March 2026: During Q1 2026, the import queue moved from an in-memory list to IndexedDB. The change shipped on 24 March.",
+          "episode_key": "trackly-q1-release",
+          "fact_type": "note"
+        }
+      ],
+      "disposition": "atlas-q2-release is allowed only for the Q2 Atlas question; both facts are prohibited for the Q1 Atlas question."
+    },
+    {
+      "case_id": "timeline-atlas-q2-reverse-quarter",
+      "facts": [
+        {
+          "content": "Atlas reporting release note, 30 June 2026: During Q2 2026, the reporting service replaced its single-file cache with sharded Parquet. The rollout completed on 27 June.",
+          "episode_key": "atlas-q2-release",
+          "fact_type": "note"
+        },
+        {
+          "content": "Trackly route editor release note, 31 March 2026: During Q1 2026, the import queue moved from an in-memory list to IndexedDB. The change shipped on 24 March.",
+          "episode_key": "trackly-q1-release",
+          "fact_type": "note"
+        }
+      ],
+      "disposition": "atlas-q2-release is allowed only for the Q2 Atlas question; both facts are prohibited for the Q1 Atlas question."
+    }
+  ]
+}

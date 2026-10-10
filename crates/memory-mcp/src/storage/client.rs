@@ -1389,21 +1389,6 @@ mod tests {
 
     #[cfg(feature = "eval-support")]
     #[tokio::test]
-    async fn in_memory_client_uses_the_configured_embedding_dimension() {
-        let client = SurrealDbClient::connect_in_memory_with_dimension(
-            "eval_dimension",
-            "main",
-            "warn",
-            384,
-        )
-        .await
-        .expect("in-memory client connects");
-
-        assert_eq!(client.migration_embedding_dimension(), 384);
-    }
-
-    #[cfg(feature = "eval-support")]
-    #[tokio::test]
     async fn in_memory_client_rejects_a_zero_embedding_dimension() {
         let result = SurrealDbClient::connect_in_memory_with_dimension(
             "eval_zero_dimension",

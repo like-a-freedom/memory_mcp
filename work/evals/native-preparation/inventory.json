@@ -1,0 +1,1396 @@
+{
+  "inventories": [
+    {
+      "case_id": "http-task-16",
+      "facts": [
+        {
+          "content": "Task 16: Add low-overhead HTTP and retained-resource diagnostics: memory_http_preflight_body_bytes is recorded through the existing metrics::histogram! facade, with no labels, exactly once after body collection completes and before JSON decoding. This includes fully collected malformed JSON because those bytes were actually buffered. Partial, refused, stream-error and cancelled bodies do not enter the distribution.",
+          "episode_key": "http-plan",
+          "fact_type": "note"
+        },
+        {
+          "content": "Task 16: Add low-overhead HTTP and retained-resource diagnostics: DEBUG operations are http.preflight.refused and http.preflight.large_body, added to logging::HTTP_OPERATIONS; operators enable only these with RUST_LOG=http.preflight=debug. Logs use the validated existing RequestId when present, parsed numeric declared length, observed prefix bytes and closed outcome only—no request method/path, tenant fingerprint, arbitrary header or content. Emit large-body events only for fully collected bodies >=65536 B. Rate-limit each fixed event/reason to at most one log per second; refusal counters remain exact. Apply the rate limit before allocating/serializing the event.",
+          "episode_key": "http-plan",
+          "fact_type": "note"
+        },
+        {
+          "content": "Events are written to **stderr** — or to `MEMORY_LOG_FILE` when set — one event\nper line. Under the stdio transport stdout carries MCP protocol framing, so\nnothing is ever written there. The sink, format and colour are read once, when\nthe subscriber is installed at startup.",
+          "episode_key": "logging-sink",
+          "fact_type": "note"
+        },
+        {
+          "content": "| Level | Use |\n|---|---|\n| `ERROR` | A failed unit of work, a risk to integrity, a failure after retries, loss of readiness. |\n| `WARN` | Handled but unexpected; degraded; a client refusal (4xx class). |\n| `INFO` | A business event or a state change. |\n| `DEBUG` | Diagnostics, off by default. |\n| `TRACE` | Fine-grained flow, opted into by name. Anything repetitive is a metric. |\n\nA failure's level is decided by its error class, not its call site:\n`MemoryError::log_level()` maps storage, transience, configuration and\nunavailability to `ERROR`, and refusals (not-found, validation, conflict,\nbudget, model-not-ready, auth) to `WARN`.",
+          "episode_key": "logging-levels",
+          "fact_type": "note"
+        },
+        {
+          "content": "| Variable | Meaning |\n|---|---|\n| `RUST_LOG` | Level and per-subsystem directives. A bare level sets the default (`info`); `prefix=level` sets a subsystem. The most specific prefix wins. |\n| `MEMORY_LOG_FORMAT` | `text` (default, human-readable, one line per event) or `json` (NDJSON, one object per event). |\n| `MEMORY_LOG_COLOR` | `always`, `never`, or anything else for auto (colour only on a colour-capable terminal, and never for a file sink). `NO_COLOR` set and non-empty disables colour. |\n| `MEMORY_LOG_TARGETS` | Third-party `tracing` targets to raise, comma-separated `target=level`. Quiet by default; can never drop this service's own events. |\n| `MEMORY_LOG_FILE` | Append the stream to this file instead of stderr. A blank value means \"unset\". |\n\n`RUST_LOG` examples:\n\n```\nRUST_LOG=info                       # default\nRUST_LOG=extract=debug              # one subsystem\nRUST_LOG=http=error,info            # quiet the HTTP surface, keep the rest\nRUST_LOG=fs_watch=trace,http=debug  # two subsystems, the most specific rule wins\n```",
+          "episode_key": "logging-config",
+          "fact_type": "experience"
+        },
+        {
+          "content": "Every unit of work carries a correlation id. In the HTTP profile it is the\nrequest's `x-request-id` (honoured when supplied, minted otherwise) and is\nadvertised back on the response; in the stdio profile it is a per-call\n`req_NNNN`. The formatter stamps the ambient id onto every event that does not\ncarry its own, so each line of one request — the access log line, a tool line, a\ndownstream warning — reads with the same `req=` and follows with a single\nfilter:\n\n```bash\ngrep 'req=<id>' memory-mcp.log\n```\n\nThe HTTP response echoes the id on `x-request-id`, and a control-plane error\nenvelope carries it as `correlation_id` — a client quoting either names the same\nvalue the log line shows.",
+          "episode_key": "logging-request",
+          "fact_type": "experience"
+        },
+        {
+          "content": "Verified: A license inventory contains 16 product blocks, 163 application rows and 899 object rows. The union covers several products rather than one license.",
+          "episode_key": "license-number",
+          "fact_type": "note"
+        },
+        {
+          "content": "Verified: Infinity means that an object is countable but its count is uncontrolled. Reference: https://example.org/pages/viewpage.action?pageId=1545882667; section 13.2, revision 75.",
+          "episode_key": "license-url",
+          "fact_type": "note"
+        },
+        {
+          "content": "Verified: Only one slide of a cloud EDR comparison was extracted. Feature-level scope may be absent from the extracted text or represented graphically.",
+          "episode_key": "mail-level",
+          "fact_type": "note"
+        },
+        {
+          "content": "Verified: Task 16 in the mobile route editor plan checks KML point import and touch gestures. It belongs to Trackly, not Memory MCP HTTP.",
+          "episode_key": "other-task",
+          "fact_type": "note"
+        }
+      ]
+    },
+    {
+      "case_id": "http-task-paraphrase",
+      "facts": [
+        {
+          "content": "Task 16: Add low-overhead HTTP and retained-resource diagnostics: memory_http_preflight_body_bytes is recorded through the existing metrics::histogram! facade, with no labels, exactly once after body collection completes and before JSON decoding. This includes fully collected malformed JSON because those bytes were actually buffered. Partial, refused, stream-error and cancelled bodies do not enter the distribution.",
+          "episode_key": "http-plan",
+          "fact_type": "note"
+        },
+        {
+          "content": "Task 16: Add low-overhead HTTP and retained-resource diagnostics: DEBUG operations are http.preflight.refused and http.preflight.large_body, added to logging::HTTP_OPERATIONS; operators enable only these with RUST_LOG=http.preflight=debug. Logs use the validated existing RequestId when present, parsed numeric declared length, observed prefix bytes and closed outcome only—no request method/path, tenant fingerprint, arbitrary header or content. Emit large-body events only for fully collected bodies >=65536 B. Rate-limit each fixed event/reason to at most one log per second; refusal counters remain exact. Apply the rate limit before allocating/serializing the event.",
+          "episode_key": "http-plan",
+          "fact_type": "note"
+        },
+        {
+          "content": "Events are written to **stderr** — or to `MEMORY_LOG_FILE` when set — one event\nper line. Under the stdio transport stdout carries MCP protocol framing, so\nnothing is ever written there. The sink, format and colour are read once, when\nthe subscriber is installed at startup.",
+          "episode_key": "logging-sink",
+          "fact_type": "note"
+        },
+        {
+          "content": "| Level | Use |\n|---|---|\n| `ERROR` | A failed unit of work, a risk to integrity, a failure after retries, loss of readiness. |\n| `WARN` | Handled but unexpected; degraded; a client refusal (4xx class). |\n| `INFO` | A business event or a state change. |\n| `DEBUG` | Diagnostics, off by default. |\n| `TRACE` | Fine-grained flow, opted into by name. Anything repetitive is a metric. |\n\nA failure's level is decided by its error class, not its call site:\n`MemoryError::log_level()` maps storage, transience, configuration and\nunavailability to `ERROR`, and refusals (not-found, validation, conflict,\nbudget, model-not-ready, auth) to `WARN`.",
+          "episode_key": "logging-levels",
+          "fact_type": "note"
+        },
+        {
+          "content": "| Variable | Meaning |\n|---|---|\n| `RUST_LOG` | Level and per-subsystem directives. A bare level sets the default (`info`); `prefix=level` sets a subsystem. The most specific prefix wins. |\n| `MEMORY_LOG_FORMAT` | `text` (default, human-readable, one line per event) or `json` (NDJSON, one object per event). |\n| `MEMORY_LOG_COLOR` | `always`, `never`, or anything else for auto (colour only on a colour-capable terminal, and never for a file sink). `NO_COLOR` set and non-empty disables colour. |\n| `MEMORY_LOG_TARGETS` | Third-party `tracing` targets to raise, comma-separated `target=level`. Quiet by default; can never drop this service's own events. |\n| `MEMORY_LOG_FILE` | Append the stream to this file instead of stderr. A blank value means \"unset\". |\n\n`RUST_LOG` examples:\n\n```\nRUST_LOG=info                       # default\nRUST_LOG=extract=debug              # one subsystem\nRUST_LOG=http=error,info            # quiet the HTTP surface, keep the rest\nRUST_LOG=fs_watch=trace,http=debug  # two subsystems, the most specific rule wins\n```",
+          "episode_key": "logging-config",
+          "fact_type": "experience"
+        },
+        {
+          "content": "Every unit of work carries a correlation id. In the HTTP profile it is the\nrequest's `x-request-id` (honoured when supplied, minted otherwise) and is\nadvertised back on the response; in the stdio profile it is a per-call\n`req_NNNN`. The formatter stamps the ambient id onto every event that does not\ncarry its own, so each line of one request — the access log line, a tool line, a\ndownstream warning — reads with the same `req=` and follows with a single\nfilter:\n\n```bash\ngrep 'req=<id>' memory-mcp.log\n```\n\nThe HTTP response echoes the id on `x-request-id`, and a control-plane error\nenvelope carries it as `correlation_id` — a client quoting either names the same\nvalue the log line shows.",
+          "episode_key": "logging-request",
+          "fact_type": "experience"
+        },
+        {
+          "content": "Verified: A license inventory contains 16 product blocks, 163 application rows and 899 object rows. The union covers several products rather than one license.",
+          "episode_key": "license-number",
+          "fact_type": "note"
+        },
+        {
+          "content": "Verified: Infinity means that an object is countable but its count is uncontrolled. Reference: https://example.org/pages/viewpage.action?pageId=1545882667; section 13.2, revision 75.",
+          "episode_key": "license-url",
+          "fact_type": "note"
+        },
+        {
+          "content": "Verified: Only one slide of a cloud EDR comparison was extracted. Feature-level scope may be absent from the extracted text or represented graphically.",
+          "episode_key": "mail-level",
+          "fact_type": "note"
+        },
+        {
+          "content": "Verified: Task 16 in the mobile route editor plan checks KML point import and touch gestures. It belongs to Trackly, not Memory MCP HTTP.",
+          "episode_key": "other-task",
+          "fact_type": "note"
+        }
+      ]
+    },
+    {
+      "case_id": "http-task-short",
+      "facts": [
+        {
+          "content": "Task 16: Add low-overhead HTTP and retained-resource diagnostics: memory_http_preflight_body_bytes is recorded through the existing metrics::histogram! facade, with no labels, exactly once after body collection completes and before JSON decoding. This includes fully collected malformed JSON because those bytes were actually buffered. Partial, refused, stream-error and cancelled bodies do not enter the distribution.",
+          "episode_key": "http-plan",
+          "fact_type": "note"
+        },
+        {
+          "content": "Task 16: Add low-overhead HTTP and retained-resource diagnostics: DEBUG operations are http.preflight.refused and http.preflight.large_body, added to logging::HTTP_OPERATIONS; operators enable only these with RUST_LOG=http.preflight=debug. Logs use the validated existing RequestId when present, parsed numeric declared length, observed prefix bytes and closed outcome only—no request method/path, tenant fingerprint, arbitrary header or content. Emit large-body events only for fully collected bodies >=65536 B. Rate-limit each fixed event/reason to at most one log per second; refusal counters remain exact. Apply the rate limit before allocating/serializing the event.",
+          "episode_key": "http-plan",
+          "fact_type": "note"
+        },
+        {
+          "content": "Events are written to **stderr** — or to `MEMORY_LOG_FILE` when set — one event\nper line. Under the stdio transport stdout carries MCP protocol framing, so\nnothing is ever written there. The sink, format and colour are read once, when\nthe subscriber is installed at startup.",
+          "episode_key": "logging-sink",
+          "fact_type": "note"
+        },
+        {
+          "content": "| Level | Use |\n|---|---|\n| `ERROR` | A failed unit of work, a risk to integrity, a failure after retries, loss of readiness. |\n| `WARN` | Handled but unexpected; degraded; a client refusal (4xx class). |\n| `INFO` | A business event or a state change. |\n| `DEBUG` | Diagnostics, off by default. |\n| `TRACE` | Fine-grained flow, opted into by name. Anything repetitive is a metric. |\n\nA failure's level is decided by its error class, not its call site:\n`MemoryError::log_level()` maps storage, transience, configuration and\nunavailability to `ERROR`, and refusals (not-found, validation, conflict,\nbudget, model-not-ready, auth) to `WARN`.",
+          "episode_key": "logging-levels",
+          "fact_type": "note"
+        },
+        {
+          "content": "| Variable | Meaning |\n|---|---|\n| `RUST_LOG` | Level and per-subsystem directives. A bare level sets the default (`info`); `prefix=level` sets a subsystem. The most specific prefix wins. |\n| `MEMORY_LOG_FORMAT` | `text` (default, human-readable, one line per event) or `json` (NDJSON, one object per event). |\n| `MEMORY_LOG_COLOR` | `always`, `never`, or anything else for auto (colour only on a colour-capable terminal, and never for a file sink). `NO_COLOR` set and non-empty disables colour. |\n| `MEMORY_LOG_TARGETS` | Third-party `tracing` targets to raise, comma-separated `target=level`. Quiet by default; can never drop this service's own events. |\n| `MEMORY_LOG_FILE` | Append the stream to this file instead of stderr. A blank value means \"unset\". |\n\n`RUST_LOG` examples:\n\n```\nRUST_LOG=info                       # default\nRUST_LOG=extract=debug              # one subsystem\nRUST_LOG=http=error,info            # quiet the HTTP surface, keep the rest\nRUST_LOG=fs_watch=trace,http=debug  # two subsystems, the most specific rule wins\n```",
+          "episode_key": "logging-config",
+          "fact_type": "experience"
+        },
+        {
+          "content": "Every unit of work carries a correlation id. In the HTTP profile it is the\nrequest's `x-request-id` (honoured when supplied, minted otherwise) and is\nadvertised back on the response; in the stdio profile it is a per-call\n`req_NNNN`. The formatter stamps the ambient id onto every event that does not\ncarry its own, so each line of one request — the access log line, a tool line, a\ndownstream warning — reads with the same `req=` and follows with a single\nfilter:\n\n```bash\ngrep 'req=<id>' memory-mcp.log\n```\n\nThe HTTP response echoes the id on `x-request-id`, and a control-plane error\nenvelope carries it as `correlation_id` — a client quoting either names the same\nvalue the log line shows.",
+          "episode_key": "logging-request",
+          "fact_type": "experience"
+        },
+        {
+          "content": "Verified: A license inventory contains 16 product blocks, 163 application rows and 899 object rows. The union covers several products rather than one license.",
+          "episode_key": "license-number",
+          "fact_type": "note"
+        },
+        {
+          "content": "Verified: Infinity means that an object is countable but its count is uncontrolled. Reference: https://example.org/pages/viewpage.action?pageId=1545882667; section 13.2, revision 75.",
+          "episode_key": "license-url",
+          "fact_type": "note"
+        },
+        {
+          "content": "Verified: Only one slide of a cloud EDR comparison was extracted. Feature-level scope may be absent from the extracted text or represented graphically.",
+          "episode_key": "mail-level",
+          "fact_type": "note"
+        },
+        {
+          "content": "Verified: Task 16 in the mobile route editor plan checks KML point import and touch gestures. It belongs to Trackly, not Memory MCP HTTP.",
+          "episode_key": "other-task",
+          "fact_type": "note"
+        }
+      ]
+    },
+    {
+      "case_id": "locomo-conv-26-000",
+      "facts": [
+        {
+          "content": "Melanie: Wow, love that painting! So cool you found such a helpful group. What's it done for you?",
+          "episode_key": "D1:6",
+          "fact_type": "experience"
+        },
+        {
+          "content": "Caroline: I'm keen on counseling or working in mental health - I'd love to support those with similar issues.",
+          "episode_key": "D1:11",
+          "fact_type": "experience"
+        },
+        {
+          "content": "Caroline: Thanks, Melanie! Your kind words really mean a lot. I'll do my best to make sure these kids have a safe and loving home.",
+          "episode_key": "D2:16",
+          "fact_type": "promise"
+        },
+        {
+          "content": "Melanie: No doubts, Caroline. You have such a caring heart - they'll get all the love and stability they need! Excited for this new chapter!",
+          "episode_key": "D2:17",
+          "fact_type": "experience"
+        }
+      ]
+    },
+    {
+      "case_id": "locomo-conv-26-082",
+      "facts": [
+        {
+          "content": "Melanie: Wow, love that painting! So cool you found such a helpful group. What's it done for you?",
+          "episode_key": "D1:6",
+          "fact_type": "experience"
+        },
+        {
+          "content": "Caroline: I'm keen on counseling or working in mental health - I'd love to support those with similar issues.",
+          "episode_key": "D1:11",
+          "fact_type": "experience"
+        },
+        {
+          "content": "Caroline: Thanks, Melanie! Your kind words really mean a lot. I'll do my best to make sure these kids have a safe and loving home.",
+          "episode_key": "D2:16",
+          "fact_type": "promise"
+        },
+        {
+          "content": "Melanie: No doubts, Caroline. You have such a caring heart - they'll get all the love and stability they need! Excited for this new chapter!",
+          "episode_key": "D2:17",
+          "fact_type": "experience"
+        }
+      ]
+    },
+    {
+      "case_id": "locomo-conv-30-000",
+      "facts": [
+        {
+          "content": "Jon: Cool, Gina! I love all dances, but contemporary is my top pick. It's so expressive and powerful! What's your fave?",
+          "episode_key": "D1:8",
+          "fact_type": "experience"
+        },
+        {
+          "content": "Gina: Definitely! Dance floors help avoid injuries and make dancing more enjoyable. You thinking about it is great. Any particular type of flooring you like?",
+          "episode_key": "D2:7",
+          "fact_type": "experience"
+        }
+      ]
+    },
+    {
+      "case_id": "locomo-conv-30-002",
+      "facts": [
+        {
+          "content": "Jon: Cool, Gina! I love all dances, but contemporary is my top pick. It's so expressive and powerful! What's your fave?",
+          "episode_key": "D1:8",
+          "fact_type": "experience"
+        },
+        {
+          "content": "Gina: Definitely! Dance floors help avoid injuries and make dancing more enjoyable. You thinking about it is great. Any particular type of flooring you like?",
+          "episode_key": "D2:7",
+          "fact_type": "experience"
+        }
+      ]
+    },
+    {
+      "case_id": "locomo-conv-41-001",
+      "facts": [
+        {
+          "content": "John: Yeah Maria, I'm really hoping to get into local politics. I love helping the community and making it a better place.",
+          "episode_key": "D1:6",
+          "fact_type": "experience"
+        },
+        {
+          "content": "John: Thanks a lot, Maria. Your help is really motivating and makes me more determined. Here's a pic of my family - they're the reason why I never give up. Their love gives me strength.",
+          "episode_key": "D2:10",
+          "fact_type": "experience"
+        },
+        {
+          "content": "Maria: Family's love really grounds us and gives us strength. Their support certainly boosts your motivation.",
+          "episode_key": "D2:13",
+          "fact_type": "experience"
+        },
+        {
+          "content": "John: Yeah, they are my rock in tough times and always cheer me on. I'm really thankful for their love. Family time means a lot to me.",
+          "episode_key": "D2:14",
+          "fact_type": "experience"
+        },
+        {
+          "content": "John: Thanks, Maria! We love climbing, sliding, and playing games. It's an awesome way to connect and have a blast. What do you enjoy doing with your family?",
+          "episode_key": "D2:16",
+          "fact_type": "experience"
+        },
+        {
+          "content": "Maria: My fam's small, but I love spending time with the friends I have. We usually watch movies, hike, and have game nights at my place. Quality connections matter most to me.",
+          "episode_key": "D2:17",
+          "fact_type": "experience"
+        }
+      ]
+    },
+    {
+      "case_id": "locomo-conv-41-065",
+      "facts": [
+        {
+          "content": "John: Yeah Maria, I'm really hoping to get into local politics. I love helping the community and making it a better place.",
+          "episode_key": "D1:6",
+          "fact_type": "experience"
+        },
+        {
+          "content": "John: Thanks a lot, Maria. Your help is really motivating and makes me more determined. Here's a pic of my family - they're the reason why I never give up. Their love gives me strength.",
+          "episode_key": "D2:10",
+          "fact_type": "experience"
+        },
+        {
+          "content": "Maria: Family's love really grounds us and gives us strength. Their support certainly boosts your motivation.",
+          "episode_key": "D2:13",
+          "fact_type": "experience"
+        },
+        {
+          "content": "John: Yeah, they are my rock in tough times and always cheer me on. I'm really thankful for their love. Family time means a lot to me.",
+          "episode_key": "D2:14",
+          "fact_type": "experience"
+        },
+        {
+          "content": "John: Thanks, Maria! We love climbing, sliding, and playing games. It's an awesome way to connect and have a blast. What do you enjoy doing with your family?",
+          "episode_key": "D2:16",
+          "fact_type": "experience"
+        },
+        {
+          "content": "Maria: My fam's small, but I love spending time with the friends I have. We usually watch movies, hike, and have game nights at my place. Quality connections matter most to me.",
+          "episode_key": "D2:17",
+          "fact_type": "experience"
+        }
+      ]
+    },
+    {
+      "case_id": "locomo-conv-42-002",
+      "facts": [
+        {
+          "content": "Nate: It was! How about you? Do you have any hobbies you love?",
+          "episode_key": "D1:9",
+          "fact_type": "experience"
+        },
+        {
+          "content": "Joanna: Yeah! Besides writing, I also enjoy reading, watching movies, and exploring nature. Anything else you enjoy doing, Nate?",
+          "episode_key": "D1:10",
+          "fact_type": "experience"
+        },
+        {
+          "content": "Nate: I love action and sci-fi movies, the effects are so cool! What about you, what's your favorite genre?",
+          "episode_key": "D1:13",
+          "fact_type": "experience"
+        },
+        {
+          "content": "Joanna: I'm all about dramas and romcoms. I love getting immersed in the feelings and plots.",
+          "episode_key": "D1:14",
+          "fact_type": "experience"
+        },
+        {
+          "content": "Nate: Oh cool! I might check that one out some time soon! I do love watching classics.",
+          "episode_key": "D1:17",
+          "fact_type": "experience"
+        },
+        {
+          "content": "Nate: Cool! I'll definitely check it out. Thanks for the recommendation!",
+          "episode_key": "D1:21",
+          "fact_type": "promise"
+        },
+        {
+          "content": "Nate: Congrats, Joanna! That sounds like a wild experience. Rock on and I hope they love it!",
+          "episode_key": "D2:8",
+          "fact_type": "experience"
+        },
+        {
+          "content": "Joanna: Good idea, Nate! I'll think about it and maybe get pets of my own soon if I can find any I'm not allergic to. Have you been up to anything recently?",
+          "episode_key": "D2:15",
+          "fact_type": "promise"
+        },
+        {
+          "content": "Nate: Wow, Joanna, that sounds amazing! Keep doing what you love!",
+          "episode_key": "D2:28",
+          "fact_type": "experience"
+        },
+        {
+          "content": "Joanna: Thanks, Nate! I'll definitely keep pursuing my passion for writing. It means a lot.",
+          "episode_key": "D2:29",
+          "fact_type": "promise"
+        }
+      ]
+    },
+    {
+      "case_id": "locomo-conv-42-096",
+      "facts": [
+        {
+          "content": "Nate: It was! How about you? Do you have any hobbies you love?",
+          "episode_key": "D1:9",
+          "fact_type": "experience"
+        },
+        {
+          "content": "Joanna: Yeah! Besides writing, I also enjoy reading, watching movies, and exploring nature. Anything else you enjoy doing, Nate?",
+          "episode_key": "D1:10",
+          "fact_type": "experience"
+        },
+        {
+          "content": "Nate: I love action and sci-fi movies, the effects are so cool! What about you, what's your favorite genre?",
+          "episode_key": "D1:13",
+          "fact_type": "experience"
+        },
+        {
+          "content": "Joanna: I'm all about dramas and romcoms. I love getting immersed in the feelings and plots.",
+          "episode_key": "D1:14",
+          "fact_type": "experience"
+        },
+        {
+          "content": "Nate: Oh cool! I might check that one out some time soon! I do love watching classics.",
+          "episode_key": "D1:17",
+          "fact_type": "experience"
+        },
+        {
+          "content": "Nate: Cool! I'll definitely check it out. Thanks for the recommendation!",
+          "episode_key": "D1:21",
+          "fact_type": "promise"
+        },
+        {
+          "content": "Nate: Congrats, Joanna! That sounds like a wild experience. Rock on and I hope they love it!",
+          "episode_key": "D2:8",
+          "fact_type": "experience"
+        },
+        {
+          "content": "Joanna: Good idea, Nate! I'll think about it and maybe get pets of my own soon if I can find any I'm not allergic to. Have you been up to anything recently?",
+          "episode_key": "D2:15",
+          "fact_type": "promise"
+        },
+        {
+          "content": "Nate: Wow, Joanna, that sounds amazing! Keep doing what you love!",
+          "episode_key": "D2:28",
+          "fact_type": "experience"
+        },
+        {
+          "content": "Joanna: Thanks, Nate! I'll definitely keep pursuing my passion for writing. It means a lot.",
+          "episode_key": "D2:29",
+          "fact_type": "promise"
+        }
+      ]
+    },
+    {
+      "case_id": "locomo-conv-43-071",
+      "facts": [
+        {
+          "content": "John: That's great! Loving it when people are passionate about their work. What kind of collaborations are you involved in for the fan project? I love talking to people about my sneaker collection.",
+          "episode_key": "D1:15",
+          "fact_type": "experience"
+        },
+        {
+          "content": "Tim: I went to a place in London a few years ago - it was like walking into a Harry Potter movie! I also went on a tour which was amazing. Have you been to any of the real Potter places? I'd love to explore them someday!",
+          "episode_key": "D1:18",
+          "fact_type": "experience"
+        },
+        {
+          "content": "John: Thanks! I'm really excited about this new journey! I'm currently considering sports brands like Nike and Under Armour. It would be great to collaborate with brands that are related to sports. However, I'm also open to exploring other brands that align with my values and interests. There are so many options out there, and I can't wait to see where this takes me!",
+          "episode_key": "D2:4",
+          "fact_type": "experience"
+        },
+        {
+          "content": "John: Thanks! Exciting times ahead! I'll keep you updated on which brands I choose. Can't wait to see where this journey leads me. Thanks for your support.",
+          "episode_key": "D2:6",
+          "fact_type": "promise"
+        },
+        {
+          "content": "Tim: Thanks! That picture is from MinaLima. They created all the props for the Harry Potter films, and I love their work. It's like having a piece of the wizarding world at home!",
+          "episode_key": "D2:9",
+          "fact_type": "experience"
+        },
+        {
+          "content": "Tim: Definitely, those reminders really help. And there's definitely a chance I'll be visiting more HP spots in the future. It feels like I'm stepping into the books!",
+          "episode_key": "D2:13",
+          "fact_type": "promise"
+        },
+        {
+          "content": "John: Thanks! That was from a game I just played. I was in it! It was awesome being out there, doing what I love. Such an awesome feeling.",
+          "episode_key": "D2:16",
+          "fact_type": "experience"
+        }
+      ]
+    },
+    {
+      "case_id": "locomo-conv-44-000",
+      "facts": [
+        {
+          "content": "Audrey: Absolutely! They're city dogs and we explore all the time. They love trying out new parks and trails. We go on adventures together very often.",
+          "episode_key": "D1:9",
+          "fact_type": "experience"
+        },
+        {
+          "content": "Andrew: No, no pets right now. But I do love animals.",
+          "episode_key": "D1:12",
+          "fact_type": "experience"
+        },
+        {
+          "content": "Audrey: Thanks! I'll let you know. Have a good one!",
+          "episode_key": "D1:23",
+          "fact_type": "promise"
+        },
+        {
+          "content": "Audrey: Pixie's fitting in great! It took her a few days to get used to the other dogs, but now they're awesome friends. They love playing and exploring the house - so cute!\n",
+          "episode_key": "D2:5",
+          "fact_type": "experience"
+        },
+        {
+          "content": "Andrew: Wow, that's so cool! I'll give those websites a try, thanks for the info!",
+          "episode_key": "D2:10",
+          "fact_type": "promise"
+        },
+        {
+          "content": "Audrey: You'll love them! They're great for cuddles and companionship.",
+          "episode_key": "D2:15",
+          "fact_type": "experience"
+        },
+        {
+          "content": "Andrew: Thanks! I'll keep looking until I find it. Super excited for what's next!",
+          "episode_key": "D2:24",
+          "fact_type": "promise"
+        },
+        {
+          "content": "Andrew: I'll keep you posted. Ttyl, Bye!",
+          "episode_key": "D2:26",
+          "fact_type": "promise"
+        }
+      ]
+    },
+    {
+      "case_id": "locomo-conv-44-061",
+      "facts": [
+        {
+          "content": "Audrey: Absolutely! They're city dogs and we explore all the time. They love trying out new parks and trails. We go on adventures together very often.",
+          "episode_key": "D1:9",
+          "fact_type": "experience"
+        },
+        {
+          "content": "Andrew: No, no pets right now. But I do love animals.",
+          "episode_key": "D1:12",
+          "fact_type": "experience"
+        },
+        {
+          "content": "Audrey: Thanks! I'll let you know. Have a good one!",
+          "episode_key": "D1:23",
+          "fact_type": "promise"
+        },
+        {
+          "content": "Audrey: Pixie's fitting in great! It took her a few days to get used to the other dogs, but now they're awesome friends. They love playing and exploring the house - so cute!\n",
+          "episode_key": "D2:5",
+          "fact_type": "experience"
+        },
+        {
+          "content": "Andrew: Wow, that's so cool! I'll give those websites a try, thanks for the info!",
+          "episode_key": "D2:10",
+          "fact_type": "promise"
+        },
+        {
+          "content": "Audrey: You'll love them! They're great for cuddles and companionship.",
+          "episode_key": "D2:15",
+          "fact_type": "experience"
+        },
+        {
+          "content": "Andrew: Thanks! I'll keep looking until I find it. Super excited for what's next!",
+          "episode_key": "D2:24",
+          "fact_type": "promise"
+        },
+        {
+          "content": "Andrew: I'll keep you posted. Ttyl, Bye!",
+          "episode_key": "D2:26",
+          "fact_type": "promise"
+        }
+      ]
+    },
+    {
+      "case_id": "locomo-conv-47-001",
+      "facts": [
+        {
+          "content": "John: That's a great idea! Your pup is gonna love it. Speaking of personal touches, what motivates you to work on your programming projects?",
+          "episode_key": "D1:17",
+          "fact_type": "experience"
+        },
+        {
+          "content": "James: Thanks John! It's super exciting. I'll keep you updated on the progress. Perhaps, thanks to your knowledge of HTML, I'll invite you to help with some things in my game.",
+          "episode_key": "D1:24",
+          "fact_type": "promise"
+        },
+        {
+          "content": "James: I'll be looking forward to it. By the way, yesterday I went bowling and got 2 strikes. I love bowling!",
+          "episode_key": "D1:26",
+          "fact_type": "experience"
+        },
+        {
+          "content": "James: I'll be looking forward to it. By the way, yesterday I went bowling and got 2 strikes. I love bowling!",
+          "episode_key": "D1:26",
+          "fact_type": "promise"
+        },
+        {
+          "content": "John: I'm sure you're very good at this. Unfortunately, I can’t share my love for him with you, my fingers are too big. Perhaps I should take up exercise, at least start going for a run in the morning. And I also don’t like bowling itself, to be honest.",
+          "episode_key": "D1:27",
+          "fact_type": "experience"
+        },
+        {
+          "content": "John: I'm sorry to hear it. Well, I'll be nearby, I'll look after your pockets.",
+          "episode_key": "D1:31",
+          "fact_type": "promise"
+        },
+        {
+          "content": "John: Hey James, awesome! Glad you're enjoying it and connecting with others. Building a community is really cool, especially when you meet people who enjoy the same things.",
+          "episode_key": "D2:2",
+          "fact_type": "experience"
+        },
+        {
+          "content": "James: A pet would truly be great for you! They bring so much love and companionship. If you're interested, I can help find the perfect one for you - you'd make a great pet parent!",
+          "episode_key": "D2:19",
+          "fact_type": "experience"
+        },
+        {
+          "content": "John: Cheers, James! Yeah, I'll keep that in mind. Appreciate the offer.",
+          "episode_key": "D2:20",
+          "fact_type": "promise"
+        }
+      ]
+    },
+    {
+      "case_id": "locomo-conv-47-067",
+      "facts": [
+        {
+          "content": "John: That's a great idea! Your pup is gonna love it. Speaking of personal touches, what motivates you to work on your programming projects?",
+          "episode_key": "D1:17",
+          "fact_type": "experience"
+        },
+        {
+          "content": "James: Thanks John! It's super exciting. I'll keep you updated on the progress. Perhaps, thanks to your knowledge of HTML, I'll invite you to help with some things in my game.",
+          "episode_key": "D1:24",
+          "fact_type": "promise"
+        },
+        {
+          "content": "James: I'll be looking forward to it. By the way, yesterday I went bowling and got 2 strikes. I love bowling!",
+          "episode_key": "D1:26",
+          "fact_type": "experience"
+        },
+        {
+          "content": "James: I'll be looking forward to it. By the way, yesterday I went bowling and got 2 strikes. I love bowling!",
+          "episode_key": "D1:26",
+          "fact_type": "promise"
+        },
+        {
+          "content": "John: I'm sure you're very good at this. Unfortunately, I can’t share my love for him with you, my fingers are too big. Perhaps I should take up exercise, at least start going for a run in the morning. And I also don’t like bowling itself, to be honest.",
+          "episode_key": "D1:27",
+          "fact_type": "experience"
+        },
+        {
+          "content": "John: I'm sorry to hear it. Well, I'll be nearby, I'll look after your pockets.",
+          "episode_key": "D1:31",
+          "fact_type": "promise"
+        },
+        {
+          "content": "John: Hey James, awesome! Glad you're enjoying it and connecting with others. Building a community is really cool, especially when you meet people who enjoy the same things.",
+          "episode_key": "D2:2",
+          "fact_type": "experience"
+        },
+        {
+          "content": "James: A pet would truly be great for you! They bring so much love and companionship. If you're interested, I can help find the perfect one for you - you'd make a great pet parent!",
+          "episode_key": "D2:19",
+          "fact_type": "experience"
+        },
+        {
+          "content": "John: Cheers, James! Yeah, I'll keep that in mind. Appreciate the offer.",
+          "episode_key": "D2:20",
+          "fact_type": "promise"
+        }
+      ]
+    },
+    {
+      "case_id": "locomo-conv-48-000",
+      "facts": [
+        {
+          "content": "Jolene: What do you value in your relationship?",
+          "episode_key": "D2:6",
+          "fact_type": "experience"
+        },
+        {
+          "content": "Deborah: It is love, and openness that have kept us close all these years. Being there for each other has made us both happy. Look what letter I received yesterday!",
+          "episode_key": "D2:7",
+          "fact_type": "experience"
+        },
+        {
+          "content": "Jolene: Wow, it sounds like that spot holds a lot of sentimental value. Does it bring back any special memories?",
+          "episode_key": "D2:16",
+          "fact_type": "experience"
+        }
+      ]
+    },
+    {
+      "case_id": "locomo-conv-48-015",
+      "facts": [
+        {
+          "content": "Jolene: What do you value in your relationship?",
+          "episode_key": "D2:6",
+          "fact_type": "experience"
+        },
+        {
+          "content": "Deborah: It is love, and openness that have kept us close all these years. Being there for each other has made us both happy. Look what letter I received yesterday!",
+          "episode_key": "D2:7",
+          "fact_type": "experience"
+        },
+        {
+          "content": "Jolene: Wow, it sounds like that spot holds a lot of sentimental value. Does it bring back any special memories?",
+          "episode_key": "D2:16",
+          "fact_type": "experience"
+        }
+      ]
+    },
+    {
+      "case_id": "locomo-conv-49-002",
+      "facts": [
+        {
+          "content": "Sam: Wow, that's cool. I love hiking, but it's been ages since I've done it. I did this hike with my dad way back when I was ten. Going hiking together was great fun, and really special for us.",
+          "episode_key": "D1:7",
+          "fact_type": "experience"
+        },
+        {
+          "content": "Sam: Nothing so far, but I was thinking about trying painting. Do you have any hobbies you love?",
+          "episode_key": "D1:11",
+          "fact_type": "experience"
+        },
+        {
+          "content": "Evan: Cool idea, Sam! I love it. Have you tried it before?",
+          "episode_key": "D1:12",
+          "fact_type": "experience"
+        },
+        {
+          "content": "Sam: Yeah, I'll keep you posted. See you soon!",
+          "episode_key": "D1:21",
+          "fact_type": "promise"
+        },
+        {
+          "content": "Evan: Yeah, what worked for me was finding a fitness routine I really enjoy. It's my go-to, I love the feeling of being healthy and strong. Making it fun and finding little ways to make smarter choices in my diet really added up. Don't forget, you got this!",
+          "episode_key": "D2:9",
+          "fact_type": "experience"
+        },
+        {
+          "content": "Sam: Thanks, Evan! Appreciate the encouragement. I'll give it a go and let you know how it turns out.",
+          "episode_key": "D2:12",
+          "fact_type": "promise"
+        },
+        {
+          "content": "Sam: Cheers, Evan! I won't stress - just gonna enjoy it.",
+          "episode_key": "D2:14",
+          "fact_type": "experience"
+        },
+        {
+          "content": "Sam: Thanks, Evan! Will do. Bye for now.",
+          "episode_key": "D2:16",
+          "fact_type": "promise"
+        },
+        {
+          "content": "Evan: Take care, Sam! I'll catch up with you later.",
+          "episode_key": "D2:17",
+          "fact_type": "promise"
+        }
+      ]
+    },
+    {
+      "case_id": "locomo-conv-49-083",
+      "facts": [
+        {
+          "content": "Sam: Wow, that's cool. I love hiking, but it's been ages since I've done it. I did this hike with my dad way back when I was ten. Going hiking together was great fun, and really special for us.",
+          "episode_key": "D1:7",
+          "fact_type": "experience"
+        },
+        {
+          "content": "Sam: Nothing so far, but I was thinking about trying painting. Do you have any hobbies you love?",
+          "episode_key": "D1:11",
+          "fact_type": "experience"
+        },
+        {
+          "content": "Evan: Cool idea, Sam! I love it. Have you tried it before?",
+          "episode_key": "D1:12",
+          "fact_type": "experience"
+        },
+        {
+          "content": "Sam: Yeah, I'll keep you posted. See you soon!",
+          "episode_key": "D1:21",
+          "fact_type": "promise"
+        },
+        {
+          "content": "Evan: Yeah, what worked for me was finding a fitness routine I really enjoy. It's my go-to, I love the feeling of being healthy and strong. Making it fun and finding little ways to make smarter choices in my diet really added up. Don't forget, you got this!",
+          "episode_key": "D2:9",
+          "fact_type": "experience"
+        },
+        {
+          "content": "Sam: Thanks, Evan! Appreciate the encouragement. I'll give it a go and let you know how it turns out.",
+          "episode_key": "D2:12",
+          "fact_type": "promise"
+        },
+        {
+          "content": "Sam: Cheers, Evan! I won't stress - just gonna enjoy it.",
+          "episode_key": "D2:14",
+          "fact_type": "experience"
+        },
+        {
+          "content": "Sam: Thanks, Evan! Will do. Bye for now.",
+          "episode_key": "D2:16",
+          "fact_type": "promise"
+        },
+        {
+          "content": "Evan: Take care, Sam! I'll catch up with you later.",
+          "episode_key": "D2:17",
+          "fact_type": "promise"
+        }
+      ]
+    },
+    {
+      "case_id": "locomo-conv-50-001",
+      "facts": [
+        {
+          "content": "Calvin: I'm heading there next month. I'll be staying in such a nice place while I'm there.\n\n",
+          "episode_key": "D1:9",
+          "fact_type": "promise"
+        },
+        {
+          "content": "Calvin: No, I've never been in that park. Looks like a chill spot. I'll definitely check it out when I'm back. Appreciate the tip!",
+          "episode_key": "D1:17",
+          "fact_type": "promise"
+        },
+        {
+          "content": "Dave: Cool! Enjoy your trip! Let me know if you need any more recommendations. Have fun!",
+          "episode_key": "D1:18",
+          "fact_type": "experience"
+        },
+        {
+          "content": "Calvin: Thanks, Dave! If I need any help, I'll be sure to let you know. Stay safe!",
+          "episode_key": "D1:19",
+          "fact_type": "promise"
+        },
+        {
+          "content": "Dave: Thanks, Calvin! Doing good. Last weekend, I went to a music festival in Boston - it was awesome! So many cool bands playing and the atmosphere was electric. I love music, it reminded me why I love it. Here's a pic, take a look.",
+          "episode_key": "D2:8",
+          "fact_type": "experience"
+        },
+        {
+          "content": "Dave: Wow, there were so many great bands! If I had to pick a favorite, it would definitely be Aerosmith. Their performance was incredible. I'll show you a pic I took when they were playing.",
+          "episode_key": "D2:10",
+          "fact_type": "promise"
+        },
+        {
+          "content": "Calvin: Yeah, no worries! I'll definitely let you know how it goes. Cheers!",
+          "episode_key": "D2:19",
+          "fact_type": "promise"
+        },
+        {
+          "content": "Dave: Enjoy the collaborations, Calvin! Stay safe!",
+          "episode_key": "D2:20",
+          "fact_type": "experience"
+        }
+      ]
+    },
+    {
+      "case_id": "locomo-conv-50-071",
+      "facts": [
+        {
+          "content": "Calvin: I'm heading there next month. I'll be staying in such a nice place while I'm there.\n\n",
+          "episode_key": "D1:9",
+          "fact_type": "promise"
+        },
+        {
+          "content": "Calvin: No, I've never been in that park. Looks like a chill spot. I'll definitely check it out when I'm back. Appreciate the tip!",
+          "episode_key": "D1:17",
+          "fact_type": "promise"
+        },
+        {
+          "content": "Dave: Cool! Enjoy your trip! Let me know if you need any more recommendations. Have fun!",
+          "episode_key": "D1:18",
+          "fact_type": "experience"
+        },
+        {
+          "content": "Calvin: Thanks, Dave! If I need any help, I'll be sure to let you know. Stay safe!",
+          "episode_key": "D1:19",
+          "fact_type": "promise"
+        },
+        {
+          "content": "Dave: Thanks, Calvin! Doing good. Last weekend, I went to a music festival in Boston - it was awesome! So many cool bands playing and the atmosphere was electric. I love music, it reminded me why I love it. Here's a pic, take a look.",
+          "episode_key": "D2:8",
+          "fact_type": "experience"
+        },
+        {
+          "content": "Dave: Wow, there were so many great bands! If I had to pick a favorite, it would definitely be Aerosmith. Their performance was incredible. I'll show you a pic I took when they were playing.",
+          "episode_key": "D2:10",
+          "fact_type": "promise"
+        },
+        {
+          "content": "Calvin: Yeah, no worries! I'll definitely let you know how it goes. Cheers!",
+          "episode_key": "D2:19",
+          "fact_type": "promise"
+        },
+        {
+          "content": "Dave: Enjoy the collaborations, Calvin! Stay safe!",
+          "episode_key": "D2:20",
+          "fact_type": "experience"
+        }
+      ]
+    },
+    {
+      "case_id": "logging-config",
+      "facts": [
+        {
+          "content": "Task 16: Add low-overhead HTTP and retained-resource diagnostics: memory_http_preflight_body_bytes is recorded through the existing metrics::histogram! facade, with no labels, exactly once after body collection completes and before JSON decoding. This includes fully collected malformed JSON because those bytes were actually buffered. Partial, refused, stream-error and cancelled bodies do not enter the distribution.",
+          "episode_key": "http-plan",
+          "fact_type": "note"
+        },
+        {
+          "content": "Task 16: Add low-overhead HTTP and retained-resource diagnostics: DEBUG operations are http.preflight.refused and http.preflight.large_body, added to logging::HTTP_OPERATIONS; operators enable only these with RUST_LOG=http.preflight=debug. Logs use the validated existing RequestId when present, parsed numeric declared length, observed prefix bytes and closed outcome only—no request method/path, tenant fingerprint, arbitrary header or content. Emit large-body events only for fully collected bodies >=65536 B. Rate-limit each fixed event/reason to at most one log per second; refusal counters remain exact. Apply the rate limit before allocating/serializing the event.",
+          "episode_key": "http-plan",
+          "fact_type": "note"
+        },
+        {
+          "content": "Events are written to **stderr** — or to `MEMORY_LOG_FILE` when set — one event\nper line. Under the stdio transport stdout carries MCP protocol framing, so\nnothing is ever written there. The sink, format and colour are read once, when\nthe subscriber is installed at startup.",
+          "episode_key": "logging-sink",
+          "fact_type": "note"
+        },
+        {
+          "content": "| Level | Use |\n|---|---|\n| `ERROR` | A failed unit of work, a risk to integrity, a failure after retries, loss of readiness. |\n| `WARN` | Handled but unexpected; degraded; a client refusal (4xx class). |\n| `INFO` | A business event or a state change. |\n| `DEBUG` | Diagnostics, off by default. |\n| `TRACE` | Fine-grained flow, opted into by name. Anything repetitive is a metric. |\n\nA failure's level is decided by its error class, not its call site:\n`MemoryError::log_level()` maps storage, transience, configuration and\nunavailability to `ERROR`, and refusals (not-found, validation, conflict,\nbudget, model-not-ready, auth) to `WARN`.",
+          "episode_key": "logging-levels",
+          "fact_type": "note"
+        },
+        {
+          "content": "| Variable | Meaning |\n|---|---|\n| `RUST_LOG` | Level and per-subsystem directives. A bare level sets the default (`info`); `prefix=level` sets a subsystem. The most specific prefix wins. |\n| `MEMORY_LOG_FORMAT` | `text` (default, human-readable, one line per event) or `json` (NDJSON, one object per event). |\n| `MEMORY_LOG_COLOR` | `always`, `never`, or anything else for auto (colour only on a colour-capable terminal, and never for a file sink). `NO_COLOR` set and non-empty disables colour. |\n| `MEMORY_LOG_TARGETS` | Third-party `tracing` targets to raise, comma-separated `target=level`. Quiet by default; can never drop this service's own events. |\n| `MEMORY_LOG_FILE` | Append the stream to this file instead of stderr. A blank value means \"unset\". |\n\n`RUST_LOG` examples:\n\n```\nRUST_LOG=info                       # default\nRUST_LOG=extract=debug              # one subsystem\nRUST_LOG=http=error,info            # quiet the HTTP surface, keep the rest\nRUST_LOG=fs_watch=trace,http=debug  # two subsystems, the most specific rule wins\n```",
+          "episode_key": "logging-config",
+          "fact_type": "experience"
+        },
+        {
+          "content": "Every unit of work carries a correlation id. In the HTTP profile it is the\nrequest's `x-request-id` (honoured when supplied, minted otherwise) and is\nadvertised back on the response; in the stdio profile it is a per-call\n`req_NNNN`. The formatter stamps the ambient id onto every event that does not\ncarry its own, so each line of one request — the access log line, a tool line, a\ndownstream warning — reads with the same `req=` and follows with a single\nfilter:\n\n```bash\ngrep 'req=<id>' memory-mcp.log\n```\n\nThe HTTP response echoes the id on `x-request-id`, and a control-plane error\nenvelope carries it as `correlation_id` — a client quoting either names the same\nvalue the log line shows.",
+          "episode_key": "logging-request",
+          "fact_type": "experience"
+        },
+        {
+          "content": "Verified: A license inventory contains 16 product blocks, 163 application rows and 899 object rows. The union covers several products rather than one license.",
+          "episode_key": "license-number",
+          "fact_type": "note"
+        },
+        {
+          "content": "Verified: Infinity means that an object is countable but its count is uncontrolled. Reference: https://example.org/pages/viewpage.action?pageId=1545882667; section 13.2, revision 75.",
+          "episode_key": "license-url",
+          "fact_type": "note"
+        },
+        {
+          "content": "Verified: Only one slide of a cloud EDR comparison was extracted. Feature-level scope may be absent from the extracted text or represented graphically.",
+          "episode_key": "mail-level",
+          "fact_type": "note"
+        },
+        {
+          "content": "Verified: Task 16 in the mobile route editor plan checks KML point import and touch gestures. It belongs to Trackly, not Memory MCP HTTP.",
+          "episode_key": "other-task",
+          "fact_type": "note"
+        }
+      ]
+    },
+    {
+      "case_id": "logging-correlation",
+      "facts": [
+        {
+          "content": "Task 16: Add low-overhead HTTP and retained-resource diagnostics: memory_http_preflight_body_bytes is recorded through the existing metrics::histogram! facade, with no labels, exactly once after body collection completes and before JSON decoding. This includes fully collected malformed JSON because those bytes were actually buffered. Partial, refused, stream-error and cancelled bodies do not enter the distribution.",
+          "episode_key": "http-plan",
+          "fact_type": "note"
+        },
+        {
+          "content": "Task 16: Add low-overhead HTTP and retained-resource diagnostics: DEBUG operations are http.preflight.refused and http.preflight.large_body, added to logging::HTTP_OPERATIONS; operators enable only these with RUST_LOG=http.preflight=debug. Logs use the validated existing RequestId when present, parsed numeric declared length, observed prefix bytes and closed outcome only—no request method/path, tenant fingerprint, arbitrary header or content. Emit large-body events only for fully collected bodies >=65536 B. Rate-limit each fixed event/reason to at most one log per second; refusal counters remain exact. Apply the rate limit before allocating/serializing the event.",
+          "episode_key": "http-plan",
+          "fact_type": "note"
+        },
+        {
+          "content": "Events are written to **stderr** — or to `MEMORY_LOG_FILE` when set — one event\nper line. Under the stdio transport stdout carries MCP protocol framing, so\nnothing is ever written there. The sink, format and colour are read once, when\nthe subscriber is installed at startup.",
+          "episode_key": "logging-sink",
+          "fact_type": "note"
+        },
+        {
+          "content": "| Level | Use |\n|---|---|\n| `ERROR` | A failed unit of work, a risk to integrity, a failure after retries, loss of readiness. |\n| `WARN` | Handled but unexpected; degraded; a client refusal (4xx class). |\n| `INFO` | A business event or a state change. |\n| `DEBUG` | Diagnostics, off by default. |\n| `TRACE` | Fine-grained flow, opted into by name. Anything repetitive is a metric. |\n\nA failure's level is decided by its error class, not its call site:\n`MemoryError::log_level()` maps storage, transience, configuration and\nunavailability to `ERROR`, and refusals (not-found, validation, conflict,\nbudget, model-not-ready, auth) to `WARN`.",
+          "episode_key": "logging-levels",
+          "fact_type": "note"
+        },
+        {
+          "content": "| Variable | Meaning |\n|---|---|\n| `RUST_LOG` | Level and per-subsystem directives. A bare level sets the default (`info`); `prefix=level` sets a subsystem. The most specific prefix wins. |\n| `MEMORY_LOG_FORMAT` | `text` (default, human-readable, one line per event) or `json` (NDJSON, one object per event). |\n| `MEMORY_LOG_COLOR` | `always`, `never`, or anything else for auto (colour only on a colour-capable terminal, and never for a file sink). `NO_COLOR` set and non-empty disables colour. |\n| `MEMORY_LOG_TARGETS` | Third-party `tracing` targets to raise, comma-separated `target=level`. Quiet by default; can never drop this service's own events. |\n| `MEMORY_LOG_FILE` | Append the stream to this file instead of stderr. A blank value means \"unset\". |\n\n`RUST_LOG` examples:\n\n```\nRUST_LOG=info                       # default\nRUST_LOG=extract=debug              # one subsystem\nRUST_LOG=http=error,info            # quiet the HTTP surface, keep the rest\nRUST_LOG=fs_watch=trace,http=debug  # two subsystems, the most specific rule wins\n```",
+          "episode_key": "logging-config",
+          "fact_type": "experience"
+        },
+        {
+          "content": "Every unit of work carries a correlation id. In the HTTP profile it is the\nrequest's `x-request-id` (honoured when supplied, minted otherwise) and is\nadvertised back on the response; in the stdio profile it is a per-call\n`req_NNNN`. The formatter stamps the ambient id onto every event that does not\ncarry its own, so each line of one request — the access log line, a tool line, a\ndownstream warning — reads with the same `req=` and follows with a single\nfilter:\n\n```bash\ngrep 'req=<id>' memory-mcp.log\n```\n\nThe HTTP response echoes the id on `x-request-id`, and a control-plane error\nenvelope carries it as `correlation_id` — a client quoting either names the same\nvalue the log line shows.",
+          "episode_key": "logging-request",
+          "fact_type": "experience"
+        },
+        {
+          "content": "Verified: A license inventory contains 16 product blocks, 163 application rows and 899 object rows. The union covers several products rather than one license.",
+          "episode_key": "license-number",
+          "fact_type": "note"
+        },
+        {
+          "content": "Verified: Infinity means that an object is countable but its count is uncontrolled. Reference: https://example.org/pages/viewpage.action?pageId=1545882667; section 13.2, revision 75.",
+          "episode_key": "license-url",
+          "fact_type": "note"
+        },
+        {
+          "content": "Verified: Only one slide of a cloud EDR comparison was extracted. Feature-level scope may be absent from the extracted text or represented graphically.",
+          "episode_key": "mail-level",
+          "fact_type": "note"
+        },
+        {
+          "content": "Verified: Task 16 in the mobile route editor plan checks KML point import and touch gestures. It belongs to Trackly, not Memory MCP HTTP.",
+          "episode_key": "other-task",
+          "fact_type": "note"
+        }
+      ]
+    },
+    {
+      "case_id": "logging-levels",
+      "facts": [
+        {
+          "content": "Task 16: Add low-overhead HTTP and retained-resource diagnostics: memory_http_preflight_body_bytes is recorded through the existing metrics::histogram! facade, with no labels, exactly once after body collection completes and before JSON decoding. This includes fully collected malformed JSON because those bytes were actually buffered. Partial, refused, stream-error and cancelled bodies do not enter the distribution.",
+          "episode_key": "http-plan",
+          "fact_type": "note"
+        },
+        {
+          "content": "Task 16: Add low-overhead HTTP and retained-resource diagnostics: DEBUG operations are http.preflight.refused and http.preflight.large_body, added to logging::HTTP_OPERATIONS; operators enable only these with RUST_LOG=http.preflight=debug. Logs use the validated existing RequestId when present, parsed numeric declared length, observed prefix bytes and closed outcome only—no request method/path, tenant fingerprint, arbitrary header or content. Emit large-body events only for fully collected bodies >=65536 B. Rate-limit each fixed event/reason to at most one log per second; refusal counters remain exact. Apply the rate limit before allocating/serializing the event.",
+          "episode_key": "http-plan",
+          "fact_type": "note"
+        },
+        {
+          "content": "Events are written to **stderr** — or to `MEMORY_LOG_FILE` when set — one event\nper line. Under the stdio transport stdout carries MCP protocol framing, so\nnothing is ever written there. The sink, format and colour are read once, when\nthe subscriber is installed at startup.",
+          "episode_key": "logging-sink",
+          "fact_type": "note"
+        },
+        {
+          "content": "| Level | Use |\n|---|---|\n| `ERROR` | A failed unit of work, a risk to integrity, a failure after retries, loss of readiness. |\n| `WARN` | Handled but unexpected; degraded; a client refusal (4xx class). |\n| `INFO` | A business event or a state change. |\n| `DEBUG` | Diagnostics, off by default. |\n| `TRACE` | Fine-grained flow, opted into by name. Anything repetitive is a metric. |\n\nA failure's level is decided by its error class, not its call site:\n`MemoryError::log_level()` maps storage, transience, configuration and\nunavailability to `ERROR`, and refusals (not-found, validation, conflict,\nbudget, model-not-ready, auth) to `WARN`.",
+          "episode_key": "logging-levels",
+          "fact_type": "note"
+        },
+        {
+          "content": "| Variable | Meaning |\n|---|---|\n| `RUST_LOG` | Level and per-subsystem directives. A bare level sets the default (`info`); `prefix=level` sets a subsystem. The most specific prefix wins. |\n| `MEMORY_LOG_FORMAT` | `text` (default, human-readable, one line per event) or `json` (NDJSON, one object per event). |\n| `MEMORY_LOG_COLOR` | `always`, `never`, or anything else for auto (colour only on a colour-capable terminal, and never for a file sink). `NO_COLOR` set and non-empty disables colour. |\n| `MEMORY_LOG_TARGETS` | Third-party `tracing` targets to raise, comma-separated `target=level`. Quiet by default; can never drop this service's own events. |\n| `MEMORY_LOG_FILE` | Append the stream to this file instead of stderr. A blank value means \"unset\". |\n\n`RUST_LOG` examples:\n\n```\nRUST_LOG=info                       # default\nRUST_LOG=extract=debug              # one subsystem\nRUST_LOG=http=error,info            # quiet the HTTP surface, keep the rest\nRUST_LOG=fs_watch=trace,http=debug  # two subsystems, the most specific rule wins\n```",
+          "episode_key": "logging-config",
+          "fact_type": "experience"
+        },
+        {
+          "content": "Every unit of work carries a correlation id. In the HTTP profile it is the\nrequest's `x-request-id` (honoured when supplied, minted otherwise) and is\nadvertised back on the response; in the stdio profile it is a per-call\n`req_NNNN`. The formatter stamps the ambient id onto every event that does not\ncarry its own, so each line of one request — the access log line, a tool line, a\ndownstream warning — reads with the same `req=` and follows with a single\nfilter:\n\n```bash\ngrep 'req=<id>' memory-mcp.log\n```\n\nThe HTTP response echoes the id on `x-request-id`, and a control-plane error\nenvelope carries it as `correlation_id` — a client quoting either names the same\nvalue the log line shows.",
+          "episode_key": "logging-request",
+          "fact_type": "experience"
+        },
+        {
+          "content": "Verified: A license inventory contains 16 product blocks, 163 application rows and 899 object rows. The union covers several products rather than one license.",
+          "episode_key": "license-number",
+          "fact_type": "note"
+        },
+        {
+          "content": "Verified: Infinity means that an object is countable but its count is uncontrolled. Reference: https://example.org/pages/viewpage.action?pageId=1545882667; section 13.2, revision 75.",
+          "episode_key": "license-url",
+          "fact_type": "note"
+        },
+        {
+          "content": "Verified: Only one slide of a cloud EDR comparison was extracted. Feature-level scope may be absent from the extracted text or represented graphically.",
+          "episode_key": "mail-level",
+          "fact_type": "note"
+        },
+        {
+          "content": "Verified: Task 16 in the mobile route editor plan checks KML point import and touch gestures. It belongs to Trackly, not Memory MCP HTTP.",
+          "episode_key": "other-task",
+          "fact_type": "note"
+        }
+      ]
+    },
+    {
+      "case_id": "logging-original",
+      "facts": [
+        {
+          "content": "Task 16: Add low-overhead HTTP and retained-resource diagnostics: memory_http_preflight_body_bytes is recorded through the existing metrics::histogram! facade, with no labels, exactly once after body collection completes and before JSON decoding. This includes fully collected malformed JSON because those bytes were actually buffered. Partial, refused, stream-error and cancelled bodies do not enter the distribution.",
+          "episode_key": "http-plan",
+          "fact_type": "note"
+        },
+        {
+          "content": "Task 16: Add low-overhead HTTP and retained-resource diagnostics: DEBUG operations are http.preflight.refused and http.preflight.large_body, added to logging::HTTP_OPERATIONS; operators enable only these with RUST_LOG=http.preflight=debug. Logs use the validated existing RequestId when present, parsed numeric declared length, observed prefix bytes and closed outcome only—no request method/path, tenant fingerprint, arbitrary header or content. Emit large-body events only for fully collected bodies >=65536 B. Rate-limit each fixed event/reason to at most one log per second; refusal counters remain exact. Apply the rate limit before allocating/serializing the event.",
+          "episode_key": "http-plan",
+          "fact_type": "note"
+        },
+        {
+          "content": "Events are written to **stderr** — or to `MEMORY_LOG_FILE` when set — one event\nper line. Under the stdio transport stdout carries MCP protocol framing, so\nnothing is ever written there. The sink, format and colour are read once, when\nthe subscriber is installed at startup.",
+          "episode_key": "logging-sink",
+          "fact_type": "note"
+        },
+        {
+          "content": "| Level | Use |\n|---|---|\n| `ERROR` | A failed unit of work, a risk to integrity, a failure after retries, loss of readiness. |\n| `WARN` | Handled but unexpected; degraded; a client refusal (4xx class). |\n| `INFO` | A business event or a state change. |\n| `DEBUG` | Diagnostics, off by default. |\n| `TRACE` | Fine-grained flow, opted into by name. Anything repetitive is a metric. |\n\nA failure's level is decided by its error class, not its call site:\n`MemoryError::log_level()` maps storage, transience, configuration and\nunavailability to `ERROR`, and refusals (not-found, validation, conflict,\nbudget, model-not-ready, auth) to `WARN`.",
+          "episode_key": "logging-levels",
+          "fact_type": "note"
+        },
+        {
+          "content": "| Variable | Meaning |\n|---|---|\n| `RUST_LOG` | Level and per-subsystem directives. A bare level sets the default (`info`); `prefix=level` sets a subsystem. The most specific prefix wins. |\n| `MEMORY_LOG_FORMAT` | `text` (default, human-readable, one line per event) or `json` (NDJSON, one object per event). |\n| `MEMORY_LOG_COLOR` | `always`, `never`, or anything else for auto (colour only on a colour-capable terminal, and never for a file sink). `NO_COLOR` set and non-empty disables colour. |\n| `MEMORY_LOG_TARGETS` | Third-party `tracing` targets to raise, comma-separated `target=level`. Quiet by default; can never drop this service's own events. |\n| `MEMORY_LOG_FILE` | Append the stream to this file instead of stderr. A blank value means \"unset\". |\n\n`RUST_LOG` examples:\n\n```\nRUST_LOG=info                       # default\nRUST_LOG=extract=debug              # one subsystem\nRUST_LOG=http=error,info            # quiet the HTTP surface, keep the rest\nRUST_LOG=fs_watch=trace,http=debug  # two subsystems, the most specific rule wins\n```",
+          "episode_key": "logging-config",
+          "fact_type": "experience"
+        },
+        {
+          "content": "Every unit of work carries a correlation id. In the HTTP profile it is the\nrequest's `x-request-id` (honoured when supplied, minted otherwise) and is\nadvertised back on the response; in the stdio profile it is a per-call\n`req_NNNN`. The formatter stamps the ambient id onto every event that does not\ncarry its own, so each line of one request — the access log line, a tool line, a\ndownstream warning — reads with the same `req=` and follows with a single\nfilter:\n\n```bash\ngrep 'req=<id>' memory-mcp.log\n```\n\nThe HTTP response echoes the id on `x-request-id`, and a control-plane error\nenvelope carries it as `correlation_id` — a client quoting either names the same\nvalue the log line shows.",
+          "episode_key": "logging-request",
+          "fact_type": "experience"
+        },
+        {
+          "content": "Verified: A license inventory contains 16 product blocks, 163 application rows and 899 object rows. The union covers several products rather than one license.",
+          "episode_key": "license-number",
+          "fact_type": "note"
+        },
+        {
+          "content": "Verified: Infinity means that an object is countable but its count is uncontrolled. Reference: https://example.org/pages/viewpage.action?pageId=1545882667; section 13.2, revision 75.",
+          "episode_key": "license-url",
+          "fact_type": "note"
+        },
+        {
+          "content": "Verified: Only one slide of a cloud EDR comparison was extracted. Feature-level scope may be absent from the extracted text or represented graphically.",
+          "episode_key": "mail-level",
+          "fact_type": "note"
+        },
+        {
+          "content": "Verified: Task 16 in the mobile route editor plan checks KML point import and touch gestures. It belongs to Trackly, not Memory MCP HTTP.",
+          "episode_key": "other-task",
+          "fact_type": "note"
+        }
+      ]
+    },
+    {
+      "case_id": "logging-russian",
+      "facts": [
+        {
+          "content": "Task 16: Add low-overhead HTTP and retained-resource diagnostics: memory_http_preflight_body_bytes is recorded through the existing metrics::histogram! facade, with no labels, exactly once after body collection completes and before JSON decoding. This includes fully collected malformed JSON because those bytes were actually buffered. Partial, refused, stream-error and cancelled bodies do not enter the distribution.",
+          "episode_key": "http-plan",
+          "fact_type": "note"
+        },
+        {
+          "content": "Task 16: Add low-overhead HTTP and retained-resource diagnostics: DEBUG operations are http.preflight.refused and http.preflight.large_body, added to logging::HTTP_OPERATIONS; operators enable only these with RUST_LOG=http.preflight=debug. Logs use the validated existing RequestId when present, parsed numeric declared length, observed prefix bytes and closed outcome only—no request method/path, tenant fingerprint, arbitrary header or content. Emit large-body events only for fully collected bodies >=65536 B. Rate-limit each fixed event/reason to at most one log per second; refusal counters remain exact. Apply the rate limit before allocating/serializing the event.",
+          "episode_key": "http-plan",
+          "fact_type": "note"
+        },
+        {
+          "content": "Events are written to **stderr** — or to `MEMORY_LOG_FILE` when set — one event\nper line. Under the stdio transport stdout carries MCP protocol framing, so\nnothing is ever written there. The sink, format and colour are read once, when\nthe subscriber is installed at startup.",
+          "episode_key": "logging-sink",
+          "fact_type": "note"
+        },
+        {
+          "content": "| Level | Use |\n|---|---|\n| `ERROR` | A failed unit of work, a risk to integrity, a failure after retries, loss of readiness. |\n| `WARN` | Handled but unexpected; degraded; a client refusal (4xx class). |\n| `INFO` | A business event or a state change. |\n| `DEBUG` | Diagnostics, off by default. |\n| `TRACE` | Fine-grained flow, opted into by name. Anything repetitive is a metric. |\n\nA failure's level is decided by its error class, not its call site:\n`MemoryError::log_level()` maps storage, transience, configuration and\nunavailability to `ERROR`, and refusals (not-found, validation, conflict,\nbudget, model-not-ready, auth) to `WARN`.",
+          "episode_key": "logging-levels",
+          "fact_type": "note"
+        },
+        {
+          "content": "| Variable | Meaning |\n|---|---|\n| `RUST_LOG` | Level and per-subsystem directives. A bare level sets the default (`info`); `prefix=level` sets a subsystem. The most specific prefix wins. |\n| `MEMORY_LOG_FORMAT` | `text` (default, human-readable, one line per event) or `json` (NDJSON, one object per event). |\n| `MEMORY_LOG_COLOR` | `always`, `never`, or anything else for auto (colour only on a colour-capable terminal, and never for a file sink). `NO_COLOR` set and non-empty disables colour. |\n| `MEMORY_LOG_TARGETS` | Third-party `tracing` targets to raise, comma-separated `target=level`. Quiet by default; can never drop this service's own events. |\n| `MEMORY_LOG_FILE` | Append the stream to this file instead of stderr. A blank value means \"unset\". |\n\n`RUST_LOG` examples:\n\n```\nRUST_LOG=info                       # default\nRUST_LOG=extract=debug              # one subsystem\nRUST_LOG=http=error,info            # quiet the HTTP surface, keep the rest\nRUST_LOG=fs_watch=trace,http=debug  # two subsystems, the most specific rule wins\n```",
+          "episode_key": "logging-config",
+          "fact_type": "experience"
+        },
+        {
+          "content": "Every unit of work carries a correlation id. In the HTTP profile it is the\nrequest's `x-request-id` (honoured when supplied, minted otherwise) and is\nadvertised back on the response; in the stdio profile it is a per-call\n`req_NNNN`. The formatter stamps the ambient id onto every event that does not\ncarry its own, so each line of one request — the access log line, a tool line, a\ndownstream warning — reads with the same `req=` and follows with a single\nfilter:\n\n```bash\ngrep 'req=<id>' memory-mcp.log\n```\n\nThe HTTP response echoes the id on `x-request-id`, and a control-plane error\nenvelope carries it as `correlation_id` — a client quoting either names the same\nvalue the log line shows.",
+          "episode_key": "logging-request",
+          "fact_type": "experience"
+        },
+        {
+          "content": "Verified: A license inventory contains 16 product blocks, 163 application rows and 899 object rows. The union covers several products rather than one license.",
+          "episode_key": "license-number",
+          "fact_type": "note"
+        },
+        {
+          "content": "Verified: Infinity means that an object is countable but its count is uncontrolled. Reference: https://example.org/pages/viewpage.action?pageId=1545882667; section 13.2, revision 75.",
+          "episode_key": "license-url",
+          "fact_type": "note"
+        },
+        {
+          "content": "Verified: Only one slide of a cloud EDR comparison was extracted. Feature-level scope may be absent from the extracted text or represented graphically.",
+          "episode_key": "mail-level",
+          "fact_type": "note"
+        },
+        {
+          "content": "Verified: Task 16 in the mobile route editor plan checks KML point import and touch gestures. It belongs to Trackly, not Memory MCP HTTP.",
+          "episode_key": "other-task",
+          "fact_type": "note"
+        }
+      ]
+    },
+    {
+      "case_id": "logging-sink",
+      "facts": [
+        {
+          "content": "Task 16: Add low-overhead HTTP and retained-resource diagnostics: memory_http_preflight_body_bytes is recorded through the existing metrics::histogram! facade, with no labels, exactly once after body collection completes and before JSON decoding. This includes fully collected malformed JSON because those bytes were actually buffered. Partial, refused, stream-error and cancelled bodies do not enter the distribution.",
+          "episode_key": "http-plan",
+          "fact_type": "note"
+        },
+        {
+          "content": "Task 16: Add low-overhead HTTP and retained-resource diagnostics: DEBUG operations are http.preflight.refused and http.preflight.large_body, added to logging::HTTP_OPERATIONS; operators enable only these with RUST_LOG=http.preflight=debug. Logs use the validated existing RequestId when present, parsed numeric declared length, observed prefix bytes and closed outcome only—no request method/path, tenant fingerprint, arbitrary header or content. Emit large-body events only for fully collected bodies >=65536 B. Rate-limit each fixed event/reason to at most one log per second; refusal counters remain exact. Apply the rate limit before allocating/serializing the event.",
+          "episode_key": "http-plan",
+          "fact_type": "note"
+        },
+        {
+          "content": "Events are written to **stderr** — or to `MEMORY_LOG_FILE` when set — one event\nper line. Under the stdio transport stdout carries MCP protocol framing, so\nnothing is ever written there. The sink, format and colour are read once, when\nthe subscriber is installed at startup.",
+          "episode_key": "logging-sink",
+          "fact_type": "note"
+        },
+        {
+          "content": "| Level | Use |\n|---|---|\n| `ERROR` | A failed unit of work, a risk to integrity, a failure after retries, loss of readiness. |\n| `WARN` | Handled but unexpected; degraded; a client refusal (4xx class). |\n| `INFO` | A business event or a state change. |\n| `DEBUG` | Diagnostics, off by default. |\n| `TRACE` | Fine-grained flow, opted into by name. Anything repetitive is a metric. |\n\nA failure's level is decided by its error class, not its call site:\n`MemoryError::log_level()` maps storage, transience, configuration and\nunavailability to `ERROR`, and refusals (not-found, validation, conflict,\nbudget, model-not-ready, auth) to `WARN`.",
+          "episode_key": "logging-levels",
+          "fact_type": "note"
+        },
+        {
+          "content": "| Variable | Meaning |\n|---|---|\n| `RUST_LOG` | Level and per-subsystem directives. A bare level sets the default (`info`); `prefix=level` sets a subsystem. The most specific prefix wins. |\n| `MEMORY_LOG_FORMAT` | `text` (default, human-readable, one line per event) or `json` (NDJSON, one object per event). |\n| `MEMORY_LOG_COLOR` | `always`, `never`, or anything else for auto (colour only on a colour-capable terminal, and never for a file sink). `NO_COLOR` set and non-empty disables colour. |\n| `MEMORY_LOG_TARGETS` | Third-party `tracing` targets to raise, comma-separated `target=level`. Quiet by default; can never drop this service's own events. |\n| `MEMORY_LOG_FILE` | Append the stream to this file instead of stderr. A blank value means \"unset\". |\n\n`RUST_LOG` examples:\n\n```\nRUST_LOG=info                       # default\nRUST_LOG=extract=debug              # one subsystem\nRUST_LOG=http=error,info            # quiet the HTTP surface, keep the rest\nRUST_LOG=fs_watch=trace,http=debug  # two subsystems, the most specific rule wins\n```",
+          "episode_key": "logging-config",
+          "fact_type": "experience"
+        },
+        {
+          "content": "Every unit of work carries a correlation id. In the HTTP profile it is the\nrequest's `x-request-id` (honoured when supplied, minted otherwise) and is\nadvertised back on the response; in the stdio profile it is a per-call\n`req_NNNN`. The formatter stamps the ambient id onto every event that does not\ncarry its own, so each line of one request — the access log line, a tool line, a\ndownstream warning — reads with the same `req=` and follows with a single\nfilter:\n\n```bash\ngrep 'req=<id>' memory-mcp.log\n```\n\nThe HTTP response echoes the id on `x-request-id`, and a control-plane error\nenvelope carries it as `correlation_id` — a client quoting either names the same\nvalue the log line shows.",
+          "episode_key": "logging-request",
+          "fact_type": "experience"
+        },
+        {
+          "content": "Verified: A license inventory contains 16 product blocks, 163 application rows and 899 object rows. The union covers several products rather than one license.",
+          "episode_key": "license-number",
+          "fact_type": "note"
+        },
+        {
+          "content": "Verified: Infinity means that an object is countable but its count is uncontrolled. Reference: https://example.org/pages/viewpage.action?pageId=1545882667; section 13.2, revision 75.",
+          "episode_key": "license-url",
+          "fact_type": "note"
+        },
+        {
+          "content": "Verified: Only one slide of a cloud EDR comparison was extracted. Feature-level scope may be absent from the extracted text or represented graphically.",
+          "episode_key": "mail-level",
+          "fact_type": "note"
+        },
+        {
+          "content": "Verified: Task 16 in the mobile route editor plan checks KML point import and touch gestures. It belongs to Trackly, not Memory MCP HTTP.",
+          "episode_key": "other-task",
+          "fact_type": "note"
+        }
+      ]
+    },
+    {
+      "case_id": "unknown-database",
+      "facts": [
+        {
+          "content": "Task 16: Add low-overhead HTTP and retained-resource diagnostics: memory_http_preflight_body_bytes is recorded through the existing metrics::histogram! facade, with no labels, exactly once after body collection completes and before JSON decoding. This includes fully collected malformed JSON because those bytes were actually buffered. Partial, refused, stream-error and cancelled bodies do not enter the distribution.",
+          "episode_key": "http-plan",
+          "fact_type": "note"
+        },
+        {
+          "content": "Task 16: Add low-overhead HTTP and retained-resource diagnostics: DEBUG operations are http.preflight.refused and http.preflight.large_body, added to logging::HTTP_OPERATIONS; operators enable only these with RUST_LOG=http.preflight=debug. Logs use the validated existing RequestId when present, parsed numeric declared length, observed prefix bytes and closed outcome only—no request method/path, tenant fingerprint, arbitrary header or content. Emit large-body events only for fully collected bodies >=65536 B. Rate-limit each fixed event/reason to at most one log per second; refusal counters remain exact. Apply the rate limit before allocating/serializing the event.",
+          "episode_key": "http-plan",
+          "fact_type": "note"
+        },
+        {
+          "content": "Events are written to **stderr** — or to `MEMORY_LOG_FILE` when set — one event\nper line. Under the stdio transport stdout carries MCP protocol framing, so\nnothing is ever written there. The sink, format and colour are read once, when\nthe subscriber is installed at startup.",
+          "episode_key": "logging-sink",
+          "fact_type": "note"
+        },
+        {
+          "content": "| Level | Use |\n|---|---|\n| `ERROR` | A failed unit of work, a risk to integrity, a failure after retries, loss of readiness. |\n| `WARN` | Handled but unexpected; degraded; a client refusal (4xx class). |\n| `INFO` | A business event or a state change. |\n| `DEBUG` | Diagnostics, off by default. |\n| `TRACE` | Fine-grained flow, opted into by name. Anything repetitive is a metric. |\n\nA failure's level is decided by its error class, not its call site:\n`MemoryError::log_level()` maps storage, transience, configuration and\nunavailability to `ERROR`, and refusals (not-found, validation, conflict,\nbudget, model-not-ready, auth) to `WARN`.",
+          "episode_key": "logging-levels",
+          "fact_type": "note"
+        },
+        {
+          "content": "| Variable | Meaning |\n|---|---|\n| `RUST_LOG` | Level and per-subsystem directives. A bare level sets the default (`info`); `prefix=level` sets a subsystem. The most specific prefix wins. |\n| `MEMORY_LOG_FORMAT` | `text` (default, human-readable, one line per event) or `json` (NDJSON, one object per event). |\n| `MEMORY_LOG_COLOR` | `always`, `never`, or anything else for auto (colour only on a colour-capable terminal, and never for a file sink). `NO_COLOR` set and non-empty disables colour. |\n| `MEMORY_LOG_TARGETS` | Third-party `tracing` targets to raise, comma-separated `target=level`. Quiet by default; can never drop this service's own events. |\n| `MEMORY_LOG_FILE` | Append the stream to this file instead of stderr. A blank value means \"unset\". |\n\n`RUST_LOG` examples:\n\n```\nRUST_LOG=info                       # default\nRUST_LOG=extract=debug              # one subsystem\nRUST_LOG=http=error,info            # quiet the HTTP surface, keep the rest\nRUST_LOG=fs_watch=trace,http=debug  # two subsystems, the most specific rule wins\n```",
+          "episode_key": "logging-config",
+          "fact_type": "experience"
+        },
+        {
+          "content": "Every unit of work carries a correlation id. In the HTTP profile it is the\nrequest's `x-request-id` (honoured when supplied, minted otherwise) and is\nadvertised back on the response; in the stdio profile it is a per-call\n`req_NNNN`. The formatter stamps the ambient id onto every event that does not\ncarry its own, so each line of one request — the access log line, a tool line, a\ndownstream warning — reads with the same `req=` and follows with a single\nfilter:\n\n```bash\ngrep 'req=<id>' memory-mcp.log\n```\n\nThe HTTP response echoes the id on `x-request-id`, and a control-plane error\nenvelope carries it as `correlation_id` — a client quoting either names the same\nvalue the log line shows.",
+          "episode_key": "logging-request",
+          "fact_type": "experience"
+        },
+        {
+          "content": "Verified: A license inventory contains 16 product blocks, 163 application rows and 899 object rows. The union covers several products rather than one license.",
+          "episode_key": "license-number",
+          "fact_type": "note"
+        },
+        {
+          "content": "Verified: Infinity means that an object is countable but its count is uncontrolled. Reference: https://example.org/pages/viewpage.action?pageId=1545882667; section 13.2, revision 75.",
+          "episode_key": "license-url",
+          "fact_type": "note"
+        },
+        {
+          "content": "Verified: Only one slide of a cloud EDR comparison was extracted. Feature-level scope may be absent from the extracted text or represented graphically.",
+          "episode_key": "mail-level",
+          "fact_type": "note"
+        },
+        {
+          "content": "Verified: Task 16 in the mobile route editor plan checks KML point import and touch gestures. It belongs to Trackly, not Memory MCP HTTP.",
+          "episode_key": "other-task",
+          "fact_type": "note"
+        }
+      ]
+    },
+    {
+      "case_id": "unknown-task",
+      "facts": [
+        {
+          "content": "Task 16: Add low-overhead HTTP and retained-resource diagnostics: memory_http_preflight_body_bytes is recorded through the existing metrics::histogram! facade, with no labels, exactly once after body collection completes and before JSON decoding. This includes fully collected malformed JSON because those bytes were actually buffered. Partial, refused, stream-error and cancelled bodies do not enter the distribution.",
+          "episode_key": "http-plan",
+          "fact_type": "note"
+        },
+        {
+          "content": "Task 16: Add low-overhead HTTP and retained-resource diagnostics: DEBUG operations are http.preflight.refused and http.preflight.large_body, added to logging::HTTP_OPERATIONS; operators enable only these with RUST_LOG=http.preflight=debug. Logs use the validated existing RequestId when present, parsed numeric declared length, observed prefix bytes and closed outcome only—no request method/path, tenant fingerprint, arbitrary header or content. Emit large-body events only for fully collected bodies >=65536 B. Rate-limit each fixed event/reason to at most one log per second; refusal counters remain exact. Apply the rate limit before allocating/serializing the event.",
+          "episode_key": "http-plan",
+          "fact_type": "note"
+        },
+        {
+          "content": "Events are written to **stderr** — or to `MEMORY_LOG_FILE` when set — one event\nper line. Under the stdio transport stdout carries MCP protocol framing, so\nnothing is ever written there. The sink, format and colour are read once, when\nthe subscriber is installed at startup.",
+          "episode_key": "logging-sink",
+          "fact_type": "note"
+        },
+        {
+          "content": "| Level | Use |\n|---|---|\n| `ERROR` | A failed unit of work, a risk to integrity, a failure after retries, loss of readiness. |\n| `WARN` | Handled but unexpected; degraded; a client refusal (4xx class). |\n| `INFO` | A business event or a state change. |\n| `DEBUG` | Diagnostics, off by default. |\n| `TRACE` | Fine-grained flow, opted into by name. Anything repetitive is a metric. |\n\nA failure's level is decided by its error class, not its call site:\n`MemoryError::log_level()` maps storage, transience, configuration and\nunavailability to `ERROR`, and refusals (not-found, validation, conflict,\nbudget, model-not-ready, auth) to `WARN`.",
+          "episode_key": "logging-levels",
+          "fact_type": "note"
+        },
+        {
+          "content": "| Variable | Meaning |\n|---|---|\n| `RUST_LOG` | Level and per-subsystem directives. A bare level sets the default (`info`); `prefix=level` sets a subsystem. The most specific prefix wins. |\n| `MEMORY_LOG_FORMAT` | `text` (default, human-readable, one line per event) or `json` (NDJSON, one object per event). |\n| `MEMORY_LOG_COLOR` | `always`, `never`, or anything else for auto (colour only on a colour-capable terminal, and never for a file sink). `NO_COLOR` set and non-empty disables colour. |\n| `MEMORY_LOG_TARGETS` | Third-party `tracing` targets to raise, comma-separated `target=level`. Quiet by default; can never drop this service's own events. |\n| `MEMORY_LOG_FILE` | Append the stream to this file instead of stderr. A blank value means \"unset\". |\n\n`RUST_LOG` examples:\n\n```\nRUST_LOG=info                       # default\nRUST_LOG=extract=debug              # one subsystem\nRUST_LOG=http=error,info            # quiet the HTTP surface, keep the rest\nRUST_LOG=fs_watch=trace,http=debug  # two subsystems, the most specific rule wins\n```",
+          "episode_key": "logging-config",
+          "fact_type": "experience"
+        },
+        {
+          "content": "Every unit of work carries a correlation id. In the HTTP profile it is the\nrequest's `x-request-id` (honoured when supplied, minted otherwise) and is\nadvertised back on the response; in the stdio profile it is a per-call\n`req_NNNN`. The formatter stamps the ambient id onto every event that does not\ncarry its own, so each line of one request — the access log line, a tool line, a\ndownstream warning — reads with the same `req=` and follows with a single\nfilter:\n\n```bash\ngrep 'req=<id>' memory-mcp.log\n```\n\nThe HTTP response echoes the id on `x-request-id`, and a control-plane error\nenvelope carries it as `correlation_id` — a client quoting either names the same\nvalue the log line shows.",
+          "episode_key": "logging-request",
+          "fact_type": "experience"
+        },
+        {
+          "content": "Verified: A license inventory contains 16 product blocks, 163 application rows and 899 object rows. The union covers several products rather than one license.",
+          "episode_key": "license-number",
+          "fact_type": "note"
+        },
+        {
+          "content": "Verified: Infinity means that an object is countable but its count is uncontrolled. Reference: https://example.org/pages/viewpage.action?pageId=1545882667; section 13.2, revision 75.",
+          "episode_key": "license-url",
+          "fact_type": "note"
+        },
+        {
+          "content": "Verified: Only one slide of a cloud EDR comparison was extracted. Feature-level scope may be absent from the extracted text or represented graphically.",
+          "episode_key": "mail-level",
+          "fact_type": "note"
+        },
+        {
+          "content": "Verified: Task 16 in the mobile route editor plan checks KML point import and touch gestures. It belongs to Trackly, not Memory MCP HTTP.",
+          "episode_key": "other-task",
+          "fact_type": "note"
+        }
+      ]
+    },
+    {
+      "case_id": "unknown-url",
+      "facts": [
+        {
+          "content": "Task 16: Add low-overhead HTTP and retained-resource diagnostics: memory_http_preflight_body_bytes is recorded through the existing metrics::histogram! facade, with no labels, exactly once after body collection completes and before JSON decoding. This includes fully collected malformed JSON because those bytes were actually buffered. Partial, refused, stream-error and cancelled bodies do not enter the distribution.",
+          "episode_key": "http-plan",
+          "fact_type": "note"
+        },
+        {
+          "content": "Task 16: Add low-overhead HTTP and retained-resource diagnostics: DEBUG operations are http.preflight.refused and http.preflight.large_body, added to logging::HTTP_OPERATIONS; operators enable only these with RUST_LOG=http.preflight=debug. Logs use the validated existing RequestId when present, parsed numeric declared length, observed prefix bytes and closed outcome only—no request method/path, tenant fingerprint, arbitrary header or content. Emit large-body events only for fully collected bodies >=65536 B. Rate-limit each fixed event/reason to at most one log per second; refusal counters remain exact. Apply the rate limit before allocating/serializing the event.",
+          "episode_key": "http-plan",
+          "fact_type": "note"
+        },
+        {
+          "content": "Events are written to **stderr** — or to `MEMORY_LOG_FILE` when set — one event\nper line. Under the stdio transport stdout carries MCP protocol framing, so\nnothing is ever written there. The sink, format and colour are read once, when\nthe subscriber is installed at startup.",
+          "episode_key": "logging-sink",
+          "fact_type": "note"
+        },
+        {
+          "content": "| Level | Use |\n|---|---|\n| `ERROR` | A failed unit of work, a risk to integrity, a failure after retries, loss of readiness. |\n| `WARN` | Handled but unexpected; degraded; a client refusal (4xx class). |\n| `INFO` | A business event or a state change. |\n| `DEBUG` | Diagnostics, off by default. |\n| `TRACE` | Fine-grained flow, opted into by name. Anything repetitive is a metric. |\n\nA failure's level is decided by its error class, not its call site:\n`MemoryError::log_level()` maps storage, transience, configuration and\nunavailability to `ERROR`, and refusals (not-found, validation, conflict,\nbudget, model-not-ready, auth) to `WARN`.",
+          "episode_key": "logging-levels",
+          "fact_type": "note"
+        },
+        {
+          "content": "| Variable | Meaning |\n|---|---|\n| `RUST_LOG` | Level and per-subsystem directives. A bare level sets the default (`info`); `prefix=level` sets a subsystem. The most specific prefix wins. |\n| `MEMORY_LOG_FORMAT` | `text` (default, human-readable, one line per event) or `json` (NDJSON, one object per event). |\n| `MEMORY_LOG_COLOR` | `always`, `never`, or anything else for auto (colour only on a colour-capable terminal, and never for a file sink). `NO_COLOR` set and non-empty disables colour. |\n| `MEMORY_LOG_TARGETS` | Third-party `tracing` targets to raise, comma-separated `target=level`. Quiet by default; can never drop this service's own events. |\n| `MEMORY_LOG_FILE` | Append the stream to this file instead of stderr. A blank value means \"unset\". |\n\n`RUST_LOG` examples:\n\n```\nRUST_LOG=info                       # default\nRUST_LOG=extract=debug              # one subsystem\nRUST_LOG=http=error,info            # quiet the HTTP surface, keep the rest\nRUST_LOG=fs_watch=trace,http=debug  # two subsystems, the most specific rule wins\n```",
+          "episode_key": "logging-config",
+          "fact_type": "experience"
+        },
+        {
+          "content": "Every unit of work carries a correlation id. In the HTTP profile it is the\nrequest's `x-request-id` (honoured when supplied, minted otherwise) and is\nadvertised back on the response; in the stdio profile it is a per-call\n`req_NNNN`. The formatter stamps the ambient id onto every event that does not\ncarry its own, so each line of one request — the access log line, a tool line, a\ndownstream warning — reads with the same `req=` and follows with a single\nfilter:\n\n```bash\ngrep 'req=<id>' memory-mcp.log\n```\n\nThe HTTP response echoes the id on `x-request-id`, and a control-plane error\nenvelope carries it as `correlation_id` — a client quoting either names the same\nvalue the log line shows.",
+          "episode_key": "logging-request",
+          "fact_type": "experience"
+        },
+        {
+          "content": "Verified: A license inventory contains 16 product blocks, 163 application rows and 899 object rows. The union covers several products rather than one license.",
+          "episode_key": "license-number",
+          "fact_type": "note"
+        },
+        {
+          "content": "Verified: Infinity means that an object is countable but its count is uncontrolled. Reference: https://example.org/pages/viewpage.action?pageId=1545882667; section 13.2, revision 75.",
+          "episode_key": "license-url",
+          "fact_type": "note"
+        },
+        {
+          "content": "Verified: Only one slide of a cloud EDR comparison was extracted. Feature-level scope may be absent from the extracted text or represented graphically.",
+          "episode_key": "mail-level",
+          "fact_type": "note"
+        },
+        {
+          "content": "Verified: Task 16 in the mobile route editor plan checks KML point import and touch gestures. It belongs to Trackly, not Memory MCP HTTP.",
+          "episode_key": "other-task",
+          "fact_type": "note"
+        }
+      ]
+    }
+  ],
+  "native_preparation": {
+    "claim_rollout_stage": "evidence",
+    "embedding_dimension": 384,
+    "embedding_signature": "embsig:a5a0756a3400378d43936b98457b96b3038ba8f0269ea49c8465cea5a80adac0",
+    "extractor_fingerprint": "anno",
+    "index_signature": "indexsig:d293fd983ef88ea75c78d3758dd09c73d5cf02726d7ec592ca28adc938421f30",
+    "model": "intfloat/multilingual-e5-small",
+    "provider_label": "local-candle",
+    "schema_version": "memory-mcp-native-preparation/v1",
+    "similarity_threshold": 0.7,
+    "source_bundle_sha256": "08c9f79d62dfa0484fbcad305dc2fb885bde754a85dd5883754ba818ab562bda"
+  }
+}

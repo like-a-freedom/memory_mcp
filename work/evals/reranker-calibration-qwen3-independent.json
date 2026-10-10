@@ -1,0 +1,244 @@
+{
+  "dataset_sha256": "b8cf99fda65c8e072efbba318dde0bcd4b3ad242033c91a175b3e52305f0f0d3",
+  "observations": [
+    {
+      "id": "e47becba:answer",
+      "relevance_logit": 0.8561000823974609,
+      "relevant": true
+    },
+    {
+      "id": "e47becba:non-answer:0:0",
+      "relevance_logit": -6.365876197814941,
+      "relevant": false
+    },
+    {
+      "id": "e47becba:non-answer:1:0",
+      "relevance_logit": -6.6931657791137695,
+      "relevant": false
+    },
+    {
+      "id": "e47becba:non-answer:1:2",
+      "relevance_logit": -7.299322128295898,
+      "relevant": false
+    },
+    {
+      "id": "118b2229:answer",
+      "relevance_logit": 3.4393310546875,
+      "relevant": true
+    },
+    {
+      "id": "118b2229:non-answer:0:0",
+      "relevance_logit": -8.064040184020996,
+      "relevant": false
+    },
+    {
+      "id": "118b2229:non-answer:5:0",
+      "relevance_logit": -7.8052263259887695,
+      "relevant": false
+    },
+    {
+      "id": "118b2229:non-answer:13:6",
+      "relevance_logit": -8.025580406188965,
+      "relevant": false
+    },
+    {
+      "id": "51a45a95:non-answer:8:6",
+      "relevance_logit": -8.513570785522461,
+      "relevant": false
+    },
+    {
+      "id": "51a45a95:non-answer:18:2",
+      "relevance_logit": -7.654383659362793,
+      "relevant": false
+    },
+    {
+      "id": "51a45a95:non-answer:30:0",
+      "relevance_logit": -7.507509231567383,
+      "relevant": false
+    },
+    {
+      "id": "58bf7951:non-answer:1:2",
+      "relevance_logit": -4.1851043701171875,
+      "relevant": false
+    },
+    {
+      "id": "58bf7951:non-answer:2:4",
+      "relevance_logit": -6.441315650939941,
+      "relevant": false
+    },
+    {
+      "id": "58bf7951:non-answer:2:6",
+      "relevance_logit": -7.710807800292969,
+      "relevant": false
+    },
+    {
+      "id": "1e043500:answer",
+      "relevance_logit": 4.507137298583984,
+      "relevant": true
+    },
+    {
+      "id": "1e043500:non-answer:5:0",
+      "relevance_logit": -8.72460651397705,
+      "relevant": false
+    },
+    {
+      "id": "1e043500:non-answer:5:2",
+      "relevance_logit": -6.167963981628418,
+      "relevant": false
+    },
+    {
+      "id": "1e043500:non-answer:5:6",
+      "relevance_logit": -8.153675079345703,
+      "relevant": false
+    },
+    {
+      "id": "c5e8278d:answer",
+      "relevance_logit": 3.270334243774414,
+      "relevant": true
+    },
+    {
+      "id": "c5e8278d:non-answer:4:0",
+      "relevance_logit": -4.149133682250977,
+      "relevant": false
+    },
+    {
+      "id": "c5e8278d:non-answer:8:0",
+      "relevance_logit": -5.631443023681641,
+      "relevant": false
+    },
+    {
+      "id": "c5e8278d:non-answer:10:2",
+      "relevance_logit": -6.540456771850586,
+      "relevant": false
+    },
+    {
+      "id": "6ade9755:answer",
+      "relevance_logit": 2.0956802368164062,
+      "relevant": true
+    },
+    {
+      "id": "6ade9755:non-answer:7:4",
+      "relevance_logit": -7.425483703613281,
+      "relevant": false
+    },
+    {
+      "id": "6ade9755:non-answer:34:6",
+      "relevance_logit": -7.6816253662109375,
+      "relevant": false
+    },
+    {
+      "id": "6ade9755:non-answer:0:0",
+      "relevance_logit": -10.237147331237793,
+      "relevant": false
+    },
+    {
+      "id": "6f9b354f:answer",
+      "relevance_logit": 4.102499008178711,
+      "relevant": true
+    },
+    {
+      "id": "6f9b354f:non-answer:0:0",
+      "relevance_logit": -6.216333389282227,
+      "relevant": false
+    },
+    {
+      "id": "6f9b354f:non-answer:0:2",
+      "relevance_logit": -6.693212509155273,
+      "relevant": false
+    },
+    {
+      "id": "6f9b354f:non-answer:0:4",
+      "relevance_logit": -7.762866973876953,
+      "relevant": false
+    },
+    {
+      "id": "58ef2f1c:non-answer:8:2",
+      "relevance_logit": -5.250052452087402,
+      "relevant": false
+    },
+    {
+      "id": "58ef2f1c:non-answer:44:0",
+      "relevance_logit": -8.785125732421875,
+      "relevant": false
+    },
+    {
+      "id": "58ef2f1c:non-answer:44:8",
+      "relevance_logit": -5.1211957931518555,
+      "relevant": false
+    },
+    {
+      "id": "f8c5f88b:answer",
+      "relevance_logit": 6.008193016052246,
+      "relevant": true
+    },
+    {
+      "id": "f8c5f88b:non-answer:2:0",
+      "relevance_logit": -7.009737968444824,
+      "relevant": false
+    },
+    {
+      "id": "f8c5f88b:non-answer:2:2",
+      "relevance_logit": -6.793300628662109,
+      "relevant": false
+    },
+    {
+      "id": "f8c5f88b:non-answer:2:4",
+      "relevance_logit": -8.338836669921875,
+      "relevant": false
+    },
+    {
+      "id": "5d3d2817:answer",
+      "relevance_logit": -2.9250669479370117,
+      "relevant": true
+    },
+    {
+      "id": "5d3d2817:non-answer:16:2",
+      "relevance_logit": -4.761221885681152,
+      "relevant": false
+    },
+    {
+      "id": "5d3d2817:non-answer:18:0",
+      "relevance_logit": -4.958133697509766,
+      "relevant": false
+    },
+    {
+      "id": "5d3d2817:non-answer:0:0",
+      "relevance_logit": -6.7689971923828125,
+      "relevant": false
+    },
+    {
+      "id": "7527f7e2:answer",
+      "relevance_logit": 6.03712272644043,
+      "relevant": true
+    },
+    {
+      "id": "7527f7e2:non-answer:0:6",
+      "relevance_logit": -7.640663146972656,
+      "relevant": false
+    },
+    {
+      "id": "7527f7e2:non-answer:26:2",
+      "relevance_logit": -7.834712982177734,
+      "relevant": false
+    },
+    {
+      "id": "7527f7e2:non-answer:39:4",
+      "relevance_logit": -6.406778335571289,
+      "relevant": false
+    }
+  ],
+  "operating_point": {
+    "f1": 1.0,
+    "false_negative": 0,
+    "false_positive": 0,
+    "floor": -2.9250669479370117,
+    "precision": 1.0,
+    "recall": 1.0,
+    "true_negative": 36,
+    "true_positive": 9
+  },
+  "reranking_signature": "reranksig:6c34a4245e8c56b263c593af3035099e9c783aa7bde2cdacadcc91174bd2e56a",
+  "schema_version": "memory-reranker-calibration-result/v1",
+  "selection_rule": "maximum development F1; ties by precision, recall, then higher floor",
+  "source_sha256": "d6f21ea9d60a0d56f34a05b609c79c88a451d2ae03597821ea3d5a9678c3a442"
+}

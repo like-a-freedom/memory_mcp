@@ -35,6 +35,11 @@ pub(crate) struct SemanticCandidate {
 /// Evidence attached to one candidate identity and carried through fusion.
 #[derive(Debug, Clone, Default)]
 pub(crate) struct CandidateEvidence {
+    pub(crate) reranking: Option<serde_json::Value>,
+    /// The candidate passed admission for a query with one explicit calendar
+    /// date before reranking. Relative dates and broad calendar periods do not
+    /// override the reranker admission floor.
+    pub(crate) explicit_date_admitted: bool,
     pub(crate) matched_content_terms: Vec<String>,
     pub(crate) matched_index_key_terms: Vec<String>,
     pub(crate) matched_references: Vec<String>,
@@ -80,7 +85,9 @@ pub(crate) struct CommunityFactCandidate {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum AdmissionBasis {
     Browse,
+    CalendarPeriod,
     Lexical,
+    Timeline,
     Reference,
     Entity,
     Semantic,
@@ -93,7 +100,9 @@ impl AdmissionBasis {
     pub(crate) fn as_str(self) -> &'static str {
         match self {
             Self::Browse => "browse",
+            Self::CalendarPeriod => "calendar_period",
             Self::Lexical => "lexical",
+            Self::Timeline => "timeline",
             Self::Reference => "reference",
             Self::Entity => "entity",
             Self::Semantic => "semantic",

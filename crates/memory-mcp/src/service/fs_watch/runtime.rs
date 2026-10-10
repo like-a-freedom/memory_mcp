@@ -10,7 +10,8 @@
 //! types are exercised only by tests, so dead-code analysis is relaxed.
 #![allow(dead_code)]
 
-use std::path::Path;
+use std::collections::HashMap;
+use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -30,6 +31,8 @@ use crate::service::fs_watch::candidate::{
 use crate::service::fs_watch::processor::InboxRevisionProcessor;
 use crate::service::fs_watch::telemetry::FsWatchTelemetry;
 use crate::service::{MemoryService, deterministic_episode_id_v2};
+
+const RECONCILIATION_INTERVAL: Duration = Duration::from_secs(5);
 
 /// Startup generation marker for requeueing failed revisions once per start.
 fn startup_generation() -> String {
@@ -149,32 +152,98 @@ async fn run_watcher_cycle(
 /// Dispatches one watcher event through the shared discover→prepare→persist
 /// path.
 async fn handle_watch_event(store: &InboxRevisionStoreClient, inbox: &Path, event: &Event) {
-    if !(event.kind.is_create() || event.kind.is_modify()) {
+    let is_create_or_modify = event.kind.is_create() || event.kind.is_modify();
+    let is_remove = event.kind.is_remove();
+    if !(is_create_or_modify || is_remove) {
         return;
     }
     for path in &event.paths {
-        discover_path(store, inbox, path).await;
+        if !path.starts_with(inbox) {
+            continue;
+        }
+        let metadata = std::fs::symlink_metadata(path);
+        match metadata {
+            Ok(metadata)
+                if metadata.file_type().is_file() && !metadata.file_type().is_symlink() =>
+            {
+                let _ = discover_path(store, inbox, path).await;
+            }
+            Ok(metadata) if metadata.file_type().is_dir() && !metadata.file_type().is_symlink() => {
+                rescan_subtree(store, inbox, path).await;
+            }
+            Ok(_) => {}
+            Err(_) if is_remove || is_create_or_modify => {
+                if let Some(parent) = path.parent() {
+                    rescan_subtree(store, inbox, parent).await;
+                }
+            }
+            Err(_) => {}
+        }
     }
 }
 
 /// Shared discovery pipeline for one candidate path.
-async fn discover_path(store: &InboxRevisionStoreClient, inbox: &Path, path: &Path) {
+async fn discover_path(store: &InboxRevisionStoreClient, inbox: &Path, path: &Path) -> bool {
     let config = FsWatchConfig {
         inbox: inbox.to_path_buf(),
     };
     let cancel = CancellationToken::new();
-    let Ok(CandidateOutcome::Ready(prepared)) =
-        prepare_candidate(&config, path, None, &cancel).await
-    else {
-        return;
+    let outcome = match prepare_candidate(&config, path, None, &cancel).await {
+        Ok(outcome) => outcome,
+        Err(_) => return false,
+    };
+    let prepared = match outcome {
+        CandidateOutcome::Ready(prepared) => prepared,
+        CandidateOutcome::Skipped(CandidateSkipReason::UnsupportedFormat) => return true,
+        CandidateOutcome::Skipped(_) => return false,
     };
     let record = build_record(&prepared);
-    if let Err(error) = store.discover_prepared(&record).await {
-        crate::logging::emit_best_effort_failure("fs_watch.discover_failed", &error);
+    match store.discover_prepared(&record).await {
+        Ok(_) => true,
+        Err(error) => {
+            crate::logging::emit_best_effort_failure("fs_watch.discover_failed", &error);
+            false
+        }
     }
 }
 
-/// Recursive startup scan of existing supported files.
+/// Rescans one affected directory because watcher backends may report a rename
+/// against its parent instead of reporting the destination file path.
+async fn rescan_subtree(store: &InboxRevisionStoreClient, inbox: &Path, root: &Path) {
+    if !root.starts_with(inbox) {
+        return;
+    }
+    let Ok(metadata) = std::fs::symlink_metadata(root) else {
+        return;
+    };
+    if !metadata.file_type().is_dir() || metadata.file_type().is_symlink() {
+        return;
+    }
+
+    let mut pending = vec![root.to_path_buf()];
+    while let Some(directory) = pending.pop() {
+        let Ok(entries) = std::fs::read_dir(&directory) else {
+            continue;
+        };
+        for entry in entries.flatten() {
+            let path = entry.path();
+            let Ok(file_type) = entry.file_type() else {
+                continue;
+            };
+            if file_type.is_symlink() {
+                continue;
+            }
+            if file_type.is_dir() {
+                pending.push(path);
+            } else if file_type.is_file() {
+                let _ = discover_path(store, inbox, &path).await;
+            }
+        }
+    }
+}
+
+/// Recursively scans existing files and records their metadata for
+/// reconciliation, avoiding repeated reads of unchanged content.
 async fn run_startup_scan(
     inbox: &Path,
     store: InboxRevisionStoreClient,
@@ -217,31 +286,95 @@ async fn run_startup_scan(
                 Ok(CandidateOutcome::Ready(prepared)) => {
                     telemetry.record_scan_file("enqueued");
                     let record = build_record(&prepared);
-                    if let Err(error) = store.discover_prepared(&record).await {
-                        crate::logging::emit_best_effort_failure(
-                            "fs_watch.discover_failed",
-                            &error,
-                        );
+                    match store.discover_prepared(&record).await {
+                        Ok(_) => true,
+                        Err(error) => {
+                            crate::logging::emit_best_effort_failure(
+                                "fs_watch.discover_failed",
+                                &error,
+                            );
+                            false
+                        }
                     }
                 }
                 Ok(CandidateOutcome::Skipped(CandidateSkipReason::Symlink)) => {
                     telemetry.record_scan_file("skipped_symlink");
+                    false
                 }
                 Ok(CandidateOutcome::Skipped(CandidateSkipReason::UnsupportedFormat)) => {
                     telemetry.record_scan_file("skipped_unsupported");
+                    true
                 }
                 Ok(CandidateOutcome::Skipped(CandidateSkipReason::NotRegularFile)) => {
                     telemetry.record_scan_file("skipped_not_regular");
+                    false
                 }
                 Ok(CandidateOutcome::Skipped(CandidateSkipReason::Interrupted)) => {
                     telemetry.record_scan_file("interrupted");
+                    false
                 }
                 Ok(CandidateOutcome::Skipped(CandidateSkipReason::OutsideRoot)) => {
                     telemetry.record_scan_file("skipped_outside_root");
+                    false
                 }
-                Err(_) => telemetry.record_scan_file("failed_read"),
+                Err(_) => {
+                    telemetry.record_scan_file("failed_read");
+                    false
+                }
+            };
+        }
+    }
+}
+
+/// Filesystem enumeration is an adapter; reconciliation policy belongs to memory.
+struct InboxScanAdapter<'a> {
+    inbox: &'a Path,
+    store: &'a InboxRevisionStoreClient,
+    stop: &'a CancellationToken,
+}
+
+#[async_trait::async_trait]
+impl crate::memory::api::InboxReconciliationPort for InboxScanAdapter<'_> {
+    async fn snapshot(&self) -> Vec<(PathBuf, String)> {
+        let mut files = Vec::new();
+        let mut pending = vec![self.inbox.to_path_buf()];
+        while let Some(dir) = pending.pop() {
+            if self.stop.is_cancelled() {
+                break;
+            }
+            let Ok(entries) = std::fs::read_dir(dir) else {
+                continue;
+            };
+            for entry in entries.flatten() {
+                if self.stop.is_cancelled() {
+                    return files;
+                }
+                let path = entry.path();
+                let Ok(metadata) = std::fs::symlink_metadata(&path) else {
+                    continue;
+                };
+                if metadata.file_type().is_symlink() {
+                    continue;
+                }
+                if metadata.is_dir() {
+                    pending.push(path);
+                } else if metadata.is_file() {
+                    files.push((
+                        path,
+                        format!("{}:{:?}", metadata.len(), metadata.modified().ok()),
+                    ));
+                }
             }
         }
+        files
+    }
+
+    async fn discover(&self, path: &Path) -> bool {
+        discover_path(self.store, self.inbox, path).await
+    }
+
+    fn cancelled(&self) -> bool {
+        self.stop.is_cancelled()
     }
 }
 
@@ -341,7 +474,32 @@ impl FsWatchRuntime {
         let scan_stop = stop_discovery.clone();
         let scan_inbox = config.inbox.clone();
         let scanner_handle = tokio::spawn(async move {
-            run_startup_scan(&scan_inbox, scan_store, scan_telemetry, scan_stop).await;
+            run_startup_scan(
+                &scan_inbox,
+                scan_store.clone(),
+                scan_telemetry.clone(),
+                scan_stop.clone(),
+            )
+            .await;
+
+            let mut observed = HashMap::new();
+            let adapter = InboxScanAdapter {
+                inbox: &scan_inbox,
+                store: &scan_store,
+                stop: &scan_stop,
+            };
+            let mut reconcile_at = tokio::time::interval_at(
+                tokio::time::Instant::now() + RECONCILIATION_INTERVAL,
+                RECONCILIATION_INTERVAL,
+            );
+            loop {
+                tokio::select! {
+                    _ = scan_stop.cancelled() => return,
+                    _ = reconcile_at.tick() => {
+                        crate::memory::api::reconcile_inbox(&adapter, &mut observed).await;
+                    }
+                }
+            }
         });
 
         // Sequential processor with a separate stop-dequeue token.

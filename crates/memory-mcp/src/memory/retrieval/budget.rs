@@ -1,6 +1,7 @@
 use crate::models::AssembledContextItem;
+use std::collections::HashSet;
 
-use super::admission::{build_query_evidence, episode_candidate_is_admitted};
+use super::admission::{build_query_evidence, episode_candidate_is_admitted_at_reference_time};
 use super::filtering;
 use super::params::DefaultContextParams;
 use super::ranking::default_episode_fallback_rationale;
@@ -15,7 +16,7 @@ pub(super) fn should_prefer_episode_content(
     episode_items: &[AssembledContextItem],
     query_terms: &[String],
 ) -> bool {
-    if episode_items.is_empty() {
+    if episode_items.is_empty() || query_terms.is_empty() {
         return false;
     }
 
@@ -24,6 +25,35 @@ pub(super) fn should_prefer_episode_content(
         .any(|fact| fact.retrieval_tier == RetrievalTier::GraphExpanded)
     {
         return false;
+    }
+
+    let selected_fact_terms = selected_facts
+        .iter()
+        .flat_map(|fact| matched_query_terms_for_text(&fact.fact.content, query_terms))
+        .collect::<HashSet<_>>();
+    let episode_terms = episode_items
+        .iter()
+        .flat_map(|item| matched_query_terms_for_text(&item.content, query_terms))
+        .collect::<HashSet<_>>();
+    if !selected_fact_terms.is_subset(&episode_terms) {
+        return false;
+    }
+
+    let best_fact_reranker = max_consistent_reranker_score(
+        selected_facts
+            .iter()
+            .map(|fact| fact.evidence.reranking.as_ref().and_then(reranker_score)),
+    );
+    let best_episode_reranker = max_consistent_reranker_score(
+        episode_items
+            .iter()
+            .map(|item| item.provenance.get("reranking").and_then(reranker_score)),
+    );
+    if let (Some((fact_signature, fact_score)), Some((episode_signature, episode_score))) =
+        (best_fact_reranker, best_episode_reranker)
+        && fact_signature == episode_signature
+    {
+        return episode_score > fact_score;
     }
 
     let best_fact_overlap = selected_facts
@@ -53,23 +83,65 @@ pub(super) fn should_prefer_episode_content(
     best_episode_term_coverage > selected_fact_term_coverage
 }
 
+fn reranker_score(evidence: &serde_json::Value) -> Option<(&str, f64)> {
+    let signature = evidence.get("model_signature")?.as_str()?;
+    let score = evidence.get("relevance_logit")?.as_f64()?;
+    (!signature.is_empty() && score.is_finite()).then_some((signature, score))
+}
+
+fn max_consistent_reranker_score<'a>(
+    evidence: impl IntoIterator<Item = Option<(&'a str, f64)>>,
+) -> Option<(&'a str, f64)> {
+    let mut signature = None;
+    let mut max_score: Option<f64> = None;
+    for (candidate_signature, score) in evidence.into_iter().collect::<Option<Vec<_>>>()? {
+        if signature.is_some_and(|signature| signature != candidate_signature) {
+            return None;
+        }
+        signature = Some(candidate_signature);
+        max_score = Some(max_score.map_or(score, |current| current.max(score)));
+    }
+    Some((signature?, max_score?))
+}
+
 pub(super) async fn collect_episode_fallback_items(
     service: &RetrievalContext,
     params: &DefaultContextParams<'_>,
     query: &str,
 ) -> Result<Vec<AssembledContextItem>, MemoryError> {
+    let response_budget = params.budget.max(1) as usize;
+    let candidate_budget = super::reranking::candidate_pool_limit(
+        response_budget,
+        service.embedding_provider.reranking_signature().is_some(),
+    );
+    let candidate_limit = candidate_budget.min(i32::MAX as usize) as i32;
     let episode_records = super::lexical::select_episode_records_for_query(
         service,
         params.cutoff_iso,
         Some(query),
-        params.budget,
+        candidate_limit,
     )
     .await?;
 
     let query_terms = crate::shared::search::search_query_terms(query);
-    let query_evidence = build_query_evidence(Some(query), Vec::new(), params.query_flags);
+    let query_evidence = build_query_evidence(Some(query), Vec::new(), &[], params.query_flags);
+    let reranker_available = service.embedding_provider.reranking_signature().is_some();
     let mut episodes = filtering::filter_episodes_by_constraints(episode_records, params.access);
-    episodes.retain(|episode| episode_candidate_is_admitted(&query_evidence, &episode.content));
+    episodes.retain(|episode| {
+        if reranker_available {
+            super::admission::episode_candidate_is_rerankable_at_reference_time(
+                &query_evidence,
+                &episode.content,
+                Some(episode.t_ref),
+            )
+        } else {
+            episode_candidate_is_admitted_at_reference_time(
+                &query_evidence,
+                &episode.content,
+                Some(episode.t_ref),
+            )
+        }
+    });
 
     episodes.sort_by(|left, right| {
         super::lexical::lexical_query_score_for_text(&right.content, &query_terms)
@@ -91,7 +163,7 @@ pub(super) async fn collect_episode_fallback_items(
         window_start: params.window_start,
         window_end: params.window_end,
         timeline_mode: params.resolved_view_mode == Some("timeline"),
-        budget: params.budget,
+        budget: candidate_limit,
         fallback_rationale_fn: default_episode_fallback_rationale,
     }))
 }
@@ -225,6 +297,139 @@ mod tests {
                 "ethiopia".to_string()
             ]
         ),);
+    }
+
+    #[test]
+    fn does_not_prefer_episode_when_it_would_drop_selected_fact_query_terms() {
+        let query_terms = vec![
+            "jon".to_string(),
+            "gina".to_string(),
+            "destress".to_string(),
+        ];
+        let mut fact = make_ranked(
+            make_fact("Gina encourages Jon to take breaks and dance it out to destress."),
+            RetrievalTier::Direct,
+        );
+        fact.evidence.reranking = Some(serde_json::json!({
+            "model_signature": "reranker-v1",
+            "relevance_logit": 2.2,
+        }));
+        let episodes = vec![AssembledContextItem {
+            content: "Jon says dancing is his passion and escape; he wants to teach others.".into(),
+            provenance: serde_json::json!({
+                "reranking": {
+                    "model_signature": "reranker-v1",
+                    "relevance_logit": 8.7,
+                }
+            }),
+            ..make_episode_item(
+                "Jon says dancing is his passion and escape; he wants to teach others.",
+            )
+        }];
+
+        assert!(!should_prefer_episode_content(
+            &[fact],
+            &episodes,
+            &query_terms
+        ));
+    }
+
+    #[test]
+    fn same_model_episode_score_can_win_when_it_preserves_selected_fact_query_terms() {
+        let query_terms = vec![
+            "jon".to_string(),
+            "dancing".to_string(),
+            "passion".to_string(),
+        ];
+        let mut fact = make_ranked(
+            make_fact("Jon's passion includes dancing every weekend with friends."),
+            RetrievalTier::Direct,
+        );
+        fact.evidence.reranking = Some(serde_json::json!({
+            "model_signature": "reranker-v1",
+            "relevance_logit": 2.2,
+        }));
+        let episode = AssembledContextItem {
+            content: "Jon describes dancing as a passion.".to_string(),
+            provenance: serde_json::json!({
+                "reranking": {
+                    "model_signature": "reranker-v1",
+                    "relevance_logit": 8.7,
+                }
+            }),
+            ..make_episode_item("Jon describes dancing as a passion.")
+        };
+
+        assert!(should_prefer_episode_content(
+            &[fact],
+            &[episode],
+            &query_terms
+        ));
+    }
+
+    #[test]
+    fn partial_episode_cannot_replace_collective_fact_evidence_even_with_higher_reranker_score() {
+        let query_terms = vec!["jon".to_string(), "gina".to_string(), "status".to_string()];
+        let mut jon_fact = make_ranked(
+            make_fact("Jon owns the deployment status."),
+            RetrievalTier::Direct,
+        );
+        jon_fact.evidence.reranking = Some(serde_json::json!({
+            "model_signature": "reranker-v1",
+            "relevance_logit": 8.0,
+        }));
+        let mut gina_fact = make_ranked(
+            make_fact("Gina owns the billing status."),
+            RetrievalTier::Direct,
+        );
+        gina_fact.evidence.reranking = Some(serde_json::json!({
+            "model_signature": "reranker-v1",
+            "relevance_logit": 7.0,
+        }));
+        let episode = AssembledContextItem {
+            content: "Jon owns the deployment status.".to_string(),
+            provenance: serde_json::json!({
+                "reranking": {
+                    "model_signature": "reranker-v1",
+                    "relevance_logit": 9.0,
+                }
+            }),
+            ..make_episode_item("Jon owns the deployment status.")
+        };
+
+        assert!(!should_prefer_episode_content(
+            &[jon_fact, gina_fact],
+            &[episode],
+            &query_terms,
+        ));
+    }
+
+    #[test]
+    fn incomparable_reranker_scores_do_not_override_lexical_fallback() {
+        let query_terms = vec!["coffee".to_string(), "brewing".to_string()];
+        let mut fact = make_ranked(
+            make_fact("coffee brewing guide for beginners"),
+            RetrievalTier::Direct,
+        );
+        fact.evidence.reranking = Some(serde_json::json!({
+            "model_signature": "reranker-v1",
+            "relevance_logit": 2.2,
+        }));
+        let episodes = vec![AssembledContextItem {
+            provenance: serde_json::json!({
+                "reranking": {
+                    "model_signature": "reranker-v2",
+                    "relevance_logit": 8.7,
+                }
+            }),
+            ..make_episode_item("coffee")
+        }];
+
+        assert!(!should_prefer_episode_content(
+            &[fact],
+            &episodes,
+            &query_terms
+        ));
     }
 
     #[test]

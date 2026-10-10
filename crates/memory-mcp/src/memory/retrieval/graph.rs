@@ -94,7 +94,21 @@ async fn resolve_query_anchor_entities(
 ) -> Result<BTreeMap<String, GraphAnchor>, MemoryError> {
     let normalized_names = query_phrase_candidates(raw_query)
         .into_iter()
-        .map(|phrase| crate::shared::search::normalize_text(&phrase))
+        .flat_map(|phrase| {
+            let possessive_subject = phrase
+                .split_whitespace()
+                .map(|word| {
+                    word.strip_suffix("'s")
+                        .or_else(|| word.strip_suffix("’s"))
+                        .unwrap_or(word)
+                })
+                .collect::<Vec<_>>()
+                .join(" ");
+            [
+                crate::shared::search::normalize_text(&phrase),
+                crate::shared::search::normalize_text(&possessive_subject),
+            ]
+        })
         .filter(|phrase| !phrase.is_empty())
         .collect::<Vec<_>>();
 
@@ -828,6 +842,7 @@ mod tests {
         let seed_query = super::super::admission::build_query_evidence(
             Some("Atlas launch"),
             Vec::new(),
+            &[],
             &QueryFlags::default(),
         );
         let admitted_seeds = admitted_graph_seed_facts(&seed_query, &[seed_fact]);

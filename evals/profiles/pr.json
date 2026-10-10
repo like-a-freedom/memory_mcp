@@ -27,6 +27,13 @@
       "expected_coverage": {
         "exact_cases": 2
       }
+    },
+    {
+      "id": "retrieval-quality",
+      "corpus_root": "evals/corpora/retrieval-quality-v1",
+      "expected_coverage": {
+        "exact_cases": 37
+      }
     }
   ],
   "gates": [
@@ -35,31 +42,73 @@
         "suite_id": "extraction",
         "metric": "entity_f1"
       },
-      "hard_floor": 0.70,
-      "regression_budget": 0.10
+      "hard_floor": 0.7,
+      "regression_budget": 0.1
     },
     {
       "target": {
         "suite_id": "claim-reconciliation",
         "metric": "claim_precision"
       },
-      "hard_floor": 0.80,
-      "regression_budget": 0.10
+      "hard_floor": 0.8,
+      "regression_budget": 0.1
     },
     {
       "target": {
         "suite_id": "claim-reconciliation",
         "metric": "claim_recall"
       },
-      "hard_floor": 0.90,
-      "regression_budget": 0.10
+      "hard_floor": 0.9,
+      "regression_budget": 0.1
     },
     {
       "target": {
         "suite_id": "external-retrieval",
         "metric": "answer_presence_proxy_at_5"
       },
-      "hard_floor": 0.90
+      "hard_floor": 0.9
+    },
+    {
+      "target": {
+        "suite_id": "retrieval-quality",
+        "metric": "precision_macro"
+      },
+      "hard_floor": 1.0
+    },
+    {
+      "target": {
+        "suite_id": "retrieval-quality",
+        "metric": "required_group_recall"
+      },
+      "hard_floor": 1.0
+    },
+    {
+      "target": {
+        "suite_id": "retrieval-quality",
+        "metric": "unknown_abstention_rate"
+      },
+      "hard_floor": 1.0
+    },
+    {
+      "target": {
+        "suite_id": "retrieval-quality",
+        "metric": "answerable_non_abstention_rate"
+      },
+      "hard_floor": 1.0
+    },
+    {
+      "target": {
+        "suite_id": "retrieval-quality",
+        "metric": "duplicate_free_rate"
+      },
+      "hard_floor": 1.0
+    },
+    {
+      "target": {
+        "suite_id": "retrieval-quality",
+        "metric": "prohibited_free_rate"
+      },
+      "hard_floor": 1.0
     }
   ]
 }

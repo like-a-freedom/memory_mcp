@@ -1,0 +1,2436 @@
+{
+  "schema_version": "memory-mcp-eval/v2",
+  "run_id": "run-1791629147",
+  "profile": "nightly",
+  "started_at": "2026-10-10T10:45:47.275770Z",
+  "duration_ms": 214404,
+  "expected_case_ids": [],
+  "expected_cases": [
+    {
+      "suite_id": "retrieval-quality",
+      "case_id": "historical-observed-cutoff"
+    },
+    {
+      "suite_id": "retrieval-quality",
+      "case_id": "http-task-16"
+    },
+    {
+      "suite_id": "retrieval-quality",
+      "case_id": "http-task-paraphrase"
+    },
+    {
+      "suite_id": "retrieval-quality",
+      "case_id": "http-task-short"
+    },
+    {
+      "suite_id": "retrieval-quality",
+      "case_id": "locomo-conv-26-000"
+    },
+    {
+      "suite_id": "retrieval-quality",
+      "case_id": "locomo-conv-26-082"
+    },
+    {
+      "suite_id": "retrieval-quality",
+      "case_id": "locomo-conv-30-000"
+    },
+    {
+      "suite_id": "retrieval-quality",
+      "case_id": "locomo-conv-30-002"
+    },
+    {
+      "suite_id": "retrieval-quality",
+      "case_id": "locomo-conv-41-001"
+    },
+    {
+      "suite_id": "retrieval-quality",
+      "case_id": "locomo-conv-41-065"
+    },
+    {
+      "suite_id": "retrieval-quality",
+      "case_id": "locomo-conv-42-002"
+    },
+    {
+      "suite_id": "retrieval-quality",
+      "case_id": "locomo-conv-42-096"
+    },
+    {
+      "suite_id": "retrieval-quality",
+      "case_id": "locomo-conv-43-071"
+    },
+    {
+      "suite_id": "retrieval-quality",
+      "case_id": "locomo-conv-44-000"
+    },
+    {
+      "suite_id": "retrieval-quality",
+      "case_id": "locomo-conv-44-061"
+    },
+    {
+      "suite_id": "retrieval-quality",
+      "case_id": "locomo-conv-47-001"
+    },
+    {
+      "suite_id": "retrieval-quality",
+      "case_id": "locomo-conv-47-067"
+    },
+    {
+      "suite_id": "retrieval-quality",
+      "case_id": "locomo-conv-48-000"
+    },
+    {
+      "suite_id": "retrieval-quality",
+      "case_id": "locomo-conv-48-015"
+    },
+    {
+      "suite_id": "retrieval-quality",
+      "case_id": "locomo-conv-49-002"
+    },
+    {
+      "suite_id": "retrieval-quality",
+      "case_id": "locomo-conv-49-083"
+    },
+    {
+      "suite_id": "retrieval-quality",
+      "case_id": "locomo-conv-50-001"
+    },
+    {
+      "suite_id": "retrieval-quality",
+      "case_id": "locomo-conv-50-071"
+    },
+    {
+      "suite_id": "retrieval-quality",
+      "case_id": "logging-config"
+    },
+    {
+      "suite_id": "retrieval-quality",
+      "case_id": "logging-correlation"
+    },
+    {
+      "suite_id": "retrieval-quality",
+      "case_id": "logging-levels"
+    },
+    {
+      "suite_id": "retrieval-quality",
+      "case_id": "logging-original"
+    },
+    {
+      "suite_id": "retrieval-quality",
+      "case_id": "logging-russian"
+    },
+    {
+      "suite_id": "retrieval-quality",
+      "case_id": "logging-sink"
+    },
+    {
+      "suite_id": "retrieval-quality",
+      "case_id": "policy-denied-abstention"
+    },
+    {
+      "suite_id": "retrieval-quality",
+      "case_id": "policy-public-evidence"
+    },
+    {
+      "suite_id": "retrieval-quality",
+      "case_id": "qualified-other-project"
+    },
+    {
+      "suite_id": "retrieval-quality",
+      "case_id": "timeline-atlas-q1-cross-project-abstention"
+    },
+    {
+      "suite_id": "retrieval-quality",
+      "case_id": "timeline-atlas-q2-reverse-quarter"
+    },
+    {
+      "suite_id": "retrieval-quality",
+      "case_id": "unknown-database"
+    },
+    {
+      "suite_id": "retrieval-quality",
+      "case_id": "unknown-task"
+    },
+    {
+      "suite_id": "retrieval-quality",
+      "case_id": "unknown-url"
+    }
+  ],
+  "outcomes": [
+    {
+      "case_key": {
+        "suite_id": "retrieval-quality",
+        "case_id": "historical-observed-cutoff"
+      },
+      "mode": "end_to_end",
+      "split": "development",
+      "label_trust": "reviewed",
+      "status": "passed",
+      "metrics": {
+        "answerable_non_abstention_rate": 1.0,
+        "duplicate_free_rate": 1.0,
+        "precision_macro": 1.0,
+        "prohibited_free_rate": 1.0,
+        "required_group_recall": 1.0
+      },
+      "evidence": {
+        "answerable_non_abstention_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "case_tag:historical": {
+          "kind": "count",
+          "value": 1
+        },
+        "case_tag:transaction-cutoff": {
+          "kind": "count",
+          "value": 1
+        },
+        "duplicate_free_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "precision_macro": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "prohibited_free_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "required_group_recall": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        }
+      },
+      "failures": [],
+      "duration_ms": 216,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "retrieval-quality",
+        "case_id": "http-task-16"
+      },
+      "mode": "end_to_end",
+      "split": "development",
+      "label_trust": "reviewed",
+      "status": "quality_failed",
+      "metrics": {
+        "answerable_non_abstention_rate": 1.0,
+        "duplicate_free_rate": 1.0,
+        "precision_macro": 1.0,
+        "prohibited_free_rate": 1.0,
+        "required_group_recall": 0.5
+      },
+      "evidence": {
+        "answerable_non_abstention_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "case_tag:numeric-distractor": {
+          "kind": "count",
+          "value": 1
+        },
+        "case_tag:partial_source_coverage": {
+          "kind": "count",
+          "value": 1
+        },
+        "case_tag:qualified-task": {
+          "kind": "count",
+          "value": 1
+        },
+        "case_tag:url-distractor": {
+          "kind": "count",
+          "value": 1
+        },
+        "duplicate_free_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "precision_macro": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "prohibited_free_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "required_group_recall": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 2
+        }
+      },
+      "failures": [
+        "retrieval missed one or more required evidence groups",
+        "native selected evidence: [{\"gold_key\":\"http-plan:note:3a82a1450071\",\"item\":{\"confidence\":0.69,\"content\":\"Task 16: Add low-overhead HTTP and retained-resource diagnostics: memory_http_preflight_body_bytes is recorded through the existing metrics::histogram! facade, with no labels, exactly once after body collection completes and before JSON decoding. This includes fully collected malformed JSON because those bytes were actually buffered. Partial, refused, stream-error and cancelled bodies do not enter the distribution.\",\"fact_id\":\"fact:8875c6b404d5fcc56b97cf2d\",\"grounding\":0.49,\"provenance\":{\"extraction_strategy\":\"structured_summary_line\",\"ingestion_method\":\"extraction\",\"matched_query_terms\":[\"16\",\"http\",\"memory\",\"metric\",\"preflight\",\"task\"],\"reranking\":{\"admission_floor\":0.0,\"model_signature\":\"reranksig:dff4b9939786ed9a1e897946778e336584cc24251a2f32282bd3fe83a680a7d1\",\"relevance_logit\":2.4545061588287354},\"retrieval_admission\":{\"basis\":\"reference\",\"community\":null,\"graph_anchor_origin\":null,\"hop_count\":null,\"matched_content_terms\":[\"http\",\"memory\",\"preflight\",\"metric\"],\"matched_index_key_terms\":[],\"matched_references\":[\"task16\"],\"policy_version\":\"retrieval-admission-v1\",\"repeated_topic\":null,\"resolved_entity_ids\":[],\"semantic_similarity\":0.8468621361767008},\"source_episode_id\":\"episode:cde651553de27befab51910e\",\"source_id\":\"native:http-plan\",\"source_type\":\"session_summary\"},\"quote\":\"memory_http_preflight_body_bytes is recorded through the existing metrics::histogram! facade, with no labels, exactly once after body collection completes and before JSON decoding. This includes fully collected malformed JSON because those bytes were actually buffered. Partial, refused, stream-error and cancelled bodies do not enter the distribution.\",\"rationale\":\"tier=fallback fts=17.88 access_count=0 confidence=0.69 relevance=0.78 grounding=0.49 alignment=1.00 semantic=enabled matched lexical query=\\\"Current approved implementation plan HTTP bounded memory progress Task 16 preflight metrics, warnings, worktree status and rulings\\\" and active at 2026-10-10\",\"reconciliation\":{\"claim_ids\":[\"claim:2401fac37b43bcd959df1faf157148951158f988010975c685594e9a869abc8e\"],\"relations\":[{\"evaluator_version\":\"builtin/v1\",\"outcome\":\"contradiction\",\"reason_code\":\"contradiction\",\"relation_id\":\"claim_relation:e9e21884b85c981039a756b1c725143e43e6d62356ec978d106a647c6c5c2f63\"}]},\"relevance\":0.78,\"retrieval_evidence\":{\"admission_basis\":\"reference\",\"policy_version\":\"retrieval-admission-v1\",\"semantic_similarity\":0.8468621361767008},\"retrieval_tier\":\"fallback\",\"semantic_available\":true,\"source_episode\":\"episode:cde651553de27befab51910e\"}}]",
+        "native reranking candidates: [{\"document\":\"Memory reference date: 2026-10-07 (07 October 2026).\\nSource identity: native:http-plan\\nTask 16: Add low-overhead HTTP and retained-resource diagnostics: memory_http_preflight_body_bytes is recorded through the existing metrics::histogram! facade, with no labels, exactly once after body collection completes and before JSON decoding. This includes fully collected malformed JSON because those bytes were actually buffered. Partial, refused, stream-error and cancelled bodies do not enter the distribution.\",\"query\":\"Current approved implementation plan HTTP bounded memory progress Task 16 preflight metrics, warnings, worktree status and rulings\",\"score\":2.4545061588287354}]"
+      ],
+      "duration_ms": 4887,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "retrieval-quality",
+        "case_id": "http-task-paraphrase"
+      },
+      "mode": "end_to_end",
+      "split": "development",
+      "label_trust": "reviewed",
+      "status": "passed",
+      "metrics": {
+        "answerable_non_abstention_rate": 1.0,
+        "duplicate_free_rate": 1.0,
+        "precision_macro": 1.0,
+        "prohibited_free_rate": 1.0,
+        "required_group_recall": 1.0
+      },
+      "evidence": {
+        "answerable_non_abstention_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "case_tag:paraphrase": {
+          "kind": "count",
+          "value": 1
+        },
+        "case_tag:task": {
+          "kind": "count",
+          "value": 1
+        },
+        "duplicate_free_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "precision_macro": {
+          "kind": "ratio",
+          "numerator": 2,
+          "denominator": 2
+        },
+        "prohibited_free_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "required_group_recall": {
+          "kind": "ratio",
+          "numerator": 2,
+          "denominator": 2
+        }
+      },
+      "failures": [],
+      "duration_ms": 5974,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "retrieval-quality",
+        "case_id": "http-task-short"
+      },
+      "mode": "end_to_end",
+      "split": "development",
+      "label_trust": "reviewed",
+      "status": "passed",
+      "metrics": {
+        "answerable_non_abstention_rate": 1.0,
+        "duplicate_free_rate": 1.0,
+        "precision_macro": 1.0,
+        "prohibited_free_rate": 1.0,
+        "required_group_recall": 1.0
+      },
+      "evidence": {
+        "answerable_non_abstention_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "case_tag:qualified-task": {
+          "kind": "count",
+          "value": 1
+        },
+        "case_tag:short-query": {
+          "kind": "count",
+          "value": 1
+        },
+        "duplicate_free_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "precision_macro": {
+          "kind": "ratio",
+          "numerator": 2,
+          "denominator": 2
+        },
+        "prohibited_free_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "required_group_recall": {
+          "kind": "ratio",
+          "numerator": 2,
+          "denominator": 2
+        }
+      },
+      "failures": [],
+      "duration_ms": 6041,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "retrieval-quality",
+        "case_id": "locomo-conv-26-000"
+      },
+      "mode": "end_to_end",
+      "split": "development",
+      "label_trust": "reviewed",
+      "status": "quality_failed",
+      "metrics": {
+        "answerable_non_abstention_rate": 1.0,
+        "duplicate_free_rate": 1.0,
+        "precision_macro": 0.3333333333333333,
+        "prohibited_free_rate": 0.0,
+        "required_group_recall": 1.0
+      },
+      "evidence": {
+        "answerable_non_abstention_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "case_tag:category-2": {
+          "kind": "count",
+          "value": 1
+        },
+        "case_tag:locomo": {
+          "kind": "count",
+          "value": 1
+        },
+        "case_tag:published-evidence": {
+          "kind": "count",
+          "value": 1
+        },
+        "duplicate_free_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "precision_macro": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 3
+        },
+        "prohibited_free_rate": {
+          "kind": "ratio",
+          "numerator": 0,
+          "denominator": 1
+        },
+        "required_group_recall": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        }
+      },
+      "failures": [
+        "retrieval returned unlabeled or disallowed evidence",
+        "prohibited evidence was retrieved",
+        "native selected evidence: [{\"gold_key\":\"raw:D1:3\",\"item\":{\"confidence\":0.68,\"content\":\"Caroline: I went to a LGBTQ support group yesterday and it was so powerful.\",\"fact_id\":\"episode_fallback:episode:8eb8e87a0676727292f42f2f\",\"grounding\":1.0,\"provenance\":{\"episode_fallback\":true,\"reference_time\":\"2023-05-08T13:56:00Z\",\"reranking\":{\"admission_floor\":0.0,\"model_signature\":\"reranksig:dff4b9939786ed9a1e897946778e336584cc24251a2f32282bd3fe83a680a7d1\",\"relevance_logit\":9.778679847717285},\"source_episode\":\"episode:8eb8e87a0676727292f42f2f\",\"source_id\":\"locomo:conv-26:D1:3\",\"source_type\":\"conversation\"},\"quote\":\"Caroline: I went to a LGBTQ support group yesterday and it was so powerful.\",\"rationale\":\"tier=fallback fts=11.00 access_count=0 confidence=0.68 grounding=1.00 semantic=enabled matched episode content query=\\\"caroline lgbtq support group\\\" and active at 2026-10-10\",\"relevance\":1.0,\"retrieval_tier\":\"fallback\",\"semantic_available\":true,\"source_episode\":\"episode:8eb8e87a0676727292f42f2f\"}},{\"gold_key\":\"raw:D2:12\",\"item\":{\"confidence\":0.43,\"content\":\"Caroline: I chose them 'cause they help LGBTQ+ folks with adoption. Their inclusivity and support really spoke to me.\",\"fact_id\":\"episode_fallback:episode:e66987b15ddbf1c2af113333\",\"grounding\":0.5,\"provenance\":{\"episode_fallback\":true,\"reference_time\":\"2023-05-25T13:14:00Z\",\"reranking\":{\"admission_floor\":0.0,\"model_signature\":\"reranksig:dff4b9939786ed9a1e897946778e336584cc24251a2f32282bd3fe83a680a7d1\",\"relevance_logit\":5.998973369598389},\"source_episode\":\"episode:e66987b15ddbf1c2af113333\",\"source_id\":\"locomo:conv-26:D2:12\",\"source_type\":\"conversation\"},\"quote\":\"Caroline: I chose them 'cause they help LGBTQ+ folks with adoption. Their inclusivity and support really spoke to me.\",\"rationale\":\"tier=fallback fts=2.00 access_count=0 confidence=0.43 grounding=0.50 semantic=enabled matched episode content query=\\\"caroline lgbtq support group\\\" and active at 2026-10-10\",\"relevance\":0.5,\"retrieval_tier\":\"fallback\",\"semantic_available\":true,\"source_episode\":\"episode:e66987b15ddbf1c2af113333\"}},{\"gold_key\":\"raw:D1:7\",\"item\":{\"confidence\":0.68,\"content\":\"Caroline: The support group has made me feel accepted and given me courage to embrace myself.\",\"fact_id\":\"episode_fallback:episode:9aebcbf806dab90b89c2beb3\",\"grounding\":1.0,\"provenance\":{\"episode_fallback\":true,\"reference_time\":\"2023-05-08T13:56:00Z\",\"reranking\":{\"admission_floor\":0.0,\"model_signature\":\"reranksig:dff4b9939786ed9a1e897946778e336584cc24251a2f32282bd3fe83a680a7d1\",\"relevance_logit\":3.599229574203491},\"source_episode\":\"episode:9aebcbf806dab90b89c2beb3\",\"source_id\":\"locomo:conv-26:D1:7\",\"source_type\":\"conversation\"},\"quote\":\"Caroline: The support group has made me feel accepted and given me courage to embrace myself.\",\"rationale\":\"tier=fallback fts=5.00 access_count=0 confidence=0.68 grounding=1.00 semantic=enabled matched episode content query=\\\"caroline lgbtq support group\\\" and active at 2026-10-10\",\"relevance\":1.0,\"retrieval_tier\":\"fallback\",\"semantic_available\":true,\"source_episode\":\"episode:9aebcbf806dab90b89c2beb3\"}}]",
+        "native reranking candidates: [{\"document\":\"Memory reference date: 2023-05-08 (08 May 2023).\\nSource identity: locomo:conv-26:D1:3\\nCaroline: I went to a LGBTQ support group yesterday and it was so powerful.\",\"query\":\"When did Caroline go to the LGBTQ support group?\",\"score\":9.778679847717285},{\"document\":\"Memory reference date: 2023-05-08 (08 May 2023).\\nSource identity: locomo:conv-26:D1:7\\nCaroline: The support group has made me feel accepted and given me courage to embrace myself.\",\"query\":\"When did Caroline go to the LGBTQ support group?\",\"score\":3.599229574203491},{\"document\":\"Memory reference date: 2023-05-25 (25 May 2023).\\nSource identity: locomo:conv-26:D2:12\\nCaroline: I chose them 'cause they help LGBTQ+ folks with adoption. Their inclusivity and support really spoke to me.\",\"query\":\"When did Caroline go to the LGBTQ support group?\",\"score\":5.998973369598389},{\"document\":\"Memory reference date: 2023-05-08 (08 May 2023).\\nSource identity: locomo:conv-26:D1:11\\nCaroline: I'm keen on counseling or working in mental health - I'd love to support those with similar issues.\",\"query\":\"When did Caroline go to the LGBTQ support group?\",\"score\":-0.8968037962913513},{\"document\":\"Memory reference date: 2023-05-25 (25 May 2023).\\nSource identity: locomo:conv-26:D2:3\\nMelanie: Thanks, Caroline! The event was really thought-provoking. I'm starting to realize that self-care is really important. It's a journey for me, but when I look after myself, I'm able to better look after my family.\",\"query\":\"When did Caroline go to the LGBTQ support group?\",\"score\":-2.6358540058135986},{\"document\":\"Memory reference date: 2023-05-25 (25 May 2023).\\nSource identity: locomo:conv-26:D2:6\\nCaroline: That's great, Mel! Taking time for yourself is so important. You're doing an awesome job looking after yourself and your family!\",\"query\":\"When did Caroline go to the LGBTQ support group?\",\"score\":-2.7797651290893555},{\"document\":\"Memory reference date: 2023-05-25 (25 May 2023).\\nSource identity: locomo:conv-26:D2:13\\nMelanie: That's great, Caroline! Loving the inclusivity and support. Anything you're excited for in the adoption process?\",\"query\":\"When did Caroline go to the LGBTQ support group?\",\"score\":-2.614100694656372},{\"document\":\"Memory reference date: 2023-05-25 (25 May 2023).\\nSource identity: locomo:conv-26:D2:17\\nMelanie: No doubts, Caroline. You have such a caring heart - they'll get all the love and stability they need! Excited for this new chapter!\",\"query\":\"When did Caroline go to the LGBTQ support group?\",\"score\":-2.0929064750671387},{\"document\":\"Memory reference date: 2023-05-25 (25 May 2023).\\nSource identity: locomo:conv-26:D2:10\\nCaroline: Thanks, Mel! My goal is to give kids a loving home. I'm truly grateful for all the support I've got from friends and mentors. Now the hard work starts to turn my dream into a reality. And here's one of the adoption agencies I'm looking into. It's a lot to take in, but I'm feeling hopeful and optimistic.\\n\\nUpstream image metadata (dataset annotation, not a user assertion):\\n{\\\"blip_caption\\\": \\\"a photography of a sign for a new arrival and an information and domestic building\\\", \\\"img_url\\\": [\\\"https://live.staticflickr.com/3437/3935231341_b2955b00dd_b.jpg\\\"], \\\"query\\\": \\\"adoption agency brochure\\\"}\",\"query\":\"When did Caroline go to the LGBTQ support group?\",\"score\":-3.702319383621216},{\"document\":\"Memory reference date: 2023-05-25 (25 May 2023).\\nSource identity: locomo:conv-26:D2:14\\nCaroline: I'm thrilled to make a family for kids who need one. It'll be tough as a single parent, but I'm up for the challenge!\",\"query\":\"When did Caroline go to the LGBTQ support group?\",\"score\":-3.1309492588043213},{\"document\":\"Memory reference date: 2023-05-25 (25 May 2023).\\nSource identity: locomo:conv-26:D2:9\\nMelanie: Wow, Caroline! That's awesome! Taking in kids in need - you're so kind. Your future family is gonna be so lucky to have you!\",\"query\":\"When did Caroline go to the LGBTQ support group?\",\"score\":-2.838308572769165},{\"document\":\"Memory reference date: 2023-05-25 (25 May 2023).\\nSource identity: locomo:conv-26:D2:2\\nCaroline: That charity race sounds great, Mel! Making a difference & raising awareness for mental health is super rewarding - I'm really proud of you for taking part!\",\"query\":\"When did Caroline go to the LGBTQ support group?\",\"score\":-1.111090898513794},{\"document\":\"Memory reference date: 2023-05-25 (25 May 2023).\\nSource identity: locomo:conv-26:D2:16\\nCaroline: Thanks, Melanie! Your kind words really mean a lot. I'll do my best to make sure these kids have a safe and loving home.\",\"query\":\"When did Caroline go to the LGBTQ support group?\",\"score\":-2.5914146900177},{\"document\":\"Memory reference date: 2023-05-25 (25 May 2023).\\nSource identity: locomo:conv-26:D2:4\\nCaroline: I totally agree, Melanie. Taking care of ourselves is so important - even if it's not always easy. Great that you're prioritizing self-care.\",\"query\":\"When did Caroline go to the LGBTQ support group?\",\"score\":-2.9208223819732666},{\"document\":\"Memory reference date: 2023-05-25 (25 May 2023).\\nSource identity: locomo:conv-26:D2:7\\nMelanie: Thanks, Caroline. It's still a work in progress, but I'm doing my best. My kids are so excited about summer break! We're thinking about going camping next month. Any fun plans for the summer?\",\"query\":\"When did Caroline go to the LGBTQ support group?\",\"score\":-4.4191975593566895},{\"document\":\"Memory reference date: 2023-05-25 (25 May 2023).\\nSource identity: locomo:conv-26:D2:1\\nMelanie: Hey Caroline, since we last chatted, I've had a lot of things happening to me. I ran a charity race for mental health last Saturday – it was really rewarding. Really made me think about taking care of our minds.\",\"query\":\"When did Caroline go to the LGBTQ support group?\",\"score\":-3.723059892654419},{\"document\":\"Memory reference date: 2023-05-25 (25 May 2023).\\nSource identity: locomo:conv-26:D2:8\\nCaroline: Researching adoption agencies — it's been a dream to have a family and give a loving home to kids who need it.\",\"query\":\"When did Caroline go to the LGBTQ support group?\",\"score\":-2.6959822177886963},{\"document\":\"Memory reference date: 2023-05-08 (08 May 2023).\\nSource identity: locomo:conv-26:D1:15\\nCaroline: Wow, Melanie! The colors really blend nicely. Painting looks like a great outlet for expressing yourself.\",\"query\":\"When did Caroline go to the LGBTQ support group?\",\"score\":-3.731552839279175},{\"document\":\"Memory reference date: 2023-05-08 (08 May 2023).\\nSource identity: locomo:conv-26:D1:6\\nMelanie: Wow, love that painting! So cool you found such a helpful group. What's it done for you?\",\"query\":\"When did Caroline go to the LGBTQ support group?\",\"score\":-6.8584394454956055},{\"document\":\"Memory reference date: 2023-05-08 (08 May 2023).\\nSource identity: locomo:conv-26:D1:10\\nMelanie: Wow, Caroline! What kinda jobs are you thinkin' of? Anything that stands out?\",\"query\":\"When did Caroline go to the LGBTQ support group?\",\"score\":-3.774888753890991},{\"document\":\"Memory reference date: 2023-05-08 (08 May 2023).\\nSource identity: locomo:conv-26:D1:2\\nMelanie: Hey Caroline! Good to see you! I'm swamped with the kids & work. What's up with you? Anything new?\",\"query\":\"When did Caroline go to the LGBTQ support group?\",\"score\":-3.918034315109253},{\"document\":\"Memory reference date: 2023-05-08 (08 May 2023).\\nSource identity: locomo:conv-26:D1:18\\nMelanie: Yep, Caroline. Taking care of ourselves is vital. I'm off to go swimming with the kids. Talk to you soon!\",\"query\":\"When did Caroline go to the LGBTQ support group?\",\"score\":-3.012809991836548},{\"document\":\"Memory reference date: 2023-05-08 (08 May 2023).\\nSource identity: locomo:conv-26:D1:4\\nMelanie: Wow, that's cool, Caroline! What happened that was so awesome? Did you hear any inspiring stories?\",\"query\":\"When did Caroline go to the LGBTQ support group?\",\"score\":-3.000823974609375},{\"document\":\"Memory reference date: 2023-05-08 (08 May 2023).\\nSource identity: locomo:conv-26:D1:13\\nCaroline: Thanks, Melanie! That's really sweet. Is this your own painting?\",\"query\":\"When did Caroline go to the LGBTQ support group?\",\"score\":-4.074613094329834},{\"document\":\"Memory reference date: 2023-05-08 (08 May 2023).\\nSource identity: locomo:conv-26:D1:16\\nMelanie: Thanks, Caroline! Painting's a fun way to express my feelings and get creative. It's a great way to relax after a long day.\",\"query\":\"When did Caroline go to the LGBTQ support group?\",\"score\":-4.6030988693237305},{\"document\":\"Memory reference date: 2023-05-08 (08 May 2023).\\nSource identity: locomo:conv-26:D1:1\\nCaroline: Hey Mel! Good to see you! How have you been?\",\"query\":\"When did Caroline go to the LGBTQ support group?\",\"score\":-2.2428953647613525},{\"document\":\"Memory reference date: 2023-05-08 (08 May 2023).\\nSource identity: locomo:conv-26:D1:5\\nCaroline: The transgender stories were so inspiring! I was so happy and thankful for all the support.\\n\\nUpstream image metadata (dataset annotation, not a user assertion):\\n{\\\"blip_caption\\\": \\\"a photo of a dog walking past a wall with a painting of a woman\\\", \\\"img_url\\\": [\\\"https://i.redd.it/l7hozpetnhlb1.jpg\\\"], \\\"query\\\": \\\"transgender pride flag mural\\\"}\",\"query\":\"When did Caroline go to the LGBTQ support group?\",\"score\":-1.1471667289733887},{\"document\":\"Memory reference date: 2023-05-08 (08 May 2023).\\nSource identity: locomo:conv-26:D1:17\\nCaroline: Totally agree, Mel. Relaxing and expressing ourselves is key. Well, I'm off to go do some research.\",\"query\":\"When did Caroline go to the LGBTQ support group?\",\"score\":-1.570756435394287},{\"document\":\"Memory reference date: 2023-05-08 (08 May 2023).\\nSource identity: locomo:conv-26:D1:9\\nCaroline: Gonna continue my edu and check out career options, which is pretty exciting!\",\"query\":\"When did Caroline go to the LGBTQ support group?\",\"score\":-2.9523439407348633}]"
+      ],
+      "duration_ms": 6632,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "retrieval-quality",
+        "case_id": "locomo-conv-26-082"
+      },
+      "mode": "end_to_end",
+      "split": "development",
+      "label_trust": "reviewed",
+      "status": "passed",
+      "metrics": {
+        "answerable_non_abstention_rate": 1.0,
+        "duplicate_free_rate": 1.0,
+        "precision_macro": 1.0,
+        "prohibited_free_rate": 1.0,
+        "required_group_recall": 1.0
+      },
+      "evidence": {
+        "answerable_non_abstention_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "case_tag:category-4": {
+          "kind": "count",
+          "value": 1
+        },
+        "case_tag:locomo": {
+          "kind": "count",
+          "value": 1
+        },
+        "case_tag:published-evidence": {
+          "kind": "count",
+          "value": 1
+        },
+        "duplicate_free_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "precision_macro": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "prohibited_free_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "required_group_recall": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        }
+      },
+      "failures": [],
+      "duration_ms": 6171,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "retrieval-quality",
+        "case_id": "locomo-conv-30-000"
+      },
+      "mode": "end_to_end",
+      "split": "development",
+      "label_trust": "reviewed",
+      "status": "passed",
+      "metrics": {
+        "answerable_non_abstention_rate": 1.0,
+        "duplicate_free_rate": 1.0,
+        "precision_macro": 1.0,
+        "prohibited_free_rate": 1.0,
+        "required_group_recall": 1.0
+      },
+      "evidence": {
+        "answerable_non_abstention_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "case_tag:category-2": {
+          "kind": "count",
+          "value": 1
+        },
+        "case_tag:locomo": {
+          "kind": "count",
+          "value": 1
+        },
+        "case_tag:published-evidence": {
+          "kind": "count",
+          "value": 1
+        },
+        "duplicate_free_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "precision_macro": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "prohibited_free_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "required_group_recall": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        }
+      },
+      "failures": [],
+      "duration_ms": 8320,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "retrieval-quality",
+        "case_id": "locomo-conv-30-002"
+      },
+      "mode": "end_to_end",
+      "split": "development",
+      "label_trust": "reviewed",
+      "status": "quality_failed",
+      "metrics": {
+        "answerable_non_abstention_rate": 1.0,
+        "duplicate_free_rate": 1.0,
+        "precision_macro": 1.0,
+        "prohibited_free_rate": 1.0,
+        "required_group_recall": 0.0
+      },
+      "evidence": {
+        "answerable_non_abstention_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "case_tag:category-4": {
+          "kind": "count",
+          "value": 1
+        },
+        "case_tag:locomo": {
+          "kind": "count",
+          "value": 1
+        },
+        "case_tag:published-evidence": {
+          "kind": "count",
+          "value": 1
+        },
+        "duplicate_free_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "precision_macro": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "prohibited_free_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "required_group_recall": {
+          "kind": "ratio",
+          "numerator": 0,
+          "denominator": 2
+        }
+      },
+      "failures": [
+        "retrieval missed one or more required evidence groups",
+        "native selected evidence: [{\"gold_key\":\"raw:D2:11\",\"item\":{\"confidence\":0.37,\"content\":\"Gina: Believe in yourself, Jon! The process may be tough, but you got this. Push through and it'll be worth it. Don't forget to take breaks and dance it out when you need to destress!\",\"fact_id\":\"episode_fallback:episode:4d965fcb44d7a6e881c0ef5b\",\"grounding\":0.4,\"provenance\":{\"episode_fallback\":true,\"reference_time\":\"2023-01-29T14:32:00Z\",\"reranking\":{\"admission_floor\":0.0,\"model_signature\":\"reranksig:dff4b9939786ed9a1e897946778e336584cc24251a2f32282bd3fe83a680a7d1\",\"relevance_logit\":2.210026502609253},\"source_episode\":\"episode:4d965fcb44d7a6e881c0ef5b\",\"source_id\":\"locomo:conv-30:D2:11\",\"source_type\":\"conversation\"},\"quote\":\"Gina: Believe in yourself, Jon! The process may be tough, but you got this. Push through and it'll be worth it. Don't forget to take breaks and dance it out when you need to destress!\",\"rationale\":\"tier=fallback fts=2.00 access_count=0 confidence=0.37 grounding=0.40 semantic=enabled matched episode content query=\\\"jon gina both like destress\\\" and active at 2026-10-10\",\"relevance\":0.4,\"retrieval_tier\":\"fallback\",\"semantic_available\":true,\"source_episode\":\"episode:4d965fcb44d7a6e881c0ef5b\"}}]",
+        "native reranking candidates: [{\"document\":\"Memory reference date: 2023-01-20 (20 January 2023).\\nSource identity: locomo:conv-30:D1:27\\nGina: Wow, they look great! Can't wait to see them rock the festival. Gonna be awesome!\",\"query\":\"How do Jon and Gina both like to destress?\",\"score\":-7.518010139465332},{\"document\":\"Memory reference date: 2023-01-20 (20 January 2023).\\nSource identity: locomo:conv-30:D1:10\\nJon: Wow, great idea! Let's go to a dance class, it'll be so much fun!\",\"query\":\"How do Jon and Gina both like to destress?\",\"score\":-8.310662269592285},{\"document\":\"Memory reference date: 2023-01-20 (20 January 2023).\\nSource identity: locomo:conv-30:D1:21\\nGina: Cool setup! Man, you can't deny that view! Got time to rehearse with a biz and a new store?\",\"query\":\"How do Jon and Gina both like to destress?\",\"score\":-7.8228631019592285},{\"document\":\"Memory reference date: 2023-01-20 (20 January 2023).\\nSource identity: locomo:conv-30:D1:17\\nGina: I used to compete in a few dance competitions and shows - my fav memory was when my team won first place at a regionals at age fifteen. It was an awesome feeling of accomplishment!\\n\\nUpstream image metadata (dataset annotation, not a user assertion):\\n{\\\"blip_caption\\\": \\\"a photography of a couple of people standing next to each other\\\", \\\"img_url\\\": [\\\"https://upload.wikimedia.org/wikipedia/commons/4/41/2009_NHK_Trophy_Dance_-_Meryl_DAVIS_-_Charlie_WHITE_-_Gold_Medal_-_0948a.jpg\\\"], \\\"query\\\": \\\"dance competition trophy team\\\"}\",\"query\":\"How do Jon and Gina both like to destress?\",\"score\":-5.711893081665039},{\"document\":\"Memory reference date: 2023-01-29 (29 January 2023).\\nSource identity: locomo:conv-30:D2:7\\nGina: Definitely! Dance floors help avoid injuries and make dancing more enjoyable. You thinking about it is great. Any particular type of flooring you like?\",\"query\":\"How do Jon and Gina both like to destress?\",\"score\":-7.093993663787842},{\"document\":\"Memory reference date: 2023-01-20 (20 January 2023).\\nSource identity: locomo:conv-30:D1:3\\nGina: Sorry about your job Jon, but starting your own business sounds awesome! Unfortunately, I also lost my job at Door Dash this month. What business are you thinking of?\",\"query\":\"How do Jon and Gina both like to destress?\",\"score\":-6.537034034729004},{\"document\":\"Memory reference date: 2023-01-29 (29 January 2023).\\nSource identity: locomo:conv-30:D2:13\\nGina: Thanks, Jon! Appreciate your support!\",\"query\":\"How do Jon and Gina both like to destress?\",\"score\":-6.565542697906494},{\"document\":\"Memory reference date: 2023-01-20 (20 January 2023).\\nSource identity: locomo:conv-30:D1:23\\nGina: Wow, it looks great! What dances do you practice? Got any projects planned?\",\"query\":\"How do Jon and Gina both like to destress?\",\"score\":-8.973362922668457},{\"document\":\"Memory reference date: 2023-01-20 (20 January 2023).\\nSource identity: locomo:conv-30:D1:14\\nJon: Wow, I'm excited too! This is gonna be great!\\n\\nUpstream image metadata (dataset annotation, not a user assertion):\\n{\\\"blip_caption\\\": \\\"a photography of a man in a suit is performing a dance\\\", \\\"img_url\\\": [\\\"https://upload.wikimedia.org/wikipedia/commons/a/a9/Dekkadancers_Mu%C5%BE_z_Malty.jpg\\\"], \\\"query\\\": \\\"dancing on stage performance dance competition last year\\\"}\",\"query\":\"How do Jon and Gina both like to destress?\",\"score\":-5.554698467254639},{\"document\":\"Memory reference date: 2023-01-29 (29 January 2023).\\nSource identity: locomo:conv-30:D2:5\\nGina: Wow, nice spot! Where is it? Got any other features you want to think about before you decide? Paris?! That is really great Jon! Never had a chance to visit it. Been only to Rome once.\",\"query\":\"How do Jon and Gina both like to destress?\",\"score\":-6.506174087524414},{\"document\":\"Memory reference date: 2023-01-29 (29 January 2023).\\nSource identity: locomo:conv-30:D2:14\\nJon: Let's keep going and chase our dreams!\",\"query\":\"How do Jon and Gina both like to destress?\",\"score\":-8.248517036437988},{\"document\":\"Memory reference date: 2023-01-29 (29 January 2023).\\nSource identity: locomo:conv-30:D2:8\\nJon: Yeah, good flooring's crucial. I'm after Marley flooring, which is what dance studios usually use. It's great 'cause it's grippy but still lets you move, plus it's tough and easy to keep clean.\",\"query\":\"How do Jon and Gina both like to destress?\",\"score\":-6.981083393096924},{\"document\":\"Memory reference date: 2023-01-20 (20 January 2023).\\nSource identity: locomo:conv-30:D1:4\\nJon: Sorry to hear that! I'm starting a dance studio 'cause I'm passionate about dancing and it'd be great to share it with others.\",\"query\":\"How do Jon and Gina both like to destress?\",\"score\":-8.593117713928223},{\"document\":\"Memory reference date: 2023-01-20 (20 January 2023).\\nSource identity: locomo:conv-30:D1:1\\nGina: Hey Jon! Good to see you. What's up? Anything new?\",\"query\":\"How do Jon and Gina both like to destress?\",\"score\":-6.435944080352783},{\"document\":\"Memory reference date: 2023-01-20 (20 January 2023).\\nSource identity: locomo:conv-30:D1:16\\nJon: Woah, that pic's from when my dance crew took home first in a local comp last year. It was amazing up on that stage! I'm super keen to spread that intensity with other peeps. Gina, you ever been in any dance comps or shows?\",\"query\":\"How do Jon and Gina both like to destress?\",\"score\":-4.6877617835998535},{\"document\":\"Memory reference date: 2023-01-20 (20 January 2023).\\nSource identity: locomo:conv-30:D1:6\\nJon: I've been into dancing since I was a kid and it's been my passion and escape. I wanna start a dance studio so I can teach others the joy that dancing brings me.\",\"query\":\"How do Jon and Gina both like to destress?\",\"score\":-8.366496086120605},{\"document\":\"Memory reference date: 2023-01-20 (20 January 2023).\\nSource identity: locomo:conv-30:D1:25\\nGina: Wow, it looks awesome! Are they yours at the festival? They're so graceful!\",\"query\":\"How do Jon and Gina both like to destress?\",\"score\":-8.009824752807617},{\"document\":\"Memory reference date: 2023-01-29 (29 January 2023).\\nSource identity: locomo:conv-30:D2:1\\nGina: Hey Jon! Long time no see! Things have been hectic lately. I just launched an ad campaign for my clothing store in hopes of growing the business. Starting my own store and taking risks is both scary and rewarding. I'm excited to see where it takes me!\\n\\nUpstream image metadata (dataset annotation, not a user assertion):\\n{\\\"blip_caption\\\": \\\"a photo of a clothing store with a variety of clothes on display\\\"}\",\"query\":\"How do Jon and Gina both like to destress?\",\"score\":-2.2790119647979736},{\"document\":\"Memory reference date: 2023-01-20 (20 January 2023).\\nSource identity: locomo:conv-30:D1:9\\nGina: Yeah, me too! Contemporary dance is so expressive and graceful - it really speaks to me.\",\"query\":\"How do Jon and Gina both like to destress?\",\"score\":-7.3289971351623535},{\"document\":\"Memory reference date: 2023-01-20 (20 January 2023).\\nSource identity: locomo:conv-30:D1:24\\nJon: Thanks! I rehearsed with a small group of dancers after work. We do all kinds of dances, from contemporary to hip-hop. We've got some cool projects in the works. Finishing up choreography to perform at a nearby festival next month. Can't wait!\\n\\nUpstream image metadata (dataset annotation, not a user assertion):\\n{\\\"blip_caption\\\": \\\"a photo of a group of dancers in white dresses on a stage\\\", \\\"img_url\\\": [\\\"https://markmorrisdancegroup.org/wp-content/uploads/2021/04/MM0108_JesuMeineFreude_Boston_BrazilTom_02.jpg\\\"], \\\"query\\\": \\\"group dancers performing on stage\\\"}\",\"query\":\"How do Jon and Gina both like to destress?\",\"score\":-7.752565860748291},{\"document\":\"Memory reference date: 2023-01-20 (20 January 2023).\\nSource identity: locomo:conv-30:D1:20\\nJon: Wow, that must've been great! Check my ideal dance studio by the water.\\n\\nUpstream image metadata (dataset annotation, not a user assertion):\\n{\\\"blip_caption\\\": \\\"a photography of a room with a view of the ocean and a few yoga mats\\\", \\\"img_url\\\": [\\\"https://live.staticflickr.com/2730/4360526470_6bee96b5d7_b.jpg\\\"], \\\"query\\\": \\\"dance studio overlooking ocean\\\"}\",\"query\":\"How do Jon and Gina both like to destress?\",\"score\":-7.367802143096924},{\"document\":\"Memory reference date: 2023-01-20 (20 January 2023).\\nSource identity: locomo:conv-30:D1:13\\nGina: Sounds great, Jon! Next Friday works. Let's boogie!\",\"query\":\"How do Jon and Gina both like to destress?\",\"score\":-5.950541019439697},{\"document\":\"Memory reference date: 2023-01-29 (29 January 2023).\\nSource identity: locomo:conv-30:D2:15\\nGina: Yeah! We've done so much, and there's nothing but good stuff coming. Let's keep going after our goals and making them happen.\",\"query\":\"How do Jon and Gina both like to destress?\",\"score\":-6.559878826141357},{\"document\":\"Memory reference date: 2023-01-29 (29 January 2023).\\nSource identity: locomo:conv-30:D2:11\\nGina: Believe in yourself, Jon! The process may be tough, but you got this. Push through and it'll be worth it. Don't forget to take breaks and dance it out when you need to destress!\",\"query\":\"How do Jon and Gina both like to destress?\",\"score\":2.210026502609253},{\"document\":\"Memory reference date: 2023-01-20 (20 January 2023).\\nSource identity: locomo:conv-30:D1:12\\nJon: Yeah definitely! Wanna see my moves next Fri? Can't wait!\",\"query\":\"How do Jon and Gina both like to destress?\",\"score\":-8.746686935424805},{\"document\":\"Memory reference date: 2023-01-20 (20 January 2023).\\nSource identity: locomo:conv-30:D1:18\\nJon: Wow! Winning first place is amazing! What dance were you doing?\",\"query\":\"How do Jon and Gina both like to destress?\",\"score\":-9.32301139831543},{\"document\":\"Memory reference date: 2023-01-20 (20 January 2023).\\nSource identity: locomo:conv-30:D1:7\\nGina: Wow Jon, same here! Dance is pretty much my go-to for stress relief. Got any fave styles?\",\"query\":\"How do Jon and Gina both like to destress?\",\"score\":-0.6400040984153748},{\"document\":\"Memory reference date: 2023-01-29 (29 January 2023).\\nSource identity: locomo:conv-30:D2:4\\nJon: Hey Gina! Thanks for asking. I'm on the hunt for the ideal spot for my dance studio and it's been quite a journey! I've been looking at different places and picturing how the space would look. I even found a place with great natural light! Oh, I've been to Paris yesterday! It was sooo cool.\\n\\nUpstream image metadata (dataset annotation, not a user assertion):\\n{\\\"blip_caption\\\": \\\"a photo of a bathroom with a blue floor and a pink wall\\\", \\\"img_url\\\": [\\\"https://avvay-aws-production.imgix.net/space-media/space-media-422692-prod.jpg\\\"], \\\"query\\\": \\\"dance studio natural lighting spacious room large windows dance mirrors\\\"}\",\"query\":\"How do Jon and Gina both like to destress?\",\"score\":-5.206363201141357},{\"document\":\"Memory reference date: 2023-01-20 (20 January 2023).\\nSource identity: locomo:conv-30:D1:22\\nJon: Hopefully, we will find a place like this that will inspire us!\",\"query\":\"How do Jon and Gina both like to destress?\",\"score\":-8.866194725036621},{\"document\":\"Memory reference date: 2023-01-29 (29 January 2023).\\nSource identity: locomo:conv-30:D2:6\\nJon: It's downtown which is awesome cuz it's easy to get to. Plus the natural light! Gotta check the size & floor quality too. We need a good dance floor with enough bounce for me & my students to dance safely.\",\"query\":\"How do Jon and Gina both like to destress?\",\"score\":-8.569869041442871},{\"document\":\"Memory reference date: 2023-01-20 (20 January 2023).\\nSource identity: locomo:conv-30:D1:26\\nJon: Yeah, they're the ones performing at the festival! They've been practicing hard and will definitely impress with their grace and skill.\",\"query\":\"How do Jon and Gina both like to destress?\",\"score\":-7.911172389984131},{\"document\":\"Memory reference date: 2023-01-29 (29 January 2023).\\nSource identity: locomo:conv-30:D2:9\\nGina: Sounds great! Marley's perfect; it's got the right amount of grip and movement. Can't wait to see your dance studio done!\",\"query\":\"How do Jon and Gina both like to destress?\",\"score\":-8.110503196716309},{\"document\":\"Memory reference date: 2023-01-29 (29 January 2023).\\nSource identity: locomo:conv-30:D2:16\\nJon: Success is almost here. We got this!\",\"query\":\"How do Jon and Gina both like to destress?\",\"score\":-8.473466873168945},{\"document\":\"Memory reference date: 2023-01-29 (29 January 2023).\\nSource identity: locomo:conv-30:D2:2\\nJon: Hey Gina! Whoa, your store looks great! All your hard work really paid off - congrats! Must be awesome to see your stuff on display.\",\"query\":\"How do Jon and Gina both like to destress?\",\"score\":-5.059527397155762},{\"document\":\"Memory reference date: 2023-01-29 (29 January 2023).\\nSource identity: locomo:conv-30:D2:12\\nJon: Glad I have you in my corner! Gotta make time to dance and vent, that's for sure. We'll make it through this - hang in there!\",\"query\":\"How do Jon and Gina both like to destress?\",\"score\":-7.1280341148376465},{\"document\":\"Memory reference date: 2023-01-29 (29 January 2023).\\nSource identity: locomo:conv-30:D2:10\\nJon: Yeah, can't wait to see it done! Looking for the right place and getting everything ready has been a mix of exciting and nerve-wracking, but I'm determined to make it work. It'll be worth it!\",\"query\":\"How do Jon and Gina both like to destress?\",\"score\":-6.108363151550293},{\"document\":\"Memory reference date: 2023-01-20 (20 January 2023).\\nSource identity: locomo:conv-30:D1:5\\nGina: That's cool, Jon! What got you into this biz?\",\"query\":\"How do Jon and Gina both like to destress?\",\"score\":-6.725159645080566},{\"document\":\"Memory reference date: 2023-01-20 (20 January 2023).\\nSource identity: locomo:conv-30:D1:8\\nJon: Cool, Gina! I love all dances, but contemporary is my top pick. It's so expressive and powerful! What's your fave?\",\"query\":\"How do Jon and Gina both like to destress?\",\"score\":-5.464535236358643},{\"document\":\"Memory reference date: 2023-01-29 (29 January 2023).\\nSource identity: locomo:conv-30:D2:3\\nGina: Thanks a bunch! It's awesome seeing my vision happen. How's the dance studio going? Did you find the right spot?\",\"query\":\"How do Jon and Gina both like to destress?\",\"score\":-9.204375267028809},{\"document\":\"Memory reference date: 2023-01-20 (20 January 2023).\\nSource identity: locomo:conv-30:D1:11\\nGina: Yeah! Let's explore some new dance moves. We should plan a dance session soon!\",\"query\":\"How do Jon and Gina both like to destress?\",\"score\":-7.4831414222717285},{\"document\":\"Memory reference date: 2023-01-20 (20 January 2023).\\nSource identity: locomo:conv-30:D1:19\\nGina: Thanks! We just did a contemporary piece called \\\"Finding Freedom.\\\" It was really emotional and powerful.\\n\\nUpstream image metadata (dataset annotation, not a user assertion):\\n{\\\"blip_caption\\\": \\\"a photo of a large open porch with a fireplace and a view of the water\\\"}\",\"query\":\"How do Jon and Gina both like to destress?\",\"score\":-6.312130451202393},{\"document\":\"Memory reference date: 2023-01-20 (20 January 2023).\\nSource identity: locomo:conv-30:D1:2\\nJon: Hey Gina! Good to see you too. Lost my job as a banker yesterday, so I'm gonna take a shot at starting my own business.\",\"query\":\"How do Jon and Gina both like to destress?\",\"score\":-5.037222385406494},{\"document\":\"Memory reference date: 2023-01-20 (20 January 2023).\\nSource identity: locomo:conv-30:D1:28\\nJon: Yeah, awesome! Glad to be part of it.\",\"query\":\"How do Jon and Gina both like to destress?\",\"score\":-8.2037992477417},{\"document\":\"Memory reference date: 2023-01-20 (20 January 2023).\\nSource identity: locomo:conv-30:D1:15\\nGina: Wow! What did you get?\",\"query\":\"How do Jon and Gina both like to destress?\",\"score\":-8.551203727722168}]"
+      ],
+      "duration_ms": 9816,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "retrieval-quality",
+        "case_id": "locomo-conv-41-001"
+      },
+      "mode": "end_to_end",
+      "split": "development",
+      "label_trust": "reviewed",
+      "status": "passed",
+      "metrics": {
+        "answerable_non_abstention_rate": 1.0,
+        "duplicate_free_rate": 1.0,
+        "precision_macro": 1.0,
+        "prohibited_free_rate": 1.0,
+        "required_group_recall": 1.0
+      },
+      "evidence": {
+        "answerable_non_abstention_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "case_tag:category-2": {
+          "kind": "count",
+          "value": 1
+        },
+        "case_tag:locomo": {
+          "kind": "count",
+          "value": 1
+        },
+        "case_tag:published-evidence": {
+          "kind": "count",
+          "value": 1
+        },
+        "duplicate_free_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "precision_macro": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "prohibited_free_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "required_group_recall": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        }
+      },
+      "failures": [],
+      "duration_ms": 8018,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "retrieval-quality",
+        "case_id": "locomo-conv-41-065"
+      },
+      "mode": "end_to_end",
+      "split": "development",
+      "label_trust": "reviewed",
+      "status": "quality_failed",
+      "metrics": {
+        "answerable_non_abstention_rate": 0.0,
+        "duplicate_free_rate": 1.0,
+        "precision_macro": 0.0,
+        "prohibited_free_rate": 1.0,
+        "required_group_recall": 0.0
+      },
+      "evidence": {
+        "answerable_non_abstention_rate": {
+          "kind": "ratio",
+          "numerator": 0,
+          "denominator": 1
+        },
+        "case_tag:category-4": {
+          "kind": "count",
+          "value": 1
+        },
+        "case_tag:locomo": {
+          "kind": "count",
+          "value": 1
+        },
+        "case_tag:published-evidence": {
+          "kind": "count",
+          "value": 1
+        },
+        "duplicate_free_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "precision_macro": {
+          "kind": "ratio",
+          "numerator": 0,
+          "denominator": 1
+        },
+        "prohibited_free_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "required_group_recall": {
+          "kind": "ratio",
+          "numerator": 0,
+          "denominator": 1
+        }
+      },
+      "failures": [
+        "retrieval missed one or more required evidence groups",
+        "retrieval did not follow the expected abstention behavior",
+        "native selected evidence: []",
+        "native reranking candidates: [{\"document\":\"Memory reference date: 2022-12-17 (17 December 2022).\\nSource identity: locomo:conv-41:D1:3\\nMaria: Been busy volunteering at the homeless shelter and keeping fit. Just started doing aerial yoga, it's great. Have you tried any other cool workout classes?\",\"query\":\"What is John's main focus in local politics?\",\"score\":-9.107197761535645},{\"document\":\"Memory reference date: 2022-12-17 (17 December 2022).\\nSource identity: locomo:conv-41:D1:12\\nJohn: It enabled needed repairs and renovations, making the learning environment safer and more modern for students.\",\"query\":\"What is John's main focus in local politics?\",\"score\":-8.281264305114746},{\"document\":\"Memory reference date: 2022-12-22 (22 December 2022).\\nSource identity: locomo:conv-41:D2:4\\nJohn: I just talked to someone who shared some amazing stories. It really fired up my passion to make education better in our area.\",\"query\":\"What is John's main focus in local politics?\",\"score\":-7.663214206695557},{\"document\":\"Memory reference date: 2022-12-22 (22 December 2022).\\nSource identity: locomo:conv-41:D2:14\\nJohn: Yeah, they are my rock in tough times and always cheer me on. I'm really thankful for their love. Family time means a lot to me.\\n\\nUpstream image metadata (dataset annotation, not a user assertion):\\n{\\\"blip_caption\\\": \\\"a photography of a family enjoying a ride on a swing\\\", \\\"img_url\\\": [\\\"https://cdn.stocksnap.io/img-thumbs/960w/playground-child_RL9KRCSWHD.jpg\\\"], \\\"query\\\": \\\"family park\\\"}\",\"query\":\"What is John's main focus in local politics?\",\"score\":-8.720948219299316},{\"document\":\"Memory reference date: 2022-12-22 (22 December 2022).\\nSource identity: locomo:conv-41:D2:10\\nJohn: Thanks a lot, Maria. Your help is really motivating and makes me more determined. Here's a pic of my family - they're the reason why I never give up. Their love gives me strength.\\n\\nUpstream image metadata (dataset annotation, not a user assertion):\\n{\\\"blip_caption\\\": \\\"a photography of a family having a picnic in the park\\\", \\\"img_url\\\": [\\\"https://images.pexels.com/photos/5119595/pexels-photo-5119595.jpeg\\\"], \\\"query\\\": \\\"family smiling hugging\\\"}\",\"query\":\"What is John's main focus in local politics?\",\"score\":-8.907696723937988},{\"document\":\"Memory reference date: 2022-12-22 (22 December 2022).\\nSource identity: locomo:conv-41:D2:21\\nMaria: Woah, that's a nice pic, John! You all obviously had a blast at dinner. Nothing beats getting together with loved ones for a good meal - it makes some awesome memories!\",\"query\":\"What is John's main focus in local politics?\",\"score\":-8.744804382324219},{\"document\":\"Memory reference date: 2022-12-22 (22 December 2022).\\nSource identity: locomo:conv-41:D2:3\\nMaria: That's awesome, John! Networking is great for gaining new perspectives and insights. Have you had any interesting conversations or revelations so far?\",\"query\":\"What is John's main focus in local politics?\",\"score\":-7.760953426361084},{\"document\":\"Memory reference date: 2022-12-22 (22 December 2022).\\nSource identity: locomo:conv-41:D2:27\\nMaria: Sure, John! It's those moments of creativity and laughter that bring us closer. Let's make happy memories with our family and keep them close.\",\"query\":\"What is John's main focus in local politics?\",\"score\":-7.949749946594238},{\"document\":\"Memory reference date: 2022-12-22 (22 December 2022).\\nSource identity: locomo:conv-41:D2:24\\nJohn: We made pizza! We had so much fun making them together. It was great picking out toppings and sharing a tasty meal with family. Have you made anything lately?\",\"query\":\"What is John's main focus in local politics?\",\"score\":-7.845096111297607},{\"document\":\"Memory reference date: 2022-12-17 (17 December 2022).\\nSource identity: locomo:conv-41:D1:14\\nJohn: I'm gonna chat with local leaders and organizations, get support and gather ideas for my next move.\",\"query\":\"What is John's main focus in local politics?\",\"score\":-3.3312389850616455},{\"document\":\"Memory reference date: 2022-12-22 (22 December 2022).\\nSource identity: locomo:conv-41:D2:23\\nMaria: Yeah, John! It definitely builds a strong bond. Those shared meals really make life enjoyable and meaningful. What did you make?\\n\\nUpstream image metadata (dataset annotation, not a user assertion):\\n{\\\"blip_caption\\\": \\\"a photo of a table with pizzas and salads on it\\\"}\",\"query\":\"What is John's main focus in local politics?\",\"score\":-8.9599609375},{\"document\":\"Memory reference date: 2022-12-17 (17 December 2022).\\nSource identity: locomo:conv-41:D1:2\\nJohn: Hey Maria! Good to see you. Just got back from a family road trip yesterday, it was fun! Anything exciting happening for you?\",\"query\":\"What is John's main focus in local politics?\",\"score\":-8.132367134094238},{\"document\":\"Memory reference date: 2022-12-22 (22 December 2022).\\nSource identity: locomo:conv-41:D2:22\\nJohn: Thanks, Maria! Meal times are always fun. Good food, laughs, and chats help us stay close.\",\"query\":\"What is John's main focus in local politics?\",\"score\":-6.533712387084961},{\"document\":\"Memory reference date: 2022-12-17 (17 December 2022).\\nSource identity: locomo:conv-41:D1:4\\nJohn: Woah, Maria, that sounds cool! I'm doing kickboxing and it's giving me so much energy.\",\"query\":\"What is John's main focus in local politics?\",\"score\":-7.596008777618408},{\"document\":\"Memory reference date: 2022-12-17 (17 December 2022).\\nSource identity: locomo:conv-41:D1:15\\nMaria: Sounds good, John. Let's get support and great ideas from local leaders and organizations. Keep me posted on how your campaign is going.\",\"query\":\"What is John's main focus in local politics?\",\"score\":-4.658133029937744},{\"document\":\"Memory reference date: 2022-12-22 (22 December 2022).\\nSource identity: locomo:conv-41:D2:28\\nJohn:  Yep, let's keep making great memories with our loved ones and cherishing the time we have. I'm off to do some taekwondo!\",\"query\":\"What is John's main focus in local politics?\",\"score\":-8.434086799621582},{\"document\":\"Memory reference date: 2022-12-22 (22 December 2022).\\nSource identity: locomo:conv-41:D2:9\\nMaria: You got this, John! I believe in your power to make a positive difference. Your passion inspires me. Keep going - I'm here for you.\",\"query\":\"What is John's main focus in local politics?\",\"score\":-7.531733512878418},{\"document\":\"Memory reference date: 2022-12-22 (22 December 2022).\\nSource identity: locomo:conv-41:D2:19\\nMaria: Definitely, John. They bring us joy, support, and a feeling of being part of something special. We should cherish every moment with them.\",\"query\":\"What is John's main focus in local politics?\",\"score\":-4.989535331726074},{\"document\":\"Memory reference date: 2022-12-17 (17 December 2022).\\nSource identity: locomo:conv-41:D1:10\\nJohn: Growing up, I saw how lack of education and crumbling infrastructure affected my neighborhood. I don't want future generations to go through that, so I think schools and infrastructure should be funded properly. Here's a pic of a school last year, after they got the funding.\\n\\nUpstream image metadata (dataset annotation, not a user assertion):\\n{\\\"blip_caption\\\": \\\"a photo of a group of men working on a building\\\", \\\"img_url\\\": [\\\"https://www.greenbaypressgazette.com/gcdn/presto/2019/07/16/PGRB/fa8d60a1-0a21-421c-b36d-31f4bc2d2b6d-KEW_0720_LC_referendum_Peters_Concrete_pour.png\\\"], \\\"query\\\": \\\"school building renovation\\\"}\",\"query\":\"What is John's main focus in local politics?\",\"score\":-7.449730396270752},{\"document\":\"Memory reference date: 2022-12-22 (22 December 2022).\\nSource identity: locomo:conv-41:D2:18\\nJohn: Sounds nice, Maria! Spending time with loved ones is important.\",\"query\":\"What is John's main focus in local politics?\",\"score\":-7.774856090545654},{\"document\":\"Memory reference date: 2022-12-22 (22 December 2022).\\nSource identity: locomo:conv-41:D2:6\\nJohn: Definitely, Maria. Investing in our future generations is key, giving them the right tools for success. It's the foundation of progress and opportunity.\",\"query\":\"What is John's main focus in local politics?\",\"score\":-6.158186435699463},{\"document\":\"Memory reference date: 2022-12-17 (17 December 2022).\\nSource identity: locomo:conv-41:D1:5\\nMaria: Cool, John. Kickboxing is a perfect way to stay in shape and de-stress. Do you have any goals you're working towards?\",\"query\":\"What is John's main focus in local politics?\",\"score\":-8.704829216003418},{\"document\":\"Memory reference date: 2022-12-17 (17 December 2022).\\nSource identity: locomo:conv-41:D1:13\\nMaria: Wow John, it really made a difference for schools and students! It must have been great to be involved. What's your next move in politics?\",\"query\":\"What is John's main focus in local politics?\",\"score\":-8.480568885803223},{\"document\":\"Memory reference date: 2022-12-22 (22 December 2022).\\nSource identity: locomo:conv-41:D2:7\\nMaria: Yeah, John. It's amazing how even minor tweaks to the system can make a big difference for lots of people. I'm really impressed with your enthusiasm and commitment to it!\",\"query\":\"What is John's main focus in local politics?\",\"score\":-8.334179878234863},{\"document\":\"Memory reference date: 2022-12-22 (22 December 2022).\\nSource identity: locomo:conv-41:D2:1\\nMaria: Hey John, been a few days since we chatted. In the meantime, I donated my old car to a homeless shelter I volunteer at yesterday. How's the campaign going? I'm keen to hearabout it.\",\"query\":\"What is John's main focus in local politics?\",\"score\":-9.63707160949707},{\"document\":\"Memory reference date: 2022-12-17 (17 December 2022).\\nSource identity: locomo:conv-41:D1:11\\nMaria: Looks good! How did the extra funding help with building the school?\",\"query\":\"What is John's main focus in local politics?\",\"score\":-10.337237358093262},{\"document\":\"Memory reference date: 2022-12-22 (22 December 2022).\\nSource identity: locomo:conv-41:D2:26\\nJohn: Yeah Maria, it's awesome! We get our creative on and have a blast together.\",\"query\":\"What is John's main focus in local politics?\",\"score\":-7.646113872528076},{\"document\":\"Memory reference date: 2022-12-22 (22 December 2022).\\nSource identity: locomo:conv-41:D2:12\\nJohn: Thanks, Maria. They really help me stay centered. They remind me why I'm so passionate about making a positive impact.\",\"query\":\"What is John's main focus in local politics?\",\"score\":-7.542251110076904},{\"document\":\"Memory reference date: 2022-12-17 (17 December 2022).\\nSource identity: locomo:conv-41:D1:1\\nMaria: Hey John! Long time no see! What's up?\",\"query\":\"What is John's main focus in local politics?\",\"score\":-10.031858444213867},{\"document\":\"Memory reference date: 2022-12-22 (22 December 2022).\\nSource identity: locomo:conv-41:D2:2\\nJohn: Hi Maria! It's been an interesting ride so far. I've been networking with some people to get their input.\",\"query\":\"What is John's main focus in local politics?\",\"score\":-8.402621269226074},{\"document\":\"Memory reference date: 2022-12-22 (22 December 2022).\\nSource identity: locomo:conv-41:D2:5\\nMaria: Wow, John! Hearing that can really make an impact and get us fired up to make a difference. It's great to hear that you're feeling motivated to make improvements to our community's education!\",\"query\":\"What is John's main focus in local politics?\",\"score\":-7.392727375030518},{\"document\":\"Memory reference date: 2022-12-22 (22 December 2022).\\nSource identity: locomo:conv-41:D2:20\\nJohn: Yeah Maria, making memories with family is priceless! Life is so much more meaningful when we spend time together. Here's a pic of us at dinner.\\n\\nUpstream image metadata (dataset annotation, not a user assertion):\\n{\\\"blip_caption\\\": \\\"a photo of a group of people standing around a kitchen table\\\", \\\"img_url\\\": [\\\"https://images.pexels.com/photos/1655329/pexels-photo-1655329.jpeg?cs\\\\\\\\u003dsrgb\\\\\\\\u0026dl\\\\\\\\u003dpexels-lisa-fotios-1655329.jpg\\\"], \\\"query\\\": \\\"family dinner gathering\\\"}\",\"query\":\"What is John's main focus in local politics?\",\"score\":-8.818572998046875},{\"document\":\"Memory reference date: 2022-12-17 (17 December 2022).\\nSource identity: locomo:conv-41:D1:8\\nJohn: I'm passionate about improving education and infrastructure in our community. Those are my main focuses.\",\"query\":\"What is John's main focus in local politics?\",\"score\":-0.8277450799942017},{\"document\":\"Memory reference date: 2022-12-17 (17 December 2022).\\nSource identity: locomo:conv-41:D1:6\\nJohn: Yeah Maria, I'm really hoping to get into local politics. I love helping the community and making it a better place.\",\"query\":\"What is John's main focus in local politics?\",\"score\":-0.8205175995826721},{\"document\":\"Memory reference date: 2022-12-22 (22 December 2022).\\nSource identity: locomo:conv-41:D2:15\\nMaria: Wow, John, that playground looks cool! What kind of stuff do you and your family do there?\",\"query\":\"What is John's main focus in local politics?\",\"score\":-10.267428398132324},{\"document\":\"Memory reference date: 2022-12-22 (22 December 2022).\\nSource identity: locomo:conv-41:D2:11\\nMaria: Wow, John, that's a great pic! Your family looks so cheerful and loving. It's wonderful to have such a supportive and loving family.\",\"query\":\"What is John's main focus in local politics?\",\"score\":-8.21915054321289},{\"document\":\"Memory reference date: 2022-12-17 (17 December 2022).\\nSource identity: locomo:conv-41:D1:7\\nMaria: Woohoo, John! That's awesome! Any specific areas you want to tackle?\",\"query\":\"What is John's main focus in local politics?\",\"score\":-8.675456047058105},{\"document\":\"Memory reference date: 2022-12-22 (22 December 2022).\\nSource identity: locomo:conv-41:D2:8\\nJohn: Thanks, Maria. Your encouragement means a lot to me. It's true that with effort and support, we can make a real difference in our community.\",\"query\":\"What is John's main focus in local politics?\",\"score\":-7.031261920928955},{\"document\":\"Memory reference date: 2022-12-22 (22 December 2022).\\nSource identity: locomo:conv-41:D2:16\\nJohn: Thanks, Maria! We love climbing, sliding, and playing games. It's an awesome way to connect and have a blast. What do you enjoy doing with your family?\",\"query\":\"What is John's main focus in local politics?\",\"score\":-9.24918270111084},{\"document\":\"Memory reference date: 2022-12-17 (17 December 2022).\\nSource identity: locomo:conv-41:D1:9\\nMaria: Wow, John! It's great to hear that. Could you tell me what got you interested in those topics?\",\"query\":\"What is John's main focus in local politics?\",\"score\":-9.498230934143066},{\"document\":\"Memory reference date: 2022-12-17 (17 December 2022).\\nSource identity: locomo:conv-41:D1:16\\nJohn: Got it! Thanks, Maria. I definitely will.\",\"query\":\"What is John's main focus in local politics?\",\"score\":-8.262451171875}]"
+      ],
+      "duration_ms": 8953,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "retrieval-quality",
+        "case_id": "locomo-conv-42-002"
+      },
+      "mode": "end_to_end",
+      "split": "development",
+      "label_trust": "reviewed",
+      "status": "passed",
+      "metrics": {
+        "answerable_non_abstention_rate": 1.0,
+        "duplicate_free_rate": 1.0,
+        "precision_macro": 1.0,
+        "prohibited_free_rate": 1.0,
+        "required_group_recall": 1.0
+      },
+      "evidence": {
+        "answerable_non_abstention_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "case_tag:category-2": {
+          "kind": "count",
+          "value": 1
+        },
+        "case_tag:locomo": {
+          "kind": "count",
+          "value": 1
+        },
+        "case_tag:published-evidence": {
+          "kind": "count",
+          "value": 1
+        },
+        "case_tag:source_labeled_upstream_image_metadata": {
+          "kind": "count",
+          "value": 1
+        },
+        "duplicate_free_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "precision_macro": {
+          "kind": "ratio",
+          "numerator": 2,
+          "denominator": 2
+        },
+        "prohibited_free_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "required_group_recall": {
+          "kind": "ratio",
+          "numerator": 2,
+          "denominator": 2
+        }
+      },
+      "failures": [],
+      "duration_ms": 7815,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "retrieval-quality",
+        "case_id": "locomo-conv-42-096"
+      },
+      "mode": "end_to_end",
+      "split": "development",
+      "label_trust": "reviewed",
+      "status": "passed",
+      "metrics": {
+        "answerable_non_abstention_rate": 1.0,
+        "duplicate_free_rate": 1.0,
+        "precision_macro": 1.0,
+        "prohibited_free_rate": 1.0,
+        "required_group_recall": 1.0
+      },
+      "evidence": {
+        "answerable_non_abstention_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "case_tag:category-4": {
+          "kind": "count",
+          "value": 1
+        },
+        "case_tag:locomo": {
+          "kind": "count",
+          "value": 1
+        },
+        "case_tag:published-evidence": {
+          "kind": "count",
+          "value": 1
+        },
+        "duplicate_free_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "precision_macro": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "prohibited_free_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "required_group_recall": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        }
+      },
+      "failures": [],
+      "duration_ms": 8773,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "retrieval-quality",
+        "case_id": "locomo-conv-43-071"
+      },
+      "mode": "end_to_end",
+      "split": "development",
+      "label_trust": "reviewed",
+      "status": "quality_failed",
+      "metrics": {
+        "answerable_non_abstention_rate": 1.0,
+        "duplicate_free_rate": 1.0,
+        "precision_macro": 0.5,
+        "prohibited_free_rate": 0.0,
+        "required_group_recall": 0.5
+      },
+      "evidence": {
+        "answerable_non_abstention_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "case_tag:category-4": {
+          "kind": "count",
+          "value": 1
+        },
+        "case_tag:locomo": {
+          "kind": "count",
+          "value": 1
+        },
+        "case_tag:published-evidence": {
+          "kind": "count",
+          "value": 1
+        },
+        "duplicate_free_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "precision_macro": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 2
+        },
+        "prohibited_free_rate": {
+          "kind": "ratio",
+          "numerator": 0,
+          "denominator": 1
+        },
+        "required_group_recall": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 2
+        }
+      },
+      "failures": [
+        "retrieval missed one or more required evidence groups",
+        "retrieval returned unlabeled or disallowed evidence",
+        "prohibited evidence was retrieved",
+        "native selected evidence: [{\"gold_key\":\"raw:D1:4\",\"item\":{\"confidence\":0.34,\"content\":\"Tim: Woohoo! Congrats on the new team. Which team did you sign with?\",\"fact_id\":\"episode_fallback:episode:309f3020f0395c271be3095c\",\"grounding\":0.33,\"provenance\":{\"episode_fallback\":true,\"reference_time\":\"2023-05-21T19:48:00Z\",\"reranking\":{\"admission_floor\":0.0,\"model_signature\":\"reranksig:dff4b9939786ed9a1e897946778e336584cc24251a2f32282bd3fe83a680a7d1\",\"relevance_logit\":5.974437236785889},\"source_episode\":\"episode:309f3020f0395c271be3095c\",\"source_id\":\"locomo:conv-43:D1:4\",\"source_type\":\"conversation\"},\"quote\":\"Tim: Woohoo! Congrats on the new team. Which team did you sign with?\",\"rationale\":\"tier=fallback fts=2.00 access_count=0 confidence=0.34 grounding=0.33 semantic=enabled matched episode content query=\\\"team john sign 21 may 2023\\\" and active at 2026-10-10\",\"relevance\":0.33,\"retrieval_tier\":\"fallback\",\"semantic_available\":true,\"source_episode\":\"episode:309f3020f0395c271be3095c\"}},{\"gold_key\":\"raw:D1:11\",\"item\":{\"confidence\":0.34,\"content\":\"John: Fitting into the new team's style of play was a challenge during pre-season.\",\"fact_id\":\"episode_fallback:episode:d4192430a99f29ae7156cad1\",\"grounding\":0.33,\"provenance\":{\"episode_fallback\":true,\"reference_time\":\"2023-05-21T19:48:00Z\",\"reranking\":{\"admission_floor\":0.0,\"model_signature\":\"reranksig:dff4b9939786ed9a1e897946778e336584cc24251a2f32282bd3fe83a680a7d1\",\"relevance_logit\":3.3970155715942383},\"source_episode\":\"episode:d4192430a99f29ae7156cad1\",\"source_id\":\"locomo:conv-43:D1:11\",\"source_type\":\"conversation\"},\"quote\":\"John: Fitting into the new team's style of play was a challenge during pre-season.\",\"rationale\":\"tier=fallback fts=2.00 access_count=0 confidence=0.34 grounding=0.33 semantic=enabled matched episode content query=\\\"team john sign 21 may 2023\\\" and active at 2026-10-10\",\"relevance\":0.33,\"retrieval_tier\":\"fallback\",\"semantic_available\":true,\"source_episode\":\"episode:d4192430a99f29ae7156cad1\"}}]",
+        "native reranking candidates: [{\"document\":\"Memory reference date: 2023-05-21 (21 May 2023).\\nSource identity: locomo:conv-43:D1:11\\nJohn: Fitting into the new team's style of play was a challenge during pre-season.\",\"query\":\"Which team did John sign with on 21 May, 2023?\",\"score\":3.3970155715942383},{\"document\":\"Memory reference date: 2023-05-21 (21 May 2023).\\nSource identity: locomo:conv-43:D1:4\\nTim: Woohoo! Congrats on the new team. Which team did you sign with?\",\"query\":\"Which team did John sign with on 21 May, 2023?\",\"score\":5.974437236785889}]"
+      ],
+      "duration_ms": 4716,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "retrieval-quality",
+        "case_id": "locomo-conv-44-000"
+      },
+      "mode": "end_to_end",
+      "split": "development",
+      "label_trust": "reviewed",
+      "status": "quality_failed",
+      "metrics": {
+        "answerable_non_abstention_rate": 1.0,
+        "duplicate_free_rate": 1.0,
+        "precision_macro": 1.0,
+        "prohibited_free_rate": 1.0,
+        "required_group_recall": 0.5
+      },
+      "evidence": {
+        "answerable_non_abstention_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "case_tag:category-2": {
+          "kind": "count",
+          "value": 1
+        },
+        "case_tag:locomo": {
+          "kind": "count",
+          "value": 1
+        },
+        "case_tag:published-evidence": {
+          "kind": "count",
+          "value": 1
+        },
+        "duplicate_free_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "precision_macro": {
+          "kind": "ratio",
+          "numerator": 2,
+          "denominator": 2
+        },
+        "prohibited_free_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "required_group_recall": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 2
+        }
+      },
+      "failures": [
+        "retrieval missed one or more required evidence groups",
+        "native selected evidence: [{\"gold_key\":\"raw:D2:1\",\"item\":{\"confidence\":0.25,\"content\":\"Audrey: Hey Andrew, I got a surprise for you! We adopted another puppy called Pixie. She's SO cute! Isn't she just the cutest?\\n\\nUpstream image metadata (dataset annotation, not a user assertion):\\n{\\\"blip_caption\\\": \\\"a photo of a small white dog sitting on a carpet\\\", \\\"img_url\\\": [\\\"https://moderndogmagazine.com/sites/default/files/images/photoentries/photos/pixie%20smiling.jpg\\\"], \\\"query\\\": \\\"new puppy Pixie\\\"}\",\"fact_id\":\"episode_fallback:episode:85f4cbb0b45bce7b305ce171\",\"grounding\":0.14,\"provenance\":{\"episode_fallback\":true,\"reference_time\":\"2023-04-02T14:42:00Z\",\"reranking\":{\"admission_floor\":0.0,\"model_signature\":\"reranksig:dff4b9939786ed9a1e897946778e336584cc24251a2f32282bd3fe83a680a7d1\",\"relevance_logit\":0.8708398342132568},\"source_episode\":\"episode:85f4cbb0b45bce7b305ce171\",\"source_id\":\"locomo:conv-44:D2:1\",\"source_type\":\"conversation\"},\"quote\":\"Audrey: Hey Andrew, I got a surprise for you! We adopted another puppy called Pixie. She's SO cute! Isn't she just the cutest?\\n\\nUpstream image metadata (dataset annotation, not a user assertion):\\n{\\\"blip_caption\\\": \\\"a photo of a small white dog sitting on a carpet\\\", \\\"img_url\\\": [\\\"https://moderndogmagazine.com/sites/default/files/images/photoentries/photos/pixie%20smiling.jpg\\\"], \\\"query\\\": \\\"new puppy Pixie\\\"}\",\"rationale\":\"tier=fallback fts=1.00 access_count=0 confidence=0.25 grounding=0.14 semantic=enabled matched episode content query=\\\"year audrey adopt first three her dogs\\\" and active at 2026-10-10\",\"relevance\":0.14,\"retrieval_tier\":\"fallback\",\"semantic_available\":true,\"source_episode\":\"episode:85f4cbb0b45bce7b305ce171\"}},{\"gold_key\":\"raw:D1:7\",\"item\":{\"confidence\":0.32,\"content\":\"Audrey: I've had them for 3 years! Their names are Pepper, Precious and Panda. I can't live without my little ones!\",\"fact_id\":\"episode_fallback:episode:7931fe554290c0b7eeb2be6e\",\"grounding\":0.29,\"provenance\":{\"episode_fallback\":true,\"reference_time\":\"2023-03-27T13:10:00Z\",\"reranking\":{\"admission_floor\":0.0,\"model_signature\":\"reranksig:dff4b9939786ed9a1e897946778e336584cc24251a2f32282bd3fe83a680a7d1\",\"relevance_logit\":0.18582408130168915},\"source_episode\":\"episode:7931fe554290c0b7eeb2be6e\",\"source_id\":\"locomo:conv-44:D1:7\",\"source_type\":\"conversation\"},\"quote\":\"Audrey: I've had them for 3 years! Their names are Pepper, Precious and Panda. I can't live without my little ones!\",\"rationale\":\"tier=fallback fts=2.00 access_count=0 confidence=0.32 grounding=0.29 semantic=enabled matched episode content query=\\\"year audrey adopt first three her dogs\\\" and active at 2026-10-10\",\"relevance\":0.29,\"retrieval_tier\":\"fallback\",\"semantic_available\":true,\"source_episode\":\"episode:7931fe554290c0b7eeb2be6e\"}}]",
+        "native reranking candidates: [{\"document\":\"Memory reference date: 2023-04-02 (02 April 2023).\\nSource identity: locomo:conv-44:D2:7\\nAudrey: Pepper took a bit to get used to her, but now they're always together!\\n\\nUpstream image metadata (dataset annotation, not a user assertion):\\n{\\\"blip_caption\\\": \\\"a photography of two dogs standing in the grass near a fence\\\", \\\"img_url\\\": [\\\"https://i2.pickpik.com/photos/398/166/341/dogs-garden-enjoy-weather-animals-preview.jpg\\\"], \\\"query\\\": \\\"pepper pixie playing together\\\"}\",\"query\":\"Which year did Audrey adopt the first three of her dogs?\",\"score\":-1.5526349544525146},{\"document\":\"Memory reference date: 2023-04-02 (02 April 2023).\\nSource identity: locomo:conv-44:D2:5\\nAudrey: Pixie's fitting in great! It took her a few days to get used to the other dogs, but now they're awesome friends. They love playing and exploring the house - so cute!\\n\\n\\nUpstream image metadata (dataset annotation, not a user assertion):\\n{\\\"blip_caption\\\": \\\"a photography of a dog playing with a group of other dogs\\\", \\\"img_url\\\": [\\\"https://images.rawpixel.com/image_800/cHJpdmF0ZS9zdGF0aWMvaW1hZ2Uvd2Vic2l0ZS8yMDIyLTA0L2xyL3B4NzIxNzk3LWltYWdlLWt3dnYzenBkLmpwZw.jpg\\\"], \\\"query\\\": \\\"pixie pepper precious panda dogs playing backyard\\\"}\",\"query\":\"Which year did Audrey adopt the first three of her dogs?\",\"score\":-2.3278238773345947},{\"document\":\"Memory reference date: 2023-04-02 (02 April 2023).\\nSource identity: locomo:conv-44:D2:9\\nAudrey: We used websites that helped us find a place that allowed dogs. They had filters that made it super easy. Found a perfect spot thanks to them!\\n\\nUpstream image metadata (dataset annotation, not a user assertion):\\n{\\\"blip_caption\\\": \\\"a photography of a dog sitting in a field of flowers\\\", \\\"img_url\\\": [\\\"https://live.staticflickr.com/2388/2232782014_51a690ec00_c.jpg\\\"], \\\"query\\\": \\\"dog-friendly website\\\"}\",\"query\":\"Which year did Audrey adopt the first three of her dogs?\",\"score\":-3.4108405113220215},{\"document\":\"Memory reference date: 2023-03-27 (27 March 2023).\\nSource identity: locomo:conv-44:D1:7\\nAudrey: I've had them for 3 years! Their names are Pepper, Precious and Panda. I can't live without my little ones!\",\"query\":\"Which year did Audrey adopt the first three of her dogs?\",\"score\":0.18582408130168915},{\"document\":\"Memory reference date: 2023-04-02 (02 April 2023).\\nSource identity: locomo:conv-44:D2:17\\nAudrey: Our furry friends make great cuddle buddies. Here's one of them enjoying some lazy couch time!\\n\\nUpstream image metadata (dataset annotation, not a user assertion):\\n{\\\"blip_caption\\\": \\\"a photography of a dog laying on a couch with a pillow\\\", \\\"img_url\\\": [\\\"https://images.pexels.com/photos/18690079/pexels-photo-18690079/free-photo-of-white-terrier-lying-on-a-sofa.jpeg\\\"]}\",\"query\":\"Which year did Audrey adopt the first three of her dogs?\",\"score\":-3.79956316947937},{\"document\":\"Memory reference date: 2023-04-02 (02 April 2023).\\nSource identity: locomo:conv-44:D2:19\\nAudrey:  Taking them on hikes must be awesome! That makes me want to hike with my dogs.\",\"query\":\"Which year did Audrey adopt the first three of her dogs?\",\"score\":-1.063997507095337},{\"document\":\"Memory reference date: 2023-04-02 (02 April 2023).\\nSource identity: locomo:conv-44:D2:15\\nAudrey: You'll love them! They're great for cuddles and companionship.\",\"query\":\"Which year did Audrey adopt the first three of her dogs?\",\"score\":-1.0845832824707031},{\"document\":\"Memory reference date: 2023-04-02 (02 April 2023).\\nSource identity: locomo:conv-44:D2:6\\nAndrew: That's awesome! Is Pepper adjusting well to her?\",\"query\":\"Which year did Audrey adopt the first three of her dogs?\",\"score\":-7.776338577270508},{\"document\":\"Memory reference date: 2023-04-02 (02 April 2023).\\nSource identity: locomo:conv-44:D2:13\\nAudrey: I'm keeping my fingers crossed for you to find a great furry friend and an apartment.\",\"query\":\"Which year did Audrey adopt the first three of her dogs?\",\"score\":-3.3820908069610596},{\"document\":\"Memory reference date: 2023-04-02 (02 April 2023).\\nSource identity: locomo:conv-44:D2:3\\nAudrey: Thanks! I know right? She's so cute! Pixie's been keeping us busy, so I haven't had a chance to check out that hiking spot yet.\",\"query\":\"Which year did Audrey adopt the first three of her dogs?\",\"score\":-3.3918633460998535},{\"document\":\"Memory reference date: 2023-04-02 (02 April 2023).\\nSource identity: locomo:conv-44:D2:25\\nAudrey: So excited for you! I can't wait to see where you and your furry friend decide to hang out. All the best!\",\"query\":\"Which year did Audrey adopt the first three of her dogs?\",\"score\":-2.562992811203003},{\"document\":\"Memory reference date: 2023-04-02 (02 April 2023).\\nSource identity: locomo:conv-44:D2:1\\nAudrey: Hey Andrew, I got a surprise for you! We adopted another puppy called Pixie. She's SO cute! Isn't she just the cutest?\\n\\nUpstream image metadata (dataset annotation, not a user assertion):\\n{\\\"blip_caption\\\": \\\"a photo of a small white dog sitting on a carpet\\\", \\\"img_url\\\": [\\\"https://moderndogmagazine.com/sites/default/files/images/photoentries/photos/pixie%20smiling.jpg\\\"], \\\"query\\\": \\\"new puppy Pixie\\\"}\",\"query\":\"Which year did Audrey adopt the first three of her dogs?\",\"score\":0.8708398342132568},{\"document\":\"Memory reference date: 2023-04-02 (02 April 2023).\\nSource identity: locomo:conv-44:D2:21\\nAudrey: Yeah! Exploring nature with them and making memories is awesome!\",\"query\":\"Which year did Audrey adopt the first three of her dogs?\",\"score\":-1.6688816547393799},{\"document\":\"Memory reference date: 2023-04-02 (02 April 2023).\\nSource identity: locomo:conv-44:D2:11\\nAudrey: You got it! I hope you find a great spot soon!\",\"query\":\"Which year did Audrey adopt the first three of her dogs?\",\"score\":-2.070188522338867},{\"document\":\"Memory reference date: 2023-04-02 (02 April 2023).\\nSource identity: locomo:conv-44:D2:23\\nAudrey: Yep! I hope you find the perfect dog-friendly spot soon so you can make new memories with them.\",\"query\":\"Which year did Audrey adopt the first three of her dogs?\",\"score\":-1.1536107063293457},{\"document\":\"Memory reference date: 2023-03-27 (27 March 2023).\\nSource identity: locomo:conv-44:D1:15\\nAudrey: Yeah, birds are amazing! I can imagine it feels incredible to soar and see the world from up high. Do you have a favorite type of bird?\",\"query\":\"Which year did Audrey adopt the first three of her dogs?\",\"score\":-3.4860875606536865},{\"document\":\"Memory reference date: 2023-03-27 (27 March 2023).\\nSource identity: locomo:conv-44:D1:2\\nAndrew: Hey Audrey! So, I started a new job as a Financial Analyst last week - it's been quite a change from my previous job. How about you? Anything interesting happening?\",\"query\":\"Which year did Audrey adopt the first three of her dogs?\",\"score\":-7.905035972595215},{\"document\":\"Memory reference date: 2023-03-27 (27 March 2023).\\nSource identity: locomo:conv-44:D1:5\\nAudrey: Sure! See them with their new collars, cute right?\\n\\nUpstream image metadata (dataset annotation, not a user assertion):\\n{\\\"blip_caption\\\": \\\"a photography of two dogs are standing in the grass with their mouths open\\\", \\\"img_url\\\": [\\\"https://worldanimalfoundation.org/wp-content/uploads/2022/07/adjustable-collar-Review.jpg\\\"]}\",\"query\":\"Which year did Audrey adopt the first three of her dogs?\",\"score\":-1.3639819622039795},{\"document\":\"Memory reference date: 2023-03-27 (27 March 2023).\\nSource identity: locomo:conv-44:D1:3\\nAudrey: Congrats on the new job! So I got these new collars and tags for my dogs - so cute!\",\"query\":\"Which year did Audrey adopt the first three of her dogs?\",\"score\":-0.7803841829299927},{\"document\":\"Memory reference date: 2023-03-27 (27 March 2023).\\nSource identity: locomo:conv-44:D1:21\\nAudrey: Cool, gonna give it a try. Thanks for the suggestion!\",\"query\":\"Which year did Audrey adopt the first three of her dogs?\",\"score\":-1.9572265148162842},{\"document\":\"Memory reference date: 2023-03-27 (27 March 2023).\\nSource identity: locomo:conv-44:D1:19\\nAudrey: Nice, spotting pretty birds while hiking must be great. Do you have any favorite hiking spots?\",\"query\":\"Which year did Audrey adopt the first three of her dogs?\",\"score\":-3.2978365421295166},{\"document\":\"Memory reference date: 2023-03-27 (27 March 2023).\\nSource identity: locomo:conv-44:D1:11\\nAudrey: They really do! It's great how much happiness they bring. Do you have any pets?\",\"query\":\"Which year did Audrey adopt the first three of her dogs?\",\"score\":-1.8352851867675781},{\"document\":\"Memory reference date: 2023-03-27 (27 March 2023).\\nSource identity: locomo:conv-44:D1:13\\nAudrey: That's great to hear! Animals are truly amazing. Do you have a favorite animal?\",\"query\":\"Which year did Audrey adopt the first three of her dogs?\",\"score\":-2.5246798992156982},{\"document\":\"Memory reference date: 2023-03-27 (27 March 2023).\\nSource identity: locomo:conv-44:D1:23\\nAudrey: Thanks! I'll let you know. Have a good one!\",\"query\":\"Which year did Audrey adopt the first three of her dogs?\",\"score\":-1.9261164665222168},{\"document\":\"Memory reference date: 2023-03-27 (27 March 2023).\\nSource identity: locomo:conv-44:D1:17\\nAudrey: Yeah they're beautiful. Do you go bird-watching? It must be awesome to see them up close.\",\"query\":\"Which year did Audrey adopt the first three of her dogs?\",\"score\":-1.657685399055481},{\"document\":\"Memory reference date: 2023-03-27 (27 March 2023).\\nSource identity: locomo:conv-44:D1:1\\nAudrey: Hey Andrew! Good to see ya! What's been up since we last talked?\",\"query\":\"Which year did Audrey adopt the first three of her dogs?\",\"score\":-3.5866312980651855},{\"document\":\"Memory reference date: 2023-03-27 (27 March 2023).\\nSource identity: locomo:conv-44:D1:9\\nAudrey: Absolutely! They're city dogs and we explore all the time. They love trying out new parks and trails. We go on adventures together very often.\",\"query\":\"Which year did Audrey adopt the first three of her dogs?\",\"score\":-0.9894391298294067}]"
+      ],
+      "duration_ms": 8195,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "retrieval-quality",
+        "case_id": "locomo-conv-44-061"
+      },
+      "mode": "end_to_end",
+      "split": "development",
+      "label_trust": "reviewed",
+      "status": "passed",
+      "metrics": {
+        "answerable_non_abstention_rate": 1.0,
+        "duplicate_free_rate": 1.0,
+        "precision_macro": 1.0,
+        "prohibited_free_rate": 1.0,
+        "required_group_recall": 1.0
+      },
+      "evidence": {
+        "answerable_non_abstention_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "case_tag:category-4": {
+          "kind": "count",
+          "value": 1
+        },
+        "case_tag:locomo": {
+          "kind": "count",
+          "value": 1
+        },
+        "case_tag:published-evidence": {
+          "kind": "count",
+          "value": 1
+        },
+        "duplicate_free_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "precision_macro": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "prohibited_free_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "required_group_recall": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        }
+      },
+      "failures": [],
+      "duration_ms": 9933,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "retrieval-quality",
+        "case_id": "locomo-conv-47-001"
+      },
+      "mode": "end_to_end",
+      "split": "development",
+      "label_trust": "reviewed",
+      "status": "passed",
+      "metrics": {
+        "answerable_non_abstention_rate": 1.0,
+        "duplicate_free_rate": 1.0,
+        "precision_macro": 1.0,
+        "prohibited_free_rate": 1.0,
+        "required_group_recall": 1.0
+      },
+      "evidence": {
+        "answerable_non_abstention_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "case_tag:category-2": {
+          "kind": "count",
+          "value": 1
+        },
+        "case_tag:locomo": {
+          "kind": "count",
+          "value": 1
+        },
+        "case_tag:published-evidence": {
+          "kind": "count",
+          "value": 1
+        },
+        "duplicate_free_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "precision_macro": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "prohibited_free_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "required_group_recall": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        }
+      },
+      "failures": [],
+      "duration_ms": 6493,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "retrieval-quality",
+        "case_id": "locomo-conv-47-067"
+      },
+      "mode": "end_to_end",
+      "split": "development",
+      "label_trust": "reviewed",
+      "status": "passed",
+      "metrics": {
+        "answerable_non_abstention_rate": 1.0,
+        "duplicate_free_rate": 1.0,
+        "precision_macro": 1.0,
+        "prohibited_free_rate": 1.0,
+        "required_group_recall": 1.0
+      },
+      "evidence": {
+        "answerable_non_abstention_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "case_tag:category-4": {
+          "kind": "count",
+          "value": 1
+        },
+        "case_tag:locomo": {
+          "kind": "count",
+          "value": 1
+        },
+        "case_tag:published-evidence": {
+          "kind": "count",
+          "value": 1
+        },
+        "duplicate_free_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "precision_macro": {
+          "kind": "ratio",
+          "numerator": 2,
+          "denominator": 2
+        },
+        "prohibited_free_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "required_group_recall": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        }
+      },
+      "failures": [],
+      "duration_ms": 10789,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "retrieval-quality",
+        "case_id": "locomo-conv-48-000"
+      },
+      "mode": "end_to_end",
+      "split": "development",
+      "label_trust": "reviewed",
+      "status": "passed",
+      "metrics": {
+        "answerable_non_abstention_rate": 1.0,
+        "duplicate_free_rate": 1.0,
+        "precision_macro": 1.0,
+        "prohibited_free_rate": 1.0,
+        "required_group_recall": 1.0
+      },
+      "evidence": {
+        "answerable_non_abstention_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "case_tag:category-2": {
+          "kind": "count",
+          "value": 1
+        },
+        "case_tag:locomo": {
+          "kind": "count",
+          "value": 1
+        },
+        "case_tag:published-evidence": {
+          "kind": "count",
+          "value": 1
+        },
+        "case_tag:upstream_temporal_underspecified": {
+          "kind": "count",
+          "value": 1
+        },
+        "duplicate_free_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "precision_macro": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "prohibited_free_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "required_group_recall": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        }
+      },
+      "failures": [],
+      "duration_ms": 5642,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "retrieval-quality",
+        "case_id": "locomo-conv-48-015"
+      },
+      "mode": "end_to_end",
+      "split": "development",
+      "label_trust": "reviewed",
+      "status": "quality_failed",
+      "metrics": {
+        "answerable_non_abstention_rate": 1.0,
+        "duplicate_free_rate": 1.0,
+        "precision_macro": 0.0,
+        "prohibited_free_rate": 0.0,
+        "required_group_recall": 0.0
+      },
+      "evidence": {
+        "answerable_non_abstention_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "case_tag:category-4": {
+          "kind": "count",
+          "value": 1
+        },
+        "case_tag:locomo": {
+          "kind": "count",
+          "value": 1
+        },
+        "case_tag:published-evidence": {
+          "kind": "count",
+          "value": 1
+        },
+        "duplicate_free_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "precision_macro": {
+          "kind": "ratio",
+          "numerator": 0,
+          "denominator": 1
+        },
+        "prohibited_free_rate": {
+          "kind": "ratio",
+          "numerator": 0,
+          "denominator": 1
+        },
+        "required_group_recall": {
+          "kind": "ratio",
+          "numerator": 0,
+          "denominator": 2
+        }
+      },
+      "failures": [
+        "retrieval missed one or more required evidence groups",
+        "retrieval returned unlabeled or disallowed evidence",
+        "prohibited evidence was retrieved",
+        "native selected evidence: [{\"gold_key\":\"raw:D2:26\",\"item\":{\"confidence\":0.67,\"content\":\"Jolene: They are very unusual pets! Here's me and my partner gaming last week - it's so fun. We played the game \\\"Detroit\\\" on the console. We are both crazy about this activity!\\n\\nUpstream image metadata (dataset annotation, not a user assertion):\\n{\\\"blip_caption\\\": \\\"a photo of a person laying in bed with a dog watching tv\\\", \\\"img_url\\\": [\\\"https://i.redd.it/0f9ubarmem291.jpg\\\"], \\\"query\\\": \\\"gaming with partner\\\"}\",\"fact_id\":\"episode_fallback:episode:fad2b983b094a563cff95ce1\",\"grounding\":1.0,\"provenance\":{\"episode_fallback\":true,\"reference_time\":\"2023-01-27T09:49:00Z\",\"reranking\":{\"admission_floor\":0.0,\"model_signature\":\"reranksig:dff4b9939786ed9a1e897946778e336584cc24251a2f32282bd3fe83a680a7d1\",\"relevance_logit\":2.988344192504883},\"source_episode\":\"episode:fad2b983b094a563cff95ce1\",\"source_id\":\"locomo:conv-48:D2:26\",\"source_type\":\"conversation\"},\"quote\":\"Jolene: They are very unusual pets! Here's me and my partner gaming last week - it's so fun. We played the game \\\"Detroit\\\" on the console. We are both crazy about this activity!\\n\\nUpstream image metadata (dataset annotation, not a user assertion):\\n{\\\"blip_caption\\\": \\\"a photo of a person laying in bed with a dog watching tv\\\", \\\"img_url\\\": [\\\"https://i.redd.it/0f9ubarmem291.jpg\\\"], \\\"query\\\": \\\"gaming with partner\\\"}\",\"rationale\":\"tier=fallback fts=2.00 access_count=0 confidence=0.67 grounding=1.00 semantic=enabled matched episode content query=\\\"pets jolene\\\" and active at 2026-10-10\",\"relevance\":1.0,\"retrieval_tier\":\"fallback\",\"semantic_available\":true,\"source_episode\":\"episode:fad2b983b094a563cff95ce1\"}}]",
+        "native reranking candidates: [{\"document\":\"Memory reference date: 2023-01-27 (27 January 2023).\\nSource identity: locomo:conv-48:D2:7\\nDeborah: It is love, and openness that have kept us close all these years. Being there for each other has made us both happy. Look what letter I received yesterday!\\n\\nUpstream image metadata (dataset annotation, not a user assertion):\\n{\\\"blip_caption\\\": \\\"a photo of a note written to someone on a piece of paper\\\", \\\"img_url\\\": [\\\"https://i.redd.it/lr823iakg38b1.jpg\\\"], \\\"query\\\": \\\"handwritten letter heartfelt message journey together\\\"}\",\"query\":\"What pets does Jolene have?\",\"score\":-8.802206039428711},{\"document\":\"Memory reference date: 2023-01-23 (23 January 2023).\\nSource identity: locomo:conv-48:D1:11\\nDeborah: It should really give you strength and energy!\",\"query\":\"What pets does Jolene have?\",\"score\":-6.566331386566162},{\"document\":\"Memory reference date: 2023-01-27 (27 January 2023).\\nSource identity: locomo:conv-48:D2:28\\nJolene: Even as a child I learned to play on my own.\",\"query\":\"What pets does Jolene have?\",\"score\":-5.51869010925293},{\"document\":\"Memory reference date: 2023-01-27 (27 January 2023).\\nSource identity: locomo:conv-48:D2:19\\nDeborah: Travel was also her great passion!\",\"query\":\"What pets does Jolene have?\",\"score\":-7.198720455169678},{\"document\":\"Memory reference date: 2023-01-27 (27 January 2023).\\nSource identity: locomo:conv-48:D2:11\\nDeborah: This is one of the places where I do it.\\n\\nUpstream image metadata (dataset annotation, not a user assertion):\\n{\\\"blip_caption\\\": \\\"a photo of a living room with a television and a window\\\", \\\"img_url\\\": [\\\"https://i.redd.it/1s7ojxx0yra61.jpg\\\"], \\\"query\\\": \\\"peaceful yoga studio mats laid out\\\"}\",\"query\":\"What pets does Jolene have?\",\"score\":-7.490952968597412},{\"document\":\"Memory reference date: 2023-01-27 (27 January 2023).\\nSource identity: locomo:conv-48:D2:31\\nDeborah: Take care and keep spreading those good vibes!\",\"query\":\"What pets does Jolene have?\",\"score\":-5.12014627456665},{\"document\":\"Memory reference date: 2023-01-27 (27 January 2023).\\nSource identity: locomo:conv-48:D2:26\\nJolene: They are very unusual pets! Here's me and my partner gaming last week - it's so fun. We played the game \\\"Detroit\\\" on the console. We are both crazy about this activity!\\n\\nUpstream image metadata (dataset annotation, not a user assertion):\\n{\\\"blip_caption\\\": \\\"a photo of a person laying in bed with a dog watching tv\\\", \\\"img_url\\\": [\\\"https://i.redd.it/0f9ubarmem291.jpg\\\"], \\\"query\\\": \\\"gaming with partner\\\"}\",\"query\":\"What pets does Jolene have?\",\"score\":2.988344192504883},{\"document\":\"Memory reference date: 2023-01-23 (23 January 2023).\\nSource identity: locomo:conv-48:D1:8\\nJolene: Staying connected is super important. Do you have something to remember her by? This pendant reminds me of my mother, she gave it to me in 2010  in Paris.\\n\\nUpstream image metadata (dataset annotation, not a user assertion):\\n{\\\"blip_caption\\\": \\\"a photo of a heart shaped pendant with a bird on it\\\", \\\"img_url\\\": [\\\"http://eternalkeepsake.com/cdn/shop/products/IMG_0841.jpg\\\"], \\\"query\\\": \\\"meaningful necklace heart pendant\\\"}\",\"query\":\"What pets does Jolene have?\",\"score\":-3.16441011428833},{\"document\":\"Memory reference date: 2023-01-27 (27 January 2023).\\nSource identity: locomo:conv-48:D2:15\\nDeborah: Yeah, it's special. I can feel her presence when I sit there and it comforts me.\\n\\nUpstream image metadata (dataset annotation, not a user assertion):\\n{\\\"blip_caption\\\": \\\"a photo of a window seat in a room with a window\\\", \\\"img_url\\\": [\\\"https://cdn.apartmenttherapy.info/image/upload/v1658863926/at/house%20tours/2022-07/India/StairwayBench.jpg\\\"], \\\"query\\\": \\\"bench window mom old house\\\"}\",\"query\":\"What pets does Jolene have?\",\"score\":-6.539539813995361},{\"document\":\"Memory reference date: 2023-01-23 (23 January 2023).\\nSource identity: locomo:conv-48:D1:1\\nDeborah: Hey Jolene, nice to meet you! How's your week going? Anything fun happened?\",\"query\":\"What pets does Jolene have?\",\"score\":-6.800016403198242},{\"document\":\"Memory reference date: 2023-01-27 (27 January 2023).\\nSource identity: locomo:conv-48:D2:16\\nJolene: Wow, it sounds like that spot holds a lot of sentimental value. Does it bring back any special memories?\",\"query\":\"What pets does Jolene have?\",\"score\":-6.259267807006836},{\"document\":\"Memory reference date: 2023-01-23 (23 January 2023).\\nSource identity: locomo:conv-48:D1:10\\nJolene: It has a special symbol on it that represents freedom for me. It's a nice reminder to go for my goals and not get held back.\",\"query\":\"What pets does Jolene have?\",\"score\":-5.237705230712891},{\"document\":\"Memory reference date: 2023-01-27 (27 January 2023).\\nSource identity: locomo:conv-48:D2:32\\nJolene: Thanks, Deb! You too, take care. See ya!\",\"query\":\"What pets does Jolene have?\",\"score\":-5.315527439117432},{\"document\":\"Memory reference date: 2023-01-23 (23 January 2023).\\nSource identity: locomo:conv-48:D1:7\\nDeborah: My mom's house had a special bench near the window. She loved to sit there every morning and take in the view. I come to sit here sometimes, it helps me stay connected to her.\",\"query\":\"What pets does Jolene have?\",\"score\":-7.064146518707275},{\"document\":\"Memory reference date: 2023-01-27 (27 January 2023).\\nSource identity: locomo:conv-48:D2:3\\nDeborah: Even though it's hard, it's comforting to look back on the great memories. We looked at the family album. Photos give me peace during difficult times. This is my parents' wedding in 1993.\\n\\nUpstream image metadata (dataset annotation, not a user assertion):\\n{\\\"blip_caption\\\": \\\"a photo of a bride and groom posing for a picture\\\", \\\"img_url\\\": [\\\"https://i.redd.it/dt61gwlzp3e31.jpg\\\"], \\\"query\\\": \\\"parents wedding day\\\"}\",\"query\":\"What pets does Jolene have?\",\"score\":-8.074551582336426},{\"document\":\"Memory reference date: 2023-01-27 (27 January 2023).\\nSource identity: locomo:conv-48:D2:5\\nDeborah: My husband and I are trying to be as good a family as my parents were!\",\"query\":\"What pets does Jolene have?\",\"score\":-7.635769844055176},{\"document\":\"Memory reference date: 2023-01-27 (27 January 2023).\\nSource identity: locomo:conv-48:D2:1\\nDeborah: Hey Jolene, sorry to tell you this but my dad passed away two days ago. It's been really tough on us all - his sudden death left us all kinda shell-shocked. I'm trying to channel my grief by spending more time with family and cherishing the memories. These moments remind me to live life fully.\\n\\nUpstream image metadata (dataset annotation, not a user assertion):\\n{\\\"blip_caption\\\": \\\"a photo of a woman hugging a woman who is sitting on a couch\\\"}\",\"query\":\"What pets does Jolene have?\",\"score\":-6.383608341217041},{\"document\":\"Memory reference date: 2023-01-27 (27 January 2023).\\nSource identity: locomo:conv-48:D2:17\\nDeborah: Yeah, Jolene. She'd sit there every night with a book and a smile, reading was one of her hobbies. It was one of her favorite places in the house. \\n\\nUpstream image metadata (dataset annotation, not a user assertion):\\n{\\\"blip_caption\\\": \\\"a photo of a view of the sky from an airplane window\\\"}\",\"query\":\"What pets does Jolene have?\",\"score\":-4.783647060394287},{\"document\":\"Memory reference date: 2023-01-23 (23 January 2023).\\nSource identity: locomo:conv-48:D1:13\\nDeborah: One of my goals is to keep teaching yoga and supporting my community. I'm passionate about helping people find peace and joy through it.\",\"query\":\"What pets does Jolene have?\",\"score\":-7.445180416107178},{\"document\":\"Memory reference date: 2023-01-27 (27 January 2023).\\nSource identity: locomo:conv-48:D2:25\\nDeborah: Cool, Jolene! Pets bring so much happiness!\",\"query\":\"What pets does Jolene have?\",\"score\":-0.9941567778587341},{\"document\":\"Memory reference date: 2023-01-27 (27 January 2023).\\nSource identity: locomo:conv-48:D2:6\\nJolene: What do you value in your relationship?\",\"query\":\"What pets does Jolene have?\",\"score\":-7.652618408203125},{\"document\":\"Memory reference date: 2023-01-23 (23 January 2023).\\nSource identity: locomo:conv-48:D1:3\\nDeborah: Congrats! Last week I visited a place that holds a lot of memories for me. It was my mother`s old house.\",\"query\":\"What pets does Jolene have?\",\"score\":-7.852634429931641},{\"document\":\"Memory reference date: 2023-01-23 (23 January 2023).\\nSource identity: locomo:conv-48:D1:15\\nDeborah: Yoga helped me find peace during a rough time, and now I'm passionate about sharing that with others.\",\"query\":\"What pets does Jolene have?\",\"score\":-7.450191974639893},{\"document\":\"Memory reference date: 2023-01-23 (23 January 2023).\\nSource identity: locomo:conv-48:D1:2\\nJolene: Hi Deb! Good to meet you! Yeah, my week's been busy. I finished an electrical engineering project last week - took a lot of work, but it's done now. Anything fun happening for you?\",\"query\":\"What pets does Jolene have?\",\"score\":-6.311887741088867},{\"document\":\"Memory reference date: 2023-01-27 (27 January 2023).\\nSource identity: locomo:conv-48:D2:2\\nJolene: Sorry to hear about your dad, Deborah. Losing a parent is tough - how's it going for you and your family?\",\"query\":\"What pets does Jolene have?\",\"score\":-6.099595546722412},{\"document\":\"Memory reference date: 2023-01-27 (27 January 2023).\\nSource identity: locomo:conv-48:D2:13\\nDeborah: That's my old home. I go there now and then for my mom, who passed away. Sitting in that spot by the window gives me peace.\",\"query\":\"What pets does Jolene have?\",\"score\":-7.610040187835693},{\"document\":\"Memory reference date: 2023-01-27 (27 January 2023).\\nSource identity: locomo:conv-48:D2:22\\nJolene:  I was playing video games and my pet just slinked out of her cage and coiled up next to me - it was too funny! My second snake Seraphim did it. Look at her sly eyes!\\n\\nUpstream image metadata (dataset annotation, not a user assertion):\\n{\\\"blip_caption\\\": \\\"a photo of a snake sticking its head out of a blanket\\\", \\\"img_url\\\": [\\\"https://i.redd.it/8aunav15kyq01.jpg\\\"], \\\"query\\\": \\\"pet snake couch\\\"}\",\"query\":\"What pets does Jolene have?\",\"score\":-0.342968612909317},{\"document\":\"Memory reference date: 2023-01-23 (23 January 2023).\\nSource identity: locomo:conv-48:D1:9\\nDeborah: Yes, I also have a pendant that reminds me of my mother. And what is special for you about your jewelry?\",\"query\":\"What pets does Jolene have?\",\"score\":-9.661191940307617},{\"document\":\"Memory reference date: 2023-01-23 (23 January 2023).\\nSource identity: locomo:conv-48:D1:6\\nJolene: Sorry about your loss, Deb. My mother also passed away last year. This is my room in her house, I also have many memories there. Is there anything special about it you remember?\\n\\nUpstream image metadata (dataset annotation, not a user assertion):\\n{\\\"blip_caption\\\": \\\"a photo of a room with a bench and a window\\\", \\\"img_url\\\": [\\\"https://www.therootboard.com/cdn/shop/articles/IMG_5420.jpg\\\"], \\\"query\\\": \\\"serene yoga studio windows natural light\\\"}\",\"query\":\"What pets does Jolene have?\",\"score\":-5.367673397064209},{\"document\":\"Memory reference date: 2023-01-27 (27 January 2023).\\nSource identity: locomo:conv-48:D2:30\\nJolene: We are planning to play \\\"Walking Dead\\\" next Saturday.\",\"query\":\"What pets does Jolene have?\",\"score\":-6.3865838050842285},{\"document\":\"Memory reference date: 2023-01-23 (23 January 2023).\\nSource identity: locomo:conv-48:D1:5\\nDeborah: It was full of memories, she passed away a few years ago. This is our last photo together.\\n\\nUpstream image metadata (dataset annotation, not a user assertion):\\n{\\\"blip_caption\\\": \\\"a photo of a woman in a wheelchair hugging a woman in a wheelchair\\\", \\\"img_url\\\": [\\\"https://jubileewriter.files.wordpress.com/2021/05/20171019_174608.jpg\\\"], \\\"query\\\": \\\"mother old home emotions memories\\\"}\",\"query\":\"What pets does Jolene have?\",\"score\":-7.9060959815979},{\"document\":\"Memory reference date: 2023-01-27 (27 January 2023).\\nSource identity: locomo:conv-48:D2:14\\nJolene: Must be great to have that place where you feel connected to her.\",\"query\":\"What pets does Jolene have?\",\"score\":-4.8109211921691895},{\"document\":\"Memory reference date: 2023-01-27 (27 January 2023).\\nSource identity: locomo:conv-48:D2:9\\nDeborah: The group members sent this to me! They thanked me for the positive influence I had on them. Those moments remind me why I'm so passionate about yoga.\",\"query\":\"What pets does Jolene have?\",\"score\":-7.432658672332764},{\"document\":\"Memory reference date: 2023-01-27 (27 January 2023).\\nSource identity: locomo:conv-48:D2:21\\nDeborah: Having a pet totally brightens up your life. It's great that it brings you comfort. Do you have any fun moments with your pet that you'd like to share?\",\"query\":\"What pets does Jolene have?\",\"score\":-8.424636840820312},{\"document\":\"Memory reference date: 2023-01-27 (27 January 2023).\\nSource identity: locomo:conv-48:D2:20\\nJolene: I want to show you one of my snakes! They always calm me down and make me happy. This is Susie.\\n\\nUpstream image metadata (dataset annotation, not a user assertion):\\n{\\\"blip_caption\\\": \\\"a photo of a bed with a snake head sticking out of it\\\", \\\"img_url\\\": [\\\"https://i.redd.it/gvb5983gs2z71.jpg\\\"], \\\"query\\\": \\\"snake curled up cozy corner room\\\"}\",\"query\":\"What pets does Jolene have?\",\"score\":-1.8976982831954956},{\"document\":\"Memory reference date: 2023-01-27 (27 January 2023).\\nSource identity: locomo:conv-48:D2:10\\nJolene: Where do you most often do yoga?\",\"query\":\"What pets does Jolene have?\",\"score\":-6.728102207183838},{\"document\":\"Memory reference date: 2023-01-27 (27 January 2023).\\nSource identity: locomo:conv-48:D2:24\\nJolene: I bought it a year ago in Paris.\",\"query\":\"What pets does Jolene have?\",\"score\":-4.449578762054443},{\"document\":\"Memory reference date: 2023-01-27 (27 January 2023).\\nSource identity: locomo:conv-48:D2:18\\nJolene: What other hobbies did your mother have?\",\"query\":\"What pets does Jolene have?\",\"score\":-3.9560558795928955},{\"document\":\"Memory reference date: 2023-01-27 (27 January 2023).\\nSource identity: locomo:conv-48:D2:4\\nJolene: They were a beautiful couple!\",\"query\":\"What pets does Jolene have?\",\"score\":-4.374149799346924},{\"document\":\"Memory reference date: 2023-01-27 (27 January 2023).\\nSource identity: locomo:conv-48:D2:12\\nJolene: Where is it?\",\"query\":\"What pets does Jolene have?\",\"score\":-5.7790937423706055},{\"document\":\"Memory reference date: 2023-01-27 (27 January 2023).\\nSource identity: locomo:conv-48:D2:8\\nJolene: What touching words! Who is this letter from?\",\"query\":\"What pets does Jolene have?\",\"score\":-7.325839042663574},{\"document\":\"Memory reference date: 2023-01-23 (23 January 2023).\\nSource identity: locomo:conv-48:D1:18\\nJolene: Looking forward to the next chat!\",\"query\":\"What pets does Jolene have?\",\"score\":-5.453674793243408},{\"document\":\"Memory reference date: 2023-01-23 (23 January 2023).\\nSource identity: locomo:conv-48:D1:4\\nJolene: Why does it hold such special memories for you?\",\"query\":\"What pets does Jolene have?\",\"score\":-6.541303634643555},{\"document\":\"Memory reference date: 2023-01-23 (23 January 2023).\\nSource identity: locomo:conv-48:D1:12\\nJolene: Do you have goals?\",\"query\":\"What pets does Jolene have?\",\"score\":-5.709825038909912},{\"document\":\"Memory reference date: 2023-01-23 (23 January 2023).\\nSource identity: locomo:conv-48:D1:14\\nJolene: What inspired you to go down this route?\",\"query\":\"What pets does Jolene have?\",\"score\":-7.034616947174072},{\"document\":\"Memory reference date: 2023-01-23 (23 January 2023).\\nSource identity: locomo:conv-48:D1:16\\nJolene: It is truly inspiring!\",\"query\":\"What pets does Jolene have?\",\"score\":-4.908515453338623}]"
+      ],
+      "duration_ms": 8959,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "retrieval-quality",
+        "case_id": "locomo-conv-49-002"
+      },
+      "mode": "end_to_end",
+      "split": "development",
+      "label_trust": "reviewed",
+      "status": "quality_failed",
+      "metrics": {
+        "answerable_non_abstention_rate": 1.0,
+        "duplicate_free_rate": 1.0,
+        "precision_macro": 1.0,
+        "prohibited_free_rate": 1.0,
+        "required_group_recall": 0.3333333333333333
+      },
+      "evidence": {
+        "answerable_non_abstention_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "case_tag:category-1": {
+          "kind": "count",
+          "value": 1
+        },
+        "case_tag:locomo": {
+          "kind": "count",
+          "value": 1
+        },
+        "case_tag:published-evidence": {
+          "kind": "count",
+          "value": 1
+        },
+        "duplicate_free_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "precision_macro": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "prohibited_free_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "required_group_recall": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 3
+        }
+      },
+      "failures": [
+        "retrieval missed one or more required evidence groups",
+        "native selected evidence: [{\"gold_key\":\"raw:D2:1\",\"item\":{\"confidence\":0.28,\"content\":\"Evan: Hey Sam, good to hear from you! Since we last talked, lots has been happening! Last weekend, I took my family on a road trip to Jasper. It was amazing! We drove through the Icefields Parkway and the glaciers and lakes were gorgeous. I got a shot of a glacier, check it out!\\n\\nUpstream image metadata (dataset annotation, not a user assertion):\\n{\\\"blip_caption\\\": \\\"a photo of a person holding a book in front of a lake\\\", \\\"img_url\\\": [\\\"https://1.bp.blogspot.com/-50oDf6izLpk/XtyM4RGdDgI/AAAAAAACwcA/nnQkAWVln4M3AQ4ZWAkGUfgrxjhpHbtJQCK4BGAsYHg/s4032/IMG_4686.jpg\\\"], \\\"query\\\": \\\"jasper national park glacier\\\"}\",\"fact_id\":\"episode_fallback:episode:b09e3bc3e19665d53a9bab7d\",\"grounding\":0.2,\"provenance\":{\"episode_fallback\":true,\"reference_time\":\"2023-05-24T19:11:00Z\",\"reranking\":{\"admission_floor\":0.0,\"model_signature\":\"reranksig:dff4b9939786ed9a1e897946778e336584cc24251a2f32282bd3fe83a680a7d1\",\"relevance_logit\":2.860734462738037},\"source_episode\":\"episode:b09e3bc3e19665d53a9bab7d\",\"source_id\":\"locomo:conv-49:D2:1\",\"source_type\":\"conversation\"},\"quote\":\"Evan: Hey Sam, good to hear from you! Since we last talked, lots has been happening! Last weekend, I took my family on a road trip to Jasper. It was amazing! We drove through the Icefields Parkway and the glaciers and lakes were gorgeous. I got a shot of a glacier, check it out!\\n\\nUpstream image metadata (dataset annotation, not a user assertion):\\n{\\\"blip_caption\\\": \\\"a photo of a person holding a book in front of a lake\\\", \\\"img_url\\\": [\\\"https://1.bp.blogspot.com/-50oDf6izLpk/XtyM4RGdDgI/AAAAAAACwcA/nnQkAWVln4M3AQ4ZWAkGUfgrxjhpHbtJQCK4BGAsYHg/s4032/IMG_4686.jpg\\\"], \\\"query\\\": \\\"jasper national park glacier\\\"}\",\"rationale\":\"tier=fallback fts=1.00 access_count=0 confidence=0.28 grounding=0.20 semantic=enabled matched episode content query=\\\"evan been roadtrip his family\\\" and active at 2026-10-10\",\"relevance\":0.2,\"retrieval_tier\":\"fallback\",\"semantic_available\":true,\"source_episode\":\"episode:b09e3bc3e19665d53a9bab7d\"}}]",
+        "native reranking candidates: [{\"document\":\"Memory reference date: 2023-05-18 (18 May 2023).\\nSource identity: locomo:conv-49:D1:9\\nSam: We hiked a good distance - quite a feat for me back then. It's definitely a great memory.\",\"query\":\"Where has Evan been on roadtrips with his family?\",\"score\":-9.280959129333496},{\"document\":\"Memory reference date: 2023-05-24 (24 May 2023).\\nSource identity: locomo:conv-49:D2:9\\nEvan: Yeah, what worked for me was finding a fitness routine I really enjoy. It's my go-to, I love the feeling of being healthy and strong. Making it fun and finding little ways to make smarter choices in my diet really added up. Don't forget, you got this!\",\"query\":\"Where has Evan been on roadtrips with his family?\",\"score\":-8.897994041442871},{\"document\":\"Memory reference date: 2023-05-24 (24 May 2023).\\nSource identity: locomo:conv-49:D2:1\\nEvan: Hey Sam, good to hear from you! Since we last talked, lots has been happening! Last weekend, I took my family on a road trip to Jasper. It was amazing! We drove through the Icefields Parkway and the glaciers and lakes were gorgeous. I got a shot of a glacier, check it out!\\n\\nUpstream image metadata (dataset annotation, not a user assertion):\\n{\\\"blip_caption\\\": \\\"a photo of a person holding a book in front of a lake\\\", \\\"img_url\\\": [\\\"https://1.bp.blogspot.com/-50oDf6izLpk/XtyM4RGdDgI/AAAAAAACwcA/nnQkAWVln4M3AQ4ZWAkGUfgrxjhpHbtJQCK4BGAsYHg/s4032/IMG_4686.jpg\\\"], \\\"query\\\": \\\"jasper national park glacier\\\"}\",\"query\":\"Where has Evan been on roadtrips with his family?\",\"score\":2.860734462738037},{\"document\":\"Memory reference date: 2023-05-24 (24 May 2023).\\nSource identity: locomo:conv-49:D2:7\\nEvan: That must have been a challenging experience, Sam. It's tough when we have to confront our own health challenges. Remember, it's never too late to make positive changes for a healthier lifestyle. Is there anything I can do to support you in this journey?\",\"query\":\"Where has Evan been on roadtrips with his family?\",\"score\":-7.35891580581665},{\"document\":\"Memory reference date: 2023-05-18 (18 May 2023).\\nSource identity: locomo:conv-49:D1:20\\nEvan: No worries, Sam! Super pumped for you! Let's catch up soon and see how you're enjoying your new hobbies!\",\"query\":\"Where has Evan been on roadtrips with his family?\",\"score\":-7.472596645355225},{\"document\":\"Memory reference date: 2023-05-24 (24 May 2023).\\nSource identity: locomo:conv-49:D2:13\\nEvan: Awesome, Sam! Have fun with it and don't put too much pressure on yourself. Can't wait to hear how it's going!\",\"query\":\"Where has Evan been on roadtrips with his family?\",\"score\":-7.193580627441406},{\"document\":\"Memory reference date: 2023-05-18 (18 May 2023).\\nSource identity: locomo:conv-49:D1:11\\nSam: Nothing so far, but I was thinking about trying painting. Do you have any hobbies you love?\\n\\nUpstream image metadata (dataset annotation, not a user assertion):\\n{\\\"blip_caption\\\": \\\"a photo of a person holding a paint set in a store\\\", \\\"img_url\\\": [\\\"https://i.redd.it/hbkrxuiitopb1.jpg\\\"], \\\"query\\\": \\\"paint set canvas hobbies\\\"}\",\"query\":\"Where has Evan been on roadtrips with his family?\",\"score\":-10.36999797821045},{\"document\":\"Memory reference date: 2023-05-24 (24 May 2023).\\nSource identity: locomo:conv-49:D2:15\\nEvan: Alright Sam, have fun with it! Keep me updated!\",\"query\":\"Where has Evan been on roadtrips with his family?\",\"score\":-6.951864242553711},{\"document\":\"Memory reference date: 2023-05-18 (18 May 2023).\\nSource identity: locomo:conv-49:D1:1\\nSam: Hey Evan, good to see you! What's new since we last met? Anything cool happening?\",\"query\":\"Where has Evan been on roadtrips with his family?\",\"score\":-8.804373741149902},{\"document\":\"Memory reference date: 2023-05-18 (18 May 2023).\\nSource identity: locomo:conv-49:D1:4\\nEvan: My old prius broke down, decided to get it repaired and sell it. Glad you asked, we went to Rockies, check it out.\\n\\nUpstream image metadata (dataset annotation, not a user assertion):\\n{\\\"blip_caption\\\": \\\"a photo of a lake with rocks and mountains in the background\\\", \\\"img_url\\\": [\\\"https://res.cloudinary.com/atlasguruprod/image/upload/v1605280914/site-prod/itineraries/402c83d0-237f-11eb-85fd-4d00e2439877/omasxscl2k2xlnc2ggvj.jpg\\\"], \\\"query\\\": \\\"canadian rockies sunset scenery\\\"}\",\"query\":\"Where has Evan been on roadtrips with his family?\",\"score\":-7.706710338592529},{\"document\":\"Memory reference date: 2023-05-18 (18 May 2023).\\nSource identity: locomo:conv-49:D1:2\\nEvan: Hey Sam! Good to see you! Yeah, I just got back from a trip with my family in my new Prius.\",\"query\":\"Where has Evan been on roadtrips with his family?\",\"score\":-2.0314486026763916},{\"document\":\"Memory reference date: 2023-05-18 (18 May 2023).\\nSource identity: locomo:conv-49:D1:8\\nEvan: Aww, that's cute. How far did you two hike?\",\"query\":\"Where has Evan been on roadtrips with his family?\",\"score\":-8.995097160339355},{\"document\":\"Memory reference date: 2023-05-24 (24 May 2023).\\nSource identity: locomo:conv-49:D2:4\\nSam: That sounds great, Evan! It's so important to take time for ourselves and find peace, especially after a hard week. Mine's been tough.\",\"query\":\"Where has Evan been on roadtrips with his family?\",\"score\":-7.490747928619385},{\"document\":\"Memory reference date: 2023-05-18 (18 May 2023).\\nSource identity: locomo:conv-49:D1:19\\nSam: Thanks, Evan! I'm excited to try new things, should be fun!\",\"query\":\"Where has Evan been on roadtrips with his family?\",\"score\":-7.577810287475586},{\"document\":\"Memory reference date: 2023-05-24 (24 May 2023).\\nSource identity: locomo:conv-49:D2:14\\nSam: Cheers, Evan! I won't stress - just gonna enjoy it.\",\"query\":\"Where has Evan been on roadtrips with his family?\",\"score\":-7.8222527503967285},{\"document\":\"Memory reference date: 2023-05-18 (18 May 2023).\\nSource identity: locomo:conv-49:D1:14\\nEvan: Yep, it's a great stress-buster. I started doing this a few years back.\\n\\nUpstream image metadata (dataset annotation, not a user assertion):\\n{\\\"blip_caption\\\": \\\"a photo of a painting of a cactus in the desert\\\", \\\"img_url\\\": [\\\"https://i.pinimg.com/originals/73/e4/fd/73e4fd6baf59abc2beca9fd5509a853c.jpg\\\"], \\\"query\\\": \\\"watercolor painting sunset\\\"}\",\"query\":\"Where has Evan been on roadtrips with his family?\",\"score\":-7.922980785369873},{\"document\":\"Memory reference date: 2023-05-18 (18 May 2023).\\nSource identity: locomo:conv-49:D1:16\\nEvan: My friend got me into it and gave me some advice, and I was hooked right away!\",\"query\":\"Where has Evan been on roadtrips with his family?\",\"score\":-7.507601737976074},{\"document\":\"Memory reference date: 2023-05-18 (18 May 2023).\\nSource identity: locomo:conv-49:D1:12\\nEvan: Cool idea, Sam! I love it. Have you tried it before?\",\"query\":\"Where has Evan been on roadtrips with his family?\",\"score\":-7.686583042144775},{\"document\":\"Memory reference date: 2023-05-18 (18 May 2023).\\nSource identity: locomo:conv-49:D1:3\\nSam: Wow, not bad, what happened to the old one? Where'd you go, by the way?\\n\\nUpstream image metadata (dataset annotation, not a user assertion):\\n{\\\"blip_caption\\\": \\\"a photo of a person's feet on a car dashboard as the sun sets\\\"}\",\"query\":\"Where has Evan been on roadtrips with his family?\",\"score\":-10.483048439025879},{\"document\":\"Memory reference date: 2023-05-18 (18 May 2023).\\nSource identity: locomo:conv-49:D1:15\\nSam: Wow, that's impressive! How did you get into watercolor painting?\",\"query\":\"Where has Evan been on roadtrips with his family?\",\"score\":-10.555764198303223},{\"document\":\"Memory reference date: 2023-05-18 (18 May 2023).\\nSource identity: locomo:conv-49:D1:18\\nEvan: You'll find it, just keep trying new things until something sparks your excitement.\",\"query\":\"Where has Evan been on roadtrips with his family?\",\"score\":-7.214890003204346},{\"document\":\"Memory reference date: 2023-05-24 (24 May 2023).\\nSource identity: locomo:conv-49:D2:10\\nSam: Thanks, Evan. Like you said, I've been looking for a hobby to stay motivated. I've been thinking about trying painting. Do you think it will help me de-stress?\",\"query\":\"Where has Evan been on roadtrips with his family?\",\"score\":-9.584782600402832},{\"document\":\"Memory reference date: 2023-05-18 (18 May 2023).\\nSource identity: locomo:conv-49:D1:7\\nSam: Wow, that's cool. I love hiking, but it's been ages since I've done it. I did this hike with my dad way back when I was ten. Going hiking together was great fun, and really special for us.\\n\\nUpstream image metadata (dataset annotation, not a user assertion):\\n{\\\"blip_caption\\\": \\\"a photography of a man and a child walking through a forest\\\", \\\"img_url\\\": [\\\"https://storage.needpix.com/rsynced_images/family-1784512_1280.jpg\\\"], \\\"query\\\": \\\"hiking trail lush greenery bonding experience\\\"}\",\"query\":\"Where has Evan been on roadtrips with his family?\",\"score\":-9.418334007263184},{\"document\":\"Memory reference date: 2023-05-24 (24 May 2023).\\nSource identity: locomo:conv-49:D2:17\\nEvan: Take care, Sam! I'll catch up with you later.\",\"query\":\"Where has Evan been on roadtrips with his family?\",\"score\":-6.776576519012451},{\"document\":\"Memory reference date: 2023-05-24 (24 May 2023).\\nSource identity: locomo:conv-49:D2:5\\nEvan: Sorry to hear that, Sam. Is there anything I can do to help?\",\"query\":\"Where has Evan been on roadtrips with his family?\",\"score\":-8.140440940856934},{\"document\":\"Memory reference date: 2023-05-24 (24 May 2023).\\nSource identity: locomo:conv-49:D2:16\\nSam: Thanks, Evan! Will do. Bye for now.\",\"query\":\"Where has Evan been on roadtrips with his family?\",\"score\":-7.7537455558776855},{\"document\":\"Memory reference date: 2023-05-18 (18 May 2023).\\nSource identity: locomo:conv-49:D1:22\\nEvan: Take it easy, Evan! Can't wait to see you. Have a good one!\",\"query\":\"Where has Evan been on roadtrips with his family?\",\"score\":-8.11573314666748},{\"document\":\"Memory reference date: 2023-05-18 (18 May 2023).\\nSource identity: locomo:conv-49:D1:13\\nSam: Not yet, but I'm keen to give it a go. It looks like a nice way to chill and get creative.\",\"query\":\"Where has Evan been on roadtrips with his family?\",\"score\":-9.05028247833252},{\"document\":\"Memory reference date: 2023-05-24 (24 May 2023).\\nSource identity: locomo:conv-49:D2:6\\nSam: Thanks, Evan. Appreciate the offer, but had a check-up with my doctor a few days ago and, yikes, the weight wasn't great. It was pretty eye-opening.\",\"query\":\"Where has Evan been on roadtrips with his family?\",\"score\":-8.786383628845215},{\"document\":\"Memory reference date: 2023-05-18 (18 May 2023).\\nSource identity: locomo:conv-49:D1:17\\nSam: Wow! I hope I can find something I'm as passionate about as you are with watercolor painting.\",\"query\":\"Where has Evan been on roadtrips with his family?\",\"score\":-10.06278133392334},{\"document\":\"Memory reference date: 2023-05-18 (18 May 2023).\\nSource identity: locomo:conv-49:D1:21\\nSam: Yeah, I'll keep you posted. See you soon!\",\"query\":\"Where has Evan been on roadtrips with his family?\",\"score\":-9.147126197814941},{\"document\":\"Memory reference date: 2023-05-24 (24 May 2023).\\nSource identity: locomo:conv-49:D2:3\\nEvan: Hey Sam, thanks for asking! It was great - fresh air, peacefulness and a cozy cabin surrounded by mountains and forests made it feel like a real retreat.\",\"query\":\"Where has Evan been on roadtrips with his family?\",\"score\":-5.102463245391846},{\"document\":\"Memory reference date: 2023-05-18 (18 May 2023).\\nSource identity: locomo:conv-49:D1:6\\nEvan: We all hiked the trails last week - the views were amazing!\",\"query\":\"Where has Evan been on roadtrips with his family?\",\"score\":-5.4919562339782715},{\"document\":\"Memory reference date: 2023-05-24 (24 May 2023).\\nSource identity: locomo:conv-49:D2:8\\nSam: Thanks, Evan. Breaking old habits isn't easy. Do you have any tips for starting the process?\",\"query\":\"Where has Evan been on roadtrips with his family?\",\"score\":-9.016068458557129},{\"document\":\"Memory reference date: 2023-05-24 (24 May 2023).\\nSource identity: locomo:conv-49:D2:2\\nSam: Hey Evan, looks amazing! I've never been to Jasper, but it looks breathtaking. Tell me more about your road trip. Was it relaxing?\",\"query\":\"Where has Evan been on roadtrips with his family?\",\"score\":-4.372235298156738},{\"document\":\"Memory reference date: 2023-05-24 (24 May 2023).\\nSource identity: locomo:conv-49:D2:11\\nEvan: Of course, Sam! Painting is a great way to relieve stress and be creative. It gives you the freedom to explore colors and textures and express feelings. I've been doing it for a few years now and it helps me find peace. But unfortunately it won't help you with your weight problem, besides painting I recommend exercising!\",\"query\":\"Where has Evan been on roadtrips with his family?\",\"score\":-9.542722702026367},{\"document\":\"Memory reference date: 2023-05-24 (24 May 2023).\\nSource identity: locomo:conv-49:D2:12\\nSam: Thanks, Evan! Appreciate the encouragement. I'll give it a go and let you know how it turns out.\",\"query\":\"Where has Evan been on roadtrips with his family?\",\"score\":-8.05709171295166},{\"document\":\"Memory reference date: 2023-05-18 (18 May 2023).\\nSource identity: locomo:conv-49:D1:10\\nEvan: What other hobbies have you found for yourself?\",\"query\":\"Where has Evan been on roadtrips with his family?\",\"score\":-8.957010269165039}]"
+      ],
+      "duration_ms": 7904,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "retrieval-quality",
+        "case_id": "locomo-conv-49-083"
+      },
+      "mode": "end_to_end",
+      "split": "development",
+      "label_trust": "reviewed",
+      "status": "quality_failed",
+      "metrics": {
+        "answerable_non_abstention_rate": 0.0,
+        "duplicate_free_rate": 1.0,
+        "precision_macro": 0.0,
+        "prohibited_free_rate": 1.0,
+        "required_group_recall": 0.0
+      },
+      "evidence": {
+        "answerable_non_abstention_rate": {
+          "kind": "ratio",
+          "numerator": 0,
+          "denominator": 1
+        },
+        "case_tag:category-4": {
+          "kind": "count",
+          "value": 1
+        },
+        "case_tag:locomo": {
+          "kind": "count",
+          "value": 1
+        },
+        "case_tag:published-evidence": {
+          "kind": "count",
+          "value": 1
+        },
+        "duplicate_free_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "precision_macro": {
+          "kind": "ratio",
+          "numerator": 0,
+          "denominator": 1
+        },
+        "prohibited_free_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "required_group_recall": {
+          "kind": "ratio",
+          "numerator": 0,
+          "denominator": 1
+        }
+      },
+      "failures": [
+        "retrieval missed one or more required evidence groups",
+        "retrieval did not follow the expected abstention behavior",
+        "native selected evidence: []",
+        "native reranking candidates: [{\"document\":\"Memory reference date: 2023-05-24 (24 May 2023).\\nSource identity: locomo:conv-49:D2:5\\nEvan: Sorry to hear that, Sam. Is there anything I can do to help?\",\"query\":\"What type of car did Evan get after his old Prius broke down?\",\"score\":-7.802773952484131},{\"document\":\"Memory reference date: 2023-05-24 (24 May 2023).\\nSource identity: locomo:conv-49:D2:6\\nSam: Thanks, Evan. Appreciate the offer, but had a check-up with my doctor a few days ago and, yikes, the weight wasn't great. It was pretty eye-opening.\",\"query\":\"What type of car did Evan get after his old Prius broke down?\",\"score\":-6.686557292938232},{\"document\":\"Memory reference date: 2023-05-18 (18 May 2023).\\nSource identity: locomo:conv-49:D1:16\\nEvan: My friend got me into it and gave me some advice, and I was hooked right away!\",\"query\":\"What type of car did Evan get after his old Prius broke down?\",\"score\":-6.744822978973389},{\"document\":\"Memory reference date: 2023-05-18 (18 May 2023).\\nSource identity: locomo:conv-49:D1:12\\nEvan: Cool idea, Sam! I love it. Have you tried it before?\",\"query\":\"What type of car did Evan get after his old Prius broke down?\",\"score\":-6.3524956703186035},{\"document\":\"Memory reference date: 2023-05-18 (18 May 2023).\\nSource identity: locomo:conv-49:D1:3\\nSam: Wow, not bad, what happened to the old one? Where'd you go, by the way?\\n\\nUpstream image metadata (dataset annotation, not a user assertion):\\n{\\\"blip_caption\\\": \\\"a photo of a person's feet on a car dashboard as the sun sets\\\"}\",\"query\":\"What type of car did Evan get after his old Prius broke down?\",\"score\":-9.619242668151855},{\"document\":\"Memory reference date: 2023-05-24 (24 May 2023).\\nSource identity: locomo:conv-49:D2:3\\nEvan: Hey Sam, thanks for asking! It was great - fresh air, peacefulness and a cozy cabin surrounded by mountains and forests made it feel like a real retreat.\",\"query\":\"What type of car did Evan get after his old Prius broke down?\",\"score\":-6.415940761566162},{\"document\":\"Memory reference date: 2023-05-18 (18 May 2023).\\nSource identity: locomo:conv-49:D1:15\\nSam: Wow, that's impressive! How did you get into watercolor painting?\",\"query\":\"What type of car did Evan get after his old Prius broke down?\",\"score\":-10.562078475952148},{\"document\":\"Memory reference date: 2023-05-18 (18 May 2023).\\nSource identity: locomo:conv-49:D1:14\\nEvan: Yep, it's a great stress-buster. I started doing this a few years back.\\n\\nUpstream image metadata (dataset annotation, not a user assertion):\\n{\\\"blip_caption\\\": \\\"a photo of a painting of a cactus in the desert\\\", \\\"img_url\\\": [\\\"https://i.pinimg.com/originals/73/e4/fd/73e4fd6baf59abc2beca9fd5509a853c.jpg\\\"], \\\"query\\\": \\\"watercolor painting sunset\\\"}\",\"query\":\"What type of car did Evan get after his old Prius broke down?\",\"score\":-8.21883487701416},{\"document\":\"Memory reference date: 2023-05-24 (24 May 2023).\\nSource identity: locomo:conv-49:D2:15\\nEvan: Alright Sam, have fun with it! Keep me updated!\",\"query\":\"What type of car did Evan get after his old Prius broke down?\",\"score\":-6.1490559577941895},{\"document\":\"Memory reference date: 2023-05-18 (18 May 2023).\\nSource identity: locomo:conv-49:D1:11\\nSam: Nothing so far, but I was thinking about trying painting. Do you have any hobbies you love?\\n\\nUpstream image metadata (dataset annotation, not a user assertion):\\n{\\\"blip_caption\\\": \\\"a photo of a person holding a paint set in a store\\\", \\\"img_url\\\": [\\\"https://i.redd.it/hbkrxuiitopb1.jpg\\\"], \\\"query\\\": \\\"paint set canvas hobbies\\\"}\",\"query\":\"What type of car did Evan get after his old Prius broke down?\",\"score\":-10.211567878723145},{\"document\":\"Memory reference date: 2023-05-18 (18 May 2023).\\nSource identity: locomo:conv-49:D1:7\\nSam: Wow, that's cool. I love hiking, but it's been ages since I've done it. I did this hike with my dad way back when I was ten. Going hiking together was great fun, and really special for us.\\n\\nUpstream image metadata (dataset annotation, not a user assertion):\\n{\\\"blip_caption\\\": \\\"a photography of a man and a child walking through a forest\\\", \\\"img_url\\\": [\\\"https://storage.needpix.com/rsynced_images/family-1784512_1280.jpg\\\"], \\\"query\\\": \\\"hiking trail lush greenery bonding experience\\\"}\",\"query\":\"What type of car did Evan get after his old Prius broke down?\",\"score\":-9.874481201171875},{\"document\":\"Memory reference date: 2023-05-24 (24 May 2023).\\nSource identity: locomo:conv-49:D2:8\\nSam: Thanks, Evan. Breaking old habits isn't easy. Do you have any tips for starting the process?\",\"query\":\"What type of car did Evan get after his old Prius broke down?\",\"score\":-7.87571382522583},{\"document\":\"Memory reference date: 2023-05-18 (18 May 2023).\\nSource identity: locomo:conv-49:D1:4\\nEvan: My old prius broke down, decided to get it repaired and sell it. Glad you asked, we went to Rockies, check it out.\\n\\nUpstream image metadata (dataset annotation, not a user assertion):\\n{\\\"blip_caption\\\": \\\"a photo of a lake with rocks and mountains in the background\\\", \\\"img_url\\\": [\\\"https://res.cloudinary.com/atlasguruprod/image/upload/v1605280914/site-prod/itineraries/402c83d0-237f-11eb-85fd-4d00e2439877/omasxscl2k2xlnc2ggvj.jpg\\\"], \\\"query\\\": \\\"canadian rockies sunset scenery\\\"}\",\"query\":\"What type of car did Evan get after his old Prius broke down?\",\"score\":-2.869844913482666},{\"document\":\"Memory reference date: 2023-05-18 (18 May 2023).\\nSource identity: locomo:conv-49:D1:2\\nEvan: Hey Sam! Good to see you! Yeah, I just got back from a trip with my family in my new Prius.\",\"query\":\"What type of car did Evan get after his old Prius broke down?\",\"score\":-3.648343801498413},{\"document\":\"Memory reference date: 2023-05-18 (18 May 2023).\\nSource identity: locomo:conv-49:D1:17\\nSam: Wow! I hope I can find something I'm as passionate about as you are with watercolor painting.\",\"query\":\"What type of car did Evan get after his old Prius broke down?\",\"score\":-9.742293357849121},{\"document\":\"Memory reference date: 2023-05-18 (18 May 2023).\\nSource identity: locomo:conv-49:D1:18\\nEvan: You'll find it, just keep trying new things until something sparks your excitement.\",\"query\":\"What type of car did Evan get after his old Prius broke down?\",\"score\":-6.594079494476318},{\"document\":\"Memory reference date: 2023-05-18 (18 May 2023).\\nSource identity: locomo:conv-49:D1:13\\nSam: Not yet, but I'm keen to give it a go. It looks like a nice way to chill and get creative.\",\"query\":\"What type of car did Evan get after his old Prius broke down?\",\"score\":-8.61242961883545},{\"document\":\"Memory reference date: 2023-05-24 (24 May 2023).\\nSource identity: locomo:conv-49:D2:7\\nEvan: That must have been a challenging experience, Sam. It's tough when we have to confront our own health challenges. Remember, it's never too late to make positive changes for a healthier lifestyle. Is there anything I can do to support you in this journey?\",\"query\":\"What type of car did Evan get after his old Prius broke down?\",\"score\":-8.395575523376465},{\"document\":\"Memory reference date: 2023-05-18 (18 May 2023).\\nSource identity: locomo:conv-49:D1:22\\nEvan: Take it easy, Evan! Can't wait to see you. Have a good one!\",\"query\":\"What type of car did Evan get after his old Prius broke down?\",\"score\":-7.218494892120361},{\"document\":\"Memory reference date: 2023-05-18 (18 May 2023).\\nSource identity: locomo:conv-49:D1:8\\nEvan: Aww, that's cute. How far did you two hike?\",\"query\":\"What type of car did Evan get after his old Prius broke down?\",\"score\":-8.114182472229004},{\"document\":\"Memory reference date: 2023-05-24 (24 May 2023).\\nSource identity: locomo:conv-49:D2:16\\nSam: Thanks, Evan! Will do. Bye for now.\",\"query\":\"What type of car did Evan get after his old Prius broke down?\",\"score\":-7.245834827423096},{\"document\":\"Memory reference date: 2023-05-24 (24 May 2023).\\nSource identity: locomo:conv-49:D2:13\\nEvan: Awesome, Sam! Have fun with it and don't put too much pressure on yourself. Can't wait to hear how it's going!\",\"query\":\"What type of car did Evan get after his old Prius broke down?\",\"score\":-6.50856876373291},{\"document\":\"Memory reference date: 2023-05-24 (24 May 2023).\\nSource identity: locomo:conv-49:D2:10\\nSam: Thanks, Evan. Like you said, I've been looking for a hobby to stay motivated. I've been thinking about trying painting. Do you think it will help me de-stress?\",\"query\":\"What type of car did Evan get after his old Prius broke down?\",\"score\":-8.89156436920166},{\"document\":\"Memory reference date: 2023-05-24 (24 May 2023).\\nSource identity: locomo:conv-49:D2:4\\nSam: That sounds great, Evan! It's so important to take time for ourselves and find peace, especially after a hard week. Mine's been tough.\",\"query\":\"What type of car did Evan get after his old Prius broke down?\",\"score\":-7.50997257232666},{\"document\":\"Memory reference date: 2023-05-18 (18 May 2023).\\nSource identity: locomo:conv-49:D1:9\\nSam: We hiked a good distance - quite a feat for me back then. It's definitely a great memory.\",\"query\":\"What type of car did Evan get after his old Prius broke down?\",\"score\":-8.60622501373291},{\"document\":\"Memory reference date: 2023-05-24 (24 May 2023).\\nSource identity: locomo:conv-49:D2:1\\nEvan: Hey Sam, good to hear from you! Since we last talked, lots has been happening! Last weekend, I took my family on a road trip to Jasper. It was amazing! We drove through the Icefields Parkway and the glaciers and lakes were gorgeous. I got a shot of a glacier, check it out!\\n\\nUpstream image metadata (dataset annotation, not a user assertion):\\n{\\\"blip_caption\\\": \\\"a photo of a person holding a book in front of a lake\\\", \\\"img_url\\\": [\\\"https://1.bp.blogspot.com/-50oDf6izLpk/XtyM4RGdDgI/AAAAAAACwcA/nnQkAWVln4M3AQ4ZWAkGUfgrxjhpHbtJQCK4BGAsYHg/s4032/IMG_4686.jpg\\\"], \\\"query\\\": \\\"jasper national park glacier\\\"}\",\"query\":\"What type of car did Evan get after his old Prius broke down?\",\"score\":-8.828660011291504},{\"document\":\"Memory reference date: 2023-05-18 (18 May 2023).\\nSource identity: locomo:conv-49:D1:6\\nEvan: We all hiked the trails last week - the views were amazing!\",\"query\":\"What type of car did Evan get after his old Prius broke down?\",\"score\":-5.7141432762146},{\"document\":\"Memory reference date: 2023-05-24 (24 May 2023).\\nSource identity: locomo:conv-49:D2:12\\nSam: Thanks, Evan! Appreciate the encouragement. I'll give it a go and let you know how it turns out.\",\"query\":\"What type of car did Evan get after his old Prius broke down?\",\"score\":-7.314695358276367},{\"document\":\"Memory reference date: 2023-05-18 (18 May 2023).\\nSource identity: locomo:conv-49:D1:19\\nSam: Thanks, Evan! I'm excited to try new things, should be fun!\",\"query\":\"What type of car did Evan get after his old Prius broke down?\",\"score\":-7.372565746307373},{\"document\":\"Memory reference date: 2023-05-24 (24 May 2023).\\nSource identity: locomo:conv-49:D2:9\\nEvan: Yeah, what worked for me was finding a fitness routine I really enjoy. It's my go-to, I love the feeling of being healthy and strong. Making it fun and finding little ways to make smarter choices in my diet really added up. Don't forget, you got this!\",\"query\":\"What type of car did Evan get after his old Prius broke down?\",\"score\":-8.234376907348633},{\"document\":\"Memory reference date: 2023-05-18 (18 May 2023).\\nSource identity: locomo:conv-49:D1:21\\nSam: Yeah, I'll keep you posted. See you soon!\",\"query\":\"What type of car did Evan get after his old Prius broke down?\",\"score\":-8.693486213684082},{\"document\":\"Memory reference date: 2023-05-24 (24 May 2023).\\nSource identity: locomo:conv-49:D2:11\\nEvan: Of course, Sam! Painting is a great way to relieve stress and be creative. It gives you the freedom to explore colors and textures and express feelings. I've been doing it for a few years now and it helps me find peace. But unfortunately it won't help you with your weight problem, besides painting I recommend exercising!\",\"query\":\"What type of car did Evan get after his old Prius broke down?\",\"score\":-8.92545223236084},{\"document\":\"Memory reference date: 2023-05-18 (18 May 2023).\\nSource identity: locomo:conv-49:D1:1\\nSam: Hey Evan, good to see you! What's new since we last met? Anything cool happening?\",\"query\":\"What type of car did Evan get after his old Prius broke down?\",\"score\":-9.090787887573242},{\"document\":\"Memory reference date: 2023-05-24 (24 May 2023).\\nSource identity: locomo:conv-49:D2:17\\nEvan: Take care, Sam! I'll catch up with you later.\",\"query\":\"What type of car did Evan get after his old Prius broke down?\",\"score\":-6.358774662017822},{\"document\":\"Memory reference date: 2023-05-24 (24 May 2023).\\nSource identity: locomo:conv-49:D2:14\\nSam: Cheers, Evan! I won't stress - just gonna enjoy it.\",\"query\":\"What type of car did Evan get after his old Prius broke down?\",\"score\":-7.506577014923096},{\"document\":\"Memory reference date: 2023-05-24 (24 May 2023).\\nSource identity: locomo:conv-49:D2:2\\nSam: Hey Evan, looks amazing! I've never been to Jasper, but it looks breathtaking. Tell me more about your road trip. Was it relaxing?\",\"query\":\"What type of car did Evan get after his old Prius broke down?\",\"score\":-8.357150077819824},{\"document\":\"Memory reference date: 2023-05-18 (18 May 2023).\\nSource identity: locomo:conv-49:D1:20\\nEvan: No worries, Sam! Super pumped for you! Let's catch up soon and see how you're enjoying your new hobbies!\",\"query\":\"What type of car did Evan get after his old Prius broke down?\",\"score\":-7.2314133644104},{\"document\":\"Memory reference date: 2023-05-18 (18 May 2023).\\nSource identity: locomo:conv-49:D1:10\\nEvan: What other hobbies have you found for yourself?\",\"query\":\"What type of car did Evan get after his old Prius broke down?\",\"score\":-9.347655296325684}]"
+      ],
+      "duration_ms": 7972,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "retrieval-quality",
+        "case_id": "locomo-conv-50-001"
+      },
+      "mode": "end_to_end",
+      "split": "development",
+      "label_trust": "reviewed",
+      "status": "quality_failed",
+      "metrics": {
+        "answerable_non_abstention_rate": 1.0,
+        "duplicate_free_rate": 1.0,
+        "precision_macro": 1.0,
+        "prohibited_free_rate": 1.0,
+        "required_group_recall": 0.3333333333333333
+      },
+      "evidence": {
+        "answerable_non_abstention_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "case_tag:category-1": {
+          "kind": "count",
+          "value": 1
+        },
+        "case_tag:locomo": {
+          "kind": "count",
+          "value": 1
+        },
+        "case_tag:published-evidence": {
+          "kind": "count",
+          "value": 1
+        },
+        "case_tag:source_labeled_upstream_image_metadata": {
+          "kind": "count",
+          "value": 1
+        },
+        "case_tag:upstream_acquisition_underspecified": {
+          "kind": "count",
+          "value": 1
+        },
+        "duplicate_free_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "precision_macro": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "prohibited_free_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "required_group_recall": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 3
+        }
+      },
+      "failures": [
+        "retrieval missed one or more required evidence groups",
+        "native selected evidence: [{\"gold_key\":\"D2:1:note:567348606949\",\"item\":{\"confidence\":0.0,\"content\":\"Calvin: Hey Dave, been a few days, so I wanted to let you in on some cool news.  I just got a new car and it's amazing! Finally owning a luxury car was a dream come true and I'm so stoked.\",\"fact_id\":\"fact:59b1511e4816dd0de75ad324\",\"grounding\":0.62,\"provenance\":{\"extraction_strategy\":\"summary_note_fallback\",\"ingestion_method\":\"extraction\",\"matched_query_terms\":[\"2023\",\"calvin\",\"march\"],\"reranking\":{\"admission_floor\":0.0,\"model_signature\":\"reranksig:dff4b9939786ed9a1e897946778e336584cc24251a2f32282bd3fe83a680a7d1\",\"relevance_logit\":0.5572494864463806},\"retrieval_admission\":{\"basis\":\"semantic\",\"community\":null,\"graph_anchor_origin\":null,\"hop_count\":null,\"matched_content_terms\":[],\"matched_index_key_terms\":[],\"matched_references\":[],\"policy_version\":\"retrieval-admission-v1\",\"repeated_topic\":null,\"resolved_entity_ids\":[],\"semantic_similarity\":0.7960419924793084},\"source_episode_id\":\"episode:ecbba98f1320d9e6f6118bb9\",\"source_id\":\"locomo:conv-50:D2:1\",\"source_type\":\"conversation\"},\"quote\":\"Calvin: Hey Dave, been a few days, so I wanted to let you in on some cool news.  I just got a new car and it's amazing! Finally owning a luxury car was a dream come true and I'm so stoked.\",\"rationale\":\"tier=temporal fts=0.00 access_count=0 confidence=0.00 relevance=0.61 grounding=0.62 alignment=1.04 semantic=enabled matched lexical query=\\\"What items did Calvin buy in March 2023?\\\" and active at 2026-10-10\",\"reconciliation\":{\"claim_ids\":[\"claim:383ad2f87e92f404e7ffe65b9839bf75c6140cce99ec126dca42f50997511366\"],\"relations\":[{\"evaluator_version\":\"builtin/v1\",\"outcome\":\"contradiction\",\"reason_code\":\"contradiction\",\"relation_id\":\"claim_relation:0109dcc7b07c9d16436cd377333332d9fee919cba33c63db94701bb5a70688fd\"},{\"evaluator_version\":\"builtin/v1\",\"outcome\":\"contradiction\",\"reason_code\":\"contradiction\",\"relation_id\":\"claim_relation:0caae31fef54706edf57968c92c462e804fa878507c4c4badb5f6ad371bdd6d7\"},{\"evaluator_version\":\"builtin/v1\",\"outcome\":\"contradiction\",\"reason_code\":\"contradiction\",\"relation_id\":\"claim_relation:339069660dcec36df67e1d47c49a92e06ccda2838eb21958532169ad97fa7a96\"},{\"evaluator_version\":\"builtin/v1\",\"outcome\":\"contradiction\",\"reason_code\":\"contradiction\",\"relation_id\":\"claim_relation:5e86d383d1083a26f20a7f6ff79a904eaaa2846a127037372dfb1c08f3367cab\"},{\"evaluator_version\":\"builtin/v1\",\"outcome\":\"contradiction\",\"reason_code\":\"contradiction\",\"relation_id\":\"claim_relation:94a70389d6159921deac382de1fd58db1d69272e88b050baff497aad33a88c44\"},{\"evaluator_version\":\"builtin/v1\",\"outcome\":\"contradiction\",\"reason_code\":\"contradiction\",\"relation_id\":\"claim_relation:9b223a44004c841429d0374c06bda76f14d1c318afcb465795105fbad71bdfdc\"},{\"evaluator_version\":\"builtin/v1\",\"outcome\":\"contradiction\",\"reason_code\":\"contradiction\",\"relation_id\":\"claim_relation:a75905597852f886d1e0b1c32e0c1a5bec6c7f655a4a77060f2846b1100d84ca\"},{\"evaluator_version\":\"builtin/v1\",\"outcome\":\"contradiction\",\"reason_code\":\"contradiction\",\"relation_id\":\"claim_relation:afe6c4790c8c93187fe4d35200cca70f96337001acbb29b946606eb27fdc98b1\"},{\"evaluator_version\":\"builtin/v1\",\"outcome\":\"contradiction\",\"reason_code\":\"contradiction\",\"relation_id\":\"claim_relation:bac883da9d254854f6bfb63c8b4c67b24042c276475cecc008b81d5dcbd85e4f\"}]},\"relevance\":0.61,\"retrieval_evidence\":{\"admission_basis\":\"semantic\",\"policy_version\":\"retrieval-admission-v1\",\"semantic_similarity\":0.7960419924793084},\"retrieval_tier\":\"temporal\",\"semantic_available\":true,\"source_episode\":\"episode:ecbba98f1320d9e6f6118bb9\"}}]",
+        "native reranking candidates: [{\"document\":\"Memory reference date: 2023-03-26 (26 March 2023).\\nSource identity: locomo:conv-50:D2:17\\nCalvin: Got a new ride and wrote some new tunes - had a few studio sessions last week and I'm excited to collaborate. Can't wait to share it with everyone!\",\"query\":\"What items did Calvin buy in March 2023?\",\"score\":-0.34188583493232727},{\"document\":\"Memory reference date: 2023-03-26 (26 March 2023).\\nSource identity: locomo:conv-50:D2:1\\nCalvin: Hey Dave, been a few days, so I wanted to let you in on some cool news.  I just got a new car and it's amazing! Finally owning a luxury car was a dream come true and I'm so stoked.\",\"query\":\"What items did Calvin buy in March 2023?\",\"score\":0.5572494864463806}]"
+      ],
+      "duration_ms": 5071,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "retrieval-quality",
+        "case_id": "locomo-conv-50-071"
+      },
+      "mode": "end_to_end",
+      "split": "development",
+      "label_trust": "reviewed",
+      "status": "passed",
+      "metrics": {
+        "answerable_non_abstention_rate": 1.0,
+        "duplicate_free_rate": 1.0,
+        "precision_macro": 1.0,
+        "prohibited_free_rate": 1.0,
+        "required_group_recall": 1.0
+      },
+      "evidence": {
+        "answerable_non_abstention_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "case_tag:category-4": {
+          "kind": "count",
+          "value": 1
+        },
+        "case_tag:locomo": {
+          "kind": "count",
+          "value": 1
+        },
+        "case_tag:published-evidence": {
+          "kind": "count",
+          "value": 1
+        },
+        "duplicate_free_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "precision_macro": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "prohibited_free_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "required_group_recall": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        }
+      },
+      "failures": [],
+      "duration_ms": 7396,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "retrieval-quality",
+        "case_id": "logging-config"
+      },
+      "mode": "end_to_end",
+      "split": "development",
+      "label_trust": "reviewed",
+      "status": "passed",
+      "metrics": {
+        "answerable_non_abstention_rate": 1.0,
+        "duplicate_free_rate": 1.0,
+        "precision_macro": 1.0,
+        "prohibited_free_rate": 1.0,
+        "required_group_recall": 1.0
+      },
+      "evidence": {
+        "answerable_non_abstention_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "case_tag:configuration": {
+          "kind": "count",
+          "value": 1
+        },
+        "case_tag:logging": {
+          "kind": "count",
+          "value": 1
+        },
+        "duplicate_free_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "precision_macro": {
+          "kind": "ratio",
+          "numerator": 2,
+          "denominator": 2
+        },
+        "prohibited_free_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "required_group_recall": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        }
+      },
+      "failures": [],
+      "duration_ms": 5622,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "retrieval-quality",
+        "case_id": "logging-correlation"
+      },
+      "mode": "end_to_end",
+      "split": "development",
+      "label_trust": "reviewed",
+      "status": "passed",
+      "metrics": {
+        "answerable_non_abstention_rate": 1.0,
+        "duplicate_free_rate": 1.0,
+        "precision_macro": 1.0,
+        "prohibited_free_rate": 1.0,
+        "required_group_recall": 1.0
+      },
+      "evidence": {
+        "answerable_non_abstention_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "case_tag:logging": {
+          "kind": "count",
+          "value": 1
+        },
+        "case_tag:paraphrase": {
+          "kind": "count",
+          "value": 1
+        },
+        "duplicate_free_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "precision_macro": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "prohibited_free_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "required_group_recall": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        }
+      },
+      "failures": [],
+      "duration_ms": 5483,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "retrieval-quality",
+        "case_id": "logging-levels"
+      },
+      "mode": "end_to_end",
+      "split": "development",
+      "label_trust": "reviewed",
+      "status": "passed",
+      "metrics": {
+        "answerable_non_abstention_rate": 1.0,
+        "duplicate_free_rate": 1.0,
+        "precision_macro": 1.0,
+        "prohibited_free_rate": 1.0,
+        "required_group_recall": 1.0
+      },
+      "evidence": {
+        "answerable_non_abstention_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "case_tag:error-policy": {
+          "kind": "count",
+          "value": 1
+        },
+        "case_tag:logging": {
+          "kind": "count",
+          "value": 1
+        },
+        "duplicate_free_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "precision_macro": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "prohibited_free_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "required_group_recall": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        }
+      },
+      "failures": [],
+      "duration_ms": 5678,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "retrieval-quality",
+        "case_id": "logging-original"
+      },
+      "mode": "end_to_end",
+      "split": "development",
+      "label_trust": "reviewed",
+      "status": "quality_failed",
+      "metrics": {
+        "answerable_non_abstention_rate": 1.0,
+        "duplicate_free_rate": 1.0,
+        "precision_macro": 1.0,
+        "prohibited_free_rate": 1.0,
+        "required_group_recall": 0.3333333333333333
+      },
+      "evidence": {
+        "answerable_non_abstention_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "case_tag:logging": {
+          "kind": "count",
+          "value": 1
+        },
+        "case_tag:original-query": {
+          "kind": "count",
+          "value": 1
+        },
+        "duplicate_free_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "precision_macro": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "prohibited_free_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "required_group_recall": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 3
+        }
+      },
+      "failures": [
+        "retrieval missed one or more required evidence groups",
+        "native selected evidence: [{\"gold_key\":\"raw:logging-config\",\"item\":{\"confidence\":0.62,\"content\":\"| Variable | Meaning |\\n|---|---|\\n| `RUST_LOG` | Level and per-subsystem directives. A bare level sets the default (`info`); `prefix=level` sets a subsystem. The most specific prefix wins. |\\n| `MEMORY_LOG_FORMAT` | `text` (default, human-readable, one line per event) or `json` (NDJSON, one object per event). |\\n| `MEMORY_LOG_COLOR` | `always`, `never`, or anything else for auto (colour only on a colour-capable terminal, and never for a file sink). `NO_COLOR` set and non-empty disables colour. |\\n| `MEMORY_LOG_TARGETS` | Third-party `tracing` targets to raise, comma-separated `target=level`. Quiet by default; can never drop this service's own events. |\\n| `MEMORY_LOG_FILE` | Append the stream to this file instead of stderr. A blank value means \\\"unset\\\". |\\n\\n`RUST_LOG` examples:\\n\\n```\\nRUST_LOG=info                       # default\\nRUST_LOG=extract=debug              # one subsystem\\nRUST_LOG=http=error,info            # quiet the HTTP surface, keep the rest\\nRUST_LOG=fs_watch=trace,http=debug  # two subsystems, the most specific rule wins\\n```\",\"fact_id\":\"episode_fallback:episode:8b072bf970d29803d8cc8c8c\",\"grounding\":0.55,\"provenance\":{\"episode_fallback\":true,\"reference_time\":\"2026-10-07T00:00:00Z\",\"reranking\":{\"admission_floor\":0.0,\"model_signature\":\"reranksig:dff4b9939786ed9a1e897946778e336584cc24251a2f32282bd3fe83a680a7d1\",\"relevance_logit\":5.447852611541748},\"source_episode\":\"episode:8b072bf970d29803d8cc8c8c\",\"source_id\":\"native:logging-config\",\"source_type\":\"session_summary\"},\"quote\":\"| Variable | Meaning |\\n|---|---|\\n| `RUST_LOG` | Level and per-subsystem directives. A bare level sets the default (`info`); `prefix=level` sets a subsystem. The most specific prefix wins. |\\n| `MEMORY_LOG_FORMAT` | `text` (default, human-readable, one line per event) or `json` (NDJSON, one object per event). |\\n| `MEMORY_LOG_COLOR` | `always`, `never`, or anything else for auto (colour only on a colour-capable terminal, and never for a file sink). `NO_COLOR` set and non-empty disables colour. |\\n| `MEMORY_LOG_TARGETS` | Third-party `tracing` targets to raise, comma-separated `target=level`. Quiet by default; can never drop this service's own events. |\\n| `MEMORY_LOG_FILE` | Append the stream to this file instead of stderr. A blank value means \\\"unset\\\". |\\n\\n`RUST_LOG` examples:\\n\\n```\\nRUST_LOG=info                       # default\\nRUST_LOG=extract=debug              # one subsystem\\nRUST_LOG=http=error,info            # quiet the HTTP surface, keep the rest\\nRUST_LOG=fs_watch=trace,http=debug  # two subsystems, the most specific rule wins\\n```\",\"rationale\":\"tier=fallback fts=6.00 access_count=0 confidence=0.62 grounding=0.55 semantic=enabled matched episode content query=\\\"logging setup tracing configuration log format log level policy memory mcp\\\" and active at 2026-10-10\",\"relevance\":0.55,\"retrieval_tier\":\"fallback\",\"semantic_available\":true,\"source_episode\":\"episode:8b072bf970d29803d8cc8c8c\"}}]",
+        "native reranking candidates: [{\"document\":\"Memory reference date: 2026-10-07 (07 October 2026).\\nSource identity: native:logging-config\\n| Variable | Meaning |\\n|---|---|\\n| `RUST_LOG` | Level and per-subsystem directives. A bare level sets the default (`info`); `prefix=level` sets a subsystem. The most specific prefix wins. |\\n| `MEMORY_LOG_FORMAT` | `text` (default, human-readable, one line per event) or `json` (NDJSON, one object per event). |\\n| `MEMORY_LOG_COLOR` | `always`, `never`, or anything else for auto (colour only on a colour-capable terminal, and never for a file sink). `NO_COLOR` set and non-empty disables colour. |\\n| `MEMORY_LOG_TARGETS` | Third-party `tracing` targets to raise, comma-separated `target=level`. Quiet by default; can never drop this service's own events. |\\n| `MEMORY_LOG_FILE` | Append the stream to this file instead of stderr. A blank value means \\\"unset\\\". |\\n\\n`RUST_LOG` examples:\\n\\n```\\nRUST_LOG=info                       # default\\nRUST_LOG=extract=debug              # one subsystem\\nRUST_LOG=http=error,info            # quiet the HTTP surface, keep the rest\\nRUST_LOG=fs_watch=trace,http=debug  # two subsystems, the most specific rule wins\\n```\",\"query\":\"logging setup, tracing configuration, log format, log level policy in memory_mcp\",\"score\":5.447852611541748},{\"document\":\"Memory reference date: 2026-10-07 (07 October 2026).\\nSource identity: native:logging-levels\\n| Level | Use |\\n|---|---|\\n| `ERROR` | A failed unit of work, a risk to integrity, a failure after retries, loss of readiness. |\\n| `WARN` | Handled but unexpected; degraded; a client refusal (4xx class). |\\n| `INFO` | A business event or a state change. |\\n| `DEBUG` | Diagnostics, off by default. |\\n| `TRACE` | Fine-grained flow, opted into by name. Anything repetitive is a metric. |\\n\\nA failure's level is decided by its error class, not its call site:\\n`MemoryError::log_level()` maps storage, transience, configuration and\\nunavailability to `ERROR`, and refusals (not-found, validation, conflict,\\nbudget, model-not-ready, auth) to `WARN`.\",\"query\":\"logging setup, tracing configuration, log format, log level policy in memory_mcp\",\"score\":-1.3076671361923218},{\"document\":\"Memory reference date: 2026-10-07 (07 October 2026).\\nSource identity: native:logging-request\\nEvery unit of work carries a correlation id. In the HTTP profile it is the\\nrequest's `x-request-id` (honoured when supplied, minted otherwise) and is\\nadvertised back on the response; in the stdio profile it is a per-call\\n`req_NNNN`. The formatter stamps the ambient id onto every event that does not\\ncarry its own, so each line of one request — the access log line, a tool line, a\\ndownstream warning — reads with the same `req=` and follows with a single\\nfilter:\\n\\n```bash\\ngrep 'req=<id>' memory-mcp.log\\n```\\n\\nThe HTTP response echoes the id on `x-request-id`, and a control-plane error\\nenvelope carries it as `correlation_id` — a client quoting either names the same\\nvalue the log line shows.\",\"query\":\"logging setup, tracing configuration, log format, log level policy in memory_mcp\",\"score\":-0.7546824812889099},{\"document\":\"Memory reference date: 2026-10-07 (07 October 2026).\\nSource identity: native:logging-sink\\nEvents are written to **stderr** — or to `MEMORY_LOG_FILE` when set — one event\\nper line. Under the stdio transport stdout carries MCP protocol framing, so\\nnothing is ever written there. The sink, format and colour are read once, when\\nthe subscriber is installed at startup.\",\"query\":\"logging setup, tracing configuration, log format, log level policy in memory_mcp\",\"score\":-0.5558234453201294},{\"document\":\"Memory reference date: 2026-10-07 (07 October 2026).\\nSource identity: native:http-plan\\n### Task 16: Add low-overhead HTTP and retained-resource diagnostics\\n\\n- `memory_http_preflight_body_bytes` is recorded through the existing `metrics::histogram!` facade, with no labels, exactly once after body collection completes and before JSON decoding. This includes fully collected malformed JSON because those bytes were actually buffered. Partial, refused, stream-error and cancelled bodies do not enter the distribution.\\n- DEBUG operations are `http.preflight.refused` and `http.preflight.large_body`, added to `logging::HTTP_OPERATIONS`; operators enable only these with `RUST_LOG=http.preflight=debug`. Logs use the validated existing `RequestId` when present, parsed numeric declared length, observed prefix bytes and closed outcome only—no request method/path, tenant fingerprint, arbitrary header or content. Emit large-body events only for fully collected bodies >=65536 B. Rate-limit each fixed event/reason to at most one log per second; refusal counters remain exact. Apply the rate limit before allocating/serializing the event.\",\"query\":\"logging setup, tracing configuration, log format, log level policy in memory_mcp\",\"score\":-4.584115028381348},{\"document\":\"Memory reference date: 2026-10-07 (07 October 2026).\\nSource identity: native:mail-level\\nVerified: Only one slide of a cloud EDR comparison was extracted. Feature-level scope may be absent from the extracted text or represented graphically.\",\"query\":\"logging setup, tracing configuration, log format, log level policy in memory_mcp\",\"score\":-7.644382476806641}]"
+      ],
+      "duration_ms": 4994,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "retrieval-quality",
+        "case_id": "logging-russian"
+      },
+      "mode": "end_to_end",
+      "split": "development",
+      "label_trust": "reviewed",
+      "status": "passed",
+      "metrics": {
+        "answerable_non_abstention_rate": 1.0,
+        "duplicate_free_rate": 1.0,
+        "precision_macro": 1.0,
+        "prohibited_free_rate": 1.0,
+        "required_group_recall": 1.0
+      },
+      "evidence": {
+        "answerable_non_abstention_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "case_tag:logging": {
+          "kind": "count",
+          "value": 1
+        },
+        "case_tag:multilingual": {
+          "kind": "count",
+          "value": 1
+        },
+        "duplicate_free_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "precision_macro": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "prohibited_free_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "required_group_recall": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        }
+      },
+      "failures": [],
+      "duration_ms": 5446,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "retrieval-quality",
+        "case_id": "logging-sink"
+      },
+      "mode": "end_to_end",
+      "split": "development",
+      "label_trust": "reviewed",
+      "status": "passed",
+      "metrics": {
+        "answerable_non_abstention_rate": 1.0,
+        "duplicate_free_rate": 1.0,
+        "precision_macro": 1.0,
+        "prohibited_free_rate": 1.0,
+        "required_group_recall": 1.0
+      },
+      "evidence": {
+        "answerable_non_abstention_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "case_tag:logging": {
+          "kind": "count",
+          "value": 1
+        },
+        "case_tag:sink": {
+          "kind": "count",
+          "value": 1
+        },
+        "duplicate_free_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "precision_macro": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "prohibited_free_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "required_group_recall": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        }
+      },
+      "failures": [],
+      "duration_ms": 5627,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "retrieval-quality",
+        "case_id": "policy-denied-abstention"
+      },
+      "mode": "end_to_end",
+      "split": "development",
+      "label_trust": "reviewed",
+      "status": "passed",
+      "metrics": {
+        "duplicate_free_rate": 1.0,
+        "prohibited_free_rate": 1.0,
+        "unknown_abstention_rate": 1.0
+      },
+      "evidence": {
+        "case_tag:access": {
+          "kind": "count",
+          "value": 1
+        },
+        "case_tag:unknown": {
+          "kind": "count",
+          "value": 1
+        },
+        "duplicate_free_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "prohibited_free_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "unknown_abstention_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        }
+      },
+      "failures": [],
+      "duration_ms": 111,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "retrieval-quality",
+        "case_id": "policy-public-evidence"
+      },
+      "mode": "end_to_end",
+      "split": "development",
+      "label_trust": "reviewed",
+      "status": "passed",
+      "metrics": {
+        "answerable_non_abstention_rate": 1.0,
+        "duplicate_free_rate": 1.0,
+        "precision_macro": 1.0,
+        "prohibited_free_rate": 1.0,
+        "required_group_recall": 1.0
+      },
+      "evidence": {
+        "answerable_non_abstention_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "case_tag:access": {
+          "kind": "count",
+          "value": 1
+        },
+        "case_tag:isolation": {
+          "kind": "count",
+          "value": 1
+        },
+        "duplicate_free_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "precision_macro": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "prohibited_free_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "required_group_recall": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        }
+      },
+      "failures": [],
+      "duration_ms": 211,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "retrieval-quality",
+        "case_id": "qualified-other-project"
+      },
+      "mode": "end_to_end",
+      "split": "development",
+      "label_trust": "reviewed",
+      "status": "passed",
+      "metrics": {
+        "answerable_non_abstention_rate": 1.0,
+        "duplicate_free_rate": 1.0,
+        "precision_macro": 1.0,
+        "prohibited_free_rate": 1.0,
+        "required_group_recall": 1.0
+      },
+      "evidence": {
+        "answerable_non_abstention_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "case_tag:project-distractor": {
+          "kind": "count",
+          "value": 1
+        },
+        "case_tag:qualified-task": {
+          "kind": "count",
+          "value": 1
+        },
+        "duplicate_free_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "precision_macro": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "prohibited_free_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "required_group_recall": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        }
+      },
+      "failures": [],
+      "duration_ms": 266,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "retrieval-quality",
+        "case_id": "timeline-atlas-q1-cross-project-abstention"
+      },
+      "mode": "end_to_end",
+      "split": "development",
+      "label_trust": "reviewed",
+      "status": "passed",
+      "metrics": {
+        "duplicate_free_rate": 1.0,
+        "prohibited_free_rate": 1.0,
+        "unknown_abstention_rate": 1.0
+      },
+      "evidence": {
+        "case_tag:calendar-period": {
+          "kind": "count",
+          "value": 1
+        },
+        "case_tag:cross-project": {
+          "kind": "count",
+          "value": 1
+        },
+        "case_tag:timeline": {
+          "kind": "count",
+          "value": 1
+        },
+        "case_tag:unknown": {
+          "kind": "count",
+          "value": 1
+        },
+        "duplicate_free_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "prohibited_free_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "unknown_abstention_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        }
+      },
+      "failures": [],
+      "duration_ms": 271,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "retrieval-quality",
+        "case_id": "timeline-atlas-q2-reverse-quarter"
+      },
+      "mode": "end_to_end",
+      "split": "development",
+      "label_trust": "reviewed",
+      "status": "passed",
+      "metrics": {
+        "answerable_non_abstention_rate": 1.0,
+        "duplicate_free_rate": 1.0,
+        "precision_macro": 1.0,
+        "prohibited_free_rate": 1.0,
+        "required_group_recall": 1.0
+      },
+      "evidence": {
+        "answerable_non_abstention_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "case_tag:answerable": {
+          "kind": "count",
+          "value": 1
+        },
+        "case_tag:calendar-period": {
+          "kind": "count",
+          "value": 1
+        },
+        "case_tag:cross-project": {
+          "kind": "count",
+          "value": 1
+        },
+        "case_tag:timeline": {
+          "kind": "count",
+          "value": 1
+        },
+        "duplicate_free_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "precision_macro": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "prohibited_free_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "required_group_recall": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        }
+      },
+      "failures": [],
+      "duration_ms": 356,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "retrieval-quality",
+        "case_id": "unknown-database"
+      },
+      "mode": "end_to_end",
+      "split": "development",
+      "label_trust": "reviewed",
+      "status": "passed",
+      "metrics": {
+        "duplicate_free_rate": 1.0,
+        "prohibited_free_rate": 1.0,
+        "unknown_abstention_rate": 1.0
+      },
+      "evidence": {
+        "case_tag:abstention": {
+          "kind": "count",
+          "value": 1
+        },
+        "case_tag:unknown": {
+          "kind": "count",
+          "value": 1
+        },
+        "duplicate_free_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "prohibited_free_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "unknown_abstention_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        }
+      },
+      "failures": [],
+      "duration_ms": 4930,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "retrieval-quality",
+        "case_id": "unknown-task"
+      },
+      "mode": "end_to_end",
+      "split": "development",
+      "label_trust": "reviewed",
+      "status": "passed",
+      "metrics": {
+        "duplicate_free_rate": 1.0,
+        "prohibited_free_rate": 1.0,
+        "unknown_abstention_rate": 1.0
+      },
+      "evidence": {
+        "case_tag:qualified-task": {
+          "kind": "count",
+          "value": 1
+        },
+        "case_tag:unknown": {
+          "kind": "count",
+          "value": 1
+        },
+        "duplicate_free_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "prohibited_free_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "unknown_abstention_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        }
+      },
+      "failures": [],
+      "duration_ms": 3234,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "retrieval-quality",
+        "case_id": "unknown-url"
+      },
+      "mode": "end_to_end",
+      "split": "development",
+      "label_trust": "reviewed",
+      "status": "passed",
+      "metrics": {
+        "duplicate_free_rate": 1.0,
+        "prohibited_free_rate": 1.0,
+        "unknown_abstention_rate": 1.0
+      },
+      "evidence": {
+        "case_tag:unknown": {
+          "kind": "count",
+          "value": 1
+        },
+        "case_tag:url-distractor": {
+          "kind": "count",
+          "value": 1
+        },
+        "duplicate_free_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "prohibited_free_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "unknown_abstention_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        }
+      },
+      "failures": [],
+      "duration_ms": 5260,
+      "attempts": 1
+    }
+  ],
+  "suite_summaries": [
+    {
+      "suite_id": "retrieval-quality",
+      "mode": "end_to_end",
+      "total": 37,
+      "passed": 26,
+      "quality_failed": 11,
+      "invalid": 0,
+      "metrics": {
+        "answerable_non_abstention_rate": 0.9375,
+        "answerable_non_abstention_rate_applicable_count": 32.0,
+        "duplicate_free_rate": 1.0,
+        "duplicate_free_rate_applicable_count": 37.0,
+        "precision_macro": 0.8697916666666667,
+        "precision_macro_applicable_count": 32.0,
+        "prohibited_free_rate": 0.918918918918919,
+        "prohibited_free_rate_applicable_count": 37.0,
+        "required_group_recall": 0.6739130434782609,
+        "required_group_recall_applicable_count": 46.0,
+        "unknown_abstention_rate": 1.0,
+        "unknown_abstention_rate_applicable_count": 5.0
+      }
+    }
+  ],
+  "gates": [
+    {
+      "suite_id": "retrieval-quality",
+      "metric": "precision_macro",
+      "observed": 0.8697916666666667,
+      "hard_floor": 1.0,
+      "baseline": null,
+      "regression_budget": null,
+      "status": "failed",
+      "reason": "hard_floor_not_met"
+    },
+    {
+      "suite_id": "retrieval-quality",
+      "metric": "required_group_recall",
+      "observed": 0.6739130434782609,
+      "hard_floor": 1.0,
+      "baseline": null,
+      "regression_budget": null,
+      "status": "failed",
+      "reason": "hard_floor_not_met"
+    },
+    {
+      "suite_id": "retrieval-quality",
+      "metric": "unknown_abstention_rate",
+      "observed": 1.0,
+      "hard_floor": 1.0,
+      "baseline": null,
+      "regression_budget": null,
+      "status": "passed",
+      "reason": "none"
+    },
+    {
+      "suite_id": "retrieval-quality",
+      "metric": "answerable_non_abstention_rate",
+      "observed": 0.9375,
+      "hard_floor": 1.0,
+      "baseline": null,
+      "regression_budget": null,
+      "status": "failed",
+      "reason": "hard_floor_not_met"
+    },
+    {
+      "suite_id": "retrieval-quality",
+      "metric": "duplicate_free_rate",
+      "observed": 1.0,
+      "hard_floor": 1.0,
+      "baseline": null,
+      "regression_budget": null,
+      "status": "passed",
+      "reason": "none"
+    },
+    {
+      "suite_id": "retrieval-quality",
+      "metric": "prohibited_free_rate",
+      "observed": 0.918918918918919,
+      "hard_floor": 1.0,
+      "baseline": null,
+      "regression_budget": null,
+      "status": "failed",
+      "reason": "hard_floor_not_met"
+    }
+  ],
+  "fingerprint": {
+    "rust_version": "rustc 1.99.0 (b940084d7 2026-09-28)",
+    "os_arch": "macos/aarch64",
+    "package_version": "0.1.0",
+    "build_profile": "debug",
+    "enabled_features": [],
+    "provider": null,
+    "model": null,
+    "device": null,
+    "configuration_hash": "bfb931082bd3b20154d8c6303abed1f4918a36d27d0f325d0e9d107d0d28dc54",
+    "git_commit": "8b1c1ed5086cdaa968889329f1ff82a6d4ce33c2",
+    "evaluator_versions": {
+      "eval-harness": "0.1.0"
+    },
+    "suite_fingerprints": {
+      "retrieval-quality": {
+        "claim_rollout_stage": "evidence",
+        "corpus_id": "retrieval-quality-v1",
+        "corpus_manifest_sha256": "76d2d89f758aac366139f0b032f8cd4fff2cdd88ace95819af5f4e804d5eaac8",
+        "corpus_revision": "r25-source-reviewed-calendar-budget-boundary",
+        "embedding_dimension": "384",
+        "embedding_signature": "embsig:b88d713a71be619fce22bcb30efe3d1cc9623afff9e6a8ae7107ba9e620b9b17",
+        "extractor_fingerprint": "anno",
+        "index_signature": "indexsig:d293fd983ef88ea75c78d3758dd09c73d5cf02726d7ec592ca28adc938421f30",
+        "model": "intfloat/multilingual-e5-small",
+        "model_file_sha256.config.json": "69137736cab8b8903a07fe8afaafdda25aac55415a12a55d1bffa9f581abf959",
+        "model_file_sha256.model.safetensors": "1a55775f53449dac10a2bcbc312469fac40b96d53198c407081a831f81c98477",
+        "model_file_sha256.tokenizer.json": "0b44a9d7b51c3c62626640cda0e2c2f70fdacdc25bbbd68038369d14ebdf4c39",
+        "prepared_claim_rollout_stage": "evidence",
+        "prepared_embedding_dimension": "384",
+        "prepared_embedding_signature": "embsig:b88d713a71be619fce22bcb30efe3d1cc9623afff9e6a8ae7107ba9e620b9b17",
+        "prepared_extractor_fingerprint": "anno",
+        "prepared_index_signature": "indexsig:d293fd983ef88ea75c78d3758dd09c73d5cf02726d7ec592ca28adc938421f30",
+        "prepared_model": "intfloat/multilingual-e5-small",
+        "prepared_provider": "local-candle",
+        "prepared_similarity_threshold": "0.7",
+        "provider": "local-candle",
+        "provider_status": "ready",
+        "reranking_signature": "reranksig:dff4b9939786ed9a1e897946778e336584cc24251a2f32282bd3fe83a680a7d1",
+        "similarity_threshold": "0.7",
+        "source_bundle_sha256": "8da56b0665758a44e7413c3bbd875395b44d9bbb6c22a0bac1f3bea21b6b565b"
+      }
+    },
+    "profile_digest": "b70944ad549141b0af63a11181e83cb75f0964e91adf380fb57512e8b729ce63"
+  },
+  "budget_status": "passed",
+  "verdict": "quality_failed",
+  "issues": []
+}

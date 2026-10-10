@@ -15,6 +15,68 @@ use memory_mcp::storage::table_scope::{KnowledgeTables, ReleaseOwnedTable};
 mod common;
 
 #[tokio::test]
+async fn conversational_statement_survives_native_extraction_with_source_lineage() {
+    let (service, db) = common::make_service_with_client().await;
+    let content = "Mara: I moved to Edinburgh last autumn to join a robotics lab.";
+    let episode_id = IngestCapability::ingest_from_service(
+        &service,
+        IngestRequest {
+            source_type: "conversation".into(),
+            source_id: "conversation:mara:move".into(),
+            content: content.into(),
+            t_ref: Utc::now(),
+            t_ingested: None,
+            policy_tags: vec!["public".into()],
+        },
+        None,
+    )
+    .await
+    .expect("ingest conversation");
+    let result = ExtractCapability::extract_from_service(&service, &episode_id, None, None)
+        .await
+        .expect("extract conversation");
+    assert_eq!(
+        result.facts.len(),
+        1,
+        "a declarative statement must remain searchable"
+    );
+    let readback = memory_mcp::knowledge::infra::KnowledgeReadAdapter::new(db, "org");
+    use memory_mcp::knowledge::api::{KnowledgeReadPort, KnowledgeReadScope};
+    let rows = readback
+        .read_scope(KnowledgeReadScope::Facts)
+        .await
+        .expect("persisted facts");
+    let fact = memory_mcp::knowledge::fact_parsing::fact_from_value_or_wrapper(&rows[0])
+        .expect("persisted fact");
+    assert_eq!(fact.content, content);
+    assert_eq!(fact.source_episode, episode_id);
+    assert_eq!(fact.policy_tags, ["public"]);
+}
+
+#[tokio::test]
+async fn conversational_question_does_not_become_an_asserted_note() {
+    let service = common::make_service().await;
+    let episode_id = IngestCapability::ingest_from_service(
+        &service,
+        IngestRequest {
+            source_type: "conversation".into(),
+            source_id: "conversation:mara:question".into(),
+            content: "Mara: Which city are you moving to after graduation?".into(),
+            t_ref: Utc::now(),
+            t_ingested: None,
+            policy_tags: vec![],
+        },
+        None,
+    )
+    .await
+    .expect("ingest conversation");
+    let result = ExtractCapability::extract_from_service(&service, &episode_id, None, None)
+        .await
+        .expect("extract conversation");
+    assert!(result.facts.is_empty(), "a question has no asserted answer");
+}
+
+#[tokio::test]
 async fn test_ingest_extract_and_assemble() {
     let service = common::make_service().await;
     let now = Utc::now();

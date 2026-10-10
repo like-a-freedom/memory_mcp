@@ -11,6 +11,28 @@ async fn main() -> std::process::ExitCode {
     let cli = cli::parse();
 
     match cli.command {
+        Command::PrepareModel {
+            manifest,
+            output_root,
+            mirror,
+        } => {
+            match eval_harness::model_preparation::prepare_model(
+                &manifest,
+                &output_root,
+                mirror.as_deref(),
+            )
+            .await
+            {
+                Ok(path) => {
+                    println!("{}", path.display());
+                    std::process::ExitCode::SUCCESS
+                }
+                Err(error) => {
+                    eprintln!("error: {error}");
+                    std::process::ExitCode::from(2)
+                }
+            }
+        }
         Command::Run {
             profile,
             artifact,
@@ -21,11 +43,51 @@ async fn main() -> std::process::ExitCode {
             manifest,
             output_root,
         } => cmd_prepare_corpus(manifest, output_root).await,
+        Command::PrepareRetrievalQuality { sources, output } => {
+            match eval_harness::suites::retrieval_quality::prepare_native_inventory(&sources).await
+            {
+                Ok(inventory) => match serde_json::to_vec_pretty(&inventory)
+                    .map_err(std::io::Error::other)
+                    .and_then(|bytes| std::fs::write(&output, bytes))
+                {
+                    Ok(()) => std::process::ExitCode::SUCCESS,
+                    Err(error) => {
+                        eprintln!(
+                            "error: cannot write preparation {}: {error}",
+                            output.display()
+                        );
+                        std::process::ExitCode::from(2)
+                    }
+                },
+                Err(error) => {
+                    eprintln!("error: {error}");
+                    std::process::ExitCode::from(2)
+                }
+            }
+        }
         Command::Merge {
             profile,
             artifact,
             shards,
         } => cmd_merge(profile, artifact, shards),
+        Command::CalibrateReranking { pairs, output } => {
+            match eval_harness::reranker_calibration::calibrate_native(&pairs).await {
+                Ok(report) => match serde_json::to_vec_pretty(&report)
+                    .map_err(std::io::Error::other)
+                    .and_then(|bytes| std::fs::write(&output, bytes))
+                {
+                    Ok(()) => std::process::ExitCode::SUCCESS,
+                    Err(error) => {
+                        eprintln!("error: cannot write calibration: {error}");
+                        std::process::ExitCode::from(2)
+                    }
+                },
+                Err(error) => {
+                    eprintln!("error: {error}");
+                    std::process::ExitCode::from(2)
+                }
+            }
+        }
     }
 }
 
@@ -101,6 +163,12 @@ async fn cmd_run(
     if manifest
         .gates
         .iter()
+        .filter(|gate| {
+            suite_filter.is_empty()
+                || suite_filter
+                    .iter()
+                    .any(|suite| suite == gate.target.suite_id.as_str())
+        })
         .any(|gate| gate.baseline_required || gate.regression_budget.is_some())
         && baseline_artifact.is_none()
     {

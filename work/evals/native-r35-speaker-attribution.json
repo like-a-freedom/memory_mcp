@@ -1,0 +1,2433 @@
+{
+  "schema_version": "memory-mcp-eval/v2",
+  "run_id": "run-1791623145",
+  "profile": "nightly",
+  "started_at": "2026-10-10T09:05:45.943886Z",
+  "duration_ms": 203832,
+  "expected_case_ids": [],
+  "expected_cases": [
+    {
+      "suite_id": "retrieval-quality",
+      "case_id": "historical-observed-cutoff"
+    },
+    {
+      "suite_id": "retrieval-quality",
+      "case_id": "http-task-16"
+    },
+    {
+      "suite_id": "retrieval-quality",
+      "case_id": "http-task-paraphrase"
+    },
+    {
+      "suite_id": "retrieval-quality",
+      "case_id": "http-task-short"
+    },
+    {
+      "suite_id": "retrieval-quality",
+      "case_id": "locomo-conv-26-000"
+    },
+    {
+      "suite_id": "retrieval-quality",
+      "case_id": "locomo-conv-26-082"
+    },
+    {
+      "suite_id": "retrieval-quality",
+      "case_id": "locomo-conv-30-000"
+    },
+    {
+      "suite_id": "retrieval-quality",
+      "case_id": "locomo-conv-30-002"
+    },
+    {
+      "suite_id": "retrieval-quality",
+      "case_id": "locomo-conv-41-001"
+    },
+    {
+      "suite_id": "retrieval-quality",
+      "case_id": "locomo-conv-41-065"
+    },
+    {
+      "suite_id": "retrieval-quality",
+      "case_id": "locomo-conv-42-002"
+    },
+    {
+      "suite_id": "retrieval-quality",
+      "case_id": "locomo-conv-42-096"
+    },
+    {
+      "suite_id": "retrieval-quality",
+      "case_id": "locomo-conv-43-071"
+    },
+    {
+      "suite_id": "retrieval-quality",
+      "case_id": "locomo-conv-44-000"
+    },
+    {
+      "suite_id": "retrieval-quality",
+      "case_id": "locomo-conv-44-061"
+    },
+    {
+      "suite_id": "retrieval-quality",
+      "case_id": "locomo-conv-47-001"
+    },
+    {
+      "suite_id": "retrieval-quality",
+      "case_id": "locomo-conv-47-067"
+    },
+    {
+      "suite_id": "retrieval-quality",
+      "case_id": "locomo-conv-48-000"
+    },
+    {
+      "suite_id": "retrieval-quality",
+      "case_id": "locomo-conv-48-015"
+    },
+    {
+      "suite_id": "retrieval-quality",
+      "case_id": "locomo-conv-49-002"
+    },
+    {
+      "suite_id": "retrieval-quality",
+      "case_id": "locomo-conv-49-083"
+    },
+    {
+      "suite_id": "retrieval-quality",
+      "case_id": "locomo-conv-50-001"
+    },
+    {
+      "suite_id": "retrieval-quality",
+      "case_id": "locomo-conv-50-071"
+    },
+    {
+      "suite_id": "retrieval-quality",
+      "case_id": "logging-config"
+    },
+    {
+      "suite_id": "retrieval-quality",
+      "case_id": "logging-correlation"
+    },
+    {
+      "suite_id": "retrieval-quality",
+      "case_id": "logging-levels"
+    },
+    {
+      "suite_id": "retrieval-quality",
+      "case_id": "logging-original"
+    },
+    {
+      "suite_id": "retrieval-quality",
+      "case_id": "logging-russian"
+    },
+    {
+      "suite_id": "retrieval-quality",
+      "case_id": "logging-sink"
+    },
+    {
+      "suite_id": "retrieval-quality",
+      "case_id": "policy-denied-abstention"
+    },
+    {
+      "suite_id": "retrieval-quality",
+      "case_id": "policy-public-evidence"
+    },
+    {
+      "suite_id": "retrieval-quality",
+      "case_id": "qualified-other-project"
+    },
+    {
+      "suite_id": "retrieval-quality",
+      "case_id": "timeline-atlas-q1-cross-project-abstention"
+    },
+    {
+      "suite_id": "retrieval-quality",
+      "case_id": "timeline-atlas-q2-reverse-quarter"
+    },
+    {
+      "suite_id": "retrieval-quality",
+      "case_id": "unknown-database"
+    },
+    {
+      "suite_id": "retrieval-quality",
+      "case_id": "unknown-task"
+    },
+    {
+      "suite_id": "retrieval-quality",
+      "case_id": "unknown-url"
+    }
+  ],
+  "outcomes": [
+    {
+      "case_key": {
+        "suite_id": "retrieval-quality",
+        "case_id": "historical-observed-cutoff"
+      },
+      "mode": "end_to_end",
+      "split": "development",
+      "label_trust": "reviewed",
+      "status": "passed",
+      "metrics": {
+        "answerable_non_abstention_rate": 1.0,
+        "duplicate_free_rate": 1.0,
+        "precision_macro": 1.0,
+        "prohibited_free_rate": 1.0,
+        "required_group_recall": 1.0
+      },
+      "evidence": {
+        "answerable_non_abstention_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "case_tag:historical": {
+          "kind": "count",
+          "value": 1
+        },
+        "case_tag:transaction-cutoff": {
+          "kind": "count",
+          "value": 1
+        },
+        "duplicate_free_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "precision_macro": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "prohibited_free_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "required_group_recall": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        }
+      },
+      "failures": [],
+      "duration_ms": 227,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "retrieval-quality",
+        "case_id": "http-task-16"
+      },
+      "mode": "end_to_end",
+      "split": "development",
+      "label_trust": "reviewed",
+      "status": "quality_failed",
+      "metrics": {
+        "answerable_non_abstention_rate": 1.0,
+        "duplicate_free_rate": 1.0,
+        "precision_macro": 1.0,
+        "prohibited_free_rate": 1.0,
+        "required_group_recall": 0.5
+      },
+      "evidence": {
+        "answerable_non_abstention_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "case_tag:numeric-distractor": {
+          "kind": "count",
+          "value": 1
+        },
+        "case_tag:partial_source_coverage": {
+          "kind": "count",
+          "value": 1
+        },
+        "case_tag:qualified-task": {
+          "kind": "count",
+          "value": 1
+        },
+        "case_tag:url-distractor": {
+          "kind": "count",
+          "value": 1
+        },
+        "duplicate_free_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "precision_macro": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "prohibited_free_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "required_group_recall": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 2
+        }
+      },
+      "failures": [
+        "retrieval missed one or more required evidence groups",
+        "native selected evidence: [{\"gold_key\":\"http-plan:note:3a82a1450071\",\"item\":{\"confidence\":0.69,\"content\":\"Task 16: Add low-overhead HTTP and retained-resource diagnostics: memory_http_preflight_body_bytes is recorded through the existing metrics::histogram! facade, with no labels, exactly once after body collection completes and before JSON decoding. This includes fully collected malformed JSON because those bytes were actually buffered. Partial, refused, stream-error and cancelled bodies do not enter the distribution.\",\"fact_id\":\"fact:8875c6b404d5fcc56b97cf2d\",\"grounding\":0.49,\"provenance\":{\"extraction_strategy\":\"structured_summary_line\",\"ingestion_method\":\"extraction\",\"matched_query_terms\":[\"16\",\"http\",\"memory\",\"metric\",\"preflight\",\"task\"],\"reranking\":{\"admission_floor\":0.0,\"model_signature\":\"reranksig:dff4b9939786ed9a1e897946778e336584cc24251a2f32282bd3fe83a680a7d1\",\"relevance_logit\":2.4545061588287354},\"retrieval_admission\":{\"basis\":\"reference\",\"community\":null,\"graph_anchor_origin\":null,\"hop_count\":null,\"matched_content_terms\":[\"http\",\"memory\",\"preflight\",\"metric\"],\"matched_index_key_terms\":[],\"matched_references\":[\"task16\"],\"policy_version\":\"retrieval-admission-v1\",\"repeated_topic\":null,\"resolved_entity_ids\":[],\"semantic_similarity\":0.8468621361767008},\"source_episode_id\":\"episode:cde651553de27befab51910e\",\"source_id\":\"native:http-plan\",\"source_type\":\"session_summary\"},\"quote\":\"memory_http_preflight_body_bytes is recorded through the existing metrics::histogram! facade, with no labels, exactly once after body collection completes and before JSON decoding. This includes fully collected malformed JSON because those bytes were actually buffered. Partial, refused, stream-error and cancelled bodies do not enter the distribution.\",\"rationale\":\"tier=fallback fts=17.88 access_count=0 confidence=0.69 relevance=0.78 grounding=0.49 alignment=1.00 semantic=enabled matched lexical query=\\\"Current approved implementation plan HTTP bounded memory progress Task 16 preflight metrics, warnings, worktree status and rulings\\\" and active at 2026-10-10\",\"reconciliation\":{\"claim_ids\":[\"claim:2401fac37b43bcd959df1faf157148951158f988010975c685594e9a869abc8e\"],\"relations\":[{\"evaluator_version\":\"builtin/v1\",\"outcome\":\"contradiction\",\"reason_code\":\"contradiction\",\"relation_id\":\"claim_relation:e9e21884b85c981039a756b1c725143e43e6d62356ec978d106a647c6c5c2f63\"}]},\"relevance\":0.78,\"retrieval_evidence\":{\"admission_basis\":\"reference\",\"policy_version\":\"retrieval-admission-v1\",\"semantic_similarity\":0.8468621361767008},\"retrieval_tier\":\"fallback\",\"semantic_available\":true,\"source_episode\":\"episode:cde651553de27befab51910e\"}}]"
+      ],
+      "duration_ms": 3163,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "retrieval-quality",
+        "case_id": "http-task-paraphrase"
+      },
+      "mode": "end_to_end",
+      "split": "development",
+      "label_trust": "reviewed",
+      "status": "quality_failed",
+      "metrics": {
+        "answerable_non_abstention_rate": 1.0,
+        "duplicate_free_rate": 1.0,
+        "precision_macro": 1.0,
+        "prohibited_free_rate": 1.0,
+        "required_group_recall": 0.5
+      },
+      "evidence": {
+        "answerable_non_abstention_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "case_tag:paraphrase": {
+          "kind": "count",
+          "value": 1
+        },
+        "case_tag:task": {
+          "kind": "count",
+          "value": 1
+        },
+        "duplicate_free_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "precision_macro": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "prohibited_free_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "required_group_recall": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 2
+        }
+      },
+      "failures": [
+        "retrieval missed one or more required evidence groups",
+        "native selected evidence: [{\"gold_key\":\"http-plan:note:3a82a1450071\",\"item\":{\"confidence\":0.69,\"content\":\"Task 16: Add low-overhead HTTP and retained-resource diagnostics: memory_http_preflight_body_bytes is recorded through the existing metrics::histogram! facade, with no labels, exactly once after body collection completes and before JSON decoding. This includes fully collected malformed JSON because those bytes were actually buffered. Partial, refused, stream-error and cancelled bodies do not enter the distribution.\",\"fact_id\":\"fact:8875c6b404d5fcc56b97cf2d\",\"grounding\":0.28,\"provenance\":{\"extraction_strategy\":\"structured_summary_line\",\"ingestion_method\":\"extraction\",\"matched_query_terms\":[\"body\",\"diagnostic\",\"http\",\"memory\"],\"reranking\":{\"admission_floor\":0.0,\"model_signature\":\"reranksig:dff4b9939786ed9a1e897946778e336584cc24251a2f32282bd3fe83a680a7d1\",\"relevance_logit\":3.267317533493042},\"retrieval_admission\":{\"basis\":\"lexical\",\"community\":null,\"graph_anchor_origin\":null,\"hop_count\":null,\"matched_content_terms\":[\"body\",\"http\",\"memory\"],\"matched_index_key_terms\":[],\"matched_references\":[],\"policy_version\":\"retrieval-admission-v1\",\"repeated_topic\":null,\"resolved_entity_ids\":[],\"semantic_similarity\":0.8514685624969078},\"source_episode_id\":\"episode:cde651553de27befab51910e\",\"source_id\":\"native:http-plan\",\"source_type\":\"session_summary\"},\"quote\":\"memory_http_preflight_body_bytes is recorded through the existing metrics::histogram! facade, with no labels, exactly once after body collection completes and before JSON decoding. This includes fully collected malformed JSON because those bytes were actually buffered. Partial, refused, stream-error and cancelled bodies do not enter the distribution.\",\"rationale\":\"tier=fallback fts=5.61 access_count=0 confidence=0.69 relevance=0.81 grounding=0.28 alignment=0.93 semantic=enabled matched lexical query=\\\"Which body measurements and diagnostics does the HTTP bounded memory plan require?\\\" and active at 2026-10-10\",\"reconciliation\":{\"claim_ids\":[\"claim:2401fac37b43bcd959df1faf157148951158f988010975c685594e9a869abc8e\"],\"relations\":[{\"evaluator_version\":\"builtin/v1\",\"outcome\":\"contradiction\",\"reason_code\":\"contradiction\",\"relation_id\":\"claim_relation:e9e21884b85c981039a756b1c725143e43e6d62356ec978d106a647c6c5c2f63\"}]},\"relevance\":0.81,\"retrieval_evidence\":{\"admission_basis\":\"lexical\",\"policy_version\":\"retrieval-admission-v1\",\"semantic_similarity\":0.8514685624969078},\"retrieval_tier\":\"fallback\",\"semantic_available\":true,\"source_episode\":\"episode:cde651553de27befab51910e\"}}]"
+      ],
+      "duration_ms": 4883,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "retrieval-quality",
+        "case_id": "http-task-short"
+      },
+      "mode": "end_to_end",
+      "split": "development",
+      "label_trust": "reviewed",
+      "status": "quality_failed",
+      "metrics": {
+        "answerable_non_abstention_rate": 1.0,
+        "duplicate_free_rate": 1.0,
+        "precision_macro": 1.0,
+        "prohibited_free_rate": 1.0,
+        "required_group_recall": 0.5
+      },
+      "evidence": {
+        "answerable_non_abstention_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "case_tag:qualified-task": {
+          "kind": "count",
+          "value": 1
+        },
+        "case_tag:short-query": {
+          "kind": "count",
+          "value": 1
+        },
+        "duplicate_free_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "precision_macro": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "prohibited_free_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "required_group_recall": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 2
+        }
+      },
+      "failures": [
+        "retrieval missed one or more required evidence groups",
+        "native selected evidence: [{\"gold_key\":\"http-plan:note:3a82a1450071\",\"item\":{\"confidence\":0.69,\"content\":\"Task 16: Add low-overhead HTTP and retained-resource diagnostics: memory_http_preflight_body_bytes is recorded through the existing metrics::histogram! facade, with no labels, exactly once after body collection completes and before JSON decoding. This includes fully collected malformed JSON because those bytes were actually buffered. Partial, refused, stream-error and cancelled bodies do not enter the distribution.\",\"fact_id\":\"fact:8875c6b404d5fcc56b97cf2d\",\"grounding\":0.81,\"provenance\":{\"extraction_strategy\":\"structured_summary_line\",\"ingestion_method\":\"extraction\",\"matched_query_terms\":[\"16\",\"diagnostic\",\"http\",\"memory\",\"task\"],\"reranking\":{\"admission_floor\":0.0,\"model_signature\":\"reranksig:dff4b9939786ed9a1e897946778e336584cc24251a2f32282bd3fe83a680a7d1\",\"relevance_logit\":4.603491306304932},\"retrieval_admission\":{\"basis\":\"reference\",\"community\":null,\"graph_anchor_origin\":null,\"hop_count\":null,\"matched_content_terms\":[\"http\",\"memory\"],\"matched_index_key_terms\":[],\"matched_references\":[\"task16\"],\"policy_version\":\"retrieval-admission-v1\",\"repeated_topic\":null,\"resolved_entity_ids\":[],\"semantic_similarity\":0.8823469463345978},\"source_episode_id\":\"episode:cde651553de27befab51910e\",\"source_id\":\"native:http-plan\",\"source_type\":\"session_summary\"},\"quote\":\"memory_http_preflight_body_bytes is recorded through the existing metrics::histogram! facade, with no labels, exactly once after body collection completes and before JSON decoding. This includes fully collected malformed JSON because those bytes were actually buffered. Partial, refused, stream-error and cancelled bodies do not enter the distribution.\",\"rationale\":\"tier=fallback fts=16.88 access_count=0 confidence=0.69 relevance=0.85 grounding=0.81 alignment=1.09 semantic=enabled matched lexical query=\\\"HTTP bounded memory Task 16 diagnostics\\\" and active at 2026-10-10\",\"reconciliation\":{\"claim_ids\":[\"claim:2401fac37b43bcd959df1faf157148951158f988010975c685594e9a869abc8e\"],\"relations\":[{\"evaluator_version\":\"builtin/v1\",\"outcome\":\"contradiction\",\"reason_code\":\"contradiction\",\"relation_id\":\"claim_relation:e9e21884b85c981039a756b1c725143e43e6d62356ec978d106a647c6c5c2f63\"}]},\"relevance\":0.85,\"retrieval_evidence\":{\"admission_basis\":\"reference\",\"policy_version\":\"retrieval-admission-v1\",\"semantic_similarity\":0.8823469463345978},\"retrieval_tier\":\"fallback\",\"semantic_available\":true,\"source_episode\":\"episode:cde651553de27befab51910e\"}}]"
+      ],
+      "duration_ms": 3382,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "retrieval-quality",
+        "case_id": "locomo-conv-26-000"
+      },
+      "mode": "end_to_end",
+      "split": "development",
+      "label_trust": "reviewed",
+      "status": "passed",
+      "metrics": {
+        "answerable_non_abstention_rate": 1.0,
+        "duplicate_free_rate": 1.0,
+        "precision_macro": 1.0,
+        "prohibited_free_rate": 1.0,
+        "required_group_recall": 1.0
+      },
+      "evidence": {
+        "answerable_non_abstention_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "case_tag:category-2": {
+          "kind": "count",
+          "value": 1
+        },
+        "case_tag:locomo": {
+          "kind": "count",
+          "value": 1
+        },
+        "case_tag:published-evidence": {
+          "kind": "count",
+          "value": 1
+        },
+        "duplicate_free_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "precision_macro": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "prohibited_free_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "required_group_recall": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        }
+      },
+      "failures": [],
+      "duration_ms": 6168,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "retrieval-quality",
+        "case_id": "locomo-conv-26-082"
+      },
+      "mode": "end_to_end",
+      "split": "development",
+      "label_trust": "reviewed",
+      "status": "passed",
+      "metrics": {
+        "answerable_non_abstention_rate": 1.0,
+        "duplicate_free_rate": 1.0,
+        "precision_macro": 1.0,
+        "prohibited_free_rate": 1.0,
+        "required_group_recall": 1.0
+      },
+      "evidence": {
+        "answerable_non_abstention_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "case_tag:category-4": {
+          "kind": "count",
+          "value": 1
+        },
+        "case_tag:locomo": {
+          "kind": "count",
+          "value": 1
+        },
+        "case_tag:published-evidence": {
+          "kind": "count",
+          "value": 1
+        },
+        "duplicate_free_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "precision_macro": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "prohibited_free_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "required_group_recall": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        }
+      },
+      "failures": [],
+      "duration_ms": 5803,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "retrieval-quality",
+        "case_id": "locomo-conv-30-000"
+      },
+      "mode": "end_to_end",
+      "split": "development",
+      "label_trust": "reviewed",
+      "status": "passed",
+      "metrics": {
+        "answerable_non_abstention_rate": 1.0,
+        "duplicate_free_rate": 1.0,
+        "precision_macro": 1.0,
+        "prohibited_free_rate": 1.0,
+        "required_group_recall": 1.0
+      },
+      "evidence": {
+        "answerable_non_abstention_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "case_tag:category-2": {
+          "kind": "count",
+          "value": 1
+        },
+        "case_tag:locomo": {
+          "kind": "count",
+          "value": 1
+        },
+        "case_tag:published-evidence": {
+          "kind": "count",
+          "value": 1
+        },
+        "duplicate_free_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "precision_macro": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "prohibited_free_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "required_group_recall": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        }
+      },
+      "failures": [],
+      "duration_ms": 8572,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "retrieval-quality",
+        "case_id": "locomo-conv-30-002"
+      },
+      "mode": "end_to_end",
+      "split": "development",
+      "label_trust": "reviewed",
+      "status": "quality_failed",
+      "metrics": {
+        "answerable_non_abstention_rate": 1.0,
+        "duplicate_free_rate": 1.0,
+        "precision_macro": 1.0,
+        "prohibited_free_rate": 1.0,
+        "required_group_recall": 0.0
+      },
+      "evidence": {
+        "answerable_non_abstention_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "case_tag:category-4": {
+          "kind": "count",
+          "value": 1
+        },
+        "case_tag:locomo": {
+          "kind": "count",
+          "value": 1
+        },
+        "case_tag:published-evidence": {
+          "kind": "count",
+          "value": 1
+        },
+        "duplicate_free_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "precision_macro": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "prohibited_free_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "required_group_recall": {
+          "kind": "ratio",
+          "numerator": 0,
+          "denominator": 2
+        }
+      },
+      "failures": [
+        "retrieval missed one or more required evidence groups",
+        "native selected evidence: [{\"gold_key\":\"D2:11:note:fc1c64593cca\",\"item\":{\"confidence\":0.0,\"content\":\"Gina: Believe in yourself, Jon! The process may be tough, but you got this. Push through and it'll be worth it. Don't forget to take breaks and dance it out when you need to destress!\",\"fact_id\":\"fact:e4c9824318c5e88c1407ead6\",\"grounding\":0.37,\"provenance\":{\"extraction_strategy\":\"summary_note_fallback\",\"ingestion_method\":\"extraction\",\"matched_query_terms\":[\"destress\",\"gina\",\"jon\"],\"reranking\":{\"admission_floor\":0.0,\"model_signature\":\"reranksig:dff4b9939786ed9a1e897946778e336584cc24251a2f32282bd3fe83a680a7d1\",\"relevance_logit\":2.210026502609253},\"retrieval_admission\":{\"basis\":\"lexical\",\"community\":null,\"graph_anchor_origin\":null,\"hop_count\":null,\"matched_content_terms\":[\"gina\",\"destress\"],\"matched_index_key_terms\":[\"gina\"],\"matched_references\":[],\"policy_version\":\"retrieval-admission-v1\",\"repeated_topic\":null,\"resolved_entity_ids\":[],\"semantic_similarity\":0.8529421671589449},\"source_episode_id\":\"episode:4d965fcb44d7a6e881c0ef5b\",\"source_id\":\"locomo:conv-30:D2:11\",\"source_type\":\"conversation\"},\"quote\":\"Gina: Believe in yourself, Jon! The process may be tough, but you got this. Push through and it'll be worth it. Don't forget to take breaks and dance it out when you need to destress!\",\"rationale\":\"tier=fallback fts=5.61 access_count=0 confidence=0.00 relevance=0.76 grounding=0.37 alignment=0.96 semantic=enabled matched lexical query=\\\"How do Jon and Gina both like to destress?\\\" and active at 2026-10-10\",\"reconciliation\":{\"claim_ids\":[\"claim:88182a1fecd20528b5504640f15dcaeb9982912a34961efe3802c102444e68a9\"],\"relations\":[{\"evaluator_version\":\"builtin/v1\",\"outcome\":\"contradiction\",\"reason_code\":\"contradiction\",\"relation_id\":\"claim_relation:1406567c947560dd1ca19e43bcb9c37d93f96558eafd87a1bd84e58f7b45a3df\"},{\"evaluator_version\":\"builtin/v1\",\"outcome\":\"contradiction\",\"reason_code\":\"contradiction\",\"relation_id\":\"claim_relation:4ee2a7761478f9dc9b0fc663761422d3716b69bb3ec4d21ea13346e1214e0951\"},{\"evaluator_version\":\"builtin/v1\",\"outcome\":\"contradiction\",\"reason_code\":\"contradiction\",\"relation_id\":\"claim_relation:5d73fd2058992eed5f6761e25ead586d5dbe9c81be5fa0ffa4a95126c7658e0c\"},{\"evaluator_version\":\"builtin/v1\",\"outcome\":\"contradiction\",\"reason_code\":\"contradiction\",\"relation_id\":\"claim_relation:5ecbbb8452c0f28f457227a69a303b418a977f594e8d1fd64d97c01387b1ab93\"},{\"evaluator_version\":\"builtin/v1\",\"outcome\":\"contradiction\",\"reason_code\":\"contradiction\",\"relation_id\":\"claim_relation:b81c3255485ff380caf52d19bfc1ffdfc3794821dd199b98433ca4c7f4e2d9ad\"},{\"evaluator_version\":\"builtin/v1\",\"outcome\":\"contradiction\",\"reason_code\":\"contradiction\",\"relation_id\":\"claim_relation:c22331d9c569e7950af14e003ff0adec0fde9cec9fb5b5c5058fd95d743edd67\"}]},\"relevance\":0.76,\"retrieval_evidence\":{\"admission_basis\":\"lexical\",\"policy_version\":\"retrieval-admission-v1\",\"semantic_similarity\":0.8529421671589449},\"retrieval_tier\":\"fallback\",\"semantic_available\":true,\"source_episode\":\"episode:4d965fcb44d7a6e881c0ef5b\"}}]"
+      ],
+      "duration_ms": 9452,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "retrieval-quality",
+        "case_id": "locomo-conv-41-001"
+      },
+      "mode": "end_to_end",
+      "split": "development",
+      "label_trust": "reviewed",
+      "status": "passed",
+      "metrics": {
+        "answerable_non_abstention_rate": 1.0,
+        "duplicate_free_rate": 1.0,
+        "precision_macro": 1.0,
+        "prohibited_free_rate": 1.0,
+        "required_group_recall": 1.0
+      },
+      "evidence": {
+        "answerable_non_abstention_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "case_tag:category-2": {
+          "kind": "count",
+          "value": 1
+        },
+        "case_tag:locomo": {
+          "kind": "count",
+          "value": 1
+        },
+        "case_tag:published-evidence": {
+          "kind": "count",
+          "value": 1
+        },
+        "duplicate_free_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "precision_macro": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "prohibited_free_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "required_group_recall": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        }
+      },
+      "failures": [],
+      "duration_ms": 7942,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "retrieval-quality",
+        "case_id": "locomo-conv-41-065"
+      },
+      "mode": "end_to_end",
+      "split": "development",
+      "label_trust": "reviewed",
+      "status": "quality_failed",
+      "metrics": {
+        "answerable_non_abstention_rate": 0.0,
+        "duplicate_free_rate": 1.0,
+        "precision_macro": 0.0,
+        "prohibited_free_rate": 1.0,
+        "required_group_recall": 0.0
+      },
+      "evidence": {
+        "answerable_non_abstention_rate": {
+          "kind": "ratio",
+          "numerator": 0,
+          "denominator": 1
+        },
+        "case_tag:category-4": {
+          "kind": "count",
+          "value": 1
+        },
+        "case_tag:locomo": {
+          "kind": "count",
+          "value": 1
+        },
+        "case_tag:published-evidence": {
+          "kind": "count",
+          "value": 1
+        },
+        "duplicate_free_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "precision_macro": {
+          "kind": "ratio",
+          "numerator": 0,
+          "denominator": 1
+        },
+        "prohibited_free_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "required_group_recall": {
+          "kind": "ratio",
+          "numerator": 0,
+          "denominator": 1
+        }
+      },
+      "failures": [
+        "retrieval missed one or more required evidence groups",
+        "retrieval did not follow the expected abstention behavior",
+        "native selected evidence: []"
+      ],
+      "duration_ms": 9534,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "retrieval-quality",
+        "case_id": "locomo-conv-42-002"
+      },
+      "mode": "end_to_end",
+      "split": "development",
+      "label_trust": "reviewed",
+      "status": "passed",
+      "metrics": {
+        "answerable_non_abstention_rate": 1.0,
+        "duplicate_free_rate": 1.0,
+        "precision_macro": 1.0,
+        "prohibited_free_rate": 1.0,
+        "required_group_recall": 1.0
+      },
+      "evidence": {
+        "answerable_non_abstention_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "case_tag:category-2": {
+          "kind": "count",
+          "value": 1
+        },
+        "case_tag:locomo": {
+          "kind": "count",
+          "value": 1
+        },
+        "case_tag:published-evidence": {
+          "kind": "count",
+          "value": 1
+        },
+        "case_tag:source_labeled_upstream_image_metadata": {
+          "kind": "count",
+          "value": 1
+        },
+        "duplicate_free_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "precision_macro": {
+          "kind": "ratio",
+          "numerator": 2,
+          "denominator": 2
+        },
+        "prohibited_free_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "required_group_recall": {
+          "kind": "ratio",
+          "numerator": 2,
+          "denominator": 2
+        }
+      },
+      "failures": [],
+      "duration_ms": 7195,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "retrieval-quality",
+        "case_id": "locomo-conv-42-096"
+      },
+      "mode": "end_to_end",
+      "split": "development",
+      "label_trust": "reviewed",
+      "status": "passed",
+      "metrics": {
+        "answerable_non_abstention_rate": 1.0,
+        "duplicate_free_rate": 1.0,
+        "precision_macro": 1.0,
+        "prohibited_free_rate": 1.0,
+        "required_group_recall": 1.0
+      },
+      "evidence": {
+        "answerable_non_abstention_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "case_tag:category-4": {
+          "kind": "count",
+          "value": 1
+        },
+        "case_tag:locomo": {
+          "kind": "count",
+          "value": 1
+        },
+        "case_tag:published-evidence": {
+          "kind": "count",
+          "value": 1
+        },
+        "duplicate_free_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "precision_macro": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "prohibited_free_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "required_group_recall": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        }
+      },
+      "failures": [],
+      "duration_ms": 8455,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "retrieval-quality",
+        "case_id": "locomo-conv-43-071"
+      },
+      "mode": "end_to_end",
+      "split": "development",
+      "label_trust": "reviewed",
+      "status": "quality_failed",
+      "metrics": {
+        "answerable_non_abstention_rate": 1.0,
+        "duplicate_free_rate": 1.0,
+        "precision_macro": 0.5,
+        "prohibited_free_rate": 0.0,
+        "required_group_recall": 0.5
+      },
+      "evidence": {
+        "answerable_non_abstention_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "case_tag:category-4": {
+          "kind": "count",
+          "value": 1
+        },
+        "case_tag:locomo": {
+          "kind": "count",
+          "value": 1
+        },
+        "case_tag:published-evidence": {
+          "kind": "count",
+          "value": 1
+        },
+        "duplicate_free_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "precision_macro": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 2
+        },
+        "prohibited_free_rate": {
+          "kind": "ratio",
+          "numerator": 0,
+          "denominator": 1
+        },
+        "required_group_recall": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 2
+        }
+      },
+      "failures": [
+        "retrieval missed one or more required evidence groups",
+        "retrieval returned unlabeled or disallowed evidence",
+        "prohibited evidence was retrieved",
+        "native selected evidence: [{\"gold_key\":\"D1:4:note:0dae3735cd17\",\"item\":{\"confidence\":0.01,\"content\":\"Tim: Woohoo! Congrats on the new team. Which team did you sign with?\",\"fact_id\":\"fact:a6c347ec5491e9a1da4b211c\",\"grounding\":0.49,\"provenance\":{\"extraction_strategy\":\"summary_note_fallback\",\"ingestion_method\":\"extraction\",\"matched_query_terms\":[\"2023\",\"may\",\"sign\",\"team\"],\"reranking\":{\"admission_floor\":0.0,\"model_signature\":\"reranksig:dff4b9939786ed9a1e897946778e336584cc24251a2f32282bd3fe83a680a7d1\",\"relevance_logit\":5.974437236785889},\"retrieval_admission\":{\"basis\":\"lexical\",\"community\":null,\"graph_anchor_origin\":null,\"hop_count\":null,\"matched_content_terms\":[\"team\",\"sign\"],\"matched_index_key_terms\":[],\"matched_references\":[],\"policy_version\":\"retrieval-admission-v1\",\"repeated_topic\":null,\"resolved_entity_ids\":[],\"semantic_similarity\":0.7803257909891067},\"source_episode_id\":\"episode:309f3020f0395c271be3095c\",\"source_id\":\"locomo:conv-43:D1:4\",\"source_type\":\"conversation\"},\"quote\":\"Tim: Woohoo! Congrats on the new team. Which team did you sign with?\",\"rationale\":\"tier=temporal fts=0.00 access_count=0 confidence=0.01 relevance=0.87 grounding=0.49 alignment=1.00 semantic=enabled matched lexical query=\\\"Which team did John sign with on 21 May, 2023?\\\" and active at 2026-10-10\",\"relevance\":0.87,\"retrieval_evidence\":{\"admission_basis\":\"lexical\",\"policy_version\":\"retrieval-admission-v1\",\"semantic_similarity\":0.7803257909891067},\"retrieval_tier\":\"temporal\",\"semantic_available\":true,\"source_episode\":\"episode:309f3020f0395c271be3095c\"}},{\"gold_key\":\"D1:11:note:b7058d27b99f\",\"item\":{\"confidence\":0.01,\"content\":\"John: Fitting into the new team's style of play was a challenge during pre-season.\",\"fact_id\":\"fact:e6d46ffe2e86293011d70695\",\"grounding\":0.53,\"provenance\":{\"extraction_strategy\":\"summary_note_fallback\",\"ingestion_method\":\"extraction\",\"matched_query_terms\":[\"2023\",\"john\",\"may\",\"team\"],\"reranking\":{\"admission_floor\":0.0,\"model_signature\":\"reranksig:dff4b9939786ed9a1e897946778e336584cc24251a2f32282bd3fe83a680a7d1\",\"relevance_logit\":3.3970155715942383},\"retrieval_admission\":{\"basis\":\"lexical\",\"community\":null,\"graph_anchor_origin\":null,\"hop_count\":null,\"matched_content_terms\":[\"team\",\"john\"],\"matched_index_key_terms\":[\"john\"],\"matched_references\":[],\"policy_version\":\"retrieval-admission-v1\",\"repeated_topic\":null,\"resolved_entity_ids\":[],\"semantic_similarity\":0.7942179657186037},\"source_episode_id\":\"episode:d4192430a99f29ae7156cad1\",\"source_id\":\"locomo:conv-43:D1:11\",\"source_type\":\"conversation\"},\"quote\":\"John: Fitting into the new team's style of play was a challenge during pre-season.\",\"rationale\":\"tier=temporal fts=0.00 access_count=0 confidence=0.01 relevance=0.81 grounding=0.53 alignment=1.01 semantic=enabled matched lexical query=\\\"Which team did John sign with on 21 May, 2023?\\\" and active at 2026-10-10\",\"relevance\":0.81,\"retrieval_evidence\":{\"admission_basis\":\"lexical\",\"policy_version\":\"retrieval-admission-v1\",\"semantic_similarity\":0.7942179657186037},\"retrieval_tier\":\"temporal\",\"semantic_available\":true,\"source_episode\":\"episode:d4192430a99f29ae7156cad1\"}}]"
+      ],
+      "duration_ms": 4810,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "retrieval-quality",
+        "case_id": "locomo-conv-44-000"
+      },
+      "mode": "end_to_end",
+      "split": "development",
+      "label_trust": "reviewed",
+      "status": "quality_failed",
+      "metrics": {
+        "answerable_non_abstention_rate": 1.0,
+        "duplicate_free_rate": 1.0,
+        "precision_macro": 1.0,
+        "prohibited_free_rate": 1.0,
+        "required_group_recall": 0.5
+      },
+      "evidence": {
+        "answerable_non_abstention_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "case_tag:category-2": {
+          "kind": "count",
+          "value": 1
+        },
+        "case_tag:locomo": {
+          "kind": "count",
+          "value": 1
+        },
+        "case_tag:published-evidence": {
+          "kind": "count",
+          "value": 1
+        },
+        "duplicate_free_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "precision_macro": {
+          "kind": "ratio",
+          "numerator": 2,
+          "denominator": 2
+        },
+        "prohibited_free_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "required_group_recall": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 2
+        }
+      },
+      "failures": [
+        "retrieval missed one or more required evidence groups",
+        "native selected evidence: [{\"gold_key\":\"raw:D2:1\",\"item\":{\"confidence\":0.25,\"content\":\"Audrey: Hey Andrew, I got a surprise for you! We adopted another puppy called Pixie. She's SO cute! Isn't she just the cutest?\\n\\nUpstream image metadata (dataset annotation, not a user assertion):\\n{\\\"blip_caption\\\": \\\"a photo of a small white dog sitting on a carpet\\\", \\\"img_url\\\": [\\\"https://moderndogmagazine.com/sites/default/files/images/photoentries/photos/pixie%20smiling.jpg\\\"], \\\"query\\\": \\\"new puppy Pixie\\\"}\",\"fact_id\":\"episode_fallback:episode:85f4cbb0b45bce7b305ce171\",\"grounding\":0.14,\"provenance\":{\"episode_fallback\":true,\"reference_time\":\"2023-04-02T14:42:00Z\",\"reranking\":{\"admission_floor\":0.0,\"model_signature\":\"reranksig:dff4b9939786ed9a1e897946778e336584cc24251a2f32282bd3fe83a680a7d1\",\"relevance_logit\":0.8708398342132568},\"source_episode\":\"episode:85f4cbb0b45bce7b305ce171\",\"source_id\":\"locomo:conv-44:D2:1\",\"source_type\":\"conversation\"},\"quote\":\"Audrey: Hey Andrew, I got a surprise for you! We adopted another puppy called Pixie. She's SO cute! Isn't she just the cutest?\\n\\nUpstream image metadata (dataset annotation, not a user assertion):\\n{\\\"blip_caption\\\": \\\"a photo of a small white dog sitting on a carpet\\\", \\\"img_url\\\": [\\\"https://moderndogmagazine.com/sites/default/files/images/photoentries/photos/pixie%20smiling.jpg\\\"], \\\"query\\\": \\\"new puppy Pixie\\\"}\",\"rationale\":\"tier=fallback fts=1.00 access_count=0 confidence=0.25 grounding=0.14 semantic=enabled matched episode content query=\\\"year audrey adopt first three her dogs\\\" and active at 2026-10-10\",\"relevance\":0.14,\"retrieval_tier\":\"fallback\",\"semantic_available\":true,\"source_episode\":\"episode:85f4cbb0b45bce7b305ce171\"}},{\"gold_key\":\"raw:D1:7\",\"item\":{\"confidence\":0.32,\"content\":\"Audrey: I've had them for 3 years! Their names are Pepper, Precious and Panda. I can't live without my little ones!\",\"fact_id\":\"episode_fallback:episode:7931fe554290c0b7eeb2be6e\",\"grounding\":0.29,\"provenance\":{\"episode_fallback\":true,\"reference_time\":\"2023-03-27T13:10:00Z\",\"reranking\":{\"admission_floor\":0.0,\"model_signature\":\"reranksig:dff4b9939786ed9a1e897946778e336584cc24251a2f32282bd3fe83a680a7d1\",\"relevance_logit\":0.18582408130168915},\"source_episode\":\"episode:7931fe554290c0b7eeb2be6e\",\"source_id\":\"locomo:conv-44:D1:7\",\"source_type\":\"conversation\"},\"quote\":\"Audrey: I've had them for 3 years! Their names are Pepper, Precious and Panda. I can't live without my little ones!\",\"rationale\":\"tier=fallback fts=2.00 access_count=0 confidence=0.32 grounding=0.29 semantic=enabled matched episode content query=\\\"year audrey adopt first three her dogs\\\" and active at 2026-10-10\",\"relevance\":0.29,\"retrieval_tier\":\"fallback\",\"semantic_available\":true,\"source_episode\":\"episode:7931fe554290c0b7eeb2be6e\"}}]"
+      ],
+      "duration_ms": 8285,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "retrieval-quality",
+        "case_id": "locomo-conv-44-061"
+      },
+      "mode": "end_to_end",
+      "split": "development",
+      "label_trust": "reviewed",
+      "status": "passed",
+      "metrics": {
+        "answerable_non_abstention_rate": 1.0,
+        "duplicate_free_rate": 1.0,
+        "precision_macro": 1.0,
+        "prohibited_free_rate": 1.0,
+        "required_group_recall": 1.0
+      },
+      "evidence": {
+        "answerable_non_abstention_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "case_tag:category-4": {
+          "kind": "count",
+          "value": 1
+        },
+        "case_tag:locomo": {
+          "kind": "count",
+          "value": 1
+        },
+        "case_tag:published-evidence": {
+          "kind": "count",
+          "value": 1
+        },
+        "duplicate_free_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "precision_macro": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "prohibited_free_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "required_group_recall": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        }
+      },
+      "failures": [],
+      "duration_ms": 10205,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "retrieval-quality",
+        "case_id": "locomo-conv-47-001"
+      },
+      "mode": "end_to_end",
+      "split": "development",
+      "label_trust": "reviewed",
+      "status": "quality_failed",
+      "metrics": {
+        "answerable_non_abstention_rate": 0.0,
+        "duplicate_free_rate": 1.0,
+        "precision_macro": 0.0,
+        "prohibited_free_rate": 1.0,
+        "required_group_recall": 0.0
+      },
+      "evidence": {
+        "answerable_non_abstention_rate": {
+          "kind": "ratio",
+          "numerator": 0,
+          "denominator": 1
+        },
+        "case_tag:category-2": {
+          "kind": "count",
+          "value": 1
+        },
+        "case_tag:locomo": {
+          "kind": "count",
+          "value": 1
+        },
+        "case_tag:published-evidence": {
+          "kind": "count",
+          "value": 1
+        },
+        "duplicate_free_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "precision_macro": {
+          "kind": "ratio",
+          "numerator": 0,
+          "denominator": 1
+        },
+        "prohibited_free_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "required_group_recall": {
+          "kind": "ratio",
+          "numerator": 0,
+          "denominator": 1
+        }
+      },
+      "failures": [
+        "retrieval missed one or more required evidence groups",
+        "retrieval did not follow the expected abstention behavior",
+        "native selected evidence: []"
+      ],
+      "duration_ms": 6558,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "retrieval-quality",
+        "case_id": "locomo-conv-47-067"
+      },
+      "mode": "end_to_end",
+      "split": "development",
+      "label_trust": "reviewed",
+      "status": "passed",
+      "metrics": {
+        "answerable_non_abstention_rate": 1.0,
+        "duplicate_free_rate": 1.0,
+        "precision_macro": 1.0,
+        "prohibited_free_rate": 1.0,
+        "required_group_recall": 1.0
+      },
+      "evidence": {
+        "answerable_non_abstention_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "case_tag:category-4": {
+          "kind": "count",
+          "value": 1
+        },
+        "case_tag:locomo": {
+          "kind": "count",
+          "value": 1
+        },
+        "case_tag:published-evidence": {
+          "kind": "count",
+          "value": 1
+        },
+        "duplicate_free_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "precision_macro": {
+          "kind": "ratio",
+          "numerator": 2,
+          "denominator": 2
+        },
+        "prohibited_free_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "required_group_recall": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        }
+      },
+      "failures": [],
+      "duration_ms": 11000,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "retrieval-quality",
+        "case_id": "locomo-conv-48-000"
+      },
+      "mode": "end_to_end",
+      "split": "development",
+      "label_trust": "reviewed",
+      "status": "passed",
+      "metrics": {
+        "answerable_non_abstention_rate": 1.0,
+        "duplicate_free_rate": 1.0,
+        "precision_macro": 1.0,
+        "prohibited_free_rate": 1.0,
+        "required_group_recall": 1.0
+      },
+      "evidence": {
+        "answerable_non_abstention_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "case_tag:category-2": {
+          "kind": "count",
+          "value": 1
+        },
+        "case_tag:locomo": {
+          "kind": "count",
+          "value": 1
+        },
+        "case_tag:published-evidence": {
+          "kind": "count",
+          "value": 1
+        },
+        "case_tag:upstream_temporal_underspecified": {
+          "kind": "count",
+          "value": 1
+        },
+        "duplicate_free_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "precision_macro": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "prohibited_free_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "required_group_recall": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        }
+      },
+      "failures": [],
+      "duration_ms": 5711,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "retrieval-quality",
+        "case_id": "locomo-conv-48-015"
+      },
+      "mode": "end_to_end",
+      "split": "development",
+      "label_trust": "reviewed",
+      "status": "quality_failed",
+      "metrics": {
+        "answerable_non_abstention_rate": 1.0,
+        "duplicate_free_rate": 1.0,
+        "precision_macro": 0.0,
+        "prohibited_free_rate": 0.0,
+        "required_group_recall": 0.0
+      },
+      "evidence": {
+        "answerable_non_abstention_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "case_tag:category-4": {
+          "kind": "count",
+          "value": 1
+        },
+        "case_tag:locomo": {
+          "kind": "count",
+          "value": 1
+        },
+        "case_tag:published-evidence": {
+          "kind": "count",
+          "value": 1
+        },
+        "duplicate_free_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "precision_macro": {
+          "kind": "ratio",
+          "numerator": 0,
+          "denominator": 1
+        },
+        "prohibited_free_rate": {
+          "kind": "ratio",
+          "numerator": 0,
+          "denominator": 1
+        },
+        "required_group_recall": {
+          "kind": "ratio",
+          "numerator": 0,
+          "denominator": 2
+        }
+      },
+      "failures": [
+        "retrieval missed one or more required evidence groups",
+        "retrieval returned unlabeled or disallowed evidence",
+        "prohibited evidence was retrieved",
+        "native selected evidence: [{\"gold_key\":\"D2:26:note:9cfcd4c84855\",\"item\":{\"confidence\":0.0,\"content\":\"Jolene: They are very unusual pets! Here's me and my partner gaming last week - it's so fun. We played the game \\\"Detroit\\\" on the console. We are both crazy about this activity!\\n\\nUpstream image metadata (dataset annotation, not a user assertion):\\n{\\\"blip_caption\\\": \\\"a photo of a person laying in bed with a dog watching tv\\\", \\\"img_url\\\": [\\\"https://i.redd.it/0f9ubarmem291.jpg\\\"], \\\"query\\\": \\\"gaming with partner\\\"}\",\"fact_id\":\"fact:58b10de00b23180124ede83d\",\"grounding\":0.65,\"provenance\":{\"extraction_strategy\":\"summary_note_fallback\",\"ingestion_method\":\"extraction\",\"matched_query_terms\":[\"jolene\",\"pets\"],\"reranking\":{\"admission_floor\":0.0,\"model_signature\":\"reranksig:dff4b9939786ed9a1e897946778e336584cc24251a2f32282bd3fe83a680a7d1\",\"relevance_logit\":2.988344192504883},\"retrieval_admission\":{\"basis\":\"lexical\",\"community\":null,\"graph_anchor_origin\":null,\"hop_count\":null,\"matched_content_terms\":[\"pets\",\"jolene\"],\"matched_index_key_terms\":[\"jolene\"],\"matched_references\":[],\"policy_version\":\"retrieval-admission-v1\",\"repeated_topic\":null,\"resolved_entity_ids\":[],\"semantic_similarity\":0.7891781193314319},\"source_episode_id\":\"episode:fad2b983b094a563cff95ce1\",\"source_id\":\"locomo:conv-48:D2:26\",\"source_type\":\"conversation\"},\"quote\":\"Jolene: They are very unusual pets! Here's me and my partner gaming last week - it's so fun. We played the game \\\"Detroit\\\" on the console. We are both crazy about this activity!\\n\\nUpstream image metadata (dataset annotation, not a user assertion):\\n{\\\"blip_caption\\\": \\\"a photo of a person laying in bed with a dog watching tv\\\", \\\"img_url\\\": [\\\"https://i.redd.it/0f9ubarmem291.jpg\\\"], \\\"query\\\": \\\"gaming with partner\\\"}\",\"rationale\":\"tier=direct fts=3.00 access_count=0 confidence=0.00 relevance=0.80 grounding=0.65 alignment=1.04 semantic=enabled matched lexical query=\\\"What pets does Jolene have?\\\" and active at 2026-10-10\",\"reconciliation\":{\"claim_ids\":[\"claim:7ef5ed88ae776c31f1431fffa70a7b83adec67f9b9d948da99d6e0a1278baf55\",\"claim:f555dae13329217285765176d5804542c068d52cc2391d26cad83753773e2f85\"],\"relations\":[{\"evaluator_version\":\"builtin/v1\",\"outcome\":\"contradiction\",\"reason_code\":\"contradiction\",\"relation_id\":\"claim_relation:015954adbf4103b5b64e8d6ee4241ab41435c6c951bfdc17c15a6823c70afc88\"},{\"evaluator_version\":\"builtin/v1\",\"outcome\":\"contradiction\",\"reason_code\":\"contradiction\",\"relation_id\":\"claim_relation:2d1292544fae916afa96d1728eb320ac6dbaeb915a35aab8327bb46420fc0525\"},{\"evaluator_version\":\"builtin/v1\",\"outcome\":\"contradiction\",\"reason_code\":\"contradiction\",\"relation_id\":\"claim_relation:377a6662f39b7ba75845dba3499758042f0309c824871d0a1376f57a45e7efa6\"},{\"evaluator_version\":\"builtin/v1\",\"outcome\":\"contradiction\",\"reason_code\":\"contradiction\",\"relation_id\":\"claim_relation:3f21d296ab40a421dc17b671c3d5d6c5ee62b3db765b16dd5ed6fbfe2115aeaf\"},{\"evaluator_version\":\"builtin/v1\",\"outcome\":\"contradiction\",\"reason_code\":\"contradiction\",\"relation_id\":\"claim_relation:412143121731f759f9cc6075373d07e3bd5e0db48d9787958618be2584ebd5f0\"},{\"evaluator_version\":\"builtin/v1\",\"outcome\":\"contradiction\",\"reason_code\":\"contradiction\",\"relation_id\":\"claim_relation:48ada6335fcafc419f2c55a873544ee0b169acaa52f762899bcd5ef88a465e23\"},{\"evaluator_version\":\"builtin/v1\",\"outcome\":\"contradiction\",\"reason_code\":\"contradiction\",\"relation_id\":\"claim_relation:51e575c0022f09f9d474b65a27e498befe6943472d79194d873ba74774186cf9\"},{\"evaluator_version\":\"builtin/v1\",\"outcome\":\"contradiction\",\"reason_code\":\"contradiction\",\"relation_id\":\"claim_relation:683fa69782409308bf9c0a22841fb9a1fe6b4b82631f0d040833412031f4aac7\"},{\"evaluator_version\":\"builtin/v1\",\"outcome\":\"contradiction\",\"reason_code\":\"contradiction\",\"relation_id\":\"claim_relation:84c534c02d172732163937c21781fe0221b8d7a11cd34c3fd2121c4bd322d85c\"},{\"evaluator_version\":\"builtin/v1\",\"outcome\":\"contradiction\",\"reason_code\":\"contradiction\",\"relation_id\":\"claim_relation:911f2efd16caf0bc93b024ce90cd186bd6e87fcbabc12752de671cb51647a469\"},{\"evaluator_version\":\"builtin/v1\",\"outcome\":\"contradiction\",\"reason_code\":\"contradiction\",\"relation_id\":\"claim_relation:b0369ed2c082d1c9c4a57da48b39bb4aaffc66c91b423e41d912acc63876d990\"},{\"evaluator_version\":\"builtin/v1\",\"outcome\":\"contradiction\",\"reason_code\":\"contradiction\",\"relation_id\":\"claim_relation:c42aa270dc50d04bab780bd04b8b82b85ed5554779110b5f32163427da5c124e\"},{\"evaluator_version\":\"builtin/v1\",\"outcome\":\"contradiction\",\"reason_code\":\"contradiction\",\"relation_id\":\"claim_relation:dc3629a19fa061f9308e1da8da11c4ea4f0d5ef3eccb8d833ae2d6ed3e7b3713\"},{\"evaluator_version\":\"builtin/v1\",\"outcome\":\"contradiction\",\"reason_code\":\"contradiction\",\"relation_id\":\"claim_relation:e50d109df320414327d0ed4a4bb90684561a6471d3f223287cdbadb7498f43de\"},{\"evaluator_version\":\"builtin/v1\",\"outcome\":\"contradiction\",\"reason_code\":\"contradiction\",\"relation_id\":\"claim_relation:f51802452c48db5a41edce13f86b40b3f3b9a1cf15656da414ad9a5c937682df\"}]},\"relevance\":0.8,\"retrieval_evidence\":{\"admission_basis\":\"lexical\",\"policy_version\":\"retrieval-admission-v1\",\"semantic_similarity\":0.7891781193314319},\"retrieval_tier\":\"direct\",\"semantic_available\":true,\"source_episode\":\"episode:fad2b983b094a563cff95ce1\"}}]"
+      ],
+      "duration_ms": 9074,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "retrieval-quality",
+        "case_id": "locomo-conv-49-002"
+      },
+      "mode": "end_to_end",
+      "split": "development",
+      "label_trust": "reviewed",
+      "status": "quality_failed",
+      "metrics": {
+        "answerable_non_abstention_rate": 1.0,
+        "duplicate_free_rate": 1.0,
+        "precision_macro": 1.0,
+        "prohibited_free_rate": 1.0,
+        "required_group_recall": 0.3333333333333333
+      },
+      "evidence": {
+        "answerable_non_abstention_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "case_tag:category-1": {
+          "kind": "count",
+          "value": 1
+        },
+        "case_tag:locomo": {
+          "kind": "count",
+          "value": 1
+        },
+        "case_tag:published-evidence": {
+          "kind": "count",
+          "value": 1
+        },
+        "duplicate_free_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "precision_macro": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "prohibited_free_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "required_group_recall": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 3
+        }
+      },
+      "failures": [
+        "retrieval missed one or more required evidence groups",
+        "native selected evidence: [{\"gold_key\":\"D2:1:note:7f40d3bd9f4f\",\"item\":{\"confidence\":0.01,\"content\":\"Evan: Hey Sam, good to hear from you! Since we last talked, lots has been happening! Last weekend, I took my family on a road trip to Jasper. It was amazing! We drove through the Icefields Parkway and the glaciers and lakes were gorgeous. I got a shot of a glacier, check it out!\\n\\nUpstream image metadata (dataset annotation, not a user assertion):\\n{\\\"blip_caption\\\": \\\"a photo of a person holding a book in front of a lake\\\", \\\"img_url\\\": [\\\"https://1.bp.blogspot.com/-50oDf6izLpk/XtyM4RGdDgI/AAAAAAACwcA/nnQkAWVln4M3AQ4ZWAkGUfgrxjhpHbtJQCK4BGAsYHg/s4032/IMG_4686.jpg\\\"], \\\"query\\\": \\\"jasper national park glacier\\\"}\",\"fact_id\":\"fact:f4ae2b223eea4a76f01ac0e7\",\"grounding\":0.33,\"provenance\":{\"extraction_strategy\":\"summary_note_fallback\",\"ingestion_method\":\"extraction\",\"matched_query_terms\":[\"been\",\"evan\",\"family\"],\"reranking\":{\"admission_floor\":0.0,\"model_signature\":\"reranksig:dff4b9939786ed9a1e897946778e336584cc24251a2f32282bd3fe83a680a7d1\",\"relevance_logit\":2.860734462738037},\"retrieval_admission\":{\"basis\":\"lexical\",\"community\":null,\"graph_anchor_origin\":null,\"hop_count\":null,\"matched_content_terms\":[\"been\",\"family\"],\"matched_index_key_terms\":[],\"matched_references\":[],\"policy_version\":\"retrieval-admission-v1\",\"repeated_topic\":null,\"resolved_entity_ids\":[],\"semantic_similarity\":0.7651925811477622},\"source_episode_id\":\"episode:b09e3bc3e19665d53a9bab7d\",\"source_id\":\"locomo:conv-49:D2:1\",\"source_type\":\"conversation\"},\"quote\":\"Evan: Hey Sam, good to hear from you! Since we last talked, lots has been happening! Last weekend, I took my family on a road trip to Jasper. It was amazing! We drove through the Icefields Parkway and the glaciers and lakes were gorgeous. I got a shot of a glacier, check it out!\\n\\nUpstream image metadata (dataset annotation, not a user assertion):\\n{\\\"blip_caption\\\": \\\"a photo of a person holding a book in front of a lake\\\", \\\"img_url\\\": [\\\"https://1.bp.blogspot.com/-50oDf6izLpk/XtyM4RGdDgI/AAAAAAACwcA/nnQkAWVln4M3AQ4ZWAkGUfgrxjhpHbtJQCK4BGAsYHg/s4032/IMG_4686.jpg\\\"], \\\"query\\\": \\\"jasper national park glacier\\\"}\",\"rationale\":\"tier=fallback fts=3.10 access_count=0 confidence=0.01 relevance=0.79 grounding=0.33 alignment=0.95 semantic=enabled matched lexical query=\\\"Where has Evan been on roadtrips with his family?\\\" and active at 2026-10-10\",\"reconciliation\":{\"claim_ids\":[\"claim:04cae1a9fdabda76cd2ad8b29c9668863442357f36457f8c09bb82219eee9b6e\",\"claim:61d30f64a2f08d61f73adbeba7c6d31ce5f4dab694a1e1ac6a9b54133c82beb1\"],\"relations\":[{\"evaluator_version\":\"builtin/v1\",\"outcome\":\"contradiction\",\"reason_code\":\"contradiction\",\"relation_id\":\"claim_relation:02dfa3758c7a4a049780385cb5333adcbb9f06a31f523c088465333f3707aeb4\"},{\"evaluator_version\":\"builtin/v1\",\"outcome\":\"contradiction\",\"reason_code\":\"contradiction\",\"relation_id\":\"claim_relation:1f60d2a417cb92bf6fe39959b868c1f76aac31ecdc30f265b5acc12d591678d7\"},{\"evaluator_version\":\"builtin/v1\",\"outcome\":\"contradiction\",\"reason_code\":\"contradiction\",\"relation_id\":\"claim_relation:2dac50c9175828b226d7f6f29e10d37045525b6e316fbe10b243da150a671788\"},{\"evaluator_version\":\"builtin/v1\",\"outcome\":\"contradiction\",\"reason_code\":\"contradiction\",\"relation_id\":\"claim_relation:330a59abf1a13f910cf53adc95f5386c18f0f087522b224e9f9004a4de7bacfc\"},{\"evaluator_version\":\"builtin/v1\",\"outcome\":\"contradiction\",\"reason_code\":\"contradiction\",\"relation_id\":\"claim_relation:59efa54f23a6b14b04d1cbbb514cb7d450421c55cec32d4eba5de172e775c6e4\"},{\"evaluator_version\":\"builtin/v1\",\"outcome\":\"contradiction\",\"reason_code\":\"contradiction\",\"relation_id\":\"claim_relation:65c2cba58f2da592b50bd13d0e78016700d71bddc15a2adc3ecb80b8385073da\"},{\"evaluator_version\":\"builtin/v1\",\"outcome\":\"contradiction\",\"reason_code\":\"contradiction\",\"relation_id\":\"claim_relation:7119d2f04ea786a3a7e3e2fea8c4309e77a28a74d15311d4c82a976d7e3f554f\"},{\"evaluator_version\":\"builtin/v1\",\"outcome\":\"contradiction\",\"reason_code\":\"contradiction\",\"relation_id\":\"claim_relation:8d5fe24ab367f3440410c8ef20626d9dc0f149c809d0eced303af6a9367091c9\"},{\"evaluator_version\":\"builtin/v1\",\"outcome\":\"contradiction\",\"reason_code\":\"contradiction\",\"relation_id\":\"claim_relation:a9bdf8ce1bd645eb34a599fc491150c9c2dc29b676f8f16d64f9fa578b77b65f\"},{\"evaluator_version\":\"builtin/v1\",\"outcome\":\"contradiction\",\"reason_code\":\"contradiction\",\"relation_id\":\"claim_relation:aeebbf42d425877c5028f39c6797ce4918bcacc461448ce3a073b76755bab062\"},{\"evaluator_version\":\"builtin/v1\",\"outcome\":\"contradiction\",\"reason_code\":\"contradiction\",\"relation_id\":\"claim_relation:b23de1d492edaab68dfeca3fa1880b6b509fd1fa3275d6e4ba2b411ec67edd53\"},{\"evaluator_version\":\"builtin/v1\",\"outcome\":\"contradiction\",\"reason_code\":\"contradiction\",\"relation_id\":\"claim_relation:bb36997722b0848cb9e1d2f2dc29655cec21a41221123d0e98d4d5e7877abac5\"},{\"evaluator_version\":\"builtin/v1\",\"outcome\":\"contradiction\",\"reason_code\":\"contradiction\",\"relation_id\":\"claim_relation:e0c5eeadc3fe5dc6c112f8d42dc81fb83692ff6e089d9010cb017e9a5501bcbb\"},{\"evaluator_version\":\"builtin/v1\",\"outcome\":\"contradiction\",\"reason_code\":\"contradiction\",\"relation_id\":\"claim_relation:ea3f8e5121bee4ef98eae13af578e538059e28e83ea9c98e05b2c751cc94f136\"}]},\"relevance\":0.79,\"retrieval_evidence\":{\"admission_basis\":\"lexical\",\"policy_version\":\"retrieval-admission-v1\",\"semantic_similarity\":0.7651925811477622},\"retrieval_tier\":\"fallback\",\"semantic_available\":true,\"source_episode\":\"episode:b09e3bc3e19665d53a9bab7d\"}}]"
+      ],
+      "duration_ms": 8071,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "retrieval-quality",
+        "case_id": "locomo-conv-49-083"
+      },
+      "mode": "end_to_end",
+      "split": "development",
+      "label_trust": "reviewed",
+      "status": "quality_failed",
+      "metrics": {
+        "answerable_non_abstention_rate": 0.0,
+        "duplicate_free_rate": 1.0,
+        "precision_macro": 0.0,
+        "prohibited_free_rate": 1.0,
+        "required_group_recall": 0.0
+      },
+      "evidence": {
+        "answerable_non_abstention_rate": {
+          "kind": "ratio",
+          "numerator": 0,
+          "denominator": 1
+        },
+        "case_tag:category-4": {
+          "kind": "count",
+          "value": 1
+        },
+        "case_tag:locomo": {
+          "kind": "count",
+          "value": 1
+        },
+        "case_tag:published-evidence": {
+          "kind": "count",
+          "value": 1
+        },
+        "duplicate_free_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "precision_macro": {
+          "kind": "ratio",
+          "numerator": 0,
+          "denominator": 1
+        },
+        "prohibited_free_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "required_group_recall": {
+          "kind": "ratio",
+          "numerator": 0,
+          "denominator": 1
+        }
+      },
+      "failures": [
+        "retrieval missed one or more required evidence groups",
+        "retrieval did not follow the expected abstention behavior",
+        "native selected evidence: []"
+      ],
+      "duration_ms": 8086,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "retrieval-quality",
+        "case_id": "locomo-conv-50-001"
+      },
+      "mode": "end_to_end",
+      "split": "development",
+      "label_trust": "reviewed",
+      "status": "quality_failed",
+      "metrics": {
+        "answerable_non_abstention_rate": 1.0,
+        "duplicate_free_rate": 1.0,
+        "precision_macro": 0.5,
+        "prohibited_free_rate": 0.0,
+        "required_group_recall": 0.3333333333333333
+      },
+      "evidence": {
+        "answerable_non_abstention_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "case_tag:category-1": {
+          "kind": "count",
+          "value": 1
+        },
+        "case_tag:locomo": {
+          "kind": "count",
+          "value": 1
+        },
+        "case_tag:published-evidence": {
+          "kind": "count",
+          "value": 1
+        },
+        "case_tag:source_labeled_upstream_image_metadata": {
+          "kind": "count",
+          "value": 1
+        },
+        "case_tag:upstream_acquisition_underspecified": {
+          "kind": "count",
+          "value": 1
+        },
+        "duplicate_free_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "precision_macro": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 2
+        },
+        "prohibited_free_rate": {
+          "kind": "ratio",
+          "numerator": 0,
+          "denominator": 1
+        },
+        "required_group_recall": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 3
+        }
+      },
+      "failures": [
+        "retrieval missed one or more required evidence groups",
+        "retrieval returned unlabeled or disallowed evidence",
+        "prohibited evidence was retrieved",
+        "native selected evidence: [{\"gold_key\":\"D2:1:note:567348606949\",\"item\":{\"confidence\":0.0,\"content\":\"Calvin: Hey Dave, been a few days, so I wanted to let you in on some cool news.  I just got a new car and it's amazing! Finally owning a luxury car was a dream come true and I'm so stoked.\",\"fact_id\":\"fact:59b1511e4816dd0de75ad324\",\"grounding\":0.62,\"provenance\":{\"extraction_strategy\":\"summary_note_fallback\",\"ingestion_method\":\"extraction\",\"matched_query_terms\":[\"2023\",\"calvin\",\"march\"],\"reranking\":{\"admission_floor\":0.0,\"model_signature\":\"reranksig:dff4b9939786ed9a1e897946778e336584cc24251a2f32282bd3fe83a680a7d1\",\"relevance_logit\":0.5572494864463806},\"retrieval_admission\":{\"basis\":\"semantic\",\"community\":null,\"graph_anchor_origin\":null,\"hop_count\":null,\"matched_content_terms\":[],\"matched_index_key_terms\":[],\"matched_references\":[],\"policy_version\":\"retrieval-admission-v1\",\"repeated_topic\":null,\"resolved_entity_ids\":[],\"semantic_similarity\":0.7960419924793084},\"source_episode_id\":\"episode:ecbba98f1320d9e6f6118bb9\",\"source_id\":\"locomo:conv-50:D2:1\",\"source_type\":\"conversation\"},\"quote\":\"Calvin: Hey Dave, been a few days, so I wanted to let you in on some cool news.  I just got a new car and it's amazing! Finally owning a luxury car was a dream come true and I'm so stoked.\",\"rationale\":\"tier=temporal fts=0.00 access_count=0 confidence=0.00 relevance=0.61 grounding=0.62 alignment=1.04 semantic=enabled matched lexical query=\\\"What items did Calvin buy in March 2023?\\\" and active at 2026-10-10\",\"reconciliation\":{\"claim_ids\":[\"claim:383ad2f87e92f404e7ffe65b9839bf75c6140cce99ec126dca42f50997511366\"],\"relations\":[{\"evaluator_version\":\"builtin/v1\",\"outcome\":\"contradiction\",\"reason_code\":\"contradiction\",\"relation_id\":\"claim_relation:0109dcc7b07c9d16436cd377333332d9fee919cba33c63db94701bb5a70688fd\"},{\"evaluator_version\":\"builtin/v1\",\"outcome\":\"contradiction\",\"reason_code\":\"contradiction\",\"relation_id\":\"claim_relation:0caae31fef54706edf57968c92c462e804fa878507c4c4badb5f6ad371bdd6d7\"},{\"evaluator_version\":\"builtin/v1\",\"outcome\":\"contradiction\",\"reason_code\":\"contradiction\",\"relation_id\":\"claim_relation:339069660dcec36df67e1d47c49a92e06ccda2838eb21958532169ad97fa7a96\"},{\"evaluator_version\":\"builtin/v1\",\"outcome\":\"contradiction\",\"reason_code\":\"contradiction\",\"relation_id\":\"claim_relation:5e86d383d1083a26f20a7f6ff79a904eaaa2846a127037372dfb1c08f3367cab\"},{\"evaluator_version\":\"builtin/v1\",\"outcome\":\"contradiction\",\"reason_code\":\"contradiction\",\"relation_id\":\"claim_relation:94a70389d6159921deac382de1fd58db1d69272e88b050baff497aad33a88c44\"},{\"evaluator_version\":\"builtin/v1\",\"outcome\":\"contradiction\",\"reason_code\":\"contradiction\",\"relation_id\":\"claim_relation:9b223a44004c841429d0374c06bda76f14d1c318afcb465795105fbad71bdfdc\"},{\"evaluator_version\":\"builtin/v1\",\"outcome\":\"contradiction\",\"reason_code\":\"contradiction\",\"relation_id\":\"claim_relation:a75905597852f886d1e0b1c32e0c1a5bec6c7f655a4a77060f2846b1100d84ca\"},{\"evaluator_version\":\"builtin/v1\",\"outcome\":\"contradiction\",\"reason_code\":\"contradiction\",\"relation_id\":\"claim_relation:afe6c4790c8c93187fe4d35200cca70f96337001acbb29b946606eb27fdc98b1\"},{\"evaluator_version\":\"builtin/v1\",\"outcome\":\"contradiction\",\"reason_code\":\"contradiction\",\"relation_id\":\"claim_relation:bac883da9d254854f6bfb63c8b4c67b24042c276475cecc008b81d5dcbd85e4f\"}]},\"relevance\":0.61,\"retrieval_evidence\":{\"admission_basis\":\"semantic\",\"policy_version\":\"retrieval-admission-v1\",\"semantic_similarity\":0.7960419924793084},\"retrieval_tier\":\"temporal\",\"semantic_available\":true,\"source_episode\":\"episode:ecbba98f1320d9e6f6118bb9\"}},{\"gold_key\":\"D2:15:note:f49bddb8c145\",\"item\":{\"confidence\":0.0,\"content\":\"Calvin: Yeah, it's always a dream to see your favorites doing their thing! So glad you got to experience that.\",\"fact_id\":\"fact:f3c6c30b5b8d8aa17d9a3c26\",\"grounding\":0.62,\"provenance\":{\"extraction_strategy\":\"summary_note_fallback\",\"ingestion_method\":\"extraction\",\"matched_query_terms\":[\"2023\",\"calvin\",\"march\"],\"reranking\":{\"admission_floor\":0.0,\"model_signature\":\"reranksig:dff4b9939786ed9a1e897946778e336584cc24251a2f32282bd3fe83a680a7d1\",\"relevance_logit\":0.18387232720851898},\"retrieval_admission\":{\"basis\":\"semantic\",\"community\":null,\"graph_anchor_origin\":null,\"hop_count\":null,\"matched_content_terms\":[],\"matched_index_key_terms\":[],\"matched_references\":[],\"policy_version\":\"retrieval-admission-v1\",\"repeated_topic\":null,\"resolved_entity_ids\":[],\"semantic_similarity\":0.7754187303507861},\"source_episode_id\":\"episode:917d9fdea128d87e55956fe4\",\"source_id\":\"locomo:conv-50:D2:15\",\"source_type\":\"conversation\"},\"quote\":\"Calvin: Yeah, it's always a dream to see your favorites doing their thing! So glad you got to experience that.\",\"rationale\":\"tier=temporal fts=0.00 access_count=0 confidence=0.00 relevance=0.54 grounding=0.62 alignment=1.04 semantic=enabled matched lexical query=\\\"What items did Calvin buy in March 2023?\\\" and active at 2026-10-10\",\"reconciliation\":{\"claim_ids\":[\"claim:13fe056c033735d708410273bd244d13529f755aa76397783546aeea6367a5db\"],\"relations\":[{\"evaluator_version\":\"builtin/v1\",\"outcome\":\"contradiction\",\"reason_code\":\"contradiction\",\"relation_id\":\"claim_relation:1e1e0aaf5162f7cc431e25348fada8240e9a3aa50794a84710de6d5bed9c7cf0\"}]},\"relevance\":0.54,\"retrieval_evidence\":{\"admission_basis\":\"semantic\",\"policy_version\":\"retrieval-admission-v1\",\"semantic_similarity\":0.7754187303507861},\"retrieval_tier\":\"temporal\",\"semantic_available\":true,\"source_episode\":\"episode:917d9fdea128d87e55956fe4\"}}]"
+      ],
+      "duration_ms": 5448,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "retrieval-quality",
+        "case_id": "locomo-conv-50-071"
+      },
+      "mode": "end_to_end",
+      "split": "development",
+      "label_trust": "reviewed",
+      "status": "passed",
+      "metrics": {
+        "answerable_non_abstention_rate": 1.0,
+        "duplicate_free_rate": 1.0,
+        "precision_macro": 1.0,
+        "prohibited_free_rate": 1.0,
+        "required_group_recall": 1.0
+      },
+      "evidence": {
+        "answerable_non_abstention_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "case_tag:category-4": {
+          "kind": "count",
+          "value": 1
+        },
+        "case_tag:locomo": {
+          "kind": "count",
+          "value": 1
+        },
+        "case_tag:published-evidence": {
+          "kind": "count",
+          "value": 1
+        },
+        "duplicate_free_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "precision_macro": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "prohibited_free_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "required_group_recall": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        }
+      },
+      "failures": [],
+      "duration_ms": 7532,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "retrieval-quality",
+        "case_id": "logging-config"
+      },
+      "mode": "end_to_end",
+      "split": "development",
+      "label_trust": "reviewed",
+      "status": "passed",
+      "metrics": {
+        "answerable_non_abstention_rate": 1.0,
+        "duplicate_free_rate": 1.0,
+        "precision_macro": 1.0,
+        "prohibited_free_rate": 1.0,
+        "required_group_recall": 1.0
+      },
+      "evidence": {
+        "answerable_non_abstention_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "case_tag:configuration": {
+          "kind": "count",
+          "value": 1
+        },
+        "case_tag:logging": {
+          "kind": "count",
+          "value": 1
+        },
+        "duplicate_free_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "precision_macro": {
+          "kind": "ratio",
+          "numerator": 2,
+          "denominator": 2
+        },
+        "prohibited_free_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "required_group_recall": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        }
+      },
+      "failures": [],
+      "duration_ms": 4947,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "retrieval-quality",
+        "case_id": "logging-correlation"
+      },
+      "mode": "end_to_end",
+      "split": "development",
+      "label_trust": "reviewed",
+      "status": "passed",
+      "metrics": {
+        "answerable_non_abstention_rate": 1.0,
+        "duplicate_free_rate": 1.0,
+        "precision_macro": 1.0,
+        "prohibited_free_rate": 1.0,
+        "required_group_recall": 1.0
+      },
+      "evidence": {
+        "answerable_non_abstention_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "case_tag:logging": {
+          "kind": "count",
+          "value": 1
+        },
+        "case_tag:paraphrase": {
+          "kind": "count",
+          "value": 1
+        },
+        "duplicate_free_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "precision_macro": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "prohibited_free_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "required_group_recall": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        }
+      },
+      "failures": [],
+      "duration_ms": 5045,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "retrieval-quality",
+        "case_id": "logging-levels"
+      },
+      "mode": "end_to_end",
+      "split": "development",
+      "label_trust": "reviewed",
+      "status": "passed",
+      "metrics": {
+        "answerable_non_abstention_rate": 1.0,
+        "duplicate_free_rate": 1.0,
+        "precision_macro": 1.0,
+        "prohibited_free_rate": 1.0,
+        "required_group_recall": 1.0
+      },
+      "evidence": {
+        "answerable_non_abstention_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "case_tag:error-policy": {
+          "kind": "count",
+          "value": 1
+        },
+        "case_tag:logging": {
+          "kind": "count",
+          "value": 1
+        },
+        "duplicate_free_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "precision_macro": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "prohibited_free_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "required_group_recall": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        }
+      },
+      "failures": [],
+      "duration_ms": 4996,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "retrieval-quality",
+        "case_id": "logging-original"
+      },
+      "mode": "end_to_end",
+      "split": "development",
+      "label_trust": "reviewed",
+      "status": "quality_failed",
+      "metrics": {
+        "answerable_non_abstention_rate": 1.0,
+        "duplicate_free_rate": 1.0,
+        "precision_macro": 1.0,
+        "prohibited_free_rate": 1.0,
+        "required_group_recall": 0.3333333333333333
+      },
+      "evidence": {
+        "answerable_non_abstention_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "case_tag:logging": {
+          "kind": "count",
+          "value": 1
+        },
+        "case_tag:original-query": {
+          "kind": "count",
+          "value": 1
+        },
+        "duplicate_free_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "precision_macro": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "prohibited_free_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "required_group_recall": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 3
+        }
+      },
+      "failures": [
+        "retrieval missed one or more required evidence groups",
+        "native selected evidence: [{\"gold_key\":\"raw:logging-config\",\"item\":{\"confidence\":0.62,\"content\":\"| Variable | Meaning |\\n|---|---|\\n| `RUST_LOG` | Level and per-subsystem directives. A bare level sets the default (`info`); `prefix=level` sets a subsystem. The most specific prefix wins. |\\n| `MEMORY_LOG_FORMAT` | `text` (default, human-readable, one line per event) or `json` (NDJSON, one object per event). |\\n| `MEMORY_LOG_COLOR` | `always`, `never`, or anything else for auto (colour only on a colour-capable terminal, and never for a file sink). `NO_COLOR` set and non-empty disables colour. |\\n| `MEMORY_LOG_TARGETS` | Third-party `tracing` targets to raise, comma-separated `target=level`. Quiet by default; can never drop this service's own events. |\\n| `MEMORY_LOG_FILE` | Append the stream to this file instead of stderr. A blank value means \\\"unset\\\". |\\n\\n`RUST_LOG` examples:\\n\\n```\\nRUST_LOG=info                       # default\\nRUST_LOG=extract=debug              # one subsystem\\nRUST_LOG=http=error,info            # quiet the HTTP surface, keep the rest\\nRUST_LOG=fs_watch=trace,http=debug  # two subsystems, the most specific rule wins\\n```\",\"fact_id\":\"episode_fallback:episode:8b072bf970d29803d8cc8c8c\",\"grounding\":0.55,\"provenance\":{\"episode_fallback\":true,\"reference_time\":\"2026-10-07T00:00:00Z\",\"reranking\":{\"admission_floor\":0.0,\"model_signature\":\"reranksig:dff4b9939786ed9a1e897946778e336584cc24251a2f32282bd3fe83a680a7d1\",\"relevance_logit\":5.447852611541748},\"source_episode\":\"episode:8b072bf970d29803d8cc8c8c\",\"source_id\":\"native:logging-config\",\"source_type\":\"session_summary\"},\"quote\":\"| Variable | Meaning |\\n|---|---|\\n| `RUST_LOG` | Level and per-subsystem directives. A bare level sets the default (`info`); `prefix=level` sets a subsystem. The most specific prefix wins. |\\n| `MEMORY_LOG_FORMAT` | `text` (default, human-readable, one line per event) or `json` (NDJSON, one object per event). |\\n| `MEMORY_LOG_COLOR` | `always`, `never`, or anything else for auto (colour only on a colour-capable terminal, and never for a file sink). `NO_COLOR` set and non-empty disables colour. |\\n| `MEMORY_LOG_TARGETS` | Third-party `tracing` targets to raise, comma-separated `target=level`. Quiet by default; can never drop this service's own events. |\\n| `MEMORY_LOG_FILE` | Append the stream to this file instead of stderr. A blank value means \\\"unset\\\". |\\n\\n`RUST_LOG` examples:\\n\\n```\\nRUST_LOG=info                       # default\\nRUST_LOG=extract=debug              # one subsystem\\nRUST_LOG=http=error,info            # quiet the HTTP surface, keep the rest\\nRUST_LOG=fs_watch=trace,http=debug  # two subsystems, the most specific rule wins\\n```\",\"rationale\":\"tier=fallback fts=6.00 access_count=0 confidence=0.62 grounding=0.55 semantic=enabled matched episode content query=\\\"logging setup tracing configuration log format log level policy memory mcp\\\" and active at 2026-10-10\",\"relevance\":0.55,\"retrieval_tier\":\"fallback\",\"semantic_available\":true,\"source_episode\":\"episode:8b072bf970d29803d8cc8c8c\"}}]"
+      ],
+      "duration_ms": 4333,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "retrieval-quality",
+        "case_id": "logging-russian"
+      },
+      "mode": "end_to_end",
+      "split": "development",
+      "label_trust": "reviewed",
+      "status": "passed",
+      "metrics": {
+        "answerable_non_abstention_rate": 1.0,
+        "duplicate_free_rate": 1.0,
+        "precision_macro": 1.0,
+        "prohibited_free_rate": 1.0,
+        "required_group_recall": 1.0
+      },
+      "evidence": {
+        "answerable_non_abstention_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "case_tag:logging": {
+          "kind": "count",
+          "value": 1
+        },
+        "case_tag:multilingual": {
+          "kind": "count",
+          "value": 1
+        },
+        "duplicate_free_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "precision_macro": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "prohibited_free_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "required_group_recall": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        }
+      },
+      "failures": [],
+      "duration_ms": 4894,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "retrieval-quality",
+        "case_id": "logging-sink"
+      },
+      "mode": "end_to_end",
+      "split": "development",
+      "label_trust": "reviewed",
+      "status": "passed",
+      "metrics": {
+        "answerable_non_abstention_rate": 1.0,
+        "duplicate_free_rate": 1.0,
+        "precision_macro": 1.0,
+        "prohibited_free_rate": 1.0,
+        "required_group_recall": 1.0
+      },
+      "evidence": {
+        "answerable_non_abstention_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "case_tag:logging": {
+          "kind": "count",
+          "value": 1
+        },
+        "case_tag:sink": {
+          "kind": "count",
+          "value": 1
+        },
+        "duplicate_free_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "precision_macro": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "prohibited_free_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "required_group_recall": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        }
+      },
+      "failures": [],
+      "duration_ms": 4912,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "retrieval-quality",
+        "case_id": "policy-denied-abstention"
+      },
+      "mode": "end_to_end",
+      "split": "development",
+      "label_trust": "reviewed",
+      "status": "passed",
+      "metrics": {
+        "duplicate_free_rate": 1.0,
+        "prohibited_free_rate": 1.0,
+        "unknown_abstention_rate": 1.0
+      },
+      "evidence": {
+        "case_tag:access": {
+          "kind": "count",
+          "value": 1
+        },
+        "case_tag:unknown": {
+          "kind": "count",
+          "value": 1
+        },
+        "duplicate_free_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "prohibited_free_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "unknown_abstention_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        }
+      },
+      "failures": [],
+      "duration_ms": 121,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "retrieval-quality",
+        "case_id": "policy-public-evidence"
+      },
+      "mode": "end_to_end",
+      "split": "development",
+      "label_trust": "reviewed",
+      "status": "passed",
+      "metrics": {
+        "answerable_non_abstention_rate": 1.0,
+        "duplicate_free_rate": 1.0,
+        "precision_macro": 1.0,
+        "prohibited_free_rate": 1.0,
+        "required_group_recall": 1.0
+      },
+      "evidence": {
+        "answerable_non_abstention_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "case_tag:access": {
+          "kind": "count",
+          "value": 1
+        },
+        "case_tag:isolation": {
+          "kind": "count",
+          "value": 1
+        },
+        "duplicate_free_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "precision_macro": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "prohibited_free_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "required_group_recall": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        }
+      },
+      "failures": [],
+      "duration_ms": 223,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "retrieval-quality",
+        "case_id": "qualified-other-project"
+      },
+      "mode": "end_to_end",
+      "split": "development",
+      "label_trust": "reviewed",
+      "status": "passed",
+      "metrics": {
+        "answerable_non_abstention_rate": 1.0,
+        "duplicate_free_rate": 1.0,
+        "precision_macro": 1.0,
+        "prohibited_free_rate": 1.0,
+        "required_group_recall": 1.0
+      },
+      "evidence": {
+        "answerable_non_abstention_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "case_tag:project-distractor": {
+          "kind": "count",
+          "value": 1
+        },
+        "case_tag:qualified-task": {
+          "kind": "count",
+          "value": 1
+        },
+        "duplicate_free_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "precision_macro": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "prohibited_free_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "required_group_recall": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        }
+      },
+      "failures": [],
+      "duration_ms": 319,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "retrieval-quality",
+        "case_id": "timeline-atlas-q1-cross-project-abstention"
+      },
+      "mode": "end_to_end",
+      "split": "development",
+      "label_trust": "reviewed",
+      "status": "passed",
+      "metrics": {
+        "duplicate_free_rate": 1.0,
+        "prohibited_free_rate": 1.0,
+        "unknown_abstention_rate": 1.0
+      },
+      "evidence": {
+        "case_tag:calendar-period": {
+          "kind": "count",
+          "value": 1
+        },
+        "case_tag:cross-project": {
+          "kind": "count",
+          "value": 1
+        },
+        "case_tag:timeline": {
+          "kind": "count",
+          "value": 1
+        },
+        "case_tag:unknown": {
+          "kind": "count",
+          "value": 1
+        },
+        "duplicate_free_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "prohibited_free_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "unknown_abstention_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        }
+      },
+      "failures": [],
+      "duration_ms": 276,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "retrieval-quality",
+        "case_id": "timeline-atlas-q2-reverse-quarter"
+      },
+      "mode": "end_to_end",
+      "split": "development",
+      "label_trust": "reviewed",
+      "status": "passed",
+      "metrics": {
+        "answerable_non_abstention_rate": 1.0,
+        "duplicate_free_rate": 1.0,
+        "precision_macro": 1.0,
+        "prohibited_free_rate": 1.0,
+        "required_group_recall": 1.0
+      },
+      "evidence": {
+        "answerable_non_abstention_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "case_tag:answerable": {
+          "kind": "count",
+          "value": 1
+        },
+        "case_tag:calendar-period": {
+          "kind": "count",
+          "value": 1
+        },
+        "case_tag:cross-project": {
+          "kind": "count",
+          "value": 1
+        },
+        "case_tag:timeline": {
+          "kind": "count",
+          "value": 1
+        },
+        "duplicate_free_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "precision_macro": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "prohibited_free_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "required_group_recall": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        }
+      },
+      "failures": [],
+      "duration_ms": 365,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "retrieval-quality",
+        "case_id": "unknown-database"
+      },
+      "mode": "end_to_end",
+      "split": "development",
+      "label_trust": "reviewed",
+      "status": "passed",
+      "metrics": {
+        "duplicate_free_rate": 1.0,
+        "prohibited_free_rate": 1.0,
+        "unknown_abstention_rate": 1.0
+      },
+      "evidence": {
+        "case_tag:abstention": {
+          "kind": "count",
+          "value": 1
+        },
+        "case_tag:unknown": {
+          "kind": "count",
+          "value": 1
+        },
+        "duplicate_free_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "prohibited_free_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "unknown_abstention_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        }
+      },
+      "failures": [],
+      "duration_ms": 4548,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "retrieval-quality",
+        "case_id": "unknown-task"
+      },
+      "mode": "end_to_end",
+      "split": "development",
+      "label_trust": "reviewed",
+      "status": "passed",
+      "metrics": {
+        "duplicate_free_rate": 1.0,
+        "prohibited_free_rate": 1.0,
+        "unknown_abstention_rate": 1.0
+      },
+      "evidence": {
+        "case_tag:qualified-task": {
+          "kind": "count",
+          "value": 1
+        },
+        "case_tag:unknown": {
+          "kind": "count",
+          "value": 1
+        },
+        "duplicate_free_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "prohibited_free_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "unknown_abstention_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        }
+      },
+      "failures": [],
+      "duration_ms": 3049,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "retrieval-quality",
+        "case_id": "unknown-url"
+      },
+      "mode": "end_to_end",
+      "split": "development",
+      "label_trust": "reviewed",
+      "status": "passed",
+      "metrics": {
+        "duplicate_free_rate": 1.0,
+        "prohibited_free_rate": 1.0,
+        "unknown_abstention_rate": 1.0
+      },
+      "evidence": {
+        "case_tag:unknown": {
+          "kind": "count",
+          "value": 1
+        },
+        "case_tag:url-distractor": {
+          "kind": "count",
+          "value": 1
+        },
+        "duplicate_free_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "prohibited_free_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "unknown_abstention_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        }
+      },
+      "failures": [],
+      "duration_ms": 4905,
+      "attempts": 1
+    }
+  ],
+  "suite_summaries": [
+    {
+      "suite_id": "retrieval-quality",
+      "mode": "end_to_end",
+      "total": 37,
+      "passed": 24,
+      "quality_failed": 13,
+      "invalid": 0,
+      "metrics": {
+        "answerable_non_abstention_rate": 0.90625,
+        "answerable_non_abstention_rate_applicable_count": 32.0,
+        "duplicate_free_rate": 1.0,
+        "duplicate_free_rate_applicable_count": 37.0,
+        "precision_macro": 0.84375,
+        "precision_macro_applicable_count": 32.0,
+        "prohibited_free_rate": 0.918918918918919,
+        "prohibited_free_rate_applicable_count": 37.0,
+        "required_group_recall": 0.6086956521739131,
+        "required_group_recall_applicable_count": 46.0,
+        "unknown_abstention_rate": 1.0,
+        "unknown_abstention_rate_applicable_count": 5.0
+      }
+    }
+  ],
+  "gates": [
+    {
+      "suite_id": "retrieval-quality",
+      "metric": "precision_macro",
+      "observed": 0.84375,
+      "hard_floor": 1.0,
+      "baseline": null,
+      "regression_budget": null,
+      "status": "failed",
+      "reason": "hard_floor_not_met"
+    },
+    {
+      "suite_id": "retrieval-quality",
+      "metric": "required_group_recall",
+      "observed": 0.6086956521739131,
+      "hard_floor": 1.0,
+      "baseline": null,
+      "regression_budget": null,
+      "status": "failed",
+      "reason": "hard_floor_not_met"
+    },
+    {
+      "suite_id": "retrieval-quality",
+      "metric": "unknown_abstention_rate",
+      "observed": 1.0,
+      "hard_floor": 1.0,
+      "baseline": null,
+      "regression_budget": null,
+      "status": "passed",
+      "reason": "none"
+    },
+    {
+      "suite_id": "retrieval-quality",
+      "metric": "answerable_non_abstention_rate",
+      "observed": 0.90625,
+      "hard_floor": 1.0,
+      "baseline": null,
+      "regression_budget": null,
+      "status": "failed",
+      "reason": "hard_floor_not_met"
+    },
+    {
+      "suite_id": "retrieval-quality",
+      "metric": "duplicate_free_rate",
+      "observed": 1.0,
+      "hard_floor": 1.0,
+      "baseline": null,
+      "regression_budget": null,
+      "status": "passed",
+      "reason": "none"
+    },
+    {
+      "suite_id": "retrieval-quality",
+      "metric": "prohibited_free_rate",
+      "observed": 0.918918918918919,
+      "hard_floor": 1.0,
+      "baseline": null,
+      "regression_budget": null,
+      "status": "failed",
+      "reason": "hard_floor_not_met"
+    }
+  ],
+  "fingerprint": {
+    "rust_version": "rustc 1.99.0 (b940084d7 2026-09-28)",
+    "os_arch": "macos/aarch64",
+    "package_version": "0.1.0",
+    "build_profile": "debug",
+    "enabled_features": [],
+    "provider": null,
+    "model": null,
+    "device": null,
+    "configuration_hash": "2531a61d9fb95614657eadf7e146ee369f8b310b33d7f729f5f7839dbcdcb0eb",
+    "git_commit": "8b1c1ed5086cdaa968889329f1ff82a6d4ce33c2",
+    "evaluator_versions": {
+      "eval-harness": "0.1.0"
+    },
+    "suite_fingerprints": {
+      "retrieval-quality": {
+        "claim_rollout_stage": "evidence",
+        "corpus_id": "retrieval-quality-v1",
+        "corpus_manifest_sha256": "76d2d89f758aac366139f0b032f8cd4fff2cdd88ace95819af5f4e804d5eaac8",
+        "corpus_revision": "r25-source-reviewed-calendar-budget-boundary",
+        "embedding_dimension": "384",
+        "embedding_signature": "embsig:b88d713a71be619fce22bcb30efe3d1cc9623afff9e6a8ae7107ba9e620b9b17",
+        "extractor_fingerprint": "anno",
+        "index_signature": "indexsig:d293fd983ef88ea75c78d3758dd09c73d5cf02726d7ec592ca28adc938421f30",
+        "model": "intfloat/multilingual-e5-small",
+        "model_file_sha256.config.json": "69137736cab8b8903a07fe8afaafdda25aac55415a12a55d1bffa9f581abf959",
+        "model_file_sha256.model.safetensors": "1a55775f53449dac10a2bcbc312469fac40b96d53198c407081a831f81c98477",
+        "model_file_sha256.tokenizer.json": "0b44a9d7b51c3c62626640cda0e2c2f70fdacdc25bbbd68038369d14ebdf4c39",
+        "prepared_claim_rollout_stage": "evidence",
+        "prepared_embedding_dimension": "384",
+        "prepared_embedding_signature": "embsig:b88d713a71be619fce22bcb30efe3d1cc9623afff9e6a8ae7107ba9e620b9b17",
+        "prepared_extractor_fingerprint": "anno",
+        "prepared_index_signature": "indexsig:d293fd983ef88ea75c78d3758dd09c73d5cf02726d7ec592ca28adc938421f30",
+        "prepared_model": "intfloat/multilingual-e5-small",
+        "prepared_provider": "local-candle",
+        "prepared_similarity_threshold": "0.7",
+        "provider": "local-candle",
+        "provider_status": "ready",
+        "reranking_signature": "reranksig:dff4b9939786ed9a1e897946778e336584cc24251a2f32282bd3fe83a680a7d1",
+        "similarity_threshold": "0.7",
+        "source_bundle_sha256": "8da56b0665758a44e7413c3bbd875395b44d9bbb6c22a0bac1f3bea21b6b565b"
+      }
+    },
+    "profile_digest": "f5f94120e16f58356348a8fa6baaf2a473380e86179d1fb4f2bf436ae3baf2aa"
+  },
+  "budget_status": "passed",
+  "verdict": "quality_failed",
+  "issues": []
+}

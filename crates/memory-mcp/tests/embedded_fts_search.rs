@@ -433,11 +433,11 @@ async fn embedded_fts_matches_separator_variants() -> Result<(), Box<dyn std::er
 
 #[tokio::test]
 async fn embedded_fts_matches_fact_index_keys() -> Result<(), Box<dyn std::error::Error>> {
-    let service = common::make_service().await;
+    let (service, db_client) = common::make_service_with_client().await;
     let t = Utc.with_ymd_and_hms(2026, 3, 15, 9, 0, 0).unwrap();
     let alice_id = common::resolve_entity(&service, "person", "Alice Smith").await?;
 
-    service
+    let fact_id = service
         .add_fact(
             "note",
             "Quarterly launch review finalized.",
@@ -450,6 +450,33 @@ async fn embedded_fts_matches_fact_index_keys() -> Result<(), Box<dyn std::error
             Provenance::agent_observation("episode:fts_index_keys"),
         )
         .await?;
+
+    let persisted = db_client
+        .select_one(&fact_id, "org")
+        .await?
+        .expect("fact should be durably persisted");
+    assert!(
+        persisted
+            .get("index_keys")
+            .and_then(serde_json::Value::as_array)
+            .is_some_and(|keys| keys.iter().any(|key| key.as_str() == Some("march 2026"))),
+        "persisted index keys should include the fact's valid month"
+    );
+
+    let cutoff = (Utc::now() + Duration::seconds(1)).to_rfc3339();
+    let lexical = KnowledgeStoreClient::new(db_client, "org")
+        .select_facts_filtered(ContextFactQuery {
+            cutoff: &cutoff,
+            query_contains: Some("march 2026"),
+            limit: 10,
+            fact_types: &[],
+        })
+        .await?;
+    assert_eq!(
+        lexical.len(),
+        1,
+        "production lexical query should find the fact through index_keys"
+    );
 
     let person_ctx = AssembleContextCapability::assemble_context_from_service(
         &service,

@@ -1,4 +1,4 @@
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 
 use chrono::{DateTime, Utc};
 use serde::Deserialize;
@@ -30,6 +30,10 @@ pub(crate) struct NativePreparationManifest {
     pub(crate) index_signature: String,
     pub(crate) extractor_fingerprint: String,
     pub(crate) claim_rollout_stage: String,
+    #[serde(default)]
+    pub(crate) model_files_sha256: BTreeMap<String, String>,
+    #[serde(default)]
+    pub(crate) reranking_signature: Option<String>,
 }
 
 pub(crate) struct RuntimeRetrievalIdentity<'a> {
@@ -41,6 +45,8 @@ pub(crate) struct RuntimeRetrievalIdentity<'a> {
     pub(crate) index_signature: &'a str,
     pub(crate) extractor_fingerprint: &'a str,
     pub(crate) claim_rollout_stage: &'a str,
+    pub(crate) model_files_sha256: &'a BTreeMap<String, String>,
+    pub(crate) reranking_signature: Option<&'a str>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -51,7 +57,11 @@ pub(crate) struct QualityCase {
     pub(crate) label_trust: LabelTrust,
     pub(crate) query: String,
     pub(crate) budget: usize,
-    pub(crate) as_of: DateTime<Utc>,
+    #[serde(default)]
+    pub(crate) as_of: Option<DateTime<Utc>>,
+    /// Transaction cutoff observed after this source's native extraction commit.
+    #[serde(default)]
+    pub(crate) snapshot_after_source: Option<String>,
     pub(crate) tags: Vec<String>,
     #[serde(default)]
     pub(crate) fact_types: Vec<String>,
@@ -105,6 +115,16 @@ pub(crate) struct QualityFactBinding {
     /// Exact persisted fact content produced by native extraction.
     pub(crate) content: String,
     pub(crate) disposition: BindingDisposition,
+    #[serde(default)]
+    pub(crate) kind: EvidenceKind,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Default, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub(crate) enum EvidenceKind {
+    #[default]
+    Fact,
+    Episode,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
@@ -220,6 +240,21 @@ impl NativePreparationManifest {
         if self.embedding_dimension == 0 {
             return Err("native preparation embedding dimension must be positive".into());
         }
+        if self.provider_label == "local-candle"
+            && (self.model_files_sha256.len() != 3
+                || ["config.json", "tokenizer.json", "model.safetensors"]
+                    .iter()
+                    .any(|file| {
+                        !self.model_files_sha256.get(*file).is_some_and(|digest| {
+                            digest.len() == 64
+                                && digest.bytes().all(|byte| byte.is_ascii_hexdigit())
+                        })
+                    }))
+        {
+            return Err(
+                "local native preparation requires config, tokenizer and weights SHA-256".into(),
+            );
+        }
         if !self.similarity_threshold.is_finite()
             || !(-1.0..=1.0).contains(&self.similarity_threshold)
         {
@@ -236,7 +271,9 @@ impl NativePreparationManifest {
     ) -> Result<(), &'static str> {
         let threshold_matches =
             self.similarity_threshold.to_bits() == runtime.similarity_threshold.to_bits();
-        if self.provider_label != runtime.provider_label
+        if &self.model_files_sha256 != runtime.model_files_sha256
+            || self.reranking_signature.as_deref() != runtime.reranking_signature
+            || self.provider_label != runtime.provider_label
             || self.model.as_deref() != runtime.model
             || self.embedding_signature != runtime.embedding_signature
             || self.embedding_dimension != runtime.embedding_dimension
@@ -332,6 +369,14 @@ impl QualityCase {
         }
 
         let mut binding_keys = BTreeSet::new();
+        if let Some(source_key) = &self.snapshot_after_source {
+            if self.as_of.is_some() {
+                return Err("snapshot_after_source and as_of are mutually exclusive".into());
+            }
+            if !episode_keys.contains(source_key) {
+                return Err("snapshot_after_source references an unknown source".into());
+            }
+        }
         let mut selectors = BTreeSet::new();
         for binding in &self.bindings {
             if binding.key.trim().is_empty()
@@ -355,7 +400,12 @@ impl QualityCase {
                     self.id, binding.key
                 ));
             }
-            if !selectors.insert((&binding.episode_key, &binding.fact_type, &binding.content)) {
+            if !selectors.insert((
+                binding.kind,
+                &binding.episode_key,
+                &binding.fact_type,
+                &binding.content,
+            )) {
                 return Err(format!(
                     "case `{}` has duplicate fact selector for binding `{}`",
                     self.id, binding.key
@@ -467,7 +517,71 @@ impl QualityExpectation {
 
 #[cfg(test)]
 mod tests {
-    use super::{QualityCorpusManifest, RuntimeRetrievalIdentity};
+    use super::{QualityCase, QualityCorpusManifest, RuntimeRetrievalIdentity};
+    use std::collections::BTreeMap;
+
+    #[test]
+    fn native_manifest_can_label_source_episode_fallback_evidence() {
+        let result = serde_json::from_value::<super::QualityFactBinding>(serde_json::json!({
+            "key":"raw-source", "episode_key":"source", "fact_type":"episode",
+            "content":"Mara moved to Edinburgh to join a robotics lab.",
+            "kind":"episode", "disposition":"allowed"
+        }));
+        assert!(
+            result.is_ok(),
+            "production episode fallback needs source-grounded labels: {result:?}"
+        );
+    }
+
+    #[test]
+    fn native_preparation_records_local_model_file_digests() {
+        let result = serde_json::from_value::<super::NativePreparationManifest>(
+            serde_json::json!({
+                "schema_version":"memory-mcp-native-preparation/v1",
+                "source_bundle_sha256":"a".repeat(64), "provider_label":"local-candle",
+                "model":"intfloat/multilingual-e5-small", "embedding_signature":format!("embsig:{}","a".repeat(64)),
+                "embedding_dimension":384, "similarity_threshold":0.7,
+                "index_signature":format!("indexsig:{}","b".repeat(64)),
+                "extractor_fingerprint":"anno", "claim_rollout_stage":"evidence",
+                "model_files_sha256":{"config.json":"c".repeat(64),"tokenizer.json":"d".repeat(64),"model.safetensors":"e".repeat(64)}
+            }),
+        );
+        assert!(
+            result.is_ok(),
+            "local native preparation must record actual model bytes: {result:?}"
+        );
+    }
+
+    #[test]
+    fn native_case_accepts_a_snapshot_after_a_durable_source_operation() {
+        let result = serde_json::from_value::<QualityCase>(serde_json::json!({
+            "id":"history", "split":"test", "label_trust":"reviewed",
+            "query":"What was approved before the update?", "budget":5,
+            "snapshot_after_source":"approval", "tags":["history"],
+            "sources":[], "bindings":[], "expect_empty":true
+        }));
+        assert!(
+            result.is_ok(),
+            "durable source snapshots need an explicit query contract: {result:?}"
+        );
+    }
+
+    #[test]
+    fn current_native_case_does_not_require_an_absolute_transaction_cutoff() {
+        let value = serde_json::json!({
+            "id":"current-snapshot", "split":"test", "label_trust":"reviewed",
+            "query":"What changed in the release plan?", "budget":5,
+            "tags":["current"], "sources":[], "bindings":[],
+            "expect_empty":true
+        });
+
+        let result = serde_json::from_value::<QualityCase>(value);
+
+        assert!(
+            result.is_ok(),
+            "current native queries use the production current-time contract: {result:?}"
+        );
+    }
 
     #[test]
     fn native_manifest_records_case_tags_and_preparation_identity() {
@@ -556,6 +670,8 @@ mod tests {
                     index_signature: &format!("indexsig:{}", "b".repeat(64)),
                     extractor_fingerprint: "anno",
                     claim_rollout_stage: "disabled",
+                    model_files_sha256: &BTreeMap::new(),
+                    reranking_signature: None,
                 },)
                 .is_ok()
         );
@@ -571,6 +687,8 @@ mod tests {
                     index_signature: &format!("indexsig:{}", "b".repeat(64)),
                     extractor_fingerprint: "anno",
                     claim_rollout_stage: "disabled",
+                    model_files_sha256: &BTreeMap::new(),
+                    reranking_signature: None,
                 },)
                 .is_err()
         );
@@ -632,4 +750,56 @@ mod tests {
             "duplicate case ids must fail corpus validation"
         );
     }
+    #[test]
+    fn reranked_runtime_cannot_pass_an_unreranked_native_manifest() {
+        let manifest = super::NativePreparationManifest {
+            schema_version: "memory-mcp-native-preparation/v1".into(),
+            source_bundle_sha256: "a".repeat(64),
+            provider_label: "openai-compatible".into(),
+            model: Some("embed-model-v1".into()),
+            embedding_signature: format!("embsig:{}", "a".repeat(64)),
+            embedding_dimension: 1536,
+            similarity_threshold: 0.7,
+            index_signature: format!("indexsig:{}", "b".repeat(64)),
+            extractor_fingerprint: "anno".into(),
+            claim_rollout_stage: "disabled".into(),
+            model_files_sha256: BTreeMap::new(),
+            reranking_signature: None,
+        };
+        let runtime = RuntimeRetrievalIdentity {
+            provider_label: "openai-compatible",
+            model: Some("embed-model-v1"),
+            embedding_signature: &manifest.embedding_signature,
+            embedding_dimension: 1536,
+            similarity_threshold: 0.7,
+            index_signature: &manifest.index_signature,
+            extractor_fingerprint: "anno",
+            claim_rollout_stage: "disabled",
+            model_files_sha256: &manifest.model_files_sha256,
+            reranking_signature: Some(
+                "reranksig:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            ),
+        };
+        assert!(
+            manifest.validate_runtime(&runtime).is_err(),
+            "reranker changes must invalidate native comparability"
+        );
+    }
+}
+#[test]
+fn native_preparation_records_independent_reranker_model_identity() {
+    let result = serde_json::from_value::<super::NativePreparationManifest>(serde_json::json!({
+        "schema_version":"memory-mcp-native-preparation/v1",
+        "source_bundle_sha256":"a".repeat(64), "provider_label":"local-candle",
+        "model":"intfloat/multilingual-e5-small", "embedding_signature":format!("embsig:{}","a".repeat(64)),
+        "embedding_dimension":384, "similarity_threshold":0.7,
+        "index_signature":format!("indexsig:{}","b".repeat(64)),
+        "extractor_fingerprint":"anno", "claim_rollout_stage":"evidence",
+        "reranking_signature":format!("reranksig:{}", "f".repeat(64)),
+        "model_files_sha256":{"config.json":"c".repeat(64),"tokenizer.json":"d".repeat(64),"model.safetensors":"e".repeat(64)}
+    }));
+    assert!(
+        result.is_ok(),
+        "local native preparation must record actual model bytes: {result:?}"
+    );
 }

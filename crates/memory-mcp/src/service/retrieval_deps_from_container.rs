@@ -11,6 +11,7 @@ use crate::service::MemoryService;
 
 impl From<&MemoryService> for AssembleContextDeps {
     fn from(ctx: &crate::service::MemoryService) -> Self {
+        let embedding_service = ctx.embedding_service();
         Self {
             active_namespace: ctx.active_namespace.clone(),
             logger: ctx.logger.clone(),
@@ -39,8 +40,8 @@ impl From<&MemoryService> for AssembleContextDeps {
                 ctx.db_client.clone(),
                 ctx.active_namespace.clone(),
             ),
-            embedding_provider: ctx.embedding_service().embedding_provider().clone(),
-            embedding_service: ctx.embedding_service(),
+            embedding_provider: embedding_service.embedding_provider().clone(),
+            embedding_service,
             context_cache: ctx.context_cache.clone(),
             query_logging_enabled: ctx.query_logging_enabled,
             query_log_retention_days: ctx.query_log_retention_days,

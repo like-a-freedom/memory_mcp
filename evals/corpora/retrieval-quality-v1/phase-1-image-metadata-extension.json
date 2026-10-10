@@ -1,0 +1,129 @@
+{
+  "schema_version": "memory-retrieval-source-only-extension/v1",
+  "review_phase": "before Qwen native retrieval predictions; source and ingest/extract/readback only",
+  "input_sha256": {
+    "image-metadata-lineage.json": "3a71bed1794a8440f66e8bb208b932ff5f441917a3d8118c8dbca641a209e922",
+    "image-metadata-binding-changes.json": "840c8f2e62f15ab2d9c5b67bdb13b058be98f795d337e6b3da7a602179b8bdd0",
+    "sources-image-metadata.json": "40a9fa5660eef5b633f02dd06e06f2474c7208e5e07a97306533ef6f30900175",
+    "corpus-image-metadata-bindings.json": "91cd7e650dcc49b1cce754e79f214cf56bb03e46791bba119248d0f590c4da84",
+    "inventory-qwen-calibrated-image-metadata.json": "0dc3e322877efcb1b432ce985a3c7265d9bfa910a813d1b03c2cdc0eddf0d62d"
+  },
+  "verified": {
+    "cases": 35,
+    "case_scoped_sources": 976,
+    "metadata_case_scoped_turns": 133,
+    "distinct_metadata_turns": 71,
+    "all_metadata_values_match_pinned_raw": true,
+    "all_base_text_preserved": true,
+    "source_bundle_matches_embedded_case_sources": true,
+    "source_sha256_matches_manifest": true,
+    "native_fact_content_type_source_multisets_match_bindings": true,
+    "all_existing_required_keys_present_and_allowed": true,
+    "raw_episode_content_matches_source": true,
+    "lineage_and_changes_match_actual_corpus": true
+  },
+  "allowed_binding_corrections": [
+    {
+      "case_id": "locomo-conv-44-000",
+      "action": "prohibited_to_allowed",
+      "bindings": [
+        {
+          "key": "D1:5:note:f6cbdbf6cf3e",
+          "source_key": "D1:5",
+          "content": "Audrey: Sure! See them with their new collars, cute right?\n\nUpstream image metadata (dataset annotation, not a user assertion):\n{\"blip_caption\": \"a photography of two dogs are standing in the grass with their mouths open\", \"img_url\": [\"https://worldanimalfoundation.org/wp-content/uploads/2022/07/adjustable-collar-Review.jpg\"]}"
+        },
+        {
+          "key": "raw:D1:5",
+          "source_key": "D1:5",
+          "content": "Audrey: Sure! See them with their new collars, cute right?\n\nUpstream image metadata (dataset annotation, not a user assertion):\n{\"blip_caption\": \"a photography of two dogs are standing in the grass with their mouths open\", \"img_url\": [\"https://worldanimalfoundation.org/wp-content/uploads/2022/07/adjustable-collar-Review.jpg\"]}"
+        }
+      ],
+      "source_only_reason": "The new caption explicitly identifies the dogs whose new collars Audrey is showing, resolving the dog-type antecedent in this local exchange. It is supplementary; a picture of two dogs does not determine adoption year or prove there are only two dogs."
+    },
+    {
+      "case_id": "locomo-conv-44-000",
+      "action": "prohibited_to_allowed",
+      "bindings": [
+        {
+          "key": "D2:5:experience:fa8bea867aea",
+          "source_key": "D2:5",
+          "content": "Audrey: Pixie's fitting in great! It took her a few days to get used to the other dogs, but now they're awesome friends. They love playing and exploring the house - so cute!\n\n\nUpstream image metadata (dataset annotation, not a user assertion):\n{\"blip_caption\": \"a photography of a dog playing with a group of other dogs\", \"img_url\": [\"https://images.rawpixel.com/image_800/cHJpdmF0ZS9zdGF0aWMvaW1hZ2Uvd2Vic2l0ZS8yMDIyLTA0L2xyL3B4NzIxNzk3LWltYWdlLWt3dnYzenBkLmpwZw.jpg\"], \"query\": \"pixie pepper precious panda dogs playing backyard\"}"
+        },
+        {
+          "key": "raw:D2:5",
+          "source_key": "D2:5",
+          "content": "Audrey: Pixie's fitting in great! It took her a few days to get used to the other dogs, but now they're awesome friends. They love playing and exploring the house - so cute!\n\n\nUpstream image metadata (dataset annotation, not a user assertion):\n{\"blip_caption\": \"a photography of a dog playing with a group of other dogs\", \"img_url\": [\"https://images.rawpixel.com/image_800/cHJpdmF0ZS9zdGF0aWMvaW1hZ2Uvd2Vic2l0ZS8yMDIyLTA0L2xyL3B4NzIxNzk3LWltYWdlLWt3dnYzenBkLmpwZw.jpg\"], \"query\": \"pixie pepper precious panda dogs playing backyard\"}"
+        }
+      ],
+      "source_only_reason": "The new metadata names Pixie, Pepper, Precious and Panda as dogs while the text distinguishes Pixie from the pre-existing other dogs. This usefully constrains first three versus newly added Pixie; it does not independently establish the earlier adoption date."
+    },
+    {
+      "case_id": "locomo-conv-50-001",
+      "action": "prohibited_to_allowed",
+      "bindings": [
+        {
+          "key": "D1:9:promise:0c9123650ec8",
+          "source_key": "D1:9",
+          "content": "Calvin: I'm heading there next month. I'll be staying in such a nice place while I'm there.\n\n\n\nUpstream image metadata (dataset annotation, not a user assertion):\n{\"blip_caption\": \"a photo of a living room with a couch, table, and television\", \"img_url\": [\"https://i.redd.it/6p8nisgp4dq41.jpg\"], \"query\": \"japanese mansion living room\"}"
+        },
+        {
+          "key": "raw:D1:9",
+          "source_key": "D1:9",
+          "content": "Calvin: I'm heading there next month. I'll be staying in such a nice place while I'm there.\n\n\n\nUpstream image metadata (dataset annotation, not a user assertion):\n{\"blip_caption\": \"a photo of a living room with a couch, table, and television\", \"img_url\": [\"https://i.redd.it/6p8nisgp4dq41.jpg\"], \"query\": \"japanese mansion living room\"}"
+        }
+      ],
+      "source_only_reason": "The new Japanese-mansion metadata links the planned stay to the accommodation referent. This is material qualifying context for an answer that might otherwise overclaim a purchase or confuse new accommodation with a completed stay; it is not evidence of a sale."
+    }
+  ],
+  "required_group_corrections": [
+    {
+      "case_id": "locomo-conv-42-002",
+      "required_evidence_groups": [
+        [
+          "D1:18:note:3d913a3c8739",
+          "raw:D1:18"
+        ],
+        [
+          "D1:16:note:4cf8ded4f988",
+          "raw:D1:16",
+          "D1:18:note:3d913a3c8739",
+          "raw:D1:18"
+        ]
+      ],
+      "reason": "D1:18 now itself carries the title in upstream image-search metadata together with the first-watched duration. It satisfies both date and title-identity support. Requiring D1:16 separately would require a redundant citation; retain two semantic groups but admit D1:18 as a title-support alternative."
+    },
+    {
+      "case_id": "locomo-conv-50-001",
+      "required_evidence_groups": [
+        [
+          "D1:3:note:211c783b1fee",
+          "raw:D1:3"
+        ],
+        [
+          "D2:1:note:567348606949",
+          "raw:D2:1",
+          "D2:5:note:e8622188f26e",
+          "raw:D2:5"
+        ],
+        [
+          "D2:5:note:e8622188f26e",
+          "raw:D2:5"
+        ]
+      ],
+      "reason": "The upstream exact item identity Ferrari 488 GTB exists in D2:5 metadata, not D2:1. Require that identity evidence as well as mansion and car-acquisition support. D2:5 also asserts finally got myself this beauty with a car caption/identity, so it can satisfy both car groups. Preserve upstream_acquisition_underspecified: neither image search metadata nor new-mansion language independently proves a real estate purchase."
+    }
+  ],
+  "unchanged_rulings": [
+    "All fourteen changed fact bindings already allowed in the proposal retain useful content and exactly preserve their original raw statement, with a clearly labeled metadata append. They are approved at binding level, along with matching raw episodes.",
+    "Only the six additional exact bindings below change from prohibited to allowed. Other appended metadata does not justify blanket promotion of a source population.",
+    "Jolene D2:26 image caption mentioning a dog does not prove she owns a dog; its metadata and gaming text do not identify her own pets and remain prohibited for the snake query.",
+    "Dancing photos, generic pets/hiking images and other-person movie preferences remain irrelevant to the specific dated events/attributes unless a binding below says otherwise."
+  ],
+  "limitations": [
+    "Image-search queries are dataset annotations used to identify intended image referents, not verbatim user assertions or independently inspected images. This reviewer did not fetch/view remote images.",
+    "conv42-002 supports an approximate 2019 from around three years before January 2022; no exact viewing date is established.",
+    "conv50-001 still cannot establish that arranging a mansion stay means buying real estate. Exact car model/Japan place references are now available only as labeled upstream image metadata.",
+    "All thirty-five queries and source rows are preserved; no floor change or prediction-driven relabeling is proposed.",
+    "No branch code or retrieval predictions inspected. Whole-branch review remains pending."
+  ]
+}

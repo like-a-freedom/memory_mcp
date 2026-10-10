@@ -6,6 +6,92 @@ use serde_json::Value;
 
 use super::query_mode::query_phrase_candidates;
 
+/// Resolve only the entire subject of a bare/profile query. Attribute words
+/// must remain part of the subject, so a partial entity match cannot broaden it.
+pub(super) async fn resolve_entity_subject(
+    service: &crate::memory::retrieval::RetrievalContext,
+    query: &str,
+) -> Result<(Vec<String>, Vec<String>), crate::MemoryError> {
+    let lowered = query.trim().to_lowercase();
+    let subject = [
+        "what do you know about ",
+        "tell me about ",
+        "profile of ",
+        "everything about ",
+    ]
+    .iter()
+    .find_map(|prefix| lowered.strip_prefix(prefix))
+    .unwrap_or(&lowered)
+    .trim_matches(|c: char| !c.is_alphanumeric());
+    let normalized = crate::shared::search::normalize_text(subject);
+    if normalized.is_empty() {
+        return Ok((Vec::new(), Vec::new()));
+    }
+    let mut lookup_names = query_phrase_candidates(query)
+        .into_iter()
+        .flat_map(|phrase| {
+            let possessive_subject = phrase
+                .split_whitespace()
+                .map(|word| {
+                    word.strip_suffix("'s")
+                        .or_else(|| word.strip_suffix("’s"))
+                        .unwrap_or(word)
+                })
+                .collect::<Vec<_>>()
+                .join(" ");
+            [
+                crate::shared::search::normalize_text(&phrase),
+                crate::shared::search::normalize_text(&possessive_subject),
+            ]
+        })
+        .collect::<Vec<_>>();
+    lookup_names.push(normalized.clone());
+    lookup_names.sort();
+    lookup_names.dedup();
+    let rows = service
+        .knowledge_store()
+        .select_entities_batch(&lookup_names)
+        .await?;
+    let mut subjects = Vec::new();
+    let mut mentioned = Vec::new();
+    for row in rows {
+        let Some(object) = row.as_object() else {
+            continue;
+        };
+        let Some(canonical) = object.get("canonical_name").and_then(Value::as_str) else {
+            continue;
+        };
+        let names = std::iter::once(canonical)
+            .chain(
+                object
+                    .get("aliases")
+                    .and_then(Value::as_array)
+                    .into_iter()
+                    .flatten()
+                    .filter_map(Value::as_str),
+            )
+            .collect::<Vec<_>>();
+        if names
+            .iter()
+            .any(|name| crate::shared::search::normalize_text(name) == normalized)
+            && let Some(id) = object.get("entity_id").and_then(Value::as_str)
+        {
+            subjects.push(id.to_owned());
+        }
+        mentioned.extend(
+            names
+                .into_iter()
+                .filter(|name| lookup_names.contains(&crate::shared::search::normalize_text(name)))
+                .map(str::to_owned),
+        );
+    }
+    subjects.sort();
+    subjects.dedup();
+    mentioned.sort();
+    mentioned.dedup();
+    Ok((subjects, mentioned))
+}
+
 /// Expands a search query with entity aliases for broader recall.
 ///
 /// Looks up entities whose canonical names appear in the query,

@@ -1,0 +1,27 @@
+{
+  "model": "cross-encoder/mmarco-mMiniLMv2-L12-H384-v1",
+  "revision": "1427fd652930e4ba29e8149678df786c240d8825",
+  "license": "Apache-2.0",
+  "files": [
+    {
+      "path": "config.json",
+      "sha256": "cc2cfe51aa3fd759d21d21acf5dfd6994aa67a3c9210636d22e143699d336c77",
+      "bytes": 891
+    },
+    {
+      "path": "tokenizer.json",
+      "sha256": "62c24cdc13d4c9952d63718d6c9fa4c287974249e16b7ade6d5a85e7bbb75626",
+      "bytes": 17082660
+    },
+    {
+      "path": "model.safetensors",
+      "sha256": "5daeca2481a76b5976a2bdc32f0a78532b6716da4f8cd3ff59460ef8d2f359b4",
+      "bytes": 470592698
+    },
+    {
+      "path": "README.md",
+      "sha256": "474736a65d6393a060119a8dc304563af67af4d8d86ccfee4a05dd0df107fc11",
+      "bytes": 2278
+    }
+  ]
+}

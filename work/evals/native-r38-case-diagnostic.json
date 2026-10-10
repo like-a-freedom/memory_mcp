@@ -1,0 +1,260 @@
+{
+  "schema_version": "memory-mcp-eval/v2",
+  "run_id": "run-1791624598",
+  "profile": "nightly",
+  "started_at": "2026-10-10T09:29:58.289216Z",
+  "duration_ms": 12401,
+  "expected_case_ids": [],
+  "expected_cases": [
+    {
+      "suite_id": "retrieval-quality",
+      "case_id": "locomo-conv-47-001"
+    },
+    {
+      "suite_id": "retrieval-quality",
+      "case_id": "unknown-url"
+    }
+  ],
+  "outcomes": [
+    {
+      "case_key": {
+        "suite_id": "retrieval-quality",
+        "case_id": "locomo-conv-47-001"
+      },
+      "mode": "end_to_end",
+      "split": "development",
+      "label_trust": "reviewed",
+      "status": "quality_failed",
+      "metrics": {
+        "answerable_non_abstention_rate": 0.0,
+        "duplicate_free_rate": 1.0,
+        "precision_macro": 0.0,
+        "prohibited_free_rate": 1.0,
+        "required_group_recall": 0.0
+      },
+      "evidence": {
+        "answerable_non_abstention_rate": {
+          "kind": "ratio",
+          "numerator": 0,
+          "denominator": 1
+        },
+        "case_tag:category-2": {
+          "kind": "count",
+          "value": 1
+        },
+        "case_tag:locomo": {
+          "kind": "count",
+          "value": 1
+        },
+        "case_tag:published-evidence": {
+          "kind": "count",
+          "value": 1
+        },
+        "duplicate_free_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "precision_macro": {
+          "kind": "ratio",
+          "numerator": 0,
+          "denominator": 1
+        },
+        "prohibited_free_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "required_group_recall": {
+          "kind": "ratio",
+          "numerator": 0,
+          "denominator": 1
+        }
+      },
+      "failures": [
+        "retrieval missed one or more required evidence groups",
+        "retrieval did not follow the expected abstention behavior",
+        "native selected evidence: []"
+      ],
+      "duration_ms": 6485,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "retrieval-quality",
+        "case_id": "unknown-url"
+      },
+      "mode": "end_to_end",
+      "split": "development",
+      "label_trust": "reviewed",
+      "status": "passed",
+      "metrics": {
+        "duplicate_free_rate": 1.0,
+        "prohibited_free_rate": 1.0,
+        "unknown_abstention_rate": 1.0
+      },
+      "evidence": {
+        "case_tag:unknown": {
+          "kind": "count",
+          "value": 1
+        },
+        "case_tag:url-distractor": {
+          "kind": "count",
+          "value": 1
+        },
+        "duplicate_free_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "prohibited_free_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "unknown_abstention_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        }
+      },
+      "failures": [],
+      "duration_ms": 4671,
+      "attempts": 1
+    }
+  ],
+  "suite_summaries": [
+    {
+      "suite_id": "retrieval-quality",
+      "mode": "end_to_end",
+      "total": 2,
+      "passed": 1,
+      "quality_failed": 1,
+      "invalid": 0,
+      "metrics": {
+        "answerable_non_abstention_rate": 0.0,
+        "answerable_non_abstention_rate_applicable_count": 1.0,
+        "duplicate_free_rate": 1.0,
+        "duplicate_free_rate_applicable_count": 2.0,
+        "precision_macro": 0.0,
+        "precision_macro_applicable_count": 1.0,
+        "prohibited_free_rate": 1.0,
+        "prohibited_free_rate_applicable_count": 2.0,
+        "required_group_recall": 0.0,
+        "required_group_recall_applicable_count": 1.0,
+        "unknown_abstention_rate": 1.0,
+        "unknown_abstention_rate_applicable_count": 1.0
+      }
+    }
+  ],
+  "gates": [
+    {
+      "suite_id": "retrieval-quality",
+      "metric": "precision_macro",
+      "observed": 0.0,
+      "hard_floor": 1.0,
+      "baseline": null,
+      "regression_budget": null,
+      "status": "failed",
+      "reason": "hard_floor_not_met"
+    },
+    {
+      "suite_id": "retrieval-quality",
+      "metric": "required_group_recall",
+      "observed": 0.0,
+      "hard_floor": 1.0,
+      "baseline": null,
+      "regression_budget": null,
+      "status": "failed",
+      "reason": "hard_floor_not_met"
+    },
+    {
+      "suite_id": "retrieval-quality",
+      "metric": "unknown_abstention_rate",
+      "observed": 1.0,
+      "hard_floor": 1.0,
+      "baseline": null,
+      "regression_budget": null,
+      "status": "passed",
+      "reason": "none"
+    },
+    {
+      "suite_id": "retrieval-quality",
+      "metric": "answerable_non_abstention_rate",
+      "observed": 0.0,
+      "hard_floor": 1.0,
+      "baseline": null,
+      "regression_budget": null,
+      "status": "failed",
+      "reason": "hard_floor_not_met"
+    },
+    {
+      "suite_id": "retrieval-quality",
+      "metric": "duplicate_free_rate",
+      "observed": 1.0,
+      "hard_floor": 1.0,
+      "baseline": null,
+      "regression_budget": null,
+      "status": "passed",
+      "reason": "none"
+    },
+    {
+      "suite_id": "retrieval-quality",
+      "metric": "prohibited_free_rate",
+      "observed": 1.0,
+      "hard_floor": 1.0,
+      "baseline": null,
+      "regression_budget": null,
+      "status": "passed",
+      "reason": "none"
+    }
+  ],
+  "fingerprint": {
+    "rust_version": "rustc 1.99.0 (b940084d7 2026-09-28)",
+    "os_arch": "macos/aarch64",
+    "package_version": "0.1.0",
+    "build_profile": "debug",
+    "enabled_features": [],
+    "provider": null,
+    "model": null,
+    "device": null,
+    "configuration_hash": "9dcf25ce168f405fb7241aa196d5a9d2fe1aeb595ec9031456e91e27d1f909eb",
+    "git_commit": "8b1c1ed5086cdaa968889329f1ff82a6d4ce33c2",
+    "evaluator_versions": {
+      "eval-harness": "0.1.0"
+    },
+    "suite_fingerprints": {
+      "retrieval-quality": {
+        "claim_rollout_stage": "evidence",
+        "corpus_id": "retrieval-quality-v1",
+        "corpus_manifest_sha256": "effb9fb32ae7979c3c5ee2be56eed9b17fb7742b20f3ca01d62e3aa51f580ebc",
+        "corpus_revision": "diagnostic-case47-and-unknown-url",
+        "embedding_dimension": "384",
+        "embedding_signature": "embsig:b88d713a71be619fce22bcb30efe3d1cc9623afff9e6a8ae7107ba9e620b9b17",
+        "extractor_fingerprint": "anno",
+        "index_signature": "indexsig:d293fd983ef88ea75c78d3758dd09c73d5cf02726d7ec592ca28adc938421f30",
+        "model": "intfloat/multilingual-e5-small",
+        "model_file_sha256.config.json": "69137736cab8b8903a07fe8afaafdda25aac55415a12a55d1bffa9f581abf959",
+        "model_file_sha256.model.safetensors": "1a55775f53449dac10a2bcbc312469fac40b96d53198c407081a831f81c98477",
+        "model_file_sha256.tokenizer.json": "0b44a9d7b51c3c62626640cda0e2c2f70fdacdc25bbbd68038369d14ebdf4c39",
+        "prepared_claim_rollout_stage": "evidence",
+        "prepared_embedding_dimension": "384",
+        "prepared_embedding_signature": "embsig:b88d713a71be619fce22bcb30efe3d1cc9623afff9e6a8ae7107ba9e620b9b17",
+        "prepared_extractor_fingerprint": "anno",
+        "prepared_index_signature": "indexsig:d293fd983ef88ea75c78d3758dd09c73d5cf02726d7ec592ca28adc938421f30",
+        "prepared_model": "intfloat/multilingual-e5-small",
+        "prepared_provider": "local-candle",
+        "prepared_similarity_threshold": "0.7",
+        "provider": "local-candle",
+        "provider_status": "ready",
+        "reranking_signature": "reranksig:dff4b9939786ed9a1e897946778e336584cc24251a2f32282bd3fe83a680a7d1",
+        "similarity_threshold": "0.7",
+        "source_bundle_sha256": "74275e48cc0c6249620c761041a05fcd22ec20447df37a808feef54a737f9170"
+      }
+    },
+    "profile_digest": "e0eba785aba34603aa0803b8cd587bcbe434868c3119c075322570c9ec875732"
+  },
+  "budget_status": "passed",
+  "verdict": "quality_failed",
+  "issues": []
+}

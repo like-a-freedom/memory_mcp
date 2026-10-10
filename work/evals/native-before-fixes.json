@@ -1,0 +1,2112 @@
+{
+  "schema_version": "memory-mcp-eval/v2",
+  "run_id": "run-1791530365",
+  "profile": "release",
+  "started_at": "2026-10-09T07:19:25.375313Z",
+  "duration_ms": 120981,
+  "expected_case_ids": [],
+  "expected_cases": [
+    {
+      "suite_id": "retrieval-quality",
+      "case_id": "http-task-16"
+    },
+    {
+      "suite_id": "retrieval-quality",
+      "case_id": "http-task-paraphrase"
+    },
+    {
+      "suite_id": "retrieval-quality",
+      "case_id": "http-task-short"
+    },
+    {
+      "suite_id": "retrieval-quality",
+      "case_id": "locomo-conv-26-000"
+    },
+    {
+      "suite_id": "retrieval-quality",
+      "case_id": "locomo-conv-26-082"
+    },
+    {
+      "suite_id": "retrieval-quality",
+      "case_id": "locomo-conv-30-000"
+    },
+    {
+      "suite_id": "retrieval-quality",
+      "case_id": "locomo-conv-30-002"
+    },
+    {
+      "suite_id": "retrieval-quality",
+      "case_id": "locomo-conv-41-001"
+    },
+    {
+      "suite_id": "retrieval-quality",
+      "case_id": "locomo-conv-41-065"
+    },
+    {
+      "suite_id": "retrieval-quality",
+      "case_id": "locomo-conv-42-002"
+    },
+    {
+      "suite_id": "retrieval-quality",
+      "case_id": "locomo-conv-42-096"
+    },
+    {
+      "suite_id": "retrieval-quality",
+      "case_id": "locomo-conv-43-071"
+    },
+    {
+      "suite_id": "retrieval-quality",
+      "case_id": "locomo-conv-44-000"
+    },
+    {
+      "suite_id": "retrieval-quality",
+      "case_id": "locomo-conv-44-061"
+    },
+    {
+      "suite_id": "retrieval-quality",
+      "case_id": "locomo-conv-47-001"
+    },
+    {
+      "suite_id": "retrieval-quality",
+      "case_id": "locomo-conv-47-067"
+    },
+    {
+      "suite_id": "retrieval-quality",
+      "case_id": "locomo-conv-48-000"
+    },
+    {
+      "suite_id": "retrieval-quality",
+      "case_id": "locomo-conv-48-015"
+    },
+    {
+      "suite_id": "retrieval-quality",
+      "case_id": "locomo-conv-49-002"
+    },
+    {
+      "suite_id": "retrieval-quality",
+      "case_id": "locomo-conv-49-083"
+    },
+    {
+      "suite_id": "retrieval-quality",
+      "case_id": "locomo-conv-50-001"
+    },
+    {
+      "suite_id": "retrieval-quality",
+      "case_id": "locomo-conv-50-071"
+    },
+    {
+      "suite_id": "retrieval-quality",
+      "case_id": "logging-config"
+    },
+    {
+      "suite_id": "retrieval-quality",
+      "case_id": "logging-correlation"
+    },
+    {
+      "suite_id": "retrieval-quality",
+      "case_id": "logging-levels"
+    },
+    {
+      "suite_id": "retrieval-quality",
+      "case_id": "logging-original"
+    },
+    {
+      "suite_id": "retrieval-quality",
+      "case_id": "logging-russian"
+    },
+    {
+      "suite_id": "retrieval-quality",
+      "case_id": "logging-sink"
+    },
+    {
+      "suite_id": "retrieval-quality",
+      "case_id": "unknown-database"
+    },
+    {
+      "suite_id": "retrieval-quality",
+      "case_id": "unknown-task"
+    },
+    {
+      "suite_id": "retrieval-quality",
+      "case_id": "unknown-url"
+    }
+  ],
+  "outcomes": [
+    {
+      "case_key": {
+        "suite_id": "retrieval-quality",
+        "case_id": "http-task-16"
+      },
+      "mode": "retrieval_only",
+      "split": "test",
+      "label_trust": "reviewed",
+      "status": "passed",
+      "metrics": {
+        "answerable_non_abstention_rate": 1.0,
+        "duplicate_free_rate": 1.0,
+        "precision_macro": 1.0,
+        "prohibited_free_rate": 1.0,
+        "required_group_recall": 1.0
+      },
+      "evidence": {
+        "answerable_non_abstention_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "case_tag:numeric-distractor": {
+          "kind": "count",
+          "value": 1
+        },
+        "case_tag:qualified-task": {
+          "kind": "count",
+          "value": 1
+        },
+        "case_tag:url-distractor": {
+          "kind": "count",
+          "value": 1
+        },
+        "duplicate_free_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "precision_macro": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "prohibited_free_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "required_group_recall": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        }
+      },
+      "failures": [],
+      "duration_ms": 3280,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "retrieval-quality",
+        "case_id": "http-task-paraphrase"
+      },
+      "mode": "retrieval_only",
+      "split": "test",
+      "label_trust": "reviewed",
+      "status": "quality_failed",
+      "metrics": {
+        "answerable_non_abstention_rate": 1.0,
+        "duplicate_free_rate": 1.0,
+        "precision_macro": 0.4,
+        "prohibited_free_rate": 0.0,
+        "required_group_recall": 1.0
+      },
+      "evidence": {
+        "answerable_non_abstention_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "case_tag:paraphrase": {
+          "kind": "count",
+          "value": 1
+        },
+        "case_tag:task": {
+          "kind": "count",
+          "value": 1
+        },
+        "duplicate_free_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "precision_macro": {
+          "kind": "ratio",
+          "numerator": 2,
+          "denominator": 5
+        },
+        "prohibited_free_rate": {
+          "kind": "ratio",
+          "numerator": 0,
+          "denominator": 1
+        },
+        "required_group_recall": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        }
+      },
+      "failures": [
+        "retrieval returned unlabeled or disallowed evidence",
+        "prohibited evidence was retrieved"
+      ],
+      "duration_ms": 3276,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "retrieval-quality",
+        "case_id": "http-task-short"
+      },
+      "mode": "retrieval_only",
+      "split": "test",
+      "label_trust": "reviewed",
+      "status": "quality_failed",
+      "metrics": {
+        "answerable_non_abstention_rate": 1.0,
+        "duplicate_free_rate": 1.0,
+        "precision_macro": 0.6666666666666666,
+        "prohibited_free_rate": 0.0,
+        "required_group_recall": 1.0
+      },
+      "evidence": {
+        "answerable_non_abstention_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "case_tag:qualified-task": {
+          "kind": "count",
+          "value": 1
+        },
+        "case_tag:short-query": {
+          "kind": "count",
+          "value": 1
+        },
+        "duplicate_free_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "precision_macro": {
+          "kind": "ratio",
+          "numerator": 2,
+          "denominator": 3
+        },
+        "prohibited_free_rate": {
+          "kind": "ratio",
+          "numerator": 0,
+          "denominator": 1
+        },
+        "required_group_recall": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        }
+      },
+      "failures": [
+        "retrieval returned unlabeled or disallowed evidence",
+        "prohibited evidence was retrieved"
+      ],
+      "duration_ms": 3276,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "retrieval-quality",
+        "case_id": "locomo-conv-26-000"
+      },
+      "mode": "retrieval_only",
+      "split": "test",
+      "label_trust": "reviewed",
+      "status": "quality_failed",
+      "metrics": {
+        "answerable_non_abstention_rate": 1.0,
+        "duplicate_free_rate": 1.0,
+        "precision_macro": 0.2,
+        "prohibited_free_rate": 0.0,
+        "required_group_recall": 1.0
+      },
+      "evidence": {
+        "answerable_non_abstention_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "case_tag:category-2": {
+          "kind": "count",
+          "value": 1
+        },
+        "case_tag:locomo": {
+          "kind": "count",
+          "value": 1
+        },
+        "case_tag:published-evidence": {
+          "kind": "count",
+          "value": 1
+        },
+        "duplicate_free_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "precision_macro": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 5
+        },
+        "prohibited_free_rate": {
+          "kind": "ratio",
+          "numerator": 0,
+          "denominator": 1
+        },
+        "required_group_recall": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        }
+      },
+      "failures": [
+        "retrieval returned unlabeled or disallowed evidence",
+        "prohibited evidence was retrieved"
+      ],
+      "duration_ms": 3708,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "retrieval-quality",
+        "case_id": "locomo-conv-26-082"
+      },
+      "mode": "retrieval_only",
+      "split": "test",
+      "label_trust": "reviewed",
+      "status": "quality_failed",
+      "metrics": {
+        "answerable_non_abstention_rate": 1.0,
+        "duplicate_free_rate": 1.0,
+        "precision_macro": 0.2,
+        "prohibited_free_rate": 0.0,
+        "required_group_recall": 1.0
+      },
+      "evidence": {
+        "answerable_non_abstention_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "case_tag:category-4": {
+          "kind": "count",
+          "value": 1
+        },
+        "case_tag:locomo": {
+          "kind": "count",
+          "value": 1
+        },
+        "case_tag:published-evidence": {
+          "kind": "count",
+          "value": 1
+        },
+        "duplicate_free_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "precision_macro": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 5
+        },
+        "prohibited_free_rate": {
+          "kind": "ratio",
+          "numerator": 0,
+          "denominator": 1
+        },
+        "required_group_recall": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        }
+      },
+      "failures": [
+        "retrieval returned unlabeled or disallowed evidence",
+        "prohibited evidence was retrieved"
+      ],
+      "duration_ms": 3503,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "retrieval-quality",
+        "case_id": "locomo-conv-30-000"
+      },
+      "mode": "retrieval_only",
+      "split": "test",
+      "label_trust": "reviewed",
+      "status": "quality_failed",
+      "metrics": {
+        "answerable_non_abstention_rate": 1.0,
+        "duplicate_free_rate": 1.0,
+        "precision_macro": 0.2,
+        "prohibited_free_rate": 0.0,
+        "required_group_recall": 1.0
+      },
+      "evidence": {
+        "answerable_non_abstention_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "case_tag:category-2": {
+          "kind": "count",
+          "value": 1
+        },
+        "case_tag:locomo": {
+          "kind": "count",
+          "value": 1
+        },
+        "case_tag:published-evidence": {
+          "kind": "count",
+          "value": 1
+        },
+        "duplicate_free_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "precision_macro": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 5
+        },
+        "prohibited_free_rate": {
+          "kind": "ratio",
+          "numerator": 0,
+          "denominator": 1
+        },
+        "required_group_recall": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        }
+      },
+      "failures": [
+        "retrieval returned unlabeled or disallowed evidence",
+        "prohibited evidence was retrieved"
+      ],
+      "duration_ms": 4320,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "retrieval-quality",
+        "case_id": "locomo-conv-30-002"
+      },
+      "mode": "retrieval_only",
+      "split": "test",
+      "label_trust": "reviewed",
+      "status": "quality_failed",
+      "metrics": {
+        "answerable_non_abstention_rate": 1.0,
+        "duplicate_free_rate": 1.0,
+        "precision_macro": 0.0,
+        "prohibited_free_rate": 0.0,
+        "required_group_recall": 0.0
+      },
+      "evidence": {
+        "answerable_non_abstention_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "case_tag:category-4": {
+          "kind": "count",
+          "value": 1
+        },
+        "case_tag:locomo": {
+          "kind": "count",
+          "value": 1
+        },
+        "case_tag:published-evidence": {
+          "kind": "count",
+          "value": 1
+        },
+        "duplicate_free_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "precision_macro": {
+          "kind": "ratio",
+          "numerator": 0,
+          "denominator": 5
+        },
+        "prohibited_free_rate": {
+          "kind": "ratio",
+          "numerator": 0,
+          "denominator": 1
+        },
+        "required_group_recall": {
+          "kind": "ratio",
+          "numerator": 0,
+          "denominator": 2
+        }
+      },
+      "failures": [
+        "retrieval missed one or more required evidence groups",
+        "retrieval returned unlabeled or disallowed evidence",
+        "prohibited evidence was retrieved"
+      ],
+      "duration_ms": 4469,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "retrieval-quality",
+        "case_id": "locomo-conv-41-001"
+      },
+      "mode": "retrieval_only",
+      "split": "test",
+      "label_trust": "reviewed",
+      "status": "quality_failed",
+      "metrics": {
+        "answerable_non_abstention_rate": 1.0,
+        "duplicate_free_rate": 1.0,
+        "precision_macro": 0.0,
+        "prohibited_free_rate": 1.0,
+        "required_group_recall": 0.0
+      },
+      "evidence": {
+        "answerable_non_abstention_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "case_tag:category-2": {
+          "kind": "count",
+          "value": 1
+        },
+        "case_tag:locomo": {
+          "kind": "count",
+          "value": 1
+        },
+        "case_tag:published-evidence": {
+          "kind": "count",
+          "value": 1
+        },
+        "duplicate_free_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "precision_macro": {
+          "kind": "ratio",
+          "numerator": 0,
+          "denominator": 1
+        },
+        "prohibited_free_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "required_group_recall": {
+          "kind": "ratio",
+          "numerator": 0,
+          "denominator": 1
+        }
+      },
+      "failures": [
+        "retrieval missed one or more required evidence groups",
+        "retrieval returned unlabeled or disallowed evidence"
+      ],
+      "duration_ms": 4142,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "retrieval-quality",
+        "case_id": "locomo-conv-41-065"
+      },
+      "mode": "retrieval_only",
+      "split": "test",
+      "label_trust": "reviewed",
+      "status": "quality_failed",
+      "metrics": {
+        "answerable_non_abstention_rate": 1.0,
+        "duplicate_free_rate": 1.0,
+        "precision_macro": 0.0,
+        "prohibited_free_rate": 0.0,
+        "required_group_recall": 0.0
+      },
+      "evidence": {
+        "answerable_non_abstention_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "case_tag:category-4": {
+          "kind": "count",
+          "value": 1
+        },
+        "case_tag:locomo": {
+          "kind": "count",
+          "value": 1
+        },
+        "case_tag:published-evidence": {
+          "kind": "count",
+          "value": 1
+        },
+        "duplicate_free_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "precision_macro": {
+          "kind": "ratio",
+          "numerator": 0,
+          "denominator": 5
+        },
+        "prohibited_free_rate": {
+          "kind": "ratio",
+          "numerator": 0,
+          "denominator": 1
+        },
+        "required_group_recall": {
+          "kind": "ratio",
+          "numerator": 0,
+          "denominator": 1
+        }
+      },
+      "failures": [
+        "retrieval missed one or more required evidence groups",
+        "retrieval returned unlabeled or disallowed evidence",
+        "prohibited evidence was retrieved"
+      ],
+      "duration_ms": 4283,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "retrieval-quality",
+        "case_id": "locomo-conv-42-002"
+      },
+      "mode": "retrieval_only",
+      "split": "test",
+      "label_trust": "reviewed",
+      "status": "quality_failed",
+      "metrics": {
+        "answerable_non_abstention_rate": 1.0,
+        "duplicate_free_rate": 1.0,
+        "precision_macro": 0.0,
+        "prohibited_free_rate": 1.0,
+        "required_group_recall": 0.0
+      },
+      "evidence": {
+        "answerable_non_abstention_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "case_tag:category-2": {
+          "kind": "count",
+          "value": 1
+        },
+        "case_tag:locomo": {
+          "kind": "count",
+          "value": 1
+        },
+        "case_tag:published-evidence": {
+          "kind": "count",
+          "value": 1
+        },
+        "duplicate_free_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "precision_macro": {
+          "kind": "ratio",
+          "numerator": 0,
+          "denominator": 3
+        },
+        "prohibited_free_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "required_group_recall": {
+          "kind": "ratio",
+          "numerator": 0,
+          "denominator": 1
+        }
+      },
+      "failures": [
+        "retrieval missed one or more required evidence groups",
+        "retrieval returned unlabeled or disallowed evidence"
+      ],
+      "duration_ms": 4197,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "retrieval-quality",
+        "case_id": "locomo-conv-42-096"
+      },
+      "mode": "retrieval_only",
+      "split": "test",
+      "label_trust": "reviewed",
+      "status": "quality_failed",
+      "metrics": {
+        "answerable_non_abstention_rate": 1.0,
+        "duplicate_free_rate": 1.0,
+        "precision_macro": 0.2,
+        "prohibited_free_rate": 0.0,
+        "required_group_recall": 1.0
+      },
+      "evidence": {
+        "answerable_non_abstention_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "case_tag:category-4": {
+          "kind": "count",
+          "value": 1
+        },
+        "case_tag:locomo": {
+          "kind": "count",
+          "value": 1
+        },
+        "case_tag:published-evidence": {
+          "kind": "count",
+          "value": 1
+        },
+        "duplicate_free_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "precision_macro": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 5
+        },
+        "prohibited_free_rate": {
+          "kind": "ratio",
+          "numerator": 0,
+          "denominator": 1
+        },
+        "required_group_recall": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        }
+      },
+      "failures": [
+        "retrieval returned unlabeled or disallowed evidence",
+        "prohibited evidence was retrieved"
+      ],
+      "duration_ms": 4113,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "retrieval-quality",
+        "case_id": "locomo-conv-43-071"
+      },
+      "mode": "retrieval_only",
+      "split": "test",
+      "label_trust": "reviewed",
+      "status": "quality_failed",
+      "metrics": {
+        "answerable_non_abstention_rate": 0.0,
+        "duplicate_free_rate": 1.0,
+        "precision_macro": 0.0,
+        "prohibited_free_rate": 1.0,
+        "required_group_recall": 0.0
+      },
+      "evidence": {
+        "answerable_non_abstention_rate": {
+          "kind": "ratio",
+          "numerator": 0,
+          "denominator": 1
+        },
+        "case_tag:category-4": {
+          "kind": "count",
+          "value": 1
+        },
+        "case_tag:locomo": {
+          "kind": "count",
+          "value": 1
+        },
+        "case_tag:published-evidence": {
+          "kind": "count",
+          "value": 1
+        },
+        "duplicate_free_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "precision_macro": {
+          "kind": "ratio",
+          "numerator": 0,
+          "denominator": 1
+        },
+        "prohibited_free_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "required_group_recall": {
+          "kind": "ratio",
+          "numerator": 0,
+          "denominator": 1
+        }
+      },
+      "failures": [
+        "retrieval missed one or more required evidence groups",
+        "retrieval did not follow the expected abstention behavior"
+      ],
+      "duration_ms": 3669,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "retrieval-quality",
+        "case_id": "locomo-conv-44-000"
+      },
+      "mode": "retrieval_only",
+      "split": "test",
+      "label_trust": "reviewed",
+      "status": "quality_failed",
+      "metrics": {
+        "answerable_non_abstention_rate": 1.0,
+        "duplicate_free_rate": 1.0,
+        "precision_macro": 0.0,
+        "prohibited_free_rate": 1.0,
+        "required_group_recall": 0.0
+      },
+      "evidence": {
+        "answerable_non_abstention_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "case_tag:category-2": {
+          "kind": "count",
+          "value": 1
+        },
+        "case_tag:locomo": {
+          "kind": "count",
+          "value": 1
+        },
+        "case_tag:published-evidence": {
+          "kind": "count",
+          "value": 1
+        },
+        "duplicate_free_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "precision_macro": {
+          "kind": "ratio",
+          "numerator": 0,
+          "denominator": 5
+        },
+        "prohibited_free_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "required_group_recall": {
+          "kind": "ratio",
+          "numerator": 0,
+          "denominator": 1
+        }
+      },
+      "failures": [
+        "retrieval missed one or more required evidence groups",
+        "retrieval returned unlabeled or disallowed evidence"
+      ],
+      "duration_ms": 3833,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "retrieval-quality",
+        "case_id": "locomo-conv-44-061"
+      },
+      "mode": "retrieval_only",
+      "split": "test",
+      "label_trust": "reviewed",
+      "status": "quality_failed",
+      "metrics": {
+        "answerable_non_abstention_rate": 1.0,
+        "duplicate_free_rate": 1.0,
+        "precision_macro": 0.0,
+        "prohibited_free_rate": 0.0,
+        "required_group_recall": 0.0
+      },
+      "evidence": {
+        "answerable_non_abstention_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "case_tag:category-4": {
+          "kind": "count",
+          "value": 1
+        },
+        "case_tag:locomo": {
+          "kind": "count",
+          "value": 1
+        },
+        "case_tag:published-evidence": {
+          "kind": "count",
+          "value": 1
+        },
+        "duplicate_free_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "precision_macro": {
+          "kind": "ratio",
+          "numerator": 0,
+          "denominator": 5
+        },
+        "prohibited_free_rate": {
+          "kind": "ratio",
+          "numerator": 0,
+          "denominator": 1
+        },
+        "required_group_recall": {
+          "kind": "ratio",
+          "numerator": 0,
+          "denominator": 1
+        }
+      },
+      "failures": [
+        "retrieval missed one or more required evidence groups",
+        "retrieval returned unlabeled or disallowed evidence",
+        "prohibited evidence was retrieved"
+      ],
+      "duration_ms": 3879,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "retrieval-quality",
+        "case_id": "locomo-conv-47-001"
+      },
+      "mode": "retrieval_only",
+      "split": "test",
+      "label_trust": "reviewed",
+      "status": "quality_failed",
+      "metrics": {
+        "answerable_non_abstention_rate": 0.0,
+        "duplicate_free_rate": 1.0,
+        "precision_macro": 0.0,
+        "prohibited_free_rate": 1.0,
+        "required_group_recall": 0.0
+      },
+      "evidence": {
+        "answerable_non_abstention_rate": {
+          "kind": "ratio",
+          "numerator": 0,
+          "denominator": 1
+        },
+        "case_tag:category-2": {
+          "kind": "count",
+          "value": 1
+        },
+        "case_tag:locomo": {
+          "kind": "count",
+          "value": 1
+        },
+        "case_tag:published-evidence": {
+          "kind": "count",
+          "value": 1
+        },
+        "duplicate_free_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "precision_macro": {
+          "kind": "ratio",
+          "numerator": 0,
+          "denominator": 1
+        },
+        "prohibited_free_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "required_group_recall": {
+          "kind": "ratio",
+          "numerator": 0,
+          "denominator": 1
+        }
+      },
+      "failures": [
+        "retrieval missed one or more required evidence groups",
+        "retrieval did not follow the expected abstention behavior"
+      ],
+      "duration_ms": 5748,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "retrieval-quality",
+        "case_id": "locomo-conv-47-067"
+      },
+      "mode": "retrieval_only",
+      "split": "test",
+      "label_trust": "reviewed",
+      "status": "quality_failed",
+      "metrics": {
+        "answerable_non_abstention_rate": 1.0,
+        "duplicate_free_rate": 1.0,
+        "precision_macro": 0.2,
+        "prohibited_free_rate": 0.0,
+        "required_group_recall": 1.0
+      },
+      "evidence": {
+        "answerable_non_abstention_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "case_tag:category-4": {
+          "kind": "count",
+          "value": 1
+        },
+        "case_tag:locomo": {
+          "kind": "count",
+          "value": 1
+        },
+        "case_tag:published-evidence": {
+          "kind": "count",
+          "value": 1
+        },
+        "duplicate_free_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "precision_macro": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 5
+        },
+        "prohibited_free_rate": {
+          "kind": "ratio",
+          "numerator": 0,
+          "denominator": 1
+        },
+        "required_group_recall": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        }
+      },
+      "failures": [
+        "retrieval returned unlabeled or disallowed evidence",
+        "prohibited evidence was retrieved"
+      ],
+      "duration_ms": 5653,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "retrieval-quality",
+        "case_id": "locomo-conv-48-000"
+      },
+      "mode": "retrieval_only",
+      "split": "test",
+      "label_trust": "reviewed",
+      "status": "quality_failed",
+      "metrics": {
+        "answerable_non_abstention_rate": 1.0,
+        "duplicate_free_rate": 1.0,
+        "precision_macro": 0.0,
+        "prohibited_free_rate": 1.0,
+        "required_group_recall": 0.0
+      },
+      "evidence": {
+        "answerable_non_abstention_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "case_tag:category-2": {
+          "kind": "count",
+          "value": 1
+        },
+        "case_tag:locomo": {
+          "kind": "count",
+          "value": 1
+        },
+        "case_tag:published-evidence": {
+          "kind": "count",
+          "value": 1
+        },
+        "duplicate_free_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "precision_macro": {
+          "kind": "ratio",
+          "numerator": 0,
+          "denominator": 1
+        },
+        "prohibited_free_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "required_group_recall": {
+          "kind": "ratio",
+          "numerator": 0,
+          "denominator": 1
+        }
+      },
+      "failures": [
+        "retrieval missed one or more required evidence groups",
+        "retrieval returned unlabeled or disallowed evidence"
+      ],
+      "duration_ms": 3334,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "retrieval-quality",
+        "case_id": "locomo-conv-48-015"
+      },
+      "mode": "retrieval_only",
+      "split": "test",
+      "label_trust": "reviewed",
+      "status": "quality_failed",
+      "metrics": {
+        "answerable_non_abstention_rate": 1.0,
+        "duplicate_free_rate": 1.0,
+        "precision_macro": 0.0,
+        "prohibited_free_rate": 0.0,
+        "required_group_recall": 0.0
+      },
+      "evidence": {
+        "answerable_non_abstention_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "case_tag:category-4": {
+          "kind": "count",
+          "value": 1
+        },
+        "case_tag:locomo": {
+          "kind": "count",
+          "value": 1
+        },
+        "case_tag:published-evidence": {
+          "kind": "count",
+          "value": 1
+        },
+        "duplicate_free_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "precision_macro": {
+          "kind": "ratio",
+          "numerator": 0,
+          "denominator": 5
+        },
+        "prohibited_free_rate": {
+          "kind": "ratio",
+          "numerator": 0,
+          "denominator": 1
+        },
+        "required_group_recall": {
+          "kind": "ratio",
+          "numerator": 0,
+          "denominator": 2
+        }
+      },
+      "failures": [
+        "retrieval missed one or more required evidence groups",
+        "retrieval returned unlabeled or disallowed evidence",
+        "prohibited evidence was retrieved"
+      ],
+      "duration_ms": 3060,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "retrieval-quality",
+        "case_id": "locomo-conv-49-002"
+      },
+      "mode": "retrieval_only",
+      "split": "test",
+      "label_trust": "reviewed",
+      "status": "quality_failed",
+      "metrics": {
+        "answerable_non_abstention_rate": 1.0,
+        "duplicate_free_rate": 1.0,
+        "precision_macro": 0.2,
+        "prohibited_free_rate": 0.0,
+        "required_group_recall": 0.3333333333333333
+      },
+      "evidence": {
+        "answerable_non_abstention_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "case_tag:category-1": {
+          "kind": "count",
+          "value": 1
+        },
+        "case_tag:locomo": {
+          "kind": "count",
+          "value": 1
+        },
+        "case_tag:published-evidence": {
+          "kind": "count",
+          "value": 1
+        },
+        "duplicate_free_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "precision_macro": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 5
+        },
+        "prohibited_free_rate": {
+          "kind": "ratio",
+          "numerator": 0,
+          "denominator": 1
+        },
+        "required_group_recall": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 3
+        }
+      },
+      "failures": [
+        "retrieval missed one or more required evidence groups",
+        "retrieval returned unlabeled or disallowed evidence",
+        "prohibited evidence was retrieved"
+      ],
+      "duration_ms": 3530,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "retrieval-quality",
+        "case_id": "locomo-conv-49-083"
+      },
+      "mode": "retrieval_only",
+      "split": "test",
+      "label_trust": "reviewed",
+      "status": "quality_failed",
+      "metrics": {
+        "answerable_non_abstention_rate": 1.0,
+        "duplicate_free_rate": 1.0,
+        "precision_macro": 0.0,
+        "prohibited_free_rate": 0.0,
+        "required_group_recall": 0.0
+      },
+      "evidence": {
+        "answerable_non_abstention_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "case_tag:category-4": {
+          "kind": "count",
+          "value": 1
+        },
+        "case_tag:locomo": {
+          "kind": "count",
+          "value": 1
+        },
+        "case_tag:published-evidence": {
+          "kind": "count",
+          "value": 1
+        },
+        "duplicate_free_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "precision_macro": {
+          "kind": "ratio",
+          "numerator": 0,
+          "denominator": 5
+        },
+        "prohibited_free_rate": {
+          "kind": "ratio",
+          "numerator": 0,
+          "denominator": 1
+        },
+        "required_group_recall": {
+          "kind": "ratio",
+          "numerator": 0,
+          "denominator": 1
+        }
+      },
+      "failures": [
+        "retrieval missed one or more required evidence groups",
+        "retrieval returned unlabeled or disallowed evidence",
+        "prohibited evidence was retrieved"
+      ],
+      "duration_ms": 3539,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "retrieval-quality",
+        "case_id": "locomo-conv-50-001"
+      },
+      "mode": "retrieval_only",
+      "split": "test",
+      "label_trust": "reviewed",
+      "status": "quality_failed",
+      "metrics": {
+        "answerable_non_abstention_rate": 0.0,
+        "duplicate_free_rate": 1.0,
+        "precision_macro": 0.0,
+        "prohibited_free_rate": 1.0,
+        "required_group_recall": 0.0
+      },
+      "evidence": {
+        "answerable_non_abstention_rate": {
+          "kind": "ratio",
+          "numerator": 0,
+          "denominator": 1
+        },
+        "case_tag:category-1": {
+          "kind": "count",
+          "value": 1
+        },
+        "case_tag:locomo": {
+          "kind": "count",
+          "value": 1
+        },
+        "case_tag:published-evidence": {
+          "kind": "count",
+          "value": 1
+        },
+        "duplicate_free_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "precision_macro": {
+          "kind": "ratio",
+          "numerator": 0,
+          "denominator": 1
+        },
+        "prohibited_free_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "required_group_recall": {
+          "kind": "ratio",
+          "numerator": 0,
+          "denominator": 2
+        }
+      },
+      "failures": [
+        "retrieval missed one or more required evidence groups",
+        "retrieval did not follow the expected abstention behavior"
+      ],
+      "duration_ms": 4158,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "retrieval-quality",
+        "case_id": "locomo-conv-50-071"
+      },
+      "mode": "retrieval_only",
+      "split": "test",
+      "label_trust": "reviewed",
+      "status": "quality_failed",
+      "metrics": {
+        "answerable_non_abstention_rate": 1.0,
+        "duplicate_free_rate": 1.0,
+        "precision_macro": 0.2,
+        "prohibited_free_rate": 0.0,
+        "required_group_recall": 1.0
+      },
+      "evidence": {
+        "answerable_non_abstention_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "case_tag:category-4": {
+          "kind": "count",
+          "value": 1
+        },
+        "case_tag:locomo": {
+          "kind": "count",
+          "value": 1
+        },
+        "case_tag:published-evidence": {
+          "kind": "count",
+          "value": 1
+        },
+        "duplicate_free_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "precision_macro": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 5
+        },
+        "prohibited_free_rate": {
+          "kind": "ratio",
+          "numerator": 0,
+          "denominator": 1
+        },
+        "required_group_recall": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        }
+      },
+      "failures": [
+        "retrieval returned unlabeled or disallowed evidence",
+        "prohibited evidence was retrieved"
+      ],
+      "duration_ms": 3826,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "retrieval-quality",
+        "case_id": "logging-config"
+      },
+      "mode": "retrieval_only",
+      "split": "test",
+      "label_trust": "reviewed",
+      "status": "quality_failed",
+      "metrics": {
+        "answerable_non_abstention_rate": 1.0,
+        "duplicate_free_rate": 1.0,
+        "precision_macro": 0.2,
+        "prohibited_free_rate": 0.0,
+        "required_group_recall": 1.0
+      },
+      "evidence": {
+        "answerable_non_abstention_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "case_tag:configuration": {
+          "kind": "count",
+          "value": 1
+        },
+        "case_tag:logging": {
+          "kind": "count",
+          "value": 1
+        },
+        "duplicate_free_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "precision_macro": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 5
+        },
+        "prohibited_free_rate": {
+          "kind": "ratio",
+          "numerator": 0,
+          "denominator": 1
+        },
+        "required_group_recall": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        }
+      },
+      "failures": [
+        "retrieval returned unlabeled or disallowed evidence",
+        "prohibited evidence was retrieved"
+      ],
+      "duration_ms": 3401,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "retrieval-quality",
+        "case_id": "logging-correlation"
+      },
+      "mode": "retrieval_only",
+      "split": "test",
+      "label_trust": "reviewed",
+      "status": "quality_failed",
+      "metrics": {
+        "answerable_non_abstention_rate": 1.0,
+        "duplicate_free_rate": 1.0,
+        "precision_macro": 0.25,
+        "prohibited_free_rate": 0.0,
+        "required_group_recall": 1.0
+      },
+      "evidence": {
+        "answerable_non_abstention_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "case_tag:logging": {
+          "kind": "count",
+          "value": 1
+        },
+        "case_tag:paraphrase": {
+          "kind": "count",
+          "value": 1
+        },
+        "duplicate_free_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "precision_macro": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 4
+        },
+        "prohibited_free_rate": {
+          "kind": "ratio",
+          "numerator": 0,
+          "denominator": 1
+        },
+        "required_group_recall": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        }
+      },
+      "failures": [
+        "retrieval returned unlabeled or disallowed evidence",
+        "prohibited evidence was retrieved"
+      ],
+      "duration_ms": 3516,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "retrieval-quality",
+        "case_id": "logging-levels"
+      },
+      "mode": "retrieval_only",
+      "split": "test",
+      "label_trust": "reviewed",
+      "status": "quality_failed",
+      "metrics": {
+        "answerable_non_abstention_rate": 1.0,
+        "duplicate_free_rate": 1.0,
+        "precision_macro": 0.2,
+        "prohibited_free_rate": 0.0,
+        "required_group_recall": 1.0
+      },
+      "evidence": {
+        "answerable_non_abstention_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "case_tag:error-policy": {
+          "kind": "count",
+          "value": 1
+        },
+        "case_tag:logging": {
+          "kind": "count",
+          "value": 1
+        },
+        "duplicate_free_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "precision_macro": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 5
+        },
+        "prohibited_free_rate": {
+          "kind": "ratio",
+          "numerator": 0,
+          "denominator": 1
+        },
+        "required_group_recall": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        }
+      },
+      "failures": [
+        "retrieval returned unlabeled or disallowed evidence",
+        "prohibited evidence was retrieved"
+      ],
+      "duration_ms": 3775,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "retrieval-quality",
+        "case_id": "logging-original"
+      },
+      "mode": "retrieval_only",
+      "split": "test",
+      "label_trust": "reviewed",
+      "status": "quality_failed",
+      "metrics": {
+        "answerable_non_abstention_rate": 1.0,
+        "duplicate_free_rate": 1.0,
+        "precision_macro": 0.0,
+        "prohibited_free_rate": 1.0,
+        "required_group_recall": 0.0
+      },
+      "evidence": {
+        "answerable_non_abstention_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "case_tag:logging": {
+          "kind": "count",
+          "value": 1
+        },
+        "case_tag:original-query": {
+          "kind": "count",
+          "value": 1
+        },
+        "duplicate_free_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "precision_macro": {
+          "kind": "ratio",
+          "numerator": 0,
+          "denominator": 5
+        },
+        "prohibited_free_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "required_group_recall": {
+          "kind": "ratio",
+          "numerator": 0,
+          "denominator": 3
+        }
+      },
+      "failures": [
+        "retrieval missed one or more required evidence groups",
+        "retrieval returned unlabeled or disallowed evidence"
+      ],
+      "duration_ms": 3243,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "retrieval-quality",
+        "case_id": "logging-russian"
+      },
+      "mode": "retrieval_only",
+      "split": "test",
+      "label_trust": "reviewed",
+      "status": "quality_failed",
+      "metrics": {
+        "answerable_non_abstention_rate": 1.0,
+        "duplicate_free_rate": 1.0,
+        "precision_macro": 0.2,
+        "prohibited_free_rate": 0.0,
+        "required_group_recall": 1.0
+      },
+      "evidence": {
+        "answerable_non_abstention_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "case_tag:logging": {
+          "kind": "count",
+          "value": 1
+        },
+        "case_tag:multilingual": {
+          "kind": "count",
+          "value": 1
+        },
+        "duplicate_free_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "precision_macro": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 5
+        },
+        "prohibited_free_rate": {
+          "kind": "ratio",
+          "numerator": 0,
+          "denominator": 1
+        },
+        "required_group_recall": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        }
+      },
+      "failures": [
+        "retrieval returned unlabeled or disallowed evidence",
+        "prohibited evidence was retrieved"
+      ],
+      "duration_ms": 3410,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "retrieval-quality",
+        "case_id": "logging-sink"
+      },
+      "mode": "retrieval_only",
+      "split": "test",
+      "label_trust": "reviewed",
+      "status": "quality_failed",
+      "metrics": {
+        "answerable_non_abstention_rate": 1.0,
+        "duplicate_free_rate": 1.0,
+        "precision_macro": 0.0,
+        "prohibited_free_rate": 0.0,
+        "required_group_recall": 0.0
+      },
+      "evidence": {
+        "answerable_non_abstention_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "case_tag:logging": {
+          "kind": "count",
+          "value": 1
+        },
+        "case_tag:sink": {
+          "kind": "count",
+          "value": 1
+        },
+        "duplicate_free_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "precision_macro": {
+          "kind": "ratio",
+          "numerator": 0,
+          "denominator": 4
+        },
+        "prohibited_free_rate": {
+          "kind": "ratio",
+          "numerator": 0,
+          "denominator": 1
+        },
+        "required_group_recall": {
+          "kind": "ratio",
+          "numerator": 0,
+          "denominator": 1
+        }
+      },
+      "failures": [
+        "retrieval missed one or more required evidence groups",
+        "retrieval returned unlabeled or disallowed evidence",
+        "prohibited evidence was retrieved"
+      ],
+      "duration_ms": 5483,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "retrieval-quality",
+        "case_id": "unknown-database"
+      },
+      "mode": "retrieval_only",
+      "split": "test",
+      "label_trust": "reviewed",
+      "status": "quality_failed",
+      "metrics": {
+        "duplicate_free_rate": 1.0,
+        "prohibited_free_rate": 0.0,
+        "unknown_abstention_rate": 0.0
+      },
+      "evidence": {
+        "case_tag:abstention": {
+          "kind": "count",
+          "value": 1
+        },
+        "case_tag:unknown": {
+          "kind": "count",
+          "value": 1
+        },
+        "duplicate_free_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "prohibited_free_rate": {
+          "kind": "ratio",
+          "numerator": 0,
+          "denominator": 1
+        },
+        "unknown_abstention_rate": {
+          "kind": "ratio",
+          "numerator": 0,
+          "denominator": 1
+        }
+      },
+      "failures": [
+        "prohibited evidence was retrieved",
+        "retrieval did not follow the expected abstention behavior"
+      ],
+      "duration_ms": 3412,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "retrieval-quality",
+        "case_id": "unknown-task"
+      },
+      "mode": "retrieval_only",
+      "split": "test",
+      "label_trust": "reviewed",
+      "status": "passed",
+      "metrics": {
+        "duplicate_free_rate": 1.0,
+        "prohibited_free_rate": 1.0,
+        "unknown_abstention_rate": 1.0
+      },
+      "evidence": {
+        "case_tag:qualified-task": {
+          "kind": "count",
+          "value": 1
+        },
+        "case_tag:unknown": {
+          "kind": "count",
+          "value": 1
+        },
+        "duplicate_free_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "prohibited_free_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "unknown_abstention_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        }
+      },
+      "failures": [],
+      "duration_ms": 3346,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "retrieval-quality",
+        "case_id": "unknown-url"
+      },
+      "mode": "retrieval_only",
+      "split": "test",
+      "label_trust": "reviewed",
+      "status": "quality_failed",
+      "metrics": {
+        "duplicate_free_rate": 1.0,
+        "prohibited_free_rate": 0.0,
+        "unknown_abstention_rate": 0.0
+      },
+      "evidence": {
+        "case_tag:unknown": {
+          "kind": "count",
+          "value": 1
+        },
+        "case_tag:url-distractor": {
+          "kind": "count",
+          "value": 1
+        },
+        "duplicate_free_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "prohibited_free_rate": {
+          "kind": "ratio",
+          "numerator": 0,
+          "denominator": 1
+        },
+        "unknown_abstention_rate": {
+          "kind": "ratio",
+          "numerator": 0,
+          "denominator": 1
+        }
+      },
+      "failures": [
+        "prohibited evidence was retrieved",
+        "retrieval did not follow the expected abstention behavior"
+      ],
+      "duration_ms": 3399,
+      "attempts": 1
+    }
+  ],
+  "suite_summaries": [
+    {
+      "suite_id": "retrieval-quality",
+      "mode": "retrieval_only",
+      "total": 31,
+      "passed": 2,
+      "quality_failed": 29,
+      "invalid": 0,
+      "metrics": {
+        "answerable_non_abstention_rate": 0.8928571428571429,
+        "answerable_non_abstention_rate_applicable_count": 28.0,
+        "duplicate_free_rate": 1.0,
+        "duplicate_free_rate_applicable_count": 31.0,
+        "precision_macro": 0.15416666666666673,
+        "precision_macro_applicable_count": 28.0,
+        "prohibited_free_rate": 0.3225806451612903,
+        "prohibited_free_rate_applicable_count": 31.0,
+        "required_group_recall": 0.4,
+        "required_group_recall_applicable_count": 35.0,
+        "unknown_abstention_rate": 0.3333333333333333,
+        "unknown_abstention_rate_applicable_count": 3.0
+      }
+    }
+  ],
+  "gates": [
+    {
+      "suite_id": "retrieval-quality",
+      "metric": "precision_macro",
+      "observed": 0.15416666666666673,
+      "hard_floor": 1.0,
+      "baseline": null,
+      "regression_budget": null,
+      "status": "failed",
+      "reason": "hard_floor_not_met"
+    },
+    {
+      "suite_id": "retrieval-quality",
+      "metric": "required_group_recall",
+      "observed": 0.4,
+      "hard_floor": 1.0,
+      "baseline": null,
+      "regression_budget": null,
+      "status": "failed",
+      "reason": "hard_floor_not_met"
+    },
+    {
+      "suite_id": "retrieval-quality",
+      "metric": "unknown_abstention_rate",
+      "observed": 0.3333333333333333,
+      "hard_floor": 1.0,
+      "baseline": null,
+      "regression_budget": null,
+      "status": "failed",
+      "reason": "hard_floor_not_met"
+    },
+    {
+      "suite_id": "retrieval-quality",
+      "metric": "answerable_non_abstention_rate",
+      "observed": 0.8928571428571429,
+      "hard_floor": 1.0,
+      "baseline": null,
+      "regression_budget": null,
+      "status": "failed",
+      "reason": "hard_floor_not_met"
+    },
+    {
+      "suite_id": "retrieval-quality",
+      "metric": "duplicate_free_rate",
+      "observed": 1.0,
+      "hard_floor": 1.0,
+      "baseline": null,
+      "regression_budget": null,
+      "status": "passed",
+      "reason": "none"
+    },
+    {
+      "suite_id": "retrieval-quality",
+      "metric": "prohibited_free_rate",
+      "observed": 0.3225806451612903,
+      "hard_floor": 1.0,
+      "baseline": null,
+      "regression_budget": null,
+      "status": "failed",
+      "reason": "hard_floor_not_met"
+    }
+  ],
+  "fingerprint": {
+    "rust_version": "rustc 1.99.0 (b940084d7 2026-09-28)",
+    "os_arch": "macos/aarch64",
+    "package_version": "0.1.0",
+    "build_profile": "debug",
+    "enabled_features": [],
+    "provider": null,
+    "model": null,
+    "device": null,
+    "configuration_hash": "d0525353b2da13fc89d0a0d1a6ad1b60973d4017afa0ef375045c33ba2a4dce6",
+    "git_commit": "8b1c1ed5086cdaa968889329f1ff82a6d4ce33c2",
+    "evaluator_versions": {
+      "eval-harness": "0.1.0"
+    },
+    "suite_fingerprints": {
+      "retrieval-quality": {
+        "claim_rollout_stage": "evidence",
+        "corpus_id": "retrieval-quality-v1",
+        "corpus_manifest_sha256": "93c55c0457e6b161e7e3d314213cdbd21e6d496dd2408633fac8340998ee5314",
+        "corpus_revision": "r1-source-reviewed-before-retrieval",
+        "embedding_dimension": "384",
+        "embedding_signature": "embsig:a5a0756a3400378d43936b98457b96b3038ba8f0269ea49c8465cea5a80adac0",
+        "extractor_fingerprint": "anno",
+        "index_signature": "indexsig:d293fd983ef88ea75c78d3758dd09c73d5cf02726d7ec592ca28adc938421f30",
+        "model": "intfloat/multilingual-e5-small",
+        "model_file_sha256.config.json": "69137736cab8b8903a07fe8afaafdda25aac55415a12a55d1bffa9f581abf959",
+        "model_file_sha256.model.safetensors": "1a55775f53449dac10a2bcbc312469fac40b96d53198c407081a831f81c98477",
+        "model_file_sha256.tokenizer.json": "0b44a9d7b51c3c62626640cda0e2c2f70fdacdc25bbbd68038369d14ebdf4c39",
+        "prepared_claim_rollout_stage": "evidence",
+        "prepared_embedding_dimension": "384",
+        "prepared_embedding_signature": "embsig:a5a0756a3400378d43936b98457b96b3038ba8f0269ea49c8465cea5a80adac0",
+        "prepared_extractor_fingerprint": "anno",
+        "prepared_index_signature": "indexsig:d293fd983ef88ea75c78d3758dd09c73d5cf02726d7ec592ca28adc938421f30",
+        "prepared_model": "intfloat/multilingual-e5-small",
+        "prepared_provider": "local-candle",
+        "prepared_similarity_threshold": "0.7",
+        "provider": "local-candle",
+        "provider_status": "ready",
+        "similarity_threshold": "0.7",
+        "source_bundle_sha256": "08c9f79d62dfa0484fbcad305dc2fb885bde754a85dd5883754ba818ab562bda"
+      }
+    },
+    "profile_digest": "998aebbc915369a8693740761d799d0b60424d51c955b5ebbe849a9031a27575"
+  },
+  "budget_status": "passed",
+  "verdict": "quality_failed",
+  "issues": []
+}

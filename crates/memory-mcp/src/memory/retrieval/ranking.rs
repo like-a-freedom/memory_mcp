@@ -561,6 +561,27 @@ fn fact_type_relevance_factor(fact: &Fact) -> f64 {
 }
 
 pub(crate) fn ranked_relevance_score(fact: &RankedContextFact) -> f64 {
+    if let Some(score) = fact
+        .evidence
+        .reranking
+        .as_ref()
+        .and_then(|e| e.get("relevance_logit"))
+        .and_then(serde_json::Value::as_f64)
+        .filter(|score| score.is_finite())
+    {
+        // This is a monotonic ranking weight, not a probability. Independent
+        // cross-encoder evidence supersedes first-stage lexical frequency.
+        let floor = fact
+            .evidence
+            .reranking
+            .as_ref()
+            .and_then(|e| e.get("admission_floor"))
+            .and_then(serde_json::Value::as_f64)
+            .unwrap_or(0.0);
+        if floor.is_finite() && score >= floor {
+            return 1.0 + score - floor;
+        }
+    }
     fact.fusion_score
         * fact.decayed_confidence.max(MIN_RANKED_CONFIDENCE)
         * novelty_factor(fact.fact.access_count)
@@ -670,7 +691,12 @@ fn fact_is_within_temporal_focus(
     fact: &RankedContextFact,
     temporal_focus: &TemporalWindow,
 ) -> bool {
-    fact.fact.t_valid >= temporal_focus.start && fact.fact.t_valid <= temporal_focus.end
+    (fact.fact.t_valid >= temporal_focus.start && fact.fact.t_valid <= temporal_focus.end)
+        || super::temporal::relative_event_date_matches(
+            &fact.fact.content,
+            fact.fact.t_valid,
+            temporal_focus,
+        )
 }
 
 fn temporal_query_terms(query_terms: &[String]) -> Vec<String> {
@@ -1220,6 +1246,9 @@ fn selected_results_meet_grounding_floor(
 
     if selected.iter().any(|fact| {
         matches!(
+            fact.evidence.admission_basis,
+            Some(super::types::AdmissionBasis::Semantic)
+        ) || matches!(
             fact.retrieval_tier,
             RetrievalTier::GraphExpanded | RetrievalTier::SemanticExpanded
         )
@@ -1783,6 +1812,7 @@ mod tests {
         let query = super::super::admission::build_query_evidence(
             Some("What is the connection path between Alice and Atlas?"),
             Vec::new(),
+            &[],
             &super::super::query_mode::QueryFlags {
                 wants_graph_path: true,
                 ..super::super::query_mode::QueryFlags::default()
@@ -1800,29 +1830,51 @@ mod tests {
 
     #[test]
     fn canonical_fact_replacement_preserves_graph_anchor_evidence() {
-        let cutoff = Utc::now();
+        let cutoff = fixed_temporal_cutoff();
         let origin = super::super::types::GraphAnchorOrigin::AdmittedSeed {
             fact_id: "fact:seed".to_string(),
         };
-        let mut existing =
-            create_ranked_test_fact("fact:old", "episode:old", cutoff, 0.4, 0.1, 0, &[]);
-        existing.graph_trace = Some(super::super::graph::GraphTrace {
+        let mut graph_fact = create_test_fact("fact:old", cutoff);
+        graph_fact.content = "same content".to_string();
+        graph_fact.fact_type = "note".to_string();
+        graph_fact.ft_score = 0.1;
+        let mut semantic_fact = create_test_fact("fact:new", cutoff);
+        semantic_fact.content = "same content".to_string();
+        semantic_fact.fact_type = "experience".to_string();
+        semantic_fact.ft_score = 0.8;
+        let trace = super::super::graph::GraphTrace {
             anchor_entity_id: "entity:alice".to_string(),
             anchor_origin: origin.clone(),
             anchor_canonical_name: "Alice".to_string(),
             hop_count: 1,
             path: vec!["entity:alice".to_string(), "entity:bob".to_string()],
-        });
-        sync_graph_evidence_from_trace(&mut existing);
+        };
+        let ranked = build_ranked_context_facts(
+            BuildRankedContextFactsRequest {
+                lexical_facts: Vec::new(),
+                graph_facts: vec![GraphCandidate {
+                    fact: graph_fact,
+                    rationale: "relationship path".to_string(),
+                    origin_factor: 1.0,
+                    trace,
+                }],
+                community_facts: Vec::new(),
+                semantic_facts: vec![super::super::types::SemanticCandidate {
+                    fact: semantic_fact,
+                    rationale: "semantic retrieval".to_string(),
+                    similarity: 0.82,
+                }],
+                query_opt: None,
+                semantic_available: true,
+                cutoff,
+            },
+            |_, _| 0.8,
+        );
 
-        let mut incoming =
-            create_ranked_test_fact("fact:new", "episode:new", cutoff, 0.5, 0.8, 0, &[]);
-        incoming.fact.fact_type = "experience".to_string();
-        merge_ranked_duplicate(&mut existing, incoming);
-
-        assert_eq!(existing.fact.fact_id, "fact:new");
-        assert_eq!(existing.evidence.graph_anchor_origin, Some(origin));
-        assert_eq!(existing.evidence.hop_count, Some(1));
+        assert_eq!(ranked.len(), 1);
+        assert_eq!(ranked[0].fact.fact_id, "fact:new");
+        assert_eq!(ranked[0].evidence.graph_anchor_origin, Some(origin));
+        assert_eq!(ranked[0].evidence.hop_count, Some(1));
     }
 
     #[test]
@@ -1904,6 +1956,39 @@ mod tests {
     }
 
     #[test]
+    fn selection_preserves_semantic_admission_when_fusion_keeps_a_lexical_tier() {
+        let mut candidate = create_ranked_test_fact(
+            "fact:donation",
+            "episode:donation",
+            fixed_temporal_cutoff(),
+            0.5,
+            1.0,
+            0,
+            &[],
+        );
+        candidate.fact.content = "They gave it away yesterday.".into();
+        candidate.evidence.semantic_similarity = Some(0.9);
+        candidate.evidence.admission_basis = Some(super::super::types::AdmissionBasis::Semantic);
+        let selected = select_ranked_context_facts(
+            vec![candidate],
+            1,
+            None,
+            vec![
+                "morgan".into(),
+                "vehicle".into(),
+                "charity".into(),
+                "family".into(),
+                "local".into(),
+            ],
+        );
+        assert_eq!(
+            selected.len(),
+            1,
+            "a lexical tier does not cancel separately verified semantic admission"
+        );
+    }
+
+    #[test]
     fn query_is_first_person_memory_recognizes_contractions() {
         assert!(query_is_first_person_memory(
             "I'm planning a weekend getaway and want something creatively fulfilling"
@@ -1975,63 +2060,62 @@ mod tests {
     #[test]
     fn semantic_evidence_stays_with_its_fact_id_when_content_deduplicates() {
         let cutoff = fixed_temporal_cutoff();
-        let mut retained = create_ranked_test_fact(
-            "fact:retained",
-            "episode:retained",
-            cutoff,
-            1.0,
-            4.0,
-            0,
-            &[],
+        let mut retained = create_test_fact("fact:retained", cutoff);
+        let mut incoming = create_test_fact("fact:incoming", cutoff);
+        retained.content = "same content".into();
+        retained.ft_score = 4.0;
+        incoming.content = "same content".into();
+        incoming.ft_score = 2.0;
+        let ranked = build_ranked_context_facts(
+            BuildRankedContextFactsRequest {
+                lexical_facts: vec![(retained, RetrievalTier::Direct)],
+                graph_facts: Vec::new(),
+                community_facts: Vec::new(),
+                semantic_facts: vec![super::super::types::SemanticCandidate {
+                    fact: incoming,
+                    rationale: "semantic retrieval".to_string(),
+                    similarity: 0.82,
+                }],
+                query_opt: None,
+                semantic_available: true,
+                cutoff,
+            },
+            |_, _| 0.8,
         );
-        let mut incoming = create_ranked_test_fact(
-            "fact:incoming",
-            "episode:incoming",
-            cutoff,
-            0.5,
-            2.0,
-            0,
-            &[],
-        );
-        retained.fact.content = "same content".into();
-        incoming.fact.content = "same content".into();
-        incoming.evidence.semantic_similarity = Some(0.82);
 
-        merge_ranked_duplicate(&mut retained, incoming);
-
-        assert_eq!(retained.fact.fact_id, "fact:retained");
-        assert_eq!(retained.evidence.semantic_similarity, None);
+        assert_eq!(ranked.len(), 1);
+        assert_eq!(ranked[0].fact.fact_id, "fact:retained");
+        assert_eq!(ranked[0].evidence.semantic_similarity, None);
     }
 
     #[test]
     fn semantic_evidence_moves_only_with_a_replaced_canonical_fact() {
         let cutoff = fixed_temporal_cutoff();
-        let mut retained = create_ranked_test_fact(
-            "fact:retained",
-            "episode:retained",
-            cutoff,
-            1.0,
-            2.0,
-            0,
-            &[],
+        let mut retained = create_test_fact("fact:retained", cutoff);
+        let mut incoming = create_test_fact("fact:incoming", cutoff);
+        retained.content = "same content".into();
+        incoming.content = "same content".into();
+        incoming.fact_type = "experience".to_string();
+        let ranked = build_ranked_context_facts(
+            BuildRankedContextFactsRequest {
+                lexical_facts: vec![(retained, RetrievalTier::Direct)],
+                graph_facts: Vec::new(),
+                community_facts: Vec::new(),
+                semantic_facts: vec![super::super::types::SemanticCandidate {
+                    fact: incoming,
+                    rationale: "semantic retrieval".to_string(),
+                    similarity: 0.82,
+                }],
+                query_opt: None,
+                semantic_available: true,
+                cutoff,
+            },
+            |_, _| 0.8,
         );
-        let mut incoming = create_ranked_test_fact(
-            "fact:incoming",
-            "episode:incoming",
-            cutoff,
-            0.5,
-            4.0,
-            0,
-            &[],
-        );
-        retained.fact.content = "same content".into();
-        incoming.fact.content = "same content".into();
-        incoming.evidence.semantic_similarity = Some(0.82);
 
-        merge_ranked_duplicate(&mut retained, incoming);
-
-        assert_eq!(retained.fact.fact_id, "fact:incoming");
-        assert_eq!(retained.evidence.semantic_similarity, Some(0.82));
+        assert_eq!(ranked.len(), 1);
+        assert_eq!(ranked[0].fact.fact_id, "fact:incoming");
+        assert_eq!(ranked[0].evidence.semantic_similarity, Some(0.82));
     }
 
     #[test]
@@ -2261,6 +2345,77 @@ mod tests {
             .collect::<Vec<_>>();
 
         assert_eq!(fact_ids, vec!["fact:july"]);
+    }
+
+    #[test]
+    fn select_ranked_context_facts_matches_relative_event_date_to_source_timestamp() {
+        let temporal_focus = infer_temporal_window("March 16, 2022", fixed_temporal_cutoff())
+            .expect("temporal focus");
+        let source_time = chrono::DateTime::parse_from_rfc3339("2022-03-17T15:47:00Z")
+            .expect("source timestamp")
+            .with_timezone(&Utc);
+        let mut candidate = create_ranked_test_fact(
+            "fact:bowling-yesterday",
+            "episode:conversation-47",
+            source_time,
+            1.0,
+            0.0,
+            0,
+            &[],
+        );
+        candidate.fact.fact_type = FactType::Experience.as_str().to_string();
+        candidate.fact.content =
+            "James: By the way, yesterday I went bowling and got 2 strikes.".to_string();
+        candidate.retrieval_tier = RetrievalTier::TemporalExpanded;
+
+        let selected = select_ranked_context_facts(
+            vec![candidate],
+            5,
+            Some(temporal_focus),
+            crate::shared::search::search_query_terms(
+                "Which recreational activity was James pursuing on March 16, 2022?",
+            ),
+        );
+
+        assert_eq!(
+            selected
+                .iter()
+                .map(|fact| fact.fact.fact_id.as_str())
+                .collect::<Vec<_>>(),
+            vec!["fact:bowling-yesterday"]
+        );
+    }
+
+    #[test]
+    fn select_ranked_context_facts_rejects_relative_event_outside_requested_day() {
+        let temporal_focus = infer_temporal_window("March 16, 2022", fixed_temporal_cutoff())
+            .expect("temporal focus");
+        let source_time = chrono::DateTime::parse_from_rfc3339("2022-03-19T15:47:00Z")
+            .expect("source timestamp")
+            .with_timezone(&Utc);
+        let mut candidate = create_ranked_test_fact(
+            "fact:bowling-yesterday-later",
+            "episode:conversation-later",
+            source_time,
+            1.0,
+            0.0,
+            0,
+            &[],
+        );
+        candidate.fact.content =
+            "James: By the way, yesterday I went bowling and got 2 strikes.".to_string();
+        candidate.retrieval_tier = RetrievalTier::TemporalExpanded;
+
+        let selected = select_ranked_context_facts(
+            vec![candidate],
+            5,
+            Some(temporal_focus),
+            crate::shared::search::search_query_terms(
+                "Which recreational activity was James pursuing on March 16, 2022?",
+            ),
+        );
+
+        assert!(selected.is_empty());
     }
 
     #[test]

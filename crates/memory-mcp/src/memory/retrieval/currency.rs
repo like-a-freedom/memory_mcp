@@ -153,6 +153,9 @@ mod tests {
     fn query(intent: AdmissionIntent) -> QueryEvidence {
         QueryEvidence {
             content_terms: Vec::new(),
+            subject_terms: Vec::new(),
+            explicit_calendar_date: None,
+            calendar_period: None,
             qualified_references: Vec::new(),
             resolved_entity_ids: Vec::new(),
             repeated_topics: Vec::new(),

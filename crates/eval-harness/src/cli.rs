@@ -27,6 +27,29 @@ pub enum Command {
         #[arg(long)]
         output_root: PathBuf,
     },
+    /// Extract a fact inventory from raw episodes with the production provider.
+    PrepareRetrievalQuality {
+        #[arg(long)]
+        sources: PathBuf,
+        #[arg(long)]
+        output: PathBuf,
+    },
+    /// Fit a relevance boundary on reviewed development pairs with the real model.
+    CalibrateReranking {
+        #[arg(long)]
+        pairs: PathBuf,
+        #[arg(long)]
+        output: PathBuf,
+    },
+    /// Provision an immutable native model bundle with hash verification.
+    PrepareModel {
+        #[arg(long)]
+        manifest: PathBuf,
+        #[arg(long)]
+        output_root: PathBuf,
+        #[arg(long)]
+        mirror: Option<String>,
+    },
     Merge {
         #[arg(long)]
         profile: PathBuf,

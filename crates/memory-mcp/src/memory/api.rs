@@ -319,3 +319,129 @@ pub async fn run_archival(
 pub async fn rebuild_communities(handles: &LifecycleHandles<'_>) -> Result<usize, MemoryError> {
     crate::memory::lifecycle_workers::run_community_rebuild_pass(handles).await
 }
+
+/// Filesystem discovery dependencies. Snapshot tokens describe metadata, never content.
+#[async_trait::async_trait]
+pub trait InboxReconciliationPort: Send + Sync {
+    /// Enumerate regular source files without following links.
+    async fn snapshot(&self) -> Vec<(std::path::PathBuf, String)>;
+    /// Run the durable candidate pipeline; false leaves the file pending.
+    async fn discover(&self, path: &std::path::Path) -> bool;
+    /// Stop discovery between files.
+    fn cancelled(&self) -> bool;
+}
+
+/// Reconcile dropped watcher events without rereading unchanged files.
+pub async fn reconcile_inbox(
+    port: &impl InboxReconciliationPort,
+    observed: &mut std::collections::HashMap<std::path::PathBuf, String>,
+) {
+    let snapshot = port.snapshot().await;
+    if port.cancelled() {
+        return;
+    }
+    let present = snapshot
+        .iter()
+        .map(|(path, _)| path.clone())
+        .collect::<std::collections::HashSet<_>>();
+    for (path, fingerprint) in snapshot {
+        if port.cancelled() {
+            return;
+        }
+        if observed.get(&path) == Some(&fingerprint) {
+            continue;
+        }
+        if port.discover(&path).await {
+            // A concurrent rewrite must remain visible on the next scan. Recording
+            // post-read metadata would acknowledge bytes discovery never consumed.
+            observed.insert(path, fingerprint);
+        }
+    }
+    if !port.cancelled() {
+        observed.retain(|path, _| present.contains(path));
+    }
+}
+
+#[cfg(test)]
+mod inbox_reconciliation_tests {
+    use super::*;
+    use std::sync::{
+        Mutex,
+        atomic::{AtomicBool, AtomicUsize, Ordering},
+    };
+    struct Source {
+        files: Mutex<Vec<(std::path::PathBuf, String)>>,
+        calls: AtomicUsize,
+        rewrite: AtomicBool,
+        stopped: AtomicBool,
+    }
+    impl Source {
+        fn new(rewrite: bool) -> Self {
+            Self {
+                files: Mutex::new(vec![("note.txt".into(), "A".into())]),
+                calls: AtomicUsize::new(0),
+                rewrite: AtomicBool::new(rewrite),
+                stopped: AtomicBool::new(false),
+            }
+        }
+    }
+    #[async_trait::async_trait]
+    impl InboxReconciliationPort for Source {
+        async fn snapshot(&self) -> Vec<(std::path::PathBuf, String)> {
+            self.files.lock().expect("files").clone()
+        }
+        async fn discover(&self, _: &std::path::Path) -> bool {
+            self.calls.fetch_add(1, Ordering::Relaxed);
+            // The durable read has completed before the next revision arrives.
+            if self.rewrite.swap(false, Ordering::Relaxed) {
+                self.files.lock().expect("files")[0].1 = "B".into();
+            }
+            true
+        }
+        fn cancelled(&self) -> bool {
+            self.stopped.load(Ordering::Relaxed)
+        }
+    }
+    #[tokio::test]
+    async fn a_rewrite_after_read_remains_pending_for_the_next_scan() {
+        let source = Source::new(true);
+        let mut observed = std::collections::HashMap::new();
+        reconcile_inbox(&source, &mut observed).await;
+        reconcile_inbox(&source, &mut observed).await;
+        assert_eq!(
+            source.calls.load(Ordering::Relaxed),
+            2,
+            "revision B must not be acknowledged by the read of A"
+        );
+    }
+    #[tokio::test]
+    async fn unchanged_source_is_discovered_once_without_watcher_events() {
+        let source = Source::new(false);
+        let mut observed = std::collections::HashMap::new();
+        reconcile_inbox(&source, &mut observed).await;
+        reconcile_inbox(&source, &mut observed).await;
+        assert_eq!(source.calls.load(Ordering::Relaxed), 1);
+    }
+    #[tokio::test]
+    async fn renamed_directory_is_discovered_as_new_source_lineage() {
+        let source = Source::new(false);
+        let mut observed = std::collections::HashMap::new();
+        reconcile_inbox(&source, &mut observed).await;
+        source.files.lock().expect("files")[0].0 = "renamed/note.txt".into();
+        reconcile_inbox(&source, &mut observed).await;
+        assert_eq!(source.calls.load(Ordering::Relaxed), 2);
+        assert!(observed.contains_key(std::path::Path::new("renamed/note.txt")));
+        assert!(!observed.contains_key(std::path::Path::new("note.txt")));
+    }
+    #[tokio::test]
+    async fn cancellation_does_not_start_discovery_or_discard_previous_state() {
+        let source = Source::new(false);
+        let mut observed = std::collections::HashMap::new();
+        reconcile_inbox(&source, &mut observed).await;
+        source.stopped.store(true, Ordering::Relaxed);
+        source.files.lock().expect("files").clear();
+        reconcile_inbox(&source, &mut observed).await;
+        assert_eq!(source.calls.load(Ordering::Relaxed), 1);
+        assert!(observed.contains_key(std::path::Path::new("note.txt")));
+    }
+}

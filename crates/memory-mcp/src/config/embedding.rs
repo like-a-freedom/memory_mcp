@@ -43,6 +43,10 @@ pub struct EmbeddingConfig {
     pub similarity_threshold: f64,
     /// Optional override for model directory path (used by local providers).
     pub model_dir: Option<String>,
+    /// Optional local multilingual cross-encoder model directory.
+    pub reranker_model_dir: Option<String>,
+    /// Relevance logit boundary selected from independent development evidence.
+    pub reranker_admission_floor: f64,
     /// Initial delay before the in-process remote recovery worker probes.
     pub recovery_interval_secs: u64,
     /// Whether remote embedding recovery is enabled after a failed startup probe.
@@ -61,6 +65,8 @@ impl Default for EmbeddingConfig {
             max_tokens: DEFAULT_EMBEDDING_MAX_TOKENS,
             similarity_threshold: DEFAULT_EMBEDDING_SIMILARITY_THRESHOLD,
             model_dir: None,
+            reranker_model_dir: None,
+            reranker_admission_floor: 0.0,
             recovery_interval_secs: DEFAULT_EMBEDDING_RECOVERY_INTERVAL_SECS,
             auto_recovery: true,
         }
@@ -76,12 +82,15 @@ pub fn build_embedding_signature(
 ) -> String {
     use sha2::{Digest, Sha256};
 
-    let material = json!({
+    let mut material = json!({
         "provider": provider_label,
         "model": model,
         "base_url": base_url.map(|url| url.trim_end_matches('/')),
         "dimension": dimension,
     });
+    if provider_label == "local-candle" {
+        material["input_contract"] = json!("e5-query-passage-v2");
+    }
 
     let mut hasher = Sha256::new();
     hasher.update(material.to_string().as_bytes());
@@ -124,6 +133,13 @@ impl EmbeddingConfig {
     /// and [`MemoryError::ConfigMissing`] when a required variable is absent while
     /// embeddings are enabled.
     pub fn from_env() -> Result<Self, MemoryError> {
+        let reranker_admission_floor =
+            parse_env::<f64>("RETRIEVAL_RERANKER_ADMISSION_FLOOR")?.unwrap_or(0.0);
+        if !reranker_admission_floor.is_finite() {
+            return Err(MemoryError::ConfigInvalid(
+                "RETRIEVAL_RERANKER_ADMISSION_FLOOR must be finite".into(),
+            ));
+        }
         let enabled = parse_bool_env("EMBEDDINGS_ENABLED")
             .or_else(|| env::var("EMBEDDINGS_PROVIDER").ok().map(|_| true))
             .unwrap_or(false);
@@ -140,6 +156,7 @@ impl EmbeddingConfig {
             ));
         }
         let model_dir = env::var("EMBEDDINGS_MODEL_DIR").ok();
+        let reranker_model_dir = env::var("RETRIEVAL_RERANKER_MODEL_DIR").ok();
         let recovery_interval_secs = parse_env::<u64>("EMBEDDINGS_RECOVERY_INTERVAL_SECS")?
             .unwrap_or(DEFAULT_EMBEDDING_RECOVERY_INTERVAL_SECS);
         if recovery_interval_secs == 0 {
@@ -156,6 +173,7 @@ impl EmbeddingConfig {
                 max_tokens,
                 similarity_threshold,
                 model_dir,
+                reranker_model_dir,
                 recovery_interval_secs,
                 auto_recovery,
                 ..Self::default()
@@ -214,6 +232,8 @@ impl EmbeddingConfig {
             max_tokens,
             similarity_threshold,
             model_dir,
+            reranker_model_dir,
+            reranker_admission_floor,
             recovery_interval_secs,
             auto_recovery,
         })
@@ -370,6 +390,20 @@ mod tests {
     }
 
     #[test]
+    fn local_e5_signature_rejects_vectors_from_the_old_query_only_contract() {
+        let signature = build_embedding_signature(
+            "local-candle",
+            Some("intfloat/multilingual-e5-small"),
+            None,
+            384,
+        );
+        assert_ne!(
+            signature, "embsig:a5a0756a3400378d43936b98457b96b3038ba8f0269ea49c8465cea5a80adac0",
+            "changing document generation must invalidate old stored vectors"
+        );
+    }
+
+    #[test]
     fn embedding_signature_changes_when_model_changes() {
         let first = build_embedding_signature(
             "openai-compatible",
@@ -489,6 +523,22 @@ mod tests {
                     Err(MemoryError::ConfigInvalid(message))
                         if message.contains("EMBEDDINGS_RECOVERY_INTERVAL_SECS")
                 ));
+            },
+        );
+    }
+
+    #[test]
+    fn embedding_config_refuses_nonfinite_reranking_boundary() {
+        with_env_vars(
+            &[
+                ("EMBEDDINGS_ENABLED", Some("false")),
+                ("RETRIEVAL_RERANKER_ADMISSION_FLOOR", Some("NaN")),
+            ],
+            || {
+                assert!(
+                    matches!(EmbeddingConfig::from_env(),Err(MemoryError::ConfigInvalid(message))
+                if message.contains("RETRIEVAL_RERANKER_ADMISSION_FLOOR"))
+                );
             },
         );
     }
