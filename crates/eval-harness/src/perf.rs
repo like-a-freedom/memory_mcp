@@ -14,4 +14,22 @@ pub mod sampler;
 pub mod scenarios;
 pub mod verdict;
 
-// filled in Task 2: `PerfError` (thiserror) lives in this root module.
+pub use profile::{
+    DriverKind, GateDirection, GateMetric, GateSpec, PerfProfile, ScenarioId, ScenarioSpec, load,
+};
+
+/// Errors of the perf surface: profile loading, artifact I/O, and run wiring.
+#[derive(Debug, thiserror::Error)]
+pub enum PerfError {
+    #[error("json decode failed: {0}")]
+    Json(#[from] serde_json::Error),
+
+    #[error("unsupported schema: {0}")]
+    Schema(String),
+
+    #[error("unsupported driver: {0}")]
+    UnsupportedDriver(String),
+
+    #[error("validation failed: {0}")]
+    Validation(String),
+}
