@@ -49,37 +49,9 @@ jobs:
         name: eval-nightly-artifact
         path: target/evals/*.json
         retention-days: 30
-
-  perf-weekly:
-    name: Weekly perf profile
-    # Pinned-host control (ADR-0082): skipped until the repo variable is set,
-    # and when set it runs only on the self-hosted runner labelled for the
-    # baseline machine — never on a GitHub-hosted runner and never on some
-    # other self-hosted runner. The label is part of the runner provisioning
-    # for the baseline host.
-    if: vars.MEMORY_PERF_PINNED_HOST == 'true'
-    runs-on: [self-hosted, perf-dev-m2]
-    timeout-minutes: 60
-    # No setup action: the pinned runner provides its own toolchain (the
-    # workspace rust-toolchain.toml pins the channel), and a native build
-    # needs neither a target triple nor the cross-compile environment.
-    steps:
-    - uses: actions/checkout@v7.0.1
-    - name: Run weekly perf profile
-      run: |
-        cargo run -p eval-harness --bin memory-perf --locked -- run \
-          --profile evals/perf/profiles/perf-weekly.json \
-          --artifact target/perf/perf-weekly.json \
-          --baseline evals/perf/baselines/perf-weekly-dev-m2.json \
-          --host-tag dev-m2
-    - name: Upload perf artifacts
-      if: always()
-      uses: actions/upload-artifact@v7
-      with:
-        name: perf-weekly
-        path: target/perf/*.json
-        if-no-files-found: warn
-        retention-days: 30
+  # No weekly perf job here by design: there is no dedicated perf machine
+  # (ADR-0082), so absolute latency is never measured in CI. The weekly
+  # profile is maintainer-invoked locally via `make perf-weekly`.
 
   benchmark-nightly:
     name: CPU benchmark profiles

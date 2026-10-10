@@ -134,11 +134,9 @@ per gate — sample count <
 
 - `make perf-smoke` (PR): `perf-pr-smoke.json`, integrity-only, any host;
   artifact uploaded `if: always()`.
-- Weekly (`evaluations.yml`): a dedicated `perf-weekly` job (not a nightly
-  step) running `perf-weekly.json` with gates on
-  `runs-on: [self-hosted, perf-dev-m2]`, guarded by
-  `vars.MEMORY_PERF_PINNED_HOST == 'true'`, baseline from
-  `evals/perf/baselines/`.
+- Weekly: `make perf-weekly` on the maintainer's local machine — no CI job
+  and no dedicated perf host (ADR-0082): gates against the committed
+  `evals/perf/baselines/perf-weekly-local.json`.
 
 ## Risks
 

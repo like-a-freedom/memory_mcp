@@ -22,6 +22,11 @@
 #   bench-check          evaluations.yml (compiles every bench target)
 #   bench-cpu-core       evaluations.yml (the Criterion run)
 #
+# Invoked by a maintainer on the local machine — never in CI, there is no
+# dedicated perf host (ADR-0082):
+#
+#   perf-weekly          weekly gates vs evals/perf/baselines/perf-weekly-local.json
+#
 # Named in a workflow's skip message, so a person following the message runs
 # the same command on a fixture-equipped host:
 #
@@ -38,7 +43,7 @@
 
 MEMORY_PERF_HOST_TAG ?= local
 
-.PHONY: perf-smoke eval-response-size eval-ner-quality bench-check bench-cpu bench-cpu-core bench-metal
+.PHONY: perf-smoke perf-weekly eval-response-size eval-ner-quality bench-check bench-cpu bench-cpu-core bench-metal
 
 perf-smoke:
 	@mkdir -p target/perf
@@ -46,6 +51,17 @@ perf-smoke:
 		--profile evals/perf/profiles/perf-pr-smoke.json \
 		--artifact target/perf/pr-smoke.json \
 		--host-tag $(MEMORY_PERF_HOST_TAG)
+
+# Weekly gates against the committed baseline. Local-only by design
+# (ADR-0082): no CI job, no dedicated perf machine. Run on the machine that
+# recorded the baseline; exit 1 = regression, 2 = invalid evidence.
+perf-weekly:
+	@mkdir -p target/perf
+	cargo run -p eval-harness --bin memory-perf --locked -- run \
+		--profile evals/perf/profiles/perf-weekly.json \
+		--artifact target/perf/perf-weekly.json \
+		--baseline evals/perf/baselines/perf-weekly-local.json \
+		--host-tag local
 
 eval-response-size:
 	@mkdir -p target/evals

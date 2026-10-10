@@ -45,16 +45,17 @@ An unknown schema version is a hard error on load and an `Invalid` verdict on
 baseline comparison. There is no "try as v1" fallback: a future v2 must be
 read by a reader that knows v2.
 
-### Pinned-host gate policy
+### Host-identity gate policy
 
 Absolute-value regression gates only apply between artifacts produced on the
 same host tag. `host_tag != baseline.host_tag` → `Invalid("host_tag
 mismatch")`, never a best-effort comparison; a differing measured `os`/`arch`
 fingerprint is `Invalid("host platform mismatch")` (ADR-0034: PR runners may
 check gross timeouts and integrity, never absolute latency). CI wiring: the PR
-smoke profile runs integrity-only (`gates: []`); the weekly profile runs on
-the self-hosted runner labelled `perf-dev-m2` behind the repo variable
-`MEMORY_PERF_PINNED_HOST == 'true'`.
+smoke profile runs integrity-only (`gates: []`); the weekly profile is
+maintainer-invoked on the local machine and is never measured in CI —
+absolute latency does not belong on shared GitHub-hosted runners, and there
+is no dedicated perf machine.
 
 ### SQL observer as an eval-only seam
 
@@ -98,7 +99,7 @@ code comes from the verdict — `passed → 0`, `regressed → 1`, `invalid → 
 Empty sample sets, a required-but-unavailable sampler, and host/schema
 mismatches are `Invalid`, never an optimistic default.
 
-### CI wiring and the pinned-host variable
+### Local weekly workflow (no dedicated machine)
 
 `make perf-smoke` runs the `perf-pr-smoke` profile with host tag
 `MEMORY_PERF_HOST_TAG` (default `local`) and is the `quality` job's perf step
@@ -106,25 +107,21 @@ in `ci.yml`; the workflow uploads `target/perf/*.json` with `if: always()`.
 The value must equal the profile's `host_tag` — the CLI rejects a mismatch
 with exit 2, so overriding it to some other host is not a supported use.
 
-The weekly run is a dedicated `perf-weekly` job in `evaluations.yml`, not a
-step inside the nightly evaluation job: absolute latency is never measured
-on a GitHub-hosted runner. The job is gated twice — the repository variable
-`MEMORY_PERF_PINNED_HOST == 'true'` (unset until the baseline is committed
-and the runner is provisioned) and
-`runs-on: [self-hosted, perf-dev-m2]` (the baseline machine's runner label).
-It writes `target/perf/perf-weekly.json`, uploads it with `if: always()`,
-and compares against the committed
-`evals/perf/baselines/perf-weekly-dev-m2.json`. The setup action is
-deliberately skipped: the pinned runner provides its own toolchain
-(`rust-toolchain.toml` pins the channel) and builds natively. Runner
-provisioning must register the runner with the label `perf-dev-m2`
-(`actions-runner --labels perf-dev-m2`) before the variable is set —
-otherwise the job only queues with no eligible runner.
+The weekly profile has no CI job: there is no dedicated perf machine
+(decision 2026-10-10), so absolute latency is never measured in CI at all.
+It is invoked by the maintainer on the same local machine that recorded the
+baseline: `make perf-weekly` runs `evals/perf/profiles/perf-weekly.json`
+with `--host-tag local` against the committed
+`evals/perf/baselines/perf-weekly-local.json` and writes
+`target/perf/perf-weekly.json`. Updating the baseline is a separate,
+explicit `--update-baseline` invocation documented in the runbook
+(`docs/performance/PERF_HARNESS.md`) and never a side effect of a gate run.
 
 `host_tag` is operator-asserted — the harness cannot measure the machine's
 identity — so the control is layered: the CLI rejects a `--host-tag` that
 does not match the profile's `host_tag` (a run cannot claim a machine the
-profile was not written for); a `host_tag` or measured `os`/`arch`
-difference between artifact and baseline turns every gate `Invalid`; and the
-job only executes on the labelled self-hosted runner behind the variable.
-The variable stays unset until the baseline is committed.
+profile was not written for), and a `host_tag` or measured `os`/`arch`
+difference between artifact and baseline turns every gate `Invalid`. The
+tag is `local` in the single-machine setup; if the baseline ever moves to
+another machine, that machine records a distinct tag and the old baseline
+is retired, not compared across tags.

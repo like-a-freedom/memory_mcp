@@ -2,7 +2,7 @@
   "schema": "memory-mcp-perf-profile/v1",
   "name": "perf-weekly",
   "budget_seconds": 1800,
-  "host_tag": "dev-m2",
+  "host_tag": "local",
   "env": {},
   "scenarios": [
     {
