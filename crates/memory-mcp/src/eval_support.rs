@@ -7,6 +7,8 @@ use crate::knowledge::claims::{RelationsForFactsQuery, SurrealClaimStore};
 use crate::models::claim::{ClaimRelation, ClaimRelationOutcome, PolicyFingerprint};
 use crate::storage::DbClient;
 
+pub use crate::storage::client::{QueryObserver, SqlObservation};
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct EvaluatedRelation {
     pub relation_id: String,

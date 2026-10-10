@@ -3,6 +3,8 @@
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
+#[cfg(feature = "eval-support")]
+use std::sync::OnceLock;
 use std::time::{Duration, Instant};
 
 use async_trait::async_trait;
@@ -233,6 +235,26 @@ pub struct SurrealDbClient {
     active_namespace: String,
     logger: StdoutLogger,
     fact_embedding_dimension: usize,
+    #[cfg(feature = "eval-support")]
+    eval_query_observer: OnceLock<Arc<dyn QueryObserver>>,
+}
+
+/// One successful SQL execution observed at the storage funnel (ADR-0082).
+///
+/// Carries only the closed-vocabulary op name, the SQL text, and the already
+/// measured duration — no request id, tenant, or row data.
+#[cfg(feature = "eval-support")]
+#[derive(Debug, Clone)]
+pub struct SqlObservation {
+    pub op: &'static str,
+    pub sql: String,
+    pub micros: u64,
+}
+
+/// Eval-only seam over the SQL funnel; installed once per client (ADR-0082).
+#[cfg(feature = "eval-support")]
+pub trait QueryObserver: Send + Sync + 'static {
+    fn observe(&self, obs: &SqlObservation);
 }
 
 enum DbEngine {
@@ -247,6 +269,13 @@ enum DbEngine {
 }
 
 impl SurrealDbClient {
+    /// Installs the eval-only SQL observer (ADR-0082). The first caller wins;
+    /// later calls are no-ops so a re-wrap cannot double-count statements.
+    #[cfg(feature = "eval-support")]
+    pub fn set_eval_query_observer(&self, obs: Arc<dyn QueryObserver>) {
+        let _ = self.eval_query_observer.set(obs);
+    }
+
     /// Connects to an embedded in-memory SurrealDB instance.
     ///
     /// This is primarily intended for tests that should exercise the real
@@ -269,6 +298,8 @@ impl SurrealDbClient {
             active_namespace: active_namespace.to_string(),
             logger: StdoutLogger::new(log_level),
             fact_embedding_dimension: crate::config::DEFAULT_EMBEDDING_DIMENSION,
+            #[cfg(feature = "eval-support")]
+            eval_query_observer: OnceLock::new(),
         })
     }
 
@@ -315,6 +346,8 @@ impl SurrealDbClient {
             active_namespace: target.namespace.clone(),
             logger: StdoutLogger::new(log_level),
             fact_embedding_dimension: crate::config::DEFAULT_EMBEDDING_DIMENSION,
+            #[cfg(feature = "eval-support")]
+            eval_query_observer: OnceLock::new(),
         })
     }
 
@@ -354,6 +387,8 @@ impl SurrealDbClient {
             active_namespace: active_namespace.to_string(),
             logger: StdoutLogger::new(log_level),
             fact_embedding_dimension,
+            #[cfg(feature = "eval-support")]
+            eval_query_observer: OnceLock::new(),
         }
     }
 
@@ -383,6 +418,8 @@ impl SurrealDbClient {
             active_namespace: active_namespace.to_string(),
             logger: StdoutLogger::new(log_level),
             fact_embedding_dimension,
+            #[cfg(feature = "eval-support")]
+            eval_query_observer: OnceLock::new(),
         }
     }
 
@@ -413,6 +450,8 @@ impl SurrealDbClient {
             active_namespace: active_namespace.to_string(),
             logger: StdoutLogger::new(log_level),
             fact_embedding_dimension,
+            #[cfg(feature = "eval-support")]
+            eval_query_observer: OnceLock::new(),
         }
     }
 
@@ -429,6 +468,8 @@ impl SurrealDbClient {
             active_namespace,
             logger: StdoutLogger::new(&config.log_level),
             fact_embedding_dimension: config.embedding.fallback_dimension(),
+            #[cfg(feature = "eval-support")]
+            eval_query_observer: OnceLock::new(),
         })
     }
 
@@ -622,6 +663,14 @@ impl SurrealDbClient {
                     ),
                     LogLevel::Debug,
                 );
+                #[cfg(feature = "eval-support")]
+                if let Some(observer) = self.eval_query_observer.get() {
+                    observer.observe(&SqlObservation {
+                        op: "db.execute_query",
+                        sql: sql.to_owned(),
+                        micros: u64::try_from(timer.elapsed().as_micros()).unwrap_or(u64::MAX),
+                    });
+                }
                 Ok(value)
             }
             Err(err) => {
@@ -683,6 +732,14 @@ impl SurrealDbClient {
                     ),
                     LogLevel::Debug,
                 );
+                #[cfg(feature = "eval-support")]
+                if let Some(observer) = self.eval_query_observer.get() {
+                    observer.observe(&SqlObservation {
+                        op: "db.execute_raw_query",
+                        sql: sql.to_owned(),
+                        micros: u64::try_from(timer.elapsed().as_micros()).unwrap_or(u64::MAX),
+                    });
+                }
                 Ok(())
             }
             Err(err) => {
