@@ -52,15 +52,98 @@ impl FactService {
         // this value is retained only for derived job/diagnostic metadata.
         let namespace = ctx.active_namespace.clone();
 
-        // Pre-fetch linked entity records in a single batch query per namespace,
-        // avoiding O(N) round-trips. Returns None for missing IDs.
-        let entity_map: std::collections::HashMap<String, (String, Vec<String>)> =
-            ctx.find_entity_records_by_ids(&entity_links).await?;
+        let (index_keys, episode_source_lineage) = self
+            .prepare_index_keys(
+                ctx,
+                content,
+                source_episode,
+                &provenance,
+                &entity_links,
+                t_valid,
+            )
+            .await?;
 
-        // Pre-fetch episode source_id; also serves as the ADR-0008 source
-        // lineage for claim projection (the connector's stable record
-        // identifier). Filesystem episodes carry an explicit `source_lineage`
-        // that is preferred over the versioned `source_id`.
+        let (embedding_fields, deferred_embedding_input) = self
+            .generate_embedding_fields(ctx, fact_type, content, quote)
+            .await?;
+
+        // Create fact record via FactService. `created == false` means the
+        // deterministic fact already existed (same id + same content): repeat
+        // ingestion is idempotent, so derived work below is skipped for it.
+        let outcome = self
+            .create_fact(
+                fact_type,
+                content,
+                quote,
+                source_episode,
+                t_valid,
+                confidence,
+                &entity_links,
+                &policy_tags,
+                &provenance,
+                embedding_fields,
+                index_keys,
+            )
+            .await?;
+        let fact_id = outcome.fact_id;
+
+        // Invalidate caches immediately after ingestion to ensure isolation.
+        invalidate_cache(&ctx.context_cache).await;
+
+        // Background processes: triple extraction and pending embedding retries.
+        crate::memory::episode::triples::spawn_triple_extraction(ctx, &fact_id, content);
+
+        // Synchronous claim projection for deterministic extract visibility.
+        // Runs only for freshly created facts: re-projecting an existing fact
+        // would collide with its deterministic claim IDs (noisy "already
+        // exists" errors) and must never overwrite claims of an invalidated
+        // fact. Same-id/same-content is idempotent by contract.
+        if outcome.created {
+            self.project_claims(
+                ctx,
+                &namespace,
+                &fact_id,
+                source_episode,
+                fact_type,
+                content,
+                &policy_tags,
+                &entity_links,
+                t_valid,
+                episode_source_lineage.as_deref(),
+            )
+            .await;
+        }
+
+        // Enqueue background embedding after claim projection to ensure test invariants.
+        if let Some(input) = deferred_embedding_input {
+            ctx.embedding_service
+                .enqueue_background_fact_embedding(namespace.clone(), fact_id.clone(), input)
+                .await;
+        }
+
+        Ok(fact_id)
+    }
+
+    /// Pre-fetch linked entity records and the episode's source lineage,
+    /// then build the deterministic index keys.
+    ///
+    /// The entity map is fetched in one batch per namespace, avoiding O(N)
+    /// round-trips. Returns None for missing IDs. The episode's `source_id`
+    /// also serves as the ADR-0008 source lineage for claim projection (the
+    /// connector's stable record identifier); filesystem episodes carry an
+    /// explicit `source_lineage` preferred over the versioned `source_id`.
+    async fn prepare_index_keys(
+        &self,
+        ctx: &crate::memory::capabilities::deps::ExtractDeps,
+        content: &str,
+        source_episode: &str,
+        provenance: &Provenance,
+        entity_links: &[String],
+        t_valid: DateTime<Utc>,
+    ) -> Result<(Vec<String>, Option<String>), MemoryError> {
+        let entity_map: std::collections::HashMap<String, (String, Vec<String>)> =
+            ctx.find_entity_records_by_ids(entity_links).await?;
+
         let episode_record = ctx.find_episode_record(source_episode).await?;
         let episode_source_id = episode_record
             .as_ref()
@@ -79,15 +162,29 @@ impl FactService {
             .build_index_keys(
                 content,
                 source_episode,
-                &provenance,
-                &entity_links,
+                provenance,
+                entity_links,
                 t_valid,
                 entity_lookup,
                 source_reference_lookup,
             )
             .await?;
 
-        // Prepare embedding input and generate or defer.
+        Ok((index_keys, episode_source_lineage))
+    }
+
+    /// Generate the embedding payload for the fact, or defer/skip it.
+    ///
+    /// Returns the optional embedding fields for persistence and the
+    /// optional deferred input to enqueue as a background retry after
+    /// claim projection.
+    async fn generate_embedding_fields(
+        &self,
+        ctx: &crate::memory::capabilities::deps::ExtractDeps,
+        fact_type: &str,
+        content: &str,
+        quote: &str,
+    ) -> Result<(Option<EmbeddingPayload>, Option<String>), MemoryError> {
         let embedding_input = Self::build_fact_embedding_input(fact_type, content, quote);
         let mut deferred_embedding_input = None;
         // Through the port, so the input limit and the disabled check apply
@@ -145,77 +242,51 @@ impl FactService {
                 None
             }
         };
+        Ok((embedding_fields, deferred_embedding_input))
+    }
 
-        // Create fact record via FactService. `created == false` means the
-        // deterministic fact already existed (same id + same content): repeat
-        // ingestion is idempotent, so derived work below is skipped for it.
-        let outcome = self
-            .create_fact(
-                fact_type,
-                content,
-                quote,
-                source_episode,
-                t_valid,
-                confidence,
-                &entity_links,
-                &policy_tags,
-                &provenance,
-                embedding_fields,
-                index_keys,
-            )
-            .await?;
-        let fact_id = outcome.fact_id;
-
-        // Invalidate caches immediately after ingestion to ensure isolation.
-        invalidate_cache(&ctx.context_cache).await;
-
-        // Background processes: triple extraction and pending embedding retries.
-        crate::memory::episode::triples::spawn_triple_extraction(ctx, &fact_id, content);
-
-        // Synchronous claim projection for deterministic extract visibility.
-        // Runs only for freshly created facts: re-projecting an existing fact
-        // would collide with its deterministic claim IDs (noisy "already
-        // exists" errors) and must never overwrite claims of an invalidated
-        // fact. Same-id/same-content is idempotent by contract.
-        if outcome.created {
-            let claim_svc = ctx.claim_service.clone();
-            let claim_fact_id = FactId::from(fact_id.clone());
-            let claim_episode_id = crate::models::EpisodeId::from(source_episode.to_string());
-            let claim_content = content.to_string();
-            let claim_entity_links = entity_links.clone();
-            let claim_t_valid = t_valid;
-            let claim_params = crate::knowledge::claims_policy::projection::FactPersistedParams {
-                namespace: &namespace,
-                fact_id: &claim_fact_id,
-                source_episode_id: &claim_episode_id,
-                fact_type,
-                content: &claim_content,
-                policy_tags: &policy_tags,
-                entity_links: &claim_entity_links,
-                t_valid: claim_t_valid,
-                source_lineage: episode_source_lineage.as_deref(),
-            };
-            match claim_svc.after_fact_persisted(&claim_params).await {
-                Ok(summary) => claim_svc.record_post_fact_success(
-                    &namespace,
-                    &summary.fact_id,
-                    summary.claims_projected,
-                    summary.claims_skipped,
-                ),
-                Err(error) => {
-                    claim_svc.record_post_fact_failure(&namespace, &claim_fact_id, &error)
-                }
-            }
+    /// Project the persisted fact onto claims and record the outcome.
+    // Clippy: params are the fact's persisted attributes — one cohesive
+    // projection step; a struct would just mirror the param list.
+    #[allow(clippy::too_many_arguments)]
+    async fn project_claims(
+        &self,
+        ctx: &crate::memory::capabilities::deps::ExtractDeps,
+        namespace: &str,
+        fact_id: &str,
+        source_episode: &str,
+        fact_type: &str,
+        content: &str,
+        policy_tags: &[String],
+        entity_links: &[String],
+        t_valid: DateTime<Utc>,
+        source_lineage: Option<&str>,
+    ) {
+        let claim_svc = ctx.claim_service.clone();
+        let claim_fact_id = FactId::from(fact_id.to_string());
+        let claim_episode_id = crate::models::EpisodeId::from(source_episode.to_string());
+        let claim_content = content.to_string();
+        let claim_entity_links = entity_links.to_vec();
+        let claim_params = crate::knowledge::claims_policy::projection::FactPersistedParams {
+            namespace,
+            fact_id: &claim_fact_id,
+            source_episode_id: &claim_episode_id,
+            fact_type,
+            content: &claim_content,
+            policy_tags,
+            entity_links: &claim_entity_links,
+            t_valid,
+            source_lineage,
+        };
+        match claim_svc.after_fact_persisted(&claim_params).await {
+            Ok(summary) => claim_svc.record_post_fact_success(
+                namespace,
+                &summary.fact_id,
+                summary.claims_projected,
+                summary.claims_skipped,
+            ),
+            Err(error) => claim_svc.record_post_fact_failure(namespace, &claim_fact_id, &error),
         }
-
-        // Enqueue background embedding after claim projection to ensure test invariants.
-        if let Some(input) = deferred_embedding_input {
-            ctx.embedding_service
-                .enqueue_background_fact_embedding(namespace.clone(), fact_id.clone(), input)
-                .await;
-        }
-
-        Ok(fact_id)
     }
 
     /// The dimension check, before the payload is assembled.
