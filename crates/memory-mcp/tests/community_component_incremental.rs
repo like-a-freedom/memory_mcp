@@ -2,8 +2,8 @@
 
 mod common;
 
-use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicUsize, Ordering};
 
 use chrono::Utc;
 use memory_mcp::eval_support::{QueryObserver, SqlObservation};
@@ -41,8 +41,7 @@ async fn community_burst_keeps_edge_neighbor_selects_bounded_per_extract() {
 
     let (service, db_client) = common::make_service_with_client().await;
     let counter = Arc::new(EdgeNeighborCounter::default());
-    db_client
-        .set_eval_query_observer(Arc::clone(&counter) as Arc<dyn QueryObserver>);
+    db_client.set_eval_query_observer(Arc::clone(&counter) as Arc<dyn QueryObserver>);
 
     let mut last_extract_selects = 0usize;
     for i in 0..BURST_EXTRACTS {
