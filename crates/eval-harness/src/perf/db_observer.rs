@@ -257,7 +257,7 @@ impl QueryObserver for QueryLedger {
         } else {
             // Overflow keeps the first observation's op/class as its label;
             // later observations of other shapes only merge latency.
-            let mut acc = inner.overflow.get_or_insert_with(|| TemplateAcc {
+            let acc = inner.overflow.get_or_insert_with(|| TemplateAcc {
                 op: obs.op.to_owned(),
                 class,
                 setup: Vec::new(),
