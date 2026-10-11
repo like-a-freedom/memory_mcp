@@ -31,14 +31,24 @@ pub struct ResourceSnapshot {
 }
 
 /// One normalized SQL template aggregate observed during a scenario.
+///
+/// `phase` separates untimed setup SQL (`"setup"`) from the measured part of
+/// the run (`"timed"`). A template observed in both phases yields one record
+/// per phase. Artifacts predating the field deserialize as `"setup"`.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SqlTemplateRecord {
     pub template_hash: String,
     pub op: String,
     pub class: String,
+    #[serde(default = "default_sql_phase")]
+    pub phase: String,
     pub count: u32,
     pub stats: LatencyStats,
+}
+
+fn default_sql_phase() -> String {
+    "setup".to_owned()
 }
 
 /// Everything one `(scenario, scale)` recording produced.

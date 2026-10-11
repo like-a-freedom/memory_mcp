@@ -169,9 +169,11 @@ async fn runner_catalog_does_not_fragment_record_ids() {
             .map(|t| &t.template_hash)
             .collect::<Vec<_>>()
     );
+    // Phase split can emit one record per (template, phase), so the catalog
+    // may hold up to two records per capped template.
     assert!(
-        record.sql.len() < MAX_TEMPLATES,
-        "distinct templates stay under the cap: {}",
+        record.sql.len() < 2 * MAX_TEMPLATES,
+        "distinct (template, phase) records stay under twice the cap: {}",
         record.sql.len()
     );
 }

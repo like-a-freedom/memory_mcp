@@ -24,7 +24,7 @@ use memory_mcp::service::memory_container_shims::{
 };
 use memory_mcp::storage::SurrealDbClient;
 
-use crate::perf::db_observer::QueryLedger;
+use crate::perf::db_observer::{QueryLedger, QueryPhase};
 use crate::perf::profile::{ScenarioId, ScenarioSpec};
 use crate::perf::sampler::{ResourceSampler, self_sampler};
 use crate::test_support::TestMemory;
@@ -128,6 +128,8 @@ impl ScenarioRun for IngestScale {
     }
 
     async fn run(&self, env: &PerfEnv, iteration: u32) -> ScenarioEvidence {
+        // Every ingest in this scenario is part of the measurement.
+        env.ledger.set_phase(QueryPhase::Timed);
         let mut ev = ScenarioEvidence::empty(self.id(), self.scale);
         for i in 0..self.scale {
             let source_id = format!(
@@ -175,6 +177,7 @@ impl ScenarioRun for AssembleScale {
     }
 
     async fn run(&self, env: &PerfEnv, iteration: u32) -> ScenarioEvidence {
+        env.ledger.set_phase(QueryPhase::Setup);
         let mut ev = ScenarioEvidence::empty(self.id(), self.scale);
         for i in 0..self.scale {
             let source_id = format!(
@@ -204,6 +207,7 @@ impl ScenarioRun for AssembleScale {
                 ev.invalid_reasons.push(reason);
             }
         }
+        env.ledger.set_phase(QueryPhase::Timed);
         for q in 0..self.queries {
             let request = AssembleContextRequest {
                 query: format!("perf query {iteration}-{q}"),
@@ -316,6 +320,7 @@ impl ScenarioRun for LatencyScenario {
 
     async fn run(&self, env: &PerfEnv, iteration: u32) -> ScenarioEvidence {
         let mut ev = ScenarioEvidence::empty(self.id, self.scale);
+        env.ledger.set_phase(QueryPhase::Setup);
         let fixture = match self.corpus(env).await {
             Ok(fixture) => fixture,
             Err(reason) => {
@@ -328,6 +333,7 @@ impl ScenarioRun for LatencyScenario {
                 .push("fixture produced no episodes".into());
             return ev;
         }
+        env.ledger.set_phase(QueryPhase::Timed);
         match self.id {
             ScenarioId::LatencyExtract => {
                 let episode_id =

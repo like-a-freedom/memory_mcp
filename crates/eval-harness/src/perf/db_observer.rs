@@ -127,13 +127,54 @@ const RULES: &[(QueryClass, &[&str])] = &[
 struct TemplateAcc {
     op: String,
     class: QueryClass,
-    latencies: Vec<u64>,
+    setup: Vec<u64>,
+    timed: Vec<u64>,
+}
+
+impl TemplateAcc {
+    fn push(&mut self, phase: QueryPhase, micros: u64) {
+        match phase {
+            QueryPhase::Setup => self.setup.push(micros),
+            QueryPhase::Timed => self.timed.push(micros),
+        }
+    }
+
+    fn samples(&self, phase: QueryPhase) -> &[u64] {
+        match phase {
+            QueryPhase::Setup => &self.setup,
+            QueryPhase::Timed => &self.timed,
+        }
+    }
+}
+
+/// Which part of a scenario run an observation belongs to.
+///
+/// Scenarios tag their untimed corpus/setup work as `Setup` and the measured
+/// capability call as `Timed`; the ledger splits one template observed in
+/// both phases into one record per phase.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum QueryPhase {
+    #[default]
+    Setup,
+    Timed,
+}
+
+impl QueryPhase {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Setup => "setup",
+            Self::Timed => "timed",
+        }
+    }
+
+    const ALL: [Self; 2] = [Self::Setup, Self::Timed];
 }
 
 #[derive(Default)]
 struct LedgerInner {
     templates: BTreeMap<String, TemplateAcc>,
     overflow: Option<TemplateAcc>,
+    phase: QueryPhase,
 }
 
 /// Mutex-protected template ledger; installed as the eval query observer and
@@ -149,32 +190,46 @@ impl QueryLedger {
         })
     }
 
-    /// Stable snapshot: one record per distinct template plus `(overflow)`.
-    /// Entries with no latency samples (the unset overflow) yield no record.
+    /// Tags every observation from now on with `phase`. Default is
+    /// [`QueryPhase::Setup`], so untimed bootstrap work is never silently
+    /// recorded as timed.
+    pub fn set_phase(&self, phase: QueryPhase) {
+        self.inner
+            .lock()
+            .expect("query ledger mutex poisoned")
+            .phase = phase;
+    }
+
+    /// Stable snapshot: one record per distinct template per phase plus
+    /// `(overflow)`. Entries with no latency samples yield no record.
     pub fn snapshot(&self) -> Vec<SqlTemplateRecord> {
         let inner = self.inner.lock().expect("query ledger mutex poisoned");
         let mut out: Vec<SqlTemplateRecord> = inner
             .templates
             .iter()
-            .filter_map(|(hash, acc)| record(hash, acc))
+            .flat_map(|(hash, acc)| records_for(hash, acc))
             .collect();
-        if let Some(rec) = inner
-            .overflow
-            .as_ref()
-            .and_then(|acc| record(OVERFLOW_KEY, acc))
-        {
-            out.push(rec);
+        if let Some(overflow) = inner.overflow.as_ref() {
+            out.extend(records_for(OVERFLOW_KEY, overflow));
         }
         out
     }
 }
 
-fn record(hash: &str, acc: &TemplateAcc) -> Option<SqlTemplateRecord> {
-    let stats = latency_stats(&acc.latencies)?;
+fn records_for(hash: &str, acc: &TemplateAcc) -> Vec<SqlTemplateRecord> {
+    QueryPhase::ALL
+        .into_iter()
+        .filter_map(|phase| record(hash, acc, phase))
+        .collect()
+}
+
+fn record(hash: &str, acc: &TemplateAcc, phase: QueryPhase) -> Option<SqlTemplateRecord> {
+    let stats = latency_stats(acc.samples(phase))?;
     Some(SqlTemplateRecord {
         template_hash: hash.to_owned(),
         op: acc.op.clone(),
         class: acc.class.as_str().to_owned(),
+        phase: phase.as_str().to_owned(),
         count: stats.count,
         stats,
     })
@@ -185,28 +240,30 @@ impl QueryObserver for QueryLedger {
         let (template, hash) = normalize_sql(&obs.sql);
         let class = classify(obs.op, &template);
         let mut inner = self.inner.lock().expect("query ledger mutex poisoned");
+        let phase = inner.phase;
         if let Some(acc) = inner.templates.get_mut(&hash) {
-            acc.latencies.push(obs.micros);
+            acc.push(phase, obs.micros);
             return;
         }
         if inner.templates.len() < MAX_TEMPLATES {
-            inner.templates.insert(
-                hash,
-                TemplateAcc {
-                    op: obs.op.to_owned(),
-                    class,
-                    latencies: vec![obs.micros],
-                },
-            );
+            let mut acc = TemplateAcc {
+                op: obs.op.to_owned(),
+                class,
+                setup: Vec::new(),
+                timed: Vec::new(),
+            };
+            acc.push(phase, obs.micros);
+            inner.templates.insert(hash, acc);
         } else {
             // Overflow keeps the first observation's op/class as its label;
             // later observations of other shapes only merge latency.
-            let acc = inner.overflow.get_or_insert_with(|| TemplateAcc {
+            let mut acc = inner.overflow.get_or_insert_with(|| TemplateAcc {
                 op: obs.op.to_owned(),
                 class,
-                latencies: Vec::new(),
+                setup: Vec::new(),
+                timed: Vec::new(),
             });
-            acc.latencies.push(obs.micros);
+            acc.push(phase, obs.micros);
         }
     }
 }
@@ -447,6 +504,29 @@ mod tests {
             .find(|r| r.template_hash == "(overflow)")
             .expect("overflow record present");
         assert_eq!(overflow.count, 1);
+    }
+
+    #[test]
+    fn same_template_in_both_phases_yields_one_record_per_phase() {
+        let ledger = QueryLedger::new();
+        ledger.observe(&obs("db.execute_query", "RETURN 1"));
+        ledger.set_phase(QueryPhase::Timed);
+        ledger.observe(&obs("db.execute_query", "RETURN 1"));
+        ledger.observe(&obs("db.execute_query", "RETURN 1"));
+
+        let records = ledger.snapshot();
+        assert_eq!(records.len(), 2, "one record per phase: {records:?}");
+        let setup = records
+            .iter()
+            .find(|r| r.phase == "setup")
+            .expect("setup record present");
+        let timed = records
+            .iter()
+            .find(|r| r.phase == "timed")
+            .expect("timed record present");
+        assert_eq!(setup.template_hash, timed.template_hash);
+        assert_eq!(setup.count, 1);
+        assert_eq!(timed.count, 2);
     }
 
     #[test]
