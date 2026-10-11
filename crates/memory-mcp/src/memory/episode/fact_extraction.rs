@@ -434,7 +434,11 @@ pub async fn extract_from_episode(
         .map(|entity| entity.entity_id.clone())
         .collect();
 
-    update_communities(service, &entity_ids).await?;
+    let mut community_new_nodes = Vec::with_capacity(1 + facts.len());
+    community_new_nodes.push(episode_id.to_string());
+    community_new_nodes.extend(facts.iter().map(|fact| fact.fact_id.clone()));
+
+    update_communities(service, &entity_ids, &community_new_nodes).await?;
 
     service.logger.log(
         log_event(

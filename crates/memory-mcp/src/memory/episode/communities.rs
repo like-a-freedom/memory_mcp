@@ -22,15 +22,22 @@ fn community_edge_endpoints(record: &Value) -> Option<(String, String)> {
 }
 
 /// Update community memberships after entity changes.
+///
+/// `new_node_ids` are the episode/fact records this extract just wrote. They
+/// seed the component walk so the traversal reaches this extract's fresh
+/// neighborhood without re-walking historical entity subgraphs that are
+/// already recorded in stored community membership.
 pub(crate) async fn update_communities(
     service: &ExtractDeps,
     entity_ids: &[String],
+    new_node_ids: &[String],
 ) -> Result<(), MemoryError> {
     if entity_ids.len() < 2 {
         return Ok(());
     }
 
-    let member_entities = collect_connected_entity_component(service, entity_ids).await?;
+    let member_entities =
+        collect_connected_entity_component(service, entity_ids, new_node_ids).await?;
     let Some(membership) = CommunityMembership::from_entities(member_entities) else {
         return Ok(());
     };
@@ -68,26 +75,56 @@ pub(crate) async fn update_communities(
 }
 
 /// BFS traversal over active edges to find all connected entities.
+///
+/// The walk is incremental: entities already recorded in a stored community
+/// membership are seeded into the visited set directly and never expanded.
+/// That keeps per-extract statement count proportional to the fresh
+/// neighborhood (touched entities plus `new_node_ids`) instead of the whole
+/// accumulated component. The pruning is safe because
+///
+/// * stored communities are member-disjoint (`update_communities` merges
+///   overlapping ones and deletes the stale rows), and
+/// * the active edge graph is monotone under supersession
+///   (`invalidate_conflicting_edges` closes same-triple versions only, so
+///   stored community members stay pairwise connected), and
+/// * every new edge this extract wrote is incident to a touched entity or a
+///   node in `new_node_ids`, so the fresh neighborhood is fully reachable from
+///   the initial queue.
+///
+/// Fresh entities (never stored in a community) keep the historical full
+/// walk; their private neighborhoods are the only subgraphs that can exist
+/// outside recorded community membership.
 pub(crate) async fn collect_connected_entity_component(
     service: &ExtractDeps,
     entity_ids: &[String],
+    new_node_ids: &[String],
 ) -> Result<Vec<String>, MemoryError> {
     let cutoff = normalize_dt(now());
-    let mut visited = BTreeSet::new();
-    let mut queue = VecDeque::new();
-    let mut traversed_nodes = HashSet::new();
+    let known_connected = known_connected_entities(service, entity_ids).await?;
 
+    let mut visited: BTreeSet<String> = known_connected.iter().cloned().collect();
+    let mut queue = VecDeque::new();
+    let mut queued: HashSet<String> = HashSet::new();
+
+    // This extract's fresh nodes are always walked: they carry the new edges.
+    for node_id in new_node_ids {
+        if queued.insert(node_id.clone()) {
+            queue.push_back(node_id.clone());
+        }
+    }
+
+    // Touched entities outside recorded community membership keep the
+    // historical walk; members of stored communities are already seeded.
     for entity_id in entity_ids.iter().filter(|id| is_entity_id(id)) {
-        if visited.insert(entity_id.clone()) {
+        if visited.insert(entity_id.clone())
+            && !known_connected.contains(entity_id)
+            && queued.insert(entity_id.clone())
+        {
             queue.push_back(entity_id.clone());
         }
     }
 
     while let Some(current) = queue.pop_front() {
-        if !traversed_nodes.insert(current.clone()) {
-            continue;
-        }
-
         for direction in [GraphDirection::Incoming, GraphDirection::Outgoing] {
             let edges = crate::knowledge::graph_store::KnowledgeGraphStore::new(
                 service.db_client.clone(),
@@ -103,13 +140,16 @@ pub(crate) async fn collect_connected_entity_component(
                 };
 
                 if is_entity_id(&neighbor) {
-                    if visited.insert(neighbor.clone()) {
+                    if visited.insert(neighbor.clone())
+                        && !known_connected.contains(&neighbor)
+                        && queued.insert(neighbor.clone())
+                    {
                         queue.push_back(neighbor);
                     }
                     continue;
                 }
 
-                if is_traversable_context_node(&neighbor) {
+                if is_traversable_context_node(&neighbor) && queued.insert(neighbor.clone()) {
                     queue.push_back(neighbor);
                 }
             }
@@ -117,6 +157,26 @@ pub(crate) async fn collect_connected_entity_component(
     }
 
     Ok(visited.into_iter().collect())
+}
+
+/// Entities already recorded in a stored community that overlaps the touched
+/// entities. These subgraphs are known-connected and must not be re-walked.
+async fn known_connected_entities(
+    service: &ExtractDeps,
+    entity_ids: &[String],
+) -> Result<HashSet<String>, MemoryError> {
+    let communities = crate::knowledge::graph_store::KnowledgeGraphStore::new(
+        service.db_client.clone(),
+        service.active_namespace.clone(),
+    )
+    .select_communities_by_member_entities(entity_ids)
+    .await?;
+
+    Ok(communities
+        .iter()
+        .filter_map(parse_community_record)
+        .flat_map(|community| community.member_entities)
+        .collect())
 }
 
 fn is_traversable_context_node(record_id: &str) -> bool {

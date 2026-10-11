@@ -713,6 +713,7 @@ mod tests {
         let connected = collect_connected_entity_component(
             &crate::memory::capabilities::deps::ExtractDeps::from(&service),
             &["entity:alice".to_string()],
+            &["episode:shared".to_string(), "fact:joint".to_string()],
         )
         .await
         .unwrap();
