@@ -51,7 +51,10 @@ Absolute-value regression gates only apply between artifacts produced on the
 same host tag. `host_tag != baseline.host_tag` → `Invalid("host_tag
 mismatch")`, never a best-effort comparison; a differing measured `os`/`arch`
 fingerprint is `Invalid("host platform mismatch")` (ADR-0034: PR runners may
-check gross timeouts and integrity, never absolute latency). CI wiring: the PR
+check gross timeouts and integrity, never absolute latency); a differing
+`profile_digest` is `Invalid("profile digest mismatch")` — comparing against
+a baseline recorded by another profile version would silently gate on
+metrics the current profile never defined. CI wiring: the PR
 smoke profile runs integrity-only (`gates: []`); the weekly profile is
 maintainer-invoked on the local machine and is never measured in CI —
 absolute latency does not belong on shared GitHub-hosted runners, and there
@@ -111,9 +114,15 @@ The weekly profile has no CI job: there is no dedicated perf machine
 (decision 2026-10-10), so absolute latency is never measured in CI at all.
 It is invoked by the maintainer on the same local machine that recorded the
 baseline: `make perf-weekly` runs `evals/perf/profiles/perf-weekly.json`
-with `--host-tag local` against the committed
+with `--release --host-tag local` against the committed
 `evals/perf/baselines/perf-weekly-local.json` and writes
-`target/perf/perf-weekly.json`. Updating the baseline is a separate,
+`target/perf/perf-weekly.json`. The weekly gates measure the shipped
+(product) build surface; the dev profile would gate on unoptimized code, so
+baselines must be recorded with the same `--release` build. The
+assemble-scale scenario ingests a fact-producing corpus, extracts it in
+setup, and uses a unique query per assemble call so the recorded latencies
+are cold retrieval through the pipeline, not warm context-cache hits.
+Updating the baseline is a separate,
 explicit `--update-baseline` invocation documented in the runbook
 (`docs/performance/PERF_HARNESS.md`) and never a side effect of a gate run.
 

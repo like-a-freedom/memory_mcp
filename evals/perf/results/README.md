@@ -9,7 +9,7 @@ never a gate input.
 
 | Directory | Artifact | Verdict at commit time |
 |---|---|---|
-| `2026-10-10/` | `weekly.json` | Passed — first baseline (`../baselines/perf-weekly-local.json`) |
+| `2026-10-10/` | `weekly.json` | Passed — release-build baseline (`../baselines/perf-weekly-local.json`); first record was the dev-build run, superseded the same day when weekly moved to `--release` and the assemble scenario started measuring cold retrieval |
 
 How to record another run: `make perf-weekly`, then copy
 `target/perf/perf-weekly.json` into a new dated directory and add a row.

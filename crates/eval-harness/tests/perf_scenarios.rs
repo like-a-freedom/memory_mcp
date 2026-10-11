@@ -1,5 +1,6 @@
 use eval_harness::perf::profile::{DriverKind, ScenarioId, ScenarioSpec};
 use eval_harness::perf::scenarios::{PerfEnv, ScenarioEvidence, ScenarioRun};
+use memory_mcp::models::AssembleContextRequest;
 use memory_mcp::storage::DbClient;
 
 async fn episode_count(env: &PerfEnv) -> u64 {
@@ -99,4 +100,47 @@ async fn build_covers_every_scenario_id() {
         assert_eq!(run.id(), id);
         assert_eq!(run.scale(), 10);
     }
+}
+
+/// The assemble-scale corpus must be fact-producing and its queries must
+/// defeat the warm context cache: the weekly gate claims to measure
+/// `assemble_context` retrieval, so a recorded sample has to contain the
+/// pipeline (SQL channels), not a cache hit over an empty result set.
+#[tokio::test]
+async fn assemble_scale_corpus_is_fact_producing_and_retrievable() {
+    let env = PerfEnv::connect().await;
+    let spec = ScenarioSpec {
+        id: ScenarioId::AssembleScale,
+        driver: DriverKind::InProcess,
+        scales: vec![3],
+        iterations: 1,
+        warmup: 0,
+        queries: Some(2),
+    };
+    let run = eval_harness::perf::scenarios::build(&spec);
+    let ev = run.run(&env, 0).await;
+    assert!(ev.invalid_reasons.is_empty(), "{:?}", ev.invalid_reasons);
+    assert_eq!(ev.latencies_us.len(), 2, "two assemble calls per iteration");
+
+    let items =
+        memory_mcp::service::memory_container_shims::memory_capabilities_assemble_context::AssembleContextCapability::assemble_context_from_service(
+            &env.service,
+            AssembleContextRequest {
+                query: "cold retrieval check: ARR grew by Friday".into(),
+                fact_types: vec![],
+                as_of: None,
+                budget: 5,
+                view_mode: None,
+                window_start: None,
+                window_end: None,
+                access: None,
+                compact: false,
+            },
+        )
+        .await
+        .expect("cold assemble");
+    assert!(
+        !items.is_empty(),
+        "scenario corpus must yield retrievable facts"
+    );
 }

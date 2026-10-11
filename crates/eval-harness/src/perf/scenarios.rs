@@ -153,6 +153,12 @@ impl ScenarioRun for IngestScale {
 /// The recorded latencies are the assemble calls only; the ingests are
 /// setup (their SQL still shows up in the ledger) and their failures land
 /// in `invalid_reasons`.
+///
+/// The corpus is fact-producing and extracted in setup, and every assemble
+/// call uses a unique query: the context cache is keyed by query, so a
+/// repeated question would record cache-hit latencies (~tens of µs) while
+/// claiming to gate the retrieval pipeline. See the weekly-gate honesty
+/// note in `docs/performance/PERF_HARNESS.md`.
 struct AssembleScale {
     scale: u32,
     queries: u32,
@@ -178,15 +184,29 @@ impl ScenarioRun for AssembleScale {
                 iteration,
                 i
             );
-            let content =
-                format!("Perf assemble {source_id}: Ada Lovelace worked on the Analytical Engine.");
-            if let Err(reason) = ingest_one(env, source_id, content, Utc::now()).await {
+            let content = format!(
+                "Perf assemble {source_id}: ARR grew to ${}M. I will send the update by Friday.",
+                10 + i
+            );
+            let episode_id = match ingest_one(env, source_id, content, Utc::now()).await {
+                Ok(id) => id,
+                Err(reason) => {
+                    ev.invalid_reasons.push(reason);
+                    continue;
+                }
+            };
+            if let Err(reason) =
+                ExtractCapability::extract_from_service(&env.service, &episode_id, None, None)
+                    .await
+                    .map(|_| ())
+                    .map_err(|err| format!("assemble setup extract {episode_id}: {err}"))
+            {
                 ev.invalid_reasons.push(reason);
             }
         }
         for q in 0..self.queries {
             let request = AssembleContextRequest {
-                query: format!("perf query {q}"),
+                query: format!("perf query {iteration}-{q}"),
                 fact_types: vec![],
                 as_of: Some(Utc::now()),
                 budget: 5,

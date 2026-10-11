@@ -3,7 +3,7 @@
   "name": "perf-weekly",
   "budget_seconds": 1800,
   "host_tag": "local",
-  "env": {},
+  "env": { "NER_EXTRACTOR": "regex" },
   "scenarios": [
     {
       "id": "ingest-scale",

@@ -53,6 +53,14 @@ pub fn evaluate(
             baseline.host.os, baseline.host.arch, artifact.host.os, artifact.host.arch
         )]);
     }
+    // Comparing against a baseline recorded by a different profile version
+    // would silently gate on metrics the current profile never defined.
+    if baseline.profile_digest != artifact.profile_digest {
+        return PerfVerdict::Invalid(vec![format!(
+            "profile digest mismatch: baseline {} != current {}",
+            baseline.profile_digest, artifact.profile_digest
+        )]);
+    }
 
     let mut invalid: Vec<String> = Vec::new();
     let mut regressed: Vec<String> = Vec::new();
@@ -301,6 +309,23 @@ mod tests {
         match evaluate(&profile, &current, Some(&baseline)) {
             PerfVerdict::Invalid(reasons) => {
                 assert!(reasons[0].contains("host platform mismatch"), "{reasons:?}")
+            }
+            other => panic!("expected Invalid, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn profile_digest_mismatch_is_invalid() {
+        let profile = profile_with_gates(vec![]);
+        let current = artifact("host-a", single(100));
+        let mut baseline = artifact("host-a", single(100));
+        baseline.profile_digest = "stale".to_owned();
+        match evaluate(&profile, &current, Some(&baseline)) {
+            PerfVerdict::Invalid(reasons) => {
+                assert!(
+                    reasons[0].contains("profile digest mismatch"),
+                    "{reasons:?}"
+                )
             }
             other => panic!("expected Invalid, got {other:?}"),
         }

@@ -55,9 +55,12 @@ perf-smoke:
 # Weekly gates against the committed baseline. Local-only by design
 # (ADR-0082): no CI job, no dedicated perf machine. Run on the machine that
 # recorded the baseline; exit 1 = regression, 2 = invalid evidence.
+# --release: the weekly gates measure the shipped product surface; the
+# dev profile would gate on unoptimized code. Baselines must be recorded
+# with the same --release build.
 perf-weekly:
 	@mkdir -p target/perf
-	cargo run -p eval-harness --bin memory-perf --locked -- run \
+	cargo run --release -p eval-harness --bin memory-perf --locked -- run \
 		--profile evals/perf/profiles/perf-weekly.json \
 		--artifact target/perf/perf-weekly.json \
 		--baseline evals/perf/baselines/perf-weekly-local.json \

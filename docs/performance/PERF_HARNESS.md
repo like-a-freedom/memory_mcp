@@ -15,13 +15,19 @@ make perf-weekly   # weekly gates vs evals/perf/baselines/perf-weekly-local.json
 
 Exit codes, identical to the quality runner: `0` passed, `1` regressed, `2`
 invalid evidence (budget exhausted, missing samples, unreadable baseline,
-host identity mismatch). The artifact is always written to `target/perf/`,
-even for invalid runs.
+host identity or platform mismatch, profile digest mismatch). The artifact
+is always written to `target/perf/`, even for invalid runs.
+
+`perf-weekly` runs `--release`: the weekly gates measure the shipped
+product surface, and the dev profile would gate on unoptimized code.
+Baselines must therefore be recorded with the same `--release` build.
+`perf-smoke` stays on the dev profile — it is an execution-integrity step,
+not a latency measurement.
 
 Direct invocation (what `make perf-weekly` wraps):
 
 ```bash
-cargo run -p eval-harness --bin memory-perf --locked -- run \
+cargo run --release -p eval-harness --bin memory-perf --locked -- run \
   --profile evals/perf/profiles/perf-weekly.json \
   --artifact target/perf/perf-weekly.json \
   --baseline evals/perf/baselines/perf-weekly-local.json \
@@ -48,6 +54,10 @@ top of it:
    the baseline's (`host_tag mismatch`).
 3. The same comparison rejects a differing measured `os`/`arch` fingerprint
    (`host platform mismatch`) — a tag can lie, a fingerprint cannot.
+4. A differing `profile_digest` is rejected (`profile digest mismatch`):
+   a baseline recorded by another profile version may gate on metrics the
+   current profile never defined, so any profile edit requires an explicit
+   re-baseline.
 
 The single-machine setup uses the tag `local` everywhere. If the baseline
 ever moves to another machine, record a distinct tag there and retire the
@@ -64,7 +74,7 @@ never writes it. To record a new baseline:
 2. Run:
 
    ```bash
-   cargo run -p eval-harness --bin memory-perf --locked -- run \
+   cargo run --release -p eval-harness --bin memory-perf --locked -- run \
      --profile evals/perf/profiles/perf-weekly.json \
      --artifact target/perf/weekly.json \
      --host-tag local \
@@ -72,7 +82,10 @@ never writes it. To record a new baseline:
    ```
 
    The copy happens only when the verdict is `Passed`; any invalidity
-   aborts with exit 2 and leaves the old baseline in place.
+   aborts with exit 2 and leaves the old baseline in place. A profile edit
+   (for example a scenario change) changes the profile digest and the next
+   gate run exits 2 until the baseline is re-recorded — that is the
+   intended fail-closed flow, not an obstacle.
 3. Write a dated rationale following the `docs/evals/BASELINE_REVIEW_*`
    pattern: what changed, why the numbers moved, which runs are expected to
    differ from the retired baseline.
@@ -105,11 +118,22 @@ Per scenario record:
 - `invalidReasons` — must be empty for a healthy run; the runner merges
   these into an `Invalid` verdict.
 
-Known gap: the committed weekly profile (ingest + assemble) records
-`EpisodeWrite`, `ProvenanceRead`, `AliasLookup` and `Other` only.
-`AnnSearch` needs an embedding provider and `FactWrite` needs an extract
-scenario — both deferred to plan 2 of the perf design; the catalog is not
-expected to contain them yet.
+Known gaps and measurement notes:
+
+- The committed weekly profile (ingest + assemble) records `EpisodeWrite`,
+  `ProvenanceRead`, `AliasLookup` and `Other` only. `AnnSearch` needs an
+  embedding provider and `FactWrite` needs an extract scenario — both
+  deferred to plan 2 of the perf design; the catalog is not expected to
+  contain them yet.
+- `assemble-scale` is a **cold-retrieval** measurement: the corpus is
+  fact-producing and extracted in setup, and each assemble call uses a
+  unique query so the context cache (keyed by query) cannot answer. A
+  repeated-query variant would record cache-hit latencies of tens of
+  microseconds while claiming to gate the retrieval pipeline.
+- The SQL observer's bookkeeping (normalize + hash + classify, a few
+  microseconds per statement) runs inside the scenario-timed span. It is a
+  constant factor per statement and self-normalizes for regression
+  detection; it is not excluded from the measured latencies.
 
 ## Profile files
 
@@ -117,7 +141,9 @@ expected to contain them yet.
   runs in CI and via `make perf-smoke`.
 - `evals/perf/profiles/perf-weekly.json` — the gated weekly profile
   (ingest/assemble at scales 10 and 100, `p95_us` and `throughput_eps`
-  gates, `max_ratio` 1.25).
+  gates, `max_ratio` 1.25). Pins `NER_EXTRACTOR=regex` because the
+  assemble setup runs extraction; an ambient model-backed extractor would
+  make weekly numbers depend on shell state and machine resources.
 
 Profiles are schema-versioned (`memory-mcp-perf-profile/v1`) and validated
 on load; gates must reference scenarios present in the same profile.
