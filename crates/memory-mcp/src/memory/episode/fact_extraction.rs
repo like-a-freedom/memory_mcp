@@ -638,3 +638,102 @@ pub(crate) fn build_extract_log_result_with_metadata(
 
     Value::Object(result)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::models::{Episode, ExtractedFact};
+    use chrono::Utc;
+    use serde_json::Value;
+
+    #[test]
+    fn should_extract_note_fact_requires_supported_source_type_and_no_existing_facts() {
+        let episode = Episode {
+            episode_id: "episode:test".to_string(),
+            source_type: "requirement".to_string(),
+            source_id: "summary-1".to_string(),
+            content: "July 2025 planning summary: platform integrations ready, stakeholder approvals pending, response workflow scoped.".to_string(),
+            t_ref: Utc::now(),
+            t_ingested: Utc::now(),
+            scope: "org".to_string(),
+            visibility_scope: String::new(),
+            policy_tags: Vec::new(),
+            source_lineage: None,
+        };
+
+        assert!(should_extract_note_fact(&episode, &[]));
+        assert!(!should_extract_note_fact(
+            &Episode {
+                source_type: "meeting".to_string(),
+                ..episode.clone()
+            },
+            &[]
+        ));
+        assert!(should_extract_note_fact(
+            &Episode {
+                source_type: "meeting_summary".to_string(),
+                ..episode.clone()
+            },
+            &[]
+        ));
+        assert!(!should_extract_note_fact(
+            &episode,
+            &[ExtractedFact {
+                fact_id: "fact:test".to_string(),
+                fact_type: "promise".to_string(),
+            }]
+        ));
+    }
+
+    #[test]
+    fn build_extract_log_result_includes_episode_metadata_and_note_fallback_usage() {
+        let episode = Episode {
+            episode_id: "episode:test".to_string(),
+            source_type: "requirement".to_string(),
+            source_id: "summary-1".to_string(),
+            content: "July 2025 planning summary: platform integrations ready.".to_string(),
+            t_ref: Utc::now(),
+            t_ingested: Utc::now(),
+            scope: "org".to_string(),
+            visibility_scope: String::new(),
+            policy_tags: Vec::new(),
+            source_lineage: None,
+        };
+
+        let result = build_extract_log_result_with_metadata(
+            Some(&episode),
+            2,
+            &[ExtractedFact {
+                fact_id: "fact:test".to_string(),
+                fact_type: "note".to_string(),
+            }],
+            3,
+            1,
+            true,
+            0,
+        );
+
+        assert_eq!(result.get("entities").and_then(Value::as_u64), Some(2));
+        assert_eq!(result.get("facts").and_then(Value::as_u64), Some(1));
+        assert_eq!(result.get("links").and_then(Value::as_u64), Some(3));
+        assert_eq!(result.get("warnings").and_then(Value::as_u64), Some(1));
+        assert_eq!(
+            result.get("source_type").and_then(Value::as_str),
+            Some("requirement")
+        );
+        assert_eq!(
+            result.get("content_chars").and_then(Value::as_u64),
+            Some(56)
+        );
+        assert_eq!(
+            result.get("note_fallback_used").and_then(Value::as_bool),
+            Some(true)
+        );
+        assert_eq!(
+            result
+                .get("structured_line_fact_count")
+                .and_then(Value::as_u64),
+            Some(0)
+        );
+    }
+}

@@ -387,3 +387,168 @@ fn log_ner_error(
         LogLevel::Warn,
     );
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::models::EntityCandidate;
+    use crate::service::EntityExtractor;
+    use crate::storage::{DbClient, SurrealDbClient};
+    use std::collections::BTreeSet;
+    use std::sync::Arc;
+    use std::time::Duration;
+
+    #[test]
+    fn dedupe_entity_candidates_merges_duplicate_names_and_aliases() {
+        let candidates = dedupe_entity_candidates(vec![
+            EntityCandidate {
+                entity_type: "person".to_string(),
+                canonical_name: "Avery Stone".to_string(),
+                aliases: vec!["A. Stone".to_string()],
+            },
+            EntityCandidate {
+                entity_type: "company".to_string(),
+                canonical_name: "Avery Stone".to_string(),
+                aliases: vec!["Stone Group".to_string()],
+            },
+            EntityCandidate {
+                entity_type: "person".to_string(),
+                canonical_name: "Avery Stone".to_string(),
+                aliases: vec!["Avery S.".to_string()],
+            },
+            EntityCandidate {
+                entity_type: "organization".to_string(),
+                canonical_name: "Operations Forum".to_string(),
+                aliases: vec![],
+            },
+        ]);
+
+        assert_eq!(candidates.len(), 2);
+
+        let avery = candidates
+            .iter()
+            .find(|candidate| candidate.canonical_name == "Avery Stone")
+            .expect("deduped person candidate");
+        assert_eq!(avery.entity_type, "person");
+        assert_eq!(
+            avery.aliases.iter().cloned().collect::<BTreeSet<_>>(),
+            BTreeSet::from([
+                "A. Stone".to_string(),
+                "Avery S.".to_string(),
+                "Stone Group".to_string(),
+            ])
+        );
+    }
+
+    #[test]
+    fn build_ner_log_result_includes_provider_entity_count_and_zero_shot_count() {
+        let result = build_ner_log_result("gliner", 3, Some(6), None);
+
+        assert_eq!(
+            result.get("provider").and_then(Value::as_str),
+            Some("gliner")
+        );
+        assert_eq!(result.get("entity_count").and_then(Value::as_u64), Some(3));
+        assert_eq!(
+            result.get("zero_shot_label_count").and_then(Value::as_u64),
+            Some(6)
+        );
+        assert!(
+            result.get("error").is_none(),
+            "error field should be omitted when not provided"
+        );
+    }
+
+    #[test]
+    fn build_ner_log_result_omits_zero_shot_label_count_when_none() {
+        let result = build_ner_log_result("regex", 0, None, None);
+
+        assert_eq!(
+            result.get("provider").and_then(Value::as_str),
+            Some("regex")
+        );
+        assert_eq!(result.get("entity_count").and_then(Value::as_u64), Some(0));
+        assert!(
+            result.get("zero_shot_label_count").is_none(),
+            "zero_shot_label_count should be omitted when None"
+        );
+    }
+
+    #[test]
+    fn build_ner_log_result_includes_error_when_provided() {
+        let result = build_ner_log_result("gliner", 0, Some(3), Some("tokenization failed"));
+
+        assert_eq!(
+            result.get("error").and_then(Value::as_str),
+            Some("tokenization failed")
+        );
+        assert_eq!(result.get("entity_count").and_then(Value::as_u64), Some(0));
+    }
+
+    #[tokio::test(flavor = "current_thread")]
+    async fn extract_entities_does_not_block_runtime_for_local_gliner_provider() {
+        struct BlockingGlinerExtractor;
+
+        #[async_trait::async_trait]
+        impl EntityExtractor for BlockingGlinerExtractor {
+            fn provider_name(&self) -> &'static str {
+                "renamed-heavy-backend"
+            }
+
+            fn scheduling(&self) -> crate::knowledge::entity_extraction::NerScheduling {
+                crate::knowledge::entity_extraction::NerScheduling::BlockingPool
+            }
+
+            async fn extract_candidates(
+                &self,
+                _content: &str,
+            ) -> Result<Vec<EntityCandidate>, MemoryError> {
+                std::thread::sleep(Duration::from_millis(250));
+                Ok(Vec::new())
+            }
+        }
+
+        let db_client = Arc::new(
+            SurrealDbClient::connect_in_memory("episode-test", "org", "warn")
+                .await
+                .expect("connect in memory"),
+        );
+        db_client
+            .apply_migrations("org")
+            .await
+            .expect("apply migrations");
+
+        let mut service = crate::service::MemoryService::new(
+            db_client,
+            "org".to_string(),
+            "warn".to_string(),
+            50,
+            100,
+        )
+        .expect("create service");
+        service.entity_extractor = Arc::new(BlockingGlinerExtractor);
+
+        let ticker = tokio::spawn(async move {
+            let start = Instant::now();
+            tokio::time::sleep(Duration::from_millis(50)).await;
+            start.elapsed()
+        });
+        tokio::task::yield_now().await;
+
+        let _ = extract_entities(
+            &crate::memory::capabilities::deps::ExtractDeps::from(&service),
+            "episode:blocking-test",
+            "Atlas project status",
+            None,
+        )
+        .await
+        .expect("extract entities");
+        let tick_elapsed = ticker.await.expect("join ticker");
+
+        assert!(
+            tick_elapsed < Duration::from_millis(150),
+            "local gliner extraction blocked the runtime for {:?}",
+            tick_elapsed
+        );
+    }
+}

@@ -42,3 +42,65 @@ pub fn fact_from_record(record: &Value) -> Option<crate::models::Fact> {
 pub fn fact_from_value_or_wrapper(value: &Value) -> Option<crate::models::Fact> {
     fact_from_record(value).or_else(|| value.get("Object").and_then(fact_from_record))
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde_json::json;
+
+    #[test]
+    fn fact_from_record_parses_full_record() {
+        let record = json!({
+            "fact_id": "fact:test123",
+            "fact_type": "note",
+            "content": "Test fact",
+            "quote": "Test quote",
+            "source_episode": "episode:abc",
+            "t_valid": "2024-01-15T10:30:00Z",
+            "t_ingested": "2024-01-15T10:31:00Z",
+            "t_invalid": "2024-01-16T10:30:00Z",
+            "confidence": 0.95,
+            "entity_links": ["entity:1", "entity:2"],
+            "scope": "org",
+            "policy_tags": ["tag1"],
+            "provenance": {"source": "test"}
+        });
+
+        let fact = fact_from_record(&record).unwrap();
+        assert_eq!(fact.fact_id, "fact:test123");
+        assert_eq!(fact.fact_type, "note");
+        assert_eq!(fact.content, "Test fact");
+        assert_eq!(fact.quote, "Test quote");
+        assert_eq!(fact.source_episode, "episode:abc");
+        assert!((fact.confidence - 0.95).abs() < f64::EPSILON);
+        assert_eq!(fact.entity_links, vec!["entity:1", "entity:2"]);
+        assert_eq!(fact.scope, "org");
+        assert_eq!(fact.policy_tags, vec!["tag1"]);
+    }
+
+    #[test]
+    fn fact_from_record_handles_optional_fields() {
+        let record = json!({
+            "fact_id": "fact:test123",
+            "fact_type": "note",
+            "content": "Test",
+            "quote": "Quote",
+            "source_episode": "episode:abc",
+            "t_valid": "2024-01-15T10:30:00Z",
+            "scope": "org"
+        });
+
+        let fact = fact_from_record(&record).unwrap();
+        assert!(fact.t_invalid.is_none());
+        assert!(fact.t_invalid_ingested.is_none());
+        assert!(fact.entity_links.is_empty());
+        assert!(fact.policy_tags.is_empty());
+        assert!((fact.confidence).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn fact_from_record_returns_none_for_invalid_record() {
+        let record = json!({"invalid": "data"});
+        assert!(fact_from_record(&record).is_none());
+    }
+}

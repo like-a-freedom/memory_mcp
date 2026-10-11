@@ -211,6 +211,11 @@ pub(crate) async fn find_overlapping_communities(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::error::MemoryError;
+    use crate::storage::DbClient;
+    use crate::storage::table_scope::OwnedTable;
+    use serde_json::Value;
+    use std::sync::Arc;
 
     #[test]
     fn community_edge_endpoints_accept_minimal_neighbor_projection() {
@@ -223,6 +228,225 @@ mod tests {
         assert_eq!(
             community_edge_endpoints(&record),
             Some(("entity:alice".to_string(), "episode:meeting".to_string()))
+        );
+    }
+
+    #[tokio::test]
+    async fn collect_connected_entity_component_uses_neighbor_queries_instead_of_edge_scan() {
+        struct NeighborOnlyDbClient;
+
+        #[async_trait::async_trait]
+        impl DbClient for NeighborOnlyDbClient {
+            async fn select_one(
+                &self,
+                _record_id: &str,
+                _namespace: &str,
+            ) -> Result<Option<Value>, MemoryError> {
+                Ok(None)
+            }
+
+            async fn select_table(
+                &self,
+                _table: OwnedTable,
+                _namespace: &str,
+            ) -> Result<Vec<Value>, MemoryError> {
+                Ok(vec![])
+            }
+
+            #[allow(clippy::too_many_arguments)]
+            async fn create(
+                &self,
+                _record_id: &str,
+                _content: Value,
+                _namespace: &str,
+                _temporal_fields: &[&str],
+            ) -> Result<Value, MemoryError> {
+                Ok(Value::Null)
+            }
+
+            async fn update(
+                &self,
+                _record_id: &str,
+                _content: Value,
+                _namespace: &str,
+                _temporal_fields: &[&str],
+            ) -> Result<Value, MemoryError> {
+                Ok(Value::Null)
+            }
+
+            async fn query(
+                &self,
+                sql: &str,
+                vars: Option<Value>,
+                _namespace: &str,
+            ) -> Result<Value, MemoryError> {
+                // The episode store now runs graph-neighbor lookups through the
+                // core `query` op; serve the deterministic component edges here
+                // and panic on a full edge scan.
+                if sql.contains("FROM edge") {
+                    if !(sql.contains("WHERE in =") || sql.contains("WHERE out =")) {
+                        panic!("community traversal should not scan the full edge table");
+                    }
+                    let incoming = sql.contains("WHERE out =");
+                    let node_id = vars
+                        .as_ref()
+                        .map(crate::shared::record::bound_node_id)
+                        .unwrap_or_default();
+                    let mk = |from_id: &str, relation: &str, to_id: &str| {
+                        json!({
+                            "edge_id": format!("edge:{from_id}:{relation}:{to_id}"),
+                            "in": from_id,
+                            "relation": relation,
+                            "out": to_id,
+                            "t_valid": "2024-01-01T00:00:00Z",
+                            "t_ingested": "2024-01-01T00:00:00Z"
+                        })
+                    };
+                    return Ok(Value::Array(match (node_id.as_str(), incoming) {
+                        ("entity:alice", false) => {
+                            vec![mk("entity:alice", "mentioned_in", "episode:shared")]
+                        }
+                        ("episode:shared", true) => vec![
+                            mk("entity:alice", "mentioned_in", "episode:shared"),
+                            mk("entity:bob", "mentioned_in", "episode:shared"),
+                        ],
+                        ("entity:bob", false) => {
+                            vec![mk("entity:bob", "involved_in", "fact:joint")]
+                        }
+                        ("fact:joint", true) => vec![
+                            mk("entity:bob", "involved_in", "fact:joint"),
+                            mk("entity:carol", "involved_in", "fact:joint"),
+                        ],
+                        _ => vec![],
+                    }));
+                }
+                Ok(Value::Null)
+            }
+
+            async fn apply_migrations(&self, _namespace: &str) -> Result<(), MemoryError> {
+                Ok(())
+            }
+        }
+
+        let service = crate::service::MemoryService::new(
+            Arc::new(NeighborOnlyDbClient),
+            "org".to_string(),
+            "warn".to_string(),
+            50,
+            100,
+        )
+        .unwrap();
+
+        let connected = collect_connected_entity_component(
+            &crate::memory::capabilities::deps::ExtractDeps::from(&service),
+            &["entity:alice".to_string()],
+            &["episode:shared".to_string(), "fact:joint".to_string()],
+        )
+        .await
+        .unwrap();
+
+        assert_eq!(
+            connected,
+            vec![
+                "entity:alice".to_string(),
+                "entity:bob".to_string(),
+                "entity:carol".to_string(),
+            ]
+        );
+    }
+
+    #[tokio::test]
+    async fn find_overlapping_communities_uses_index_based_lookup() {
+        use std::sync::atomic::{AtomicBool, Ordering};
+
+        static SELECT_COMMUNITIES_BY_MEMBER_CALLED: AtomicBool = AtomicBool::new(false);
+        static SELECT_TABLE_CALLED: AtomicBool = AtomicBool::new(false);
+
+        #[derive(Clone)]
+        struct IndexLookupDbClient;
+
+        #[async_trait::async_trait]
+        impl DbClient for IndexLookupDbClient {
+            async fn select_one(
+                &self,
+                _record_id: &str,
+                _namespace: &str,
+            ) -> Result<Option<Value>, MemoryError> {
+                Ok(None)
+            }
+
+            async fn select_table(
+                &self,
+                _table: OwnedTable,
+                _namespace: &str,
+            ) -> Result<Vec<Value>, MemoryError> {
+                SELECT_TABLE_CALLED.store(true, Ordering::SeqCst);
+                Ok(vec![])
+            }
+
+            #[allow(clippy::too_many_arguments)]
+            async fn create(
+                &self,
+                _record_id: &str,
+                _content: Value,
+                _namespace: &str,
+                _temporal_fields: &[&str],
+            ) -> Result<Value, MemoryError> {
+                Ok(Value::Null)
+            }
+
+            async fn update(
+                &self,
+                _record_id: &str,
+                _content: Value,
+                _namespace: &str,
+                _temporal_fields: &[&str],
+            ) -> Result<Value, MemoryError> {
+                Ok(Value::Null)
+            }
+
+            async fn query(
+                &self,
+                sql: &str,
+                _vars: Option<Value>,
+                _namespace: &str,
+            ) -> Result<Value, MemoryError> {
+                // The episode store now runs the indexed community lookup
+                // through the core `query` op; flag it so the test can assert
+                // the indexed path is used (not a full `select_table` scan).
+                if sql.contains("community") && sql.contains("CONTAINSANY") {
+                    SELECT_COMMUNITIES_BY_MEMBER_CALLED.store(true, Ordering::SeqCst);
+                }
+                Ok(Value::Null)
+            }
+
+            async fn apply_migrations(&self, _namespace: &str) -> Result<(), MemoryError> {
+                Ok(())
+            }
+        }
+
+        let service = crate::service::MemoryService::new(
+            Arc::new(IndexLookupDbClient),
+            "org".to_string(),
+            "warn".to_string(),
+            50,
+            100,
+        )
+        .unwrap();
+
+        let _ = find_overlapping_communities(
+            &crate::memory::capabilities::deps::ExtractDeps::from(&service),
+            &["entity:alice".to_string(), "entity:bob".to_string()],
+        )
+        .await;
+
+        assert!(
+            SELECT_COMMUNITIES_BY_MEMBER_CALLED.load(Ordering::SeqCst),
+            "find_overlapping_communities should call select_communities_by_member_entities"
+        );
+        assert!(
+            !SELECT_TABLE_CALLED.load(Ordering::SeqCst),
+            "find_overlapping_communities should NOT call select_table (full scan)"
         );
     }
 }
