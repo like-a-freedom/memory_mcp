@@ -25,6 +25,10 @@ async fn make_service(name: &str) -> MemoryService {
     MemoryService::new(db, "org".to_string(), "warn".to_string(), 50, 100).expect("memory service")
 }
 
+const DUAL_FIELD_MSG: &str = "Invalid extract arguments: use only one inline snake_case field — `content` or `text` — not both. Do not wrap arguments in `payload`.";
+const DUAL_SOURCE_MSG: &str = "Invalid extract arguments: provide exactly one snake_case input source. Use `episode_id` for stored content, or `content`/`text` for inline text, but not both. Do not wrap arguments in `payload`.";
+const NEITHER_SOURCE_MSG: &str = "Invalid extract arguments: provide exactly one snake_case input source — `episode_id` or non-empty `content`/`text`. Do not wrap arguments in `payload`.";
+
 fn validation_message<T: std::fmt::Debug>(result: Result<T, MemoryError>) -> String {
     match result {
         Err(MemoryError::Validation(msg)) => msg,
@@ -51,10 +55,7 @@ async fn content_and_text_together_is_refused() {
         )
         .await,
     );
-    assert!(
-        msg.contains("use only one inline snake_case field"),
-        "dual-field message: {msg}"
-    );
+    assert_eq!(msg, DUAL_FIELD_MSG, "dual-field message must be exact");
 }
 
 /// episode_id + content (no text): the dual-source check fires.
@@ -76,11 +77,7 @@ async fn episode_id_and_content_together_is_refused() {
         )
         .await,
     );
-    assert!(
-        msg.contains("provide exactly one snake_case input source"),
-        "dual-source message: {msg}"
-    );
-    assert!(msg.contains("not both"), "dual-source message: {msg}");
+    assert_eq!(msg, DUAL_SOURCE_MSG, "dual-source message must be exact");
 }
 
 /// No input at all: the neither-source check fires.
@@ -102,11 +99,10 @@ async fn neither_episode_nor_inline_is_refused() {
         )
         .await,
     );
-    assert!(
-        msg.contains("provide exactly one snake_case input source"),
-        "neither-source message: {msg}"
+    assert_eq!(
+        msg, NEITHER_SOURCE_MSG,
+        "neither-source message must be exact"
     );
-    assert!(msg.contains("non-empty"), "neither-source message: {msg}");
 }
 
 /// episode_id + content + text together: the dual-field check wins — its
@@ -129,12 +125,8 @@ async fn dual_field_check_wins_over_dual_source_when_all_three_are_present() {
         )
         .await,
     );
-    assert!(
-        msg.contains("use only one inline snake_case field"),
-        "dual-field check must fire first, got: {msg}"
-    );
-    assert!(
-        !msg.contains("provide exactly one snake_case input source"),
-        "dual-source message must not leak: {msg}"
+    assert_eq!(
+        msg, DUAL_FIELD_MSG,
+        "dual-field check must fire first with its exact message, got: {msg}"
     );
 }

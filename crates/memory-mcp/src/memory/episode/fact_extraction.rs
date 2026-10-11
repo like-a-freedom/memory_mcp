@@ -38,6 +38,12 @@ fn source_type_supports_summary_fallback(source_type: &str) -> bool {
     ) || source_type.ends_with("_summary")
 }
 
+/// Whether the note-fallback fact may be extracted for this episode.
+///
+/// The reporting predicate in [`build_extract_log_result`] mirrors the
+/// source-type/content checks but adds its own precondition (exactly one
+/// Note fact); the two are deliberately not merged — extraction gates on
+/// "no facts yet", reporting on "the one fact is a note".
 pub(super) fn should_extract_note_fact(episode: &Episode, facts: &[ExtractedFact]) -> bool {
     if !facts.is_empty() {
         return false;
@@ -575,6 +581,14 @@ pub async fn extract_from_episode(
     })
 }
 
+/// Build the extract log result, deriving `note_fallback_used` and the
+/// structured-line fact count from the episode content.
+///
+/// The note-fallback reporting predicate here mirrors the
+/// source-type/content checks of [`should_extract_note_fact`] but adds
+/// its own precondition (exactly one Note fact); the two are
+/// deliberately not merged — extraction gates on "no facts yet",
+/// reporting on "the one fact is a note".
 pub(crate) fn build_extract_log_result(
     episode: Option<&Episode>,
     entities_len: usize,

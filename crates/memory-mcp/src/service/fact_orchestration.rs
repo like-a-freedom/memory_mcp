@@ -67,11 +67,8 @@ impl FactService {
             .generate_embedding_fields(ctx, fact_type, content, quote)
             .await?;
 
-        // Create fact record via FactService. `created == false` means the
-        // deterministic fact already existed (same id + same content): repeat
-        // ingestion is idempotent, so derived work below is skipped for it.
         let outcome = self
-            .create_fact(
+            .persist_fact(
                 fact_type,
                 content,
                 quote,
@@ -85,43 +82,24 @@ impl FactService {
                 index_keys,
             )
             .await?;
-        let fact_id = outcome.fact_id;
 
-        // Invalidate caches immediately after ingestion to ensure isolation.
-        invalidate_cache(&ctx.context_cache).await;
+        self.run_post_persist(
+            ctx,
+            &namespace,
+            &outcome.fact_id,
+            outcome.created,
+            source_episode,
+            fact_type,
+            content,
+            &policy_tags,
+            &entity_links,
+            t_valid,
+            episode_source_lineage.as_deref(),
+            deferred_embedding_input,
+        )
+        .await;
 
-        // Background processes: triple extraction and pending embedding retries.
-        crate::memory::episode::triples::spawn_triple_extraction(ctx, &fact_id, content);
-
-        // Synchronous claim projection for deterministic extract visibility.
-        // Runs only for freshly created facts: re-projecting an existing fact
-        // would collide with its deterministic claim IDs (noisy "already
-        // exists" errors) and must never overwrite claims of an invalidated
-        // fact. Same-id/same-content is idempotent by contract.
-        if outcome.created {
-            self.project_claims(
-                ctx,
-                &namespace,
-                &fact_id,
-                source_episode,
-                fact_type,
-                content,
-                &policy_tags,
-                &entity_links,
-                t_valid,
-                episode_source_lineage.as_deref(),
-            )
-            .await;
-        }
-
-        // Enqueue background embedding after claim projection to ensure test invariants.
-        if let Some(input) = deferred_embedding_input {
-            ctx.embedding_service
-                .enqueue_background_fact_embedding(namespace.clone(), fact_id.clone(), input)
-                .await;
-        }
-
-        Ok(fact_id)
+        Ok(outcome.fact_id)
     }
 
     /// Pre-fetch linked entity records and the episode's source lineage,
@@ -243,6 +221,100 @@ impl FactService {
             }
         };
         Ok((embedding_fields, deferred_embedding_input))
+    }
+
+    /// Persist the fact record via the knowledge write path.
+    ///
+    /// `created == false` means the deterministic fact already existed
+    /// (same id + same content): repeat ingestion is idempotent, so the
+    /// post-persist phases below skip derived work for it.
+    #[allow(clippy::too_many_arguments)]
+    async fn persist_fact(
+        &self,
+        fact_type: &str,
+        content: &str,
+        quote: &str,
+        source_episode: &str,
+        t_valid: DateTime<Utc>,
+        confidence: f64,
+        entity_links: &[String],
+        policy_tags: &[String],
+        provenance: &Provenance,
+        embedding_fields: Option<EmbeddingPayload>,
+        index_keys: Vec<String>,
+    ) -> Result<crate::knowledge::fact_service::CreateFactOutcome, MemoryError> {
+        self.create_fact(
+            fact_type,
+            content,
+            quote,
+            source_episode,
+            t_valid,
+            confidence,
+            entity_links,
+            policy_tags,
+            provenance,
+            embedding_fields,
+            index_keys,
+        )
+        .await
+    }
+
+    /// Post-persist phases in side-effect order: cache invalidation,
+    /// background triple extraction, synchronous claim projection (fresh
+    /// facts only), and the deferred embedding retry enqueue.
+    #[allow(clippy::too_many_arguments)]
+    async fn run_post_persist(
+        &self,
+        ctx: &crate::memory::capabilities::deps::ExtractDeps,
+        namespace: &str,
+        fact_id: &str,
+        created: bool,
+        source_episode: &str,
+        fact_type: &str,
+        content: &str,
+        policy_tags: &[String],
+        entity_links: &[String],
+        t_valid: DateTime<Utc>,
+        source_lineage: Option<&str>,
+        deferred_embedding_input: Option<String>,
+    ) {
+        // Invalidate caches immediately after ingestion to ensure isolation.
+        invalidate_cache(&ctx.context_cache).await;
+
+        // Background processes: triple extraction and pending embedding retries.
+        crate::memory::episode::triples::spawn_triple_extraction(ctx, fact_id, content);
+
+        // Synchronous claim projection for deterministic extract visibility.
+        // Runs only for freshly created facts: re-projecting an existing fact
+        // would collide with its deterministic claim IDs (noisy "already
+        // exists" errors) and must never overwrite claims of an invalidated
+        // fact. Same-id/same-content is idempotent by contract.
+        if created {
+            self.project_claims(
+                ctx,
+                namespace,
+                fact_id,
+                source_episode,
+                fact_type,
+                content,
+                policy_tags,
+                entity_links,
+                t_valid,
+                source_lineage,
+            )
+            .await;
+        }
+
+        // Enqueue background embedding after claim projection to ensure test invariants.
+        if let Some(input) = deferred_embedding_input {
+            ctx.embedding_service
+                .enqueue_background_fact_embedding(
+                    namespace.to_string(),
+                    fact_id.to_string(),
+                    input,
+                )
+                .await;
+        }
     }
 
     /// Project the persisted fact onto claims and record the outcome.
