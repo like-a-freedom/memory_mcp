@@ -5,7 +5,7 @@
 
 use super::artifact::PerfArtifact;
 use super::domain::ScenarioRecord;
-use super::profile::{GateDirection, GateMetric, PerfProfile};
+use super::profile::{GateDirection, GateMetric, GateSpec, PerfProfile};
 use super::reducer::{self as reducer, latency_key};
 
 /// Outcome of a perf run: pass, regression against a baseline, or an
@@ -39,27 +39,8 @@ pub fn evaluate(
     let Some(baseline) = baseline else {
         return PerfVerdict::Passed;
     };
-    if baseline.host.host_tag != artifact.host.host_tag {
-        return PerfVerdict::Invalid(vec![format!(
-            "host_tag mismatch: baseline {} != current {}",
-            baseline.host.host_tag, artifact.host.host_tag
-        )]);
-    }
-    // The tag is operator-asserted; the platform fingerprint is measured, so
-    // a tag agreeing across different machines still fails here.
-    if baseline.host.os != artifact.host.os || baseline.host.arch != artifact.host.arch {
-        return PerfVerdict::Invalid(vec![format!(
-            "host platform mismatch: baseline {}/{} != current {}/{}",
-            baseline.host.os, baseline.host.arch, artifact.host.os, artifact.host.arch
-        )]);
-    }
-    // Comparing against a baseline recorded by a different profile version
-    // would silently gate on metrics the current profile never defined.
-    if baseline.profile_digest != artifact.profile_digest {
-        return PerfVerdict::Invalid(vec![format!(
-            "profile digest mismatch: baseline {} != current {}",
-            baseline.profile_digest, artifact.profile_digest
-        )]);
+    if let Some(mismatch) = host_mismatch(baseline, artifact) {
+        return PerfVerdict::Invalid(vec![mismatch]);
     }
 
     let mut invalid: Vec<String> = Vec::new();
@@ -80,66 +61,10 @@ pub fn evaluate(
             continue;
         }
         for (key, record) in current_records {
-            let metric_key = latency_key(scenario, gate.metric);
-            let sample_count = record.latencies.map(|stats| stats.count).unwrap_or(0);
-            if sample_count < gate.min_samples {
-                invalid.push(format!(
-                    "{key}: sample count {sample_count} below min_samples {}",
-                    gate.min_samples
-                ));
-                continue;
-            }
-            let Some(current) = metric_value(record, gate.metric) else {
-                invalid.push(format!("{key}: current metric missing"));
-                continue;
-            };
-            let Some(baseline_record) = baseline.scenarios.get(key) else {
-                invalid.push(format!("{metric_key}: gate baseline metric missing"));
-                continue;
-            };
-            let Some(base_value) = metric_value(baseline_record, gate.metric) else {
-                invalid.push(format!("{metric_key}: gate baseline metric missing"));
-                continue;
-            };
-            let message = |ratio: f64| {
-                format!(
-                    "{metric_key} ratio {ratio:.3}>{} (current {current}, baseline {base_value})",
-                    gate.max_ratio
-                )
-            };
-            let beyond = match gate.direction {
-                GateDirection::LowerIsBetter => match reducer::ratio(current, base_value) {
-                    Some(ratio) => ratio > gate.max_ratio,
-                    None => {
-                        invalid.push(format!(
-                            "{metric_key}: ratio undefined (baseline {base_value})"
-                        ));
-                        continue;
-                    }
-                },
-                GateDirection::HigherIsBetter => {
-                    if current <= 0.0 {
-                        regressed.push(message(f64::INFINITY));
-                        continue;
-                    }
-                    match reducer::ratio(base_value, current) {
-                        Some(ratio) => ratio > gate.max_ratio,
-                        None => {
-                            invalid
-                                .push(format!("{metric_key}: ratio undefined (current {current})"));
-                            continue;
-                        }
-                    }
-                }
-            };
-            if beyond {
-                let ratio = match gate.direction {
-                    GateDirection::LowerIsBetter => reducer::ratio(current, base_value),
-                    GateDirection::HigherIsBetter => reducer::ratio(base_value, current),
-                };
-                if let Some(ratio) = ratio {
-                    regressed.push(message(ratio));
-                }
+            match check_record(gate, key, record, baseline) {
+                RecordOutcome::Ok => {}
+                RecordOutcome::Invalid(message) => invalid.push(message),
+                RecordOutcome::Regressed(message) => regressed.push(message),
             }
         }
     }
@@ -151,6 +76,134 @@ pub fn evaluate(
         return PerfVerdict::Regressed(regressed);
     }
     PerfVerdict::Passed
+}
+
+/// Baseline-vs-current platform identity check. First mismatch wins; the
+/// tag is operator-asserted while os/arch are measured, so a tag agreeing
+/// across different machines still fails here.
+fn host_mismatch(baseline: &PerfArtifact, artifact: &PerfArtifact) -> Option<String> {
+    if baseline.host.host_tag != artifact.host.host_tag {
+        return Some(format!(
+            "host_tag mismatch: baseline {} != current {}",
+            baseline.host.host_tag, artifact.host.host_tag
+        ));
+    }
+    if baseline.host.os != artifact.host.os || baseline.host.arch != artifact.host.arch {
+        return Some(format!(
+            "host platform mismatch: baseline {}/{} != current {}/{}",
+            baseline.host.os, baseline.host.arch, artifact.host.os, artifact.host.arch
+        ));
+    }
+    // Comparing against a baseline recorded by a different profile version
+    // would silently gate on metrics the current profile never defined.
+    if baseline.profile_digest != artifact.profile_digest {
+        return Some(format!(
+            "profile digest mismatch: baseline {} != current {}",
+            baseline.profile_digest, artifact.profile_digest
+        ));
+    }
+    None
+}
+
+/// Gate comparison result for one scenario record.
+enum GateCheck {
+    /// Ratio exceeds `max_ratio`; carries the formatted ratio.
+    Beyond(f64),
+    Within,
+    /// Ratio could not be computed; carries which side made it undefined.
+    Undefined(UndefinedSide),
+}
+
+#[derive(Clone, Copy)]
+enum UndefinedSide {
+    Baseline,
+    Current,
+}
+
+impl UndefinedSide {
+    fn label(self) -> &'static str {
+        match self {
+            Self::Baseline => "baseline",
+            Self::Current => "current",
+        }
+    }
+
+    fn value(self, current: f64, base: f64) -> f64 {
+        match self {
+            Self::Baseline => base,
+            Self::Current => current,
+        }
+    }
+}
+
+/// Direction-aware ratio check. Ratio math lives in `reducer::ratio`
+/// exclusively; a non-positive current throughput is always a regression.
+fn gate_verdict(direction: GateDirection, current: f64, base: f64, max_ratio: f64) -> GateCheck {
+    match direction {
+        GateDirection::LowerIsBetter => match reducer::ratio(current, base) {
+            Some(ratio) if ratio > max_ratio => GateCheck::Beyond(ratio),
+            Some(_) => GateCheck::Within,
+            None => GateCheck::Undefined(UndefinedSide::Baseline),
+        },
+        GateDirection::HigherIsBetter => {
+            if current <= 0.0 {
+                return GateCheck::Beyond(f64::INFINITY);
+            }
+            match reducer::ratio(base, current) {
+                Some(ratio) if ratio > max_ratio => GateCheck::Beyond(ratio),
+                Some(_) => GateCheck::Within,
+                None => GateCheck::Undefined(UndefinedSide::Current),
+            }
+        }
+    }
+}
+
+/// Outcome of gating a single current scenario record against its baseline.
+enum RecordOutcome {
+    Ok,
+    Invalid(String),
+    Regressed(String),
+}
+
+/// Validate one record's evidence, then gate its metric. Precedence within
+/// a record: evidence invalidity (samples, missing values) short-circuits
+/// before any ratio comparison.
+fn check_record(
+    gate: &GateSpec,
+    key: &str,
+    record: &ScenarioRecord,
+    baseline: &PerfArtifact,
+) -> RecordOutcome {
+    let scenario = gate.scenario.as_str();
+    let metric_key = latency_key(scenario, gate.metric);
+    let sample_count = record.latencies.map(|stats| stats.count).unwrap_or(0);
+    if sample_count < gate.min_samples {
+        return RecordOutcome::Invalid(format!(
+            "{key}: sample count {sample_count} below min_samples {}",
+            gate.min_samples
+        ));
+    }
+    let Some(current) = metric_value(record, gate.metric) else {
+        return RecordOutcome::Invalid(format!("{key}: current metric missing"));
+    };
+    let Some(baseline_record) = baseline.scenarios.get(key) else {
+        return RecordOutcome::Invalid(format!("{metric_key}: gate baseline metric missing"));
+    };
+    let Some(base_value) = metric_value(baseline_record, gate.metric) else {
+        return RecordOutcome::Invalid(format!("{metric_key}: gate baseline metric missing"));
+    };
+    match gate_verdict(gate.direction, current, base_value, gate.max_ratio) {
+        GateCheck::Beyond(ratio) => RecordOutcome::Regressed(format!(
+            "{metric_key} ratio {ratio:.3}>{} (current {current}, baseline {base_value})",
+            gate.max_ratio
+        )),
+        GateCheck::Within => RecordOutcome::Ok,
+        GateCheck::Undefined(side) => RecordOutcome::Invalid(format!(
+            "{metric_key}: ratio undefined ({} {})",
+            side.label(),
+            side.value(current, base_value)
+        )),
+    }
 }
 
 /// Gate metric value of one scenario record; `None` when the record has no
