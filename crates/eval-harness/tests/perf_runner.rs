@@ -175,3 +175,107 @@ async fn runner_catalog_does_not_fragment_record_ids() {
         record.sql.len()
     );
 }
+
+const ASSEMBLE_PROFILE_JSON: &str = r#"{
+  "schema": "memory-mcp-perf-profile/v1",
+  "name": "runner-phase-test",
+  "budget_seconds": 60,
+  "host_tag": "test",
+  "scenarios": [
+    {
+      "id": "assemble-scale",
+      "driver": "in_process",
+      "scales": [2],
+      "iterations": 1,
+      "warmup": 0,
+      "queries": 1
+    }
+  ]
+}"#;
+
+/// Phase split: catalog records carry a `phase` field so SQL from a
+/// scenario's untimed setup (corpus ingest/extract) is distinguishable from
+/// the timed measurement. `IngestScale` times its whole loop, so every
+/// catalog record must be tagged `timed`.
+#[tokio::test]
+async fn runner_catalog_tags_ingest_scale_sql_as_timed_phase() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let profile_path = dir.path().join("profile.json");
+    std::fs::write(&profile_path, PROFILE_JSON).expect("write profile");
+    let profile = load(&profile_path).expect("valid profile");
+
+    let opts = options(dir.path(), "artifact.json");
+    let artifact_path = opts.artifact_path.clone();
+    let outcome = run_profile(&profile, "phase-ingest-digest", opts).await;
+    assert!(
+        matches!(outcome.verdict, PerfVerdict::Passed),
+        "run must be healthy: {:?}",
+        outcome.verdict
+    );
+
+    let raw = std::fs::read_to_string(&artifact_path).expect("read artifact json");
+    let json: serde_json::Value = serde_json::from_str(&raw).expect("artifact is valid json");
+    let catalog = json["scenarios"]["ingest-scale-2"]["sql"]
+        .as_array()
+        .expect("sql catalog present");
+    assert!(!catalog.is_empty(), "ingest-scale must record SQL");
+    for entry in catalog {
+        assert_eq!(
+            entry["phase"].as_str(),
+            Some("timed"),
+            "every ingest-scale statement is part of the timed measurement: {entry}"
+        );
+    }
+}
+
+/// AssembleScale ingests and extracts the corpus as untimed setup, then times
+/// the assemble calls: the catalog must contain both phases, extract writes
+/// stay in `setup`, and the vector search serving assemble stays `timed`.
+#[tokio::test]
+async fn runner_catalog_splits_assemble_setup_from_timed_phase() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let profile_path = dir.path().join("profile.json");
+    std::fs::write(&profile_path, ASSEMBLE_PROFILE_JSON).expect("write profile");
+    let profile = load(&profile_path).expect("valid profile");
+
+    let opts = options(dir.path(), "artifact.json");
+    let artifact_path = opts.artifact_path.clone();
+    let outcome = run_profile(&profile, "phase-assemble-digest", opts).await;
+    assert!(
+        matches!(outcome.verdict, PerfVerdict::Passed),
+        "run must be healthy: {:?}",
+        outcome.verdict
+    );
+
+    let raw = std::fs::read_to_string(&artifact_path).expect("read artifact json");
+    let json: serde_json::Value = serde_json::from_str(&raw).expect("artifact is valid json");
+    let catalog = json["scenarios"]["assemble-scale-2"]["sql"]
+        .as_array()
+        .expect("sql catalog present");
+
+    let phases: std::collections::BTreeSet<&str> = catalog
+        .iter()
+        .filter_map(|entry| entry["phase"].as_str())
+        .collect();
+    assert_eq!(
+        phases,
+        ["setup", "timed"].into_iter().collect(),
+        "assemble-scale must record both setup and timed SQL, got {phases:?}"
+    );
+    for entry in catalog {
+        let class = entry["class"].as_str().unwrap_or_default();
+        let phase = entry["phase"].as_str().unwrap_or_default();
+        if class == "FactWrite" {
+            assert_eq!(
+                phase, "setup",
+                "corpus writes belong to the untimed setup: {entry}"
+            );
+        }
+        if class == "AnnSearch" {
+            assert_eq!(
+                phase, "timed",
+                "assemble's vector search belongs to the timed measurement: {entry}"
+            );
+        }
+    }
+}
