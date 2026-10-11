@@ -997,6 +997,27 @@ fn parse_calendar_period(raw: &str) -> Option<CalendarPeriod> {
         .filter(|token| !token.is_empty())
         .map(str::to_lowercase)
         .collect::<Vec<_>>();
+    for window in tokens.windows(3) {
+        let (Some(first_month), Some(second_month), Ok(year)) = (
+            super::temporal::month_number(&window[0]),
+            super::temporal::month_number(&window[1]),
+            window[2].parse::<i32>(),
+        ) else {
+            continue;
+        };
+        if second_month != first_month + 1 || !(1900..=2200).contains(&year) {
+            continue;
+        }
+        let (end_year, end_month) = if second_month == 12 {
+            (year.checked_add(1)?, 1)
+        } else {
+            (year, second_month + 1)
+        };
+        return Some(CalendarPeriod {
+            start: NaiveDate::from_ymd_opt(year, first_month, 1)?,
+            end_exclusive: NaiveDate::from_ymd_opt(end_year, end_month, 1)?,
+        });
+    }
     for (index, token) in tokens.iter().enumerate() {
         if let Some(quarter) = quarter_number(token)
             && let Some(year) = tokens
@@ -1359,7 +1380,23 @@ fn is_event_time_query_cue(term: &str) -> bool {
 
 fn is_calendar_period_component(term: &str, period: CalendarPeriod) -> bool {
     term == period.start.year().to_string()
-        || super::temporal::month_number(term) == Some(period.start.month())
+        || super::temporal::month_number(term).is_some_and(|month| {
+            [period.start.year(), period.start.year() + 1]
+                .into_iter()
+                .filter_map(|year| {
+                    let first_day = chrono::NaiveDate::from_ymd_opt(year, month, 1)?;
+                    let (next_year, next_month) = if month == 12 {
+                        (year + 1, 1)
+                    } else {
+                        (year, month + 1)
+                    };
+                    let next_month = chrono::NaiveDate::from_ymd_opt(next_year, next_month, 1)?;
+                    Some((first_day, next_month))
+                })
+                .any(|(first_day, next_month)| {
+                    first_day < period.end_exclusive && next_month > period.start
+                })
+        })
         || quarter_number(term)
             .is_some_and(|quarter| ((period.start.month() - 1) / 3) + 1 == quarter)
         || (period.is_single_day() && term == period.start.day().to_string())
@@ -2880,6 +2917,48 @@ mod tests {
         assert_eq!(
             evaluate_candidate(&query, &graph_candidate, &policy),
             AdmissionDecision::Reject(RejectReason::InsufficientEvidence)
+        );
+    }
+
+    #[test]
+    fn adjacent_months_with_shared_year_form_one_calendar_period() {
+        let period = parse_calendar_period("march april 2026 atlas beacon decisions")
+            .expect("calendar range");
+        assert_eq!(
+            period.start,
+            chrono::NaiveDate::from_ymd_opt(2026, 3, 1).unwrap()
+        );
+        assert_eq!(
+            period.end_exclusive,
+            chrono::NaiveDate::from_ymd_opt(2026, 5, 1).unwrap()
+        );
+    }
+
+    #[test]
+    fn adjacent_month_range_crosses_year_boundary() {
+        let period =
+            parse_calendar_period("November December 2026").expect("year-crossing calendar period");
+        assert_eq!(
+            period.start,
+            chrono::NaiveDate::from_ymd_opt(2026, 11, 1).unwrap()
+        );
+        assert_eq!(
+            period.end_exclusive,
+            chrono::NaiveDate::from_ymd_opt(2027, 1, 1).unwrap()
+        );
+        let query = query("November December 2026");
+        let mut fact = candidate("The annual review was approved.", None);
+        fact.fact.t_valid = chrono::DateTime::parse_from_rfc3339("2026-11-15T09:00:00Z")
+            .expect("valid reference date")
+            .with_timezone(&Utc);
+        fact.fact.t_ingested = fact.fact.t_valid;
+        let access = AccessPayload::default();
+        let policy =
+            AdmissionPolicy::new(0.7, fact.fact.t_valid + chrono::Duration::days(1), &access);
+
+        assert_eq!(
+            evaluate_candidate(&query, &fact, &policy),
+            AdmissionDecision::Admit(AdmissionBasis::CalendarPeriod)
         );
     }
 }

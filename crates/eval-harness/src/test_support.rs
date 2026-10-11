@@ -150,10 +150,27 @@ pub async fn seed_fact_with_links(
     entity_links: Vec<String>,
     source_id: Option<&str>,
 ) -> String {
+    seed_fact_with_links_and_source(service, content, t_valid, entity_links, source_id)
+        .await
+        .fact_id
+}
+
+pub struct SeededFact {
+    pub fact_id: String,
+    pub source_episode_id: Option<String>,
+}
+
+pub async fn seed_fact_with_links_and_source(
+    service: &MemoryService,
+    content: &str,
+    t_valid: DateTime<Utc>,
+    entity_links: Vec<String>,
+    source_id: Option<&str>,
+) -> SeededFact {
     let normalized_source_id = source_id.filter(|s| !s.trim().is_empty());
 
     if normalized_source_id.is_none() {
-        return service
+        let fact_id = service
             .add_fact(
                 "note",
                 content,
@@ -167,6 +184,10 @@ pub async fn seed_fact_with_links(
             )
             .await
             .expect("seed fact should succeed");
+        return SeededFact {
+            fact_id,
+            source_episode_id: None,
+        };
     }
 
     let source_id = normalized_source_id
@@ -188,7 +209,7 @@ pub async fn seed_fact_with_links(
     .await
     .expect("seed project episode should succeed");
 
-    service
+    let fact_id = service
         .add_fact(
             "note",
             content,
@@ -201,5 +222,9 @@ pub async fn seed_fact_with_links(
             Provenance::agent_observation(&episode_id),
         )
         .await
-        .expect("seed project fact should succeed")
+        .expect("seed project fact should succeed");
+    SeededFact {
+        fact_id,
+        source_episode_id: Some(episode_id),
+    }
 }

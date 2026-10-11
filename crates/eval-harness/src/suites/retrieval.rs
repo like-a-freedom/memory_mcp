@@ -174,6 +174,21 @@ fn id_retrieval_evidence(
     ))
 }
 
+fn scored_evidence_id(
+    item_id: &str,
+    source_episode: &str,
+    seeded_facts: &BTreeMap<String, String>,
+) -> String {
+    if seeded_facts.contains_key(item_id) {
+        item_id.to_string()
+    } else if item_id.starts_with("episode_fallback:") && seeded_facts.contains_key(source_episode)
+    {
+        source_episode.to_string()
+    } else {
+        item_id.to_string()
+    }
+}
+
 fn invalid_case_outcome(
     case_key: CaseKey,
     reason: &str,
@@ -302,7 +317,7 @@ impl LocalRetrievalSuite {
                     };
                 }
             };
-            let fact_id = test_support::seed_fact_with_links(
+            let seeded = test_support::seed_fact_with_links_and_source(
                 &service,
                 &fact.content,
                 t_valid,
@@ -310,7 +325,10 @@ impl LocalRetrievalSuite {
                 fact.source_id.as_deref(),
             )
             .await;
-            seeded_facts.insert(fact_id, fact.content.clone());
+            seeded_facts.insert(seeded.fact_id, fact.content.clone());
+            if let Some(episode_id) = seeded.source_episode_id {
+                seeded_facts.insert(episode_id, fact.content.clone());
+            }
         }
 
         let required_groups = match resolve_gold_groups(&case.expected.must_contain, &seeded_facts)
@@ -372,7 +390,7 @@ impl LocalRetrievalSuite {
 
         let returned_ids = items
             .iter()
-            .map(|item| item.fact_id.clone())
+            .map(|item| scored_evidence_id(&item.fact_id, &item.source_episode, &seeded_facts))
             .collect::<Vec<_>>();
         let cutoff = match u32::try_from(case.budget) {
             Ok(cutoff) if cutoff > 0 => cutoff,
@@ -439,6 +457,9 @@ impl LocalRetrievalSuite {
         }
         if !duplicate_free {
             failures.push("retrieval returned duplicate fact IDs".into());
+        }
+        if status == CaseStatus::QualityFailed {
+            failures.push(format!("returned evidence IDs: {returned_ids:?}"));
         }
 
         EvalCaseOutcome {
@@ -526,6 +547,49 @@ impl EvalSuite for LocalRetrievalSuite {
 mod tests {
     use super::*;
     use crate::reducer::SuiteReducer;
+
+    #[test]
+    fn episode_fallback_scores_its_persisted_source_identity() {
+        let seeded = BTreeMap::from([
+            ("fact:atlas".into(), "Atlas decision".into()),
+            ("episode:atlas".into(), "Atlas decision".into()),
+        ]);
+        assert_eq!(
+            scored_evidence_id("episode_fallback:episode:atlas", "episode:atlas", &seeded),
+            "episode:atlas"
+        );
+    }
+
+    #[test]
+    fn unrelated_synthetic_item_does_not_inherit_episode_gold() {
+        let seeded = BTreeMap::from([("episode:atlas".into(), "Atlas decision".into())]);
+        assert_eq!(
+            scored_evidence_id("facet:atlas", "episode:atlas", &seeded),
+            "facet:atlas"
+        );
+    }
+
+    #[tokio::test]
+    async fn breadth_product_decisions_cover_march_and_april_without_old_summaries() {
+        let cases = load_cases().expect("load local retrieval cases");
+        let case = cases
+            .iter()
+            .find(|case| case.id == "ret-061")
+            .expect("breadth product decision case exists");
+        let outcome = LocalRetrievalSuite::run_case(case).await;
+        assert_eq!(outcome.status, CaseStatus::Passed, "{outcome:#?}");
+    }
+
+    #[tokio::test]
+    async fn breadth_decisions_retrieve_each_source_without_quarterly_digests() {
+        let cases = load_cases().expect("load local retrieval cases");
+        let case = cases
+            .iter()
+            .find(|case| case.id == "ret-062")
+            .expect("breadth decision case exists");
+        let outcome = LocalRetrievalSuite::run_case(case).await;
+        assert_eq!(outcome.status, CaseStatus::Passed, "{outcome:#?}");
+    }
 
     fn reducer_outcome(
         id: &str,
