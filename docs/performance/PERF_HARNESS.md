@@ -112,19 +112,25 @@ Per scenario record:
   unavailable (`null`, documented ADR-0082); with the embedded `mem://`
   engine disk bytes are legitimately zero.
 - `sql` — the SQL catalog: one record per distinct normalized template
-  (`templateHash`, `op`, `class`, `count`, `stats`), plus one `(overflow)`
-  row if the 64-template cap was hit. Classes are the closed vocabulary in
-  `crates/eval-harness/src/perf/db_observer.rs`.
+  per phase (`templateHash`, `op`, `class`, `phase`, `count`, `stats`),
+  plus one `(overflow)` row per phase if the 64-template cap was hit.
+  `phase` is `setup` (untimed corpus/ingest/extract work a scenario does
+  around its measurement) or `timed` (the measured capability call); a
+  template observed in both phases yields one record per phase, and
+  artifacts predating the field deserialize as `setup`. Classes are the
+  closed vocabulary in `crates/eval-harness/src/perf/db_observer.rs`.
 - `invalidReasons` — must be empty for a healthy run; the runner merges
   these into an `Invalid` verdict.
 
 Known gaps and measurement notes:
 
-- The committed weekly profile (ingest + assemble) records `EpisodeWrite`,
-  `ProvenanceRead`, `AliasLookup` and `Other` only. `AnnSearch` needs an
-  embedding provider and `FactWrite` needs an extract scenario — both
-  deferred to plan 2 of the perf design; the catalog is not expected to
-  contain them yet.
+- The ingest scenarios measure ingest only, so their catalog is entirely
+  `timed`; assemble-scale splits `FactWrite`/`EdgeNeighbors` (corpus
+  extract, `setup`) from the retrieval statements (`timed`). Extract's
+  community walk is incremental — seeded from stored membership, fresh
+  neighborhood only — so its `EdgeNeighbors` statement count stays flat
+  as the corpus grows (regression-guarded by
+  `crates/memory-mcp/tests/community_component_incremental.rs`).
 - `assemble-scale` is a **cold-retrieval** measurement: the corpus is
   fact-producing and extracted in setup, and each assemble call uses a
   unique query so the context cache (keyed by query) cannot answer. A

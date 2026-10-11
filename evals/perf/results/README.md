@@ -10,6 +10,7 @@ never a gate input.
 | Directory | Artifact | Verdict at commit time |
 |---|---|---|
 | `2026-10-10/` | `weekly.json` | Passed — release-build baseline (`../baselines/perf-weekly-local.json`); first record was the dev-build run, superseded the same day when weekly moved to `--release` and the assemble scenario started measuring cold retrieval |
+| `2026-10-11/` | `weekly.json` | Passed — new baseline after the incremental community walk (extract's `EdgeNeighbors` setup statements ~150× fewer at scale 100, run 97s → 3.7s) and the catalog's setup/timed phase split |
 
 How to record another run: `make perf-weekly`, then copy
 `target/perf/perf-weekly.json` into a new dated directory and add a row.

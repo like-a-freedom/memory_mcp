@@ -71,7 +71,11 @@ deliberately outside the funnel and is never observed. When no observer is
 installed the cost is one `OnceLock` read. Production builds do not enable
 `eval-support`; the observation carries no `request_id`, tenant, or data —
 only closed-vocabulary operation names and a normalized SQL template
-(ADR-0048 bounded labels).
+(ADR-0048 bounded labels). The ledger additionally tags each observation
+with a `setup`/`timed` phase that scenarios flip around their measured
+call, so untimed corpus work (for example the extract pipeline's SQL) is
+never mistaken for timed SQL in the artifact catalog; the phase field is
+additive and older artifacts deserialize it as `setup`.
 
 ### Resource sampling and the `libc` decision
 
