@@ -31,16 +31,57 @@ pub async fn extract_entities(
     let provider = service.entity_extractor.provider_name();
     let content_chars = content.chars().count();
 
-    let extraction_result = match service.entity_extractor.scheduling() {
+    let candidates =
+        match run_ner_extraction(service.entity_extractor.clone(), content, zero_shot_labels).await
+        {
+            Ok(candidates) => candidates,
+            Err(err) => {
+                let label_count = zero_shot_labels.map(|labels| labels.len());
+                log_ner_error(service, provider, content_chars, label_count, &err, timer);
+                return Err(err);
+            }
+        };
+
+    service.logger.log(
+        log_event(
+            "ner.extract.done",
+            json!({"content_chars": content_chars}),
+            build_ner_log_result(
+                provider,
+                candidates.len(),
+                zero_shot_labels.map(|labels| labels.len()),
+                None,
+            ),
+            None,
+            None,
+            Some(duration_ms(timer.elapsed())),
+        ),
+        LogLevel::Info,
+    );
+
+    let entities = resolve_and_dedupe(service, provider, candidates).await?;
+
+    persist_extraction_projection(service, episode_id, &entities).await?;
+
+    Ok(entities)
+}
+
+/// Run the extractor, honoring its scheduling mode.
+///
+/// A blocking-pool worker is a task of its own, so the ambient correlation id
+/// does not cross the boundary. Capture it at the call site and re-enter the
+/// scope inside, so the extractor's own events (`ner.*`) carry the same
+/// `req=` as the request that awaited them.
+async fn run_ner_extraction(
+    extractor: std::sync::Arc<dyn crate::knowledge::entity_extraction::EntityExtractor>,
+    content: &str,
+    zero_shot_labels: Option<&[String]>,
+) -> Result<Vec<EntityCandidate>, MemoryError> {
+    match extractor.scheduling() {
         NerScheduling::BlockingPool => {
-            let extractor = service.entity_extractor.clone();
             let content_owned = content.to_string();
             let zero_shot_labels = zero_shot_labels.map(<[String]>::to_vec);
             let handle = tokio::runtime::Handle::current();
-            // A blocking-pool worker is a task of its own, so the ambient
-            // correlation id does not cross the boundary. Capture it here and
-            // re-enter the scope inside, so the extractor's own events (`ner.*`)
-            // carry the same `req=` as the request that awaited them.
             let correlation_id = crate::logging::correlation::current();
 
             tokio::task::spawn_blocking(move || {
@@ -68,41 +109,22 @@ pub async fn extract_entities(
         }
         NerScheduling::Inline => match zero_shot_labels {
             Some(labels) => {
-                service
-                    .entity_extractor
+                extractor
                     .extract_candidates_with_labels(content, labels)
                     .await
             }
-            None => service.entity_extractor.extract_candidates(content).await,
+            None => extractor.extract_candidates(content).await,
         },
-    };
+    }
+}
 
-    let candidates = match extraction_result {
-        Ok(candidates) => candidates,
-        Err(err) => {
-            let label_count = zero_shot_labels.map(|labels| labels.len());
-            log_ner_error(service, provider, content_chars, label_count, &err, timer);
-            return Err(err);
-        }
-    };
-
-    service.logger.log(
-        log_event(
-            "ner.extract.done",
-            json!({"content_chars": content_chars}),
-            build_ner_log_result(
-                provider,
-                candidates.len(),
-                zero_shot_labels.map(|labels| labels.len()),
-                None,
-            ),
-            None,
-            None,
-            Some(duration_ms(timer.elapsed())),
-        ),
-        LogLevel::Info,
-    );
-
+/// Deduplicate raw candidates, resolve each to a durable entity id, and
+/// drop repeats. Resolution failures log `ner.resolve.error` and abort.
+async fn resolve_and_dedupe(
+    service: &ExtractDeps,
+    provider: &str,
+    candidates: Vec<EntityCandidate>,
+) -> Result<Vec<ExtractedEntity>, MemoryError> {
     let candidates = dedupe_entity_candidates(candidates);
     let mut entities = Vec::with_capacity(candidates.len());
     let mut seen_entity_ids = HashSet::new();
@@ -142,8 +164,6 @@ pub async fn extract_entities(
             });
         }
     }
-
-    persist_extraction_projection(service, episode_id, &entities).await?;
 
     Ok(entities)
 }
