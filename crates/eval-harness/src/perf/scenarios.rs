@@ -4,11 +4,13 @@
 //! iterations are warm-up (discarded) and which are recorded. Scenarios never
 //! exclude warm-up themselves.
 
+use std::future::Future;
 use std::sync::{Arc, Mutex};
 use std::time::Instant;
 
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};
+use memory_mcp::error::MemoryError;
 use memory_mcp::eval_support::QueryObserver;
 use memory_mcp::models::{
     AssembleContextRequest, EntityCandidate, ExplainItem, ExplainRequest, IngestRequest,
@@ -89,12 +91,32 @@ fn micros_since(start: Instant) -> u64 {
     u64::try_from(start.elapsed().as_micros()).unwrap_or(u64::MAX)
 }
 
+/// Deterministic per-iteration source id, unique across scenario, scale,
+/// iteration and index so no iteration can be swallowed by dedup.
+fn perf_source_id(scenario: ScenarioId, scale: u32, iteration: u32, i: u32) -> String {
+    format!("perf-{}-{}-{}-{}", scenario.as_str(), scale, iteration, i)
+}
+
+/// Times one capability call: records the latency on success, or the
+/// `"{label}: {err}"` reason on failure.
+async fn timed<T>(
+    ev: &mut ScenarioEvidence,
+    label: &str,
+    fut: impl Future<Output = Result<T, MemoryError>>,
+) {
+    let start = Instant::now();
+    match fut.await {
+        Ok(_) => ev.latencies_us.push(micros_since(start)),
+        Err(err) => ev.invalid_reasons.push(format!("{label}: {err}")),
+    }
+}
+
 async fn ingest_one(
     env: &PerfEnv,
     source_id: String,
     content: String,
     t_ref: DateTime<Utc>,
-) -> Result<String, String> {
+) -> Result<String, MemoryError> {
     IngestCapability::ingest_from_service(
         &env.service,
         IngestRequest {
@@ -108,7 +130,6 @@ async fn ingest_one(
         None,
     )
     .await
-    .map_err(|err| format!("ingest {source_id}: {err}"))
 }
 
 /// N ingests with ids unique across scenario, scale, iteration and index, so
@@ -132,20 +153,15 @@ impl ScenarioRun for IngestScale {
         env.ledger.set_phase(QueryPhase::Timed);
         let mut ev = ScenarioEvidence::empty(self.id(), self.scale);
         for i in 0..self.scale {
-            let source_id = format!(
-                "perf-{}-{}-{}-{}",
-                self.id().as_str(),
-                self.scale,
-                iteration,
-                i
-            );
+            let source_id = perf_source_id(self.id(), self.scale, iteration, i);
             let content =
                 format!("Perf ingest {source_id}: Ada Lovelace worked on the Analytical Engine.");
-            let start = Instant::now();
-            match ingest_one(env, source_id, content, Utc::now()).await {
-                Ok(_) => ev.latencies_us.push(micros_since(start)),
-                Err(reason) => ev.invalid_reasons.push(reason),
-            }
+            timed(
+                &mut ev,
+                &format!("ingest {source_id}"),
+                ingest_one(env, source_id, content, Utc::now()),
+            )
+            .await;
         }
         ev
     }
@@ -180,21 +196,16 @@ impl ScenarioRun for AssembleScale {
         env.ledger.set_phase(QueryPhase::Setup);
         let mut ev = ScenarioEvidence::empty(self.id(), self.scale);
         for i in 0..self.scale {
-            let source_id = format!(
-                "perf-{}-{}-{}-{}",
-                self.id().as_str(),
-                self.scale,
-                iteration,
-                i
-            );
+            let source_id = perf_source_id(self.id(), self.scale, iteration, i);
             let content = format!(
                 "Perf assemble {source_id}: ARR grew to ${}M. I will send the update by Friday.",
                 10 + i
             );
-            let episode_id = match ingest_one(env, source_id, content, Utc::now()).await {
+            let episode_id = match ingest_one(env, source_id.clone(), content, Utc::now()).await {
                 Ok(id) => id,
-                Err(reason) => {
-                    ev.invalid_reasons.push(reason);
+                Err(err) => {
+                    ev.invalid_reasons
+                        .push(format!("ingest {source_id}: {err}"));
                     continue;
                 }
             };
@@ -220,13 +231,12 @@ impl ScenarioRun for AssembleScale {
                 access: None,
                 compact: false,
             };
-            let start = Instant::now();
-            match AssembleContextCapability::assemble_context_from_service(&env.service, request)
-                .await
-            {
-                Ok(_) => ev.latencies_us.push(micros_since(start)),
-                Err(err) => ev.invalid_reasons.push(format!("assemble: {err}")),
-            }
+            timed(
+                &mut ev,
+                "assemble",
+                AssembleContextCapability::assemble_context_from_service(&env.service, request),
+            )
+            .await;
         }
         ev
     }
@@ -261,7 +271,9 @@ async fn corpus_fixture(
             "Perf fixture {i}: ARR grew to ${}M. I will send the update by Friday.",
             3 + i
         );
-        let episode_id = ingest_one(env, source_id, content, fixture_t_ref()).await?;
+        let episode_id = ingest_one(env, source_id.clone(), content, fixture_t_ref())
+            .await
+            .map_err(|err| format!("ingest {source_id}: {err}"))?;
         episode_ids.push(episode_id);
     }
     for episode_id in &episode_ids {
@@ -338,13 +350,12 @@ impl ScenarioRun for LatencyScenario {
             ScenarioId::LatencyExtract => {
                 let episode_id =
                     &fixture.episode_ids[(iteration as usize) % fixture.episode_ids.len()];
-                let start = Instant::now();
-                match ExtractCapability::extract_from_service(&env.service, episode_id, None, None)
-                    .await
-                {
-                    Ok(_) => ev.latencies_us.push(micros_since(start)),
-                    Err(err) => ev.invalid_reasons.push(format!("extract: {err}")),
-                }
+                timed(
+                    &mut ev,
+                    "extract",
+                    ExtractCapability::extract_from_service(&env.service, episode_id, None, None),
+                )
+                .await;
             }
             ScenarioId::LatencyResolve => {
                 let candidate = EntityCandidate {
@@ -352,11 +363,12 @@ impl ScenarioRun for LatencyScenario {
                     canonical_name: format!("Perf Candidate {}", iteration % self.scale.max(1)),
                     aliases: vec![],
                 };
-                let start = Instant::now();
-                match ResolveCapability::resolve_from_service(&env.service, candidate, None).await {
-                    Ok(_) => ev.latencies_us.push(micros_since(start)),
-                    Err(err) => ev.invalid_reasons.push(format!("resolve: {err}")),
-                }
+                timed(
+                    &mut ev,
+                    "resolve",
+                    ResolveCapability::resolve_from_service(&env.service, candidate, None),
+                )
+                .await;
             }
             ScenarioId::LatencyExplain => {
                 if fixture.fact_ids.is_empty() {
@@ -383,11 +395,12 @@ impl ScenarioRun for LatencyScenario {
                     context_pack,
                     compact: false,
                 };
-                let start = Instant::now();
-                match ExplainCapability::explain_from_service(&env.service, request, None).await {
-                    Ok(_) => ev.latencies_us.push(micros_since(start)),
-                    Err(err) => ev.invalid_reasons.push(format!("explain: {err}")),
-                }
+                timed(
+                    &mut ev,
+                    "explain",
+                    ExplainCapability::explain_from_service(&env.service, request, None),
+                )
+                .await;
             }
             ScenarioId::LatencyInvalidate => {
                 if fixture.fact_ids.is_empty() {
@@ -401,13 +414,12 @@ impl ScenarioRun for LatencyScenario {
                     reason: "perf latency scenario".into(),
                     t_invalid: Utc::now(),
                 };
-                let start = Instant::now();
-                match InvalidateCapability::invalidate_from_service(&env.service, request, None)
-                    .await
-                {
-                    Ok(_) => ev.latencies_us.push(micros_since(start)),
-                    Err(err) => ev.invalid_reasons.push(format!("invalidate: {err}")),
-                }
+                timed(
+                    &mut ev,
+                    "invalidate",
+                    InvalidateCapability::invalidate_from_service(&env.service, request, None),
+                )
+                .await;
             }
             ScenarioId::IngestScale | ScenarioId::AssembleScale => {
                 ev.invalid_reasons
