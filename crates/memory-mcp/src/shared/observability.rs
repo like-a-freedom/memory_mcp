@@ -163,7 +163,7 @@ pub const METRIC_HTTP_BACKGROUND_EMBEDDING_RUNNING_TASKS: &str =
 pub const METRIC_HTTP_BACKGROUND_EMBEDDING_RETAINED_BYTES: &str =
     "memory_http_background_embedding_retained_bytes";
 
-/// Bytes in glibc's main arena, from `mallinfo2.arena`.
+/// Total non-mmap bytes in glibc arenas, from `mallinfo2.arena`.
 pub const METRIC_ALLOC_ARENA_BYTES: &str = "memory_alloc_arena_bytes";
 /// Bytes in glibc's mmap'd blocks, from `mallinfo2.hblkhd`.
 pub const METRIC_ALLOC_MMAP_BYTES: &str = "memory_alloc_mmap_bytes";
@@ -171,7 +171,7 @@ pub const METRIC_ALLOC_MMAP_BYTES: &str = "memory_alloc_mmap_bytes";
 pub const METRIC_ALLOC_IN_USE_BYTES: &str = "memory_alloc_in_use_bytes";
 /// Bytes in glibc's free blocks, from `mallinfo2.fordblks`.
 pub const METRIC_ALLOC_FREE_BYTES: &str = "memory_alloc_free_bytes";
-/// Bytes releasable from the top of glibc's heap, from `mallinfo2.keepcost`.
+/// Main-arena top-chunk statistic, from `mallinfo2.keepcost`; not a trim-yield guarantee.
 pub const METRIC_ALLOC_KEEPCOST_BYTES: &str = "memory_alloc_keepcost_bytes";
 /// Width of the `[heap]` mapping in `/proc/self/maps`, in bytes.
 pub const METRIC_ALLOC_HEAP_BYTES: &str = "memory_alloc_heap_bytes";

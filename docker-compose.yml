@@ -95,6 +95,7 @@ services:
       ALLOWED_HOSTS: "${ALLOWED_HOSTS:?ALLOWED_HOSTS is required (comma-separated)}"
       ALLOWED_ORIGINS: "${ALLOWED_ORIGINS:?ALLOWED_ORIGINS is required (comma-separated, no wildcard)}"
       MEMORY_MCP_HTTP_REPLICA_ID: "${MEMORY_MCP_HTTP_REPLICA_ID:-memory-http-1}"
+      MEMORY_MCP_HTTP_HEAP_DUMP_ENABLED: "${MEMORY_MCP_HTTP_HEAP_DUMP_ENABLED:-false}"
       RUST_LOG: "${RUST_LOG:-info}"
       NER_EXTRACTOR: "${NER_EXTRACTOR:-anno}"
       EMBEDDINGS_ENABLED: "${EMBEDDINGS_ENABLED:-false}"

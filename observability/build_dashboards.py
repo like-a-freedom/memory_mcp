@@ -767,12 +767,12 @@ def technical() -> dict:
             "- A value that *sticks* above zero across consecutive scrapes means "
             "requests are slow enough to be caught, and the number is how many "
             "were in flight at once.\n\n"
-            "So: read the trend across scrapes, never a single sample. CPU and "
-            "memory are not exported by the application, on purpose: they are "
-            "host and container figures, read from node_exporter and cAdvisor "
-            "on their own dashboards, and duplicating them into this "
-            "exposition would put two copies of a number in two places to "
-            "keep in sync.",
+            "So: read the trend across scrapes, never a single sample. Process CPU, "
+            "RSS and swap are not exported as continuous application series: "
+            "host and container readings belong on node_exporter and cAdvisor "
+            "dashboards. The HTTP memory diagnostics row is the narrow "
+            "exception for allocator-internal attribution; it is not a "
+            "replacement for process RSS or container accounting.",
             (12, 7, 12, 7),
         ),
     ]

@@ -10,6 +10,18 @@
 
 **Spec:** this deployment's own evidence, not a design doc: `/opt/memory_mcp/memory-consumption.md` (operator's 2026-10-07 map of the footprint), `docs/performance/HTTP_MEMORY_BASELINE.md` (measurement protocol and its BLOCKED gates), `docs/performance/MEMORY_PROFILE.md` (allocator matrix), and — binding — `observability/README.md` section "Deliberate gaps" (the "No process metrics" rule this plan amends, deliberately and in writing).
 
+## Current status (2026-10-12)
+
+Phase 0 instrumentation and its local code/observability gates are implemented.
+The paired end-to-end diagnostics-overhead comparison remains **PARTIAL**;
+controlled footprint acceptance, allocation profiling, and the external exporter
+inventory remain **BLOCKED**. Phase 1 contains hypotheses only; no RAM-reduction
+fix has been selected or claimed. See
+[`docs/performance/HTTP_MEMORY_BASELINE.md`](../../performance/HTTP_MEMORY_BASELINE.md)
+for the evidence boundary. The checkboxes below preserve the original step plan;
+use the status above and baseline rather than interpreting unchecked boxes as
+proof that implementation is still pending.
+
 ## Global Constraints
 
 - Workspace `rust-version` 1.99.0; no toolchain, dependency, `Cargo.toml`, Dockerfile or CI-pin changes.
@@ -24,19 +36,25 @@
 - Before shipping: `cargo fmt --all --check`, `cargo clippy --workspace --all-targets --features fs-watch,mcp-apps,streamable-http --locked -- -D warnings` (zero warnings), and `cargo run -p xtask -- check-observability` (which regenerates the dashboards and runs the `observability/*.py` contract checks).
 - Do NOT add a container `mem_limit` as a fix for the footprint; the operator has rejected a cap as the solution. Revisit only after Phase 1 lands.
 
-### Measured baseline (2026-10-12, image `v1.33.0`, idle)
+### Reported production snapshot (2026-10-12, image `v1.33.0`, idle; not a causal baseline)
 
 | Signal | Value | Source |
 |---|---|---|
-| `[heap]` extent | 1 144 MB VSZ, ~400-500 MB resident | `/proc/<pid>/maps` `[heap]` |
+| `[heap]` extent | 1 144 MB virtual mapping extent; not resident-byte accounting | `/proc/<pid>/maps` `[heap]` |
 | `VmData` / `VmHWM` | 1 221 MB / 1 216 MB | `/proc/<pid>/status` |
 | `VmRSS` / `VmSwap` | ~437-477 MB / ~780-820 MB | `/proc/<pid>/status` |
 | cgroup `anon` / `current` | 448 MB / 481 MB | cgroup v2 |
-| container RSS / swap / max | ~755-780 MB (old build) -> ~477-509 MB (new) | cAdvisor, already scraped |
+| container RSS / swap / max | ~755-780 MB (reported old build) -> ~477-509 MB (reported new build); not paired | cAdvisor |
 | App owner gauges (caches, runtimes, reservations) | **all 0** | `/memory/metrics` |
 | Data size / threads / NER | ~1 MB / 3 / `anno` (no model, embeddings remote) | prod / code |
 
-The whole footprint is anonymous glibc heap over ~1 MB of data. Static reading of the crate found no large up-front allocation, and the app's own accounting reports zero — which is exactly the gap Phase 0 closes.
+These observations show large process RSS/swap and a large virtual `[heap]` extent
+alongside zero values from the measured application owners. They do not show that
+the `[heap]` pages are resident, prove that glibc retained the reported RSS, or
+identify the allocation source. The cAdvisor old/new values are not a paired,
+controlled comparison. Static reading of the crate found no obvious large
+up-front allocation, but does not establish a runtime root cause. Attribution
+remains unresolved; Phase 0 instruments hypotheses rather than declaring one.
 
 ## Review Focus
 

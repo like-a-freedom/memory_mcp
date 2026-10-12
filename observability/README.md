@@ -1,8 +1,9 @@
 # Observability
 
-Two Grafana dashboards, forty-two recording rules and eighteen alerts over the
-metrics the `streamable-http` profile exports on `/metrics`, plus the scrape
-configuration that gets those metrics to a collector in the first place.
+Two Grafana dashboards, forty-two recording rules in ten groups and eighteen
+alerts over the metrics the `streamable-http` profile exports on `/metrics`, plus
+the scrape configuration that gets those metrics to a collector in the first
+place.
 
 **These artifacts describe the HTTP SaaS profile, and only that profile.** The
 stdio deployment is a local single process with no metrics backend of its own, so
@@ -20,7 +21,7 @@ Run `cargo run -p xtask -- check-observability` to execute the full gate.
 
 ```
 observability/
-├── recording_rules.yml     42 rules in 9 groups
+├── recording_rules.yml     42 rules in 10 groups
 ├── alerts.yml              18 alerts in 8 groups
 ├── prometheus.yml          scrape + rule_files, for Prometheus
 ├── vmagent/
@@ -142,7 +143,7 @@ access failure does not establish that a series is absent from VictoriaMetrics.
 | What is failing? | technical → *Helicopter view — what is failing* |
 | Is anything still running? | technical → *Helicopter view — is it still running* |
 | Is anything being collected at all? | technical → *Collection health* |
-| What does the HTTP process account for in its bounded owners? | technical → *HTTP memory diagnostics* |
+| What does the HTTP process account for in its bounded owners and allocator? | technical → *HTTP memory diagnostics* |
 | What is slow? | technical → *HTTP latency* → *p95 by route* |
 | Is it getting slower, or was it always slow? | technical → *HTTP latency* → *Latency percentiles over time* |
 | Why is it slow? | technical → *Pipeline stages* |
@@ -162,10 +163,11 @@ The technical dashboard is ordered RED — rate, errors, duration above the
 fold, saturation below — because that is the order an on-call engineer reads
 in. Every row below the overview explains one of the four numbers above it.
 The *HTTP memory diagnostics* row follows collection health. It charts the
-preflight summary/refusal metrics and the bounded owner gauges; those gauges are
-not complete heap accounting or process RSS. Host/container panels remain absent
-until Task 15's external metric inventory has verified safe selectors. Use the
-controlled process sampler for `VmRSS`/`VmSwap`.
+preflight summary/refusal metrics, bounded owner gauges and allocator-attribution
+panels. Neither owner accounting nor allocator statistics are complete process
+RSS or container accounting. Host/container panels remain absent until the
+external metric inventory verifies safe selectors. Use the controlled process
+sampler for `VmRSS`/`VmSwap`.
 
 The product dashboard has **no latency percentiles at all**. Its reader's
 questions are whether the memory is growing, how old it is, whether people are
@@ -356,14 +358,13 @@ counters for what they then did.
 
 Things an operator might look for that are not here, and why.
 
-**No process metrics.** RSS, CPU and uptime are deliberately not exported by
-the application. They are host and container figures, not application ones:
-`node_exporter` and `cAdvisor` already report them on their own dashboards, and
-a second copy inside this exposition would be a number kept in two places to
-keep in sync. So a latency spike is correlated against those dashboards rather
-than against a panel here, and the *Saturation* row carries what the
-application itself can saturate on — in-flight requests — which is the signal
-those dashboards do not have.
+**No continuous process RSS, CPU or uptime metrics.** The application does not
+export those process-wide series. Host and container exporters own the host and
+container views; duplicating those measurements here would create competing
+copies. The HTTP profile does emit one-off process RSS/swap/high-water-mark
+startup logs for phase attribution, and allocator accounting is the narrow
+exception described below. The *Saturation* row carries the application-level
+signal those exporters do not have — in-flight requests.
 
 **Allocator attribution is the one process-memory exception.** Six
 `memory_alloc_*` gauges report glibc's own accounting of this process's heap —
@@ -371,21 +372,23 @@ those dashboards do not have.
 `[heap]` mapping extent from `/proc/self/maps` — sampled on the same five-second
 upkeep tick. They are not a second copy of cAdvisor: cAdvisor reports the
 container's RSS, swap and working set, and none of those say *where inside the
-process* the bytes went. A `[heap]` extent far above the live bytes is allocator
-retention — free chunks kept instead of returned to the OS — and neither
-cAdvisor nor node_exporter can see it. Read them beside those dashboards, never
-instead of them. Off Linux/glibc the families are absent rather than zero,
-because there is no `mallinfo2` to read, and a zero would read as "the allocator
-holds nothing".
+process* the bytes went. `mallinfo2.arena`, `uordblks` and `fordblks` share
+aggregate non-mmap arena scope; `[heap]` is only one virtual mapping and is not
+resident memory. Do not
+infer retention by comparing the `[heap]` extent directly with aggregate
+in-use bytes, or assume all free arena bytes can be returned to the OS. Read
+these beside RSS/swap and use allocator profiling to establish a cause. Off
+Linux/glibc the families are absent rather than zero, because there is no
+`mallinfo2` to read, and a zero would read as "the allocator holds nothing".
 
 | Metric | Meaning |
 | --- | --- |
-| `memory_alloc_arena_bytes` | glibc's main arena (`mallinfo2.arena`), free chunks included |
-| `memory_alloc_in_use_bytes` | Live allocations (`mallinfo2.uordblks`) |
-| `memory_alloc_free_bytes` | Free chunks the allocator retained (`mallinfo2.fordblks`) |
+| `memory_alloc_arena_bytes` | Total non-mmap memory in glibc arenas (`mallinfo2.arena`), free chunks included |
+| `memory_alloc_in_use_bytes` | Allocated arena blocks (`mallinfo2.uordblks`) |
+| `memory_alloc_free_bytes` | Bytes in free arena blocks (`mallinfo2.fordblks`); not all are necessarily reclaimable |
 | `memory_alloc_mmap_bytes` | Large blocks that bypassed the arena (`mallinfo2.hblkhd`) |
-| `memory_alloc_keepcost_bytes` | Bytes `malloc_trim(0)` could return (`mallinfo2.keepcost`) |
-| `memory_alloc_heap_bytes` | Width of the `[heap]` mapping in `/proc/self/maps` |
+| `memory_alloc_keepcost_bytes` | Main-arena top-chunk statistic (`mallinfo2.keepcost`), not a guaranteed `malloc_trim(0)` yield |
+| `memory_alloc_heap_bytes` | Virtual width of the `[heap]` mapping in `/proc/self/maps`, not resident bytes |
 
 **HTTP preflight and resource metrics.** `memory_http_preflight_body_bytes` is a
 no-label summary of fully collected request bodies, including malformed JSON;
@@ -461,10 +464,12 @@ In order of likelihood:
 1. **The rule has not been evaluated yet.** Recording rules run on their group's
    interval, 30 s. A freshly started Prometheus shows gaps until each rule has
    fired once.
-2. **The feature is off.** The HTTP families need the `streamable-http` profile.
-   An absent series means the feature is off, not that it is idle. Filesystem
-   ingestion is not a case here any more: it is stdio-only and has no panel in
-   this set at all.
+2. **The feature or platform is unavailable.** The HTTP families need the
+   `streamable-http` profile; the six allocator families additionally require
+   Linux/glibc and a readable allocator signal. An absent allocator family is
+   not a zero reading. For the other HTTP families, absence may mean the feature
+   is off, not that it is idle. Filesystem ingestion is stdio-only and has no
+   panel in this set.
 3. **The series has never been written.** Prometheus series are created lazily
    per label set, so `outcome="5xx"` does not exist on a service that has never
    returned a 5xx. The rules that care use `or vector(0)`, so a recorded rule
@@ -492,10 +497,12 @@ RocksDB store, serving real requests, rather than reasoned about:
   lifecycle inventory is a gauge (`memory_operation_stock`), so opening a
   dashboard cannot inflate a counter.
 - Every family that appeared carried its `# HELP` line.
-- After the upkeep tick, all eight HTTP resource gauges appear with `# HELP` and
+- After the upkeep tick, all eight HTTP owner gauges appear with `# HELP` and
   `# TYPE` metadata, including zero-valued owners; the gauges are refreshed
   without a scrape and the preflight reservation gauge returns to zero after its
   reservation is released.
+- The Linux/glibc regression test asserts that all six allocator gauges are
+  emitted and that process RSS/CPU/uptime metric families remain absent.
 
 The claim families need traffic that exercises claim reconciliation before
 they appear, which is why a fresh server's exposition carries the HTTP and
@@ -547,7 +554,7 @@ what lets a bounded context say what a measurement means without acquiring
 infrastructure, per ADR-0058.
 
 That file is the reference to read when a number on a dashboard is not what you
-expected. Every family in its `DESCRIPTIONS` list — twenty-nine of them —
-carries a `# HELP` line naming the trap it has, and they render in `/metrics`.
-(The checkers count thirty names, because they also pick up a test's own
-string; the difference is that string, not a family.)
+expected. Its 45 `DESCRIPTIONS` entries each carry a `# HELP` line that names
+the measurement's semantics and limitations; those families render in
+`/metrics`. Source-level checker counts can also include references and test
+strings, so the registry is the family inventory.

@@ -425,10 +425,10 @@ docker compose --env-file <env> config --quiet
 ```
 
 `/health/live` and `/health/ready` are public health endpoints. MCP requests at
-`POST /mcp` require a provisioned Bearer API key. The database is exposed on
-`localhost:8000` for local inspection and its data is stored in the
-`surrealdb-data` volume. The image is built from source with Cargo and its final
-stage is `gcr.io/distroless/cc-debian13:nonroot`.
+`POST /mcp` require a provisioned Bearer API key. SurrealDB listens at
+`surrealdb:8000` only on the Compose network; its port is not published on the
+host. Its data is stored in the `surrealdb-data` volume. The image is built from
+source with Cargo and its final stage is `gcr.io/distroless/cc-debian13:nonroot`.
 
 Release runs publish the image to GitHub Container Registry as
 `ghcr.io/like-a-freedom/memory_mcp:latest`, `sha-<commit>` and the release
@@ -804,7 +804,7 @@ MEMORY_MCP_HTTP_REPLICA_ID=node-a \
 | `/api/v1/operator/*` | OIDC operator + CSRF + recent-auth | Operator-only: provisioning retry, suspend, resume, purge, reembed, recovery. `reembed` rewrites a whole tenant namespace's vectors — irreversible; see [ADR-0077](docs/adr/0077-http-embedding-maintenance.md) |
 | `/auth/oidc/*` | OIDC flow | Login, callback, logout |
 | `/api/v1/auth/local/*` | Local administrator password | Administrator login, activation, password reset |
-| `/api/v1/admin/*` | Local administrator session + CSRF | Client provisioning, key issuance and revocation, suspend and resume |
+| `/api/v1/admin/*` | Local administrator session + CSRF | Client provisioning, key issuance and revocation, suspend and resume; optional, expensive `GET /api/v1/admin/heap` allocator report when `MEMORY_MCP_HTTP_HEAP_DUMP_ENABLED=true` |
 | `/health/live`, `/health/ready` | Public | Process liveness and admission readiness |
 | `/metrics` | Public (no app auth) | Prometheus scrape (enabled by the `streamable-http` profile). Restrict at the reverse proxy or network layer. |
 | `/` and SPA fallback | Public | Control-plane web UI embedded by the `streamable-http` build |
@@ -1469,6 +1469,17 @@ families:
 | `memory_operation_duration_seconds` | `operation`, `outcome` | Operation latency histogram |
 | `memory_operation_results_total` | `operation`, `result` | Counts of bounded domain outputs such as facts, entities, or retrieved items |
 
+The HTTP profile also exports request/background-work metrics and eight no-label
+owner gauges refreshed by its existing five-second upkeep task. They describe
+preflight reservations, resident tenant runtimes, cache-accounted bytes, and
+background embedding task counts/bytes. Linux/glibc builds add six `memory_alloc_*`
+gauges from `mallinfo2` and `/proc/self/maps`: allocator accounting and the
+virtual `[heap]` mapping extent, not process RSS, swap, or cgroup memory. Missing
+platform signals are absent rather than zero. Process RSS/swap/high-water mark
+are logged at HTTP startup boundaries, not as continuously sampled metric
+families. See the [observability guide](observability/README.md) for each
+family's semantics, dashboards, scrape path, and known gaps.
+
 Claim reconciliation exports additional `memory_claim_*` families under the
 cardinality rules in [ADR-0005](docs/adr/0005-separate-claim-traces-from-metric-labels.md).
 The evaluation harness does not publish ephemeral Prometheus series: its
@@ -2017,6 +2028,15 @@ This switch only controls database-backed query analytics. Regular runtime logs 
 - `trace`: fine-grained diagnostics such as cache misses and sets, `query_log` skips when disabled, retrieval-tier summaries, appended `experience` facts, and Active-Namespace community rebuild details
 - `warn`: recoverable issues such as unknown `view_mode` fallback, access-heat tracking failures, query analytics write failures, degraded worker passes, and `fs_watch.degraded`
 - `error`: terminal failures such as process-level startup/serve failures
+
+The HTTP profile also emits `op=http.startup_memory` at `config_resolved`,
+`deployment_policy_resolved`, `store_connected`, `state_assembled`,
+`upkeep_started`, and `router_built`. Each event records `rss_bytes`,
+`swap_bytes`, `hwm_bytes`, and `heap_bytes`; unavailable platform values are
+JSON `null`. One `op=http.glibc_tunables` event records the process's allocator
+environment values and a `mallinfo2` summary where glibc is available. These
+are startup diagnostics, not a replacement for controlled RSS measurements; see
+[the logging runbook](docs/operations/LOGGING.md).
 
 Recommended presets:
 

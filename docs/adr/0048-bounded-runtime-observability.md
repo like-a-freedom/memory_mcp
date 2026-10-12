@@ -51,16 +51,32 @@ batch observability surface. Its existing run/case durations, suite summaries,
 quality metrics, gates, and capacity metrics are documented rather than
 exported through the server Prometheus recorder.
 
-Without the `prometheus` feature, metric calls remain no-ops. Without
-`MEMORY_PROMETHEUS_LISTEN_ADDR`, no recorder or socket is installed, preserving
-the zero-config default.
+### HTTP-profile memory diagnostics amendment (2026-10-12)
+
+The HTTP profile has bounded owner gauges and adds six Linux/glibc allocator
+gauges for diagnosis of a process-footprint incident. `mallinfo2` reports aggregate
+non-mmap arena accounting and mmap allocations; `/proc/self/maps` supplies the
+virtual extent of the `[heap]` mapping. These are not RSS, swap, cgroup memory,
+or proof of allocator retention. Missing platform readings stay absent rather
+than becoming zero. The six allocator families carry no labels and are refreshed
+by the existing upkeep task; they do not justify exporting per-tenant or
+request-level series.
+
+HTTP startup logs separately record process RSS, swap and high-water mark at
+fixed startup boundaries. The optional heap-dump route is default-off and
+requires the local-admin surface. Neither is a continuous metric family.
+
+The runtime profile determines how the recorder is installed: HTTP's
+`streamable-http` profile installs the recorder for its `/metrics` route;
+stdio/local builds make metric calls no-ops without the `prometheus` feature and
+open a separate listener only when `MEMORY_PROMETHEUS_LISTEN_ADDR` is set.
 
 ## Consequences
 
 ### Positive
 
-- Operators get bounded volume, latency, and result metrics for the runtime
-  paths that matter to memory quality and capacity.
+- Operators get bounded volume, latency, result, and selected resource-owner
+  metrics for the runtime paths that matter to memory quality and capacity.
 - MCP and CLI adapters cannot drift in their instrumentation because they share
   protocol-agnostic tool functions.
 - Evaluation remains reproducible and artifact-based instead of depending on a
@@ -74,8 +90,8 @@ the zero-config default.
 - Result counts are only emitted where the operation produces a bounded,
   decision-useful quantity. They are not a replacement for database capacity
   inspection.
-- A future public metric family or label must update this ADR and its bounded
-  vocabulary tests.
+- A future public metric family or label must update this ADR, its bounded
+  vocabulary tests, and the corresponding dashboard and scrape contract.
 
 ## Alternatives considered
 

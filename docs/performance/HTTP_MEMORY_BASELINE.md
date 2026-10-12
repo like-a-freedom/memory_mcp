@@ -1,6 +1,6 @@
 # HTTP memory baseline protocol
 
-Status: procedure and sampler contract; **no controlled baseline has been collected yet**. The staging safety tests pass, but no disposable staging deployment/database/provider was supplied. Production has not been seeded or sent workload requests; Task 2 attribution remains unresolved, so no RAM-reduction claim is supported.
+Status: procedure and sampler contract; **no controlled baseline has been collected yet**. The staging safety tests pass, but no disposable staging deployment/database/provider was supplied. Production has not been seeded or sent workload requests; root-cause attribution remains unresolved, so no RAM-reduction claim is supported.
 
 ## Sampler
 
@@ -53,10 +53,24 @@ These values are owner-level diagnostics only. They do not account for all Rust
 heap allocations, allocator retention, SDK/database internals, process
 `VmRSS`/`VmSwap`, or host/container memory. No controlled Linux A/B or allocation
 attribution has been collected, so the gauges provide no evidence of RSS
-reduction or target acceptance. Task 15 external exporter inventory remains
-blocked as stated above; it is not replaced with zero-valued or guessed series.
+reduction or target acceptance. The external exporter inventory remains blocked
+as stated above; it is not replaced with zero-valued or guessed series.
 
-## Task 18 acceptance status (2026-10-08)
+## Process-level attribution signals
+
+Linux/glibc builds also expose six no-label `memory_alloc_*` gauges from
+`mallinfo2` and `/proc/self/maps`; the gauges describe allocator accounting and
+the virtual `[heap]` extent, not RSS or resident container memory. HTTP startup
+logs include process RSS, swap, high-water mark and heap extent at fixed phase
+boundaries. `GET /api/v1/admin/heap` can return glibc's detailed `malloc_info`
+report only when explicitly enabled and protected by the local-admin session.
+These instruments improve diagnosis but do not identify allocation roots or
+prove a RAM reduction. The production service is still on the pre-change image
+and its application scrape has not been verified. When the candidate is staged,
+its `/memory` mount means the collector must scrape `/memory/metrics`; verify
+that path before interpreting dashboard panels.
+
+## Acceptance status (updated 2026-10-12)
 
 The implementation and local regression gates do not substitute for the Linux
 release measurements. No isolated staging deployment, database, or mock
@@ -67,11 +81,11 @@ candidate has not passed or failed the memory targets; they remain unmeasured.
 | --- | --- | --- |
 | Controlled baseline/candidate | Three fresh-process Linux runs per build under the same 2-CPU limit, dataset, configuration, and deterministic provider | **BLOCKED** — no disposable staging target and controlled dependencies supplied |
 | Process footprint | Active `VmRSS+VmSwap` <=200 MiB; post-work warm idle <=100 MiB; `VmHWM` recorded separately; >=4x reduction only when baseline exceeds the applicable target | **NOT MEASURED** — sampler exists, but no controlled process samples were collected |
-| Diagnostics overhead | Three paired INFO runs and three paired INFO-vs-DEBUG runs; footprint delta <=5 MiB, CPU/accepted-operation delta <=5%, p95 <=1.15x, constant app series count | **PARTIAL** — the added per-tick work is measured on this branch (<=4.8 us per five-second tick, >=5 orders below the 5% gate; footprint has no standing term; six label-free series added) — see *Diagnostics overhead: added-work bound*. The paired end-to-end INFO runs on a disposable Linux staging deployment remain NOT MEASURED; no service-only CPU attribution was possible |
+| Diagnostics overhead | Three paired INFO runs and three paired INFO-vs-DEBUG runs; footprint delta <=5 MiB, CPU/accepted-operation delta <=5%, p95 <=1.15x, constant app series count | **PARTIAL** — a reader microbenchmark measured about 4.8 μs per upkeep call, but that is not the gate's CPU-per-accepted-operation comparison. Persistent RSS impact, CPU delta per accepted operation, p95, and paired INFO/DEBUG staging runs remain NOT MEASURED; six label-free series are added — see *Diagnostics overhead: added-work bound* |
 | Allocation attribution | Staging profiler live allocations and peak stacks tied to the candidate build | **BLOCKED** — no staging profiler run; owner gauges do not identify allocation roots |
 | Host/container dashboard context | Verified read-only VictoriaMetrics access and safe selectors for node_exporter/cAdvisor | **BLOCKED** — no verified query path or selectors; no guessed or zero-valued panels were added |
-| Local shipping validation | Full `memory_mcp` tests in default and HTTP feature profiles; format, strict workspace Clippy, toolchain pin, observability checker | **PASSED** — `MEMORY_LOG_COLOR=never cargo test -p memory_mcp --locked`; `MEMORY_LOG_COLOR=never cargo test -p memory_mcp --features streamable-http,mcp-apps,test-fixtures --locked`; `cargo fmt --all --check`; workspace Clippy with `-D warnings`; both xtask checks. Strict Clippy reported no warnings. This is local code validation, not Linux memory acceptance. |
-| Release decision | Evidence-backed choice between robustness-only release with RAM target unverified, or a focused owner fix based on allocation stacks | **OPEN** — the plan assigns this choice to the user; neither path is selected here |
+| Local shipping validation | Workspace/default and HTTP-feature tests, feature-profile builds, format, strict lint, observability, evaluation and perf smoke | **PASSED locally** — workspace tests; no-default filesystem test; optional HTTP+fixture suite; `streamable-http`, `control-plane` and `prometheus` feature checks; `cargo fmt`; strict workspace Clippy (CI and project feature sets, plus macOS `metal` and `accelerate,mimalloc`); UI WASM Clippy; toolchain/Dioxus/observability checks; release evaluation (154/154), response-size evaluation (61/61), and perf smoke. Four VAGO checkpoint tests were ignored because the 1.6 GB model is absent. These are local macOS results; Linux/Windows packaging and Docker release jobs remain CI gates. This does not establish Linux memory acceptance. |
+| Release decision | Evidence-backed choice between a diagnostics/robustness release with RAM target unverified, or a focused owner fix based on allocation stacks | **DECIDED** — the user authorized release of the diagnostics work; RAM targets remain unverified and no reduction claim is supported |
 | Image and rollback proposal | Immutable old/new image digests and staging-accepted effective configuration | **NOT PREPARED** — no release image was built or staged; no deployment or rollback was attempted |
 
 The accepted-request latency gate remains p95 <=1.15x the controlled baseline;
@@ -81,21 +95,23 @@ local tests, or host/container series cannot establish process-level target
 acceptance or a causal RSS reduction.
 
 Production deployment, restart, config change, and rollback remain outside this
-work. A release must not be described as having met its RAM target until the
-blocked evidence is collected and the open release decision is made. The local
-shipping checks above do not establish RSS, swap, allocation-attribution,
-diagnostics-overhead, latency, or resource-plateau acceptance.
+work. The release is for diagnostics and robustness only: do not describe it as
+having met a RAM target or demonstrated a reduction until the blocked evidence
+is collected. The local shipping checks above do not establish RSS, swap,
+allocation-attribution, diagnostics-overhead, latency, or resource-plateau
+acceptance.
 
 ## Diagnostics overhead: added-work bound (2026-10-12)
 
 The allocator-attribution change adds exactly one `read_alloc()` call per
 five-second upkeep tick: one `mallinfo2()` call, one `/proc/self/maps` read of a
-few kilobytes, and six no-label `metrics::gauge!` sets. It retains nothing —
-`AllocSnapshot` is `Copy` over six `Option<u64>` fields, and the maps buffer is
-freed on the same tick — so the footprint delta is bounded by the tick's
-transient allocations rather than by a new plateau. The series-count gate is
-satisfied by construction: six families, one label-free series each, constant per
-scrape.
+few kilobytes, and six no-label `metrics::gauge!` sets. `AllocSnapshot` is a
+`Copy` value and the maps buffer is dropped after each read, so the application
+holds no per-tick snapshot. That does **not** prove zero persistent RSS cost:
+glibc may retain freed allocation space, and the metrics registry holds six
+constant series. The series-count gate is satisfied by construction — six
+families, one label-free series each — but the resident-memory delta still needs
+the paired staging measurement.
 
 The added CPU was measured on this branch in a Linux container
 (`rust:1.99.0-trixie`, glibc, `rustc -O`) by calling the real `read_alloc` from
@@ -107,12 +123,14 @@ and a 204.8 MB live heap:
 | ~0 | 4 748 ns | 0.000095% |
 | 204.8 MB | 4 798 ns | 0.000096% |
 
-The cost does not scale with live bytes, because `mallinfo2` walks arena bins
-rather than allocations. What it does scale with is the number of VM areas in
-`/proc/self/maps`, which this probe process has few of: on a process with a very
-large mapping count the read is proportionally larger, though still bounded by
-one file read per tick. Against the 5% CPU gate this is five orders of magnitude
-of margin, and the footprint gate (<=5 MiB) has no standing term to breach.
+The two measured calls are close in cost, but two heap sizes do not establish
+how runtime scales with arena count or other process layouts. Reading
+`/proc/self/maps` processes the file's contents, so a larger mapping list may
+increase that part of the cost. The measured 4.8 microseconds is about 0.000096% of a five-second wall-clock
+tick. That is a descriptive duty-cycle estimate only, not service CPU per
+accepted operation and not comparable to the gate's 5% CPU-delta threshold.
+Neither the microbenchmark nor that ratio measures end-to-end service CPU or
+retained RSS.
 
 **Still not measured.** The gate is written as a paired end-to-end comparison:
 three paired INFO runs with the upkeep read enabled versus disabled, and a third

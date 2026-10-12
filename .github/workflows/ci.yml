@@ -73,12 +73,12 @@ jobs:
           cargo clippy -p ui --target wasm32-unknown-unknown --all-targets --locked -- -D warnings
       - name: Observability rules, alerts and dashboards
         run: |
-          # 45 recording rules, 20 alerts and 2 dashboards — groups that
-          # nothing reached: a rule reading a metric the crate no longer
+          # 42 recording rules (10 groups), 18 alerts (8 groups), two dashboards.
+          # The check catches gaps: a rule reading a metric the crate no longer
           # exports evaluates to empty and never fires, and a panel naming a
-          # deleted series renders empty, which is indistinguishable from a
-          # subsystem that is off. The checkers are Python; this step is a
-          # cargo invocation, which is what ADR-0064 requires of CI.
+          # deleted series renders empty, indistinguishable from a subsystem that
+          # is off. The checkers are Python; this step is a cargo invocation, which
+          # is what ADR-0064 requires of CI.
           python3 -m pip install --quiet pyyaml
           cargo run --locked -p xtask -- check-observability
       - name: Default workspace tests
@@ -299,6 +299,11 @@ jobs:
         run: |
           set -euo pipefail
           docker compose --env-file "${SMOKE_ENV_FILE}" config --quiet
+          # The heap report is opt-in. Prove an explicit operator setting is
+          # forwarded through Compose rather than only used for interpolation.
+          env MEMORY_MCP_HTTP_HEAP_DUMP_ENABLED=true \
+            docker compose --env-file "${SMOKE_ENV_FILE}" config --format json \
+            | python3 -c 'import json, sys; value = json.load(sys.stdin)["services"]["memory_mcp"]["environment"].get("MEMORY_MCP_HTTP_HEAP_DUMP_ENABLED"); assert value == "true", value'
           # The browser method set is a runtime value, so the provider half has
           # to resolve from the same file rather than from a second overlay.
           hex64() { head -c 32 /dev/urandom | od -An -tx1 | tr -d ' \n'; }
