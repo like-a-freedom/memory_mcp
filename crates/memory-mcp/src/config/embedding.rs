@@ -45,7 +45,7 @@ pub struct EmbeddingConfig {
     pub model_dir: Option<String>,
     /// Optional local multilingual cross-encoder model directory.
     pub reranker_model_dir: Option<String>,
-    /// Relevance logit boundary selected from independent development evidence.
+    /// Relevance logit floor selected from independent development evidence.
     pub reranker_admission_floor: f64,
     /// Initial delay before the in-process remote recovery worker probes.
     pub recovery_interval_secs: u64,
@@ -174,6 +174,7 @@ impl EmbeddingConfig {
                 similarity_threshold,
                 model_dir,
                 reranker_model_dir,
+                reranker_admission_floor,
                 recovery_interval_secs,
                 auto_recovery,
                 ..Self::default()
@@ -535,10 +536,11 @@ mod tests {
                 ("RETRIEVAL_RERANKER_ADMISSION_FLOOR", Some("NaN")),
             ],
             || {
-                assert!(
-                    matches!(EmbeddingConfig::from_env(),Err(MemoryError::ConfigInvalid(message))
-                if message.contains("RETRIEVAL_RERANKER_ADMISSION_FLOOR"))
-                );
+                assert!(matches!(
+                    EmbeddingConfig::from_env(),
+                    Err(MemoryError::ConfigInvalid(message))
+                        if message.contains("RETRIEVAL_RERANKER_ADMISSION_FLOOR")
+                ));
             },
         );
     }

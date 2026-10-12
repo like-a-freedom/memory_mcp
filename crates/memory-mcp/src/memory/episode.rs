@@ -262,6 +262,7 @@ mod tests {
     #[test]
     fn should_extract_note_fact_requires_supported_source_type_and_no_existing_facts() {
         let episode = Episode {
+            source_context: None,
             episode_id: "episode:test".to_string(),
             source_type: "requirement".to_string(),
             source_id: "summary-1".to_string(),
@@ -277,6 +278,7 @@ mod tests {
         assert!(should_extract_note_fact(&episode, &[]));
         assert!(!should_extract_note_fact(
             &Episode {
+                source_context: None,
                 source_type: "meeting".to_string(),
                 ..episode.clone()
             },
@@ -284,6 +286,7 @@ mod tests {
         ));
         assert!(should_extract_note_fact(
             &Episode {
+                source_context: None,
                 source_type: "meeting_summary".to_string(),
                 ..episode.clone()
             },
@@ -485,6 +488,7 @@ mod tests {
     #[test]
     fn build_extract_log_result_includes_episode_metadata_and_note_fallback_usage() {
         let episode = Episode {
+            source_context: None,
             episode_id: "episode:test".to_string(),
             source_type: "requirement".to_string(),
             source_id: "summary-1".to_string(),

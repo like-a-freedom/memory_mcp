@@ -113,6 +113,7 @@ pub async fn make_service_with_client_result()
 #[allow(dead_code)]
 pub async fn ingest_episode(service: &MemoryService, source_id: &str, content: &str) -> String {
     let request = IngestRequest {
+        source_context: None,
         source_type: "chat".to_string(),
         source_id: source_id.to_string(),
         content: content.to_string(),
@@ -176,6 +177,7 @@ pub async fn seed_episode_backed_fact_with_source_id(
     let episode_id = IngestCapability::ingest_from_service(
         service,
         IngestRequest {
+            source_context: None,
             source_type: "seed".to_string(),
             source_id: source_id.to_string(),
             content: content.to_string(),

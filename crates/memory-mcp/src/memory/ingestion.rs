@@ -193,6 +193,10 @@ impl IngestionService {
                 }
                 payload.insert("source_lineage".to_string(), json!(trimmed.to_string()));
             }
+            if let Some(context) = &request.source_context {
+                payload.insert("source_group".to_string(), json!(context.group));
+                payload.insert("source_position".to_string(), json!(context.position));
+            }
             let content = Value::Object(payload);
             // Whether this call actually wrote. A duplicate is not new
             // knowledge — including one the outbox reports as a swallowed

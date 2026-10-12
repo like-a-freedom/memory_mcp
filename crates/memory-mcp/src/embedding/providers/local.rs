@@ -264,13 +264,13 @@ fn mean_pool_embeddings(embeddings: &[Vec<f64>]) -> Result<Vec<f64>, MemoryError
 
 #[async_trait]
 impl EmbeddingProvider for LocalCandleEmbeddingProvider {
+    fn reranking_signature(&self) -> Option<&str> {
+        self.reranker.as_ref().map(|reranker| reranker.signature())
+    }
     fn reranking_admission_floor(&self) -> f64 {
         self.reranker
             .as_ref()
-            .map_or(0.0, |model| model.admission_floor())
-    }
-    fn reranking_signature(&self) -> Option<&str> {
-        self.reranker.as_ref().map(|reranker| reranker.signature())
+            .map_or(0.0, |reranker| reranker.admission_floor())
     }
     async fn rerank(
         &self,

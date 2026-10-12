@@ -44,6 +44,14 @@ impl std::fmt::Display for FactType {
 }
 
 /// An episode represents a unit of ingested content.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+pub struct SourceContext {
+    /// Stable identity of one ordered source stream, supplied by its producer.
+    pub group: String,
+    /// One-based position in that stream; unrelated streams may reuse positions.
+    pub position: u64,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct Episode {
     pub episode_id: String,
@@ -61,6 +69,8 @@ pub struct Episode {
     /// `source_id` as the reconciliation lineage.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub source_lineage: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub source_context: Option<SourceContext>,
 }
 
 impl Episode {}

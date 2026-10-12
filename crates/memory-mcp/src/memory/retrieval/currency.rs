@@ -154,6 +154,9 @@ mod tests {
         QueryEvidence {
             content_terms: Vec::new(),
             subject_terms: Vec::new(),
+            requests_acquisition: false,
+            requires_self_reported_relief: false,
+            requested_preference_polarity: None,
             explicit_calendar_date: None,
             calendar_period: None,
             qualified_references: Vec::new(),

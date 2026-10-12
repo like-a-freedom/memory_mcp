@@ -230,6 +230,7 @@ async fn relate_records_an_operator_originated_edge() {
     let episode_id = IngestCapability::ingest_from_service(
         &service,
         memory_mcp::models::IngestRequest {
+            source_context: None,
             source_type: "test".to_string(),
             source_id: "relate-origin".to_string(),
             content: "Alice Smith and Bob Jones presented at a conference".to_string(),

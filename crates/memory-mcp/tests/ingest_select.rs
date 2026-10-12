@@ -63,6 +63,7 @@ async fn ingest_then_extract_roundtrip() -> Result<(), Box<dyn std::error::Error
     let svc = common::make_service().await;
 
     let req = IngestRequest {
+        source_context: None,
         source_type: "meeting".to_string(),
         source_id: "test-1".to_string(),
         content: "Meeting with Alice Inc and Bob Corp. Budget $100k".to_string(),
@@ -93,6 +94,7 @@ async fn ingest_persists_the_supplied_episode() -> Result<(), Box<dyn std::error
     let t_ref = Utc.with_ymd_and_hms(2026, 10, 3, 10, 0, 0).unwrap();
     let t_ingested = Utc.with_ymd_and_hms(2026, 10, 3, 10, 1, 0).unwrap();
     let request = || IngestRequest {
+        source_context: None,
         source_type: "inline".to_owned(),
         source_id: "source-a01".to_owned(),
         content: "exact original episode content".to_owned(),
@@ -120,6 +122,7 @@ async fn duplicate_ingestion_preserves_the_existing_episode()
 -> Result<(), Box<dyn std::error::Error>> {
     let (service, _) = common::make_service_with_client_result().await?;
     let request = || IngestRequest {
+        source_context: None,
         source_type: "inline".to_owned(),
         source_id: "source-a01".to_owned(),
         content: "exact original episode content".to_owned(),
@@ -161,6 +164,7 @@ async fn ingest_reuses_one_legacy_episode_by_source_identity()
     let episode_id = IngestCapability::ingest_from_service(
         &service,
         IngestRequest {
+            source_context: None,
             source_type: "inline".into(),
             source_id: "legacy-source".into(),
             content: "legacy content".into(),
@@ -200,6 +204,7 @@ async fn ingest_rejects_ambiguous_legacy_episode_identity_without_writing()
     let result = IngestCapability::ingest_from_service(
         &service,
         IngestRequest {
+            source_context: None,
             source_type: "inline".into(),
             source_id: "ambiguous-source".into(),
             content: "ambiguous content".into(),

@@ -653,6 +653,9 @@ async fn prepare_native_sources(
         if let Some(t_ingested) = source.t_ingested {
             request = request.t_ingested(t_ingested);
         }
+        if let Some(source_context) = &source.source_context {
+            request = request.source_context(source_context.clone());
+        }
         let request = request
             .build()
             .map_err(|_| "a frozen source episode does not satisfy the ingest contract")?;
@@ -1218,6 +1221,7 @@ mod source_bundle_tests {
             t_ref: timestamp,
             t_ingested: None,
             policy_tags: vec![],
+            source_context: None,
         };
         let manifest = QualityCorpusManifest {
             schema_version: "memory-mcp-retrieval-quality/v1".into(),
@@ -1284,6 +1288,7 @@ mod source_bundle_tests {
             t_ref: timestamp,
             t_ingested: None,
             policy_tags: vec![],
+            source_context: None,
         };
         let source_bytes = serde_json::to_vec(&[SourceBundleEntry {
             case_id: "case-1".into(),

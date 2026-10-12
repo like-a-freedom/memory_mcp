@@ -50,6 +50,7 @@ impl PoisoningSuite {
         let result = IngestCapability::ingest_from_service(
             &service,
             memory_mcp::models::IngestRequest {
+                source_context: None,
                 source_type: "external".into(),
                 source_id: format!("poison-{scenario}"),
                 content: malicious_content.into(),

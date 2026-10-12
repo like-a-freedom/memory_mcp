@@ -24,6 +24,8 @@ async fn tools_ingest_returns_validation_error_for_bad_t_ref() {
         t_ref: "not-a-date".to_string(),
         t_ingested: None,
         policy_tags: vec![],
+        source_group: None,
+        source_position: None,
     };
 
     let result = memory_mcp::tools::ingest(&service, params).await;
@@ -101,6 +103,8 @@ async fn tools_ingest_and_extract_happy_path() {
         t_ref: Utc::now().to_rfc3339(),
         t_ingested: None,
         policy_tags: vec![],
+        source_group: None,
+        source_position: None,
     };
 
     let response = memory_mcp::tools::ingest(&service, params)

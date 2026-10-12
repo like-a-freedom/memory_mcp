@@ -55,6 +55,7 @@ async fn test_service_ingest_and_extract_flow() {
     let service = common::make_service().await;
 
     let request = memory_mcp::models::IngestRequest {
+        source_context: None,
         source_type: "meeting".to_string(),
         source_id: "integration-test-1".to_string(),
         content: "Meeting with Alice Inc and Bob Corp. Discussed ARR growth to $5M. Alice will deliver the prototype by Friday.".to_string(),
@@ -101,6 +102,7 @@ async fn extractor_fingerprint_projection() {
     let (service, db_client) = common::make_service_with_client().await;
 
     let request = memory_mcp::models::IngestRequest {
+        source_context: None,
         source_type: "meeting".to_string(),
         source_id: "fingerprint-projection-1".to_string(),
         content: "Alice Inc and Bob Corp discussed the Atlas launch with Carol.".to_string(),
@@ -327,6 +329,7 @@ async fn test_service_extract_persists_edge_provenance_and_extracted_origin() {
     let episode_id = IngestCapability::ingest_from_service(
         &service,
         memory_mcp::models::IngestRequest {
+            source_context: None,
             source_type: "meeting".to_string(),
             source_id: "edge-prov-1".to_string(),
             content: "Meeting with Alice Smith about ARR goals".to_string(),
@@ -368,6 +371,7 @@ async fn test_service_extract_returns_contradiction_warning_for_conflicting_metr
     let first_episode = IngestCapability::ingest_from_service(
         &service,
         memory_mcp::models::IngestRequest {
+            source_context: None,
             source_type: "chat".to_string(),
             source_id: "contradiction-metric-1".to_string(),
             content: "Alice Smith reports ARR is $5M.".to_string(),
@@ -399,6 +403,7 @@ async fn test_service_extract_returns_contradiction_warning_for_conflicting_metr
     let second_episode = IngestCapability::ingest_from_service(
         &service,
         memory_mcp::models::IngestRequest {
+            source_context: None,
             source_type: "chat".to_string(),
             source_id: "contradiction-metric-2".to_string(),
             content: "Alice Smith reports ARR is $7M.".to_string(),
@@ -525,6 +530,7 @@ async fn test_service_does_not_persist_fact_embeddings_without_provider() {
     let episode_id = IngestCapability::ingest_from_service(
         &service,
         memory_mcp::models::IngestRequest {
+            source_context: None,
             source_type: "meeting".to_string(),
             source_id: "semantic-slot-1".to_string(),
             content: "Alice Smith reviewed ARR improvements".to_string(),
@@ -638,6 +644,7 @@ async fn test_service_merges_overlapping_entity_cohorts_into_one_community() {
         let episode_id = IngestCapability::ingest_from_service(
             &service,
             memory_mcp::models::IngestRequest {
+                source_context: None,
                 source_type: "meeting".to_string(),
                 source_id: source_id.to_string(),
                 content: content.to_string(),
@@ -1543,6 +1550,7 @@ async fn test_service_assemble_context_filters_by_fact_type_within_active_namesp
     let atlas_episode = IngestCapability::ingest_from_service(
         &service,
         memory_mcp::models::IngestRequest {
+            source_context: None,
             source_type: "document".to_string(),
             source_id: "project-atlas-budget".to_string(),
             content: "Atlas budget source note".to_string(),
@@ -1558,6 +1566,7 @@ async fn test_service_assemble_context_filters_by_fact_type_within_active_namesp
     let beacon_episode = IngestCapability::ingest_from_service(
         &service,
         memory_mcp::models::IngestRequest {
+            source_context: None,
             source_type: "document".to_string(),
             source_id: "project-beacon-budget".to_string(),
             content: "Beacon budget source note".to_string(),
@@ -1654,6 +1663,7 @@ async fn test_service_assemble_context_does_not_append_recent_experience_for_que
     let source_episode = IngestCapability::ingest_from_service(
         &service,
         memory_mcp::models::IngestRequest {
+            source_context: None,
             source_type: "document".to_string(),
             source_id: "experience-primary-match".to_string(),
             content: "Atlas source episode".to_string(),
@@ -1767,6 +1777,7 @@ async fn test_service_assemble_context_facets_view_groups_by_policy_tags() {
         IngestCapability::ingest_from_service(
             &service,
             memory_mcp::models::IngestRequest {
+                source_context: None,
                 source_type: "document".to_string(),
                 source_id: source_id.to_string(),
                 content: content.to_string(),
@@ -2229,6 +2240,7 @@ async fn test_service_assemble_context_appends_recent_experience_for_browse_like
     let source_episode = IngestCapability::ingest_from_service(
         &service,
         memory_mcp::models::IngestRequest {
+            source_context: None,
             source_type: "document".to_string(),
             source_id: "experience-browse-base".to_string(),
             content: "Atlas source episode".to_string(),
@@ -2528,6 +2540,7 @@ async fn test_service_explain_with_graph_insights_returns_hub_and_connections() 
     let episode_id = IngestCapability::ingest_from_service(
         &service,
         memory_mcp::models::IngestRequest {
+            source_context: None,
             source_type: "meeting".to_string(),
             source_id: "explain-graph-1".to_string(),
             content: "Bob Explain coordinated the partner review".to_string(),
@@ -2847,6 +2860,7 @@ async fn test_service_archival_pass_with_real_surrealdb_archives_old_episode() {
     let episode_id = IngestCapability::ingest_from_service(
         &service,
         memory_mcp::models::IngestRequest {
+            source_context: None,
             source_type: "meeting".to_string(),
             source_id: "archival-real-1".to_string(),
             content: "Old episode for archival".to_string(),
@@ -2916,6 +2930,7 @@ async fn test_service_archival_pass_skips_recent_episodes() {
     let episode_id = IngestCapability::ingest_from_service(
         &service,
         memory_mcp::models::IngestRequest {
+            source_context: None,
             source_type: "chat".to_string(),
             source_id: "archival-recent-skip".to_string(),
             content: "Recent episode should not be archived".to_string(),
@@ -2968,6 +2983,7 @@ async fn test_extract_generates_note_fact_for_summary_requirement_episode() {
         &service,
 
             memory_mcp::models::IngestRequest {
+                source_context: None,
                 source_type: "requirement".to_string(),
                 source_id: "summary-requirement-1".to_string(),
                 content: "July 2025 planning summary: platform integrations ready, stakeholder approvals pending, response workflow scoped.".to_string(),
@@ -2997,6 +3013,7 @@ async fn test_extract_meeting_summary_generates_line_level_decision_and_fact_rec
         &service,
 
             memory_mcp::models::IngestRequest {
+                source_context: None,
                 source_type: "meeting_summary".to_string(),
                 source_id: "meeting-summary-line-facts-1".to_string(),
                 content: "Project decision summary:\n\n- Decision: Approve the cross-platform activation policy.\n- Decision: Keep legacy on-premise licenses separate.\n- Fact: Working release milestone targeted for early May.".to_string(),
@@ -3070,6 +3087,7 @@ async fn test_extract_summary_with_thematic_sections_generates_line_level_note_r
         &service,
 
             memory_mcp::models::IngestRequest {
+                source_context: None,
                 source_type: "meeting_summary".to_string(),
                 source_id: "meeting-summary-thematic-sections-1".to_string(),
                 content: "# Monthly coordination summary\n\n## Release Activities\n- Finalize phased rollout checklist.\n- Publish support handoff notes.\n\n## Capacity Planning\n- Prepare archive review for next quarter.".to_string(),

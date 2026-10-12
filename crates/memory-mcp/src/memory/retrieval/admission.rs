@@ -9,6 +9,59 @@ use super::filtering::{fact_allowed_by_access, fact_is_active_at};
 use super::query_mode::QueryFlags;
 use super::types::{AdmissionBasis, RankedContextFact};
 
+const ACQUISITION_INTENT_TERMS: &[&str] = &[
+    "acquire",
+    "acquired",
+    "acquiring",
+    "buy",
+    "bought",
+    "buying",
+    "get",
+    "gets",
+    "got",
+    "obtain",
+    "obtained",
+    "obtaining",
+    "purchase",
+    "purchased",
+    "purchasing",
+];
+const ACQUISITION_EVIDENCE_TERMS: &[&str] = &[
+    "acquire",
+    "acquired",
+    "acquiring",
+    "buy",
+    "bought",
+    "buying",
+    "obtain",
+    "obtained",
+    "obtaining",
+    "purchase",
+    "purchased",
+    "purchasing",
+];
+const SALE_TERMS: &[&str] = &["sale", "sell", "selling", "sells", "sold"];
+const POSITIVE_PREFERENCE_TERMS: &[&str] = &[
+    "enjoy",
+    "enjoys",
+    "enjoyed",
+    "like",
+    "likes",
+    "liked",
+    "love",
+    "loves",
+    "loved",
+    "prefer",
+    "prefers",
+    "preferred",
+    "favorite",
+    "favourite",
+];
+const NEGATIVE_PREFERENCE_TERMS: &[&str] = &[
+    "dislike", "dislikes", "disliked", "hate", "hates", "hated", "detest", "detests", "detested",
+    "despise", "despises", "despised",
+];
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(super) enum AdmissionIntent {
     Browse,
@@ -22,10 +75,19 @@ pub(super) enum AdmissionIntent {
     EventTime,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(super) enum PreferencePolarity {
+    Positive,
+    Negative,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(super) struct QueryEvidence {
     pub(super) content_terms: Vec<String>,
     pub(super) subject_terms: Vec<String>,
+    pub(super) requests_acquisition: bool,
+    pub(super) requires_self_reported_relief: bool,
+    pub(super) requested_preference_polarity: Option<PreferencePolarity>,
     pub(super) explicit_calendar_date: Option<chrono::NaiveDate>,
     pub(super) calendar_period: Option<CalendarPeriod>,
     pub(super) qualified_references: Vec<String>,
@@ -108,6 +170,13 @@ pub(super) fn build_query_evidence(
     let calendar_period = parse_calendar_period(&cleaned_query);
     let intent = classify_intent(raw, flags, !resolved_entity_ids.is_empty());
     let empty_query = raw.trim().is_empty();
+    let subject_terms = unique_terms(
+        mentioned_names
+            .iter()
+            .flat_map(|name| search_query_terms(name))
+            .chain(inferred_subject_terms(raw))
+            .collect(),
+    );
     let content_terms = if empty_query {
         Vec::new()
     } else {
@@ -122,6 +191,7 @@ pub(super) fn build_query_evidence(
                         && !(intent == AdmissionIntent::Current && is_current_intent_cue(term))
                         && !(intent == AdmissionIntent::Personalization
                             && is_personal_planning_cue(term))
+                        && !(calendar_period.is_some() && is_calendar_browse_scope_term(term))
                 })
                 .collect(),
         )
@@ -129,12 +199,10 @@ pub(super) fn build_query_evidence(
 
     QueryEvidence {
         content_terms,
-        subject_terms: unique_terms(
-            mentioned_names
-                .iter()
-                .flat_map(|name| search_query_terms(name))
-                .collect(),
-        ),
+        requires_self_reported_relief: query_requests_shared_personal_relief(raw, &subject_terms),
+        requested_preference_polarity: preference_polarity(raw),
+        subject_terms,
+        requests_acquisition: query_text_requests_acquisition(&cleaned_query),
         explicit_calendar_date,
         calendar_period,
         mandatory_reference_alternatives: qualified_references.clone(),
@@ -147,8 +215,267 @@ pub(super) fn build_query_evidence(
     }
 }
 
+fn query_requests_shared_personal_relief(query: &str, subject_terms: &[String]) -> bool {
+    if subject_terms.len() < 2 {
+        return false;
+    }
+    let terms = query
+        .split(|character: char| !character.is_alphabetic())
+        .filter(|term| !term.is_empty())
+        .map(str::to_ascii_lowercase)
+        .collect::<HashSet<_>>();
+    let asks_about_shared_preference = terms.contains("both") || terms.contains("each");
+    let asks_about_preference = [
+        "like",
+        "likes",
+        "love",
+        "loves",
+        "enjoy",
+        "enjoys",
+        "prefer",
+        "prefers",
+        "favorite",
+        "favourite",
+    ]
+    .iter()
+    .any(|term| terms.contains(*term));
+    let asks_about_relief = ["destress", "relax", "relief", "stress", "unwind"]
+        .iter()
+        .any(|term| terms.contains(*term));
+
+    asks_about_shared_preference && asks_about_preference && asks_about_relief
+}
+
+fn inferred_subject_terms(query: &str) -> Vec<String> {
+    const SUBJECT_QUERY_FRAME_TERMS: &[&str] = &[
+        "what",
+        "which",
+        "who",
+        "whom",
+        "whose",
+        "where",
+        "when",
+        "why",
+        "how",
+        "did",
+        "does",
+        "do",
+        "is",
+        "are",
+        "was",
+        "were",
+        "has",
+        "have",
+        "had",
+        "can",
+        "could",
+        "will",
+        "would",
+        "should",
+        "tell",
+        "show",
+        "find",
+        "list",
+        "describe",
+        "explain",
+        "summarize",
+        "recall",
+        "remember",
+    ];
+    const NON_PERSON_PROPER_NOUNS: &[&str] = &[
+        "april",
+        "august",
+        "december",
+        "february",
+        "friday",
+        "january",
+        "july",
+        "june",
+        "march",
+        "may",
+        "monday",
+        "november",
+        "october",
+        "saturday",
+        "september",
+        "sunday",
+        "thursday",
+        "tuesday",
+        "wednesday",
+    ];
+
+    let tokens = query
+        .split(|character: char| !character.is_alphabetic())
+        .filter(|token| !token.is_empty())
+        .collect::<Vec<_>>();
+
+    unique_terms(
+        tokens
+            .iter()
+            .enumerate()
+            .filter(|(index, token)| {
+                *index > 0
+                    && tokens[..*index].iter().any(|preceding| {
+                        SUBJECT_QUERY_FRAME_TERMS
+                            .iter()
+                            .any(|cue| preceding.eq_ignore_ascii_case(cue))
+                    })
+                    && token.chars().next().is_some_and(char::is_uppercase)
+                    && token.chars().skip(1).any(char::is_lowercase)
+                    && !NON_PERSON_PROPER_NOUNS
+                        .iter()
+                        .any(|excluded| token.eq_ignore_ascii_case(excluded))
+            })
+            .flat_map(|(_, token)| search_query_terms(token))
+            .collect(),
+    )
+}
+
+pub(super) fn candidate_has_explicit_subject_support(query: &str, content: &str) -> bool {
+    let subject_terms = inferred_subject_terms(query);
+    if subject_terms.is_empty() {
+        return false;
+    }
+
+    let content_units = content
+        .split_whitespace()
+        .flat_map(|token| {
+            token.split(|character: char| !character.is_alphanumeric() && character != '-')
+        })
+        .filter(|token| !token.is_empty())
+        .map(search_query_terms)
+        .filter(|terms| !terms.is_empty())
+        .collect::<Vec<_>>();
+
+    content_units.iter().enumerate().any(|(start, _)| {
+        let mut candidate_terms = Vec::new();
+        for unit in &content_units[start..] {
+            candidate_terms.extend(unit.iter().cloned());
+            if candidate_terms == subject_terms {
+                return true;
+            }
+            if !subject_terms.starts_with(&candidate_terms) {
+                break;
+            }
+        }
+        false
+    })
+}
+
+pub(super) fn source_question_conflicts_with_query_preference(
+    query: &str,
+    subject_terms: &[String],
+    source_question: &str,
+) -> bool {
+    preference_relation_conflicts(
+        preference_polarity(query),
+        &search_query_terms(query),
+        subject_terms,
+        source_question,
+    )
+}
+
+pub(super) fn source_question_predicates_compatible(query: &str, source: &str) -> bool {
+    if query == source {
+        return true;
+    }
+
+    matches!(
+        (preference_polarity(query), preference_polarity(source)),
+        (Some(query), Some(source)) if query == source
+    )
+}
+
+fn candidate_conflicts_with_query_preference(query: &QueryEvidence, content: &str) -> bool {
+    preference_relation_conflicts(
+        query.requested_preference_polarity,
+        &query.content_terms,
+        &query.subject_terms,
+        content,
+    )
+}
+
+fn preference_relation_conflicts(
+    requested: Option<PreferencePolarity>,
+    query_terms: &[String],
+    subject_terms: &[String],
+    content: &str,
+) -> bool {
+    let Some(requested) = requested else {
+        return false;
+    };
+    if preference_polarity(content) != Some(opposite_preference_polarity(requested)) {
+        return false;
+    }
+
+    let content_terms = search_query_terms(content);
+    query_terms.iter().any(|term| {
+        !subject_terms.contains(term) && !is_preference_term(term) && content_terms.contains(term)
+    })
+}
+
+fn preference_polarity(text: &str) -> Option<PreferencePolarity> {
+    let words = text
+        .split(|character: char| !character.is_alphabetic())
+        .filter(|word| !word.is_empty())
+        .map(str::to_ascii_lowercase)
+        .collect::<Vec<_>>();
+    let mut found = None;
+    for (index, word) in words.iter().enumerate() {
+        let polarity = if POSITIVE_PREFERENCE_TERMS.contains(&word.as_str()) {
+            Some(PreferencePolarity::Positive)
+        } else if NEGATIVE_PREFERENCE_TERMS.contains(&word.as_str()) {
+            Some(PreferencePolarity::Negative)
+        } else {
+            None
+        };
+        let Some(polarity) = polarity else {
+            continue;
+        };
+        let negated = index > 0 && matches!(words[index - 1].as_str(), "not" | "never")
+            || index > 1
+                && words[index - 1] == "t"
+                && matches!(words[index - 2].as_str(), "don" | "doesn" | "didn");
+        if negated {
+            continue;
+        }
+        if found.is_some_and(|existing| existing != polarity) {
+            return None;
+        }
+        found = Some(polarity);
+    }
+    found
+}
+
+fn opposite_preference_polarity(polarity: PreferencePolarity) -> PreferencePolarity {
+    match polarity {
+        PreferencePolarity::Positive => PreferencePolarity::Negative,
+        PreferencePolarity::Negative => PreferencePolarity::Positive,
+    }
+}
+
+fn is_preference_term(term: &str) -> bool {
+    POSITIVE_PREFERENCE_TERMS.contains(&term) || NEGATIVE_PREFERENCE_TERMS.contains(&term)
+}
+
 fn is_current_intent_cue(term: &str) -> bool {
     matches!(term, "current" | "currently" | "latest" | "newest")
+}
+
+fn is_calendar_browse_scope_term(term: &str) -> bool {
+    matches!(
+        term,
+        "about"
+            | "all"
+            | "display"
+            | "fact"
+            | "find"
+            | "item"
+            | "list"
+            | "memory"
+            | "record"
+            | "show"
+    )
 }
 
 fn is_timeline_intent_cue(term: &str) -> bool {
@@ -187,25 +514,26 @@ pub(super) fn evaluate_candidate(
         return AdmissionDecision::Admit(AdmissionBasis::Browse);
     }
 
-    if negative_project_membership_conflicts(query, &candidate.fact.content) {
+    if candidate_conflicts_with_query_reference(query, &candidate.fact.content) {
         return AdmissionDecision::Reject(RejectReason::ReferenceConflict);
     }
 
-    if query.intent == AdmissionIntent::EventTime
-        && !has_topically_grounded_event_time(
-            query,
-            &candidate.fact.content,
-            Some(candidate.fact.t_valid),
-            candidate.evidence.semantic_similarity,
-            policy.semantic_threshold,
-        )
+    if candidate_conflicts_with_query_preference(query, &candidate.fact.content) {
+        return AdmissionDecision::Reject(RejectReason::InsufficientEvidence);
+    }
+
+    if speaker_conflicts_with_requested_subject(query, &candidate.fact.content) {
+        return AdmissionDecision::Reject(RejectReason::InsufficientEvidence);
+    }
+
+    if query.requires_self_reported_relief
+        && !content_asserts_self_reported_relief(&candidate.fact.content)
     {
         return AdmissionDecision::Reject(RejectReason::InsufficientEvidence);
     }
 
-    if query.intent != AdmissionIntent::EventTime
-        && query.calendar_period.is_some()
-        && !has_calendar_period_and_topic_support(
+    if query.intent == AdmissionIntent::EventTime
+        && !has_topically_grounded_event_time(
             query,
             &candidate.fact.content,
             Some(candidate.fact.t_valid),
@@ -224,7 +552,7 @@ pub(super) fn evaluate_candidate(
             .any(|reference| candidate_references.contains(reference))
         {
             if query.content_terms.is_empty()
-                || has_sufficient_candidate_support(query, candidate)
+                || has_minimum_candidate_topic_hits(query, candidate)
                 || has_native_single_term_support(query, candidate)
             {
                 return AdmissionDecision::Admit(AdmissionBasis::Reference);
@@ -251,6 +579,33 @@ pub(super) fn evaluate_candidate(
             return AdmissionDecision::Reject(RejectReason::ReferenceConflict);
         }
 
+        // Source-expanded facts are loaded only from an episode whose direct
+        // fact already passed this query's qualified-reference check. They may
+        // inherit that episode-level qualification, but still need independent
+        // topical support and may not contradict the requested reference.
+        if candidate.retrieval_tier == super::types::RetrievalTier::SourceExpanded
+            && has_minimum_candidate_topic_hits(query, candidate)
+        {
+            return AdmissionDecision::Admit(AdmissionBasis::QualifiedSourceEpisode);
+        }
+
+        return AdmissionDecision::Reject(RejectReason::InsufficientEvidence);
+    }
+
+    if has_calendar_acquisition_support(query, candidate) {
+        return AdmissionDecision::Admit(AdmissionBasis::CalendarAcquisition);
+    }
+
+    if query.intent != AdmissionIntent::EventTime
+        && query.calendar_period.is_some()
+        && !has_calendar_period_and_topic_support(
+            query,
+            &candidate.fact.content,
+            Some(candidate.fact.t_valid),
+            candidate.evidence.semantic_similarity,
+            policy.semantic_threshold,
+        )
+    {
         return AdmissionDecision::Reject(RejectReason::InsufficientEvidence);
     }
 
@@ -351,6 +706,21 @@ pub(super) fn evaluate_candidate(
 }
 
 fn has_sufficient_candidate_support(query: &QueryEvidence, candidate: &RankedContextFact) -> bool {
+    has_sufficient_term_support(query, &matched_candidate_topic_terms(query, candidate))
+}
+
+fn has_minimum_candidate_topic_hits(query: &QueryEvidence, candidate: &RankedContextFact) -> bool {
+    if query.content_terms.is_empty() {
+        return false;
+    }
+    let minimum_hits = if query.content_terms.len() == 1 { 1 } else { 2 };
+    matched_candidate_topic_terms(query, candidate).len() >= minimum_hits
+}
+
+fn matched_candidate_topic_terms(
+    query: &QueryEvidence,
+    candidate: &RankedContextFact,
+) -> Vec<String> {
     let content_terms = search_query_terms(&strip_url_tokens(&candidate.fact.content));
     let index_key_terms = candidate
         .fact
@@ -358,13 +728,82 @@ fn has_sufficient_candidate_support(query: &QueryEvidence, candidate: &RankedCon
         .iter()
         .flat_map(|key| search_query_terms(&strip_url_tokens(key)))
         .collect::<Vec<_>>();
-    let matched_terms = query
+    query
         .content_terms
         .iter()
         .filter(|term| content_terms.contains(term) || index_key_terms.contains(term))
         .cloned()
-        .collect::<Vec<_>>();
-    has_sufficient_term_support(query, &matched_terms)
+        .collect()
+}
+
+fn speaker_conflicts_with_requested_subject(query: &QueryEvidence, content: &str) -> bool {
+    if query.subject_terms.is_empty() {
+        return false;
+    }
+
+    let Some((speaker, assertion)) = content.split_once(':') else {
+        return false;
+    };
+    let speaker = speaker.trim();
+    if speaker.is_empty()
+        || speaker.len() > 60
+        || speaker.split_whitespace().count() > 3
+        || speaker.split_whitespace().any(|word| {
+            !word.chars().all(char::is_alphabetic)
+                || !word.chars().next().is_some_and(char::is_uppercase)
+                || !word.chars().skip(1).any(char::is_lowercase)
+        })
+    {
+        return false;
+    }
+
+    let speaker_terms = search_query_terms(speaker);
+    if assertion_explicitly_attributes_a_fact_to_subject(assertion, &query.subject_terms) {
+        return false;
+    }
+    !query
+        .subject_terms
+        .iter()
+        .any(|term| speaker_terms.contains(term))
+}
+
+pub(super) fn episode_candidate_matches_query_subject(
+    query: &QueryEvidence,
+    content: &str,
+) -> bool {
+    !speaker_conflicts_with_requested_subject(query, content)
+        && (!query.requires_self_reported_relief || content_asserts_self_reported_relief(content))
+}
+
+pub(super) fn source_episode_has_hard_query_conflict(query: &QueryEvidence, content: &str) -> bool {
+    candidate_conflicts_with_query_reference(query, content)
+        || candidate_conflicts_with_query_preference(query, content)
+        || speaker_conflicts_with_requested_subject(query, content)
+}
+
+fn content_asserts_self_reported_relief(content: &str) -> bool {
+    content
+        .split_once("Upstream image metadata")
+        .map_or(content, |(assertion, _)| assertion)
+        .split(['.', '!', '?', '\n'])
+        .filter(|sentence| !sentence.trim().is_empty())
+        .any(|sentence| {
+            let words = sentence
+                .split(|character: char| !character.is_alphabetic())
+                .filter(|word| !word.is_empty())
+                .map(str::to_ascii_lowercase)
+                .collect::<HashSet<_>>();
+            let uses_first_person = ["i", "me", "my", "mine", "we", "us", "our", "ours"]
+                .iter()
+                .any(|term| words.contains(*term));
+            let states_relief_or_escape = [
+                "destress", "escape", "relax", "relaxed", "relaxing", "relief", "stress", "unwind",
+            ]
+            .iter()
+            .any(|term| words.contains(*term));
+
+            uses_first_person && states_relief_or_escape
+        })
 }
 
 fn has_timeline_topic_support(query: &QueryEvidence, candidate: &RankedContextFact) -> bool {
@@ -491,6 +930,292 @@ fn has_calendar_period_and_topic_support(
     })
 }
 
+fn has_calendar_acquisition_support(query: &QueryEvidence, candidate: &RankedContextFact) -> bool {
+    let Some(period) = query.calendar_period else {
+        return false;
+    };
+    if !query_requests_acquisition(query)
+        || !candidate_matches_calendar_period(
+            period,
+            &candidate.fact.content,
+            Some(candidate.fact.t_valid),
+        )
+    {
+        return false;
+    }
+
+    let source_matches_requested_subject = query.subject_terms.is_empty()
+        || candidate
+            .fact
+            .content
+            .split_once(':')
+            .map(|(speaker, _)| search_query_terms(speaker))
+            .is_some_and(|speaker_terms| {
+                query
+                    .subject_terms
+                    .iter()
+                    .any(|subject| speaker_terms.contains(subject))
+            });
+
+    source_matches_requested_subject
+        && content_asserts_requested_calendar_acquisition(query, &candidate.fact.content)
+}
+
+fn content_asserts_requested_calendar_acquisition(query: &QueryEvidence, content: &str) -> bool {
+    let content = content
+        .split_once("Upstream image metadata")
+        .map_or(content, |(assertion, _)| assertion);
+    let requested_object_terms = query
+        .content_terms
+        .iter()
+        .filter(|term| {
+            !query.subject_terms.contains(term)
+                && !ACQUISITION_INTENT_TERMS.contains(&term.as_str())
+                && !term.chars().all(|character| character.is_ascii_digit())
+                && super::temporal::month_number(term).is_none()
+                && !matches!(
+                    term.as_str(),
+                    "new"
+                        | "item"
+                        | "items"
+                        | "thing"
+                        | "things"
+                        | "object"
+                        | "objects"
+                        | "product"
+                        | "products"
+                        | "stuff"
+                        | "which"
+                        | "what"
+                        | "did"
+                        | "does"
+                        | "do"
+                        | "the"
+                        | "in"
+                        | "on"
+                        | "during"
+                        | "for"
+                )
+        })
+        .collect::<Vec<_>>();
+
+    content
+        .split(['.', '!', '?', '\n'])
+        .filter(|sentence| !sentence.trim().is_empty())
+        .any(|sentence| {
+            if !content_asserts_calendar_acquisition(sentence) {
+                return false;
+            }
+            let sentence_terms = search_query_terms(&strip_url_tokens(sentence));
+            requested_object_terms
+                .iter()
+                .all(|term| sentence_terms.contains(*term))
+        })
+}
+
+fn assertion_explicitly_attributes_a_fact_to_subject(
+    assertion: &str,
+    subject_terms: &[String],
+) -> bool {
+    const FINITE_PREDICATES: &[&str] = &[
+        "am", "are", "became", "becomes", "bought", "builds", "built", "does", "enjoys", "feels",
+        "got", "had", "has", "have", "is", "likes", "lives", "loves", "made", "owns", "plays",
+        "prefers", "uses", "was", "were", "will", "works", "worked", "wants",
+    ];
+    let assertion = assertion
+        .split_once("Upstream image metadata")
+        .map_or(assertion, |(text, _)| text);
+    let body = assertion
+        .split_once(':')
+        .map_or(assertion, |(_, body)| body);
+    body.split(['.', '!', '?', ';', '\n']).any(|sentence| {
+        let words = sentence
+            .split(|character: char| !character.is_alphabetic())
+            .filter(|word| !word.is_empty())
+            .map(str::to_ascii_lowercase)
+            .collect::<Vec<_>>();
+        words.iter().enumerate().any(|(index, word)| {
+            let word_terms = search_query_terms(word);
+            if !subject_terms
+                .iter()
+                .any(|subject| word_terms.contains(subject))
+            {
+                return false;
+            }
+
+            let next_words = words.iter().skip(index + 1).take(4).collect::<Vec<_>>();
+            let predicate_position = next_words
+                .iter()
+                .position(|next| FINITE_PREDICATES.contains(&next.as_str()))
+                .or_else(|| {
+                    (next_words.first().is_some_and(|next| next.as_str() == "s"))
+                        .then(|| {
+                            next_words
+                                .iter()
+                                .skip(1)
+                                .position(|next| FINITE_PREDICATES.contains(&next.as_str()))
+                                .map(|position| position + 1)
+                        })
+                        .flatten()
+                });
+            predicate_position.is_some_and(|position| {
+                !next_words
+                    .iter()
+                    .take(position)
+                    .any(|word| matches!(word.as_str(), "he" | "i" | "she" | "they" | "we" | "you"))
+            })
+        })
+    })
+}
+
+pub(super) fn query_requests_acquisition(query: &QueryEvidence) -> bool {
+    query.requests_acquisition
+        || query
+            .content_terms
+            .iter()
+            .any(|term| ACQUISITION_INTENT_TERMS.contains(&term.as_str()))
+}
+
+fn query_text_requests_acquisition(query: &str) -> bool {
+    query
+        .split(|character: char| !character.is_alphabetic())
+        .filter(|term| !term.is_empty())
+        .any(|term| ACQUISITION_INTENT_TERMS.contains(&term.to_ascii_lowercase().as_str()))
+}
+
+fn content_asserts_calendar_acquisition(content: &str) -> bool {
+    let content = content
+        .split_once("Upstream image metadata")
+        .map_or(content, |(assertion, _)| assertion);
+
+    content
+        .split(['.', '!', '?', '\n'])
+        .filter(|sentence| !sentence.trim().is_empty())
+        .any(|sentence| {
+            let sentence_terms = search_query_terms(&strip_url_tokens(sentence));
+            sentence_terms
+                .iter()
+                .any(|term| ACQUISITION_EVIDENCE_TERMS.contains(&term.as_str()))
+                || has_newly_obtained_object_assertion(sentence)
+                || has_newly_owned_property_assertion(sentence, &sentence_terms)
+        })
+}
+
+fn has_newly_obtained_object_assertion(sentence: &str) -> bool {
+    let terms = sentence
+        .split(|character: char| !character.is_alphabetic())
+        .filter(|term| !term.is_empty())
+        .map(str::to_ascii_lowercase)
+        .collect::<Vec<_>>();
+    terms.iter().enumerate().any(|(index, term)| {
+        if !matches!(term.as_str(), "get" | "gets" | "got") {
+            return false;
+        }
+
+        let mut next = index + 1;
+        if terms.get(next).is_some_and(|term| {
+            matches!(
+                term.as_str(),
+                "myself" | "yourself" | "himself" | "herself" | "ourselves" | "themselves"
+            )
+        }) {
+            next += 1;
+        }
+        if terms.get(next).is_some_and(|term| {
+            matches!(
+                term.as_str(),
+                "a" | "an"
+                    | "the"
+                    | "my"
+                    | "your"
+                    | "his"
+                    | "her"
+                    | "our"
+                    | "their"
+                    | "this"
+                    | "that"
+                    | "these"
+                    | "those"
+                    | "some"
+                    | "another"
+            )
+        }) {
+            next += 1;
+        }
+
+        terms.get(next).is_some_and(|term| term == "new")
+            && terms
+                .get(next + 1)
+                .is_some_and(|term| !matches!(term.as_str(), "to" | "of" | "for"))
+    })
+}
+
+pub(super) fn content_asserts_acquisition(content: &str) -> bool {
+    let content = content
+        .split_once("Upstream image metadata")
+        .map_or(content, |(assertion, _)| assertion);
+
+    content
+        .split(['.', '!', '?', '\n'])
+        .filter(|sentence| !sentence.trim().is_empty())
+        .any(|sentence| {
+            let sentence_terms = search_query_terms(&strip_url_tokens(sentence));
+            let raw_terms = sentence
+                .split(|character: char| !character.is_alphabetic())
+                .filter(|term| !term.is_empty())
+                .map(str::to_ascii_lowercase)
+                .collect::<Vec<_>>();
+            sentence_terms
+                .iter()
+                .any(|term| ACQUISITION_EVIDENCE_TERMS.contains(&term.as_str()))
+                || has_newly_owned_property_assertion(sentence, &sentence_terms)
+                || raw_terms.windows(2).any(|pair| {
+                    matches!(pair[0].as_str(), "get" | "gets" | "got")
+                        && matches!(
+                            pair[1].as_str(),
+                            "a" | "an"
+                                | "the"
+                                | "my"
+                                | "your"
+                                | "his"
+                                | "her"
+                                | "our"
+                                | "their"
+                                | "this"
+                                | "that"
+                                | "these"
+                                | "those"
+                                | "some"
+                                | "new"
+                                | "another"
+                        )
+                })
+                || raw_terms.windows(3).any(|triple| {
+                    matches!(triple[0].as_str(), "get" | "gets" | "got")
+                        && matches!(
+                            triple[1].as_str(),
+                            "myself"
+                                | "yourself"
+                                | "himself"
+                                | "herself"
+                                | "ourselves"
+                                | "themselves"
+                        )
+                        && matches!(
+                            triple[2].as_str(),
+                            "a" | "an"
+                                | "the"
+                                | "this"
+                                | "that"
+                                | "these"
+                                | "those"
+                                | "some"
+                                | "new"
+                        )
+                })
+        })
+}
+
 fn has_semantic_calendar_topic_support(
     query: &QueryEvidence,
     sentence: &str,
@@ -508,77 +1233,8 @@ fn has_semantic_calendar_topic_support(
             .content_terms
             .iter()
             .any(|term| sentence_terms.contains(term));
-    const ACQUISITION_INTENT_TERMS: &[&str] = &[
-        "acquire",
-        "acquired",
-        "acquiring",
-        "buy",
-        "bought",
-        "buying",
-        "get",
-        "gets",
-        "got",
-        "obtain",
-        "obtained",
-        "obtaining",
-        "purchase",
-        "purchased",
-        "purchasing",
-    ];
-    const ACQUISITION_EVIDENCE_TERMS: &[&str] = &[
-        "acquire",
-        "acquired",
-        "acquiring",
-        "buy",
-        "bought",
-        "buying",
-        "obtain",
-        "obtained",
-        "obtaining",
-        "purchase",
-        "purchased",
-        "purchasing",
-    ];
-    const SALE_TERMS: &[&str] = &["sale", "sell", "selling", "sells", "sold"];
-    let query_mentions_acquisition = query
-        .content_terms
-        .iter()
-        .any(|term| ACQUISITION_INTENT_TERMS.contains(&term.as_str()));
-    let sentence_mentions_acquisition = sentence_terms
-        .iter()
-        .any(|term| ACQUISITION_EVIDENCE_TERMS.contains(&term.as_str()))
-        || sentence_terms.windows(2).any(|pair| {
-            matches!(pair[0].as_str(), "get" | "gets" | "got")
-                && matches!(
-                    pair[1].as_str(),
-                    "a" | "an"
-                        | "the"
-                        | "my"
-                        | "your"
-                        | "his"
-                        | "her"
-                        | "our"
-                        | "their"
-                        | "this"
-                        | "that"
-                        | "these"
-                        | "those"
-                        | "some"
-                        | "new"
-                        | "another"
-                )
-        })
-        || sentence_terms.windows(3).any(|triple| {
-            matches!(triple[0].as_str(), "get" | "gets" | "got")
-                && matches!(
-                    triple[1].as_str(),
-                    "myself" | "yourself" | "himself" | "herself" | "ourselves" | "themselves"
-                )
-                && matches!(
-                    triple[2].as_str(),
-                    "a" | "an" | "the" | "this" | "that" | "these" | "those" | "some" | "new"
-                )
-        });
+    let sentence_mentions_acquisition = content_asserts_calendar_acquisition(sentence);
+    let query_mentions_acquisition = query_requests_acquisition(query);
     let query_mentions_sale = query
         .content_terms
         .iter()
@@ -588,13 +1244,43 @@ fn has_semantic_calendar_topic_support(
         .any(|term| SALE_TERMS.contains(&term.as_str()));
 
     if query_mentions_acquisition {
-        return sentence_mentions_acquisition;
+        return sentence_mentions_acquisition
+            && content_asserts_requested_calendar_acquisition(query, sentence);
     }
     if query_mentions_sale {
         return sentence_mentions_sale;
     }
 
     has_lexical_topic_anchor && has_explicit_event_time(sentence)
+}
+
+fn has_newly_owned_property_assertion(sentence: &str, sentence_terms: &[String]) -> bool {
+    const POSSESSIVE_NEW_CONSTRUCTIONS: &[&str] = &[
+        " my new ",
+        " our new ",
+        " his new ",
+        " her new ",
+        " their new ",
+    ];
+    const PROPERTY_TERMS: &[&str] = &[
+        "apartment",
+        "condo",
+        "estate",
+        "flat",
+        "home",
+        "house",
+        "mansion",
+        "property",
+        "townhouse",
+    ];
+
+    let normalized = format!(" {} ", sentence.to_ascii_lowercase());
+    POSSESSIVE_NEW_CONSTRUCTIONS
+        .iter()
+        .any(|construction| normalized.contains(construction))
+        && sentence_terms
+            .iter()
+            .any(|term| PROPERTY_TERMS.contains(&term.as_str()))
 }
 
 fn has_native_single_term_support(query: &QueryEvidence, candidate: &RankedContextFact) -> bool {
@@ -706,7 +1392,10 @@ pub(super) fn episode_candidate_is_admitted_at_reference_time(
         return true;
     }
 
-    if negative_project_membership_conflicts(query, content) {
+    if candidate_conflicts_with_query_reference(query, content)
+        || candidate_conflicts_with_query_preference(query, content)
+        || !episode_candidate_matches_query_subject(query, content)
+    {
         return false;
     }
 
@@ -715,7 +1404,7 @@ pub(super) fn episode_candidate_is_admitted_at_reference_time(
     }
 
     if !query.mandatory_reference_alternatives.is_empty() {
-        if negative_project_membership_conflicts(query, content) {
+        if candidate_conflicts_with_query_reference(query, content) {
             return false;
         }
         let candidate_references = extract_qualified_references(content);
@@ -740,7 +1429,10 @@ pub(super) fn episode_candidate_is_rerankable_at_reference_time(
         return true;
     }
 
-    if negative_project_membership_conflicts(query, content) {
+    if candidate_conflicts_with_query_reference(query, content)
+        || candidate_conflicts_with_query_preference(query, content)
+        || !episode_candidate_matches_query_subject(query, content)
+    {
         return false;
     }
 
@@ -856,7 +1548,52 @@ fn populate_candidate_evidence(query: &QueryEvidence, candidate: &mut RankedCont
     candidate.evidence.repeated_topic = repeated_topic_admission_evidence(query, &candidate.fact);
 }
 
-fn negative_project_membership_conflicts(query: &QueryEvidence, content: &str) -> bool {
+fn candidate_conflicts_with_query_reference(query: &QueryEvidence, content: &str) -> bool {
+    let denied_references = content
+        .split(['.', '!', '?', '\n', ';', ','])
+        .map(str::trim)
+        .filter_map(|clause| {
+            let lower = clause.to_ascii_lowercase();
+            let denied = ["not ", "never ", "except ", "excluding "]
+                .iter()
+                .any(|prefix| lower.starts_with(prefix));
+            (denied && !lower.starts_with("not only "))
+                .then(|| extract_qualified_references(clause))
+        })
+        .flatten()
+        .collect::<HashSet<_>>();
+    let candidate_references = extract_qualified_references(content);
+    let has_supported_requested_reference =
+        query
+            .mandatory_reference_alternatives
+            .iter()
+            .any(|reference| {
+                candidate_references.contains(reference) && !denied_references.contains(reference)
+            });
+    let denies_requested_reference = query
+        .mandatory_reference_alternatives
+        .iter()
+        .any(|reference| denied_references.contains(reference));
+    if denies_requested_reference && !has_supported_requested_reference {
+        return true;
+    }
+
+    let has_exact_reference = candidate_references
+        .iter()
+        .any(|reference| query.mandatory_reference_alternatives.contains(reference));
+    if !has_exact_reference
+        && query
+            .mandatory_reference_alternatives
+            .iter()
+            .any(|expected| {
+                candidate_references
+                    .iter()
+                    .any(|actual| reference_family(expected) == reference_family(actual))
+            })
+    {
+        return true;
+    }
+
     content
         .split(['.', '!', '?', '\n'])
         .filter(|sentence| !sentence.trim().is_empty())
@@ -996,6 +1733,7 @@ fn parse_calendar_period(raw: &str) -> Option<CalendarPeriod> {
         .split(|character: char| !character.is_alphanumeric() && character != '-')
         .filter(|token| !token.is_empty())
         .map(str::to_lowercase)
+        .filter(|token| token != "and")
         .collect::<Vec<_>>();
     for window in tokens.windows(3) {
         let (Some(first_month), Some(second_month), Ok(year)) = (
@@ -1623,6 +2361,15 @@ mod tests {
         build_query_evidence(Some(raw), Vec::new(), &[], &QueryFlags::default())
     }
 
+    fn query_with_mentioned_subject(raw: &str, subject: &str) -> QueryEvidence {
+        build_query_evidence(
+            Some(raw),
+            Vec::new(),
+            &[subject.to_string()],
+            &QueryFlags::default(),
+        )
+    }
+
     fn timeline_query(raw: &str) -> QueryEvidence {
         let flags = QueryFlags {
             wants_timeline: true,
@@ -1685,6 +2432,71 @@ mod tests {
                 .with_timezone(&Utc),
             &access,
         );
+
+        assert_eq!(
+            evaluate_candidate(&query, &fact, &policy),
+            AdmissionDecision::Reject(RejectReason::InsufficientEvidence)
+        );
+    }
+
+    #[test]
+    fn named_subject_query_rejects_a_similar_fact_spoken_by_another_person() {
+        let query = query_with_mentioned_subject(
+            "What programming languages has James worked with?",
+            "James",
+        );
+        let fact = candidate(
+            "John: I've worked with Python and C++ on programming projects.",
+            None,
+        );
+        let access = AccessPayload::default();
+        let policy = AdmissionPolicy::new(0.7, Utc::now(), &access);
+
+        assert_eq!(
+            evaluate_candidate(&query, &fact, &policy),
+            AdmissionDecision::Reject(RejectReason::InsufficientEvidence)
+        );
+    }
+
+    #[test]
+    fn named_subject_query_keeps_a_fact_spoken_by_the_requested_person() {
+        let query = query_with_mentioned_subject(
+            "What programming languages has James worked with?",
+            "James",
+        );
+        let fact = candidate(
+            "James: I've worked with Python and C++ on programming projects.",
+            None,
+        );
+        let access = AccessPayload::default();
+        let policy = AdmissionPolicy::new(0.7, Utc::now(), &access);
+
+        assert_eq!(
+            evaluate_candidate(&query, &fact, &policy),
+            AdmissionDecision::Admit(AdmissionBasis::Lexical)
+        );
+    }
+
+    #[test]
+    fn query_infers_a_named_speaker_subject_from_the_question_text() {
+        let query = query("What programming languages has James worked with?");
+
+        assert_eq!(query.subject_terms, vec!["jame"]);
+    }
+
+    #[test]
+    fn title_case_search_phrase_does_not_infer_a_named_speaker_subject() {
+        let query = query("Delta Enrollment");
+
+        assert!(query.subject_terms.is_empty());
+    }
+
+    #[test]
+    fn natural_language_subject_rejects_a_matching_topic_from_another_speaker() {
+        let query = query("What pets does Jolene have?");
+        let fact = candidate("Deborah: Cool, Jolene! Pets bring so much happiness.", None);
+        let access = AccessPayload::default();
+        let policy = AdmissionPolicy::new(0.7, Utc::now(), &access);
 
         assert_eq!(
             evaluate_candidate(&query, &fact, &policy),
@@ -1763,7 +2575,111 @@ mod tests {
 
         assert_eq!(
             evaluate_candidate(&query, &fact, &policy),
-            AdmissionDecision::Admit(AdmissionBasis::Semantic)
+            AdmissionDecision::Admit(AdmissionBasis::CalendarAcquisition)
+        );
+    }
+
+    #[test]
+    fn calendar_purchase_query_accepts_a_newly_owned_property() {
+        let query = query("What items did Calvin buy in March 2023?");
+        let mut fact = candidate(
+            "Calvin: Something really exciting happened to me - I just had a big life change! Here's my new mansion - pretty cool huh?",
+            Some(0.8),
+        );
+        fact.fact.t_valid = chrono::DateTime::parse_from_rfc3339("2023-03-23T11:53:00Z")
+            .expect("valid source timestamp")
+            .with_timezone(&Utc);
+        fact.fact.t_ingested = fact.fact.t_valid;
+        let access = AccessPayload::default();
+        let policy = AdmissionPolicy::new(
+            0.7,
+            chrono::DateTime::parse_from_rfc3339("2023-04-01T00:00:00Z")
+                .expect("valid cutoff")
+                .with_timezone(&Utc),
+            &access,
+        );
+
+        assert_eq!(
+            evaluate_candidate(&query, &fact, &policy),
+            AdmissionDecision::Admit(AdmissionBasis::CalendarAcquisition)
+        );
+    }
+
+    #[test]
+    fn calendar_purchase_query_uses_direct_new_property_evidence_without_embedding_score() {
+        let query = query("What items did Calvin buy in March 2023?");
+        let mut fact = candidate(
+            "Calvin: I just had a big life change! Here's my new mansion.",
+            None,
+        );
+        fact.fact.t_valid = chrono::DateTime::parse_from_rfc3339("2023-03-23T11:53:00Z")
+            .expect("valid source timestamp")
+            .with_timezone(&Utc);
+        fact.fact.t_ingested = fact.fact.t_valid;
+        let access = AccessPayload::default();
+        let policy = AdmissionPolicy::new(
+            0.7,
+            chrono::DateTime::parse_from_rfc3339("2023-04-01T00:00:00Z")
+                .expect("valid cutoff")
+                .with_timezone(&Utc),
+            &access,
+        );
+
+        assert_eq!(
+            evaluate_candidate(&query, &fact, &policy),
+            AdmissionDecision::Admit(AdmissionBasis::CalendarAcquisition)
+        );
+    }
+
+    #[test]
+    fn calendar_purchase_query_does_not_treat_getting_a_chance_as_an_acquisition() {
+        let query = query("What items did Calvin buy in March 2023?");
+        let mut fact = candidate(
+            "Calvin: I got a chance to learn about Japanese culture in March.",
+            None,
+        );
+        fact.fact.t_valid = chrono::DateTime::parse_from_rfc3339("2023-03-23T11:53:00Z")
+            .expect("valid source timestamp")
+            .with_timezone(&Utc);
+        fact.fact.t_ingested = fact.fact.t_valid;
+        let access = AccessPayload::default();
+        let policy = AdmissionPolicy::new(
+            0.7,
+            chrono::DateTime::parse_from_rfc3339("2023-04-01T00:00:00Z")
+                .expect("valid cutoff")
+                .with_timezone(&Utc),
+            &access,
+        );
+
+        assert_eq!(
+            evaluate_candidate(&query, &fact, &policy),
+            AdmissionDecision::Reject(RejectReason::InsufficientEvidence)
+        );
+    }
+
+    #[test]
+    fn calendar_purchase_query_does_not_treat_a_new_job_as_property() {
+        let query = query("What items did Calvin buy in March 2023?");
+        let mut fact = candidate(
+            "Calvin: I am excited about my new job and the opportunities ahead.",
+            Some(0.99),
+        );
+        fact.fact.t_valid = chrono::DateTime::parse_from_rfc3339("2023-03-23T11:53:00Z")
+            .expect("valid source timestamp")
+            .with_timezone(&Utc);
+        fact.fact.t_ingested = fact.fact.t_valid;
+        let access = AccessPayload::default();
+        let policy = AdmissionPolicy::new(
+            0.7,
+            chrono::DateTime::parse_from_rfc3339("2023-04-01T00:00:00Z")
+                .expect("valid cutoff")
+                .with_timezone(&Utc),
+            &access,
+        );
+
+        assert_eq!(
+            evaluate_candidate(&query, &fact, &policy),
+            AdmissionDecision::Reject(RejectReason::InsufficientEvidence)
         );
     }
 
@@ -2160,6 +3076,27 @@ mod tests {
     }
 
     #[test]
+    fn adjacent_month_calendar_browse_covers_both_months_without_a_topic_filter() {
+        let query = query("Show records from March and April 2026");
+
+        assert_eq!(
+            query.calendar_period,
+            Some(CalendarPeriod {
+                start: chrono::NaiveDate::from_ymd_opt(2026, 3, 1).expect("valid start"),
+                end_exclusive: chrono::NaiveDate::from_ymd_opt(2026, 5, 1).expect("valid end"),
+            })
+        );
+        assert!(query.content_terms.is_empty());
+    }
+
+    #[test]
+    fn calendar_browse_keeps_a_specific_requested_topic() {
+        let query = query("Show records about dogs from March and April 2026");
+
+        assert_eq!(query.content_terms, vec!["dogs"]);
+    }
+
+    #[test]
     fn month_year_content_query_admits_a_paraphrased_acquisition_in_that_period() {
         let query = query("What items did Calvin buy in March 2023?");
         let mut fact = candidate("Calvin: I just got a new car.", Some(0.99));
@@ -2173,7 +3110,7 @@ mod tests {
 
         assert_eq!(
             evaluate_candidate(&query, &fact, &policy),
-            AdmissionDecision::Admit(AdmissionBasis::Semantic)
+            AdmissionDecision::Admit(AdmissionBasis::CalendarAcquisition)
         );
     }
 
@@ -2476,6 +3413,74 @@ mod tests {
         assert_eq!(
             evaluate("Task 16 licenses", "Task 16 grants licenses.", None),
             AdmissionDecision::Admit(AdmissionBasis::Reference)
+        );
+    }
+
+    #[test]
+    fn exact_reference_uses_topical_hits_without_dilution_from_long_query_filler() {
+        let query = query(
+            "Current approved implementation plan HTTP bounded memory progress Task 16 preflight metrics, warnings, worktree status and rulings",
+        );
+        let fact = candidate(
+            "Task 16: HTTP preflight diagnostics record refused requests and observed body size.",
+            None,
+        );
+        let access = AccessPayload::default();
+        let policy = AdmissionPolicy::new(0.7, Utc::now(), &access);
+
+        assert_eq!(
+            evaluate_candidate(&query, &fact, &policy),
+            AdmissionDecision::Admit(AdmissionBasis::Reference)
+        );
+    }
+
+    #[test]
+    fn source_expanded_fact_inherits_reference_from_its_admitted_episode() {
+        let query = query(
+            "Current approved implementation plan HTTP bounded memory progress Task 16 preflight metrics, warnings, worktree status and rulings",
+        );
+        let mut sibling = candidate(
+            "HTTP preflight refused events log the request id and observed body length.",
+            None,
+        );
+        sibling.fact.source_episode = "episode:task-16".to_string();
+        sibling.retrieval_tier = RetrievalTier::SourceExpanded;
+        let access = AccessPayload::default();
+        let policy = AdmissionPolicy::new(0.7, Utc::now(), &access);
+
+        assert_eq!(
+            evaluate_candidate(&query, &sibling, &policy),
+            AdmissionDecision::Admit(AdmissionBasis::QualifiedSourceEpisode)
+        );
+    }
+
+    #[test]
+    fn direct_fact_cannot_inherit_a_qualified_episode_reference() {
+        let query = query("Task 16 HTTP access log fields");
+        let fact = candidate(
+            "HTTP access logs should include request_id and duration_ms.",
+            None,
+        );
+        let access = AccessPayload::default();
+        let policy = AdmissionPolicy::new(0.7, Utc::now(), &access);
+
+        assert_eq!(
+            evaluate_candidate(&query, &fact, &policy),
+            AdmissionDecision::Reject(RejectReason::InsufficientEvidence)
+        );
+    }
+
+    #[test]
+    fn source_expansion_does_not_admit_an_unrelated_sibling() {
+        let query = query("Task 16 HTTP access log fields");
+        let mut sibling = candidate("The support team scheduled a customer interview.", None);
+        sibling.retrieval_tier = RetrievalTier::SourceExpanded;
+        let access = AccessPayload::default();
+        let policy = AdmissionPolicy::new(0.7, Utc::now(), &access);
+
+        assert_eq!(
+            evaluate_candidate(&query, &sibling, &policy),
+            AdmissionDecision::Reject(RejectReason::InsufficientEvidence)
         );
     }
 
@@ -2921,34 +3926,31 @@ mod tests {
     }
 
     #[test]
-    fn adjacent_months_with_shared_year_form_one_calendar_period() {
-        let period = parse_calendar_period("march april 2026 atlas beacon decisions")
-            .expect("calendar range");
+    fn adjacent_month_query_admits_an_april_fact() {
+        let mut fact = candidate("The annual review was approved.", None);
+        fact.fact.t_valid = chrono::DateTime::parse_from_rfc3339("2026-04-15T09:00:00Z")
+            .expect("valid reference date")
+            .with_timezone(&Utc);
+        fact.fact.t_ingested = fact.fact.t_valid;
+        let access = AccessPayload::default();
+        let policy =
+            AdmissionPolicy::new(0.7, fact.fact.t_valid + chrono::Duration::days(1), &access);
+
         assert_eq!(
-            period.start,
-            chrono::NaiveDate::from_ymd_opt(2026, 3, 1).unwrap()
-        );
-        assert_eq!(
-            period.end_exclusive,
-            chrono::NaiveDate::from_ymd_opt(2026, 5, 1).unwrap()
+            evaluate_candidate(
+                &query("Show records from March and April 2026"),
+                &fact,
+                &policy,
+            ),
+            AdmissionDecision::Admit(AdmissionBasis::CalendarPeriod)
         );
     }
 
     #[test]
-    fn adjacent_month_range_crosses_year_boundary() {
-        let period =
-            parse_calendar_period("November December 2026").expect("year-crossing calendar period");
-        assert_eq!(
-            period.start,
-            chrono::NaiveDate::from_ymd_opt(2026, 11, 1).unwrap()
-        );
-        assert_eq!(
-            period.end_exclusive,
-            chrono::NaiveDate::from_ymd_opt(2027, 1, 1).unwrap()
-        );
+    fn adjacent_month_query_admits_a_december_fact_at_year_end() {
         let query = query("November December 2026");
         let mut fact = candidate("The annual review was approved.", None);
-        fact.fact.t_valid = chrono::DateTime::parse_from_rfc3339("2026-11-15T09:00:00Z")
+        fact.fact.t_valid = chrono::DateTime::parse_from_rfc3339("2026-12-31T23:59:00Z")
             .expect("valid reference date")
             .with_timezone(&Utc);
         fact.fact.t_ingested = fact.fact.t_valid;
@@ -2960,5 +3962,164 @@ mod tests {
             evaluate_candidate(&query, &fact, &policy),
             AdmissionDecision::Admit(AdmissionBasis::CalendarPeriod)
         );
+    }
+
+    #[test]
+    fn adjacent_month_query_rejects_a_fact_after_the_year_boundary() {
+        let query = query("November December 2026");
+        let mut fact = candidate("The annual review was approved.", None);
+        fact.fact.t_valid = chrono::DateTime::parse_from_rfc3339("2027-01-01T00:00:00Z")
+            .expect("valid reference date")
+            .with_timezone(&Utc);
+        fact.fact.t_ingested = fact.fact.t_valid;
+        let access = AccessPayload::default();
+        let policy =
+            AdmissionPolicy::new(0.7, fact.fact.t_valid + chrono::Duration::days(1), &access);
+
+        assert_eq!(
+            evaluate_candidate(&query, &fact, &policy),
+            AdmissionDecision::Reject(RejectReason::InsufficientEvidence)
+        );
+    }
+
+    #[test]
+    fn semantic_calendar_admission_rejects_getting_a_chance_as_a_purchase() {
+        let mut fact = candidate(
+            "Calvin: I'm so excited to learn about Japanese culture and get a chance to expand.",
+            Some(0.99),
+        );
+        fact.fact.t_valid = chrono::DateTime::parse_from_rfc3339("2023-03-23T12:00:00Z")
+            .expect("valid source reference date")
+            .with_timezone(&Utc);
+        fact.fact.t_ingested = fact.fact.t_valid;
+        let access = AccessPayload::default();
+        let policy =
+            AdmissionPolicy::new(0.7, fact.fact.t_valid + chrono::Duration::days(1), &access);
+
+        assert_eq!(
+            evaluate_candidate(
+                &query("What items did Calvin buy in March 2023?"),
+                &fact,
+                &policy,
+            ),
+            AdmissionDecision::Reject(RejectReason::InsufficientEvidence)
+        );
+    }
+
+    #[test]
+    fn purchase_query_accepts_getting_a_new_item_in_the_requested_period() {
+        let mut fact = candidate("Calvin: I just got a new car and it's amazing.", Some(0.99));
+        fact.fact.t_valid = chrono::DateTime::parse_from_rfc3339("2023-03-26T12:00:00Z")
+            .expect("valid source reference date")
+            .with_timezone(&Utc);
+        fact.fact.t_ingested = fact.fact.t_valid;
+        let access = AccessPayload::default();
+        let policy =
+            AdmissionPolicy::new(0.7, fact.fact.t_valid + chrono::Duration::days(1), &access);
+
+        assert_eq!(
+            evaluate_candidate(
+                &query("What items did Calvin buy in March 2023?"),
+                &fact,
+                &policy,
+            ),
+            AdmissionDecision::Admit(AdmissionBasis::CalendarAcquisition)
+        );
+    }
+
+    #[test]
+    fn calendar_purchase_admission_rejects_a_different_requested_object() {
+        let mut fact = candidate("Calvin: I bought a new bicycle in March 2023.", Some(0.99));
+        fact.fact.t_valid = chrono::DateTime::parse_from_rfc3339("2023-03-26T12:00:00Z")
+            .expect("valid source reference date")
+            .with_timezone(&Utc);
+        fact.fact.t_ingested = fact.fact.t_valid;
+        let access = AccessPayload::default();
+        let policy =
+            AdmissionPolicy::new(0.7, fact.fact.t_valid + chrono::Duration::days(1), &access);
+
+        assert_eq!(
+            evaluate_candidate(
+                &query("Which car did Calvin buy in March 2023?"),
+                &fact,
+                &policy
+            ),
+            AdmissionDecision::Reject(RejectReason::InsufficientEvidence)
+        );
+    }
+
+    #[test]
+    fn calendar_purchase_admission_requires_the_requested_reference() {
+        let mut fact = candidate("Calvin: I bought a new car in March 2023.", Some(0.99));
+        fact.fact.t_valid = chrono::DateTime::parse_from_rfc3339("2023-03-26T12:00:00Z")
+            .expect("valid source reference date")
+            .with_timezone(&Utc);
+        fact.fact.t_ingested = fact.fact.t_valid;
+        let access = AccessPayload::default();
+        let policy =
+            AdmissionPolicy::new(0.7, fact.fact.t_valid + chrono::Duration::days(1), &access);
+
+        assert_eq!(
+            evaluate_candidate(
+                &query("Which car did Calvin buy for task OPS-42 in March 2023?"),
+                &fact,
+                &policy,
+            ),
+            AdmissionDecision::Reject(RejectReason::InsufficientEvidence)
+        );
+    }
+
+    #[test]
+    fn explicit_requested_subject_assertion_is_not_rejected_for_a_different_speaker() {
+        let fact = candidate("Deborah: Jolene has two cats.", Some(0.99));
+        let query = build_query_evidence(
+            Some("What pets does Jolene have?"),
+            Vec::new(),
+            &["Jolene".to_string()],
+            &QueryFlags::default(),
+        );
+        let access = AccessPayload::default();
+        let policy = AdmissionPolicy::new(0.7, Utc::now(), &access);
+
+        assert!(matches!(
+            evaluate_candidate(&query, &fact, &policy),
+            AdmissionDecision::Admit(_)
+        ));
+    }
+
+    #[test]
+    fn a_vocative_does_not_make_a_different_speakers_fact_about_the_subject() {
+        let fact = candidate("Deborah: Jolene, I have two pets.", Some(0.99));
+        let query = build_query_evidence(
+            Some("What pets does Jolene have?"),
+            Vec::new(),
+            &["Jolene".to_string()],
+            &QueryFlags::default(),
+        );
+        let access = AccessPayload::default();
+        let policy = AdmissionPolicy::new(0.7, Utc::now(), &access);
+
+        assert!(matches!(
+            evaluate_candidate(&query, &fact, &policy),
+            AdmissionDecision::Reject(_)
+        ));
+    }
+
+    #[test]
+    fn raw_episode_fallback_must_not_mistake_a_vocative_for_subject_attribution() {
+        let query = build_query_evidence(
+            Some("What pets does Jolene have?"),
+            Vec::new(),
+            &["Jolene".to_string()],
+            &QueryFlags::default(),
+        );
+        let advice = "Deborah: Jolene, I have two pets.";
+
+        assert!(!episode_candidate_is_admitted_at_reference_time(
+            &query, advice, None
+        ));
+        assert!(!episode_candidate_is_rerankable_at_reference_time(
+            &query, advice, None
+        ));
     }
 }

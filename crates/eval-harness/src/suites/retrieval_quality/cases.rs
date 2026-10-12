@@ -97,6 +97,8 @@ pub(crate) struct SourceEpisode {
     pub(crate) t_ingested: Option<DateTime<Utc>>,
     #[serde(default)]
     pub(crate) policy_tags: Vec<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub(crate) source_context: Option<memory_mcp::models::SourceContext>,
 }
 
 #[derive(Debug, Clone, Deserialize, serde::Serialize, PartialEq, Eq)]

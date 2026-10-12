@@ -203,6 +203,7 @@ async fn oversized_persisted_episode_is_rejected_before_extraction_writes()
     let episode_id = IngestCapability::ingest_from_service(
         &memory.service,
         IngestRequest {
+            source_context: None,
             source_type: "chat".to_string(),
             source_id: "oversized-owner-test".to_string(),
             content,

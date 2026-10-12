@@ -76,6 +76,7 @@ impl CapacitySuite {
         let result = IngestCapability::ingest_from_service(
             &service,
             memory_mcp::models::IngestRequest {
+                source_context: None,
                 source_type: "lifecycle".into(),
                 source_id: format!("cap-{scenario}"),
                 content: content.into(),

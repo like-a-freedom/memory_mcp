@@ -85,6 +85,7 @@ pub(super) fn ranked_fact_to_item(
             json!({
                 "policy_version": "retrieval-admission-v1",
                 "basis": evidence.admission_basis.map(|basis| basis.as_str()),
+                "explicit_date_admitted": evidence.explicit_date_admitted,
                 "matched_content_terms": evidence.matched_content_terms,
                 "matched_index_key_terms": evidence.matched_index_key_terms,
                 "matched_references": evidence.matched_references,
@@ -273,6 +274,26 @@ mod tests {
     fn selected_fact_matched_terms_empty_selected_facts() {
         let terms = selected_fact_matched_terms(&[], &["hello".to_string()]);
         assert!(terms.is_empty());
+    }
+
+    #[test]
+    fn ranked_fact_output_preserves_exact_date_admission_evidence() {
+        let mut ranked = make_ranked(
+            make_fact("James went bowling yesterday.", vec![]),
+            vec!["bowling".to_string()],
+            ranking::RetrievalTier::Direct,
+        );
+        ranked.evidence.explicit_date_admitted = true;
+
+        let item = ranked_fact_to_item(ranked, chrono::Utc::now(), |_, _| 0.8);
+
+        assert_eq!(
+            item.provenance
+                .get("retrieval_admission")
+                .and_then(|evidence| evidence.get("explicit_date_admitted"))
+                .and_then(serde_json::Value::as_bool),
+            Some(true)
+        );
     }
 
     #[test]

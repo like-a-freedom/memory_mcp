@@ -662,6 +662,8 @@ async fn mcp_gliner_ingest_then_extract_completes_end_to_end() {
             t_ref: Utc::now().to_rfc3339(),
             t_ingested: None,
             policy_tags: Vec::new(),
+            source_group: None,
+            source_position: None,
         }))
         .await
         .expect("MCP ingest should succeed")
@@ -704,6 +706,7 @@ async fn ingest_episode(service: &MemoryService, content: &str) -> String {
     IngestCapability::ingest_from_service(
         service,
         IngestRequest {
+            source_context: None,
             source_type: "test".to_string(),
             source_id: content_source_id(content),
             content: content.to_string(),
@@ -952,5 +955,669 @@ async fn memory_service_assemble_context_uses_real_local_candle_embeddings() {
                 item.retrieval_tier.clone()
             ))
             .collect::<Vec<_>>()
+    );
+}
+
+#[tokio::test(flavor = "current_thread")]
+#[cfg(feature = "eval-support")]
+#[ignore = "requires the pinned local embedding and reranker model directories used by retrieval-quality eval"]
+async fn real_local_reranker_preserves_a_dated_adjacent_conversation_answer() {
+    use memory_mcp::storage::DbClient;
+
+    let _env_lock = ENV_LOCK.lock().await;
+    let embedding_dir = env::var("EMBEDDINGS_MODEL_DIR")
+        .expect("set EMBEDDINGS_MODEL_DIR to the pinned multilingual-e5-small directory");
+    let reranker_dir = env::var("RETRIEVAL_RERANKER_MODEL_DIR")
+        .expect("set RETRIEVAL_RERANKER_MODEL_DIR to the pinned reranker directory");
+    assert_required_files(Path::new(&embedding_dir), LOCAL_CANDLE_REQUIRED_FILES);
+    assert_required_files(Path::new(&reranker_dir), LOCAL_CANDLE_REQUIRED_FILES);
+
+    let temp_dir = TempDir::new().expect("temp dir should be created");
+    let mut pairs = configure_embedded_env(&temp_dir);
+    pairs.extend([
+        ("NER_EXTRACTOR", Some("regex".to_string())),
+        ("EMBEDDINGS_ENABLED", Some("true".to_string())),
+        ("EMBEDDINGS_PROVIDER", Some("local-candle".to_string())),
+        (
+            "EMBEDDINGS_MODEL",
+            Some("intfloat/multilingual-e5-small".to_string()),
+        ),
+        ("EMBEDDINGS_MODEL_DIR", Some(embedding_dir)),
+        (
+            "SURREALDB_EMBEDDING_DIMENSION",
+            Some(LOCAL_CANDLE_DIMENSION.to_string()),
+        ),
+        ("RETRIEVAL_RERANKER_MODEL_DIR", Some(reranker_dir)),
+        ("RETRIEVAL_RERANKER_DEVICE", Some("cpu".to_string())),
+        ("MEMORY_CLAIM_ROLLOUT_STAGE", Some("evidence".to_string())),
+        ("EMBEDDINGS_BASE_URL", None),
+        ("EMBEDDINGS_API_KEY", None),
+    ]);
+    let _env = EnvGuard::apply(pairs);
+    let embedding_config = memory_mcp::config::EmbeddingConfig::from_env()
+        .expect("the native evaluation embedding configuration should be valid");
+    let surreal_config = memory_mcp::config::SurrealConfig::from_env()
+        .expect("the native evaluation storage configuration should be valid");
+    let embedding = memory_mcp::eval_support::retrieval::create_eval_embedding_provider(
+        &embedding_config,
+        &surreal_config.data_dir_or_default(),
+    )
+    .await
+    .expect("the pinned local evaluation models should initialize");
+    let db = std::sync::Arc::new(
+        memory_mcp::storage::SurrealDbClient::connect_in_memory_with_dimension(
+            "local_reranker_conversation_test",
+            ORG_SCOPE,
+            "warn",
+            embedding.dimension,
+        )
+        .await
+        .expect("native evaluation storage should initialize"),
+    );
+    let db_for_neighborhood = db.clone();
+    db.apply_migrations(ORG_SCOPE)
+        .await
+        .expect("native evaluation schema should initialize");
+    let service = memory_mcp::eval_support::retrieval::new_eval_retrieval_service(
+        db,
+        ORG_SCOPE.to_string(),
+        memory_mcp::eval_support::retrieval::EvalRetrievalConfig {
+            embedding_provider: embedding.provider,
+            semantic_threshold: embedding.similarity_threshold,
+            claim_stage: "evidence".to_string(),
+        },
+    )
+    .await
+    .expect("native evaluation retrieval service should initialize");
+
+    let corpus_path = repo_root()
+        .join("../..")
+        .join("evals/corpora/retrieval-quality-v1/retrieval-quality.json");
+    let corpus: serde_json::Value = serde_json::from_slice(
+        &std::fs::read(&corpus_path).expect("the checked-in retrieval-quality corpus should exist"),
+    )
+    .expect("the checked-in retrieval-quality corpus should be valid JSON");
+    let case = corpus["cases"]
+        .as_array()
+        .and_then(|cases| cases.iter().find(|case| case["id"] == "locomo-conv-43-071"))
+        .expect("the dated conversation case should be present");
+    let mut episode_ids = std::collections::BTreeMap::new();
+    for source in case["sources"]
+        .as_array()
+        .expect("the case should contain source turns")
+    {
+        let policy_tags = source["policy_tags"]
+            .as_array()
+            .cloned()
+            .unwrap_or_default();
+        let request: IngestRequest = serde_json::from_value(serde_json::json!({
+            "source_type": source["source_type"],
+            "source_id": source["source_id"],
+            "content": source["content"],
+            "t_ref": source["t_ref"],
+            "t_ingested": source["t_ingested"],
+            "policy_tags": policy_tags,
+            "source_context": source["source_context"],
+        }))
+        .expect("a frozen case source should satisfy the ingest contract");
+        let episode_id = IngestCapability::ingest_from_service(&service, request, None)
+            .await
+            .expect("turn should ingest");
+        episode_ids.insert(
+            source["source_id"]
+                .as_str()
+                .expect("source id should be a string")
+                .to_string(),
+            episode_id.clone(),
+        );
+        ExtractCapability::extract_from_service(&service, &episode_id, None, None)
+            .await
+            .expect("turn should extract");
+    }
+    let anchor_id = episode_ids
+        .get("locomo:conv-43:D1:4")
+        .expect("the matching question turn should have been ingested")
+        .clone();
+    let neighborhoods = memory_mcp::memory::episode_context_store::EpisodeContextStore::new(
+        db_for_neighborhood,
+        ORG_SCOPE,
+    )
+    .select_source_neighborhoods_for_episodes(&[anchor_id], &Utc::now().to_rfc3339(), None, None)
+    .await
+    .expect("the native source-neighborhood query should succeed");
+    let neighborhood_source_ids = neighborhoods
+        .iter()
+        .filter_map(|row| {
+            let object = row
+                .get("Object")
+                .and_then(serde_json::Value::as_object)
+                .or_else(|| row.as_object())?;
+            object
+                .get("source_id")
+                .and_then(serde_json::Value::as_str)
+                .map(str::to_string)
+        })
+        .collect::<std::collections::BTreeSet<_>>();
+    assert!(
+        neighborhood_source_ids.contains("locomo:conv-43:D1:5"),
+        "the native source neighborhood should contain the answer turn; got {neighborhood_source_ids:#?}"
+    );
+
+    let items = AssembleContextCapability::assemble_context_from_service(
+        &service,
+        AssembleContextRequest {
+            query: "Which team did John sign with on 21 May, 2023?".to_string(),
+            fact_types: Vec::new(),
+            as_of: None,
+            budget: 5,
+            view_mode: None,
+            window_start: None,
+            window_end: None,
+            access: None,
+            compact: false,
+        },
+    )
+    .await
+    .expect("context should assemble with the reranker enabled");
+
+    assert!(
+        items.iter().any(|item| {
+            item.content.contains("Minnesota Wolves")
+                && item
+                    .provenance
+                    .get("retrieval_admission")
+                    .and_then(|admission| admission.get("basis"))
+                    .and_then(serde_json::Value::as_str)
+                    == Some("qualified_source_episode")
+        }),
+        "the real reranker should retain the answer proven by the adjacent matching question: {items:#?}"
+    );
+    let signing_turn = episode_ids
+        .get("locomo:conv-43:D1:3")
+        .expect("the signing turn should have been ingested");
+    assert!(
+        items
+            .iter()
+            .any(|item| item.source_episode == *signing_turn),
+        "the matched answer should retain its query-related antecedent: {items:#?}"
+    );
+    let same_day_distractor = episode_ids
+        .get("locomo:conv-43:D1:11")
+        .expect("the same-day distractor turn should have been ingested");
+    assert!(
+        items
+            .iter()
+            .all(|item| item.source_episode != *same_day_distractor),
+        "a direct source question-answer pair should suppress unrelated same-day evidence: {items:#?}"
+    );
+    assert!(
+        items.iter().any(|item| {
+            item.provenance
+                .get("reranking")
+                .and_then(|evidence| evidence.get("model_signature"))
+                .and_then(serde_json::Value::as_str)
+                .is_some()
+        }),
+        "the pinned reranker model must have participated in context assembly: {items:#?}"
+    );
+
+    let movie_case = corpus["cases"]
+        .as_array()
+        .and_then(|cases| cases.iter().find(|case| case["id"] == "locomo-conv-42-096"))
+        .expect("the movie-preference case should be present");
+    let mut movie_episode_ids = std::collections::BTreeMap::new();
+    for source in movie_case["sources"]
+        .as_array()
+        .expect("the movie case should contain complete source turns")
+    {
+        let request: IngestRequest = serde_json::from_value(serde_json::json!({
+            "source_type": source["source_type"],
+            "source_id": source["source_id"],
+            "content": source["content"],
+            "t_ref": source["t_ref"],
+            "t_ingested": source["t_ingested"],
+            "policy_tags": source["policy_tags"].as_array().cloned().unwrap_or_default(),
+            "source_context": source["source_context"],
+        }))
+        .expect("a source-grounded movie turn should satisfy the ingest contract");
+        let episode_id = IngestCapability::ingest_from_service(&service, request, None)
+            .await
+            .expect("movie turn should ingest");
+        movie_episode_ids.insert(
+            source["source_id"]
+                .as_str()
+                .expect("source id should be a string")
+                .to_string(),
+            episode_id.clone(),
+        );
+        ExtractCapability::extract_from_service(&service, &episode_id, None, None)
+            .await
+            .expect("movie turn should extract");
+    }
+    let movie_items = AssembleContextCapability::assemble_context_from_service(
+        &service,
+        AssembleContextRequest {
+            query: movie_case["query"]
+                .as_str()
+                .expect("the frozen movie query should be a string")
+                .to_string(),
+            fact_types: Vec::new(),
+            as_of: None,
+            budget: movie_case["budget"].as_i64().unwrap_or(5) as i32,
+            view_mode: None,
+            window_start: None,
+            window_end: None,
+            access: None,
+            compact: false,
+        },
+    )
+    .await
+    .expect("the movie preference context should assemble through production retrieval");
+    let movie_answer = movie_episode_ids
+        .get("locomo:conv-42:D1:13")
+        .expect("the movie-preference answer should have been ingested");
+    let broad_hobby = movie_episode_ids
+        .get("locomo:conv-42:D1:11")
+        .expect("the broad hobby turn should have been ingested");
+    assert!(
+        movie_items
+            .iter()
+            .any(|item| item.source_episode == *movie_answer),
+        "the specific movie-type answer should survive source-question expansion: {movie_items:#?}"
+    );
+    assert!(
+        movie_items
+            .iter()
+            .all(|item| item.source_episode != *broad_hobby),
+        "the general movie-hobby statement must not dilute the requested type: {movie_items:#?}"
+    );
+
+    let charity_case = corpus["cases"]
+        .as_array()
+        .and_then(|cases| cases.iter().find(|case| case["id"] == "locomo-conv-26-082"))
+        .expect("the charity-race case should be present");
+    let mut charity_episode_ids = std::collections::BTreeMap::new();
+    for source in charity_case["sources"]
+        .as_array()
+        .expect("the charity-race case should contain complete source turns")
+    {
+        let request: IngestRequest = serde_json::from_value(serde_json::json!({
+            "source_type": source["source_type"],
+            "source_id": source["source_id"],
+            "content": source["content"],
+            "t_ref": source["t_ref"],
+            "t_ingested": source["t_ingested"],
+            "policy_tags": source["policy_tags"].as_array().cloned().unwrap_or_default(),
+            "source_context": source["source_context"],
+        }))
+        .expect("a frozen charity-race source should satisfy the ingest contract");
+        let episode_id = IngestCapability::ingest_from_service(&service, request, None)
+            .await
+            .expect("a charity-race source turn should ingest");
+        charity_episode_ids.insert(
+            source["source_id"]
+                .as_str()
+                .expect("source id should be a string")
+                .to_string(),
+            episode_id.clone(),
+        );
+        ExtractCapability::extract_from_service(&service, &episode_id, None, None)
+            .await
+            .expect("a charity-race source turn should extract");
+    }
+    let charity_items = AssembleContextCapability::assemble_context_from_service(
+        &service,
+        AssembleContextRequest {
+            query: charity_case["query"]
+                .as_str()
+                .expect("the frozen charity-race query should be a string")
+                .to_string(),
+            fact_types: Vec::new(),
+            as_of: None,
+            budget: charity_case["budget"].as_i64().unwrap_or(5) as i32,
+            view_mode: None,
+            window_start: None,
+            window_end: None,
+            access: None,
+            compact: false,
+        },
+    )
+    .await
+    .expect("the charity-race context should assemble through production retrieval");
+    let allowed_charity_sources = charity_case["bindings"]
+        .as_array()
+        .expect("the charity-race case should contain reviewed bindings")
+        .iter()
+        .filter(|binding| binding["disposition"] == "allowed")
+        .filter_map(|binding| binding["episode_key"].as_str())
+        .filter_map(|episode_key| {
+            charity_episode_ids
+                .keys()
+                .find(|source_id| source_id.ends_with(&format!(":{episode_key}")))
+                .cloned()
+        })
+        .collect::<std::collections::BTreeSet<_>>();
+    let selected_charity_sources = charity_episode_ids
+        .iter()
+        .filter(|(_, episode_id)| {
+            charity_items
+                .iter()
+                .any(|item| item.source_episode == episode_id.as_str())
+        })
+        .map(|(source_id, _)| source_id.clone())
+        .collect::<std::collections::BTreeSet<_>>();
+    assert!(
+        selected_charity_sources.is_subset(&allowed_charity_sources),
+        "the charity-race query must not return prohibited turns: {charity_items:#?}"
+    );
+    assert!(
+        charity_case["required_evidence_groups"]
+            .as_array()
+            .expect("the charity-race case should contain required evidence groups")
+            .iter()
+            .all(|group| {
+                group
+                    .as_array()
+                    .into_iter()
+                    .flatten()
+                    .filter_map(serde_json::Value::as_str)
+                    .any(|required_key| {
+                        charity_case["bindings"]
+                            .as_array()
+                            .into_iter()
+                            .flatten()
+                            .find(|binding| binding["key"] == required_key)
+                            .and_then(|binding| binding["episode_key"].as_str())
+                            .is_some_and(|episode_key| {
+                                selected_charity_sources.iter().any(|source_id| {
+                                    source_id.ends_with(&format!(":{episode_key}"))
+                                })
+                            })
+                    })
+            }),
+        "the charity-race query must retain every required evidence group: {charity_items:#?}"
+    );
+
+    let http_case = corpus["cases"]
+        .as_array()
+        .and_then(|cases| cases.iter().find(|case| case["id"] == "http-task-short"))
+        .expect("the short HTTP diagnostics case should be present");
+    for source in http_case["sources"]
+        .as_array()
+        .expect("the HTTP diagnostics case should contain its source set")
+    {
+        let request: IngestRequest = serde_json::from_value(serde_json::json!({
+            "source_type": source["source_type"],
+            "source_id": source["source_id"],
+            "content": source["content"],
+            "t_ref": source["t_ref"],
+            "t_ingested": source["t_ingested"],
+            "policy_tags": source["policy_tags"].as_array().cloned().unwrap_or_default(),
+            "source_context": source["source_context"],
+        }))
+        .expect("a frozen HTTP source should satisfy the ingest contract");
+        let episode_id = IngestCapability::ingest_from_service(&service, request, None)
+            .await
+            .expect("an HTTP case source should ingest");
+        ExtractCapability::extract_from_service(&service, &episode_id, None, None)
+            .await
+            .expect("an HTTP case source should extract");
+    }
+    let http_items = AssembleContextCapability::assemble_context_from_service(
+        &service,
+        AssembleContextRequest {
+            query: http_case["query"]
+                .as_str()
+                .expect("the frozen HTTP query should be a string")
+                .to_string(),
+            fact_types: Vec::new(),
+            as_of: None,
+            budget: http_case["budget"].as_i64().unwrap_or(5) as i32,
+            view_mode: None,
+            window_start: None,
+            window_end: None,
+            access: None,
+            compact: false,
+        },
+    )
+    .await
+    .expect("the short HTTP diagnostics context should assemble");
+    let http_context = http_items
+        .iter()
+        .map(|item| item.content.as_str())
+        .collect::<Vec<_>>()
+        .join("\n");
+    assert!(
+        http_context.contains("memory_http_preflight_body_bytes"),
+        "the bounded-body metric should be returned: {http_items:#?}"
+    );
+    assert!(
+        http_context.contains("http.preflight.refused"),
+        "the diagnostics operations should also be returned: {http_items:#?}"
+    );
+
+    let logging_case = corpus["cases"]
+        .as_array()
+        .and_then(|cases| cases.iter().find(|case| case["id"] == "logging-original"))
+        .expect("the original multi-facet logging case should be present");
+    let logging_items = AssembleContextCapability::assemble_context_from_service(
+        &service,
+        AssembleContextRequest {
+            query: logging_case["query"]
+                .as_str()
+                .expect("the frozen logging query should be a string")
+                .to_string(),
+            fact_types: Vec::new(),
+            as_of: None,
+            budget: logging_case["budget"].as_i64().unwrap_or(5) as i32,
+            view_mode: None,
+            window_start: None,
+            window_end: None,
+            access: None,
+            compact: false,
+        },
+    )
+    .await
+    .expect("the multi-facet logging context should assemble");
+    let logging_context = logging_items
+        .iter()
+        .map(|item| item.content.as_str())
+        .collect::<Vec<_>>()
+        .join("\n");
+    assert!(
+        logging_context.contains("MEMORY_LOG_FILE")
+            || logging_context.contains("written to **stderr**"),
+        "the log sink and output format should be returned: {logging_items:#?}"
+    );
+    assert!(
+        logging_context.contains("MemoryError::log_level()"),
+        "the level policy should be returned: {logging_items:#?}"
+    );
+    assert!(
+        logging_context.contains("MEMORY_LOG_FORMAT"),
+        "the logging configuration should be returned: {logging_items:#?}"
+    );
+
+    let language_case = corpus["cases"]
+        .as_array()
+        .and_then(|cases| cases.iter().find(|case| case["id"] == "locomo-conv-47-067"))
+        .expect("the programming-language case should be present");
+    let mut language_episode_ids = std::collections::BTreeMap::new();
+    for source in language_case["sources"]
+        .as_array()
+        .expect("the programming-language case should contain complete source turns")
+    {
+        let request: IngestRequest = serde_json::from_value(serde_json::json!({
+            "source_type": source["source_type"],
+            "source_id": source["source_id"],
+            "content": source["content"],
+            "t_ref": source["t_ref"],
+            "t_ingested": source["t_ingested"],
+            "policy_tags": source["policy_tags"].as_array().cloned().unwrap_or_default(),
+            "source_context": source["source_context"],
+        }))
+        .expect("a source-grounded language turn should satisfy the ingest contract");
+        let episode_id = IngestCapability::ingest_from_service(&service, request, None)
+            .await
+            .expect("a programming-language turn should ingest");
+        language_episode_ids.insert(
+            source["source_id"]
+                .as_str()
+                .expect("source id should be a string")
+                .to_string(),
+            episode_id.clone(),
+        );
+        ExtractCapability::extract_from_service(&service, &episode_id, None, None)
+            .await
+            .expect("a programming-language turn should extract");
+    }
+    let language_items = AssembleContextCapability::assemble_context_from_service(
+        &service,
+        AssembleContextRequest {
+            query: language_case["query"]
+                .as_str()
+                .expect("the frozen language query should be a string")
+                .to_string(),
+            fact_types: Vec::new(),
+            as_of: None,
+            budget: language_case["budget"].as_i64().unwrap_or(5) as i32,
+            view_mode: None,
+            window_start: None,
+            window_end: None,
+            access: None,
+            compact: false,
+        },
+    )
+    .await
+    .expect("the programming-language context should assemble through production retrieval");
+    let language_answer = language_episode_ids
+        .get("locomo:conv-47:D1:8")
+        .expect("the direct language answer should have been ingested");
+    assert!(
+        language_items
+            .iter()
+            .any(|item| item.source_episode == *language_answer),
+        "the direct Python/C++ answer should survive source-question expansion: {language_items:#?}"
+    );
+    for distractor_id in ["locomo:conv-47:D1:10", "locomo:conv-47:D1:18"] {
+        let distractor = language_episode_ids
+            .get(distractor_id)
+            .expect("the complete language conversation should include the distractor turn");
+        assert!(
+            language_items
+                .iter()
+                .all(|item| item.source_episode != *distractor),
+            "an adjacent negative or motivation answer cannot answer the language query ({distractor_id}): {language_items:#?}"
+        );
+    }
+
+    let roadtrip_case = corpus["cases"]
+        .as_array()
+        .and_then(|cases| cases.iter().find(|case| case["id"] == "locomo-conv-49-002"))
+        .expect("the family-roadtrip case should be present");
+    let mut roadtrip_episode_ids = std::collections::BTreeMap::new();
+    for source in roadtrip_case["sources"]
+        .as_array()
+        .expect("the roadtrip case should contain complete source turns")
+    {
+        let request: IngestRequest = serde_json::from_value(serde_json::json!({
+            "source_type": source["source_type"],
+            "source_id": source["source_id"],
+            "content": source["content"],
+            "t_ref": source["t_ref"],
+            "t_ingested": source["t_ingested"],
+            "policy_tags": source["policy_tags"].as_array().cloned().unwrap_or_default(),
+            "source_context": source["source_context"],
+        }))
+        .expect("a source-grounded roadtrip turn should satisfy the ingest contract");
+        let episode_id = IngestCapability::ingest_from_service(&service, request, None)
+            .await
+            .expect("roadtrip turn should ingest");
+        roadtrip_episode_ids.insert(
+            source["source_id"]
+                .as_str()
+                .expect("source id should be a string")
+                .to_string(),
+            episode_id.clone(),
+        );
+        ExtractCapability::extract_from_service(&service, &episode_id, None, None)
+            .await
+            .expect("roadtrip turn should extract");
+    }
+    let roadtrip_items = AssembleContextCapability::assemble_context_from_service(
+        &service,
+        AssembleContextRequest {
+            query: roadtrip_case["query"]
+                .as_str()
+                .expect("the frozen roadtrip query should be a string")
+                .to_string(),
+            fact_types: Vec::new(),
+            as_of: None,
+            budget: roadtrip_case["budget"].as_i64().unwrap_or(5) as i32,
+            view_mode: None,
+            window_start: None,
+            window_end: None,
+            access: None,
+            compact: false,
+        },
+    )
+    .await
+    .expect("the roadtrip context should assemble through production retrieval");
+    let roadtrip_selected_source_ids = roadtrip_items
+        .iter()
+        .filter_map(|item| {
+            item.provenance
+                .get("source_id")
+                .and_then(serde_json::Value::as_str)
+                .map(str::to_string)
+        })
+        .collect::<Vec<_>>();
+    for source_id in [
+        "locomo:conv-49:D1:2",
+        "locomo:conv-49:D1:4",
+        "locomo:conv-49:D2:1",
+    ] {
+        let expected_episode = roadtrip_episode_ids
+            .get(source_id)
+            .expect("each required source turn should have been ingested");
+        assert!(
+            roadtrip_items
+                .iter()
+                .any(|item| item.source_episode == *expected_episode),
+            "all independent source turns should survive source-question expansion, including {source_id}; selected source ids: {roadtrip_selected_source_ids:?}"
+        );
+    }
+
+    let car_case = corpus["cases"]
+        .as_array()
+        .and_then(|cases| cases.iter().find(|case| case["id"] == "locomo-conv-49-083"))
+        .expect("the Prius question should be present");
+    let car_items = AssembleContextCapability::assemble_context_from_service(
+        &service,
+        AssembleContextRequest {
+            query: car_case["query"]
+                .as_str()
+                .expect("the frozen car query should be a string")
+                .to_string(),
+            fact_types: Vec::new(),
+            as_of: None,
+            budget: car_case["budget"].as_i64().unwrap_or(5) as i32,
+            view_mode: None,
+            window_start: None,
+            window_end: None,
+            access: None,
+            compact: false,
+        },
+    )
+    .await
+    .expect("the Prius context should assemble through production retrieval");
+    let new_prius = roadtrip_episode_ids
+        .get("locomo:conv-49:D1:2")
+        .expect("the new Prius turn should have been ingested");
+    assert!(
+        car_items
+            .iter()
+            .any(|item| item.source_episode == *new_prius),
+        "the reranker should use nearby source turns to connect the new Prius with the old car breakdown: {car_items:#?}"
     );
 }

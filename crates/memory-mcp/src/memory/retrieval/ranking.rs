@@ -569,13 +569,11 @@ pub(crate) fn ranked_relevance_score(fact: &RankedContextFact) -> f64 {
         .and_then(serde_json::Value::as_f64)
         .filter(|score| score.is_finite())
     {
-        // This is a monotonic ranking weight, not a probability. Independent
-        // cross-encoder evidence supersedes first-stage lexical frequency.
         let floor = fact
             .evidence
             .reranking
             .as_ref()
-            .and_then(|e| e.get("admission_floor"))
+            .and_then(|evidence| evidence.get("admission_floor"))
             .and_then(serde_json::Value::as_f64)
             .unwrap_or(0.0);
         if floor.is_finite() && score >= floor {
@@ -1250,7 +1248,9 @@ fn selected_results_meet_grounding_floor(
             Some(super::types::AdmissionBasis::Semantic)
         ) || matches!(
             fact.retrieval_tier,
-            RetrievalTier::GraphExpanded | RetrievalTier::SemanticExpanded
+            RetrievalTier::SourceExpanded
+                | RetrievalTier::GraphExpanded
+                | RetrievalTier::SemanticExpanded
         )
     }) {
         return true;
@@ -2345,6 +2345,48 @@ mod tests {
             .collect::<Vec<_>>();
 
         assert_eq!(fact_ids, vec!["fact:july"]);
+    }
+
+    #[test]
+    fn select_ranked_context_facts_respects_model_reranking_order() {
+        let cutoff = fixed_temporal_cutoff();
+        let mut model_preferred = create_ranked_test_fact(
+            "fact:model-preferred",
+            "episode:model-preferred",
+            cutoff,
+            0.01,
+            0.0,
+            0,
+            &[],
+        );
+        model_preferred.evidence.reranking = Some(serde_json::json!({
+            "relevance_logit": 2.0
+        }));
+
+        let mut fusion_preferred = create_ranked_test_fact(
+            "fact:fusion-preferred",
+            "episode:fusion-preferred",
+            cutoff,
+            100.0,
+            0.0,
+            0,
+            &[],
+        );
+        fusion_preferred.evidence.reranking = Some(serde_json::json!({
+            "relevance_logit": 1.0
+        }));
+
+        let selected = select_ranked_context_facts(
+            vec![fusion_preferred, model_preferred],
+            1,
+            None,
+            Vec::new(),
+        );
+
+        assert_eq!(
+            selected[0].fact.fact_id, "fact:model-preferred",
+            "the cross-encoder result must survive final budget selection"
+        );
     }
 
     #[test]

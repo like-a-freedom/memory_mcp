@@ -55,6 +55,7 @@ fn stamp() -> Option<f64> {
 
 fn request(source_id: &str) -> IngestRequest {
     IngestRequest {
+        source_context: None,
         source_type: "meeting".to_string(),
         source_id: source_id.to_string(),
         content: "Standup with Alice about the Q3 launch. Bob owns the rollout plan.".to_string(),

@@ -131,6 +131,7 @@ async fn zero_config_anno_creates_no_model_cache_and_round_trips() {
     let episode_id = IngestCapability::ingest_from_service(
         &service,
         memory_mcp::models::IngestRequest {
+            source_context: None,
             source_type: "test".to_string(),
             source_id: "zero-config-1".to_string(),
             content: "Alice Smith presented Project Atlas at OpenAI".to_string(),

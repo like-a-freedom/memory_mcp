@@ -68,6 +68,7 @@ mod tests {
         let result = crate::service::memory_container_shims::memory_capabilities_ingest::IngestCapability::ingest_from_service(
             &svc,
             IngestRequest {
+                source_context: None,
                 source_type: "inline".into(),
                 source_id: "cap-ingest".into(),
                 content: "hello world".into(),
@@ -92,6 +93,7 @@ mod tests {
         };
         let t_ref = chrono::Utc::now();
         let request = |source_id: &str| IngestRequest {
+            source_context: None,
             source_type: "inline".into(),
             source_id: source_id.into(),
             content: "c".into(),
@@ -126,6 +128,7 @@ mod tests {
             let result = crate::service::memory_container_shims::memory_capabilities_ingest::IngestCapability::ingest_from_service(
                 &svc,
                 IngestRequest {
+                    source_context: None,
                     source_type: "inline".into(),
                     source_id: format!("one-token-{index}"),
                     content: "c".into(),
@@ -145,6 +148,7 @@ mod tests {
         let exhausted = crate::service::memory_container_shims::memory_capabilities_ingest::IngestCapability::ingest_from_service(
             &svc,
             IngestRequest {
+                source_context: None,
                 source_type: "inline".into(),
                 source_id: "one-token-exhausted".into(),
                 content: "c".into(),

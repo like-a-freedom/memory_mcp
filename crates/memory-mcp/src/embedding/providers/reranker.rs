@@ -98,6 +98,10 @@ impl CandleReranker {
         } else {
             hasher.update(b"xlm-r-pair-512-source-reference-time-single-logit-floor-zero-v3");
         }
+        if admission_floor != 0.0 {
+            hasher.update(b"independently-selected-admission-floor");
+            hasher.update(admission_floor.to_le_bytes());
+        }
         if is_gguf {
             hasher.update(b"candle-qwen3-gguf-cpu-f32-v1");
         }
@@ -112,10 +116,6 @@ impl CandleReranker {
                 }
                 hasher.update(&buffer[..count]);
             }
-        }
-        if admission_floor != 0.0 {
-            hasher.update(b"independently-selected-admission-floor");
-            hasher.update(admission_floor.to_le_bytes());
         }
         Ok(Self {
             model,

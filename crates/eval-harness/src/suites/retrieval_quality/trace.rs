@@ -89,7 +89,7 @@ mod tests {
             Some("trace-test-v1")
         }
         fn reranking_admission_floor(&self) -> f64 {
-            0.5
+            0.37
         }
         async fn rerank(
             &self,
@@ -123,6 +123,6 @@ mod tests {
         assert!(provider.drain().is_empty());
         assert_eq!(provider.embed_query("q").await.expect("query"), vec![2.0]);
         assert_eq!(provider.reranking_signature(), Some("trace-test-v1"));
-        assert_eq!(provider.reranking_admission_floor(), 0.5);
+        assert_eq!(provider.reranking_admission_floor(), 0.37);
     }
 }

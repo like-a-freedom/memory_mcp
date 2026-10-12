@@ -186,6 +186,7 @@ async fn run_e2e_case(case: &EndToEndCase) -> EvalCaseOutcome {
         let episode_id = match IngestCapability::ingest_from_service(
             &service,
             memory_mcp::models::IngestRequest {
+                source_context: None,
                 source_type: source.source_type.clone(),
                 source_id: source.source_id.clone(),
                 content: source.content.clone(),

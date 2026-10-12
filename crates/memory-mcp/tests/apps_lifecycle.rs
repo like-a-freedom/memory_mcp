@@ -12,6 +12,7 @@ async fn lifecycle_view_and_archive_restore_flow_are_service_backed() {
     let episode_id = IngestCapability::ingest_from_service(
         &service,
         memory_mcp::models::IngestRequest {
+            source_context: None,
             source_type: "meeting".to_string(),
             source_id: "lifecycle-archive-1".to_string(),
             content: "Lifecycle candidate episode".to_string(),

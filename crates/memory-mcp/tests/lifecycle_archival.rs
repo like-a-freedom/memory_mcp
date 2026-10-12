@@ -24,6 +24,7 @@ async fn archival_pass_processes_only_active_namespace() {
     let episode_id = IngestCapability::ingest_from_service(
         &service,
         memory_mcp::models::IngestRequest {
+            source_context: None,
             source_type: "meeting".to_string(),
             source_id: "personal-archival-1".to_string(),
             content: "Personal archival candidate".to_string(),
@@ -85,6 +86,7 @@ async fn archival_pass_when_episode_fact_was_recently_accessed_then_skips_archiv
     let episode_id = IngestCapability::ingest_from_service(
         &service,
         memory_mcp::models::IngestRequest {
+            source_context: None,
             source_type: "meeting".to_string(),
             source_id: "personal-archival-hot-1".to_string(),
             content: "Personal hot archival candidate".to_string(),

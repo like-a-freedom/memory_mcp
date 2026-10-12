@@ -16,6 +16,16 @@ pub fn validate_ingest_request(request: &IngestRequest) -> Result<(), MemoryErro
         return Err(MemoryError::Validation("content is required".into()));
     }
 
+    if let Some(context) = &request.source_context
+        && (context.group.trim().is_empty()
+            || context.position == 0
+            || context.position > i64::MAX as u64)
+    {
+        return Err(MemoryError::Validation(
+            "source_context requires a non-empty group and a positive, storable position".into(),
+        ));
+    }
+
     Ok(())
 }
 
@@ -64,6 +74,7 @@ mod tests {
 
     fn create_valid_ingest_request() -> IngestRequest {
         IngestRequest {
+            source_context: None,
             source_type: "email".to_string(),
             source_id: "msg-123".to_string(),
             content: "Test content".to_string(),
@@ -109,6 +120,19 @@ mod tests {
         request.content = "".to_string();
         let result = validate_ingest_request(&request);
         assert!(matches!(result, Err(MemoryError::Validation(msg)) if msg.contains("content")));
+    }
+
+    #[test]
+    fn validate_ingest_request_rejects_unstorable_source_position() {
+        let mut request = create_valid_ingest_request();
+        request.source_context = Some(crate::models::SourceContext {
+            group: "dialogue".into(),
+            position: u64::MAX,
+        });
+        assert!(matches!(
+            validate_ingest_request(&request),
+            Err(MemoryError::Validation(message)) if message.contains("source_context")
+        ));
     }
 
     fn create_valid_entity_candidate() -> EntityCandidate {

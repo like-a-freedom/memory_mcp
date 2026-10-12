@@ -224,6 +224,7 @@ async fn ingest_and_extract(
     let episode_id = IngestCapability::ingest_from_service(
         service,
         IngestRequest {
+            source_context: None,
             source_type: params.source_type.to_string(),
             source_id: params.source_id.to_string(),
             content: params.content.to_string(),

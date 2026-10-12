@@ -21,6 +21,7 @@ async fn conversational_statement_survives_native_extraction_with_source_lineage
     let episode_id = IngestCapability::ingest_from_service(
         &service,
         IngestRequest {
+            source_context: None,
             source_type: "conversation".into(),
             source_id: "conversation:mara:move".into(),
             content: content.into(),
@@ -59,6 +60,7 @@ async fn conversational_question_does_not_become_an_asserted_note() {
     let episode_id = IngestCapability::ingest_from_service(
         &service,
         IngestRequest {
+            source_context: None,
             source_type: "conversation".into(),
             source_id: "conversation:mara:question".into(),
             content: "Mara: Which city are you moving to after graduation?".into(),
@@ -83,6 +85,7 @@ async fn test_ingest_extract_and_assemble() {
     let episode_id = IngestCapability::ingest_from_service(
         &service,
         IngestRequest {
+            source_context: None,
             source_type: "email".to_string(),
             source_id: "MSG-201".to_string(),
             content: "ARR grew to $3M. I will send the update by Friday.".to_string(),
@@ -128,6 +131,7 @@ async fn test_extract_skips_low_value_email_header_roster_note_fallback() {
         &service,
 
             IngestRequest {
+                source_context: None,
                 source_type: "email".to_string(),
                 source_id: "MSG-ROSTER-1".to_string(),
                 content: "Subject: Weekly distro\nFrom: ops@example.com\nTo: alice@example.com; bob@example.com; carol@example.com\nCC: dave@example.com; erin@example.com".to_string(),
@@ -185,6 +189,7 @@ async fn test_invalidate_and_explain() {
     let episode_id = IngestCapability::ingest_from_service(
         &service,
         IngestRequest {
+            source_context: None,
             source_type: "email".to_string(),
             source_id: "MSG-202".to_string(),
             content: "ARR is $1M".to_string(),
@@ -350,6 +355,7 @@ async fn test_explain_exposes_graph_insights_for_cross_community_connection() {
     let episode_id = IngestCapability::ingest_from_service(
         &service,
         IngestRequest {
+            source_context: None,
             source_type: "meeting".to_string(),
             source_id: "graph-insights-1".to_string(),
             content: "Alice Smith reviewed the partner map".to_string(),
@@ -490,6 +496,7 @@ async fn test_assemble_context_uses_matching_community_summary() {
     let episode_id = IngestCapability::ingest_from_service(
         &service,
         IngestRequest {
+            source_context: None,
             source_type: "meeting".to_string(),
             source_id: "community-retrieval-1".to_string(),
             content: "Alice Smith met Bob Jones to plan next steps".to_string(),
@@ -1266,6 +1273,7 @@ async fn test_query_prefers_matching_episode_content_over_irrelevant_fact_fallba
         &service,
 
             IngestRequest {
+                source_context: None,
                 source_type: "requirement".to_string(),
                 source_id: "july-platform-planning".to_string(),
                 content: "Platform planning notes July 2025: release scope, integrations, and response workflow updates.".to_string(),
@@ -1328,6 +1336,7 @@ async fn test_assemble_context_returns_extracted_meeting_summary_fact_for_matchi
         &service,
 
             IngestRequest {
+                source_context: None,
                 source_type: "meeting_summary".to_string(),
                 source_id: "meeting-archive-scan-2026-04-13-01-architecture".to_string(),
                 content: "Product architecture and deployment decisions:\n\n- Decision: Use a single umbrella product identifier for the product suite.\n- Decision: Keep legacy on-premise identifier only temporarily.\n- Decision: Standardize release timelines across channels.".to_string(),
@@ -1347,6 +1356,7 @@ async fn test_assemble_context_returns_extracted_meeting_summary_fact_for_matchi
         &service,
 
             IngestRequest {
+                source_context: None,
                 source_type: "meeting_summary".to_string(),
                 source_id: "meeting-archive-scan-2026-04-13-10-documentation".to_string(),
                 content: "Documentation and localization facts for product materials:\n\n- Fact: Help kickoff is open for documentation and localization work; naming details need alignment.\n- Fact: Docs team is asking for final terminology in both languages.".to_string(),
@@ -1401,6 +1411,7 @@ async fn test_assemble_context_extracts_facts_from_ad_hoc_markdown_summary() {
         &service,
 
             IngestRequest {
+                source_context: None,
                 source_type: "ad-hoc".to_string(),
                 source_id: "summary-archive-2026-04-13-adhoc-01".to_string(),
                 content: "# September 2025 program summary\n\n## Launch Activities\n- Regional launch in South market (September 30)\n- Response logging discussion (September 30)\n\n## Decisions Made\n1. Regional launch in South market approved for September 30.\n2. Response logging rollout approved for September 30.\n\n## Pending Items\n1. Complete global launch follow-up.\n2. Continue platform 1.5 development.".to_string(),
@@ -1499,6 +1510,7 @@ async fn test_assemble_context_prefers_extracted_fact_from_thematic_markdown_sum
         &service,
 
             IngestRequest {
+                source_context: None,
                 source_type: "ad-hoc".to_string(),
                 source_id: "summary-archive-2026-04-13-adhoc-02".to_string(),
                 content: "# Monthly coordination summary\n\n## Release Activities\n- Finalize phased rollout checklist.\n- Publish support handoff notes.\n\n## Capacity Planning\n- Prepare archive review for next quarter.".to_string(),
@@ -1559,6 +1571,7 @@ async fn test_assemble_context_keeps_extracted_presentation_summary_facts_for_br
         &service,
 
             IngestRequest {
+                source_context: None,
                 source_type: "presentation_summary".to_string(),
                 source_id: "launch-brief-summary-2026-04-13".to_string(),
                 content: "Quarterly launch brief:\n- Suite Alpha, Suite Beta, and Suite Gamma launch on the shared platform in Q3 2026.\n- Technical preview is September 30, 2026, with general availability in late October 2026.\n- Roadmap adds external connectors, export automation, and staged rollout controls in Q4 2026.\n- Following wave adds desktop agent support, workflow versioning, and graphical rules in H1 2027.\n- Licensing uses pooled capacity units and unified product identification.".to_string(),

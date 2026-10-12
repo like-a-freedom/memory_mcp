@@ -55,6 +55,10 @@ struct MappedProvider {
     embeddings: HashMap<String, Vec<f64>>,
 }
 
+struct ControlledReranker {
+    seen_queries: Arc<Mutex<Vec<String>>>,
+}
+
 #[async_trait]
 impl EmbeddingProvider for MappedProvider {
     fn is_enabled(&self) -> bool {
@@ -77,6 +81,63 @@ impl EmbeddingProvider for MappedProvider {
                 input.len()
             ))
         })
+    }
+}
+
+#[async_trait]
+impl EmbeddingProvider for ControlledReranker {
+    fn is_enabled(&self) -> bool {
+        true
+    }
+
+    fn provider_name(&self) -> &'static str {
+        "eval-controlled-reranker"
+    }
+
+    fn dimension(&self) -> usize {
+        1536
+    }
+
+    async fn embed(&self, _input: &str) -> Result<Vec<f64>, MemoryError> {
+        let mut vector = vec![0.0; self.dimension()];
+        vector[0] = 1.0;
+        Ok(vector)
+    }
+
+    async fn rerank(
+        &self,
+        query: &str,
+        documents: &[String],
+    ) -> Result<Option<Vec<f64>>, MemoryError> {
+        self.seen_queries
+            .lock()
+            .expect("controlled reranker query lock")
+            .push(query.to_owned());
+        let query = query.to_ascii_lowercase();
+        let scores = documents
+            .iter()
+            .map(|document| {
+                let document = document.to_ascii_lowercase();
+                let facet_match = if query == "body measurements" || query == "K measurements" {
+                    document.contains("body") && document.contains("measurements")
+                        || document.contains("K measurements")
+                } else if query == "diagnostics http bounded memory plan" {
+                    ["diagnostics", "http", "bounded", "memory", "plan"]
+                        .iter()
+                        .all(|term| document.contains(term))
+                } else if query == "http diagnostics" {
+                    document.contains("http") && document.contains("diagnostics")
+                } else {
+                    false
+                };
+                if facet_match { 1.0 } else { -1.0 }
+            })
+            .collect();
+        Ok(Some(scores))
+    }
+
+    fn reranking_signature(&self) -> Option<&str> {
+        Some("reranksig:controlled-query-facets-v1")
     }
 }
 
@@ -187,6 +248,7 @@ async fn ingest_source_only_episode(
     memory_mcp::service::memory_container_shims::memory_capabilities_ingest::IngestCapability::ingest_from_service(
         service,
         memory_mcp::models::IngestRequest {
+            source_context: None,
             source_type: "chat".into(),
             source_id: source_id.into(),
             content: content.into(),
@@ -198,6 +260,33 @@ async fn ingest_source_only_episode(
     )
     .await
     .expect("ingest source-only episode through the production API")
+}
+
+async fn ingest_conversation_turn(
+    service: &MemoryService,
+    source_id: &str,
+    group: &str,
+    position: u64,
+    content: &str,
+) -> String {
+    memory_mcp::service::memory_container_shims::memory_capabilities_ingest::IngestCapability::ingest_from_service(
+        service,
+        memory_mcp::models::IngestRequest {
+            source_context: Some(memory_mcp::models::SourceContext {
+                group: group.to_string(),
+                position,
+            }),
+            source_type: "conversation".into(),
+            source_id: source_id.into(),
+            content: content.into(),
+            t_ref: Utc::now(),
+            t_ingested: None,
+            policy_tags: Vec::new(),
+        },
+        None,
+    )
+    .await
+    .expect("ingest conversation turn through the production API")
 }
 
 #[tokio::test]
@@ -552,6 +641,153 @@ async fn high_level_semantic_paraphrase_survives_zero_lexical_grounding() {
 }
 
 #[tokio::test]
+async fn scoped_secondary_facets_keep_complementary_evidence_and_reject_generic_http_diagnostics() {
+    let db = test_db().await;
+    let seen_queries = Arc::new(Mutex::new(Vec::new()));
+    let service = new_eval_retrieval_service(
+        db as Arc<dyn DbClient>,
+        "main".to_string(),
+        eval_config(
+            Arc::new(ControlledReranker {
+                seen_queries: seen_queries.clone(),
+            }),
+            0.7,
+        ),
+    )
+    .await
+    .expect("controlled reranker service");
+    let now = Utc::now();
+    let body_fact = service
+        .add_fact(
+            "note",
+            "The HTTP request-body measurements record byte count and chunk count.",
+            "The HTTP request-body measurements record byte count and chunk count.",
+            "episode:http-body-envelope",
+            now,
+            0.9,
+            Vec::new(),
+            Vec::new(),
+            Provenance::agent_observation("episode:http-body-envelope"),
+        )
+        .await
+        .expect("write body-measurement evidence");
+    let diagnostics_fact = service
+        .add_fact(
+            "note",
+            "The bounded-memory plan requires HTTP diagnostics for stalled request bodies and streaming backpressure.",
+            "The bounded-memory plan requires HTTP diagnostics for stalled request bodies and streaming backpressure.",
+            "episode:http-bounded-diagnostics",
+            now,
+            0.9,
+            Vec::new(),
+            Vec::new(),
+            Provenance::agent_observation("episode:http-bounded-diagnostics"),
+        )
+        .await
+        .expect("write scoped diagnostics evidence");
+    let distractor_fact = service
+        .add_fact(
+            "note",
+            "HTTP server diagnostics expose request status and log levels for operators.",
+            "HTTP server diagnostics expose request status and log levels for operators.",
+            "episode:http-server-logging",
+            now,
+            0.9,
+            Vec::new(),
+            Vec::new(),
+            Provenance::agent_observation("episode:http-server-logging"),
+        )
+        .await
+        .expect("write related but unscoped diagnostics evidence");
+
+    let query =
+        "Which body measurements and diagnostics does the HTTP bounded memory plan require?";
+    let items =
+        AssembleContextCapability::assemble_context_from_service(&service, assemble_request(query))
+            .await
+            .expect("assemble through real retrieval, admission and reranking");
+
+    let returned_ids = items
+        .iter()
+        .map(|item| item.fact_id.as_str())
+        .collect::<Vec<_>>();
+    let seen = seen_queries.lock().expect("controlled reranker query lock");
+    assert!(
+        returned_ids.contains(&body_fact.as_str()),
+        "body evidence missing; returned={returned_ids:?}; reranker queries={:?}",
+        *seen
+    );
+    assert!(
+        returned_ids.contains(&diagnostics_fact.as_str()),
+        "scoped diagnostics missing; returned={returned_ids:?}; reranker queries={:?}",
+        *seen
+    );
+    assert!(
+        !returned_ids.contains(&distractor_fact.as_str()),
+        "generic diagnostics should be rejected; returned={returned_ids:?}; reranker queries={:?}",
+        *seen
+    );
+    assert!(seen.iter().any(|seen_query| seen_query == query));
+    assert!(
+        seen.iter()
+            .any(|seen_query| seen_query == "body measurements")
+    );
+    assert!(seen.iter().any(|seen_query| {
+        seen_query
+            .to_ascii_lowercase()
+            .contains("diagnostics http bounded memory plan")
+    }));
+}
+
+#[tokio::test]
+async fn unicode_conjunction_is_assembled_with_its_scoped_http_evidence() {
+    let db = test_db().await;
+    let seen_queries = Arc::new(Mutex::new(Vec::new()));
+    let service = new_eval_retrieval_service(
+        db as Arc<dyn DbClient>,
+        "main".to_string(),
+        eval_config(
+            Arc::new(ControlledReranker {
+                seen_queries: seen_queries.clone(),
+            }),
+            0.7,
+        ),
+    )
+    .await
+    .expect("controlled reranker service");
+    let content = "The K measurements and HTTP diagnostics are recorded for each request.";
+    let fact_id = service
+        .add_fact(
+            "note",
+            content,
+            content,
+            "episode:unicode-http-measurements",
+            Utc::now(),
+            0.9,
+            Vec::new(),
+            Vec::new(),
+            Provenance::agent_observation("episode:unicode-http-measurements"),
+        )
+        .await
+        .expect("write Unicode-scoped evidence");
+    let query = "Show K measurements and HTTP diagnostics";
+
+    let items =
+        AssembleContextCapability::assemble_context_from_service(&service, assemble_request(query))
+            .await
+            .expect("Unicode conjunction must survive context assembly");
+
+    assert!(items.iter().any(|item| item.fact_id == fact_id));
+    let seen = seen_queries.lock().expect("controlled reranker query lock");
+    assert!(seen.iter().any(|seen_query| seen_query == query));
+    assert!(seen.iter().any(|seen_query| seen_query == "K measurements"));
+    assert!(
+        seen.iter()
+            .any(|seen_query| seen_query == "HTTP diagnostics")
+    );
+}
+
+#[tokio::test]
 async fn episode_fallback_rejects_a_single_keyword_match_for_a_multiterm_query() {
     let db = test_db().await;
     let seed_service = MemoryService::new(
@@ -566,6 +802,7 @@ async fn episode_fallback_rejects_a_single_keyword_match_for_a_multiterm_query()
         memory_mcp::service::memory_container_shims::memory_capabilities_ingest::IngestCapability::ingest_from_service(
             &seed_service,
             memory_mcp::models::IngestRequest {
+                source_context: None,
                 source_type: "chat".to_string(),
                 source_id: "episode-fallback-single-keyword".to_string(),
                 content: "Cobalt is a blue pigment.".to_string(),
@@ -581,6 +818,7 @@ async fn episode_fallback_rejects_a_single_keyword_match_for_a_multiterm_query()
         memory_mcp::service::memory_container_shims::memory_capabilities_ingest::IngestCapability::ingest_from_service(
             &seed_service,
             memory_mcp::models::IngestRequest {
+                source_context: None,
                 source_type: "chat".to_string(),
                 source_id: "episode-fallback-multi-term".to_string(),
                 content: "Find cobalt orchids beside the river.".to_string(),
@@ -989,6 +1227,7 @@ async fn episode_reranker_can_recover_a_relevant_passage_beyond_the_lexical_head
         memory_mcp::service::memory_container_shims::memory_capabilities_ingest::IngestCapability::ingest_from_service(
             &seed_service,
             memory_mcp::models::IngestRequest {
+                source_context: None,
                 source_type: "chat".into(),
                 source_id: source_id.into(),
                 content: content.into(),
@@ -1138,7 +1377,9 @@ async fn fact_reranker_scores_candidates_before_response_budget_truncation() {
 
 struct RejectingReranker;
 
-struct IndependentlyCalibratedReranker;
+struct IndependentlyCalibratedReranker {
+    scored_documents: Arc<Mutex<Vec<String>>>,
+}
 #[async_trait]
 impl EmbeddingProvider for IndependentlyCalibratedReranker {
     fn is_enabled(&self) -> bool {
@@ -1150,29 +1391,40 @@ impl EmbeddingProvider for IndependentlyCalibratedReranker {
     fn dimension(&self) -> usize {
         1536
     }
-    async fn embed(&self, _: &str) -> Result<Vec<f64>, MemoryError> {
+    async fn embed(&self, input: &str) -> Result<Vec<f64>, MemoryError> {
         let mut v = vec![0.0; 1536];
-        v[0] = 1.0;
+        if input.contains("Mara enjoys hiking.") {
+            v[1] = 1.0;
+        } else {
+            v[0] = 1.0;
+        }
         Ok(v)
     }
     async fn rerank(&self, _: &str, documents: &[String]) -> Result<Option<Vec<f64>>, MemoryError> {
+        self.scored_documents
+            .lock()
+            .expect("reranker document lock")
+            .extend(documents.iter().cloned());
         Ok(Some(vec![-1.0; documents.len()]))
     }
     fn reranking_signature(&self) -> Option<&str> {
-        Some("controlled-calibrated-floor-minus-two")
-    }
-    fn reranking_admission_floor(&self) -> f64 {
-        -2.0
+        Some("controlled-negative-logit-reranker")
     }
 }
 
 #[tokio::test]
-async fn independent_negative_logit_boundary_is_honored_by_real_assembly() {
+async fn negative_reranker_logit_preserves_grounded_facts_and_rejects_weak_semantics() {
     let db = test_db().await;
+    let scored_documents = Arc::new(Mutex::new(Vec::new()));
     let service = new_eval_retrieval_service(
         db as Arc<dyn DbClient>,
         "main".into(),
-        eval_config(Arc::new(IndependentlyCalibratedReranker), 0.7),
+        eval_config(
+            Arc::new(IndependentlyCalibratedReranker {
+                scored_documents: scored_documents.clone(),
+            }),
+            0.7,
+        ),
     )
     .await
     .expect("service");
@@ -1190,17 +1442,110 @@ async fn independent_negative_logit_boundary_is_honored_by_real_assembly() {
         )
         .await
         .expect("fact");
+    let weak_id = service
+        .add_fact(
+            "note",
+            "The production HTTP endpoint is awaiting review.",
+            "The production HTTP endpoint is awaiting review.",
+            "episode:weak-semantic",
+            Utc::now(),
+            0.9,
+            vec![],
+            vec![],
+            Provenance::manual(),
+        )
+        .await
+        .expect("weak semantic fact");
     let items = AssembleContextCapability::assemble_context_from_service(
         &service,
-        assemble_request("What are Mara's hobbies?"),
+        assemble_request("What activity does Mara enjoy hiking?"),
     )
     .await
     .expect("assembly");
+    let scored_documents = scored_documents.lock().expect("reranker document lock");
+    assert!(
+        scored_documents
+            .iter()
+            .any(|document| document.ends_with("Mara enjoys hiking.")),
+        "the lexical candidate must reach the reranker; scored documents: {scored_documents:#?}"
+    );
     assert!(
         items.iter().any(|i| i.fact_id == id),
-        "negative logit above the independently selected boundary remains admissible"
+        "an independent lexical match must survive a negative cross-encoder logit; retrieved items: {items:#?}"
     );
-    assert_eq!(items[0].provenance["reranking"]["admission_floor"], -2.0);
+    let grounded_item = items
+        .iter()
+        .find(|item| item.fact_id == id)
+        .expect("lexically admitted fact");
+    assert_eq!(
+        grounded_item.provenance["retrieval_admission"]["basis"],
+        "lexical"
+    );
+    assert!(
+        grounded_item.provenance["retrieval_admission"]["matched_content_terms"]
+            .as_array()
+            .is_some_and(|terms| !terms.is_empty())
+    );
+    assert!(
+        !items.iter().any(|i| i.fact_id == weak_id),
+        "semantic similarity without query grounding must not admit a negative-logit candidate"
+    );
+}
+
+#[tokio::test]
+async fn compound_identifiers_do_not_supply_explicit_subject_support() {
+    let db = test_db().await;
+    let service = new_eval_retrieval_service(
+        db as Arc<dyn DbClient>,
+        "main".into(),
+        eval_config(Arc::new(RejectingReranker), 0.7),
+    )
+    .await
+    .expect("service");
+    let answer_id = service
+        .add_fact(
+            "note",
+            "Memory MCP log output uses MEMORY_LOG_FORMAT to select text or JSON and MEMORY_LOG_COLOR to select colour behavior.",
+            "Memory MCP log output uses MEMORY_LOG_FORMAT to select text or JSON and MEMORY_LOG_COLOR to select colour behavior.",
+            "episode:logging-configuration",
+            Utc::now(),
+            0.9,
+            vec![],
+            vec![],
+            Provenance::manual(),
+        )
+        .await
+        .expect("logging configuration fact");
+    let unrelated_id = service
+        .add_fact(
+            "note",
+            "A control-plane error envelope carries the correlation id; memory-mcp.log writes one request id on every line.",
+            "A control-plane error envelope carries the correlation id; memory-mcp.log writes one request id on every line.",
+            "episode:request-correlation",
+            Utc::now(),
+            0.9,
+            vec![],
+            vec![],
+            Provenance::manual(),
+        )
+        .await
+        .expect("request correlation fact");
+
+    let items = AssembleContextCapability::assemble_context_from_service(
+        &service,
+        assemble_request("What controls the format and colour of Memory MCP logs?"),
+    )
+    .await
+    .expect("assembly");
+
+    assert!(
+        items.iter().any(|item| item.fact_id == answer_id),
+        "the requested product and logging attributes must survive negative reranker evidence; retrieved items: {items:#?}"
+    );
+    assert!(
+        !items.iter().any(|item| item.fact_id == unrelated_id),
+        "hyphenated identifiers must not make unrelated content appear to support the named query subject; retrieved items: {items:#?}"
+    );
 }
 
 #[tokio::test]
@@ -1493,7 +1838,7 @@ async fn negative_cross_encoder_evidence_rejects_a_high_cosine_lexical_fact() {
     .expect("assembly");
     assert!(
         items.is_empty(),
-        "negative independent relevance evidence must reject the lexical/ANN hit"
+        "negative independent relevance evidence must reject the lexical/ANN hit; retrieved items: {items:#?}"
     );
 }
 
@@ -1554,6 +1899,7 @@ async fn episode_fallback_cannot_bypass_negative_cross_encoder_evidence() {
     .expect("component service");
     memory_mcp::service::memory_container_shims::memory_capabilities_ingest::IngestCapability::ingest_from_service(
         &service, memory_mcp::models::IngestRequest {
+            source_context: None,
             source_type: "chat".into(), source_id: "raw-episode-reranking".into(),
             content: "Approved migrations use a logging checklist.".into(), t_ref: Utc::now(),
             t_ingested: None, policy_tags: vec![],
@@ -1640,6 +1986,7 @@ async fn irrelevant_episode_cannot_replace_a_reranked_relevant_fact() {
         .expect("fact");
     memory_mcp::service::memory_container_shims::memory_capabilities_ingest::IngestCapability::ingest_from_service(
         &service, memory_mcp::models::IngestRequest {
+            source_context: None,
             source_type: "chat".into(), source_id: "strong-overlap-irrelevant-episode".into(),
             content: "The database migration warnings are a draft; nobody has approved the request.".into(),
             t_ref: Utc::now(), t_ingested: None, policy_tags: vec![],
@@ -1948,6 +2295,7 @@ async fn calendar_query_reranking_receives_the_persisted_source_episode_referenc
     .expect("service");
     let id=memory_mcp::service::memory_container_shims::memory_capabilities_ingest::IngestCapability::ingest_from_service(
         &service,memory_mcp::models::IngestRequest {
+            source_context: None,
             source_type:"chat".into(),source_id:"calendar-episode".into(),
             content:"James went hiking in the mountains.".into(),
             t_ref:chrono::DateTime::parse_from_rfc3339("2022-03-16T12:00:00Z").expect("date").with_timezone(&Utc),
@@ -2149,6 +2497,7 @@ async fn reranker_cannot_veto_fact_with_exact_date_subject_and_event_support() {
         let episode_id = memory_mcp::service::memory_container_shims::memory_capabilities_ingest::IngestCapability::ingest_from_service(
             &service,
             memory_mcp::models::IngestRequest {
+                source_context: None,
                 source_type: source["source_type"].as_str().expect("source type").into(),
                 source_id: source["source_id"].as_str().expect("source identity").into(),
                 content: source["content"].as_str().expect("source text").into(),
@@ -2520,5 +2869,219 @@ async fn lexical_episode_admission_rejects_explicitly_excluded_project_membershi
     assert!(
         items.iter().all(|item| item.source_episode != episode_id),
         "lexical episode admission must honor explicit negative project membership"
+    );
+}
+
+struct CapturingContextReranker {
+    documents: Arc<Mutex<Vec<String>>>,
+}
+
+#[async_trait]
+impl EmbeddingProvider for CapturingContextReranker {
+    fn is_enabled(&self) -> bool {
+        true
+    }
+
+    fn provider_name(&self) -> &'static str {
+        "capturing-source-context-reranker"
+    }
+
+    fn dimension(&self) -> usize {
+        1536
+    }
+
+    async fn embed(&self, _: &str) -> Result<Vec<f64>, MemoryError> {
+        let mut vector = vec![0.0; 1536];
+        vector[0] = 1.0;
+        Ok(vector)
+    }
+
+    async fn rerank(&self, _: &str, documents: &[String]) -> Result<Option<Vec<f64>>, MemoryError> {
+        self.documents
+            .lock()
+            .expect("captured reranker documents are not poisoned")
+            .extend(documents.iter().cloned());
+        Ok(Some(vec![10.0; documents.len()]))
+    }
+
+    fn reranking_signature(&self) -> Option<&str> {
+        Some("capturing-source-context-reranker-v1")
+    }
+}
+
+#[tokio::test]
+async fn candidate_reranking_document_includes_only_its_immediate_source_question() {
+    let db = test_db().await;
+    let documents = Arc::new(Mutex::new(Vec::new()));
+    let service = new_eval_retrieval_service(
+        db as Arc<dyn DbClient>,
+        "main".into(),
+        eval_config(
+            Arc::new(CapturingContextReranker {
+                documents: documents.clone(),
+            }),
+            0.7,
+        ),
+    )
+    .await
+    .expect("service");
+    ingest_conversation_turn(
+        &service,
+        "conversation:company-question",
+        "conversation:company",
+        2,
+        "Owen: Which company did you select?",
+    )
+    .await;
+    let answer_episode = ingest_conversation_turn(
+        &service,
+        "conversation:company-answer",
+        "conversation:company",
+        3,
+        "Mira: I selected Acme as my company.",
+    )
+    .await;
+    ingest_conversation_turn(
+        &service,
+        "conversation:company-follow-up",
+        "conversation:company",
+        4,
+        "Owen: Which bank did Mira choose?",
+    )
+    .await;
+    let fact_id = service
+        .add_fact(
+            "note",
+            "Mira selected Acme as her company.",
+            "Mira selected Acme as my company.",
+            &answer_episode,
+            Utc::now(),
+            0.9,
+            vec![],
+            vec![],
+            Provenance::manual(),
+        )
+        .await
+        .expect("persist the answer fact");
+
+    let items = AssembleContextCapability::assemble_context_from_service(
+        &service,
+        assemble_request("What company did Mira select?"),
+    )
+    .await
+    .expect("assemble context");
+
+    assert!(items.iter().any(|item| item.fact_id == fact_id));
+    let documents = documents
+        .lock()
+        .expect("captured reranker documents are not poisoned");
+    let candidate_document = documents
+        .iter()
+        .find(|document| document.contains("Mira selected Acme as her company."))
+        .expect("the selected answer fact must be reranked");
+    assert!(
+        candidate_document.contains("Which company did you select?"),
+        "the answer candidate should be scored with its immediate source question: {candidate_document:#?}"
+    );
+    assert!(
+        !candidate_document.contains("Which bank did Mira choose?"),
+        "unrelated later turns must not leak into the candidate's reranking context: {candidate_document:#?}"
+    );
+}
+
+#[tokio::test]
+async fn candidate_reranking_document_includes_the_same_speaker_context_of_a_follow_up_answer() {
+    let db = test_db().await;
+    let documents = Arc::new(Mutex::new(Vec::new()));
+    let service = new_eval_retrieval_service(
+        db as Arc<dyn DbClient>,
+        "main".into(),
+        eval_config(
+            Arc::new(CapturingContextReranker {
+                documents: documents.clone(),
+            }),
+            0.7,
+        ),
+    )
+    .await
+    .expect("service");
+    ingest_conversation_turn(
+        &service,
+        "locomo:conv-41:D1:6",
+        "locomo:conv-41:session_1",
+        6,
+        "John: Yeah Maria, I'm really hoping to get into local politics. I love helping the community and making it a better place.",
+    )
+    .await;
+    ingest_conversation_turn(
+        &service,
+        "locomo:conv-41:D1:7",
+        "locomo:conv-41:session_1",
+        7,
+        "Maria: Woohoo, John! That's awesome! Any specific areas do you want to tackle?",
+    )
+    .await;
+    let answer_episode = ingest_conversation_turn(
+        &service,
+        "locomo:conv-41:D1:8",
+        "locomo:conv-41:session_1",
+        8,
+        "John: I'm passionate about improving education and infrastructure in our community. Those are my main focuses.",
+    )
+    .await;
+    ingest_conversation_turn(
+        &service,
+        "locomo:conv-41:D1:9",
+        "locomo:conv-41:session_1",
+        9,
+        "Maria: Could you tell me what got you interested in those topics?",
+    )
+    .await;
+    let fact_id = service
+        .add_fact(
+            "note",
+            "John is passionate about improving education and infrastructure in his community.",
+            "John is passionate about improving education and infrastructure in his community.",
+            &answer_episode,
+            Utc::now(),
+            0.9,
+            vec![],
+            vec![],
+            Provenance::manual(),
+        )
+        .await
+        .expect("persist the answer fact");
+
+    let items = AssembleContextCapability::assemble_context_from_service(
+        &service,
+        assemble_request("What is John's main focus in local politics?"),
+    )
+    .await
+    .expect("assemble context");
+
+    assert!(items.iter().any(|item| item.fact_id == fact_id));
+    let documents = documents
+        .lock()
+        .expect("captured reranker documents are not poisoned");
+    let candidate_document = documents
+        .iter()
+        .find(|document| {
+            document.contains("John is passionate about improving education and infrastructure")
+        })
+        .expect("the selected answer fact must be reranked");
+    assert!(
+        candidate_document
+            .contains("John: Yeah Maria, I'm really hoping to get into local politics."),
+        "a follow-up answer should be scored with the same speaker's immediately prior topic: {candidate_document:#?}"
+    );
+    assert!(
+        candidate_document.contains(
+            "Maria: Woohoo, John! That's awesome! Any specific areas do you want to tackle?"
+        ),
+        "the direct question should remain in the candidate's source context: {candidate_document:#?}"
+    );
+    assert!(
+        !candidate_document.contains("Could you tell me what got you interested"),
+        "the candidate must not inherit later source turns: {candidate_document:#?}"
     );
 }

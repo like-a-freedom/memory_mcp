@@ -1,12 +1,26 @@
 use serde_json::Value;
 
-use crate::models::Episode;
+use crate::models::{Episode, SourceContext};
 use crate::shared::temporal::parse_iso;
-use crate::storage::value_helpers::{json_string, unwrap_array_value};
+use crate::storage::value_helpers::{json_i64, json_string, unwrap_array_value};
 
 /// Parse an episode from a database record.
 #[must_use]
 pub fn episode_from_record(record: &serde_json::Map<String, Value>) -> Option<Episode> {
+    let source_context = match (
+        record.get("source_group").and_then(json_string),
+        record
+            .get("source_position")
+            .and_then(json_i64)
+            .and_then(|position| u64::try_from(position).ok()),
+    ) {
+        (Some(group), Some(position)) => Some(SourceContext {
+            group: group.to_string(),
+            position,
+        }),
+        (None, None) => None,
+        _ => return None,
+    };
     Some(Episode {
         episode_id: json_string(record.get("episode_id")?)?.to_string(),
         source_type: json_string(record.get("source_type")?)?.to_string(),
@@ -41,5 +55,6 @@ pub fn episode_from_record(record: &serde_json::Map<String, Value>) -> Option<Ep
             .get("source_lineage")
             .and_then(json_string)
             .map(ToString::to_string),
+        source_context,
     })
 }

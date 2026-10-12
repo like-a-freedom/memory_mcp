@@ -68,6 +68,19 @@ where
             let lexical_score = fallback_lexical_score(&episode.content, &query_terms);
             let confidence = episode_fallback_confidence(&episode, &query_terms, params.cutoff);
             let grounding = episode_fallback_grounding(&episode.content, &query_terms);
+            let mut provenance = json!({
+                "source_episode": episode.episode_id,
+                "source_type": episode.source_type,
+                "source_id": episode.source_id,
+                "episode_fallback": true,
+                "reference_time": episode.t_ref,
+            });
+            if let Some(source_context) = &episode.source_context {
+                provenance["source_context"] = json!({
+                    "group": source_context.group,
+                    "position": source_context.position,
+                });
+            }
 
             AssembledContextItem {
                 fact_id: format!("episode_fallback:{}", episode.episode_id),
@@ -78,13 +91,7 @@ where
                 relevance: grounding,
                 grounding,
                 semantic_available: Some(params.semantic_available),
-                provenance: json!({
-                    "source_episode": episode.episode_id,
-                    "source_type": episode.source_type,
-                    "source_id": episode.source_id,
-                    "episode_fallback": true,
-                    "reference_time": episode.t_ref,
-                }),
+                provenance,
                 rationale: format!(
                     "tier={} fts={:.2} access_count=0 confidence={:.2} grounding={:.2} semantic={} {}",
                     RetrievalTier::EpisodeFallback.as_str(),
@@ -471,6 +478,7 @@ mod tests {
         let items = build_episode_fallback_items(EpisodeFallbackParams {
             episodes: vec![
                 Episode {
+                    source_context: None,
                     episode_id: "episode:exact".to_string(),
                     source_type: "meeting".to_string(),
                     source_id: "fallback-exact".to_string(),
@@ -483,6 +491,7 @@ mod tests {
                 source_lineage: None,
                 },
                 Episode {
+                    source_context: None,
                     episode_id: "episode:generic".to_string(),
                     source_type: "meeting".to_string(),
                     source_id: "fallback-generic".to_string(),
@@ -516,6 +525,7 @@ mod tests {
         let items = build_episode_fallback_items(EpisodeFallbackParams {
             episodes: vec![
                 Episode {
+                    source_context: None,
                     episode_id: "episode:source-first".to_string(),
                     source_type: "meeting".to_string(),
                     source_id: "duplicate-source".to_string(),
@@ -528,6 +538,7 @@ mod tests {
                     source_lineage: None,
                 },
                 Episode {
+                    source_context: None,
                     episode_id: "episode:source-second".to_string(),
                     source_type: "meeting".to_string(),
                     source_id: "duplicate-source".to_string(),
@@ -541,6 +552,7 @@ mod tests {
                     source_lineage: None,
                 },
                 Episode {
+                    source_context: None,
                     episode_id: "episode:content-first".to_string(),
                     source_type: "meeting".to_string(),
                     source_id: "content-a".to_string(),
@@ -553,6 +565,7 @@ mod tests {
                     source_lineage: None,
                 },
                 Episode {
+                    source_context: None,
                     episode_id: "episode:content-second".to_string(),
                     source_type: "meeting".to_string(),
                     source_id: "content-b".to_string(),
@@ -586,6 +599,7 @@ mod tests {
         let items = build_episode_fallback_items(EpisodeFallbackParams {
             episodes: vec![
                 Episode {
+                    source_context: None,
                     episode_id: "episode:strong".to_string(),
                     source_type: "meeting".to_string(),
                     source_id: "strong-match".to_string(),
@@ -598,6 +612,7 @@ mod tests {
                     source_lineage: None,
                 },
                 Episode {
+                    source_context: None,
                     episode_id: "episode:weak".to_string(),
                     source_type: "meeting".to_string(),
                     source_id: "weak-match".to_string(),

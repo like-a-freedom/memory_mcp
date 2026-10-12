@@ -239,6 +239,11 @@ mod tests {
     }
 
     #[test]
+    fn nonfinite_scores_fail_closed() {
+        assert!(fit_threshold(&[(f64::NAN, true), (0.0, false)]).is_err());
+    }
+
+    #[test]
     fn configured_floor_reports_inclusive_admission_counts() {
         let result = evaluate_floor(&[(0.0, true), (0.0, false), (-1.0, false)], 0.0)
             .expect("finite configured floor");
@@ -253,10 +258,5 @@ mod tests {
     #[test]
     fn nonfinite_configured_floor_fails_closed() {
         assert!(evaluate_floor(&[(1.0, true), (-1.0, false)], f64::NAN).is_err());
-    }
-
-    #[test]
-    fn nonfinite_scores_fail_closed() {
-        assert!(fit_threshold(&[(f64::NAN, true), (0.0, false)]).is_err());
     }
 }

@@ -83,6 +83,7 @@ pub async fn ingest_probe(service: &MemoryService, source_id: &str, content: &st
     IngestCapability::ingest_from_service(
         service,
         IngestRequest {
+            source_context: None,
             source_type: "bench".into(),
             source_id: source_id.to_string(),
             content: content.to_string(),
@@ -197,6 +198,7 @@ pub async fn seed_fact_with_links_and_source(
     let episode_id = IngestCapability::ingest_from_service(
         service,
         IngestRequest {
+            source_context: None,
             source_type: "seed".to_string(),
             source_id,
             content: format!("seed source for {content}"),

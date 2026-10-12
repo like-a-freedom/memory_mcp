@@ -1,4 +1,4 @@
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 
 use chrono::{DateTime, Utc};
 use serde_json::json;
@@ -6,7 +6,9 @@ use serde_json::json;
 use crate::error::MemoryError;
 use crate::logging::LogLevel;
 use crate::memory::retrieval::RetrievalContext;
-use crate::models::{AccessPayload, AssembleContextRequest, AssembledContextItem};
+use crate::models::{
+    AccessPayload, AssembleContextRequest, AssembledContextItem, RetrievalEvidence,
+};
 use crate::platform::log_event::log_event;
 
 use super::alias_expansion::expand_query_with_aliases;
@@ -283,20 +285,888 @@ pub(super) async fn assemble_default_context(
     );
     let ranked =
         super::admission::admit_ranked_candidates(&query_evidence, ranked, &admission_policy);
-    let ranked = ranked
+    let ranked: Vec<RankedContextFact> = ranked
         .into_iter()
         .take(retrieval_candidate_limit(service, params.budget) as usize)
         .collect();
-    let ranked = super::reranking::filter_candidates(
-        service,
-        params.raw_query_opt.unwrap_or_default(),
-        ranked,
-    )
-    .await?;
+    // A source episode can be a useful discourse anchor even when its
+    // standalone text is a weak answer to the query. Preserve anchors after
+    // evidence admission but before the cross-encoder prunes candidates; the
+    // source-question resolver still requires a matching question, a unique
+    // adjacent turn, access/time eligibility, and a matching speaker.
+    let source_question_candidates = ranked
+        .iter()
+        .map(|candidate| candidate.fact.source_episode.clone())
+        .collect::<Vec<_>>();
+    let ranked = super::reranking::filter_candidates(service, &params, ranked).await?;
     let current_query = query_evidence.intent == super::admission::AdmissionIntent::Current;
     let ranked = project_current_candidates(service, &params, &query_evidence, ranked).await?;
     let selection = select_context_facts(service, &params, ranked, current_query).await?;
-    finalize_with_first_person_appenders(&params, selection).await
+    let mut source_question_candidates = source_question_candidates;
+    for episode_id in &selection.episode_fallback_source_anchors {
+        if !source_question_candidates.contains(episode_id) {
+            source_question_candidates.push(episode_id.clone());
+        }
+    }
+    let selected = finalize_with_first_person_appenders(&params, selection).await?;
+    append_source_answers(
+        service,
+        &params,
+        current_query,
+        &source_question_candidates,
+        selected,
+    )
+    .await
+}
+
+/// Short answers can omit the words in the user's query. Use a matching
+/// question in the same producer-declared stream to retain its response and,
+/// for a follow-up question, the preceding answer from the same speaker.
+async fn append_source_answers(
+    service: &RetrievalContext,
+    params: &DefaultContextParams<'_>,
+    current_query: bool,
+    candidate_anchors: &[String],
+    mut items: Vec<AssembledContextItem>,
+) -> Result<Vec<AssembledContextItem>, MemoryError> {
+    if params.query_opt.is_none() || current_query || params.query_flags.wants_timeline {
+        return Ok(items);
+    }
+    let query = params.raw_query_opt.unwrap_or_default();
+    let query_evidence =
+        super::admission::build_query_evidence(Some(query), Vec::new(), &[], params.query_flags);
+    let subject_terms = query_evidence.subject_terms.clone();
+    let selected_anchor_ids = items
+        .iter()
+        .map(|item| item.source_episode.clone())
+        .collect::<HashSet<_>>();
+    let mut anchors = items
+        .iter()
+        .filter(|item| {
+            item.provenance
+                .get("episode_fallback")
+                .and_then(serde_json::Value::as_bool)
+                != Some(true)
+                || item
+                    .provenance
+                    .get("source_context")
+                    .is_some_and(serde_json::Value::is_object)
+        })
+        .map(|item| item.source_episode.clone())
+        .collect::<Vec<_>>();
+    for episode_id in candidate_anchors {
+        if !anchors.contains(episode_id) {
+            anchors.push(episode_id.clone());
+        }
+    }
+    let window_start = params
+        .window_start
+        .as_ref()
+        .map(|date| crate::shared::temporal::normalize_dt(*date));
+    let window_end = params
+        .window_end
+        .as_ref()
+        .map(|date| crate::shared::temporal::normalize_dt(*date));
+    let neighborhoods = super::filtering::filter_episodes_by_constraints(
+        service
+            .episode_context_store()
+            .select_source_neighborhoods_for_episodes(
+                &anchors,
+                params.cutoff_iso,
+                window_start.as_deref(),
+                window_end.as_deref(),
+            )
+            .await?,
+        params.access,
+    );
+    let mut directly_answered_questions = HashSet::new();
+    let mut directly_answered_evidence = HashSet::new();
+    let mut linked_source_evidence = HashMap::<String, HashSet<String>>::new();
+    for anchor_id in anchors {
+        let Some(anchor) = neighborhoods
+            .iter()
+            .find(|episode| episode.episode_id == anchor_id)
+        else {
+            continue;
+        };
+        let Some(source_context) = &anchor.source_context else {
+            continue;
+        };
+        let neighbors = neighborhoods
+            .iter()
+            .filter(|episode| {
+                episode.source_context.as_ref().is_some_and(|context| {
+                    context.group == source_context.group
+                        && source_context.position.abs_diff(context.position)
+                            <= crate::memory::episode_context_store::SOURCE_CONTEXT_RADIUS as u64
+                })
+            })
+            .cloned()
+            .collect::<Vec<_>>();
+        let mut supplemental = Vec::new();
+        for related_episode in &neighbors {
+            if related_episode.source_context.is_none() {
+                continue;
+            }
+            if related_episode.episode_id == anchor.episode_id
+                || !super::admission::episode_candidate_matches_query_subject(
+                    &query_evidence,
+                    &related_episode.content,
+                )
+            {
+                continue;
+            }
+            let has_explicit_link = super::reranking::source_context_has_explicit_additive_link(
+                query,
+                &anchor.content,
+                &related_episode.content,
+            )
+                || super::reranking::source_context_has_explicit_additive_link(
+                    query,
+                    &related_episode.content,
+                    &anchor.content,
+                );
+            let speakers_are_requested =
+                episode_speaker_matches_subject(&anchor.content, &subject_terms)
+                    && episode_speaker_matches_subject(&related_episode.content, &subject_terms);
+            let related_to_anchor = has_explicit_link
+                && query_requests_multiple_evidence(query)
+                && !same_turn_speaker(&anchor.content, &related_episode.content)
+                && subject_terms.len() >= 2
+                && speakers_are_requested;
+            let related_typed_answer = query_requests_multiple_evidence(query)
+                && super::reranking::typed_answer_slot_support(
+                    query,
+                    &related_episode.content,
+                    &subject_terms,
+                ) == Some(true)
+                && same_turn_speaker(&anchor.content, &related_episode.content)
+                && episode_speaker_matches_subject(&related_episode.content, &subject_terms);
+            if related_to_anchor || related_typed_answer {
+                supplemental.push((
+                    related_episode.clone(),
+                    None,
+                    (source_context.group.clone(), anchor.episode_id.clone()),
+                    SourceContextRelation::QueryRelatedConversationTurn,
+                    anchor.episode_id.clone(),
+                ));
+            } else if related_episode
+                .source_context
+                .as_ref()
+                .is_some_and(|context| {
+                    context.group == source_context.group
+                        && context.position < source_context.position
+                })
+                && same_turn_speaker(&anchor.content, &related_episode.content)
+                && super::reranking::source_context_supports_requested_transition(
+                    query,
+                    &anchor.content,
+                    &related_episode.content,
+                )
+            {
+                supplemental.push((
+                    related_episode.clone(),
+                    None,
+                    (source_context.group.clone(), anchor.episode_id.clone()),
+                    SourceContextRelation::QueryRelatedAntecedent,
+                    anchor.episode_id.clone(),
+                ));
+            }
+        }
+        for question in &neighbors {
+            let Some(question_context) = &question.source_context else {
+                continue;
+            };
+            let query_matched_question =
+                super::reranking::source_question_matches_query_via_context(
+                    &question.content,
+                    query,
+                    &subject_terms,
+                    &anchor.content,
+                );
+            let context_only_follow_up =
+                super::reranking::source_question_is_context_only_follow_up(
+                    &question.content,
+                    query,
+                    &subject_terms,
+                );
+            let question_key = (question_context.group.clone(), question.episode_id.clone());
+            let question_position = question_context.position;
+            let response = question_position
+                .checked_add(1)
+                .and_then(|position| unique_source_episode_at(&neighbors, position));
+            let travel_event_follow_up = response.as_ref().is_some_and(|response| {
+                same_turn_speaker(&anchor.content, &response.content)
+                    && episode_speaker_matches_subject(&response.content, &subject_terms)
+                    && neighbors.iter().any(|antecedent| {
+                        antecedent.source_context.as_ref().is_some_and(|context| {
+                            context.group == question_key.0
+                                && context.position < question_position
+                                && question_position.abs_diff(context.position)
+                                    <= crate::memory::episode_context_store::SOURCE_CONTEXT_RADIUS
+                                        as u64
+                        }) && !antecedent.content.contains('?')
+                            && same_turn_speaker(&antecedent.content, &response.content)
+                            && super::reranking::source_context_is_travel_event_antecedent(
+                                query,
+                                &question.content,
+                                &antecedent.content,
+                            )
+                    })
+            });
+            let query_matched_question = query_matched_question || travel_event_follow_up;
+            let anaphoric_follow_up = selected_anchor_ids.contains(&anchor.episode_id)
+                && super::reranking::source_question_contains_anaphoric_reference(
+                    &question.content,
+                )
+                && super::reranking::source_question_is_supported_by_assertion(
+                    &question.content,
+                    query,
+                    &anchor.content,
+                    &subject_terms,
+                )
+                && response.as_ref().is_some_and(|response| {
+                    same_turn_speaker(&anchor.content, &response.content)
+                        && episode_speaker_matches_subject(&response.content, &subject_terms)
+                        && super::reranking::anaphoric_response_asserts_requested_acquisition(
+                            query,
+                            &question.content,
+                            &response.content,
+                        )
+                });
+            if !query_matched_question && !anaphoric_follow_up && !context_only_follow_up {
+                continue;
+            }
+            if context_only_follow_up && !query_matched_question && !anaphoric_follow_up {
+                if question_position.checked_add(1) == Some(source_context.position) {
+                    for antecedent in neighbors.iter().filter(|episode| {
+                        episode.source_context.as_ref().is_some_and(|context| {
+                            context.group == question_key.0
+                                && context.position < question_position
+                                && question_position.abs_diff(context.position)
+                                    <= crate::memory::episode_context_store::SOURCE_CONTEXT_RADIUS
+                                        as u64
+                        }) && !episode.content.contains('?')
+                            && same_turn_speaker(&anchor.content, &episode.content)
+                            && super::reranking::source_context_is_related_support(
+                                query,
+                                &anchor.content,
+                                &episode.content,
+                            )
+                    }) {
+                        supplemental.push((
+                            antecedent.clone(),
+                            None,
+                            question_key.clone(),
+                            SourceContextRelation::QueryRelatedAntecedent,
+                            anchor.episode_id.clone(),
+                        ));
+                    }
+                }
+                continue;
+            }
+            if anaphoric_follow_up && let Some(response) = response.as_ref() {
+                supplemental.push((
+                    (**response).clone(),
+                    None,
+                    question_key.clone(),
+                    SourceContextRelation::AnaphoricFollowUpAnswer,
+                    anchor.episode_id.clone(),
+                ));
+            }
+
+            if question_position == source_context.position
+                && let Some(response) = response
+                && episode_speaker_matches_subject(&response.content, &subject_terms)
+            {
+                supplemental.push((
+                    response.clone(),
+                    Some(anchor.episode_id.clone()),
+                    question_key.clone(),
+                    SourceContextRelation::AdjacentQuestionAnswer,
+                    response.episode_id.clone(),
+                ));
+                for antecedent in neighbors.iter().filter(|episode| {
+                    episode.source_context.as_ref().is_some_and(|context| {
+                        context.group == question_key.0
+                            && context.position < question_position
+                            && question_position.abs_diff(context.position)
+                                <= crate::memory::episode_context_store::SOURCE_CONTEXT_RADIUS
+                                    as u64
+                    }) && !episode.content.contains('?')
+                        && same_turn_speaker(&episode.content, &response.content)
+                        && (super::reranking::source_context_is_related_support(
+                            query,
+                            &response.content,
+                            &episode.content,
+                        ) || super::reranking::source_question_is_supported_by_assertion(
+                            &question.content,
+                            query,
+                            &episode.content,
+                            &subject_terms,
+                        ))
+                }) {
+                    supplemental.push((
+                        antecedent.clone(),
+                        None,
+                        question_key.clone(),
+                        SourceContextRelation::QueryRelatedAntecedent,
+                        response.episode_id.clone(),
+                    ));
+                }
+            }
+
+            if question_position.checked_sub(1) == Some(source_context.position)
+                && let Some(response) = response
+                && same_turn_speaker(&anchor.content, &response.content)
+                && episode_speaker_matches_subject(&response.content, &subject_terms)
+            {
+                supplemental.push((
+                    response.clone(),
+                    None,
+                    question_key.clone(),
+                    SourceContextRelation::AdjacentQuestionAnswer,
+                    response.episode_id.clone(),
+                ));
+            }
+
+            if question_position.checked_add(1) == Some(source_context.position) {
+                // The anchor is already the unique response immediately after
+                // a query-matching source question. Treat it as direct evidence
+                // and keep the bundle within this producer-declared group;
+                // an earlier same-speaker turn is not automatically relevant
+                // just because it repeats one query word.
+                directly_answered_questions.insert(question_key.clone());
+                directly_answered_evidence
+                    .insert((question_key.0.clone(), anchor.episode_id.clone()));
+                for antecedent in neighbors.iter().filter(|episode| {
+                    episode.source_context.as_ref().is_some_and(|context| {
+                        context.group == question_key.0
+                            && context.position < question_position
+                            && question_position.abs_diff(context.position)
+                                <= crate::memory::episode_context_store::SOURCE_CONTEXT_RADIUS
+                                    as u64
+                    }) && !episode.content.contains('?')
+                        && same_turn_speaker(&episode.content, &anchor.content)
+                        && (super::reranking::source_context_is_related_support(
+                            query,
+                            &anchor.content,
+                            &episode.content,
+                        ) || super::reranking::source_context_is_travel_event_antecedent(
+                            query,
+                            &question.content,
+                            &episode.content,
+                        ))
+                }) {
+                    supplemental.push((
+                        antecedent.clone(),
+                        None,
+                        question_key.clone(),
+                        SourceContextRelation::QueryRelatedAntecedent,
+                        anchor.episode_id.clone(),
+                    ));
+                }
+            }
+        }
+
+        for (episode, replaces_episode_id, question_key, relation, relevance_anchor_id) in
+            supplemental
+        {
+            let directly_answers_question = replaces_episode_id.is_some();
+            if super::admission::source_episode_has_hard_query_conflict(
+                &query_evidence,
+                &episode.content,
+            ) {
+                continue;
+            }
+            if params
+                .window_start
+                .is_some_and(|start| episode.t_ref < start)
+                || params.window_end.is_some_and(|end| episode.t_ref > end)
+            {
+                continue;
+            }
+            if items
+                .iter()
+                .any(|item| item.source_episode == episode.episode_id)
+            {
+                if matches!(
+                    relation,
+                    SourceContextRelation::QueryRelatedAntecedent
+                        | SourceContextRelation::QueryRelatedConversationTurn
+                        | SourceContextRelation::AnaphoricFollowUpAnswer
+                ) && let Some(item) = items
+                    .iter_mut()
+                    .find(|item| item.source_episode == episode.episode_id)
+                {
+                    annotate_source_context_admission(
+                        item,
+                        &question_key.1,
+                        &source_context.group,
+                        source_context.position,
+                        episode
+                            .source_context
+                            .as_ref()
+                            .map(|context| context.position),
+                        relation,
+                    );
+                    linked_source_evidence
+                        .entry(episode.episode_id.clone())
+                        .or_default()
+                        .insert(relevance_anchor_id.clone());
+                }
+                if directly_answers_question {
+                    directly_answered_evidence
+                        .insert((question_key.0.clone(), episode.episode_id.clone()));
+                    directly_answered_questions.insert(question_key);
+                }
+                continue;
+            }
+            let answer_facts = service
+                .graph_store
+                .select_active_facts_by_episode(
+                    &episode.episode_id,
+                    params.cutoff_iso,
+                    retrieval_candidate_limit(service, params.budget),
+                )
+                .await?;
+            let answer_facts =
+                filter_facts_by_constraints(answer_facts, params.access, params.fact_types);
+            let mut answer_items = answer_facts
+                .into_iter()
+                .map(|fact| source_answer_fact_item(fact, params.cutoff, service))
+                .collect::<Vec<_>>();
+            if answer_items.is_empty() {
+                answer_items = super::views::build_episode_fallback_items(
+                    super::views::EpisodeFallbackParams {
+                        episodes: vec![episode.clone()],
+                        query_opt: params.raw_query_opt,
+                        semantic_available: service.embedding_provider.is_enabled(),
+                        cutoff: params.cutoff,
+                        window_start: params.window_start,
+                        window_end: params.window_end,
+                        timeline_mode: false,
+                        budget: 1,
+                        fallback_rationale_fn: source_answer_rationale,
+                    },
+                );
+            }
+            for mut answer_item in answer_items {
+                if super::admission::source_episode_has_hard_query_conflict(
+                    &query_evidence,
+                    &answer_item.content,
+                ) {
+                    continue;
+                }
+                if items.iter().any(|item| item.fact_id == answer_item.fact_id) {
+                    continue;
+                }
+                annotate_source_context_admission(
+                    &mut answer_item,
+                    &question_key.1,
+                    &source_context.group,
+                    source_context.position,
+                    episode
+                        .source_context
+                        .as_ref()
+                        .map(|context| context.position),
+                    relation,
+                );
+                if let Some(question_episode_id) = replaces_episode_id.as_ref()
+                    && let Some(index) = items.iter().position(|item| {
+                        item.source_episode.as_str() == question_episode_id.as_str()
+                    })
+                {
+                    items[index] = answer_item;
+                    if directly_answers_question {
+                        directly_answered_evidence
+                            .insert((question_key.0.clone(), episode.episode_id.clone()));
+                        directly_answered_questions.insert(question_key.clone());
+                    }
+                    continue;
+                }
+                if items.len() < params.budget.max(1) as usize
+                    || service.embedding_provider.reranking_signature().is_some()
+                {
+                    items.push(answer_item);
+                    if matches!(
+                        relation,
+                        SourceContextRelation::QueryRelatedAntecedent
+                            | SourceContextRelation::QueryRelatedConversationTurn
+                            | SourceContextRelation::AnaphoricFollowUpAnswer
+                    ) {
+                        linked_source_evidence
+                            .entry(episode.episode_id.clone())
+                            .or_default()
+                            .insert(relevance_anchor_id.clone());
+                    }
+                    if directly_answers_question {
+                        directly_answered_evidence
+                            .insert((question_key.0.clone(), episode.episode_id.clone()));
+                        directly_answered_questions.insert(question_key.clone());
+                    }
+                }
+            }
+        }
+    }
+    let multi_evidence_query = query_requests_multiple_evidence(query);
+    if !directly_answered_questions.is_empty() {
+        // A matched source question anchors its response and validated
+        // same-speaker antecedents within that producer-declared group. Keep
+        // other source groups only when the query asks for multiple values.
+        let directly_answered_groups = directly_answered_questions
+            .iter()
+            .map(|(group, _)| group.clone())
+            .collect::<HashSet<_>>();
+        items.retain(|item| {
+            let source_group = neighborhoods
+                .iter()
+                .find(|episode| episode.episode_id == item.source_episode)
+                .and_then(|episode| episode.source_context.as_ref())
+                .map(|context| context.group.clone())
+                .or_else(|| {
+                    item.provenance
+                        .get("source_context")
+                        .and_then(serde_json::Value::as_object)
+                        .and_then(|context| context.get("group"))
+                        .and_then(serde_json::Value::as_str)
+                        .map(str::to_string)
+                });
+            let Some(source_group) = source_group else {
+                return true;
+            };
+            if !multi_evidence_query && !directly_answered_groups.contains(&source_group) {
+                return false;
+            }
+            !directly_answered_groups.contains(&source_group)
+                || directly_answered_evidence.contains(&(source_group, item.source_episode.clone()))
+                || linked_source_evidence.contains_key(&item.source_episode)
+        });
+    }
+    let items = append_source_episode_fact_candidates(service, params, items).await?;
+    let filtered = super::reranking::filter_items(
+        service,
+        params.raw_query_opt.unwrap_or_default(),
+        items,
+        params.budget.max(1) as usize,
+        params.resolved_view_mode == Some("timeline"),
+    )
+    .await?;
+    if !multi_evidence_query && params.resolved_view_mode != Some("timeline") {
+        let source_group_by_episode = neighborhoods
+            .iter()
+            .filter_map(|episode| {
+                episode
+                    .source_context
+                    .as_ref()
+                    .map(|context| (episode.episode_id.clone(), context.group.clone()))
+            })
+            .collect::<HashMap<_, _>>();
+        return Ok(retain_best_source_group_items(
+            filtered,
+            &source_group_by_episode,
+            &directly_answered_evidence,
+            &linked_source_evidence,
+        ));
+    }
+    Ok(filtered)
+}
+
+fn query_requests_multiple_evidence(query: &str) -> bool {
+    let lower_query = query.to_lowercase();
+    let tokens = query
+        .split(|character: char| !character.is_alphanumeric())
+        .filter(|token| !token.is_empty())
+        .map(|token| {
+            (
+                token.to_lowercase(),
+                token.chars().next().is_some_and(char::is_uppercase),
+            )
+        })
+        .collect::<Vec<_>>();
+    if tokens
+        .iter()
+        .any(|token| matches!(token.0.as_str(), "both" | "each" | "several" | "multiple"))
+    {
+        return true;
+    }
+    if ["which year", "what year"]
+        .iter()
+        .any(|phrase| lower_query.starts_with(phrase))
+    {
+        return false;
+    }
+    if ["types of", "kinds of", "sorts of"]
+        .iter()
+        .any(|phrase| lower_query.contains(phrase))
+    {
+        return true;
+    }
+    if ["type of", "kind of", "sort of"]
+        .iter()
+        .any(|phrase| lower_query.contains(phrase))
+    {
+        return false;
+    }
+    let invariant_or_singular_s = [
+        "analysis", "business", "focus", "news", "physics", "politics", "series", "species",
+        "status", "this",
+    ];
+    tokens.iter().any(|(token, proper_name)| {
+        !proper_name
+            && token.len() >= 4
+            && !invariant_or_singular_s.contains(&token.as_str())
+            && (token.ends_with("ies") || token.ends_with('s') && !token.ends_with("ss"))
+    })
+}
+
+fn retain_best_source_group_items(
+    items: Vec<AssembledContextItem>,
+    source_group_by_episode: &HashMap<String, String>,
+    directly_answered_evidence: &HashSet<(String, String)>,
+    linked_source_evidence: &HashMap<String, HashSet<String>>,
+) -> Vec<AssembledContextItem> {
+    let directly_matched_groups = items
+        .iter()
+        .filter(|item| super::reranking::item_has_direct_lexical_evidence(item))
+        .filter_map(|item| source_group_by_episode.get(&item.source_episode).cloned())
+        .collect::<HashSet<_>>();
+    let directly_answered_groups = directly_answered_evidence
+        .iter()
+        .map(|(group, _)| group.as_str())
+        .collect::<HashSet<_>>();
+    let mut retained_groups = HashSet::new();
+    let mut retained_directly_matched_groups = HashSet::new();
+    items
+        .into_iter()
+        .filter(|item| {
+            let Some(group) = source_group_by_episode.get(&item.source_episode) else {
+                return true;
+            };
+            if directly_answered_evidence.contains(&(group.clone(), item.source_episode.clone())) {
+                return true;
+            }
+            if linked_source_evidence.contains_key(&item.source_episode) {
+                return true;
+            }
+            if directly_answered_groups.contains(group.as_str()) {
+                return false;
+            }
+            if directly_matched_groups.contains(group) {
+                return super::reranking::item_has_direct_lexical_evidence(item)
+                    && retained_directly_matched_groups.insert(group.clone());
+            }
+            retained_groups.insert(group.clone())
+        })
+        .collect()
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum SourceContextRelation {
+    AdjacentQuestionAnswer,
+    QueryRelatedAntecedent,
+    QueryRelatedConversationTurn,
+    AnaphoricFollowUpAnswer,
+}
+
+impl SourceContextRelation {
+    fn as_str(self) -> &'static str {
+        match self {
+            Self::AdjacentQuestionAnswer => "adjacent_question_answer",
+            Self::QueryRelatedAntecedent => "query_related_antecedent",
+            Self::QueryRelatedConversationTurn => "query_related_conversation_turn",
+            Self::AnaphoricFollowUpAnswer => "anaphoric_follow_up_answer",
+        }
+    }
+}
+
+fn episode_speaker_matches_subject(content: &str, subject_terms: &[String]) -> bool {
+    if subject_terms.is_empty() {
+        return true;
+    }
+    let Some((speaker, _)) = content.split_once(':') else {
+        return false;
+    };
+    let speaker_terms = crate::shared::search::search_query_terms(speaker.trim());
+    subject_terms
+        .iter()
+        .any(|term| speaker_terms.contains(term))
+}
+
+fn annotate_source_context_admission(
+    item: &mut AssembledContextItem,
+    related_episode_id: &str,
+    group: &str,
+    question_position: u64,
+    answer_position: Option<u64>,
+    relation: SourceContextRelation,
+) {
+    if !item.provenance.is_object() {
+        item.provenance = serde_json::json!({});
+    }
+    item.provenance["retrieval_admission"] = serde_json::json!({
+        "policy_version": "retrieval-admission-v1",
+        "basis": "qualified_source_episode",
+        "source_context_relation": relation.as_str(),
+        "related_episode_id": related_episode_id,
+        "source_context_group": group,
+        "source_context_position": question_position,
+    });
+    if let Some(position) = answer_position {
+        item.provenance["source_context"] = json!({"group": group, "position": position});
+    }
+}
+
+fn source_answer_fact_item(
+    fact: crate::models::Fact,
+    cutoff: DateTime<Utc>,
+    service: &RetrievalContext,
+) -> AssembledContextItem {
+    let mut provenance = fact.provenance.to_json_value();
+    if !provenance.is_object() {
+        provenance = json!({});
+    }
+    provenance["reference_time"] = json!(fact.t_valid.to_rfc3339());
+    provenance["source_episode"] = json!(fact.source_episode);
+    provenance["source_episode_id"] = json!(fact.source_episode);
+    let confidence = super::fact_decayed_confidence(&fact, cutoff);
+    AssembledContextItem {
+        fact_id: fact.fact_id,
+        content: fact.content,
+        quote: fact.quote,
+        source_episode: fact.source_episode,
+        confidence,
+        semantic_available: Some(service.embedding_provider.is_enabled()),
+        provenance,
+        rationale: "tier=source_expanded source-ordered answer to a matching question".into(),
+        retrieval_tier: Some("source_expanded".into()),
+        retrieval_evidence: Some(RetrievalEvidence {
+            policy_version: "retrieval-admission-v1".into(),
+            admission_basis: "qualified_source_episode".into(),
+            semantic_similarity: None,
+            graph_anchor_origin: None,
+            hop_count: None,
+        }),
+        ..Default::default()
+    }
+}
+
+async fn append_source_episode_fact_candidates(
+    service: &RetrievalContext,
+    params: &DefaultContextParams<'_>,
+    mut items: Vec<AssembledContextItem>,
+) -> Result<Vec<AssembledContextItem>, MemoryError> {
+    if service.embedding_provider.reranking_signature().is_none() || items.is_empty() {
+        return Ok(items);
+    }
+
+    let mut seen_episode_ids = HashSet::new();
+    let episode_ids = items
+        .iter()
+        .filter(|item| {
+            item.provenance
+                .get("episode_fallback")
+                .and_then(serde_json::Value::as_bool)
+                != Some(true)
+        })
+        .map(|item| item.source_episode.clone())
+        .filter(|episode_id| !episode_id.is_empty() && seen_episode_ids.insert(episode_id.clone()))
+        .collect::<Vec<_>>();
+    if episode_ids.is_empty() {
+        return Ok(items);
+    }
+
+    let candidate_limit =
+        super::reranking::candidate_pool_limit(params.budget.max(1) as usize, true);
+    let candidate_slots = candidate_limit.saturating_sub(items.len());
+    if candidate_slots == 0 {
+        return Ok(items);
+    }
+    let per_episode_limit = (candidate_slots / episode_ids.len()).max(1);
+    let mut seen_fact_ids = items
+        .iter()
+        .map(|item| item.fact_id.clone())
+        .collect::<HashSet<_>>();
+    let mut siblings = Vec::new();
+
+    for episode_id in episode_ids {
+        let records = service
+            .graph_store
+            .select_active_facts_by_episode(
+                &episode_id,
+                params.cutoff_iso,
+                per_episode_limit.min(i32::MAX as usize) as i32,
+            )
+            .await?;
+        let facts = super::filtering::filter_facts_by_constraints(
+            records,
+            params.access,
+            params.fact_types,
+        )
+        .into_iter()
+        .filter(|fact| {
+            params
+                .window_start
+                .is_none_or(|start| fact.t_valid >= start)
+                && params.window_end.is_none_or(|end| fact.t_valid <= end)
+        })
+        .collect::<Vec<_>>();
+        for fact in facts {
+            if !seen_fact_ids.insert(fact.fact_id.clone()) {
+                continue;
+            }
+            siblings.push(source_episode_fact_candidate_item(
+                fact,
+                params.cutoff,
+                service,
+            ));
+        }
+    }
+
+    items.extend(siblings);
+    Ok(items)
+}
+
+fn source_episode_fact_candidate_item(
+    fact: crate::models::Fact,
+    cutoff: DateTime<Utc>,
+    service: &RetrievalContext,
+) -> AssembledContextItem {
+    let mut item = source_answer_fact_item(fact, cutoff, service);
+    item.retrieval_evidence = None;
+    item.rationale = "tier=source_expanded sibling fact from a selected source episode".into();
+    item
+}
+
+fn unique_source_episode_at(
+    episodes: &[crate::models::Episode],
+    position: u64,
+) -> Option<&crate::models::Episode> {
+    let mut matches = episodes.iter().filter(|episode| {
+        episode
+            .source_context
+            .as_ref()
+            .is_some_and(|context| context.position == position)
+    });
+    let episode = matches.next()?;
+    matches.next().is_none().then_some(episode)
+}
+
+fn same_turn_speaker(anchor: &str, answer: &str) -> bool {
+    fn speaker(content: &str) -> Option<&str> {
+        content
+            .split_once(':')
+            .map(|(name, _)| name.trim())
+            .filter(|name| !name.is_empty() && name.len() <= 60 && !name.contains('\n'))
+    }
+    match (speaker(anchor), speaker(answer)) {
+        (Some(left), Some(right)) => left.eq_ignore_ascii_case(right),
+        _ => false,
+    }
+}
+
+fn source_answer_rationale(_: Option<&str>, _: chrono::DateTime<Utc>) -> String {
+    "source-ordered context for adjacent matching question".into()
 }
 
 async fn project_current_candidates(
@@ -366,6 +1236,7 @@ struct RetrievedFactChannels {
     direct_facts: Vec<crate::models::Fact>,
     temporal_facts: Vec<crate::models::Fact>,
     expanded_facts: Vec<crate::models::Fact>,
+    source_facts: Vec<crate::models::Fact>,
     graph_facts: Vec<crate::memory::retrieval::graph::GraphCandidate>,
     community_facts: Vec<super::types::CommunityFactCandidate>,
     semantic_facts: Vec<super::types::SemanticCandidate>,
@@ -384,6 +1255,7 @@ struct SelectedContext {
     selected: Vec<RankedContextFact>,
     ranked_candidates: Vec<RankedContextFact>,
     episode_fallback_items: Vec<AssembledContextItem>,
+    episode_fallback_source_anchors: Vec<String>,
     prefer_episode_content: bool,
 }
 
@@ -414,6 +1286,7 @@ async fn retrieve_fact_channels(
         filter_facts_by_constraints(lexical_result.records, params.access, params.fact_types);
 
     let mut expanded_facts = Vec::new();
+    let mut source_facts = Vec::<crate::models::Fact>::new();
     let mut temporal_facts = Vec::new();
     let mut graph_facts = Vec::new();
     let mut community_facts = Vec::new();
@@ -469,6 +1342,53 @@ async fn retrieve_fact_channels(
             .map(|fact| fact.fact_id.clone())
             .collect();
 
+        let source_query_evidence = super::admission::build_query_evidence(
+            Some(query),
+            Vec::new(),
+            &[],
+            params.query_flags,
+        );
+        let mut source_episode_ids = Vec::new();
+        let mut seen_source_episode_ids = HashSet::new();
+        for fact in direct_facts
+            .iter()
+            .chain(temporal_facts.iter())
+            .chain(expanded_facts.iter())
+        {
+            if super::admission::episode_candidate_is_admitted_at_reference_time(
+                &source_query_evidence,
+                &fact.content,
+                Some(fact.t_valid),
+            ) && seen_source_episode_ids.insert(fact.source_episode.clone())
+            {
+                source_episode_ids.push(fact.source_episode.clone());
+            }
+            if source_episode_ids.len() >= params.budget.max(1) as usize {
+                break;
+            }
+        }
+        for episode_id in source_episode_ids {
+            let remaining = candidate_limit.saturating_sub(source_facts.len() as i32);
+            if remaining <= 0 {
+                break;
+            }
+            let sibling_records = service
+                .graph_store
+                .select_active_facts_by_episode(&episode_id, params.cutoff_iso, remaining)
+                .await?;
+            for sibling in
+                filter_facts_by_constraints(sibling_records, params.access, params.fact_types)
+            {
+                if !base_direct_ids.contains(&sibling.fact_id)
+                    && !source_facts
+                        .iter()
+                        .any(|fact| fact.fact_id == sibling.fact_id)
+                {
+                    source_facts.push(sibling);
+                }
+            }
+        }
+
         let experience_query_terms =
             expand_experience_query_terms(params.query_terms, &direct_facts);
         let experience_topic_terms = experience_query_terms
@@ -522,6 +1442,7 @@ async fn retrieve_fact_channels(
             .iter()
             .chain(temporal_facts.iter())
             .chain(expanded_facts.iter())
+            .chain(source_facts.iter())
             .map(|fact| fact.fact_id.clone())
             .collect();
 
@@ -558,6 +1479,7 @@ async fn retrieve_fact_channels(
             .iter()
             .chain(temporal_facts.iter())
             .chain(expanded_facts.iter())
+            .chain(source_facts.iter())
             .chain(graph_facts.iter().map(|candidate| &candidate.fact))
             .filter(|fact| {
                 super::admission::episode_candidate_is_admitted_at_reference_time(
@@ -603,6 +1525,7 @@ async fn retrieve_fact_channels(
         direct_facts,
         temporal_facts,
         expanded_facts,
+        source_facts,
         graph_facts,
         community_facts,
         semantic_facts,
@@ -627,6 +1550,7 @@ async fn rank_fact_channels(
         direct_facts,
         temporal_facts,
         expanded_facts,
+        source_facts,
         graph_facts,
         community_facts,
         semantic_facts,
@@ -647,6 +1571,11 @@ async fn rank_fact_channels(
             expanded_facts
                 .into_iter()
                 .map(|fact| (fact, RetrievalTier::AliasExpanded)),
+        );
+        lexical_facts.extend(
+            source_facts
+                .into_iter()
+                .map(|fact| (fact, RetrievalTier::SourceExpanded)),
         );
 
         Ok(build_ranked_context_facts(
@@ -695,20 +1624,34 @@ async fn select_context_facts(
     // Episodic fallback has no fact-level reconciliation identity. It cannot
     // prove that a statement remains current, so it must not bypass the
     // relation projection for a current-intent query.
-    let episode_fallback_items = if current_query {
-        Vec::new()
+    let (episode_fallback_items, episode_fallback_source_anchors) = if current_query {
+        (Vec::new(), Vec::new())
     } else if let Some(query) = params.query_opt {
         let items = collect_episode_fallback_items(service, params, query).await?;
-        super::reranking::filter_items(
+        let mut seen_source_anchors = HashSet::new();
+        let source_anchors = items
+            .iter()
+            .filter(|item| {
+                item.provenance
+                    .get("source_context")
+                    .is_some_and(serde_json::Value::is_object)
+            })
+            .map(|item| item.source_episode.clone())
+            .filter(|episode_id| {
+                !episode_id.is_empty() && seen_source_anchors.insert(episode_id.clone())
+            })
+            .collect::<Vec<_>>();
+        let filtered = super::reranking::filter_items(
             service,
             params.raw_query_opt.unwrap_or(query),
             items,
             params.budget.max(1) as usize,
             timeline_mode,
         )
-        .await?
+        .await?;
+        (filtered, source_anchors)
     } else {
-        Vec::new()
+        (Vec::new(), Vec::new())
     };
 
     if ranked_facts.is_empty() {
@@ -717,6 +1660,7 @@ async fn select_context_facts(
                 selected: Vec::new(),
                 ranked_candidates: Vec::new(),
                 episode_fallback_items,
+                episode_fallback_source_anchors,
                 prefer_episode_content: false,
             });
         }
@@ -724,6 +1668,7 @@ async fn select_context_facts(
             selected: Vec::new(),
             ranked_candidates: Vec::new(),
             episode_fallback_items: Vec::new(),
+            episode_fallback_source_anchors: Vec::new(),
             prefer_episode_content: false,
         });
     }
@@ -786,6 +1731,7 @@ async fn select_context_facts(
         selected: selected_ranked,
         ranked_candidates,
         episode_fallback_items,
+        episode_fallback_source_anchors,
         prefer_episode_content,
     })
 }
@@ -810,6 +1756,7 @@ async fn finalize_with_first_person_appenders(
         selected: selected_ranked,
         ranked_candidates,
         episode_fallback_items,
+        episode_fallback_source_anchors: _,
         prefer_episode_content,
     } = selection;
 
@@ -926,11 +1873,149 @@ mod tests {
     }
 
     #[test]
+    fn query_requests_multiple_evidence_for_plural_targets_and_cross_person_questions() {
+        for query in [
+            "What programming languages has James worked with?",
+            "What pets does Jolene have?",
+            "What types of movies does Nate enjoy watching the most?",
+            "Where has Evan been on roadtrips with his family?",
+            "What items did Calvin buy in March 2023?",
+            "How do Jon and Gina both like to destress?",
+            "Which body measurements and diagnostics does the HTTP plan require?",
+        ] {
+            assert!(
+                query_requests_multiple_evidence(query),
+                "the query requests multiple pieces of evidence: {query}"
+            );
+        }
+    }
+
+    #[test]
+    fn query_requests_multiple_evidence_rejects_singular_questions_and_proper_names() {
+        for query in [
+            "What did the charity race raise awareness for?",
+            "What is John's main focus in local politics?",
+            "Which year did Audrey adopt the first three of her dogs?",
+            "What type of car did Evan get after his old Prius broke down?",
+            "What type of movies does Nate enjoy watching the most?",
+            "Which team did John sign with on 21 May, 2023?",
+        ] {
+            assert!(
+                !query_requests_multiple_evidence(query),
+                "the query requests one answer: {query}"
+            );
+        }
+    }
+
+    #[test]
+    fn singular_query_keeps_only_the_highest_ranked_item_per_source_group() {
+        let mut primary = episode_item("best match");
+        primary.source_episode = "episode:primary".to_string();
+        let mut distractor = episode_item("weaker related match");
+        distractor.source_episode = "episode:distractor".to_string();
+        let mut separate_session = episode_item("different conversation session");
+        separate_session.source_episode = "episode:separate".to_string();
+        let groups = HashMap::from([
+            ("episode:primary".to_string(), "session:a".to_string()),
+            ("episode:distractor".to_string(), "session:a".to_string()),
+            ("episode:separate".to_string(), "session:b".to_string()),
+        ]);
+
+        let selected = retain_best_source_group_items(
+            vec![primary, distractor, separate_session],
+            &groups,
+            &HashSet::new(),
+            &HashMap::new(),
+        );
+
+        assert_eq!(
+            selected
+                .iter()
+                .map(|item| item.source_episode.as_str())
+                .collect::<Vec<_>>(),
+            ["episode:primary", "episode:separate"]
+        );
+    }
+
+    #[test]
+    fn direct_source_question_bundle_survives_singular_group_deduplication() {
+        let mut answer = episode_item("answer");
+        answer.source_episode = "episode:answer".to_string();
+        let mut antecedent = episode_item("query related antecedent");
+        antecedent.source_episode = "episode:antecedent".to_string();
+        let mut distractor = episode_item("unrelated source turn");
+        distractor.source_episode = "episode:distractor".to_string();
+        let groups = HashMap::from([
+            ("episode:answer".to_string(), "session:a".to_string()),
+            ("episode:antecedent".to_string(), "session:a".to_string()),
+            ("episode:distractor".to_string(), "session:a".to_string()),
+        ]);
+        let direct_bundle = HashSet::from([
+            ("session:a".to_string(), "episode:answer".to_string()),
+            ("session:a".to_string(), "episode:antecedent".to_string()),
+        ]);
+
+        let selected = retain_best_source_group_items(
+            vec![answer, antecedent, distractor],
+            &groups,
+            &direct_bundle,
+            &HashMap::new(),
+        );
+
+        assert_eq!(
+            selected
+                .iter()
+                .map(|item| item.source_episode.as_str())
+                .collect::<Vec<_>>(),
+            ["episode:answer", "episode:antecedent"]
+        );
+    }
+
+    #[test]
+    fn direct_lexical_evidence_precedes_a_higher_scoring_graph_neighbor_in_the_same_group() {
+        let mut graph_neighbor = episode_item("semantically related graph neighbor");
+        graph_neighbor.source_episode = "episode:graph".to_string();
+        graph_neighbor.retrieval_tier = Some("graph".to_string());
+        graph_neighbor.provenance["retrieval_admission"] = serde_json::json!({"basis": "semantic"});
+        graph_neighbor.provenance["reranking"] = serde_json::json!({"relevance_logit": 1.19});
+
+        let mut direct = episode_item("direct lexical answer");
+        direct.source_episode = "episode:direct".to_string();
+        direct.retrieval_tier = Some("direct".to_string());
+        direct.provenance["retrieval_admission"] = serde_json::json!({
+            "basis": "lexical",
+            "matched_content_terms": ["charity", "race", "awareness"]
+        });
+        direct.provenance["reranking"] = serde_json::json!({"relevance_logit": 1.02});
+
+        let groups = HashMap::from([
+            ("episode:graph".to_string(), "session:a".to_string()),
+            ("episode:direct".to_string(), "session:a".to_string()),
+        ]);
+
+        let selected = retain_best_source_group_items(
+            vec![graph_neighbor, direct],
+            &groups,
+            &HashSet::new(),
+            &HashMap::new(),
+        );
+
+        assert_eq!(
+            selected
+                .iter()
+                .map(|item| item.source_episode.as_str())
+                .collect::<Vec<_>>(),
+            ["episode:direct"]
+        );
+    }
+
+    #[test]
     fn selected_context_carries_episode_fallback_decision() {
         let selection = SelectedContext {
             selected: Vec::new(),
             ranked_candidates: Vec::new(),
             episode_fallback_items: Vec::new(),
+            episode_fallback_source_anchors: Vec::new(),
             prefer_episode_content: true,
         };
         assert!(selection.prefer_episode_content);
@@ -938,6 +2023,20 @@ mod tests {
 
     fn query_terms() -> Vec<String> {
         crate::shared::search::search_query_terms("platform planning notes july 2025")
+    }
+
+    #[test]
+    fn source_answer_must_belong_to_a_named_subject_in_the_query() {
+        let subjects = vec!["evan".to_string()];
+
+        assert!(episode_speaker_matches_subject(
+            "Evan: We went to the Rockies.",
+            &subjects
+        ));
+        assert!(!episode_speaker_matches_subject(
+            "Sam: We went to the Rockies.",
+            &subjects
+        ));
     }
 
     #[test]

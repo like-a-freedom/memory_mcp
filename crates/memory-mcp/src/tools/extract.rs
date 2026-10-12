@@ -148,6 +148,7 @@ async fn extract_inner<T: ToolContext>(
     match ctx
         .ingest(
             IngestRequest {
+                source_context: None,
                 source_type,
                 source_id,
                 content,

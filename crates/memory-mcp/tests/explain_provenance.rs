@@ -232,6 +232,7 @@ async fn explain_includes_linked_episodes_via_shared_entity() {
     let episode_a_id = IngestCapability::ingest_from_service(
         &service,
         memory_mcp::models::IngestRequest {
+            source_context: None,
             source_type: "email".into(),
             source_id: "linked-ep-a".into(),
             content: "Alice Smith closed a deal".into(),
@@ -264,6 +265,7 @@ async fn explain_includes_linked_episodes_via_shared_entity() {
     let episode_b_id = IngestCapability::ingest_from_service(
         &service,
         memory_mcp::models::IngestRequest {
+            source_context: None,
             source_type: "email".into(),
             source_id: "linked-ep-b".into(),
             content: "Alice Smith presented results".into(),
@@ -394,6 +396,7 @@ async fn explain_returns_all_allowed_lineage_without_restricted_sources() {
         let episode_id = IngestCapability::ingest_from_service(
             &service,
             IngestRequest {
+                source_context: None,
                 source_type: "email".into(),
                 source_id: key.into(),
                 content: content.into(),
@@ -657,6 +660,7 @@ async fn explain_batch_shares_graph_insights() {
     let ep_a = IngestCapability::ingest_from_service(
         &service,
         IngestRequest {
+            source_context: None,
             source_type: "note".into(),
             source_id: "batch-ep-a".into(),
             content: "Alice met Bob".into(),
@@ -687,6 +691,7 @@ async fn explain_batch_shares_graph_insights() {
     let ep_b = IngestCapability::ingest_from_service(
         &service,
         IngestRequest {
+            source_context: None,
             source_type: "note".into(),
             source_id: "batch-ep-b".into(),
             content: "Bob talked to Alice again".into(),
@@ -768,6 +773,7 @@ async fn explain_batch_mixed_with_and_without_fact_ids() {
     let ep_with = IngestCapability::ingest_from_service(
         &service,
         IngestRequest {
+            source_context: None,
             source_type: "note".into(),
             source_id: "mixed-ep-1".into(),
             content: "Fact content here".into(),
@@ -801,6 +807,7 @@ async fn explain_batch_mixed_with_and_without_fact_ids() {
     let ep_without = IngestCapability::ingest_from_service(
         &service,
         IngestRequest {
+            source_context: None,
             source_type: "note".into(),
             source_id: "mixed-ep-2".into(),
             content: "Just an episode, no fact".into(),

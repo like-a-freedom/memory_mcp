@@ -19,6 +19,7 @@ pub(crate) enum RetrievalTier {
     Direct,
     AliasExpanded,
     TemporalExpanded,
+    SourceExpanded,
     GraphExpanded,
     SemanticExpanded,
     EpisodeFallback,
@@ -86,9 +87,11 @@ pub(crate) struct CommunityFactCandidate {
 pub(crate) enum AdmissionBasis {
     Browse,
     CalendarPeriod,
+    CalendarAcquisition,
     Lexical,
     Timeline,
     Reference,
+    QualifiedSourceEpisode,
     Entity,
     Semantic,
     GraphRelationship,
@@ -101,9 +104,11 @@ impl AdmissionBasis {
         match self {
             Self::Browse => "browse",
             Self::CalendarPeriod => "calendar_period",
+            Self::CalendarAcquisition => "calendar_acquisition",
             Self::Lexical => "lexical",
             Self::Timeline => "timeline",
             Self::Reference => "reference",
+            Self::QualifiedSourceEpisode => "qualified_source_episode",
             Self::Entity => "entity",
             Self::Semantic => "semantic",
             Self::GraphRelationship => "graph_relationship",
@@ -125,6 +130,7 @@ impl RetrievalTier {
             Self::Direct => "direct",
             Self::AliasExpanded => "alias",
             Self::TemporalExpanded => "temporal",
+            Self::SourceExpanded => "source",
             Self::GraphExpanded => "graph",
             Self::SemanticExpanded => "semantic",
             Self::EpisodeFallback => "fallback",
@@ -137,8 +143,9 @@ impl RetrievalTier {
             Self::EpisodeFallback => 1,
             Self::AliasExpanded => 2,
             Self::TemporalExpanded => 3,
-            Self::GraphExpanded => 4,
-            Self::SemanticExpanded => 5,
+            Self::SourceExpanded => 4,
+            Self::GraphExpanded => 5,
+            Self::SemanticExpanded => 6,
         }
     }
 }

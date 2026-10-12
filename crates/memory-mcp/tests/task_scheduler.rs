@@ -160,6 +160,7 @@ async fn durable_extract_uses_the_configured_anno_input_limit()
     let episode_id = IngestCapability::ingest_from_service(
         &service,
         memory_mcp::models::IngestRequest {
+            source_context: None,
             source_type: "meeting".to_string(),
             source_id: "durable-anno-limit".to_string(),
             content: "Alice Smith met Bob Jones".to_string(),

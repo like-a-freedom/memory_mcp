@@ -1335,6 +1335,8 @@ mod tests {
                 t_ref: "2026-01-01T00:00:00Z".to_string(),
                 t_ingested: None,
                 policy_tags: Vec::new(),
+                source_group: None,
+                source_position: None,
             }))
             .await
             .expect("MCP ingest should succeed")
@@ -2074,6 +2076,7 @@ mod tests {
         let stale_episode_id = crate::service::memory_container_shims::memory_capabilities_ingest::IngestCapability::ingest_from_service(
             mcp.service().as_ref(),
             IngestRequest {
+                source_context: None,
                 source_type: "meeting".to_string(),
                 source_id: "stale-lifecycle-episode".to_string(),
                 content: "Legacy launch plan that should be archived.".to_string(),

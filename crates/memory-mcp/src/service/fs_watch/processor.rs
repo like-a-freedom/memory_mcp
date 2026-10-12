@@ -204,6 +204,7 @@ async fn process_with_deps(
             let episode_id = ingestion_service
                 .ingest_with_metadata(
                     crate::models::IngestRequest {
+                        source_context: None,
                         source_type,
                         source_id: format!("{lineage}:{content_hash}"),
                         content: prepared_content,

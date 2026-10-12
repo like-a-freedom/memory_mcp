@@ -6,7 +6,7 @@ use serde_json::json;
 
 use crate::error::MemoryError;
 use crate::logging::LogLevel;
-use crate::models::{AccessPayload, IngestRequest};
+use crate::models::{AccessPayload, IngestRequest, SourceContext};
 use crate::tools::context::{ToolContext, ToolEvent};
 use crate::tools::params::IngestParams;
 use crate::tools::parsers::parse_datetime;
@@ -40,8 +40,18 @@ async fn ingest_inner<T: ToolContext>(
         ))
     })?;
     let t_ingested = params.t_ingested.as_ref().and_then(|s| parse_datetime(s));
+    let source_context = match (params.source_group, params.source_position) {
+        (Some(group), Some(position)) => Some(SourceContext { group, position }),
+        (None, None) => None,
+        _ => {
+            return Err(MemoryError::Validation(
+                "source_group and source_position must be supplied together".into(),
+            ));
+        }
+    };
     let access = AccessPayload::default();
     let request = IngestRequest {
+        source_context,
         source_type: params.source_type,
         source_id: params.source_id,
         content: params.content,
@@ -190,6 +200,8 @@ mod tests {
             t_ref: "2026-01-01T00:00:00Z".to_string(),
             t_ingested: None,
             policy_tags: Vec::new(),
+            source_group: None,
+            source_position: None,
         }
     }
 

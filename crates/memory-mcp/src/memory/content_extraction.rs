@@ -665,6 +665,7 @@ mod tests {
         let expected_hash = hex::encode(Sha256::digest(canonical.to_string_lossy().as_bytes()));
 
         let prepared = prepare_ingest_request(IngestRequest {
+            source_context: None,
             source_type: "document".to_string(),
             source_id: "caller-provided".to_string(),
             content: file_path.to_string_lossy().into_owned(),
@@ -690,6 +691,7 @@ mod tests {
         std::fs::write(&file_path, content).expect("long fixture file should be writable");
 
         let prepared = prepare_ingest_request(IngestRequest {
+            source_context: None,
             source_type: "document".to_string(),
             source_id: "caller-provided".to_string(),
             content: file_path.to_string_lossy().into_owned(),
@@ -1051,6 +1053,7 @@ mod tests {
     #[test]
     fn apply_prepared_content_updates_request_when_some() {
         let mut req = IngestRequest {
+            source_context: None,
             source_type: "test".to_string(),
             source_id: "original".to_string(),
             content: "old".to_string(),
@@ -1083,6 +1086,7 @@ mod tests {
     #[test]
     fn apply_prepared_content_returns_false_when_none() {
         let mut req = IngestRequest {
+            source_context: None,
             source_type: "test".to_string(),
             source_id: "id".to_string(),
             content: "old".to_string(),

@@ -12,6 +12,8 @@ pub async fn run(service: &MemoryService, args: IngestArgs) -> Result<(), Memory
         t_ref: args.t_ref,
         t_ingested: args.t_ingested,
         policy_tags: args.policy_tags,
+        source_group: None,
+        source_position: None,
     };
     let response = crate::tools::ingest(service, params).await?;
     write_response(&response).map_err(|err| MemoryError::Transient(err.to_string()))?;

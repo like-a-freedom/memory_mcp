@@ -23,6 +23,10 @@ pub struct IngestParams {
     /// Policy tags (optional)
     #[serde(default)]
     pub policy_tags: Vec<String>,
+    /// Producer-declared identity of an ordered source stream (optional).
+    pub source_group: Option<String>,
+    /// One-based turn position within source_group (optional; supply both).
+    pub source_position: Option<u64>,
 }
 
 /// Parameters for the `explain` tool.
@@ -139,6 +143,8 @@ mod tests {
             "t_ref",
             "t_ingested",
             "policy_tags",
+            "source_group",
+            "source_position",
         ] {
             assert!(properties.contains_key(key), "missing property {key}");
         }
@@ -149,6 +155,21 @@ mod tests {
                 "unexpected camelCase property {key}"
             );
         }
+    }
+
+    #[test]
+    fn ingest_params_accepts_ordered_source_stream() {
+        let params: IngestParams = serde_json::from_value(serde_json::json!({
+            "source_type": "conversation",
+            "source_id": "dialogue:1",
+            "content": "A turn",
+            "t_ref": "2026-01-01T00:00:00Z",
+            "source_group": "dialogue",
+            "source_position": 1
+        }))
+        .expect("source order is part of the ingest contract");
+        assert_eq!(params.source_group.as_deref(), Some("dialogue"));
+        assert_eq!(params.source_position, Some(1));
     }
 
     #[test]

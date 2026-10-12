@@ -122,11 +122,6 @@ impl EmbeddingService {
         let Some(signature) = provider.reranking_signature().map(str::to_owned) else {
             return provider.rerank(query, documents).await;
         };
-        if !provider.reranking_admission_floor().is_finite() {
-            return Err(MemoryError::Validation(
-                "nonfinite reranking boundary".into(),
-            ));
-        }
         let keys = documents
             .iter()
             .map(|doc| relevance_key(&signature, query, doc))

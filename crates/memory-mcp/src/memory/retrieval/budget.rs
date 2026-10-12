@@ -20,10 +20,20 @@ pub(super) fn should_prefer_episode_content(
         return false;
     }
 
-    if selected_facts
-        .iter()
-        .any(|fact| fact.retrieval_tier == RetrievalTier::GraphExpanded)
-    {
+    if episode_items.iter().any(|episode| {
+        selected_facts
+            .iter()
+            .any(|fact| fact.fact.source_episode == episode.source_episode)
+    }) {
+        return false;
+    }
+
+    if selected_facts.iter().any(|fact| {
+        matches!(
+            fact.retrieval_tier,
+            RetrievalTier::SourceExpanded | RetrievalTier::GraphExpanded
+        )
+    }) {
         return false;
     }
 
@@ -53,7 +63,29 @@ pub(super) fn should_prefer_episode_content(
         (best_fact_reranker, best_episode_reranker)
         && fact_signature == episode_signature
     {
-        return episode_score > fact_score;
+        let episode_floor = episode_items
+            .iter()
+            .filter(|item| {
+                item.provenance
+                    .get("reranking")
+                    .and_then(reranker_score)
+                    .is_some_and(|(signature, score)| {
+                        signature == episode_signature && score == episode_score
+                    })
+            })
+            .filter_map(|item| {
+                item.provenance
+                    .get("reranking")
+                    .and_then(|evidence| evidence.get("admission_floor"))
+                    .and_then(serde_json::Value::as_f64)
+            })
+            .max_by(f64::total_cmp);
+        if episode_floor.is_some_and(|floor| episode_score < floor) {
+            return false;
+        }
+        if episode_score > fact_score {
+            return true;
+        }
     }
 
     let best_fact_overlap = selected_facts
@@ -256,6 +288,83 @@ mod tests {
     }
 
     #[test]
+    fn prefers_false_when_source_expanded_facts_present() {
+        let fact = make_fact("coffee brewing guide");
+        let ranked = make_ranked(fact, RetrievalTier::SourceExpanded);
+        let episodes = vec![make_episode_item("coffee brewing techniques")];
+        assert!(!should_prefer_episode_content(
+            &[ranked],
+            &episodes,
+            &["coffee".to_string()]
+        ));
+    }
+
+    #[test]
+    fn prefers_a_relevant_episode_that_covers_more_query_terms_than_its_best_fact() {
+        let mut ranked = make_ranked(
+            make_fact("HTTP body diagnostics record buffered bytes"),
+            RetrievalTier::Direct,
+        );
+        ranked.evidence.reranking = Some(serde_json::json!({
+            "model_signature": "reranksig:test",
+            "relevance_logit": 3.0,
+            "admission_floor": 0.0,
+        }));
+        let mut episode = make_episode_item(
+            "HTTP body measurements and diagnostics include buffered bytes and retained resources",
+        );
+        episode.source_episode = "episode:other".into();
+        episode.provenance["reranking"] = serde_json::json!({
+            "model_signature": "reranksig:test",
+            "relevance_logit": 0.5,
+            "admission_floor": 0.0,
+        });
+
+        assert!(should_prefer_episode_content(
+            &[ranked],
+            &[episode],
+            &[
+                "http".to_string(),
+                "body".to_string(),
+                "measurements".to_string(),
+                "diagnostics".to_string(),
+                "retained".to_string(),
+                "resources".to_string(),
+            ]
+        ));
+    }
+
+    #[test]
+    fn prefers_ranked_facts_over_raw_fallback_from_the_same_source_episode() {
+        let mut ranked = make_ranked(
+            make_fact("HTTP body diagnostics record buffered bytes"),
+            RetrievalTier::Direct,
+        );
+        ranked.evidence.reranking = Some(serde_json::json!({
+            "model_signature": "reranksig:test",
+            "relevance_logit": 0.2,
+            "admission_floor": 0.0,
+        }));
+        let mut episode =
+            make_episode_item("HTTP body measurements and diagnostics include buffered bytes");
+        episode.provenance["reranking"] = serde_json::json!({
+            "model_signature": "reranksig:test",
+            "relevance_logit": 1.0,
+            "admission_floor": 0.0,
+        });
+
+        assert!(!should_prefer_episode_content(
+            &[ranked],
+            &[episode],
+            &[
+                "http".to_string(),
+                "body".to_string(),
+                "diagnostics".to_string()
+            ]
+        ));
+    }
+
+    #[test]
     fn prefers_false_when_episode_overlap_not_better() {
         let fact = make_fact("coffee brewing guide for beginners");
         let ranked = make_ranked(fact, RetrievalTier::Direct);
@@ -271,7 +380,9 @@ mod tests {
     fn prefers_true_when_episode_coverage_exceeds_fact() {
         let fact = make_fact("coffee");
         let ranked = make_ranked(fact, RetrievalTier::Direct);
-        let episodes = vec![make_episode_item("coffee brewing techniques from ethiopia")];
+        let mut episode = make_episode_item("coffee brewing techniques from ethiopia");
+        episode.source_episode = "episode:other".into();
+        let episodes = vec![episode];
         assert!(should_prefer_episode_content(
             &[ranked],
             &episodes,
@@ -349,7 +460,7 @@ mod tests {
             "model_signature": "reranker-v1",
             "relevance_logit": 2.2,
         }));
-        let episode = AssembledContextItem {
+        let mut episode = AssembledContextItem {
             content: "Jon describes dancing as a passion.".to_string(),
             provenance: serde_json::json!({
                 "reranking": {
@@ -359,6 +470,7 @@ mod tests {
             }),
             ..make_episode_item("Jon describes dancing as a passion.")
         };
+        episode.source_episode = "episode:other".into();
 
         assert!(should_prefer_episode_content(
             &[fact],

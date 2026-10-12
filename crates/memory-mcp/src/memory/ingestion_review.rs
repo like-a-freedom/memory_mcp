@@ -48,6 +48,7 @@ pub async fn prepare_ingestion_review(
             crate::memory::capabilities::ingest::IngestCapability::ingest_with(
                 &deps.ingest,
                 IngestRequest {
+                    source_context: None,
                     source_type: "app_ingestion_review".to_string(),
                     source_id: format!(
                         "ingestion-review:{}",

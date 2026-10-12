@@ -276,6 +276,7 @@ impl AgentMemoryStoreBackend for ProductionCaptureBackend {
     ) -> Result<String, MemoryError> {
         let content = event.content.clone().unwrap_or_default();
         let request = crate::models::IngestRequest {
+            source_context: None,
             source_type: "agent_lifecycle".to_string(),
             source_id: event.task_fingerprint.clone(),
             content,

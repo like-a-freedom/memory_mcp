@@ -78,6 +78,7 @@ impl ActionGroundingSuite {
         let episode_id = match IngestCapability::ingest_from_service(
             &service,
             memory_mcp::models::IngestRequest {
+                source_context: None,
                 source_type: "email".into(),
                 source_id: format!("grounding-{mode_name}"),
                 content: content.into(),

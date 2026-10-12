@@ -25,6 +25,7 @@ async fn stored_extraction_logs_its_lifecycle_without_ingesting_again() {
     let episode_id = IngestCapability::ingest_from_service(
         &service,
         IngestRequest {
+            source_context: None,
             source_type: "note".into(),
             source_id: "stored-reporting".into(),
             content: "I will finish it by Friday. ARR $2M".into(),

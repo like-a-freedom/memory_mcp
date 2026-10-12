@@ -1,0 +1,6045 @@
+{
+  "schema_version": "memory-mcp-eval/v2",
+  "run_id": "run-1791778630",
+  "profile": "pr",
+  "started_at": "2026-10-12T04:17:10.841918Z",
+  "duration_ms": 239015,
+  "expected_case_ids": [],
+  "expected_cases": [
+    {
+      "suite_id": "claim-reconciliation",
+      "case_id": "cr-001"
+    },
+    {
+      "suite_id": "claim-reconciliation",
+      "case_id": "cr-002"
+    },
+    {
+      "suite_id": "claim-reconciliation",
+      "case_id": "cr-003"
+    },
+    {
+      "suite_id": "claim-reconciliation",
+      "case_id": "cr-004"
+    },
+    {
+      "suite_id": "claim-reconciliation",
+      "case_id": "cr-005"
+    },
+    {
+      "suite_id": "claim-reconciliation",
+      "case_id": "cr-006"
+    },
+    {
+      "suite_id": "claim-reconciliation",
+      "case_id": "cr-007"
+    },
+    {
+      "suite_id": "claim-reconciliation",
+      "case_id": "cr-008"
+    },
+    {
+      "suite_id": "claim-reconciliation",
+      "case_id": "cr-009"
+    },
+    {
+      "suite_id": "claim-reconciliation",
+      "case_id": "cr-010"
+    },
+    {
+      "suite_id": "claim-reconciliation",
+      "case_id": "cr-011"
+    },
+    {
+      "suite_id": "claim-reconciliation",
+      "case_id": "cr-012"
+    },
+    {
+      "suite_id": "claim-reconciliation",
+      "case_id": "cr-013"
+    },
+    {
+      "suite_id": "claim-reconciliation",
+      "case_id": "cr-014"
+    },
+    {
+      "suite_id": "claim-reconciliation",
+      "case_id": "cr-015"
+    },
+    {
+      "suite_id": "claim-reconciliation",
+      "case_id": "cr-016"
+    },
+    {
+      "suite_id": "claim-reconciliation",
+      "case_id": "cr-017"
+    },
+    {
+      "suite_id": "claim-reconciliation",
+      "case_id": "cr-018"
+    },
+    {
+      "suite_id": "claim-reconciliation",
+      "case_id": "cr-019"
+    },
+    {
+      "suite_id": "claim-reconciliation",
+      "case_id": "cr-020"
+    },
+    {
+      "suite_id": "claim-reconciliation",
+      "case_id": "cr-022"
+    },
+    {
+      "suite_id": "claim-reconciliation",
+      "case_id": "cr-023"
+    },
+    {
+      "suite_id": "claim-reconciliation",
+      "case_id": "cr-024"
+    },
+    {
+      "suite_id": "claim-reconciliation",
+      "case_id": "cr-025"
+    },
+    {
+      "suite_id": "claim-reconciliation",
+      "case_id": "cr-026"
+    },
+    {
+      "suite_id": "claim-reconciliation",
+      "case_id": "cr-027"
+    },
+    {
+      "suite_id": "claim-reconciliation",
+      "case_id": "cr-028"
+    },
+    {
+      "suite_id": "claim-reconciliation",
+      "case_id": "cr-029"
+    },
+    {
+      "suite_id": "claim-reconciliation",
+      "case_id": "cr-030"
+    },
+    {
+      "suite_id": "claim-reconciliation",
+      "case_id": "cr-031"
+    },
+    {
+      "suite_id": "claim-reconciliation",
+      "case_id": "cr-032"
+    },
+    {
+      "suite_id": "claim-reconciliation",
+      "case_id": "cr-033"
+    },
+    {
+      "suite_id": "claim-reconciliation",
+      "case_id": "cr-034"
+    },
+    {
+      "suite_id": "claim-reconciliation",
+      "case_id": "cr-035"
+    },
+    {
+      "suite_id": "claim-reconciliation",
+      "case_id": "cr-036"
+    },
+    {
+      "suite_id": "claim-reconciliation",
+      "case_id": "cr-037"
+    },
+    {
+      "suite_id": "claim-reconciliation",
+      "case_id": "cr-038"
+    },
+    {
+      "suite_id": "claim-reconciliation",
+      "case_id": "cr-039"
+    },
+    {
+      "suite_id": "claim-reconciliation",
+      "case_id": "cr-040"
+    },
+    {
+      "suite_id": "claim-reconciliation",
+      "case_id": "cr-041"
+    },
+    {
+      "suite_id": "claim-reconciliation",
+      "case_id": "cr-042"
+    },
+    {
+      "suite_id": "external-retrieval",
+      "case_id": "longmemeval-cleaned:eval-mini-001"
+    },
+    {
+      "suite_id": "external-retrieval",
+      "case_id": "longmemeval-cleaned:eval-mini-002"
+    },
+    {
+      "suite_id": "extraction",
+      "case_id": "ext-001"
+    },
+    {
+      "suite_id": "extraction",
+      "case_id": "ext-002"
+    },
+    {
+      "suite_id": "extraction",
+      "case_id": "ext-003"
+    },
+    {
+      "suite_id": "extraction",
+      "case_id": "ext-004"
+    },
+    {
+      "suite_id": "extraction",
+      "case_id": "ext-005"
+    },
+    {
+      "suite_id": "extraction",
+      "case_id": "ext-006"
+    },
+    {
+      "suite_id": "extraction",
+      "case_id": "ext-007"
+    },
+    {
+      "suite_id": "extraction",
+      "case_id": "ext-008"
+    },
+    {
+      "suite_id": "extraction",
+      "case_id": "ext-009"
+    },
+    {
+      "suite_id": "local-retrieval",
+      "case_id": "first-person-rescue-profile"
+    },
+    {
+      "suite_id": "local-retrieval",
+      "case_id": "graph-anchor-alice-neighbor"
+    },
+    {
+      "suite_id": "local-retrieval",
+      "case_id": "ret-001"
+    },
+    {
+      "suite_id": "local-retrieval",
+      "case_id": "ret-002"
+    },
+    {
+      "suite_id": "local-retrieval",
+      "case_id": "ret-003"
+    },
+    {
+      "suite_id": "local-retrieval",
+      "case_id": "ret-004"
+    },
+    {
+      "suite_id": "local-retrieval",
+      "case_id": "ret-005"
+    },
+    {
+      "suite_id": "local-retrieval",
+      "case_id": "ret-006"
+    },
+    {
+      "suite_id": "local-retrieval",
+      "case_id": "ret-007"
+    },
+    {
+      "suite_id": "local-retrieval",
+      "case_id": "ret-008"
+    },
+    {
+      "suite_id": "local-retrieval",
+      "case_id": "ret-009"
+    },
+    {
+      "suite_id": "local-retrieval",
+      "case_id": "ret-010"
+    },
+    {
+      "suite_id": "local-retrieval",
+      "case_id": "ret-011"
+    },
+    {
+      "suite_id": "local-retrieval",
+      "case_id": "ret-012"
+    },
+    {
+      "suite_id": "local-retrieval",
+      "case_id": "ret-013"
+    },
+    {
+      "suite_id": "local-retrieval",
+      "case_id": "ret-014"
+    },
+    {
+      "suite_id": "local-retrieval",
+      "case_id": "ret-015"
+    },
+    {
+      "suite_id": "local-retrieval",
+      "case_id": "ret-016"
+    },
+    {
+      "suite_id": "local-retrieval",
+      "case_id": "ret-017"
+    },
+    {
+      "suite_id": "local-retrieval",
+      "case_id": "ret-018"
+    },
+    {
+      "suite_id": "local-retrieval",
+      "case_id": "ret-019"
+    },
+    {
+      "suite_id": "local-retrieval",
+      "case_id": "ret-020"
+    },
+    {
+      "suite_id": "local-retrieval",
+      "case_id": "ret-021"
+    },
+    {
+      "suite_id": "local-retrieval",
+      "case_id": "ret-022"
+    },
+    {
+      "suite_id": "local-retrieval",
+      "case_id": "ret-023"
+    },
+    {
+      "suite_id": "local-retrieval",
+      "case_id": "ret-024"
+    },
+    {
+      "suite_id": "local-retrieval",
+      "case_id": "ret-025"
+    },
+    {
+      "suite_id": "local-retrieval",
+      "case_id": "ret-026"
+    },
+    {
+      "suite_id": "local-retrieval",
+      "case_id": "ret-027"
+    },
+    {
+      "suite_id": "local-retrieval",
+      "case_id": "ret-028"
+    },
+    {
+      "suite_id": "local-retrieval",
+      "case_id": "ret-029"
+    },
+    {
+      "suite_id": "local-retrieval",
+      "case_id": "ret-030"
+    },
+    {
+      "suite_id": "local-retrieval",
+      "case_id": "ret-031"
+    },
+    {
+      "suite_id": "local-retrieval",
+      "case_id": "ret-032"
+    },
+    {
+      "suite_id": "local-retrieval",
+      "case_id": "ret-033"
+    },
+    {
+      "suite_id": "local-retrieval",
+      "case_id": "ret-034"
+    },
+    {
+      "suite_id": "local-retrieval",
+      "case_id": "ret-035"
+    },
+    {
+      "suite_id": "local-retrieval",
+      "case_id": "ret-036"
+    },
+    {
+      "suite_id": "local-retrieval",
+      "case_id": "ret-037"
+    },
+    {
+      "suite_id": "local-retrieval",
+      "case_id": "ret-038"
+    },
+    {
+      "suite_id": "local-retrieval",
+      "case_id": "ret-039"
+    },
+    {
+      "suite_id": "local-retrieval",
+      "case_id": "ret-040"
+    },
+    {
+      "suite_id": "local-retrieval",
+      "case_id": "ret-041"
+    },
+    {
+      "suite_id": "local-retrieval",
+      "case_id": "ret-042"
+    },
+    {
+      "suite_id": "local-retrieval",
+      "case_id": "ret-043"
+    },
+    {
+      "suite_id": "local-retrieval",
+      "case_id": "ret-044"
+    },
+    {
+      "suite_id": "local-retrieval",
+      "case_id": "ret-045"
+    },
+    {
+      "suite_id": "local-retrieval",
+      "case_id": "ret-046"
+    },
+    {
+      "suite_id": "local-retrieval",
+      "case_id": "ret-047"
+    },
+    {
+      "suite_id": "local-retrieval",
+      "case_id": "ret-048"
+    },
+    {
+      "suite_id": "local-retrieval",
+      "case_id": "ret-049"
+    },
+    {
+      "suite_id": "local-retrieval",
+      "case_id": "ret-050"
+    },
+    {
+      "suite_id": "local-retrieval",
+      "case_id": "ret-056"
+    },
+    {
+      "suite_id": "local-retrieval",
+      "case_id": "ret-057"
+    },
+    {
+      "suite_id": "local-retrieval",
+      "case_id": "ret-058"
+    },
+    {
+      "suite_id": "local-retrieval",
+      "case_id": "ret-059"
+    },
+    {
+      "suite_id": "local-retrieval",
+      "case_id": "ret-060"
+    },
+    {
+      "suite_id": "local-retrieval",
+      "case_id": "ret-061"
+    },
+    {
+      "suite_id": "local-retrieval",
+      "case_id": "ret-062"
+    },
+    {
+      "suite_id": "local-retrieval",
+      "case_id": "ret-063"
+    },
+    {
+      "suite_id": "local-retrieval",
+      "case_id": "timeline-auto-atlas-history"
+    },
+    {
+      "suite_id": "retrieval-quality",
+      "case_id": "historical-observed-cutoff"
+    },
+    {
+      "suite_id": "retrieval-quality",
+      "case_id": "http-task-16"
+    },
+    {
+      "suite_id": "retrieval-quality",
+      "case_id": "http-task-paraphrase"
+    },
+    {
+      "suite_id": "retrieval-quality",
+      "case_id": "http-task-short"
+    },
+    {
+      "suite_id": "retrieval-quality",
+      "case_id": "locomo-conv-26-000"
+    },
+    {
+      "suite_id": "retrieval-quality",
+      "case_id": "locomo-conv-26-082"
+    },
+    {
+      "suite_id": "retrieval-quality",
+      "case_id": "locomo-conv-30-000"
+    },
+    {
+      "suite_id": "retrieval-quality",
+      "case_id": "locomo-conv-30-002"
+    },
+    {
+      "suite_id": "retrieval-quality",
+      "case_id": "locomo-conv-41-001"
+    },
+    {
+      "suite_id": "retrieval-quality",
+      "case_id": "locomo-conv-41-065"
+    },
+    {
+      "suite_id": "retrieval-quality",
+      "case_id": "locomo-conv-42-002"
+    },
+    {
+      "suite_id": "retrieval-quality",
+      "case_id": "locomo-conv-42-096"
+    },
+    {
+      "suite_id": "retrieval-quality",
+      "case_id": "locomo-conv-43-071"
+    },
+    {
+      "suite_id": "retrieval-quality",
+      "case_id": "locomo-conv-44-000"
+    },
+    {
+      "suite_id": "retrieval-quality",
+      "case_id": "locomo-conv-44-061"
+    },
+    {
+      "suite_id": "retrieval-quality",
+      "case_id": "locomo-conv-47-001"
+    },
+    {
+      "suite_id": "retrieval-quality",
+      "case_id": "locomo-conv-47-067"
+    },
+    {
+      "suite_id": "retrieval-quality",
+      "case_id": "locomo-conv-48-000"
+    },
+    {
+      "suite_id": "retrieval-quality",
+      "case_id": "locomo-conv-48-015"
+    },
+    {
+      "suite_id": "retrieval-quality",
+      "case_id": "locomo-conv-49-002"
+    },
+    {
+      "suite_id": "retrieval-quality",
+      "case_id": "locomo-conv-49-083"
+    },
+    {
+      "suite_id": "retrieval-quality",
+      "case_id": "locomo-conv-50-001"
+    },
+    {
+      "suite_id": "retrieval-quality",
+      "case_id": "locomo-conv-50-071"
+    },
+    {
+      "suite_id": "retrieval-quality",
+      "case_id": "logging-config"
+    },
+    {
+      "suite_id": "retrieval-quality",
+      "case_id": "logging-correlation"
+    },
+    {
+      "suite_id": "retrieval-quality",
+      "case_id": "logging-levels"
+    },
+    {
+      "suite_id": "retrieval-quality",
+      "case_id": "logging-original"
+    },
+    {
+      "suite_id": "retrieval-quality",
+      "case_id": "logging-russian"
+    },
+    {
+      "suite_id": "retrieval-quality",
+      "case_id": "logging-sink"
+    },
+    {
+      "suite_id": "retrieval-quality",
+      "case_id": "policy-denied-abstention"
+    },
+    {
+      "suite_id": "retrieval-quality",
+      "case_id": "policy-public-evidence"
+    },
+    {
+      "suite_id": "retrieval-quality",
+      "case_id": "qualified-other-project"
+    },
+    {
+      "suite_id": "retrieval-quality",
+      "case_id": "timeline-atlas-q1-cross-project-abstention"
+    },
+    {
+      "suite_id": "retrieval-quality",
+      "case_id": "timeline-atlas-q2-reverse-quarter"
+    },
+    {
+      "suite_id": "retrieval-quality",
+      "case_id": "unknown-database"
+    },
+    {
+      "suite_id": "retrieval-quality",
+      "case_id": "unknown-task"
+    },
+    {
+      "suite_id": "retrieval-quality",
+      "case_id": "unknown-url"
+    }
+  ],
+  "outcomes": [
+    {
+      "case_key": {
+        "suite_id": "claim-reconciliation",
+        "case_id": "cr-001"
+      },
+      "mode": "end_to_end",
+      "split": "development",
+      "label_trust": "official",
+      "status": "passed",
+      "metrics": {
+        "expected_contradictions": 1.0,
+        "isolation_violations": 0.0,
+        "matched_persisted_relations": 1.0,
+        "matched_warnings": 1.0,
+        "persisted_isolation_violations": 0.0,
+        "persisted_policy_mismatches": 0.0,
+        "persisted_relations": 1.0,
+        "persisted_unresolved_lineage": 0.0,
+        "predicted_warnings": 1.0,
+        "self_lineage_relations": 0.0,
+        "unresolved_lineage": 0.0
+      },
+      "evidence": {
+        "classification": {
+          "kind": "classification",
+          "true_positives": 1,
+          "false_positives": 0,
+          "false_negatives": 0,
+          "true_negatives": 0
+        }
+      },
+      "failures": [],
+      "duration_ms": 47,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "claim-reconciliation",
+        "case_id": "cr-002"
+      },
+      "mode": "end_to_end",
+      "split": "development",
+      "label_trust": "official",
+      "status": "passed",
+      "metrics": {
+        "expected_contradictions": 0.0,
+        "isolation_violations": 0.0,
+        "matched_persisted_relations": 0.0,
+        "matched_warnings": 0.0,
+        "persisted_isolation_violations": 0.0,
+        "persisted_policy_mismatches": 0.0,
+        "persisted_relations": 0.0,
+        "persisted_unresolved_lineage": 0.0,
+        "predicted_warnings": 0.0,
+        "self_lineage_relations": 0.0,
+        "unresolved_lineage": 0.0
+      },
+      "evidence": {},
+      "failures": [],
+      "duration_ms": 33,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "claim-reconciliation",
+        "case_id": "cr-003"
+      },
+      "mode": "end_to_end",
+      "split": "development",
+      "label_trust": "official",
+      "status": "passed",
+      "metrics": {
+        "expected_contradictions": 0.0,
+        "isolation_violations": 0.0,
+        "matched_persisted_relations": 0.0,
+        "matched_warnings": 0.0,
+        "persisted_isolation_violations": 0.0,
+        "persisted_policy_mismatches": 0.0,
+        "persisted_relations": 0.0,
+        "persisted_unresolved_lineage": 0.0,
+        "predicted_warnings": 0.0,
+        "self_lineage_relations": 0.0,
+        "unresolved_lineage": 0.0
+      },
+      "evidence": {},
+      "failures": [],
+      "duration_ms": 34,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "claim-reconciliation",
+        "case_id": "cr-004"
+      },
+      "mode": "end_to_end",
+      "split": "development",
+      "label_trust": "official",
+      "status": "passed",
+      "metrics": {
+        "expected_contradictions": 0.0,
+        "isolation_violations": 0.0,
+        "matched_persisted_relations": 0.0,
+        "matched_warnings": 0.0,
+        "persisted_isolation_violations": 0.0,
+        "persisted_policy_mismatches": 0.0,
+        "persisted_relations": 0.0,
+        "persisted_unresolved_lineage": 0.0,
+        "predicted_warnings": 0.0,
+        "self_lineage_relations": 0.0,
+        "unresolved_lineage": 0.0
+      },
+      "evidence": {},
+      "failures": [],
+      "duration_ms": 35,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "claim-reconciliation",
+        "case_id": "cr-005"
+      },
+      "mode": "end_to_end",
+      "split": "development",
+      "label_trust": "official",
+      "status": "passed",
+      "metrics": {
+        "expected_contradictions": 0.0,
+        "isolation_violations": 0.0,
+        "matched_persisted_relations": 1.0,
+        "matched_warnings": 0.0,
+        "persisted_isolation_violations": 0.0,
+        "persisted_policy_mismatches": 0.0,
+        "persisted_relations": 1.0,
+        "persisted_unresolved_lineage": 0.0,
+        "predicted_warnings": 0.0,
+        "self_lineage_relations": 0.0,
+        "unresolved_lineage": 0.0
+      },
+      "evidence": {},
+      "failures": [],
+      "duration_ms": 46,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "claim-reconciliation",
+        "case_id": "cr-006"
+      },
+      "mode": "end_to_end",
+      "split": "development",
+      "label_trust": "official",
+      "status": "passed",
+      "metrics": {
+        "expected_contradictions": 0.0,
+        "isolation_violations": 0.0,
+        "matched_persisted_relations": 0.0,
+        "matched_warnings": 0.0,
+        "persisted_isolation_violations": 0.0,
+        "persisted_policy_mismatches": 0.0,
+        "persisted_relations": 0.0,
+        "persisted_unresolved_lineage": 0.0,
+        "predicted_warnings": 0.0,
+        "self_lineage_relations": 0.0,
+        "unresolved_lineage": 0.0
+      },
+      "evidence": {},
+      "failures": [],
+      "duration_ms": 36,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "claim-reconciliation",
+        "case_id": "cr-007"
+      },
+      "mode": "end_to_end",
+      "split": "development",
+      "label_trust": "official",
+      "status": "passed",
+      "metrics": {
+        "expected_contradictions": 0.0,
+        "isolation_violations": 0.0,
+        "matched_persisted_relations": 0.0,
+        "matched_warnings": 0.0,
+        "persisted_isolation_violations": 0.0,
+        "persisted_policy_mismatches": 0.0,
+        "persisted_relations": 0.0,
+        "persisted_unresolved_lineage": 0.0,
+        "predicted_warnings": 0.0,
+        "self_lineage_relations": 1.0,
+        "unresolved_lineage": 0.0
+      },
+      "evidence": {},
+      "failures": [],
+      "duration_ms": 46,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "claim-reconciliation",
+        "case_id": "cr-008"
+      },
+      "mode": "end_to_end",
+      "split": "development",
+      "label_trust": "official",
+      "status": "passed",
+      "metrics": {
+        "expected_contradictions": 0.0,
+        "isolation_violations": 0.0,
+        "matched_persisted_relations": 0.0,
+        "matched_warnings": 0.0,
+        "persisted_isolation_violations": 0.0,
+        "persisted_policy_mismatches": 0.0,
+        "persisted_relations": 0.0,
+        "persisted_unresolved_lineage": 0.0,
+        "predicted_warnings": 0.0,
+        "self_lineage_relations": 1.0,
+        "unresolved_lineage": 0.0
+      },
+      "evidence": {},
+      "failures": [],
+      "duration_ms": 44,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "claim-reconciliation",
+        "case_id": "cr-009"
+      },
+      "mode": "end_to_end",
+      "split": "development",
+      "label_trust": "official",
+      "status": "passed",
+      "metrics": {
+        "expected_contradictions": 0.0,
+        "isolation_violations": 0.0,
+        "matched_persisted_relations": 0.0,
+        "matched_warnings": 0.0,
+        "persisted_isolation_violations": 0.0,
+        "persisted_policy_mismatches": 0.0,
+        "persisted_relations": 0.0,
+        "persisted_unresolved_lineage": 0.0,
+        "predicted_warnings": 0.0,
+        "self_lineage_relations": 0.0,
+        "unresolved_lineage": 0.0
+      },
+      "evidence": {},
+      "failures": [],
+      "duration_ms": 44,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "claim-reconciliation",
+        "case_id": "cr-010"
+      },
+      "mode": "end_to_end",
+      "split": "development",
+      "label_trust": "official",
+      "status": "passed",
+      "metrics": {
+        "expected_contradictions": 0.0,
+        "isolation_violations": 0.0,
+        "matched_persisted_relations": 0.0,
+        "matched_warnings": 0.0,
+        "persisted_isolation_violations": 0.0,
+        "persisted_policy_mismatches": 0.0,
+        "persisted_relations": 0.0,
+        "persisted_unresolved_lineage": 0.0,
+        "predicted_warnings": 0.0,
+        "self_lineage_relations": 0.0,
+        "unresolved_lineage": 0.0
+      },
+      "evidence": {},
+      "failures": [],
+      "duration_ms": 38,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "claim-reconciliation",
+        "case_id": "cr-011"
+      },
+      "mode": "end_to_end",
+      "split": "development",
+      "label_trust": "official",
+      "status": "passed",
+      "metrics": {
+        "expected_contradictions": 0.0,
+        "isolation_violations": 0.0,
+        "matched_persisted_relations": 0.0,
+        "matched_warnings": 0.0,
+        "persisted_isolation_violations": 0.0,
+        "persisted_policy_mismatches": 0.0,
+        "persisted_relations": 0.0,
+        "persisted_unresolved_lineage": 0.0,
+        "predicted_warnings": 0.0,
+        "self_lineage_relations": 0.0,
+        "unresolved_lineage": 0.0
+      },
+      "evidence": {},
+      "failures": [],
+      "duration_ms": 36,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "claim-reconciliation",
+        "case_id": "cr-012"
+      },
+      "mode": "end_to_end",
+      "split": "development",
+      "label_trust": "official",
+      "status": "passed",
+      "metrics": {
+        "expected_contradictions": 1.0,
+        "isolation_violations": 0.0,
+        "matched_persisted_relations": 1.0,
+        "matched_warnings": 1.0,
+        "persisted_isolation_violations": 0.0,
+        "persisted_policy_mismatches": 0.0,
+        "persisted_relations": 1.0,
+        "persisted_unresolved_lineage": 0.0,
+        "predicted_warnings": 1.0,
+        "self_lineage_relations": 0.0,
+        "unresolved_lineage": 0.0
+      },
+      "evidence": {
+        "classification": {
+          "kind": "classification",
+          "true_positives": 1,
+          "false_positives": 0,
+          "false_negatives": 0,
+          "true_negatives": 0
+        }
+      },
+      "failures": [],
+      "duration_ms": 46,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "claim-reconciliation",
+        "case_id": "cr-013"
+      },
+      "mode": "end_to_end",
+      "split": "development",
+      "label_trust": "official",
+      "status": "passed",
+      "metrics": {
+        "expected_contradictions": 1.0,
+        "isolation_violations": 0.0,
+        "matched_persisted_relations": 1.0,
+        "matched_warnings": 1.0,
+        "persisted_isolation_violations": 0.0,
+        "persisted_policy_mismatches": 0.0,
+        "persisted_relations": 1.0,
+        "persisted_unresolved_lineage": 0.0,
+        "predicted_warnings": 1.0,
+        "self_lineage_relations": 0.0,
+        "unresolved_lineage": 0.0
+      },
+      "evidence": {
+        "classification": {
+          "kind": "classification",
+          "true_positives": 1,
+          "false_positives": 0,
+          "false_negatives": 0,
+          "true_negatives": 0
+        }
+      },
+      "failures": [],
+      "duration_ms": 37,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "claim-reconciliation",
+        "case_id": "cr-014"
+      },
+      "mode": "end_to_end",
+      "split": "development",
+      "label_trust": "official",
+      "status": "passed",
+      "metrics": {
+        "expected_contradictions": 0.0,
+        "isolation_violations": 0.0,
+        "matched_persisted_relations": 0.0,
+        "matched_warnings": 0.0,
+        "persisted_isolation_violations": 0.0,
+        "persisted_policy_mismatches": 0.0,
+        "persisted_relations": 0.0,
+        "persisted_unresolved_lineage": 0.0,
+        "predicted_warnings": 0.0,
+        "self_lineage_relations": 0.0,
+        "unresolved_lineage": 0.0
+      },
+      "evidence": {},
+      "failures": [],
+      "duration_ms": 32,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "claim-reconciliation",
+        "case_id": "cr-015"
+      },
+      "mode": "end_to_end",
+      "split": "development",
+      "label_trust": "official",
+      "status": "passed",
+      "metrics": {
+        "expected_contradictions": 0.0,
+        "isolation_violations": 0.0,
+        "matched_persisted_relations": 0.0,
+        "matched_warnings": 0.0,
+        "persisted_isolation_violations": 0.0,
+        "persisted_policy_mismatches": 0.0,
+        "persisted_relations": 0.0,
+        "persisted_unresolved_lineage": 0.0,
+        "predicted_warnings": 0.0,
+        "self_lineage_relations": 0.0,
+        "unresolved_lineage": 0.0
+      },
+      "evidence": {},
+      "failures": [],
+      "duration_ms": 32,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "claim-reconciliation",
+        "case_id": "cr-016"
+      },
+      "mode": "end_to_end",
+      "split": "development",
+      "label_trust": "official",
+      "status": "passed",
+      "metrics": {
+        "expected_contradictions": 0.0,
+        "isolation_violations": 0.0,
+        "matched_persisted_relations": 0.0,
+        "matched_warnings": 0.0,
+        "persisted_isolation_violations": 0.0,
+        "persisted_policy_mismatches": 0.0,
+        "persisted_relations": 0.0,
+        "persisted_unresolved_lineage": 0.0,
+        "predicted_warnings": 0.0,
+        "self_lineage_relations": 0.0,
+        "unresolved_lineage": 0.0
+      },
+      "evidence": {},
+      "failures": [],
+      "duration_ms": 32,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "claim-reconciliation",
+        "case_id": "cr-017"
+      },
+      "mode": "end_to_end",
+      "split": "development",
+      "label_trust": "official",
+      "status": "passed",
+      "metrics": {
+        "expected_contradictions": 0.0,
+        "isolation_violations": 0.0,
+        "matched_persisted_relations": 0.0,
+        "matched_warnings": 0.0,
+        "persisted_isolation_violations": 0.0,
+        "persisted_policy_mismatches": 0.0,
+        "persisted_relations": 0.0,
+        "persisted_unresolved_lineage": 0.0,
+        "predicted_warnings": 0.0,
+        "self_lineage_relations": 0.0,
+        "unresolved_lineage": 0.0
+      },
+      "evidence": {},
+      "failures": [],
+      "duration_ms": 31,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "claim-reconciliation",
+        "case_id": "cr-018"
+      },
+      "mode": "end_to_end",
+      "split": "development",
+      "label_trust": "official",
+      "status": "passed",
+      "metrics": {
+        "expected_contradictions": 0.0,
+        "isolation_violations": 0.0,
+        "matched_persisted_relations": 0.0,
+        "matched_warnings": 0.0,
+        "persisted_isolation_violations": 0.0,
+        "persisted_policy_mismatches": 0.0,
+        "persisted_relations": 0.0,
+        "persisted_unresolved_lineage": 0.0,
+        "predicted_warnings": 0.0,
+        "self_lineage_relations": 1.0,
+        "unresolved_lineage": 0.0
+      },
+      "evidence": {},
+      "failures": [],
+      "duration_ms": 34,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "claim-reconciliation",
+        "case_id": "cr-019"
+      },
+      "mode": "end_to_end",
+      "split": "development",
+      "label_trust": "official",
+      "status": "passed",
+      "metrics": {
+        "expected_contradictions": 0.0,
+        "isolation_violations": 0.0,
+        "matched_persisted_relations": 0.0,
+        "matched_warnings": 0.0,
+        "persisted_isolation_violations": 0.0,
+        "persisted_policy_mismatches": 0.0,
+        "persisted_relations": 0.0,
+        "persisted_unresolved_lineage": 0.0,
+        "predicted_warnings": 0.0,
+        "self_lineage_relations": 0.0,
+        "unresolved_lineage": 0.0
+      },
+      "evidence": {},
+      "failures": [],
+      "duration_ms": 36,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "claim-reconciliation",
+        "case_id": "cr-020"
+      },
+      "mode": "end_to_end",
+      "split": "development",
+      "label_trust": "official",
+      "status": "passed",
+      "metrics": {
+        "expected_contradictions": 1.0,
+        "isolation_violations": 0.0,
+        "matched_persisted_relations": 1.0,
+        "matched_warnings": 1.0,
+        "persisted_isolation_violations": 0.0,
+        "persisted_policy_mismatches": 0.0,
+        "persisted_relations": 1.0,
+        "persisted_unresolved_lineage": 0.0,
+        "predicted_warnings": 1.0,
+        "self_lineage_relations": 0.0,
+        "unresolved_lineage": 0.0
+      },
+      "evidence": {
+        "classification": {
+          "kind": "classification",
+          "true_positives": 1,
+          "false_positives": 0,
+          "false_negatives": 0,
+          "true_negatives": 0
+        }
+      },
+      "failures": [],
+      "duration_ms": 46,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "claim-reconciliation",
+        "case_id": "cr-022"
+      },
+      "mode": "end_to_end",
+      "split": "development",
+      "label_trust": "official",
+      "status": "passed",
+      "metrics": {
+        "expected_contradictions": 0.0,
+        "isolation_violations": 0.0,
+        "matched_persisted_relations": 0.0,
+        "matched_warnings": 0.0,
+        "persisted_isolation_violations": 0.0,
+        "persisted_policy_mismatches": 0.0,
+        "persisted_relations": 0.0,
+        "persisted_unresolved_lineage": 0.0,
+        "predicted_warnings": 0.0,
+        "self_lineage_relations": 0.0,
+        "unresolved_lineage": 0.0
+      },
+      "evidence": {},
+      "failures": [],
+      "duration_ms": 47,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "claim-reconciliation",
+        "case_id": "cr-023"
+      },
+      "mode": "end_to_end",
+      "split": "development",
+      "label_trust": "official",
+      "status": "passed",
+      "metrics": {
+        "expected_contradictions": 0.0,
+        "isolation_violations": 0.0,
+        "matched_persisted_relations": 0.0,
+        "matched_warnings": 0.0,
+        "persisted_isolation_violations": 0.0,
+        "persisted_policy_mismatches": 0.0,
+        "persisted_relations": 0.0,
+        "persisted_unresolved_lineage": 0.0,
+        "predicted_warnings": 0.0,
+        "self_lineage_relations": 0.0,
+        "unresolved_lineage": 0.0
+      },
+      "evidence": {},
+      "failures": [],
+      "duration_ms": 33,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "claim-reconciliation",
+        "case_id": "cr-024"
+      },
+      "mode": "end_to_end",
+      "split": "development",
+      "label_trust": "official",
+      "status": "passed",
+      "metrics": {
+        "expected_contradictions": 0.0,
+        "isolation_violations": 0.0,
+        "matched_persisted_relations": 0.0,
+        "matched_warnings": 0.0,
+        "persisted_isolation_violations": 0.0,
+        "persisted_policy_mismatches": 0.0,
+        "persisted_relations": 0.0,
+        "persisted_unresolved_lineage": 0.0,
+        "predicted_warnings": 0.0,
+        "self_lineage_relations": 0.0,
+        "unresolved_lineage": 0.0
+      },
+      "evidence": {},
+      "failures": [],
+      "duration_ms": 37,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "claim-reconciliation",
+        "case_id": "cr-025"
+      },
+      "mode": "end_to_end",
+      "split": "development",
+      "label_trust": "official",
+      "status": "passed",
+      "metrics": {
+        "expected_contradictions": 0.0,
+        "isolation_violations": 0.0,
+        "matched_persisted_relations": 0.0,
+        "matched_warnings": 0.0,
+        "persisted_isolation_violations": 0.0,
+        "persisted_policy_mismatches": 0.0,
+        "persisted_relations": 0.0,
+        "persisted_unresolved_lineage": 0.0,
+        "predicted_warnings": 0.0,
+        "self_lineage_relations": 0.0,
+        "unresolved_lineage": 0.0
+      },
+      "evidence": {},
+      "failures": [],
+      "duration_ms": 34,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "claim-reconciliation",
+        "case_id": "cr-026"
+      },
+      "mode": "end_to_end",
+      "split": "development",
+      "label_trust": "official",
+      "status": "passed",
+      "metrics": {
+        "expected_contradictions": 0.0,
+        "isolation_violations": 0.0,
+        "matched_persisted_relations": 0.0,
+        "matched_warnings": 0.0,
+        "persisted_isolation_violations": 0.0,
+        "persisted_policy_mismatches": 0.0,
+        "persisted_relations": 0.0,
+        "persisted_unresolved_lineage": 0.0,
+        "predicted_warnings": 0.0,
+        "self_lineage_relations": 0.0,
+        "unresolved_lineage": 0.0
+      },
+      "evidence": {},
+      "failures": [],
+      "duration_ms": 36,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "claim-reconciliation",
+        "case_id": "cr-027"
+      },
+      "mode": "end_to_end",
+      "split": "development",
+      "label_trust": "official",
+      "status": "passed",
+      "metrics": {
+        "expected_contradictions": 0.0,
+        "isolation_violations": 0.0,
+        "matched_persisted_relations": 0.0,
+        "matched_warnings": 0.0,
+        "persisted_isolation_violations": 0.0,
+        "persisted_policy_mismatches": 0.0,
+        "persisted_relations": 0.0,
+        "persisted_unresolved_lineage": 0.0,
+        "predicted_warnings": 0.0,
+        "self_lineage_relations": 0.0,
+        "unresolved_lineage": 0.0
+      },
+      "evidence": {},
+      "failures": [],
+      "duration_ms": 38,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "claim-reconciliation",
+        "case_id": "cr-028"
+      },
+      "mode": "end_to_end",
+      "split": "development",
+      "label_trust": "official",
+      "status": "passed",
+      "metrics": {
+        "expected_contradictions": 0.0,
+        "isolation_violations": 0.0,
+        "matched_persisted_relations": 0.0,
+        "matched_warnings": 0.0,
+        "persisted_isolation_violations": 0.0,
+        "persisted_policy_mismatches": 0.0,
+        "persisted_relations": 0.0,
+        "persisted_unresolved_lineage": 0.0,
+        "predicted_warnings": 0.0,
+        "self_lineage_relations": 1.0,
+        "unresolved_lineage": 0.0
+      },
+      "evidence": {},
+      "failures": [],
+      "duration_ms": 41,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "claim-reconciliation",
+        "case_id": "cr-029"
+      },
+      "mode": "end_to_end",
+      "split": "development",
+      "label_trust": "official",
+      "status": "passed",
+      "metrics": {
+        "expected_contradictions": 0.0,
+        "isolation_violations": 0.0,
+        "matched_persisted_relations": 0.0,
+        "matched_warnings": 0.0,
+        "persisted_isolation_violations": 0.0,
+        "persisted_policy_mismatches": 0.0,
+        "persisted_relations": 0.0,
+        "persisted_unresolved_lineage": 0.0,
+        "predicted_warnings": 0.0,
+        "self_lineage_relations": 0.0,
+        "unresolved_lineage": 0.0
+      },
+      "evidence": {},
+      "failures": [],
+      "duration_ms": 32,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "claim-reconciliation",
+        "case_id": "cr-030"
+      },
+      "mode": "end_to_end",
+      "split": "development",
+      "label_trust": "official",
+      "status": "passed",
+      "metrics": {
+        "expected_contradictions": 0.0,
+        "isolation_violations": 0.0,
+        "matched_persisted_relations": 0.0,
+        "matched_warnings": 0.0,
+        "persisted_isolation_violations": 0.0,
+        "persisted_policy_mismatches": 0.0,
+        "persisted_relations": 0.0,
+        "persisted_unresolved_lineage": 0.0,
+        "predicted_warnings": 0.0,
+        "self_lineage_relations": 0.0,
+        "unresolved_lineage": 0.0
+      },
+      "evidence": {},
+      "failures": [],
+      "duration_ms": 34,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "claim-reconciliation",
+        "case_id": "cr-031"
+      },
+      "mode": "end_to_end",
+      "split": "test",
+      "label_trust": "official",
+      "status": "passed",
+      "metrics": {
+        "expected_contradictions": 1.0,
+        "isolation_violations": 0.0,
+        "matched_persisted_relations": 1.0,
+        "matched_warnings": 1.0,
+        "persisted_isolation_violations": 0.0,
+        "persisted_policy_mismatches": 0.0,
+        "persisted_relations": 1.0,
+        "persisted_unresolved_lineage": 0.0,
+        "predicted_warnings": 1.0,
+        "self_lineage_relations": 0.0,
+        "unresolved_lineage": 0.0
+      },
+      "evidence": {
+        "classification": {
+          "kind": "classification",
+          "true_positives": 1,
+          "false_positives": 0,
+          "false_negatives": 0,
+          "true_negatives": 0
+        }
+      },
+      "failures": [],
+      "duration_ms": 46,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "claim-reconciliation",
+        "case_id": "cr-032"
+      },
+      "mode": "end_to_end",
+      "split": "test",
+      "label_trust": "official",
+      "status": "passed",
+      "metrics": {
+        "expected_contradictions": 0.0,
+        "isolation_violations": 0.0,
+        "matched_persisted_relations": 0.0,
+        "matched_warnings": 0.0,
+        "persisted_isolation_violations": 0.0,
+        "persisted_policy_mismatches": 0.0,
+        "persisted_relations": 0.0,
+        "persisted_unresolved_lineage": 0.0,
+        "predicted_warnings": 0.0,
+        "self_lineage_relations": 1.0,
+        "unresolved_lineage": 0.0
+      },
+      "evidence": {},
+      "failures": [],
+      "duration_ms": 35,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "claim-reconciliation",
+        "case_id": "cr-033"
+      },
+      "mode": "end_to_end",
+      "split": "test",
+      "label_trust": "official",
+      "status": "passed",
+      "metrics": {
+        "expected_contradictions": 0.0,
+        "isolation_violations": 0.0,
+        "matched_persisted_relations": 0.0,
+        "matched_warnings": 0.0,
+        "persisted_isolation_violations": 0.0,
+        "persisted_policy_mismatches": 0.0,
+        "persisted_relations": 0.0,
+        "persisted_unresolved_lineage": 0.0,
+        "predicted_warnings": 0.0,
+        "self_lineage_relations": 0.0,
+        "unresolved_lineage": 0.0
+      },
+      "evidence": {},
+      "failures": [],
+      "duration_ms": 35,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "claim-reconciliation",
+        "case_id": "cr-034"
+      },
+      "mode": "end_to_end",
+      "split": "test",
+      "label_trust": "official",
+      "status": "passed",
+      "metrics": {
+        "expected_contradictions": 0.0,
+        "isolation_violations": 0.0,
+        "matched_persisted_relations": 0.0,
+        "matched_warnings": 0.0,
+        "persisted_isolation_violations": 0.0,
+        "persisted_policy_mismatches": 0.0,
+        "persisted_relations": 0.0,
+        "persisted_unresolved_lineage": 0.0,
+        "predicted_warnings": 0.0,
+        "self_lineage_relations": 1.0,
+        "unresolved_lineage": 0.0
+      },
+      "evidence": {},
+      "failures": [],
+      "duration_ms": 34,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "claim-reconciliation",
+        "case_id": "cr-035"
+      },
+      "mode": "end_to_end",
+      "split": "test",
+      "label_trust": "official",
+      "status": "passed",
+      "metrics": {
+        "expected_contradictions": 0.0,
+        "isolation_violations": 0.0,
+        "matched_persisted_relations": 0.0,
+        "matched_warnings": 0.0,
+        "persisted_isolation_violations": 0.0,
+        "persisted_policy_mismatches": 0.0,
+        "persisted_relations": 0.0,
+        "persisted_unresolved_lineage": 0.0,
+        "predicted_warnings": 0.0,
+        "self_lineage_relations": 0.0,
+        "unresolved_lineage": 0.0
+      },
+      "evidence": {},
+      "failures": [],
+      "duration_ms": 34,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "claim-reconciliation",
+        "case_id": "cr-036"
+      },
+      "mode": "end_to_end",
+      "split": "test",
+      "label_trust": "official",
+      "status": "passed",
+      "metrics": {
+        "expected_contradictions": 0.0,
+        "isolation_violations": 0.0,
+        "matched_persisted_relations": 0.0,
+        "matched_warnings": 0.0,
+        "persisted_isolation_violations": 0.0,
+        "persisted_policy_mismatches": 0.0,
+        "persisted_relations": 0.0,
+        "persisted_unresolved_lineage": 0.0,
+        "predicted_warnings": 0.0,
+        "self_lineage_relations": 0.0,
+        "unresolved_lineage": 0.0
+      },
+      "evidence": {},
+      "failures": [],
+      "duration_ms": 33,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "claim-reconciliation",
+        "case_id": "cr-037"
+      },
+      "mode": "end_to_end",
+      "split": "test",
+      "label_trust": "official",
+      "status": "passed",
+      "metrics": {
+        "expected_contradictions": 0.0,
+        "isolation_violations": 0.0,
+        "matched_persisted_relations": 1.0,
+        "matched_warnings": 0.0,
+        "persisted_isolation_violations": 0.0,
+        "persisted_policy_mismatches": 0.0,
+        "persisted_relations": 1.0,
+        "persisted_unresolved_lineage": 0.0,
+        "predicted_warnings": 0.0,
+        "self_lineage_relations": 0.0,
+        "unresolved_lineage": 0.0
+      },
+      "evidence": {},
+      "failures": [],
+      "duration_ms": 46,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "claim-reconciliation",
+        "case_id": "cr-038"
+      },
+      "mode": "end_to_end",
+      "split": "test",
+      "label_trust": "official",
+      "status": "passed",
+      "metrics": {
+        "expected_contradictions": 0.0,
+        "isolation_violations": 0.0,
+        "matched_persisted_relations": 0.0,
+        "matched_warnings": 0.0,
+        "persisted_isolation_violations": 0.0,
+        "persisted_policy_mismatches": 0.0,
+        "persisted_relations": 0.0,
+        "persisted_unresolved_lineage": 0.0,
+        "predicted_warnings": 0.0,
+        "self_lineage_relations": 0.0,
+        "unresolved_lineage": 0.0
+      },
+      "evidence": {},
+      "failures": [],
+      "duration_ms": 36,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "claim-reconciliation",
+        "case_id": "cr-039"
+      },
+      "mode": "end_to_end",
+      "split": "test",
+      "label_trust": "official",
+      "status": "passed",
+      "metrics": {
+        "expected_contradictions": 0.0,
+        "isolation_violations": 0.0,
+        "matched_persisted_relations": 0.0,
+        "matched_warnings": 0.0,
+        "persisted_isolation_violations": 0.0,
+        "persisted_policy_mismatches": 0.0,
+        "persisted_relations": 0.0,
+        "persisted_unresolved_lineage": 0.0,
+        "predicted_warnings": 0.0,
+        "self_lineage_relations": 0.0,
+        "unresolved_lineage": 0.0
+      },
+      "evidence": {},
+      "failures": [],
+      "duration_ms": 33,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "claim-reconciliation",
+        "case_id": "cr-040"
+      },
+      "mode": "end_to_end",
+      "split": "test",
+      "label_trust": "official",
+      "status": "passed",
+      "metrics": {
+        "expected_contradictions": 1.0,
+        "isolation_violations": 0.0,
+        "matched_persisted_relations": 1.0,
+        "matched_warnings": 1.0,
+        "persisted_isolation_violations": 0.0,
+        "persisted_policy_mismatches": 0.0,
+        "persisted_relations": 1.0,
+        "persisted_unresolved_lineage": 0.0,
+        "predicted_warnings": 1.0,
+        "self_lineage_relations": 0.0,
+        "unresolved_lineage": 0.0
+      },
+      "evidence": {
+        "classification": {
+          "kind": "classification",
+          "true_positives": 1,
+          "false_positives": 0,
+          "false_negatives": 0,
+          "true_negatives": 0
+        }
+      },
+      "failures": [],
+      "duration_ms": 48,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "claim-reconciliation",
+        "case_id": "cr-041"
+      },
+      "mode": "end_to_end",
+      "split": "development",
+      "label_trust": "official",
+      "status": "passed",
+      "metrics": {
+        "expected_contradictions": 0.0,
+        "isolation_violations": 0.0,
+        "matched_persisted_relations": 0.0,
+        "matched_warnings": 0.0,
+        "persisted_isolation_violations": 0.0,
+        "persisted_policy_mismatches": 0.0,
+        "persisted_relations": 0.0,
+        "persisted_unresolved_lineage": 0.0,
+        "predicted_warnings": 0.0,
+        "self_lineage_relations": 0.0,
+        "unresolved_lineage": 0.0
+      },
+      "evidence": {},
+      "failures": [],
+      "duration_ms": 40,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "claim-reconciliation",
+        "case_id": "cr-042"
+      },
+      "mode": "end_to_end",
+      "split": "development",
+      "label_trust": "official",
+      "status": "passed",
+      "metrics": {
+        "expected_contradictions": 0.0,
+        "isolation_violations": 0.0,
+        "matched_persisted_relations": 0.0,
+        "matched_warnings": 0.0,
+        "persisted_isolation_violations": 0.0,
+        "persisted_policy_mismatches": 0.0,
+        "persisted_relations": 0.0,
+        "persisted_unresolved_lineage": 0.0,
+        "predicted_warnings": 0.0,
+        "self_lineage_relations": 0.0,
+        "unresolved_lineage": 0.0
+      },
+      "evidence": {},
+      "failures": [],
+      "duration_ms": 32,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "external-retrieval",
+        "case_id": "longmemeval-cleaned:eval-mini-001"
+      },
+      "mode": "retrieval_only",
+      "split": "test",
+      "label_trust": "weak",
+      "status": "passed",
+      "metrics": {
+        "answer_presence_proxy_at_5": 1.0,
+        "query_ms": 4.0
+      },
+      "evidence": {
+        "answer_presence_proxy": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        }
+      },
+      "failures": [],
+      "duration_ms": 50,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "external-retrieval",
+        "case_id": "longmemeval-cleaned:eval-mini-002"
+      },
+      "mode": "retrieval_only",
+      "split": "test",
+      "label_trust": "weak",
+      "status": "passed",
+      "metrics": {
+        "answer_presence_proxy_at_5": 1.0,
+        "query_ms": 6.0
+      },
+      "evidence": {
+        "answer_presence_proxy": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        }
+      },
+      "failures": [],
+      "duration_ms": 52,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "extraction",
+        "case_id": "ext-001"
+      },
+      "mode": "end_to_end",
+      "split": "development",
+      "label_trust": "official",
+      "status": "passed",
+      "metrics": {
+        "entity_f1": 0.0,
+        "entity_precision": 0.0,
+        "entity_recall": 1.0,
+        "fact_type_accuracy": 1.0,
+        "warning_recall": 1.0
+      },
+      "evidence": {
+        "classification": {
+          "kind": "classification",
+          "true_positives": 0,
+          "false_positives": 2,
+          "false_negatives": 0,
+          "true_negatives": 0
+        }
+      },
+      "failures": [],
+      "duration_ms": 52,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "extraction",
+        "case_id": "ext-002"
+      },
+      "mode": "end_to_end",
+      "split": "development",
+      "label_trust": "official",
+      "status": "passed",
+      "metrics": {
+        "entity_f1": 1.0,
+        "entity_precision": 1.0,
+        "entity_recall": 1.0,
+        "fact_type_accuracy": 1.0,
+        "warning_recall": 1.0
+      },
+      "evidence": {
+        "classification": {
+          "kind": "classification",
+          "true_positives": 2,
+          "false_positives": 0,
+          "false_negatives": 0,
+          "true_negatives": 0
+        }
+      },
+      "failures": [],
+      "duration_ms": 38,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "extraction",
+        "case_id": "ext-003"
+      },
+      "mode": "end_to_end",
+      "split": "development",
+      "label_trust": "official",
+      "status": "passed",
+      "metrics": {
+        "entity_f1": 0.5,
+        "entity_precision": 0.3333333333333333,
+        "entity_recall": 1.0,
+        "fact_type_accuracy": 1.0,
+        "warning_recall": 1.0
+      },
+      "evidence": {
+        "classification": {
+          "kind": "classification",
+          "true_positives": 1,
+          "false_positives": 2,
+          "false_negatives": 0,
+          "true_negatives": 0
+        }
+      },
+      "failures": [],
+      "duration_ms": 48,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "extraction",
+        "case_id": "ext-004"
+      },
+      "mode": "end_to_end",
+      "split": "development",
+      "label_trust": "official",
+      "status": "passed",
+      "metrics": {
+        "entity_f1": 0.5,
+        "entity_precision": 0.3333333333333333,
+        "entity_recall": 1.0,
+        "fact_type_accuracy": 1.0,
+        "warning_recall": 1.0
+      },
+      "evidence": {
+        "classification": {
+          "kind": "classification",
+          "true_positives": 1,
+          "false_positives": 2,
+          "false_negatives": 0,
+          "true_negatives": 0
+        }
+      },
+      "failures": [],
+      "duration_ms": 47,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "extraction",
+        "case_id": "ext-005"
+      },
+      "mode": "end_to_end",
+      "split": "development",
+      "label_trust": "official",
+      "status": "passed",
+      "metrics": {
+        "entity_f1": 0.6666666666666666,
+        "entity_precision": 0.5,
+        "entity_recall": 1.0,
+        "fact_type_accuracy": 1.0,
+        "warning_recall": 1.0
+      },
+      "evidence": {
+        "classification": {
+          "kind": "classification",
+          "true_positives": 1,
+          "false_positives": 1,
+          "false_negatives": 0,
+          "true_negatives": 0
+        }
+      },
+      "failures": [],
+      "duration_ms": 45,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "extraction",
+        "case_id": "ext-006"
+      },
+      "mode": "end_to_end",
+      "split": "development",
+      "label_trust": "official",
+      "status": "passed",
+      "metrics": {
+        "entity_f1": 1.0,
+        "entity_precision": 1.0,
+        "entity_recall": 1.0,
+        "fact_type_accuracy": 1.0,
+        "warning_recall": 1.0
+      },
+      "evidence": {
+        "classification": {
+          "kind": "classification",
+          "true_positives": 2,
+          "false_positives": 0,
+          "false_negatives": 0,
+          "true_negatives": 0
+        }
+      },
+      "failures": [],
+      "duration_ms": 45,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "extraction",
+        "case_id": "ext-007"
+      },
+      "mode": "end_to_end",
+      "split": "development",
+      "label_trust": "official",
+      "status": "passed",
+      "metrics": {
+        "entity_f1": 1.0,
+        "entity_precision": 1.0,
+        "entity_recall": 1.0,
+        "fact_type_accuracy": 1.0,
+        "warning_recall": 1.0
+      },
+      "evidence": {
+        "classification": {
+          "kind": "classification",
+          "true_positives": 2,
+          "false_positives": 0,
+          "false_negatives": 0,
+          "true_negatives": 0
+        }
+      },
+      "failures": [],
+      "duration_ms": 45,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "extraction",
+        "case_id": "ext-008"
+      },
+      "mode": "end_to_end",
+      "split": "development",
+      "label_trust": "official",
+      "status": "passed",
+      "metrics": {
+        "entity_f1": 1.0,
+        "entity_precision": 1.0,
+        "entity_recall": 1.0,
+        "fact_type_accuracy": 1.0,
+        "warning_recall": 1.0
+      },
+      "evidence": {
+        "classification": {
+          "kind": "classification",
+          "true_positives": 1,
+          "false_positives": 0,
+          "false_negatives": 0,
+          "true_negatives": 0
+        }
+      },
+      "failures": [],
+      "duration_ms": 36,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "extraction",
+        "case_id": "ext-009"
+      },
+      "mode": "end_to_end",
+      "split": "development",
+      "label_trust": "official",
+      "status": "passed",
+      "metrics": {
+        "entity_f1": 0.8,
+        "entity_precision": 0.6666666666666666,
+        "entity_recall": 1.0,
+        "fact_type_accuracy": 1.0,
+        "warning_recall": 1.0
+      },
+      "evidence": {
+        "classification": {
+          "kind": "classification",
+          "true_positives": 2,
+          "false_positives": 1,
+          "false_negatives": 0,
+          "true_negatives": 0
+        }
+      },
+      "failures": [],
+      "duration_ms": 41,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "local-retrieval",
+        "case_id": "first-person-rescue-profile"
+      },
+      "mode": "retrieval_only",
+      "split": "development",
+      "label_trust": "weak",
+      "status": "passed",
+      "metrics": {
+        "legacy_v1_mrr_at_budget": 1.0,
+        "legacy_v1_required_group_recall_at_budget": 1.0,
+        "legacy_v1_top_1_hit_rate_at_budget": 1.0
+      },
+      "evidence": {
+        "retrieval": {
+          "kind": "retrieval",
+          "relevant": 1,
+          "hits_at_k": 1,
+          "first_relevant_rank": 1,
+          "cutoff": 2
+        }
+      },
+      "failures": [],
+      "duration_ms": 47,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "local-retrieval",
+        "case_id": "graph-anchor-alice-neighbor"
+      },
+      "mode": "retrieval_only",
+      "split": "development",
+      "label_trust": "weak",
+      "status": "passed",
+      "metrics": {
+        "legacy_v1_mrr_at_budget": 1.0,
+        "legacy_v1_required_group_recall_at_budget": 1.0,
+        "legacy_v1_top_1_hit_rate_at_budget": 1.0
+      },
+      "evidence": {
+        "retrieval": {
+          "kind": "retrieval",
+          "relevant": 1,
+          "hits_at_k": 1,
+          "first_relevant_rank": 1,
+          "cutoff": 5
+        }
+      },
+      "failures": [],
+      "duration_ms": 38,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "local-retrieval",
+        "case_id": "ret-001"
+      },
+      "mode": "retrieval_only",
+      "split": "development",
+      "label_trust": "weak",
+      "status": "passed",
+      "metrics": {
+        "legacy_v1_mrr_at_budget": 1.0,
+        "legacy_v1_required_group_recall_at_budget": 1.0,
+        "legacy_v1_top_1_hit_rate_at_budget": 1.0
+      },
+      "evidence": {
+        "retrieval": {
+          "kind": "retrieval",
+          "relevant": 1,
+          "hits_at_k": 1,
+          "first_relevant_rank": 1,
+          "cutoff": 5
+        }
+      },
+      "failures": [],
+      "duration_ms": 72,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "local-retrieval",
+        "case_id": "ret-002"
+      },
+      "mode": "retrieval_only",
+      "split": "development",
+      "label_trust": "weak",
+      "status": "passed",
+      "metrics": {
+        "legacy_v1_mrr_at_budget": 1.0,
+        "legacy_v1_required_group_recall_at_budget": 1.0,
+        "legacy_v1_top_1_hit_rate_at_budget": 1.0
+      },
+      "evidence": {
+        "retrieval": {
+          "kind": "retrieval",
+          "relevant": 1,
+          "hits_at_k": 1,
+          "first_relevant_rank": 1,
+          "cutoff": 5
+        }
+      },
+      "failures": [],
+      "duration_ms": 38,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "local-retrieval",
+        "case_id": "ret-003"
+      },
+      "mode": "retrieval_only",
+      "split": "development",
+      "label_trust": "weak",
+      "status": "passed",
+      "metrics": {
+        "legacy_v1_mrr_at_budget": 1.0,
+        "legacy_v1_required_group_recall_at_budget": 1.0,
+        "legacy_v1_top_1_hit_rate_at_budget": 1.0
+      },
+      "evidence": {
+        "retrieval": {
+          "kind": "retrieval",
+          "relevant": 1,
+          "hits_at_k": 1,
+          "first_relevant_rank": 1,
+          "cutoff": 5
+        }
+      },
+      "failures": [],
+      "duration_ms": 38,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "local-retrieval",
+        "case_id": "ret-004"
+      },
+      "mode": "retrieval_only",
+      "split": "development",
+      "label_trust": "weak",
+      "status": "passed",
+      "metrics": {
+        "legacy_v1_mrr_at_budget": 1.0,
+        "legacy_v1_required_group_recall_at_budget": 1.0,
+        "legacy_v1_top_1_hit_rate_at_budget": 1.0
+      },
+      "evidence": {
+        "retrieval": {
+          "kind": "retrieval",
+          "relevant": 1,
+          "hits_at_k": 1,
+          "first_relevant_rank": 1,
+          "cutoff": 5
+        }
+      },
+      "failures": [],
+      "duration_ms": 39,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "local-retrieval",
+        "case_id": "ret-005"
+      },
+      "mode": "retrieval_only",
+      "split": "development",
+      "label_trust": "weak",
+      "status": "passed",
+      "metrics": {
+        "legacy_v1_mrr_at_budget": 1.0,
+        "legacy_v1_required_group_recall_at_budget": 1.0,
+        "legacy_v1_top_1_hit_rate_at_budget": 1.0
+      },
+      "evidence": {
+        "retrieval": {
+          "kind": "retrieval",
+          "relevant": 1,
+          "hits_at_k": 1,
+          "first_relevant_rank": 1,
+          "cutoff": 5
+        }
+      },
+      "failures": [],
+      "duration_ms": 38,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "local-retrieval",
+        "case_id": "ret-006"
+      },
+      "mode": "retrieval_only",
+      "split": "development",
+      "label_trust": "weak",
+      "status": "passed",
+      "metrics": {
+        "legacy_v1_mrr_at_budget": 1.0,
+        "legacy_v1_required_group_recall_at_budget": 1.0,
+        "legacy_v1_top_1_hit_rate_at_budget": 1.0
+      },
+      "evidence": {
+        "retrieval": {
+          "kind": "retrieval",
+          "relevant": 1,
+          "hits_at_k": 1,
+          "first_relevant_rank": 1,
+          "cutoff": 5
+        }
+      },
+      "failures": [],
+      "duration_ms": 40,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "local-retrieval",
+        "case_id": "ret-007"
+      },
+      "mode": "retrieval_only",
+      "split": "development",
+      "label_trust": "weak",
+      "status": "passed",
+      "metrics": {
+        "legacy_v1_mrr_at_budget": 1.0,
+        "legacy_v1_required_group_recall_at_budget": 1.0,
+        "legacy_v1_top_1_hit_rate_at_budget": 1.0
+      },
+      "evidence": {
+        "retrieval": {
+          "kind": "retrieval",
+          "relevant": 1,
+          "hits_at_k": 1,
+          "first_relevant_rank": 1,
+          "cutoff": 5
+        }
+      },
+      "failures": [],
+      "duration_ms": 39,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "local-retrieval",
+        "case_id": "ret-008"
+      },
+      "mode": "retrieval_only",
+      "split": "development",
+      "label_trust": "weak",
+      "status": "passed",
+      "metrics": {
+        "legacy_v1_mrr_at_budget": 1.0,
+        "legacy_v1_required_group_recall_at_budget": 1.0,
+        "legacy_v1_top_1_hit_rate_at_budget": 1.0
+      },
+      "evidence": {
+        "retrieval": {
+          "kind": "retrieval",
+          "relevant": 1,
+          "hits_at_k": 1,
+          "first_relevant_rank": 1,
+          "cutoff": 5
+        }
+      },
+      "failures": [],
+      "duration_ms": 40,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "local-retrieval",
+        "case_id": "ret-009"
+      },
+      "mode": "retrieval_only",
+      "split": "development",
+      "label_trust": "weak",
+      "status": "passed",
+      "metrics": {
+        "legacy_v1_mrr_at_budget": 1.0,
+        "legacy_v1_required_group_recall_at_budget": 1.0,
+        "legacy_v1_top_1_hit_rate_at_budget": 1.0
+      },
+      "evidence": {
+        "retrieval": {
+          "kind": "retrieval",
+          "relevant": 1,
+          "hits_at_k": 1,
+          "first_relevant_rank": 1,
+          "cutoff": 5
+        }
+      },
+      "failures": [],
+      "duration_ms": 40,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "local-retrieval",
+        "case_id": "ret-010"
+      },
+      "mode": "retrieval_only",
+      "split": "development",
+      "label_trust": "weak",
+      "status": "passed",
+      "metrics": {
+        "legacy_v1_mrr_at_budget": 1.0,
+        "legacy_v1_required_group_recall_at_budget": 1.0,
+        "legacy_v1_top_1_hit_rate_at_budget": 1.0
+      },
+      "evidence": {
+        "retrieval": {
+          "kind": "retrieval",
+          "relevant": 1,
+          "hits_at_k": 1,
+          "first_relevant_rank": 1,
+          "cutoff": 5
+        }
+      },
+      "failures": [],
+      "duration_ms": 41,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "local-retrieval",
+        "case_id": "ret-011"
+      },
+      "mode": "retrieval_only",
+      "split": "development",
+      "label_trust": "weak",
+      "status": "passed",
+      "metrics": {
+        "legacy_v1_mrr_at_budget": 1.0,
+        "legacy_v1_required_group_recall_at_budget": 1.0,
+        "legacy_v1_top_1_hit_rate_at_budget": 1.0
+      },
+      "evidence": {
+        "retrieval": {
+          "kind": "retrieval",
+          "relevant": 1,
+          "hits_at_k": 1,
+          "first_relevant_rank": 1,
+          "cutoff": 5
+        }
+      },
+      "failures": [],
+      "duration_ms": 41,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "local-retrieval",
+        "case_id": "ret-012"
+      },
+      "mode": "retrieval_only",
+      "split": "development",
+      "label_trust": "weak",
+      "status": "passed",
+      "metrics": {
+        "legacy_v1_mrr_at_budget": 1.0,
+        "legacy_v1_required_group_recall_at_budget": 1.0,
+        "legacy_v1_top_1_hit_rate_at_budget": 1.0
+      },
+      "evidence": {
+        "retrieval": {
+          "kind": "retrieval",
+          "relevant": 1,
+          "hits_at_k": 1,
+          "first_relevant_rank": 1,
+          "cutoff": 5
+        }
+      },
+      "failures": [],
+      "duration_ms": 37,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "local-retrieval",
+        "case_id": "ret-013"
+      },
+      "mode": "retrieval_only",
+      "split": "development",
+      "label_trust": "weak",
+      "status": "passed",
+      "metrics": {
+        "legacy_v1_mrr_at_budget": 1.0,
+        "legacy_v1_required_group_recall_at_budget": 1.0,
+        "legacy_v1_top_1_hit_rate_at_budget": 1.0
+      },
+      "evidence": {
+        "retrieval": {
+          "kind": "retrieval",
+          "relevant": 1,
+          "hits_at_k": 1,
+          "first_relevant_rank": 1,
+          "cutoff": 5
+        }
+      },
+      "failures": [],
+      "duration_ms": 40,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "local-retrieval",
+        "case_id": "ret-014"
+      },
+      "mode": "retrieval_only",
+      "split": "development",
+      "label_trust": "weak",
+      "status": "passed",
+      "metrics": {
+        "legacy_v1_mrr_at_budget": 1.0,
+        "legacy_v1_required_group_recall_at_budget": 1.0,
+        "legacy_v1_top_1_hit_rate_at_budget": 1.0
+      },
+      "evidence": {
+        "retrieval": {
+          "kind": "retrieval",
+          "relevant": 1,
+          "hits_at_k": 1,
+          "first_relevant_rank": 1,
+          "cutoff": 5
+        }
+      },
+      "failures": [],
+      "duration_ms": 40,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "local-retrieval",
+        "case_id": "ret-015"
+      },
+      "mode": "retrieval_only",
+      "split": "development",
+      "label_trust": "weak",
+      "status": "passed",
+      "metrics": {
+        "legacy_v1_mrr_at_budget": 1.0,
+        "legacy_v1_required_group_recall_at_budget": 1.0,
+        "legacy_v1_top_1_hit_rate_at_budget": 1.0
+      },
+      "evidence": {
+        "retrieval": {
+          "kind": "retrieval",
+          "relevant": 1,
+          "hits_at_k": 1,
+          "first_relevant_rank": 1,
+          "cutoff": 5
+        }
+      },
+      "failures": [],
+      "duration_ms": 42,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "local-retrieval",
+        "case_id": "ret-016"
+      },
+      "mode": "retrieval_only",
+      "split": "development",
+      "label_trust": "weak",
+      "status": "passed",
+      "metrics": {
+        "legacy_v1_mrr_at_budget": 1.0,
+        "legacy_v1_required_group_recall_at_budget": 1.0,
+        "legacy_v1_top_1_hit_rate_at_budget": 1.0
+      },
+      "evidence": {
+        "retrieval": {
+          "kind": "retrieval",
+          "relevant": 1,
+          "hits_at_k": 1,
+          "first_relevant_rank": 1,
+          "cutoff": 5
+        }
+      },
+      "failures": [],
+      "duration_ms": 42,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "local-retrieval",
+        "case_id": "ret-017"
+      },
+      "mode": "retrieval_only",
+      "split": "development",
+      "label_trust": "weak",
+      "status": "passed",
+      "metrics": {
+        "legacy_v1_mrr_at_budget": 1.0,
+        "legacy_v1_required_group_recall_at_budget": 1.0,
+        "legacy_v1_top_1_hit_rate_at_budget": 1.0
+      },
+      "evidence": {
+        "retrieval": {
+          "kind": "retrieval",
+          "relevant": 1,
+          "hits_at_k": 1,
+          "first_relevant_rank": 1,
+          "cutoff": 5
+        }
+      },
+      "failures": [],
+      "duration_ms": 43,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "local-retrieval",
+        "case_id": "ret-018"
+      },
+      "mode": "retrieval_only",
+      "split": "development",
+      "label_trust": "weak",
+      "status": "passed",
+      "metrics": {
+        "legacy_v1_mrr_at_budget": 1.0,
+        "legacy_v1_required_group_recall_at_budget": 1.0,
+        "legacy_v1_top_1_hit_rate_at_budget": 1.0
+      },
+      "evidence": {
+        "retrieval": {
+          "kind": "retrieval",
+          "relevant": 1,
+          "hits_at_k": 1,
+          "first_relevant_rank": 1,
+          "cutoff": 5
+        }
+      },
+      "failures": [],
+      "duration_ms": 43,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "local-retrieval",
+        "case_id": "ret-019"
+      },
+      "mode": "retrieval_only",
+      "split": "development",
+      "label_trust": "weak",
+      "status": "passed",
+      "metrics": {
+        "legacy_v1_mrr_at_budget": 1.0,
+        "legacy_v1_required_group_recall_at_budget": 1.0,
+        "legacy_v1_top_1_hit_rate_at_budget": 1.0
+      },
+      "evidence": {
+        "retrieval": {
+          "kind": "retrieval",
+          "relevant": 1,
+          "hits_at_k": 1,
+          "first_relevant_rank": 1,
+          "cutoff": 5
+        }
+      },
+      "failures": [],
+      "duration_ms": 44,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "local-retrieval",
+        "case_id": "ret-020"
+      },
+      "mode": "retrieval_only",
+      "split": "development",
+      "label_trust": "weak",
+      "status": "passed",
+      "metrics": {
+        "legacy_v1_mrr_at_budget": 1.0,
+        "legacy_v1_required_group_recall_at_budget": 1.0,
+        "legacy_v1_top_1_hit_rate_at_budget": 1.0
+      },
+      "evidence": {
+        "retrieval": {
+          "kind": "retrieval",
+          "relevant": 1,
+          "hits_at_k": 1,
+          "first_relevant_rank": 1,
+          "cutoff": 5
+        }
+      },
+      "failures": [],
+      "duration_ms": 41,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "local-retrieval",
+        "case_id": "ret-021"
+      },
+      "mode": "retrieval_only",
+      "split": "development",
+      "label_trust": "weak",
+      "status": "passed",
+      "metrics": {
+        "legacy_v1_mrr_at_budget": 1.0,
+        "legacy_v1_required_group_recall_at_budget": 1.0,
+        "legacy_v1_top_1_hit_rate_at_budget": 1.0
+      },
+      "evidence": {
+        "retrieval": {
+          "kind": "retrieval",
+          "relevant": 1,
+          "hits_at_k": 1,
+          "first_relevant_rank": 1,
+          "cutoff": 5
+        }
+      },
+      "failures": [],
+      "duration_ms": 44,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "local-retrieval",
+        "case_id": "ret-022"
+      },
+      "mode": "retrieval_only",
+      "split": "development",
+      "label_trust": "weak",
+      "status": "passed",
+      "metrics": {
+        "legacy_v1_mrr_at_budget": 1.0,
+        "legacy_v1_required_group_recall_at_budget": 1.0,
+        "legacy_v1_top_1_hit_rate_at_budget": 1.0
+      },
+      "evidence": {
+        "retrieval": {
+          "kind": "retrieval",
+          "relevant": 1,
+          "hits_at_k": 1,
+          "first_relevant_rank": 1,
+          "cutoff": 5
+        }
+      },
+      "failures": [],
+      "duration_ms": 40,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "local-retrieval",
+        "case_id": "ret-023"
+      },
+      "mode": "retrieval_only",
+      "split": "development",
+      "label_trust": "weak",
+      "status": "passed",
+      "metrics": {
+        "legacy_v1_mrr_at_budget": 1.0,
+        "legacy_v1_required_group_recall_at_budget": 1.0,
+        "legacy_v1_top_1_hit_rate_at_budget": 1.0
+      },
+      "evidence": {
+        "retrieval": {
+          "kind": "retrieval",
+          "relevant": 1,
+          "hits_at_k": 1,
+          "first_relevant_rank": 1,
+          "cutoff": 5
+        }
+      },
+      "failures": [],
+      "duration_ms": 42,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "local-retrieval",
+        "case_id": "ret-024"
+      },
+      "mode": "retrieval_only",
+      "split": "development",
+      "label_trust": "weak",
+      "status": "passed",
+      "metrics": {
+        "legacy_v1_mrr_at_budget": 1.0,
+        "legacy_v1_required_group_recall_at_budget": 1.0,
+        "legacy_v1_top_1_hit_rate_at_budget": 1.0
+      },
+      "evidence": {
+        "retrieval": {
+          "kind": "retrieval",
+          "relevant": 1,
+          "hits_at_k": 1,
+          "first_relevant_rank": 1,
+          "cutoff": 5
+        }
+      },
+      "failures": [],
+      "duration_ms": 39,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "local-retrieval",
+        "case_id": "ret-025"
+      },
+      "mode": "retrieval_only",
+      "split": "development",
+      "label_trust": "weak",
+      "status": "passed",
+      "metrics": {
+        "legacy_v1_mrr_at_budget": 1.0,
+        "legacy_v1_required_group_recall_at_budget": 1.0,
+        "legacy_v1_top_1_hit_rate_at_budget": 1.0
+      },
+      "evidence": {
+        "retrieval": {
+          "kind": "retrieval",
+          "relevant": 1,
+          "hits_at_k": 1,
+          "first_relevant_rank": 1,
+          "cutoff": 5
+        }
+      },
+      "failures": [],
+      "duration_ms": 39,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "local-retrieval",
+        "case_id": "ret-026"
+      },
+      "mode": "retrieval_only",
+      "split": "development",
+      "label_trust": "weak",
+      "status": "passed",
+      "metrics": {
+        "legacy_v1_mrr_at_budget": 1.0,
+        "legacy_v1_required_group_recall_at_budget": 1.0,
+        "legacy_v1_top_1_hit_rate_at_budget": 1.0
+      },
+      "evidence": {
+        "retrieval": {
+          "kind": "retrieval",
+          "relevant": 1,
+          "hits_at_k": 1,
+          "first_relevant_rank": 1,
+          "cutoff": 5
+        }
+      },
+      "failures": [],
+      "duration_ms": 38,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "local-retrieval",
+        "case_id": "ret-027"
+      },
+      "mode": "retrieval_only",
+      "split": "development",
+      "label_trust": "weak",
+      "status": "passed",
+      "metrics": {
+        "legacy_v1_mrr_at_budget": 1.0,
+        "legacy_v1_required_group_recall_at_budget": 1.0,
+        "legacy_v1_top_1_hit_rate_at_budget": 1.0
+      },
+      "evidence": {
+        "retrieval": {
+          "kind": "retrieval",
+          "relevant": 1,
+          "hits_at_k": 1,
+          "first_relevant_rank": 1,
+          "cutoff": 5
+        }
+      },
+      "failures": [],
+      "duration_ms": 38,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "local-retrieval",
+        "case_id": "ret-028"
+      },
+      "mode": "retrieval_only",
+      "split": "development",
+      "label_trust": "weak",
+      "status": "passed",
+      "metrics": {
+        "legacy_v1_mrr_at_budget": 1.0,
+        "legacy_v1_required_group_recall_at_budget": 1.0,
+        "legacy_v1_top_1_hit_rate_at_budget": 1.0
+      },
+      "evidence": {
+        "retrieval": {
+          "kind": "retrieval",
+          "relevant": 1,
+          "hits_at_k": 1,
+          "first_relevant_rank": 1,
+          "cutoff": 5
+        }
+      },
+      "failures": [],
+      "duration_ms": 38,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "local-retrieval",
+        "case_id": "ret-029"
+      },
+      "mode": "retrieval_only",
+      "split": "development",
+      "label_trust": "weak",
+      "status": "passed",
+      "metrics": {
+        "legacy_v1_mrr_at_budget": 1.0,
+        "legacy_v1_required_group_recall_at_budget": 1.0,
+        "legacy_v1_top_1_hit_rate_at_budget": 1.0
+      },
+      "evidence": {
+        "retrieval": {
+          "kind": "retrieval",
+          "relevant": 1,
+          "hits_at_k": 1,
+          "first_relevant_rank": 1,
+          "cutoff": 5
+        }
+      },
+      "failures": [],
+      "duration_ms": 38,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "local-retrieval",
+        "case_id": "ret-030"
+      },
+      "mode": "retrieval_only",
+      "split": "development",
+      "label_trust": "weak",
+      "status": "passed",
+      "metrics": {
+        "legacy_v1_mrr_at_budget": 1.0,
+        "legacy_v1_required_group_recall_at_budget": 1.0,
+        "legacy_v1_top_1_hit_rate_at_budget": 1.0
+      },
+      "evidence": {
+        "retrieval": {
+          "kind": "retrieval",
+          "relevant": 1,
+          "hits_at_k": 1,
+          "first_relevant_rank": 1,
+          "cutoff": 5
+        }
+      },
+      "failures": [],
+      "duration_ms": 38,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "local-retrieval",
+        "case_id": "ret-031"
+      },
+      "mode": "retrieval_only",
+      "split": "development",
+      "label_trust": "weak",
+      "status": "passed",
+      "metrics": {
+        "legacy_v1_mrr_at_budget": 1.0,
+        "legacy_v1_required_group_recall_at_budget": 1.0,
+        "legacy_v1_top_1_hit_rate_at_budget": 1.0
+      },
+      "evidence": {
+        "retrieval": {
+          "kind": "retrieval",
+          "relevant": 1,
+          "hits_at_k": 1,
+          "first_relevant_rank": 1,
+          "cutoff": 5
+        }
+      },
+      "failures": [],
+      "duration_ms": 38,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "local-retrieval",
+        "case_id": "ret-032"
+      },
+      "mode": "retrieval_only",
+      "split": "development",
+      "label_trust": "weak",
+      "status": "passed",
+      "metrics": {
+        "legacy_v1_mrr_at_budget": 1.0,
+        "legacy_v1_required_group_recall_at_budget": 1.0,
+        "legacy_v1_top_1_hit_rate_at_budget": 1.0
+      },
+      "evidence": {
+        "retrieval": {
+          "kind": "retrieval",
+          "relevant": 1,
+          "hits_at_k": 1,
+          "first_relevant_rank": 1,
+          "cutoff": 5
+        }
+      },
+      "failures": [],
+      "duration_ms": 41,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "local-retrieval",
+        "case_id": "ret-033"
+      },
+      "mode": "retrieval_only",
+      "split": "development",
+      "label_trust": "weak",
+      "status": "passed",
+      "metrics": {
+        "legacy_v1_mrr_at_budget": 1.0,
+        "legacy_v1_required_group_recall_at_budget": 1.0,
+        "legacy_v1_top_1_hit_rate_at_budget": 1.0
+      },
+      "evidence": {
+        "retrieval": {
+          "kind": "retrieval",
+          "relevant": 1,
+          "hits_at_k": 1,
+          "first_relevant_rank": 1,
+          "cutoff": 5
+        }
+      },
+      "failures": [],
+      "duration_ms": 38,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "local-retrieval",
+        "case_id": "ret-034"
+      },
+      "mode": "retrieval_only",
+      "split": "development",
+      "label_trust": "weak",
+      "status": "passed",
+      "metrics": {
+        "legacy_v1_mrr_at_budget": 1.0,
+        "legacy_v1_required_group_recall_at_budget": 1.0,
+        "legacy_v1_top_1_hit_rate_at_budget": 1.0
+      },
+      "evidence": {
+        "retrieval": {
+          "kind": "retrieval",
+          "relevant": 1,
+          "hits_at_k": 1,
+          "first_relevant_rank": 1,
+          "cutoff": 5
+        }
+      },
+      "failures": [],
+      "duration_ms": 40,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "local-retrieval",
+        "case_id": "ret-035"
+      },
+      "mode": "retrieval_only",
+      "split": "development",
+      "label_trust": "weak",
+      "status": "passed",
+      "metrics": {
+        "legacy_v1_mrr_at_budget": 1.0,
+        "legacy_v1_required_group_recall_at_budget": 1.0,
+        "legacy_v1_top_1_hit_rate_at_budget": 1.0
+      },
+      "evidence": {
+        "retrieval": {
+          "kind": "retrieval",
+          "relevant": 1,
+          "hits_at_k": 1,
+          "first_relevant_rank": 1,
+          "cutoff": 5
+        }
+      },
+      "failures": [],
+      "duration_ms": 40,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "local-retrieval",
+        "case_id": "ret-036"
+      },
+      "mode": "retrieval_only",
+      "split": "development",
+      "label_trust": "weak",
+      "status": "passed",
+      "metrics": {
+        "legacy_v1_mrr_at_budget": 1.0,
+        "legacy_v1_required_group_recall_at_budget": 1.0,
+        "legacy_v1_top_1_hit_rate_at_budget": 1.0
+      },
+      "evidence": {
+        "retrieval": {
+          "kind": "retrieval",
+          "relevant": 1,
+          "hits_at_k": 1,
+          "first_relevant_rank": 1,
+          "cutoff": 5
+        }
+      },
+      "failures": [],
+      "duration_ms": 39,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "local-retrieval",
+        "case_id": "ret-037"
+      },
+      "mode": "retrieval_only",
+      "split": "development",
+      "label_trust": "weak",
+      "status": "passed",
+      "metrics": {
+        "legacy_v1_mrr_at_budget": 1.0,
+        "legacy_v1_required_group_recall_at_budget": 1.0,
+        "legacy_v1_top_1_hit_rate_at_budget": 1.0
+      },
+      "evidence": {
+        "retrieval": {
+          "kind": "retrieval",
+          "relevant": 1,
+          "hits_at_k": 1,
+          "first_relevant_rank": 1,
+          "cutoff": 5
+        }
+      },
+      "failures": [],
+      "duration_ms": 36,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "local-retrieval",
+        "case_id": "ret-038"
+      },
+      "mode": "retrieval_only",
+      "split": "development",
+      "label_trust": "weak",
+      "status": "passed",
+      "metrics": {
+        "legacy_v1_mrr_at_budget": 1.0,
+        "legacy_v1_required_group_recall_at_budget": 1.0,
+        "legacy_v1_top_1_hit_rate_at_budget": 1.0
+      },
+      "evidence": {
+        "retrieval": {
+          "kind": "retrieval",
+          "relevant": 1,
+          "hits_at_k": 1,
+          "first_relevant_rank": 1,
+          "cutoff": 5
+        }
+      },
+      "failures": [],
+      "duration_ms": 39,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "local-retrieval",
+        "case_id": "ret-039"
+      },
+      "mode": "retrieval_only",
+      "split": "development",
+      "label_trust": "weak",
+      "status": "passed",
+      "metrics": {
+        "legacy_v1_mrr_at_budget": 1.0,
+        "legacy_v1_required_group_recall_at_budget": 1.0,
+        "legacy_v1_top_1_hit_rate_at_budget": 1.0
+      },
+      "evidence": {
+        "retrieval": {
+          "kind": "retrieval",
+          "relevant": 1,
+          "hits_at_k": 1,
+          "first_relevant_rank": 1,
+          "cutoff": 5
+        }
+      },
+      "failures": [],
+      "duration_ms": 39,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "local-retrieval",
+        "case_id": "ret-040"
+      },
+      "mode": "retrieval_only",
+      "split": "development",
+      "label_trust": "weak",
+      "status": "passed",
+      "metrics": {
+        "legacy_v1_mrr_at_budget": 1.0,
+        "legacy_v1_required_group_recall_at_budget": 1.0,
+        "legacy_v1_top_1_hit_rate_at_budget": 1.0
+      },
+      "evidence": {
+        "retrieval": {
+          "kind": "retrieval",
+          "relevant": 1,
+          "hits_at_k": 1,
+          "first_relevant_rank": 1,
+          "cutoff": 5
+        }
+      },
+      "failures": [],
+      "duration_ms": 38,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "local-retrieval",
+        "case_id": "ret-041"
+      },
+      "mode": "retrieval_only",
+      "split": "development",
+      "label_trust": "weak",
+      "status": "passed",
+      "metrics": {
+        "legacy_v1_mrr_at_budget": 1.0,
+        "legacy_v1_required_group_recall_at_budget": 1.0,
+        "legacy_v1_top_1_hit_rate_at_budget": 1.0
+      },
+      "evidence": {
+        "retrieval": {
+          "kind": "retrieval",
+          "relevant": 1,
+          "hits_at_k": 1,
+          "first_relevant_rank": 1,
+          "cutoff": 5
+        }
+      },
+      "failures": [],
+      "duration_ms": 37,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "local-retrieval",
+        "case_id": "ret-042"
+      },
+      "mode": "retrieval_only",
+      "split": "development",
+      "label_trust": "weak",
+      "status": "passed",
+      "metrics": {
+        "legacy_v1_mrr_at_budget": 1.0,
+        "legacy_v1_required_group_recall_at_budget": 1.0,
+        "legacy_v1_top_1_hit_rate_at_budget": 1.0
+      },
+      "evidence": {
+        "retrieval": {
+          "kind": "retrieval",
+          "relevant": 1,
+          "hits_at_k": 1,
+          "first_relevant_rank": 1,
+          "cutoff": 5
+        }
+      },
+      "failures": [],
+      "duration_ms": 39,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "local-retrieval",
+        "case_id": "ret-043"
+      },
+      "mode": "retrieval_only",
+      "split": "development",
+      "label_trust": "weak",
+      "status": "passed",
+      "metrics": {
+        "legacy_v1_mrr_at_budget": 1.0,
+        "legacy_v1_required_group_recall_at_budget": 1.0,
+        "legacy_v1_top_1_hit_rate_at_budget": 1.0
+      },
+      "evidence": {
+        "retrieval": {
+          "kind": "retrieval",
+          "relevant": 1,
+          "hits_at_k": 1,
+          "first_relevant_rank": 1,
+          "cutoff": 5
+        }
+      },
+      "failures": [],
+      "duration_ms": 39,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "local-retrieval",
+        "case_id": "ret-044"
+      },
+      "mode": "retrieval_only",
+      "split": "development",
+      "label_trust": "weak",
+      "status": "passed",
+      "metrics": {
+        "legacy_v1_mrr_at_budget": 1.0,
+        "legacy_v1_required_group_recall_at_budget": 1.0,
+        "legacy_v1_top_1_hit_rate_at_budget": 1.0
+      },
+      "evidence": {
+        "retrieval": {
+          "kind": "retrieval",
+          "relevant": 1,
+          "hits_at_k": 1,
+          "first_relevant_rank": 1,
+          "cutoff": 5
+        }
+      },
+      "failures": [],
+      "duration_ms": 39,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "local-retrieval",
+        "case_id": "ret-045"
+      },
+      "mode": "retrieval_only",
+      "split": "development",
+      "label_trust": "weak",
+      "status": "passed",
+      "metrics": {
+        "legacy_v1_mrr_at_budget": 1.0,
+        "legacy_v1_required_group_recall_at_budget": 1.0,
+        "legacy_v1_top_1_hit_rate_at_budget": 1.0
+      },
+      "evidence": {
+        "retrieval": {
+          "kind": "retrieval",
+          "relevant": 1,
+          "hits_at_k": 1,
+          "first_relevant_rank": 1,
+          "cutoff": 5
+        }
+      },
+      "failures": [],
+      "duration_ms": 38,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "local-retrieval",
+        "case_id": "ret-046"
+      },
+      "mode": "retrieval_only",
+      "split": "development",
+      "label_trust": "weak",
+      "status": "passed",
+      "metrics": {
+        "legacy_v1_mrr_at_budget": 1.0,
+        "legacy_v1_required_group_recall_at_budget": 1.0,
+        "legacy_v1_top_1_hit_rate_at_budget": 1.0
+      },
+      "evidence": {
+        "retrieval": {
+          "kind": "retrieval",
+          "relevant": 1,
+          "hits_at_k": 1,
+          "first_relevant_rank": 1,
+          "cutoff": 5
+        }
+      },
+      "failures": [],
+      "duration_ms": 39,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "local-retrieval",
+        "case_id": "ret-047"
+      },
+      "mode": "retrieval_only",
+      "split": "development",
+      "label_trust": "weak",
+      "status": "passed",
+      "metrics": {
+        "legacy_v1_mrr_at_budget": 1.0,
+        "legacy_v1_required_group_recall_at_budget": 1.0,
+        "legacy_v1_top_1_hit_rate_at_budget": 1.0
+      },
+      "evidence": {
+        "retrieval": {
+          "kind": "retrieval",
+          "relevant": 1,
+          "hits_at_k": 1,
+          "first_relevant_rank": 1,
+          "cutoff": 5
+        }
+      },
+      "failures": [],
+      "duration_ms": 41,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "local-retrieval",
+        "case_id": "ret-048"
+      },
+      "mode": "retrieval_only",
+      "split": "development",
+      "label_trust": "weak",
+      "status": "passed",
+      "metrics": {
+        "legacy_v1_mrr_at_budget": 1.0,
+        "legacy_v1_required_group_recall_at_budget": 1.0,
+        "legacy_v1_top_1_hit_rate_at_budget": 1.0
+      },
+      "evidence": {
+        "retrieval": {
+          "kind": "retrieval",
+          "relevant": 1,
+          "hits_at_k": 1,
+          "first_relevant_rank": 1,
+          "cutoff": 5
+        }
+      },
+      "failures": [],
+      "duration_ms": 40,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "local-retrieval",
+        "case_id": "ret-049"
+      },
+      "mode": "retrieval_only",
+      "split": "development",
+      "label_trust": "weak",
+      "status": "passed",
+      "metrics": {
+        "legacy_v1_mrr_at_budget": 1.0,
+        "legacy_v1_required_group_recall_at_budget": 1.0,
+        "legacy_v1_top_1_hit_rate_at_budget": 1.0
+      },
+      "evidence": {
+        "retrieval": {
+          "kind": "retrieval",
+          "relevant": 1,
+          "hits_at_k": 1,
+          "first_relevant_rank": 1,
+          "cutoff": 5
+        }
+      },
+      "failures": [],
+      "duration_ms": 39,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "local-retrieval",
+        "case_id": "ret-050"
+      },
+      "mode": "retrieval_only",
+      "split": "development",
+      "label_trust": "weak",
+      "status": "passed",
+      "metrics": {
+        "legacy_v1_mrr_at_budget": 1.0,
+        "legacy_v1_required_group_recall_at_budget": 1.0,
+        "legacy_v1_top_1_hit_rate_at_budget": 1.0
+      },
+      "evidence": {
+        "retrieval": {
+          "kind": "retrieval",
+          "relevant": 1,
+          "hits_at_k": 1,
+          "first_relevant_rank": 1,
+          "cutoff": 5
+        }
+      },
+      "failures": [],
+      "duration_ms": 39,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "local-retrieval",
+        "case_id": "ret-056"
+      },
+      "mode": "retrieval_only",
+      "split": "development",
+      "label_trust": "weak",
+      "status": "passed",
+      "metrics": {
+        "legacy_v1_mrr_at_budget": 1.0,
+        "legacy_v1_required_group_recall_at_budget": 1.0,
+        "legacy_v1_top_1_hit_rate_at_budget": 1.0
+      },
+      "evidence": {
+        "retrieval": {
+          "kind": "retrieval",
+          "relevant": 1,
+          "hits_at_k": 1,
+          "first_relevant_rank": 1,
+          "cutoff": 5
+        }
+      },
+      "failures": [],
+      "duration_ms": 38,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "local-retrieval",
+        "case_id": "ret-057"
+      },
+      "mode": "retrieval_only",
+      "split": "development",
+      "label_trust": "weak",
+      "status": "passed",
+      "metrics": {
+        "legacy_v1_mrr_at_budget": 1.0,
+        "legacy_v1_required_group_recall_at_budget": 1.0,
+        "legacy_v1_top_1_hit_rate_at_budget": 1.0
+      },
+      "evidence": {
+        "retrieval": {
+          "kind": "retrieval",
+          "relevant": 1,
+          "hits_at_k": 1,
+          "first_relevant_rank": 1,
+          "cutoff": 5
+        }
+      },
+      "failures": [],
+      "duration_ms": 39,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "local-retrieval",
+        "case_id": "ret-058"
+      },
+      "mode": "retrieval_only",
+      "split": "development",
+      "label_trust": "weak",
+      "status": "passed",
+      "metrics": {
+        "legacy_v1_mrr_at_budget": 1.0,
+        "legacy_v1_required_group_recall_at_budget": 1.0,
+        "legacy_v1_top_1_hit_rate_at_budget": 1.0
+      },
+      "evidence": {
+        "retrieval": {
+          "kind": "retrieval",
+          "relevant": 1,
+          "hits_at_k": 1,
+          "first_relevant_rank": 1,
+          "cutoff": 5
+        }
+      },
+      "failures": [],
+      "duration_ms": 38,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "local-retrieval",
+        "case_id": "ret-059"
+      },
+      "mode": "retrieval_only",
+      "split": "development",
+      "label_trust": "weak",
+      "status": "passed",
+      "metrics": {
+        "legacy_v1_mrr_at_budget": 1.0,
+        "legacy_v1_required_group_recall_at_budget": 1.0,
+        "legacy_v1_top_1_hit_rate_at_budget": 1.0
+      },
+      "evidence": {
+        "retrieval": {
+          "kind": "retrieval",
+          "relevant": 1,
+          "hits_at_k": 1,
+          "first_relevant_rank": 1,
+          "cutoff": 5
+        }
+      },
+      "failures": [],
+      "duration_ms": 38,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "local-retrieval",
+        "case_id": "ret-060"
+      },
+      "mode": "retrieval_only",
+      "split": "development",
+      "label_trust": "weak",
+      "status": "passed",
+      "metrics": {
+        "legacy_v1_mrr_at_budget": 1.0,
+        "legacy_v1_required_group_recall_at_budget": 1.0,
+        "legacy_v1_top_1_hit_rate_at_budget": 1.0
+      },
+      "evidence": {
+        "retrieval": {
+          "kind": "retrieval",
+          "relevant": 1,
+          "hits_at_k": 1,
+          "first_relevant_rank": 1,
+          "cutoff": 5
+        }
+      },
+      "failures": [],
+      "duration_ms": 39,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "local-retrieval",
+        "case_id": "ret-061"
+      },
+      "mode": "retrieval_only",
+      "split": "development",
+      "label_trust": "weak",
+      "status": "passed",
+      "metrics": {
+        "legacy_v1_mrr_at_budget": 1.0,
+        "legacy_v1_required_group_recall_at_budget": 1.0,
+        "legacy_v1_top_1_hit_rate_at_budget": 1.0
+      },
+      "evidence": {
+        "retrieval": {
+          "kind": "retrieval",
+          "relevant": 4,
+          "hits_at_k": 4,
+          "first_relevant_rank": 1,
+          "cutoff": 6
+        }
+      },
+      "failures": [],
+      "duration_ms": 77,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "local-retrieval",
+        "case_id": "ret-062"
+      },
+      "mode": "retrieval_only",
+      "split": "development",
+      "label_trust": "weak",
+      "status": "passed",
+      "metrics": {
+        "legacy_v1_mrr_at_budget": 1.0,
+        "legacy_v1_required_group_recall_at_budget": 1.0,
+        "legacy_v1_top_1_hit_rate_at_budget": 1.0
+      },
+      "evidence": {
+        "retrieval": {
+          "kind": "retrieval",
+          "relevant": 4,
+          "hits_at_k": 4,
+          "first_relevant_rank": 1,
+          "cutoff": 6
+        }
+      },
+      "failures": [],
+      "duration_ms": 81,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "local-retrieval",
+        "case_id": "ret-063"
+      },
+      "mode": "retrieval_only",
+      "split": "development",
+      "label_trust": "weak",
+      "status": "passed",
+      "metrics": {
+        "legacy_v1_mrr_at_budget": 1.0,
+        "legacy_v1_required_group_recall_at_budget": 1.0,
+        "legacy_v1_top_1_hit_rate_at_budget": 1.0
+      },
+      "evidence": {
+        "retrieval": {
+          "kind": "retrieval",
+          "relevant": 4,
+          "hits_at_k": 4,
+          "first_relevant_rank": 1,
+          "cutoff": 6
+        }
+      },
+      "failures": [],
+      "duration_ms": 90,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "local-retrieval",
+        "case_id": "timeline-auto-atlas-history"
+      },
+      "mode": "retrieval_only",
+      "split": "development",
+      "label_trust": "weak",
+      "status": "passed",
+      "metrics": {
+        "legacy_v1_mrr_at_budget": 1.0,
+        "legacy_v1_required_group_recall_at_budget": 1.0,
+        "legacy_v1_top_1_hit_rate_at_budget": 1.0
+      },
+      "evidence": {
+        "retrieval": {
+          "kind": "retrieval",
+          "relevant": 2,
+          "hits_at_k": 2,
+          "first_relevant_rank": 1,
+          "cutoff": 5
+        }
+      },
+      "failures": [],
+      "duration_ms": 45,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "retrieval-quality",
+        "case_id": "historical-observed-cutoff"
+      },
+      "mode": "end_to_end",
+      "split": "development",
+      "label_trust": "reviewed",
+      "status": "passed",
+      "metrics": {
+        "answerable_non_abstention_rate": 1.0,
+        "duplicate_free_rate": 1.0,
+        "precision_macro": 1.0,
+        "prohibited_free_rate": 1.0,
+        "required_group_recall": 1.0
+      },
+      "evidence": {
+        "answerable_non_abstention_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "case_tag:historical": {
+          "kind": "count",
+          "value": 1
+        },
+        "case_tag:transaction-cutoff": {
+          "kind": "count",
+          "value": 1
+        },
+        "duplicate_free_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "precision_macro": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "prohibited_free_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "required_group_recall": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        }
+      },
+      "failures": [],
+      "duration_ms": 224,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "retrieval-quality",
+        "case_id": "http-task-16"
+      },
+      "mode": "end_to_end",
+      "split": "development",
+      "label_trust": "reviewed",
+      "status": "passed",
+      "metrics": {
+        "answerable_non_abstention_rate": 1.0,
+        "duplicate_free_rate": 1.0,
+        "precision_macro": 1.0,
+        "prohibited_free_rate": 1.0,
+        "required_group_recall": 1.0
+      },
+      "evidence": {
+        "answerable_non_abstention_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "case_tag:numeric-distractor": {
+          "kind": "count",
+          "value": 1
+        },
+        "case_tag:partial_source_coverage": {
+          "kind": "count",
+          "value": 1
+        },
+        "case_tag:qualified-task": {
+          "kind": "count",
+          "value": 1
+        },
+        "case_tag:url-distractor": {
+          "kind": "count",
+          "value": 1
+        },
+        "duplicate_free_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "precision_macro": {
+          "kind": "ratio",
+          "numerator": 2,
+          "denominator": 2
+        },
+        "prohibited_free_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "required_group_recall": {
+          "kind": "ratio",
+          "numerator": 2,
+          "denominator": 2
+        }
+      },
+      "failures": [],
+      "duration_ms": 5758,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "retrieval-quality",
+        "case_id": "http-task-paraphrase"
+      },
+      "mode": "end_to_end",
+      "split": "development",
+      "label_trust": "reviewed",
+      "status": "passed",
+      "metrics": {
+        "answerable_non_abstention_rate": 1.0,
+        "duplicate_free_rate": 1.0,
+        "precision_macro": 1.0,
+        "prohibited_free_rate": 1.0,
+        "required_group_recall": 1.0
+      },
+      "evidence": {
+        "answerable_non_abstention_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "case_tag:paraphrase": {
+          "kind": "count",
+          "value": 1
+        },
+        "case_tag:task": {
+          "kind": "count",
+          "value": 1
+        },
+        "duplicate_free_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "precision_macro": {
+          "kind": "ratio",
+          "numerator": 2,
+          "denominator": 2
+        },
+        "prohibited_free_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "required_group_recall": {
+          "kind": "ratio",
+          "numerator": 2,
+          "denominator": 2
+        }
+      },
+      "failures": [],
+      "duration_ms": 8724,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "retrieval-quality",
+        "case_id": "http-task-short"
+      },
+      "mode": "end_to_end",
+      "split": "development",
+      "label_trust": "reviewed",
+      "status": "passed",
+      "metrics": {
+        "answerable_non_abstention_rate": 1.0,
+        "duplicate_free_rate": 1.0,
+        "precision_macro": 1.0,
+        "prohibited_free_rate": 1.0,
+        "required_group_recall": 1.0
+      },
+      "evidence": {
+        "answerable_non_abstention_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "case_tag:qualified-task": {
+          "kind": "count",
+          "value": 1
+        },
+        "case_tag:short-query": {
+          "kind": "count",
+          "value": 1
+        },
+        "duplicate_free_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "precision_macro": {
+          "kind": "ratio",
+          "numerator": 2,
+          "denominator": 2
+        },
+        "prohibited_free_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "required_group_recall": {
+          "kind": "ratio",
+          "numerator": 2,
+          "denominator": 2
+        }
+      },
+      "failures": [],
+      "duration_ms": 4141,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "retrieval-quality",
+        "case_id": "locomo-conv-26-000"
+      },
+      "mode": "end_to_end",
+      "split": "development",
+      "label_trust": "reviewed",
+      "status": "passed",
+      "metrics": {
+        "answerable_non_abstention_rate": 1.0,
+        "duplicate_free_rate": 1.0,
+        "precision_macro": 1.0,
+        "prohibited_free_rate": 1.0,
+        "required_group_recall": 1.0
+      },
+      "evidence": {
+        "answerable_non_abstention_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "case_tag:category-2": {
+          "kind": "count",
+          "value": 1
+        },
+        "case_tag:locomo": {
+          "kind": "count",
+          "value": 1
+        },
+        "case_tag:published-evidence": {
+          "kind": "count",
+          "value": 1
+        },
+        "duplicate_free_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "precision_macro": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "prohibited_free_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "required_group_recall": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        }
+      },
+      "failures": [],
+      "duration_ms": 7140,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "retrieval-quality",
+        "case_id": "locomo-conv-26-082"
+      },
+      "mode": "end_to_end",
+      "split": "development",
+      "label_trust": "reviewed",
+      "status": "passed",
+      "metrics": {
+        "answerable_non_abstention_rate": 1.0,
+        "duplicate_free_rate": 1.0,
+        "precision_macro": 1.0,
+        "prohibited_free_rate": 1.0,
+        "required_group_recall": 1.0
+      },
+      "evidence": {
+        "answerable_non_abstention_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "case_tag:category-4": {
+          "kind": "count",
+          "value": 1
+        },
+        "case_tag:locomo": {
+          "kind": "count",
+          "value": 1
+        },
+        "case_tag:published-evidence": {
+          "kind": "count",
+          "value": 1
+        },
+        "duplicate_free_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "precision_macro": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "prohibited_free_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "required_group_recall": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        }
+      },
+      "failures": [],
+      "duration_ms": 7159,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "retrieval-quality",
+        "case_id": "locomo-conv-30-000"
+      },
+      "mode": "end_to_end",
+      "split": "development",
+      "label_trust": "reviewed",
+      "status": "passed",
+      "metrics": {
+        "answerable_non_abstention_rate": 1.0,
+        "duplicate_free_rate": 1.0,
+        "precision_macro": 1.0,
+        "prohibited_free_rate": 1.0,
+        "required_group_recall": 1.0
+      },
+      "evidence": {
+        "answerable_non_abstention_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "case_tag:category-2": {
+          "kind": "count",
+          "value": 1
+        },
+        "case_tag:locomo": {
+          "kind": "count",
+          "value": 1
+        },
+        "case_tag:published-evidence": {
+          "kind": "count",
+          "value": 1
+        },
+        "duplicate_free_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "precision_macro": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "prohibited_free_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "required_group_recall": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        }
+      },
+      "failures": [],
+      "duration_ms": 9177,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "retrieval-quality",
+        "case_id": "locomo-conv-30-002"
+      },
+      "mode": "end_to_end",
+      "split": "development",
+      "label_trust": "reviewed",
+      "status": "passed",
+      "metrics": {
+        "answerable_non_abstention_rate": 1.0,
+        "duplicate_free_rate": 1.0,
+        "precision_macro": 1.0,
+        "prohibited_free_rate": 1.0,
+        "required_group_recall": 1.0
+      },
+      "evidence": {
+        "answerable_non_abstention_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "case_tag:category-4": {
+          "kind": "count",
+          "value": 1
+        },
+        "case_tag:locomo": {
+          "kind": "count",
+          "value": 1
+        },
+        "case_tag:published-evidence": {
+          "kind": "count",
+          "value": 1
+        },
+        "duplicate_free_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "precision_macro": {
+          "kind": "ratio",
+          "numerator": 3,
+          "denominator": 3
+        },
+        "prohibited_free_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "required_group_recall": {
+          "kind": "ratio",
+          "numerator": 2,
+          "denominator": 2
+        }
+      },
+      "failures": [],
+      "duration_ms": 10893,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "retrieval-quality",
+        "case_id": "locomo-conv-41-001"
+      },
+      "mode": "end_to_end",
+      "split": "development",
+      "label_trust": "reviewed",
+      "status": "passed",
+      "metrics": {
+        "answerable_non_abstention_rate": 1.0,
+        "duplicate_free_rate": 1.0,
+        "precision_macro": 1.0,
+        "prohibited_free_rate": 1.0,
+        "required_group_recall": 1.0
+      },
+      "evidence": {
+        "answerable_non_abstention_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "case_tag:category-2": {
+          "kind": "count",
+          "value": 1
+        },
+        "case_tag:locomo": {
+          "kind": "count",
+          "value": 1
+        },
+        "case_tag:published-evidence": {
+          "kind": "count",
+          "value": 1
+        },
+        "duplicate_free_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "precision_macro": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "prohibited_free_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "required_group_recall": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        }
+      },
+      "failures": [],
+      "duration_ms": 8805,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "retrieval-quality",
+        "case_id": "locomo-conv-41-065"
+      },
+      "mode": "end_to_end",
+      "split": "development",
+      "label_trust": "reviewed",
+      "status": "passed",
+      "metrics": {
+        "answerable_non_abstention_rate": 1.0,
+        "duplicate_free_rate": 1.0,
+        "precision_macro": 1.0,
+        "prohibited_free_rate": 1.0,
+        "required_group_recall": 1.0
+      },
+      "evidence": {
+        "answerable_non_abstention_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "case_tag:category-4": {
+          "kind": "count",
+          "value": 1
+        },
+        "case_tag:locomo": {
+          "kind": "count",
+          "value": 1
+        },
+        "case_tag:published-evidence": {
+          "kind": "count",
+          "value": 1
+        },
+        "duplicate_free_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "precision_macro": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "prohibited_free_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "required_group_recall": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        }
+      },
+      "failures": [],
+      "duration_ms": 10592,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "retrieval-quality",
+        "case_id": "locomo-conv-42-002"
+      },
+      "mode": "end_to_end",
+      "split": "development",
+      "label_trust": "reviewed",
+      "status": "passed",
+      "metrics": {
+        "answerable_non_abstention_rate": 1.0,
+        "duplicate_free_rate": 1.0,
+        "precision_macro": 1.0,
+        "prohibited_free_rate": 1.0,
+        "required_group_recall": 1.0
+      },
+      "evidence": {
+        "answerable_non_abstention_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "case_tag:category-2": {
+          "kind": "count",
+          "value": 1
+        },
+        "case_tag:locomo": {
+          "kind": "count",
+          "value": 1
+        },
+        "case_tag:published-evidence": {
+          "kind": "count",
+          "value": 1
+        },
+        "case_tag:source_labeled_upstream_image_metadata": {
+          "kind": "count",
+          "value": 1
+        },
+        "duplicate_free_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "precision_macro": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "prohibited_free_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "required_group_recall": {
+          "kind": "ratio",
+          "numerator": 2,
+          "denominator": 2
+        }
+      },
+      "failures": [],
+      "duration_ms": 8152,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "retrieval-quality",
+        "case_id": "locomo-conv-42-096"
+      },
+      "mode": "end_to_end",
+      "split": "development",
+      "label_trust": "reviewed",
+      "status": "passed",
+      "metrics": {
+        "answerable_non_abstention_rate": 1.0,
+        "duplicate_free_rate": 1.0,
+        "precision_macro": 1.0,
+        "prohibited_free_rate": 1.0,
+        "required_group_recall": 1.0
+      },
+      "evidence": {
+        "answerable_non_abstention_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "case_tag:category-4": {
+          "kind": "count",
+          "value": 1
+        },
+        "case_tag:locomo": {
+          "kind": "count",
+          "value": 1
+        },
+        "case_tag:published-evidence": {
+          "kind": "count",
+          "value": 1
+        },
+        "duplicate_free_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "precision_macro": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "prohibited_free_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "required_group_recall": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        }
+      },
+      "failures": [],
+      "duration_ms": 9369,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "retrieval-quality",
+        "case_id": "locomo-conv-43-071"
+      },
+      "mode": "end_to_end",
+      "split": "development",
+      "label_trust": "reviewed",
+      "status": "passed",
+      "metrics": {
+        "answerable_non_abstention_rate": 1.0,
+        "duplicate_free_rate": 1.0,
+        "precision_macro": 1.0,
+        "prohibited_free_rate": 1.0,
+        "required_group_recall": 1.0
+      },
+      "evidence": {
+        "answerable_non_abstention_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "case_tag:category-4": {
+          "kind": "count",
+          "value": 1
+        },
+        "case_tag:locomo": {
+          "kind": "count",
+          "value": 1
+        },
+        "case_tag:published-evidence": {
+          "kind": "count",
+          "value": 1
+        },
+        "duplicate_free_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "precision_macro": {
+          "kind": "ratio",
+          "numerator": 2,
+          "denominator": 2
+        },
+        "prohibited_free_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "required_group_recall": {
+          "kind": "ratio",
+          "numerator": 2,
+          "denominator": 2
+        }
+      },
+      "failures": [],
+      "duration_ms": 6427,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "retrieval-quality",
+        "case_id": "locomo-conv-44-000"
+      },
+      "mode": "end_to_end",
+      "split": "development",
+      "label_trust": "reviewed",
+      "status": "passed",
+      "metrics": {
+        "answerable_non_abstention_rate": 1.0,
+        "duplicate_free_rate": 1.0,
+        "precision_macro": 1.0,
+        "prohibited_free_rate": 1.0,
+        "required_group_recall": 1.0
+      },
+      "evidence": {
+        "answerable_non_abstention_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "case_tag:category-2": {
+          "kind": "count",
+          "value": 1
+        },
+        "case_tag:locomo": {
+          "kind": "count",
+          "value": 1
+        },
+        "case_tag:published-evidence": {
+          "kind": "count",
+          "value": 1
+        },
+        "duplicate_free_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "precision_macro": {
+          "kind": "ratio",
+          "numerator": 2,
+          "denominator": 2
+        },
+        "prohibited_free_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "required_group_recall": {
+          "kind": "ratio",
+          "numerator": 2,
+          "denominator": 2
+        }
+      },
+      "failures": [],
+      "duration_ms": 9483,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "retrieval-quality",
+        "case_id": "locomo-conv-44-061"
+      },
+      "mode": "end_to_end",
+      "split": "development",
+      "label_trust": "reviewed",
+      "status": "passed",
+      "metrics": {
+        "answerable_non_abstention_rate": 1.0,
+        "duplicate_free_rate": 1.0,
+        "precision_macro": 1.0,
+        "prohibited_free_rate": 1.0,
+        "required_group_recall": 1.0
+      },
+      "evidence": {
+        "answerable_non_abstention_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "case_tag:category-4": {
+          "kind": "count",
+          "value": 1
+        },
+        "case_tag:locomo": {
+          "kind": "count",
+          "value": 1
+        },
+        "case_tag:published-evidence": {
+          "kind": "count",
+          "value": 1
+        },
+        "duplicate_free_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "precision_macro": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "prohibited_free_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "required_group_recall": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        }
+      },
+      "failures": [],
+      "duration_ms": 9581,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "retrieval-quality",
+        "case_id": "locomo-conv-47-001"
+      },
+      "mode": "end_to_end",
+      "split": "development",
+      "label_trust": "reviewed",
+      "status": "passed",
+      "metrics": {
+        "answerable_non_abstention_rate": 1.0,
+        "duplicate_free_rate": 1.0,
+        "precision_macro": 1.0,
+        "prohibited_free_rate": 1.0,
+        "required_group_recall": 1.0
+      },
+      "evidence": {
+        "answerable_non_abstention_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "case_tag:category-2": {
+          "kind": "count",
+          "value": 1
+        },
+        "case_tag:locomo": {
+          "kind": "count",
+          "value": 1
+        },
+        "case_tag:published-evidence": {
+          "kind": "count",
+          "value": 1
+        },
+        "duplicate_free_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "precision_macro": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "prohibited_free_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "required_group_recall": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        }
+      },
+      "failures": [],
+      "duration_ms": 7927,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "retrieval-quality",
+        "case_id": "locomo-conv-47-067"
+      },
+      "mode": "end_to_end",
+      "split": "development",
+      "label_trust": "reviewed",
+      "status": "passed",
+      "metrics": {
+        "answerable_non_abstention_rate": 1.0,
+        "duplicate_free_rate": 1.0,
+        "precision_macro": 1.0,
+        "prohibited_free_rate": 1.0,
+        "required_group_recall": 1.0
+      },
+      "evidence": {
+        "answerable_non_abstention_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "case_tag:category-4": {
+          "kind": "count",
+          "value": 1
+        },
+        "case_tag:locomo": {
+          "kind": "count",
+          "value": 1
+        },
+        "case_tag:published-evidence": {
+          "kind": "count",
+          "value": 1
+        },
+        "duplicate_free_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "precision_macro": {
+          "kind": "ratio",
+          "numerator": 2,
+          "denominator": 2
+        },
+        "prohibited_free_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "required_group_recall": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        }
+      },
+      "failures": [],
+      "duration_ms": 7973,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "retrieval-quality",
+        "case_id": "locomo-conv-48-000"
+      },
+      "mode": "end_to_end",
+      "split": "development",
+      "label_trust": "reviewed",
+      "status": "passed",
+      "metrics": {
+        "answerable_non_abstention_rate": 1.0,
+        "duplicate_free_rate": 1.0,
+        "precision_macro": 1.0,
+        "prohibited_free_rate": 1.0,
+        "required_group_recall": 1.0
+      },
+      "evidence": {
+        "answerable_non_abstention_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "case_tag:category-2": {
+          "kind": "count",
+          "value": 1
+        },
+        "case_tag:locomo": {
+          "kind": "count",
+          "value": 1
+        },
+        "case_tag:published-evidence": {
+          "kind": "count",
+          "value": 1
+        },
+        "case_tag:upstream_temporal_underspecified": {
+          "kind": "count",
+          "value": 1
+        },
+        "duplicate_free_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "precision_macro": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "prohibited_free_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "required_group_recall": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        }
+      },
+      "failures": [],
+      "duration_ms": 6450,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "retrieval-quality",
+        "case_id": "locomo-conv-48-015"
+      },
+      "mode": "end_to_end",
+      "split": "development",
+      "label_trust": "reviewed",
+      "status": "passed",
+      "metrics": {
+        "answerable_non_abstention_rate": 1.0,
+        "duplicate_free_rate": 1.0,
+        "precision_macro": 1.0,
+        "prohibited_free_rate": 1.0,
+        "required_group_recall": 1.0
+      },
+      "evidence": {
+        "answerable_non_abstention_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "case_tag:category-4": {
+          "kind": "count",
+          "value": 1
+        },
+        "case_tag:locomo": {
+          "kind": "count",
+          "value": 1
+        },
+        "case_tag:published-evidence": {
+          "kind": "count",
+          "value": 1
+        },
+        "duplicate_free_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "precision_macro": {
+          "kind": "ratio",
+          "numerator": 2,
+          "denominator": 2
+        },
+        "prohibited_free_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "required_group_recall": {
+          "kind": "ratio",
+          "numerator": 2,
+          "denominator": 2
+        }
+      },
+      "failures": [],
+      "duration_ms": 6346,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "retrieval-quality",
+        "case_id": "locomo-conv-49-002"
+      },
+      "mode": "end_to_end",
+      "split": "development",
+      "label_trust": "reviewed",
+      "status": "passed",
+      "metrics": {
+        "answerable_non_abstention_rate": 1.0,
+        "duplicate_free_rate": 1.0,
+        "precision_macro": 1.0,
+        "prohibited_free_rate": 1.0,
+        "required_group_recall": 1.0
+      },
+      "evidence": {
+        "answerable_non_abstention_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "case_tag:category-1": {
+          "kind": "count",
+          "value": 1
+        },
+        "case_tag:locomo": {
+          "kind": "count",
+          "value": 1
+        },
+        "case_tag:published-evidence": {
+          "kind": "count",
+          "value": 1
+        },
+        "duplicate_free_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "precision_macro": {
+          "kind": "ratio",
+          "numerator": 3,
+          "denominator": 3
+        },
+        "prohibited_free_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "required_group_recall": {
+          "kind": "ratio",
+          "numerator": 3,
+          "denominator": 3
+        }
+      },
+      "failures": [],
+      "duration_ms": 8625,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "retrieval-quality",
+        "case_id": "locomo-conv-49-083"
+      },
+      "mode": "end_to_end",
+      "split": "development",
+      "label_trust": "reviewed",
+      "status": "passed",
+      "metrics": {
+        "answerable_non_abstention_rate": 1.0,
+        "duplicate_free_rate": 1.0,
+        "precision_macro": 1.0,
+        "prohibited_free_rate": 1.0,
+        "required_group_recall": 1.0
+      },
+      "evidence": {
+        "answerable_non_abstention_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "case_tag:category-4": {
+          "kind": "count",
+          "value": 1
+        },
+        "case_tag:locomo": {
+          "kind": "count",
+          "value": 1
+        },
+        "case_tag:published-evidence": {
+          "kind": "count",
+          "value": 1
+        },
+        "duplicate_free_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "precision_macro": {
+          "kind": "ratio",
+          "numerator": 2,
+          "denominator": 2
+        },
+        "prohibited_free_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "required_group_recall": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        }
+      },
+      "failures": [],
+      "duration_ms": 9993,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "retrieval-quality",
+        "case_id": "locomo-conv-50-001"
+      },
+      "mode": "end_to_end",
+      "split": "development",
+      "label_trust": "reviewed",
+      "status": "passed",
+      "metrics": {
+        "answerable_non_abstention_rate": 1.0,
+        "duplicate_free_rate": 1.0,
+        "precision_macro": 1.0,
+        "prohibited_free_rate": 1.0,
+        "required_group_recall": 1.0
+      },
+      "evidence": {
+        "answerable_non_abstention_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "case_tag:category-1": {
+          "kind": "count",
+          "value": 1
+        },
+        "case_tag:locomo": {
+          "kind": "count",
+          "value": 1
+        },
+        "case_tag:published-evidence": {
+          "kind": "count",
+          "value": 1
+        },
+        "case_tag:source_labeled_upstream_image_metadata": {
+          "kind": "count",
+          "value": 1
+        },
+        "case_tag:upstream_acquisition_underspecified": {
+          "kind": "count",
+          "value": 1
+        },
+        "duplicate_free_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "precision_macro": {
+          "kind": "ratio",
+          "numerator": 4,
+          "denominator": 4
+        },
+        "prohibited_free_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "required_group_recall": {
+          "kind": "ratio",
+          "numerator": 3,
+          "denominator": 3
+        }
+      },
+      "failures": [],
+      "duration_ms": 5734,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "retrieval-quality",
+        "case_id": "locomo-conv-50-071"
+      },
+      "mode": "end_to_end",
+      "split": "development",
+      "label_trust": "reviewed",
+      "status": "passed",
+      "metrics": {
+        "answerable_non_abstention_rate": 1.0,
+        "duplicate_free_rate": 1.0,
+        "precision_macro": 1.0,
+        "prohibited_free_rate": 1.0,
+        "required_group_recall": 1.0
+      },
+      "evidence": {
+        "answerable_non_abstention_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "case_tag:category-4": {
+          "kind": "count",
+          "value": 1
+        },
+        "case_tag:locomo": {
+          "kind": "count",
+          "value": 1
+        },
+        "case_tag:published-evidence": {
+          "kind": "count",
+          "value": 1
+        },
+        "duplicate_free_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "precision_macro": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "prohibited_free_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "required_group_recall": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        }
+      },
+      "failures": [],
+      "duration_ms": 7641,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "retrieval-quality",
+        "case_id": "logging-config"
+      },
+      "mode": "end_to_end",
+      "split": "development",
+      "label_trust": "reviewed",
+      "status": "passed",
+      "metrics": {
+        "answerable_non_abstention_rate": 1.0,
+        "duplicate_free_rate": 1.0,
+        "precision_macro": 1.0,
+        "prohibited_free_rate": 1.0,
+        "required_group_recall": 1.0
+      },
+      "evidence": {
+        "answerable_non_abstention_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "case_tag:configuration": {
+          "kind": "count",
+          "value": 1
+        },
+        "case_tag:logging": {
+          "kind": "count",
+          "value": 1
+        },
+        "duplicate_free_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "precision_macro": {
+          "kind": "ratio",
+          "numerator": 2,
+          "denominator": 2
+        },
+        "prohibited_free_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "required_group_recall": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        }
+      },
+      "failures": [],
+      "duration_ms": 8893,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "retrieval-quality",
+        "case_id": "logging-correlation"
+      },
+      "mode": "end_to_end",
+      "split": "development",
+      "label_trust": "reviewed",
+      "status": "passed",
+      "metrics": {
+        "answerable_non_abstention_rate": 1.0,
+        "duplicate_free_rate": 1.0,
+        "precision_macro": 1.0,
+        "prohibited_free_rate": 1.0,
+        "required_group_recall": 1.0
+      },
+      "evidence": {
+        "answerable_non_abstention_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "case_tag:logging": {
+          "kind": "count",
+          "value": 1
+        },
+        "case_tag:paraphrase": {
+          "kind": "count",
+          "value": 1
+        },
+        "duplicate_free_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "precision_macro": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "prohibited_free_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "required_group_recall": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        }
+      },
+      "failures": [],
+      "duration_ms": 5707,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "retrieval-quality",
+        "case_id": "logging-levels"
+      },
+      "mode": "end_to_end",
+      "split": "development",
+      "label_trust": "reviewed",
+      "status": "passed",
+      "metrics": {
+        "answerable_non_abstention_rate": 1.0,
+        "duplicate_free_rate": 1.0,
+        "precision_macro": 1.0,
+        "prohibited_free_rate": 1.0,
+        "required_group_recall": 1.0
+      },
+      "evidence": {
+        "answerable_non_abstention_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "case_tag:error-policy": {
+          "kind": "count",
+          "value": 1
+        },
+        "case_tag:logging": {
+          "kind": "count",
+          "value": 1
+        },
+        "duplicate_free_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "precision_macro": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "prohibited_free_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "required_group_recall": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        }
+      },
+      "failures": [],
+      "duration_ms": 5356,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "retrieval-quality",
+        "case_id": "logging-original"
+      },
+      "mode": "end_to_end",
+      "split": "development",
+      "label_trust": "reviewed",
+      "status": "passed",
+      "metrics": {
+        "answerable_non_abstention_rate": 1.0,
+        "duplicate_free_rate": 1.0,
+        "precision_macro": 1.0,
+        "prohibited_free_rate": 1.0,
+        "required_group_recall": 1.0
+      },
+      "evidence": {
+        "answerable_non_abstention_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "case_tag:logging": {
+          "kind": "count",
+          "value": 1
+        },
+        "case_tag:original-query": {
+          "kind": "count",
+          "value": 1
+        },
+        "duplicate_free_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "precision_macro": {
+          "kind": "ratio",
+          "numerator": 3,
+          "denominator": 3
+        },
+        "prohibited_free_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "required_group_recall": {
+          "kind": "ratio",
+          "numerator": 3,
+          "denominator": 3
+        }
+      },
+      "failures": [],
+      "duration_ms": 10814,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "retrieval-quality",
+        "case_id": "logging-russian"
+      },
+      "mode": "end_to_end",
+      "split": "development",
+      "label_trust": "reviewed",
+      "status": "passed",
+      "metrics": {
+        "answerable_non_abstention_rate": 1.0,
+        "duplicate_free_rate": 1.0,
+        "precision_macro": 1.0,
+        "prohibited_free_rate": 1.0,
+        "required_group_recall": 1.0
+      },
+      "evidence": {
+        "answerable_non_abstention_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "case_tag:logging": {
+          "kind": "count",
+          "value": 1
+        },
+        "case_tag:multilingual": {
+          "kind": "count",
+          "value": 1
+        },
+        "duplicate_free_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "precision_macro": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "prohibited_free_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "required_group_recall": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        }
+      },
+      "failures": [],
+      "duration_ms": 5351,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "retrieval-quality",
+        "case_id": "logging-sink"
+      },
+      "mode": "end_to_end",
+      "split": "development",
+      "label_trust": "reviewed",
+      "status": "passed",
+      "metrics": {
+        "answerable_non_abstention_rate": 1.0,
+        "duplicate_free_rate": 1.0,
+        "precision_macro": 1.0,
+        "prohibited_free_rate": 1.0,
+        "required_group_recall": 1.0
+      },
+      "evidence": {
+        "answerable_non_abstention_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "case_tag:logging": {
+          "kind": "count",
+          "value": 1
+        },
+        "case_tag:sink": {
+          "kind": "count",
+          "value": 1
+        },
+        "duplicate_free_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "precision_macro": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "prohibited_free_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "required_group_recall": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        }
+      },
+      "failures": [],
+      "duration_ms": 5292,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "retrieval-quality",
+        "case_id": "policy-denied-abstention"
+      },
+      "mode": "end_to_end",
+      "split": "development",
+      "label_trust": "reviewed",
+      "status": "passed",
+      "metrics": {
+        "duplicate_free_rate": 1.0,
+        "prohibited_free_rate": 1.0,
+        "unknown_abstention_rate": 1.0
+      },
+      "evidence": {
+        "case_tag:access": {
+          "kind": "count",
+          "value": 1
+        },
+        "case_tag:unknown": {
+          "kind": "count",
+          "value": 1
+        },
+        "duplicate_free_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "prohibited_free_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "unknown_abstention_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        }
+      },
+      "failures": [],
+      "duration_ms": 114,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "retrieval-quality",
+        "case_id": "policy-public-evidence"
+      },
+      "mode": "end_to_end",
+      "split": "development",
+      "label_trust": "reviewed",
+      "status": "passed",
+      "metrics": {
+        "answerable_non_abstention_rate": 1.0,
+        "duplicate_free_rate": 1.0,
+        "precision_macro": 1.0,
+        "prohibited_free_rate": 1.0,
+        "required_group_recall": 1.0
+      },
+      "evidence": {
+        "answerable_non_abstention_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "case_tag:access": {
+          "kind": "count",
+          "value": 1
+        },
+        "case_tag:isolation": {
+          "kind": "count",
+          "value": 1
+        },
+        "duplicate_free_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "precision_macro": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "prohibited_free_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "required_group_recall": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        }
+      },
+      "failures": [],
+      "duration_ms": 221,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "retrieval-quality",
+        "case_id": "qualified-other-project"
+      },
+      "mode": "end_to_end",
+      "split": "development",
+      "label_trust": "reviewed",
+      "status": "passed",
+      "metrics": {
+        "answerable_non_abstention_rate": 1.0,
+        "duplicate_free_rate": 1.0,
+        "precision_macro": 1.0,
+        "prohibited_free_rate": 1.0,
+        "required_group_recall": 1.0
+      },
+      "evidence": {
+        "answerable_non_abstention_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "case_tag:project-distractor": {
+          "kind": "count",
+          "value": 1
+        },
+        "case_tag:qualified-task": {
+          "kind": "count",
+          "value": 1
+        },
+        "duplicate_free_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "precision_macro": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "prohibited_free_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "required_group_recall": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        }
+      },
+      "failures": [],
+      "duration_ms": 277,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "retrieval-quality",
+        "case_id": "timeline-atlas-q1-cross-project-abstention"
+      },
+      "mode": "end_to_end",
+      "split": "development",
+      "label_trust": "reviewed",
+      "status": "passed",
+      "metrics": {
+        "duplicate_free_rate": 1.0,
+        "prohibited_free_rate": 1.0,
+        "unknown_abstention_rate": 1.0
+      },
+      "evidence": {
+        "case_tag:calendar-period": {
+          "kind": "count",
+          "value": 1
+        },
+        "case_tag:cross-project": {
+          "kind": "count",
+          "value": 1
+        },
+        "case_tag:timeline": {
+          "kind": "count",
+          "value": 1
+        },
+        "case_tag:unknown": {
+          "kind": "count",
+          "value": 1
+        },
+        "duplicate_free_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "prohibited_free_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "unknown_abstention_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        }
+      },
+      "failures": [],
+      "duration_ms": 278,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "retrieval-quality",
+        "case_id": "timeline-atlas-q2-reverse-quarter"
+      },
+      "mode": "end_to_end",
+      "split": "development",
+      "label_trust": "reviewed",
+      "status": "passed",
+      "metrics": {
+        "answerable_non_abstention_rate": 1.0,
+        "duplicate_free_rate": 1.0,
+        "precision_macro": 1.0,
+        "prohibited_free_rate": 1.0,
+        "required_group_recall": 1.0
+      },
+      "evidence": {
+        "answerable_non_abstention_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "case_tag:answerable": {
+          "kind": "count",
+          "value": 1
+        },
+        "case_tag:calendar-period": {
+          "kind": "count",
+          "value": 1
+        },
+        "case_tag:cross-project": {
+          "kind": "count",
+          "value": 1
+        },
+        "case_tag:timeline": {
+          "kind": "count",
+          "value": 1
+        },
+        "duplicate_free_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "precision_macro": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "prohibited_free_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "required_group_recall": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        }
+      },
+      "failures": [],
+      "duration_ms": 368,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "retrieval-quality",
+        "case_id": "unknown-database"
+      },
+      "mode": "end_to_end",
+      "split": "development",
+      "label_trust": "reviewed",
+      "status": "passed",
+      "metrics": {
+        "duplicate_free_rate": 1.0,
+        "prohibited_free_rate": 1.0,
+        "unknown_abstention_rate": 1.0
+      },
+      "evidence": {
+        "case_tag:abstention": {
+          "kind": "count",
+          "value": 1
+        },
+        "case_tag:unknown": {
+          "kind": "count",
+          "value": 1
+        },
+        "duplicate_free_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "prohibited_free_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "unknown_abstention_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        }
+      },
+      "failures": [],
+      "duration_ms": 4905,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "retrieval-quality",
+        "case_id": "unknown-task"
+      },
+      "mode": "end_to_end",
+      "split": "development",
+      "label_trust": "reviewed",
+      "status": "passed",
+      "metrics": {
+        "duplicate_free_rate": 1.0,
+        "prohibited_free_rate": 1.0,
+        "unknown_abstention_rate": 1.0
+      },
+      "evidence": {
+        "case_tag:qualified-task": {
+          "kind": "count",
+          "value": 1
+        },
+        "case_tag:unknown": {
+          "kind": "count",
+          "value": 1
+        },
+        "duplicate_free_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "prohibited_free_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "unknown_abstention_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        }
+      },
+      "failures": [],
+      "duration_ms": 3390,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "retrieval-quality",
+        "case_id": "unknown-url"
+      },
+      "mode": "end_to_end",
+      "split": "development",
+      "label_trust": "reviewed",
+      "status": "passed",
+      "metrics": {
+        "duplicate_free_rate": 1.0,
+        "prohibited_free_rate": 1.0,
+        "unknown_abstention_rate": 1.0
+      },
+      "evidence": {
+        "case_tag:unknown": {
+          "kind": "count",
+          "value": 1
+        },
+        "case_tag:url-distractor": {
+          "kind": "count",
+          "value": 1
+        },
+        "duplicate_free_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "prohibited_free_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "unknown_abstention_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        }
+      },
+      "failures": [],
+      "duration_ms": 5541,
+      "attempts": 1
+    }
+  ],
+  "suite_summaries": [
+    {
+      "suite_id": "local-retrieval",
+      "mode": "retrieval_only",
+      "total": 61,
+      "passed": 61,
+      "quality_failed": 0,
+      "invalid": 0,
+      "metrics": {
+        "legacy_v1_mrr_at_budget": 1.0,
+        "legacy_v1_rank_applicable_cases": 61.0,
+        "legacy_v1_recall_applicable_groups": 71.0,
+        "legacy_v1_required_group_recall_at_budget": 1.0,
+        "legacy_v1_top_1_hit_rate_at_budget": 1.0
+      }
+    },
+    {
+      "suite_id": "extraction",
+      "mode": "end_to_end",
+      "total": 9,
+      "passed": 9,
+      "quality_failed": 0,
+      "invalid": 0,
+      "metrics": {
+        "entity_f1": 0.7499999999999999,
+        "entity_precision": 0.6,
+        "entity_recall": 1.0
+      }
+    },
+    {
+      "suite_id": "claim-reconciliation",
+      "mode": "end_to_end",
+      "total": 41,
+      "passed": 41,
+      "quality_failed": 0,
+      "invalid": 0,
+      "metrics": {
+        "claim_f1": 1.0,
+        "claim_precision": 1.0,
+        "claim_recall": 1.0
+      }
+    },
+    {
+      "suite_id": "external-retrieval",
+      "mode": "retrieval_only",
+      "total": 2,
+      "passed": 2,
+      "quality_failed": 0,
+      "invalid": 0,
+      "metrics": {
+        "answer_presence_proxy_at_5": 1.0
+      }
+    },
+    {
+      "suite_id": "retrieval-quality",
+      "mode": "end_to_end",
+      "total": 37,
+      "passed": 37,
+      "quality_failed": 0,
+      "invalid": 0,
+      "metrics": {
+        "answerable_non_abstention_rate": 1.0,
+        "answerable_non_abstention_rate_applicable_count": 32.0,
+        "duplicate_free_rate": 1.0,
+        "duplicate_free_rate_applicable_count": 37.0,
+        "precision_macro": 1.0,
+        "precision_macro_applicable_count": 32.0,
+        "prohibited_free_rate": 1.0,
+        "prohibited_free_rate_applicable_count": 37.0,
+        "required_group_recall": 1.0,
+        "required_group_recall_applicable_count": 46.0,
+        "unknown_abstention_rate": 1.0,
+        "unknown_abstention_rate_applicable_count": 5.0
+      }
+    }
+  ],
+  "gates": [
+    {
+      "suite_id": "extraction",
+      "metric": "entity_f1",
+      "observed": 0.7499999999999999,
+      "hard_floor": 0.7,
+      "baseline": 0.7499999999999999,
+      "regression_budget": 0.1,
+      "status": "passed",
+      "reason": "none"
+    },
+    {
+      "suite_id": "claim-reconciliation",
+      "metric": "claim_precision",
+      "observed": 1.0,
+      "hard_floor": 0.8,
+      "baseline": 1.0,
+      "regression_budget": 0.1,
+      "status": "passed",
+      "reason": "none"
+    },
+    {
+      "suite_id": "claim-reconciliation",
+      "metric": "claim_recall",
+      "observed": 1.0,
+      "hard_floor": 0.9,
+      "baseline": 1.0,
+      "regression_budget": 0.1,
+      "status": "passed",
+      "reason": "none"
+    },
+    {
+      "suite_id": "external-retrieval",
+      "metric": "answer_presence_proxy_at_5",
+      "observed": 1.0,
+      "hard_floor": 0.9,
+      "baseline": null,
+      "regression_budget": null,
+      "status": "passed",
+      "reason": "none"
+    },
+    {
+      "suite_id": "retrieval-quality",
+      "metric": "precision_macro",
+      "observed": 1.0,
+      "hard_floor": 1.0,
+      "baseline": null,
+      "regression_budget": null,
+      "status": "passed",
+      "reason": "none"
+    },
+    {
+      "suite_id": "retrieval-quality",
+      "metric": "required_group_recall",
+      "observed": 1.0,
+      "hard_floor": 1.0,
+      "baseline": null,
+      "regression_budget": null,
+      "status": "passed",
+      "reason": "none"
+    },
+    {
+      "suite_id": "retrieval-quality",
+      "metric": "unknown_abstention_rate",
+      "observed": 1.0,
+      "hard_floor": 1.0,
+      "baseline": null,
+      "regression_budget": null,
+      "status": "passed",
+      "reason": "none"
+    },
+    {
+      "suite_id": "retrieval-quality",
+      "metric": "answerable_non_abstention_rate",
+      "observed": 1.0,
+      "hard_floor": 1.0,
+      "baseline": null,
+      "regression_budget": null,
+      "status": "passed",
+      "reason": "none"
+    },
+    {
+      "suite_id": "retrieval-quality",
+      "metric": "duplicate_free_rate",
+      "observed": 1.0,
+      "hard_floor": 1.0,
+      "baseline": null,
+      "regression_budget": null,
+      "status": "passed",
+      "reason": "none"
+    },
+    {
+      "suite_id": "retrieval-quality",
+      "metric": "prohibited_free_rate",
+      "observed": 1.0,
+      "hard_floor": 1.0,
+      "baseline": null,
+      "regression_budget": null,
+      "status": "passed",
+      "reason": "none"
+    }
+  ],
+  "fingerprint": {
+    "rust_version": "rustc 1.99.0 (b940084d7 2026-09-28)",
+    "os_arch": "macos/aarch64",
+    "package_version": "0.1.0",
+    "build_profile": "debug",
+    "enabled_features": [],
+    "provider": null,
+    "model": null,
+    "device": null,
+    "configuration_hash": "da372a4062ae9794e43b5c62dd7eca9b0031126d4a7b776bda0c5b5356b3df5e",
+    "git_commit": "e6d17cb06cd5f9f7f4a76114fded609351b27c8c",
+    "evaluator_versions": {
+      "eval-harness": "0.1.0"
+    },
+    "suite_fingerprints": {
+      "local-retrieval": {
+        "fixture_sha256": "e291234ed715d5bdae1810fb28f456b5b998fbd5ed410116c1bd1bba4d49fca6",
+        "label_trust": "weak",
+        "metric_version": "local-retrieval-v1-legacy-diagnostic"
+      },
+      "retrieval-quality": {
+        "claim_rollout_stage": "evidence",
+        "corpus_id": "retrieval-quality-v1",
+        "corpus_manifest_sha256": "ec720673f9dc0ea2f77f278ca3224a4672fea10f2af812ef8a5b9ca945363079",
+        "corpus_revision": "r27-upstream-session-order",
+        "embedding_dimension": "384",
+        "embedding_signature": "embsig:b88d713a71be619fce22bcb30efe3d1cc9623afff9e6a8ae7107ba9e620b9b17",
+        "extractor_fingerprint": "anno",
+        "index_signature": "indexsig:d293fd983ef88ea75c78d3758dd09c73d5cf02726d7ec592ca28adc938421f30",
+        "model": "intfloat/multilingual-e5-small",
+        "model_file_sha256.config.json": "69137736cab8b8903a07fe8afaafdda25aac55415a12a55d1bffa9f581abf959",
+        "model_file_sha256.model.safetensors": "1a55775f53449dac10a2bcbc312469fac40b96d53198c407081a831f81c98477",
+        "model_file_sha256.tokenizer.json": "0b44a9d7b51c3c62626640cda0e2c2f70fdacdc25bbbd68038369d14ebdf4c39",
+        "prepared_claim_rollout_stage": "evidence",
+        "prepared_embedding_dimension": "384",
+        "prepared_embedding_signature": "embsig:b88d713a71be619fce22bcb30efe3d1cc9623afff9e6a8ae7107ba9e620b9b17",
+        "prepared_extractor_fingerprint": "anno",
+        "prepared_index_signature": "indexsig:d293fd983ef88ea75c78d3758dd09c73d5cf02726d7ec592ca28adc938421f30",
+        "prepared_model": "intfloat/multilingual-e5-small",
+        "prepared_provider": "local-candle",
+        "prepared_similarity_threshold": "0.7",
+        "provider": "local-candle",
+        "provider_status": "ready",
+        "reranking_signature": "reranksig:dff4b9939786ed9a1e897946778e336584cc24251a2f32282bd3fe83a680a7d1",
+        "similarity_threshold": "0.7",
+        "source_bundle_sha256": "e9fe9d7f35281572730e722dbb22daba8ade19b6cb9f6a4f2c9f4f83f47d110c"
+      }
+    },
+    "profile_digest": "774f2f4b836b060a645a77c04acdc0f5a405b7b6a643c3758162b74698618bd0"
+  },
+  "budget_status": "passed",
+  "verdict": "passed",
+  "issues": []
+}

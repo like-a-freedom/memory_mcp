@@ -47,8 +47,8 @@ pub trait EmbeddingProvider: Send + Sync {
         self.embed(input).await
     }
 
-    /// Optional query/passage cross-encoder evidence. Scores are raw logits;
-    /// zero is the fixed relevance admission boundary, not a cosine threshold.
+    /// Optional query/passage cross-encoder evidence. Scores are raw logits
+    /// used to rank candidates already admitted by retrieval.
     async fn rerank(
         &self,
         _query: &str,

@@ -3,6 +3,7 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 use super::access::AccessPayload;
+use super::domain::SourceContext;
 use super::provenance::ProvenanceSource;
 
 /// Request to ingest a new episode into memory.
@@ -15,6 +16,9 @@ pub struct IngestRequest {
     pub t_ingested: Option<DateTime<Utc>>,
     #[serde(default)]
     pub policy_tags: Vec<String>,
+    /// Optional producer-declared source order for conversation-aware recall.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub source_context: Option<SourceContext>,
 }
 
 /// Request to explain context items with source citations.
@@ -377,6 +381,7 @@ pub struct IngestRequestBuilder {
     t_ref: Option<DateTime<Utc>>,
     t_ingested: Option<DateTime<Utc>>,
     policy_tags: Vec<String>,
+    source_context: Option<SourceContext>,
 }
 
 impl IngestRequestBuilder {
@@ -416,6 +421,11 @@ impl IngestRequestBuilder {
         self
     }
 
+    pub fn source_context(mut self, value: SourceContext) -> Self {
+        self.source_context = Some(value);
+        self
+    }
+
     /// Builds the IngestRequest.
     pub fn build(self) -> Result<IngestRequest, String> {
         Ok(IngestRequest {
@@ -425,6 +435,7 @@ impl IngestRequestBuilder {
             t_ref: self.t_ref.ok_or("t_ref is required")?,
             t_ingested: self.t_ingested,
             policy_tags: self.policy_tags,
+            source_context: self.source_context,
         })
     }
 }
