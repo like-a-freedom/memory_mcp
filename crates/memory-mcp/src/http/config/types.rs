@@ -167,7 +167,9 @@ pub struct HttpConfig {
     #[serde(skip)]
     pub browser_auth: Option<BrowserAuthMethods>,
     /// Whether `GET /api/v1/admin/heap` is mounted. Off unless the deployment
-    /// sets `MEMORY_MCP_HTTP_HEAP_DUMP_ENABLED`.
+    /// sets `MEMORY_MCP_HTTP_HEAP_DUMP_ENABLED`. Inert unless the `local` browser
+    /// method is enabled: the route lives in the local administrator's subtree,
+    /// so an OIDC-only deployment has nowhere to mount it.
     #[serde(default)]
     pub heap_dump_enabled: bool,
 }

@@ -190,6 +190,30 @@ mod tests {
         );
     }
 
+    /// The flag is inert without the local administrator's surface.
+    ///
+    /// The dump reuses the local session the rest of `/api/v1/admin/*` is
+    /// mounted behind, so an OIDC-only deployment mounts nothing for it even
+    /// with `MEMORY_MCP_HTTP_HEAP_DUMP_ENABLED=true` — the whole admin subtree is
+    /// absent there. Pinned rather than merely documented: mounting it on the
+    /// OIDC side is a deliberate change with its own auth decision, not a line a
+    /// later refactor adds by accident.
+    #[tokio::test]
+    async fn heap_dump_route_is_absent_without_the_local_admin_surface() {
+        let builder = HttpStateTestBuilder::new().await;
+        let state = builder
+            .with_heap_dump_enabled(true)
+            .build()
+            .await
+            .expect("OIDC-method HTTP state");
+
+        assert_eq!(
+            status_of(state, "/api/v1/admin/heap").await,
+            StatusCode::NOT_FOUND,
+            "an OIDC-only deployment has no local-admin subtree to mount the dump in"
+        );
+    }
+
     #[cfg(all(target_os = "linux", target_env = "gnu"))]
     #[test]
     fn malloc_info_text_is_present_on_glibc() {

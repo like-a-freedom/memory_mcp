@@ -1366,7 +1366,7 @@ seconds — a longer interval would let a revoked authorization keep streaming.
 | `MEMORY_MCP_HTTP_TASK_SYNC_MAX_BYTES` | `usize` | `1048576` (1 MiB) | Preflight size limit: `extract` work above this returns a preflight rejection for clients that did not advertise Tasks |
 | `MEMORY_MCP_HTTP_REPLICA_ID` | string | unset (falls back to process PID) | Stable replica identity. Set in multi-replica deployments; the PID fallback is safe only for a single process |
 
-One toggle is not a limit and lives here only so the environment surface stays in one place. `MEMORY_MCP_HTTP_HEAP_DUMP_ENABLED` (`bool`, default `false`) mounts `GET /api/v1/admin/heap`, which returns glibc's `malloc_info` report for the process. It is expensive — the call walks every arena and bin under the allocator's internal locks — so it stays off unless an operator is actively investigating memory; the route is administered by the local-admin session like the rest of `/api/v1/admin/*`, and on a non-glibc build it answers `501`.
+One toggle is not a limit and lives here only so the environment surface stays in one place. `MEMORY_MCP_HTTP_HEAP_DUMP_ENABLED` (`bool`, default `false`) mounts `GET /api/v1/admin/heap`, which returns glibc's `malloc_info` report for the process. It is expensive — the call walks every arena and bin under the allocator's internal locks — so it stays off unless an operator is actively investigating memory; the route is administered by the local-admin session like the rest of `/api/v1/admin/*`, and on a non-glibc build it answers `501`. It is inert unless the `local` method is enabled: an OIDC-only deployment has no local-admin subtree to mount it in, so the flag mounts nothing there.
 
 #### Constrained memory profile
 
