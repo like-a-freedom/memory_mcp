@@ -1,0 +1,172 @@
+//! Process-memory readers that no external collector can supply.
+//!
+//! Two signals live only inside this process and are invisible to cAdvisor:
+//! the glibc allocator's own accounting (`mallinfo2`) and the `[heap]`
+//! mapping extent from `/proc/self/maps`. They are the attribution the
+//! footprint investigation needs — RSS says *how much*, these say *which
+//! arena* — and they belong to `platform` because they are a technical
+//! read of the host, carrying no business orchestration.
+//!
+//! Every field is optional and every read is total: off Linux/glibc the
+//! answer is `None`, and a `None` is never recorded as `0`. A fabricated
+//! zero is a worse signal than a missing one — it reads as "the allocator
+//! holds nothing", which is exactly the wrong conclusion to reach from a
+//! platform that has no allocator telemetry at all.
+
+/// glibc `malloc` accounting plus the `[heap]` mapping extent.
+///
+/// Every field is optional: off Linux/glibc there is no `mallinfo2` call and
+/// no heap extent, so every field is `None`.
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct AllocSnapshot {
+    /// Total bytes in the main arena (`mallinfo2.arena`).
+    pub(crate) arena_bytes: Option<u64>,
+    /// Bytes in mmap'd blocks at or above the mmap threshold (`hblkhd`).
+    pub(crate) mmap_bytes: Option<u64>,
+    /// Bytes in in-use blocks (`uordblks`) — the live allocations.
+    pub(crate) in_use_bytes: Option<u64>,
+    /// Bytes in free blocks (`fordblks`) — retained, not returned to the OS.
+    pub(crate) free_bytes: Option<u64>,
+    /// Bytes at the top of the heap releasable by `malloc_trim` (`keepcost`).
+    pub(crate) keepcost_bytes: Option<u64>,
+    /// Width of the `[heap]` mapping in `/proc/self/maps`, in bytes.
+    pub(crate) heap_bytes: Option<u64>,
+}
+
+/// Read glibc's allocator accounting and the `[heap]` extent.
+///
+/// Read-only and total: it never panics and never fabricates a value. When a
+/// signal is unavailable the corresponding field is `None`.
+pub(crate) fn read_alloc() -> AllocSnapshot {
+    let mut snapshot = AllocSnapshot {
+        heap_bytes: read_proc_self_maps().and_then(|maps| parse_heap_bytes(&maps)),
+        ..AllocSnapshot::default()
+    };
+    fill_from_mallinfo2(&mut snapshot);
+    snapshot
+}
+
+/// Fill the `mallinfo2` fields on Linux/glibc.
+#[cfg(all(target_os = "linux", target_env = "gnu"))]
+fn fill_from_mallinfo2(snapshot: &mut AllocSnapshot) {
+    // SAFETY: `mallinfo2` takes no arguments and returns a plain struct of
+    // `size_t` values by value. It is async-signal-safe, never allocates and
+    // cannot fail, so its return value is always fully initialised.
+    let info = unsafe { mallinfo2() };
+    snapshot.arena_bytes = Some(info.arena as u64);
+    snapshot.mmap_bytes = Some(info.hblkhd as u64);
+    snapshot.in_use_bytes = Some(info.uordblks as u64);
+    snapshot.free_bytes = Some(info.fordblks as u64);
+    snapshot.keepcost_bytes = Some(info.keepcost as u64);
+}
+
+/// Off Linux/glibc there is no `mallinfo2`: every field stays `None`.
+#[cfg(not(all(target_os = "linux", target_env = "gnu")))]
+fn fill_from_mallinfo2(_snapshot: &mut AllocSnapshot) {}
+
+/// `/proc/self/maps` on Linux/glibc, or `None` anywhere else.
+///
+/// "Not glibc" and "no file" collapse to the same answer on purpose: the heap
+/// extent only means something alongside glibc's `mallinfo2`, and reporting it
+/// from an allocator we do not otherwise measure would mix two vocabularies in
+/// one family.
+fn read_proc_self_maps() -> Option<String> {
+    #[cfg(all(target_os = "linux", target_env = "gnu"))]
+    {
+        std::fs::read_to_string("/proc/self/maps").ok()
+    }
+    #[cfg(not(all(target_os = "linux", target_env = "gnu")))]
+    {
+        None
+    }
+}
+
+/// Bytes spanned by the `[heap]` mapping, or `None` when the file has none.
+///
+/// The width of the address range, not the resident pages: `/proc` maps are
+/// already denominated in bytes, and this is the extent the allocator may grow
+/// into — the number that read 1.14 GB on the host. A file with no `[heap]`
+/// line is `None`, never `0`: the two mean different things.
+fn parse_heap_bytes(maps: &str) -> Option<u64> {
+    for line in maps.lines() {
+        if !line.ends_with("[heap]") {
+            continue;
+        }
+        let range = line.split_whitespace().next()?;
+        let (start, end) = range.split_once('-')?;
+        let start = u64::from_str_radix(start, 16).ok()?;
+        let end = u64::from_str_radix(end, 16).ok()?;
+        return end.checked_sub(start);
+    }
+    None
+}
+
+/// glibc `struct mallinfo2`, returned by `mallinfo2(3)`.
+///
+/// The field order is fixed by glibc's ABI. Only the fields this module reads
+/// are named; the rest are declared so the returned struct is exactly the
+/// `size_t`-wide shape glibc writes.
+#[cfg(all(target_os = "linux", target_env = "gnu"))]
+#[repr(C)]
+struct Mallinfo2 {
+    arena: usize,
+    ordblks: usize,
+    smblks: usize,
+    hblks: usize,
+    hblkhd: usize,
+    usmblks: usize,
+    fsmblks: usize,
+    uordblks: usize,
+    fordblks: usize,
+    keepcost: usize,
+}
+
+#[cfg(all(target_os = "linux", target_env = "gnu"))]
+unsafe extern "C" {
+    /// glibc's byte-denominated `malloc` statistics.
+    fn mallinfo2() -> Mallinfo2;
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn finds_heap_extent_in_maps() {
+        // A well-formed maps range whose width is 0x100 pages: the parser reads
+        // `end - start`, and the fixture's extent is what the assertion pins.
+        let maps = "7f0000000000-7f0000100000 rw-p 00000000 00:00 0 [heap]\n";
+        assert_eq!(parse_heap_bytes(maps), Some(0x100 * 4096));
+    }
+
+    #[test]
+    fn maps_without_heap_is_none_not_zero() {
+        assert_eq!(
+            parse_heap_bytes(
+                "7f0100000000-7f0100010000 r-xp 00000000 00:00 0 /usr/lib/libc.so.6\n"
+            ),
+            None
+        );
+    }
+
+    #[cfg(all(target_os = "linux", target_env = "gnu"))]
+    #[test]
+    fn read_alloc_reports_the_glibc_arena() {
+        let alloc = read_alloc();
+        assert!(
+            alloc.arena_bytes.is_some(),
+            "glibc mallinfo2 is available on this host, so the arena is measured"
+        );
+        assert!(alloc.in_use_bytes.is_some());
+    }
+
+    #[cfg(not(all(target_os = "linux", target_env = "gnu")))]
+    #[test]
+    fn read_alloc_is_all_none_off_glibc() {
+        assert_eq!(
+            read_alloc(),
+            AllocSnapshot::default(),
+            "off glibc every field is None, never zero"
+        );
+    }
+}

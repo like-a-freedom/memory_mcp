@@ -1170,7 +1170,7 @@ pub(crate) mod tests {
             crate::shared::observability::METRIC_HTTP_PREFLIGHT_BODY_BYTES,
             crate::shared::observability::METRIC_HTTP_PREFLIGHT_REFUSALS_TOTAL,
         ];
-        const HTTP_OWNER_SNAPSHOT: [&str; 8] = [
+        const HTTP_OWNER_SNAPSHOT: [&str; 14] = [
             crate::shared::observability::METRIC_HTTP_PREFLIGHT_RESERVED_REQUESTS,
             crate::shared::observability::METRIC_HTTP_PREFLIGHT_RESERVED_BYTES,
             crate::shared::observability::METRIC_HTTP_TENANT_RUNTIME_COUNT,
@@ -1179,6 +1179,12 @@ pub(crate) mod tests {
             crate::shared::observability::METRIC_HTTP_BACKGROUND_EMBEDDING_ADMITTED_TASKS,
             crate::shared::observability::METRIC_HTTP_BACKGROUND_EMBEDDING_RUNNING_TASKS,
             crate::shared::observability::METRIC_HTTP_BACKGROUND_EMBEDDING_RETAINED_BYTES,
+            crate::shared::observability::METRIC_ALLOC_ARENA_BYTES,
+            crate::shared::observability::METRIC_ALLOC_MMAP_BYTES,
+            crate::shared::observability::METRIC_ALLOC_IN_USE_BYTES,
+            crate::shared::observability::METRIC_ALLOC_FREE_BYTES,
+            crate::shared::observability::METRIC_ALLOC_KEEPCOST_BYTES,
+            crate::shared::observability::METRIC_ALLOC_HEAP_BYTES,
         ];
 
         let exposition = exposed(|| async {

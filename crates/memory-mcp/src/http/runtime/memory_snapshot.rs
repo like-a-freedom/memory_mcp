@@ -14,6 +14,10 @@ pub(crate) struct HttpMemorySnapshot {
     pub(crate) background_embedding_admitted_tasks: usize,
     pub(crate) background_embedding_running_tasks: usize,
     pub(crate) background_embedding_retained_bytes: usize,
+    /// The allocator's own accounting and the `[heap]` extent. Every field is
+    /// `None` off Linux/glibc; the recorder skips a `None` rather than writing
+    /// a zero.
+    pub(crate) alloc: crate::platform::process_memory::AllocSnapshot,
 }
 
 #[derive(Clone)]
@@ -60,6 +64,7 @@ impl HttpMemorySnapshotSource {
             background_embedding_admitted_tasks: background.admitted_tasks,
             background_embedding_running_tasks: background.running_tasks,
             background_embedding_retained_bytes: background.retained_bytes,
+            alloc: crate::platform::process_memory::read_alloc(),
         }
     }
 }

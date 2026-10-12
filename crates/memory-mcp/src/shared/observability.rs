@@ -163,6 +163,19 @@ pub const METRIC_HTTP_BACKGROUND_EMBEDDING_RUNNING_TASKS: &str =
 pub const METRIC_HTTP_BACKGROUND_EMBEDDING_RETAINED_BYTES: &str =
     "memory_http_background_embedding_retained_bytes";
 
+/// Bytes in glibc's main arena, from `mallinfo2.arena`.
+pub const METRIC_ALLOC_ARENA_BYTES: &str = "memory_alloc_arena_bytes";
+/// Bytes in glibc's mmap'd blocks, from `mallinfo2.hblkhd`.
+pub const METRIC_ALLOC_MMAP_BYTES: &str = "memory_alloc_mmap_bytes";
+/// Bytes in glibc's in-use blocks, from `mallinfo2.uordblks`.
+pub const METRIC_ALLOC_IN_USE_BYTES: &str = "memory_alloc_in_use_bytes";
+/// Bytes in glibc's free blocks, from `mallinfo2.fordblks`.
+pub const METRIC_ALLOC_FREE_BYTES: &str = "memory_alloc_free_bytes";
+/// Bytes releasable from the top of glibc's heap, from `mallinfo2.keepcost`.
+pub const METRIC_ALLOC_KEEPCOST_BYTES: &str = "memory_alloc_keepcost_bytes";
+/// Width of the `[heap]` mapping in `/proc/self/maps`, in bytes.
+pub const METRIC_ALLOC_HEAP_BYTES: &str = "memory_alloc_heap_bytes";
+
 /// Measures one named stage of a pipeline.
 ///
 /// A guard rather than a pair of calls around a block, because a stage is often
@@ -504,6 +517,60 @@ pub const DESCRIPTIONS: &[MetricDescription] = &[
         kind: MetricKind::Gauge,
         unit: None,
         help: "Bytes retained by admitted background embedding tasks",
+    },
+    MetricDescription {
+        name: METRIC_ALLOC_ARENA_BYTES,
+        kind: MetricKind::Gauge,
+        unit: None,
+        help: "Bytes in glibc's main arena (`mallinfo2.arena`), the brk heap \
+               the allocator grows into. A level, and one that counts retained \
+               free blocks as much as live ones: read it beside in-use and \
+               free, never alone. Absent off Linux/glibc, where there is no \
+               mallinfo2 — absent, not zero.",
+    },
+    MetricDescription {
+        name: METRIC_ALLOC_MMAP_BYTES,
+        kind: MetricKind::Gauge,
+        unit: None,
+        help: "Bytes in glibc's mmap'd blocks (`mallinfo2.hblkhd`): \
+               allocations large enough to bypass the arena. A large value \
+               beside a small arena is one oversized buffer, not steady \
+               state.",
+    },
+    MetricDescription {
+        name: METRIC_ALLOC_IN_USE_BYTES,
+        kind: MetricKind::Gauge,
+        unit: None,
+        help: "Bytes in in-use glibc blocks (`mallinfo2.uordblks`), the live \
+               allocations. The floor a trim cannot go below: against arena it \
+               says how much of the heap is retained rather than held.",
+    },
+    MetricDescription {
+        name: METRIC_ALLOC_FREE_BYTES,
+        kind: MetricKind::Gauge,
+        unit: None,
+        help: "Bytes in free glibc blocks (`mallinfo2.fordblks`), retained by \
+               the allocator and not returned to the OS. Free far above in-use \
+               is the signature of chunks a periodic `malloc_trim` could \
+               release.",
+    },
+    MetricDescription {
+        name: METRIC_ALLOC_KEEPCOST_BYTES,
+        kind: MetricKind::Gauge,
+        unit: None,
+        help: "Bytes at the top of the glibc heap releasable by \
+               `malloc_trim(0)` (`mallinfo2.keepcost`): what a trim would give \
+               back right now. Forced to zero by a non-zero \
+               `MALLOC_TRIM_THRESHOLD_`, so read it with the tunables in the \
+               startup log.",
+    },
+    MetricDescription {
+        name: METRIC_ALLOC_HEAP_BYTES,
+        kind: MetricKind::Gauge,
+        unit: None,
+        help: "Width of the `[heap]` mapping in `/proc/self/maps`, in bytes: \
+               the virtual extent the allocator may grow into. Far above the \
+               resident bytes it is address space, not memory in use.",
     },
     // The families below are declared in their own modules but described here,
     // with the rest of the vocabulary: a panel author reading `/metrics` has no

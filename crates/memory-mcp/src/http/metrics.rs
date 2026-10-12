@@ -101,6 +101,8 @@ pub fn spawn_upkeep_with_ticks(
 #[cfg(feature = "prometheus")]
 fn record_memory_snapshot(snapshot: HttpMemorySnapshot) {
     use crate::shared::observability::{
+        METRIC_ALLOC_ARENA_BYTES, METRIC_ALLOC_FREE_BYTES, METRIC_ALLOC_HEAP_BYTES,
+        METRIC_ALLOC_IN_USE_BYTES, METRIC_ALLOC_KEEPCOST_BYTES, METRIC_ALLOC_MMAP_BYTES,
         METRIC_HTTP_BACKGROUND_EMBEDDING_ADMITTED_TASKS,
         METRIC_HTTP_BACKGROUND_EMBEDDING_RETAINED_BYTES,
         METRIC_HTTP_BACKGROUND_EMBEDDING_RUNNING_TASKS, METRIC_HTTP_CONTEXT_CACHE_ACCOUNTED_BYTES,
@@ -121,6 +123,29 @@ fn record_memory_snapshot(snapshot: HttpMemorySnapshot) {
         .set(snapshot.background_embedding_running_tasks as f64);
     metrics::gauge!(METRIC_HTTP_BACKGROUND_EMBEDDING_RETAINED_BYTES)
         .set(snapshot.background_embedding_retained_bytes as f64);
+
+    // The allocator families are set only where the reader produced a value.
+    // A `None` means the signal does not exist on this platform (no glibc), so
+    // writing a zero would report "the allocator holds nothing" — a claim we
+    // cannot make. Skipping leaves the series absent, which is the truth.
+    if let Some(value) = snapshot.alloc.arena_bytes {
+        metrics::gauge!(METRIC_ALLOC_ARENA_BYTES).set(value as f64);
+    }
+    if let Some(value) = snapshot.alloc.mmap_bytes {
+        metrics::gauge!(METRIC_ALLOC_MMAP_BYTES).set(value as f64);
+    }
+    if let Some(value) = snapshot.alloc.in_use_bytes {
+        metrics::gauge!(METRIC_ALLOC_IN_USE_BYTES).set(value as f64);
+    }
+    if let Some(value) = snapshot.alloc.free_bytes {
+        metrics::gauge!(METRIC_ALLOC_FREE_BYTES).set(value as f64);
+    }
+    if let Some(value) = snapshot.alloc.keepcost_bytes {
+        metrics::gauge!(METRIC_ALLOC_KEEPCOST_BYTES).set(value as f64);
+    }
+    if let Some(value) = snapshot.alloc.heap_bytes {
+        metrics::gauge!(METRIC_ALLOC_HEAP_BYTES).set(value as f64);
+    }
 }
 
 /// Reject the stdio-profile listener env var in HTTP mode: the HTTP
@@ -383,5 +408,55 @@ mod tests {
             "with no recorder there is nothing to render, and the handler must \
              not invent a series: {body}"
         );
+    }
+
+    /// The allocator families reach the exposition, and process metrics do not.
+    ///
+    /// The five-second upkeep tick is the only writer of the six allocator
+    /// gauges, so a test that serves no request has to drive it directly;
+    /// `spawn_upkeep_with_ticks` acknowledges a tick so the assertion runs after
+    /// upkeep, not before it. The second assertion is the contract: RSS, CPU and
+    /// uptime belong to cAdvisor, which already reports them for this container,
+    /// and this crate must not fork them into a `memory_process_*` family.
+    #[cfg(all(
+        feature = "prometheus",
+        feature = "test-fixtures",
+        target_os = "linux",
+        target_env = "gnu"
+    ))]
+    #[tokio::test]
+    async fn upkeep_ticks_expose_allocator_gauges_and_no_process_metrics() {
+        let handle = crate::observability::shared_test_handle().expect("prometheus enabled");
+        let fixture = crate::http::runtime::memory_snapshot::HttpMemorySnapshotTestFixture::new()
+            .await
+            .expect("the snapshot fixture builds");
+        let source = fixture.source();
+
+        let (ticks_tx, ticks_rx) = tokio::sync::mpsc::unbounded_channel();
+        let cancel = tokio_util::sync::CancellationToken::new();
+        let upkeep =
+            super::spawn_upkeep_with_ticks(handle.clone(), cancel.clone(), ticks_rx, source);
+
+        let (acknowledge, ran) = tokio::sync::oneshot::channel();
+        ticks_tx.send(acknowledge).expect("upkeep is listening");
+        ran.await.expect("upkeep ran one tick");
+
+        let exposition = handle.render();
+        assert!(
+            exposition.contains(&format!(
+                "# HELP {} ",
+                crate::shared::observability::METRIC_ALLOC_ARENA_BYTES
+            )),
+            "glibc reports an arena, so the upkeep tick must record it; an \
+             absent family is what a panel reading *No data* looks like: \
+             {exposition}"
+        );
+        assert!(
+            !exposition.contains("memory_process_rss"),
+            "RSS belongs to cAdvisor; exporting it here would fork the contract"
+        );
+
+        cancel.cancel();
+        let _ = tokio::time::timeout(std::time::Duration::from_secs(1), upkeep).await;
     }
 }

@@ -19,6 +19,8 @@ pub mod lifecycle_runtime;
 pub mod log_event;
 pub mod model_runtime;
 pub mod persistence;
+#[cfg(any(test, feature = "streamable-http"))]
+pub mod process_memory;
 pub mod rate_limiter;
 pub mod request_budget;
 pub mod traversal_budget;
