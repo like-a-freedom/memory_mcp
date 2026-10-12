@@ -57,6 +57,18 @@ Both files on one compose project share a network, so the target in
 `vmagent.yml` — `memory_mcp:8080`, the service name — resolves. Grafana reads
 the result as a Prometheus-type data source at `http://localhost:8428`.
 
+**A deployment under a path prefix serves the exposition under that prefix.**
+The path of `MEMORY_MCP_HTTP_PUBLIC_BASE_URL` *is* the server's mount base, and
+the router nests the whole app under it, so `https://host/memory` answers at
+`/memory/metrics` and `/metrics` is a 404 there. Both shipped files state the base
+path they assume, on a `# assumed_base_path: ""` line above `metrics_path`, and a
+check in the crate (`scrape_path_matches_base_path`) fails when the two disagree —
+a prefixed deployment edits both lines together. Note that the production
+deployment this work came from runs under `/memory` and scrapes **no application
+metrics today**, so its dashboards are empty until its collector is pointed at
+`/memory/metrics`; the shipped files describe the collection shape, not that
+deployment's current state.
+
 To run the collector stack on its own, against a service on the host, the
 compose project directory becomes the collector file's own directory and the
 config path has to be named relative to it:

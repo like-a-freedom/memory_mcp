@@ -871,4 +871,77 @@ mod tests {
             );
         }
     }
+
+    /// The scrape path a deployment at `base_path` must configure.
+    fn metrics_path_for_base(base_path: &str) -> String {
+        if base_path.is_empty() {
+            "/metrics".to_string()
+        } else {
+            format!("{base_path}/metrics")
+        }
+    }
+
+    /// The mount base a shipped scrape config says it is written for.
+    fn declared_base_path(source: &str) -> Option<String> {
+        source.lines().find_map(|line| {
+            let rest = line.trim().strip_prefix("# assumed_base_path:")?;
+            let value = rest.trim().strip_prefix('\"')?;
+            value.split('\"').next().map(str::to_owned)
+        })
+    }
+
+    /// The `metrics_path` a shipped scrape config sets.
+    fn configured_metrics_path(source: &str) -> Option<String> {
+        source.lines().find_map(|line| {
+            line.trim()
+                .strip_prefix("metrics_path:")
+                .map(|rest| rest.trim().to_owned())
+        })
+    }
+
+    /// A deployment under a mount base serves the exposition under that base.
+    ///
+    /// The path of `MEMORY_MCP_HTTP_PUBLIC_BASE_URL` *is* the mount base — there
+    /// is no separate knob — and the router nests the whole app under it, so a
+    /// prefixed deployment reaches `/metrics` only as `<base>/metrics`. A scrape
+    /// config that keeps `/metrics` there gets a 404 on every scrape, which is a
+    /// blank dashboard and a `ScrapeTargetDown` firing, not an error anyone
+    /// reads as a configuration mistake.
+    ///
+    /// The shipped configs are written for the root-mounted bundled stack, where
+    /// `/metrics` is correct. Each states the base path it assumes, and this
+    /// check holds the two together: changing one without the other fails.
+    #[test]
+    fn scrape_path_matches_base_path() {
+        assert_eq!(metrics_path_for_base(""), "/metrics");
+        assert_eq!(metrics_path_for_base("/memory"), "/memory/metrics");
+
+        for (name, source) in [
+            (
+                "observability/vmagent/vmagent.yml",
+                include_str!("../../../../observability/vmagent/vmagent.yml"),
+            ),
+            (
+                "observability/prometheus.yml",
+                include_str!("../../../../observability/prometheus.yml"),
+            ),
+        ] {
+            let assumed = declared_base_path(source).unwrap_or_else(|| {
+                panic!(
+                    "{name} must state the mount base it is written for, as a \
+                     `# assumed_base_path: \"…\"` line, or a prefixed deployment \
+                     inherits a path that 404s"
+                )
+            });
+            let configured = configured_metrics_path(source)
+                .unwrap_or_else(|| panic!("{name} must set `metrics_path:`"));
+            assert_eq!(
+                configured,
+                metrics_path_for_base(&assumed),
+                "{name}: `metrics_path` must be `<assumed_base_path>/metrics` — the \
+                 path of MEMORY_MCP_HTTP_PUBLIC_BASE_URL is the mount base, and the \
+                 router nests `/metrics` under it"
+            );
+        }
+    }
 }

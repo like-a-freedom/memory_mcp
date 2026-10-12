@@ -67,7 +67,7 @@ candidate has not passed or failed the memory targets; they remain unmeasured.
 | --- | --- | --- |
 | Controlled baseline/candidate | Three fresh-process Linux runs per build under the same 2-CPU limit, dataset, configuration, and deterministic provider | **BLOCKED** — no disposable staging target and controlled dependencies supplied |
 | Process footprint | Active `VmRSS+VmSwap` <=200 MiB; post-work warm idle <=100 MiB; `VmHWM` recorded separately; >=4x reduction only when baseline exceeds the applicable target | **NOT MEASURED** — sampler exists, but no controlled process samples were collected |
-| Diagnostics overhead | Three paired INFO runs and three paired INFO-vs-DEBUG runs; footprint delta <=5 MiB, CPU/accepted-operation delta <=5%, p95 <=1.15x, constant app series count | **NOT MEASURED** — no paired staging runs or service-only CPU attribution |
+| Diagnostics overhead | Three paired INFO runs and three paired INFO-vs-DEBUG runs; footprint delta <=5 MiB, CPU/accepted-operation delta <=5%, p95 <=1.15x, constant app series count | **PARTIAL** — the added per-tick work is measured on this branch (<=4.8 us per five-second tick, >=5 orders below the 5% gate; footprint has no standing term; six label-free series added) — see *Diagnostics overhead: added-work bound*. The paired end-to-end INFO runs on a disposable Linux staging deployment remain NOT MEASURED; no service-only CPU attribution was possible |
 | Allocation attribution | Staging profiler live allocations and peak stacks tied to the candidate build | **BLOCKED** — no staging profiler run; owner gauges do not identify allocation roots |
 | Host/container dashboard context | Verified read-only VictoriaMetrics access and safe selectors for node_exporter/cAdvisor | **BLOCKED** — no verified query path or selectors; no guessed or zero-valued panels were added |
 | Local shipping validation | Full `memory_mcp` tests in default and HTTP feature profiles; format, strict workspace Clippy, toolchain pin, observability checker | **PASSED** — `MEMORY_LOG_COLOR=never cargo test -p memory_mcp --locked`; `MEMORY_LOG_COLOR=never cargo test -p memory_mcp --features streamable-http,mcp-apps,test-fixtures --locked`; `cargo fmt --all --check`; workspace Clippy with `-D warnings`; both xtask checks. Strict Clippy reported no warnings. This is local code validation, not Linux memory acceptance. |
@@ -85,6 +85,41 @@ work. A release must not be described as having met its RAM target until the
 blocked evidence is collected and the open release decision is made. The local
 shipping checks above do not establish RSS, swap, allocation-attribution,
 diagnostics-overhead, latency, or resource-plateau acceptance.
+
+## Diagnostics overhead: added-work bound (2026-10-12)
+
+The allocator-attribution change adds exactly one `read_alloc()` call per
+five-second upkeep tick: one `mallinfo2()` call, one `/proc/self/maps` read of a
+few kilobytes, and six no-label `metrics::gauge!` sets. It retains nothing —
+`AllocSnapshot` is `Copy` over six `Option<u64>` fields, and the maps buffer is
+freed on the same tick — so the footprint delta is bounded by the tick's
+transient allocations rather than by a new plateau. The series-count gate is
+satisfied by construction: six families, one label-free series each, constant per
+scrape.
+
+The added CPU was measured on this branch in a Linux container
+(`rust:1.99.0-trixie`, glibc, `rustc -O`) by calling the real `read_alloc` from
+`crates/memory-mcp/src/platform/process_memory.rs` 200 000 times against a small
+and a 204.8 MB live heap:
+
+| Live heap | Per call | Share of one 5 s tick |
+| --- | --- | --- |
+| ~0 | 4 748 ns | 0.000095% |
+| 204.8 MB | 4 798 ns | 0.000096% |
+
+The cost does not scale with live bytes, because `mallinfo2` walks arena bins
+rather than allocations. What it does scale with is the number of VM areas in
+`/proc/self/maps`, which this probe process has few of: on a process with a very
+large mapping count the read is proportionally larger, though still bounded by
+one file read per tick. Against the 5% CPU gate this is five orders of magnitude
+of margin, and the footprint gate (<=5 MiB) has no standing term to breach.
+
+**Still not measured.** The gate is written as a paired end-to-end comparison:
+three paired INFO runs with the upkeep read enabled versus disabled, and a third
+with the allocator read stubbed to `None`. That needs a disposable Linux staging
+deployment running this build, which this session did not have; the sampler
+commands and the dataset protocol are above. This bound is evidence about the
+added work, not a substitute for those runs.
 
 ## Durable task artifact residual bound
 

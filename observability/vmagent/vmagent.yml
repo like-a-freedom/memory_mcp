@@ -30,6 +30,15 @@ scrape_configs:
   # collectors with different job names for the same service would have the
   # alert read the wrong target.
   - job_name: memory_mcp
+    # The mount base this file is written for. The path of
+    # `MEMORY_MCP_HTTP_PUBLIC_BASE_URL` *is* the server's mount base, and the
+    # router nests the whole app — `/metrics` included — under it, so a
+    # deployment at `https://host/memory` serves the exposition at
+    # `/memory/metrics` and 404s `/metrics`. This file targets the bundled,
+    # root-mounted stack; a prefixed deployment sets `metrics_path` to
+    # `<base>/metrics` and updates this declaration to match. A test in the crate
+    # (`scrape_path_matches_base_path`) fails if the two disagree.
+    # assumed_base_path: ""
     metrics_path: /metrics
     # Stated rather than inherited: changing the global default for another
     # job must not silently change this one's resolution.
