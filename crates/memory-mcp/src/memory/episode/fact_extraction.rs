@@ -257,19 +257,13 @@ pub(super) async fn detect_contradiction_warnings(
     claim_based_contradiction_warnings(service, facts).await
 }
 
-/// Load claim relations for the given facts. Error handling is the caller's
+/// Load claim relations for the given fact ids. Error handling is the caller's
 /// concern (one path propagates, the reconciliation path swallows).
 async fn claim_relations_for_facts(
     service: &ExtractDeps,
-    facts: &[ExtractedFact],
+    fact_ids: &[crate::models::FactId],
 ) -> Result<Vec<crate::models::claim::ClaimRelation>, MemoryError> {
-    let fact_ids: Vec<_> = facts
-        .iter()
-        .map(|f| crate::models::FactId::from(f.fact_id.as_str()))
-        .collect();
-    let query = crate::knowledge::claims::RelationsForFactsQuery {
-        fact_ids: &fact_ids,
-    };
+    let query = crate::knowledge::claims::RelationsForFactsQuery { fact_ids };
     service
         .claim_service
         .store
@@ -304,7 +298,7 @@ async fn claim_based_contradiction_warnings(
     if fact_ids.is_empty() {
         return Ok(Vec::new());
     }
-    let relations = claim_relations_for_facts(service, facts).await?;
+    let relations = claim_relations_for_facts(service, &fact_ids).await?;
     let mut warnings = Vec::new();
     for rel in &relations {
         if rel.outcome != ClaimRelationOutcome::Contradiction {
@@ -537,7 +531,11 @@ pub async fn extract_from_episode(
         .rollout_stage
         .exposes_evidence()
     {
-        let relations = claim_relations_for_facts(service, &facts)
+        let fact_ids: Vec<_> = facts
+            .iter()
+            .map(|f| crate::models::FactId::from(f.fact_id.as_str()))
+            .collect();
+        let relations = claim_relations_for_facts(service, &fact_ids)
             .await
             .unwrap_or_default();
         let active_relations = relations
