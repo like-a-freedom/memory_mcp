@@ -43,7 +43,7 @@ The whole footprint is anonymous glibc heap over ~1 MB of data. Static reading o
 Input classes and failure modes the spec implies but the task tests do not exercise — each is pinned by the named task test:
 
 1. **Non-Linux / non-glibc** — on macOS the allocator read yields all `None` and no gauge is emitted; a `None` must never become `0` — Task 1 unit `maps_without_heap_is_none_not_zero`.
-2. **Malformed `/proc` and cgroup layouts** — a `maps` file where the `[heap]` line is absent, or a private cgroup namespace where `/proc/self/cgroup` reads `0::/` and the counters live directly under `/sys/fs/cgroup/`: each yields `None` for that field only, never a panic and never a whole-snapshot error — Task 1 unit `private_cgroup_namespace_resolves_counters`.
+2. **Malformed `/proc`** — a `maps` file where the `[heap]` line is absent yields `None` for `heap_bytes` only, never a panic, never a `0` and never a whole-snapshot error — Task 1 unit `maps_without_heap_is_none_not_zero`. (No cgroup is read: the binding carve-out keeps cgroup counters with cAdvisor.)
 3. **Exposition contract unchanged for process metrics** — the rendered `/metrics` must still contain no `memory_process_rss`/`memory_process_cpu`/`memory_process_uptime` family, and `observability/README.md` must document the allocator carve-out — Task 4 test `check-observability` plus the amended README.
 4. **Heap route safety** — the on-demand `malloc_info` dump is refused (404) unless explicitly enabled, and never echoes request data — Task 2 test `heap_dump_route_is_disabled_by_default`.
 5. **Scrape path under a base path** — a deployment with `base_path=/memory` serves the exposition at `/memory/metrics`; the shipped scrape config must match or every new panel is empty — Task 5 test/check `scrape_path_matches_base_path`.
@@ -59,15 +59,16 @@ Input classes and failure modes the spec implies but the task tests do not exerc
 - Create: `crates/memory-mcp/src/platform/process_memory.rs` (the allocator / `[heap]` reader + parsers)
 - Modify: `crates/memory-mcp/src/platform.rs` (register `pub mod process_memory;`)
 - Modify: `crates/memory-mcp/src/shared/observability.rs` (6 consts + 6 `MetricDescription` entries)
+- Modify: `crates/memory-mcp/src/observability.rs` (add the six names to the `HTTP_OWNER_SNAPSHOT` allow-list inside `every_declared_family_reaches_the_exposition`; the family is written only by upkeep, exactly like the eight already listed there, so without the entry that test fails on a declared-but-unrecorded family)
 - Modify: `crates/memory-mcp/src/http/runtime/memory_snapshot.rs` (`HttpMemorySnapshot` gains an `alloc` field + `capture()` populates it)
 - Modify: `crates/memory-mcp/src/http/metrics.rs` (`record_memory_snapshot()` sets the gauges)
 - Test: unit tests in `process_memory.rs`; one exposition test via the existing `spawn_upkeep_with_ticks` fixture.
 
 **Interfaces:**
 - Consumes: nothing from other tasks; the existing `HttpMemorySnapshotSource::capture()` call site in `spawn_upkeep`.
-- Produces: `pub(crate) struct AllocSnapshot { pub arena_bytes: Option<u64>, pub mmap_bytes: Option<u64>, pub in_use_bytes: Option<u64>, pub free_bytes: Option<u64>, pub keepcost_bytes: Option<u64>, pub heap_bytes: Option<u64> }` and `pub(crate) fn read_alloc() -> AllocSnapshot`. Read-only; every field optional; never panics. Also `pub(crate) struct ProcessTotals { rss_bytes: Option<u64>, swap_bytes: Option<u64>, hwm_bytes: Option<u64> }` and `pub(crate) fn read_process_totals() -> ProcessTotals` — used only by Task 3's logs, never exported as gauges.
+- Produces: `pub(crate) struct AllocSnapshot { pub(crate) arena_bytes: Option<u64>, pub(crate) mmap_bytes: Option<u64>, pub(crate) in_use_bytes: Option<u64>, pub(crate) free_bytes: Option<u64>, pub(crate) keepcost_bytes: Option<u64>, pub(crate) heap_bytes: Option<u64> }` and `pub(crate) fn read_alloc() -> AllocSnapshot`. Read-only; every field optional; never panics. `ProcessTotals` / `read_process_totals()` are **not** produced here: their only consumer is Task 3's logs, and a `pub(crate)` item with no caller in this commit is dead code under the zero-warning gate (`-D warnings`). Task 3 produces them in the same file.
 
-New constants + registry entries (`kind: MetricKind::Gauge`, `unit: Some(Unit::Bytes)`): `memory_alloc_arena_bytes` (`mallinfo2.arena`), `memory_alloc_mmap_bytes` (`hblkhd`), `memory_alloc_in_use_bytes` (`uordblks`), `memory_alloc_free_bytes` (`fordblks`), `memory_alloc_keepcost_bytes` (`keepcost`), `memory_alloc_heap_bytes` (the `[heap]` mapping size from `/proc/self/maps`).
+New constants + registry entries (`kind: MetricKind::Gauge`, `unit: None`): `memory_alloc_arena_bytes` (`mallinfo2.arena`), `memory_alloc_mmap_bytes` (`hblkhd`), `memory_alloc_in_use_bytes` (`uordblks`), `memory_alloc_free_bytes` (`fordblks`), `memory_alloc_keepcost_bytes` (`keepcost`), `memory_alloc_heap_bytes` (the `[heap]` mapping size from `/proc/self/maps`).
 
 - [ ] **Step 1: Write the failing parser unit tests**
 
@@ -76,27 +77,28 @@ In `process_memory.rs`, test against string fixtures (no live host):
 ```rust
 #[test]
 fn finds_heap_extent_in_maps() {
-    let maps = "5555 rw-p 00000000 00:00 0 [heap]\n";
+    // A well-formed maps range whose length is 0x100 pages: the parser reads
+    // `end - start`, and the fixture's extent is what the assertion pins.
+    let maps = "7f0000000000-7f0000100000 rw-p 00000000 00:00 0 [heap]\n";
     assert_eq!(parse_heap_bytes(maps), Some(0x100 * 4096));
 }
 
 #[test]
 fn maps_without_heap_is_none_not_zero() {
-    assert_eq!(parse_heap_bytes("5555 r-xp 0 00:00 0 /usr/lib/libc.so.6\n"), None);
+    assert_eq!(
+        parse_heap_bytes("7f0100000000-7f0100010000 r-xp 00000000 00:00 0 /usr/lib/libc.so.6\n"),
+        None
+    );
 }
 
-#[test]
-fn private_cgroup_namespace_resolves_counters() {
-    // `0::/` with the mount at the container root: counters live directly
-    // under /sys/fs/cgroup/, not under a sub-path.
-    assert_eq!(resolve_cgroup_memory_dir("0::/\n", "/sys/fs/cgroup"), "/sys/fs/cgroup");
-}
 ```
+
+There is no cgroup parser: the binding spec's "No process metrics" carve-out keeps cgroup counters with cAdvisor, and no code in this plan reads a cgroup, so a `resolve_cgroup_memory_dir` helper would be an uncalled `pub(crate)` function — dead code under `-D warnings`, and a direct test of a private helper, which the testing rules forbid. The robustness this task must show is the parser's: a `maps` file with no `[heap]` line yields `None`, never `0`.
 
 - [ ] **Step 2: Run the tests to verify they fail**
 
 Run: `cargo test -p memory_mcp --lib platform::process_memory`
-Expected: COMPILE ERROR — `parse_heap_bytes` / `resolve_cgroup_memory_dir` not found.
+Expected: COMPILE ERROR — `parse_heap_bytes` not found.
 
 - [ ] **Step 3: Implement the reader**
 
@@ -109,7 +111,7 @@ Expected: PASS.
 
 - [ ] **Step 5: Declare the families and set the gauges**
 
-Add the six consts and their `MetricDescription` entries to `DESCRIPTIONS` in `shared/observability.rs` (gauges carry `unit: None`; `only_histograms_carry_a_unit` pins that rule, so a unit here fails the build). Add an `alloc: AllocSnapshot` field to `HttpMemorySnapshot` (keep `Copy`), populate it in `capture()`, and in `record_memory_snapshot()` set each gauge only when its field is `Some`.
+Add the six consts and their `MetricDescription` entries to `DESCRIPTIONS` in `shared/observability.rs` (gauges carry `unit: None`; `counters_and_gauges_are_dimensionless` pins that rule, so a unit here fails the build). Add the six names to the `HTTP_OWNER_SNAPSHOT` allow-list in `src/observability.rs::tests::every_declared_family_reaches_the_exposition`, which otherwise fails on a declared-but-unrecorded family. Add an `alloc: AllocSnapshot` field to `HttpMemorySnapshot` (keep `Copy`), populate it in `capture()`, and in `record_memory_snapshot()` set each gauge only when its field is `Some`.
 
 - [ ] **Step 6: Exposition test**
 
@@ -194,10 +196,11 @@ git commit -m "feat(observability): operator-gated heap dump and glibc tunable l
 **Files:**
 - Modify: `crates/memory-mcp/src/http/runtime/bootstrap.rs` (`build_state`)
 - Modify: `crates/memory-mcp/src/bin/memory_mcp_http.rs` (one marker after the router is built)
+- Modify: `crates/memory-mcp/src/platform/process_memory.rs` (add `ProcessTotals { rss_bytes, swap_bytes, hwm_bytes }` and `read_process_totals()` — produced here, not in Task 1, because its only caller is this marker and an uncalled function is dead code under `-D warnings`)
 - Test: unit test for the marker helper.
 
 **Interfaces:**
-- Consumes: `crate::platform::process_memory::{read_process_totals, read_alloc}` from Task 1.
+- Consumes: `crate::platform::process_memory::read_alloc` from Task 1; produces `read_process_totals` in the same file for its own use.
 - Produces: `fn log_memory_marker(logger: &StdoutLogger, phase: &'static str)` emitting an INFO event `op=http.startup_memory` with `phase`, `rss_bytes`, `hwm_bytes`, `heap_bytes`. **Logs only — no metric family.**
 
 - [ ] **Step 1: Write the failing test**
