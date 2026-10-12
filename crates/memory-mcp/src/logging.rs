@@ -703,6 +703,11 @@ pub const HTTP_OPERATIONS: &[&str] = &[
     "http.lifecycle.archival_failed",
     "http.preflight.refused",
     "http.preflight.large_body",
+    // Emitted by the allocator-attribution diagnostics: the startup-phase memory
+    // marker in `runtime/bootstrap.rs`, and the glibc tunable line in the HTTP
+    // binary. Both are one-shot startup events rather than per-request ones.
+    "http.startup_memory",
+    "http.glibc_tunables",
 ];
 
 /// The closed registry of operation-name namespaces ([ADR-0081]).
