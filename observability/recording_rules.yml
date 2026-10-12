@@ -546,3 +546,26 @@ groups:
             sum(increase(memory_operation_results_total{operation="extract",result="entities"}[1d])),
             1
           )
+
+  # ─── Allocator attribution ─────────────────────────────────────────────────
+  #
+  # How much address space the allocator reserved against how much it has live
+  # objects for. It is a ratio rather than a byte count because the question is
+  # "is the extent moving with the work", and it is a recording rule because the
+  # dashboard's rule is that every derived figure is computed once per interval
+  # rather than once per panel.
+  - name: memory-allocator
+    interval: 30s
+    rules:
+      # `/proc/self/maps`'s `[heap]` width over the bytes in live allocations.
+      #
+      # The denominator is filtered to `> 0` rather than guarded with
+      # `or vector(0)`: with no live bytes the ratio is undefined, and an
+      # undefined figure is better represented by an absent series than by an
+      # infinity that reads as an emergency. Both families are absent off
+      # Linux/glibc, and the rule is then simply empty.
+      - record: memory:alloc:heap_in_use_ratio
+        expr: |
+          memory_alloc_heap_bytes
+          /
+          (memory_alloc_in_use_bytes > 0)

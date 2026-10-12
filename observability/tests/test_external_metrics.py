@@ -297,6 +297,69 @@ class DashboardMetricContractTests(unittest.TestCase):
             "external panels require the blocked Task 15 inventory",
         )
 
+    def test_technical_dashboard_contains_allocator_attribution(self):
+        dashboard_path = (
+            Path(__file__).resolve().parents[1]
+            / "dashboards"
+            / "technical.json"
+        )
+        document = json.loads(dashboard_path.read_text())
+        parent = next(
+            (
+                panel
+                for panel in document["panels"]
+                if panel.get("type") == "row"
+                and panel.get("title") == "HTTP memory diagnostics"
+            ),
+            None,
+        )
+        self.assertIsNotNone(
+            parent, "the app diagnostics row is the allocator row's parent"
+        )
+        allocator = next(
+            (
+                panel
+                for panel in parent["panels"]
+                if panel.get("type") == "row"
+                and panel.get("title") == "Allocator attribution"
+            ),
+            None,
+        )
+
+        self.assertIsNotNone(
+            allocator, "technical dashboard is missing the allocator attribution row"
+        )
+        self.assertTrue(allocator["collapsed"])
+        panels = list(descendant_panels(allocator))
+        panel_titles = {panel["title"] for panel in panels}
+        for title in (
+            "Allocator arena, in use and free",
+            "Allocator mmap'd blocks and releasable top",
+            "Heap extent",
+            "Heap extent per live byte",
+        ):
+            self.assertIn(title, panel_titles)
+        expressions = "\n".join(
+            target["expr"]
+            for panel in panels
+            for target in panel.get("targets", [])
+        )
+        # All six allocator families must be charted, or check_dashboards.py's
+        # "no family is read by nothing" rule fails — the two are the same
+        # contract stated from opposite ends.
+        for family in (
+            "memory_alloc_arena_bytes",
+            "memory_alloc_in_use_bytes",
+            "memory_alloc_free_bytes",
+            "memory_alloc_mmap_bytes",
+            "memory_alloc_keepcost_bytes",
+            "memory_alloc_heap_bytes",
+        ):
+            self.assertIn(family, expressions)
+        # The ratio panel reads the recording rule, so the rule has a reader.
+        self.assertIn("memory:alloc:heap_in_use_ratio", expressions)
+        self.assertNotIn("or vector(0)", expressions)
+
     def test_app_body_distribution_uses_exported_metric_type(self):
         dashboard_path = (
             Path(__file__).resolve().parents[1]

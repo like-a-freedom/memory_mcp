@@ -349,9 +349,31 @@ the application. They are host and container figures, not application ones:
 `node_exporter` and `cAdvisor` already report them on their own dashboards, and
 a second copy inside this exposition would be a number kept in two places to
 keep in sync. So a latency spike is correlated against those dashboards rather
-rather than against a panel here, and the *Saturation* row carries what the
+than against a panel here, and the *Saturation* row carries what the
 application itself can saturate on — in-flight requests — which is the signal
 those dashboards do not have.
+
+**Allocator attribution is the one process-memory exception.** Six
+`memory_alloc_*` gauges report glibc's own accounting of this process's heap —
+`mallinfo2`'s arena, live, free, mmap'd and releasable-top figures, plus the
+`[heap]` mapping extent from `/proc/self/maps` — sampled on the same five-second
+upkeep tick. They are not a second copy of cAdvisor: cAdvisor reports the
+container's RSS, swap and working set, and none of those say *where inside the
+process* the bytes went. A `[heap]` extent far above the live bytes is allocator
+retention — free chunks kept instead of returned to the OS — and neither
+cAdvisor nor node_exporter can see it. Read them beside those dashboards, never
+instead of them. Off Linux/glibc the families are absent rather than zero,
+because there is no `mallinfo2` to read, and a zero would read as "the allocator
+holds nothing".
+
+| Metric | Meaning |
+| --- | --- |
+| `memory_alloc_arena_bytes` | glibc's main arena (`mallinfo2.arena`), free chunks included |
+| `memory_alloc_in_use_bytes` | Live allocations (`mallinfo2.uordblks`) |
+| `memory_alloc_free_bytes` | Free chunks the allocator retained (`mallinfo2.fordblks`) |
+| `memory_alloc_mmap_bytes` | Large blocks that bypassed the arena (`mallinfo2.hblkhd`) |
+| `memory_alloc_keepcost_bytes` | Bytes `malloc_trim(0)` could return (`mallinfo2.keepcost`) |
+| `memory_alloc_heap_bytes` | Width of the `[heap]` mapping in `/proc/self/maps` |
 
 **HTTP preflight and resource metrics.** `memory_http_preflight_body_bytes` is a
 no-label summary of fully collected request bodies, including malformed JSON;
@@ -376,9 +398,10 @@ the existing five-second upkeep tick:
 
 These are no-label gauges: they contain no tenant or cache payload identity, and
 they cover only resources represented by those owners. They are not complete heap
-accounting, process RSS, swap, or a proxy for either. Use the controlled `xtask`
-process sampler and host/container exporters for those separate measurement
-levels; do not add the owner gauges together and call the result RSS.
+accounting, process RSS, swap, or a proxy for either — the `memory_alloc_*`
+gauges above are the closest thing here to heap accounting. Use the controlled
+`xtask` process sampler and host/container exporters for the rest; do not add the
+owner gauges together and call the result RSS.
 
 **No per-tenant label.** A tenant label is unbounded in cardinality — it is one
 series per tenant, forever. The tenant fingerprint is in the logs, which is

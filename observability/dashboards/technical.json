@@ -2373,6 +2373,355 @@
                 "type": "prometheus",
                 "uid": "${datasource}"
               },
+              "description": "glibc's own accounting of the main arena. `free` is memory the allocator kept instead of returning to the OS: an arena far above in-use is retention, not work in progress. Absent off Linux/glibc, never zero.",
+              "fieldConfig": {
+                "defaults": {
+                  "color": {
+                    "mode": "palette-classic"
+                  },
+                  "custom": {
+                    "axisBorderShow": false,
+                    "axisCenteredZero": false,
+                    "axisLabel": "",
+                    "axisPlacement": "auto",
+                    "barAlignment": 0,
+                    "drawStyle": "line",
+                    "fillOpacity": 8,
+                    "gradientMode": "none",
+                    "hideFrom": {
+                      "legend": false,
+                      "tooltip": false,
+                      "viz": false
+                    },
+                    "insertNulls": false,
+                    "lineInterpolation": "linear",
+                    "lineWidth": 1,
+                    "pointSize": 5,
+                    "scaleDistribution": {
+                      "type": "linear"
+                    },
+                    "showPoints": "never",
+                    "spanNulls": false,
+                    "stacking": {
+                      "group": "A",
+                      "mode": "none"
+                    },
+                    "thresholdsStyle": {
+                      "mode": "off"
+                    }
+                  },
+                  "mappings": [],
+                  "min": 0,
+                  "unit": "bytes"
+                },
+                "overrides": []
+              },
+              "gridPos": {
+                "h": 8,
+                "w": 6,
+                "x": 0,
+                "y": 0
+              },
+              "id": 0,
+              "options": {
+                "legend": {
+                  "calcs": [
+                    "lastNotNull",
+                    "max"
+                  ],
+                  "displayMode": "table",
+                  "placement": "right",
+                  "showLegend": true
+                },
+                "tooltip": {
+                  "mode": "multi",
+                  "sort": "desc"
+                }
+              },
+              "pluginVersion": "13.2.4",
+              "targets": [
+                {
+                  "datasource": {
+                    "type": "prometheus",
+                    "uid": "${datasource}"
+                  },
+                  "editorMode": "code",
+                  "expr": "memory_alloc_arena_bytes",
+                  "legendFormat": "arena",
+                  "range": true,
+                  "refId": "A"
+                },
+                {
+                  "datasource": {
+                    "type": "prometheus",
+                    "uid": "${datasource}"
+                  },
+                  "editorMode": "code",
+                  "expr": "memory_alloc_in_use_bytes",
+                  "legendFormat": "in use",
+                  "range": true,
+                  "refId": "B"
+                },
+                {
+                  "datasource": {
+                    "type": "prometheus",
+                    "uid": "${datasource}"
+                  },
+                  "editorMode": "code",
+                  "expr": "memory_alloc_free_bytes",
+                  "legendFormat": "free (retained)",
+                  "range": true,
+                  "refId": "C"
+                }
+              ],
+              "title": "Allocator arena, in use and free",
+              "type": "timeseries"
+            },
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${datasource}"
+              },
+              "description": "Bytes the allocator holds outside its live arena blocks: requests large enough to bypass the arena entirely (`hblkhd`), and the bytes at the top of the heap `malloc_trim(0)` could give back right now (`keepcost`). A non-zero `MALLOC_TRIM_THRESHOLD_` pins the second at zero; the startup log carries that variable.",
+              "fieldConfig": {
+                "defaults": {
+                  "color": {
+                    "mode": "palette-classic"
+                  },
+                  "custom": {
+                    "axisBorderShow": false,
+                    "axisCenteredZero": false,
+                    "axisLabel": "",
+                    "axisPlacement": "auto",
+                    "barAlignment": 0,
+                    "drawStyle": "line",
+                    "fillOpacity": 8,
+                    "gradientMode": "none",
+                    "hideFrom": {
+                      "legend": false,
+                      "tooltip": false,
+                      "viz": false
+                    },
+                    "insertNulls": false,
+                    "lineInterpolation": "linear",
+                    "lineWidth": 1,
+                    "pointSize": 5,
+                    "scaleDistribution": {
+                      "type": "linear"
+                    },
+                    "showPoints": "never",
+                    "spanNulls": false,
+                    "stacking": {
+                      "group": "A",
+                      "mode": "none"
+                    },
+                    "thresholdsStyle": {
+                      "mode": "off"
+                    }
+                  },
+                  "mappings": [],
+                  "min": 0,
+                  "unit": "bytes"
+                },
+                "overrides": []
+              },
+              "gridPos": {
+                "h": 8,
+                "w": 6,
+                "x": 6,
+                "y": 0
+              },
+              "id": 0,
+              "options": {
+                "legend": {
+                  "calcs": [
+                    "lastNotNull",
+                    "max"
+                  ],
+                  "displayMode": "table",
+                  "placement": "right",
+                  "showLegend": true
+                },
+                "tooltip": {
+                  "mode": "multi",
+                  "sort": "desc"
+                }
+              },
+              "pluginVersion": "13.2.4",
+              "targets": [
+                {
+                  "datasource": {
+                    "type": "prometheus",
+                    "uid": "${datasource}"
+                  },
+                  "editorMode": "code",
+                  "expr": "memory_alloc_mmap_bytes",
+                  "legendFormat": "mmap'd",
+                  "range": true,
+                  "refId": "A"
+                },
+                {
+                  "datasource": {
+                    "type": "prometheus",
+                    "uid": "${datasource}"
+                  },
+                  "editorMode": "code",
+                  "expr": "memory_alloc_keepcost_bytes",
+                  "legendFormat": "releasable top",
+                  "range": true,
+                  "refId": "B"
+                }
+              ],
+              "title": "Allocator mmap'd blocks and releasable top",
+              "type": "timeseries"
+            },
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${datasource}"
+              },
+              "description": "The width of the `[heap]` mapping in `/proc/self/maps`: the address space the allocator may grow into. Far above the resident bytes it is address space, not memory in use.",
+              "fieldConfig": {
+                "defaults": {
+                  "unit": "bytes",
+                  "color": {
+                    "mode": "thresholds"
+                  },
+                  "mappings": [],
+                  "thresholds": {
+                    "mode": "absolute",
+                    "steps": [
+                      {
+                        "color": "text",
+                        "value": null
+                      }
+                    ]
+                  },
+                  "decimals": 0
+                },
+                "overrides": []
+              },
+              "gridPos": {
+                "h": 8,
+                "w": 6,
+                "x": 12,
+                "y": 0
+              },
+              "id": 0,
+              "options": {
+                "colorMode": "value",
+                "graphMode": "none",
+                "justifyMode": "auto",
+                "orientation": "auto",
+                "reduceOptions": {
+                  "calcs": [
+                    "lastNotNull"
+                  ],
+                  "fields": "",
+                  "values": false
+                },
+                "textMode": "auto"
+              },
+              "pluginVersion": "13.2.4",
+              "targets": [
+                {
+                  "datasource": {
+                    "type": "prometheus",
+                    "uid": "${datasource}"
+                  },
+                  "editorMode": "code",
+                  "expr": "memory_alloc_heap_bytes",
+                  "legendFormat": "",
+                  "range": true,
+                  "refId": "A"
+                }
+              ],
+              "title": "Heap extent",
+              "type": "stat"
+            },
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${datasource}"
+              },
+              "description": "`[heap]` extent divided by live allocation bytes, from a recording rule. 1 means the extent holds only what is in use; higher means the allocator is holding address space it no longer has objects for. Absent when there are no live bytes, because the ratio is then undefined.",
+              "fieldConfig": {
+                "defaults": {
+                  "unit": "short",
+                  "color": {
+                    "mode": "thresholds"
+                  },
+                  "mappings": [],
+                  "thresholds": {
+                    "mode": "absolute",
+                    "steps": [
+                      {
+                        "color": "text",
+                        "value": null
+                      }
+                    ]
+                  },
+                  "decimals": 2
+                },
+                "overrides": []
+              },
+              "gridPos": {
+                "h": 8,
+                "w": 6,
+                "x": 18,
+                "y": 0
+              },
+              "id": 0,
+              "options": {
+                "colorMode": "value",
+                "graphMode": "none",
+                "justifyMode": "auto",
+                "orientation": "auto",
+                "reduceOptions": {
+                  "calcs": [
+                    "lastNotNull"
+                  ],
+                  "fields": "",
+                  "values": false
+                },
+                "textMode": "auto"
+              },
+              "pluginVersion": "13.2.4",
+              "targets": [
+                {
+                  "datasource": {
+                    "type": "prometheus",
+                    "uid": "${datasource}"
+                  },
+                  "editorMode": "code",
+                  "expr": "memory:alloc:heap_in_use_ratio",
+                  "legendFormat": "",
+                  "range": true,
+                  "refId": "A"
+                }
+              ],
+              "title": "Heap extent per live byte",
+              "type": "stat"
+            }
+          ],
+          "title": "Allocator attribution",
+          "type": "row"
+        },
+        {
+          "collapsed": true,
+          "gridPos": {
+            "h": 1,
+            "w": 24,
+            "x": 0,
+            "y": 0
+          },
+          "id": 0,
+          "panels": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${datasource}"
+              },
               "description": "",
               "gridPos": {
                 "h": 8,
@@ -2387,7 +2736,7 @@
                   "showLineNumbers": false,
                   "showMiniMap": false
                 },
-                "content": "These are bounded owner-accounting gauges, not process memory. They cover only the preflight budget, resident runtime caches and the background task coordinator; allocator retention, SDK/database internals and other heap are outside them. **Do not add them and call the result RSS.** Use controlled `xtask` process sampling for `VmRSS`/`VmSwap`, and keep host/container exporter values separate.",
+                "content": "These are bounded owner-accounting gauges, not process memory. They cover only the preflight budget, resident runtime caches and the background task coordinator; allocator retention, SDK/database internals and other heap are outside them. **Do not add them and call the result RSS.** Use controlled `xtask` process sampling for `VmRSS`/`VmSwap`, and keep host/container exporter values separate. The *Allocator attribution* row is the one exception worth knowing about: those gauges are glibc's accounting of the heap itself, so they describe what the allocator holds rather than what an owner charged \u2014 read them there, not here.",
                 "mode": "markdown"
               },
               "pluginVersion": "13.2.4",
@@ -3590,7 +3939,7 @@
               "showLineNumbers": false,
               "showMiniMap": false
             },
-            "content": "All figures come from recording rules in `observability/recording_rules.yml`, so a derived number is computed once per interval rather than once per panel refresh. Every family is described at its source in `crates/memory-mcp/src/shared/observability.rs`, and each description names the trap that family has.\n\n**The four that will mislead you if read naively:**\n\n1. `memory_operation_results_total` counts work produced. Its `rate()` is meaningless; `increase()` over a window is the question. The product dashboard uses it that way.\n2. `memory_operation_stock` and `memory_claim_relations_active` are levels, set rather than accumulated, so they are read as they stand.\n3. **Every histogram is exported as a summary, not as buckets** \u2014 there is no `le` label, and latency is read from the `quantile=\"\u2026\"` lines. Configuring buckets would switch the exporter process-wide and cost every duration metric its quantiles.\n4. `4xx` is not availability. It is very often the service working correctly.\n\n**Known gaps, deliberately:**\n\n- No process metrics (RSS, CPU, uptime). They are host and container figures, not application ones: read them from node_exporter and cAdvisor on their own dashboards, and use the *Saturation* row here for what the application itself can saturate on.\n- `up` and `memory_build_info` come from the collection layer rather than from a request \u2014 `up` is generated by the collector and exists only where a scrape configuration is installed, and the build stamp is written once at startup. Both are on the *Collection health* row.\n- No cross-tenant label. It would be unbounded; the tenant fingerprint lives in the logs instead.",
+            "content": "All figures come from recording rules in `observability/recording_rules.yml`, so a derived number is computed once per interval rather than once per panel refresh. Every family is described at its source in `crates/memory-mcp/src/shared/observability.rs`, and each description names the trap that family has.\n\n**The four that will mislead you if read naively:**\n\n1. `memory_operation_results_total` counts work produced. Its `rate()` is meaningless; `increase()` over a window is the question. The product dashboard uses it that way.\n2. `memory_operation_stock` and `memory_claim_relations_active` are levels, set rather than accumulated, so they are read as they stand.\n3. **Every histogram is exported as a summary, not as buckets** \u2014 there is no `le` label, and latency is read from the `quantile=\"\u2026\"` lines. Configuring buckets would switch the exporter process-wide and cost every duration metric its quantiles.\n4. `4xx` is not availability. It is very often the service working correctly.\n\n**Known gaps, deliberately:**\n\n- No process metrics (RSS, CPU, uptime). They are host and container figures, not application ones: read them from node_exporter and cAdvisor on their own dashboards, and use the *Saturation* row here for what the application itself can saturate on. The one exception is the *Allocator attribution* row: glibc's `mallinfo2` accounting and the `[heap]` extent describe this process's heap, which no collector can see, and they are absent rather than zero off Linux/glibc.\n- `up` and `memory_build_info` come from the collection layer rather than from a request \u2014 `up` is generated by the collector and exists only where a scrape configuration is installed, and the build stamp is written once at startup. Both are on the *Collection health* row.\n- No cross-tenant label. It would be unbounded; the tenant fingerprint lives in the logs instead.",
             "mode": "markdown"
           },
           "pluginVersion": "13.2.4",
