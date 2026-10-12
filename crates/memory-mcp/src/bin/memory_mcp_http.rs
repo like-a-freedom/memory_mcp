@@ -34,8 +34,9 @@ fn log_failure(op: &str, error: &dyn std::fmt::Display) {
 /// glibc reads these variables once, at first allocation, so an operator who
 /// inspects a *shell's* environment sees something different from what this
 /// process is running with. Logging them beside the footprint numbers is what
-/// makes "the heap never shrank" diagnosable: a non-zero
-/// `MALLOC_TRIM_THRESHOLD_` alone explains a `keepcost` pinned at zero.
+/// makes "the heap never shrank" diagnosable. The trim threshold controls
+/// when glibc attempts automatic trimming; its value does not determine
+/// `mallinfo2.keepcost` directly.
 fn log_glibc_tunables() {
     let mut event = std::collections::HashMap::from([(
         "op".to_string(),

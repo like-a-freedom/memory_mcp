@@ -522,55 +522,50 @@ pub const DESCRIPTIONS: &[MetricDescription] = &[
         name: METRIC_ALLOC_ARENA_BYTES,
         kind: MetricKind::Gauge,
         unit: None,
-        help: "Bytes in glibc's main arena (`mallinfo2.arena`), the brk heap \
-               the allocator grows into. A level, and one that counts retained \
-               free blocks as much as live ones: read it beside in-use and \
-               free, never alone. Absent off Linux/glibc, where there is no \
-               mallinfo2 — absent, not zero.",
+        help: "Non-mmap bytes acquired by glibc arenas (`mallinfo2.arena`). \
+               This is aggregate allocator accounting, not the `/proc` `[heap]` \
+               mapping; read it beside in-use and free. Absent off Linux/glibc, \
+               where there is no mallinfo2 — absent, not zero.",
     },
     MetricDescription {
         name: METRIC_ALLOC_MMAP_BYTES,
         kind: MetricKind::Gauge,
         unit: None,
-        help: "Bytes in glibc's mmap'd blocks (`mallinfo2.hblkhd`): \
-               allocations large enough to bypass the arena. A large value \
-               beside a small arena is one oversized buffer, not steady \
-               state.",
+        help: "Bytes in glibc mmap allocations (`mallinfo2.hblkhd`), separate \
+               from arena accounting. A large value can indicate allocations \
+               bypassing arenas, but does not identify a specific buffer.",
     },
     MetricDescription {
         name: METRIC_ALLOC_IN_USE_BYTES,
         kind: MetricKind::Gauge,
         unit: None,
-        help: "Bytes in in-use glibc blocks (`mallinfo2.uordblks`), the live \
-               allocations. The floor a trim cannot go below: against arena it \
-               says how much of the heap is retained rather than held.",
+        help: "Bytes in allocator in-use arena blocks (`mallinfo2.uordblks`), \
+               aggregated across arenas and excluding mmap allocations. Read \
+               against `mallinfo2.arena`, which has the same accounting scope.",
     },
     MetricDescription {
         name: METRIC_ALLOC_FREE_BYTES,
         kind: MetricKind::Gauge,
         unit: None,
-        help: "Bytes in free glibc blocks (`mallinfo2.fordblks`), retained by \
-               the allocator and not returned to the OS. Free far above in-use \
-               is the signature of chunks a periodic `malloc_trim` could \
-               release.",
+        help: "Bytes in free glibc arena blocks (`mallinfo2.fordblks`), \
+               aggregated across arenas and excluding mmap allocations. Free \
+               blocks are not necessarily all reclaimable by `malloc_trim`.",
     },
     MetricDescription {
         name: METRIC_ALLOC_KEEPCOST_BYTES,
         kind: MetricKind::Gauge,
         unit: None,
-        help: "Bytes at the top of the glibc heap releasable by \
-               `malloc_trim(0)` (`mallinfo2.keepcost`): what a trim would give \
-               back right now. Forced to zero by a non-zero \
-               `MALLOC_TRIM_THRESHOLD_`, so read it with the tunables in the \
-               startup log.",
+        help: "The main arena's top-chunk statistic (`mallinfo2.keepcost`). It \
+               is not a guarantee of bytes `malloc_trim(0)` will return, and \
+               `MALLOC_TRIM_THRESHOLD_` does not directly force it to zero.",
     },
     MetricDescription {
         name: METRIC_ALLOC_HEAP_BYTES,
         kind: MetricKind::Gauge,
         unit: None,
-        help: "Width of the `[heap]` mapping in `/proc/self/maps`, in bytes: \
-               the virtual extent the allocator may grow into. Far above the \
-               resident bytes it is address space, not memory in use.",
+        help: "Width of the main `[heap]` mapping in `/proc/self/maps`, in \
+               bytes. This virtual extent is not the same scope as aggregate \
+               `mallinfo2` accounting and is not resident memory by itself.",
     },
     // The families below are declared in their own modules but described here,
     // with the rest of the vocabulary: a panel author reading `/metrics` has no

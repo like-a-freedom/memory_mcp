@@ -29,12 +29,12 @@ ROOT = pathlib.Path(__file__).resolve().parents[1]
 ALERTS = ROOT / "observability/alerts.yml"
 
 sys.path.insert(0, str(ROOT / "observability"))
-from check_rules import (
+from check_rules import (  # noqa: E402
     bounded_vocabulary,
     exported_families,
     strip_strings,
     unknown_label_values,
-)  # noqa: E402
+)
 
 DERIVED = ("_sum", "_count", "_bucket")
 

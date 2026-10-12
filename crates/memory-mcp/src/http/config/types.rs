@@ -896,6 +896,7 @@ mod tests {
             "MEMORY_MCP_HTTP_TASK_RETENTION_SECS",
             "MEMORY_MCP_HTTP_TASK_QUEUE_CAPACITY",
             "MEMORY_MCP_HTTP_TASK_SYNC_MAX_BYTES",
+            "MEMORY_MCP_HTTP_HEAP_DUMP_ENABLED",
             // Read by `validate()` for the stdio-only ingestion guard. A test
             // that sets it and a sibling that calls `validate()` without the
             // lock are the same race, so the variable belongs in this list for
@@ -996,6 +997,7 @@ mod tests {
             assert_eq!(cfg.bind.port(), 8080);
             assert_eq!(cfg.allowed_hosts, vec!["localhost".to_string()]);
             assert_eq!(cfg.signup_mode, SignupMode::InviteOnly);
+            assert!(!cfg.heap_dump_enabled, "heap dumps default to disabled");
         });
     }
 

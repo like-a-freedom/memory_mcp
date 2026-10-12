@@ -266,11 +266,10 @@ mod tests {
         let state = crate::http::HttpState::default_for_test().await;
         let router =
             crate::http::router::build_router(state, None).expect("router builds in tests");
-        // `/metrics` rather than a business route: it needs no database, no
-        // identity provider and no body, and the middleware wraps it exactly as
-        // it wraps everything else.
+        // `/health/live` needs no database, identity provider or request body.
+        // Unlike `/metrics`, it is counted as traffic by the middleware.
         let request = Request::builder()
-            .uri("/metrics")
+            .uri("/health/live")
             .header("host", "localhost")
             .body(Body::empty())
             .expect("request builds");
@@ -278,7 +277,7 @@ mod tests {
         let response = router
             .call(request)
             .await
-            .expect("the router serves /metrics");
+            .expect("the router serves /health/live");
         assert_eq!(response.status(), axum::http::StatusCode::OK);
 
         let exposition = crate::observability::shared_test_handle()
@@ -290,10 +289,10 @@ mod tests {
             crate::observability::METRIC_HTTP_REQUESTS_INFLIGHT,
         ] {
             assert!(
-                exposition.contains(&format!("# HELP {family} ")),
+                exposition.lines().any(|line| line.starts_with(family)),
                 "a request was served through the middleware, so `{family}` must \
-                 be in the exposition; a blank HTTP row on every dashboard is \
-                 what its absence looks like: {exposition}"
+                 have a recorded sample; a HELP-only family would leave the \
+                 dashboard blank: {exposition}"
             );
         }
     }
@@ -442,19 +441,31 @@ mod tests {
         ran.await.expect("upkeep ran one tick");
 
         let exposition = handle.render();
-        assert!(
-            exposition.contains(&format!(
-                "# HELP {} ",
-                crate::shared::observability::METRIC_ALLOC_ARENA_BYTES
-            )),
-            "glibc reports an arena, so the upkeep tick must record it; an \
-             absent family is what a panel reading *No data* looks like: \
-             {exposition}"
-        );
-        assert!(
-            !exposition.contains("memory_process_rss"),
-            "RSS belongs to cAdvisor; exporting it here would fork the contract"
-        );
+        for family in [
+            crate::shared::observability::METRIC_ALLOC_ARENA_BYTES,
+            crate::shared::observability::METRIC_ALLOC_MMAP_BYTES,
+            crate::shared::observability::METRIC_ALLOC_IN_USE_BYTES,
+            crate::shared::observability::METRIC_ALLOC_FREE_BYTES,
+            crate::shared::observability::METRIC_ALLOC_KEEPCOST_BYTES,
+            crate::shared::observability::METRIC_ALLOC_HEAP_BYTES,
+        ] {
+            assert!(
+                exposition
+                    .lines()
+                    .any(|line| line.starts_with(&format!("{family} "))),
+                "upkeep must record a sample for {family}: {exposition}"
+            );
+        }
+        for family in [
+            "memory_process_rss",
+            "memory_process_cpu",
+            "memory_process_uptime",
+        ] {
+            assert!(
+                !exposition.lines().any(|line| line.starts_with(family)),
+                "{family} belongs to external exporters; exporting it here forks the contract"
+            );
+        }
 
         cancel.cancel();
         let _ = tokio::time::timeout(std::time::Duration::from_secs(1), upkeep).await;

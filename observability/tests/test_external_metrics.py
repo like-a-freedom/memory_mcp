@@ -4,6 +4,8 @@ import tempfile
 import unittest
 from pathlib import Path
 
+import yaml
+
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 from observability import check_dashboards
 
@@ -261,7 +263,7 @@ class DashboardMetricContractTests(unittest.TestCase):
             None,
         )
 
-        self.assertIsNotNone(row, "technical dashboard is missing the app diagnostics row")
+        assert row is not None, "technical dashboard is missing the app diagnostics row"
         self.assertTrue(row["collapsed"])
         panels = list(descendant_panels(row))
         panel_titles = {panel["title"] for panel in panels}
@@ -313,9 +315,7 @@ class DashboardMetricContractTests(unittest.TestCase):
             ),
             None,
         )
-        self.assertIsNotNone(
-            parent, "the app diagnostics row is the allocator row's parent"
-        )
+        assert parent is not None, "the app diagnostics row is the allocator row's parent"
         allocator = next(
             (
                 panel
@@ -326,17 +326,15 @@ class DashboardMetricContractTests(unittest.TestCase):
             None,
         )
 
-        self.assertIsNotNone(
-            allocator, "technical dashboard is missing the allocator attribution row"
-        )
+        assert allocator is not None, "technical dashboard is missing the allocator attribution row"
         self.assertTrue(allocator["collapsed"])
         panels = list(descendant_panels(allocator))
         panel_titles = {panel["title"] for panel in panels}
         for title in (
             "Allocator arena, in use and free",
-            "Allocator mmap'd blocks and releasable top",
+            "Allocator mmap'd blocks and main-arena top chunk",
             "Heap extent",
-            "Heap extent per live byte",
+            "Arena in-use fraction",
         ):
             self.assertIn(title, panel_titles)
         expressions = "\n".join(
@@ -356,9 +354,36 @@ class DashboardMetricContractTests(unittest.TestCase):
             "memory_alloc_heap_bytes",
         ):
             self.assertIn(family, expressions)
-        # The ratio panel reads the recording rule, so the rule has a reader.
-        self.assertIn("memory:alloc:heap_in_use_ratio", expressions)
+        keepcost_legend = next(
+            target["legendFormat"]
+            for panel in panels
+            for target in panel.get("targets", [])
+            if target.get("expr") == "memory_alloc_keepcost_bytes"
+        )
+        self.assertEqual(keepcost_legend, "keepcost")
+        # The fraction compares mallinfo2 fields with the same scope; the
+        # process [heap] mapping is only the main arena and must not be divided
+        # by aggregate in-use bytes from all arenas.
+        self.assertIn("memory:alloc:arena_in_use_ratio", expressions)
+        self.assertNotIn("memory:alloc:heap_in_use_ratio", expressions)
         self.assertNotIn("or vector(0)", expressions)
+
+    def test_allocator_in_use_fraction_uses_matching_mallinfo_scope(self):
+        rules_path = Path(__file__).resolve().parents[1] / "recording_rules.yml"
+        rules = yaml.safe_load(rules_path.read_text())
+        allocator_group = next(
+            group for group in rules["groups"] if group["name"] == "memory-allocator"
+        )
+        ratio_rule = next(
+            rule
+            for rule in allocator_group["rules"]
+            if rule["record"] == "memory:alloc:arena_in_use_ratio"
+        )
+
+        self.assertEqual(
+            " ".join(ratio_rule["expr"].split()),
+            "memory_alloc_in_use_bytes / (memory_alloc_arena_bytes > 0)",
+        )
 
     def test_app_body_distribution_uses_exported_metric_type(self):
         dashboard_path = (

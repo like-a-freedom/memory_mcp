@@ -1,6 +1,6 @@
 # Observability
 
-Two Grafana dashboards, forty-one recording rules and eighteen alerts over the
+Two Grafana dashboards, forty-two recording rules and eighteen alerts over the
 metrics the `streamable-http` profile exports on `/metrics`, plus the scrape
 configuration that gets those metrics to a collector in the first place.
 
@@ -20,7 +20,7 @@ Run `cargo run -p xtask -- check-observability` to execute the full gate.
 
 ```
 observability/
-├── recording_rules.yml     41 rules in 9 groups
+├── recording_rules.yml     42 rules in 9 groups
 ├── alerts.yml              18 alerts in 8 groups
 ├── prometheus.yml          scrape + rule_files, for Prometheus
 ├── vmagent/

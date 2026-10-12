@@ -157,12 +157,12 @@ def load_external_metric_contract(
 
 
 sys.path.insert(0, str(ROOT / "observability"))
-from check_rules import (
+from check_rules import (  # noqa: E402
     bounded_vocabulary,
     exported_families,
     strip_strings,
     unknown_label_values,
-)  # noqa: E402
+)
 
 
 def recorded_series() -> set[str]:

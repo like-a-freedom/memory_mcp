@@ -2373,7 +2373,7 @@
                 "type": "prometheus",
                 "uid": "${datasource}"
               },
-              "description": "glibc's own accounting of the main arena. `free` is memory the allocator kept instead of returning to the OS: an arena far above in-use is retention, not work in progress. Absent off Linux/glibc, never zero.",
+              "description": "Aggregate glibc mallinfo2 accounting across arenas; `arena`, `in-use` and `free` share the same non-mmap scope. A large free value is allocator-free space, not a guarantee that all of it can be returned to the OS. Absent off Linux/glibc, never zero.",
               "fieldConfig": {
                 "defaults": {
                   "color": {
@@ -2469,7 +2469,7 @@
                   },
                   "editorMode": "code",
                   "expr": "memory_alloc_free_bytes",
-                  "legendFormat": "free (retained)",
+                  "legendFormat": "free",
                   "range": true,
                   "refId": "C"
                 }
@@ -2482,7 +2482,7 @@
                 "type": "prometheus",
                 "uid": "${datasource}"
               },
-              "description": "Bytes the allocator holds outside its live arena blocks: requests large enough to bypass the arena entirely (`hblkhd`), and the bytes at the top of the heap `malloc_trim(0)` could give back right now (`keepcost`). A non-zero `MALLOC_TRIM_THRESHOLD_` pins the second at zero; the startup log carries that variable.",
+              "description": "`hblkhd` counts bytes in mmap allocations outside arena accounting. `keepcost` is the main arena's top-chunk statistic, not a guarantee of what `malloc_trim(0)` will return. `MALLOC_TRIM_THRESHOLD_` controls when automatic trimming is attempted; it does not directly force `keepcost` to zero.",
               "fieldConfig": {
                 "defaults": {
                   "color": {
@@ -2567,12 +2567,12 @@
                   },
                   "editorMode": "code",
                   "expr": "memory_alloc_keepcost_bytes",
-                  "legendFormat": "releasable top",
+                  "legendFormat": "keepcost",
                   "range": true,
                   "refId": "B"
                 }
               ],
-              "title": "Allocator mmap'd blocks and releasable top",
+              "title": "Allocator mmap'd blocks and main-arena top chunk",
               "type": "timeseries"
             },
             {
@@ -2580,7 +2580,7 @@
                 "type": "prometheus",
                 "uid": "${datasource}"
               },
-              "description": "The width of the `[heap]` mapping in `/proc/self/maps`: the address space the allocator may grow into. Far above the resident bytes it is address space, not memory in use.",
+              "description": "The width of the main `[heap]` mapping in `/proc/self/maps`. This virtual extent has a different scope from aggregate `mallinfo2` accounting and is not resident memory by itself.",
               "fieldConfig": {
                 "defaults": {
                   "unit": "bytes",
@@ -2644,7 +2644,7 @@
                 "type": "prometheus",
                 "uid": "${datasource}"
               },
-              "description": "`[heap]` extent divided by live allocation bytes, from a recording rule. 1 means the extent holds only what is in use; higher means the allocator is holding address space it no longer has objects for. Absent when there are no live bytes, because the ratio is then undefined.",
+              "description": "Aggregate `mallinfo2.uordblks` divided by `mallinfo2.arena`. Both values share the same non-mmap arena scope. A lower fraction means a larger share of arena-accounted bytes are free; it does not measure process RSS or the `[heap]` mapping extent.",
               "fieldConfig": {
                 "defaults": {
                   "unit": "short",
@@ -2694,13 +2694,13 @@
                     "uid": "${datasource}"
                   },
                   "editorMode": "code",
-                  "expr": "memory:alloc:heap_in_use_ratio",
+                  "expr": "memory:alloc:arena_in_use_ratio",
                   "legendFormat": "",
                   "range": true,
                   "refId": "A"
                 }
               ],
-              "title": "Heap extent per live byte",
+              "title": "Arena in-use fraction",
               "type": "stat"
             }
           ],

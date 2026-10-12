@@ -3,9 +3,10 @@
 //! Two signals live only inside this process and are invisible to cAdvisor:
 //! the glibc allocator's own accounting (`mallinfo2`) and the `[heap]`
 //! mapping extent from `/proc/self/maps`. They are the attribution the
-//! footprint investigation needs — RSS says *how much*, these say *which
-//! arena* — and they belong to `platform` because they are a technical
-//! read of the host, carrying no business orchestration.
+//! footprint investigation needs — RSS says *how much*, these describe
+//! allocator-accounted bytes and the main heap's virtual extent — and they
+//! belong to `platform` because they are a technical read of the host, carrying
+//! no business orchestration.
 //!
 //! Every field is optional and every read is total: off Linux/glibc the
 //! answer is `None`, and a `None` is never recorded as `0`. A fabricated
@@ -19,15 +20,15 @@
 /// no heap extent, so every field is `None`.
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
 pub(crate) struct AllocSnapshot {
-    /// Total bytes in the main arena (`mallinfo2.arena`).
+    /// Non-mmap bytes acquired by glibc arenas (`mallinfo2.arena`).
     pub(crate) arena_bytes: Option<u64>,
-    /// Bytes in mmap'd blocks at or above the mmap threshold (`hblkhd`).
+    /// Bytes in glibc mmap allocations (`mallinfo2.hblkhd`).
     pub(crate) mmap_bytes: Option<u64>,
-    /// Bytes in in-use blocks (`uordblks`) — the live allocations.
+    /// Bytes in allocator in-use arena blocks (`mallinfo2.uordblks`).
     pub(crate) in_use_bytes: Option<u64>,
-    /// Bytes in free blocks (`fordblks`) — retained, not returned to the OS.
+    /// Bytes in allocator free arena blocks (`mallinfo2.fordblks`); not all are necessarily reclaimable.
     pub(crate) free_bytes: Option<u64>,
-    /// Bytes at the top of the heap releasable by `malloc_trim` (`keepcost`).
+    /// Main arena top-chunk statistic (`mallinfo2.keepcost`), not a trim-yield guarantee.
     pub(crate) keepcost_bytes: Option<u64>,
     /// Width of the `[heap]` mapping in `/proc/self/maps`, in bytes.
     pub(crate) heap_bytes: Option<u64>,
@@ -49,9 +50,8 @@ pub(crate) fn read_alloc() -> AllocSnapshot {
 /// Fill the `mallinfo2` fields on Linux/glibc.
 #[cfg(all(target_os = "linux", target_env = "gnu"))]
 fn fill_from_mallinfo2(snapshot: &mut AllocSnapshot) {
-    // SAFETY: `mallinfo2` takes no arguments and returns a plain struct of
-    // `size_t` values by value. It is async-signal-safe, never allocates and
-    // cannot fail, so its return value is always fully initialised.
+    // SAFETY: this Linux/GNU-only declaration matches glibc's `mallinfo2`
+    // ABI: it takes no arguments and returns the C struct of `size_t` fields.
     let info = unsafe { mallinfo2() };
     snapshot.arena_bytes = Some(info.arena as u64);
     snapshot.mmap_bytes = Some(info.hblkhd as u64);

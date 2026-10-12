@@ -549,23 +549,19 @@ groups:
 
   # ─── Allocator attribution ─────────────────────────────────────────────────
   #
-  # How much address space the allocator reserved against how much it has live
-  # objects for. It is a ratio rather than a byte count because the question is
-  # "is the extent moving with the work", and it is a recording rule because the
-  # dashboard's rule is that every derived figure is computed once per interval
-  # rather than once per panel.
+  # Fraction of aggregate non-mmap arena bytes currently in use, comparing
+  # mallinfo2 fields with the same accounting scope. It is a recording rule
+  # because every derived figure is computed once per interval rather than once
+  # per panel.
   - name: memory-allocator
     interval: 30s
     rules:
-      # `/proc/self/maps`'s `[heap]` width over the bytes in live allocations.
-      #
-      # The denominator is filtered to `> 0` rather than guarded with
-      # `or vector(0)`: with no live bytes the ratio is undefined, and an
-      # undefined figure is better represented by an absent series than by an
-      # infinity that reads as an emergency. Both families are absent off
-      # Linux/glibc, and the rule is then simply empty.
-      - record: memory:alloc:heap_in_use_ratio
+      # Both values come from mallinfo2 and describe non-mmap arena bytes
+      # aggregated across arenas; the [heap] mapping has a narrower scope and
+      # must not be used as the numerator here. A zero arena is absent rather
+      # than represented as an infinity or zero-fallback ratio.
+      - record: memory:alloc:arena_in_use_ratio
         expr: |
-          memory_alloc_heap_bytes
+          memory_alloc_in_use_bytes
           /
-          (memory_alloc_in_use_bytes > 0)
+          (memory_alloc_arena_bytes > 0)

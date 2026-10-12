@@ -1301,9 +1301,8 @@ pub(crate) fn render_json(event: &HashMap<String, Value>, level: LogLevel, ts: &
 ///
 /// The logger writes to stderr or to the process-wide file sink, neither of
 /// which a test can read back. This records every rendered line in a buffer
-/// while a capture is installed, so a test can assert on the line an operator
-/// actually reads — which is where a formatting bug is invisible when the
-/// assertion is made against a structure instead.
+/// while a capture is installed, with terminal color sequences removed so
+/// assertions do not depend on whether the test runner has a TTY.
 ///
 /// Each guard owns its buffer. An earlier version shared one and counted
 /// holders, which made two tests running in parallel see each other's lines and
@@ -1382,11 +1381,38 @@ pub mod capture {
     pub(crate) fn record(line: &str) {
         let Some(slot) = ACTIVE.get() else { return };
         let Ok(active) = slot.lock() else { return };
+        let line = strip_ansi_csi(line);
         for buffer in active.iter() {
             if let Ok(mut lines) = buffer.lock() {
-                lines.push(line.to_owned());
+                lines.push(line.clone());
             }
         }
+    }
+
+    fn strip_ansi_csi(line: &str) -> String {
+        let mut plain = String::with_capacity(line.len());
+        let mut chars = line.chars().peekable();
+        while let Some(character) = chars.next() {
+            if character == '\u{1b}' && chars.peek() == Some(&'[') {
+                chars.next();
+                for sequence_byte in chars.by_ref() {
+                    if ('@'..='~').contains(&sequence_byte) {
+                        break;
+                    }
+                }
+            } else {
+                plain.push(character);
+            }
+        }
+        plain
+    }
+
+    #[test]
+    fn captured_lines_ignore_terminal_color_sequences() {
+        let capture = install();
+        record("\u{1b}[2mINFO\u{1b}[0m  op=example\u{1b}[0m");
+
+        assert_eq!(capture.lines(), ["INFO  op=example"]);
     }
 
     /// Run `body` with a level override in effect, then restore.

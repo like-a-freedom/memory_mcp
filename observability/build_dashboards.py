@@ -18,6 +18,7 @@ recorded series name in `recording_rules.yml`.
 import json
 import pathlib
 import re
+from typing import Any
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 OUT = ROOT / "observability/dashboards"
@@ -97,15 +98,16 @@ def stat(
     read across a row, and one that colours by value paints a healthy service
     green and a broken one the same green.
     """
-    panel = {
+    field_defaults: dict[str, Any] = {
+        "unit": unit,
+        "color": {"mode": "thresholds"},
+        "mappings": [],
+    }
+    panel: dict[str, Any] = {
         "datasource": DATASOURCE,
         "description": description,
         "fieldConfig": {
-            "defaults": {
-                "unit": unit,
-                "color": {"mode": "thresholds"},
-                "mappings": [],
-            },
+            "defaults": field_defaults,
             "overrides": [],
         },
         "gridPos": {"h": grid[1], "w": grid[2], "x": grid[0], "y": y},
@@ -128,17 +130,17 @@ def stat(
         "type": "stat",
     }
     if thresholds is not None:
-        panel["fieldConfig"]["defaults"]["thresholds"] = {
+        field_defaults["thresholds"] = {
             "mode": "absolute",
             "steps": thresholds,
         }
     else:
-        panel["fieldConfig"]["defaults"]["thresholds"] = {
+        field_defaults["thresholds"] = {
             "mode": "absolute",
             "steps": [{"color": "text", "value": None}],
         }
     if decimals is not None:
-        panel["fieldConfig"]["defaults"]["decimals"] = decimals
+        field_defaults["decimals"] = decimals
     if links:
         panel["links"] = links
     return panel
@@ -298,16 +300,17 @@ def status_history(
     state timeline — consecutive equal values are merged there and are not
     merged here, so the key would be a no-op that reads as intent.
     """
-    panel = {
+    field_defaults: dict[str, Any] = {
+        "color": {"mode": "thresholds"},
+        "custom": {"fillOpacity": 80, "lineWidth": 1},
+        "mappings": [],
+        "unit": "s",
+    }
+    panel: dict[str, Any] = {
         "datasource": DATASOURCE,
         "description": description,
         "fieldConfig": {
-            "defaults": {
-                "color": {"mode": "thresholds"},
-                "custom": {"fillOpacity": 80, "lineWidth": 1},
-                "mappings": [],
-                "unit": "s",
-            },
+            "defaults": field_defaults,
             "overrides": [],
         },
         "gridPos": {"h": grid[1], "w": grid[2], "x": grid[0], "y": y},
@@ -330,7 +333,7 @@ def status_history(
         "title": title,
         "type": "status-history",
     }
-    panel["fieldConfig"]["defaults"]["thresholds"] = {
+    field_defaults["thresholds"] = {
         "mode": "absolute",
         "steps": thresholds or [{"color": "text", "value": None}],
     }
@@ -964,28 +967,28 @@ def technical() -> dict:
             [
                 target("memory_alloc_arena_bytes", "arena"),
                 target("memory_alloc_in_use_bytes", "in use"),
-                target("memory_alloc_free_bytes", "free (retained)"),
+                target("memory_alloc_free_bytes", "free"),
             ],
             (0, 8, 6, 0),
-            "glibc's own accounting of the main arena. `free` is memory the "
-            "allocator kept instead of returning to the OS: an arena far above "
-            "in-use is retention, not work in progress. Absent off Linux/glibc, "
-            "never zero.",
+            "Aggregate glibc mallinfo2 accounting across arenas; `arena`, "
+            "`in-use` and `free` share the same non-mmap scope. A large free "
+            "value is allocator-free space, not a guarantee that all of it can "
+            "be returned to the OS. Absent off Linux/glibc, never zero.",
             unit="bytes",
             legend_calcs=["lastNotNull", "max"],
         ),
         timeseries(
-            "Allocator mmap'd blocks and releasable top",
+            "Allocator mmap'd blocks and main-arena top chunk",
             [
                 target("memory_alloc_mmap_bytes", "mmap'd"),
-                target("memory_alloc_keepcost_bytes", "releasable top"),
+                target("memory_alloc_keepcost_bytes", "keepcost"),
             ],
             (6, 8, 6, 0),
-            "Bytes the allocator holds outside its live arena blocks: requests "
-            "large enough to bypass the arena entirely (`hblkhd`), and the bytes "
-            "at the top of the heap `malloc_trim(0)` could give back right now "
-            "(`keepcost`). A non-zero `MALLOC_TRIM_THRESHOLD_` pins the second "
-            "at zero; the startup log carries that variable.",
+            "`hblkhd` counts bytes in mmap allocations outside arena accounting. "
+            "`keepcost` is the main arena's top-chunk statistic, not a guarantee "
+            "of what `malloc_trim(0)` will return. `MALLOC_TRIM_THRESHOLD_` "
+            "controls when automatic trimming is attempted; it does not directly "
+            "force `keepcost` to zero.",
             unit="bytes",
             legend_calcs=["lastNotNull", "max"],
         ),
@@ -994,21 +997,20 @@ def technical() -> dict:
             "memory_alloc_heap_bytes",
             "bytes",
             (12, 8, 6, 0),
-            "The width of the `[heap]` mapping in `/proc/self/maps`: the address "
-            "space the allocator may grow into. Far above the resident bytes it "
-            "is address space, not memory in use.",
+            "The width of the main `[heap]` mapping in `/proc/self/maps`. This "
+            "virtual extent has a different scope from aggregate `mallinfo2` "
+            "accounting and is not resident memory by itself.",
             decimals=0,
         ),
         stat(
-            "Heap extent per live byte",
-            "memory:alloc:heap_in_use_ratio",
+            "Arena in-use fraction",
+            "memory:alloc:arena_in_use_ratio",
             "short",
             (18, 8, 6, 0),
-            "`[heap]` extent divided by live allocation bytes, from a recording "
-            "rule. 1 means the extent holds only what is in use; higher means "
-            "the allocator is holding address space it no longer has objects "
-            "for. Absent when there are no live bytes, because the ratio is then "
-            "undefined.",
+            "Aggregate `mallinfo2.uordblks` divided by `mallinfo2.arena`. Both "
+            "values share the same non-mmap arena scope. A lower fraction means "
+            "a larger share of arena-accounted bytes are free; it does not "
+            "measure process RSS or the `[heap]` mapping extent.",
             decimals=2,
         ),
     ]

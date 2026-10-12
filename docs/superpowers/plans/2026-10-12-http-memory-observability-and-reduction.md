@@ -248,11 +248,11 @@ The dashboards are **generated**: `observability/build_dashboards.py` writes `da
 - Modify: `observability/README.md` (amend "Deliberate gaps" — the "No process metrics" rule gains the allocator carve-out and its reason)
 - Modify: `observability/build_dashboards.py` (a new "Allocator attribution" row; update the interpretation bullet that repeats "No process metrics")
 - Modify: `observability/tests/test_external_metrics.py` (pin the new row's titles and the six expressions, mirroring the existing `HTTP memory diagnostics` contract test)
-- Modify: `observability/recording_rules.yml` and `observability/alerts.yml` (a recording rule for the `heap`/`in-use` ratio and an alert only if the review agrees one is warranted; a rule with no reader is a defect)
+- Modify: `observability/recording_rules.yml` (a same-scope aggregate arena in-use fraction; a rule with no reader is a defect). Modify `observability/alerts.yml` only if review evidence warrants an alert.
 
 **Interfaces:**
 - Consumes: the six gauge names from Task 1.
-- Produces: a collapsed "Allocator attribution" row with panels for arena vs in-use vs free, mmap, keepcost and `[heap]`, wired to `memory_alloc_*`; the README carve-out.
+- Produces: a collapsed "Allocator attribution" row with panels for aggregate arena vs in-use vs free, mmap, main-arena `keepcost`, `[heap]` extent, and the same-scope arena in-use fraction; the README carve-out.
 
 - [ ] **Step 1: Amend the README and the generator**
 
@@ -320,9 +320,9 @@ Do not implement these before Task 1 exposes `memory_alloc_*`: each names the on
 
 | # | Hypothesis | The measurement that decides it | Candidate fix |
 |---|---|---|---|
-| H1 | glibc **arena retention**: the 1.14 GB `[heap]` is mostly free chunks the allocator keeps, not live objects | `memory_alloc_free_bytes` >> `memory_alloc_in_use_bytes` and `keepcost` is large | periodic `malloc_trim(0)`, and/or `MALLOC_TRIM_THRESHOLD_` / a fixed `MALLOC_MMAP_THRESHOLD_`; A/B against no-op |
+| H1 | glibc **arena retention**: allocator-accounted arena space is mostly free chunks, not live objects; `[heap]` is a separate main-heap extent signal | `memory_alloc_free_bytes` >> `memory_alloc_in_use_bytes`; interpret `memory_alloc_keepcost_bytes` separately as the main-arena top-chunk statistic | periodic `malloc_trim(0)`, and/or `MALLOC_TRIM_THRESHOLD_` / a fixed `MALLOC_MMAP_THRESHOLD_`; A/B against no-op |
 | H2 | **Startup peak** (~1.2 GB `VmHWM`) is an eager-init artifact | the Task 3 `http.startup_memory` markers show which phase owns the peak | make the owning subsystem lazy/bounded |
-| H3 | A **transient large buffer** (query result, embedding batch, body) drives the heap up once and glibc keeps it | `memory_alloc_*` before/after one workload request via the Task 2 dump | bound the buffer; chunk or stream it |
+| H3 | A **transient large buffer** (query result, embedding batch, body) drives allocator usage up once and glibc retains arena space afterward | compare `memory_alloc_*` samples before and after a controlled request; use the Task 2 `malloc_info` dump as a separate allocator-detail snapshot | bound the buffer; chunk or stream it |
 | H4 | **Allocator choice** | A/B `--features mimalloc` on this exact dataset/config under the sampler | adopt for Linux only if the A/B wins |
 | H5 | Footprint scales with **concurrency/buffer limits** (`POOL_CAP`, `GLOBAL_REQUEST_LIMIT`, `SUBSCRIPTION_LIMIT`, `MAINTENANCE_PARALLELISM`, `PREFLIGHT_BYTES`=64 MiB default) | ramp each limit and watch `memory_alloc_*` | lazy per-request buffers instead of pre-sized |
 | H6 | **Idle tenants retain runtimes** | `memory_http_tenant_runtime_count` vs `RUNTIME_IDLE_TTL_SECS` under a real request then idle | free caches/pools on eviction |
