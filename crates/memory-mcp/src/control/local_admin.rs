@@ -75,6 +75,7 @@ impl LocalAdminExtension {
 
 pub mod csrf;
 pub mod handlers;
+pub mod heap;
 
 /// Seconds within which a credential-affecting or client-mutating
 /// operation must have re-authenticated.

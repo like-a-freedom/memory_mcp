@@ -32,6 +32,10 @@ pub const DEFAULT_SUBSCRIPTION_AUTH_RECHECK: Duration = Duration::from_secs(30);
 pub const DEFAULT_TASK_RETENTION_SECS: u64 = 7 * 24 * 60 * 60;
 pub const DEFAULT_TASK_QUEUE_CAPACITY: usize = 256;
 pub const DEFAULT_TASK_SYNC_MAX_BYTES: usize = 1024 * 1024;
+/// Whether `GET /api/v1/admin/heap` is mounted. Off by default: the handler
+/// walks the whole heap and answers with allocator internals, so it is an
+/// operator diagnostic and not part of the shipped surface.
+pub const DEFAULT_HEAP_DUMP_ENABLED: bool = false;
 pub const DEFAULT_ALLOWED_HOSTS: &[&str] = &[]; // must be set explicitly in production
 pub const DEFAULT_ALLOWED_ORIGINS: &[&str] = &[];
 /// Sentinel for `MEMORY_MCP_HTTP_OIDC_ALLOWED_ALG`: accept what the provider

@@ -143,6 +143,16 @@ impl HttpStateTestBuilder {
         self
     }
 
+    /// Mount the operator-gated heap dump route on this test state.
+    ///
+    /// The route is off in `default_for_test` (it is off in production too), so
+    /// a test that exercises the mount has to ask for it explicitly — which is
+    /// also what keeps the disabled-by-default assertion honest.
+    pub fn with_heap_dump_enabled(mut self, enabled: bool) -> Self {
+        self.config.heap_dump_enabled = enabled;
+        self
+    }
+
     /// Drop the pre-joined browser policy so composition reconciles it from the
     /// durable store, exactly as production does.
     ///

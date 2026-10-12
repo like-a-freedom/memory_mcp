@@ -29,6 +29,24 @@ fn log_failure(op: &str, error: &dyn std::fmt::Display) {
     );
 }
 
+/// Record glibc's allocator tunables and this process's `mallinfo2` summary.
+///
+/// glibc reads these variables once, at first allocation, so an operator who
+/// inspects a *shell's* environment sees something different from what this
+/// process is running with. Logging them beside the footprint numbers is what
+/// makes "the heap never shrank" diagnosable: a non-zero
+/// `MALLOC_TRIM_THRESHOLD_` alone explains a `keepcost` pinned at zero.
+fn log_glibc_tunables() {
+    let mut event = std::collections::HashMap::from([(
+        "op".to_string(),
+        serde_json::Value::String("http.glibc_tunables".to_string()),
+    )]);
+    for (name, value) in memory_mcp::control::local_admin::heap::effective_glibc_tunables() {
+        event.insert(name.to_string(), serde_json::Value::String(value));
+    }
+    memory_mcp::logging::emit(event, memory_mcp::logging::LogLevel::Info);
+}
+
 #[tokio::main]
 async fn main() -> ExitCode {
     let logger = StdoutLogger::from_env();
@@ -174,6 +192,7 @@ async fn main() -> ExitCode {
         }
     };
     bootstrap::emit_startup_log(&logger, &cfg);
+    log_glibc_tunables();
     let background_cleanup_grace = cfg.shutdown_grace;
     let serve_result = server::serve(cfg, router, state.shutdown.clone()).await;
     state.admission.close();

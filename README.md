@@ -1053,6 +1053,7 @@ operator configuration and are listed under
 | `MEMORY_MCP_HTTP_DATA_DIR` | HTTP storage | No | [Streamable HTTP](#streamable-http-environment-variables) |
 | `MEMORY_MCP_HTTP_EXTRACTION_CONCURRENCY` | Plan limits | Conditional | [Streamable HTTP](#streamable-http-environment-variables) |
 | `MEMORY_MCP_HTTP_GLOBAL_REQUEST_LIMIT` | HTTP limits | No | [Streamable HTTP](#streamable-http-environment-variables) |
+| `MEMORY_MCP_HTTP_HEAP_DUMP_ENABLED` | HTTP diagnostics | No | [Streamable HTTP](#streamable-http-environment-variables) |
 | `MEMORY_MCP_HTTP_IDENTITY_INDEX_KEY` | HTTP secrets | Conditional | [Streamable HTTP](#streamable-http-environment-variables) |
 | `MEMORY_MCP_HTTP_INGEST_PER_MINUTE` | Plan limits | Conditional | [Streamable HTTP](#streamable-http-environment-variables) |
 | `MEMORY_MCP_HTTP_LOCAL_DEFAULT_PLAN_VERSION` | HTTP auth | Conditional | [Streamable HTTP](#streamable-http-environment-variables) |
@@ -1364,6 +1365,8 @@ seconds — a longer interval would let a revoked authorization keep streaming.
 | `MEMORY_MCP_HTTP_TASK_QUEUE_CAPACITY` | `usize` | `256` | Bounded durable Task queue capacity |
 | `MEMORY_MCP_HTTP_TASK_SYNC_MAX_BYTES` | `usize` | `1048576` (1 MiB) | Preflight size limit: `extract` work above this returns a preflight rejection for clients that did not advertise Tasks |
 | `MEMORY_MCP_HTTP_REPLICA_ID` | string | unset (falls back to process PID) | Stable replica identity. Set in multi-replica deployments; the PID fallback is safe only for a single process |
+
+One toggle is not a limit and lives here only so the environment surface stays in one place. `MEMORY_MCP_HTTP_HEAP_DUMP_ENABLED` (`bool`, default `false`) mounts `GET /api/v1/admin/heap`, which returns glibc's `malloc_info` report for the process. It is expensive — the call walks every arena and bin under the allocator's internal locks — so it stays off unless an operator is actively investigating memory; the route is administered by the local-admin session like the rest of `/api/v1/admin/*`, and on a non-glibc build it answers `501`.
 
 #### Constrained memory profile
 

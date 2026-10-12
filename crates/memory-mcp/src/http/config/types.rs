@@ -17,10 +17,10 @@ pub use crate::models::auth::{AUTH_METHOD_LOCAL, AUTH_METHOD_OIDC, BrowserAuthMe
 
 use super::parse::{
     DEFAULT_BIND, DEFAULT_BODY_LIMIT_BYTES, DEFAULT_GLOBAL_REQUEST_LIMIT,
-    DEFAULT_MAINTENANCE_PARALLELISM, DEFAULT_OIDC_ALG, DEFAULT_POOL_CAP, DEFAULT_PREFLIGHT_BYTES,
-    DEFAULT_PREFLIGHT_REQUEST_LIMIT, DEFAULT_REQUEST_DEADLINE, DEFAULT_RUNTIME_ACTIVATION_TIMEOUT,
-    DEFAULT_RUNTIME_CAPACITY_WAIT, DEFAULT_RUNTIME_IDLE_TTL, DEFAULT_SHUTDOWN_GRACE,
-    DEFAULT_SUBSCRIPTION_AUTH_RECHECK, DEFAULT_SUBSCRIPTION_LIMIT,
+    DEFAULT_HEAP_DUMP_ENABLED, DEFAULT_MAINTENANCE_PARALLELISM, DEFAULT_OIDC_ALG, DEFAULT_POOL_CAP,
+    DEFAULT_PREFLIGHT_BYTES, DEFAULT_PREFLIGHT_REQUEST_LIMIT, DEFAULT_REQUEST_DEADLINE,
+    DEFAULT_RUNTIME_ACTIVATION_TIMEOUT, DEFAULT_RUNTIME_CAPACITY_WAIT, DEFAULT_RUNTIME_IDLE_TTL,
+    DEFAULT_SHUTDOWN_GRACE, DEFAULT_SUBSCRIPTION_AUTH_RECHECK, DEFAULT_SUBSCRIPTION_LIMIT,
     DEFAULT_SUBSCRIPTION_QUEUE_CAPACITY, DEFAULT_TASK_QUEUE_CAPACITY, DEFAULT_TASK_RETENTION_SECS,
     DEFAULT_TASK_SYNC_MAX_BYTES, TrustedCidr, deserialize_duration_secs, deserialize_hex_32,
     load_signup_plan_limits, optional_env, parse_csv, parse_env_or, parse_hex_32_env, require_env,
@@ -166,6 +166,10 @@ pub struct HttpConfig {
     /// selection and all mode-specific secrets/limits.
     #[serde(skip)]
     pub browser_auth: Option<BrowserAuthMethods>,
+    /// Whether `GET /api/v1/admin/heap` is mounted. Off unless the deployment
+    /// sets `MEMORY_MCP_HTTP_HEAP_DUMP_ENABLED`.
+    #[serde(default)]
+    pub heap_dump_enabled: bool,
 }
 
 /// `HttpConfig` carries four independent secret classes — the API-key pepper,
@@ -220,6 +224,7 @@ impl fmt::Debug for HttpConfig {
             .field("signup_mode", &self.signup_mode)
             .field("signup_plan_limits", &self.signup_plan_limits)
             .field("browser_auth", &self.browser_auth)
+            .field("heap_dump_enabled", &self.heap_dump_enabled)
             .finish()
     }
 }
@@ -443,6 +448,10 @@ impl HttpConfig {
         let task_sync_max_bytes = parse_env_or(
             "MEMORY_MCP_HTTP_TASK_SYNC_MAX_BYTES",
             DEFAULT_TASK_SYNC_MAX_BYTES,
+        )?;
+        let heap_dump_enabled = parse_env_or(
+            "MEMORY_MCP_HTTP_HEAP_DUMP_ENABLED",
+            DEFAULT_HEAP_DUMP_ENABLED,
         )?;
         let trusted_proxy_cidrs = parse_csv("MEMORY_MCP_HTTP_TRUSTED_PROXY_CIDRS")?
             .into_iter()
@@ -698,6 +707,7 @@ impl HttpConfig {
             signup_mode,
             signup_plan_limits,
             browser_auth,
+            heap_dump_enabled,
         };
         Ok(cfg)
     }
@@ -795,6 +805,7 @@ impl HttpConfig {
                     },
                 }),
             }),
+            heap_dump_enabled: DEFAULT_HEAP_DUMP_ENABLED,
         }
     }
 }

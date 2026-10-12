@@ -271,7 +271,21 @@ pub fn build_router(
             .route(
                 "/api/v1/admin/clients/{account_id}/identity_invitation",
                 post(handlers::invite_client_identity),
+            );
+        // The heap dump is operator-gated at runtime, not by the profile: a
+        // deployment that sets `MEMORY_MCP_HTTP_HEAP_DUMP_ENABLED` gets it, and
+        // one that does not serves a 404 from the reserved-surface fallback. It
+        // is a route, not a flag inside a handler, so an unenabled deployment
+        // has nothing to reach and nothing to authenticate against.
+        let local_admin = if state.config.heap_dump_enabled {
+            local_admin.route(
+                "/api/v1/admin/heap",
+                get(crate::control::local_admin::heap::heap_dump),
             )
+        } else {
+            local_admin
+        };
+        let local_admin = local_admin
             // Local routes are merged after the base router's route-scoped
             // layers were applied, so they carry their own copy of the local
             // deadline. Host/Origin is not repeated here: it is a property of
