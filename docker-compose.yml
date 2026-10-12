@@ -61,8 +61,9 @@ services:
       - --pass
       - "${SURREALDB_PASSWORD:?SURREALDB_PASSWORD is required; supply an operator-generated value}"
       - rocksdb:/data/memory.db
-    ports:
-      - "8000:8000"
+    # The database port is intentionally NOT published. `memory_mcp` reaches
+    # SurrealDB over this compose network (`ws://surrealdb:8000/rpc`), so a host
+    # port mapping had no consumer and only widened the attack surface.
     volumes:
       - surrealdb-data:/data
     healthcheck:
