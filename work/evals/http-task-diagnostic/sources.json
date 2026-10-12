@@ -1,0 +1,362 @@
+[
+  {
+    "case_id": "http-task-16",
+    "source": {
+      "key": "http-plan",
+      "source_type": "session_summary",
+      "source_id": "native:http-plan",
+      "content": "### Task 16: Add low-overhead HTTP and retained-resource diagnostics\n\n- `memory_http_preflight_body_bytes` is recorded through the existing `metrics::histogram!` facade, with no labels, exactly once after body collection completes and before JSON decoding. This includes fully collected malformed JSON because those bytes were actually buffered. Partial, refused, stream-error and cancelled bodies do not enter the distribution.\n- DEBUG operations are `http.preflight.refused` and `http.preflight.large_body`, added to `logging::HTTP_OPERATIONS`; operators enable only these with `RUST_LOG=http.preflight=debug`. Logs use the validated existing `RequestId` when present, parsed numeric declared length, observed prefix bytes and closed outcome only—no request method/path, tenant fingerprint, arbitrary header or content. Emit large-body events only for fully collected bodies >=65536 B. Rate-limit each fixed event/reason to at most one log per second; refusal counters remain exact. Apply the rate limit before allocating/serializing the event.",
+      "t_ref": "2026-10-07T00:00:00Z"
+    }
+  },
+  {
+    "case_id": "http-task-16",
+    "source": {
+      "key": "logging-sink",
+      "source_type": "session_summary",
+      "source_id": "native:logging-sink",
+      "content": "Events are written to **stderr** — or to `MEMORY_LOG_FILE` when set — one event\nper line. Under the stdio transport stdout carries MCP protocol framing, so\nnothing is ever written there. The sink, format and colour are read once, when\nthe subscriber is installed at startup.",
+      "t_ref": "2026-10-07T00:00:00Z"
+    }
+  },
+  {
+    "case_id": "http-task-16",
+    "source": {
+      "key": "logging-levels",
+      "source_type": "session_summary",
+      "source_id": "native:logging-levels",
+      "content": "| Level | Use |\n|---|---|\n| `ERROR` | A failed unit of work, a risk to integrity, a failure after retries, loss of readiness. |\n| `WARN` | Handled but unexpected; degraded; a client refusal (4xx class). |\n| `INFO` | A business event or a state change. |\n| `DEBUG` | Diagnostics, off by default. |\n| `TRACE` | Fine-grained flow, opted into by name. Anything repetitive is a metric. |\n\nA failure's level is decided by its error class, not its call site:\n`MemoryError::log_level()` maps storage, transience, configuration and\nunavailability to `ERROR`, and refusals (not-found, validation, conflict,\nbudget, model-not-ready, auth) to `WARN`.",
+      "t_ref": "2026-10-07T00:00:00Z"
+    }
+  },
+  {
+    "case_id": "http-task-16",
+    "source": {
+      "key": "logging-config",
+      "source_type": "session_summary",
+      "source_id": "native:logging-config",
+      "content": "| Variable | Meaning |\n|---|---|\n| `RUST_LOG` | Level and per-subsystem directives. A bare level sets the default (`info`); `prefix=level` sets a subsystem. The most specific prefix wins. |\n| `MEMORY_LOG_FORMAT` | `text` (default, human-readable, one line per event) or `json` (NDJSON, one object per event). |\n| `MEMORY_LOG_COLOR` | `always`, `never`, or anything else for auto (colour only on a colour-capable terminal, and never for a file sink). `NO_COLOR` set and non-empty disables colour. |\n| `MEMORY_LOG_TARGETS` | Third-party `tracing` targets to raise, comma-separated `target=level`. Quiet by default; can never drop this service's own events. |\n| `MEMORY_LOG_FILE` | Append the stream to this file instead of stderr. A blank value means \"unset\". |\n\n`RUST_LOG` examples:\n\n```\nRUST_LOG=info                       # default\nRUST_LOG=extract=debug              # one subsystem\nRUST_LOG=http=error,info            # quiet the HTTP surface, keep the rest\nRUST_LOG=fs_watch=trace,http=debug  # two subsystems, the most specific rule wins\n```",
+      "t_ref": "2026-10-07T00:00:00Z"
+    }
+  },
+  {
+    "case_id": "http-task-16",
+    "source": {
+      "key": "logging-request",
+      "source_type": "session_summary",
+      "source_id": "native:logging-request",
+      "content": "Every unit of work carries a correlation id. In the HTTP profile it is the\nrequest's `x-request-id` (honoured when supplied, minted otherwise) and is\nadvertised back on the response; in the stdio profile it is a per-call\n`req_NNNN`. The formatter stamps the ambient id onto every event that does not\ncarry its own, so each line of one request — the access log line, a tool line, a\ndownstream warning — reads with the same `req=` and follows with a single\nfilter:\n\n```bash\ngrep 'req=<id>' memory-mcp.log\n```\n\nThe HTTP response echoes the id on `x-request-id`, and a control-plane error\nenvelope carries it as `correlation_id` — a client quoting either names the same\nvalue the log line shows.",
+      "t_ref": "2026-10-07T00:00:00Z"
+    }
+  },
+  {
+    "case_id": "http-task-16",
+    "source": {
+      "key": "license-number",
+      "source_type": "session_summary",
+      "source_id": "native:license-number",
+      "content": "Verified: A license inventory contains 16 product blocks, 163 application rows and 899 object rows. The union covers several products rather than one license.",
+      "t_ref": "2026-10-07T00:00:00Z"
+    }
+  },
+  {
+    "case_id": "http-task-16",
+    "source": {
+      "key": "license-url",
+      "source_type": "session_summary",
+      "source_id": "native:license-url",
+      "content": "Verified: Infinity means that an object is countable but its count is uncontrolled. Reference: https://example.org/pages/viewpage.action?pageId=1545882667; section 13.2, revision 75.",
+      "t_ref": "2026-10-07T00:00:00Z"
+    }
+  },
+  {
+    "case_id": "http-task-16",
+    "source": {
+      "key": "mail-level",
+      "source_type": "session_summary",
+      "source_id": "native:mail-level",
+      "content": "Verified: Only one slide of a cloud EDR comparison was extracted. Feature-level scope may be absent from the extracted text or represented graphically.",
+      "t_ref": "2026-10-07T00:00:00Z"
+    }
+  },
+  {
+    "case_id": "http-task-16",
+    "source": {
+      "key": "other-task",
+      "source_type": "session_summary",
+      "source_id": "native:other-task",
+      "content": "Verified: Task 16 in the mobile route editor plan checks KML point import and touch gestures. It belongs to Trackly, not Memory MCP HTTP.",
+      "t_ref": "2026-10-07T00:00:00Z"
+    }
+  },
+  {
+    "case_id": "http-task-short",
+    "source": {
+      "key": "http-plan",
+      "source_type": "session_summary",
+      "source_id": "native:http-plan",
+      "content": "### Task 16: Add low-overhead HTTP and retained-resource diagnostics\n\n- `memory_http_preflight_body_bytes` is recorded through the existing `metrics::histogram!` facade, with no labels, exactly once after body collection completes and before JSON decoding. This includes fully collected malformed JSON because those bytes were actually buffered. Partial, refused, stream-error and cancelled bodies do not enter the distribution.\n- DEBUG operations are `http.preflight.refused` and `http.preflight.large_body`, added to `logging::HTTP_OPERATIONS`; operators enable only these with `RUST_LOG=http.preflight=debug`. Logs use the validated existing `RequestId` when present, parsed numeric declared length, observed prefix bytes and closed outcome only—no request method/path, tenant fingerprint, arbitrary header or content. Emit large-body events only for fully collected bodies >=65536 B. Rate-limit each fixed event/reason to at most one log per second; refusal counters remain exact. Apply the rate limit before allocating/serializing the event.",
+      "t_ref": "2026-10-07T00:00:00Z"
+    }
+  },
+  {
+    "case_id": "http-task-short",
+    "source": {
+      "key": "logging-sink",
+      "source_type": "session_summary",
+      "source_id": "native:logging-sink",
+      "content": "Events are written to **stderr** — or to `MEMORY_LOG_FILE` when set — one event\nper line. Under the stdio transport stdout carries MCP protocol framing, so\nnothing is ever written there. The sink, format and colour are read once, when\nthe subscriber is installed at startup.",
+      "t_ref": "2026-10-07T00:00:00Z"
+    }
+  },
+  {
+    "case_id": "http-task-short",
+    "source": {
+      "key": "logging-levels",
+      "source_type": "session_summary",
+      "source_id": "native:logging-levels",
+      "content": "| Level | Use |\n|---|---|\n| `ERROR` | A failed unit of work, a risk to integrity, a failure after retries, loss of readiness. |\n| `WARN` | Handled but unexpected; degraded; a client refusal (4xx class). |\n| `INFO` | A business event or a state change. |\n| `DEBUG` | Diagnostics, off by default. |\n| `TRACE` | Fine-grained flow, opted into by name. Anything repetitive is a metric. |\n\nA failure's level is decided by its error class, not its call site:\n`MemoryError::log_level()` maps storage, transience, configuration and\nunavailability to `ERROR`, and refusals (not-found, validation, conflict,\nbudget, model-not-ready, auth) to `WARN`.",
+      "t_ref": "2026-10-07T00:00:00Z"
+    }
+  },
+  {
+    "case_id": "http-task-short",
+    "source": {
+      "key": "logging-config",
+      "source_type": "session_summary",
+      "source_id": "native:logging-config",
+      "content": "| Variable | Meaning |\n|---|---|\n| `RUST_LOG` | Level and per-subsystem directives. A bare level sets the default (`info`); `prefix=level` sets a subsystem. The most specific prefix wins. |\n| `MEMORY_LOG_FORMAT` | `text` (default, human-readable, one line per event) or `json` (NDJSON, one object per event). |\n| `MEMORY_LOG_COLOR` | `always`, `never`, or anything else for auto (colour only on a colour-capable terminal, and never for a file sink). `NO_COLOR` set and non-empty disables colour. |\n| `MEMORY_LOG_TARGETS` | Third-party `tracing` targets to raise, comma-separated `target=level`. Quiet by default; can never drop this service's own events. |\n| `MEMORY_LOG_FILE` | Append the stream to this file instead of stderr. A blank value means \"unset\". |\n\n`RUST_LOG` examples:\n\n```\nRUST_LOG=info                       # default\nRUST_LOG=extract=debug              # one subsystem\nRUST_LOG=http=error,info            # quiet the HTTP surface, keep the rest\nRUST_LOG=fs_watch=trace,http=debug  # two subsystems, the most specific rule wins\n```",
+      "t_ref": "2026-10-07T00:00:00Z"
+    }
+  },
+  {
+    "case_id": "http-task-short",
+    "source": {
+      "key": "logging-request",
+      "source_type": "session_summary",
+      "source_id": "native:logging-request",
+      "content": "Every unit of work carries a correlation id. In the HTTP profile it is the\nrequest's `x-request-id` (honoured when supplied, minted otherwise) and is\nadvertised back on the response; in the stdio profile it is a per-call\n`req_NNNN`. The formatter stamps the ambient id onto every event that does not\ncarry its own, so each line of one request — the access log line, a tool line, a\ndownstream warning — reads with the same `req=` and follows with a single\nfilter:\n\n```bash\ngrep 'req=<id>' memory-mcp.log\n```\n\nThe HTTP response echoes the id on `x-request-id`, and a control-plane error\nenvelope carries it as `correlation_id` — a client quoting either names the same\nvalue the log line shows.",
+      "t_ref": "2026-10-07T00:00:00Z"
+    }
+  },
+  {
+    "case_id": "http-task-short",
+    "source": {
+      "key": "license-number",
+      "source_type": "session_summary",
+      "source_id": "native:license-number",
+      "content": "Verified: A license inventory contains 16 product blocks, 163 application rows and 899 object rows. The union covers several products rather than one license.",
+      "t_ref": "2026-10-07T00:00:00Z"
+    }
+  },
+  {
+    "case_id": "http-task-short",
+    "source": {
+      "key": "license-url",
+      "source_type": "session_summary",
+      "source_id": "native:license-url",
+      "content": "Verified: Infinity means that an object is countable but its count is uncontrolled. Reference: https://example.org/pages/viewpage.action?pageId=1545882667; section 13.2, revision 75.",
+      "t_ref": "2026-10-07T00:00:00Z"
+    }
+  },
+  {
+    "case_id": "http-task-short",
+    "source": {
+      "key": "mail-level",
+      "source_type": "session_summary",
+      "source_id": "native:mail-level",
+      "content": "Verified: Only one slide of a cloud EDR comparison was extracted. Feature-level scope may be absent from the extracted text or represented graphically.",
+      "t_ref": "2026-10-07T00:00:00Z"
+    }
+  },
+  {
+    "case_id": "http-task-short",
+    "source": {
+      "key": "other-task",
+      "source_type": "session_summary",
+      "source_id": "native:other-task",
+      "content": "Verified: Task 16 in the mobile route editor plan checks KML point import and touch gestures. It belongs to Trackly, not Memory MCP HTTP.",
+      "t_ref": "2026-10-07T00:00:00Z"
+    }
+  },
+  {
+    "case_id": "http-task-paraphrase",
+    "source": {
+      "key": "http-plan",
+      "source_type": "session_summary",
+      "source_id": "native:http-plan",
+      "content": "### Task 16: Add low-overhead HTTP and retained-resource diagnostics\n\n- `memory_http_preflight_body_bytes` is recorded through the existing `metrics::histogram!` facade, with no labels, exactly once after body collection completes and before JSON decoding. This includes fully collected malformed JSON because those bytes were actually buffered. Partial, refused, stream-error and cancelled bodies do not enter the distribution.\n- DEBUG operations are `http.preflight.refused` and `http.preflight.large_body`, added to `logging::HTTP_OPERATIONS`; operators enable only these with `RUST_LOG=http.preflight=debug`. Logs use the validated existing `RequestId` when present, parsed numeric declared length, observed prefix bytes and closed outcome only—no request method/path, tenant fingerprint, arbitrary header or content. Emit large-body events only for fully collected bodies >=65536 B. Rate-limit each fixed event/reason to at most one log per second; refusal counters remain exact. Apply the rate limit before allocating/serializing the event.",
+      "t_ref": "2026-10-07T00:00:00Z"
+    }
+  },
+  {
+    "case_id": "http-task-paraphrase",
+    "source": {
+      "key": "logging-sink",
+      "source_type": "session_summary",
+      "source_id": "native:logging-sink",
+      "content": "Events are written to **stderr** — or to `MEMORY_LOG_FILE` when set — one event\nper line. Under the stdio transport stdout carries MCP protocol framing, so\nnothing is ever written there. The sink, format and colour are read once, when\nthe subscriber is installed at startup.",
+      "t_ref": "2026-10-07T00:00:00Z"
+    }
+  },
+  {
+    "case_id": "http-task-paraphrase",
+    "source": {
+      "key": "logging-levels",
+      "source_type": "session_summary",
+      "source_id": "native:logging-levels",
+      "content": "| Level | Use |\n|---|---|\n| `ERROR` | A failed unit of work, a risk to integrity, a failure after retries, loss of readiness. |\n| `WARN` | Handled but unexpected; degraded; a client refusal (4xx class). |\n| `INFO` | A business event or a state change. |\n| `DEBUG` | Diagnostics, off by default. |\n| `TRACE` | Fine-grained flow, opted into by name. Anything repetitive is a metric. |\n\nA failure's level is decided by its error class, not its call site:\n`MemoryError::log_level()` maps storage, transience, configuration and\nunavailability to `ERROR`, and refusals (not-found, validation, conflict,\nbudget, model-not-ready, auth) to `WARN`.",
+      "t_ref": "2026-10-07T00:00:00Z"
+    }
+  },
+  {
+    "case_id": "http-task-paraphrase",
+    "source": {
+      "key": "logging-config",
+      "source_type": "session_summary",
+      "source_id": "native:logging-config",
+      "content": "| Variable | Meaning |\n|---|---|\n| `RUST_LOG` | Level and per-subsystem directives. A bare level sets the default (`info`); `prefix=level` sets a subsystem. The most specific prefix wins. |\n| `MEMORY_LOG_FORMAT` | `text` (default, human-readable, one line per event) or `json` (NDJSON, one object per event). |\n| `MEMORY_LOG_COLOR` | `always`, `never`, or anything else for auto (colour only on a colour-capable terminal, and never for a file sink). `NO_COLOR` set and non-empty disables colour. |\n| `MEMORY_LOG_TARGETS` | Third-party `tracing` targets to raise, comma-separated `target=level`. Quiet by default; can never drop this service's own events. |\n| `MEMORY_LOG_FILE` | Append the stream to this file instead of stderr. A blank value means \"unset\". |\n\n`RUST_LOG` examples:\n\n```\nRUST_LOG=info                       # default\nRUST_LOG=extract=debug              # one subsystem\nRUST_LOG=http=error,info            # quiet the HTTP surface, keep the rest\nRUST_LOG=fs_watch=trace,http=debug  # two subsystems, the most specific rule wins\n```",
+      "t_ref": "2026-10-07T00:00:00Z"
+    }
+  },
+  {
+    "case_id": "http-task-paraphrase",
+    "source": {
+      "key": "logging-request",
+      "source_type": "session_summary",
+      "source_id": "native:logging-request",
+      "content": "Every unit of work carries a correlation id. In the HTTP profile it is the\nrequest's `x-request-id` (honoured when supplied, minted otherwise) and is\nadvertised back on the response; in the stdio profile it is a per-call\n`req_NNNN`. The formatter stamps the ambient id onto every event that does not\ncarry its own, so each line of one request — the access log line, a tool line, a\ndownstream warning — reads with the same `req=` and follows with a single\nfilter:\n\n```bash\ngrep 'req=<id>' memory-mcp.log\n```\n\nThe HTTP response echoes the id on `x-request-id`, and a control-plane error\nenvelope carries it as `correlation_id` — a client quoting either names the same\nvalue the log line shows.",
+      "t_ref": "2026-10-07T00:00:00Z"
+    }
+  },
+  {
+    "case_id": "http-task-paraphrase",
+    "source": {
+      "key": "license-number",
+      "source_type": "session_summary",
+      "source_id": "native:license-number",
+      "content": "Verified: A license inventory contains 16 product blocks, 163 application rows and 899 object rows. The union covers several products rather than one license.",
+      "t_ref": "2026-10-07T00:00:00Z"
+    }
+  },
+  {
+    "case_id": "http-task-paraphrase",
+    "source": {
+      "key": "license-url",
+      "source_type": "session_summary",
+      "source_id": "native:license-url",
+      "content": "Verified: Infinity means that an object is countable but its count is uncontrolled. Reference: https://example.org/pages/viewpage.action?pageId=1545882667; section 13.2, revision 75.",
+      "t_ref": "2026-10-07T00:00:00Z"
+    }
+  },
+  {
+    "case_id": "http-task-paraphrase",
+    "source": {
+      "key": "mail-level",
+      "source_type": "session_summary",
+      "source_id": "native:mail-level",
+      "content": "Verified: Only one slide of a cloud EDR comparison was extracted. Feature-level scope may be absent from the extracted text or represented graphically.",
+      "t_ref": "2026-10-07T00:00:00Z"
+    }
+  },
+  {
+    "case_id": "http-task-paraphrase",
+    "source": {
+      "key": "other-task",
+      "source_type": "session_summary",
+      "source_id": "native:other-task",
+      "content": "Verified: Task 16 in the mobile route editor plan checks KML point import and touch gestures. It belongs to Trackly, not Memory MCP HTTP.",
+      "t_ref": "2026-10-07T00:00:00Z"
+    }
+  },
+  {
+    "case_id": "unknown-database",
+    "source": {
+      "key": "http-plan",
+      "source_type": "session_summary",
+      "source_id": "native:http-plan",
+      "content": "### Task 16: Add low-overhead HTTP and retained-resource diagnostics\n\n- `memory_http_preflight_body_bytes` is recorded through the existing `metrics::histogram!` facade, with no labels, exactly once after body collection completes and before JSON decoding. This includes fully collected malformed JSON because those bytes were actually buffered. Partial, refused, stream-error and cancelled bodies do not enter the distribution.\n- DEBUG operations are `http.preflight.refused` and `http.preflight.large_body`, added to `logging::HTTP_OPERATIONS`; operators enable only these with `RUST_LOG=http.preflight=debug`. Logs use the validated existing `RequestId` when present, parsed numeric declared length, observed prefix bytes and closed outcome only—no request method/path, tenant fingerprint, arbitrary header or content. Emit large-body events only for fully collected bodies >=65536 B. Rate-limit each fixed event/reason to at most one log per second; refusal counters remain exact. Apply the rate limit before allocating/serializing the event.",
+      "t_ref": "2026-10-07T00:00:00Z"
+    }
+  },
+  {
+    "case_id": "unknown-database",
+    "source": {
+      "key": "logging-sink",
+      "source_type": "session_summary",
+      "source_id": "native:logging-sink",
+      "content": "Events are written to **stderr** — or to `MEMORY_LOG_FILE` when set — one event\nper line. Under the stdio transport stdout carries MCP protocol framing, so\nnothing is ever written there. The sink, format and colour are read once, when\nthe subscriber is installed at startup.",
+      "t_ref": "2026-10-07T00:00:00Z"
+    }
+  },
+  {
+    "case_id": "unknown-database",
+    "source": {
+      "key": "logging-levels",
+      "source_type": "session_summary",
+      "source_id": "native:logging-levels",
+      "content": "| Level | Use |\n|---|---|\n| `ERROR` | A failed unit of work, a risk to integrity, a failure after retries, loss of readiness. |\n| `WARN` | Handled but unexpected; degraded; a client refusal (4xx class). |\n| `INFO` | A business event or a state change. |\n| `DEBUG` | Diagnostics, off by default. |\n| `TRACE` | Fine-grained flow, opted into by name. Anything repetitive is a metric. |\n\nA failure's level is decided by its error class, not its call site:\n`MemoryError::log_level()` maps storage, transience, configuration and\nunavailability to `ERROR`, and refusals (not-found, validation, conflict,\nbudget, model-not-ready, auth) to `WARN`.",
+      "t_ref": "2026-10-07T00:00:00Z"
+    }
+  },
+  {
+    "case_id": "unknown-database",
+    "source": {
+      "key": "logging-config",
+      "source_type": "session_summary",
+      "source_id": "native:logging-config",
+      "content": "| Variable | Meaning |\n|---|---|\n| `RUST_LOG` | Level and per-subsystem directives. A bare level sets the default (`info`); `prefix=level` sets a subsystem. The most specific prefix wins. |\n| `MEMORY_LOG_FORMAT` | `text` (default, human-readable, one line per event) or `json` (NDJSON, one object per event). |\n| `MEMORY_LOG_COLOR` | `always`, `never`, or anything else for auto (colour only on a colour-capable terminal, and never for a file sink). `NO_COLOR` set and non-empty disables colour. |\n| `MEMORY_LOG_TARGETS` | Third-party `tracing` targets to raise, comma-separated `target=level`. Quiet by default; can never drop this service's own events. |\n| `MEMORY_LOG_FILE` | Append the stream to this file instead of stderr. A blank value means \"unset\". |\n\n`RUST_LOG` examples:\n\n```\nRUST_LOG=info                       # default\nRUST_LOG=extract=debug              # one subsystem\nRUST_LOG=http=error,info            # quiet the HTTP surface, keep the rest\nRUST_LOG=fs_watch=trace,http=debug  # two subsystems, the most specific rule wins\n```",
+      "t_ref": "2026-10-07T00:00:00Z"
+    }
+  },
+  {
+    "case_id": "unknown-database",
+    "source": {
+      "key": "logging-request",
+      "source_type": "session_summary",
+      "source_id": "native:logging-request",
+      "content": "Every unit of work carries a correlation id. In the HTTP profile it is the\nrequest's `x-request-id` (honoured when supplied, minted otherwise) and is\nadvertised back on the response; in the stdio profile it is a per-call\n`req_NNNN`. The formatter stamps the ambient id onto every event that does not\ncarry its own, so each line of one request — the access log line, a tool line, a\ndownstream warning — reads with the same `req=` and follows with a single\nfilter:\n\n```bash\ngrep 'req=<id>' memory-mcp.log\n```\n\nThe HTTP response echoes the id on `x-request-id`, and a control-plane error\nenvelope carries it as `correlation_id` — a client quoting either names the same\nvalue the log line shows.",
+      "t_ref": "2026-10-07T00:00:00Z"
+    }
+  },
+  {
+    "case_id": "unknown-database",
+    "source": {
+      "key": "license-number",
+      "source_type": "session_summary",
+      "source_id": "native:license-number",
+      "content": "Verified: A license inventory contains 16 product blocks, 163 application rows and 899 object rows. The union covers several products rather than one license.",
+      "t_ref": "2026-10-07T00:00:00Z"
+    }
+  },
+  {
+    "case_id": "unknown-database",
+    "source": {
+      "key": "license-url",
+      "source_type": "session_summary",
+      "source_id": "native:license-url",
+      "content": "Verified: Infinity means that an object is countable but its count is uncontrolled. Reference: https://example.org/pages/viewpage.action?pageId=1545882667; section 13.2, revision 75.",
+      "t_ref": "2026-10-07T00:00:00Z"
+    }
+  },
+  {
+    "case_id": "unknown-database",
+    "source": {
+      "key": "mail-level",
+      "source_type": "session_summary",
+      "source_id": "native:mail-level",
+      "content": "Verified: Only one slide of a cloud EDR comparison was extracted. Feature-level scope may be absent from the extracted text or represented graphically.",
+      "t_ref": "2026-10-07T00:00:00Z"
+    }
+  },
+  {
+    "case_id": "unknown-database",
+    "source": {
+      "key": "other-task",
+      "source_type": "session_summary",
+      "source_id": "native:other-task",
+      "content": "Verified: Task 16 in the mobile route editor plan checks KML point import and touch gestures. It belongs to Trackly, not Memory MCP HTTP.",
+      "t_ref": "2026-10-07T00:00:00Z"
+    }
+  }
+]

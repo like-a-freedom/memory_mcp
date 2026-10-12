@@ -1,0 +1,260 @@
+{
+  "schema_version": "memory-mcp-eval/v2",
+  "run_id": "run-1791743762",
+  "profile": "nightly",
+  "started_at": "2026-10-11T18:36:02.426497Z",
+  "duration_ms": 9568,
+  "expected_case_ids": [],
+  "expected_cases": [
+    {
+      "suite_id": "retrieval-quality",
+      "case_id": "locomo-conv-43-071"
+    },
+    {
+      "suite_id": "retrieval-quality",
+      "case_id": "unknown-task"
+    }
+  ],
+  "outcomes": [
+    {
+      "case_key": {
+        "suite_id": "retrieval-quality",
+        "case_id": "locomo-conv-43-071"
+      },
+      "mode": "end_to_end",
+      "split": "development",
+      "label_trust": "reviewed",
+      "status": "quality_failed",
+      "metrics": {
+        "answerable_non_abstention_rate": 1.0,
+        "duplicate_free_rate": 1.0,
+        "precision_macro": 1.0,
+        "prohibited_free_rate": 1.0,
+        "required_group_recall": 0.5
+      },
+      "evidence": {
+        "answerable_non_abstention_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "case_tag:category-4": {
+          "kind": "count",
+          "value": 1
+        },
+        "case_tag:locomo": {
+          "kind": "count",
+          "value": 1
+        },
+        "case_tag:published-evidence": {
+          "kind": "count",
+          "value": 1
+        },
+        "duplicate_free_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "precision_macro": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "prohibited_free_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "required_group_recall": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 2
+        }
+      },
+      "failures": [
+        "retrieval missed one or more required evidence groups",
+        "native selected evidence: [{\"gold_key\":\"D1:5:note:914bfd7d441a\",\"item\":{\"confidence\":0.01,\"content\":\"John: The Minnesota Wolves! I can't wait to play with them!\",\"fact_id\":\"fact:8a60d78fedd6d91818e9df92\",\"provenance\":{\"extraction_strategy\":\"summary_note_fallback\",\"ingestion_method\":\"extraction\",\"reference_time\":\"2023-05-21T19:48:00+00:00\",\"reranking\":{\"admission_floor\":0.0,\"model_signature\":\"reranksig:dff4b9939786ed9a1e897946778e336584cc24251a2f32282bd3fe83a680a7d1\",\"relevance_logit\":6.325489521026611},\"retrieval_admission\":{\"basis\":\"qualified_source_episode\",\"policy_version\":\"retrieval-admission-v1\",\"related_episode_id\":\"episode:309f3020f0395c271be3095c\",\"source_context_group\":\"locomo:conv-43:session_1\",\"source_context_position\":4,\"source_context_relation\":\"adjacent_question_answer\"},\"source_context\":{\"group\":\"locomo:conv-43:session_1\",\"position\":5},\"source_episode\":\"episode:b38d655c2e0ee6201e46bb4e\",\"source_episode_id\":\"episode:b38d655c2e0ee6201e46bb4e\",\"source_id\":\"locomo:conv-43:D1:5\",\"source_type\":\"conversation\"},\"quote\":\"John: The Minnesota Wolves! I can't wait to play with them!\",\"rationale\":\"tier=source_expanded source-ordered answer to a matching question\",\"retrieval_evidence\":{\"admission_basis\":\"qualified_source_episode\",\"policy_version\":\"retrieval-admission-v1\"},\"retrieval_tier\":\"source_expanded\",\"semantic_available\":true,\"source_episode\":\"episode:b38d655c2e0ee6201e46bb4e\"}}]",
+        "native reranking candidates: [{\"document\":\"Memory reference date: 2023-05-21 (21 May 2023).\\nSource identity: locomo:conv-43:D1:11\\nJohn: Fitting into the new team's style of play was a challenge during pre-season.\",\"query\":\"Which team did John sign with on 21 May, 2023?\",\"score\":3.3970155715942383},{\"document\":\"Memory reference date: 2023-05-21 (21 May 2023).\\nSource identity: locomo:conv-43:D1:11\\nJohn: Fitting into the new team's style of play was a challenge during pre-season.\",\"query\":\"Which team did John sign with on 21 May\",\"score\":-0.29358652234077454},{\"document\":\"Memory reference date: 2023-05-21 (21 May 2023).\\nSource identity: locomo:conv-43:D1:11\\nJohn: Fitting into the new team's style of play was a challenge during pre-season.\",\"query\":\"2023?\",\"score\":-0.8122963309288025},{\"document\":\"Memory reference date: 2023-05-21 (21 May 2023).\\nSource identity: locomo:conv-43:D1:4\\nTim: Woohoo! Congrats on the new team. Which team did you sign with?\",\"query\":\"Which team did John sign with on 21 May, 2023?\",\"score\":5.974437236785889},{\"document\":\"Memory reference date: 2023-05-21 (21 May 2023).\\nSource identity: locomo:conv-43:D1:4\\nTim: Woohoo! Congrats on the new team. Which team did you sign with?\",\"query\":\"Which team did John sign with on 21 May\",\"score\":1.2389235496520996},{\"document\":\"Memory reference date: 2023-05-21 (21 May 2023).\\nSource identity: locomo:conv-43:D1:4\\nTim: Woohoo! Congrats on the new team. Which team did you sign with?\",\"query\":\"2023?\",\"score\":-1.5708205699920654},{\"document\":\"Memory reference date: 2023-05-21 (21 May 2023).\\nSource identity: locomo:conv-43:D1:5\\nJohn: The Minnesota Wolves! I can't wait to play with them!\",\"query\":\"Which team did John sign with on 21 May, 2023?\",\"score\":6.325489521026611},{\"document\":\"Memory reference date: 2023-05-21 (21 May 2023).\\nSource identity: locomo:conv-43:D1:5\\nJohn: The Minnesota Wolves! I can't wait to play with them!\",\"query\":\"Which team did John sign with on 21 May\",\"score\":2.30260968208313},{\"document\":\"Memory reference date: 2023-05-21 (21 May 2023).\\nSource identity: locomo:conv-43:D1:5\\nJohn: The Minnesota Wolves! I can't wait to play with them!\",\"query\":\"2023?\",\"score\":0.16754281520843506}]"
+      ],
+      "duration_ms": 5225,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "retrieval-quality",
+        "case_id": "unknown-task"
+      },
+      "mode": "end_to_end",
+      "split": "development",
+      "label_trust": "reviewed",
+      "status": "passed",
+      "metrics": {
+        "duplicate_free_rate": 1.0,
+        "prohibited_free_rate": 1.0,
+        "unknown_abstention_rate": 1.0
+      },
+      "evidence": {
+        "case_tag:qualified-task": {
+          "kind": "count",
+          "value": 1
+        },
+        "case_tag:unknown": {
+          "kind": "count",
+          "value": 1
+        },
+        "duplicate_free_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "prohibited_free_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "unknown_abstention_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        }
+      },
+      "failures": [],
+      "duration_ms": 3016,
+      "attempts": 1
+    }
+  ],
+  "suite_summaries": [
+    {
+      "suite_id": "retrieval-quality",
+      "mode": "end_to_end",
+      "total": 2,
+      "passed": 1,
+      "quality_failed": 1,
+      "invalid": 0,
+      "metrics": {
+        "answerable_non_abstention_rate": 1.0,
+        "answerable_non_abstention_rate_applicable_count": 1.0,
+        "duplicate_free_rate": 1.0,
+        "duplicate_free_rate_applicable_count": 2.0,
+        "precision_macro": 1.0,
+        "precision_macro_applicable_count": 1.0,
+        "prohibited_free_rate": 1.0,
+        "prohibited_free_rate_applicable_count": 2.0,
+        "required_group_recall": 0.5,
+        "required_group_recall_applicable_count": 2.0,
+        "unknown_abstention_rate": 1.0,
+        "unknown_abstention_rate_applicable_count": 1.0
+      }
+    }
+  ],
+  "gates": [
+    {
+      "suite_id": "retrieval-quality",
+      "metric": "precision_macro",
+      "observed": 1.0,
+      "hard_floor": 1.0,
+      "baseline": null,
+      "regression_budget": null,
+      "status": "passed",
+      "reason": "none"
+    },
+    {
+      "suite_id": "retrieval-quality",
+      "metric": "required_group_recall",
+      "observed": 0.5,
+      "hard_floor": 1.0,
+      "baseline": null,
+      "regression_budget": null,
+      "status": "failed",
+      "reason": "hard_floor_not_met"
+    },
+    {
+      "suite_id": "retrieval-quality",
+      "metric": "unknown_abstention_rate",
+      "observed": 1.0,
+      "hard_floor": 1.0,
+      "baseline": null,
+      "regression_budget": null,
+      "status": "passed",
+      "reason": "none"
+    },
+    {
+      "suite_id": "retrieval-quality",
+      "metric": "answerable_non_abstention_rate",
+      "observed": 1.0,
+      "hard_floor": 1.0,
+      "baseline": null,
+      "regression_budget": null,
+      "status": "passed",
+      "reason": "none"
+    },
+    {
+      "suite_id": "retrieval-quality",
+      "metric": "duplicate_free_rate",
+      "observed": 1.0,
+      "hard_floor": 1.0,
+      "baseline": null,
+      "regression_budget": null,
+      "status": "passed",
+      "reason": "none"
+    },
+    {
+      "suite_id": "retrieval-quality",
+      "metric": "prohibited_free_rate",
+      "observed": 1.0,
+      "hard_floor": 1.0,
+      "baseline": null,
+      "regression_budget": null,
+      "status": "passed",
+      "reason": "none"
+    }
+  ],
+  "fingerprint": {
+    "rust_version": "rustc 1.99.0 (b940084d7 2026-09-28)",
+    "os_arch": "macos/aarch64",
+    "package_version": "0.1.0",
+    "build_profile": "debug",
+    "enabled_features": [],
+    "provider": null,
+    "model": null,
+    "device": null,
+    "configuration_hash": "b25a16d7273d5461d2a4cc9846e29884b2f39babac19f503df283556297808e3",
+    "git_commit": "e6d17cb06cd5f9f7f4a76114fded609351b27c8c",
+    "evaluator_versions": {
+      "eval-harness": "0.1.0"
+    },
+    "suite_fingerprints": {
+      "retrieval-quality": {
+        "claim_rollout_stage": "evidence",
+        "corpus_id": "retrieval-quality-v1",
+        "corpus_manifest_sha256": "a33d76f783ba01759a66e2ac389da42231ba0ab1969aedd3c1ef2e90481fac9c",
+        "corpus_revision": "r27-diagnostic-focus",
+        "embedding_dimension": "384",
+        "embedding_signature": "embsig:b88d713a71be619fce22bcb30efe3d1cc9623afff9e6a8ae7107ba9e620b9b17",
+        "extractor_fingerprint": "anno",
+        "index_signature": "indexsig:d293fd983ef88ea75c78d3758dd09c73d5cf02726d7ec592ca28adc938421f30",
+        "model": "intfloat/multilingual-e5-small",
+        "model_file_sha256.config.json": "69137736cab8b8903a07fe8afaafdda25aac55415a12a55d1bffa9f581abf959",
+        "model_file_sha256.model.safetensors": "1a55775f53449dac10a2bcbc312469fac40b96d53198c407081a831f81c98477",
+        "model_file_sha256.tokenizer.json": "0b44a9d7b51c3c62626640cda0e2c2f70fdacdc25bbbd68038369d14ebdf4c39",
+        "prepared_claim_rollout_stage": "evidence",
+        "prepared_embedding_dimension": "384",
+        "prepared_embedding_signature": "embsig:b88d713a71be619fce22bcb30efe3d1cc9623afff9e6a8ae7107ba9e620b9b17",
+        "prepared_extractor_fingerprint": "anno",
+        "prepared_index_signature": "indexsig:d293fd983ef88ea75c78d3758dd09c73d5cf02726d7ec592ca28adc938421f30",
+        "prepared_model": "intfloat/multilingual-e5-small",
+        "prepared_provider": "local-candle",
+        "prepared_similarity_threshold": "0.7",
+        "provider": "local-candle",
+        "provider_status": "ready",
+        "reranking_signature": "reranksig:dff4b9939786ed9a1e897946778e336584cc24251a2f32282bd3fe83a680a7d1",
+        "similarity_threshold": "0.7",
+        "source_bundle_sha256": "7196e418823f1c9baf92b8f42cdebd557a0d8579f25f88ed2f482ee4fabb80fd"
+      }
+    },
+    "profile_digest": "e1514e9232d4267cf4fa9f7bf5d091dd6c8b42fea8270d6cd19042907a5efadd"
+  },
+  "budget_status": "passed",
+  "verdict": "quality_failed",
+  "issues": []
+}

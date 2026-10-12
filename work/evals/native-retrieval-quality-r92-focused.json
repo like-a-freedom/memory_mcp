@@ -1,0 +1,828 @@
+{
+  "schema_version": "memory-mcp-eval/v2",
+  "run_id": "run-1791758391",
+  "profile": "nightly",
+  "started_at": "2026-10-11T22:39:51.723762Z",
+  "duration_ms": 92266,
+  "expected_case_ids": [],
+  "expected_cases": [
+    {
+      "suite_id": "retrieval-quality",
+      "case_id": "http-task-short"
+    },
+    {
+      "suite_id": "retrieval-quality",
+      "case_id": "locomo-conv-41-065"
+    },
+    {
+      "suite_id": "retrieval-quality",
+      "case_id": "locomo-conv-42-096"
+    },
+    {
+      "suite_id": "retrieval-quality",
+      "case_id": "locomo-conv-43-071"
+    },
+    {
+      "suite_id": "retrieval-quality",
+      "case_id": "locomo-conv-44-000"
+    },
+    {
+      "suite_id": "retrieval-quality",
+      "case_id": "locomo-conv-48-015"
+    },
+    {
+      "suite_id": "retrieval-quality",
+      "case_id": "locomo-conv-49-002"
+    },
+    {
+      "suite_id": "retrieval-quality",
+      "case_id": "locomo-conv-49-083"
+    },
+    {
+      "suite_id": "retrieval-quality",
+      "case_id": "locomo-conv-50-001"
+    },
+    {
+      "suite_id": "retrieval-quality",
+      "case_id": "logging-original"
+    },
+    {
+      "suite_id": "retrieval-quality",
+      "case_id": "unknown-task"
+    }
+  ],
+  "outcomes": [
+    {
+      "case_key": {
+        "suite_id": "retrieval-quality",
+        "case_id": "http-task-short"
+      },
+      "mode": "end_to_end",
+      "split": "development",
+      "label_trust": "reviewed",
+      "status": "passed",
+      "metrics": {
+        "answerable_non_abstention_rate": 1.0,
+        "duplicate_free_rate": 1.0,
+        "precision_macro": 1.0,
+        "prohibited_free_rate": 1.0,
+        "required_group_recall": 1.0
+      },
+      "evidence": {
+        "answerable_non_abstention_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "case_tag:qualified-task": {
+          "kind": "count",
+          "value": 1
+        },
+        "case_tag:short-query": {
+          "kind": "count",
+          "value": 1
+        },
+        "duplicate_free_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "precision_macro": {
+          "kind": "ratio",
+          "numerator": 2,
+          "denominator": 2
+        },
+        "prohibited_free_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "required_group_recall": {
+          "kind": "ratio",
+          "numerator": 2,
+          "denominator": 2
+        }
+      },
+      "failures": [],
+      "duration_ms": 3657,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "retrieval-quality",
+        "case_id": "locomo-conv-41-065"
+      },
+      "mode": "end_to_end",
+      "split": "development",
+      "label_trust": "reviewed",
+      "status": "passed",
+      "metrics": {
+        "answerable_non_abstention_rate": 1.0,
+        "duplicate_free_rate": 1.0,
+        "precision_macro": 1.0,
+        "prohibited_free_rate": 1.0,
+        "required_group_recall": 1.0
+      },
+      "evidence": {
+        "answerable_non_abstention_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "case_tag:category-4": {
+          "kind": "count",
+          "value": 1
+        },
+        "case_tag:locomo": {
+          "kind": "count",
+          "value": 1
+        },
+        "case_tag:published-evidence": {
+          "kind": "count",
+          "value": 1
+        },
+        "duplicate_free_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "precision_macro": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "prohibited_free_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "required_group_recall": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        }
+      },
+      "failures": [],
+      "duration_ms": 13802,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "retrieval-quality",
+        "case_id": "locomo-conv-42-096"
+      },
+      "mode": "end_to_end",
+      "split": "development",
+      "label_trust": "reviewed",
+      "status": "passed",
+      "metrics": {
+        "answerable_non_abstention_rate": 1.0,
+        "duplicate_free_rate": 1.0,
+        "precision_macro": 1.0,
+        "prohibited_free_rate": 1.0,
+        "required_group_recall": 1.0
+      },
+      "evidence": {
+        "answerable_non_abstention_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "case_tag:category-4": {
+          "kind": "count",
+          "value": 1
+        },
+        "case_tag:locomo": {
+          "kind": "count",
+          "value": 1
+        },
+        "case_tag:published-evidence": {
+          "kind": "count",
+          "value": 1
+        },
+        "duplicate_free_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "precision_macro": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "prohibited_free_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "required_group_recall": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        }
+      },
+      "failures": [],
+      "duration_ms": 10336,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "retrieval-quality",
+        "case_id": "locomo-conv-43-071"
+      },
+      "mode": "end_to_end",
+      "split": "development",
+      "label_trust": "reviewed",
+      "status": "passed",
+      "metrics": {
+        "answerable_non_abstention_rate": 1.0,
+        "duplicate_free_rate": 1.0,
+        "precision_macro": 1.0,
+        "prohibited_free_rate": 1.0,
+        "required_group_recall": 1.0
+      },
+      "evidence": {
+        "answerable_non_abstention_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "case_tag:category-4": {
+          "kind": "count",
+          "value": 1
+        },
+        "case_tag:locomo": {
+          "kind": "count",
+          "value": 1
+        },
+        "case_tag:published-evidence": {
+          "kind": "count",
+          "value": 1
+        },
+        "duplicate_free_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "precision_macro": {
+          "kind": "ratio",
+          "numerator": 2,
+          "denominator": 2
+        },
+        "prohibited_free_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "required_group_recall": {
+          "kind": "ratio",
+          "numerator": 2,
+          "denominator": 2
+        }
+      },
+      "failures": [],
+      "duration_ms": 5800,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "retrieval-quality",
+        "case_id": "locomo-conv-44-000"
+      },
+      "mode": "end_to_end",
+      "split": "development",
+      "label_trust": "reviewed",
+      "status": "passed",
+      "metrics": {
+        "answerable_non_abstention_rate": 1.0,
+        "duplicate_free_rate": 1.0,
+        "precision_macro": 1.0,
+        "prohibited_free_rate": 1.0,
+        "required_group_recall": 1.0
+      },
+      "evidence": {
+        "answerable_non_abstention_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "case_tag:category-2": {
+          "kind": "count",
+          "value": 1
+        },
+        "case_tag:locomo": {
+          "kind": "count",
+          "value": 1
+        },
+        "case_tag:published-evidence": {
+          "kind": "count",
+          "value": 1
+        },
+        "duplicate_free_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "precision_macro": {
+          "kind": "ratio",
+          "numerator": 3,
+          "denominator": 3
+        },
+        "prohibited_free_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "required_group_recall": {
+          "kind": "ratio",
+          "numerator": 2,
+          "denominator": 2
+        }
+      },
+      "failures": [],
+      "duration_ms": 8356,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "retrieval-quality",
+        "case_id": "locomo-conv-48-015"
+      },
+      "mode": "end_to_end",
+      "split": "development",
+      "label_trust": "reviewed",
+      "status": "passed",
+      "metrics": {
+        "answerable_non_abstention_rate": 1.0,
+        "duplicate_free_rate": 1.0,
+        "precision_macro": 1.0,
+        "prohibited_free_rate": 1.0,
+        "required_group_recall": 1.0
+      },
+      "evidence": {
+        "answerable_non_abstention_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "case_tag:category-4": {
+          "kind": "count",
+          "value": 1
+        },
+        "case_tag:locomo": {
+          "kind": "count",
+          "value": 1
+        },
+        "case_tag:published-evidence": {
+          "kind": "count",
+          "value": 1
+        },
+        "duplicate_free_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "precision_macro": {
+          "kind": "ratio",
+          "numerator": 2,
+          "denominator": 2
+        },
+        "prohibited_free_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "required_group_recall": {
+          "kind": "ratio",
+          "numerator": 2,
+          "denominator": 2
+        }
+      },
+      "failures": [],
+      "duration_ms": 10176,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "retrieval-quality",
+        "case_id": "locomo-conv-49-002"
+      },
+      "mode": "end_to_end",
+      "split": "development",
+      "label_trust": "reviewed",
+      "status": "passed",
+      "metrics": {
+        "answerable_non_abstention_rate": 1.0,
+        "duplicate_free_rate": 1.0,
+        "precision_macro": 1.0,
+        "prohibited_free_rate": 1.0,
+        "required_group_recall": 1.0
+      },
+      "evidence": {
+        "answerable_non_abstention_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "case_tag:category-1": {
+          "kind": "count",
+          "value": 1
+        },
+        "case_tag:locomo": {
+          "kind": "count",
+          "value": 1
+        },
+        "case_tag:published-evidence": {
+          "kind": "count",
+          "value": 1
+        },
+        "duplicate_free_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "precision_macro": {
+          "kind": "ratio",
+          "numerator": 3,
+          "denominator": 3
+        },
+        "prohibited_free_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "required_group_recall": {
+          "kind": "ratio",
+          "numerator": 3,
+          "denominator": 3
+        }
+      },
+      "failures": [],
+      "duration_ms": 9567,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "retrieval-quality",
+        "case_id": "locomo-conv-49-083"
+      },
+      "mode": "end_to_end",
+      "split": "development",
+      "label_trust": "reviewed",
+      "status": "passed",
+      "metrics": {
+        "answerable_non_abstention_rate": 1.0,
+        "duplicate_free_rate": 1.0,
+        "precision_macro": 1.0,
+        "prohibited_free_rate": 1.0,
+        "required_group_recall": 1.0
+      },
+      "evidence": {
+        "answerable_non_abstention_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "case_tag:category-4": {
+          "kind": "count",
+          "value": 1
+        },
+        "case_tag:locomo": {
+          "kind": "count",
+          "value": 1
+        },
+        "case_tag:published-evidence": {
+          "kind": "count",
+          "value": 1
+        },
+        "duplicate_free_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "precision_macro": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "prohibited_free_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "required_group_recall": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        }
+      },
+      "failures": [],
+      "duration_ms": 9601,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "retrieval-quality",
+        "case_id": "locomo-conv-50-001"
+      },
+      "mode": "end_to_end",
+      "split": "development",
+      "label_trust": "reviewed",
+      "status": "quality_failed",
+      "metrics": {
+        "answerable_non_abstention_rate": 1.0,
+        "duplicate_free_rate": 1.0,
+        "precision_macro": 0.75,
+        "prohibited_free_rate": 0.0,
+        "required_group_recall": 1.0
+      },
+      "evidence": {
+        "answerable_non_abstention_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "case_tag:category-1": {
+          "kind": "count",
+          "value": 1
+        },
+        "case_tag:locomo": {
+          "kind": "count",
+          "value": 1
+        },
+        "case_tag:published-evidence": {
+          "kind": "count",
+          "value": 1
+        },
+        "case_tag:source_labeled_upstream_image_metadata": {
+          "kind": "count",
+          "value": 1
+        },
+        "case_tag:upstream_acquisition_underspecified": {
+          "kind": "count",
+          "value": 1
+        },
+        "duplicate_free_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "precision_macro": {
+          "kind": "ratio",
+          "numerator": 3,
+          "denominator": 4
+        },
+        "prohibited_free_rate": {
+          "kind": "ratio",
+          "numerator": 0,
+          "denominator": 1
+        },
+        "required_group_recall": {
+          "kind": "ratio",
+          "numerator": 3,
+          "denominator": 3
+        }
+      },
+      "failures": [
+        "retrieval returned unlabeled or disallowed evidence",
+        "prohibited evidence was retrieved",
+        "native selected evidence: [{\"gold_key\":\"D2:5:note:e8622188f26e\",\"item\":{\"confidence\":0.0,\"content\":\"Calvin: Woohoo! I finally got myself this beauty. Here's a pic from yesterday when I took it for a ride. Can't believe I'm actually driving it. Definitely what I deserve after all this hard work. Every time I step in, it's like an adrenaline rush!\\n\\nUpstream image metadata (dataset annotation, not a user assertion):\\n{\\\"blip_caption\\\": \\\"a photo of a red sports car parked on the side of the road\\\", \\\"img_url\\\": [\\\"https://i.redd.it/v7n19f5lcqn91.jpg\\\"], \\\"query\\\": \\\"ferrari 488 gtb japanese mansion\\\"}\",\"fact_id\":\"fact:e0250440aa21a6cd4e47e69c\",\"grounding\":0.62,\"provenance\":{\"extraction_strategy\":\"summary_note_fallback\",\"ingestion_method\":\"extraction\",\"matched_query_terms\":[\"2023\",\"calvin\",\"march\"],\"reranking\":{\"admission_floor\":0.0,\"model_signature\":\"reranksig:dff4b9939786ed9a1e897946778e336584cc24251a2f32282bd3fe83a680a7d1\",\"relevance_logit\":1.362194299697876},\"retrieval_admission\":{\"basis\":\"qualified_source_episode\",\"policy_version\":\"retrieval-admission-v1\",\"related_episode_id\":\"episode:5b1ff5b47083003df318133f\",\"source_context_group\":\"locomo:conv-50:session_2\",\"source_context_position\":5,\"source_context_relation\":\"anaphoric_follow_up_answer\"},\"source_context\":{\"group\":\"locomo:conv-50:session_2\",\"position\":5},\"source_episode_id\":\"episode:3e3e2affa869b081e7e54165\",\"source_id\":\"locomo:conv-50:D2:5\",\"source_type\":\"conversation\"},\"quote\":\"Calvin: Woohoo! I finally got myself this beauty. Here's a pic from yesterday when I took it for a ride. Can't believe I'm actually driving it. Definitely what I deserve after all this hard work. Every time I step in, it's like an adrenaline rush!\\n\\nUpstream image metadata (dataset annotation, not a user assertion):\\n{\\\"blip_caption\\\": \\\"a photo of a red sports car parked on the side of the road\\\", \\\"img_url\\\": [\\\"https://i.redd.it/v7n19f5lcqn91.jpg\\\"], \\\"query\\\": \\\"ferrari 488 gtb japanese mansion\\\"}\",\"rationale\":\"tier=temporal fts=0.00 access_count=0 confidence=0.00 relevance=0.70 grounding=0.62 alignment=1.04 semantic=enabled matched lexical query=\\\"What items did Calvin buy in March 2023?\\\" and active at 2026-10-11\",\"reconciliation\":{\"claim_ids\":[\"claim:87a26d35fdb581a364e3f7f1bc5c06149b552f5edb76664a6041dac349e69a1f\",\"claim:dca5573583af8a5d45d5aada4c1e31fd575722b98735519e949c62c19a720fc2\"],\"relations\":[{\"counterpart_source_episode_id\":\"episode:ecbba98f1320d9e6f6118bb9\",\"evaluator_version\":\"builtin/v1\",\"outcome\":\"contradiction\",\"reason_code\":\"contradiction\",\"relation_id\":\"claim_relation:0caae31fef54706edf57968c92c462e804fa878507c4c4badb5f6ad371bdd6d7\"},{\"counterpart_source_episode_id\":\"episode:3912a635c68ee542242dba27\",\"evaluator_version\":\"builtin/v1\",\"outcome\":\"contradiction\",\"reason_code\":\"contradiction\",\"relation_id\":\"claim_relation:20c82dd209249e694075779eb160aa7e0f9ad3ea74ca84bcc1e132e8708a3ddd\"},{\"counterpart_source_episode_id\":\"episode:eb23f3f0003af17af58050e6\",\"evaluator_version\":\"builtin/v1\",\"outcome\":\"contradiction\",\"reason_code\":\"contradiction\",\"relation_id\":\"claim_relation:26e6f5d1b46a955e34a1429d502d960391466068147c2122bb50237e275b2f4e\"},{\"evaluator_version\":\"builtin/v1\",\"outcome\":\"contradiction\",\"reason_code\":\"contradiction\",\"relation_id\":\"claim_relation:2a82b56680ffca1ece37e0d635dba4c4c7c4eedcd82a5c86dd6e6d3bc388d93c\"},{\"evaluator_version\":\"builtin/v1\",\"outcome\":\"contradiction\",\"reason_code\":\"contradiction\",\"relation_id\":\"claim_relation:355cd2916b5308cc7d96bd47a2e51d2d678fb370ff2202e0bf5ac15904746b55\"},{\"evaluator_version\":\"builtin/v1\",\"outcome\":\"contradiction\",\"reason_code\":\"contradiction\",\"relation_id\":\"claim_relation:44db2410f5c244549826bdc8bb4ed45c58adeb74473d993682825bc001222f04\"},{\"evaluator_version\":\"builtin/v1\",\"outcome\":\"contradiction\",\"reason_code\":\"contradiction\",\"relation_id\":\"claim_relation:5ca9806bcc44df785bedac44e0769b10c0919dc3de7a830ed0be4da653903d0a\"},{\"counterpart_source_episode_id\":\"episode:eb23f3f0003af17af58050e6\",\"evaluator_version\":\"builtin/v1\",\"outcome\":\"contradiction\",\"reason_code\":\"contradiction\",\"relation_id\":\"claim_relation:696e15e89db7edfc9ccb500575c9092712a2bfc97df0fbbe5431afd47a4e4cfb\"},{\"evaluator_version\":\"builtin/v1\",\"outcome\":\"contradiction\",\"reason_code\":\"contradiction\",\"relation_id\":\"claim_relation:6be00378143c6b991cf1f7f112c11ec0def251552f01437739bf3d1e759151cf\"},{\"evaluator_version\":\"builtin/v1\",\"outcome\":\"contradiction\",\"reason_code\":\"contradiction\",\"relation_id\":\"claim_relation:7faa442237475bad8f1557cacd9d3ad50786f3f5e5e32b7a96223fe453426772\"},{\"evaluator_version\":\"builtin/v1\",\"outcome\":\"contradiction\",\"reason_code\":\"contradiction\",\"relation_id\":\"claim_relation:82db9b5e29186974cd0f94481aa3736538f1b80089c3867a3c6b9d67f1b493cc\"},{\"evaluator_version\":\"builtin/v1\",\"outcome\":\"contradiction\",\"reason_code\":\"contradiction\",\"relation_id\":\"claim_relation:d8e7f8f61349349ce7fa1e1e397b0451cc1e2c51f11e2003331d19d6358f53ed\"},{\"evaluator_version\":\"builtin/v1\",\"outcome\":\"contradiction\",\"reason_code\":\"contradiction\",\"relation_id\":\"claim_relation:f7edbe26daa2979803124cc85f07909846d412e339700f9111b28af0e3474e22\"},{\"evaluator_version\":\"builtin/v1\",\"outcome\":\"contradiction\",\"reason_code\":\"contradiction\",\"relation_id\":\"claim_relation:fde1ee066c100963b3b68f05c8ae3e29f123c6e3432886079b3d35b128d2008b\"},{\"evaluator_version\":\"builtin/v1\",\"outcome\":\"contradiction\",\"reason_code\":\"contradiction\",\"relation_id\":\"claim_relation:fe258c8f4cb1ebbfcd813570e78b37d70681d2f5ec95495aceeb54557e0eaddb\"}]},\"relevance\":0.7,\"retrieval_evidence\":{\"admission_basis\":\"calendar_acquisition\",\"policy_version\":\"retrieval-admission-v1\",\"semantic_similarity\":0.769871881314137},\"retrieval_tier\":\"temporal\",\"semantic_available\":true,\"source_episode\":\"episode:3e3e2affa869b081e7e54165\"}},{\"gold_key\":\"D1:3:note:211c783b1fee\",\"item\":{\"confidence\":0.0,\"content\":\"Calvin: That event sounds great! Something really exciting happened to me - I just had a big life change! Here's my new mansion - pretty cool huh?\\n\\nUpstream image metadata (dataset annotation, not a user assertion):\\n{\\\"blip_caption\\\": \\\"a photo of a building with a sign on the front of it\\\", \\\"img_url\\\": [\\\"https://localandbespoke.files.wordpress.com/2018/11/imag0397.jpg\\\"], \\\"query\\\": \\\"mansion entrance japan\\\"}\",\"fact_id\":\"fact:85eba879bfefc3a8e2b4f078\",\"grounding\":0.62,\"provenance\":{\"extraction_strategy\":\"summary_note_fallback\",\"ingestion_method\":\"extraction\",\"matched_query_terms\":[\"2023\",\"calvin\",\"march\"],\"reranking\":{\"admission_floor\":0.0,\"model_signature\":\"reranksig:dff4b9939786ed9a1e897946778e336584cc24251a2f32282bd3fe83a680a7d1\",\"relevance_logit\":0.857363760471344},\"retrieval_admission\":{\"basis\":\"calendar_acquisition\",\"community\":null,\"explicit_date_admitted\":false,\"graph_anchor_origin\":null,\"hop_count\":null,\"matched_content_terms\":[],\"matched_index_key_terms\":[],\"matched_references\":[],\"policy_version\":\"retrieval-admission-v1\",\"repeated_topic\":null,\"resolved_entity_ids\":[],\"semantic_similarity\":0.7822443250838352},\"source_episode_id\":\"episode:eb23f3f0003af17af58050e6\",\"source_id\":\"locomo:conv-50:D1:3\",\"source_type\":\"conversation\"},\"quote\":\"Calvin: That event sounds great! Something really exciting happened to me - I just had a big life change! Here's my new mansion - pretty cool huh?\\n\\nUpstream image metadata (dataset annotation, not a user assertion):\\n{\\\"blip_caption\\\": \\\"a photo of a building with a sign on the front of it\\\", \\\"img_url\\\": [\\\"https://localandbespoke.files.wordpress.com/2018/11/imag0397.jpg\\\"], \\\"query\\\": \\\"mansion entrance japan\\\"}\",\"rationale\":\"tier=temporal fts=0.00 access_count=0 confidence=0.00 relevance=0.65 grounding=0.62 alignment=1.04 semantic=enabled matched lexical query=\\\"What items did Calvin buy in March 2023?\\\" and active at 2026-10-11\",\"reconciliation\":{\"claim_ids\":[\"claim:340a4d85479d300e16f23c06b0898025752fa7f07da7ec1065bba17037495f23\",\"claim:aa64354ae883e117cf4dd19c1ffbeaa7db593680658fab78860f749aac31a598\"],\"relations\":[{\"evaluator_version\":\"builtin/v1\",\"outcome\":\"contradiction\",\"reason_code\":\"contradiction\",\"relation_id\":\"claim_relation:1e344256393f788c14420eec1e6f890bc6755dc024317fa351c36bf9be387fd6\"},{\"counterpart_source_episode_id\":\"episode:3912a635c68ee542242dba27\",\"evaluator_version\":\"builtin/v1\",\"outcome\":\"contradiction\",\"reason_code\":\"contradiction\",\"relation_id\":\"claim_relation:2131e461802afa8a4afece10482216344f58fa3c645cbd619a31894aca6ac57c\"},{\"counterpart_source_episode_id\":\"episode:3e3e2affa869b081e7e54165\",\"evaluator_version\":\"builtin/v1\",\"outcome\":\"contradiction\",\"reason_code\":\"contradiction\",\"relation_id\":\"claim_relation:26e6f5d1b46a955e34a1429d502d960391466068147c2122bb50237e275b2f4e\"},{\"evaluator_version\":\"builtin/v1\",\"outcome\":\"contradiction\",\"reason_code\":\"contradiction\",\"relation_id\":\"claim_relation:285fff9688984d65d586476074b98116b08cd9a9e3f73588d1c95d18779134fd\"},{\"evaluator_version\":\"builtin/v1\",\"outcome\":\"contradiction\",\"reason_code\":\"contradiction\",\"relation_id\":\"claim_relation:4de1ed084f0325a6ed711e422a67db8d0b141fcf189ba04a38519acfb15a2935\"},{\"evaluator_version\":\"builtin/v1\",\"outcome\":\"contradiction\",\"reason_code\":\"contradiction\",\"relation_id\":\"claim_relation:531e0f96353fd8e89d353396573959aa580540cf6db849ce78596c0fe616c50b\"},{\"evaluator_version\":\"builtin/v1\",\"outcome\":\"contradiction\",\"reason_code\":\"contradiction\",\"relation_id\":\"claim_relation:61260a1bf2dabc76b64a6d60550fe75485e6d8fc91e9955787324d61899432e2\"},{\"counterpart_source_episode_id\":\"episode:3e3e2affa869b081e7e54165\",\"evaluator_version\":\"builtin/v1\",\"outcome\":\"contradiction\",\"reason_code\":\"contradiction\",\"relation_id\":\"claim_relation:696e15e89db7edfc9ccb500575c9092712a2bfc97df0fbbe5431afd47a4e4cfb\"},{\"evaluator_version\":\"builtin/v1\",\"outcome\":\"contradiction\",\"reason_code\":\"contradiction\",\"relation_id\":\"claim_relation:806f6c45fd8a83f3d5c2e9cf9660f1890e452fd97e9b741ee26d47d1a85bde45\"},{\"evaluator_version\":\"builtin/v1\",\"outcome\":\"contradiction\",\"reason_code\":\"contradiction\",\"relation_id\":\"claim_relation:8a0a2e7404a2b35c63a2f0d5ae51fd4b3040431b58c546efbfdba51b227a83b7\"},{\"counterpart_source_episode_id\":\"episode:ecbba98f1320d9e6f6118bb9\",\"evaluator_version\":\"builtin/v1\",\"outcome\":\"contradiction\",\"reason_code\":\"contradiction\",\"relation_id\":\"claim_relation:a75905597852f886d1e0b1c32e0c1a5bec6c7f655a4a77060f2846b1100d84ca\"},{\"evaluator_version\":\"builtin/v1\",\"outcome\":\"contradiction\",\"reason_code\":\"contradiction\",\"relation_id\":\"claim_relation:d8b136fca9227089a82b52b56c3bbc8bbaf410786a06108f3cddffcb394ba38c\"},{\"evaluator_version\":\"builtin/v1\",\"outcome\":\"contradiction\",\"reason_code\":\"contradiction\",\"relation_id\":\"claim_relation:e173a8007c2fdbf5ba38eeae8424d98a2ab881500f5762fe183da187ddf9c8ec\"},{\"evaluator_version\":\"builtin/v1\",\"outcome\":\"contradiction\",\"reason_code\":\"contradiction\",\"relation_id\":\"claim_relation:eb636c1c06ba643e90cfeaa18f0c5c1032150db7848a43c5acdf64b8e02c6d6d\"},{\"evaluator_version\":\"builtin/v1\",\"outcome\":\"contradiction\",\"reason_code\":\"contradiction\",\"relation_id\":\"claim_relation:f9633113c859d44acec37457856588fc116f78902856c5f80b259f7ace6e6474\"}]},\"relevance\":0.65,\"retrieval_evidence\":{\"admission_basis\":\"calendar_acquisition\",\"policy_version\":\"retrieval-admission-v1\",\"semantic_similarity\":0.7822443250838352},\"retrieval_tier\":\"temporal\",\"semantic_available\":true,\"source_episode\":\"episode:eb23f3f0003af17af58050e6\"}},{\"gold_key\":\"D1:5:note:59b523dca06e\",\"item\":{\"confidence\":0.0,\"content\":\"Calvin: I'm so excited to learn about Japanese culture and get a chance to expand.\",\"fact_id\":\"fact:db0e679ccf36b3897bc0d2ca\",\"grounding\":0.62,\"provenance\":{\"extraction_strategy\":\"summary_note_fallback\",\"ingestion_method\":\"extraction\",\"matched_query_terms\":[\"2023\",\"calvin\",\"march\"],\"reranking\":{\"admission_floor\":0.0,\"model_signature\":\"reranksig:dff4b9939786ed9a1e897946778e336584cc24251a2f32282bd3fe83a680a7d1\",\"relevance_logit\":0.6260501742362976},\"retrieval_admission\":{\"basis\":\"qualified_source_episode\",\"policy_version\":\"retrieval-admission-v1\",\"related_episode_id\":\"episode:2d7729eb3fb927cd92b43277\",\"source_context_group\":\"locomo:conv-50:session_1\",\"source_context_position\":3,\"source_context_relation\":\"anaphoric_follow_up_answer\"},\"source_context\":{\"group\":\"locomo:conv-50:session_1\",\"position\":5},\"source_episode_id\":\"episode:3912a635c68ee542242dba27\",\"source_id\":\"locomo:conv-50:D1:5\",\"source_type\":\"conversation\"},\"quote\":\"Calvin: I'm so excited to learn about Japanese culture and get a chance to expand.\",\"rationale\":\"tier=temporal fts=0.00 access_count=0 confidence=0.00 relevance=0.62 grounding=0.62 alignment=1.04 semantic=enabled matched lexical query=\\\"What items did Calvin buy in March 2023?\\\" and active at 2026-10-11\",\"reconciliation\":{\"claim_ids\":[\"claim:158f12c226339e53c6fda2f5775432ce5e37c820b3d0958b7c48ebadf4067f96\"],\"relations\":[{\"evaluator_version\":\"builtin/v1\",\"outcome\":\"contradiction\",\"reason_code\":\"contradiction\",\"relation_id\":\"claim_relation:0a138a6f5c4d41840e03c665d48e50c7a9757cebbde5302ceabe46e98d1541f1\"},{\"evaluator_version\":\"builtin/v1\",\"outcome\":\"contradiction\",\"reason_code\":\"contradiction\",\"relation_id\":\"claim_relation:12a00bfda65d848e6209f3486bc7d4e611335eb1e235d4f50f93992eb0e9d263\"},{\"counterpart_source_episode_id\":\"episode:3e3e2affa869b081e7e54165\",\"evaluator_version\":\"builtin/v1\",\"outcome\":\"contradiction\",\"reason_code\":\"contradiction\",\"relation_id\":\"claim_relation:20c82dd209249e694075779eb160aa7e0f9ad3ea74ca84bcc1e132e8708a3ddd\"},{\"counterpart_source_episode_id\":\"episode:eb23f3f0003af17af58050e6\",\"evaluator_version\":\"builtin/v1\",\"outcome\":\"contradiction\",\"reason_code\":\"contradiction\",\"relation_id\":\"claim_relation:2131e461802afa8a4afece10482216344f58fa3c645cbd619a31894aca6ac57c\"},{\"evaluator_version\":\"builtin/v1\",\"outcome\":\"contradiction\",\"reason_code\":\"contradiction\",\"relation_id\":\"claim_relation:6f568f2ce61a8a2775c71feac18f99d03298b29bd12bb544b496a4511b802c0a\"},{\"evaluator_version\":\"builtin/v1\",\"outcome\":\"contradiction\",\"reason_code\":\"contradiction\",\"relation_id\":\"claim_relation:9933c9844c8fa593b1c9d512cfd1dae8911afdd89e7f774d23b4cd69213f912d\"},{\"counterpart_source_episode_id\":\"episode:ecbba98f1320d9e6f6118bb9\",\"evaluator_version\":\"builtin/v1\",\"outcome\":\"contradiction\",\"reason_code\":\"contradiction\",\"relation_id\":\"claim_relation:9b223a44004c841429d0374c06bda76f14d1c318afcb465795105fbad71bdfdc\"},{\"evaluator_version\":\"builtin/v1\",\"outcome\":\"contradiction\",\"reason_code\":\"contradiction\",\"relation_id\":\"claim_relation:a08644629ba6b36c57725e96487fb8ca6a78d4f43f5266524f5117abdf222a02\"},{\"evaluator_version\":\"builtin/v1\",\"outcome\":\"contradiction\",\"reason_code\":\"contradiction\",\"relation_id\":\"claim_relation:ec2820152e6c149a61031a630c18dbf9cb42cc5478ba23851e044f9684fe6b61\"}]},\"relevance\":0.62,\"retrieval_evidence\":{\"admission_basis\":\"calendar_acquisition\",\"policy_version\":\"retrieval-admission-v1\",\"semantic_similarity\":0.7856691760110144},\"retrieval_tier\":\"temporal\",\"semantic_available\":true,\"source_episode\":\"episode:3912a635c68ee542242dba27\"}},{\"gold_key\":\"D2:1:note:567348606949\",\"item\":{\"confidence\":0.0,\"content\":\"Calvin: Hey Dave, been a few days, so I wanted to let you in on some cool news.  I just got a new car and it's amazing! Finally owning a luxury car was a dream come true and I'm so stoked.\",\"fact_id\":\"fact:59b1511e4816dd0de75ad324\",\"provenance\":{\"extraction_strategy\":\"summary_note_fallback\",\"ingestion_method\":\"extraction\",\"reference_time\":\"2023-03-26T16:45:00+00:00\",\"reranking\":{\"admission_floor\":0.0,\"model_signature\":\"reranksig:dff4b9939786ed9a1e897946778e336584cc24251a2f32282bd3fe83a680a7d1\",\"relevance_logit\":0.5572494864463806},\"retrieval_admission\":{\"basis\":\"qualified_source_episode\",\"policy_version\":\"retrieval-admission-v1\",\"related_episode_id\":\"episode:5b1ff5b47083003df318133f\",\"source_context_group\":\"locomo:conv-50:session_2\",\"source_context_position\":5,\"source_context_relation\":\"query_related_antecedent\"},\"source_context\":{\"group\":\"locomo:conv-50:session_2\",\"position\":1},\"source_episode\":\"episode:ecbba98f1320d9e6f6118bb9\",\"source_episode_id\":\"episode:ecbba98f1320d9e6f6118bb9\",\"source_id\":\"locomo:conv-50:D2:1\",\"source_type\":\"conversation\"},\"quote\":\"Calvin: Hey Dave, been a few days, so I wanted to let you in on some cool news.  I just got a new car and it's amazing! Finally owning a luxury car was a dream come true and I'm so stoked.\",\"rationale\":\"tier=source_expanded source-ordered answer to a matching question\",\"reconciliation\":{\"claim_ids\":[\"claim:383ad2f87e92f404e7ffe65b9839bf75c6140cce99ec126dca42f50997511366\"],\"relations\":[{\"evaluator_version\":\"builtin/v1\",\"outcome\":\"contradiction\",\"reason_code\":\"contradiction\",\"relation_id\":\"claim_relation:0109dcc7b07c9d16436cd377333332d9fee919cba33c63db94701bb5a70688fd\"},{\"counterpart_source_episode_id\":\"episode:3e3e2affa869b081e7e54165\",\"evaluator_version\":\"builtin/v1\",\"outcome\":\"contradiction\",\"reason_code\":\"contradiction\",\"relation_id\":\"claim_relation:0caae31fef54706edf57968c92c462e804fa878507c4c4badb5f6ad371bdd6d7\"},{\"evaluator_version\":\"builtin/v1\",\"outcome\":\"contradiction\",\"reason_code\":\"contradiction\",\"relation_id\":\"claim_relation:339069660dcec36df67e1d47c49a92e06ccda2838eb21958532169ad97fa7a96\"},{\"evaluator_version\":\"builtin/v1\",\"outcome\":\"contradiction\",\"reason_code\":\"contradiction\",\"relation_id\":\"claim_relation:5e86d383d1083a26f20a7f6ff79a904eaaa2846a127037372dfb1c08f3367cab\"},{\"evaluator_version\":\"builtin/v1\",\"outcome\":\"contradiction\",\"reason_code\":\"contradiction\",\"relation_id\":\"claim_relation:94a70389d6159921deac382de1fd58db1d69272e88b050baff497aad33a88c44\"},{\"counterpart_source_episode_id\":\"episode:3912a635c68ee542242dba27\",\"evaluator_version\":\"builtin/v1\",\"outcome\":\"contradiction\",\"reason_code\":\"contradiction\",\"relation_id\":\"claim_relation:9b223a44004c841429d0374c06bda76f14d1c318afcb465795105fbad71bdfdc\"},{\"counterpart_source_episode_id\":\"episode:eb23f3f0003af17af58050e6\",\"evaluator_version\":\"builtin/v1\",\"outcome\":\"contradiction\",\"reason_code\":\"contradiction\",\"relation_id\":\"claim_relation:a75905597852f886d1e0b1c32e0c1a5bec6c7f655a4a77060f2846b1100d84ca\"},{\"evaluator_version\":\"builtin/v1\",\"outcome\":\"contradiction\",\"reason_code\":\"contradiction\",\"relation_id\":\"claim_relation:afe6c4790c8c93187fe4d35200cca70f96337001acbb29b946606eb27fdc98b1\"},{\"evaluator_version\":\"builtin/v1\",\"outcome\":\"contradiction\",\"reason_code\":\"contradiction\",\"relation_id\":\"claim_relation:bac883da9d254854f6bfb63c8b4c67b24042c276475cecc008b81d5dcbd85e4f\"}]},\"retrieval_evidence\":{\"admission_basis\":\"qualified_source_episode\",\"policy_version\":\"retrieval-admission-v1\"},\"retrieval_tier\":\"source_expanded\",\"semantic_available\":true,\"source_episode\":\"episode:ecbba98f1320d9e6f6118bb9\"}}]",
+        "native reranking candidates: [{\"document\":\"Memory reference date: 2023-03-23 (23 March 2023).\\nSource identity: locomo:conv-50:D1:7\\nCalvin: Never been there before. Fascinated by the traditions and can't wait to get a taste of the culture.\\nSource-ordered dialogue context:\\nNearby source turn for context only (earlier): Calvin: I'm so excited to learn about Japanese culture and get a chance to expand.\\nNearby source turn for context only (earlier): Dave: Wow, Calvin, learning about new cultures is awesome! Have you ever been to Japan?\\n\",\"query\":\"What items did Calvin buy in March 2023?\",\"score\":-0.10216385871171951},{\"document\":\"Memory reference date: 2023-03-26 (26 March 2023).\\nSource identity: locomo:conv-50:D2:13\\nCalvin: Cool, Dave! Seeing your favorite singers live must have been wild! Did you get a chance to hang out with them after the show?\\nSource-ordered dialogue context:\\nNearby source turn for context only (earlier): Calvin: Wow, sounds like a blast! Which one was your favorite?\\nNearby source turn for context only (earlier): Dave: Wow, there were so many great bands! If I had to pick a favorite, it would definitely be Aerosmith. Their performance was incredible. I'll show you a pic I took when they were playing.\\nNearby source turn for context only (later): Dave: Nah, didn't get to hang with them after the show, but seeing them live was cool enough. It's always a dream to see your favorites performing!\\nNearby source turn for context only (later): Calvin: Yeah, it's always a dream to see your favorites doing their thing! So glad you got to experience that.\\nNearby source turn for context only (later): Dave: Thanks, Calvin! Yeah, it was an incredible experience. So, anything new happening in your life?\\n\",\"query\":\"What items did Calvin buy in March 2023?\",\"score\":0.4826694130897522},{\"document\":\"Memory reference date: 2023-03-23 (23 March 2023).\\nSource identity: locomo:conv-50:D1:5\\nCalvin: I'm so excited to learn about Japanese culture and get a chance to expand.\\nSource-ordered dialogue context:\\nNearby source turn for context only (earlier): Dave: Hey Calvin! Nice to meet you too! Things have been going well since we last talked. I attended this awesome event recently. It was like a car lover's paradise! They had so many classic cars on show, I was in awe. I even had the opportunity to speak with some of the owners and hear their fascinating stories. It was super inspiring. What about you? Anything exciting happening in your life lately?\\nNearby source turn for context only (later): Dave: Wow, Calvin, learning about new cultures is awesome! Have you ever been to Japan?\\nNearby source turn for context only (later): Calvin: Never been there before. Fascinated by the traditions and can't wait to get a taste of the culture.\\nNearby source turn for context only (later): Dave: Wow, Japan sounds amazing. Can't wait to hear all about it! When are you leaving?\\n\",\"query\":\"What items did Calvin buy in March 2023?\",\"score\":0.6260501742362976},{\"document\":\"Memory reference date: 2023-03-26 (26 March 2023).\\nSource identity: locomo:conv-50:D2:1\\nCalvin: Hey Dave, been a few days, so I wanted to let you in on some cool news.  I just got a new car and it's amazing! Finally owning a luxury car was a dream come true and I'm so stoked.\\nSource-ordered dialogue context:\\nNearby source turn for context only (later): Dave: Woohoo, Calvin! Congrats on the new car! How's it driving?\\nNearby source turn for context only (later): Calvin: Nice car! It's an amazing ride - super smooth and real powerful. Like a rockstar behind the wheel! Thanks, man!\\nNearby source turn for context only (later): Dave: Wow, Calvin! Owning something like this must feel amazing. Is this your first one? Show me a pic! What's it called?\\nNearby source turn for context only (later): Calvin: Woohoo! I finally got myself this beauty. Here's a pic from yesterday when I took it for a ride. Can't believe I'm actually driving it. Definitely what I deserve after all this hard work. Every time I step in, it's like an adrenaline rush!\\n\",\"query\":\"What items did Calvin buy in March 2023?\",\"score\":0.3667670786380768},{\"document\":\"Memory reference date: 2023-03-26 (26 March 2023).\\nSource identity: locomo:conv-50:D2:17\\nCalvin: Got a new ride and wrote some new tunes - had a few studio sessions last week and I'm excited to collaborate. Can't wait to share it with everyone!\\nSource-ordered dialogue context:\\nNearby source turn for context only (earlier): Dave: Thanks, Calvin! Yeah, it was an incredible experience. So, anything new happening in your life?\\nNearby source turn for context only (later): Dave: Cool, Calvin! Looking forward to hearing your new tunes. Keep me updated on how your collaborations go!\\nNearby source turn for context only (later): Dave: Enjoy the collaborations, Calvin! Stay safe!\\n\",\"query\":\"What items did Calvin buy in March 2023?\",\"score\":0.5371114611625671},{\"document\":\"Memory reference date: 2023-03-26 (26 March 2023).\\nSource identity: locomo:conv-50:D2:5\\nCalvin: Woohoo! I finally got myself this beauty. Here's a pic from yesterday when I took it for a ride. Can't believe I'm actually driving it. Definitely what I deserve after all this hard work. Every time I step in, it's like an adrenaline rush!\\n\\nUpstream image metadata (dataset annotation, not a user assertion):\\n{\\\"blip_caption\\\": \\\"a photo of a red sports car parked on the side of the road\\\", \\\"img_url\\\": [\\\"https://i.redd.it/v7n19f5lcqn91.jpg\\\"], \\\"query\\\": \\\"ferrari 488 gtb japanese mansion\\\"}\\nSource-ordered dialogue context:\\nNearby source turn for context only (earlier): Calvin: Hey Dave, been a few days, so I wanted to let you in on some cool news.  I just got a new car and it's amazing! Finally owning a luxury car was a dream come true and I'm so stoked.\\nNearby source turn for context only (earlier): Dave: Woohoo, Calvin! Congrats on the new car! How's it driving?\\nNearby source turn for context only (earlier): Dave: Wow, Calvin! Owning something like this must feel amazing. Is this your first one? Show me a pic! What's it called?\\nNearby source turn for context only (later): Dave: Calvin, that car looks awesome! You must feel amazing every time you get inside! You deserved it - congrats buddy!\\nNearby source turn for context only (later): Dave: Thanks, Calvin! Doing good. Last weekend, I went to a music festival in Boston - it was awesome! So many cool bands playing and the atmosphere was electric. I love music, it reminded me why I love it. Here's a pic, take a look.\\n\",\"query\":\"What items did Calvin buy in March 2023?\",\"score\":1.362194299697876},{\"document\":\"Memory reference date: 2023-03-23 (23 March 2023).\\nSource identity: locomo:conv-50:D1:3\\nCalvin: That event sounds great! Something really exciting happened to me - I just had a big life change! Here's my new mansion - pretty cool huh?\\n\\nUpstream image metadata (dataset annotation, not a user assertion):\\n{\\\"blip_caption\\\": \\\"a photo of a building with a sign on the front of it\\\", \\\"img_url\\\": [\\\"https://localandbespoke.files.wordpress.com/2018/11/imag0397.jpg\\\"], \\\"query\\\": \\\"mansion entrance japan\\\"}\\nSource-ordered dialogue context:\\nNearby source turn for context only (earlier): Dave: Hey Calvin! Nice to meet you too! Things have been going well since we last talked. I attended this awesome event recently. It was like a car lover's paradise! They had so many classic cars on show, I was in awe. I even had the opportunity to speak with some of the owners and hear their fascinating stories. It was super inspiring. What about you? Anything exciting happening in your life lately?\\nNearby source turn for context only (later): Dave: Wow! Congrats on the big change! What inspired you to start this journey?\\n\",\"query\":\"What items did Calvin buy in March 2023?\",\"score\":0.857363760471344},{\"document\":\"Memory reference date: 2023-03-26 (26 March 2023).\\nSource identity: locomo:conv-50:D2:1\\nCalvin: Hey Dave, been a few days, so I wanted to let you in on some cool news.  I just got a new car and it's amazing! Finally owning a luxury car was a dream come true and I'm so stoked.\",\"query\":\"What items did Calvin buy in March 2023?\",\"score\":0.5572494864463806}]"
+      ],
+      "duration_ms": 7015,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "retrieval-quality",
+        "case_id": "logging-original"
+      },
+      "mode": "end_to_end",
+      "split": "development",
+      "label_trust": "reviewed",
+      "status": "passed",
+      "metrics": {
+        "answerable_non_abstention_rate": 1.0,
+        "duplicate_free_rate": 1.0,
+        "precision_macro": 1.0,
+        "prohibited_free_rate": 1.0,
+        "required_group_recall": 1.0
+      },
+      "evidence": {
+        "answerable_non_abstention_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "case_tag:logging": {
+          "kind": "count",
+          "value": 1
+        },
+        "case_tag:original-query": {
+          "kind": "count",
+          "value": 1
+        },
+        "duplicate_free_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "precision_macro": {
+          "kind": "ratio",
+          "numerator": 3,
+          "denominator": 3
+        },
+        "prohibited_free_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "required_group_recall": {
+          "kind": "ratio",
+          "numerator": 3,
+          "denominator": 3
+        }
+      },
+      "failures": [],
+      "duration_ms": 9591,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "retrieval-quality",
+        "case_id": "unknown-task"
+      },
+      "mode": "end_to_end",
+      "split": "development",
+      "label_trust": "reviewed",
+      "status": "passed",
+      "metrics": {
+        "duplicate_free_rate": 1.0,
+        "prohibited_free_rate": 1.0,
+        "unknown_abstention_rate": 1.0
+      },
+      "evidence": {
+        "case_tag:qualified-task": {
+          "kind": "count",
+          "value": 1
+        },
+        "case_tag:unknown": {
+          "kind": "count",
+          "value": 1
+        },
+        "duplicate_free_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "prohibited_free_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "unknown_abstention_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        }
+      },
+      "failures": [],
+      "duration_ms": 3009,
+      "attempts": 1
+    }
+  ],
+  "suite_summaries": [
+    {
+      "suite_id": "retrieval-quality",
+      "mode": "end_to_end",
+      "total": 11,
+      "passed": 10,
+      "quality_failed": 1,
+      "invalid": 0,
+      "metrics": {
+        "answerable_non_abstention_rate": 1.0,
+        "answerable_non_abstention_rate_applicable_count": 10.0,
+        "duplicate_free_rate": 1.0,
+        "duplicate_free_rate_applicable_count": 11.0,
+        "precision_macro": 0.975,
+        "precision_macro_applicable_count": 10.0,
+        "prohibited_free_rate": 0.9090909090909091,
+        "prohibited_free_rate_applicable_count": 11.0,
+        "required_group_recall": 1.0,
+        "required_group_recall_applicable_count": 20.0,
+        "unknown_abstention_rate": 1.0,
+        "unknown_abstention_rate_applicable_count": 1.0
+      }
+    }
+  ],
+  "gates": [
+    {
+      "suite_id": "retrieval-quality",
+      "metric": "precision_macro",
+      "observed": 0.975,
+      "hard_floor": 1.0,
+      "baseline": null,
+      "regression_budget": null,
+      "status": "failed",
+      "reason": "hard_floor_not_met"
+    },
+    {
+      "suite_id": "retrieval-quality",
+      "metric": "required_group_recall",
+      "observed": 1.0,
+      "hard_floor": 1.0,
+      "baseline": null,
+      "regression_budget": null,
+      "status": "passed",
+      "reason": "none"
+    },
+    {
+      "suite_id": "retrieval-quality",
+      "metric": "unknown_abstention_rate",
+      "observed": 1.0,
+      "hard_floor": 1.0,
+      "baseline": null,
+      "regression_budget": null,
+      "status": "passed",
+      "reason": "none"
+    },
+    {
+      "suite_id": "retrieval-quality",
+      "metric": "answerable_non_abstention_rate",
+      "observed": 1.0,
+      "hard_floor": 1.0,
+      "baseline": null,
+      "regression_budget": null,
+      "status": "passed",
+      "reason": "none"
+    },
+    {
+      "suite_id": "retrieval-quality",
+      "metric": "duplicate_free_rate",
+      "observed": 1.0,
+      "hard_floor": 1.0,
+      "baseline": null,
+      "regression_budget": null,
+      "status": "passed",
+      "reason": "none"
+    },
+    {
+      "suite_id": "retrieval-quality",
+      "metric": "prohibited_free_rate",
+      "observed": 0.9090909090909091,
+      "hard_floor": 1.0,
+      "baseline": null,
+      "regression_budget": null,
+      "status": "failed",
+      "reason": "hard_floor_not_met"
+    }
+  ],
+  "fingerprint": {
+    "rust_version": "rustc 1.99.0 (b940084d7 2026-09-28)",
+    "os_arch": "macos/aarch64",
+    "package_version": "0.1.0",
+    "build_profile": "debug",
+    "enabled_features": [],
+    "provider": null,
+    "model": null,
+    "device": null,
+    "configuration_hash": "fcee5e56fb11a1b126344a3a397ac32e7b0f13e8568d9a127bd83c0a57eed8c3",
+    "git_commit": "e6d17cb06cd5f9f7f4a76114fded609351b27c8c",
+    "evaluator_versions": {
+      "eval-harness": "0.1.0"
+    },
+    "suite_fingerprints": {
+      "retrieval-quality": {
+        "claim_rollout_stage": "evidence",
+        "corpus_id": "retrieval-quality-v1",
+        "corpus_manifest_sha256": "ed054268c5efb0d4a837134405aa923264eca3c08fa61374d93fc4b90b441251",
+        "corpus_revision": "r27-diagnostic-focus",
+        "embedding_dimension": "384",
+        "embedding_signature": "embsig:b88d713a71be619fce22bcb30efe3d1cc9623afff9e6a8ae7107ba9e620b9b17",
+        "extractor_fingerprint": "anno",
+        "index_signature": "indexsig:d293fd983ef88ea75c78d3758dd09c73d5cf02726d7ec592ca28adc938421f30",
+        "model": "intfloat/multilingual-e5-small",
+        "model_file_sha256.config.json": "69137736cab8b8903a07fe8afaafdda25aac55415a12a55d1bffa9f581abf959",
+        "model_file_sha256.model.safetensors": "1a55775f53449dac10a2bcbc312469fac40b96d53198c407081a831f81c98477",
+        "model_file_sha256.tokenizer.json": "0b44a9d7b51c3c62626640cda0e2c2f70fdacdc25bbbd68038369d14ebdf4c39",
+        "prepared_claim_rollout_stage": "evidence",
+        "prepared_embedding_dimension": "384",
+        "prepared_embedding_signature": "embsig:b88d713a71be619fce22bcb30efe3d1cc9623afff9e6a8ae7107ba9e620b9b17",
+        "prepared_extractor_fingerprint": "anno",
+        "prepared_index_signature": "indexsig:d293fd983ef88ea75c78d3758dd09c73d5cf02726d7ec592ca28adc938421f30",
+        "prepared_model": "intfloat/multilingual-e5-small",
+        "prepared_provider": "local-candle",
+        "prepared_similarity_threshold": "0.7",
+        "provider": "local-candle",
+        "provider_status": "ready",
+        "reranking_signature": "reranksig:dff4b9939786ed9a1e897946778e336584cc24251a2f32282bd3fe83a680a7d1",
+        "similarity_threshold": "0.7",
+        "source_bundle_sha256": "5d5ca4c12ced94a25b0ec7d621bcc75e246aa075d105f0f62b7cb77ec5a1c650"
+      }
+    },
+    "profile_digest": "12fbf38d8c06829e962a455e8c961ce20c505fa4aa85d90a428958322a2bf1f6"
+  },
+  "budget_status": "passed",
+  "verdict": "quality_failed",
+  "issues": []
+}

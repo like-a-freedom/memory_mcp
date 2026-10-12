@@ -1,0 +1,325 @@
+{
+  "schema_version": "memory-mcp-eval/v2",
+  "run_id": "run-1791731804",
+  "profile": "nightly",
+  "started_at": "2026-10-11T15:16:44.587897Z",
+  "duration_ms": 22793,
+  "expected_case_ids": [],
+  "expected_cases": [
+    {
+      "suite_id": "retrieval-quality",
+      "case_id": "http-task-16"
+    },
+    {
+      "suite_id": "retrieval-quality",
+      "case_id": "http-task-paraphrase"
+    },
+    {
+      "suite_id": "retrieval-quality",
+      "case_id": "http-task-short"
+    },
+    {
+      "suite_id": "retrieval-quality",
+      "case_id": "unknown-database"
+    }
+  ],
+  "outcomes": [
+    {
+      "case_key": {
+        "suite_id": "retrieval-quality",
+        "case_id": "http-task-16"
+      },
+      "mode": "end_to_end",
+      "split": "development",
+      "label_trust": "reviewed",
+      "status": "passed",
+      "metrics": {
+        "answerable_non_abstention_rate": 1.0,
+        "duplicate_free_rate": 1.0,
+        "precision_macro": 1.0,
+        "prohibited_free_rate": 1.0,
+        "required_group_recall": 1.0
+      },
+      "evidence": {
+        "answerable_non_abstention_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "case_tag:numeric-distractor": {
+          "kind": "count",
+          "value": 1
+        },
+        "case_tag:partial_source_coverage": {
+          "kind": "count",
+          "value": 1
+        },
+        "case_tag:qualified-task": {
+          "kind": "count",
+          "value": 1
+        },
+        "case_tag:url-distractor": {
+          "kind": "count",
+          "value": 1
+        },
+        "duplicate_free_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "precision_macro": {
+          "kind": "ratio",
+          "numerator": 2,
+          "denominator": 2
+        },
+        "prohibited_free_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "required_group_recall": {
+          "kind": "ratio",
+          "numerator": 2,
+          "denominator": 2
+        }
+      },
+      "failures": [],
+      "duration_ms": 5144,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "retrieval-quality",
+        "case_id": "http-task-paraphrase"
+      },
+      "mode": "end_to_end",
+      "split": "development",
+      "label_trust": "reviewed",
+      "status": "quality_failed",
+      "metrics": {
+        "answerable_non_abstention_rate": 1.0,
+        "duplicate_free_rate": 1.0,
+        "precision_macro": 1.0,
+        "prohibited_free_rate": 1.0,
+        "required_group_recall": 0.5
+      },
+      "evidence": {
+        "answerable_non_abstention_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "case_tag:paraphrase": {
+          "kind": "count",
+          "value": 1
+        },
+        "case_tag:task": {
+          "kind": "count",
+          "value": 1
+        },
+        "duplicate_free_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "precision_macro": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "prohibited_free_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "required_group_recall": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 2
+        }
+      },
+      "failures": [
+        "retrieval missed one or more required evidence groups",
+        "native selected evidence: [{\"gold_key\":\"http-plan:note:3a82a1450071\",\"item\":{\"confidence\":0.69,\"content\":\"Task 16: Add low-overhead HTTP and retained-resource diagnostics: memory_http_preflight_body_bytes is recorded through the existing metrics::histogram! facade, with no labels, exactly once after body collection completes and before JSON decoding. This includes fully collected malformed JSON because those bytes were actually buffered. Partial, refused, stream-error and cancelled bodies do not enter the distribution.\",\"fact_id\":\"fact:8875c6b404d5fcc56b97cf2d\",\"grounding\":0.28,\"provenance\":{\"extraction_strategy\":\"structured_summary_line\",\"ingestion_method\":\"extraction\",\"matched_query_terms\":[\"body\",\"diagnostic\",\"http\",\"memory\"],\"reranking\":{\"admission_floor\":0.0,\"model_signature\":\"reranksig:dff4b9939786ed9a1e897946778e336584cc24251a2f32282bd3fe83a680a7d1\",\"relevance_logit\":3.267317533493042},\"retrieval_admission\":{\"basis\":\"lexical\",\"community\":null,\"graph_anchor_origin\":null,\"hop_count\":null,\"matched_content_terms\":[\"body\",\"http\",\"memory\"],\"matched_index_key_terms\":[],\"matched_references\":[],\"policy_version\":\"retrieval-admission-v1\",\"repeated_topic\":null,\"resolved_entity_ids\":[],\"semantic_similarity\":0.8514685624969078},\"source_episode_id\":\"episode:cde651553de27befab51910e\",\"source_id\":\"native:http-plan\",\"source_type\":\"session_summary\"},\"quote\":\"memory_http_preflight_body_bytes is recorded through the existing metrics::histogram! facade, with no labels, exactly once after body collection completes and before JSON decoding. This includes fully collected malformed JSON because those bytes were actually buffered. Partial, refused, stream-error and cancelled bodies do not enter the distribution.\",\"rationale\":\"tier=fallback fts=5.61 access_count=0 confidence=0.69 relevance=0.81 grounding=0.28 alignment=0.93 semantic=enabled matched lexical query=\\\"Which body measurements and diagnostics does the HTTP bounded memory plan require?\\\" and active at 2026-10-11\",\"reconciliation\":{\"claim_ids\":[\"claim:2401fac37b43bcd959df1faf157148951158f988010975c685594e9a869abc8e\"],\"relations\":[{\"evaluator_version\":\"builtin/v1\",\"outcome\":\"contradiction\",\"reason_code\":\"contradiction\",\"relation_id\":\"claim_relation:e9e21884b85c981039a756b1c725143e43e6d62356ec978d106a647c6c5c2f63\"}]},\"relevance\":0.81,\"retrieval_evidence\":{\"admission_basis\":\"lexical\",\"policy_version\":\"retrieval-admission-v1\",\"semantic_similarity\":0.8514685624969078},\"retrieval_tier\":\"fallback\",\"semantic_available\":true,\"source_episode\":\"episode:cde651553de27befab51910e\"}}]",
+        "native reranking candidates: [{\"document\":\"Memory reference date: 2026-10-07 (07 October 2026).\\nSource identity: native:mail-level\\nVerified: Only one slide of a cloud EDR comparison was extracted. Feature-level scope may be absent from the extracted text or represented graphically.\",\"query\":\"Which body measurements and diagnostics does the HTTP bounded memory plan require?\",\"score\":-9.146785736083984},{\"document\":\"Memory reference date: 2026-10-07 (07 October 2026).\\nSource identity: native:http-plan\\nTask 16: Add low-overhead HTTP and retained-resource diagnostics: memory_http_preflight_body_bytes is recorded through the existing metrics::histogram! facade, with no labels, exactly once after body collection completes and before JSON decoding. This includes fully collected malformed JSON because those bytes were actually buffered. Partial, refused, stream-error and cancelled bodies do not enter the distribution.\",\"query\":\"Which body measurements and diagnostics does the HTTP bounded memory plan require?\",\"score\":3.267317533493042},{\"document\":\"Memory reference date: 2026-10-07 (07 October 2026).\\nSource identity: native:logging-sink\\nEvents are written to **stderr** — or to `MEMORY_LOG_FILE` when set — one event\\nper line. Under the stdio transport stdout carries MCP protocol framing, so\\nnothing is ever written there. The sink, format and colour are read once, when\\nthe subscriber is installed at startup.\",\"query\":\"Which body measurements and diagnostics does the HTTP bounded memory plan require?\",\"score\":-9.383145332336426},{\"document\":\"Memory reference date: 2026-10-07 (07 October 2026).\\nSource identity: native:logging-config\\n| Variable | Meaning |\\n|---|---|\\n| `RUST_LOG` | Level and per-subsystem directives. A bare level sets the default (`info`); `prefix=level` sets a subsystem. The most specific prefix wins. |\\n| `MEMORY_LOG_FORMAT` | `text` (default, human-readable, one line per event) or `json` (NDJSON, one object per event). |\\n| `MEMORY_LOG_COLOR` | `always`, `never`, or anything else for auto (colour only on a colour-capable terminal, and never for a file sink). `NO_COLOR` set and non-empty disables colour. |\\n| `MEMORY_LOG_TARGETS` | Third-party `tracing` targets to raise, comma-separated `target=level`. Quiet by default; can never drop this service's own events. |\\n| `MEMORY_LOG_FILE` | Append the stream to this file instead of stderr. A blank value means \\\"unset\\\". |\\n\\n`RUST_LOG` examples:\\n\\n```\\nRUST_LOG=info                       # default\\nRUST_LOG=extract=debug              # one subsystem\\nRUST_LOG=http=error,info            # quiet the HTTP surface, keep the rest\\nRUST_LOG=fs_watch=trace,http=debug  # two subsystems, the most specific rule wins\\n```\",\"query\":\"Which body measurements and diagnostics does the HTTP bounded memory plan require?\",\"score\":-6.436931133270264},{\"document\":\"Memory reference date: 2026-10-07 (07 October 2026).\\nSource identity: native:http-plan\\nTask 16: Add low-overhead HTTP and retained-resource diagnostics: DEBUG operations are http.preflight.refused and http.preflight.large_body, added to logging::HTTP_OPERATIONS; operators enable only these with RUST_LOG=http.preflight=debug. Logs use the validated existing RequestId when present, parsed numeric declared length, observed prefix bytes and closed outcome only—no request method/path, tenant fingerprint, arbitrary header or content. Emit large-body events only for fully collected bodies >=65536 B. Rate-limit each fixed event/reason to at most one log per second; refusal counters remain exact. Apply the rate limit before allocating/serializing the event.\",\"query\":\"Which body measurements and diagnostics does the HTTP bounded memory plan require?\",\"score\":-0.6556990742683411},{\"document\":\"Memory reference date: 2026-10-07 (07 October 2026).\\nSource identity: native:logging-request\\nEvery unit of work carries a correlation id. In the HTTP profile it is the\\nrequest's `x-request-id` (honoured when supplied, minted otherwise) and is\\nadvertised back on the response; in the stdio profile it is a per-call\\n`req_NNNN`. The formatter stamps the ambient id onto every event that does not\\ncarry its own, so each line of one request — the access log line, a tool line, a\\ndownstream warning — reads with the same `req=` and follows with a single\\nfilter:\\n\\n```bash\\ngrep 'req=<id>' memory-mcp.log\\n```\\n\\nThe HTTP response echoes the id on `x-request-id`, and a control-plane error\\nenvelope carries it as `correlation_id` — a client quoting either names the same\\nvalue the log line shows.\",\"query\":\"Which body measurements and diagnostics does the HTTP bounded memory plan require?\",\"score\":-9.042471885681152},{\"document\":\"Memory reference date: 2026-10-07 (07 October 2026).\\nSource identity: native:license-url\\nVerified: Infinity means that an object is countable but its count is uncontrolled. Reference: https://example.org/pages/viewpage.action?pageId=1545882667; section 13.2, revision 75.\",\"query\":\"Which body measurements and diagnostics does the HTTP bounded memory plan require?\",\"score\":-9.311139106750488},{\"document\":\"Memory reference date: 2026-10-07 (07 October 2026).\\nSource identity: native:license-number\\nVerified: A license inventory contains 16 product blocks, 163 application rows and 899 object rows. The union covers several products rather than one license.\",\"query\":\"Which body measurements and diagnostics does the HTTP bounded memory plan require?\",\"score\":-9.831554412841797},{\"document\":\"Memory reference date: 2026-10-07 (07 October 2026).\\nSource identity: native:logging-levels\\n| Level | Use |\\n|---|---|\\n| `ERROR` | A failed unit of work, a risk to integrity, a failure after retries, loss of readiness. |\\n| `WARN` | Handled but unexpected; degraded; a client refusal (4xx class). |\\n| `INFO` | A business event or a state change. |\\n| `DEBUG` | Diagnostics, off by default. |\\n| `TRACE` | Fine-grained flow, opted into by name. Anything repetitive is a metric. |\\n\\nA failure's level is decided by its error class, not its call site:\\n`MemoryError::log_level()` maps storage, transience, configuration and\\nunavailability to `ERROR`, and refusals (not-found, validation, conflict,\\nbudget, model-not-ready, auth) to `WARN`.\",\"query\":\"Which body measurements and diagnostics does the HTTP bounded memory plan require?\",\"score\":-7.4447245597839355},{\"document\":\"Memory reference date: 2026-10-07 (07 October 2026).\\nSource identity: native:mail-level\\nVerified: Only one slide of a cloud EDR comparison was extracted. Feature-level scope may be absent from the extracted text or represented graphically.\",\"query\":\"body measurements\",\"score\":-7.544138431549072},{\"document\":\"Memory reference date: 2026-10-07 (07 October 2026).\\nSource identity: native:http-plan\\nTask 16: Add low-overhead HTTP and retained-resource diagnostics: memory_http_preflight_body_bytes is recorded through the existing metrics::histogram! facade, with no labels, exactly once after body collection completes and before JSON decoding. This includes fully collected malformed JSON because those bytes were actually buffered. Partial, refused, stream-error and cancelled bodies do not enter the distribution.\",\"query\":\"body measurements\",\"score\":-3.867640495300293},{\"document\":\"Memory reference date: 2026-10-07 (07 October 2026).\\nSource identity: native:logging-sink\\nEvents are written to **stderr** — or to `MEMORY_LOG_FILE` when set — one event\\nper line. Under the stdio transport stdout carries MCP protocol framing, so\\nnothing is ever written there. The sink, format and colour are read once, when\\nthe subscriber is installed at startup.\",\"query\":\"body measurements\",\"score\":-6.8337883949279785},{\"document\":\"Memory reference date: 2026-10-07 (07 October 2026).\\nSource identity: native:logging-config\\n| Variable | Meaning |\\n|---|---|\\n| `RUST_LOG` | Level and per-subsystem directives. A bare level sets the default (`info`); `prefix=level` sets a subsystem. The most specific prefix wins. |\\n| `MEMORY_LOG_FORMAT` | `text` (default, human-readable, one line per event) or `json` (NDJSON, one object per event). |\\n| `MEMORY_LOG_COLOR` | `always`, `never`, or anything else for auto (colour only on a colour-capable terminal, and never for a file sink). `NO_COLOR` set and non-empty disables colour. |\\n| `MEMORY_LOG_TARGETS` | Third-party `tracing` targets to raise, comma-separated `target=level`. Quiet by default; can never drop this service's own events. |\\n| `MEMORY_LOG_FILE` | Append the stream to this file instead of stderr. A blank value means \\\"unset\\\". |\\n\\n`RUST_LOG` examples:\\n\\n```\\nRUST_LOG=info                       # default\\nRUST_LOG=extract=debug              # one subsystem\\nRUST_LOG=http=error,info            # quiet the HTTP surface, keep the rest\\nRUST_LOG=fs_watch=trace,http=debug  # two subsystems, the most specific rule wins\\n```\",\"query\":\"body measurements\",\"score\":-6.1090474128723145},{\"document\":\"Memory reference date: 2026-10-07 (07 October 2026).\\nSource identity: native:http-plan\\nTask 16: Add low-overhead HTTP and retained-resource diagnostics: DEBUG operations are http.preflight.refused and http.preflight.large_body, added to logging::HTTP_OPERATIONS; operators enable only these with RUST_LOG=http.preflight=debug. Logs use the validated existing RequestId when present, parsed numeric declared length, observed prefix bytes and closed outcome only—no request method/path, tenant fingerprint, arbitrary header or content. Emit large-body events only for fully collected bodies >=65536 B. Rate-limit each fixed event/reason to at most one log per second; refusal counters remain exact. Apply the rate limit before allocating/serializing the event.\",\"query\":\"body measurements\",\"score\":-6.8077616691589355},{\"document\":\"Memory reference date: 2026-10-07 (07 October 2026).\\nSource identity: native:logging-request\\nEvery unit of work carries a correlation id. In the HTTP profile it is the\\nrequest's `x-request-id` (honoured when supplied, minted otherwise) and is\\nadvertised back on the response; in the stdio profile it is a per-call\\n`req_NNNN`. The formatter stamps the ambient id onto every event that does not\\ncarry its own, so each line of one request — the access log line, a tool line, a\\ndownstream warning — reads with the same `req=` and follows with a single\\nfilter:\\n\\n```bash\\ngrep 'req=<id>' memory-mcp.log\\n```\\n\\nThe HTTP response echoes the id on `x-request-id`, and a control-plane error\\nenvelope carries it as `correlation_id` — a client quoting either names the same\\nvalue the log line shows.\",\"query\":\"body measurements\",\"score\":-7.657536029815674},{\"document\":\"Memory reference date: 2026-10-07 (07 October 2026).\\nSource identity: native:license-url\\nVerified: Infinity means that an object is countable but its count is uncontrolled. Reference: https://example.org/pages/viewpage.action?pageId=1545882667; section 13.2, revision 75.\",\"query\":\"body measurements\",\"score\":-5.8546576499938965},{\"document\":\"Memory reference date: 2026-10-07 (07 October 2026).\\nSource identity: native:license-number\\nVerified: A license inventory contains 16 product blocks, 163 application rows and 899 object rows. The union covers several products rather than one license.\",\"query\":\"body measurements\",\"score\":-6.715993404388428},{\"document\":\"Memory reference date: 2026-10-07 (07 October 2026).\\nSource identity: native:logging-levels\\n| Level | Use |\\n|---|---|\\n| `ERROR` | A failed unit of work, a risk to integrity, a failure after retries, loss of readiness. |\\n| `WARN` | Handled but unexpected; degraded; a client refusal (4xx class). |\\n| `INFO` | A business event or a state change. |\\n| `DEBUG` | Diagnostics, off by default. |\\n| `TRACE` | Fine-grained flow, opted into by name. Anything repetitive is a metric. |\\n\\nA failure's level is decided by its error class, not its call site:\\n`MemoryError::log_level()` maps storage, transience, configuration and\\nunavailability to `ERROR`, and refusals (not-found, validation, conflict,\\nbudget, model-not-ready, auth) to `WARN`.\",\"query\":\"body measurements\",\"score\":-6.313418388366699},{\"document\":\"Memory reference date: 2026-10-07 (07 October 2026).\\nSource identity: native:mail-level\\nVerified: Only one slide of a cloud EDR comparison was extracted. Feature-level scope may be absent from the extracted text or represented graphically.\",\"query\":\"diagnostics\",\"score\":-7.72484827041626},{\"document\":\"Memory reference date: 2026-10-07 (07 October 2026).\\nSource identity: native:http-plan\\nTask 16: Add low-overhead HTTP and retained-resource diagnostics: memory_http_preflight_body_bytes is recorded through the existing metrics::histogram! facade, with no labels, exactly once after body collection completes and before JSON decoding. This includes fully collected malformed JSON because those bytes were actually buffered. Partial, refused, stream-error and cancelled bodies do not enter the distribution.\",\"query\":\"diagnostics\",\"score\":-5.14031982421875},{\"document\":\"Memory reference date: 2026-10-07 (07 October 2026).\\nSource identity: native:logging-sink\\nEvents are written to **stderr** — or to `MEMORY_LOG_FILE` when set — one event\\nper line. Under the stdio transport stdout carries MCP protocol framing, so\\nnothing is ever written there. The sink, format and colour are read once, when\\nthe subscriber is installed at startup.\",\"query\":\"diagnostics\",\"score\":-6.949502944946289},{\"document\":\"Memory reference date: 2026-10-07 (07 October 2026).\\nSource identity: native:logging-config\\n| Variable | Meaning |\\n|---|---|\\n| `RUST_LOG` | Level and per-subsystem directives. A bare level sets the default (`info`); `prefix=level` sets a subsystem. The most specific prefix wins. |\\n| `MEMORY_LOG_FORMAT` | `text` (default, human-readable, one line per event) or `json` (NDJSON, one object per event). |\\n| `MEMORY_LOG_COLOR` | `always`, `never`, or anything else for auto (colour only on a colour-capable terminal, and never for a file sink). `NO_COLOR` set and non-empty disables colour. |\\n| `MEMORY_LOG_TARGETS` | Third-party `tracing` targets to raise, comma-separated `target=level`. Quiet by default; can never drop this service's own events. |\\n| `MEMORY_LOG_FILE` | Append the stream to this file instead of stderr. A blank value means \\\"unset\\\". |\\n\\n`RUST_LOG` examples:\\n\\n```\\nRUST_LOG=info                       # default\\nRUST_LOG=extract=debug              # one subsystem\\nRUST_LOG=http=error,info            # quiet the HTTP surface, keep the rest\\nRUST_LOG=fs_watch=trace,http=debug  # two subsystems, the most specific rule wins\\n```\",\"query\":\"diagnostics\",\"score\":-7.577311038970947},{\"document\":\"Memory reference date: 2026-10-07 (07 October 2026).\\nSource identity: native:http-plan\\nTask 16: Add low-overhead HTTP and retained-resource diagnostics: DEBUG operations are http.preflight.refused and http.preflight.large_body, added to logging::HTTP_OPERATIONS; operators enable only these with RUST_LOG=http.preflight=debug. Logs use the validated existing RequestId when present, parsed numeric declared length, observed prefix bytes and closed outcome only—no request method/path, tenant fingerprint, arbitrary header or content. Emit large-body events only for fully collected bodies >=65536 B. Rate-limit each fixed event/reason to at most one log per second; refusal counters remain exact. Apply the rate limit before allocating/serializing the event.\",\"query\":\"diagnostics\",\"score\":-5.7677717208862305},{\"document\":\"Memory reference date: 2026-10-07 (07 October 2026).\\nSource identity: native:logging-request\\nEvery unit of work carries a correlation id. In the HTTP profile it is the\\nrequest's `x-request-id` (honoured when supplied, minted otherwise) and is\\nadvertised back on the response; in the stdio profile it is a per-call\\n`req_NNNN`. The formatter stamps the ambient id onto every event that does not\\ncarry its own, so each line of one request — the access log line, a tool line, a\\ndownstream warning — reads with the same `req=` and follows with a single\\nfilter:\\n\\n```bash\\ngrep 'req=<id>' memory-mcp.log\\n```\\n\\nThe HTTP response echoes the id on `x-request-id`, and a control-plane error\\nenvelope carries it as `correlation_id` — a client quoting either names the same\\nvalue the log line shows.\",\"query\":\"diagnostics\",\"score\":-7.6531081199646},{\"document\":\"Memory reference date: 2026-10-07 (07 October 2026).\\nSource identity: native:license-url\\nVerified: Infinity means that an object is countable but its count is uncontrolled. Reference: https://example.org/pages/viewpage.action?pageId=1545882667; section 13.2, revision 75.\",\"query\":\"diagnostics\",\"score\":-6.278122425079346},{\"document\":\"Memory reference date: 2026-10-07 (07 October 2026).\\nSource identity: native:license-number\\nVerified: A license inventory contains 16 product blocks, 163 application rows and 899 object rows. The union covers several products rather than one license.\",\"query\":\"diagnostics\",\"score\":-7.126823425292969},{\"document\":\"Memory reference date: 2026-10-07 (07 October 2026).\\nSource identity: native:logging-levels\\n| Level | Use |\\n|---|---|\\n| `ERROR` | A failed unit of work, a risk to integrity, a failure after retries, loss of readiness. |\\n| `WARN` | Handled but unexpected; degraded; a client refusal (4xx class). |\\n| `INFO` | A business event or a state change. |\\n| `DEBUG` | Diagnostics, off by default. |\\n| `TRACE` | Fine-grained flow, opted into by name. Anything repetitive is a metric. |\\n\\nA failure's level is decided by its error class, not its call site:\\n`MemoryError::log_level()` maps storage, transience, configuration and\\nunavailability to `ERROR`, and refusals (not-found, validation, conflict,\\nbudget, model-not-ready, auth) to `WARN`.\",\"query\":\"diagnostics\",\"score\":-3.972656488418579},{\"document\":\"Memory reference date: 2026-10-07 (07 October 2026).\\nSource identity: native:http-plan\\n### Task 16: Add low-overhead HTTP and retained-resource diagnostics\\n\\n- `memory_http_preflight_body_bytes` is recorded through the existing `metrics::histogram!` facade, with no labels, exactly once after body collection completes and before JSON decoding. This includes fully collected malformed JSON because those bytes were actually buffered. Partial, refused, stream-error and cancelled bodies do not enter the distribution.\\n- DEBUG operations are `http.preflight.refused` and `http.preflight.large_body`, added to `logging::HTTP_OPERATIONS`; operators enable only these with `RUST_LOG=http.preflight=debug`. Logs use the validated existing `RequestId` when present, parsed numeric declared length, observed prefix bytes and closed outcome only—no request method/path, tenant fingerprint, arbitrary header or content. Emit large-body events only for fully collected bodies >=65536 B. Rate-limit each fixed event/reason to at most one log per second; refusal counters remain exact. Apply the rate limit before allocating/serializing the event.\",\"query\":\"Which body measurements and diagnostics does the HTTP bounded memory plan require?\",\"score\":0.5627794861793518},{\"document\":\"Memory reference date: 2026-10-07 (07 October 2026).\\nSource identity: native:http-plan\\n### Task 16: Add low-overhead HTTP and retained-resource diagnostics\\n\\n- `memory_http_preflight_body_bytes` is recorded through the existing `metrics::histogram!` facade, with no labels, exactly once after body collection completes and before JSON decoding. This includes fully collected malformed JSON because those bytes were actually buffered. Partial, refused, stream-error and cancelled bodies do not enter the distribution.\\n- DEBUG operations are `http.preflight.refused` and `http.preflight.large_body`, added to `logging::HTTP_OPERATIONS`; operators enable only these with `RUST_LOG=http.preflight=debug`. Logs use the validated existing `RequestId` when present, parsed numeric declared length, observed prefix bytes and closed outcome only—no request method/path, tenant fingerprint, arbitrary header or content. Emit large-body events only for fully collected bodies >=65536 B. Rate-limit each fixed event/reason to at most one log per second; refusal counters remain exact. Apply the rate limit before allocating/serializing the event.\",\"query\":\"body measurements\",\"score\":-5.32345724105835},{\"document\":\"Memory reference date: 2026-10-07 (07 October 2026).\\nSource identity: native:http-plan\\n### Task 16: Add low-overhead HTTP and retained-resource diagnostics\\n\\n- `memory_http_preflight_body_bytes` is recorded through the existing `metrics::histogram!` facade, with no labels, exactly once after body collection completes and before JSON decoding. This includes fully collected malformed JSON because those bytes were actually buffered. Partial, refused, stream-error and cancelled bodies do not enter the distribution.\\n- DEBUG operations are `http.preflight.refused` and `http.preflight.large_body`, added to `logging::HTTP_OPERATIONS`; operators enable only these with `RUST_LOG=http.preflight=debug`. Logs use the validated existing `RequestId` when present, parsed numeric declared length, observed prefix bytes and closed outcome only—no request method/path, tenant fingerprint, arbitrary header or content. Emit large-body events only for fully collected bodies >=65536 B. Rate-limit each fixed event/reason to at most one log per second; refusal counters remain exact. Apply the rate limit before allocating/serializing the event.\",\"query\":\"diagnostics\",\"score\":-5.783696174621582}]"
+      ],
+      "duration_ms": 8414,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "retrieval-quality",
+        "case_id": "http-task-short"
+      },
+      "mode": "end_to_end",
+      "split": "development",
+      "label_trust": "reviewed",
+      "status": "quality_failed",
+      "metrics": {
+        "answerable_non_abstention_rate": 1.0,
+        "duplicate_free_rate": 1.0,
+        "precision_macro": 1.0,
+        "prohibited_free_rate": 1.0,
+        "required_group_recall": 0.5
+      },
+      "evidence": {
+        "answerable_non_abstention_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "case_tag:qualified-task": {
+          "kind": "count",
+          "value": 1
+        },
+        "case_tag:short-query": {
+          "kind": "count",
+          "value": 1
+        },
+        "duplicate_free_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "precision_macro": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "prohibited_free_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "required_group_recall": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 2
+        }
+      },
+      "failures": [
+        "retrieval missed one or more required evidence groups",
+        "native selected evidence: [{\"gold_key\":\"http-plan:note:3a82a1450071\",\"item\":{\"confidence\":0.69,\"content\":\"Task 16: Add low-overhead HTTP and retained-resource diagnostics: memory_http_preflight_body_bytes is recorded through the existing metrics::histogram! facade, with no labels, exactly once after body collection completes and before JSON decoding. This includes fully collected malformed JSON because those bytes were actually buffered. Partial, refused, stream-error and cancelled bodies do not enter the distribution.\",\"fact_id\":\"fact:8875c6b404d5fcc56b97cf2d\",\"grounding\":0.81,\"provenance\":{\"extraction_strategy\":\"structured_summary_line\",\"ingestion_method\":\"extraction\",\"matched_query_terms\":[\"16\",\"diagnostic\",\"http\",\"memory\",\"task\"],\"reranking\":{\"admission_floor\":0.0,\"model_signature\":\"reranksig:dff4b9939786ed9a1e897946778e336584cc24251a2f32282bd3fe83a680a7d1\",\"relevance_logit\":4.603491306304932},\"retrieval_admission\":{\"basis\":\"reference\",\"community\":null,\"graph_anchor_origin\":null,\"hop_count\":null,\"matched_content_terms\":[\"http\",\"memory\"],\"matched_index_key_terms\":[],\"matched_references\":[\"task16\"],\"policy_version\":\"retrieval-admission-v1\",\"repeated_topic\":null,\"resolved_entity_ids\":[],\"semantic_similarity\":0.8823469463345978},\"source_episode_id\":\"episode:cde651553de27befab51910e\",\"source_id\":\"native:http-plan\",\"source_type\":\"session_summary\"},\"quote\":\"memory_http_preflight_body_bytes is recorded through the existing metrics::histogram! facade, with no labels, exactly once after body collection completes and before JSON decoding. This includes fully collected malformed JSON because those bytes were actually buffered. Partial, refused, stream-error and cancelled bodies do not enter the distribution.\",\"rationale\":\"tier=fallback fts=16.88 access_count=0 confidence=0.69 relevance=0.85 grounding=0.81 alignment=1.09 semantic=enabled matched lexical query=\\\"HTTP bounded memory Task 16 diagnostics\\\" and active at 2026-10-11\",\"reconciliation\":{\"claim_ids\":[\"claim:2401fac37b43bcd959df1faf157148951158f988010975c685594e9a869abc8e\"],\"relations\":[{\"evaluator_version\":\"builtin/v1\",\"outcome\":\"contradiction\",\"reason_code\":\"contradiction\",\"relation_id\":\"claim_relation:e9e21884b85c981039a756b1c725143e43e6d62356ec978d106a647c6c5c2f63\"}]},\"relevance\":0.85,\"retrieval_evidence\":{\"admission_basis\":\"reference\",\"policy_version\":\"retrieval-admission-v1\",\"semantic_similarity\":0.8823469463345978},\"retrieval_tier\":\"fallback\",\"semantic_available\":true,\"source_episode\":\"episode:cde651553de27befab51910e\"}}]",
+        "native reranking candidates: [{\"document\":\"Memory reference date: 2026-10-07 (07 October 2026).\\nSource identity: native:http-plan\\nTask 16: Add low-overhead HTTP and retained-resource diagnostics: memory_http_preflight_body_bytes is recorded through the existing metrics::histogram! facade, with no labels, exactly once after body collection completes and before JSON decoding. This includes fully collected malformed JSON because those bytes were actually buffered. Partial, refused, stream-error and cancelled bodies do not enter the distribution.\",\"query\":\"HTTP bounded memory Task 16 diagnostics\",\"score\":4.603491306304932},{\"document\":\"Memory reference date: 2026-10-07 (07 October 2026).\\nSource identity: native:http-plan\\n### Task 16: Add low-overhead HTTP and retained-resource diagnostics\\n\\n- `memory_http_preflight_body_bytes` is recorded through the existing `metrics::histogram!` facade, with no labels, exactly once after body collection completes and before JSON decoding. This includes fully collected malformed JSON because those bytes were actually buffered. Partial, refused, stream-error and cancelled bodies do not enter the distribution.\\n- DEBUG operations are `http.preflight.refused` and `http.preflight.large_body`, added to `logging::HTTP_OPERATIONS`; operators enable only these with `RUST_LOG=http.preflight=debug`. Logs use the validated existing `RequestId` when present, parsed numeric declared length, observed prefix bytes and closed outcome only—no request method/path, tenant fingerprint, arbitrary header or content. Emit large-body events only for fully collected bodies >=65536 B. Rate-limit each fixed event/reason to at most one log per second; refusal counters remain exact. Apply the rate limit before allocating/serializing the event.\",\"query\":\"HTTP bounded memory Task 16 diagnostics\",\"score\":3.678063154220581}]"
+      ],
+      "duration_ms": 3391,
+      "attempts": 1
+    },
+    {
+      "case_key": {
+        "suite_id": "retrieval-quality",
+        "case_id": "unknown-database"
+      },
+      "mode": "end_to_end",
+      "split": "development",
+      "label_trust": "reviewed",
+      "status": "passed",
+      "metrics": {
+        "duplicate_free_rate": 1.0,
+        "prohibited_free_rate": 1.0,
+        "unknown_abstention_rate": 1.0
+      },
+      "evidence": {
+        "case_tag:abstention": {
+          "kind": "count",
+          "value": 1
+        },
+        "case_tag:unknown": {
+          "kind": "count",
+          "value": 1
+        },
+        "duplicate_free_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "prohibited_free_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        },
+        "unknown_abstention_rate": {
+          "kind": "ratio",
+          "numerator": 1,
+          "denominator": 1
+        }
+      },
+      "failures": [],
+      "duration_ms": 4511,
+      "attempts": 1
+    }
+  ],
+  "suite_summaries": [
+    {
+      "suite_id": "retrieval-quality",
+      "mode": "end_to_end",
+      "total": 4,
+      "passed": 2,
+      "quality_failed": 2,
+      "invalid": 0,
+      "metrics": {
+        "answerable_non_abstention_rate": 1.0,
+        "answerable_non_abstention_rate_applicable_count": 3.0,
+        "duplicate_free_rate": 1.0,
+        "duplicate_free_rate_applicable_count": 4.0,
+        "precision_macro": 1.0,
+        "precision_macro_applicable_count": 3.0,
+        "prohibited_free_rate": 1.0,
+        "prohibited_free_rate_applicable_count": 4.0,
+        "required_group_recall": 0.6666666666666666,
+        "required_group_recall_applicable_count": 6.0,
+        "unknown_abstention_rate": 1.0,
+        "unknown_abstention_rate_applicable_count": 1.0
+      }
+    }
+  ],
+  "gates": [],
+  "fingerprint": {
+    "rust_version": "rustc 1.99.0 (b940084d7 2026-09-28)",
+    "os_arch": "macos/aarch64",
+    "package_version": "0.1.0",
+    "build_profile": "debug",
+    "enabled_features": [],
+    "provider": null,
+    "model": null,
+    "device": null,
+    "configuration_hash": "85bde2ece6cdba8b837b57381234ef6c4d2ad23dce7748b360c94632bdd3334f",
+    "git_commit": "e6d17cb06cd5f9f7f4a76114fded609351b27c8c",
+    "evaluator_versions": {
+      "eval-harness": "0.1.0"
+    },
+    "suite_fingerprints": {
+      "retrieval-quality": {
+        "claim_rollout_stage": "evidence",
+        "corpus_id": "retrieval-quality-v1",
+        "corpus_manifest_sha256": "6c69459ab5f7240d63173d925e4133e017aa05e813086b6d5e6ab1237056049f",
+        "corpus_revision": "r27-upstream-session-order",
+        "embedding_dimension": "384",
+        "embedding_signature": "embsig:b88d713a71be619fce22bcb30efe3d1cc9623afff9e6a8ae7107ba9e620b9b17",
+        "extractor_fingerprint": "anno",
+        "index_signature": "indexsig:d293fd983ef88ea75c78d3758dd09c73d5cf02726d7ec592ca28adc938421f30",
+        "model": "intfloat/multilingual-e5-small",
+        "model_file_sha256.config.json": "69137736cab8b8903a07fe8afaafdda25aac55415a12a55d1bffa9f581abf959",
+        "model_file_sha256.model.safetensors": "1a55775f53449dac10a2bcbc312469fac40b96d53198c407081a831f81c98477",
+        "model_file_sha256.tokenizer.json": "0b44a9d7b51c3c62626640cda0e2c2f70fdacdc25bbbd68038369d14ebdf4c39",
+        "prepared_claim_rollout_stage": "evidence",
+        "prepared_embedding_dimension": "384",
+        "prepared_embedding_signature": "embsig:b88d713a71be619fce22bcb30efe3d1cc9623afff9e6a8ae7107ba9e620b9b17",
+        "prepared_extractor_fingerprint": "anno",
+        "prepared_index_signature": "indexsig:d293fd983ef88ea75c78d3758dd09c73d5cf02726d7ec592ca28adc938421f30",
+        "prepared_model": "intfloat/multilingual-e5-small",
+        "prepared_provider": "local-candle",
+        "prepared_similarity_threshold": "0.7",
+        "provider": "local-candle",
+        "provider_status": "ready",
+        "reranking_signature": "reranksig:dff4b9939786ed9a1e897946778e336584cc24251a2f32282bd3fe83a680a7d1",
+        "similarity_threshold": "0.7",
+        "source_bundle_sha256": "f5278c3f293985142e9a24e3555154b4bb444e9d90ed24cf6a22677ecc228869"
+      }
+    },
+    "profile_digest": "1ea132fce963088e18bc3888b216d89e07fa49a1903208a3f6df5905e5064048"
+  },
+  "budget_status": "passed",
+  "verdict": "quality_failed",
+  "issues": []
+}

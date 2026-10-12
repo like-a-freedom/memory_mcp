@@ -1,0 +1,944 @@
+{
+  "schema_version": "memory-mcp-retrieval-quality/v1",
+  "corpus_id": "retrieval-quality-v1",
+  "revision": "r27-upstream-session-order",
+  "source_bundle_path": "sources.json",
+  "source_sha256": "f5278c3f293985142e9a24e3555154b4bb444e9d90ed24cf6a22677ecc228869",
+  "native_preparation": {
+    "claim_rollout_stage": "evidence",
+    "embedding_dimension": 384,
+    "embedding_signature": "embsig:b88d713a71be619fce22bcb30efe3d1cc9623afff9e6a8ae7107ba9e620b9b17",
+    "extractor_fingerprint": "anno",
+    "index_signature": "indexsig:d293fd983ef88ea75c78d3758dd09c73d5cf02726d7ec592ca28adc938421f30",
+    "model": "intfloat/multilingual-e5-small",
+    "model_files_sha256": {
+      "config.json": "69137736cab8b8903a07fe8afaafdda25aac55415a12a55d1bffa9f581abf959",
+      "model.safetensors": "1a55775f53449dac10a2bcbc312469fac40b96d53198c407081a831f81c98477",
+      "tokenizer.json": "0b44a9d7b51c3c62626640cda0e2c2f70fdacdc25bbbd68038369d14ebdf4c39"
+    },
+    "provider_label": "local-candle",
+    "reranking_signature": "reranksig:dff4b9939786ed9a1e897946778e336584cc24251a2f32282bd3fe83a680a7d1",
+    "schema_version": "memory-mcp-native-preparation/v1",
+    "similarity_threshold": 0.7,
+    "source_bundle_sha256": "f5278c3f293985142e9a24e3555154b4bb444e9d90ed24cf6a22677ecc228869"
+  },
+  "cases": [
+    {
+      "id": "http-task-16",
+      "split": "development",
+      "label_trust": "reviewed",
+      "query": "Current approved implementation plan HTTP bounded memory progress Task 16 preflight metrics, warnings, worktree status and rulings",
+      "budget": 5,
+      "tags": [
+        "qualified-task",
+        "numeric-distractor",
+        "url-distractor",
+        "partial_source_coverage"
+      ],
+      "sources": [
+        {
+          "key": "http-plan",
+          "source_type": "session_summary",
+          "source_id": "native:http-plan",
+          "content": "### Task 16: Add low-overhead HTTP and retained-resource diagnostics\n\n- `memory_http_preflight_body_bytes` is recorded through the existing `metrics::histogram!` facade, with no labels, exactly once after body collection completes and before JSON decoding. This includes fully collected malformed JSON because those bytes were actually buffered. Partial, refused, stream-error and cancelled bodies do not enter the distribution.\n- DEBUG operations are `http.preflight.refused` and `http.preflight.large_body`, added to `logging::HTTP_OPERATIONS`; operators enable only these with `RUST_LOG=http.preflight=debug`. Logs use the validated existing `RequestId` when present, parsed numeric declared length, observed prefix bytes and closed outcome only—no request method/path, tenant fingerprint, arbitrary header or content. Emit large-body events only for fully collected bodies >=65536 B. Rate-limit each fixed event/reason to at most one log per second; refusal counters remain exact. Apply the rate limit before allocating/serializing the event.",
+          "t_ref": "2026-10-07T00:00:00Z"
+        },
+        {
+          "key": "logging-sink",
+          "source_type": "session_summary",
+          "source_id": "native:logging-sink",
+          "content": "Events are written to **stderr** — or to `MEMORY_LOG_FILE` when set — one event\nper line. Under the stdio transport stdout carries MCP protocol framing, so\nnothing is ever written there. The sink, format and colour are read once, when\nthe subscriber is installed at startup.",
+          "t_ref": "2026-10-07T00:00:00Z"
+        },
+        {
+          "key": "logging-levels",
+          "source_type": "session_summary",
+          "source_id": "native:logging-levels",
+          "content": "| Level | Use |\n|---|---|\n| `ERROR` | A failed unit of work, a risk to integrity, a failure after retries, loss of readiness. |\n| `WARN` | Handled but unexpected; degraded; a client refusal (4xx class). |\n| `INFO` | A business event or a state change. |\n| `DEBUG` | Diagnostics, off by default. |\n| `TRACE` | Fine-grained flow, opted into by name. Anything repetitive is a metric. |\n\nA failure's level is decided by its error class, not its call site:\n`MemoryError::log_level()` maps storage, transience, configuration and\nunavailability to `ERROR`, and refusals (not-found, validation, conflict,\nbudget, model-not-ready, auth) to `WARN`.",
+          "t_ref": "2026-10-07T00:00:00Z"
+        },
+        {
+          "key": "logging-config",
+          "source_type": "session_summary",
+          "source_id": "native:logging-config",
+          "content": "| Variable | Meaning |\n|---|---|\n| `RUST_LOG` | Level and per-subsystem directives. A bare level sets the default (`info`); `prefix=level` sets a subsystem. The most specific prefix wins. |\n| `MEMORY_LOG_FORMAT` | `text` (default, human-readable, one line per event) or `json` (NDJSON, one object per event). |\n| `MEMORY_LOG_COLOR` | `always`, `never`, or anything else for auto (colour only on a colour-capable terminal, and never for a file sink). `NO_COLOR` set and non-empty disables colour. |\n| `MEMORY_LOG_TARGETS` | Third-party `tracing` targets to raise, comma-separated `target=level`. Quiet by default; can never drop this service's own events. |\n| `MEMORY_LOG_FILE` | Append the stream to this file instead of stderr. A blank value means \"unset\". |\n\n`RUST_LOG` examples:\n\n```\nRUST_LOG=info                       # default\nRUST_LOG=extract=debug              # one subsystem\nRUST_LOG=http=error,info            # quiet the HTTP surface, keep the rest\nRUST_LOG=fs_watch=trace,http=debug  # two subsystems, the most specific rule wins\n```",
+          "t_ref": "2026-10-07T00:00:00Z"
+        },
+        {
+          "key": "logging-request",
+          "source_type": "session_summary",
+          "source_id": "native:logging-request",
+          "content": "Every unit of work carries a correlation id. In the HTTP profile it is the\nrequest's `x-request-id` (honoured when supplied, minted otherwise) and is\nadvertised back on the response; in the stdio profile it is a per-call\n`req_NNNN`. The formatter stamps the ambient id onto every event that does not\ncarry its own, so each line of one request — the access log line, a tool line, a\ndownstream warning — reads with the same `req=` and follows with a single\nfilter:\n\n```bash\ngrep 'req=<id>' memory-mcp.log\n```\n\nThe HTTP response echoes the id on `x-request-id`, and a control-plane error\nenvelope carries it as `correlation_id` — a client quoting either names the same\nvalue the log line shows.",
+          "t_ref": "2026-10-07T00:00:00Z"
+        },
+        {
+          "key": "license-number",
+          "source_type": "session_summary",
+          "source_id": "native:license-number",
+          "content": "Verified: A license inventory contains 16 product blocks, 163 application rows and 899 object rows. The union covers several products rather than one license.",
+          "t_ref": "2026-10-07T00:00:00Z"
+        },
+        {
+          "key": "license-url",
+          "source_type": "session_summary",
+          "source_id": "native:license-url",
+          "content": "Verified: Infinity means that an object is countable but its count is uncontrolled. Reference: https://example.org/pages/viewpage.action?pageId=1545882667; section 13.2, revision 75.",
+          "t_ref": "2026-10-07T00:00:00Z"
+        },
+        {
+          "key": "mail-level",
+          "source_type": "session_summary",
+          "source_id": "native:mail-level",
+          "content": "Verified: Only one slide of a cloud EDR comparison was extracted. Feature-level scope may be absent from the extracted text or represented graphically.",
+          "t_ref": "2026-10-07T00:00:00Z"
+        },
+        {
+          "key": "other-task",
+          "source_type": "session_summary",
+          "source_id": "native:other-task",
+          "content": "Verified: Task 16 in the mobile route editor plan checks KML point import and touch gestures. It belongs to Trackly, not Memory MCP HTTP.",
+          "t_ref": "2026-10-07T00:00:00Z"
+        }
+      ],
+      "bindings": [
+        {
+          "key": "http-plan:note:3a82a1450071",
+          "content": "Task 16: Add low-overhead HTTP and retained-resource diagnostics: memory_http_preflight_body_bytes is recorded through the existing metrics::histogram! facade, with no labels, exactly once after body collection completes and before JSON decoding. This includes fully collected malformed JSON because those bytes were actually buffered. Partial, refused, stream-error and cancelled bodies do not enter the distribution.",
+          "episode_key": "http-plan",
+          "fact_type": "note",
+          "disposition": "allowed"
+        },
+        {
+          "key": "http-plan:note:ca50e98513e3",
+          "content": "Task 16: Add low-overhead HTTP and retained-resource diagnostics: DEBUG operations are http.preflight.refused and http.preflight.large_body, added to logging::HTTP_OPERATIONS; operators enable only these with RUST_LOG=http.preflight=debug. Logs use the validated existing RequestId when present, parsed numeric declared length, observed prefix bytes and closed outcome only—no request method/path, tenant fingerprint, arbitrary header or content. Emit large-body events only for fully collected bodies >=65536 B. Rate-limit each fixed event/reason to at most one log per second; refusal counters remain exact. Apply the rate limit before allocating/serializing the event.",
+          "episode_key": "http-plan",
+          "fact_type": "note",
+          "disposition": "allowed"
+        },
+        {
+          "key": "logging-sink:note:3f3f5ac57b49",
+          "content": "Events are written to **stderr** — or to `MEMORY_LOG_FILE` when set — one event\nper line. Under the stdio transport stdout carries MCP protocol framing, so\nnothing is ever written there. The sink, format and colour are read once, when\nthe subscriber is installed at startup.",
+          "episode_key": "logging-sink",
+          "fact_type": "note",
+          "disposition": "prohibited"
+        },
+        {
+          "key": "logging-levels:note:4e1dedabeafc",
+          "content": "| Level | Use |\n|---|---|\n| `ERROR` | A failed unit of work, a risk to integrity, a failure after retries, loss of readiness. |\n| `WARN` | Handled but unexpected; degraded; a client refusal (4xx class). |\n| `INFO` | A business event or a state change. |\n| `DEBUG` | Diagnostics, off by default. |\n| `TRACE` | Fine-grained flow, opted into by name. Anything repetitive is a metric. |\n\nA failure's level is decided by its error class, not its call site:\n`MemoryError::log_level()` maps storage, transience, configuration and\nunavailability to `ERROR`, and refusals (not-found, validation, conflict,\nbudget, model-not-ready, auth) to `WARN`.",
+          "episode_key": "logging-levels",
+          "fact_type": "note",
+          "disposition": "prohibited"
+        },
+        {
+          "key": "logging-config:experience:d1c94b8339d1",
+          "content": "| Variable | Meaning |\n|---|---|\n| `RUST_LOG` | Level and per-subsystem directives. A bare level sets the default (`info`); `prefix=level` sets a subsystem. The most specific prefix wins. |\n| `MEMORY_LOG_FORMAT` | `text` (default, human-readable, one line per event) or `json` (NDJSON, one object per event). |\n| `MEMORY_LOG_COLOR` | `always`, `never`, or anything else for auto (colour only on a colour-capable terminal, and never for a file sink). `NO_COLOR` set and non-empty disables colour. |\n| `MEMORY_LOG_TARGETS` | Third-party `tracing` targets to raise, comma-separated `target=level`. Quiet by default; can never drop this service's own events. |\n| `MEMORY_LOG_FILE` | Append the stream to this file instead of stderr. A blank value means \"unset\". |\n\n`RUST_LOG` examples:\n\n```\nRUST_LOG=info                       # default\nRUST_LOG=extract=debug              # one subsystem\nRUST_LOG=http=error,info            # quiet the HTTP surface, keep the rest\nRUST_LOG=fs_watch=trace,http=debug  # two subsystems, the most specific rule wins\n```",
+          "episode_key": "logging-config",
+          "fact_type": "experience",
+          "disposition": "prohibited"
+        },
+        {
+          "key": "logging-request:experience:98575917d45f",
+          "content": "Every unit of work carries a correlation id. In the HTTP profile it is the\nrequest's `x-request-id` (honoured when supplied, minted otherwise) and is\nadvertised back on the response; in the stdio profile it is a per-call\n`req_NNNN`. The formatter stamps the ambient id onto every event that does not\ncarry its own, so each line of one request — the access log line, a tool line, a\ndownstream warning — reads with the same `req=` and follows with a single\nfilter:\n\n```bash\ngrep 'req=<id>' memory-mcp.log\n```\n\nThe HTTP response echoes the id on `x-request-id`, and a control-plane error\nenvelope carries it as `correlation_id` — a client quoting either names the same\nvalue the log line shows.",
+          "episode_key": "logging-request",
+          "fact_type": "experience",
+          "disposition": "prohibited"
+        },
+        {
+          "key": "license-number:note:af4a36a04f85",
+          "content": "Verified: A license inventory contains 16 product blocks, 163 application rows and 899 object rows. The union covers several products rather than one license.",
+          "episode_key": "license-number",
+          "fact_type": "note",
+          "disposition": "prohibited"
+        },
+        {
+          "key": "license-url:note:45c6651529c9",
+          "content": "Verified: Infinity means that an object is countable but its count is uncontrolled. Reference: https://example.org/pages/viewpage.action?pageId=1545882667; section 13.2, revision 75.",
+          "episode_key": "license-url",
+          "fact_type": "note",
+          "disposition": "prohibited"
+        },
+        {
+          "key": "mail-level:note:3484d2496188",
+          "content": "Verified: Only one slide of a cloud EDR comparison was extracted. Feature-level scope may be absent from the extracted text or represented graphically.",
+          "episode_key": "mail-level",
+          "fact_type": "note",
+          "disposition": "prohibited"
+        },
+        {
+          "key": "other-task:note:65df630a6db4",
+          "content": "Verified: Task 16 in the mobile route editor plan checks KML point import and touch gestures. It belongs to Trackly, not Memory MCP HTTP.",
+          "episode_key": "other-task",
+          "fact_type": "note",
+          "disposition": "prohibited"
+        },
+        {
+          "key": "raw:http-plan",
+          "episode_key": "http-plan",
+          "fact_type": "episode",
+          "content": "### Task 16: Add low-overhead HTTP and retained-resource diagnostics\n\n- `memory_http_preflight_body_bytes` is recorded through the existing `metrics::histogram!` facade, with no labels, exactly once after body collection completes and before JSON decoding. This includes fully collected malformed JSON because those bytes were actually buffered. Partial, refused, stream-error and cancelled bodies do not enter the distribution.\n- DEBUG operations are `http.preflight.refused` and `http.preflight.large_body`, added to `logging::HTTP_OPERATIONS`; operators enable only these with `RUST_LOG=http.preflight=debug`. Logs use the validated existing `RequestId` when present, parsed numeric declared length, observed prefix bytes and closed outcome only—no request method/path, tenant fingerprint, arbitrary header or content. Emit large-body events only for fully collected bodies >=65536 B. Rate-limit each fixed event/reason to at most one log per second; refusal counters remain exact. Apply the rate limit before allocating/serializing the event.",
+          "kind": "episode",
+          "disposition": "allowed"
+        },
+        {
+          "key": "raw:logging-sink",
+          "episode_key": "logging-sink",
+          "fact_type": "episode",
+          "content": "Events are written to **stderr** — or to `MEMORY_LOG_FILE` when set — one event\nper line. Under the stdio transport stdout carries MCP protocol framing, so\nnothing is ever written there. The sink, format and colour are read once, when\nthe subscriber is installed at startup.",
+          "kind": "episode",
+          "disposition": "prohibited"
+        },
+        {
+          "key": "raw:logging-levels",
+          "episode_key": "logging-levels",
+          "fact_type": "episode",
+          "content": "| Level | Use |\n|---|---|\n| `ERROR` | A failed unit of work, a risk to integrity, a failure after retries, loss of readiness. |\n| `WARN` | Handled but unexpected; degraded; a client refusal (4xx class). |\n| `INFO` | A business event or a state change. |\n| `DEBUG` | Diagnostics, off by default. |\n| `TRACE` | Fine-grained flow, opted into by name. Anything repetitive is a metric. |\n\nA failure's level is decided by its error class, not its call site:\n`MemoryError::log_level()` maps storage, transience, configuration and\nunavailability to `ERROR`, and refusals (not-found, validation, conflict,\nbudget, model-not-ready, auth) to `WARN`.",
+          "kind": "episode",
+          "disposition": "prohibited"
+        },
+        {
+          "key": "raw:logging-config",
+          "episode_key": "logging-config",
+          "fact_type": "episode",
+          "content": "| Variable | Meaning |\n|---|---|\n| `RUST_LOG` | Level and per-subsystem directives. A bare level sets the default (`info`); `prefix=level` sets a subsystem. The most specific prefix wins. |\n| `MEMORY_LOG_FORMAT` | `text` (default, human-readable, one line per event) or `json` (NDJSON, one object per event). |\n| `MEMORY_LOG_COLOR` | `always`, `never`, or anything else for auto (colour only on a colour-capable terminal, and never for a file sink). `NO_COLOR` set and non-empty disables colour. |\n| `MEMORY_LOG_TARGETS` | Third-party `tracing` targets to raise, comma-separated `target=level`. Quiet by default; can never drop this service's own events. |\n| `MEMORY_LOG_FILE` | Append the stream to this file instead of stderr. A blank value means \"unset\". |\n\n`RUST_LOG` examples:\n\n```\nRUST_LOG=info                       # default\nRUST_LOG=extract=debug              # one subsystem\nRUST_LOG=http=error,info            # quiet the HTTP surface, keep the rest\nRUST_LOG=fs_watch=trace,http=debug  # two subsystems, the most specific rule wins\n```",
+          "kind": "episode",
+          "disposition": "prohibited"
+        },
+        {
+          "key": "raw:logging-request",
+          "episode_key": "logging-request",
+          "fact_type": "episode",
+          "content": "Every unit of work carries a correlation id. In the HTTP profile it is the\nrequest's `x-request-id` (honoured when supplied, minted otherwise) and is\nadvertised back on the response; in the stdio profile it is a per-call\n`req_NNNN`. The formatter stamps the ambient id onto every event that does not\ncarry its own, so each line of one request — the access log line, a tool line, a\ndownstream warning — reads with the same `req=` and follows with a single\nfilter:\n\n```bash\ngrep 'req=<id>' memory-mcp.log\n```\n\nThe HTTP response echoes the id on `x-request-id`, and a control-plane error\nenvelope carries it as `correlation_id` — a client quoting either names the same\nvalue the log line shows.",
+          "kind": "episode",
+          "disposition": "prohibited"
+        },
+        {
+          "key": "raw:license-number",
+          "episode_key": "license-number",
+          "fact_type": "episode",
+          "content": "Verified: A license inventory contains 16 product blocks, 163 application rows and 899 object rows. The union covers several products rather than one license.",
+          "kind": "episode",
+          "disposition": "prohibited"
+        },
+        {
+          "key": "raw:license-url",
+          "episode_key": "license-url",
+          "fact_type": "episode",
+          "content": "Verified: Infinity means that an object is countable but its count is uncontrolled. Reference: https://example.org/pages/viewpage.action?pageId=1545882667; section 13.2, revision 75.",
+          "kind": "episode",
+          "disposition": "prohibited"
+        },
+        {
+          "key": "raw:mail-level",
+          "episode_key": "mail-level",
+          "fact_type": "episode",
+          "content": "Verified: Only one slide of a cloud EDR comparison was extracted. Feature-level scope may be absent from the extracted text or represented graphically.",
+          "kind": "episode",
+          "disposition": "prohibited"
+        },
+        {
+          "key": "raw:other-task",
+          "episode_key": "other-task",
+          "fact_type": "episode",
+          "content": "Verified: Task 16 in the mobile route editor plan checks KML point import and touch gestures. It belongs to Trackly, not Memory MCP HTTP.",
+          "kind": "episode",
+          "disposition": "prohibited"
+        }
+      ],
+      "required_evidence_groups": [
+        [
+          "http-plan:note:3a82a1450071",
+          "raw:http-plan"
+        ],
+        [
+          "http-plan:note:ca50e98513e3",
+          "raw:http-plan"
+        ]
+      ],
+      "expect_empty": false
+    },
+    {
+      "id": "http-task-short",
+      "split": "development",
+      "label_trust": "reviewed",
+      "query": "HTTP bounded memory Task 16 diagnostics",
+      "budget": 5,
+      "tags": [
+        "qualified-task",
+        "short-query"
+      ],
+      "sources": [
+        {
+          "key": "http-plan",
+          "source_type": "session_summary",
+          "source_id": "native:http-plan",
+          "content": "### Task 16: Add low-overhead HTTP and retained-resource diagnostics\n\n- `memory_http_preflight_body_bytes` is recorded through the existing `metrics::histogram!` facade, with no labels, exactly once after body collection completes and before JSON decoding. This includes fully collected malformed JSON because those bytes were actually buffered. Partial, refused, stream-error and cancelled bodies do not enter the distribution.\n- DEBUG operations are `http.preflight.refused` and `http.preflight.large_body`, added to `logging::HTTP_OPERATIONS`; operators enable only these with `RUST_LOG=http.preflight=debug`. Logs use the validated existing `RequestId` when present, parsed numeric declared length, observed prefix bytes and closed outcome only—no request method/path, tenant fingerprint, arbitrary header or content. Emit large-body events only for fully collected bodies >=65536 B. Rate-limit each fixed event/reason to at most one log per second; refusal counters remain exact. Apply the rate limit before allocating/serializing the event.",
+          "t_ref": "2026-10-07T00:00:00Z"
+        },
+        {
+          "key": "logging-sink",
+          "source_type": "session_summary",
+          "source_id": "native:logging-sink",
+          "content": "Events are written to **stderr** — or to `MEMORY_LOG_FILE` when set — one event\nper line. Under the stdio transport stdout carries MCP protocol framing, so\nnothing is ever written there. The sink, format and colour are read once, when\nthe subscriber is installed at startup.",
+          "t_ref": "2026-10-07T00:00:00Z"
+        },
+        {
+          "key": "logging-levels",
+          "source_type": "session_summary",
+          "source_id": "native:logging-levels",
+          "content": "| Level | Use |\n|---|---|\n| `ERROR` | A failed unit of work, a risk to integrity, a failure after retries, loss of readiness. |\n| `WARN` | Handled but unexpected; degraded; a client refusal (4xx class). |\n| `INFO` | A business event or a state change. |\n| `DEBUG` | Diagnostics, off by default. |\n| `TRACE` | Fine-grained flow, opted into by name. Anything repetitive is a metric. |\n\nA failure's level is decided by its error class, not its call site:\n`MemoryError::log_level()` maps storage, transience, configuration and\nunavailability to `ERROR`, and refusals (not-found, validation, conflict,\nbudget, model-not-ready, auth) to `WARN`.",
+          "t_ref": "2026-10-07T00:00:00Z"
+        },
+        {
+          "key": "logging-config",
+          "source_type": "session_summary",
+          "source_id": "native:logging-config",
+          "content": "| Variable | Meaning |\n|---|---|\n| `RUST_LOG` | Level and per-subsystem directives. A bare level sets the default (`info`); `prefix=level` sets a subsystem. The most specific prefix wins. |\n| `MEMORY_LOG_FORMAT` | `text` (default, human-readable, one line per event) or `json` (NDJSON, one object per event). |\n| `MEMORY_LOG_COLOR` | `always`, `never`, or anything else for auto (colour only on a colour-capable terminal, and never for a file sink). `NO_COLOR` set and non-empty disables colour. |\n| `MEMORY_LOG_TARGETS` | Third-party `tracing` targets to raise, comma-separated `target=level`. Quiet by default; can never drop this service's own events. |\n| `MEMORY_LOG_FILE` | Append the stream to this file instead of stderr. A blank value means \"unset\". |\n\n`RUST_LOG` examples:\n\n```\nRUST_LOG=info                       # default\nRUST_LOG=extract=debug              # one subsystem\nRUST_LOG=http=error,info            # quiet the HTTP surface, keep the rest\nRUST_LOG=fs_watch=trace,http=debug  # two subsystems, the most specific rule wins\n```",
+          "t_ref": "2026-10-07T00:00:00Z"
+        },
+        {
+          "key": "logging-request",
+          "source_type": "session_summary",
+          "source_id": "native:logging-request",
+          "content": "Every unit of work carries a correlation id. In the HTTP profile it is the\nrequest's `x-request-id` (honoured when supplied, minted otherwise) and is\nadvertised back on the response; in the stdio profile it is a per-call\n`req_NNNN`. The formatter stamps the ambient id onto every event that does not\ncarry its own, so each line of one request — the access log line, a tool line, a\ndownstream warning — reads with the same `req=` and follows with a single\nfilter:\n\n```bash\ngrep 'req=<id>' memory-mcp.log\n```\n\nThe HTTP response echoes the id on `x-request-id`, and a control-plane error\nenvelope carries it as `correlation_id` — a client quoting either names the same\nvalue the log line shows.",
+          "t_ref": "2026-10-07T00:00:00Z"
+        },
+        {
+          "key": "license-number",
+          "source_type": "session_summary",
+          "source_id": "native:license-number",
+          "content": "Verified: A license inventory contains 16 product blocks, 163 application rows and 899 object rows. The union covers several products rather than one license.",
+          "t_ref": "2026-10-07T00:00:00Z"
+        },
+        {
+          "key": "license-url",
+          "source_type": "session_summary",
+          "source_id": "native:license-url",
+          "content": "Verified: Infinity means that an object is countable but its count is uncontrolled. Reference: https://example.org/pages/viewpage.action?pageId=1545882667; section 13.2, revision 75.",
+          "t_ref": "2026-10-07T00:00:00Z"
+        },
+        {
+          "key": "mail-level",
+          "source_type": "session_summary",
+          "source_id": "native:mail-level",
+          "content": "Verified: Only one slide of a cloud EDR comparison was extracted. Feature-level scope may be absent from the extracted text or represented graphically.",
+          "t_ref": "2026-10-07T00:00:00Z"
+        },
+        {
+          "key": "other-task",
+          "source_type": "session_summary",
+          "source_id": "native:other-task",
+          "content": "Verified: Task 16 in the mobile route editor plan checks KML point import and touch gestures. It belongs to Trackly, not Memory MCP HTTP.",
+          "t_ref": "2026-10-07T00:00:00Z"
+        }
+      ],
+      "bindings": [
+        {
+          "key": "http-plan:note:3a82a1450071",
+          "content": "Task 16: Add low-overhead HTTP and retained-resource diagnostics: memory_http_preflight_body_bytes is recorded through the existing metrics::histogram! facade, with no labels, exactly once after body collection completes and before JSON decoding. This includes fully collected malformed JSON because those bytes were actually buffered. Partial, refused, stream-error and cancelled bodies do not enter the distribution.",
+          "episode_key": "http-plan",
+          "fact_type": "note",
+          "disposition": "allowed"
+        },
+        {
+          "key": "http-plan:note:ca50e98513e3",
+          "content": "Task 16: Add low-overhead HTTP and retained-resource diagnostics: DEBUG operations are http.preflight.refused and http.preflight.large_body, added to logging::HTTP_OPERATIONS; operators enable only these with RUST_LOG=http.preflight=debug. Logs use the validated existing RequestId when present, parsed numeric declared length, observed prefix bytes and closed outcome only—no request method/path, tenant fingerprint, arbitrary header or content. Emit large-body events only for fully collected bodies >=65536 B. Rate-limit each fixed event/reason to at most one log per second; refusal counters remain exact. Apply the rate limit before allocating/serializing the event.",
+          "episode_key": "http-plan",
+          "fact_type": "note",
+          "disposition": "allowed"
+        },
+        {
+          "key": "logging-sink:note:3f3f5ac57b49",
+          "content": "Events are written to **stderr** — or to `MEMORY_LOG_FILE` when set — one event\nper line. Under the stdio transport stdout carries MCP protocol framing, so\nnothing is ever written there. The sink, format and colour are read once, when\nthe subscriber is installed at startup.",
+          "episode_key": "logging-sink",
+          "fact_type": "note",
+          "disposition": "prohibited"
+        },
+        {
+          "key": "logging-levels:note:4e1dedabeafc",
+          "content": "| Level | Use |\n|---|---|\n| `ERROR` | A failed unit of work, a risk to integrity, a failure after retries, loss of readiness. |\n| `WARN` | Handled but unexpected; degraded; a client refusal (4xx class). |\n| `INFO` | A business event or a state change. |\n| `DEBUG` | Diagnostics, off by default. |\n| `TRACE` | Fine-grained flow, opted into by name. Anything repetitive is a metric. |\n\nA failure's level is decided by its error class, not its call site:\n`MemoryError::log_level()` maps storage, transience, configuration and\nunavailability to `ERROR`, and refusals (not-found, validation, conflict,\nbudget, model-not-ready, auth) to `WARN`.",
+          "episode_key": "logging-levels",
+          "fact_type": "note",
+          "disposition": "prohibited"
+        },
+        {
+          "key": "logging-config:experience:d1c94b8339d1",
+          "content": "| Variable | Meaning |\n|---|---|\n| `RUST_LOG` | Level and per-subsystem directives. A bare level sets the default (`info`); `prefix=level` sets a subsystem. The most specific prefix wins. |\n| `MEMORY_LOG_FORMAT` | `text` (default, human-readable, one line per event) or `json` (NDJSON, one object per event). |\n| `MEMORY_LOG_COLOR` | `always`, `never`, or anything else for auto (colour only on a colour-capable terminal, and never for a file sink). `NO_COLOR` set and non-empty disables colour. |\n| `MEMORY_LOG_TARGETS` | Third-party `tracing` targets to raise, comma-separated `target=level`. Quiet by default; can never drop this service's own events. |\n| `MEMORY_LOG_FILE` | Append the stream to this file instead of stderr. A blank value means \"unset\". |\n\n`RUST_LOG` examples:\n\n```\nRUST_LOG=info                       # default\nRUST_LOG=extract=debug              # one subsystem\nRUST_LOG=http=error,info            # quiet the HTTP surface, keep the rest\nRUST_LOG=fs_watch=trace,http=debug  # two subsystems, the most specific rule wins\n```",
+          "episode_key": "logging-config",
+          "fact_type": "experience",
+          "disposition": "prohibited"
+        },
+        {
+          "key": "logging-request:experience:98575917d45f",
+          "content": "Every unit of work carries a correlation id. In the HTTP profile it is the\nrequest's `x-request-id` (honoured when supplied, minted otherwise) and is\nadvertised back on the response; in the stdio profile it is a per-call\n`req_NNNN`. The formatter stamps the ambient id onto every event that does not\ncarry its own, so each line of one request — the access log line, a tool line, a\ndownstream warning — reads with the same `req=` and follows with a single\nfilter:\n\n```bash\ngrep 'req=<id>' memory-mcp.log\n```\n\nThe HTTP response echoes the id on `x-request-id`, and a control-plane error\nenvelope carries it as `correlation_id` — a client quoting either names the same\nvalue the log line shows.",
+          "episode_key": "logging-request",
+          "fact_type": "experience",
+          "disposition": "prohibited"
+        },
+        {
+          "key": "license-number:note:af4a36a04f85",
+          "content": "Verified: A license inventory contains 16 product blocks, 163 application rows and 899 object rows. The union covers several products rather than one license.",
+          "episode_key": "license-number",
+          "fact_type": "note",
+          "disposition": "prohibited"
+        },
+        {
+          "key": "license-url:note:45c6651529c9",
+          "content": "Verified: Infinity means that an object is countable but its count is uncontrolled. Reference: https://example.org/pages/viewpage.action?pageId=1545882667; section 13.2, revision 75.",
+          "episode_key": "license-url",
+          "fact_type": "note",
+          "disposition": "prohibited"
+        },
+        {
+          "key": "mail-level:note:3484d2496188",
+          "content": "Verified: Only one slide of a cloud EDR comparison was extracted. Feature-level scope may be absent from the extracted text or represented graphically.",
+          "episode_key": "mail-level",
+          "fact_type": "note",
+          "disposition": "prohibited"
+        },
+        {
+          "key": "other-task:note:65df630a6db4",
+          "content": "Verified: Task 16 in the mobile route editor plan checks KML point import and touch gestures. It belongs to Trackly, not Memory MCP HTTP.",
+          "episode_key": "other-task",
+          "fact_type": "note",
+          "disposition": "prohibited"
+        },
+        {
+          "key": "raw:http-plan",
+          "episode_key": "http-plan",
+          "fact_type": "episode",
+          "content": "### Task 16: Add low-overhead HTTP and retained-resource diagnostics\n\n- `memory_http_preflight_body_bytes` is recorded through the existing `metrics::histogram!` facade, with no labels, exactly once after body collection completes and before JSON decoding. This includes fully collected malformed JSON because those bytes were actually buffered. Partial, refused, stream-error and cancelled bodies do not enter the distribution.\n- DEBUG operations are `http.preflight.refused` and `http.preflight.large_body`, added to `logging::HTTP_OPERATIONS`; operators enable only these with `RUST_LOG=http.preflight=debug`. Logs use the validated existing `RequestId` when present, parsed numeric declared length, observed prefix bytes and closed outcome only—no request method/path, tenant fingerprint, arbitrary header or content. Emit large-body events only for fully collected bodies >=65536 B. Rate-limit each fixed event/reason to at most one log per second; refusal counters remain exact. Apply the rate limit before allocating/serializing the event.",
+          "kind": "episode",
+          "disposition": "allowed"
+        },
+        {
+          "key": "raw:logging-sink",
+          "episode_key": "logging-sink",
+          "fact_type": "episode",
+          "content": "Events are written to **stderr** — or to `MEMORY_LOG_FILE` when set — one event\nper line. Under the stdio transport stdout carries MCP protocol framing, so\nnothing is ever written there. The sink, format and colour are read once, when\nthe subscriber is installed at startup.",
+          "kind": "episode",
+          "disposition": "prohibited"
+        },
+        {
+          "key": "raw:logging-levels",
+          "episode_key": "logging-levels",
+          "fact_type": "episode",
+          "content": "| Level | Use |\n|---|---|\n| `ERROR` | A failed unit of work, a risk to integrity, a failure after retries, loss of readiness. |\n| `WARN` | Handled but unexpected; degraded; a client refusal (4xx class). |\n| `INFO` | A business event or a state change. |\n| `DEBUG` | Diagnostics, off by default. |\n| `TRACE` | Fine-grained flow, opted into by name. Anything repetitive is a metric. |\n\nA failure's level is decided by its error class, not its call site:\n`MemoryError::log_level()` maps storage, transience, configuration and\nunavailability to `ERROR`, and refusals (not-found, validation, conflict,\nbudget, model-not-ready, auth) to `WARN`.",
+          "kind": "episode",
+          "disposition": "prohibited"
+        },
+        {
+          "key": "raw:logging-config",
+          "episode_key": "logging-config",
+          "fact_type": "episode",
+          "content": "| Variable | Meaning |\n|---|---|\n| `RUST_LOG` | Level and per-subsystem directives. A bare level sets the default (`info`); `prefix=level` sets a subsystem. The most specific prefix wins. |\n| `MEMORY_LOG_FORMAT` | `text` (default, human-readable, one line per event) or `json` (NDJSON, one object per event). |\n| `MEMORY_LOG_COLOR` | `always`, `never`, or anything else for auto (colour only on a colour-capable terminal, and never for a file sink). `NO_COLOR` set and non-empty disables colour. |\n| `MEMORY_LOG_TARGETS` | Third-party `tracing` targets to raise, comma-separated `target=level`. Quiet by default; can never drop this service's own events. |\n| `MEMORY_LOG_FILE` | Append the stream to this file instead of stderr. A blank value means \"unset\". |\n\n`RUST_LOG` examples:\n\n```\nRUST_LOG=info                       # default\nRUST_LOG=extract=debug              # one subsystem\nRUST_LOG=http=error,info            # quiet the HTTP surface, keep the rest\nRUST_LOG=fs_watch=trace,http=debug  # two subsystems, the most specific rule wins\n```",
+          "kind": "episode",
+          "disposition": "prohibited"
+        },
+        {
+          "key": "raw:logging-request",
+          "episode_key": "logging-request",
+          "fact_type": "episode",
+          "content": "Every unit of work carries a correlation id. In the HTTP profile it is the\nrequest's `x-request-id` (honoured when supplied, minted otherwise) and is\nadvertised back on the response; in the stdio profile it is a per-call\n`req_NNNN`. The formatter stamps the ambient id onto every event that does not\ncarry its own, so each line of one request — the access log line, a tool line, a\ndownstream warning — reads with the same `req=` and follows with a single\nfilter:\n\n```bash\ngrep 'req=<id>' memory-mcp.log\n```\n\nThe HTTP response echoes the id on `x-request-id`, and a control-plane error\nenvelope carries it as `correlation_id` — a client quoting either names the same\nvalue the log line shows.",
+          "kind": "episode",
+          "disposition": "prohibited"
+        },
+        {
+          "key": "raw:license-number",
+          "episode_key": "license-number",
+          "fact_type": "episode",
+          "content": "Verified: A license inventory contains 16 product blocks, 163 application rows and 899 object rows. The union covers several products rather than one license.",
+          "kind": "episode",
+          "disposition": "prohibited"
+        },
+        {
+          "key": "raw:license-url",
+          "episode_key": "license-url",
+          "fact_type": "episode",
+          "content": "Verified: Infinity means that an object is countable but its count is uncontrolled. Reference: https://example.org/pages/viewpage.action?pageId=1545882667; section 13.2, revision 75.",
+          "kind": "episode",
+          "disposition": "prohibited"
+        },
+        {
+          "key": "raw:mail-level",
+          "episode_key": "mail-level",
+          "fact_type": "episode",
+          "content": "Verified: Only one slide of a cloud EDR comparison was extracted. Feature-level scope may be absent from the extracted text or represented graphically.",
+          "kind": "episode",
+          "disposition": "prohibited"
+        },
+        {
+          "key": "raw:other-task",
+          "episode_key": "other-task",
+          "fact_type": "episode",
+          "content": "Verified: Task 16 in the mobile route editor plan checks KML point import and touch gestures. It belongs to Trackly, not Memory MCP HTTP.",
+          "kind": "episode",
+          "disposition": "prohibited"
+        }
+      ],
+      "required_evidence_groups": [
+        [
+          "http-plan:note:3a82a1450071",
+          "raw:http-plan"
+        ],
+        [
+          "http-plan:note:ca50e98513e3",
+          "raw:http-plan"
+        ]
+      ],
+      "expect_empty": false
+    },
+    {
+      "id": "http-task-paraphrase",
+      "split": "development",
+      "label_trust": "reviewed",
+      "query": "Which body measurements and diagnostics does the HTTP bounded memory plan require?",
+      "budget": 5,
+      "tags": [
+        "paraphrase",
+        "task"
+      ],
+      "sources": [
+        {
+          "key": "http-plan",
+          "source_type": "session_summary",
+          "source_id": "native:http-plan",
+          "content": "### Task 16: Add low-overhead HTTP and retained-resource diagnostics\n\n- `memory_http_preflight_body_bytes` is recorded through the existing `metrics::histogram!` facade, with no labels, exactly once after body collection completes and before JSON decoding. This includes fully collected malformed JSON because those bytes were actually buffered. Partial, refused, stream-error and cancelled bodies do not enter the distribution.\n- DEBUG operations are `http.preflight.refused` and `http.preflight.large_body`, added to `logging::HTTP_OPERATIONS`; operators enable only these with `RUST_LOG=http.preflight=debug`. Logs use the validated existing `RequestId` when present, parsed numeric declared length, observed prefix bytes and closed outcome only—no request method/path, tenant fingerprint, arbitrary header or content. Emit large-body events only for fully collected bodies >=65536 B. Rate-limit each fixed event/reason to at most one log per second; refusal counters remain exact. Apply the rate limit before allocating/serializing the event.",
+          "t_ref": "2026-10-07T00:00:00Z"
+        },
+        {
+          "key": "logging-sink",
+          "source_type": "session_summary",
+          "source_id": "native:logging-sink",
+          "content": "Events are written to **stderr** — or to `MEMORY_LOG_FILE` when set — one event\nper line. Under the stdio transport stdout carries MCP protocol framing, so\nnothing is ever written there. The sink, format and colour are read once, when\nthe subscriber is installed at startup.",
+          "t_ref": "2026-10-07T00:00:00Z"
+        },
+        {
+          "key": "logging-levels",
+          "source_type": "session_summary",
+          "source_id": "native:logging-levels",
+          "content": "| Level | Use |\n|---|---|\n| `ERROR` | A failed unit of work, a risk to integrity, a failure after retries, loss of readiness. |\n| `WARN` | Handled but unexpected; degraded; a client refusal (4xx class). |\n| `INFO` | A business event or a state change. |\n| `DEBUG` | Diagnostics, off by default. |\n| `TRACE` | Fine-grained flow, opted into by name. Anything repetitive is a metric. |\n\nA failure's level is decided by its error class, not its call site:\n`MemoryError::log_level()` maps storage, transience, configuration and\nunavailability to `ERROR`, and refusals (not-found, validation, conflict,\nbudget, model-not-ready, auth) to `WARN`.",
+          "t_ref": "2026-10-07T00:00:00Z"
+        },
+        {
+          "key": "logging-config",
+          "source_type": "session_summary",
+          "source_id": "native:logging-config",
+          "content": "| Variable | Meaning |\n|---|---|\n| `RUST_LOG` | Level and per-subsystem directives. A bare level sets the default (`info`); `prefix=level` sets a subsystem. The most specific prefix wins. |\n| `MEMORY_LOG_FORMAT` | `text` (default, human-readable, one line per event) or `json` (NDJSON, one object per event). |\n| `MEMORY_LOG_COLOR` | `always`, `never`, or anything else for auto (colour only on a colour-capable terminal, and never for a file sink). `NO_COLOR` set and non-empty disables colour. |\n| `MEMORY_LOG_TARGETS` | Third-party `tracing` targets to raise, comma-separated `target=level`. Quiet by default; can never drop this service's own events. |\n| `MEMORY_LOG_FILE` | Append the stream to this file instead of stderr. A blank value means \"unset\". |\n\n`RUST_LOG` examples:\n\n```\nRUST_LOG=info                       # default\nRUST_LOG=extract=debug              # one subsystem\nRUST_LOG=http=error,info            # quiet the HTTP surface, keep the rest\nRUST_LOG=fs_watch=trace,http=debug  # two subsystems, the most specific rule wins\n```",
+          "t_ref": "2026-10-07T00:00:00Z"
+        },
+        {
+          "key": "logging-request",
+          "source_type": "session_summary",
+          "source_id": "native:logging-request",
+          "content": "Every unit of work carries a correlation id. In the HTTP profile it is the\nrequest's `x-request-id` (honoured when supplied, minted otherwise) and is\nadvertised back on the response; in the stdio profile it is a per-call\n`req_NNNN`. The formatter stamps the ambient id onto every event that does not\ncarry its own, so each line of one request — the access log line, a tool line, a\ndownstream warning — reads with the same `req=` and follows with a single\nfilter:\n\n```bash\ngrep 'req=<id>' memory-mcp.log\n```\n\nThe HTTP response echoes the id on `x-request-id`, and a control-plane error\nenvelope carries it as `correlation_id` — a client quoting either names the same\nvalue the log line shows.",
+          "t_ref": "2026-10-07T00:00:00Z"
+        },
+        {
+          "key": "license-number",
+          "source_type": "session_summary",
+          "source_id": "native:license-number",
+          "content": "Verified: A license inventory contains 16 product blocks, 163 application rows and 899 object rows. The union covers several products rather than one license.",
+          "t_ref": "2026-10-07T00:00:00Z"
+        },
+        {
+          "key": "license-url",
+          "source_type": "session_summary",
+          "source_id": "native:license-url",
+          "content": "Verified: Infinity means that an object is countable but its count is uncontrolled. Reference: https://example.org/pages/viewpage.action?pageId=1545882667; section 13.2, revision 75.",
+          "t_ref": "2026-10-07T00:00:00Z"
+        },
+        {
+          "key": "mail-level",
+          "source_type": "session_summary",
+          "source_id": "native:mail-level",
+          "content": "Verified: Only one slide of a cloud EDR comparison was extracted. Feature-level scope may be absent from the extracted text or represented graphically.",
+          "t_ref": "2026-10-07T00:00:00Z"
+        },
+        {
+          "key": "other-task",
+          "source_type": "session_summary",
+          "source_id": "native:other-task",
+          "content": "Verified: Task 16 in the mobile route editor plan checks KML point import and touch gestures. It belongs to Trackly, not Memory MCP HTTP.",
+          "t_ref": "2026-10-07T00:00:00Z"
+        }
+      ],
+      "bindings": [
+        {
+          "key": "http-plan:note:3a82a1450071",
+          "content": "Task 16: Add low-overhead HTTP and retained-resource diagnostics: memory_http_preflight_body_bytes is recorded through the existing metrics::histogram! facade, with no labels, exactly once after body collection completes and before JSON decoding. This includes fully collected malformed JSON because those bytes were actually buffered. Partial, refused, stream-error and cancelled bodies do not enter the distribution.",
+          "episode_key": "http-plan",
+          "fact_type": "note",
+          "disposition": "allowed"
+        },
+        {
+          "key": "http-plan:note:ca50e98513e3",
+          "content": "Task 16: Add low-overhead HTTP and retained-resource diagnostics: DEBUG operations are http.preflight.refused and http.preflight.large_body, added to logging::HTTP_OPERATIONS; operators enable only these with RUST_LOG=http.preflight=debug. Logs use the validated existing RequestId when present, parsed numeric declared length, observed prefix bytes and closed outcome only—no request method/path, tenant fingerprint, arbitrary header or content. Emit large-body events only for fully collected bodies >=65536 B. Rate-limit each fixed event/reason to at most one log per second; refusal counters remain exact. Apply the rate limit before allocating/serializing the event.",
+          "episode_key": "http-plan",
+          "fact_type": "note",
+          "disposition": "allowed"
+        },
+        {
+          "key": "logging-sink:note:3f3f5ac57b49",
+          "content": "Events are written to **stderr** — or to `MEMORY_LOG_FILE` when set — one event\nper line. Under the stdio transport stdout carries MCP protocol framing, so\nnothing is ever written there. The sink, format and colour are read once, when\nthe subscriber is installed at startup.",
+          "episode_key": "logging-sink",
+          "fact_type": "note",
+          "disposition": "prohibited"
+        },
+        {
+          "key": "logging-levels:note:4e1dedabeafc",
+          "content": "| Level | Use |\n|---|---|\n| `ERROR` | A failed unit of work, a risk to integrity, a failure after retries, loss of readiness. |\n| `WARN` | Handled but unexpected; degraded; a client refusal (4xx class). |\n| `INFO` | A business event or a state change. |\n| `DEBUG` | Diagnostics, off by default. |\n| `TRACE` | Fine-grained flow, opted into by name. Anything repetitive is a metric. |\n\nA failure's level is decided by its error class, not its call site:\n`MemoryError::log_level()` maps storage, transience, configuration and\nunavailability to `ERROR`, and refusals (not-found, validation, conflict,\nbudget, model-not-ready, auth) to `WARN`.",
+          "episode_key": "logging-levels",
+          "fact_type": "note",
+          "disposition": "prohibited"
+        },
+        {
+          "key": "logging-config:experience:d1c94b8339d1",
+          "content": "| Variable | Meaning |\n|---|---|\n| `RUST_LOG` | Level and per-subsystem directives. A bare level sets the default (`info`); `prefix=level` sets a subsystem. The most specific prefix wins. |\n| `MEMORY_LOG_FORMAT` | `text` (default, human-readable, one line per event) or `json` (NDJSON, one object per event). |\n| `MEMORY_LOG_COLOR` | `always`, `never`, or anything else for auto (colour only on a colour-capable terminal, and never for a file sink). `NO_COLOR` set and non-empty disables colour. |\n| `MEMORY_LOG_TARGETS` | Third-party `tracing` targets to raise, comma-separated `target=level`. Quiet by default; can never drop this service's own events. |\n| `MEMORY_LOG_FILE` | Append the stream to this file instead of stderr. A blank value means \"unset\". |\n\n`RUST_LOG` examples:\n\n```\nRUST_LOG=info                       # default\nRUST_LOG=extract=debug              # one subsystem\nRUST_LOG=http=error,info            # quiet the HTTP surface, keep the rest\nRUST_LOG=fs_watch=trace,http=debug  # two subsystems, the most specific rule wins\n```",
+          "episode_key": "logging-config",
+          "fact_type": "experience",
+          "disposition": "prohibited"
+        },
+        {
+          "key": "logging-request:experience:98575917d45f",
+          "content": "Every unit of work carries a correlation id. In the HTTP profile it is the\nrequest's `x-request-id` (honoured when supplied, minted otherwise) and is\nadvertised back on the response; in the stdio profile it is a per-call\n`req_NNNN`. The formatter stamps the ambient id onto every event that does not\ncarry its own, so each line of one request — the access log line, a tool line, a\ndownstream warning — reads with the same `req=` and follows with a single\nfilter:\n\n```bash\ngrep 'req=<id>' memory-mcp.log\n```\n\nThe HTTP response echoes the id on `x-request-id`, and a control-plane error\nenvelope carries it as `correlation_id` — a client quoting either names the same\nvalue the log line shows.",
+          "episode_key": "logging-request",
+          "fact_type": "experience",
+          "disposition": "prohibited"
+        },
+        {
+          "key": "license-number:note:af4a36a04f85",
+          "content": "Verified: A license inventory contains 16 product blocks, 163 application rows and 899 object rows. The union covers several products rather than one license.",
+          "episode_key": "license-number",
+          "fact_type": "note",
+          "disposition": "prohibited"
+        },
+        {
+          "key": "license-url:note:45c6651529c9",
+          "content": "Verified: Infinity means that an object is countable but its count is uncontrolled. Reference: https://example.org/pages/viewpage.action?pageId=1545882667; section 13.2, revision 75.",
+          "episode_key": "license-url",
+          "fact_type": "note",
+          "disposition": "prohibited"
+        },
+        {
+          "key": "mail-level:note:3484d2496188",
+          "content": "Verified: Only one slide of a cloud EDR comparison was extracted. Feature-level scope may be absent from the extracted text or represented graphically.",
+          "episode_key": "mail-level",
+          "fact_type": "note",
+          "disposition": "prohibited"
+        },
+        {
+          "key": "other-task:note:65df630a6db4",
+          "content": "Verified: Task 16 in the mobile route editor plan checks KML point import and touch gestures. It belongs to Trackly, not Memory MCP HTTP.",
+          "episode_key": "other-task",
+          "fact_type": "note",
+          "disposition": "prohibited"
+        },
+        {
+          "key": "raw:http-plan",
+          "episode_key": "http-plan",
+          "fact_type": "episode",
+          "content": "### Task 16: Add low-overhead HTTP and retained-resource diagnostics\n\n- `memory_http_preflight_body_bytes` is recorded through the existing `metrics::histogram!` facade, with no labels, exactly once after body collection completes and before JSON decoding. This includes fully collected malformed JSON because those bytes were actually buffered. Partial, refused, stream-error and cancelled bodies do not enter the distribution.\n- DEBUG operations are `http.preflight.refused` and `http.preflight.large_body`, added to `logging::HTTP_OPERATIONS`; operators enable only these with `RUST_LOG=http.preflight=debug`. Logs use the validated existing `RequestId` when present, parsed numeric declared length, observed prefix bytes and closed outcome only—no request method/path, tenant fingerprint, arbitrary header or content. Emit large-body events only for fully collected bodies >=65536 B. Rate-limit each fixed event/reason to at most one log per second; refusal counters remain exact. Apply the rate limit before allocating/serializing the event.",
+          "kind": "episode",
+          "disposition": "allowed"
+        },
+        {
+          "key": "raw:logging-sink",
+          "episode_key": "logging-sink",
+          "fact_type": "episode",
+          "content": "Events are written to **stderr** — or to `MEMORY_LOG_FILE` when set — one event\nper line. Under the stdio transport stdout carries MCP protocol framing, so\nnothing is ever written there. The sink, format and colour are read once, when\nthe subscriber is installed at startup.",
+          "kind": "episode",
+          "disposition": "prohibited"
+        },
+        {
+          "key": "raw:logging-levels",
+          "episode_key": "logging-levels",
+          "fact_type": "episode",
+          "content": "| Level | Use |\n|---|---|\n| `ERROR` | A failed unit of work, a risk to integrity, a failure after retries, loss of readiness. |\n| `WARN` | Handled but unexpected; degraded; a client refusal (4xx class). |\n| `INFO` | A business event or a state change. |\n| `DEBUG` | Diagnostics, off by default. |\n| `TRACE` | Fine-grained flow, opted into by name. Anything repetitive is a metric. |\n\nA failure's level is decided by its error class, not its call site:\n`MemoryError::log_level()` maps storage, transience, configuration and\nunavailability to `ERROR`, and refusals (not-found, validation, conflict,\nbudget, model-not-ready, auth) to `WARN`.",
+          "kind": "episode",
+          "disposition": "prohibited"
+        },
+        {
+          "key": "raw:logging-config",
+          "episode_key": "logging-config",
+          "fact_type": "episode",
+          "content": "| Variable | Meaning |\n|---|---|\n| `RUST_LOG` | Level and per-subsystem directives. A bare level sets the default (`info`); `prefix=level` sets a subsystem. The most specific prefix wins. |\n| `MEMORY_LOG_FORMAT` | `text` (default, human-readable, one line per event) or `json` (NDJSON, one object per event). |\n| `MEMORY_LOG_COLOR` | `always`, `never`, or anything else for auto (colour only on a colour-capable terminal, and never for a file sink). `NO_COLOR` set and non-empty disables colour. |\n| `MEMORY_LOG_TARGETS` | Third-party `tracing` targets to raise, comma-separated `target=level`. Quiet by default; can never drop this service's own events. |\n| `MEMORY_LOG_FILE` | Append the stream to this file instead of stderr. A blank value means \"unset\". |\n\n`RUST_LOG` examples:\n\n```\nRUST_LOG=info                       # default\nRUST_LOG=extract=debug              # one subsystem\nRUST_LOG=http=error,info            # quiet the HTTP surface, keep the rest\nRUST_LOG=fs_watch=trace,http=debug  # two subsystems, the most specific rule wins\n```",
+          "kind": "episode",
+          "disposition": "prohibited"
+        },
+        {
+          "key": "raw:logging-request",
+          "episode_key": "logging-request",
+          "fact_type": "episode",
+          "content": "Every unit of work carries a correlation id. In the HTTP profile it is the\nrequest's `x-request-id` (honoured when supplied, minted otherwise) and is\nadvertised back on the response; in the stdio profile it is a per-call\n`req_NNNN`. The formatter stamps the ambient id onto every event that does not\ncarry its own, so each line of one request — the access log line, a tool line, a\ndownstream warning — reads with the same `req=` and follows with a single\nfilter:\n\n```bash\ngrep 'req=<id>' memory-mcp.log\n```\n\nThe HTTP response echoes the id on `x-request-id`, and a control-plane error\nenvelope carries it as `correlation_id` — a client quoting either names the same\nvalue the log line shows.",
+          "kind": "episode",
+          "disposition": "prohibited"
+        },
+        {
+          "key": "raw:license-number",
+          "episode_key": "license-number",
+          "fact_type": "episode",
+          "content": "Verified: A license inventory contains 16 product blocks, 163 application rows and 899 object rows. The union covers several products rather than one license.",
+          "kind": "episode",
+          "disposition": "prohibited"
+        },
+        {
+          "key": "raw:license-url",
+          "episode_key": "license-url",
+          "fact_type": "episode",
+          "content": "Verified: Infinity means that an object is countable but its count is uncontrolled. Reference: https://example.org/pages/viewpage.action?pageId=1545882667; section 13.2, revision 75.",
+          "kind": "episode",
+          "disposition": "prohibited"
+        },
+        {
+          "key": "raw:mail-level",
+          "episode_key": "mail-level",
+          "fact_type": "episode",
+          "content": "Verified: Only one slide of a cloud EDR comparison was extracted. Feature-level scope may be absent from the extracted text or represented graphically.",
+          "kind": "episode",
+          "disposition": "prohibited"
+        },
+        {
+          "key": "raw:other-task",
+          "episode_key": "other-task",
+          "fact_type": "episode",
+          "content": "Verified: Task 16 in the mobile route editor plan checks KML point import and touch gestures. It belongs to Trackly, not Memory MCP HTTP.",
+          "kind": "episode",
+          "disposition": "prohibited"
+        }
+      ],
+      "required_evidence_groups": [
+        [
+          "http-plan:note:3a82a1450071",
+          "raw:http-plan"
+        ],
+        [
+          "http-plan:note:ca50e98513e3",
+          "raw:http-plan"
+        ]
+      ],
+      "expect_empty": false
+    },
+    {
+      "id": "unknown-database",
+      "split": "development",
+      "label_trust": "reviewed",
+      "query": "Who approved a PostgreSQL migration for the checkout service?",
+      "budget": 5,
+      "tags": [
+        "unknown",
+        "abstention"
+      ],
+      "sources": [
+        {
+          "key": "http-plan",
+          "source_type": "session_summary",
+          "source_id": "native:http-plan",
+          "content": "### Task 16: Add low-overhead HTTP and retained-resource diagnostics\n\n- `memory_http_preflight_body_bytes` is recorded through the existing `metrics::histogram!` facade, with no labels, exactly once after body collection completes and before JSON decoding. This includes fully collected malformed JSON because those bytes were actually buffered. Partial, refused, stream-error and cancelled bodies do not enter the distribution.\n- DEBUG operations are `http.preflight.refused` and `http.preflight.large_body`, added to `logging::HTTP_OPERATIONS`; operators enable only these with `RUST_LOG=http.preflight=debug`. Logs use the validated existing `RequestId` when present, parsed numeric declared length, observed prefix bytes and closed outcome only—no request method/path, tenant fingerprint, arbitrary header or content. Emit large-body events only for fully collected bodies >=65536 B. Rate-limit each fixed event/reason to at most one log per second; refusal counters remain exact. Apply the rate limit before allocating/serializing the event.",
+          "t_ref": "2026-10-07T00:00:00Z"
+        },
+        {
+          "key": "logging-sink",
+          "source_type": "session_summary",
+          "source_id": "native:logging-sink",
+          "content": "Events are written to **stderr** — or to `MEMORY_LOG_FILE` when set — one event\nper line. Under the stdio transport stdout carries MCP protocol framing, so\nnothing is ever written there. The sink, format and colour are read once, when\nthe subscriber is installed at startup.",
+          "t_ref": "2026-10-07T00:00:00Z"
+        },
+        {
+          "key": "logging-levels",
+          "source_type": "session_summary",
+          "source_id": "native:logging-levels",
+          "content": "| Level | Use |\n|---|---|\n| `ERROR` | A failed unit of work, a risk to integrity, a failure after retries, loss of readiness. |\n| `WARN` | Handled but unexpected; degraded; a client refusal (4xx class). |\n| `INFO` | A business event or a state change. |\n| `DEBUG` | Diagnostics, off by default. |\n| `TRACE` | Fine-grained flow, opted into by name. Anything repetitive is a metric. |\n\nA failure's level is decided by its error class, not its call site:\n`MemoryError::log_level()` maps storage, transience, configuration and\nunavailability to `ERROR`, and refusals (not-found, validation, conflict,\nbudget, model-not-ready, auth) to `WARN`.",
+          "t_ref": "2026-10-07T00:00:00Z"
+        },
+        {
+          "key": "logging-config",
+          "source_type": "session_summary",
+          "source_id": "native:logging-config",
+          "content": "| Variable | Meaning |\n|---|---|\n| `RUST_LOG` | Level and per-subsystem directives. A bare level sets the default (`info`); `prefix=level` sets a subsystem. The most specific prefix wins. |\n| `MEMORY_LOG_FORMAT` | `text` (default, human-readable, one line per event) or `json` (NDJSON, one object per event). |\n| `MEMORY_LOG_COLOR` | `always`, `never`, or anything else for auto (colour only on a colour-capable terminal, and never for a file sink). `NO_COLOR` set and non-empty disables colour. |\n| `MEMORY_LOG_TARGETS` | Third-party `tracing` targets to raise, comma-separated `target=level`. Quiet by default; can never drop this service's own events. |\n| `MEMORY_LOG_FILE` | Append the stream to this file instead of stderr. A blank value means \"unset\". |\n\n`RUST_LOG` examples:\n\n```\nRUST_LOG=info                       # default\nRUST_LOG=extract=debug              # one subsystem\nRUST_LOG=http=error,info            # quiet the HTTP surface, keep the rest\nRUST_LOG=fs_watch=trace,http=debug  # two subsystems, the most specific rule wins\n```",
+          "t_ref": "2026-10-07T00:00:00Z"
+        },
+        {
+          "key": "logging-request",
+          "source_type": "session_summary",
+          "source_id": "native:logging-request",
+          "content": "Every unit of work carries a correlation id. In the HTTP profile it is the\nrequest's `x-request-id` (honoured when supplied, minted otherwise) and is\nadvertised back on the response; in the stdio profile it is a per-call\n`req_NNNN`. The formatter stamps the ambient id onto every event that does not\ncarry its own, so each line of one request — the access log line, a tool line, a\ndownstream warning — reads with the same `req=` and follows with a single\nfilter:\n\n```bash\ngrep 'req=<id>' memory-mcp.log\n```\n\nThe HTTP response echoes the id on `x-request-id`, and a control-plane error\nenvelope carries it as `correlation_id` — a client quoting either names the same\nvalue the log line shows.",
+          "t_ref": "2026-10-07T00:00:00Z"
+        },
+        {
+          "key": "license-number",
+          "source_type": "session_summary",
+          "source_id": "native:license-number",
+          "content": "Verified: A license inventory contains 16 product blocks, 163 application rows and 899 object rows. The union covers several products rather than one license.",
+          "t_ref": "2026-10-07T00:00:00Z"
+        },
+        {
+          "key": "license-url",
+          "source_type": "session_summary",
+          "source_id": "native:license-url",
+          "content": "Verified: Infinity means that an object is countable but its count is uncontrolled. Reference: https://example.org/pages/viewpage.action?pageId=1545882667; section 13.2, revision 75.",
+          "t_ref": "2026-10-07T00:00:00Z"
+        },
+        {
+          "key": "mail-level",
+          "source_type": "session_summary",
+          "source_id": "native:mail-level",
+          "content": "Verified: Only one slide of a cloud EDR comparison was extracted. Feature-level scope may be absent from the extracted text or represented graphically.",
+          "t_ref": "2026-10-07T00:00:00Z"
+        },
+        {
+          "key": "other-task",
+          "source_type": "session_summary",
+          "source_id": "native:other-task",
+          "content": "Verified: Task 16 in the mobile route editor plan checks KML point import and touch gestures. It belongs to Trackly, not Memory MCP HTTP.",
+          "t_ref": "2026-10-07T00:00:00Z"
+        }
+      ],
+      "bindings": [
+        {
+          "key": "http-plan:note:3a82a1450071",
+          "content": "Task 16: Add low-overhead HTTP and retained-resource diagnostics: memory_http_preflight_body_bytes is recorded through the existing metrics::histogram! facade, with no labels, exactly once after body collection completes and before JSON decoding. This includes fully collected malformed JSON because those bytes were actually buffered. Partial, refused, stream-error and cancelled bodies do not enter the distribution.",
+          "episode_key": "http-plan",
+          "fact_type": "note",
+          "disposition": "prohibited"
+        },
+        {
+          "key": "http-plan:note:ca50e98513e3",
+          "content": "Task 16: Add low-overhead HTTP and retained-resource diagnostics: DEBUG operations are http.preflight.refused and http.preflight.large_body, added to logging::HTTP_OPERATIONS; operators enable only these with RUST_LOG=http.preflight=debug. Logs use the validated existing RequestId when present, parsed numeric declared length, observed prefix bytes and closed outcome only—no request method/path, tenant fingerprint, arbitrary header or content. Emit large-body events only for fully collected bodies >=65536 B. Rate-limit each fixed event/reason to at most one log per second; refusal counters remain exact. Apply the rate limit before allocating/serializing the event.",
+          "episode_key": "http-plan",
+          "fact_type": "note",
+          "disposition": "prohibited"
+        },
+        {
+          "key": "logging-sink:note:3f3f5ac57b49",
+          "content": "Events are written to **stderr** — or to `MEMORY_LOG_FILE` when set — one event\nper line. Under the stdio transport stdout carries MCP protocol framing, so\nnothing is ever written there. The sink, format and colour are read once, when\nthe subscriber is installed at startup.",
+          "episode_key": "logging-sink",
+          "fact_type": "note",
+          "disposition": "prohibited"
+        },
+        {
+          "key": "logging-levels:note:4e1dedabeafc",
+          "content": "| Level | Use |\n|---|---|\n| `ERROR` | A failed unit of work, a risk to integrity, a failure after retries, loss of readiness. |\n| `WARN` | Handled but unexpected; degraded; a client refusal (4xx class). |\n| `INFO` | A business event or a state change. |\n| `DEBUG` | Diagnostics, off by default. |\n| `TRACE` | Fine-grained flow, opted into by name. Anything repetitive is a metric. |\n\nA failure's level is decided by its error class, not its call site:\n`MemoryError::log_level()` maps storage, transience, configuration and\nunavailability to `ERROR`, and refusals (not-found, validation, conflict,\nbudget, model-not-ready, auth) to `WARN`.",
+          "episode_key": "logging-levels",
+          "fact_type": "note",
+          "disposition": "prohibited"
+        },
+        {
+          "key": "logging-config:experience:d1c94b8339d1",
+          "content": "| Variable | Meaning |\n|---|---|\n| `RUST_LOG` | Level and per-subsystem directives. A bare level sets the default (`info`); `prefix=level` sets a subsystem. The most specific prefix wins. |\n| `MEMORY_LOG_FORMAT` | `text` (default, human-readable, one line per event) or `json` (NDJSON, one object per event). |\n| `MEMORY_LOG_COLOR` | `always`, `never`, or anything else for auto (colour only on a colour-capable terminal, and never for a file sink). `NO_COLOR` set and non-empty disables colour. |\n| `MEMORY_LOG_TARGETS` | Third-party `tracing` targets to raise, comma-separated `target=level`. Quiet by default; can never drop this service's own events. |\n| `MEMORY_LOG_FILE` | Append the stream to this file instead of stderr. A blank value means \"unset\". |\n\n`RUST_LOG` examples:\n\n```\nRUST_LOG=info                       # default\nRUST_LOG=extract=debug              # one subsystem\nRUST_LOG=http=error,info            # quiet the HTTP surface, keep the rest\nRUST_LOG=fs_watch=trace,http=debug  # two subsystems, the most specific rule wins\n```",
+          "episode_key": "logging-config",
+          "fact_type": "experience",
+          "disposition": "prohibited"
+        },
+        {
+          "key": "logging-request:experience:98575917d45f",
+          "content": "Every unit of work carries a correlation id. In the HTTP profile it is the\nrequest's `x-request-id` (honoured when supplied, minted otherwise) and is\nadvertised back on the response; in the stdio profile it is a per-call\n`req_NNNN`. The formatter stamps the ambient id onto every event that does not\ncarry its own, so each line of one request — the access log line, a tool line, a\ndownstream warning — reads with the same `req=` and follows with a single\nfilter:\n\n```bash\ngrep 'req=<id>' memory-mcp.log\n```\n\nThe HTTP response echoes the id on `x-request-id`, and a control-plane error\nenvelope carries it as `correlation_id` — a client quoting either names the same\nvalue the log line shows.",
+          "episode_key": "logging-request",
+          "fact_type": "experience",
+          "disposition": "prohibited"
+        },
+        {
+          "key": "license-number:note:af4a36a04f85",
+          "content": "Verified: A license inventory contains 16 product blocks, 163 application rows and 899 object rows. The union covers several products rather than one license.",
+          "episode_key": "license-number",
+          "fact_type": "note",
+          "disposition": "prohibited"
+        },
+        {
+          "key": "license-url:note:45c6651529c9",
+          "content": "Verified: Infinity means that an object is countable but its count is uncontrolled. Reference: https://example.org/pages/viewpage.action?pageId=1545882667; section 13.2, revision 75.",
+          "episode_key": "license-url",
+          "fact_type": "note",
+          "disposition": "prohibited"
+        },
+        {
+          "key": "mail-level:note:3484d2496188",
+          "content": "Verified: Only one slide of a cloud EDR comparison was extracted. Feature-level scope may be absent from the extracted text or represented graphically.",
+          "episode_key": "mail-level",
+          "fact_type": "note",
+          "disposition": "prohibited"
+        },
+        {
+          "key": "other-task:note:65df630a6db4",
+          "content": "Verified: Task 16 in the mobile route editor plan checks KML point import and touch gestures. It belongs to Trackly, not Memory MCP HTTP.",
+          "episode_key": "other-task",
+          "fact_type": "note",
+          "disposition": "prohibited"
+        },
+        {
+          "key": "raw:http-plan",
+          "episode_key": "http-plan",
+          "fact_type": "episode",
+          "content": "### Task 16: Add low-overhead HTTP and retained-resource diagnostics\n\n- `memory_http_preflight_body_bytes` is recorded through the existing `metrics::histogram!` facade, with no labels, exactly once after body collection completes and before JSON decoding. This includes fully collected malformed JSON because those bytes were actually buffered. Partial, refused, stream-error and cancelled bodies do not enter the distribution.\n- DEBUG operations are `http.preflight.refused` and `http.preflight.large_body`, added to `logging::HTTP_OPERATIONS`; operators enable only these with `RUST_LOG=http.preflight=debug`. Logs use the validated existing `RequestId` when present, parsed numeric declared length, observed prefix bytes and closed outcome only—no request method/path, tenant fingerprint, arbitrary header or content. Emit large-body events only for fully collected bodies >=65536 B. Rate-limit each fixed event/reason to at most one log per second; refusal counters remain exact. Apply the rate limit before allocating/serializing the event.",
+          "kind": "episode",
+          "disposition": "prohibited"
+        },
+        {
+          "key": "raw:logging-sink",
+          "episode_key": "logging-sink",
+          "fact_type": "episode",
+          "content": "Events are written to **stderr** — or to `MEMORY_LOG_FILE` when set — one event\nper line. Under the stdio transport stdout carries MCP protocol framing, so\nnothing is ever written there. The sink, format and colour are read once, when\nthe subscriber is installed at startup.",
+          "kind": "episode",
+          "disposition": "prohibited"
+        },
+        {
+          "key": "raw:logging-levels",
+          "episode_key": "logging-levels",
+          "fact_type": "episode",
+          "content": "| Level | Use |\n|---|---|\n| `ERROR` | A failed unit of work, a risk to integrity, a failure after retries, loss of readiness. |\n| `WARN` | Handled but unexpected; degraded; a client refusal (4xx class). |\n| `INFO` | A business event or a state change. |\n| `DEBUG` | Diagnostics, off by default. |\n| `TRACE` | Fine-grained flow, opted into by name. Anything repetitive is a metric. |\n\nA failure's level is decided by its error class, not its call site:\n`MemoryError::log_level()` maps storage, transience, configuration and\nunavailability to `ERROR`, and refusals (not-found, validation, conflict,\nbudget, model-not-ready, auth) to `WARN`.",
+          "kind": "episode",
+          "disposition": "prohibited"
+        },
+        {
+          "key": "raw:logging-config",
+          "episode_key": "logging-config",
+          "fact_type": "episode",
+          "content": "| Variable | Meaning |\n|---|---|\n| `RUST_LOG` | Level and per-subsystem directives. A bare level sets the default (`info`); `prefix=level` sets a subsystem. The most specific prefix wins. |\n| `MEMORY_LOG_FORMAT` | `text` (default, human-readable, one line per event) or `json` (NDJSON, one object per event). |\n| `MEMORY_LOG_COLOR` | `always`, `never`, or anything else for auto (colour only on a colour-capable terminal, and never for a file sink). `NO_COLOR` set and non-empty disables colour. |\n| `MEMORY_LOG_TARGETS` | Third-party `tracing` targets to raise, comma-separated `target=level`. Quiet by default; can never drop this service's own events. |\n| `MEMORY_LOG_FILE` | Append the stream to this file instead of stderr. A blank value means \"unset\". |\n\n`RUST_LOG` examples:\n\n```\nRUST_LOG=info                       # default\nRUST_LOG=extract=debug              # one subsystem\nRUST_LOG=http=error,info            # quiet the HTTP surface, keep the rest\nRUST_LOG=fs_watch=trace,http=debug  # two subsystems, the most specific rule wins\n```",
+          "kind": "episode",
+          "disposition": "prohibited"
+        },
+        {
+          "key": "raw:logging-request",
+          "episode_key": "logging-request",
+          "fact_type": "episode",
+          "content": "Every unit of work carries a correlation id. In the HTTP profile it is the\nrequest's `x-request-id` (honoured when supplied, minted otherwise) and is\nadvertised back on the response; in the stdio profile it is a per-call\n`req_NNNN`. The formatter stamps the ambient id onto every event that does not\ncarry its own, so each line of one request — the access log line, a tool line, a\ndownstream warning — reads with the same `req=` and follows with a single\nfilter:\n\n```bash\ngrep 'req=<id>' memory-mcp.log\n```\n\nThe HTTP response echoes the id on `x-request-id`, and a control-plane error\nenvelope carries it as `correlation_id` — a client quoting either names the same\nvalue the log line shows.",
+          "kind": "episode",
+          "disposition": "prohibited"
+        },
+        {
+          "key": "raw:license-number",
+          "episode_key": "license-number",
+          "fact_type": "episode",
+          "content": "Verified: A license inventory contains 16 product blocks, 163 application rows and 899 object rows. The union covers several products rather than one license.",
+          "kind": "episode",
+          "disposition": "prohibited"
+        },
+        {
+          "key": "raw:license-url",
+          "episode_key": "license-url",
+          "fact_type": "episode",
+          "content": "Verified: Infinity means that an object is countable but its count is uncontrolled. Reference: https://example.org/pages/viewpage.action?pageId=1545882667; section 13.2, revision 75.",
+          "kind": "episode",
+          "disposition": "prohibited"
+        },
+        {
+          "key": "raw:mail-level",
+          "episode_key": "mail-level",
+          "fact_type": "episode",
+          "content": "Verified: Only one slide of a cloud EDR comparison was extracted. Feature-level scope may be absent from the extracted text or represented graphically.",
+          "kind": "episode",
+          "disposition": "prohibited"
+        },
+        {
+          "key": "raw:other-task",
+          "episode_key": "other-task",
+          "fact_type": "episode",
+          "content": "Verified: Task 16 in the mobile route editor plan checks KML point import and touch gestures. It belongs to Trackly, not Memory MCP HTTP.",
+          "kind": "episode",
+          "disposition": "prohibited"
+        }
+      ],
+      "required_evidence_groups": [],
+      "expect_empty": true
+    }
+  ]
+}

@@ -1,0 +1,58 @@
+{
+  "schema_version": "memory-mcp-eval-profile/v1",
+  "profile": "nightly",
+  "time_budget_seconds": 3600,
+  "suites": [
+    {
+      "id": "retrieval-quality",
+      "corpus_root": "work/evals/retrieval-quality-focused",
+      "expected_coverage": {
+        "exact_cases": 11
+      }
+    }
+  ],
+  "gates": [
+    {
+      "target": {
+        "suite_id": "retrieval-quality",
+        "metric": "precision_macro"
+      },
+      "hard_floor": 1.0
+    },
+    {
+      "target": {
+        "suite_id": "retrieval-quality",
+        "metric": "required_group_recall"
+      },
+      "hard_floor": 1.0
+    },
+    {
+      "target": {
+        "suite_id": "retrieval-quality",
+        "metric": "unknown_abstention_rate"
+      },
+      "hard_floor": 1.0
+    },
+    {
+      "target": {
+        "suite_id": "retrieval-quality",
+        "metric": "answerable_non_abstention_rate"
+      },
+      "hard_floor": 1.0
+    },
+    {
+      "target": {
+        "suite_id": "retrieval-quality",
+        "metric": "duplicate_free_rate"
+      },
+      "hard_floor": 1.0
+    },
+    {
+      "target": {
+        "suite_id": "retrieval-quality",
+        "metric": "prohibited_free_rate"
+      },
+      "hard_floor": 1.0
+    }
+  ]
+}

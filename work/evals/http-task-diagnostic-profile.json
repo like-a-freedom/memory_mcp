@@ -1,0 +1,15 @@
+{
+  "schema_version": "memory-mcp-eval-profile/v1",
+  "profile": "nightly",
+  "time_budget_seconds": 600,
+  "suites": [
+    {
+      "id": "retrieval-quality",
+      "corpus_root": "work/evals/http-task-diagnostic",
+      "expected_coverage": {
+        "exact_cases": 4
+      }
+    }
+  ],
+  "gates": []
+}
