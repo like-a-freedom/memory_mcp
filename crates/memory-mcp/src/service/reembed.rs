@@ -57,6 +57,23 @@ struct NamespaceBatchState {
     failed_fact_ids: Vec<String>,
 }
 
+impl NamespaceBatchState {
+    /// Record one successfully rewritten fact and advance the resume cursor.
+    fn record_success(&mut self, fact_id: &str) {
+        self.processed += 1;
+        self.succeeded += 1;
+        self.last_completed_fact_id = Some(fact_id.to_string());
+    }
+
+    /// Record one failed fact. The resume cursor stays on the last
+    /// *succeeded* fact so a resume retries this one.
+    fn record_failure(&mut self, fact_id: &str) {
+        self.processed += 1;
+        self.failed += 1;
+        self.failed_fact_ids.push(fact_id.to_string());
+    }
+}
+
 /// Result of processing one batch: keep going or short-circuit the pass.
 enum BatchOutcome {
     /// Batch processed; continue with the next batch.
@@ -222,19 +239,8 @@ impl MemoryService {
 
         progress.on_job_started(pass.summary.total_facts, pass.resumed, pass.resumed_count);
 
-        self.persist_reembed_job(
-            &pass.summary,
-            &pass.target_signature,
-            pass.target_dimension,
-            &pass.namespace_progress,
-            Some(&pass.started_at_rfc3339),
-            None,
-            "running",
-            None,
-            None,
-            pass.started_at.elapsed(),
-        )
-        .await?;
+        self.persist_pass_job(&pass, "running", None, None, None)
+            .await?;
 
         // Drop the HNSW index before rewriting facts.
         // SurrealDB enforces vector dimension at the index level, so the
@@ -424,16 +430,7 @@ impl MemoryService {
             }
         }
 
-        update_namespace_progress(
-            &mut pass.namespace_progress,
-            namespace,
-            "completed",
-            ns_state.processed,
-            ns_state.succeeded,
-            ns_state.failed,
-            ns_state.last_completed_fact_id.as_deref(),
-            &ns_state.failed_fact_ids,
-        );
+        update_pass_namespace_progress(pass, namespace, "completed", &ns_state);
         self.write_embedding_state(
             namespace,
             "ready",
@@ -484,18 +481,7 @@ impl MemoryService {
     ) -> Result<BatchOutcome, MemoryError> {
         let embedding_state = self.embedding_runtime_snapshot();
         // In --retry-failed mode, filter batch to only failed fact IDs.
-        let batch: Vec<Value> = if options.retry_failed {
-            batch
-                .into_iter()
-                .filter(|fact| {
-                    fact.get("fact_id")
-                        .and_then(json_string)
-                        .is_some_and(|id| pass.retry_failed_ids.contains(id))
-                })
-                .collect()
-        } else {
-            batch
-        };
+        let batch = filter_retry_batch(batch, options, pass);
 
         if batch.is_empty() {
             // No retryable facts in this batch — continue to next batch.
@@ -529,93 +515,13 @@ impl MemoryService {
                 .await
             {
                 Ok(updated_fact_id) => {
-                    pass.summary.processed_facts += 1;
-                    pass.summary.succeeded_facts += 1;
-                    ns_state.processed += 1;
-                    ns_state.succeeded += 1;
-                    ns_state.last_completed_fact_id = Some(updated_fact_id.clone());
-                    update_namespace_progress(
-                        &mut pass.namespace_progress,
-                        namespace,
-                        "running",
-                        ns_state.processed,
-                        ns_state.succeeded,
-                        ns_state.failed,
-                        ns_state.last_completed_fact_id.as_deref(),
-                        &ns_state.failed_fact_ids,
-                    );
-                    self.persist_reembed_job(
-                        &pass.summary,
-                        &pass.target_signature,
-                        pass.target_dimension,
-                        &pass.namespace_progress,
-                        Some(&pass.started_at_rfc3339),
-                        None,
-                        "running",
-                        Some(namespace),
-                        None,
-                        pass.started_at.elapsed(),
-                    )
-                    .await?;
-
-                    self.logger.log(
-                        std::collections::HashMap::from([
-                            ("op".to_string(), json!("reembed.cursor_advanced")),
-                            ("namespace".to_string(), json!(namespace)),
-                            (
-                                "last_completed_fact_id".to_string(),
-                                json!(ns_state.last_completed_fact_id.clone()),
-                            ),
-                        ]),
-                        LogLevel::Debug,
-                    );
+                    self.handle_rewrite_success(namespace, &updated_fact_id, pass, ns_state)
+                        .await?;
                 }
                 Err(err) => {
                     // Continue-on-error: record the failure and proceed.
-                    //
-                    // Do NOT advance `last_completed_fact_id` past the
-                    // failed fact — the cursor must point at the last
-                    // *succeeded* fact so a resume retries the failed
-                    // one. Advancing here would skip it on the next run
-                    // (the query uses `fact_id > cursor`).
-                    pass.summary.processed_facts += 1;
-                    pass.summary.failed_facts += 1;
-                    ns_state.processed += 1;
-                    ns_state.failed += 1;
-                    ns_state.failed_fact_ids.push(fact_id.clone());
-                    pass.summary.failed_fact_ids.push(fact_id.clone());
-                    update_namespace_progress(
-                        &mut pass.namespace_progress,
-                        namespace,
-                        "running",
-                        ns_state.processed,
-                        ns_state.succeeded,
-                        ns_state.failed,
-                        ns_state.last_completed_fact_id.as_deref(),
-                        &ns_state.failed_fact_ids,
-                    );
-                    self.persist_reembed_job(
-                        &pass.summary,
-                        &pass.target_signature,
-                        pass.target_dimension,
-                        &pass.namespace_progress,
-                        Some(&pass.started_at_rfc3339),
-                        None,
-                        "running",
-                        Some(namespace),
-                        None,
-                        pass.started_at.elapsed(),
-                    )
-                    .await?;
-                    self.logger.log(
-                        std::collections::HashMap::from([
-                            ("op".to_string(), json!("reembed.fact_failed")),
-                            ("namespace".to_string(), json!(namespace)),
-                            ("fact_id".to_string(), json!(fact_id.clone())),
-                            ("error".to_string(), json!(err.to_string())),
-                        ]),
-                        LogLevel::Warn,
-                    );
+                    self.handle_rewrite_failure(namespace, &fact_id, &err, pass, ns_state)
+                        .await?;
 
                     // Check quota: if failures exceed the limit, abort.
                     let max_failures = options.effective_max_failures(pass.summary.total_facts);
@@ -625,17 +531,12 @@ impl MemoryService {
                         let error_message = format!(
                             "reembed exceeded max_failures ({max_failures}) after fact {fact_id}: {err}"
                         );
-                        self.persist_reembed_job(
-                            &pass.summary,
-                            &pass.target_signature,
-                            pass.target_dimension,
-                            &pass.namespace_progress,
-                            Some(&pass.started_at_rfc3339),
-                            Some(&chrono::Utc::now().to_rfc3339()),
+                        self.persist_pass_job(
+                            pass,
                             "failed",
                             Some(namespace),
+                            Some(&chrono::Utc::now().to_rfc3339()),
                             Some(&error_message),
-                            pass.started_at.elapsed(),
                         )
                         .await?;
                         self.logger.log(
@@ -693,6 +594,69 @@ impl MemoryService {
         Ok(BatchOutcome::Continue)
     }
 
+    /// Success arm of one fact rewrite: bump counters, advance the resume
+    /// cursor, persist progress, and log `reembed.cursor_advanced`.
+    async fn handle_rewrite_success(
+        &self,
+        namespace: &str,
+        updated_fact_id: &str,
+        pass: &mut ReembedPass,
+        ns_state: &mut NamespaceBatchState,
+    ) -> Result<(), MemoryError> {
+        pass.summary.processed_facts += 1;
+        pass.summary.succeeded_facts += 1;
+        ns_state.record_success(updated_fact_id);
+        update_pass_namespace_progress(pass, namespace, "running", ns_state);
+        self.persist_pass_job(pass, "running", Some(namespace), None, None)
+            .await?;
+        self.logger.log(
+            std::collections::HashMap::from([
+                ("op".to_string(), json!("reembed.cursor_advanced")),
+                ("namespace".to_string(), json!(namespace)),
+                (
+                    "last_completed_fact_id".to_string(),
+                    json!(ns_state.last_completed_fact_id.clone()),
+                ),
+            ]),
+            LogLevel::Debug,
+        );
+        Ok(())
+    }
+
+    /// Failure arm of one fact rewrite: record the failure and persist
+    /// progress as `running` (the quota abort is the caller's concern).
+    ///
+    /// Do NOT advance `last_completed_fact_id` past the failed fact — the
+    /// cursor must point at the last *succeeded* fact so a resume retries
+    /// the failed one. Advancing here would skip it on the next run (the
+    /// query uses `fact_id > cursor`).
+    async fn handle_rewrite_failure(
+        &self,
+        namespace: &str,
+        fact_id: &str,
+        err: &MemoryError,
+        pass: &mut ReembedPass,
+        ns_state: &mut NamespaceBatchState,
+    ) -> Result<(), MemoryError> {
+        pass.summary.processed_facts += 1;
+        pass.summary.failed_facts += 1;
+        ns_state.record_failure(fact_id);
+        pass.summary.failed_fact_ids.push(fact_id.to_string());
+        update_pass_namespace_progress(pass, namespace, "running", ns_state);
+        self.persist_pass_job(pass, "running", Some(namespace), None, None)
+            .await?;
+        self.logger.log(
+            std::collections::HashMap::from([
+                ("op".to_string(), json!("reembed.fact_failed")),
+                ("namespace".to_string(), json!(namespace)),
+                ("fact_id".to_string(), json!(fact_id)),
+                ("error".to_string(), json!(err.to_string())),
+            ]),
+            LogLevel::Warn,
+        );
+        Ok(())
+    }
+
     /// Cancel-path: report the interruption and persist the job as `interrupted`.
     /// Shared by the between-batch and per-fact cancellation checks.
     async fn persist_interrupted(
@@ -701,17 +665,12 @@ impl MemoryService {
         pass: &ReembedPass,
     ) -> Result<(), MemoryError> {
         progress.on_interrupted(&pass.summary, pass.started_at.elapsed());
-        self.persist_reembed_job(
-            &pass.summary,
-            &pass.target_signature,
-            pass.target_dimension,
-            &pass.namespace_progress,
-            Some(&pass.started_at_rfc3339),
-            Some(&chrono::Utc::now().to_rfc3339()),
+        self.persist_pass_job(
+            pass,
             "interrupted",
             None,
+            Some(&chrono::Utc::now().to_rfc3339()),
             None,
-            pass.started_at.elapsed(),
         )
         .await?;
         Ok(())
@@ -757,19 +716,8 @@ impl MemoryService {
         };
 
         let finished_at = chrono::Utc::now().to_rfc3339();
-        self.persist_reembed_job(
-            &pass.summary,
-            &pass.target_signature,
-            pass.target_dimension,
-            &pass.namespace_progress,
-            Some(&pass.started_at_rfc3339),
-            Some(&finished_at),
-            final_status,
-            None,
-            None,
-            pass.started_at.elapsed(),
-        )
-        .await?;
+        self.persist_pass_job(pass, final_status, None, Some(&finished_at), None)
+            .await?;
         self.logger.log(
             std::collections::HashMap::from([
                 ("op".to_string(), json!("reembed.job_completed")),
@@ -932,6 +880,31 @@ impl MemoryService {
         .await
     }
 
+    /// Persist the job record with the pass-derived fields read from `pass`
+    /// (summary, signature, dimension, progress map, start timestamps).
+    async fn persist_pass_job(
+        &self,
+        pass: &ReembedPass,
+        status: &str,
+        current_namespace: Option<&str>,
+        finished_at: Option<&str>,
+        last_error: Option<&str>,
+    ) -> Result<(), MemoryError> {
+        self.persist_reembed_job(
+            &pass.summary,
+            &pass.target_signature,
+            pass.target_dimension,
+            &pass.namespace_progress,
+            Some(&pass.started_at_rfc3339),
+            finished_at,
+            status,
+            current_namespace,
+            last_error,
+            pass.started_at.elapsed(),
+        )
+        .await
+    }
+
     #[allow(clippy::too_many_arguments)]
     async fn persist_reembed_job(
         &self,
@@ -1082,6 +1055,46 @@ fn update_namespace_progress(
             "updated_at": chrono::Utc::now().to_rfc3339(),
         }),
     );
+}
+
+/// Reflect the per-namespace counters in `ns_state` into the pass's
+/// persisted progress map.
+fn update_pass_namespace_progress(
+    pass: &mut ReembedPass,
+    namespace: &str,
+    status: &str,
+    ns_state: &NamespaceBatchState,
+) {
+    update_namespace_progress(
+        &mut pass.namespace_progress,
+        namespace,
+        status,
+        ns_state.processed,
+        ns_state.succeeded,
+        ns_state.failed,
+        ns_state.last_completed_fact_id.as_deref(),
+        &ns_state.failed_fact_ids,
+    );
+}
+
+/// In `--retry-failed` mode, keep only facts whose IDs are in the retry set.
+fn filter_retry_batch(
+    batch: Vec<Value>,
+    options: &ReembedOptions,
+    pass: &ReembedPass,
+) -> Vec<Value> {
+    if options.retry_failed {
+        batch
+            .into_iter()
+            .filter(|fact| {
+                fact.get("fact_id")
+                    .and_then(json_string)
+                    .is_some_and(|id| pass.retry_failed_ids.contains(id))
+            })
+            .collect()
+    } else {
+        batch
+    }
 }
 
 fn facts_per_second(elapsed: std::time::Duration, processed_facts: usize) -> f64 {

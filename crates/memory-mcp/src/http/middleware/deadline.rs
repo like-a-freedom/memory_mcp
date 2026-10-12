@@ -9,21 +9,32 @@ use axum::http::StatusCode;
 use axum::middleware::Next;
 use axum::response::Response;
 use std::sync::Arc;
+use std::time::Instant;
 
 use crate::http::HttpState;
 
 /// Wrap the request in the configured deadline.
+///
+/// The deadline is also installed as the ambient request budget
+/// ([`crate::platform::request_budget`]) so the database retry loop bounds each
+/// attempt by the time the request actually has left, rather than running out a
+/// fixed per-attempt timeout and retrying into the middleware's cancellation.
 pub async fn request_deadline(
     axum::extract::State(state): axum::extract::State<Arc<HttpState>>,
     req: axum::extract::Request,
     next: Next,
 ) -> Response {
     let deadline = state.config.request_deadline;
-    let resp = tokio::time::timeout(deadline, next.run(req)).await;
+    let deadline_at = Instant::now() + deadline;
+    let resp = tokio::time::timeout(
+        deadline,
+        crate::platform::request_budget::scope(deadline_at, next.run(req)),
+    )
+    .await;
     match resp {
         Ok(response) => response,
         Err(_elapsed) => {
-            let body = format!("deadline exceeded after {:?}", deadline);
+            let body = format!("deadline exceeded after {deadline:?}");
             let mut response = Response::new(axum::body::Body::from(body));
             *response.status_mut() = StatusCode::REQUEST_TIMEOUT;
             response.headers_mut().insert(

@@ -85,12 +85,16 @@ impl ExplanationService {
         struct ResolvedItem {
             item: ExplainItem,
             episode: Option<crate::models::Episode>,
-            fact_record: Option<serde_json::Map<String, Value>>,
+            fact_record: crate::storage::RecordLookup,
             entity_links: Vec<String>,
         }
 
         let mut resolved = Vec::with_capacity(request.context_pack.len());
         let mut all_entity_links: HashSet<String> = HashSet::new();
+        // One resolve per distinct id for the whole call: several items routinely
+        // cite the same episode (the seed of a context pack) or the same fact.
+        let mut episode_cache: HashMap<String, Option<crate::models::Episode>> = HashMap::new();
+        let mut fact_cache: HashMap<String, crate::storage::RecordLookup> = HashMap::new();
 
         for item in request.context_pack {
             if item.source_episode.is_empty() {
@@ -104,34 +108,48 @@ impl ExplanationService {
             // episode id that no longer exists. The owner-scoped
             // accessor refuses the cross-kind read; this absorbs
             // the refusal rather than failing the whole pack.
-            let record = match self.find_episode_record(&item.source_episode).await {
-                Ok(record) => record,
-                Err(error) => provenance_lookup_error(error)?,
-            };
-            let record = record.filter(|record| {
-                crate::memory::retrieval::filtering::episode_record_allowed_object(
-                    record,
-                    &access_policy,
-                )
-            });
-            let episode = record
-                .as_ref()
-                .and_then(crate::memory::record_parsing::episode_from_record);
-
-            let fact_record = if let Some(ref fact_id) = item.fact_id {
-                // Same policy for the fact side: an id that names
-                // another kind contributes no entity links.
-                let fact_record = match self.find_fact_record(fact_id).await {
+            let episode = if let Some(cached) = episode_cache.get(&item.source_episode) {
+                cached.clone()
+            } else {
+                let record = match self.find_episode_record(&item.source_episode).await {
                     Ok(record) => record,
                     Err(error) => provenance_lookup_error(error)?,
                 };
-                fact_record.filter(|record| {
-                    crate::memory::retrieval::filtering::fact_record_allowed_object(
+                let record = record.filter(|record| {
+                    crate::memory::retrieval::filtering::episode_record_allowed_object(
                         record,
                         &access_policy,
-                        &[],
                     )
-                })
+                });
+                let episode = record
+                    .as_ref()
+                    .and_then(crate::memory::record_parsing::episode_from_record);
+                episode_cache.insert(item.source_episode.clone(), episode.clone());
+                episode
+            };
+
+            // The access-checked fact record is resolved once and kept for
+            // Phase 3, which needs it for its provenance merge.
+            let fact_record = if let Some(ref fact_id) = item.fact_id {
+                // Same policy for the fact side: an id that names
+                // another kind contributes no entity links.
+                if let Some(cached) = fact_cache.get(fact_id) {
+                    cached.clone()
+                } else {
+                    let record = match self.find_fact_record(fact_id).await {
+                        Ok(record) => record,
+                        Err(error) => provenance_lookup_error(error)?,
+                    };
+                    let record = record.filter(|record| {
+                        crate::memory::retrieval::filtering::fact_record_allowed_object(
+                            record,
+                            &access_policy,
+                            &[],
+                        )
+                    });
+                    fact_cache.insert(fact_id.clone(), record.clone());
+                    record
+                }
             } else {
                 None
             };
@@ -411,6 +429,19 @@ impl ExplanationService {
 
         let budget = crate::platform::traversal_budget::GraphTraversalBudget::EXPLAIN;
         let cutoff = now();
+        // Read the communities once for the whole batch. The surprising-connection
+        // scan needs them to seed each entity's community membership, and loading
+        // them per linked entity meant up to eight full `community` table reads
+        // inside a single explain request.
+        let communities = self
+            .knowledge_graph_store()
+            .select_communities()
+            .await?
+            .into_iter()
+            .filter_map(|record| {
+                crate::memory::retrieval::graph_reads::graph_community_from_value(&record)
+            })
+            .collect::<Vec<_>>();
         let hub_entities = crate::memory::retrieval::graph_reads::find_hub_entities(
             self,
             cutoff,
@@ -432,7 +463,11 @@ impl ExplanationService {
         for entity_id in linked_entities {
             for connection in
                 crate::memory::retrieval::graph_surprising::find_surprising_connections(
-                    self, &entity_id, 3, budget,
+                    self,
+                    &entity_id,
+                    3,
+                    budget,
+                    &communities,
                 )
                 .await?
             {
@@ -628,6 +663,249 @@ mod tests {
         assert!(
             result.is_ok(),
             "well-formed id must pass validation: {result:?}"
+        );
+    }
+
+    /// Counts every read of the `community` table.
+    #[derive(Default)]
+    struct CountingDbClient {
+        community_selects: std::sync::atomic::AtomicUsize,
+    }
+
+    #[async_trait::async_trait]
+    impl crate::storage::client::DbClient for CountingDbClient {
+        async fn select_one(
+            &self,
+            record_id: &str,
+            _ns: &str,
+        ) -> Result<Option<Value>, MemoryError> {
+            Ok(Some(
+                json!({"entity_id": record_id, "canonical_name": record_id}),
+            ))
+        }
+
+        async fn select_table(
+            &self,
+            table: crate::storage::table_scope::OwnedTable,
+            _ns: &str,
+        ) -> Result<Vec<Value>, MemoryError> {
+            if table.as_str() == "community" {
+                self.community_selects
+                    .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+            }
+            Ok(vec![])
+        }
+
+        async fn create(
+            &self,
+            _: &str,
+            _: Value,
+            _: &str,
+            _: &[&str],
+        ) -> Result<Value, MemoryError> {
+            Ok(Value::Null)
+        }
+
+        async fn update(
+            &self,
+            _: &str,
+            _: Value,
+            _: &str,
+            _: &[&str],
+        ) -> Result<Value, MemoryError> {
+            Ok(Value::Null)
+        }
+
+        async fn query(
+            &self,
+            sql: &str,
+            _vars: Option<Value>,
+            _ns: &str,
+        ) -> Result<Value, MemoryError> {
+            if sql.contains("FROM edge") {
+                Ok(Value::Array(Vec::new()))
+            } else {
+                Ok(Value::Null)
+            }
+        }
+
+        async fn apply_migrations(&self, _ns: &str) -> Result<(), MemoryError> {
+            Ok(())
+        }
+    }
+
+    #[tokio::test]
+    async fn explain_batch_fetches_communities_once() {
+        let db = Arc::new(CountingDbClient::default());
+        let svc = ExplanationService::new(db.clone(), StdoutLogger::new("warn"), "org".to_string());
+        // The batch's observable cost contract is how many times it reaches for
+        // the community table: once for the whole batch, not once per linked
+        // entity. The empty fake data keeps the traversal itself out of the way;
+        // `.expect(...)` still requires the batch to have run against the links.
+        let _insights = svc
+            .build_graph_insights_batched(&[
+                "entity:a".to_string(),
+                "entity:b".to_string(),
+                "entity:c".to_string(),
+            ])
+            .await
+            .expect("insights")
+            .expect("batch has linked entities");
+        assert_eq!(
+            db.community_selects
+                .load(std::sync::atomic::Ordering::Relaxed),
+            1,
+            "one community load per batch, not one per entity"
+        );
+    }
+
+    /// Records every `select_one` id so a test can assert how many times an
+    /// item's episode or fact was fetched.
+    #[derive(Default)]
+    struct LookupCountingDbClient {
+        selected_ids: std::sync::Mutex<Vec<String>>,
+    }
+
+    impl LookupCountingDbClient {
+        fn select_one_count(&self, id: &str) -> usize {
+            self.selected_ids
+                .lock()
+                .expect("lock")
+                .iter()
+                .filter(|seen| seen.as_str() == id)
+                .count()
+        }
+    }
+
+    #[async_trait::async_trait]
+    impl crate::storage::client::DbClient for LookupCountingDbClient {
+        async fn select_one(
+            &self,
+            record_id: &str,
+            _ns: &str,
+        ) -> Result<Option<Value>, MemoryError> {
+            self.selected_ids
+                .lock()
+                .expect("lock")
+                .push(record_id.to_string());
+            if let Some(key) = record_id.strip_prefix("episode:") {
+                Ok(Some(json!({
+                    "episode_id": record_id,
+                    "source_type": "email",
+                    "source_id": format!("src-{key}"),
+                    "content": format!("content {key}"),
+                    "t_ref": "2026-01-01T00:00:00Z",
+                    "t_ingested": "2026-01-01T00:00:00Z",
+                })))
+            } else if record_id.starts_with("fact:") {
+                Ok(Some(json!({
+                    "fact_id": record_id,
+                    "entity_links": [],
+                    "provenance": {},
+                    "t_valid": "2026-01-01T00:00:00Z",
+                    "confidence": 1.0,
+                    "fact_type": "note",
+                })))
+            } else {
+                Ok(None)
+            }
+        }
+
+        async fn select_table(
+            &self,
+            _table: crate::storage::table_scope::OwnedTable,
+            _ns: &str,
+        ) -> Result<Vec<Value>, MemoryError> {
+            Ok(vec![])
+        }
+
+        async fn create(
+            &self,
+            _: &str,
+            _: Value,
+            _: &str,
+            _: &[&str],
+        ) -> Result<Value, MemoryError> {
+            Ok(Value::Null)
+        }
+
+        async fn update(
+            &self,
+            _: &str,
+            _: Value,
+            _: &str,
+            _: &[&str],
+        ) -> Result<Value, MemoryError> {
+            Ok(Value::Null)
+        }
+
+        async fn query(
+            &self,
+            sql: &str,
+            _vars: Option<Value>,
+            _ns: &str,
+        ) -> Result<Value, MemoryError> {
+            if sql.contains("FROM edge") {
+                Ok(Value::Array(Vec::new()))
+            } else {
+                Ok(Value::Null)
+            }
+        }
+
+        async fn apply_migrations(&self, _ns: &str) -> Result<(), MemoryError> {
+            Ok(())
+        }
+    }
+
+    fn explain_item(episode: &str, fact: &str) -> ExplainItem {
+        ExplainItem {
+            fact_id: Some(fact.to_string()),
+            content: "item".to_string(),
+            source_episode: episode.to_string(),
+            ..Default::default()
+        }
+    }
+
+    #[tokio::test]
+    async fn explain_fetches_each_unique_episode_and_fact_once() {
+        let db = Arc::new(LookupCountingDbClient::default());
+        let svc = ExplanationService::new(db.clone(), StdoutLogger::new("warn"), "org".to_string());
+        // Two items share an episode and a fact; a third uses a distinct pair.
+        // Each unique id must be resolved once for the whole call, however many
+        // items reference it.
+        svc.explain(
+            ExplainRequest {
+                context_pack: vec![
+                    explain_item("episode:e1", "fact:f1"),
+                    explain_item("episode:e1", "fact:f1"),
+                    explain_item("episode:e2", "fact:f2"),
+                ],
+                compact: true,
+            },
+            None,
+        )
+        .await
+        .expect("explain");
+
+        assert_eq!(
+            db.select_one_count("episode:e1"),
+            1,
+            "shared episode fetched once"
+        );
+        assert_eq!(
+            db.select_one_count("episode:e2"),
+            1,
+            "distinct episode fetched once"
+        );
+        assert_eq!(
+            db.select_one_count("fact:f1"),
+            1,
+            "shared fact fetched once"
+        );
+        assert_eq!(
+            db.select_one_count("fact:f2"),
+            1,
+            "distinct fact fetched once"
         );
     }
 }

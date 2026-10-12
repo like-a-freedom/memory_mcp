@@ -31,16 +31,57 @@ pub async fn extract_entities(
     let provider = service.entity_extractor.provider_name();
     let content_chars = content.chars().count();
 
-    let extraction_result = match service.entity_extractor.scheduling() {
+    let candidates =
+        match run_ner_extraction(service.entity_extractor.clone(), content, zero_shot_labels).await
+        {
+            Ok(candidates) => candidates,
+            Err(err) => {
+                let label_count = zero_shot_labels.map(|labels| labels.len());
+                log_ner_error(service, provider, content_chars, label_count, &err, timer);
+                return Err(err);
+            }
+        };
+
+    service.logger.log(
+        log_event(
+            "ner.extract.done",
+            json!({"content_chars": content_chars}),
+            build_ner_log_result(
+                provider,
+                candidates.len(),
+                zero_shot_labels.map(|labels| labels.len()),
+                None,
+            ),
+            None,
+            None,
+            Some(duration_ms(timer.elapsed())),
+        ),
+        LogLevel::Info,
+    );
+
+    let entities = resolve_and_dedupe(service, provider, candidates).await?;
+
+    persist_extraction_projection(service, episode_id, &entities).await?;
+
+    Ok(entities)
+}
+
+/// Run the extractor, honoring its scheduling mode.
+///
+/// A blocking-pool worker is a task of its own, so the ambient correlation id
+/// does not cross the boundary. Capture it at the call site and re-enter the
+/// scope inside, so the extractor's own events (`ner.*`) carry the same
+/// `req=` as the request that awaited them.
+async fn run_ner_extraction(
+    extractor: std::sync::Arc<dyn crate::knowledge::entity_extraction::EntityExtractor>,
+    content: &str,
+    zero_shot_labels: Option<&[String]>,
+) -> Result<Vec<EntityCandidate>, MemoryError> {
+    match extractor.scheduling() {
         NerScheduling::BlockingPool => {
-            let extractor = service.entity_extractor.clone();
             let content_owned = content.to_string();
             let zero_shot_labels = zero_shot_labels.map(<[String]>::to_vec);
             let handle = tokio::runtime::Handle::current();
-            // A blocking-pool worker is a task of its own, so the ambient
-            // correlation id does not cross the boundary. Capture it here and
-            // re-enter the scope inside, so the extractor's own events (`ner.*`)
-            // carry the same `req=` as the request that awaited them.
             let correlation_id = crate::logging::correlation::current();
 
             tokio::task::spawn_blocking(move || {
@@ -68,41 +109,22 @@ pub async fn extract_entities(
         }
         NerScheduling::Inline => match zero_shot_labels {
             Some(labels) => {
-                service
-                    .entity_extractor
+                extractor
                     .extract_candidates_with_labels(content, labels)
                     .await
             }
-            None => service.entity_extractor.extract_candidates(content).await,
+            None => extractor.extract_candidates(content).await,
         },
-    };
+    }
+}
 
-    let candidates = match extraction_result {
-        Ok(candidates) => candidates,
-        Err(err) => {
-            let label_count = zero_shot_labels.map(|labels| labels.len());
-            log_ner_error(service, provider, content_chars, label_count, &err, timer);
-            return Err(err);
-        }
-    };
-
-    service.logger.log(
-        log_event(
-            "ner.extract.done",
-            json!({"content_chars": content_chars}),
-            build_ner_log_result(
-                provider,
-                candidates.len(),
-                zero_shot_labels.map(|labels| labels.len()),
-                None,
-            ),
-            None,
-            None,
-            Some(duration_ms(timer.elapsed())),
-        ),
-        LogLevel::Info,
-    );
-
+/// Deduplicate raw candidates, resolve each to a durable entity id, and
+/// drop repeats. Resolution failures log `ner.resolve.error` and abort.
+async fn resolve_and_dedupe(
+    service: &ExtractDeps,
+    provider: &str,
+    candidates: Vec<EntityCandidate>,
+) -> Result<Vec<ExtractedEntity>, MemoryError> {
     let candidates = dedupe_entity_candidates(candidates);
     let mut entities = Vec::with_capacity(candidates.len());
     let mut seen_entity_ids = HashSet::new();
@@ -142,8 +164,6 @@ pub async fn extract_entities(
             });
         }
     }
-
-    persist_extraction_projection(service, episode_id, &entities).await?;
 
     Ok(entities)
 }
@@ -366,4 +386,169 @@ fn log_ner_error(
         ),
         LogLevel::Warn,
     );
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::models::EntityCandidate;
+    use crate::service::EntityExtractor;
+    use crate::storage::{DbClient, SurrealDbClient};
+    use std::collections::BTreeSet;
+    use std::sync::Arc;
+    use std::time::Duration;
+
+    #[test]
+    fn dedupe_entity_candidates_merges_duplicate_names_and_aliases() {
+        let candidates = dedupe_entity_candidates(vec![
+            EntityCandidate {
+                entity_type: "person".to_string(),
+                canonical_name: "Avery Stone".to_string(),
+                aliases: vec!["A. Stone".to_string()],
+            },
+            EntityCandidate {
+                entity_type: "company".to_string(),
+                canonical_name: "Avery Stone".to_string(),
+                aliases: vec!["Stone Group".to_string()],
+            },
+            EntityCandidate {
+                entity_type: "person".to_string(),
+                canonical_name: "Avery Stone".to_string(),
+                aliases: vec!["Avery S.".to_string()],
+            },
+            EntityCandidate {
+                entity_type: "organization".to_string(),
+                canonical_name: "Operations Forum".to_string(),
+                aliases: vec![],
+            },
+        ]);
+
+        assert_eq!(candidates.len(), 2);
+
+        let avery = candidates
+            .iter()
+            .find(|candidate| candidate.canonical_name == "Avery Stone")
+            .expect("deduped person candidate");
+        assert_eq!(avery.entity_type, "person");
+        assert_eq!(
+            avery.aliases.iter().cloned().collect::<BTreeSet<_>>(),
+            BTreeSet::from([
+                "A. Stone".to_string(),
+                "Avery S.".to_string(),
+                "Stone Group".to_string(),
+            ])
+        );
+    }
+
+    #[test]
+    fn build_ner_log_result_includes_provider_entity_count_and_zero_shot_count() {
+        let result = build_ner_log_result("gliner", 3, Some(6), None);
+
+        assert_eq!(
+            result.get("provider").and_then(Value::as_str),
+            Some("gliner")
+        );
+        assert_eq!(result.get("entity_count").and_then(Value::as_u64), Some(3));
+        assert_eq!(
+            result.get("zero_shot_label_count").and_then(Value::as_u64),
+            Some(6)
+        );
+        assert!(
+            result.get("error").is_none(),
+            "error field should be omitted when not provided"
+        );
+    }
+
+    #[test]
+    fn build_ner_log_result_omits_zero_shot_label_count_when_none() {
+        let result = build_ner_log_result("regex", 0, None, None);
+
+        assert_eq!(
+            result.get("provider").and_then(Value::as_str),
+            Some("regex")
+        );
+        assert_eq!(result.get("entity_count").and_then(Value::as_u64), Some(0));
+        assert!(
+            result.get("zero_shot_label_count").is_none(),
+            "zero_shot_label_count should be omitted when None"
+        );
+    }
+
+    #[test]
+    fn build_ner_log_result_includes_error_when_provided() {
+        let result = build_ner_log_result("gliner", 0, Some(3), Some("tokenization failed"));
+
+        assert_eq!(
+            result.get("error").and_then(Value::as_str),
+            Some("tokenization failed")
+        );
+        assert_eq!(result.get("entity_count").and_then(Value::as_u64), Some(0));
+    }
+
+    #[tokio::test(flavor = "current_thread")]
+    async fn extract_entities_does_not_block_runtime_for_local_gliner_provider() {
+        struct BlockingGlinerExtractor;
+
+        #[async_trait::async_trait]
+        impl EntityExtractor for BlockingGlinerExtractor {
+            fn provider_name(&self) -> &'static str {
+                "renamed-heavy-backend"
+            }
+
+            fn scheduling(&self) -> crate::knowledge::entity_extraction::NerScheduling {
+                crate::knowledge::entity_extraction::NerScheduling::BlockingPool
+            }
+
+            async fn extract_candidates(
+                &self,
+                _content: &str,
+            ) -> Result<Vec<EntityCandidate>, MemoryError> {
+                std::thread::sleep(Duration::from_millis(250));
+                Ok(Vec::new())
+            }
+        }
+
+        let db_client = Arc::new(
+            SurrealDbClient::connect_in_memory("episode-test", "org", "warn")
+                .await
+                .expect("connect in memory"),
+        );
+        db_client
+            .apply_migrations("org")
+            .await
+            .expect("apply migrations");
+
+        let mut service = crate::service::MemoryService::new(
+            db_client,
+            "org".to_string(),
+            "warn".to_string(),
+            50,
+            100,
+        )
+        .expect("create service");
+        service.entity_extractor = Arc::new(BlockingGlinerExtractor);
+
+        let ticker = tokio::spawn(async move {
+            let start = Instant::now();
+            tokio::time::sleep(Duration::from_millis(50)).await;
+            start.elapsed()
+        });
+        tokio::task::yield_now().await;
+
+        let _ = extract_entities(
+            &crate::memory::capabilities::deps::ExtractDeps::from(&service),
+            "episode:blocking-test",
+            "Atlas project status",
+            None,
+        )
+        .await
+        .expect("extract entities");
+        let tick_elapsed = ticker.await.expect("join ticker");
+
+        assert!(
+            tick_elapsed < Duration::from_millis(150),
+            "local gliner extraction blocked the runtime for {:?}",
+            tick_elapsed
+        );
+    }
 }

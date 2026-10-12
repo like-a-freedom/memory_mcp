@@ -12,6 +12,7 @@ suite-scoped cases.
 | `nightly` | `make eval-nightly` | scheduled breadth | blocking when scheduled |
 | `response_size` | `make eval-response-size` | compact vs verbose `assemble_context` and `explain` serialization | diagnostic; execution integrity blocking |
 | `ner_quality` | `make eval-ner-quality` | five extractor backends on the committed fixture | manual/platform-aware |
+| `perf_weekly` | `make perf-weekly` | ingest/assemble latency and throughput gates vs the committed baseline | manual, local machine only |
 | `external_*` | `make eval-external-*` | one pinned classic corpus per profile | requires prepared corpus |
 
 Response-size reports separate `assemble_*` and `explain_*` metrics. It is
@@ -44,3 +45,13 @@ official upstream launcher must be present before publishing such a result.
 
 The current NER floors and their review rationale are recorded in
 [`NER_BASELINE_REVIEW_2026-09-05.md`](NER_BASELINE_REVIEW_2026-09-05.md).
+
+## Perf
+
+Perf gates live outside CI by design (ADR-0082): `make perf-weekly` compares
+the weekly profile against
+[`evals/perf/baselines/perf-weekly-local.json`](../../evals/perf/baselines/perf-weekly-local.json)
+on the maintainer's local machine, and dated artifacts are archived under
+[`evals/perf/results/`](../../evals/perf/results/). Commands, the host-tag
+policy, artifact layout, and the baseline-update ritual are documented in
+[`docs/performance/PERF_HARNESS.md`](../performance/PERF_HARNESS.md).

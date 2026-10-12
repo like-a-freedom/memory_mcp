@@ -1,9 +1,12 @@
 # Criterion benchmark matrix
 
 The benchmark commands are intentionally separate from correctness profiles.
-Correctness profiles (`make eval-pr`, `make eval-release`, `make eval-nightly`,
-`make eval-response-size`, and `make eval-ner-quality`) must pass before a
-performance result is compared with a previous run.
+Run PR, release, and nightly correctness profiles with `memory-eval run`; PR
+and release require their checked-in regression baselines. The smaller
+`make eval-response-size` and `make eval-ner-quality` targets remain available.
+All applicable correctness profiles must pass before comparing a performance
+result with a previous run. See the Evaluation section in `README.md` for the
+exact profile commands and baseline paths.
 
 | Target | Scope | Required inputs | Command |
 |---|---|---|---|

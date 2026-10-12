@@ -20,4 +20,5 @@ pub mod log_event;
 pub mod model_runtime;
 pub mod persistence;
 pub mod rate_limiter;
+pub mod request_budget;
 pub mod traversal_budget;

@@ -156,9 +156,21 @@ pub fn versioned_migrations() -> &'static [MigrationScript] {
             file_name: "039_filesystem_ingestion.surql",
             sql: include_str!("../../migrations/039_filesystem_ingestion.surql"),
         },
+        // Numbered 053 to sit after the SaaS-only scripts in filename order,
+        // but it belongs to the base profile: both the stdio server and every
+        // HTTP tenant replay this catalog, so a lookup index the context read
+        // path needs must be registered here rather than in the SaaS list.
         MigrationScript {
-            file_name: "053_episode_source_context.surql",
-            sql: include_str!("../../migrations/053_episode_source_context.surql"),
+            file_name: "053_context_lookup_indexes.surql",
+            sql: include_str!("../../migrations/053_context_lookup_indexes.surql"),
+        },
+        MigrationScript {
+            file_name: "054_query_index_coverage.surql",
+            sql: include_str!("../../migrations/054_query_index_coverage.surql"),
+        },
+        MigrationScript {
+            file_name: "055_episode_source_context.surql",
+            sql: include_str!("../../migrations/055_episode_source_context.surql"),
         },
         // NOTE: SaaS-specific migrations (040+) are NOT registered here.
         // They are applied separately by the HTTP profile's provisioning
@@ -974,7 +986,12 @@ fn required_schema_fields(table: &str) -> &'static [&'static str] {
 
 fn required_schema_indexes(table: &str) -> &'static [&'static str] {
     match table {
-        "episode" => &["episode_source_id", "episode_project"],
+        "episode" => &[
+            "episode_source_id",
+            "episode_project",
+            "episode_episode_id",
+            "episode_t_ref",
+        ],
         "entity" => &[
             "entity_canonical_name",
             "entity_canonical_name_normalized",
@@ -987,6 +1004,8 @@ fn required_schema_indexes(table: &str) -> &'static [&'static str] {
             "fact_project",
             "fact_project_type",
             "fact_claim_backfill_cursor_idx",
+            "fact_source_episode",
+            "fact_t_valid",
         ],
         "edge" => &[
             "edge_relation",
@@ -994,6 +1013,7 @@ fn required_schema_indexes(table: &str) -> &'static [&'static str] {
             "edge_out",
             "edge_from_to_idx",
             "edge_temporal_idx",
+            "edge_t_valid",
         ],
         "community" => &["community_summary_search", "community_members"],
         "query_log" => &[

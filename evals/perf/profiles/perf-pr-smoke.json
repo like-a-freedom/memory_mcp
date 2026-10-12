@@ -1,0 +1,53 @@
+{
+  "schema": "memory-mcp-perf-profile/v1",
+  "name": "pr-smoke",
+  "budget_seconds": 300,
+  "host_tag": "local",
+  "env": { "NER_EXTRACTOR": "regex" },
+  "scenarios": [
+    {
+      "id": "ingest-scale",
+      "driver": "in_process",
+      "scales": [10],
+      "iterations": 3,
+      "warmup": 1
+    },
+    {
+      "id": "assemble-scale",
+      "driver": "in_process",
+      "scales": [10],
+      "iterations": 3,
+      "warmup": 1,
+      "queries": 5
+    },
+    {
+      "id": "latency-extract",
+      "driver": "in_process",
+      "scales": [10],
+      "iterations": 1,
+      "warmup": 0
+    },
+    {
+      "id": "latency-resolve",
+      "driver": "in_process",
+      "scales": [10],
+      "iterations": 1,
+      "warmup": 0
+    },
+    {
+      "id": "latency-explain",
+      "driver": "in_process",
+      "scales": [10],
+      "iterations": 1,
+      "warmup": 0
+    },
+    {
+      "id": "latency-invalidate",
+      "driver": "in_process",
+      "scales": [10],
+      "iterations": 1,
+      "warmup": 0
+    }
+  ],
+  "gates": []
+}

@@ -44,8 +44,12 @@
 
 services:
   surrealdb:
-    image: surrealdb/surrealdb:v3.2.4
+    image: surrealdb/surrealdb:v3.3.2
     platform: linux/amd64
+    # Bound the database's memory so it cannot drive the host into swap. 512M is
+    # several times the current working set; raise via `SURREALDB_MEM_LIMIT` if a
+    # large namespace's startup index build needs more.
+    mem_limit: "${SURREALDB_MEM_LIMIT:-512m}"
     # Docker creates named volumes as root-owned. The official image defaults
     # to nonroot, so run this single stateful service as root to initialize and
     # maintain the mounted RocksDB directory.
@@ -75,6 +79,9 @@ services:
       dockerfile: Dockerfile
     image: "${MEMORY_MCP_IMAGE:-memory-mcp-http:local}"
     platform: linux/amd64
+    # Bound the server's RSS so a leak or a burst cannot push the host into
+    # swap; raise via `MEMORY_MCP_MEM_LIMIT` if a deployment needs more.
+    mem_limit: "${MEMORY_MCP_MEM_LIMIT:-768m}"
     ports:
       - "8080:8080"
     depends_on:

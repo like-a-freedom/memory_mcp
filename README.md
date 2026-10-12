@@ -2252,20 +2252,41 @@ The `eval-harness` crate (`memory-eval` binary) provides a profile-driven,
 truthful evaluation system. It is never linked into the production binary.
 
 ```bash
-# PR profile (target 10 min)
-make eval-pr
+# PR profile, including native retrieval-quality evaluation
+mkdir -p target/evals
+cargo run -p eval-harness --locked --bin memory-eval -- run \
+  --profile evals/profiles/pr.json \
+  --artifact target/evals/pr.json \
+  --baseline evals/baselines/one-active-namespace-pr.json
 
-# Release profile (target 20 min)
-make eval-release
+# Release profile, including native retrieval-quality evaluation
+cargo run -p eval-harness --locked --bin memory-eval -- run \
+  --profile evals/profiles/release.json \
+  --artifact target/evals/release.json \
+  --baseline evals/baselines/one-active-namespace-release.json
 
 # Nightly profile (full end-to-end)
-make eval-nightly
+cargo run -p eval-harness --locked --bin memory-eval -- run \
+  --profile evals/profiles/nightly.json \
+  --artifact target/evals/nightly.json
+
+# Smaller correctness profiles
+make eval-response-size
+make eval-ner-quality
 
 # Corpus preparation (one-time, requires network)
-cargo run -p eval-harness --bin memory-eval -- prepare-corpus \
+cargo run -p eval-harness --locked --bin memory-eval -- prepare-corpus \
   --manifest evals/corpora/longmemeval.json \
   --output-root data/corpora
 ```
+
+The PR and release profiles require the corresponding checked-in baseline
+because they enforce regression budgets. Native retrieval-quality runs also
+require the pinned E5 and mMARCO model files, `MEMORY_CLAIM_ROLLOUT_STAGE=evidence`,
+and reranker admission floor `0`. Follow the [retrieval-quality corpus runbook](evals/corpora/retrieval-quality-v1/README.md)
+for model preparation and the full environment configuration. A missing or
+incompatible provider makes those cases `invalid` and does not count as a
+passing evaluation.
 
 Profiles, modes, outcome semantics, artifact schema, and baseline governance
 are documented in the design spec at

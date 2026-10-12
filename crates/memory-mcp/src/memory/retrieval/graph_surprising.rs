@@ -2,9 +2,7 @@
 use crate::error::MemoryError;
 use crate::knowledge::community::is_entity_id;
 use crate::logging::LogLevel;
-use crate::memory::retrieval::graph_reads::{
-    GraphCommunity, GraphContext, graph_community_from_value,
-};
+use crate::memory::retrieval::graph_reads::{GraphCommunity, GraphContext};
 use crate::models::SurprisingConnection;
 use crate::platform::log_event::log_event;
 use crate::platform::traversal_budget::GraphTraversalBudget;
@@ -17,6 +15,7 @@ pub(crate) async fn find_surprising_connections(
     source_entity: &str,
     max_depth: i32,
     budget: GraphTraversalBudget,
+    communities: &[GraphCommunity],
 ) -> Result<Vec<SurprisingConnection>, MemoryError> {
     if !is_entity_id(source_entity) || max_depth < 2 {
         ctx.logger().log(
@@ -46,14 +45,7 @@ pub(crate) async fn find_surprising_connections(
     );
 
     let cutoff_iso = normalize_dt(crate::shared::temporal::now());
-    let communities = ctx
-        .knowledge_graph_store()
-        .select_communities()
-        .await?
-        .into_iter()
-        .filter_map(|record| graph_community_from_value(&record))
-        .collect::<Vec<_>>();
-    let source_community_ids = community_ids_for_member(&communities, source_entity);
+    let source_community_ids = community_ids_for_member(communities, source_entity);
     let mut name_cache = HashMap::new();
     let source_entity_name = cached_entity_name(ctx, source_entity, &mut name_cache).await?;
 
@@ -109,7 +101,7 @@ pub(crate) async fn find_surprising_connections(
                     && next_depth >= 2
                     && is_surprising_target(
                         &source_community_ids,
-                        &community_ids_for_member(&communities, &neighbor),
+                        &community_ids_for_member(communities, &neighbor),
                     )
                 {
                     let target_entity_name =
@@ -238,6 +230,7 @@ fn community_ids_for_member(communities: &[GraphCommunity], entity_id: &str) -> 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::memory::retrieval::graph_reads::graph_community_from_value;
     use crate::storage::client::DbClient;
     use async_trait::async_trait;
     use serde_json::json;
@@ -282,19 +275,15 @@ mod tests {
                 table: crate::storage::table_scope::OwnedTable,
                 _namespace: &str,
             ) -> Result<Vec<Value>, MemoryError> {
-                if table.as_str() == "community" {
-                    return Ok((0..256)
-                        .map(|idx| {
-                            json!({
-                                "community_id": format!("community:{idx}"),
-                                "summary": format!("Community {idx}"),
-                                "member_entities": [format!("entity:{idx}")],
-                                "updated_at": "2026-04-15T00:00:00Z",
-                            })
-                        })
-                        .collect());
-                }
-
+                // The scan receives its communities as a parameter, so it must
+                // never reach for the table itself. Making that a panic, rather
+                // than a counter the test reads afterwards, means the failure
+                // lands on the offending call rather than on a later assertion.
+                assert_ne!(
+                    table.as_str(),
+                    "community",
+                    "the scan must not read the community table itself"
+                );
                 Ok(vec![])
             }
 
@@ -333,7 +322,8 @@ mod tests {
                         return Ok(Value::Array(Vec::new()));
                     }
                     let node_id = vars
-                        .and_then(|vars| vars["node_id"].as_str().map(str::to_string))
+                        .as_ref()
+                        .map(crate::shared::record::bound_node_id)
                         .unwrap_or_default();
                     let next_edge = if let Some(idx) = node_id.strip_prefix("entity:") {
                         json!({
@@ -371,10 +361,29 @@ mod tests {
         )
         .expect("service");
 
-        let connections =
-            find_surprising_connections(&service, "entity:0", 32, GraphTraversalBudget::FULL)
-                .await
-                .expect("connections");
+        // The communities the batch resolved once, passed in as the scan's
+        // input. Building 256 of them keeps the traversal budget, not the
+        // membership data, the thing under test.
+        let communities = (0..256)
+            .map(|idx| {
+                json!({
+                    "community_id": format!("community:{idx}"),
+                    "summary": format!("Community {idx}"),
+                    "member_entities": [format!("entity:{idx}")],
+                    "updated_at": "2026-04-15T00:00:00Z",
+                })
+            })
+            .filter_map(|record| graph_community_from_value(&record))
+            .collect::<Vec<_>>();
+        let connections = find_surprising_connections(
+            &service,
+            "entity:0",
+            32,
+            GraphTraversalBudget::FULL,
+            &communities,
+        )
+        .await
+        .expect("connections");
 
         assert!(
             db.neighbor_queries.load(Ordering::Relaxed)

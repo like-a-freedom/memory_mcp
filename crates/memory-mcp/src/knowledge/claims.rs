@@ -1141,9 +1141,14 @@ mod tests {
 
     #[test]
     fn latest_registered_migration_is_expected() {
+        // This test exists so that appending to the catalog is a deliberate act:
+        // a new migration changes what "last" is, and whoever adds one updates
+        // the expectation here. It names the file, not a number, because the
+        // numbering has two series (base profile and SaaS-only) and the
+        // catalog entry is chosen by position, not by count.
         let migrations = crate::storage::migrations::versioned_migrations();
         let last = migrations.last().unwrap();
-        assert_eq!(last.file_name, "053_episode_source_context.surql");
+        assert_eq!(last.file_name, "055_episode_source_context.surql");
     }
 
     #[test]

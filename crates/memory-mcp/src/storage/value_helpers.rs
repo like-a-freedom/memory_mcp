@@ -211,6 +211,15 @@ mod tests {
     }
 
     #[test]
+    fn unwrap_record_string_handles_record_id() {
+        let value = json!({"RecordId": {"table": "entity", "key": "alice"}});
+        assert_eq!(
+            unwrap_record_string(&value),
+            Some("entity:alice".to_string())
+        );
+    }
+
+    #[test]
     fn string_from_value_handles_record_id_missing_fields() {
         let value = json!({"RecordId": {"table": "entity"}});
         assert_eq!(string_from_value(&value), None);

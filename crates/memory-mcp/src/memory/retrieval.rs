@@ -1145,8 +1145,8 @@ mod tests {
                         |sql| sql.contains("FROM edge"),
                         |_sql, vars| {
                             let node_id = vars
-                                .and_then(|v| v.get("node_id").cloned())
-                                .and_then(|v| v.as_str().map(str::to_string))
+                                .as_ref()
+                                .map(|v| crate::shared::record::bound_node_id(v))
                                 .unwrap_or_default();
                             Ok(Value::Array(match node_id.as_str() {
                                 "entity:alpha" => vec![json!({

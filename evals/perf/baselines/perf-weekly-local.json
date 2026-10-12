@@ -1,0 +1,1979 @@
+{
+  "schema": "memory-mcp-perf/v1",
+  "profile": "perf-weekly",
+  "profileDigest": "bb173e2096d2dca7249d4306540f7a2db4f164eb47c992fabf777253925937ee",
+  "commit": "89ecb1bc",
+  "host": {
+    "hostTag": "local",
+    "os": "macos",
+    "arch": "aarch64"
+  },
+  "startedAt": "2026-10-11T05:53:03.883142+00:00",
+  "durationMs": 3734,
+  "scenarios": {
+    "assemble-scale-10": {
+      "latencies": {
+        "count": 15,
+        "p50_us": 9393,
+        "p90_us": 10305,
+        "p95_us": 10738,
+        "p99_us": 10738,
+        "mean_us": 9405,
+        "total_us": 141085
+      },
+      "throughputEps": 106.31888577807706,
+      "samplesRaw": [
+        8717,
+        8689,
+        8311,
+        8420,
+        8285,
+        9959,
+        9393,
+        9404,
+        9198,
+        9270,
+        10738,
+        10237,
+        10305,
+        10089,
+        10070
+      ],
+      "sql": [
+        {
+          "templateHash": "013712abdee36464",
+          "op": "db.execute_query",
+          "class": "ProvenanceRead",
+          "phase": "timed",
+          "count": 80,
+          "stats": {
+            "count": 80,
+            "p50_us": 96,
+            "p90_us": 128,
+            "p95_us": 130,
+            "p99_us": 141,
+            "mean_us": 98,
+            "total_us": 7885
+          }
+        },
+        {
+          "templateHash": "2140a92d4808e17e",
+          "op": "db.execute_query",
+          "class": "Other",
+          "phase": "timed",
+          "count": 100,
+          "stats": {
+            "count": 100,
+            "p50_us": 69,
+            "p90_us": 108,
+            "p95_us": 119,
+            "p99_us": 130,
+            "mean_us": 76,
+            "total_us": 7601
+          }
+        },
+        {
+          "templateHash": "27ff4c17b1818b75",
+          "op": "db.execute_query",
+          "class": "Other",
+          "phase": "setup",
+          "count": 40,
+          "stats": {
+            "count": 40,
+            "p50_us": 77,
+            "p90_us": 85,
+            "p95_us": 86,
+            "p99_us": 111,
+            "mean_us": 79,
+            "total_us": 3167
+          }
+        },
+        {
+          "templateHash": "319e36f02dbd39cc",
+          "op": "db.execute_query",
+          "class": "ResolveLookup",
+          "phase": "setup",
+          "count": 80,
+          "stats": {
+            "count": 80,
+            "p50_us": 38,
+            "p90_us": 44,
+            "p95_us": 45,
+            "p99_us": 104,
+            "mean_us": 38,
+            "total_us": 3108
+          }
+        },
+        {
+          "templateHash": "32dc8d6f1dad8ab1",
+          "op": "db.execute_query",
+          "class": "Other",
+          "phase": "setup",
+          "count": 240,
+          "stats": {
+            "count": 240,
+            "p50_us": 26,
+            "p90_us": 32,
+            "p95_us": 32,
+            "p99_us": 36,
+            "mean_us": 27,
+            "total_us": 6537
+          }
+        },
+        {
+          "templateHash": "42476f07ebde1b8b",
+          "op": "db.execute_query",
+          "class": "Other",
+          "phase": "setup",
+          "count": 30,
+          "stats": {
+            "count": 30,
+            "p50_us": 38,
+            "p90_us": 43,
+            "p95_us": 44,
+            "p99_us": 46,
+            "mean_us": 38,
+            "total_us": 1152
+          }
+        },
+        {
+          "templateHash": "459431758cd729de",
+          "op": "db.execute_query",
+          "class": "Other",
+          "phase": "setup",
+          "count": 10,
+          "stats": {
+            "count": 10,
+            "p50_us": 73,
+            "p90_us": 94,
+            "p95_us": 101,
+            "p99_us": 101,
+            "mean_us": 74,
+            "total_us": 746
+          }
+        },
+        {
+          "templateHash": "45edb59b5f06320b",
+          "op": "db.execute_query",
+          "class": "CommunityScan",
+          "phase": "setup",
+          "count": 80,
+          "stats": {
+            "count": 80,
+            "p50_us": 72,
+            "p90_us": 101,
+            "p95_us": 103,
+            "p99_us": 114,
+            "mean_us": 79,
+            "total_us": 6338
+          }
+        },
+        {
+          "templateHash": "4acb9410125589a0",
+          "op": "db.execute_query",
+          "class": "FactWrite",
+          "phase": "setup",
+          "count": 80,
+          "stats": {
+            "count": 80,
+            "p50_us": 157,
+            "p90_us": 180,
+            "p95_us": 194,
+            "p99_us": 400,
+            "mean_us": 163,
+            "total_us": 13078
+          }
+        },
+        {
+          "templateHash": "59db7032fb925765",
+          "op": "db.execute_query",
+          "class": "ResolveLookup",
+          "phase": "setup",
+          "count": 120,
+          "stats": {
+            "count": 120,
+            "p50_us": 47,
+            "p90_us": 55,
+            "p95_us": 58,
+            "p99_us": 61,
+            "mean_us": 47,
+            "total_us": 5706
+          }
+        },
+        {
+          "templateHash": "5aaeef64056d5c21",
+          "op": "db.execute_query",
+          "class": "Other",
+          "phase": "setup",
+          "count": 80,
+          "stats": {
+            "count": 80,
+            "p50_us": 107,
+            "p90_us": 119,
+            "p95_us": 121,
+            "p99_us": 168,
+            "mean_us": 108,
+            "total_us": 8662
+          }
+        },
+        {
+          "templateHash": "5fb8325e33267f59",
+          "op": "db.execute_query",
+          "class": "Other",
+          "phase": "setup",
+          "count": 40,
+          "stats": {
+            "count": 40,
+            "p50_us": 89,
+            "p90_us": 99,
+            "p95_us": 101,
+            "p99_us": 118,
+            "mean_us": 90,
+            "total_us": 3630
+          }
+        },
+        {
+          "templateHash": "612f8e5c7c25d170",
+          "op": "db.execute_query",
+          "class": "EdgeNeighbors",
+          "phase": "setup",
+          "count": 131,
+          "stats": {
+            "count": 131,
+            "p50_us": 108,
+            "p90_us": 123,
+            "p95_us": 134,
+            "p99_us": 151,
+            "mean_us": 107,
+            "total_us": 14076
+          }
+        },
+        {
+          "templateHash": "612f8e5c7c25d170",
+          "op": "db.execute_query",
+          "class": "EdgeNeighbors",
+          "phase": "timed",
+          "count": 220,
+          "stats": {
+            "count": 220,
+            "p50_us": 69,
+            "p90_us": 77,
+            "p95_us": 79,
+            "p99_us": 85,
+            "mean_us": 69,
+            "total_us": 15326
+          }
+        },
+        {
+          "templateHash": "693f9f700c768be8",
+          "op": "db.execute_query",
+          "class": "EntityUpsert",
+          "phase": "setup",
+          "count": 11,
+          "stats": {
+            "count": 11,
+            "p50_us": 39,
+            "p90_us": 48,
+            "p95_us": 91,
+            "p99_us": 91,
+            "mean_us": 43,
+            "total_us": 476
+          }
+        },
+        {
+          "templateHash": "69f012dd7581f1e4",
+          "op": "db.execute_query",
+          "class": "Other",
+          "phase": "timed",
+          "count": 20,
+          "stats": {
+            "count": 20,
+            "p50_us": 58,
+            "p90_us": 74,
+            "p95_us": 76,
+            "p99_us": 78,
+            "mean_us": 61,
+            "total_us": 1221
+          }
+        },
+        {
+          "templateHash": "6cc42b7daa46a1a7",
+          "op": "db.execute_query",
+          "class": "ProvenanceRead",
+          "phase": "timed",
+          "count": 40,
+          "stats": {
+            "count": 40,
+            "p50_us": 141,
+            "p90_us": 158,
+            "p95_us": 164,
+            "p99_us": 255,
+            "mean_us": 143,
+            "total_us": 5745
+          }
+        },
+        {
+          "templateHash": "72d0d98dbcb21c86",
+          "op": "db.execute_query",
+          "class": "AliasLookup",
+          "phase": "setup",
+          "count": 22,
+          "stats": {
+            "count": 22,
+            "p50_us": 43,
+            "p90_us": 53,
+            "p95_us": 61,
+            "p99_us": 87,
+            "mean_us": 45,
+            "total_us": 997
+          }
+        },
+        {
+          "templateHash": "7940895e5873e42c",
+          "op": "db.execute_query",
+          "class": "Other",
+          "phase": "setup",
+          "count": 120,
+          "stats": {
+            "count": 120,
+            "p50_us": 17,
+            "p90_us": 20,
+            "p95_us": 20,
+            "p99_us": 23,
+            "mean_us": 17,
+            "total_us": 2069
+          }
+        },
+        {
+          "templateHash": "7db8205bfe1fe0f5",
+          "op": "db.execute_query",
+          "class": "EntityUpsert",
+          "phase": "setup",
+          "count": 40,
+          "stats": {
+            "count": 40,
+            "p50_us": 41,
+            "p90_us": 48,
+            "p95_us": 51,
+            "p99_us": 75,
+            "mean_us": 43,
+            "total_us": 1726
+          }
+        },
+        {
+          "templateHash": "8320d12aa6b12a27",
+          "op": "db.execute_query",
+          "class": "ProvenanceRead",
+          "phase": "setup",
+          "count": 120,
+          "stats": {
+            "count": 120,
+            "p50_us": 105,
+            "p90_us": 135,
+            "p95_us": 138,
+            "p99_us": 144,
+            "mean_us": 106,
+            "total_us": 12783
+          }
+        },
+        {
+          "templateHash": "85465ffc7d2935d4",
+          "op": "db.execute_query",
+          "class": "ProvenanceRead",
+          "phase": "timed",
+          "count": 20,
+          "stats": {
+            "count": 20,
+            "p50_us": 239,
+            "p90_us": 357,
+            "p95_us": 363,
+            "p99_us": 386,
+            "mean_us": 263,
+            "total_us": 5274
+          }
+        },
+        {
+          "templateHash": "8633c76c65f189af",
+          "op": "db.execute_query",
+          "class": "ProvenanceRead",
+          "phase": "setup",
+          "count": 40,
+          "stats": {
+            "count": 40,
+            "p50_us": 54,
+            "p90_us": 60,
+            "p95_us": 65,
+            "p99_us": 82,
+            "mean_us": 55,
+            "total_us": 2239
+          }
+        },
+        {
+          "templateHash": "8c8ee1a75d6cafef",
+          "op": "db.execute_query",
+          "class": "EpisodeWrite",
+          "phase": "setup",
+          "count": 40,
+          "stats": {
+            "count": 40,
+            "p50_us": 48,
+            "p90_us": 58,
+            "p95_us": 65,
+            "p99_us": 79,
+            "mean_us": 50,
+            "total_us": 2025
+          }
+        },
+        {
+          "templateHash": "8d61ab183cd86fc1",
+          "op": "db.execute_query",
+          "class": "EdgeNeighbors",
+          "phase": "setup",
+          "count": 131,
+          "stats": {
+            "count": 131,
+            "p50_us": 75,
+            "p90_us": 89,
+            "p95_us": 96,
+            "p99_us": 105,
+            "mean_us": 76,
+            "total_us": 10036
+          }
+        },
+        {
+          "templateHash": "8d61ab183cd86fc1",
+          "op": "db.execute_query",
+          "class": "EdgeNeighbors",
+          "phase": "timed",
+          "count": 220,
+          "stats": {
+            "count": 220,
+            "p50_us": 121,
+            "p90_us": 155,
+            "p95_us": 245,
+            "p99_us": 419,
+            "mean_us": 133,
+            "total_us": 29474
+          }
+        },
+        {
+          "templateHash": "8e8e5d482b4a1a0d",
+          "op": "db.execute_query",
+          "class": "AliasLookup",
+          "phase": "timed",
+          "count": 40,
+          "stats": {
+            "count": 40,
+            "p50_us": 46,
+            "p90_us": 50,
+            "p95_us": 52,
+            "p99_us": 70,
+            "mean_us": 46,
+            "total_us": 1851
+          }
+        },
+        {
+          "templateHash": "9040f6b6a8c11854",
+          "op": "db.execute_query",
+          "class": "ProvenanceRead",
+          "phase": "timed",
+          "count": 20,
+          "stats": {
+            "count": 20,
+            "p50_us": 123,
+            "p90_us": 133,
+            "p95_us": 135,
+            "p99_us": 159,
+            "mean_us": 123,
+            "total_us": 2474
+          }
+        },
+        {
+          "templateHash": "9e7af5b7e2e2f0b0",
+          "op": "db.execute_query",
+          "class": "Other",
+          "phase": "setup",
+          "count": 9,
+          "stats": {
+            "count": 9,
+            "p50_us": 157,
+            "p90_us": 228,
+            "p95_us": 228,
+            "p99_us": 228,
+            "mean_us": 165,
+            "total_us": 1493
+          }
+        },
+        {
+          "templateHash": "a478f19254b99cdb",
+          "op": "db.execute_query",
+          "class": "ProvenanceRead",
+          "phase": "setup",
+          "count": 160,
+          "stats": {
+            "count": 160,
+            "p50_us": 41,
+            "p90_us": 50,
+            "p95_us": 51,
+            "p99_us": 57,
+            "mean_us": 41,
+            "total_us": 6697
+          }
+        },
+        {
+          "templateHash": "a8d5351a815cf3bf",
+          "op": "db.execute_query",
+          "class": "ProvenanceRead",
+          "phase": "timed",
+          "count": 20,
+          "stats": {
+            "count": 20,
+            "p50_us": 95,
+            "p90_us": 101,
+            "p95_us": 102,
+            "p99_us": 108,
+            "mean_us": 94,
+            "total_us": 1895
+          }
+        },
+        {
+          "templateHash": "acd55f03709bde71",
+          "op": "db.execute_query",
+          "class": "ProvenanceRead",
+          "phase": "timed",
+          "count": 20,
+          "stats": {
+            "count": 20,
+            "p50_us": 490,
+            "p90_us": 693,
+            "p95_us": 704,
+            "p99_us": 739,
+            "mean_us": 518,
+            "total_us": 10372
+          }
+        },
+        {
+          "templateHash": "b34a40f0de88241b",
+          "op": "db.execute_query",
+          "class": "Other",
+          "phase": "setup",
+          "count": 40,
+          "stats": {
+            "count": 40,
+            "p50_us": 15,
+            "p90_us": 17,
+            "p95_us": 19,
+            "p99_us": 22,
+            "mean_us": 15,
+            "total_us": 604
+          }
+        },
+        {
+          "templateHash": "b49799ed4a29738b",
+          "op": "db.execute_query",
+          "class": "AliasLookup",
+          "phase": "timed",
+          "count": 20,
+          "stats": {
+            "count": 20,
+            "p50_us": 261,
+            "p90_us": 347,
+            "p95_us": 355,
+            "p99_us": 363,
+            "mean_us": 275,
+            "total_us": 5509
+          }
+        },
+        {
+          "templateHash": "b61c61a33e6300e6",
+          "op": "db.execute_query",
+          "class": "RelateEdge",
+          "phase": "setup",
+          "count": 240,
+          "stats": {
+            "count": 240,
+            "p50_us": 73,
+            "p90_us": 87,
+            "p95_us": 93,
+            "p99_us": 104,
+            "mean_us": 75,
+            "total_us": 18233
+          }
+        },
+        {
+          "templateHash": "c47596bdf0788f80",
+          "op": "db.execute_query",
+          "class": "ProvenanceRead",
+          "phase": "timed",
+          "count": 20,
+          "stats": {
+            "count": 20,
+            "p50_us": 342,
+            "p90_us": 539,
+            "p95_us": 539,
+            "p99_us": 565,
+            "mean_us": 390,
+            "total_us": 7816
+          }
+        },
+        {
+          "templateHash": "cb2093b52c7524af",
+          "op": "db.execute_query",
+          "class": "ProvenanceRead",
+          "phase": "setup",
+          "count": 240,
+          "stats": {
+            "count": 240,
+            "p50_us": 20,
+            "p90_us": 25,
+            "p95_us": 26,
+            "p99_us": 28,
+            "mean_us": 20,
+            "total_us": 4897
+          }
+        },
+        {
+          "templateHash": "cd6bba171f451f4d",
+          "op": "db.execute_query",
+          "class": "ProvenanceRead",
+          "phase": "setup",
+          "count": 120,
+          "stats": {
+            "count": 120,
+            "p50_us": 68,
+            "p90_us": 76,
+            "p95_us": 80,
+            "p99_us": 83,
+            "mean_us": 68,
+            "total_us": 8275
+          }
+        },
+        {
+          "templateHash": "dfc7a388f1a096d8",
+          "op": "db.execute_query",
+          "class": "ProvenanceRead",
+          "phase": "setup",
+          "count": 120,
+          "stats": {
+            "count": 120,
+            "p50_us": 65,
+            "p90_us": 74,
+            "p95_us": 79,
+            "p99_us": 84,
+            "mean_us": 66,
+            "total_us": 7958
+          }
+        },
+        {
+          "templateHash": "dfc7a388f1a096d8",
+          "op": "db.execute_query",
+          "class": "ProvenanceRead",
+          "phase": "timed",
+          "count": 20,
+          "stats": {
+            "count": 20,
+            "p50_us": 140,
+            "p90_us": 149,
+            "p95_us": 150,
+            "p99_us": 155,
+            "mean_us": 137,
+            "total_us": 2742
+          }
+        },
+        {
+          "templateHash": "eadd69d7b17962b8",
+          "op": "db.execute_query",
+          "class": "ProvenanceRead",
+          "phase": "setup",
+          "count": 80,
+          "stats": {
+            "count": 80,
+            "p50_us": 67,
+            "p90_us": 78,
+            "p95_us": 84,
+            "p99_us": 103,
+            "mean_us": 69,
+            "total_us": 5529
+          }
+        },
+        {
+          "templateHash": "fac577e757add5f2",
+          "op": "db.execute_query",
+          "class": "Other",
+          "phase": "setup",
+          "count": 80,
+          "stats": {
+            "count": 80,
+            "p50_us": 61,
+            "p90_us": 69,
+            "p95_us": 72,
+            "p99_us": 103,
+            "mean_us": 62,
+            "total_us": 4982
+          }
+        },
+        {
+          "templateHash": "fb7f09d2e3945b16",
+          "op": "db.execute_query",
+          "class": "ResolveLookup",
+          "phase": "setup",
+          "count": 11,
+          "stats": {
+            "count": 11,
+            "p50_us": 47,
+            "p90_us": 55,
+            "p95_us": 85,
+            "p99_us": 85,
+            "mean_us": 49,
+            "total_us": 548
+          }
+        },
+        {
+          "templateHash": "fc2e3bae2415778c",
+          "op": "db.execute_query",
+          "class": "EdgeNeighbors",
+          "phase": "setup",
+          "count": 240,
+          "stats": {
+            "count": 240,
+            "p50_us": 59,
+            "p90_us": 64,
+            "p95_us": 66,
+            "p99_us": 72,
+            "mean_us": 59,
+            "total_us": 14254
+          }
+        }
+      ],
+      "resources": {
+        "rssBytes": 20037680,
+        "peakRssBytes": 23314432,
+        "diskReadBytes": 0,
+        "diskWriteBytes": 0,
+        "ioReadOps": null,
+        "ioWriteOps": null
+      },
+      "invalidReasons": []
+    },
+    "assemble-scale-100": {
+      "latencies": {
+        "count": 15,
+        "p50_us": 30191,
+        "p90_us": 37125,
+        "p95_us": 37229,
+        "p99_us": 37229,
+        "mean_us": 30612,
+        "total_us": 459184
+      },
+      "throughputEps": 32.66664343705356,
+      "samplesRaw": [
+        25554,
+        24183,
+        23397,
+        23519,
+        23300,
+        32971,
+        31599,
+        30191,
+        29697,
+        29899,
+        36924,
+        37037,
+        37125,
+        36559,
+        37229
+      ],
+      "sql": [
+        {
+          "templateHash": "013712abdee36464",
+          "op": "db.execute_query",
+          "class": "ProvenanceRead",
+          "phase": "timed",
+          "count": 80,
+          "stats": {
+            "count": 80,
+            "p50_us": 415,
+            "p90_us": 644,
+            "p95_us": 737,
+            "p99_us": 765,
+            "mean_us": 430,
+            "total_us": 34432
+          }
+        },
+        {
+          "templateHash": "2140a92d4808e17e",
+          "op": "db.execute_query",
+          "class": "Other",
+          "phase": "timed",
+          "count": 100,
+          "stats": {
+            "count": 100,
+            "p50_us": 70,
+            "p90_us": 130,
+            "p95_us": 140,
+            "p99_us": 154,
+            "mean_us": 83,
+            "total_us": 8308
+          }
+        },
+        {
+          "templateHash": "27ff4c17b1818b75",
+          "op": "db.execute_query",
+          "class": "Other",
+          "phase": "setup",
+          "count": 400,
+          "stats": {
+            "count": 400,
+            "p50_us": 84,
+            "p90_us": 90,
+            "p95_us": 93,
+            "p99_us": 101,
+            "mean_us": 84,
+            "total_us": 33622
+          }
+        },
+        {
+          "templateHash": "319e36f02dbd39cc",
+          "op": "db.execute_query",
+          "class": "ResolveLookup",
+          "phase": "setup",
+          "count": 800,
+          "stats": {
+            "count": 800,
+            "p50_us": 37,
+            "p90_us": 42,
+            "p95_us": 44,
+            "p99_us": 48,
+            "mean_us": 37,
+            "total_us": 30107
+          }
+        },
+        {
+          "templateHash": "32dc8d6f1dad8ab1",
+          "op": "db.execute_query",
+          "class": "Other",
+          "phase": "setup",
+          "count": 2400,
+          "stats": {
+            "count": 2400,
+            "p50_us": 27,
+            "p90_us": 32,
+            "p95_us": 32,
+            "p99_us": 35,
+            "mean_us": 27,
+            "total_us": 66597
+          }
+        },
+        {
+          "templateHash": "42476f07ebde1b8b",
+          "op": "db.execute_query",
+          "class": "Other",
+          "phase": "setup",
+          "count": 300,
+          "stats": {
+            "count": 300,
+            "p50_us": 105,
+            "p90_us": 116,
+            "p95_us": 120,
+            "p99_us": 128,
+            "mean_us": 106,
+            "total_us": 31801
+          }
+        },
+        {
+          "templateHash": "459431758cd729de",
+          "op": "db.execute_query",
+          "class": "Other",
+          "phase": "setup",
+          "count": 100,
+          "stats": {
+            "count": 100,
+            "p50_us": 117,
+            "p90_us": 161,
+            "p95_us": 169,
+            "p99_us": 177,
+            "mean_us": 117,
+            "total_us": 11724
+          }
+        },
+        {
+          "templateHash": "45edb59b5f06320b",
+          "op": "db.execute_query",
+          "class": "CommunityScan",
+          "phase": "setup",
+          "count": 800,
+          "stats": {
+            "count": 800,
+            "p50_us": 80,
+            "p90_us": 121,
+            "p95_us": 126,
+            "p99_us": 161,
+            "mean_us": 92,
+            "total_us": 73711
+          }
+        },
+        {
+          "templateHash": "4acb9410125589a0",
+          "op": "db.execute_query",
+          "class": "FactWrite",
+          "phase": "setup",
+          "count": 800,
+          "stats": {
+            "count": 800,
+            "p50_us": 168,
+            "p90_us": 194,
+            "p95_us": 202,
+            "p99_us": 220,
+            "mean_us": 170,
+            "total_us": 136705
+          }
+        },
+        {
+          "templateHash": "59db7032fb925765",
+          "op": "db.execute_query",
+          "class": "ResolveLookup",
+          "phase": "setup",
+          "count": 1200,
+          "stats": {
+            "count": 1200,
+            "p50_us": 50,
+            "p90_us": 189,
+            "p95_us": 194,
+            "p99_us": 200,
+            "mean_us": 87,
+            "total_us": 105168
+          }
+        },
+        {
+          "templateHash": "5aaeef64056d5c21",
+          "op": "db.execute_query",
+          "class": "Other",
+          "phase": "setup",
+          "count": 800,
+          "stats": {
+            "count": 800,
+            "p50_us": 105,
+            "p90_us": 116,
+            "p95_us": 119,
+            "p99_us": 125,
+            "mean_us": 105,
+            "total_us": 84102
+          }
+        },
+        {
+          "templateHash": "5fb8325e33267f59",
+          "op": "db.execute_query",
+          "class": "Other",
+          "phase": "setup",
+          "count": 400,
+          "stats": {
+            "count": 400,
+            "p50_us": 91,
+            "p90_us": 97,
+            "p95_us": 98,
+            "p99_us": 104,
+            "mean_us": 91,
+            "total_us": 36463
+          }
+        },
+        {
+          "templateHash": "612f8e5c7c25d170",
+          "op": "db.execute_query",
+          "class": "EdgeNeighbors",
+          "phase": "setup",
+          "count": 1301,
+          "stats": {
+            "count": 1301,
+            "p50_us": 182,
+            "p90_us": 224,
+            "p95_us": 233,
+            "p99_us": 249,
+            "mean_us": 170,
+            "total_us": 221591
+          }
+        },
+        {
+          "templateHash": "612f8e5c7c25d170",
+          "op": "db.execute_query",
+          "class": "EdgeNeighbors",
+          "phase": "timed",
+          "count": 280,
+          "stats": {
+            "count": 280,
+            "p50_us": 70,
+            "p90_us": 83,
+            "p95_us": 99,
+            "p99_us": 135,
+            "mean_us": 73,
+            "total_us": 20681
+          }
+        },
+        {
+          "templateHash": "693f9f700c768be8",
+          "op": "db.execute_query",
+          "class": "EntityUpsert",
+          "phase": "setup",
+          "count": 101,
+          "stats": {
+            "count": 101,
+            "p50_us": 36,
+            "p90_us": 41,
+            "p95_us": 43,
+            "p99_us": 46,
+            "mean_us": 37,
+            "total_us": 3746
+          }
+        },
+        {
+          "templateHash": "69f012dd7581f1e4",
+          "op": "db.execute_query",
+          "class": "Other",
+          "phase": "timed",
+          "count": 20,
+          "stats": {
+            "count": 20,
+            "p50_us": 81,
+            "p90_us": 89,
+            "p95_us": 91,
+            "p99_us": 94,
+            "mean_us": 80,
+            "total_us": 1617
+          }
+        },
+        {
+          "templateHash": "6cc42b7daa46a1a7",
+          "op": "db.execute_query",
+          "class": "ProvenanceRead",
+          "phase": "timed",
+          "count": 40,
+          "stats": {
+            "count": 40,
+            "p50_us": 219,
+            "p90_us": 306,
+            "p95_us": 344,
+            "p99_us": 368,
+            "mean_us": 229,
+            "total_us": 9197
+          }
+        },
+        {
+          "templateHash": "72d0d98dbcb21c86",
+          "op": "db.execute_query",
+          "class": "AliasLookup",
+          "phase": "setup",
+          "count": 202,
+          "stats": {
+            "count": 202,
+            "p50_us": 43,
+            "p90_us": 49,
+            "p95_us": 51,
+            "p99_us": 55,
+            "mean_us": 43,
+            "total_us": 8729
+          }
+        },
+        {
+          "templateHash": "7940895e5873e42c",
+          "op": "db.execute_query",
+          "class": "Other",
+          "phase": "setup",
+          "count": 1200,
+          "stats": {
+            "count": 1200,
+            "p50_us": 16,
+            "p90_us": 20,
+            "p95_us": 20,
+            "p99_us": 23,
+            "mean_us": 17,
+            "total_us": 20412
+          }
+        },
+        {
+          "templateHash": "7db8205bfe1fe0f5",
+          "op": "db.execute_query",
+          "class": "EntityUpsert",
+          "phase": "setup",
+          "count": 400,
+          "stats": {
+            "count": 400,
+            "p50_us": 44,
+            "p90_us": 48,
+            "p95_us": 50,
+            "p99_us": 53,
+            "mean_us": 44,
+            "total_us": 17711
+          }
+        },
+        {
+          "templateHash": "8320d12aa6b12a27",
+          "op": "db.execute_query",
+          "class": "ProvenanceRead",
+          "phase": "setup",
+          "count": 1200,
+          "stats": {
+            "count": 1200,
+            "p50_us": 395,
+            "p90_us": 647,
+            "p95_us": 680,
+            "p99_us": 710,
+            "mean_us": 393,
+            "total_us": 472299
+          }
+        },
+        {
+          "templateHash": "85465ffc7d2935d4",
+          "op": "db.execute_query",
+          "class": "ProvenanceRead",
+          "phase": "timed",
+          "count": 20,
+          "stats": {
+            "count": 20,
+            "p50_us": 1545,
+            "p90_us": 2449,
+            "p95_us": 2456,
+            "p99_us": 2496,
+            "mean_us": 1674,
+            "total_us": 33491
+          }
+        },
+        {
+          "templateHash": "8633c76c65f189af",
+          "op": "db.execute_query",
+          "class": "ProvenanceRead",
+          "phase": "setup",
+          "count": 400,
+          "stats": {
+            "count": 400,
+            "p50_us": 56,
+            "p90_us": 60,
+            "p95_us": 61,
+            "p99_us": 69,
+            "mean_us": 56,
+            "total_us": 22460
+          }
+        },
+        {
+          "templateHash": "8c8ee1a75d6cafef",
+          "op": "db.execute_query",
+          "class": "EpisodeWrite",
+          "phase": "setup",
+          "count": 400,
+          "stats": {
+            "count": 400,
+            "p50_us": 52,
+            "p90_us": 58,
+            "p95_us": 61,
+            "p99_us": 68,
+            "mean_us": 52,
+            "total_us": 20963
+          }
+        },
+        {
+          "templateHash": "8d61ab183cd86fc1",
+          "op": "db.execute_query",
+          "class": "EdgeNeighbors",
+          "phase": "setup",
+          "count": 1301,
+          "stats": {
+            "count": 1301,
+            "p50_us": 73,
+            "p90_us": 83,
+            "p95_us": 115,
+            "p99_us": 145,
+            "mean_us": 76,
+            "total_us": 99569
+          }
+        },
+        {
+          "templateHash": "8d61ab183cd86fc1",
+          "op": "db.execute_query",
+          "class": "EdgeNeighbors",
+          "phase": "timed",
+          "count": 280,
+          "stats": {
+            "count": 280,
+            "p50_us": 204,
+            "p90_us": 305,
+            "p95_us": 1788,
+            "p99_us": 3894,
+            "mean_us": 359,
+            "total_us": 100754
+          }
+        },
+        {
+          "templateHash": "8e8e5d482b4a1a0d",
+          "op": "db.execute_query",
+          "class": "AliasLookup",
+          "phase": "timed",
+          "count": 40,
+          "stats": {
+            "count": 40,
+            "p50_us": 73,
+            "p90_us": 84,
+            "p95_us": 89,
+            "p99_us": 99,
+            "mean_us": 73,
+            "total_us": 2952
+          }
+        },
+        {
+          "templateHash": "9040f6b6a8c11854",
+          "op": "db.execute_query",
+          "class": "ProvenanceRead",
+          "phase": "timed",
+          "count": 20,
+          "stats": {
+            "count": 20,
+            "p50_us": 190,
+            "p90_us": 279,
+            "p95_us": 280,
+            "p99_us": 293,
+            "mean_us": 202,
+            "total_us": 4042
+          }
+        },
+        {
+          "templateHash": "9e7af5b7e2e2f0b0",
+          "op": "db.execute_query",
+          "class": "Other",
+          "phase": "setup",
+          "count": 99,
+          "stats": {
+            "count": 99,
+            "p50_us": 201,
+            "p90_us": 250,
+            "p95_us": 259,
+            "p99_us": 272,
+            "mean_us": 202,
+            "total_us": 20087
+          }
+        },
+        {
+          "templateHash": "a478f19254b99cdb",
+          "op": "db.execute_query",
+          "class": "ProvenanceRead",
+          "phase": "setup",
+          "count": 1600,
+          "stats": {
+            "count": 1600,
+            "p50_us": 42,
+            "p90_us": 49,
+            "p95_us": 51,
+            "p99_us": 54,
+            "mean_us": 41,
+            "total_us": 67047
+          }
+        },
+        {
+          "templateHash": "a8d5351a815cf3bf",
+          "op": "db.execute_query",
+          "class": "ProvenanceRead",
+          "phase": "timed",
+          "count": 20,
+          "stats": {
+            "count": 20,
+            "p50_us": 171,
+            "p90_us": 216,
+            "p95_us": 223,
+            "p99_us": 234,
+            "mean_us": 170,
+            "total_us": 3415
+          }
+        },
+        {
+          "templateHash": "acd55f03709bde71",
+          "op": "db.execute_query",
+          "class": "ProvenanceRead",
+          "phase": "timed",
+          "count": 20,
+          "stats": {
+            "count": 20,
+            "p50_us": 2348,
+            "p90_us": 4477,
+            "p95_us": 4623,
+            "p99_us": 4730,
+            "mean_us": 2875,
+            "total_us": 57505
+          }
+        },
+        {
+          "templateHash": "b34a40f0de88241b",
+          "op": "db.execute_query",
+          "class": "Other",
+          "phase": "setup",
+          "count": 400,
+          "stats": {
+            "count": 400,
+            "p50_us": 20,
+            "p90_us": 22,
+            "p95_us": 23,
+            "p99_us": 27,
+            "mean_us": 18,
+            "total_us": 7372
+          }
+        },
+        {
+          "templateHash": "b49799ed4a29738b",
+          "op": "db.execute_query",
+          "class": "AliasLookup",
+          "phase": "timed",
+          "count": 20,
+          "stats": {
+            "count": 20,
+            "p50_us": 1220,
+            "p90_us": 2221,
+            "p95_us": 2224,
+            "p99_us": 2234,
+            "mean_us": 1427,
+            "total_us": 28550
+          }
+        },
+        {
+          "templateHash": "b61c61a33e6300e6",
+          "op": "db.execute_query",
+          "class": "RelateEdge",
+          "phase": "setup",
+          "count": 2400,
+          "stats": {
+            "count": 2400,
+            "p50_us": 77,
+            "p90_us": 88,
+            "p95_us": 93,
+            "p99_us": 103,
+            "mean_us": 78,
+            "total_us": 187754
+          }
+        },
+        {
+          "templateHash": "c47596bdf0788f80",
+          "op": "db.execute_query",
+          "class": "ProvenanceRead",
+          "phase": "timed",
+          "count": 20,
+          "stats": {
+            "count": 20,
+            "p50_us": 2150,
+            "p90_us": 3921,
+            "p95_us": 4002,
+            "p99_us": 4034,
+            "mean_us": 2565,
+            "total_us": 51304
+          }
+        },
+        {
+          "templateHash": "cb2093b52c7524af",
+          "op": "db.execute_query",
+          "class": "ProvenanceRead",
+          "phase": "setup",
+          "count": 2400,
+          "stats": {
+            "count": 2400,
+            "p50_us": 20,
+            "p90_us": 25,
+            "p95_us": 26,
+            "p99_us": 27,
+            "mean_us": 19,
+            "total_us": 47757
+          }
+        },
+        {
+          "templateHash": "cd6bba171f451f4d",
+          "op": "db.execute_query",
+          "class": "ProvenanceRead",
+          "phase": "setup",
+          "count": 1200,
+          "stats": {
+            "count": 1200,
+            "p50_us": 68,
+            "p90_us": 76,
+            "p95_us": 79,
+            "p99_us": 86,
+            "mean_us": 68,
+            "total_us": 82469
+          }
+        },
+        {
+          "templateHash": "dfc7a388f1a096d8",
+          "op": "db.execute_query",
+          "class": "ProvenanceRead",
+          "phase": "setup",
+          "count": 1200,
+          "stats": {
+            "count": 1200,
+            "p50_us": 65,
+            "p90_us": 72,
+            "p95_us": 75,
+            "p99_us": 82,
+            "mean_us": 65,
+            "total_us": 78974
+          }
+        },
+        {
+          "templateHash": "dfc7a388f1a096d8",
+          "op": "db.execute_query",
+          "class": "ProvenanceRead",
+          "phase": "timed",
+          "count": 20,
+          "stats": {
+            "count": 20,
+            "p50_us": 145,
+            "p90_us": 159,
+            "p95_us": 160,
+            "p99_us": 165,
+            "mean_us": 143,
+            "total_us": 2874
+          }
+        },
+        {
+          "templateHash": "eadd69d7b17962b8",
+          "op": "db.execute_query",
+          "class": "ProvenanceRead",
+          "phase": "setup",
+          "count": 800,
+          "stats": {
+            "count": 800,
+            "p50_us": 96,
+            "p90_us": 125,
+            "p95_us": 132,
+            "p99_us": 144,
+            "mean_us": 97,
+            "total_us": 77867
+          }
+        },
+        {
+          "templateHash": "fac577e757add5f2",
+          "op": "db.execute_query",
+          "class": "Other",
+          "phase": "setup",
+          "count": 800,
+          "stats": {
+            "count": 800,
+            "p50_us": 63,
+            "p90_us": 68,
+            "p95_us": 71,
+            "p99_us": 75,
+            "mean_us": 63,
+            "total_us": 50566
+          }
+        },
+        {
+          "templateHash": "fb7f09d2e3945b16",
+          "op": "db.execute_query",
+          "class": "ResolveLookup",
+          "phase": "setup",
+          "count": 101,
+          "stats": {
+            "count": 101,
+            "p50_us": 45,
+            "p90_us": 52,
+            "p95_us": 53,
+            "p99_us": 60,
+            "mean_us": 45,
+            "total_us": 4598
+          }
+        },
+        {
+          "templateHash": "fc2e3bae2415778c",
+          "op": "db.execute_query",
+          "class": "EdgeNeighbors",
+          "phase": "setup",
+          "count": 2400,
+          "stats": {
+            "count": 2400,
+            "p50_us": 59,
+            "p90_us": 65,
+            "p95_us": 67,
+            "p99_us": 72,
+            "mean_us": 59,
+            "total_us": 142947
+          }
+        }
+      ],
+      "resources": {
+        "rssBytes": 60375112,
+        "peakRssBytes": 96092160,
+        "diskReadBytes": 0,
+        "diskWriteBytes": 0,
+        "ioReadOps": null,
+        "ioWriteOps": null
+      },
+      "invalidReasons": []
+    },
+    "ingest-scale-10": {
+      "latencies": {
+        "count": 30,
+        "p50_us": 134,
+        "p90_us": 155,
+        "p95_us": 199,
+        "p99_us": 201,
+        "mean_us": 141,
+        "total_us": 4231
+      },
+      "throughputEps": 7090.522335145355,
+      "samplesRaw": [
+        150,
+        150,
+        150,
+        146,
+        157,
+        154,
+        149,
+        141,
+        201,
+        199,
+        155,
+        143,
+        134,
+        138,
+        139,
+        133,
+        133,
+        134,
+        129,
+        129,
+        129,
+        125,
+        133,
+        129,
+        131,
+        128,
+        127,
+        125,
+        120,
+        120
+      ],
+      "sql": [
+        {
+          "templateHash": "8633c76c65f189af",
+          "op": "db.execute_query",
+          "class": "ProvenanceRead",
+          "phase": "timed",
+          "count": 40,
+          "stats": {
+            "count": 40,
+            "p50_us": 57,
+            "p90_us": 76,
+            "p95_us": 82,
+            "p99_us": 546,
+            "mean_us": 71,
+            "total_us": 2849
+          }
+        },
+        {
+          "templateHash": "8c8ee1a75d6cafef",
+          "op": "db.execute_query",
+          "class": "EpisodeWrite",
+          "phase": "timed",
+          "count": 40,
+          "stats": {
+            "count": 40,
+            "p50_us": 46,
+            "p90_us": 65,
+            "p95_us": 93,
+            "p99_us": 248,
+            "mean_us": 54,
+            "total_us": 2191
+          }
+        },
+        {
+          "templateHash": "cb2093b52c7524af",
+          "op": "db.execute_query",
+          "class": "ProvenanceRead",
+          "phase": "timed",
+          "count": 40,
+          "stats": {
+            "count": 40,
+            "p50_us": 20,
+            "p90_us": 26,
+            "p95_us": 35,
+            "p99_us": 51,
+            "mean_us": 22,
+            "total_us": 903
+          }
+        }
+      ],
+      "resources": {
+        "rssBytes": 163840,
+        "peakRssBytes": 1327104,
+        "diskReadBytes": 0,
+        "diskWriteBytes": 0,
+        "ioReadOps": null,
+        "ioWriteOps": null
+      },
+      "invalidReasons": []
+    },
+    "ingest-scale-100": {
+      "latencies": {
+        "count": 300,
+        "p50_us": 130,
+        "p90_us": 139,
+        "p95_us": 143,
+        "p99_us": 158,
+        "mean_us": 130,
+        "total_us": 39144
+      },
+      "throughputEps": 7664.009809932557,
+      "samplesRaw": [
+        130,
+        132,
+        136,
+        124,
+        135,
+        129,
+        143,
+        122,
+        130,
+        131,
+        132,
+        128,
+        123,
+        117,
+        125,
+        127,
+        119,
+        120,
+        118,
+        118,
+        117,
+        117,
+        126,
+        125,
+        116,
+        124,
+        118,
+        119,
+        117,
+        120,
+        116,
+        125,
+        123,
+        121,
+        131,
+        127,
+        114,
+        124,
+        141,
+        125,
+        134,
+        127,
+        128,
+        130,
+        130,
+        133,
+        129,
+        124,
+        135,
+        136,
+        130,
+        130,
+        129,
+        126,
+        134,
+        134,
+        131,
+        129,
+        128,
+        138,
+        127,
+        129,
+        130,
+        129,
+        129,
+        126,
+        125,
+        141,
+        150,
+        116,
+        181,
+        158,
+        138,
+        130,
+        136,
+        135,
+        131,
+        135,
+        131,
+        134,
+        139,
+        130,
+        141,
+        136,
+        135,
+        139,
+        135,
+        133,
+        140,
+        138,
+        133,
+        135,
+        129,
+        130,
+        132,
+        137,
+        145,
+        141,
+        134,
+        137,
+        130,
+        132,
+        135,
+        138,
+        136,
+        147,
+        139,
+        140,
+        138,
+        140,
+        121,
+        129,
+        138,
+        134,
+        136,
+        137,
+        128,
+        133,
+        125,
+        132,
+        130,
+        125,
+        133,
+        145,
+        147,
+        133,
+        142,
+        144,
+        132,
+        134,
+        134,
+        130,
+        136,
+        134,
+        134,
+        134,
+        132,
+        139,
+        135,
+        128,
+        126,
+        123,
+        122,
+        121,
+        117,
+        118,
+        125,
+        126,
+        121,
+        115,
+        117,
+        126,
+        124,
+        125,
+        128,
+        130,
+        127,
+        119,
+        118,
+        129,
+        128,
+        120,
+        117,
+        125,
+        126,
+        129,
+        125,
+        133,
+        133,
+        149,
+        133,
+        128,
+        126,
+        159,
+        149,
+        129,
+        136,
+        133,
+        135,
+        131,
+        126,
+        130,
+        144,
+        142,
+        145,
+        130,
+        136,
+        130,
+        127,
+        128,
+        128,
+        130,
+        199,
+        139,
+        137,
+        118,
+        138,
+        137,
+        143,
+        150,
+        139,
+        133,
+        136,
+        130,
+        130,
+        134,
+        131,
+        132,
+        129,
+        128,
+        130,
+        135,
+        133,
+        128,
+        132,
+        129,
+        125,
+        129,
+        129,
+        136,
+        130,
+        132,
+        129,
+        127,
+        129,
+        130,
+        134,
+        131,
+        126,
+        130,
+        130,
+        135,
+        132,
+        135,
+        134,
+        129,
+        131,
+        130,
+        129,
+        129,
+        133,
+        129,
+        134,
+        132,
+        135,
+        130,
+        130,
+        131,
+        128,
+        128,
+        128,
+        131,
+        134,
+        130,
+        127,
+        128,
+        125,
+        132,
+        129,
+        127,
+        129,
+        130,
+        128,
+        134,
+        116,
+        114,
+        120,
+        127,
+        126,
+        124,
+        119,
+        125,
+        117,
+        125,
+        119,
+        122,
+        119,
+        123,
+        118,
+        121,
+        116,
+        124,
+        131,
+        132,
+        128,
+        120,
+        116,
+        124,
+        119,
+        119,
+        124,
+        142,
+        142,
+        130,
+        129,
+        143,
+        136,
+        129,
+        130,
+        136
+      ],
+      "sql": [
+        {
+          "templateHash": "8633c76c65f189af",
+          "op": "db.execute_query",
+          "class": "ProvenanceRead",
+          "phase": "timed",
+          "count": 400,
+          "stats": {
+            "count": 400,
+            "p50_us": 50,
+            "p90_us": 55,
+            "p95_us": 58,
+            "p99_us": 67,
+            "mean_us": 50,
+            "total_us": 20324
+          }
+        },
+        {
+          "templateHash": "8c8ee1a75d6cafef",
+          "op": "db.execute_query",
+          "class": "EpisodeWrite",
+          "phase": "timed",
+          "count": 400,
+          "stats": {
+            "count": 400,
+            "p50_us": 40,
+            "p90_us": 45,
+            "p95_us": 47,
+            "p99_us": 53,
+            "mean_us": 40,
+            "total_us": 16312
+          }
+        },
+        {
+          "templateHash": "cb2093b52c7524af",
+          "op": "db.execute_query",
+          "class": "ProvenanceRead",
+          "phase": "timed",
+          "count": 400,
+          "stats": {
+            "count": 400,
+            "p50_us": 22,
+            "p90_us": 23,
+            "p95_us": 24,
+            "p99_us": 25,
+            "mean_us": 20,
+            "total_us": 8333
+          }
+        }
+      ],
+      "resources": {
+        "rssBytes": 1540096,
+        "peakRssBytes": 1540096,
+        "diskReadBytes": 0,
+        "diskWriteBytes": 0,
+        "ioReadOps": null,
+        "ioWriteOps": null
+      },
+      "invalidReasons": []
+    }
+  }
+}

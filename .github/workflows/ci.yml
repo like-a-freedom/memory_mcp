@@ -137,11 +137,18 @@ jobs:
           mkdir -p target/evals
           cargo run -p eval-harness --bin memory-eval --locked -- run --profile "evals/profiles/$EVAL_PROFILE.json" --artifact "target/evals/$EVAL_PROFILE.json" --baseline "evals/baselines/one-active-namespace-$EVAL_PROFILE.json"
           make eval-response-size
+      - name: Perf smoke
+        run: make perf-smoke
       - uses: actions/upload-artifact@v7
         if: always()
         with:
           name: evaluation
           path: target/evals/*.json
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: perf-smoke
+          path: target/perf/*.json
 
   native:
     needs: quality
@@ -166,8 +173,12 @@ jobs:
         include:
           - os: ubuntu-latest
             target: x86_64-unknown-linux-gnu
-          - os: ubuntu-24.04-arm
-            target: aarch64-unknown-linux-gnu
+          # TEMPORARILY DISABLED. The `ubuntu-24.04-arm` runner was SIGTERM'd
+          # mid-build (exit 143, "runner has received a shutdown signal") partway
+          # through the RocksDB/ONNX compile, which failed the release. Re-enable
+          # this entry once the runner flake is understood.
+          #   - os: ubuntu-24.04-arm
+          #     target: aarch64-unknown-linux-gnu
           - os: macos-15
             target: aarch64-apple-darwin
           - os: windows-2025

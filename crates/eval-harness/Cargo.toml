@@ -14,6 +14,10 @@ path = "src/lib.rs"
 name = "memory-eval"
 path = "src/main.rs"
 
+[[bin]]
+name = "memory-perf"
+path = "src/perf_main.rs"
+
 [dependencies]
 memory_mcp = { path = "../memory-mcp", features = ["eval-support"] }
 async-trait.workspace = true
@@ -38,6 +42,12 @@ tokio.workspace = true
 
 [dev-dependencies]
 tempfile.workspace = true
+
+# macOS resource sampling for the perf harness (ADR-0082): proc_pid_rusage is
+# the only per-process source of phys_footprint and disk I/O counters. Never
+# linked by production crates — only this private harness uses it.
+[target.'cfg(target_os = "macos")'.dependencies]
+libc = "0.2"
 
 [features]
 # Compile the Criterion benchmark targets of this package.

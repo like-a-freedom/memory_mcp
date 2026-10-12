@@ -43,6 +43,12 @@ fn source_type_supports_summary_fallback(source_type: &str) -> bool {
     ) || source_type.ends_with("_summary")
 }
 
+/// Whether the note-fallback fact may be extracted for this episode.
+///
+/// The reporting predicate in [`build_extract_log_result`] mirrors the
+/// source-type/content checks but adds its own precondition (exactly one
+/// Note fact); the two are deliberately not merged — extraction gates on
+/// "no facts yet", reporting on "the one fact is a note".
 pub(super) fn should_extract_note_fact(episode: &Episode, facts: &[ExtractedFact]) -> bool {
     if !facts.is_empty() {
         return false;
@@ -103,6 +109,67 @@ pub(super) async fn add_extracted_fact(
     })
 }
 
+/// Push a heuristic fact for the episode content when `enabled` is true.
+/// Content/quote are always the full episode text with the
+/// `episode_heuristic` strategy — the three heuristics differ only in type.
+async fn push_heuristic(
+    service: &ExtractDeps,
+    episode: &Episode,
+    facts: &mut Vec<ExtractedFact>,
+    entity_links: &[String],
+    fact_type: &str,
+    enabled: bool,
+) -> Result<(), MemoryError> {
+    if !enabled {
+        return Ok(());
+    }
+    facts.push(
+        add_extracted_fact(
+            service,
+            episode,
+            fact_type,
+            &episode.content,
+            &episode.content,
+            entity_links,
+            "episode_heuristic",
+        )
+        .await?,
+    );
+    Ok(())
+}
+
+/// Shared debug event for the two extract-path decisions that carry the
+/// episode's source type and content length (structured-summary detection
+/// and note fallback). `structured_line_fact_count` is present only on the
+/// structured-summary event.
+fn log_extraction_decision(
+    service: &ExtractDeps,
+    op: &str,
+    episode: &Episode,
+    structured_line_fact_count: Option<usize>,
+) {
+    let mut args = serde_json::Map::from_iter([
+        ("episode_id".to_string(), json!(episode.episode_id)),
+        ("source_type".to_string(), json!(episode.source_type)),
+    ]);
+    if let Some(count) = structured_line_fact_count {
+        args.insert("structured_line_fact_count".to_string(), json!(count));
+    }
+    service.logger.log(
+        log_event(
+            op,
+            Value::Object(args),
+            json!({
+                "content_chars": episode.content.chars().count(),
+            }),
+            None,
+            None,
+            None,
+        ),
+        LogLevel::Debug,
+    );
+}
+
 /// Extract facts from an episode.
 pub async fn extract_facts(
     service: &ExtractDeps,
@@ -111,22 +178,11 @@ pub async fn extract_facts(
 ) -> Result<FactExtractionOutcome, MemoryError> {
     let structured_candidates = structured_summary_fact_candidates(&episode.content);
     if !structured_candidates.is_empty() {
-        service.logger.log(
-            log_event(
-                "extract.structured_summary",
-                json!({
-                    "episode_id": episode.episode_id,
-                    "source_type": episode.source_type,
-                    "structured_line_fact_count": structured_candidates.len(),
-                }),
-                json!({
-                    "content_chars": episode.content.chars().count(),
-                }),
-                None,
-                None,
-                None,
-            ),
-            LogLevel::Debug,
+        log_extraction_decision(
+            service,
+            "extract.structured_summary",
+            episode,
+            Some(structured_candidates.len()),
         );
 
         let mut facts = Vec::with_capacity(structured_candidates.len());
@@ -160,69 +216,37 @@ pub async fn extract_facts(
         .map(|entity| entity.entity_id.clone())
         .collect::<Vec<_>>();
 
-    if is_metric_statement(&episode.content) {
-        facts.push(
-            add_extracted_fact(
-                service,
-                episode,
-                FactType::Metric.as_str(),
-                &episode.content,
-                &episode.content,
-                &entity_links,
-                "episode_heuristic",
-            )
-            .await?,
-        );
-    }
-
-    if is_promise_statement(&normalized) || is_document_action_item(&episode.content) {
-        facts.push(
-            add_extracted_fact(
-                service,
-                episode,
-                FactType::Promise.as_str(),
-                &episode.content,
-                &episode.content,
-                &entity_links,
-                "episode_heuristic",
-            )
-            .await?,
-        );
-    }
-
-    if is_experience_statement(&episode.content) {
-        facts.push(
-            add_extracted_fact(
-                service,
-                episode,
-                FactType::Experience.as_str(),
-                &episode.content,
-                &episode.content,
-                &entity_links,
-                "episode_heuristic",
-            )
-            .await?,
-        );
-    }
+    push_heuristic(
+        service,
+        episode,
+        &mut facts,
+        &entity_links,
+        FactType::Metric.as_str(),
+        is_metric_statement(&episode.content),
+    )
+    .await?;
+    push_heuristic(
+        service,
+        episode,
+        &mut facts,
+        &entity_links,
+        FactType::Promise.as_str(),
+        is_promise_statement(&normalized) || is_document_action_item(&episode.content),
+    )
+    .await?;
+    push_heuristic(
+        service,
+        episode,
+        &mut facts,
+        &entity_links,
+        FactType::Experience.as_str(),
+        is_experience_statement(&episode.content),
+    )
+    .await?;
 
     let note_fallback_used = should_extract_note_fact(episode, &facts);
     if note_fallback_used {
-        service.logger.log(
-            log_event(
-                "extract.note_fallback",
-                json!({
-                    "episode_id": episode.episode_id,
-                    "source_type": episode.source_type,
-                }),
-                json!({
-                    "content_chars": episode.content.chars().count(),
-                }),
-                None,
-                None,
-                None,
-            ),
-            LogLevel::Debug,
-        );
+        log_extraction_decision(service, "extract.note_fallback", episode, None);
 
         facts.push(
             add_extracted_fact(
@@ -252,6 +276,35 @@ pub(super) async fn detect_contradiction_warnings(
     claim_based_contradiction_warnings(service, facts).await
 }
 
+/// Load claim relations for the given fact ids. Error handling is the caller's
+/// concern (one path propagates, the reconciliation path swallows).
+async fn claim_relations_for_facts(
+    service: &ExtractDeps,
+    fact_ids: &[crate::models::FactId],
+) -> Result<Vec<crate::models::claim::ClaimRelation>, MemoryError> {
+    let query = crate::knowledge::claims::RelationsForFactsQuery { fact_ids };
+    service
+        .claim_service
+        .store
+        .select_relations_for_facts(query)
+        .await
+}
+
+/// Load a stored fact record and parse it, collapsing fetch/parse errors to
+/// `None` (the contradiction-warning path treats a missing fact as empty
+/// content rather than failing the extraction).
+async fn fact_content_from_record(
+    service: &ExtractDeps,
+    fact_id: &str,
+) -> Option<crate::models::Fact> {
+    service
+        .find_fact_record(fact_id)
+        .await
+        .ok()
+        .flatten()
+        .and_then(|record| fact_from_value_or_wrapper(&Value::Object(record)))
+}
+
 /// Query claim relations for active contradictions involving the extracted facts.
 async fn claim_based_contradiction_warnings(
     service: &ExtractDeps,
@@ -264,14 +317,7 @@ async fn claim_based_contradiction_warnings(
     if fact_ids.is_empty() {
         return Ok(Vec::new());
     }
-    let query = crate::knowledge::claims::RelationsForFactsQuery {
-        fact_ids: &fact_ids,
-    };
-    let relations = service
-        .claim_service
-        .store
-        .select_relations_for_facts(query)
-        .await?;
+    let relations = claim_relations_for_facts(service, &fact_ids).await?;
     let mut warnings = Vec::new();
     for rel in &relations {
         if rel.outcome != ClaimRelationOutcome::Contradiction {
@@ -312,30 +358,12 @@ async fn claim_based_contradiction_warnings(
             .map(|f| f.fact_type.clone())
             .unwrap_or_default();
         // Load both fact records to read their content.
-        let current_record = service
-            .find_fact_record(current_fact_id)
-            .await
-            .ok()
-            .and_then(|r| {
-                r.and_then(|record| {
-                    let v = serde_json::Value::Object(record);
-                    fact_from_value_or_wrapper(&v)
-                })
-            });
+        let current_record = fact_content_from_record(service, current_fact_id).await;
         let new_content = current_record
             .as_ref()
             .map(|f| f.content.clone())
             .unwrap_or_default();
-        let counterpart = service
-            .find_fact_record(counterpart_id)
-            .await
-            .ok()
-            .and_then(|r| {
-                r.and_then(|record| {
-                    let v = serde_json::Value::Object(record);
-                    fact_from_value_or_wrapper(&v)
-                })
-            });
+        let counterpart = fact_content_from_record(service, counterpart_id).await;
         let counterpart_content = counterpart
             .as_ref()
             .map(|f| f.content.clone())
@@ -351,6 +379,77 @@ async fn claim_based_contradiction_warnings(
         });
     }
     Ok(warnings)
+}
+
+/// Write `mentioned_in` edges from each extracted entity to the episode and
+/// collect the corresponding extract links.
+async fn store_mentioned_in(
+    service: &ExtractDeps,
+    episode_id: &str,
+    episode: &Episode,
+    entities: &[ExtractedEntity],
+    links: &mut Vec<ExtractedLink>,
+    t_ingested: chrono::DateTime<chrono::Utc>,
+) -> Result<(), MemoryError> {
+    for entity in entities {
+        links.push(ExtractedLink {
+            entity_id: entity.entity_id.clone(),
+            episode_id: episode_id.to_string(),
+        });
+
+        let edge = Edge {
+            in_id: entity.entity_id.clone(),
+            relation: "mentioned_in".to_string(),
+            out_id: episode_id.to_string(),
+            origin: EdgeOrigin::Extracted,
+            strength: 1.0,
+            confidence: 0.9,
+            provenance: crate::models::Provenance::agent_observation(episode_id),
+            t_valid: episode.t_ref,
+            t_ingested,
+            t_invalid: None,
+            t_invalid_ingested: None,
+        };
+        store_edge(service, &edge).await?
+    }
+    Ok(())
+}
+
+/// Write `involved_in` edges from each stored fact's entity links to the fact.
+async fn store_involved_in(
+    service: &ExtractDeps,
+    episode_id: &str,
+    episode: &Episode,
+    facts: &[ExtractedFact],
+    t_ingested: chrono::DateTime<chrono::Utc>,
+) -> Result<(), MemoryError> {
+    for fact in facts {
+        let fact_record = service.find_fact_record(&fact.fact_id).await?;
+        let Some(fact_record) = fact_record else {
+            continue;
+        };
+        let Some(stored_fact) = fact_from_value_or_wrapper(&Value::Object(fact_record)) else {
+            continue;
+        };
+
+        for entity_id in &stored_fact.entity_links {
+            let edge = Edge {
+                in_id: entity_id.clone(),
+                relation: "involved_in".to_string(),
+                out_id: fact.fact_id.clone(),
+                origin: EdgeOrigin::Extracted,
+                strength: 0.8,
+                confidence: 0.85,
+                provenance: crate::models::Provenance::agent_observation(episode_id),
+                t_valid: episode.t_ref,
+                t_ingested,
+                t_invalid: None,
+                t_invalid_ingested: None,
+            };
+            store_edge(service, &edge).await?
+        }
+    }
+    Ok(())
 }
 
 /// Extract entities and facts from an episode.
@@ -399,61 +498,27 @@ pub async fn extract_from_episode(
     let mut links = Vec::new();
     let edge_ingested = now();
 
-    for entity in &entities {
-        links.push(ExtractedLink {
-            entity_id: entity.entity_id.clone(),
-            episode_id: episode_id.to_string(),
-        });
-
-        let edge = Edge {
-            in_id: entity.entity_id.clone(),
-            relation: "mentioned_in".to_string(),
-            out_id: episode_id.to_string(),
-            origin: EdgeOrigin::Extracted,
-            strength: 1.0,
-            confidence: 0.9,
-            provenance: crate::models::Provenance::agent_observation(episode_id),
-            t_valid: episode.t_ref,
-            t_ingested: edge_ingested,
-            t_invalid: None,
-            t_invalid_ingested: None,
-        };
-        store_edge(service, &edge).await?
-    }
-
-    for fact in &facts {
-        let fact_record = service.find_fact_record(&fact.fact_id).await?;
-        let Some(fact_record) = fact_record else {
-            continue;
-        };
-        let Some(stored_fact) = fact_from_value_or_wrapper(&Value::Object(fact_record)) else {
-            continue;
-        };
-
-        for entity_id in &stored_fact.entity_links {
-            let edge = Edge {
-                in_id: entity_id.clone(),
-                relation: "involved_in".to_string(),
-                out_id: fact.fact_id.clone(),
-                origin: EdgeOrigin::Extracted,
-                strength: 0.8,
-                confidence: 0.85,
-                provenance: crate::models::Provenance::agent_observation(episode_id),
-                t_valid: episode.t_ref,
-                t_ingested: edge_ingested,
-                t_invalid: None,
-                t_invalid_ingested: None,
-            };
-            store_edge(service, &edge).await?
-        }
-    }
+    store_mentioned_in(
+        service,
+        episode_id,
+        &episode,
+        &entities,
+        &mut links,
+        edge_ingested,
+    )
+    .await?;
+    store_involved_in(service, episode_id, &episode, &facts, edge_ingested).await?;
 
     let entity_ids: Vec<String> = entities
         .iter()
         .map(|entity| entity.entity_id.clone())
         .collect();
 
-    update_communities(service, &entity_ids).await?;
+    let mut community_new_nodes = Vec::with_capacity(1 + facts.len());
+    community_new_nodes.push(episode_id.to_string());
+    community_new_nodes.extend(facts.iter().map(|fact| fact.fact_id.clone()));
+
+    update_communities(service, &entity_ids, &community_new_nodes).await?;
 
     service.logger.log(
         log_event(
@@ -478,7 +543,6 @@ pub async fn extract_from_episode(
     // Build reconciliation summary when evidence exposure is enabled.
     // Shadow and Relations stages project claims and persist relations,
     // but only Evidence exposes authorized metadata to the extract API.
-    // Build reconciliation summary when evidence exposure is enabled.
     // Queries active claim relations for the extracted facts.
     let reconciliation = if service
         .claim_service
@@ -490,13 +554,7 @@ pub async fn extract_from_episode(
             .iter()
             .map(|f| crate::models::FactId::from(f.fact_id.as_str()))
             .collect();
-        let query = crate::knowledge::claims::RelationsForFactsQuery {
-            fact_ids: &fact_ids,
-        };
-        let relations = service
-            .claim_service
-            .store
-            .select_relations_for_facts(query)
+        let relations = claim_relations_for_facts(service, &fact_ids)
             .await
             .unwrap_or_default();
         let active_relations = relations
@@ -540,6 +598,14 @@ pub async fn extract_from_episode(
     })
 }
 
+/// Build the extract log result, deriving `note_fallback_used` and the
+/// structured-line fact count from the episode content.
+///
+/// The note-fallback reporting predicate here mirrors the
+/// source-type/content checks of [`should_extract_note_fact`] but adds
+/// its own precondition (exactly one Note fact); the two are
+/// deliberately not merged — extraction gates on "no facts yet",
+/// reporting on "the one fact is a note".
 pub(crate) fn build_extract_log_result(
     episode: Option<&Episode>,
     entities_len: usize,
@@ -602,4 +668,105 @@ pub(crate) fn build_extract_log_result_with_metadata(
     }
 
     Value::Object(result)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::models::{Episode, ExtractedFact};
+    use chrono::Utc;
+    use serde_json::Value;
+
+    #[test]
+    fn should_extract_note_fact_requires_supported_source_type_and_no_existing_facts() {
+        let episode = Episode {
+            episode_id: "episode:test".to_string(),
+            source_type: "requirement".to_string(),
+            source_id: "summary-1".to_string(),
+            content: "July 2025 planning summary: platform integrations ready, stakeholder approvals pending, response workflow scoped.".to_string(),
+            t_ref: Utc::now(),
+            t_ingested: Utc::now(),
+            scope: "org".to_string(),
+            visibility_scope: String::new(),
+            policy_tags: Vec::new(),
+            source_lineage: None,
+            source_context: None,
+        };
+
+        assert!(should_extract_note_fact(&episode, &[]));
+        assert!(!should_extract_note_fact(
+            &Episode {
+                source_type: "meeting".to_string(),
+                ..episode.clone()
+            },
+            &[]
+        ));
+        assert!(should_extract_note_fact(
+            &Episode {
+                source_type: "meeting_summary".to_string(),
+                ..episode.clone()
+            },
+            &[]
+        ));
+        assert!(!should_extract_note_fact(
+            &episode,
+            &[ExtractedFact {
+                fact_id: "fact:test".to_string(),
+                fact_type: "promise".to_string(),
+            }]
+        ));
+    }
+
+    #[test]
+    fn build_extract_log_result_includes_episode_metadata_and_note_fallback_usage() {
+        let episode = Episode {
+            episode_id: "episode:test".to_string(),
+            source_type: "requirement".to_string(),
+            source_id: "summary-1".to_string(),
+            content: "July 2025 planning summary: platform integrations ready.".to_string(),
+            t_ref: Utc::now(),
+            t_ingested: Utc::now(),
+            scope: "org".to_string(),
+            visibility_scope: String::new(),
+            policy_tags: Vec::new(),
+            source_lineage: None,
+            source_context: None,
+        };
+
+        let result = build_extract_log_result_with_metadata(
+            Some(&episode),
+            2,
+            &[ExtractedFact {
+                fact_id: "fact:test".to_string(),
+                fact_type: "note".to_string(),
+            }],
+            3,
+            1,
+            true,
+            0,
+        );
+
+        assert_eq!(result.get("entities").and_then(Value::as_u64), Some(2));
+        assert_eq!(result.get("facts").and_then(Value::as_u64), Some(1));
+        assert_eq!(result.get("links").and_then(Value::as_u64), Some(3));
+        assert_eq!(result.get("warnings").and_then(Value::as_u64), Some(1));
+        assert_eq!(
+            result.get("source_type").and_then(Value::as_str),
+            Some("requirement")
+        );
+        assert_eq!(
+            result.get("content_chars").and_then(Value::as_u64),
+            Some(56)
+        );
+        assert_eq!(
+            result.get("note_fallback_used").and_then(Value::as_bool),
+            Some(true)
+        );
+        assert_eq!(
+            result
+                .get("structured_line_fact_count")
+                .and_then(Value::as_u64),
+            Some(0)
+        );
+    }
 }

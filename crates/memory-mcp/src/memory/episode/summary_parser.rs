@@ -354,3 +354,103 @@ pub(super) fn sanitized_content_for_entity_extraction(content: &str) -> String {
 
     sanitized_lines.join("\n")
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::models::FactType;
+
+    #[test]
+    fn structured_summary_fact_candidates_extract_labeled_and_heading_scoped_lines() {
+        let candidates = structured_summary_fact_candidates(
+            "Project decision summary:\n\n- Decision: Approve the cross-platform activation policy.\n- Decision: Keep legacy on-premise licenses separate.\n\nDocumentation facts:\n- Fact: Docs team needs final terminology for supported languages.",
+        );
+
+        assert_eq!(candidates.len(), 3);
+        assert_eq!(candidates[0].fact_type, FactType::Decision.as_str());
+        assert_eq!(
+            candidates[0].content,
+            "Approve the cross-platform activation policy."
+        );
+        assert_eq!(candidates[1].fact_type, FactType::Decision.as_str());
+        assert_eq!(
+            candidates[1].content,
+            "Keep legacy on-premise licenses separate."
+        );
+        assert_eq!(candidates[2].fact_type, FactType::Note.as_str());
+        assert_eq!(
+            candidates[2].content,
+            "Docs team needs final terminology for supported languages."
+        );
+    }
+
+    #[test]
+    fn structured_summary_fact_candidates_extract_markdown_headings_without_colons() {
+        let candidates = structured_summary_fact_candidates(
+            "# September 2025 program summary\n\n## Decisions Made\n1. Regional launch in South market approved for September 30.\n2. Response logging rollout approved for September 30.\n\n## Pending Items\n1. Complete global launch follow-up.\n2. Continue platform 1.5 development.",
+        );
+
+        assert_eq!(candidates.len(), 4);
+        assert_eq!(candidates[0].fact_type, FactType::Decision.as_str());
+        assert_eq!(
+            candidates[0].content,
+            "Regional launch in South market approved for September 30."
+        );
+        assert_eq!(candidates[1].fact_type, FactType::Decision.as_str());
+        assert_eq!(
+            candidates[1].content,
+            "Response logging rollout approved for September 30."
+        );
+        assert_eq!(candidates[2].fact_type, FactType::Note.as_str());
+        assert_eq!(candidates[2].content, "Complete global launch follow-up.");
+        assert_eq!(candidates[3].fact_type, FactType::Note.as_str());
+        assert_eq!(candidates[3].content, "Continue platform 1.5 development.");
+    }
+
+    #[test]
+    fn structured_summary_fact_candidates_extract_thematic_heading_lines_with_heading_context() {
+        let candidates = structured_summary_fact_candidates(
+            "# Monthly coordination summary\n\n## Release Activities\n- Finalize phased rollout checklist.\n- Publish support handoff notes.\n\n## Capacity Planning\n- Prepare archive review for next quarter.",
+        );
+
+        assert_eq!(candidates.len(), 3);
+        assert_eq!(candidates[0].fact_type, FactType::Note.as_str());
+        assert_eq!(
+            candidates[0].content,
+            "Release Activities: Finalize phased rollout checklist."
+        );
+        assert_eq!(candidates[0].quote, "Finalize phased rollout checklist.");
+        assert_eq!(
+            candidates[1].content,
+            "Release Activities: Publish support handoff notes."
+        );
+        assert_eq!(
+            candidates[2].content,
+            "Capacity Planning: Prepare archive review for next quarter."
+        );
+    }
+
+    #[test]
+    fn sanitized_content_for_entity_extraction_strips_structural_labels() {
+        let sanitized = sanitized_content_for_entity_extraction(
+            "Architecture decisions:\n- Decision: Platform becomes the umbrella product name.\n- Fact: Legacy bridge remains active during rollout.",
+        );
+
+        assert!(!sanitized.contains("Decision:"));
+        assert!(!sanitized.contains("Fact:"));
+        assert!(!sanitized.contains("Architecture decisions:"));
+        assert!(sanitized.contains("Platform becomes the umbrella product name."));
+        assert!(sanitized.contains("Legacy bridge remains active during rollout."));
+    }
+
+    #[test]
+    fn sanitized_content_for_entity_extraction_strips_thematic_section_headings() {
+        let sanitized = sanitized_content_for_entity_extraction(
+            "Release Activities:\n- Finalize phased rollout checklist.\n- Publish support handoff notes.",
+        );
+
+        assert!(!sanitized.contains("Release Activities:"));
+        assert!(sanitized.contains("Finalize phased rollout checklist."));
+        assert!(sanitized.contains("Publish support handoff notes."));
+    }
+}

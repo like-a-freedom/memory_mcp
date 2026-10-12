@@ -49,43 +49,18 @@ async fn extract_inner<T: ToolContext>(
         duration: None,
     });
 
-    if content.is_some() && text.is_some() {
-        let message = "Invalid extract arguments: use only one inline snake_case field — `content` or `text` — not both. Do not wrap arguments in `payload`.";
+    if let Some(err) = validate_extract_inputs(&episode_id, &content, &text) {
         ctx.record(ToolEvent {
             op: "extract.invalid_input",
-            args: json!({"episode_id": &episode_id, "has_content": true}),
-            result: json!({"error": message}),
+            args: json!({"episode_id": &episode_id, "has_content": err.has_content}),
+            result: json!({"error": err.message}),
             level: LogLevel::Warn,
             duration: Some(timer.elapsed()),
         });
-        return Err(MemoryError::Validation(message.to_string()));
+        return Err(MemoryError::Validation(err.message.to_string()));
     }
 
     let inline_content = content.or(text);
-
-    if episode_id.is_some() && inline_content.is_some() {
-        let message = "Invalid extract arguments: provide exactly one snake_case input source. Use `episode_id` for stored content, or `content`/`text` for inline text, but not both. Do not wrap arguments in `payload`.";
-        ctx.record(ToolEvent {
-            op: "extract.invalid_input",
-            args: json!({"episode_id": &episode_id, "has_content": true}),
-            result: json!({"error": message}),
-            level: LogLevel::Warn,
-            duration: Some(timer.elapsed()),
-        });
-        return Err(MemoryError::Validation(message.to_string()));
-    }
-
-    if episode_id.is_none() && inline_content.is_none() {
-        let message = "Invalid extract arguments: provide exactly one snake_case input source — `episode_id` or non-empty `content`/`text`. Do not wrap arguments in `payload`.";
-        ctx.record(ToolEvent {
-            op: "extract.invalid_input",
-            args: json!({"episode_id": &episode_id, "has_content": false}),
-            result: json!({"error": message}),
-            level: LogLevel::Warn,
-            duration: Some(timer.elapsed()),
-        });
-        return Err(MemoryError::Validation(message.to_string()));
-    }
 
     if let Some(ref episode_id) = episode_id {
         match ctx
@@ -93,34 +68,8 @@ async fn extract_inner<T: ToolContext>(
             .await
         {
             Ok(result) => {
-                record_extract_results(&operation_metrics, &result);
-                operation_metrics.success();
-                let log_result = match ctx.find_episode(episode_id).await {
-                    Ok(episode) => build_extract_log_result(
-                        episode.as_ref(),
-                        result.entities.len(),
-                        &result.facts,
-                        result.links.len(),
-                        result.warnings.len(),
-                    ),
-                    Err(_) => build_extract_log_result(
-                        None,
-                        result.entities.len(),
-                        &result.facts,
-                        result.links.len(),
-                        result.warnings.len(),
-                    ),
-                };
-
-                ctx.record(ToolEvent {
-                    op: "extract.done",
-                    args: json!({"episode_id": episode_id}),
-                    result: log_result,
-                    level: LogLevel::Info,
-                    duration: Some(timer.elapsed()),
-                });
-                let guidance = extract_guidance(&result);
-                return Ok(ToolResponse::success_with_guidance(result, guidance));
+                return record_extract_done(ctx, &mut operation_metrics, timer, episode_id, result)
+                    .await;
             }
             Err(err) => {
                 ctx.record(ToolEvent {
@@ -172,34 +121,8 @@ async fn extract_inner<T: ToolContext>(
             };
             match extraction {
                 Ok(result) => {
-                    record_extract_results(&operation_metrics, &result);
-                    operation_metrics.success();
-                    let log_result = match ctx.find_episode(&episode_id).await {
-                        Ok(episode) => build_extract_log_result(
-                            episode.as_ref(),
-                            result.entities.len(),
-                            &result.facts,
-                            result.links.len(),
-                            result.warnings.len(),
-                        ),
-                        Err(_) => build_extract_log_result(
-                            None,
-                            result.entities.len(),
-                            &result.facts,
-                            result.links.len(),
-                            result.warnings.len(),
-                        ),
-                    };
-
-                    ctx.record(ToolEvent {
-                        op: "extract.done",
-                        args: json!({"episode_id": &episode_id}),
-                        result: log_result,
-                        level: LogLevel::Info,
-                        duration: Some(timer.elapsed()),
-                    });
-                    let guidance = extract_guidance(&result);
-                    Ok(ToolResponse::success_with_guidance(result, guidance))
+                    record_extract_done(ctx, &mut operation_metrics, timer, &episode_id, result)
+                        .await
                 }
                 Err(err) => {
                     ctx.record(ToolEvent {
@@ -224,6 +147,83 @@ async fn extract_inner<T: ToolContext>(
             Err(err)
         }
     }
+}
+
+/// Refusal of an invalid `extract` argument combination: the exact message
+/// and the `has_content` flag the `extract.invalid_input` event carries.
+struct ExtractInputError {
+    message: &'static str,
+    has_content: bool,
+}
+
+/// The three invalid-input shapes, checked in a fixed order: dual-field
+/// (content+text) wins over dual-source (episode_id+inline) wins over
+/// neither-source. `None` means the combination is valid.
+fn validate_extract_inputs(
+    episode_id: &Option<String>,
+    content: &Option<String>,
+    text: &Option<String>,
+) -> Option<ExtractInputError> {
+    if content.is_some() && text.is_some() {
+        return Some(ExtractInputError {
+            message: "Invalid extract arguments: use only one inline snake_case field — `content` or `text` — not both. Do not wrap arguments in `payload`.",
+            has_content: true,
+        });
+    }
+    let inline_content = content.is_some() || text.is_some();
+    if episode_id.is_some() && inline_content {
+        return Some(ExtractInputError {
+            message: "Invalid extract arguments: provide exactly one snake_case input source. Use `episode_id` for stored content, or `content`/`text` for inline text, but not both. Do not wrap arguments in `payload`.",
+            has_content: true,
+        });
+    }
+    if episode_id.is_none() && !inline_content {
+        return Some(ExtractInputError {
+            message: "Invalid extract arguments: provide exactly one snake_case input source — `episode_id` or non-empty `content`/`text`. Do not wrap arguments in `payload`.",
+            has_content: false,
+        });
+    }
+    None
+}
+
+/// Shared success tail of both extraction paths: record result metrics,
+/// emit `extract.done` with the episode-shaped log result, and wrap the
+/// outcome with path-appropriate guidance.
+async fn record_extract_done<T: ToolContext>(
+    ctx: &T,
+    operation_metrics: &mut crate::observability::OperationMetrics,
+    timer: Instant,
+    episode_id: &str,
+    result: ExtractResult,
+) -> Result<ToolResponse<ExtractResult>, MemoryError> {
+    record_extract_results(operation_metrics, &result);
+    operation_metrics.success();
+    let log_result = match ctx.find_episode(episode_id).await {
+        Ok(episode) => build_extract_log_result(
+            episode.as_ref(),
+            result.entities.len(),
+            &result.facts,
+            result.links.len(),
+            result.warnings.len(),
+        ),
+        Err(_) => build_extract_log_result(
+            None,
+            result.entities.len(),
+            &result.facts,
+            result.links.len(),
+            result.warnings.len(),
+        ),
+    };
+
+    ctx.record(ToolEvent {
+        op: "extract.done",
+        args: json!({"episode_id": episode_id}),
+        result: log_result,
+        level: LogLevel::Info,
+        duration: Some(timer.elapsed()),
+    });
+    let guidance = extract_guidance(&result);
+    Ok(ToolResponse::success_with_guidance(result, guidance))
 }
 
 /// Next-step guidance for an `extract` result.

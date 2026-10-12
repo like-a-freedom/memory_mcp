@@ -49,6 +49,10 @@ jobs:
         name: eval-nightly-artifact
         path: target/evals/*.json
         retention-days: 30
+  # No weekly perf job here by design: there is no dedicated perf machine
+  # (ADR-0082), so absolute latency is never measured in CI. The weekly
+  # profile is maintainer-invoked locally via `make perf-weekly`.
+
   benchmark-nightly:
     name: CPU benchmark profiles
     runs-on: ubuntu-latest

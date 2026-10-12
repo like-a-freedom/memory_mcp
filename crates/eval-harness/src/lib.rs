@@ -10,6 +10,7 @@ pub mod merge;
 pub mod metrics;
 pub mod model_preparation;
 pub mod ner_fixtures;
+pub mod perf;
 pub mod profile;
 pub mod reducer;
 pub mod report;

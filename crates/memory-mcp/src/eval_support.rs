@@ -8,6 +8,7 @@ use crate::models::claim::{ClaimRelation, ClaimRelationOutcome, PolicyFingerprin
 use crate::storage::DbClient;
 
 pub mod retrieval;
+pub use crate::storage::client::{QueryObserver, SqlObservation};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct EvaluatedRelation {
