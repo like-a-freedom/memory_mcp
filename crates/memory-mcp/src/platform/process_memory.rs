@@ -101,6 +101,67 @@ fn parse_heap_bytes(maps: &str) -> Option<u64> {
     None
 }
 
+/// The process's own memory totals, from `/proc/self/status`.
+///
+/// Gated to the build that has a caller for them — the startup marker in
+/// `http::runtime::bootstrap` — because the allocator gauges are not the only
+/// process-memory read: these are logs, never a family, and a `pub(crate)` item
+/// with no caller in a build is dead code under the zero-warning gate. The
+/// parser test below keeps them live in any test build.
+#[cfg(any(test, feature = "streamable-http"))]
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct ProcessTotals {
+    /// Resident set size (`VmRSS`).
+    pub(crate) rss_bytes: Option<u64>,
+    /// Swapped-out bytes (`VmSwap`).
+    pub(crate) swap_bytes: Option<u64>,
+    /// Peak resident set size (`VmHWM`) — the boot-time high-water mark.
+    pub(crate) hwm_bytes: Option<u64>,
+}
+
+/// Read RSS, swap and the peak from `/proc/self/status`; all `None` off Linux.
+#[cfg(any(test, feature = "streamable-http"))]
+pub(crate) fn read_process_totals() -> ProcessTotals {
+    match read_proc_self_status() {
+        Some(status) => parse_proc_status(&status),
+        None => ProcessTotals::default(),
+    }
+}
+
+/// `/proc/self/status` on Linux, or `None` anywhere else.
+#[cfg(any(test, feature = "streamable-http"))]
+fn read_proc_self_status() -> Option<String> {
+    #[cfg(target_os = "linux")]
+    {
+        std::fs::read_to_string("/proc/self/status").ok()
+    }
+    #[cfg(not(target_os = "linux"))]
+    {
+        None
+    }
+}
+
+/// Parse `VmRSS`, `VmSwap` and `VmHWM`. Each is reported in kB; return bytes.
+#[cfg(any(test, feature = "streamable-http"))]
+fn parse_proc_status(status: &str) -> ProcessTotals {
+    ProcessTotals {
+        rss_bytes: status_kib(status, "VmRSS:"),
+        swap_bytes: status_kib(status, "VmSwap:"),
+        hwm_bytes: status_kib(status, "VmHWM:"),
+    }
+}
+
+/// The first numeric value after `key`, converted from kB to bytes.
+#[cfg(any(test, feature = "streamable-http"))]
+fn status_kib(status: &str, key: &str) -> Option<u64> {
+    status
+        .lines()
+        .find_map(|line| line.strip_prefix(key))
+        .and_then(|rest| rest.split_whitespace().next())
+        .and_then(|value| value.parse::<u64>().ok())
+        .map(|kib| kib.saturating_mul(1024))
+}
+
 /// glibc `struct mallinfo2`, returned by `mallinfo2(3)`.
 ///
 /// The field order is fixed by glibc's ABI. Only the fields this module reads
@@ -167,6 +228,51 @@ mod tests {
             read_alloc(),
             AllocSnapshot::default(),
             "off glibc every field is None, never zero"
+        );
+    }
+
+    #[test]
+    fn parses_rss_swap_and_peak_from_proc_status() {
+        let status = "Name:\tmemory_mcp\nVmPeak:\t  500000 kB\nVmRSS:\t  1234 kB\n\
+                      VmSwap:\t    56 kB\nVmHWM:\t  7890 kB\n";
+        let totals = parse_proc_status(status);
+        assert_eq!(totals.rss_bytes, Some(1234 * 1024));
+        assert_eq!(totals.swap_bytes, Some(56 * 1024));
+        assert_eq!(totals.hwm_bytes, Some(7890 * 1024));
+    }
+
+    #[test]
+    fn missing_proc_status_keys_are_none_not_zero() {
+        let totals = parse_proc_status("Name:\tmemory_mcp\n");
+        assert_eq!(
+            totals,
+            ProcessTotals::default(),
+            "a key the file does not carry is None, never zero"
+        );
+    }
+
+    /// Where `/proc/self/status` exists, the live reader reports this process.
+    ///
+    /// The parser test above feeds fixtures; this is the one that proves the
+    /// reader is wired to the real file and returns a number, not just that a
+    /// string can be parsed.
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn read_process_totals_reads_the_live_process_on_linux() {
+        let totals = read_process_totals();
+        assert!(
+            totals.rss_bytes.is_some(),
+            "/proc/self/status reports VmRSS on Linux"
+        );
+    }
+
+    #[cfg(not(target_os = "linux"))]
+    #[test]
+    fn read_process_totals_is_all_none_off_linux() {
+        assert_eq!(
+            read_process_totals(),
+            ProcessTotals::default(),
+            "with no /proc every field is None, never zero"
         );
     }
 }

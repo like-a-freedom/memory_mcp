@@ -191,6 +191,7 @@ async fn main() -> ExitCode {
             return ExitCode::from(2);
         }
     };
+    bootstrap::log_memory_marker(&logger, "router_built");
     bootstrap::emit_startup_log(&logger, &cfg);
     log_glibc_tunables();
     let background_cleanup_grace = cfg.shutdown_grace;

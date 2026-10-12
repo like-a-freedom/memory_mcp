@@ -342,6 +342,8 @@ pub async fn build_state(
     cfg: &HttpConfig,
     logger: &StdoutLogger,
 ) -> Result<HttpRuntime, (ExitCode, String)> {
+    log_memory_marker(logger, "config_resolved");
+
     #[cfg(feature = "prometheus")]
     let metrics_handle = match crate::http::metrics::install_recorder() {
         Ok(h) => Some(h),
@@ -375,6 +377,7 @@ pub async fn build_state(
         event.insert("signature".to_string(), serde_json::json!(policy.signature));
         logger.log(event, crate::logging::LogLevel::Info);
     }
+    log_memory_marker(logger, "deployment_policy_resolved");
 
     let background_task_runner =
         Arc::new(crate::embedding::providers::task_runner::BackgroundTaskRunner::new());
@@ -388,6 +391,7 @@ pub async fn build_state(
                 ));
             }
         };
+    log_memory_marker(logger, "store_connected");
     let state = match HttpState::assemble_with_deployment_policy(
         cfg.clone(),
         composition.registry,
@@ -406,6 +410,7 @@ pub async fn build_state(
             ));
         }
     };
+    log_memory_marker(logger, "state_assembled");
     let background_upkeep_cancel = tokio_util::sync::CancellationToken::new();
     #[cfg(feature = "prometheus")]
     let memory_snapshot_source = Arc::new(
@@ -425,6 +430,8 @@ pub async fn build_state(
     });
     #[cfg(not(feature = "prometheus"))]
     let background_upkeep = None;
+
+    log_memory_marker(logger, "upkeep_started");
 
     Ok(HttpRuntime {
         state,
@@ -490,6 +497,40 @@ pub fn emit_startup_log(logger: &StdoutLogger, cfg: &HttpConfig) {
         serde_json::Value::from(cfg.tenant_db.url == "mem://"),
     );
     logger.log(fields, crate::logging::LogLevel::Info);
+}
+
+/// Record this process's memory after one named startup phase.
+///
+/// A boot-time log rather than a metric, deliberately: the peak this exists to
+/// catch is reached once and never again, so a five-second gauge would sample
+/// past it, and a series that is never set leaves a panel reading *No data*,
+/// which is what a switched-off subsystem looks like. `phase` names the
+/// boundary; a field is JSON `null` where the platform has no such signal,
+/// which is not the same as a measured zero.
+pub fn log_memory_marker(logger: &StdoutLogger, phase: &'static str) {
+    logger.log(startup_memory_fields(phase), crate::logging::LogLevel::Info);
+}
+
+/// The event body for [`log_memory_marker`], split out so a test reads it
+/// without a logger or a captured line.
+fn startup_memory_fields(
+    phase: &'static str,
+) -> std::collections::HashMap<String, serde_json::Value> {
+    let totals = crate::platform::process_memory::read_process_totals();
+    let heap_bytes = crate::platform::process_memory::read_alloc().heap_bytes;
+    let mut fields = std::collections::HashMap::new();
+    fields.insert("op".into(), serde_json::Value::from("http.startup_memory"));
+    fields.insert("phase".into(), serde_json::Value::from(phase));
+    fields.insert("rss_bytes".into(), optional_bytes(totals.rss_bytes));
+    fields.insert("swap_bytes".into(), optional_bytes(totals.swap_bytes));
+    fields.insert("hwm_bytes".into(), optional_bytes(totals.hwm_bytes));
+    fields.insert("heap_bytes".into(), optional_bytes(heap_bytes));
+    fields
+}
+
+/// A missing measurement is JSON `null` — present as a key, absent as a value.
+fn optional_bytes(value: Option<u64>) -> serde_json::Value {
+    value.map_or(serde_json::Value::Null, serde_json::Value::from)
 }
 
 #[cfg(test)]
@@ -759,6 +800,45 @@ mod tests {
         assert!(
             error.contains("could not be resolved"),
             "the failure must name the cause: {error}"
+        );
+    }
+
+    /// The startup marker names its phase and carries the whole footprint.
+    ///
+    /// Keys, not values, are asserted on every platform: `rss_bytes` is JSON
+    /// `null` where there is no `/proc`, and the marker must still carry the key
+    /// so a log query counts phases rather than dropping the ones with no value.
+    #[test]
+    fn startup_markers_report_phase_and_peak() {
+        let fields = startup_memory_fields("build_state");
+        assert_eq!(
+            fields.get("op"),
+            Some(&serde_json::Value::from("http.startup_memory"))
+        );
+        assert_eq!(
+            fields.get("phase"),
+            Some(&serde_json::Value::from("build_state"))
+        );
+        for key in ["rss_bytes", "swap_bytes", "hwm_bytes", "heap_bytes"] {
+            assert!(
+                fields.contains_key(key),
+                "`{key}` must be present: {fields:?}"
+            );
+        }
+    }
+
+    /// Where `/proc/self/status` exists, the peak is a number, not `null`.
+    ///
+    /// The Linux side of the same read the platform-gated allocator gauges use:
+    /// a marker whose `rss_bytes` were always null would look identical on Linux
+    /// and on a platform that has no `/proc` at all.
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn startup_markers_report_a_non_null_rss_on_linux() {
+        let fields = startup_memory_fields("build_state");
+        assert!(
+            fields["rss_bytes"].is_u64(),
+            "reading /proc/self/status must yield a number here: {fields:?}"
         );
     }
 }
