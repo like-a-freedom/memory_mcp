@@ -1502,7 +1502,7 @@ def product() -> dict:
             "Success and failure by operation",
             [
                 target(
-                    'sum by (operation, outcome) (rate(memory_operation_calls_total[15m]))',
+                    'sum by (operation, outcome) (rate(memory_operation_calls_total[15m])) or vector(0)',
                     "{{operation}} · {{outcome}}",
                 )
             ],
@@ -1575,8 +1575,9 @@ def product() -> dict:
             "and nothing is coming in to replace it.\n\n"
             "**Capture here is what callers asked for** — MCP ingest and "
             "extract. Inbox capture is a separate line on the panel above, so a "
-            "watcher-fed deployment reads *No data* here rather than a ratio "
-            "built on a denominator that does not exist. Zero with no recall is "
+            "watcher-fed deployment reads *0* here — no recalls against no "
+            "asked-for capture — rather than a ratio built on a denominator "
+            "that does not exist. Zero with no recall is "
             "the write-only archive, shown rather than hidden behind a gap.\n\n"
             "Read it as a shape, never as a target. It is a rate over a recent "
             "window, so a quiet half hour and a busy one differ by an order of "
@@ -1691,7 +1692,7 @@ def product() -> dict:
             "Extraction warnings",
             [
                 target(
-                    'sum(rate(memory_operation_results_total{result="warnings"}[15m]))',
+                    'sum(rate(memory_operation_results_total{result="warnings"}[15m])) or vector(0)',
                     "warnings",
                 )
             ],
@@ -1708,7 +1709,7 @@ def product() -> dict:
             "Claim outcomes",
             [
                 target(
-                    'sum by (outcome) (rate(memory_claim_pipeline_total{stage="reconcile"}[15m]))',
+                    'memory:claim_pipeline:rate15m{stage="reconcile"} or vector(0)',
                     "{{outcome}}",
                 )
             ],

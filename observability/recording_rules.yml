@@ -172,11 +172,20 @@ groups:
   - name: memory-operations
     interval: 30s
     rules:
+      # Calls per operation. The fallback is the idle deployment: fifteen
+      # minutes without calls is 0 calls per second, not an unmeasured
+      # product. There is no per-operation fill here — the fill would be the
+      # same series multiplied by zero, which adds no label the left side
+      # does not already have — so a fully idle deployment reads one
+      # labelless zero and the per-operation lines return with traffic.
       - record: memory:operation_calls:rate15m
         expr: |
-          sum by (operation) (
-            rate(memory_operation_calls_total[15m])
+          (
+            sum by (operation) (
+              rate(memory_operation_calls_total[15m])
+            )
           )
+          or vector(0)
 
       # Failures per operation.
       #
@@ -231,19 +240,28 @@ groups:
       #
       # `increase()` and a 1d window, not `rate()`: this family counts things
       # produced, so a rate of "facts per second" is a number nobody asks for.
-      # "How much knowledge did this deployment extract today" is.
+      # "How much knowledge did this deployment extract today" is. A day with
+      # nothing produced reads a flat 0 rather than a gap.
       - record: memory:operation_results:increase1d
         expr: |
-          sum by (result) (
-            increase(memory_operation_results_total[1d])
+          (
+            sum by (result) (
+              increase(memory_operation_results_total[1d])
+            )
           )
+          or vector(0)
 
-      # And over an hour, for a shorter window on the same dashboard.
+      # And over an hour, for a shorter window on the same dashboard. A dead
+      # hour reads a flat 0, which is how a slow day is told apart from a
+      # dead one rather than from an unmeasured one.
       - record: memory:operation_results:increase1h
         expr: |
-          sum by (result) (
-            increase(memory_operation_results_total[1h])
+          (
+            sum by (result) (
+              increase(memory_operation_results_total[1h])
+            )
           )
+          or vector(0)
 
   # ─── Pipeline stages ────────────────────────────────────────────────────────
   #
@@ -368,10 +386,11 @@ groups:
       # two is the point: refusals alone say who was turned away, and the sum of
       # both is the only "are people arriving" this metrics surface can honestly
       # answer — it still cannot distinguish a first sign-up from a return, and
-      # it does not try to.
+      # it does not try to. A quarter hour with no sign-ins reads 0 rather
+      # than absent, beside the refusals that do the same.
       - record: memory:auth_signins:rate15m
         expr: |
-          rate(memory_auth_signins_total[15m])
+          rate(memory_auth_signins_total[15m]) or vector(0)
 
   # ─── Claims ─────────────────────────────────────────────────────────────────
   #
@@ -471,31 +490,46 @@ groups:
       # Recall, per second. This is the value moment: context delivered to an
       # agent is what the product is for, and for an API-shaped product the
       # calls processed are the closest thing to a north-star figure.
+      #
+      # The fallback is the idle deployment: fifteen minutes without a recall
+      # is 0 recalls per second, not an unmeasured loop.
       - record: memory:lifecycle:recall:rate15m
         expr: |
-          sum by (operation) (
-            rate(memory_operation_calls_total{operation=~"assemble_context|explain|resolve"}[15m])
+          (
+            sum by (operation) (
+              rate(memory_operation_calls_total{operation=~"assemble_context|explain|resolve"}[15m])
+            )
           )
+          or vector(0)
 
       - record: memory:lifecycle:recall:rate15m_total
         expr: |
-          sum(
-            rate(memory_operation_calls_total{operation=~"assemble_context|explain|resolve"}[15m])
+          (
+            sum(
+              rate(memory_operation_calls_total{operation=~"assemble_context|explain|resolve"}[15m])
+            )
           )
+          or vector(0)
 
       # Capture through MCP, per second: knowledge entering the store because a
-      # caller asked for it.
+      # caller asked for it. Same idle fallback as recall above.
       - record: memory:lifecycle:capture:rate15m
         expr: |
-          sum by (operation) (
-            rate(memory_operation_calls_total{operation=~"ingest|extract"}[15m])
+          (
+            sum by (operation) (
+              rate(memory_operation_calls_total{operation=~"ingest|extract"}[15m])
+            )
           )
+          or vector(0)
 
       - record: memory:lifecycle:capture:rate15m_total
         expr: |
-          sum(
-            rate(memory_operation_calls_total{operation=~"ingest|extract"}[15m])
+          (
+            sum(
+              rate(memory_operation_calls_total{operation=~"ingest|extract"}[15m])
+            )
           )
+          or vector(0)
 
       # Capture that nobody asked for: episodes the filesystem watcher carried
       # in from the inbox, by what happened to each revision.
@@ -522,16 +556,18 @@ groups:
       #
       # Capture here is the MCP figure. Unattended inbox capture is a separate
       # series on purpose, so a watcher-only deployment — where recall happens
-      # and no MCP capture series exists at all — reads *No data* rather than
-      # a number built on a denominator that does not exist. That is the honest
-      # reading of "this ratio is about what people asked for".
+      # and no MCP capture series exists at all — reads *0* rather than a
+      # number built on a denominator that does not exist: no recalls against
+      # no asked-for capture. That is the honest reading of "this ratio is
+      # about what people asked for".
       #
       # Absence is read rather than dropped on the numerator, because the case
       # that matters most is a deployment whose only traffic is capture:
       # `recall or capture * 0` puts the zero there explicitly, so the panel
       # shows `0` — a write-only archive, visible — instead of *No data*, which
       # would read as "not measured" for the one state the panel exists to
-      # show. A deployment with neither side stays absent.
+      # show. A deployment with neither side reads 0: the totals below always
+      # resolve, so the numerator is an explicit zero rather than an absence.
       #
       # The floor on the denominator, with the same `or vector(0)` treatment, is
       # what keeps a capture that almost stopped from erasing the ratio: recall

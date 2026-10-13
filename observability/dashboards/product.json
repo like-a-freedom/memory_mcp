@@ -879,7 +879,7 @@
                 "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "sum by (operation, outcome) (rate(memory_operation_calls_total[15m]))",
+              "expr": "sum by (operation, outcome) (rate(memory_operation_calls_total[15m])) or vector(0)",
               "legendFormat": "{{operation}} \u00b7 {{outcome}}",
               "range": true,
               "refId": "A"
@@ -1016,7 +1016,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "description": "How many times knowledge was read back for every time it was written, over fifteen minutes.\n\n**Below one means storing more than reading** \u2014 where a memory system sits while an agent is still learning a project, and well above once it has context worth reusing. A very large number means recall with almost no capture: what is stored is being used and nothing is coming in to replace it.\n\n**Capture here is what callers asked for** \u2014 MCP ingest and extract. Inbox capture is a separate line on the panel above, so a watcher-fed deployment reads *No data* here rather than a ratio built on a denominator that does not exist. Zero with no recall is the write-only archive, shown rather than hidden behind a gap.\n\nRead it as a shape, never as a target. It is a rate over a recent window, so a quiet half hour and a busy one differ by an order of magnitude on the same day.",
+          "description": "How many times knowledge was read back for every time it was written, over fifteen minutes.\n\n**Below one means storing more than reading** \u2014 where a memory system sits while an agent is still learning a project, and well above once it has context worth reusing. A very large number means recall with almost no capture: what is stored is being used and nothing is coming in to replace it.\n\n**Capture here is what callers asked for** \u2014 MCP ingest and extract. Inbox capture is a separate line on the panel above, so a watcher-fed deployment reads *0* here \u2014 no recalls against no asked-for capture \u2014 rather than a ratio built on a denominator that does not exist. Zero with no recall is the write-only archive, shown rather than hidden behind a gap.\n\nRead it as a shape, never as a target. It is a rate over a recent window, so a quiet half hour and a busy one differ by an order of magnitude on the same day.",
           "fieldConfig": {
             "defaults": {
               "unit": "short",
@@ -1616,7 +1616,7 @@
                 "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "sum(rate(memory_operation_results_total{result=\"warnings\"}[15m]))",
+              "expr": "sum(rate(memory_operation_results_total{result=\"warnings\"}[15m])) or vector(0)",
               "legendFormat": "warnings",
               "range": true,
               "refId": "A"
@@ -1703,7 +1703,7 @@
                 "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "sum by (outcome) (rate(memory_claim_pipeline_total{stage=\"reconcile\"}[15m]))",
+              "expr": "memory:claim_pipeline:rate15m{stage=\"reconcile\"} or vector(0)",
               "legendFormat": "{{outcome}}",
               "range": true,
               "refId": "A"
