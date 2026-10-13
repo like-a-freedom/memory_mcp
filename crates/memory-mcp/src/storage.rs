@@ -24,6 +24,7 @@ pub mod access_log_store;
 pub(crate) mod client;
 pub mod event_log_store;
 pub(crate) mod helpers;
+pub(crate) mod json_conversion;
 pub(crate) mod migrations;
 pub(crate) mod queries;
 pub mod table_scope;
