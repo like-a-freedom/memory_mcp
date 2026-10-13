@@ -1,0 +1,112 @@
+{
+  "tagged": {
+    "command": [
+      "docker",
+      "run",
+      "--rm",
+      "--name",
+      "memory-rootcause-tagged",
+      "--memory=3g",
+      "--cpus=2",
+      "--env",
+      "MALLOC_ARENA_MAX=2",
+      "--mount",
+      "type=bind,source=/private/tmp/memory-rootcause-linux-probe,target=/probe,readonly",
+      "rust:1.99.0-trixie",
+      "/probe/target/release/memory-rootcause-probe",
+      "tagged",
+      "300"
+    ],
+    "exit_code": 0,
+    "stdout": "mode=tagged facts=300 dimension=2048 value_size=56 json_size=32\nstart live=1666 peak=1666 largest=1024 cumulative=1934 arena=270336 free=262032 inuse=8304 mmap=0\nVmHWM:\t    1976 kB\nVmRSS:\t    1976 kB\nVmSwap:\t       0 kB\nsurreal_rows live=34704466 peak=34704706 largest=114688 cumulative=35049598 arena=34881536 free=133024 inuse=34748512 mmap=0\nVmHWM:\t   35896 kB\nVmRSS:\t   35896 kB\nVmSwap:\t       0 kB\ntagged_json live=804188793 peak=838891593 largest=114688 cumulative=839240789 arena=881557504 free=34867600 inuse=846689904 mmap=0\nVmHWM:\t  862728 kB\nVmRSS:\t  862728 kB\nVmSwap:\t       0 kB\nnormalized live=19871756 peak=1608441696 largest=114688 cumulative=1663359033 arena=1693560832 free=1673623360 inuse=19937472 mmap=0\nVmHWM:\t 1655700 kB\nVmRSS:\t 1655700 kB\nVmSwap:\t       0 kB\ndropped live=1666 peak=1608441696 largest=114688 cumulative=1663363097 arena=1690808320 free=1690774144 inuse=34176 mmap=0\nVmHWM:\t 1655532 kB\nVmRSS:\t 1653012 kB\nVmSwap:\t       0 kB\n",
+    "stderr": ""
+  },
+  "move": {
+    "command": [
+      "docker",
+      "run",
+      "--rm",
+      "--name",
+      "memory-rootcause-move",
+      "--memory=3g",
+      "--cpus=2",
+      "--env",
+      "MALLOC_ARENA_MAX=2",
+      "--mount",
+      "type=bind,source=/private/tmp/memory-rootcause-linux-probe,target=/probe,readonly",
+      "rust:1.99.0-trixie",
+      "/probe/target/release/memory-rootcause-probe",
+      "move",
+      "300"
+    ],
+    "exit_code": 0,
+    "stdout": "mode=move facts=300 dimension=2048 value_size=56 json_size=32\nstart live=1664 peak=1664 largest=1024 cumulative=1930 arena=270336 free=262032 inuse=8304 mmap=0\nVmHWM:\t    1996 kB\nVmRSS:\t    1996 kB\nVmSwap:\t       0 kB\nsurreal_rows live=34704464 peak=34704704 largest=114688 cumulative=35049594 arena=34881536 free=133024 inuse=34748512 mmap=0\nVmHWM:\t   35916 kB\nVmRSS:\t   35916 kB\nVmSwap:\t       0 kB\ntagged_json live=804188791 peak=838891591 largest=114688 cumulative=839240785 arena=881557504 free=34867600 inuse=846689904 mmap=0\nVmHWM:\t  862748 kB\nVmRSS:\t  862748 kB\nVmSwap:\t       0 kB\nnormalized live=19871754 peak=838891591 largest=114688 cumulative=859172539 arena=881557504 free=861625120 inuse=19932384 mmap=0\nVmHWM:\t  862748 kB\nVmRSS:\t  862748 kB\nVmSwap:\t       0 kB\ndropped live=1664 peak=838891591 largest=114688 cumulative=859176603 arena=878866432 free=878837440 inuse=28992 mmap=0\nVmHWM:\t  862580 kB\nVmRSS:\t  860120 kB\nVmSwap:\t       0 kB\n",
+    "stderr": ""
+  },
+  "direct": {
+    "command": [
+      "docker",
+      "run",
+      "--rm",
+      "--name",
+      "memory-rootcause-direct",
+      "--memory=3g",
+      "--cpus=2",
+      "--env",
+      "MALLOC_ARENA_MAX=2",
+      "--mount",
+      "type=bind,source=/private/tmp/memory-rootcause-linux-probe,target=/probe,readonly",
+      "rust:1.99.0-trixie",
+      "/probe/target/release/memory-rootcause-probe",
+      "direct",
+      "300"
+    ],
+    "exit_code": 0,
+    "stdout": "mode=direct facts=300 dimension=2048 value_size=56 json_size=32\nstart live=1666 peak=1666 largest=1024 cumulative=1934 arena=270336 free=262032 inuse=8304 mmap=0\nVmHWM:\t    1976 kB\nVmRSS:\t    1976 kB\nVmSwap:\t       0 kB\nsurreal_rows live=34704466 peak=34704706 largest=114688 cumulative=35049598 arena=34881536 free=133024 inuse=34748512 mmap=0\nVmHWM:\t   35896 kB\nVmRSS:\t   35896 kB\nVmSwap:\t       0 kB\ndirect_json live=34625266 peak=34706514 largest=114688 cumulative=35243262 arena=34889728 free=215392 inuse=34674336 mmap=0\nVmHWM:\t   35904 kB\nVmRSS:\t   35904 kB\nVmSwap:\t       0 kB\ndropped live=1666 peak=34706514 largest=114688 cumulative=35247326 arena=34889728 free=34866400 inuse=23328 mmap=0\nVmHWM:\t   35904 kB\nVmRSS:\t   35904 kB\nVmSwap:\t       0 kB\n",
+    "stderr": ""
+  },
+  "projected": {
+    "command": [
+      "docker",
+      "run",
+      "--rm",
+      "--name",
+      "memory-rootcause-projected",
+      "--memory=3g",
+      "--cpus=2",
+      "--env",
+      "MALLOC_ARENA_MAX=2",
+      "--mount",
+      "type=bind,source=/private/tmp/memory-rootcause-linux-probe,target=/probe,readonly",
+      "rust:1.99.0-trixie",
+      "/probe/target/release/memory-rootcause-probe",
+      "projected",
+      "300"
+    ],
+    "exit_code": 0,
+    "stdout": "mode=projected facts=300 dimension=2048 value_size=56 json_size=32\nstart live=1669 peak=1669 largest=1024 cumulative=1940 arena=270336 free=262032 inuse=8304 mmap=0\nVmHWM:\t    1984 kB\nVmRSS:\t    1984 kB\nVmSwap:\t       0 kB\nsurreal_rows live=295369 peak=295529 largest=16800 cumulative=616504 arena=462848 free=135216 inuse=327632 mmap=0\nVmHWM:\t    2292 kB\nVmRSS:\t    2292 kB\nVmSwap:\t       0 kB\ntagged_json live=974196 peak=1267896 largest=16800 cumulative=1593095 arena=1499136 free=446624 inuse=1052512 mmap=0\nVmHWM:\t    3304 kB\nVmRSS:\t    3304 kB\nVmSwap:\t       0 kB\nnormalized live=208259 peak=1946954 largest=16800 cumulative=2833239 arena=2224128 free=1972096 inuse=252032 mmap=0\nVmHWM:\t    4012 kB\nVmRSS:\t    4012 kB\nVmSwap:\t       0 kB\ndropped live=1669 peak=1946954 largest=16800 cumulative=2837303 arena=2224128 free=2202560 inuse=21568 mmap=0\nVmHWM:\t    4012 kB\nVmRSS:\t    4012 kB\nVmSwap:\t       0 kB\n",
+    "stderr": ""
+  },
+  "trim": {
+    "command": [
+      "docker",
+      "run",
+      "--rm",
+      "--name",
+      "memory-rootcause-trim",
+      "--memory=3g",
+      "--cpus=2",
+      "--env",
+      "MALLOC_ARENA_MAX=2",
+      "--mount",
+      "type=bind,source=/private/tmp/memory-rootcause-linux-probe,target=/probe,readonly",
+      "rust:1.99.0-trixie",
+      "/probe/target/release/memory-rootcause-probe",
+      "trim",
+      "300"
+    ],
+    "exit_code": 0,
+    "stdout": "mode=trim facts=300 dimension=2048 value_size=56 json_size=32\nstart live=1664 peak=1664 largest=1024 cumulative=1930 arena=270336 free=262032 inuse=8304 mmap=0\nVmHWM:\t    1972 kB\nVmRSS:\t    1972 kB\nVmSwap:\t       0 kB\nsurreal_rows live=34704464 peak=34704704 largest=114688 cumulative=35049594 arena=34881536 free=133024 inuse=34748512 mmap=0\nVmHWM:\t   35892 kB\nVmRSS:\t   35892 kB\nVmSwap:\t       0 kB\ntagged_json live=804188791 peak=838891591 largest=114688 cumulative=839240785 arena=881557504 free=34867600 inuse=846689904 mmap=0\nVmHWM:\t  862724 kB\nVmRSS:\t  862724 kB\nVmSwap:\t       0 kB\nnormalized live=19871754 peak=1608441694 largest=114688 cumulative=1663359029 arena=1693560832 free=1673623360 inuse=19937472 mmap=0\nVmHWM:\t 1655696 kB\nVmRSS:\t 1655696 kB\nVmSwap:\t       0 kB\ndropped live=1664 peak=1608441694 largest=114688 cumulative=1663363093 arena=1690808320 free=1690774144 inuse=34176 mmap=0\nVmHWM:\t 1655472 kB\nVmRSS:\t 1653008 kB\nVmSwap:\t       0 kB\nmalloc_trim_return=1\nafter_trim live=1664 peak=1608441694 largest=114688 cumulative=1663367157 arena=1690677248 free=1690641152 inuse=36096 mmap=0\nVmHWM:\t 1655472 kB\nVmRSS:\t    2356 kB\nVmSwap:\t       0 kB\n",
+    "stderr": ""
+  }
+}

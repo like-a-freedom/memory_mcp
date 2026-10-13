@@ -1,0 +1,16 @@
+{
+  "schema": "memory-mcp-memory-evidence/v1",
+  "analysis_date": "2026-10-13",
+  "production_platform": "linux/amd64",
+  "probe_platform": "linux/arm64",
+  "source_release_commit": "bec27690df8578b807d76fee4551b2687acbc983",
+  "original_report_sha256": "8274bfcee98f651e58f05f3c5cca0f8cdfeecdc3227fcf04ea8c669a6db0082b",
+  "files": {
+    "production-observations.json": "d9e178692df448d312b5c5aea6082b359485f697a35c1797515f12e4aec6f0ce",
+    "metrics-at-084130.json": "b44297ad84f52dfa729c55135597272cb519d3813fa471dfc9565045e0184006",
+    "startup-window.json": "0cdc9e3453cd25fa733709b705e060cffb94827e99fbe079315cba16cdfc200f",
+    "results.json": "39b0f4b0fe9a618cd808a7a5a97fee8f3660f240d2a9415a08d5a27aa5bcccb4"
+  },
+  "experimental_source": "/private/tmp/memory-rootcause-linux-probe/src/main.rs",
+  "experimental_source_policy": "Historical evidence only. Do not read, copy or adapt experimental implementation during TDD."
+}

@@ -1,0 +1,89 @@
+{
+  "observed_utc": "2026-10-13T08:45:59.027926+00:00",
+  "pid": 450909,
+  "start_utc": "2026-10-13T08:19:37.135304579Z",
+  "restart_count": 7,
+  "limits": {
+    "Memory": 1073741824,
+    "MemorySwap": 2147483648
+  },
+  "image_id": "sha256:cbdf13400635dc674301a24294e1f0fea7b789cbb62a22d518a77aa8f538d31b",
+  "repo_digests": [
+    "ghcr.io/like-a-freedom/memory_mcp@sha256:6f374a20668a3e2003727636c937c0448e90c86eb256dc9c0b5731c3c3ef243b"
+  ],
+  "image_created": "2026-10-12T18:52:15.690923417Z",
+  "image_architecture": "amd64",
+  "image_labels": null,
+  "binary_sha256": "234d11ba44e7834593b10aaabbac181c0d09117d5f813e0dd76f337dfa5ec017",
+  "status": {
+    "VmHWM": "1045516 kB",
+    "VmRSS": "737980 kB",
+    "VmSwap": "1048488 kB",
+    "Threads": "3"
+  },
+  "glibc": "GNU C Library (Debian GLIBC 2.41-12+deb13u4) stable release version 2.41.",
+  "allocator_env": {
+    "MALLOC_ARENA_MAX": "2",
+    "MALLOC_MMAP_THRESHOLD_": null,
+    "MALLOC_TRIM_THRESHOLD_": null
+  },
+  "startup_memory_logs": [
+    "2026-10-13T07:48:29.210195Z  INFO  op=http.startup_memory  heap_bytes=540672  hwm_bytes=24068096  phase=config_resolved  rss_bytes=24068096  swap_bytes=0",
+    "2026-10-13T07:48:29.215888Z  INFO  op=http.startup_memory  heap_bytes=811008  hwm_bytes=26693632  phase=deployment_policy_resolved  rss_bytes=26693632  swap_bytes=0",
+    "2026-10-13T07:48:29.297921Z  INFO  op=http.startup_memory  heap_bytes=946176  hwm_bytes=30851072  phase=store_connected  rss_bytes=30851072  swap_bytes=0",
+    "2026-10-13T07:48:29.570304Z  INFO  op=http.startup_memory  heap_bytes=1359872  hwm_bytes=54030336  phase=state_assembled  rss_bytes=34414592  swap_bytes=0",
+    "2026-10-13T07:48:29.570440Z  INFO  op=http.startup_memory  heap_bytes=1359872  hwm_bytes=54030336  phase=upkeep_started  rss_bytes=34480128  swap_bytes=0",
+    "2026-10-13T07:48:29.572172Z  INFO  op=http.startup_memory  heap_bytes=1536000  hwm_bytes=54030336  phase=router_built  rss_bytes=35766272  swap_bytes=0",
+    "2026-10-13T08:19:37.462291Z  INFO  op=http.startup_memory  heap_bytes=540672  hwm_bytes=24092672  phase=config_resolved  rss_bytes=24092672  swap_bytes=0",
+    "2026-10-13T08:19:37.468070Z  INFO  op=http.startup_memory  heap_bytes=811008  hwm_bytes=26447872  phase=deployment_policy_resolved  rss_bytes=26447872  swap_bytes=0",
+    "2026-10-13T08:19:37.566806Z  INFO  op=http.startup_memory  heap_bytes=946176  hwm_bytes=30871552  phase=store_connected  rss_bytes=30871552  swap_bytes=0",
+    "2026-10-13T08:19:37.783653Z  INFO  op=http.startup_memory  heap_bytes=1359872  hwm_bytes=53874688  phase=state_assembled  rss_bytes=34238464  swap_bytes=0",
+    "2026-10-13T08:19:37.783788Z  INFO  op=http.startup_memory  heap_bytes=1359872  hwm_bytes=53874688  phase=upkeep_started  rss_bytes=34291712  swap_bytes=0",
+    "2026-10-13T08:19:37.785634Z  INFO  op=http.startup_memory  heap_bytes=1536000  hwm_bytes=53874688  phase=router_built  rss_bytes=35487744  swap_bytes=0"
+  ],
+  "kernel_oom_lines": [
+    "2026-10-13T07:48:28.261118+00:00 my-vps kernel: tokio-rt-worker invoked oom-killer: gfp_mask=0x100cca(GFP_HIGHUSER_MOVABLE), order=0, oom_score_adj=0",
+    "2026-10-13T07:48:28.303586+00:00 my-vps kernel: Memory cgroup out of memory: Killed process 349749 (memory_mcp_http) total-vm:2010576kB, anon-rss:844108kB, file-rss:112kB, shmem-rss:0kB, UID:65532 pgtables:3940kB oom_score_adj:0",
+    "2026-10-13T08:19:36.624785+00:00 my-vps kernel: tokio-rt-worker invoked oom-killer: gfp_mask=0x100cca(GFP_HIGHUSER_MOVABLE), order=0, oom_score_adj=0",
+    "2026-10-13T08:19:36.631412+00:00 my-vps kernel: Memory cgroup out of memory: Killed process 436883 (memory_mcp_http) total-vm:2157240kB, anon-rss:965148kB, file-rss:0kB, shmem-rss:0kB, UID:65532 pgtables:4184kB oom_score_adj:0"
+  ],
+  "database_aggregates": [
+    {
+      "tenant_status": "ready",
+      "counts": [
+        {
+          "result": [
+            {
+              "content_chars": 66670,
+              "n": 306,
+              "vector_elements": 626688
+            }
+          ],
+          "status": "OK",
+          "time": "98.130571ms",
+          "type": null
+        },
+        {
+          "result": [
+            {
+              "n": 41
+            }
+          ],
+          "status": "OK",
+          "time": "1.224352ms",
+          "type": null
+        },
+        {
+          "result": [
+            {
+              "n": 300
+            }
+          ],
+          "status": "OK",
+          "time": "59.476062ms",
+          "type": null
+        }
+      ]
+    }
+  ]
+}
