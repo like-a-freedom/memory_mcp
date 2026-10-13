@@ -146,6 +146,11 @@ impl EmbeddingConfig {
         let timeout_secs =
             parse_env::<u64>("EMBEDDINGS_TIMEOUT_SECS")?.unwrap_or(DEFAULT_EMBEDDING_TIMEOUT_SECS);
         let configured_dimension = parse_env::<usize>("SURREALDB_EMBEDDING_DIMENSION")?;
+        if configured_dimension == Some(0) {
+            return Err(MemoryError::ConfigInvalid(
+                "SURREALDB_EMBEDDING_DIMENSION must be greater than zero".to_string(),
+            ));
+        }
         let max_tokens =
             parse_env::<usize>("EMBEDDINGS_MAX_TOKENS")?.unwrap_or(DEFAULT_EMBEDDING_MAX_TOKENS);
         let similarity_threshold = parse_env::<f64>("EMBEDDINGS_SIMILARITY_THRESHOLD")?
@@ -523,6 +528,45 @@ mod tests {
                     result,
                     Err(MemoryError::ConfigInvalid(message))
                         if message.contains("EMBEDDINGS_RECOVERY_INTERVAL_SECS")
+                ));
+            },
+        );
+    }
+
+    #[test]
+    fn embedding_config_rejects_zero_dimension_when_embeddings_are_disabled() {
+        with_env_vars(
+            &[
+                ("EMBEDDINGS_ENABLED", Some("false")),
+                ("EMBEDDINGS_PROVIDER", None),
+                ("SURREALDB_EMBEDDING_DIMENSION", Some("0")),
+            ],
+            || {
+                let result = EmbeddingConfig::from_env();
+                assert!(matches!(
+                    result,
+                    Err(MemoryError::ConfigInvalid(message))
+                        if message.contains("SURREALDB_EMBEDDING_DIMENSION")
+                ));
+            },
+        );
+    }
+
+    #[test]
+    fn embedding_config_rejects_zero_dimension_when_embeddings_are_enabled() {
+        with_env_vars(
+            &[
+                ("EMBEDDINGS_ENABLED", Some("true")),
+                ("EMBEDDINGS_PROVIDER", Some("openai-compatible")),
+                ("EMBEDDINGS_MODEL", Some("test-model")),
+                ("SURREALDB_EMBEDDING_DIMENSION", Some("0")),
+            ],
+            || {
+                let result = EmbeddingConfig::from_env();
+                assert!(matches!(
+                    result,
+                    Err(MemoryError::ConfigInvalid(message))
+                        if message.contains("SURREALDB_EMBEDDING_DIMENSION")
                 ));
             },
         );
