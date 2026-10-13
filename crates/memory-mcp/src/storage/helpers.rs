@@ -152,13 +152,12 @@ pub fn extract_records(value: Value) -> Vec<Value> {
         Value::Array(arr) => arr.into_iter().map(unwrap_object_wrapper).collect(),
         Value::Object(mut map) => {
             if let Some(array) = map.remove("Array") {
-                return array
-                    .as_array()
-                    .cloned()
-                    .unwrap_or_default()
-                    .into_iter()
-                    .map(unwrap_object_wrapper)
-                    .collect();
+                return match array {
+                    Value::Array(records) => {
+                        records.into_iter().map(unwrap_object_wrapper).collect()
+                    }
+                    _ => Vec::new(),
+                };
             }
             if let Some(object) = map.remove("Object") {
                 return vec![normalize_surreal_json(&object)];
