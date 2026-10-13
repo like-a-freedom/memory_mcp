@@ -172,12 +172,12 @@ impl ReembedStoreClient {
             // comparison and the stale-signature OR predicate are combined in
             // one WHERE clause. Filtering the stale set in a subquery keeps
             // cursor pagination correct on the MSRV-compatible database.
-            "SELECT * FROM (SELECT * FROM fact WHERE embedding_signature IS NONE \
+            "SELECT fact_id, fact_type, content, quote FROM (SELECT fact_id, fact_type, content, quote FROM fact WHERE embedding_signature IS NONE \
              OR embedding_signature IS NULL OR embedding_signature != $target_signature) \
              WHERE fact_id > $last_completed_fact_id ORDER BY fact_id ASC LIMIT $limit"
                 .to_string()
         } else {
-            "SELECT * FROM fact WHERE (embedding_signature IS NONE OR embedding_signature IS NULL \
+            "SELECT fact_id, fact_type, content, quote FROM fact WHERE (embedding_signature IS NONE OR embedding_signature IS NULL \
              OR embedding_signature != $target_signature) ORDER BY fact_id ASC LIMIT $limit"
                 .to_string()
         };

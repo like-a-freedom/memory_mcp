@@ -83,6 +83,364 @@ async fn dimensional_memory(dimension: usize) -> (MemoryService, Arc<SurrealDbCl
     (service, db_client)
 }
 
+async fn declared_index_dimension(db_client: &SurrealDbClient) -> Option<usize> {
+    let raw = DbClient::query(db_client, "INFO FOR TABLE fact", None, "org")
+        .await
+        .expect("fact index definition read through public DbClient");
+    let define = raw
+        .as_array()?
+        .first()?
+        .get("indexes")?
+        .get("fact_embedding_hnsw")?
+        .as_str()?;
+    let width = &define[define.find("DIMENSION ")? + "DIMENSION ".len()..];
+    width
+        .chars()
+        .take_while(char::is_ascii_digit)
+        .collect::<String>()
+        .parse()
+        .ok()
+}
+
+async fn assert_stored_vector_dimension(
+    db_client: &SurrealDbClient,
+    fact_id: &str,
+    expected_dimension: usize,
+) {
+    assert_eq!(
+        stored_vector_dimension(db_client, fact_id).await,
+        Some(expected_dimension),
+        "fixture vector width is independent evidence from the declared index"
+    );
+    assert_eq!(
+        declared_index_dimension(db_client).await,
+        Some(expected_dimension),
+        "the public schema reports the requested HNSW width"
+    );
+}
+
+async fn stored_vector_dimension(db_client: &SurrealDbClient, fact_id: &str) -> Option<usize> {
+    let record = DbClient::select_one(db_client, fact_id, "org")
+        .await
+        .expect("stored vector readback succeeds")
+        .expect("stored vector fact exists");
+    record["embedding"].as_array().map(Vec::len)
+}
+
+async fn assert_active_projection_at_dimension(dimension: usize) {
+    let (service, db_client) = dimensional_memory(dimension).await;
+    let fact_id = add_fixture_fact(
+        &service,
+        "dimension-aware active projection fixture",
+        "episode:dimension-active-projection",
+        Utc::now(),
+        vec!["dimension-matrix".to_string()],
+    )
+    .await;
+    DbClient::update(
+        db_client.as_ref(),
+        &fact_id,
+        json!({"embedding": vec![0.25_f32; dimension]}),
+        "org",
+        &[],
+    )
+    .await
+    .expect("dimension-specific vector stored");
+    let rows = KnowledgeGraphStore::new(db_client.clone(), "org")
+        .select_active_facts(10)
+        .await
+        .expect("active facts selected by owning store");
+    let row = rows
+        .iter()
+        .find(|row| row["fact_id"].as_str() == Some(fact_id.as_str()))
+        .expect("active fixture returned by owning store");
+
+    assert_eq!(row["content"], "dimension-aware active projection fixture");
+    assert_eq!(row["policy_tags"], json!(["dimension-matrix"]));
+    assert!(row.get("embedding").is_none());
+    assert_stored_vector_dimension(db_client.as_ref(), &fact_id, dimension).await;
+}
+
+async fn assert_decay_projection_at_dimension(dimension: usize) {
+    let (service, db_client) = dimensional_memory(dimension).await;
+    let fact_id = add_fixture_fact(
+        &service,
+        "dimension-aware decay projection fixture",
+        "episode:dimension-decay-projection",
+        Utc::now() - Duration::days(400),
+        vec![],
+    )
+    .await;
+    DbClient::update(
+        db_client.as_ref(),
+        &fact_id,
+        json!({"embedding": vec![0.25_f32; dimension]}),
+        "org",
+        &[],
+    )
+    .await
+    .expect("dimension-specific vector stored");
+    let rows = KnowledgeGraphStore::new(db_client.clone(), "org")
+        .select_decay_candidates(10)
+        .await
+        .expect("decay candidates selected by owning store");
+    let row = rows
+        .iter()
+        .find(|row| row["fact_id"].as_str() == Some(fact_id.as_str()))
+        .expect("decay fixture returned by owning store");
+
+    assert_eq!(row["confidence"], 0.9);
+    assert!(row.get("content").is_none());
+    assert!(row.get("embedding").is_none());
+    assert_stored_vector_dimension(db_client.as_ref(), &fact_id, dimension).await;
+}
+
+async fn assert_scan_projection_at_dimension(dimension: usize) {
+    let (service, db_client) = dimensional_memory(dimension).await;
+    let fact_id = add_fixture_fact(
+        &service,
+        "dimension-aware nonsemantic scan fixture",
+        "episode:dimension-scan-projection",
+        Utc::now(),
+        vec![],
+    )
+    .await;
+    DbClient::update(
+        db_client.as_ref(),
+        &fact_id,
+        json!({"embedding": vec![0.25_f32; dimension]}),
+        "org",
+        &[],
+    )
+    .await
+    .expect("dimension-specific vector stored");
+    let observer = Arc::new(RecordingObserver::default());
+    db_client.set_eval_query_observer(observer.clone() as Arc<dyn QueryObserver>);
+    let items = AssembleContextCapability::assemble_context_from_service(
+        &service,
+        assemble_request(
+            "ignored by wake-up view",
+            Utc::now() + Duration::hours(1),
+            10,
+            Some("wake_up"),
+            None,
+        ),
+    )
+    .await
+    .expect("nonsemantic scan completes with embeddings stored");
+
+    assert!(items.iter().any(|item| item.fact_id == fact_id));
+    let scan = observer
+        .observations()
+        .into_iter()
+        .find(|observation| observation.sql.contains("FROM fact"))
+        .expect("actual fact scan observed");
+    assert!(scan.sql.to_ascii_lowercase().contains("select id, fact_id"));
+    assert!(!scan.sql.to_ascii_lowercase().contains("embedding"));
+    assert_stored_vector_dimension(db_client.as_ref(), &fact_id, dimension).await;
+}
+
+async fn assert_ann_projection_at_dimension(dimension: usize) {
+    let (service, db_client) = dimensional_memory(dimension).await;
+    let now = Utc::now();
+    let e0_id = add_fixture_fact(
+        &service,
+        "semantic basis e0 dimension matrix",
+        "episode:semantic-e0-dimension-matrix",
+        now,
+        vec![],
+    )
+    .await;
+    let e1_id = add_fixture_fact(
+        &service,
+        "semantic basis e1 dimension matrix",
+        "episode:semantic-e1-dimension-matrix",
+        now,
+        vec![],
+    )
+    .await;
+    let mut e0 = vec![0.0_f32; dimension];
+    e0[0] = 1.0;
+    let mut e1 = vec![0.0_f32; dimension];
+    e1[1] = 1.0;
+    for (fact_id, embedding) in [(&e0_id, e0), (&e1_id, e1)] {
+        DbClient::update(
+            db_client.as_ref(),
+            fact_id,
+            json!({"embedding": embedding}),
+            "org",
+            &[],
+        )
+        .await
+        .expect("dimension-specific ANN vector stored");
+    }
+    let store = KnowledgeStoreClient::new(db_client.clone(), "org");
+    let mut query = vec![0.0; dimension];
+    query[0] = 1.0;
+
+    let rows = store
+        .select_facts_ann(&(now + Duration::seconds(1)).to_rfc3339(), &query, 2)
+        .await
+        .expect("ANN query uses the dimension-specific public store path");
+
+    assert_eq!(rows.len(), 2);
+    assert_eq!(rows[0]["fact_id"].as_str(), Some(e0_id.as_str()));
+    assert_eq!(rows[0]["sem_score"].as_f64(), Some(1.0));
+    assert_eq!(rows[1]["fact_id"].as_str(), Some(e1_id.as_str()));
+    assert_eq!(rows[1]["sem_score"].as_f64(), Some(0.0));
+    assert!(rows.iter().all(|row| row.get("embedding").is_none()));
+    assert_stored_vector_dimension(db_client.as_ref(), &e0_id, dimension).await;
+    assert_stored_vector_dimension(db_client.as_ref(), &e1_id, dimension).await;
+}
+
+async fn remove_embedding_index(db_client: &SurrealDbClient) {
+    DbClient::query(
+        db_client,
+        "REMOVE INDEX fact_embedding_hnsw ON TABLE fact",
+        None,
+        "org",
+    )
+    .await
+    .expect("embedding index removed through public DbClient");
+}
+
+#[tokio::test]
+async fn active_projection_keeps_results_when_embedding_index_is_absent() {
+    const DIMENSION: usize = 3072;
+    let (service, db_client) = dimensional_memory(DIMENSION).await;
+    let fact_id = add_fixture_fact(
+        &service,
+        "active projection without embedding index",
+        "episode:active-without-index",
+        Utc::now(),
+        vec![],
+    )
+    .await;
+    DbClient::update(
+        db_client.as_ref(),
+        &fact_id,
+        json!({"embedding": vec![0.25_f32; DIMENSION]}),
+        "org",
+        &[],
+    )
+    .await
+    .expect("stored vector written before dropping the index");
+    remove_embedding_index(db_client.as_ref()).await;
+
+    let rows = KnowledgeGraphStore::new(db_client.clone(), "org")
+        .select_active_facts(10)
+        .await
+        .expect("active read does not depend on the vector index");
+    let row = rows
+        .iter()
+        .find(|row| row["fact_id"].as_str() == Some(fact_id.as_str()))
+        .expect("active fact remains available");
+
+    assert_eq!(row["content"], "active projection without embedding index");
+    assert!(row.get("embedding").is_none());
+    assert_eq!(declared_index_dimension(db_client.as_ref()).await, None);
+    assert_eq!(
+        stored_vector_dimension(db_client.as_ref(), &fact_id).await,
+        Some(DIMENSION_WITHOUT_INDEX)
+    );
+}
+
+#[tokio::test]
+async fn decay_projection_keeps_results_when_embedding_index_is_absent() {
+    const DIMENSION: usize = 3072;
+    let (service, db_client) = dimensional_memory(DIMENSION).await;
+    let fact_id = add_fixture_fact(
+        &service,
+        "decay projection without embedding index",
+        "episode:decay-without-index",
+        Utc::now() - Duration::days(400),
+        vec![],
+    )
+    .await;
+    DbClient::update(
+        db_client.as_ref(),
+        &fact_id,
+        json!({"embedding": vec![0.25_f32; DIMENSION]}),
+        "org",
+        &[],
+    )
+    .await
+    .expect("stored vector written before dropping the index");
+    remove_embedding_index(db_client.as_ref()).await;
+
+    let rows = KnowledgeGraphStore::new(db_client.clone(), "org")
+        .select_decay_candidates(10)
+        .await
+        .expect("decay read does not depend on the vector index");
+    let row = rows
+        .iter()
+        .find(|row| row["fact_id"].as_str() == Some(fact_id.as_str()))
+        .expect("decay candidate remains available");
+
+    assert_eq!(row["confidence"], 0.9);
+    assert!(row.get("content").is_none());
+    assert!(row.get("embedding").is_none());
+    assert_eq!(declared_index_dimension(db_client.as_ref()).await, None);
+    assert_eq!(
+        stored_vector_dimension(db_client.as_ref(), &fact_id).await,
+        Some(DIMENSION_WITHOUT_INDEX)
+    );
+}
+
+#[tokio::test]
+async fn nonsemantic_scan_keeps_results_when_embedding_index_is_absent() {
+    const DIMENSION: usize = 3072;
+    let (service, db_client) = dimensional_memory(DIMENSION).await;
+    let fact_id = add_fixture_fact(
+        &service,
+        "nonsemantic scan without embedding index",
+        "episode:scan-without-index",
+        Utc::now(),
+        vec![],
+    )
+    .await;
+    DbClient::update(
+        db_client.as_ref(),
+        &fact_id,
+        json!({"embedding": vec![0.25_f32; DIMENSION]}),
+        "org",
+        &[],
+    )
+    .await
+    .expect("stored vector written before dropping the index");
+    remove_embedding_index(db_client.as_ref()).await;
+    let observer = Arc::new(RecordingObserver::default());
+    db_client.set_eval_query_observer(observer.clone() as Arc<dyn QueryObserver>);
+
+    let items = AssembleContextCapability::assemble_context_from_service(
+        &service,
+        assemble_request(
+            "ignored by wake-up view",
+            Utc::now() + Duration::hours(1),
+            10,
+            Some("wake_up"),
+            None,
+        ),
+    )
+    .await
+    .expect("nonsemantic scan does not depend on the vector index");
+
+    assert!(items.iter().any(|item| item.fact_id == fact_id));
+    let scan = observer
+        .observations()
+        .into_iter()
+        .find(|observation| observation.sql.contains("FROM fact"))
+        .expect("actual full fact scan observed");
+    assert!(!scan.sql.to_ascii_lowercase().contains("embedding"));
+    assert_eq!(declared_index_dimension(db_client.as_ref()).await, None);
+    assert_eq!(
+        stored_vector_dimension(db_client.as_ref(), &fact_id).await,
+        Some(DIMENSION_WITHOUT_INDEX)
+    );
+}
+
+const DIMENSION_WITHOUT_INDEX: usize = 3072;
+
 fn assemble_request(
     query: &str,
     as_of: chrono::DateTime<Utc>,
@@ -197,53 +555,7 @@ async fn active_fact_reads_omit_embeddings_and_keep_nonsemantic_fields() {
 
 #[tokio::test]
 async fn ann_returns_score_without_vector_payload() {
-    const DIMENSION: usize = 2048;
-    let (service, db_client) = dimensional_memory(DIMENSION).await;
-    let now = Utc::now();
-    let e0_id = add_fixture_fact(
-        &service,
-        "semantic basis e0 fixture",
-        "episode:semantic-e0",
-        now,
-        vec![],
-    )
-    .await;
-    let e1_id = add_fixture_fact(
-        &service,
-        "semantic basis e1 fixture",
-        "episode:semantic-e1",
-        now,
-        vec![],
-    )
-    .await;
-    let mut e0 = vec![0.0_f32; DIMENSION];
-    e0[0] = 1.0;
-    let mut e1 = vec![0.0_f32; DIMENSION];
-    e1[1] = 1.0;
-    for (fact_id, embedding) in [(&e0_id, e0), (&e1_id, e1)] {
-        DbClient::update(
-            db_client.as_ref(),
-            fact_id,
-            json!({"embedding": embedding}),
-            "org",
-            &[],
-        )
-        .await
-        .expect("fixture embedding stored");
-    }
-    let store = KnowledgeStoreClient::new(db_client, "org");
-    let mut query = vec![0.0; DIMENSION];
-    query[0] = 1.0;
-
-    let rows = store
-        .select_facts_ann(&(now + Duration::seconds(1)).to_rfc3339(), &query, 1)
-        .await
-        .expect("ANN facts selected");
-
-    assert_eq!(rows.len(), 1);
-    assert_eq!(rows[0]["fact_id"].as_str(), Some(e0_id.as_str()));
-    assert_eq!(rows[0]["sem_score"].as_f64(), Some(1.0));
-    assert!(rows[0].get("embedding").is_none());
+    assert_ann_projection_at_dimension(2048).await;
 }
 
 #[tokio::test]
@@ -628,3 +940,66 @@ async fn full_scan_keeps_rows_after_the_first_1000_records() {
             && !sql.contains(" limit ")
     }));
 }
+
+macro_rules! active_projection_dimension_case {
+    ($name:ident, $dimension:literal) => {
+        #[tokio::test]
+        async fn $name() {
+            assert_active_projection_at_dimension($dimension).await;
+        }
+    };
+}
+
+macro_rules! decay_projection_dimension_case {
+    ($name:ident, $dimension:literal) => {
+        #[tokio::test]
+        async fn $name() {
+            assert_decay_projection_at_dimension($dimension).await;
+        }
+    };
+}
+
+macro_rules! scan_projection_dimension_case {
+    ($name:ident, $dimension:literal) => {
+        #[tokio::test]
+        async fn $name() {
+            assert_scan_projection_at_dimension($dimension).await;
+        }
+    };
+}
+
+macro_rules! ann_projection_dimension_case {
+    ($name:ident, $dimension:literal) => {
+        #[tokio::test]
+        async fn $name() {
+            assert_ann_projection_at_dimension($dimension).await;
+        }
+    };
+}
+
+active_projection_dimension_case!(active_projection_dimension_17, 17);
+active_projection_dimension_case!(active_projection_dimension_384, 384);
+active_projection_dimension_case!(active_projection_dimension_768, 768);
+active_projection_dimension_case!(active_projection_dimension_1536, 1536);
+active_projection_dimension_case!(active_projection_dimension_2048, 2048);
+active_projection_dimension_case!(active_projection_dimension_3072, 3072);
+
+decay_projection_dimension_case!(decay_projection_dimension_17, 17);
+decay_projection_dimension_case!(decay_projection_dimension_384, 384);
+decay_projection_dimension_case!(decay_projection_dimension_768, 768);
+decay_projection_dimension_case!(decay_projection_dimension_1536, 1536);
+decay_projection_dimension_case!(decay_projection_dimension_2048, 2048);
+decay_projection_dimension_case!(decay_projection_dimension_3072, 3072);
+
+scan_projection_dimension_case!(scan_projection_dimension_17, 17);
+scan_projection_dimension_case!(scan_projection_dimension_384, 384);
+scan_projection_dimension_case!(scan_projection_dimension_768, 768);
+scan_projection_dimension_case!(scan_projection_dimension_1536, 1536);
+scan_projection_dimension_case!(scan_projection_dimension_2048, 2048);
+scan_projection_dimension_case!(scan_projection_dimension_3072, 3072);
+
+ann_projection_dimension_case!(ann_projection_dimension_17, 17);
+ann_projection_dimension_case!(ann_projection_dimension_384, 384);
+ann_projection_dimension_case!(ann_projection_dimension_768, 768);
+ann_projection_dimension_case!(ann_projection_dimension_1536, 1536);
+ann_projection_dimension_case!(ann_projection_dimension_3072, 3072);

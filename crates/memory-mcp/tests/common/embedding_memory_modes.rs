@@ -21,6 +21,146 @@ static NEXT_DATABASE_ID: AtomicUsize = AtomicUsize::new(1);
 type ObservedAnnRows = Arc<Mutex<Vec<Value>>>;
 type ObservedQuerySql = Arc<Mutex<Vec<String>>>;
 
+#[derive(Clone, Debug)]
+pub struct ReembedBatchRow {
+    pub fact_id: Option<String>,
+    pub fact_type: Option<String>,
+    pub content: Option<String>,
+    pub quote: Option<String>,
+    pub columns: Vec<String>,
+}
+
+#[derive(Clone, Debug)]
+pub struct ReembedBatchObservation {
+    pub sql: String,
+    pub rows: Vec<ReembedBatchRow>,
+}
+
+#[derive(Clone)]
+pub struct ReembedBatchObserverHandle {
+    observations: Arc<Mutex<Vec<ReembedBatchObservation>>>,
+}
+
+pub struct ReembedBatchObserverDb {
+    inner: Arc<dyn DbClient>,
+    observations: Arc<Mutex<Vec<ReembedBatchObservation>>>,
+}
+
+impl ReembedBatchObserverDb {
+    pub fn new(inner: Arc<dyn DbClient>) -> (Self, ReembedBatchObserverHandle) {
+        let observations = Arc::new(Mutex::new(Vec::new()));
+        let db = Self {
+            inner,
+            observations: observations.clone(),
+        };
+        let observer = ReembedBatchObserverHandle { observations };
+        (db, observer)
+    }
+}
+
+impl ReembedBatchObserverHandle {
+    pub async fn batches(&self) -> Vec<ReembedBatchObservation> {
+        self.observations.lock().await.clone()
+    }
+}
+
+#[async_trait]
+impl DbClient for ReembedBatchObserverDb {
+    async fn select_one(
+        &self,
+        record_id: &str,
+        namespace: &str,
+    ) -> Result<Option<Value>, MemoryError> {
+        self.inner.select_one(record_id, namespace).await
+    }
+
+    async fn select_table(
+        &self,
+        table: OwnedTable,
+        namespace: &str,
+    ) -> Result<Vec<Value>, MemoryError> {
+        self.inner.select_table(table, namespace).await
+    }
+
+    async fn create(
+        &self,
+        record_id: &str,
+        content: Value,
+        namespace: &str,
+        temporal_fields: &[&str],
+    ) -> Result<Value, MemoryError> {
+        self.inner
+            .create(record_id, content, namespace, temporal_fields)
+            .await
+    }
+
+    async fn update(
+        &self,
+        record_id: &str,
+        content: Value,
+        namespace: &str,
+        temporal_fields: &[&str],
+    ) -> Result<Value, MemoryError> {
+        self.inner
+            .update(record_id, content, namespace, temporal_fields)
+            .await
+    }
+
+    async fn query(
+        &self,
+        sql: &str,
+        vars: Option<Value>,
+        namespace: &str,
+    ) -> Result<Value, MemoryError> {
+        let result = self.inner.query(sql, vars, namespace).await?;
+        if sql.contains("embedding_signature") && sql.contains("ORDER BY fact_id ASC LIMIT $limit")
+        {
+            let rows = result.as_array().ok_or_else(|| {
+                MemoryError::Storage("reembed observer expected an array result".to_string())
+            })?;
+            let observations = rows
+                .iter()
+                .map(|row| {
+                    let object = row.as_object();
+                    ReembedBatchRow {
+                        fact_id: object
+                            .and_then(|map| map.get("fact_id"))
+                            .and_then(Value::as_str)
+                            .map(str::to_owned),
+                        fact_type: object
+                            .and_then(|map| map.get("fact_type"))
+                            .and_then(Value::as_str)
+                            .map(str::to_owned),
+                        content: object
+                            .and_then(|map| map.get("content"))
+                            .and_then(Value::as_str)
+                            .map(str::to_owned),
+                        quote: object
+                            .and_then(|map| map.get("quote"))
+                            .and_then(Value::as_str)
+                            .map(str::to_owned),
+                        columns: object
+                            .map(|map| map.keys().cloned().collect())
+                            .unwrap_or_default(),
+                    }
+                })
+                .collect();
+            self.observations
+                .lock()
+                .await
+                .push(ReembedBatchObservation {
+                    sql: sql.to_string(),
+                    rows: observations,
+                });
+        }
+        Ok(result)
+    }
+
+    async fn apply_migrations(&self, namespace: &str) -> Result<(), MemoryError> {
+        self.inner.apply_migrations(namespace).await
+    }
+}
+
 #[derive(Clone, Copy)]
 pub enum AnnEvidence {
     Missing,
@@ -51,6 +191,12 @@ impl EmbeddingProvider for FixedEmbeddingProvider {
     async fn embed(&self, _input: &str) -> Result<Vec<f64>, MemoryError> {
         Ok(self.vector.clone())
     }
+}
+
+pub fn fixed_embedding_provider(dimension: usize) -> Arc<dyn EmbeddingProvider> {
+    let mut vector = vec![0.0; dimension];
+    vector[0] = 1.0;
+    Arc::new(FixedEmbeddingProvider { vector })
 }
 
 pub struct AnnEvidenceDb {
