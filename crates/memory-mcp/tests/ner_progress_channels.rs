@@ -359,6 +359,9 @@ fn blocked_gliner_refresh_does_not_delay_initialize() {
     let temp = TempDir::new().expect("temp");
     let mut child = Command::new(binary())
         .arg("serve")
+        // This assertion requires the refresh lifecycle INFO marker. The
+        // test process may inherit a stricter RUST_LOG filter from its caller.
+        .env("RUST_LOG", "info")
         .env("SURREALDB_EMBEDDED", "true")
         .env("SURREALDB_DATA_DIR", temp.path().join("db"))
         .env("SURREALDB_DB_NAME", "memory_blocked_refresh")

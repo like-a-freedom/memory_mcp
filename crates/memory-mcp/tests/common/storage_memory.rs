@@ -22,6 +22,7 @@ const CHILD_TIMEOUT: Duration = Duration::from_secs(120);
 const REPORT_TIMEOUT: Duration = Duration::from_secs(30);
 const POLL_INTERVAL: Duration = Duration::from_millis(50);
 const ALLOCATION_QUERY_PAGE_ROWS: usize = 300;
+static NEXT_DOCKER_CONTAINER_SEQUENCE: AtomicUsize = AtomicUsize::new(0);
 
 pub const CHILD_MODE_ENV: &str = "MEMORY_MCP_STORAGE_ALLOCATION_CHILD";
 pub const REPORT_PREFIX: &str = "MEMORY_MCP_STORAGE_ALLOCATION_REPORT=";
@@ -672,11 +673,8 @@ struct DockerContainer {
 
 impl DockerContainer {
     fn start() -> io::Result<Self> {
-        let timestamp = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .unwrap_or_default()
-            .as_nanos();
-        let name = format!("memory-mcp-storage-{}-{timestamp}", std::process::id());
+        let sequence = NEXT_DOCKER_CONTAINER_SEQUENCE.fetch_add(1, Ordering::Relaxed);
+        let name = format!("memory-mcp-storage-{}-{sequence}", std::process::id());
         let output = Command::new("docker")
             .args([
                 "run",
