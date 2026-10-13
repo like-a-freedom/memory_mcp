@@ -167,7 +167,7 @@ pub fn build_select_facts_ann_query(
     // HNSW ef_search defaults to 4 * K for better recall
     let ef_search = (ann_limit * 4).max(16);
     let sql = format!(
-        "SELECT *, vector::similarity::cosine(embedding, $query_vec) AS sem_score \
+        "SELECT id, {NONSEMANTIC_FACT_PROJECTION}, vector::similarity::cosine(embedding, $query_vec) AS sem_score \
          FROM fact \
          WHERE embedding IS NOT NONE \
            AND embedding IS NOT NULL \

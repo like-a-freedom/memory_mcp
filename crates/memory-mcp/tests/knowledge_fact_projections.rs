@@ -2,15 +2,19 @@
 
 use chrono::{Duration, Utc};
 use memory_mcp::eval_support::{QueryObserver, SqlObservation};
-use memory_mcp::knowledge::graph_store::KnowledgeGraphStore;
+use memory_mcp::knowledge::{KnowledgeGraphStore, KnowledgeStoreClient};
 use memory_mcp::models::{AssembleContextRequest, Provenance};
+use memory_mcp::service::MemoryService;
 use memory_mcp::service::memory_container_shims::memory_capabilities_assemble_context::AssembleContextCapability;
-use memory_mcp::storage::DbClient;
 use memory_mcp::storage::table_scope::{KnowledgeTables, ReleaseOwnedTable};
+use memory_mcp::storage::{DbClient, SurrealDbClient};
 use serde_json::{Value, json};
+use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
 
 mod common;
+
+static DIMENSIONAL_DB_COUNTER: AtomicUsize = AtomicUsize::new(1);
 
 #[derive(Default)]
 struct RecordingObserver {
@@ -53,6 +57,30 @@ async fn add_fixture_fact(
         )
         .await
         .expect("fixture fact added")
+}
+
+async fn dimensional_memory(dimension: usize) -> (MemoryService, Arc<SurrealDbClient>) {
+    let sequence = DIMENSIONAL_DB_COUNTER.fetch_add(1, Ordering::Relaxed);
+    let database = format!("knowledge_fact_projection_{sequence}");
+    let db_client = Arc::new(
+        SurrealDbClient::connect_in_memory_with_dimension(&database, "org", "warn", dimension)
+            .await
+            .expect("dimension-aware in-memory database connected"),
+    );
+    db_client
+        .apply_migrations("org")
+        .await
+        .expect("dimension-aware migrations applied");
+    let service = MemoryService::new(
+        db_client.clone(),
+        "org".to_string(),
+        "warn".to_string(),
+        50,
+        100,
+    )
+    .expect("memory service created");
+
+    (service, db_client)
 }
 
 fn assemble_request(
@@ -165,6 +193,57 @@ async fn active_fact_reads_omit_embeddings_and_keep_nonsemantic_fields() {
     assert_eq!(row["policy_tags"], json!(["persona"]));
     assert!(row["index_keys"].is_array());
     assert_eq!(row["confidence"], 0.8);
+}
+
+#[tokio::test]
+async fn ann_returns_score_without_vector_payload() {
+    const DIMENSION: usize = 2048;
+    let (service, db_client) = dimensional_memory(DIMENSION).await;
+    let now = Utc::now();
+    let e0_id = add_fixture_fact(
+        &service,
+        "semantic basis e0 fixture",
+        "episode:semantic-e0",
+        now,
+        vec![],
+    )
+    .await;
+    let e1_id = add_fixture_fact(
+        &service,
+        "semantic basis e1 fixture",
+        "episode:semantic-e1",
+        now,
+        vec![],
+    )
+    .await;
+    let mut e0 = vec![0.0_f32; DIMENSION];
+    e0[0] = 1.0;
+    let mut e1 = vec![0.0_f32; DIMENSION];
+    e1[1] = 1.0;
+    for (fact_id, embedding) in [(&e0_id, e0), (&e1_id, e1)] {
+        DbClient::update(
+            db_client.as_ref(),
+            fact_id,
+            json!({"embedding": embedding}),
+            "org",
+            &[],
+        )
+        .await
+        .expect("fixture embedding stored");
+    }
+    let store = KnowledgeStoreClient::new(db_client, "org");
+    let mut query = vec![0.0; DIMENSION];
+    query[0] = 1.0;
+
+    let rows = store
+        .select_facts_ann(&(now + Duration::seconds(1)).to_rfc3339(), &query, 1)
+        .await
+        .expect("ANN facts selected");
+
+    assert_eq!(rows.len(), 1);
+    assert_eq!(rows[0]["fact_id"].as_str(), Some(e0_id.as_str()));
+    assert_eq!(rows[0]["sem_score"].as_f64(), Some(1.0));
+    assert!(rows[0].get("embedding").is_none());
 }
 
 #[tokio::test]

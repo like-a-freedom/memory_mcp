@@ -119,22 +119,24 @@ pub(crate) async fn collect_semantic_facts(
             continue;
         }
 
-        let similarity = record
+        let score = record
             .as_object()
             .and_then(|map: &serde_json::Map<String, Value>| map.get("sem_score"))
-            .and_then(Value::as_f64)
-            .unwrap_or_else(|| {
-                let embedding = record
-                    .as_object()
-                    .and_then(|map: &serde_json::Map<String, Value>| map.get("embedding"))
-                    .and_then(embedding_from_value);
-                match embedding {
-                    Some(ref emb) if emb.len() == query_embedding.len() => {
-                        crate::embedding::providers::cosine_similarity(&query_embedding, emb)
-                    }
-                    _ => 0.0,
-                }
-            });
+            .and_then(Value::as_f64);
+        let similarity = if let Some(score) = score {
+            score
+        } else {
+            let embedding = record
+                .as_object()
+                .and_then(|map: &serde_json::Map<String, Value>| map.get("embedding"))
+                .and_then(embedding_from_value);
+            let Some(embedding) =
+                embedding.filter(|embedding| embedding.len() == query_embedding.len())
+            else {
+                continue;
+            };
+            crate::embedding::providers::cosine_similarity(&query_embedding, &embedding)
+        };
 
         validate_semantic_similarity(similarity, &fact.fact_id)?;
 
