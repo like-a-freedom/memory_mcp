@@ -429,12 +429,12 @@ def technical() -> dict:
     ]
     every_stage[0]["targets"] = [
         target(
-            'max by (operation) (memory_operation_duration_seconds{quantile="0.95"})',
+            "memory:operation_duration:p95_5m",
             "{{operation}}",
             "A",
         ),
         target(
-            'max by (stage) (memory_pipeline_stage_duration_seconds{quantile="0.95"})',
+            'max by (stage) (memory:pipeline_stage_duration:p95_5m)',
             "{{stage}}",
             "B",
         ),
@@ -470,12 +470,11 @@ def technical() -> dict:
             "ops",
             (12, 9, 12, 9),
             "The failures that do not belong to an operation: background passes "
-            "that failed or degraded, claim projection errors, failed "
-            "filesystem revisions, sign-in refusals, runtime refusals and "
-            "registry drift.\n\n"
+            "that failed or degraded, claim projection errors, sign-in "
+            "refusals, runtime refusals and registry drift.\n\n"
             "**All of them per second, so they are comparable with each other "
             "in a way the ratio tiles beside them are not** — a burst of "
-            "refusals and a steady trickle of failed revisions are different "
+            "refusals and a slow registry drift are different "
             "problems and sit side by side here. Registry drift is per kind, "
             "because its two kinds are different faults.\n\n"
             "**Amber means *something* failed, not that a lot did.** These "
@@ -486,7 +485,7 @@ def technical() -> dict:
             "threshold worth matching.\n\n"
             "This is also the only place the whole service's failure surface "
             "fits in one glance: an operation that fails 0.1% of the time and a "
-            "watcher that has not processed a revision in an hour are both "
+            "registry drift that never clears are both "
             "visible from across the room.",
             thresholds=[
                 {"color": "green", "value": None},
@@ -502,16 +501,16 @@ def technical() -> dict:
     what_is_failing[1]["targets"] = [
         target("memory:background_jobs:unhealthy_rate15m", "background {{pass}}", "A"),
         target(
-            'sum(rate(memory_claim_pipeline_total{reason_code="internal"}[15m]))',
+            'sum(rate(memory_claim_pipeline_total{reason_code="internal"}[15m])) or vector(0)',
             "claim projection",
             "B",
         ),
-        target("sum(memory:auth_refusals:rate15m)", "sign-in refusals", "D"),
-        target("sum(memory:runtime_refusals:rate15m)", "runtime refusals", "E"),
+        target("sum(memory:auth_refusals:rate15m)", "sign-in refusals", "C"),
+        target("sum(memory:runtime_refusals:rate15m)", "runtime refusals", "D"),
         target(
-            "sum by (kind) (rate(memory_http_registry_reconciliation_total[15m]))",
+            "sum by (kind) (rate(memory_http_registry_reconciliation_total[15m])) or vector(0)",
             "registry {{kind}}",
-            "F",
+            "E",
         ),
     ]
     sections.append(("Helicopter view — what is failing", what_is_failing))
@@ -569,7 +568,7 @@ def technical() -> dict:
             "Stage latency, over time",
             [
                 target(
-                    'max by (stage) (memory_pipeline_stage_duration_seconds{quantile="0.95"})',
+                    "max by (stage) (memory:pipeline_stage_duration:p95_5m)",
                     "{{stage}}",
                 )
             ],
@@ -1014,15 +1013,34 @@ def technical() -> dict:
             decimals=2,
         ),
     ]
-    http_memory = [
-        row("Preflight body collection", preflight_panels),
-        row("Preflight reservations and runtimes", reservation_panels),
-        row("Resident runtime caches", cache_panels),
-        row("Background embedding coordinator", background_panels),
-        row("Allocator attribution", allocator_panels),
-        row("Accounting limits", interpretation_panels),
-    ]
-    sections.append(("HTTP memory diagnostics", http_memory))
+    # One top-level row each, never rows inside a row. Grafana's schema has a
+    # single row level: panels nested inside a row are dropped on import,
+    # which is how this section once shipped empty rows with its widgets
+    # missing. `check_dashboards.py` rejects nesting so it cannot come back.
+    sections.append(
+        ("HTTP memory diagnostics — Preflight body collection", preflight_panels)
+    )
+    sections.append(
+        (
+            "HTTP memory diagnostics — Preflight reservations and runtimes",
+            reservation_panels,
+        )
+    )
+    sections.append(
+        ("HTTP memory diagnostics — Resident runtime caches", cache_panels)
+    )
+    sections.append(
+        (
+            "HTTP memory diagnostics — Background embedding coordinator",
+            background_panels,
+        )
+    )
+    sections.append(
+        ("HTTP memory diagnostics — Allocator attribution", allocator_panels)
+    )
+    sections.append(
+        ("HTTP memory diagnostics — Accounting limits", interpretation_panels)
+    )
 
     jobs = [
         timeseries(

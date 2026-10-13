@@ -143,7 +143,7 @@ access failure does not establish that a series is absent from VictoriaMetrics.
 | What is failing? | technical → *Helicopter view — what is failing* |
 | Is anything still running? | technical → *Helicopter view — is it still running* |
 | Is anything being collected at all? | technical → *Collection health* |
-| What does the HTTP process account for in its bounded owners and allocator? | technical → *HTTP memory diagnostics* |
+| What does the HTTP process account for in its bounded owners and allocator? | technical → *HTTP memory diagnostics* rows |
 | What is slow? | technical → *HTTP latency* → *p95 by route* |
 | Is it getting slower, or was it always slow? | technical → *HTTP latency* → *Latency percentiles over time* |
 | Why is it slow? | technical → *Pipeline stages* |
@@ -162,7 +162,9 @@ access failure does not establish that a series is absent from VictoriaMetrics.
 The technical dashboard is ordered RED — rate, errors, duration above the
 fold, saturation below — because that is the order an on-call engineer reads
 in. Every row below the overview explains one of the four numbers above it.
-The *HTTP memory diagnostics* row follows collection health. It charts the
+The six *HTTP memory diagnostics* rows follow collection health — one row
+per subsection, because rows cannot be nested: panels inside a row are
+dropped on import. They chart the
 preflight summary/refusal metrics, bounded owner gauges and allocator-attribution
 panels. Neither owner accounting nor allocator statistics are complete process
 RSS or container accounting. Host/container panels remain absent until the

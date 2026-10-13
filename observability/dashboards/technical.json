@@ -93,7 +93,7 @@
                 "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "max by (operation) (memory_operation_duration_seconds{quantile=\"0.95\"})",
+              "expr": "memory:operation_duration:p95_5m",
               "legendFormat": "{{operation}}",
               "range": true,
               "refId": "A"
@@ -104,7 +104,7 @@
                 "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "max by (stage) (memory_pipeline_stage_duration_seconds{quantile=\"0.95\"})",
+              "expr": "max by (stage) (memory:pipeline_stage_duration:p95_5m)",
               "legendFormat": "{{stage}}",
               "range": true,
               "refId": "B"
@@ -200,7 +200,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "description": "The failures that do not belong to an operation: background passes that failed or degraded, claim projection errors, failed filesystem revisions, sign-in refusals, runtime refusals and registry drift.\n\n**All of them per second, so they are comparable with each other in a way the ratio tiles beside them are not** \u2014 a burst of refusals and a steady trickle of failed revisions are different problems and sit side by side here. Registry drift is per kind, because its two kinds are different faults.\n\n**Amber means *something* failed, not that a lot did.** These series sit next to alerts that fire at any non-zero rate \u2014 `ClaimProjectionFailing` and `RegistryInconsistent` both fire at `> 0` \u2014 so amber here is what a page looks like before it is one. Red at a tenth per second is a sustained failure rather than a threshold worth matching.\n\nThis is also the only place the whole service's failure surface fits in one glance: an operation that fails 0.1% of the time and a watcher that has not processed a revision in an hour are both visible from across the room.",
+          "description": "The failures that do not belong to an operation: background passes that failed or degraded, claim projection errors, sign-in refusals, runtime refusals and registry drift.\n\n**All of them per second, so they are comparable with each other in a way the ratio tiles beside them are not** \u2014 a burst of refusals and a slow registry drift are different problems and sit side by side here. Registry drift is per kind, because its two kinds are different faults.\n\n**Amber means *something* failed, not that a lot did.** These series sit next to alerts that fire at any non-zero rate \u2014 `ClaimProjectionFailing` and `RegistryInconsistent` both fire at `> 0` \u2014 so amber here is what a page looks like before it is one. Red at a tenth per second is a sustained failure rather than a threshold worth matching.\n\nThis is also the only place the whole service's failure surface fits in one glance: an operation that fails 0.1% of the time and a registry drift that never clears are both visible from across the room.",
           "fieldConfig": {
             "defaults": {
               "unit": "ops",
@@ -269,7 +269,7 @@
                 "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "sum(rate(memory_claim_pipeline_total{reason_code=\"internal\"}[15m]))",
+              "expr": "sum(rate(memory_claim_pipeline_total{reason_code=\"internal\"}[15m])) or vector(0)",
               "legendFormat": "claim projection",
               "range": true,
               "refId": "B"
@@ -283,7 +283,7 @@
               "expr": "sum(memory:auth_refusals:rate15m)",
               "legendFormat": "sign-in refusals",
               "range": true,
-              "refId": "D"
+              "refId": "C"
             },
             {
               "datasource": {
@@ -294,7 +294,7 @@
               "expr": "sum(memory:runtime_refusals:rate15m)",
               "legendFormat": "runtime refusals",
               "range": true,
-              "refId": "E"
+              "refId": "D"
             },
             {
               "datasource": {
@@ -302,10 +302,10 @@
                 "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "sum by (kind) (rate(memory_http_registry_reconciliation_total[15m]))",
+              "expr": "sum by (kind) (rate(memory_http_registry_reconciliation_total[15m])) or vector(0)",
               "legendFormat": "registry {{kind}}",
               "range": true,
-              "refId": "F"
+              "refId": "E"
             }
           ],
           "title": "Everything else, failures per second",
@@ -537,7 +537,7 @@
                 "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "max by (stage) (memory_pipeline_stage_duration_seconds{quantile=\"0.95\"})",
+              "expr": "max by (stage) (memory:pipeline_stage_duration:p95_5m)",
               "legendFormat": "{{stage}}",
               "range": true,
               "refId": "A"
@@ -1654,1101 +1654,181 @@
       "id": 0,
       "panels": [
         {
-          "collapsed": true,
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "description": "The 95th percentile of fully collected request body bytes. This is an exporter summary, not a histogram: the family exposes quantile lines plus `_sum` and `_count`, with no `_bucket` or `le` label. Fully collected malformed JSON is included; partial, refused, read-error and cancelled bodies are not.",
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "palette-classic"
+              },
+              "custom": {
+                "axisBorderShow": false,
+                "axisCenteredZero": false,
+                "axisLabel": "",
+                "axisPlacement": "auto",
+                "barAlignment": 0,
+                "drawStyle": "line",
+                "fillOpacity": 8,
+                "gradientMode": "none",
+                "hideFrom": {
+                  "legend": false,
+                  "tooltip": false,
+                  "viz": false
+                },
+                "insertNulls": false,
+                "lineInterpolation": "linear",
+                "lineWidth": 1,
+                "pointSize": 5,
+                "scaleDistribution": {
+                  "type": "linear"
+                },
+                "showPoints": "never",
+                "spanNulls": false,
+                "stacking": {
+                  "group": "A",
+                  "mode": "none"
+                },
+                "thresholdsStyle": {
+                  "mode": "off"
+                }
+              },
+              "mappings": [],
+              "min": 0,
+              "unit": "bytes"
+            },
+            "overrides": []
+          },
           "gridPos": {
-            "h": 1,
-            "w": 24,
+            "h": 8,
+            "w": 12,
             "x": 0,
             "y": 0
           },
           "id": 0,
-          "panels": [
-            {
-              "datasource": {
-                "type": "prometheus",
-                "uid": "${datasource}"
-              },
-              "description": "The 95th percentile of fully collected request body bytes. This is an exporter summary, not a histogram: the family exposes quantile lines plus `_sum` and `_count`, with no `_bucket` or `le` label. Fully collected malformed JSON is included; partial, refused, read-error and cancelled bodies are not.",
-              "fieldConfig": {
-                "defaults": {
-                  "color": {
-                    "mode": "palette-classic"
-                  },
-                  "custom": {
-                    "axisBorderShow": false,
-                    "axisCenteredZero": false,
-                    "axisLabel": "",
-                    "axisPlacement": "auto",
-                    "barAlignment": 0,
-                    "drawStyle": "line",
-                    "fillOpacity": 8,
-                    "gradientMode": "none",
-                    "hideFrom": {
-                      "legend": false,
-                      "tooltip": false,
-                      "viz": false
-                    },
-                    "insertNulls": false,
-                    "lineInterpolation": "linear",
-                    "lineWidth": 1,
-                    "pointSize": 5,
-                    "scaleDistribution": {
-                      "type": "linear"
-                    },
-                    "showPoints": "never",
-                    "spanNulls": false,
-                    "stacking": {
-                      "group": "A",
-                      "mode": "none"
-                    },
-                    "thresholdsStyle": {
-                      "mode": "off"
-                    }
-                  },
-                  "mappings": [],
-                  "min": 0,
-                  "unit": "bytes"
-                },
-                "overrides": []
-              },
-              "gridPos": {
-                "h": 8,
-                "w": 12,
-                "x": 0,
-                "y": 0
-              },
-              "id": 0,
-              "options": {
-                "legend": {
-                  "calcs": [
-                    "lastNotNull",
-                    "max"
-                  ],
-                  "displayMode": "table",
-                  "placement": "right",
-                  "showLegend": true
-                },
-                "tooltip": {
-                  "mode": "multi",
-                  "sort": "desc"
-                }
-              },
-              "pluginVersion": "13.2.4",
-              "targets": [
-                {
-                  "datasource": {
-                    "type": "prometheus",
-                    "uid": "${datasource}"
-                  },
-                  "editorMode": "code",
-                  "expr": "memory_http_preflight_body_bytes{quantile=\"0.95\"}",
-                  "legendFormat": "p95",
-                  "range": true,
-                  "refId": "A"
-                }
+          "options": {
+            "legend": {
+              "calcs": [
+                "lastNotNull",
+                "max"
               ],
-              "title": "Fully collected body size p95",
-              "type": "timeseries"
+              "displayMode": "table",
+              "placement": "right",
+              "showLegend": true
             },
+            "tooltip": {
+              "mode": "multi",
+              "sort": "desc"
+            }
+          },
+          "pluginVersion": "13.2.4",
+          "targets": [
             {
               "datasource": {
                 "type": "prometheus",
                 "uid": "${datasource}"
               },
-              "description": "The rate of bounded preflight refusals. The only reasons are `request_capacity`, `aggregate_byte_capacity` and `body_limit`; body stream errors are not counted as capacity refusals.",
-              "fieldConfig": {
-                "defaults": {
-                  "color": {
-                    "mode": "palette-classic"
-                  },
-                  "custom": {
-                    "axisBorderShow": false,
-                    "axisCenteredZero": false,
-                    "axisLabel": "",
-                    "axisPlacement": "auto",
-                    "barAlignment": 0,
-                    "drawStyle": "line",
-                    "fillOpacity": 8,
-                    "gradientMode": "none",
-                    "hideFrom": {
-                      "legend": false,
-                      "tooltip": false,
-                      "viz": false
-                    },
-                    "insertNulls": false,
-                    "lineInterpolation": "linear",
-                    "lineWidth": 1,
-                    "pointSize": 5,
-                    "scaleDistribution": {
-                      "type": "linear"
-                    },
-                    "showPoints": "never",
-                    "spanNulls": false,
-                    "stacking": {
-                      "group": "A",
-                      "mode": "none"
-                    },
-                    "thresholdsStyle": {
-                      "mode": "off"
-                    }
-                  },
-                  "mappings": [],
-                  "min": 0,
-                  "unit": "ops"
-                },
-                "overrides": []
-              },
-              "gridPos": {
-                "h": 8,
-                "w": 12,
-                "x": 12,
-                "y": 0
-              },
-              "id": 0,
-              "options": {
-                "legend": {
-                  "calcs": [
-                    "mean",
-                    "max"
-                  ],
-                  "displayMode": "table",
-                  "placement": "right",
-                  "showLegend": true
-                },
-                "tooltip": {
-                  "mode": "multi",
-                  "sort": "desc"
-                }
-              },
-              "pluginVersion": "13.2.4",
-              "targets": [
-                {
-                  "datasource": {
-                    "type": "prometheus",
-                    "uid": "${datasource}"
-                  },
-                  "editorMode": "code",
-                  "expr": "sum by (reason) (rate(memory_http_preflight_refusals_total[5m]))",
-                  "legendFormat": "{{reason}}",
-                  "range": true,
-                  "refId": "A"
-                }
-              ],
-              "title": "Preflight refusals by reason",
-              "type": "timeseries"
+              "editorMode": "code",
+              "expr": "memory_http_preflight_body_bytes{quantile=\"0.95\"}",
+              "legendFormat": "p95",
+              "range": true,
+              "refId": "A"
             }
           ],
-          "title": "Preflight body collection",
-          "type": "row"
+          "title": "Fully collected body size p95",
+          "type": "timeseries"
         },
         {
-          "collapsed": true,
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "description": "The rate of bounded preflight refusals. The only reasons are `request_capacity`, `aggregate_byte_capacity` and `body_limit`; body stream errors are not counted as capacity refusals.",
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "palette-classic"
+              },
+              "custom": {
+                "axisBorderShow": false,
+                "axisCenteredZero": false,
+                "axisLabel": "",
+                "axisPlacement": "auto",
+                "barAlignment": 0,
+                "drawStyle": "line",
+                "fillOpacity": 8,
+                "gradientMode": "none",
+                "hideFrom": {
+                  "legend": false,
+                  "tooltip": false,
+                  "viz": false
+                },
+                "insertNulls": false,
+                "lineInterpolation": "linear",
+                "lineWidth": 1,
+                "pointSize": 5,
+                "scaleDistribution": {
+                  "type": "linear"
+                },
+                "showPoints": "never",
+                "spanNulls": false,
+                "stacking": {
+                  "group": "A",
+                  "mode": "none"
+                },
+                "thresholdsStyle": {
+                  "mode": "off"
+                }
+              },
+              "mappings": [],
+              "min": 0,
+              "unit": "ops"
+            },
+            "overrides": []
+          },
           "gridPos": {
-            "h": 1,
-            "w": 24,
-            "x": 0,
+            "h": 8,
+            "w": 12,
+            "x": 12,
             "y": 0
           },
           "id": 0,
-          "panels": [
-            {
-              "datasource": {
-                "type": "prometheus",
-                "uid": "${datasource}"
-              },
-              "description": "Request slots currently held while HTTP preflight collects bodies. Refreshed by the existing upkeep worker, not by scrapes.",
-              "fieldConfig": {
-                "defaults": {
-                  "unit": "short",
-                  "color": {
-                    "mode": "thresholds"
-                  },
-                  "mappings": [],
-                  "thresholds": {
-                    "mode": "absolute",
-                    "steps": [
-                      {
-                        "color": "text",
-                        "value": null
-                      }
-                    ]
-                  },
-                  "decimals": 0
-                },
-                "overrides": []
-              },
-              "gridPos": {
-                "h": 6,
-                "w": 8,
-                "x": 0,
-                "y": 0
-              },
-              "id": 0,
-              "options": {
-                "colorMode": "value",
-                "graphMode": "none",
-                "justifyMode": "auto",
-                "orientation": "auto",
-                "reduceOptions": {
-                  "calcs": [
-                    "lastNotNull"
-                  ],
-                  "fields": "",
-                  "values": false
-                },
-                "textMode": "auto"
-              },
-              "pluginVersion": "13.2.4",
-              "targets": [
-                {
-                  "datasource": {
-                    "type": "prometheus",
-                    "uid": "${datasource}"
-                  },
-                  "editorMode": "code",
-                  "expr": "memory_http_preflight_reserved_requests",
-                  "legendFormat": "",
-                  "range": true,
-                  "refId": "A"
-                }
+          "options": {
+            "legend": {
+              "calcs": [
+                "mean",
+                "max"
               ],
-              "title": "Reserved preflight requests",
-              "type": "stat"
+              "displayMode": "table",
+              "placement": "right",
+              "showLegend": true
             },
-            {
-              "datasource": {
-                "type": "prometheus",
-                "uid": "${datasource}"
-              },
-              "description": "Bytes charged to the process-wide preflight budget. This is the reservation ledger, not exact resident body memory or RSS.",
-              "fieldConfig": {
-                "defaults": {
-                  "unit": "bytes",
-                  "color": {
-                    "mode": "thresholds"
-                  },
-                  "mappings": [],
-                  "thresholds": {
-                    "mode": "absolute",
-                    "steps": [
-                      {
-                        "color": "text",
-                        "value": null
-                      }
-                    ]
-                  },
-                  "decimals": 0
-                },
-                "overrides": []
-              },
-              "gridPos": {
-                "h": 6,
-                "w": 8,
-                "x": 8,
-                "y": 0
-              },
-              "id": 0,
-              "options": {
-                "colorMode": "value",
-                "graphMode": "none",
-                "justifyMode": "auto",
-                "orientation": "auto",
-                "reduceOptions": {
-                  "calcs": [
-                    "lastNotNull"
-                  ],
-                  "fields": "",
-                  "values": false
-                },
-                "textMode": "auto"
-              },
-              "pluginVersion": "13.2.4",
-              "targets": [
-                {
-                  "datasource": {
-                    "type": "prometheus",
-                    "uid": "${datasource}"
-                  },
-                  "editorMode": "code",
-                  "expr": "memory_http_preflight_reserved_bytes",
-                  "legendFormat": "",
-                  "range": true,
-                  "refId": "A"
-                }
-              ],
-              "title": "Reserved preflight bytes",
-              "type": "stat"
-            },
-            {
-              "datasource": {
-                "type": "prometheus",
-                "uid": "${datasource}"
-              },
-              "description": "Ready or draining runtimes resident in the bounded pool. Loading slots and failed activations are not counted.",
-              "fieldConfig": {
-                "defaults": {
-                  "unit": "short",
-                  "color": {
-                    "mode": "thresholds"
-                  },
-                  "mappings": [],
-                  "thresholds": {
-                    "mode": "absolute",
-                    "steps": [
-                      {
-                        "color": "text",
-                        "value": null
-                      }
-                    ]
-                  },
-                  "decimals": 0
-                },
-                "overrides": []
-              },
-              "gridPos": {
-                "h": 6,
-                "w": 8,
-                "x": 16,
-                "y": 0
-              },
-              "id": 0,
-              "options": {
-                "colorMode": "value",
-                "graphMode": "none",
-                "justifyMode": "auto",
-                "orientation": "auto",
-                "reduceOptions": {
-                  "calcs": [
-                    "lastNotNull"
-                  ],
-                  "fields": "",
-                  "values": false
-                },
-                "textMode": "auto"
-              },
-              "pluginVersion": "13.2.4",
-              "targets": [
-                {
-                  "datasource": {
-                    "type": "prometheus",
-                    "uid": "${datasource}"
-                  },
-                  "editorMode": "code",
-                  "expr": "memory_http_tenant_runtime_count",
-                  "legendFormat": "",
-                  "range": true,
-                  "refId": "A"
-                }
-              ],
-              "title": "Resident tenant runtimes",
-              "type": "stat"
+            "tooltip": {
+              "mode": "multi",
+              "sort": "desc"
             }
-          ],
-          "title": "Preflight reservations and runtimes",
-          "type": "row"
-        },
-        {
-          "collapsed": true,
-          "gridPos": {
-            "h": 1,
-            "w": 24,
-            "x": 0,
-            "y": 0
           },
-          "id": 0,
-          "panels": [
+          "pluginVersion": "13.2.4",
+          "targets": [
             {
               "datasource": {
                 "type": "prometheus",
                 "uid": "${datasource}"
               },
-              "description": "Owner-accounted context and query cache estimates summed over resident runtimes. These owner estimates are not complete heap accounting or process RSS.",
-              "fieldConfig": {
-                "defaults": {
-                  "color": {
-                    "mode": "palette-classic"
-                  },
-                  "custom": {
-                    "axisBorderShow": false,
-                    "axisCenteredZero": false,
-                    "axisLabel": "",
-                    "axisPlacement": "auto",
-                    "barAlignment": 0,
-                    "drawStyle": "line",
-                    "fillOpacity": 8,
-                    "gradientMode": "none",
-                    "hideFrom": {
-                      "legend": false,
-                      "tooltip": false,
-                      "viz": false
-                    },
-                    "insertNulls": false,
-                    "lineInterpolation": "linear",
-                    "lineWidth": 1,
-                    "pointSize": 5,
-                    "scaleDistribution": {
-                      "type": "linear"
-                    },
-                    "showPoints": "never",
-                    "spanNulls": false,
-                    "stacking": {
-                      "group": "A",
-                      "mode": "none"
-                    },
-                    "thresholdsStyle": {
-                      "mode": "off"
-                    }
-                  },
-                  "mappings": [],
-                  "min": 0,
-                  "unit": "bytes"
-                },
-                "overrides": []
-              },
-              "gridPos": {
-                "h": 8,
-                "w": 24,
-                "x": 0,
-                "y": 0
-              },
-              "id": 0,
-              "options": {
-                "legend": {
-                  "calcs": [
-                    "max",
-                    "lastNotNull"
-                  ],
-                  "displayMode": "table",
-                  "placement": "right",
-                  "showLegend": true
-                },
-                "tooltip": {
-                  "mode": "multi",
-                  "sort": "desc"
-                }
-              },
-              "pluginVersion": "13.2.4",
-              "targets": [
-                {
-                  "datasource": {
-                    "type": "prometheus",
-                    "uid": "${datasource}"
-                  },
-                  "editorMode": "code",
-                  "expr": "memory_http_context_cache_accounted_bytes",
-                  "legendFormat": "context cache",
-                  "range": true,
-                  "refId": "A"
-                },
-                {
-                  "datasource": {
-                    "type": "prometheus",
-                    "uid": "${datasource}"
-                  },
-                  "editorMode": "code",
-                  "expr": "memory_http_query_cache_accounted_bytes",
-                  "legendFormat": "query cache",
-                  "range": true,
-                  "refId": "B"
-                }
-              ],
-              "title": "Resident cache-accounted bytes",
-              "type": "timeseries"
+              "editorMode": "code",
+              "expr": "sum by (reason) (rate(memory_http_preflight_refusals_total[5m]))",
+              "legendFormat": "{{reason}}",
+              "range": true,
+              "refId": "A"
             }
           ],
-          "title": "Resident runtime caches",
-          "type": "row"
-        },
-        {
-          "collapsed": true,
-          "gridPos": {
-            "h": 1,
-            "w": 24,
-            "x": 0,
-            "y": 0
-          },
-          "id": 0,
-          "panels": [
-            {
-              "datasource": {
-                "type": "prometheus",
-                "uid": "${datasource}"
-              },
-              "description": "Admitted and currently running work from the one process-wide background embedding coordinator. These are not summed per tenant.",
-              "fieldConfig": {
-                "defaults": {
-                  "color": {
-                    "mode": "palette-classic"
-                  },
-                  "custom": {
-                    "axisBorderShow": false,
-                    "axisCenteredZero": false,
-                    "axisLabel": "",
-                    "axisPlacement": "auto",
-                    "barAlignment": 0,
-                    "drawStyle": "line",
-                    "fillOpacity": 8,
-                    "gradientMode": "none",
-                    "hideFrom": {
-                      "legend": false,
-                      "tooltip": false,
-                      "viz": false
-                    },
-                    "insertNulls": false,
-                    "lineInterpolation": "linear",
-                    "lineWidth": 1,
-                    "pointSize": 5,
-                    "scaleDistribution": {
-                      "type": "linear"
-                    },
-                    "showPoints": "never",
-                    "spanNulls": false,
-                    "stacking": {
-                      "group": "A",
-                      "mode": "none"
-                    },
-                    "thresholdsStyle": {
-                      "mode": "off"
-                    }
-                  },
-                  "mappings": [],
-                  "min": 0,
-                  "unit": "short"
-                },
-                "overrides": []
-              },
-              "gridPos": {
-                "h": 8,
-                "w": 12,
-                "x": 0,
-                "y": 0
-              },
-              "id": 0,
-              "options": {
-                "legend": {
-                  "calcs": [
-                    "max",
-                    "lastNotNull"
-                  ],
-                  "displayMode": "table",
-                  "placement": "right",
-                  "showLegend": true
-                },
-                "tooltip": {
-                  "mode": "multi",
-                  "sort": "desc"
-                }
-              },
-              "pluginVersion": "13.2.4",
-              "targets": [
-                {
-                  "datasource": {
-                    "type": "prometheus",
-                    "uid": "${datasource}"
-                  },
-                  "editorMode": "code",
-                  "expr": "memory_http_background_embedding_admitted_tasks",
-                  "legendFormat": "admitted",
-                  "range": true,
-                  "refId": "A"
-                },
-                {
-                  "datasource": {
-                    "type": "prometheus",
-                    "uid": "${datasource}"
-                  },
-                  "editorMode": "code",
-                  "expr": "memory_http_background_embedding_running_tasks",
-                  "legendFormat": "running",
-                  "range": true,
-                  "refId": "B"
-                }
-              ],
-              "title": "Background embedding task counts",
-              "type": "timeseries"
-            },
-            {
-              "datasource": {
-                "type": "prometheus",
-                "uid": "${datasource}"
-              },
-              "description": "Input bytes retained by admitted background embedding work in the process-wide coordinator. This owner ledger is not full heap or RSS.",
-              "fieldConfig": {
-                "defaults": {
-                  "color": {
-                    "mode": "palette-classic"
-                  },
-                  "custom": {
-                    "axisBorderShow": false,
-                    "axisCenteredZero": false,
-                    "axisLabel": "",
-                    "axisPlacement": "auto",
-                    "barAlignment": 0,
-                    "drawStyle": "line",
-                    "fillOpacity": 8,
-                    "gradientMode": "none",
-                    "hideFrom": {
-                      "legend": false,
-                      "tooltip": false,
-                      "viz": false
-                    },
-                    "insertNulls": false,
-                    "lineInterpolation": "linear",
-                    "lineWidth": 1,
-                    "pointSize": 5,
-                    "scaleDistribution": {
-                      "type": "linear"
-                    },
-                    "showPoints": "never",
-                    "spanNulls": false,
-                    "stacking": {
-                      "group": "A",
-                      "mode": "none"
-                    },
-                    "thresholdsStyle": {
-                      "mode": "off"
-                    }
-                  },
-                  "mappings": [],
-                  "min": 0,
-                  "unit": "bytes"
-                },
-                "overrides": []
-              },
-              "gridPos": {
-                "h": 8,
-                "w": 12,
-                "x": 12,
-                "y": 0
-              },
-              "id": 0,
-              "options": {
-                "legend": {
-                  "calcs": [
-                    "max",
-                    "lastNotNull"
-                  ],
-                  "displayMode": "table",
-                  "placement": "right",
-                  "showLegend": true
-                },
-                "tooltip": {
-                  "mode": "multi",
-                  "sort": "desc"
-                }
-              },
-              "pluginVersion": "13.2.4",
-              "targets": [
-                {
-                  "datasource": {
-                    "type": "prometheus",
-                    "uid": "${datasource}"
-                  },
-                  "editorMode": "code",
-                  "expr": "memory_http_background_embedding_retained_bytes",
-                  "legendFormat": "retained input",
-                  "range": true,
-                  "refId": "A"
-                }
-              ],
-              "title": "Background embedding retained bytes",
-              "type": "timeseries"
-            }
-          ],
-          "title": "Background embedding coordinator",
-          "type": "row"
-        },
-        {
-          "collapsed": true,
-          "gridPos": {
-            "h": 1,
-            "w": 24,
-            "x": 0,
-            "y": 0
-          },
-          "id": 0,
-          "panels": [
-            {
-              "datasource": {
-                "type": "prometheus",
-                "uid": "${datasource}"
-              },
-              "description": "Aggregate glibc mallinfo2 accounting across arenas; `arena`, `in-use` and `free` share the same non-mmap scope. A large free value is allocator-free space, not a guarantee that all of it can be returned to the OS. Absent off Linux/glibc, never zero.",
-              "fieldConfig": {
-                "defaults": {
-                  "color": {
-                    "mode": "palette-classic"
-                  },
-                  "custom": {
-                    "axisBorderShow": false,
-                    "axisCenteredZero": false,
-                    "axisLabel": "",
-                    "axisPlacement": "auto",
-                    "barAlignment": 0,
-                    "drawStyle": "line",
-                    "fillOpacity": 8,
-                    "gradientMode": "none",
-                    "hideFrom": {
-                      "legend": false,
-                      "tooltip": false,
-                      "viz": false
-                    },
-                    "insertNulls": false,
-                    "lineInterpolation": "linear",
-                    "lineWidth": 1,
-                    "pointSize": 5,
-                    "scaleDistribution": {
-                      "type": "linear"
-                    },
-                    "showPoints": "never",
-                    "spanNulls": false,
-                    "stacking": {
-                      "group": "A",
-                      "mode": "none"
-                    },
-                    "thresholdsStyle": {
-                      "mode": "off"
-                    }
-                  },
-                  "mappings": [],
-                  "min": 0,
-                  "unit": "bytes"
-                },
-                "overrides": []
-              },
-              "gridPos": {
-                "h": 8,
-                "w": 6,
-                "x": 0,
-                "y": 0
-              },
-              "id": 0,
-              "options": {
-                "legend": {
-                  "calcs": [
-                    "lastNotNull",
-                    "max"
-                  ],
-                  "displayMode": "table",
-                  "placement": "right",
-                  "showLegend": true
-                },
-                "tooltip": {
-                  "mode": "multi",
-                  "sort": "desc"
-                }
-              },
-              "pluginVersion": "13.2.4",
-              "targets": [
-                {
-                  "datasource": {
-                    "type": "prometheus",
-                    "uid": "${datasource}"
-                  },
-                  "editorMode": "code",
-                  "expr": "memory_alloc_arena_bytes",
-                  "legendFormat": "arena",
-                  "range": true,
-                  "refId": "A"
-                },
-                {
-                  "datasource": {
-                    "type": "prometheus",
-                    "uid": "${datasource}"
-                  },
-                  "editorMode": "code",
-                  "expr": "memory_alloc_in_use_bytes",
-                  "legendFormat": "in use",
-                  "range": true,
-                  "refId": "B"
-                },
-                {
-                  "datasource": {
-                    "type": "prometheus",
-                    "uid": "${datasource}"
-                  },
-                  "editorMode": "code",
-                  "expr": "memory_alloc_free_bytes",
-                  "legendFormat": "free",
-                  "range": true,
-                  "refId": "C"
-                }
-              ],
-              "title": "Allocator arena, in use and free",
-              "type": "timeseries"
-            },
-            {
-              "datasource": {
-                "type": "prometheus",
-                "uid": "${datasource}"
-              },
-              "description": "`hblkhd` counts bytes in mmap allocations outside arena accounting. `keepcost` is the main arena's top-chunk statistic, not a guarantee of what `malloc_trim(0)` will return. `MALLOC_TRIM_THRESHOLD_` controls when automatic trimming is attempted; it does not directly force `keepcost` to zero.",
-              "fieldConfig": {
-                "defaults": {
-                  "color": {
-                    "mode": "palette-classic"
-                  },
-                  "custom": {
-                    "axisBorderShow": false,
-                    "axisCenteredZero": false,
-                    "axisLabel": "",
-                    "axisPlacement": "auto",
-                    "barAlignment": 0,
-                    "drawStyle": "line",
-                    "fillOpacity": 8,
-                    "gradientMode": "none",
-                    "hideFrom": {
-                      "legend": false,
-                      "tooltip": false,
-                      "viz": false
-                    },
-                    "insertNulls": false,
-                    "lineInterpolation": "linear",
-                    "lineWidth": 1,
-                    "pointSize": 5,
-                    "scaleDistribution": {
-                      "type": "linear"
-                    },
-                    "showPoints": "never",
-                    "spanNulls": false,
-                    "stacking": {
-                      "group": "A",
-                      "mode": "none"
-                    },
-                    "thresholdsStyle": {
-                      "mode": "off"
-                    }
-                  },
-                  "mappings": [],
-                  "min": 0,
-                  "unit": "bytes"
-                },
-                "overrides": []
-              },
-              "gridPos": {
-                "h": 8,
-                "w": 6,
-                "x": 6,
-                "y": 0
-              },
-              "id": 0,
-              "options": {
-                "legend": {
-                  "calcs": [
-                    "lastNotNull",
-                    "max"
-                  ],
-                  "displayMode": "table",
-                  "placement": "right",
-                  "showLegend": true
-                },
-                "tooltip": {
-                  "mode": "multi",
-                  "sort": "desc"
-                }
-              },
-              "pluginVersion": "13.2.4",
-              "targets": [
-                {
-                  "datasource": {
-                    "type": "prometheus",
-                    "uid": "${datasource}"
-                  },
-                  "editorMode": "code",
-                  "expr": "memory_alloc_mmap_bytes",
-                  "legendFormat": "mmap'd",
-                  "range": true,
-                  "refId": "A"
-                },
-                {
-                  "datasource": {
-                    "type": "prometheus",
-                    "uid": "${datasource}"
-                  },
-                  "editorMode": "code",
-                  "expr": "memory_alloc_keepcost_bytes",
-                  "legendFormat": "keepcost",
-                  "range": true,
-                  "refId": "B"
-                }
-              ],
-              "title": "Allocator mmap'd blocks and main-arena top chunk",
-              "type": "timeseries"
-            },
-            {
-              "datasource": {
-                "type": "prometheus",
-                "uid": "${datasource}"
-              },
-              "description": "The width of the main `[heap]` mapping in `/proc/self/maps`. This virtual extent has a different scope from aggregate `mallinfo2` accounting and is not resident memory by itself.",
-              "fieldConfig": {
-                "defaults": {
-                  "unit": "bytes",
-                  "color": {
-                    "mode": "thresholds"
-                  },
-                  "mappings": [],
-                  "thresholds": {
-                    "mode": "absolute",
-                    "steps": [
-                      {
-                        "color": "text",
-                        "value": null
-                      }
-                    ]
-                  },
-                  "decimals": 0
-                },
-                "overrides": []
-              },
-              "gridPos": {
-                "h": 8,
-                "w": 6,
-                "x": 12,
-                "y": 0
-              },
-              "id": 0,
-              "options": {
-                "colorMode": "value",
-                "graphMode": "none",
-                "justifyMode": "auto",
-                "orientation": "auto",
-                "reduceOptions": {
-                  "calcs": [
-                    "lastNotNull"
-                  ],
-                  "fields": "",
-                  "values": false
-                },
-                "textMode": "auto"
-              },
-              "pluginVersion": "13.2.4",
-              "targets": [
-                {
-                  "datasource": {
-                    "type": "prometheus",
-                    "uid": "${datasource}"
-                  },
-                  "editorMode": "code",
-                  "expr": "memory_alloc_heap_bytes",
-                  "legendFormat": "",
-                  "range": true,
-                  "refId": "A"
-                }
-              ],
-              "title": "Heap extent",
-              "type": "stat"
-            },
-            {
-              "datasource": {
-                "type": "prometheus",
-                "uid": "${datasource}"
-              },
-              "description": "Aggregate `mallinfo2.uordblks` divided by `mallinfo2.arena`. Both values share the same non-mmap arena scope. A lower fraction means a larger share of arena-accounted bytes are free; it does not measure process RSS or the `[heap]` mapping extent.",
-              "fieldConfig": {
-                "defaults": {
-                  "unit": "short",
-                  "color": {
-                    "mode": "thresholds"
-                  },
-                  "mappings": [],
-                  "thresholds": {
-                    "mode": "absolute",
-                    "steps": [
-                      {
-                        "color": "text",
-                        "value": null
-                      }
-                    ]
-                  },
-                  "decimals": 2
-                },
-                "overrides": []
-              },
-              "gridPos": {
-                "h": 8,
-                "w": 6,
-                "x": 18,
-                "y": 0
-              },
-              "id": 0,
-              "options": {
-                "colorMode": "value",
-                "graphMode": "none",
-                "justifyMode": "auto",
-                "orientation": "auto",
-                "reduceOptions": {
-                  "calcs": [
-                    "lastNotNull"
-                  ],
-                  "fields": "",
-                  "values": false
-                },
-                "textMode": "auto"
-              },
-              "pluginVersion": "13.2.4",
-              "targets": [
-                {
-                  "datasource": {
-                    "type": "prometheus",
-                    "uid": "${datasource}"
-                  },
-                  "editorMode": "code",
-                  "expr": "memory:alloc:arena_in_use_ratio",
-                  "legendFormat": "",
-                  "range": true,
-                  "refId": "A"
-                }
-              ],
-              "title": "Arena in-use fraction",
-              "type": "stat"
-            }
-          ],
-          "title": "Allocator attribution",
-          "type": "row"
-        },
-        {
-          "collapsed": true,
-          "gridPos": {
-            "h": 1,
-            "w": 24,
-            "x": 0,
-            "y": 0
-          },
-          "id": 0,
-          "panels": [
-            {
-              "datasource": {
-                "type": "prometheus",
-                "uid": "${datasource}"
-              },
-              "description": "",
-              "gridPos": {
-                "h": 8,
-                "w": 24,
-                "x": 0,
-                "y": 0
-              },
-              "id": 0,
-              "options": {
-                "code": {
-                  "language": "plaintext",
-                  "showLineNumbers": false,
-                  "showMiniMap": false
-                },
-                "content": "These are bounded owner-accounting gauges, not process memory. They cover only the preflight budget, resident runtime caches and the background task coordinator; allocator retention, SDK/database internals and other heap are outside them. **Do not add them and call the result RSS.** Use controlled `xtask` process sampling for `VmRSS`/`VmSwap`, and keep host/container exporter values separate. The *Allocator attribution* row is the one exception worth knowing about: those gauges are glibc's accounting of the heap itself, so they describe what the allocator holds rather than what an owner charged \u2014 read them there, not here.",
-                "mode": "markdown"
-              },
-              "pluginVersion": "13.2.4",
-              "title": "How to read these gauges",
-              "type": "text"
-            }
-          ],
-          "title": "Accounting limits",
-          "type": "row"
+          "title": "Preflight refusals by reason",
+          "type": "timeseries"
         }
       ],
-      "title": "HTTP memory diagnostics",
+      "title": "HTTP memory diagnostics \u2014 Preflight body collection",
       "type": "row"
     },
     {
@@ -2758,6 +1838,912 @@
         "w": 24,
         "x": 0,
         "y": 9
+      },
+      "id": 0,
+      "panels": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "description": "Request slots currently held while HTTP preflight collects bodies. Refreshed by the existing upkeep worker, not by scrapes.",
+          "fieldConfig": {
+            "defaults": {
+              "unit": "short",
+              "color": {
+                "mode": "thresholds"
+              },
+              "mappings": [],
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "text",
+                    "value": null
+                  }
+                ]
+              },
+              "decimals": 0
+            },
+            "overrides": []
+          },
+          "gridPos": {
+            "h": 6,
+            "w": 8,
+            "x": 0,
+            "y": 0
+          },
+          "id": 0,
+          "options": {
+            "colorMode": "value",
+            "graphMode": "none",
+            "justifyMode": "auto",
+            "orientation": "auto",
+            "reduceOptions": {
+              "calcs": [
+                "lastNotNull"
+              ],
+              "fields": "",
+              "values": false
+            },
+            "textMode": "auto"
+          },
+          "pluginVersion": "13.2.4",
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${datasource}"
+              },
+              "editorMode": "code",
+              "expr": "memory_http_preflight_reserved_requests",
+              "legendFormat": "",
+              "range": true,
+              "refId": "A"
+            }
+          ],
+          "title": "Reserved preflight requests",
+          "type": "stat"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "description": "Bytes charged to the process-wide preflight budget. This is the reservation ledger, not exact resident body memory or RSS.",
+          "fieldConfig": {
+            "defaults": {
+              "unit": "bytes",
+              "color": {
+                "mode": "thresholds"
+              },
+              "mappings": [],
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "text",
+                    "value": null
+                  }
+                ]
+              },
+              "decimals": 0
+            },
+            "overrides": []
+          },
+          "gridPos": {
+            "h": 6,
+            "w": 8,
+            "x": 8,
+            "y": 0
+          },
+          "id": 0,
+          "options": {
+            "colorMode": "value",
+            "graphMode": "none",
+            "justifyMode": "auto",
+            "orientation": "auto",
+            "reduceOptions": {
+              "calcs": [
+                "lastNotNull"
+              ],
+              "fields": "",
+              "values": false
+            },
+            "textMode": "auto"
+          },
+          "pluginVersion": "13.2.4",
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${datasource}"
+              },
+              "editorMode": "code",
+              "expr": "memory_http_preflight_reserved_bytes",
+              "legendFormat": "",
+              "range": true,
+              "refId": "A"
+            }
+          ],
+          "title": "Reserved preflight bytes",
+          "type": "stat"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "description": "Ready or draining runtimes resident in the bounded pool. Loading slots and failed activations are not counted.",
+          "fieldConfig": {
+            "defaults": {
+              "unit": "short",
+              "color": {
+                "mode": "thresholds"
+              },
+              "mappings": [],
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "text",
+                    "value": null
+                  }
+                ]
+              },
+              "decimals": 0
+            },
+            "overrides": []
+          },
+          "gridPos": {
+            "h": 6,
+            "w": 8,
+            "x": 16,
+            "y": 0
+          },
+          "id": 0,
+          "options": {
+            "colorMode": "value",
+            "graphMode": "none",
+            "justifyMode": "auto",
+            "orientation": "auto",
+            "reduceOptions": {
+              "calcs": [
+                "lastNotNull"
+              ],
+              "fields": "",
+              "values": false
+            },
+            "textMode": "auto"
+          },
+          "pluginVersion": "13.2.4",
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${datasource}"
+              },
+              "editorMode": "code",
+              "expr": "memory_http_tenant_runtime_count",
+              "legendFormat": "",
+              "range": true,
+              "refId": "A"
+            }
+          ],
+          "title": "Resident tenant runtimes",
+          "type": "stat"
+        }
+      ],
+      "title": "HTTP memory diagnostics \u2014 Preflight reservations and runtimes",
+      "type": "row"
+    },
+    {
+      "collapsed": true,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 10
+      },
+      "id": 0,
+      "panels": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "description": "Owner-accounted context and query cache estimates summed over resident runtimes. These owner estimates are not complete heap accounting or process RSS.",
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "palette-classic"
+              },
+              "custom": {
+                "axisBorderShow": false,
+                "axisCenteredZero": false,
+                "axisLabel": "",
+                "axisPlacement": "auto",
+                "barAlignment": 0,
+                "drawStyle": "line",
+                "fillOpacity": 8,
+                "gradientMode": "none",
+                "hideFrom": {
+                  "legend": false,
+                  "tooltip": false,
+                  "viz": false
+                },
+                "insertNulls": false,
+                "lineInterpolation": "linear",
+                "lineWidth": 1,
+                "pointSize": 5,
+                "scaleDistribution": {
+                  "type": "linear"
+                },
+                "showPoints": "never",
+                "spanNulls": false,
+                "stacking": {
+                  "group": "A",
+                  "mode": "none"
+                },
+                "thresholdsStyle": {
+                  "mode": "off"
+                }
+              },
+              "mappings": [],
+              "min": 0,
+              "unit": "bytes"
+            },
+            "overrides": []
+          },
+          "gridPos": {
+            "h": 8,
+            "w": 24,
+            "x": 0,
+            "y": 0
+          },
+          "id": 0,
+          "options": {
+            "legend": {
+              "calcs": [
+                "max",
+                "lastNotNull"
+              ],
+              "displayMode": "table",
+              "placement": "right",
+              "showLegend": true
+            },
+            "tooltip": {
+              "mode": "multi",
+              "sort": "desc"
+            }
+          },
+          "pluginVersion": "13.2.4",
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${datasource}"
+              },
+              "editorMode": "code",
+              "expr": "memory_http_context_cache_accounted_bytes",
+              "legendFormat": "context cache",
+              "range": true,
+              "refId": "A"
+            },
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${datasource}"
+              },
+              "editorMode": "code",
+              "expr": "memory_http_query_cache_accounted_bytes",
+              "legendFormat": "query cache",
+              "range": true,
+              "refId": "B"
+            }
+          ],
+          "title": "Resident cache-accounted bytes",
+          "type": "timeseries"
+        }
+      ],
+      "title": "HTTP memory diagnostics \u2014 Resident runtime caches",
+      "type": "row"
+    },
+    {
+      "collapsed": true,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 11
+      },
+      "id": 0,
+      "panels": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "description": "Admitted and currently running work from the one process-wide background embedding coordinator. These are not summed per tenant.",
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "palette-classic"
+              },
+              "custom": {
+                "axisBorderShow": false,
+                "axisCenteredZero": false,
+                "axisLabel": "",
+                "axisPlacement": "auto",
+                "barAlignment": 0,
+                "drawStyle": "line",
+                "fillOpacity": 8,
+                "gradientMode": "none",
+                "hideFrom": {
+                  "legend": false,
+                  "tooltip": false,
+                  "viz": false
+                },
+                "insertNulls": false,
+                "lineInterpolation": "linear",
+                "lineWidth": 1,
+                "pointSize": 5,
+                "scaleDistribution": {
+                  "type": "linear"
+                },
+                "showPoints": "never",
+                "spanNulls": false,
+                "stacking": {
+                  "group": "A",
+                  "mode": "none"
+                },
+                "thresholdsStyle": {
+                  "mode": "off"
+                }
+              },
+              "mappings": [],
+              "min": 0,
+              "unit": "short"
+            },
+            "overrides": []
+          },
+          "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 0,
+            "y": 0
+          },
+          "id": 0,
+          "options": {
+            "legend": {
+              "calcs": [
+                "max",
+                "lastNotNull"
+              ],
+              "displayMode": "table",
+              "placement": "right",
+              "showLegend": true
+            },
+            "tooltip": {
+              "mode": "multi",
+              "sort": "desc"
+            }
+          },
+          "pluginVersion": "13.2.4",
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${datasource}"
+              },
+              "editorMode": "code",
+              "expr": "memory_http_background_embedding_admitted_tasks",
+              "legendFormat": "admitted",
+              "range": true,
+              "refId": "A"
+            },
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${datasource}"
+              },
+              "editorMode": "code",
+              "expr": "memory_http_background_embedding_running_tasks",
+              "legendFormat": "running",
+              "range": true,
+              "refId": "B"
+            }
+          ],
+          "title": "Background embedding task counts",
+          "type": "timeseries"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "description": "Input bytes retained by admitted background embedding work in the process-wide coordinator. This owner ledger is not full heap or RSS.",
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "palette-classic"
+              },
+              "custom": {
+                "axisBorderShow": false,
+                "axisCenteredZero": false,
+                "axisLabel": "",
+                "axisPlacement": "auto",
+                "barAlignment": 0,
+                "drawStyle": "line",
+                "fillOpacity": 8,
+                "gradientMode": "none",
+                "hideFrom": {
+                  "legend": false,
+                  "tooltip": false,
+                  "viz": false
+                },
+                "insertNulls": false,
+                "lineInterpolation": "linear",
+                "lineWidth": 1,
+                "pointSize": 5,
+                "scaleDistribution": {
+                  "type": "linear"
+                },
+                "showPoints": "never",
+                "spanNulls": false,
+                "stacking": {
+                  "group": "A",
+                  "mode": "none"
+                },
+                "thresholdsStyle": {
+                  "mode": "off"
+                }
+              },
+              "mappings": [],
+              "min": 0,
+              "unit": "bytes"
+            },
+            "overrides": []
+          },
+          "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 12,
+            "y": 0
+          },
+          "id": 0,
+          "options": {
+            "legend": {
+              "calcs": [
+                "max",
+                "lastNotNull"
+              ],
+              "displayMode": "table",
+              "placement": "right",
+              "showLegend": true
+            },
+            "tooltip": {
+              "mode": "multi",
+              "sort": "desc"
+            }
+          },
+          "pluginVersion": "13.2.4",
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${datasource}"
+              },
+              "editorMode": "code",
+              "expr": "memory_http_background_embedding_retained_bytes",
+              "legendFormat": "retained input",
+              "range": true,
+              "refId": "A"
+            }
+          ],
+          "title": "Background embedding retained bytes",
+          "type": "timeseries"
+        }
+      ],
+      "title": "HTTP memory diagnostics \u2014 Background embedding coordinator",
+      "type": "row"
+    },
+    {
+      "collapsed": true,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 12
+      },
+      "id": 0,
+      "panels": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "description": "Aggregate glibc mallinfo2 accounting across arenas; `arena`, `in-use` and `free` share the same non-mmap scope. A large free value is allocator-free space, not a guarantee that all of it can be returned to the OS. Absent off Linux/glibc, never zero.",
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "palette-classic"
+              },
+              "custom": {
+                "axisBorderShow": false,
+                "axisCenteredZero": false,
+                "axisLabel": "",
+                "axisPlacement": "auto",
+                "barAlignment": 0,
+                "drawStyle": "line",
+                "fillOpacity": 8,
+                "gradientMode": "none",
+                "hideFrom": {
+                  "legend": false,
+                  "tooltip": false,
+                  "viz": false
+                },
+                "insertNulls": false,
+                "lineInterpolation": "linear",
+                "lineWidth": 1,
+                "pointSize": 5,
+                "scaleDistribution": {
+                  "type": "linear"
+                },
+                "showPoints": "never",
+                "spanNulls": false,
+                "stacking": {
+                  "group": "A",
+                  "mode": "none"
+                },
+                "thresholdsStyle": {
+                  "mode": "off"
+                }
+              },
+              "mappings": [],
+              "min": 0,
+              "unit": "bytes"
+            },
+            "overrides": []
+          },
+          "gridPos": {
+            "h": 8,
+            "w": 6,
+            "x": 0,
+            "y": 0
+          },
+          "id": 0,
+          "options": {
+            "legend": {
+              "calcs": [
+                "lastNotNull",
+                "max"
+              ],
+              "displayMode": "table",
+              "placement": "right",
+              "showLegend": true
+            },
+            "tooltip": {
+              "mode": "multi",
+              "sort": "desc"
+            }
+          },
+          "pluginVersion": "13.2.4",
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${datasource}"
+              },
+              "editorMode": "code",
+              "expr": "memory_alloc_arena_bytes",
+              "legendFormat": "arena",
+              "range": true,
+              "refId": "A"
+            },
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${datasource}"
+              },
+              "editorMode": "code",
+              "expr": "memory_alloc_in_use_bytes",
+              "legendFormat": "in use",
+              "range": true,
+              "refId": "B"
+            },
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${datasource}"
+              },
+              "editorMode": "code",
+              "expr": "memory_alloc_free_bytes",
+              "legendFormat": "free",
+              "range": true,
+              "refId": "C"
+            }
+          ],
+          "title": "Allocator arena, in use and free",
+          "type": "timeseries"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "description": "`hblkhd` counts bytes in mmap allocations outside arena accounting. `keepcost` is the main arena's top-chunk statistic, not a guarantee of what `malloc_trim(0)` will return. `MALLOC_TRIM_THRESHOLD_` controls when automatic trimming is attempted; it does not directly force `keepcost` to zero.",
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "palette-classic"
+              },
+              "custom": {
+                "axisBorderShow": false,
+                "axisCenteredZero": false,
+                "axisLabel": "",
+                "axisPlacement": "auto",
+                "barAlignment": 0,
+                "drawStyle": "line",
+                "fillOpacity": 8,
+                "gradientMode": "none",
+                "hideFrom": {
+                  "legend": false,
+                  "tooltip": false,
+                  "viz": false
+                },
+                "insertNulls": false,
+                "lineInterpolation": "linear",
+                "lineWidth": 1,
+                "pointSize": 5,
+                "scaleDistribution": {
+                  "type": "linear"
+                },
+                "showPoints": "never",
+                "spanNulls": false,
+                "stacking": {
+                  "group": "A",
+                  "mode": "none"
+                },
+                "thresholdsStyle": {
+                  "mode": "off"
+                }
+              },
+              "mappings": [],
+              "min": 0,
+              "unit": "bytes"
+            },
+            "overrides": []
+          },
+          "gridPos": {
+            "h": 8,
+            "w": 6,
+            "x": 6,
+            "y": 0
+          },
+          "id": 0,
+          "options": {
+            "legend": {
+              "calcs": [
+                "lastNotNull",
+                "max"
+              ],
+              "displayMode": "table",
+              "placement": "right",
+              "showLegend": true
+            },
+            "tooltip": {
+              "mode": "multi",
+              "sort": "desc"
+            }
+          },
+          "pluginVersion": "13.2.4",
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${datasource}"
+              },
+              "editorMode": "code",
+              "expr": "memory_alloc_mmap_bytes",
+              "legendFormat": "mmap'd",
+              "range": true,
+              "refId": "A"
+            },
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${datasource}"
+              },
+              "editorMode": "code",
+              "expr": "memory_alloc_keepcost_bytes",
+              "legendFormat": "keepcost",
+              "range": true,
+              "refId": "B"
+            }
+          ],
+          "title": "Allocator mmap'd blocks and main-arena top chunk",
+          "type": "timeseries"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "description": "The width of the main `[heap]` mapping in `/proc/self/maps`. This virtual extent has a different scope from aggregate `mallinfo2` accounting and is not resident memory by itself.",
+          "fieldConfig": {
+            "defaults": {
+              "unit": "bytes",
+              "color": {
+                "mode": "thresholds"
+              },
+              "mappings": [],
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "text",
+                    "value": null
+                  }
+                ]
+              },
+              "decimals": 0
+            },
+            "overrides": []
+          },
+          "gridPos": {
+            "h": 8,
+            "w": 6,
+            "x": 12,
+            "y": 0
+          },
+          "id": 0,
+          "options": {
+            "colorMode": "value",
+            "graphMode": "none",
+            "justifyMode": "auto",
+            "orientation": "auto",
+            "reduceOptions": {
+              "calcs": [
+                "lastNotNull"
+              ],
+              "fields": "",
+              "values": false
+            },
+            "textMode": "auto"
+          },
+          "pluginVersion": "13.2.4",
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${datasource}"
+              },
+              "editorMode": "code",
+              "expr": "memory_alloc_heap_bytes",
+              "legendFormat": "",
+              "range": true,
+              "refId": "A"
+            }
+          ],
+          "title": "Heap extent",
+          "type": "stat"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "description": "Aggregate `mallinfo2.uordblks` divided by `mallinfo2.arena`. Both values share the same non-mmap arena scope. A lower fraction means a larger share of arena-accounted bytes are free; it does not measure process RSS or the `[heap]` mapping extent.",
+          "fieldConfig": {
+            "defaults": {
+              "unit": "short",
+              "color": {
+                "mode": "thresholds"
+              },
+              "mappings": [],
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "text",
+                    "value": null
+                  }
+                ]
+              },
+              "decimals": 2
+            },
+            "overrides": []
+          },
+          "gridPos": {
+            "h": 8,
+            "w": 6,
+            "x": 18,
+            "y": 0
+          },
+          "id": 0,
+          "options": {
+            "colorMode": "value",
+            "graphMode": "none",
+            "justifyMode": "auto",
+            "orientation": "auto",
+            "reduceOptions": {
+              "calcs": [
+                "lastNotNull"
+              ],
+              "fields": "",
+              "values": false
+            },
+            "textMode": "auto"
+          },
+          "pluginVersion": "13.2.4",
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${datasource}"
+              },
+              "editorMode": "code",
+              "expr": "memory:alloc:arena_in_use_ratio",
+              "legendFormat": "",
+              "range": true,
+              "refId": "A"
+            }
+          ],
+          "title": "Arena in-use fraction",
+          "type": "stat"
+        }
+      ],
+      "title": "HTTP memory diagnostics \u2014 Allocator attribution",
+      "type": "row"
+    },
+    {
+      "collapsed": true,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 13
+      },
+      "id": 0,
+      "panels": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "description": "",
+          "gridPos": {
+            "h": 8,
+            "w": 24,
+            "x": 0,
+            "y": 0
+          },
+          "id": 0,
+          "options": {
+            "code": {
+              "language": "plaintext",
+              "showLineNumbers": false,
+              "showMiniMap": false
+            },
+            "content": "These are bounded owner-accounting gauges, not process memory. They cover only the preflight budget, resident runtime caches and the background task coordinator; allocator retention, SDK/database internals and other heap are outside them. **Do not add them and call the result RSS.** Use controlled `xtask` process sampling for `VmRSS`/`VmSwap`, and keep host/container exporter values separate. The *Allocator attribution* row is the one exception worth knowing about: those gauges are glibc's accounting of the heap itself, so they describe what the allocator holds rather than what an owner charged \u2014 read them there, not here.",
+            "mode": "markdown"
+          },
+          "pluginVersion": "13.2.4",
+          "title": "How to read these gauges",
+          "type": "text"
+        }
+      ],
+      "title": "HTTP memory diagnostics \u2014 Accounting limits",
+      "type": "row"
+    },
+    {
+      "collapsed": true,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 14
       },
       "id": 0,
       "panels": [
@@ -3032,7 +3018,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 10
+        "y": 15
       },
       "id": 0,
       "panels": [
@@ -3221,7 +3207,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 11
+        "y": 16
       },
       "id": 0,
       "panels": [
@@ -3348,7 +3334,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 12
+        "y": 17
       },
       "id": 0,
       "panels": [
@@ -3536,7 +3522,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 13
+        "y": 18
       },
       "id": 0,
       "panels": [
@@ -3916,7 +3902,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 14
+        "y": 19
       },
       "id": 0,
       "panels": [

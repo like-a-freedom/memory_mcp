@@ -253,19 +253,31 @@ class DashboardMetricContractTests(unittest.TestCase):
             / "technical.json"
         )
         document = json.loads(dashboard_path.read_text())
-        row = next(
-            (
-                panel
-                for panel in document["panels"]
-                if panel.get("type") == "row"
-                and panel.get("title") == "HTTP memory diagnostics"
-            ),
-            None,
-        )
+        # One top-level row per diagnostics subsection. Rows cannot be
+        # nested: Grafana drops panels inside a row on import, so a
+        # subsection is a row of its own rather than a child of a shared
+        # diagnostics row.
+        rows = [
+            panel
+            for panel in document["panels"]
+            if panel.get("type") == "row"
+            and panel.get("title", "").startswith("HTTP memory diagnostics")
+        ]
 
-        assert row is not None, "technical dashboard is missing the app diagnostics row"
-        self.assertTrue(row["collapsed"])
-        panels = list(descendant_panels(row))
+        assert rows, "technical dashboard is missing the app diagnostics rows"
+        self.assertEqual(len(rows), 6)
+        for row in rows:
+            self.assertTrue(row["collapsed"])
+            self.assertFalse(
+                any(
+                    child.get("type") == "row"
+                    for child in row.get("panels", [])
+                ),
+                f"{row['title']}: rows cannot contain rows",
+            )
+        panels = [
+            panel for row in rows for panel in descendant_panels(row)
+        ]
         panel_titles = {panel["title"] for panel in panels}
         self.assertIn("Fully collected body size p95", panel_titles)
         self.assertIn("Preflight refusals by reason", panel_titles)
@@ -306,22 +318,13 @@ class DashboardMetricContractTests(unittest.TestCase):
             / "technical.json"
         )
         document = json.loads(dashboard_path.read_text())
-        parent = next(
+        allocator = next(
             (
                 panel
                 for panel in document["panels"]
                 if panel.get("type") == "row"
-                and panel.get("title") == "HTTP memory diagnostics"
-            ),
-            None,
-        )
-        assert parent is not None, "the app diagnostics row is the allocator row's parent"
-        allocator = next(
-            (
-                panel
-                for panel in parent["panels"]
-                if panel.get("type") == "row"
-                and panel.get("title") == "Allocator attribution"
+                and panel.get("title")
+                == "HTTP memory diagnostics — Allocator attribution"
             ),
             None,
         )
@@ -392,14 +395,15 @@ class DashboardMetricContractTests(unittest.TestCase):
             / "technical.json"
         )
         document = json.loads(dashboard_path.read_text())
-        row = next(
+        rows = [
             panel
             for panel in document["panels"]
             if panel.get("type") == "row"
-            and panel.get("title") == "HTTP memory diagnostics"
-        )
+            and panel.get("title", "").startswith("HTTP memory diagnostics")
+        ]
         body_panel = next(
             panel
+            for row in rows
             for panel in descendant_panels(row)
             if panel.get("title") == "Fully collected body size p95"
         )

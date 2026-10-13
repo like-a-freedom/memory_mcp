@@ -189,19 +189,36 @@ groups:
             rate(memory_operation_calls_total{outcome="error"}[15m])
           )
 
-      # The ratio, guarded the same way as the HTTP one.
+      # The ratio, guarded the same way as the HTTP one, and filled with
+      # per-operation zeros when healthy: without the fill a service with
+      # traffic and no failures records nothing, and the failure-rate tiles
+      # read *No data* rather than green. `or on(operation)` keeps an
+      # operation that is failing on its ratio and puts the operations with
+      # traffic and no failures on an explicit zero; the trailing
+      # `or vector(0)` is the fully idle deployment, which has no operation
+      # to attach a zero to. Alerts compare this against thresholds, so a
+      # zero never fires one — absence and zero behave the same there.
       - record: memory:operation_calls:error_ratio15m
         expr: |
-          sum by (operation) (
-            rate(memory_operation_calls_total{outcome="error"}[15m])
+          (
+            sum by (operation) (
+              rate(memory_operation_calls_total{outcome="error"}[15m])
+            )
+            or on(operation)
+            (
+              sum by (operation) (
+                rate(memory_operation_calls_total[15m])
+              ) * 0
+            )
           )
           /
           clamp_min(
             sum by (operation) (
               rate(memory_operation_calls_total[15m])
-            ),
+            ) or vector(0),
             0.001
           )
+          or vector(0)
 
       # Operation latency, by operation.
       - record: memory:operation_duration:p95_5m
@@ -265,11 +282,26 @@ groups:
 
       # Passes that failed or degraded. Both are "this pass did not fully do
       # its job"; separating them is a panel choice, not an alert one.
+      #
+      # Filled with per-pass zeros like the operation ratio above: a scheduler
+      # whose passes all succeed records no unhealthy series at all, and the
+      # unhealthy panels must read 0 rather than *No data* on exactly that
+      # healthy deployment. The trailing `or vector(0)` is a deployment where
+      # no pass has run yet, which has no pass to attach a zero to.
       - record: memory:background_jobs:unhealthy_rate15m
         expr: |
-          sum by (pass) (
-            rate(memory_background_jobs_total{outcome=~"error|degraded"}[15m])
+          (
+            sum by (pass) (
+              rate(memory_background_jobs_total{outcome=~"error|degraded"}[15m])
+            )
+            or on(pass)
+            (
+              sum by (pass) (
+                rate(memory_background_jobs_total[15m])
+              ) * 0
+            )
           )
+          or vector(0)
 
       # How long since each job last ran without failing.
       #
@@ -301,20 +333,33 @@ groups:
   - name: memory-refusals
     interval: 30s
     rules:
+      # A refusal family with no refusals records nothing, and the refusal
+      # panels must read 0 rather than *No data* on the healthy deployment
+      # that refuses nothing — the same `or vector(0)` the HTTP error rules
+      # use, for the same reason. There is no per-label fill here: refusals
+      # are standalone counters with no "total" counterpart to take zeros
+      # from, so a healthy deployment reads one labelless zero and the
+      # per-reason lines appear with the first refusal.
       - record: memory:runtime_refusals:rate15m
         expr: |
-          sum by (op) (
-            rate(memory_runtime_refusals_total[15m])
+          (
+            sum by (op) (
+              rate(memory_runtime_refusals_total[15m])
+            )
           )
+          or vector(0)
 
       # `surface` is kept in the key even though it has one value today. It is
       # emitted as a label, and dropping it here would merge a second surface
       # into the first without any signal that it had happened.
       - record: memory:auth_refusals:rate15m
         expr: |
-          sum by (surface, branch) (
-            rate(memory_auth_refusals_total[15m])
+          (
+            sum by (surface, branch) (
+              rate(memory_auth_refusals_total[15m])
+            )
           )
+          or vector(0)
 
       # Sign-ins that completed, next to the refusals above.
       #
@@ -329,24 +374,34 @@ groups:
           rate(memory_auth_signins_total[15m])
 
   # ─── Claims ─────────────────────────────────────────────────────────────────
+  #
+  # A quiet claims pipeline records nothing, and the claims panels must read
+  # 0 rather than *No data* on the deployment with nothing to reconcile —
+  # the same `or vector(0)` the HTTP error rules use, for the same reason.
+  # Alerts compare these against thresholds, so a zero never fires one.
   - name: memory-claims
     interval: 30s
     rules:
       - record: memory:claim_pipeline:rate15m
         expr: |
-          sum by (stage, outcome) (
-            rate(memory_claim_pipeline_total[15m])
+          (
+            sum by (stage, outcome) (
+              rate(memory_claim_pipeline_total[15m])
+            )
           )
+          or vector(0)
 
       # Active relations, summed across schema and outcome.
       #
       # A level, so it is read as it stands rather than by rate. Note that the
       # sum under-reports: a series only exists once it has been set at least
       # once, so a schema with no relations of some outcome is absent rather
-      # than zero. The gauge's own description says so.
+      # than zero. The gauge's own description says so. The fallback below
+      # only covers no series at all — a store with nothing counted yet reads
+      # 0, which is what an empty store holds.
       - record: memory:claim_relations:active
         expr: |
-          sum(memory_claim_relations_active)
+          sum(memory_claim_relations_active) or vector(0)
 
       # Mean candidates per claim slot.
       #
@@ -362,12 +417,17 @@ groups:
       # quantile lines share — so a selector for the bare name sums all eight
       # series and divides by the quantiles as well. A test in the crate pins
       # that name for exactly this reason.
+      #
+      # Both halves carry the `or vector(0)` fallback: with no candidates in
+      # fifteen minutes the mean is 0, not absent.
       - record: memory:claim_candidates:mean15m
         expr: |
-          sum(rate(memory_claim_candidates_considered_sum[15m]))
+          (
+            sum(rate(memory_claim_candidates_considered_sum[15m])) or vector(0)
+          )
           /
           clamp_min(
-            sum(rate(memory_claim_candidates_considered_count[15m])),
+            sum(rate(memory_claim_candidates_considered_count[15m])) or vector(0),
             0.000001
           )
 
@@ -378,9 +438,12 @@ groups:
       # reason, and it is the series that says whether that walk is keeping up.
       - record: memory:claim_backfill_facts:rate15m
         expr: |
-          sum by (outcome, reason_code) (
-            rate(memory_claim_backfill_facts_total[15m])
+          (
+            sum by (outcome, reason_code) (
+              rate(memory_claim_backfill_facts_total[15m])
+            )
           )
+          or vector(0)
 
   # ─── Lifecycle ──────────────────────────────────────────────────────────────
   #

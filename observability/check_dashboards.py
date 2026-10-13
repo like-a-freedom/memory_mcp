@@ -439,8 +439,12 @@ def check_row_contents(
     Collapsed rows use a local coordinate space and must stay on one band;
     Grafana renders a multi-band collapsed row as a diagonal staircase. The
     expanded overview uses the shared dashboard grid and may have multiple
-    bands, but its children must start below the row header. In either mode,
-    nested rows and panel cells are still checked recursively.
+    bands, but its children must start below the row header.
+
+    A row must not contain another row: Grafana's schema has a single row
+    level, and panels nested inside a row are dropped on import — which is
+    how a dashboard ships empty rows with its widgets missing. A subsection
+    is a top-level row of its own.
     """
     children = [child for child in row.get("panels", []) if child["type"] != "row"]
     bands = sorted({child["gridPos"]["y"] for child in children})
@@ -457,12 +461,11 @@ def check_row_contents(
     for child in row.get("panels", []):
         child_grid = child["gridPos"]
         if child["type"] == "row":
-            if expanded:
-                failures.append(
-                    f"{path.name} / {row['title']}: expanded rows cannot contain "
-                    f"nested rows"
-                )
-            check_row_contents(path, child, failures)
+            failures.append(
+                f"{path.name} / {row['title']}: nested row "
+                f"{child['title']!r} — rows cannot contain rows, and Grafana "
+                f"drops nested panels on import; make it a top-level row"
+            )
             continue
         if child_grid["x"] + child_grid["w"] > 24:
             failures.append(
