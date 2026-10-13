@@ -23,6 +23,11 @@ pub(crate) const NONSEMANTIC_FACT_PROJECTION: &str = "fact_id, fact_type, conten
      t_invalid, t_invalid_ingested, confidence, index_keys, access_count, last_accessed, \
      entity_links, scope, policy_tags, provenance";
 
+/// Selects every fact row needed by nonsemantic retrieval without returning its vector payload.
+pub fn build_scan_nonsemantic_facts_query() -> String {
+    format!("SELECT id, {NONSEMANTIC_FACT_PROJECTION} FROM fact")
+}
+
 /// The temporal columns a fact carries, and an edge's, which are the same.
 pub const FACT_TEMPORAL_FIELDS: &[&str] = &[
     "t_valid",
@@ -597,6 +602,18 @@ mod tests {
         assert!(sql.ends_with("ORDER BY t_valid ASC LIMIT $limit"), "{sql}");
         assert_eq!(vars["cutoff"], "2026-05-13T00:00:00Z");
         assert_eq!(vars["limit"], 5);
+    }
+
+    #[test]
+    fn scan_nonsemantic_facts_query_projects_without_narrowing_the_row_set() {
+        let sql = build_scan_nonsemantic_facts_query().to_ascii_lowercase();
+
+        assert!(sql.starts_with("select id, fact_id, fact_type, content, quote, source_episode"));
+        assert!(sql.contains("t_invalid"));
+        assert!(sql.contains("policy_tags"));
+        assert!(!sql.contains("embedding"));
+        assert!(!sql.contains(" where "));
+        assert!(!sql.contains(" limit "));
     }
 
     #[test]
