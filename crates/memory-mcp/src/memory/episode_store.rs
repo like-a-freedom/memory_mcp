@@ -61,6 +61,35 @@ impl EpisodeStoreClient {
             .unwrap_or(0) as i32)
     }
 
+    /// Returns the newest episode ingest time in the bound Active Namespace.
+    ///
+    /// The freshness clock is memory-only, so a restart wipes it; the store
+    /// still knows when knowledge last landed, and startup restores the clock
+    /// from this. `t_ingested` defaults to the write moment, so its maximum
+    /// is that moment in the common case. `None` when no episode was ever
+    /// stored, which reads as absent rather than as knowledge from the epoch.
+    ///
+    /// Ordered, not aggregated: `math::max` is numeric-only and reads null
+    /// over these strings, while every write goes through `normalize_dt` —
+    /// fixed-width RFC 3339 — so lexicographic order is chronological order.
+    pub async fn newest_t_ingested(
+        &self,
+    ) -> Result<Option<chrono::DateTime<chrono::Utc>>, MemoryError> {
+        let result = self
+            .db
+            .query(
+                "SELECT t_ingested FROM episode ORDER BY t_ingested DESC LIMIT 1",
+                None,
+            )
+            .await?;
+        Ok(result
+            .as_array()
+            .and_then(|rows| rows.first())
+            .and_then(|row| row.get("t_ingested"))
+            .and_then(Value::as_str)
+            .and_then(crate::shared::temporal::parse_iso))
+    }
+
     pub async fn create(&self, record_id: &str, content: Value) -> Result<Value, MemoryError> {
         self.db
             .create(
@@ -373,6 +402,58 @@ mod tests {
         let count = store.count_episodes().await.expect("count episodes");
 
         assert_eq!(count, 0);
+    }
+
+    async fn seed_episode(store: &EpisodeStoreClient, record_id: &str, t_ingested: &str) {
+        store
+            .create(
+                record_id,
+                json!({
+                    "episode_id": record_id,
+                    "source_type": "inline",
+                    "source_id": record_id,
+                    "content": format!("content {record_id}"),
+                    "policy_tags": [],
+                    "t_ref": "2026-01-01T00:00:00Z",
+                    "t_ingested": t_ingested,
+                }),
+            )
+            .await
+            .expect("seed episode should succeed");
+    }
+
+    /// An empty store has never learned anything, which reads as absent.
+    #[tokio::test]
+    async fn newest_t_ingested_returns_none_for_empty_store() {
+        let db_client = make_db().await;
+        let store = EpisodeStoreClient::new(db_client, "org");
+
+        let newest = store.newest_t_ingested().await.expect("newest t_ingested");
+
+        assert_eq!(newest, None);
+    }
+
+    /// The newest ingest time across episodes, not an arbitrary row.
+    #[tokio::test]
+    async fn newest_t_ingested_returns_max_t_ingested() {
+        let db_client = make_db().await;
+        let store = EpisodeStoreClient::new(db_client.clone(), "org");
+        seed_episode(&store, "episode:old", "2026-01-10T10:00:00Z").await;
+        seed_episode(&store, "episode:new", "2026-03-10T10:00:00Z").await;
+        seed_episode(&store, "episode:middle", "2026-02-10T10:00:00Z").await;
+
+        let newest = store
+            .newest_t_ingested()
+            .await
+            .expect("newest t_ingested")
+            .expect("episodes were seeded");
+
+        assert_eq!(
+            newest,
+            chrono::DateTime::parse_from_rfc3339("2026-03-10T10:00:00Z")
+                .expect("literal is RFC 3339")
+                .with_timezone(&chrono::Utc)
+        );
     }
 
     #[tokio::test]

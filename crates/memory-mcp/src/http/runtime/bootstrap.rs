@@ -411,6 +411,12 @@ pub async fn build_state(
         }
     };
     log_memory_marker(logger, "state_assembled");
+    // The freshness clock is memory-only: without this, a restart leaves the
+    // age panels and the staleness alert blind until the next capture. The
+    // recorder is installed above, before any stamp can be set — the reverse
+    // order would record into the void. Metric-only and infallible by
+    // construction: per-tenant failures warn and never fail the boot.
+    crate::http::knowledge_clock::restore_knowledge_clock(&state.registry).await;
     let background_upkeep_cancel = tokio_util::sync::CancellationToken::new();
     #[cfg(feature = "prometheus")]
     let memory_snapshot_source = Arc::new(

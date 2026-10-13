@@ -511,6 +511,33 @@ pub(crate) fn record_knowledge_write() {
     metrics::gauge!(METRIC_KNOWLEDGE_LAST_WRITE_TIMESTAMP_SECONDS).set(unix_seconds());
 }
 
+/// Restore the freshness stamp from durable state at startup.
+///
+/// A restart wipes the gauge, and the store still knows when knowledge last
+/// landed: the restore writes that stored moment back, so the age panels and
+/// the staleness alert read the true age instead of silence until the next
+/// capture. `None` — an empty store — leaves the gauge absent: a deployment
+/// that has never learned anything has no age to report, and zero would claim
+/// it learned something at the epoch.
+///
+/// Deliberately separate from [`record_knowledge_write`]: a write stamps the
+/// moment it landed, while this stamps a moment the store remembers. The
+/// wiring lint below allows this call only from the startup restore.
+#[cfg_attr(
+    not(feature = "streamable-http"),
+    allow(dead_code, reason = "the startup restore walk is HTTP-only")
+)]
+pub(crate) fn restore_knowledge_clock(newest_write_unix_seconds: Option<f64>) {
+    #[cfg(feature = "prometheus")]
+    if let Some(stamped) = newest_write_unix_seconds {
+        // A pre-epoch moment cannot be represented; clamp like the write
+        // clock rather than storing a lie that reads as plausible.
+        metrics::gauge!(METRIC_KNOWLEDGE_LAST_WRITE_TIMESTAMP_SECONDS).set(stamped.max(0.0));
+    }
+    #[cfg(not(feature = "prometheus"))]
+    let _ = newest_write_unix_seconds;
+}
+
 /// Record a sign-in that completed.
 ///
 /// Called where the session is issued rather than where the flow ends, so it
@@ -910,6 +937,73 @@ pub(crate) mod tests {
         );
     }
 
+    /// A restored stamp sets the knowledge clock to the stored moment.
+    ///
+    /// A restart wipes the gauge, and the store still knows when knowledge
+    /// last landed. The restore writes that stored moment back, so the age
+    /// panels and the staleness alert read the true age instead of silence
+    /// until the next capture.
+    #[tokio::test]
+    async fn a_restored_stamp_sets_the_knowledge_clock() {
+        // A worked literal, not a recomputation: the gauge must carry exactly
+        // the moment it was given.
+        const STORED: f64 = 1_788_800_000.0;
+        let exposition = exposed(|| async {
+            restore_knowledge_clock(Some(STORED));
+            render()
+        })
+        .await;
+
+        assert_eq!(
+            sample_bare(&exposition, METRIC_KNOWLEDGE_LAST_WRITE_TIMESTAMP_SECONDS),
+            Some(STORED),
+            "a restore must set the clock to the stored moment: {exposition}"
+        );
+    }
+
+    /// Restoring without stored knowledge leaves the clock alone.
+    ///
+    /// An empty store has never learned anything, which reads as absent —
+    /// never as a zero that would claim knowledge landed at the epoch. The
+    /// shared recorder outlives any one test, so this asserts the restore is
+    /// a no-op (before and after readings agree) rather than absence, which
+    /// a sibling test's stamp would break.
+    #[tokio::test]
+    async fn restoring_without_knowledge_leaves_the_clock_alone() {
+        let (before, after) = exposed(|| async {
+            let before = render();
+            restore_knowledge_clock(None);
+            (before, render())
+        })
+        .await;
+
+        assert_eq!(
+            sample_bare(&before, METRIC_KNOWLEDGE_LAST_WRITE_TIMESTAMP_SECONDS),
+            sample_bare(&after, METRIC_KNOWLEDGE_LAST_WRITE_TIMESTAMP_SECONDS),
+            "restoring nothing must not move the clock"
+        );
+    }
+
+    /// A stored moment before the epoch clamps to it, like the write clock.
+    ///
+    /// A pre-epoch stamp cannot be represented and is not worth a lie that
+    /// reads as plausible: the epoch value is obviously wrong on a
+    /// dashboard, which is what makes it noticeable rather than trusted.
+    #[tokio::test]
+    async fn a_restored_pre_epoch_stamp_clamps_to_the_epoch() {
+        let exposition = exposed(|| async {
+            restore_knowledge_clock(Some(-1.0));
+            render()
+        })
+        .await;
+
+        assert_eq!(
+            sample_bare(&exposition, METRIC_KNOWLEDGE_LAST_WRITE_TIMESTAMP_SECONDS),
+            Some(0.0),
+            "a moment before the epoch must clamp rather than lie: {exposition}"
+        );
+    }
+
     /// Only the two knowledge writes stamp the clock — a wiring lint, not a
     /// scenario.
     ///
@@ -920,6 +1014,10 @@ pub(crate) mod tests {
     /// learning look freshly fed, and the first leaves the gauge absent for
     /// every deployment whose knowledge arrives unattended — which is the whole
     /// reason the gauge exists.
+    ///
+    /// The startup restore is a separate function with its own lint below:
+    /// it sets the clock from a stored moment rather than stamping the
+    /// moment of a write.
     #[test]
     fn only_the_knowledge_writes_stamp_the_clock() {
         let writers = [
@@ -977,6 +1075,45 @@ pub(crate) mod tests {
              MCP call that asked for it: a capture that arrives and fails would \
              otherwise keep the clock fresh"
         );
+    }
+
+    /// The startup restore has one wiring site — a lint, not a scenario.
+    ///
+    /// `restore_knowledge_clock` sets the clock from a stored moment rather
+    /// than stamping the moment of a write. Only the boot walk may call it:
+    /// a restore from any request path would let traffic move the clock
+    /// without knowledge landing, which is the failure the clock exists to
+    /// catch.
+    #[test]
+    fn knowledge_clock_restore_has_one_wiring_site() {
+        const WIRING: &str = include_str!("http/knowledge_clock.rs");
+        assert!(
+            WIRING.contains("restore_knowledge_clock("),
+            "http/knowledge_clock.rs is the restore wiring site and must call it"
+        );
+        for (name, source) in [
+            ("memory/ingestion.rs", include_str!("memory/ingestion.rs")),
+            (
+                "memory/episode/fact_extraction.rs",
+                include_str!("memory/episode/fact_extraction.rs"),
+            ),
+            ("memory/retrieval.rs", include_str!("memory/retrieval.rs")),
+            ("memory/lifecycle.rs", include_str!("memory/lifecycle.rs")),
+            (
+                "tools/assemble_context.rs",
+                include_str!("tools/assemble_context.rs"),
+            ),
+            ("tools/ingest.rs", include_str!("tools/ingest.rs")),
+            ("tools/extract.rs", include_str!("tools/extract.rs")),
+            ("tools/resolve.rs", include_str!("tools/resolve.rs")),
+            ("tools/explain.rs", include_str!("tools/explain.rs")),
+        ] {
+            assert!(
+                !source.contains("restore_knowledge_clock("),
+                "{name} must not restore the clock: only the boot walk reads \
+                 a stored moment"
+            );
+        }
     }
 
     /// A background pass stamps when it last ran.

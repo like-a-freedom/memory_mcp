@@ -701,6 +701,7 @@ pub const HTTP_OPERATIONS: &[&str] = &[
     "http.tenant_embedding_index_reconcile_failed",
     "http.lifecycle.decay_failed",
     "http.lifecycle.archival_failed",
+    "http.lifecycle.clock_restore_failed",
     "http.preflight.refused",
     "http.preflight.large_body",
     // Emitted by the allocator-attribution diagnostics: the startup-phase memory
