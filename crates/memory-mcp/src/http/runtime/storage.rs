@@ -274,7 +274,7 @@ async fn resolve_tenant_embedding(
     {
         Ok(decision) => decision,
         Err(err) => {
-            log_tenant_embedding_degraded(namespace, &policy.signature, &err.to_string());
+            log_tenant_embedding_degraded(namespace, &policy.signature, &err);
             EmbeddingStartupDecision::DisableSemantic {
                 reason: format!("tenant embedding state could not be read: {err}"),
             }
@@ -325,7 +325,7 @@ fn log_tenant_embedding_decision(
     crate::logging::emit(event, crate::logging::LogLevel::Info);
 }
 
-fn log_tenant_embedding_degraded(namespace: &str, target_signature: &str, reason: &str) {
+fn log_tenant_embedding_degraded(namespace: &str, target_signature: &str, err: &MemoryError) {
     let mut event = std::collections::HashMap::new();
     event.insert(
         "op".to_string(),
@@ -336,8 +336,8 @@ fn log_tenant_embedding_degraded(namespace: &str, target_signature: &str, reason
         "target_signature".to_string(),
         serde_json::json!(target_signature),
     );
-    event.insert("error".to_string(), serde_json::json!(reason));
-    crate::logging::emit(event, crate::logging::LogLevel::Warn);
+    event.insert("error".to_string(), serde_json::json!(err.to_string()));
+    crate::logging::emit(event, err.log_level());
 }
 
 impl TenantRuntime {
@@ -643,12 +643,7 @@ pub(crate) async fn reconcile_tenant_index_dimension(
                 }
                 Ok(_) => {
                     if let Err(err) = redefine_embedding_index(&store, policy.dimension).await {
-                        log_index_reconcile(
-                            namespace,
-                            Some(existing),
-                            policy.dimension,
-                            &err.to_string(),
-                        );
+                        log_index_reconcile(namespace, Some(existing), policy.dimension, &err);
                         return IndexWriteGate::Unreadable;
                     }
                     let mut event = std::collections::HashMap::new();
@@ -666,19 +661,14 @@ pub(crate) async fn reconcile_tenant_index_dimension(
                     IndexWriteGate::Redeclared
                 }
                 Err(err) => {
-                    log_index_reconcile(
-                        namespace,
-                        Some(existing),
-                        policy.dimension,
-                        &err.to_string(),
-                    );
+                    log_index_reconcile(namespace, Some(existing), policy.dimension, &err);
                     IndexWriteGate::Unreadable
                 }
             }
         }
         Ok(_) => IndexWriteGate::Matches,
         Err(err) => {
-            log_index_reconcile(namespace, None, policy.dimension, &err.to_string());
+            log_index_reconcile(namespace, None, policy.dimension, &err);
             IndexWriteGate::Unreadable
         }
     }
@@ -696,7 +686,7 @@ async fn redefine_embedding_index(
     store.define_embedding_index(dimension).await
 }
 
-fn log_index_reconcile(namespace: &str, existing: Option<usize>, target: usize, reason: &str) {
+fn log_index_reconcile(namespace: &str, existing: Option<usize>, target: usize, err: &MemoryError) {
     let mut event = std::collections::HashMap::new();
     event.insert(
         "op".to_string(),
@@ -708,8 +698,8 @@ fn log_index_reconcile(namespace: &str, existing: Option<usize>, target: usize, 
         serde_json::json!(existing),
     );
     event.insert("target_dimension".to_string(), serde_json::json!(target));
-    event.insert("error".to_string(), serde_json::json!(reason));
-    crate::logging::emit(event, crate::logging::LogLevel::Warn);
+    event.insert("error".to_string(), serde_json::json!(err.to_string()));
+    crate::logging::emit(event, err.log_level());
 }
 
 #[cfg(test)]
@@ -735,6 +725,91 @@ mod tests {
             created_at: Utc::now(),
             version: 0,
         }
+    }
+
+    /// A read that failed is classified by the error it carries: a storage
+    /// outage is an error, a client mistake is a warning, and hardcoding one
+    /// level would report both the same way to `RUST_LOG`.
+    ///
+    /// The rendered line is asserted, because that is what an operator
+    /// filters on; the level read off a structure would not prove the line
+    /// carries it.
+    #[tokio::test]
+    async fn a_tenant_embedding_read_failure_takes_its_level_from_the_error() {
+        let sink = crate::logging::capture::install();
+
+        crate::logging::capture::with_level("http=info", || async {
+            log_tenant_embedding_degraded(
+                "ns_read_failed",
+                "embsig:old",
+                &MemoryError::Storage("disk is gone".into()),
+            );
+            log_tenant_embedding_degraded(
+                "ns_read_failed",
+                "embsig:old",
+                &MemoryError::Validation("unknown namespace".into()),
+            );
+        })
+        .await;
+
+        let recorded = sink.lines();
+        assert!(
+            recorded.iter().any(|line| {
+                line.contains("op=http.tenant_embedding_read_failed")
+                    && line.contains("ERROR")
+                    && line.contains("disk is gone")
+            }),
+            "a storage failure must stay an error: {recorded:?}"
+        );
+        assert!(
+            recorded.iter().any(|line| {
+                line.contains("op=http.tenant_embedding_read_failed")
+                    && line.contains("WARN")
+                    && line.contains("unknown namespace")
+            }),
+            "a client mistake must not read as a storage outage: {recorded:?}"
+        );
+    }
+
+    /// The same rule on the reconcile path: the dimension could not be
+    /// reconciled, and why decides whether an operator is paged for it.
+    #[tokio::test]
+    async fn an_index_reconcile_failure_takes_its_level_from_the_error() {
+        let sink = crate::logging::capture::install();
+
+        crate::logging::capture::with_level("http=info", || async {
+            log_index_reconcile(
+                "ns_reconcile_failed",
+                Some(1536),
+                3072,
+                &MemoryError::Storage("disk is gone".into()),
+            );
+            log_index_reconcile(
+                "ns_reconcile_failed",
+                Some(1536),
+                3072,
+                &MemoryError::Validation("namespace is not ready".into()),
+            );
+        })
+        .await;
+
+        let recorded = sink.lines();
+        assert!(
+            recorded.iter().any(|line| {
+                line.contains("op=http.tenant_embedding_index_reconcile_failed")
+                    && line.contains("ERROR")
+                    && line.contains("disk is gone")
+            }),
+            "a storage failure must stay an error: {recorded:?}"
+        );
+        assert!(
+            recorded.iter().any(|line| {
+                line.contains("op=http.tenant_embedding_index_reconcile_failed")
+                    && line.contains("WARN")
+                    && line.contains("namespace is not ready")
+            }),
+            "a client mistake must not read as a storage outage: {recorded:?}"
+        );
     }
 
     #[tokio::test]

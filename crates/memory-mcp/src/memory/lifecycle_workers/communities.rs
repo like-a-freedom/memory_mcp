@@ -80,7 +80,7 @@ pub(crate) fn spawn_community_worker(
                         "error".to_string(),
                         serde_json::Value::String(err.to_string()),
                     );
-                    logger.log(event, crate::logging::LogLevel::Warn);
+                    logger.log(event, err.log_level());
                 }
             }
         }

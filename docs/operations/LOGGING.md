@@ -98,10 +98,11 @@ The HTTP profile emits `op=http.startup_memory` at six fixed phase boundaries:
 `config_resolved`, `deployment_policy_resolved`, `store_connected`,
 `state_assembled`, `upkeep_started`, and `router_built`. Each event includes
 `rss_bytes`, `swap_bytes`, `hwm_bytes`, and `heap_bytes`. A missing platform
-reading is JSON `null`, not zero. These one-off INFO events help locate startup
-peaks; they are not a time series and do not replace the controlled process
-sampler. `upkeep_started` marks that the upkeep task was spawned; it does not
-synchronize with the task's first poll.
+reading is JSON `null`, not zero. These one-off DEBUG events help locate
+startup peaks; they are below the default `info` level, so an operator reading
+them runs `RUST_LOG=debug`. They are not a time series and do not replace the
+controlled process sampler. `upkeep_started` marks that the upkeep task was
+spawned; it does not synchronize with the task's first poll.
 
 At startup, `op=http.glibc_tunables` reports the process environment values for
 `MALLOC_ARENA_MAX`, `MALLOC_MMAP_THRESHOLD_`, and `MALLOC_TRIM_THRESHOLD_` under
@@ -109,7 +110,8 @@ the fields `malloc_arena_max`, `malloc_mmap_threshold`, and
 `malloc_trim_threshold`, plus `allocator_summary`. An `unset` value means glibc
 uses its own default; it does not mean a numeric zero. The summary is
 `mallinfo2` accounting when glibc is available and an explicit unavailable
-message on other platforms.
+message on other platforms. It is a DEBUG event, like the memory markers
+above.
 
 ## Configuration
 

@@ -56,7 +56,7 @@ pub async fn extract_entities(
             None,
             Some(duration_ms(timer.elapsed())),
         ),
-        LogLevel::Info,
+        LogLevel::Debug,
     );
 
     let entities = resolve_and_dedupe(service, provider, candidates).await?;
@@ -152,7 +152,7 @@ async fn resolve_and_dedupe(
                         None,
                         None,
                     ),
-                    LogLevel::Warn,
+                    err.log_level(),
                 );
             })?;
 
@@ -384,7 +384,7 @@ fn log_ner_error(
             None,
             Some(duration_ms(timer.elapsed())),
         ),
-        LogLevel::Warn,
+        err.log_level(),
     );
 }
 

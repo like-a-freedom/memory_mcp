@@ -45,7 +45,7 @@ fn log_glibc_tunables() {
     for (name, value) in memory_mcp::control::local_admin::heap::effective_glibc_tunables() {
         event.insert(name.to_string(), serde_json::Value::String(value));
     }
-    memory_mcp::logging::emit(event, memory_mcp::logging::LogLevel::Info);
+    memory_mcp::logging::emit(event, memory_mcp::logging::LogLevel::Debug);
 }
 
 #[tokio::main]

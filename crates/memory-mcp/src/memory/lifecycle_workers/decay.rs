@@ -86,7 +86,7 @@ pub(crate) fn spawn_decay_worker(
                         "error".to_string(),
                         serde_json::Value::String(format!("{}", e)),
                     );
-                    logger.log(event, crate::logging::LogLevel::Warn);
+                    logger.log(event, e.log_level());
                 }
             }
         }

@@ -185,7 +185,7 @@ impl FactService {
                         ),
                         ("fact_type".to_string(), json!(fact_type)),
                     ]),
-                    LogLevel::Info,
+                    LogLevel::Debug,
                 );
                 Some(self.build_embedding_payload(ctx, embedding)?)
             }
@@ -197,7 +197,7 @@ impl FactService {
                         ("op".to_string(), json!("embedding.write_skipped")),
                         ("reason".to_string(), json!(format!("{reason:?}"))),
                     ]),
-                    LogLevel::Info,
+                    LogLevel::Debug,
                 );
                 None
             }
@@ -212,7 +212,7 @@ impl FactService {
                         ("error".to_string(), json!(err.to_string())),
                         ("fact_type".to_string(), json!(fact_type)),
                     ]),
-                    LogLevel::Warn,
+                    err.log_level(),
                 );
                 if ctx.embedding_service.should_defer_embedding_retry(&err) {
                     deferred_embedding_input = Some(embedding_input.clone());

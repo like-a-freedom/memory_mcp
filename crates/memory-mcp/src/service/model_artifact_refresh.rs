@@ -82,22 +82,23 @@ async fn run_one_refresh(
 ) {
     logger.log(
         structured_event("ner.artifact_refresh.started", json!({}), json!({})),
-        // Keep the lifecycle marker visible with the default `warn` log
+        // Keep the lifecycle marker visible with the default `info` log
         // level: operators and readiness tests must be able to distinguish a
         // refresh that never started from one that failed during resolution.
-        LogLevel::Warn,
+        LogLevel::Info,
     );
     let store = match crate::embedding::model_artifacts::NerArtifactStore::new(store_root, progress)
     {
         Ok(store) => store,
         Err(err) => {
+            let level = err.log_level();
             logger.log(
                 structured_event(
                     "ner.artifact_refresh.failed",
                     json!({"error": err.to_string()}),
                     json!({"activation": "unchanged"}),
                 ),
-                LogLevel::Error,
+                level,
             );
             return;
         }
@@ -108,7 +109,7 @@ async fn run_one_refresh(
             "ner.artifact_refresh.up_to_date",
             json!({"revision": revision}),
             json!({}),
-            LogLevel::Info,
+            LogLevel::Debug,
         ),
         Ok(CandidateRefreshOutcome::CandidateReady { revision }) => (
             "ner.artifact_refresh.candidate_ready",
@@ -120,7 +121,7 @@ async fn run_one_refresh(
             "ner.artifact_refresh.suppressed_incompatible",
             json!({"revision": revision}),
             json!({}),
-            LogLevel::Info,
+            LogLevel::Debug,
         ),
         Err(err) if is_cancellation_marker(&err) => (
             "ner.artifact_refresh.stopped",
@@ -132,7 +133,7 @@ async fn run_one_refresh(
             "ner.artifact_refresh.failed",
             json!({"error": err.to_string()}),
             json!({"activation": "unchanged"}),
-            LogLevel::Error,
+            err.log_level(),
         ),
     };
     logger.log(structured_event(op, args, result), level);
@@ -246,6 +247,7 @@ mod tests {
         // Outcome events are emitted by `refresh_candidate`; this test
         // only asserts that the runtime spawn/shutdown pair is well-formed.
         let progress: Arc<dyn ModelProgressSink> = Arc::new(CapturingSink::default());
+        let sink = crate::logging::capture::install();
         let runtime = NerArtifactRefreshRuntime::start(
             NerArtifactRefreshConfig {
                 store_root: temp.path().to_path_buf(),
@@ -253,9 +255,21 @@ mod tests {
             },
             spec(),
             native(),
-            StdoutLogger::new("error"),
+            StdoutLogger::new("info"),
         );
         runtime.shutdown().await;
+
+        // The lifecycle marker must be readable without raising
+        // `RUST_LOG`: an operator distinguishing a refresh that never
+        // started from one that failed during resolution reads it at the
+        // deployment's default level.
+        let recorded = sink.lines();
+        assert!(
+            recorded.iter().any(|line| {
+                line.contains("op=ner.artifact_refresh.started") && line.contains("INFO")
+            }),
+            "the lifecycle marker must render at info: {recorded:?}"
+        );
     }
 
     #[tokio::test]

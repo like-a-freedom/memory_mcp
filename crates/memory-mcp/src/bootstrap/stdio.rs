@@ -33,6 +33,24 @@ pub struct NoopProgressSink;
 impl crate::embedding::model_artifacts::ModelProgressSink for NoopProgressSink {
     fn emit(&self, _event: &crate::embedding::model_artifacts::ModelProgressEvent) {}
 }
+
+/// Record that the startup version probe could not run.
+///
+/// The probe is best-effort — startup continues with no server version —
+/// but this line is where a support conversation finds out the database
+/// could not be read, so its level is the error's own rather than one level
+/// chosen at the call site: a config mistake and a storage outage must not
+/// read the same to `RUST_LOG`.
+fn log_version_probe_failure(logger: &crate::logging::StdoutLogger, err: &MemoryError) {
+    let mut event = std::collections::HashMap::new();
+    event.insert(
+        "op".to_string(),
+        serde_json::json!("main.version_probe_failed"),
+    );
+    event.insert("error".to_string(), serde_json::json!(err.to_string()));
+    logger.log(event, err.log_level());
+}
+
 pub async fn build_memory_service_from_env(
     mode: EmbeddingActivationMode,
     ner_progress: std::sync::Arc<dyn crate::embedding::model_artifacts::ModelProgressSink>,
@@ -79,13 +97,7 @@ pub async fn build_memory_service_from_env(
     let server_version = match db_client.server_version(&active_namespace).await {
         Ok(version) => version,
         Err(err) => {
-            let mut event = std::collections::HashMap::new();
-            event.insert(
-                "op".to_string(),
-                serde_json::json!("main.version_probe_failed"),
-            );
-            event.insert("error".to_string(), serde_json::json!(err.to_string()));
-            startup_logger.log(event, crate::logging::LogLevel::Warn);
+            log_version_probe_failure(&startup_logger, &err);
             None
         }
     };
@@ -312,4 +324,43 @@ pub(crate) fn forced_embedding_runtime_state(
     dimension: Option<usize>,
 ) -> EmbeddingRuntimeState {
     EmbeddingRuntimeState::new(provider, signature, model, dimension)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// A probe that could not run is classified by the error that stopped
+    /// it. The rendered line is asserted, because `RUST_LOG` filters on the
+    /// level it carries — a storage outage that read as a warning would
+    /// disappear exactly when somebody was looking for it.
+    #[test]
+    fn a_version_probe_failure_takes_its_level_from_the_error() {
+        let sink = crate::logging::capture::install();
+        let logger = crate::logging::StdoutLogger::new("info");
+
+        log_version_probe_failure(&logger, &MemoryError::Storage("disk is gone".into()));
+        log_version_probe_failure(
+            &logger,
+            &MemoryError::Validation("unknown namespace".into()),
+        );
+
+        let recorded = sink.lines();
+        assert!(
+            recorded.iter().any(|line| {
+                line.contains("op=main.version_probe_failed")
+                    && line.contains("ERROR")
+                    && line.contains("disk is gone")
+            }),
+            "a storage failure must stay an error: {recorded:?}"
+        );
+        assert!(
+            recorded.iter().any(|line| {
+                line.contains("op=main.version_probe_failed")
+                    && line.contains("WARN")
+                    && line.contains("unknown namespace")
+            }),
+            "a client mistake must not read as a storage outage: {recorded:?}"
+        );
+    }
 }

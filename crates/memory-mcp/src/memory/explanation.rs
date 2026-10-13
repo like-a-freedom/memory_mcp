@@ -203,7 +203,7 @@ impl ExplanationService {
                         None,
                         None,
                     ),
-                    LogLevel::Warn,
+                    err.log_level(),
                 );
             }
 

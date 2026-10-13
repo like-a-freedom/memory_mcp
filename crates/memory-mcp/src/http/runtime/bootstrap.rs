@@ -116,7 +116,7 @@ fn log_secondary_cleanup_failure(owner: &str, error: &crate::error::MemoryError)
     );
     event.insert("owner".to_string(), serde_json::json!(owner));
     event.insert("error".to_string(), serde_json::json!(error.to_string()));
-    crate::logging::emit(event, crate::logging::LogLevel::Error);
+    crate::logging::emit(event, error.log_level());
 }
 
 /// Test-fixture seam for verifying the shared shutdown ordering without
@@ -508,7 +508,10 @@ pub fn emit_startup_log(logger: &StdoutLogger, cfg: &HttpConfig) {
 /// boundary; a field is JSON `null` where the platform has no such signal,
 /// which is not the same as a measured zero.
 pub fn log_memory_marker(logger: &StdoutLogger, phase: &'static str) {
-    logger.log(startup_memory_fields(phase), crate::logging::LogLevel::Info);
+    logger.log(
+        startup_memory_fields(phase),
+        crate::logging::LogLevel::Debug,
+    );
 }
 
 /// The event body for [`log_memory_marker`], split out so a test reads it
@@ -839,6 +842,81 @@ mod tests {
         assert!(
             fields["rss_bytes"].is_u64(),
             "reading /proc/self/status must yield a number here: {fields:?}"
+        );
+    }
+
+    /// The marker records where a phase ended, which is a diagnostic: it must
+    /// stay out of a deployment's default output, and an operator who asks
+    /// for `RUST_LOG=http=debug` must get it at the level it is documented
+    /// at.
+    ///
+    /// The rendered line is asserted, not the event map: `RUST_LOG` reads
+    /// the line's level, so a marker that had drifted from `debug` would
+    /// still build the same map and prove nothing.
+    #[test]
+    fn a_startup_marker_is_a_debug_line_the_default_level_filters_out() {
+        let sink = crate::logging::capture::install();
+        // A phase name only this test uses. Every live capture records every
+        // line in the process, so an absence assertion on a phase a parallel
+        // test might also record would fail for an unrelated reason.
+        let phase = "test_startup_marker_probe";
+
+        let quiet = StdoutLogger::new("http=info");
+        log_memory_marker(&quiet, phase);
+        assert!(
+            !sink.lines().iter().any(|line| line.contains(phase)),
+            "the marker must not appear at the deployment's info level"
+        );
+
+        let verbose = StdoutLogger::new("http=debug");
+        log_memory_marker(&verbose, phase);
+        let recorded = sink.lines();
+        assert!(
+            recorded.iter().any(|line| {
+                line.contains("op=http.startup_memory")
+                    && line.contains("DEBUG")
+                    && line.contains(phase)
+            }),
+            "asked for, the marker must render at debug: {recorded:?}"
+        );
+    }
+
+    /// The secondary cleanup is classified by the error it carries, not by
+    /// where it was logged from. A storage outage and a client mistake have
+    /// to read differently to `RUST_LOG`, and one hardcoded level would
+    /// report both the same way.
+    #[tokio::test]
+    async fn a_secondary_cleanup_failure_takes_its_level_from_the_error() {
+        let sink = crate::logging::capture::install();
+
+        crate::logging::capture::with_level("info", || async {
+            log_secondary_cleanup_failure(
+                "metrics_upkeep",
+                &crate::error::MemoryError::Storage("disk is gone".into()),
+            );
+            log_secondary_cleanup_failure(
+                "metrics_upkeep",
+                &crate::error::MemoryError::Validation("unknown namespace".into()),
+            );
+        })
+        .await;
+
+        let recorded = sink.lines();
+        assert!(
+            recorded.iter().any(|line| {
+                line.contains("op=http.background_cleanup_secondary_failure")
+                    && line.contains("ERROR")
+                    && line.contains("disk is gone")
+            }),
+            "a storage failure must stay an error: {recorded:?}"
+        );
+        assert!(
+            recorded.iter().any(|line| {
+                line.contains("op=http.background_cleanup_secondary_failure")
+                    && line.contains("WARN")
+                    && line.contains("unknown namespace")
+            }),
+            "a client mistake must not read as a storage outage: {recorded:?}"
         );
     }
 }

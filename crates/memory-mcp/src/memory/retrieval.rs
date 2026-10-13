@@ -94,7 +94,7 @@ async fn track_fact_accesses(
                     None,
                     None,
                 ),
-                LogLevel::Warn,
+                err.log_level(),
             );
         }
     }
@@ -177,7 +177,7 @@ async fn assemble_context_inner(
                     None,
                     None,
                 ),
-                LogLevel::Info,
+                LogLevel::Debug,
             );
 
             let latency_ms = started_at.elapsed().as_secs_f64() * 1000.0;

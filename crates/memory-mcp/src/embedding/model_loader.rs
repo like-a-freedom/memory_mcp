@@ -50,7 +50,7 @@ pub async fn ensure_model_cached_with_files(
     if is_model_cached_with_files(cache_dir, required_files) {
         log_message(
             logger,
-            LogLevel::Info,
+            LogLevel::Debug,
             &format!("Model already cached at {}", cache_dir.display()),
         );
         return Ok(cache_dir.to_path_buf());
@@ -81,7 +81,7 @@ pub async fn ensure_model_cached_with_files(
         if target_path.is_file() {
             log_message(
                 logger,
-                LogLevel::Info,
+                LogLevel::Debug,
                 &format!("{file_name} already present, skipping"),
             );
             continue;

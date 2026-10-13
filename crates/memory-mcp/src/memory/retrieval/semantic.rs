@@ -69,7 +69,7 @@ pub(crate) async fn collect_semantic_facts(
                         ),
                         ("error".to_string(), serde_json::json!(err.to_string())),
                     ]),
-                    crate::logging::LogLevel::Warn,
+                    err.log_level(),
                 );
                 return Ok(Vec::new());
             }

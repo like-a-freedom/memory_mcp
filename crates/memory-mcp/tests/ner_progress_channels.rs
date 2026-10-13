@@ -432,9 +432,9 @@ fn blocked_gliner_refresh_does_not_delay_initialize() {
     // arrived during the initialize deadline.
     let saw_started = stderr_lines
         .iter()
-        .any(|line| line.contains("ner.artifact_refresh.started"));
+        .any(|line| line.contains("ner.artifact_refresh.started") && line.contains("INFO"));
     assert!(
         saw_started,
-        "expected ner.artifact_refresh.started on stderr; got: {stderr_lines:?}"
+        "expected ner.artifact_refresh.started at info on stderr; got: {stderr_lines:?}"
     );
 }

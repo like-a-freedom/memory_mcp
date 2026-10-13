@@ -143,7 +143,7 @@ impl MemoryService {
                         ("index".to_string(), json!(EMBEDDING_INDEX_NAME)),
                         ("error".to_string(), json!(err.to_string())),
                     ]),
-                    LogLevel::Warn,
+                    err.log_level(),
                 );
                 Err(err)
             }
@@ -575,7 +575,7 @@ impl MemoryService {
                                 ),
                                 ("resumed".to_string(), json!(pass.resumed)),
                             ]),
-                            LogLevel::Warn,
+                            LogLevel::Error,
                         );
                         progress.on_job_completed(
                             &ReembedOutcome::Failed,
@@ -652,7 +652,7 @@ impl MemoryService {
                 ("fact_id".to_string(), json!(fact_id)),
                 ("error".to_string(), json!(err.to_string())),
             ]),
-            LogLevel::Warn,
+            err.log_level(),
         );
         Ok(())
     }

@@ -228,7 +228,7 @@ async fn run_cycle(registry: RegistryHandle, hooks: &SchedulerHooks, shutdown: C
                         "http.job.failed",
                         "error",
                         &error.to_string(),
-                        LogLevel::Error,
+                        error.log_level(),
                     );
                     "error"
                 }
@@ -308,6 +308,43 @@ mod tests {
                     && line.contains("ERROR")
             }),
             "a failed job must be logged at error level: {recorded:?}"
+        );
+    }
+
+    /// The level of a failed job is the error's, not the call site's: a job
+    /// that failed on a client-class error must not be reported as if the
+    /// deployment were broken, or a storage outage and a bad input would be
+    /// indistinguishable to `RUST_LOG`.
+    ///
+    /// This is the regression pin for asking the error rather than
+    /// hardcoding `error` here: it fails the moment this line is hardcoded
+    /// back to one level.
+    #[tokio::test]
+    async fn a_job_failed_on_a_client_error_is_logged_at_its_level() {
+        let registry = test_registry().await;
+        let sink = crate::logging::capture::install();
+        let hooks = SchedulerHooks::new(
+            vec![Arc::new(|_registry| {
+                Box::pin(async { Err(MemoryError::Validation("bad dimension".into())) })
+            })],
+            1,
+        )
+        .expect("non-empty hooks");
+        let shutdown = CancellationToken::new();
+
+        let _ = crate::logging::capture::with_level("http=info", || {
+            run_cycle(registry, &hooks, shutdown)
+        })
+        .await;
+
+        let recorded = sink.lines();
+        assert!(
+            recorded.iter().any(|line| {
+                line.contains("op=http.job.failed")
+                    && line.contains(r#"error="validation error: bad dimension""#)
+                    && line.contains("WARN")
+            }),
+            "a failed job must be logged at the level its error asks for: {recorded:?}"
         );
     }
 

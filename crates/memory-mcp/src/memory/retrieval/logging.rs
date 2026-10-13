@@ -219,7 +219,7 @@ pub(crate) async fn maybe_record_query_log(
                             None,
                             None,
                         ),
-                        LogLevel::Warn,
+                        err.log_level(),
                     );
                 }
             }
@@ -238,7 +238,7 @@ pub(crate) async fn maybe_record_query_log(
                     None,
                     None,
                 ),
-                LogLevel::Warn,
+                err.log_level(),
             );
         }
     }

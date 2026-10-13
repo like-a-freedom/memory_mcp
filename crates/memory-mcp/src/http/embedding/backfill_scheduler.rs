@@ -314,10 +314,12 @@ fn declined_reason(gate: crate::http::runtime::storage::IndexWriteGate) -> Optio
 
 /// A tenant the tick deliberately did not touch, with the reason it gave.
 ///
-/// `Info`, not `Warn`, and never counted as degraded: this is the job working
-/// correctly. A decline that were reported as a failure would page an operator
-/// for every tenant an operator has not reembedded yet — which is every tenant
-/// in the fleet after a provider change.
+/// `Debug`, not `Warn`, and never counted as degraded: this is the job working
+/// correctly, and the scheduler repeats it every minute for every tenant an
+/// operator has not reembedded yet — which is every tenant in the fleet after
+/// a provider change. A decline reported as a failure would page an operator
+/// for each of them; a decline reported at `info` would write that line on
+/// every tick. An operator who wants the reason runs `RUST_LOG=debug`.
 fn log_declined(tenant: &Tenant, dimension: usize, reason: &'static str) {
     let mut event = std::collections::HashMap::new();
     event.insert(
@@ -331,7 +333,7 @@ fn log_declined(tenant: &Tenant, dimension: usize, reason: &'static str) {
     );
     event.insert("dimension".to_string(), serde_json::json!(dimension));
     event.insert("reason".to_string(), serde_json::json!(reason));
-    crate::logging::emit(event, crate::logging::LogLevel::Info);
+    crate::logging::emit(event, crate::logging::LogLevel::Debug);
 }
 
 #[cfg(test)]
@@ -707,6 +709,50 @@ mod tests {
         assert_eq!(
             declined_reason(IndexWriteGate::Unreadable),
             Some("index_state_unknown")
+        );
+    }
+
+    /// A tenant the tick deliberately skipped is a diagnostic, not a
+    /// failure: the scheduler repeats it every minute for every tenant an
+    /// operator has not reembedded yet, and reporting it above `debug` would
+    /// either page for work going correctly or be filtered out entirely for
+    /// being noise.
+    ///
+    /// The rendered line is asserted, because the level is what `RUST_LOG`
+    /// filters on.
+    #[tokio::test]
+    async fn a_declined_tenant_is_logged_at_debug() {
+        use crate::http::registry::models::{NamespaceBinding, TenantStatus};
+
+        let sink = crate::logging::capture::install();
+        let tenant = Tenant {
+            id: "ten_declined".to_string(),
+            status: TenantStatus::Ready,
+            namespace_binding: NamespaceBinding {
+                namespace: "ns_declined".to_string(),
+                database: "memory".into(),
+            },
+            plan_version: 1,
+            schema_version: 0,
+            retry_stage: None,
+            provisioning_lease: None,
+            created_at: chrono::Utc::now(),
+            version: 0,
+        };
+
+        crate::logging::capture::with_level("http=debug", || async {
+            log_declined(&tenant, 1536, "stored_vectors_at_other_dimension");
+        })
+        .await;
+
+        let recorded = sink.lines();
+        assert!(
+            recorded.iter().any(|line| {
+                line.contains("op=http.embedding.backfill_declined")
+                    && line.contains("DEBUG")
+                    && line.contains("stored_vectors_at_other_dimension")
+            }),
+            "a declined tenant must be reported at debug: {recorded:?}"
         );
     }
 }

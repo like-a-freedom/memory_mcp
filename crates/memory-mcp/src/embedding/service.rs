@@ -319,7 +319,7 @@ impl EmbeddingService {
                 ("input_bytes".to_string(), json!(input.len())),
                 ("retained_bytes".to_string(), json!(retained_bytes)),
             ]),
-            LogLevel::Info,
+            LogLevel::Debug,
         );
 
         let service = self.clone();
@@ -413,7 +413,7 @@ impl EmbeddingService {
                 ("input_bytes".to_string(), json!(input.len())),
                 ("retained_bytes".to_string(), json!(retained_bytes)),
             ]),
-            LogLevel::Info,
+            LogLevel::Debug,
         );
 
         let service = self.clone();
@@ -464,7 +464,7 @@ impl EmbeddingService {
                     ("fact_id".to_string(), json!(fact_id)),
                     ("error".to_string(), json!(err.to_string())),
                 ]),
-                LogLevel::Warn,
+                err.log_level(),
             );
         }
     }
@@ -487,7 +487,7 @@ impl EmbeddingService {
                             ("fact_id".to_string(), json!(fact_id)),
                             ("attempt".to_string(), json!(attempt)),
                         ]),
-                        LogLevel::Info,
+                        LogLevel::Debug,
                     );
                     return Ok(());
                 }
@@ -533,7 +533,7 @@ impl EmbeddingService {
                     ("input_bytes".to_string(), json!(input.len())),
                     ("error".to_string(), json!(err.to_string())),
                 ]),
-                LogLevel::Warn,
+                err.log_level(),
             );
         }
     }
@@ -562,7 +562,7 @@ impl EmbeddingService {
                             ("input_chars".to_string(), json!(input.chars().count())),
                             ("attempt".to_string(), json!(attempt)),
                         ]),
-                        LogLevel::Info,
+                        LogLevel::Debug,
                     );
                     return Ok(());
                 }
@@ -760,7 +760,7 @@ async fn generate_with_provider(
                     None,
                     Some(crate::platform::log_event::duration_ms(timer.elapsed())),
                 ),
-                LogLevel::Info,
+                LogLevel::Debug,
             );
             Ok(Some(embedding))
         }
@@ -778,7 +778,7 @@ async fn generate_with_provider(
                     None,
                     Some(crate::platform::log_event::duration_ms(timer.elapsed())),
                 ),
-                LogLevel::Warn,
+                err.log_level(),
             );
             Err(err)
         }
@@ -1450,6 +1450,84 @@ mod tests {
             .unwrap_or_else(|| panic!("the skip must be logged: {lines:?}"));
         assert!(line.contains("duration_ms="), "top-level duration: {line}");
         assert!(!line.contains("args.duration_ms"), "never nested: {line}");
+    }
+
+    /// A completed embed is a diagnostic, not a business event: a
+    /// deployment that logged every one of them at the default level would
+    /// bury the lines an operator is actually reading.
+    ///
+    /// The rendered line is asserted, because that is what `RUST_LOG`
+    /// filters on — the event map is the same at every level, so asserting
+    /// it would not catch the line drifting back.
+    #[tokio::test]
+    async fn a_completed_generation_is_logged_at_debug() {
+        let guard = crate::logging::capture::install();
+        let provider: Arc<dyn EmbeddingProvider> = Arc::new(ScriptedProvider::new(4));
+        let logger = StdoutLogger::new("debug");
+
+        generate_with_provider(&provider, &logger, "hello", EmbeddingPurpose::Document)
+            .await
+            .expect("a scripted provider succeeds")
+            .expect("a scripted provider returns a vector");
+
+        let lines = guard.lines();
+        assert!(
+            lines
+                .iter()
+                .any(|line| line.contains("op=embedding.generate.done") && line.contains("DEBUG")),
+            "a completed generation must render at debug: {lines:?}"
+        );
+    }
+
+    /// A failed generation is classified by the error it carries, not by
+    /// where it happened. This line used to be a hardcoded warning, which
+    /// reported a storage outage exactly like a rejected input — and a
+    /// storage outage reported as a warning disappears at `RUST_LOG=error`
+    /// precisely when somebody is looking for it.
+    #[tokio::test]
+    async fn a_failed_generation_takes_its_level_from_the_error() {
+        let guard = crate::logging::capture::install();
+        let logger = StdoutLogger::new("debug");
+
+        let mut storage_outage = ScriptedProvider::new(4).fail_permanently();
+        storage_outage.fail_with = MemoryError::Storage("permanent failure".to_string());
+        let storage_outage: Arc<dyn EmbeddingProvider> = Arc::new(storage_outage);
+        let _ = generate_with_provider(
+            &storage_outage,
+            &logger,
+            "hello",
+            EmbeddingPurpose::Document,
+        )
+        .await;
+
+        let mut rejected_input = ScriptedProvider::new(4).fail_permanently();
+        rejected_input.fail_with = MemoryError::Validation("bad dimension".to_string());
+        let rejected_input: Arc<dyn EmbeddingProvider> = Arc::new(rejected_input);
+        let _ = generate_with_provider(
+            &rejected_input,
+            &logger,
+            "world",
+            EmbeddingPurpose::Document,
+        )
+        .await;
+
+        let lines = guard.lines();
+        assert!(
+            lines.iter().any(|line| {
+                line.contains("op=embedding.generate.error")
+                    && line.contains("ERROR")
+                    && line.contains("permanent failure")
+            }),
+            "a storage failure must stay an error: {lines:?}"
+        );
+        assert!(
+            lines.iter().any(|line| {
+                line.contains("op=embedding.generate.error")
+                    && line.contains("WARN")
+                    && line.contains("bad dimension")
+            }),
+            "a rejected input must not read as a storage outage: {lines:?}"
+        );
     }
 
     /// The two adapters of `EmbeddingGeneration` both carry the input limit,

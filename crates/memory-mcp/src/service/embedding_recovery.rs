@@ -315,7 +315,7 @@ pub(crate) async fn run_backfill(
         log_recovery_event(
             service.logger,
             "embedding.backfill_progress",
-            LogLevel::Info,
+            LogLevel::Debug,
             [
                 ("batch_size", json!(batch_size)),
                 ("processed", json!(processed)),
@@ -576,7 +576,7 @@ pub(crate) async fn run_recovery_worker(
                 let level = if consecutive_failures >= settings.warn_demote_after {
                     LogLevel::Debug
                 } else {
-                    LogLevel::Warn
+                    error.log_level()
                 };
                 log_recovery_probe_failure(&service.logger, consecutive_failures, &error, level);
                 delay = recovery_backoff_with_settings(

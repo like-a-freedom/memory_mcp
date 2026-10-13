@@ -271,7 +271,7 @@ pub(crate) async fn resolve_embedding_preflight(
                 ),
             );
             event.insert("model".to_string(), serde_json::json!(config.model.clone()));
-            startup_logger.log(event, crate::logging::LogLevel::Warn);
+            startup_logger.log(event, err.log_level());
             None
         }
     }

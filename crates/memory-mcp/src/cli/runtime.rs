@@ -142,7 +142,7 @@ pub async fn run_stdio_server(logger: &StdoutLogger) -> Result<(), Box<dyn std::
                 "waited_secs" => json!(outcome.waited_secs),
                 "lease_released" => json!(outcome.lease_released),
             ),
-            LogLevel::Debug,
+            LogLevel::Info,
         );
     }
     claim_worker.shutdown().await;

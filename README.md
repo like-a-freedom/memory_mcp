@@ -631,9 +631,8 @@ Important notes:
 
 | Level | Events you'll see |
 |-------|-------------------|
-| `info` | `fs_watch.ready` (startup), `fs_watch.revision` (per-revision outcome: relative path + short revision prefix only) |
+| `info` | `fs_watch.ready` (startup), `fs_watch.revision` (per-revision outcome: relative path + short revision prefix only), `fs_watch.shutdown` outcome on clean exit |
 | `warn` | `fs_watch.degraded` (watcher backend exhausted after bounded backoff) |
-| `debug` | `fs_watch.shutdown` outcome on clean exit |
 
 Revision events contain relative paths and short revision prefixes only; file
 contents and absolute inbox roots never appear in logs except startup
@@ -1425,8 +1424,10 @@ dimension, through the same function the activation path uses:
   entirely, before any provider call. Those vectors belong to another provider
   and only a reembed may rewrite them; attempting it would pay the provider for
   a write the database then rejects, on every tick, forever. The skip logs
-  `http.embedding.backfill_declined` at `Info` and does not count as degraded,
-  because it is the job behaving correctly.
+  `http.embedding.backfill_declined` at `Debug` and does not count as degraded:
+  the job is behaving correctly, and the line would otherwise repeat for every
+  affected tenant on every pass. An operator who wants the reason runs
+  `RUST_LOG=debug`.
 
 When the job is disabled it logs `http.embedding.backfill_disabled` at `Debug`
 and does nothing, so a deployment that enabled embeddings but left recovery off
@@ -2024,18 +2025,20 @@ This switch only controls database-backed query analytics. Regular runtime logs 
 `memory_mcp` emits structured logs at the standard levels:
 
 - `info`: lifecycle milestones and successful high-level operations such as `ingest`, `extract`, `assemble_context`, filesystem-ingestion readiness and per-revision outcomes, and community rebuild passes
-- `debug`: feature-path decisions such as document ingest transport detection (`file`/`directory`/`url`/`inline`), view-mode selection, graph insight assembly, hub/community map building, and successful `query_log` writes when enabled
+- `debug`: feature-path decisions such as document ingest transport detection (`file`/`directory`/`url`/`inline`), view-mode selection, graph insight assembly, hub/community map building, and successful `query_log` writes when enabled; also cache hits, per-stage success timings (`embedding.generate.done`, `ner.extract.done`), background embedding enqueue/success, per-batch backfill progress, no-work artifact-refresh outcomes, and the one-shot startup memory and glibc tunable markers
 - `trace`: fine-grained diagnostics such as cache misses and sets, `query_log` skips when disabled, retrieval-tier summaries, appended `experience` facts, and Active-Namespace community rebuild details
-- `warn`: recoverable issues such as unknown `view_mode` fallback, access-heat tracking failures, query analytics write failures, degraded worker passes, and `fs_watch.degraded`
-- `error`: terminal failures such as process-level startup/serve failures
+- `warn`: recoverable issues such as unknown `view_mode` fallback, `fs_watch.degraded`, and failures still being retried; a site holding a `MemoryError` logs the class the error maps to, so a client refusal (validation, not-found, auth, quota) logs `warn` while a storage or transient failure at the same site logs `error` — background worker passes and lifecycle jobs follow that rule too
+- `error`: terminal failures such as process-level startup/serve failures, failed background jobs and fact rewrites, and any failure whose error class maps to `error`
 
-The HTTP profile also emits `op=http.startup_memory` at `config_resolved`,
-`deployment_policy_resolved`, `store_connected`, `state_assembled`,
-`upkeep_started`, and `router_built`. Each event records `rss_bytes`,
-`swap_bytes`, `hwm_bytes`, and `heap_bytes`; unavailable platform values are
-JSON `null`. One `op=http.glibc_tunables` event records the process's allocator
-environment values and a `mallinfo2` summary where glibc is available. These
-are startup diagnostics, not a replacement for controlled RSS measurements; see
+The HTTP profile emits `op=http.startup_memory` at `debug` level, at the six
+phase boundaries `config_resolved`, `deployment_policy_resolved`,
+`store_connected`, `state_assembled`, `upkeep_started`, and `router_built`.
+Each event records `rss_bytes`, `swap_bytes`, `hwm_bytes`, and `heap_bytes`;
+unavailable platform values are JSON `null`. One `op=http.glibc_tunables`
+event, also at `debug`, records the process's allocator environment values and
+a `mallinfo2` summary where glibc is available. Both are startup diagnostics
+below the default level, so reading them takes `RUST_LOG=debug`; they are not a
+replacement for controlled RSS measurements; see
 [the logging runbook](docs/operations/LOGGING.md).
 
 Recommended presets:
