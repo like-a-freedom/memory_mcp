@@ -11,6 +11,15 @@ use memory_mcp::storage::{DbClient, SurrealDbClient};
 use serde_json::json;
 
 pub mod http_server;
+#[cfg(all(
+    feature = "streamable-http",
+    feature = "mcp-apps",
+    feature = "eval-support",
+    feature = "test-fixtures"
+))]
+#[allow(dead_code)]
+// Shared artifact validator support is used only by its dedicated integration target.
+pub mod http_storage_memory;
 
 static TEST_DB_COUNTER: AtomicUsize = AtomicUsize::new(1);
 

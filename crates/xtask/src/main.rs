@@ -59,6 +59,10 @@ enum Command {
         /// Linux process ID to sample.
         #[arg(long)]
         pid: u32,
+        /// Finish successfully after the target exits, provided a matching
+        /// application sample was captured and a final cgroup snapshot flushed.
+        #[arg(long)]
+        allow_process_exit: bool,
         /// Sampling duration, from 1 to 86400 seconds.
         #[arg(long)]
         duration_secs: u64,
@@ -68,6 +72,12 @@ enum Command {
         /// Output JSON-lines file. Existing files are replaced.
         #[arg(long)]
         output: PathBuf,
+        /// Optional marker written after the first sample has been flushed.
+        #[arg(long)]
+        ready_file: Option<PathBuf>,
+        /// Require at least one sample from this executable basename.
+        #[arg(long)]
+        target_binary_name: Option<String>,
     },
     /// Regenerate the dashboards and check the rules, alerts and panels
     /// against the metrics the crate actually exports.
@@ -85,10 +95,22 @@ fn main() -> std::process::ExitCode {
         Command::CheckToolchainPin => toolchain::check(),
         Command::SampleMemory {
             pid,
+            allow_process_exit,
             duration_secs,
             interval_ms,
             output,
-        } => memory::run(pid, duration_secs, interval_ms, &output).map_err(pack::PackError::Smoke),
+            ready_file,
+            target_binary_name,
+        } => memory::run(
+            pid,
+            duration_secs,
+            interval_ms,
+            &output,
+            allow_process_exit,
+            ready_file.as_deref(),
+            target_binary_name.as_deref(),
+        )
+        .map_err(pack::PackError::Smoke),
         Command::CheckObservability => observability::run(&observability::scripts_dir()),
     };
     match result {

@@ -23,6 +23,11 @@ pub(crate) const NONSEMANTIC_FACT_PROJECTION: &str = "fact_id, fact_type, conten
      t_invalid, t_invalid_ingested, confidence, index_keys, access_count, last_accessed, \
      entity_links, scope, policy_tags, provenance";
 
+/// Selects every fact row needed by nonsemantic retrieval without returning its vector payload.
+pub fn build_scan_nonsemantic_facts_query() -> String {
+    format!("SELECT id, {NONSEMANTIC_FACT_PROJECTION} FROM fact")
+}
+
 /// The temporal columns a fact carries, and an edge's, which are the same.
 pub const FACT_TEMPORAL_FIELDS: &[&str] = &[
     "t_valid",
@@ -162,7 +167,7 @@ pub fn build_select_facts_ann_query(
     // HNSW ef_search defaults to 4 * K for better recall
     let ef_search = (ann_limit * 4).max(16);
     let sql = format!(
-        "SELECT *, vector::similarity::cosine(embedding, $query_vec) AS sem_score \
+        "SELECT id, {NONSEMANTIC_FACT_PROJECTION}, vector::similarity::cosine(embedding, $query_vec) AS sem_score \
          FROM fact \
          WHERE embedding IS NOT NONE \
            AND embedding IS NOT NULL \
@@ -184,7 +189,20 @@ pub fn build_select_facts_ann_query(
 pub fn build_select_active_facts_query(cutoff: &str, limit: i32) -> (String, Value) {
     let visibility = build_fact_visibility_clause("$cutoff");
     (
-        format!("SELECT * FROM fact WHERE {visibility} ORDER BY t_valid ASC LIMIT $limit"),
+        format!(
+            "SELECT {NONSEMANTIC_FACT_PROJECTION} FROM fact WHERE {visibility} ORDER BY t_valid ASC LIMIT $limit"
+        ),
+        json!({"cutoff": cutoff, "limit": limit}),
+    )
+}
+
+/// Selects the fields consumed by the confidence-decay lifecycle pass.
+pub fn build_select_decay_facts_query(cutoff: &str, limit: i32) -> (String, Value) {
+    let visibility = build_fact_visibility_clause("$cutoff");
+    (
+        format!(
+            "SELECT fact_id, t_valid, t_invalid, confidence, access_count, last_accessed FROM fact WHERE {visibility} ORDER BY t_valid ASC LIMIT $limit"
+        ),
         json!({"cutoff": cutoff, "limit": limit}),
     )
 }
@@ -574,10 +592,52 @@ mod tests {
     fn build_select_active_facts_query_uses_full_bitemporal_visibility() {
         let (sql, vars) = build_select_active_facts_query("2026-05-13T00:00:00Z", 5);
 
+        assert!(sql.starts_with(&format!("SELECT {NONSEMANTIC_FACT_PROJECTION} FROM fact ")));
+        assert!(!sql.starts_with("SELECT * FROM fact"));
         assert!(sql.contains("t_valid <= type::datetime($cutoff)"));
         assert!(sql.contains("t_ingested IS NONE OR t_ingested <= type::datetime($cutoff)"));
-        assert!(sql.contains("t_invalid_ingested > type::datetime($cutoff)"));
+        assert!(sql.contains(
+            "(t_invalid IS NONE OR t_invalid > type::datetime($cutoff) OR t_invalid_ingested > type::datetime($cutoff))"
+        ));
+        assert!(sql.ends_with("ORDER BY t_valid ASC LIMIT $limit"), "{sql}");
         assert_eq!(vars["cutoff"], "2026-05-13T00:00:00Z");
         assert_eq!(vars["limit"], 5);
+    }
+
+    #[test]
+    fn scan_nonsemantic_facts_query_projects_without_narrowing_the_row_set() {
+        let sql = build_scan_nonsemantic_facts_query().to_ascii_lowercase();
+
+        assert!(sql.starts_with("select id, fact_id, fact_type, content, quote, source_episode"));
+        assert!(sql.contains("t_invalid"));
+        assert!(sql.contains("policy_tags"));
+        assert!(!sql.contains("embedding"));
+        assert!(!sql.contains(" where "));
+        assert!(!sql.contains(" limit "));
+    }
+
+    #[test]
+    fn decay_candidate_query_preserves_active_visibility_order_and_bindings() {
+        let cutoff = "2026-05-13T00:00:00Z";
+        let (sql, vars) = build_select_decay_facts_query(cutoff, 37);
+        let (active_sql, active_vars) = build_select_active_facts_query(cutoff, 37);
+
+        let projection = sql
+            .strip_prefix("SELECT ")
+            .and_then(|query| query.split_once(" FROM fact"))
+            .map(|(projection, _)| projection);
+        assert_eq!(
+            projection,
+            Some("fact_id, t_valid, t_invalid, confidence, access_count, last_accessed")
+        );
+        assert_eq!(
+            sql.split_once(" FROM fact").map(|(_, remainder)| remainder),
+            active_sql
+                .split_once(" FROM fact")
+                .map(|(_, remainder)| remainder)
+        );
+        assert_eq!(vars, active_vars);
+        assert_eq!(vars["cutoff"], cutoff);
+        assert_eq!(vars["limit"], 37);
     }
 }

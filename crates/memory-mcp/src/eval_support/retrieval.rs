@@ -120,6 +120,27 @@ pub async fn new_eval_retrieval_service(
     .with_claim_rollout_stage(&config.claim_stage)
 }
 
+/// Builds the eval service with a complete embedding identity so tests can
+/// exercise the public re-embed use case against a real database.
+pub async fn new_eval_reembed_service(
+    db_client: Arc<dyn DbClient>,
+    active_namespace: String,
+    config: EvalRetrievalConfig,
+    signature: String,
+    model: Option<String>,
+) -> Result<MemoryService, MemoryError> {
+    let provider = config.embedding_provider.clone();
+    let dimension = provider.dimension();
+    let service = new_eval_retrieval_service(db_client, active_namespace, config).await?;
+    service.replace_embedding_runtime_state(crate::embedding::runtime::EmbeddingRuntimeState::new(
+        provider,
+        Some(signature),
+        model,
+        Some(dimension),
+    ));
+    Ok(service)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

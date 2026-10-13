@@ -127,7 +127,7 @@ fn indefinite_article(table: &str) -> &'static str {
 }
 
 pub fn surreal_to_json(value: SurrealValue) -> Value {
-    serde_json::to_value(value).unwrap_or(Value::Null)
+    super::json_conversion::surreal_to_json(value)
 }
 
 /// Reconstructs a `table:key` record-id string from a serialized SurrealDB
@@ -141,46 +141,6 @@ pub fn record_id_from_json_value(value: &Value) -> Option<String> {
     let table = record_id.get("table").and_then(|v| v.as_str())?;
     let key = record_id.get("key").and_then(|v| v.as_str())?;
     Some(format!("{table}:{key}"))
-}
-
-pub fn extract_first_record(value: Value) -> Option<Value> {
-    extract_records(value).into_iter().next()
-}
-
-pub fn extract_records(value: Value) -> Vec<Value> {
-    match value {
-        Value::Array(arr) => arr.into_iter().map(unwrap_object_wrapper).collect(),
-        Value::Object(mut map) => {
-            if let Some(array) = map.remove("Array") {
-                return array
-                    .as_array()
-                    .cloned()
-                    .unwrap_or_default()
-                    .into_iter()
-                    .map(unwrap_object_wrapper)
-                    .collect();
-            }
-            if let Some(object) = map.remove("Object") {
-                return vec![normalize_surreal_json(&object)];
-            }
-            vec![normalize_surreal_json(&Value::Object(map))]
-        }
-        Value::Null => Vec::new(),
-        other => vec![normalize_surreal_json(&other)],
-    }
-}
-
-fn unwrap_object_wrapper(value: Value) -> Value {
-    match value {
-        Value::Object(mut map) => {
-            if let Some(object) = map.remove("Object") {
-                normalize_surreal_json(&object)
-            } else {
-                normalize_surreal_json(&Value::Object(map))
-            }
-        }
-        other => normalize_surreal_json(&other),
-    }
 }
 
 /// Unwrap SurrealDB's tagged JSON representation into plain values.

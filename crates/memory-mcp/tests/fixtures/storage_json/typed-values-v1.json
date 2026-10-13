@@ -1,0 +1,87 @@
+[
+  {
+    "bytes": {
+      "Bytes": [0, 127, 255]
+    },
+    "duration": {
+      "Duration": {
+        "nanos": 0,
+        "secs": 5400
+      }
+    },
+    "file": {
+      "File": {
+        "bucket": "fixture",
+        "key": "/sample.txt"
+      }
+    },
+    "point": {
+      "Geometry": {
+        "Point": {
+          "x": 1.25,
+          "y": -2.5
+        }
+      }
+    },
+    "range": {
+      "Range": {
+        "end": {
+          "Excluded": 3
+        },
+        "start": {
+          "Included": 1
+        }
+      }
+    },
+    "record_ids": [
+      {
+        "RecordId": {
+          "key": "trip-a",
+          "table": "fact"
+        }
+      },
+      {
+        "RecordId": {
+          "key": "key with space",
+          "table": "fact"
+        }
+      },
+      {
+        "RecordId": {
+          "key": "ключ",
+          "table": "fact"
+        }
+      },
+      {
+        "RecordId": {
+          "key": "a:b",
+          "table": "fact"
+        }
+      },
+      {
+        "RecordId": {
+          "key": 7,
+          "table": "fact"
+        }
+      },
+      {
+        "RecordId": {
+          "key": [1, "a"],
+          "table": "fact"
+        }
+      }
+    ],
+    "regex": {
+      "Regex": "a.*b"
+    },
+    "set": {
+      "Set": ["alpha", "beta"]
+    },
+    "table": {
+      "Table": "entity"
+    },
+    "uuid": {
+      "Uuid": "00000000-0000-4000-8000-000000000001"
+    }
+  }
+]

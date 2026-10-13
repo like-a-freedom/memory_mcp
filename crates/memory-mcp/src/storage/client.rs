@@ -22,9 +22,9 @@ use crate::error::MemoryError;
 use crate::logging::{LogLevel, StdoutLogger};
 
 use super::helpers::{
-    ensure_dir_exists, extract_first_record, extract_records, find_version_in_json,
-    is_missing_table_error, normalize_url, surreal_to_json,
+    ensure_dir_exists, find_version_in_json, is_missing_table_error, normalize_url, surreal_to_json,
 };
+use super::json_conversion::surreal_records_to_json;
 use super::queries::{build_create_query, build_select_one_query, build_update_query};
 
 /// Low-level database operations used by startup, migrations, and test fixtures.
@@ -173,7 +173,8 @@ impl BoundDbClient {
         vars: Option<Value>,
     ) -> Result<Vec<Value>, MemoryError> {
         match self.db.query(sql, vars, &self.namespace).await {
-            Ok(value) => Ok(value.as_array().cloned().unwrap_or_default()),
+            Ok(Value::Array(rows)) => Ok(rows),
+            Ok(_) => Ok(Vec::new()),
             Err(MemoryError::Storage(message)) if is_missing_table_error(&message) => Ok(vec![]),
             Err(err) => Err(err),
         }
@@ -940,8 +941,7 @@ impl DbClient for SurrealDbClient {
             Err(err) => return Err(err),
         };
 
-        let normalized = surreal_to_json(surreal_val);
-        let result = extract_first_record(normalized);
+        let result = surreal_records_to_json(surreal_val).into_iter().next();
 
         self.log_op(
             "db.select_one.result",
@@ -977,8 +977,7 @@ impl DbClient for SurrealDbClient {
             }
             Err(err) => return Err(err),
         };
-        let normalized = surreal_to_json(surreal_val);
-        let results = extract_records(normalized);
+        let results = surreal_records_to_json(surreal_val);
 
         self.log_op(
             "db.select_table.result",
@@ -1009,8 +1008,10 @@ impl DbClient for SurrealDbClient {
 
         let (sql, vars) = build_create_query(record_id, content, temporal_fields);
         let surreal_val = self.execute_query(&sql, Some(vars), namespace).await?;
-        let normalized = surreal_to_json(surreal_val);
-        let result = extract_first_record(normalized).unwrap_or(Value::Null);
+        let result = surreal_records_to_json(surreal_val)
+            .into_iter()
+            .next()
+            .unwrap_or(Value::Null);
 
         self.log_op(
             "db.create.result",
@@ -1037,8 +1038,10 @@ impl DbClient for SurrealDbClient {
 
         let (sql, vars) = build_update_query(record_id, content, temporal_fields)?;
         let surreal_val = self.execute_query(&sql, Some(vars), namespace).await?;
-        let normalized = surreal_to_json(surreal_val);
-        let result = extract_first_record(normalized).unwrap_or(Value::Null);
+        let result = surreal_records_to_json(surreal_val)
+            .into_iter()
+            .next()
+            .unwrap_or(Value::Null);
 
         self.log_op(
             "db.update.result",
@@ -1070,8 +1073,7 @@ impl DbClient for SurrealDbClient {
         }
 
         let surreal_val = self.execute_query(sql, vars, namespace).await?;
-        let normalized = surreal_to_json(surreal_val);
-        let results = extract_records(normalized);
+        let results = surreal_records_to_json(surreal_val);
 
         self.log_op(
             "db.query.result",
@@ -1346,6 +1348,19 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn query_rows_returns_empty_for_a_non_array_success_value() {
+        let bound = scripted_bound_client(QueryBehavior::Rows(serde_json::json!("not rows")));
+
+        let result = bound.query_rows("SELECT * FROM fact", None).await;
+
+        assert!(
+            result
+                .expect("successful non-array results degrade to empty")
+                .is_empty()
+        );
+    }
+
+    #[tokio::test]
     async fn query_rows_returns_empty_when_table_missing() {
         let bound = scripted_bound_client(QueryBehavior::MissingTable);
 
@@ -1416,7 +1431,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn query_rejects_error_in_later_statement() {
+    async fn query_propagates_error_in_second_statement() {
         let client = SurrealDbClient::connect_in_memory("test_db", "test", "warn")
             .await
             .expect("in-memory db");
@@ -1476,7 +1491,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn namespace_mismatch_is_rejected_before_query_execution() {
+    async fn namespace_mismatch_does_not_execute_query() {
         let client = SurrealDbClient::connect_in_memory("namespace_binding", "main", "warn")
             .await
             .expect("in-memory db");

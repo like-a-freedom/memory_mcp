@@ -1143,6 +1143,7 @@ mod tests {
     struct SequenceTestEmbeddingProvider {
         dimension: usize,
         fail_on_call: Option<usize>,
+        cancel_on_call: Option<(usize, CancellationToken)>,
         call_count: AtomicUsize,
     }
 
@@ -1151,6 +1152,7 @@ mod tests {
             Self {
                 dimension,
                 fail_on_call: None,
+                cancel_on_call: None,
                 call_count: AtomicUsize::new(0),
             }
         }
@@ -1159,6 +1161,20 @@ mod tests {
             Self {
                 dimension,
                 fail_on_call: Some(fail_on_call),
+                cancel_on_call: None,
+                call_count: AtomicUsize::new(0),
+            }
+        }
+
+        fn cancels_on_call(
+            dimension: usize,
+            cancel_on_call: usize,
+            cancellation: CancellationToken,
+        ) -> Self {
+            Self {
+                dimension,
+                fail_on_call: None,
+                cancel_on_call: Some((cancel_on_call, cancellation)),
                 call_count: AtomicUsize::new(0),
             }
         }
@@ -1184,6 +1200,12 @@ mod tests {
                 return Err(MemoryError::Storage(format!(
                     "synthetic reembed failure on call {call}"
                 )));
+            }
+
+            if let Some((cancel_on_call, cancellation)) = &self.cancel_on_call
+                && *cancel_on_call == call
+            {
+                cancellation.cancel();
             }
 
             let mut embedding = vec![0.0; self.dimension];
@@ -2214,6 +2236,107 @@ mod tests {
                 .and_then(|j| j.get("status"))
                 .and_then(|v| v.as_str()),
             Some("interrupted")
+        );
+    }
+
+    #[tokio::test]
+    async fn reembed_cancellation_after_101_successes_resumes_from_durable_cursor() {
+        const FACT_COUNT: usize = 205;
+        const CANCEL_AFTER: usize = 101;
+
+        let db = make_in_memory_db(&["org"]).await;
+        for index in 0..FACT_COUNT {
+            seed_fact_with_embedding(
+                &db,
+                "org",
+                &format!("fact:resume_{index:03}"),
+                &format!("resume fact {index:03}"),
+                vec![1.0; DEFAULT_EMBEDDING_DIMENSION],
+                "embsig:old",
+            )
+            .await;
+        }
+
+        let cancellation = CancellationToken::new();
+        let interrupted = make_reembed_service(
+            db.clone(),
+            "org",
+            Arc::new(SequenceTestEmbeddingProvider::cancels_on_call(
+                DEFAULT_EMBEDDING_DIMENSION,
+                CANCEL_AFTER,
+                cancellation.clone(),
+            )),
+            DEFAULT_EMBEDDING_DIMENSION,
+        );
+        let (first_summary, first_outcome) = interrupted
+            .reembed_all_facts(
+                &ReembedOptions::default(),
+                &NoopProgressReporter,
+                &cancellation,
+            )
+            .await
+            .expect("cancellation returns an interrupted outcome");
+
+        assert_eq!(first_outcome, ReembedOutcome::Interrupted);
+        assert_eq!(first_summary.succeeded_facts, CANCEL_AFTER);
+        let interrupted_job = db
+            .select_one("embedding_job:fact_reembed", "org")
+            .await
+            .expect("read interrupted reembed job")
+            .expect("interrupted job is durable");
+        assert_eq!(interrupted_job.get("status"), Some(&json!("interrupted")));
+        assert_eq!(
+            interrupted_job["namespace_progress"]["org"]["last_completed_fact_id"],
+            "fact:resume_100"
+        );
+        assert_eq!(
+            interrupted_job["namespace_progress"]["org"]["succeeded_facts"],
+            CANCEL_AFTER
+        );
+
+        let resumed = make_reembed_service(
+            db.clone(),
+            "org",
+            Arc::new(SequenceTestEmbeddingProvider::new(
+                DEFAULT_EMBEDDING_DIMENSION,
+            )),
+            DEFAULT_EMBEDDING_DIMENSION,
+        );
+        let (resumed_summary, resumed_outcome) = resumed
+            .reembed_all_facts(
+                &ReembedOptions::default(),
+                &NoopProgressReporter,
+                &CancellationToken::new(),
+            )
+            .await
+            .expect("resume from the persisted cursor completes");
+
+        assert_eq!(resumed_outcome, ReembedOutcome::Completed);
+        assert_eq!(resumed_summary.succeeded_facts, FACT_COUNT - CANCEL_AFTER);
+        assert_eq!(resumed_summary.failed_facts, 0);
+        for index in 0..FACT_COUNT {
+            let fact_id = format!("fact:resume_{index:03}");
+            let fact = db
+                .select_one(&fact_id, "org")
+                .await
+                .expect("read rewritten fact")
+                .expect("rewritten fact remains present");
+            assert_eq!(
+                fact["embedding"].as_array().map(Vec::len),
+                Some(DEFAULT_EMBEDDING_DIMENSION)
+            );
+            assert_eq!(fact["embedding_signature"], "embsig:new");
+        }
+
+        let completed_job = db
+            .select_one("embedding_job:fact_reembed", "org")
+            .await
+            .expect("read completed reembed job")
+            .expect("completed job remains durable");
+        assert_eq!(completed_job.get("status"), Some(&json!("completed")));
+        assert_eq!(
+            completed_job["namespace_progress"]["org"]["last_completed_fact_id"],
+            "fact:resume_204"
         );
     }
 

@@ -92,6 +92,25 @@ jobs:
         run: cargo test -p memory_mcp --no-default-features --test fs_watch_process_disabled --locked
       - name: Optional feature tests
         run: cargo test -p memory_mcp --lib --bins --tests --features fs-watch,mcp-apps,streamable-http,test-fixtures --locked
+      - name: Embedding mode and dimension transition tests
+        # The retrieval/mode contract target is gated by eval-support and is
+        # excluded from the ordinary optional-feature invocation above.
+        run: cargo test -p memory_mcp --test embedding_memory_modes --features streamable-http,test-fixtures,eval-support --locked -- --test-threads=1
+      - name: Storage materialization allocation regressions
+        # These ignored cases deliberately start a pinned remote SurrealDB and
+        # measure the real adapter in an isolated child process. Running the
+        # exact target here makes G2 a native Linux CI gate instead of a local
+        # opt-in benchmark.
+        run: cargo test -p memory_mcp --test storage_materialization_memory --locked -- --ignored --test-threads=1 --nocapture
+      - name: Storage memory evidence validators
+        # These fail-closed artifact checks are gated by eval-support and are
+        # not part of the ordinary feature matrix above. Keep them in PR CI
+        # even when the long native resource matrix is unavailable.
+        run: cargo test -p memory_mcp --test http_storage_memory --features streamable-http,mcp-apps,eval-support,test-fixtures --locked -- --test-threads=1
+      - name: Storage release performance and quality evidence validators
+        # Exercise the pairwise A/A and A/B comparator and immutable native
+        # quality-artifact validator as a visible required gate.
+        run: cargo test -p eval-harness --test storage_release_gates --locked
       - name: Check the HTTP profile and its internal back-compat name
         run: |
           set -euo pipefail
