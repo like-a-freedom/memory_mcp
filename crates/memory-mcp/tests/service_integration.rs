@@ -2234,7 +2234,7 @@ async fn test_service_assemble_context_does_not_track_access_for_synthetic_view_
 }
 
 #[tokio::test]
-async fn test_service_assemble_context_appends_recent_experience_for_browse_like_requests() {
+async fn test_service_experience_read_keeps_source_and_confidence() {
     let (service, _db_client) = common::make_service_with_client().await;
 
     let source_episode = IngestCapability::ingest_from_service(
@@ -2268,13 +2268,14 @@ async fn test_service_assemble_context_appends_recent_experience_for_browse_like
         .await
         .unwrap();
 
+    let recent_experience_t_valid = Utc.with_ymd_and_hms(2026, 4, 10, 10, 0, 0).unwrap();
     let recent_experience_id = service
         .add_fact(
             "experience",
             "Alice prefers weekly launch updates",
             "Alice prefers weekly launch updates",
             &source_episode,
-            Utc.with_ymd_and_hms(2026, 4, 10, 10, 0, 0).unwrap(),
+            recent_experience_t_valid,
             0.8,
             vec![],
             vec![],
@@ -2283,11 +2284,18 @@ async fn test_service_assemble_context_appends_recent_experience_for_browse_like
         .await
         .unwrap();
 
+    let as_of = Utc::now() + chrono::Duration::seconds(1);
+    let age_days = (as_of - recent_experience_t_valid).num_days().max(0) as f64;
+    let expected_confidence = (0.8
+        * 0.5_f64.powf(age_days / memory_mcp::models::Fact::DEFAULT_HALF_LIFE_DAYS)
+        * memory_mcp::models::Fact::CONFIDENCE_SCALE)
+        .round()
+        / memory_mcp::models::Fact::CONFIDENCE_SCALE;
     let items = AssembleContextCapability::assemble_context_from_service(
         &service,
         memory_mcp::models::AssembleContextRequest {
             query: String::new(),
-            as_of: Some(Utc::now() + chrono::Duration::seconds(1)),
+            as_of: Some(as_of),
             budget: 10,
             fact_types: vec![],
             view_mode: None,
@@ -2304,12 +2312,12 @@ async fn test_service_assemble_context_appends_recent_experience_for_browse_like
         items.iter().any(|item| item.fact_id == fact_id),
         "browse-like retrieval should still include active base facts"
     );
-    assert!(
-        items
-            .iter()
-            .any(|item| item.fact_id == recent_experience_id),
-        "browse-like retrieval should append recent experience facts: {items:?}"
-    );
+    let recent_experience = items
+        .iter()
+        .find(|item| item.fact_id == recent_experience_id)
+        .expect("browse-like retrieval should append recent experience facts");
+    assert_eq!(recent_experience.source_episode, source_episode);
+    assert_eq!(recent_experience.confidence, expected_confidence);
 }
 
 #[tokio::test]

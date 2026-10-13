@@ -184,7 +184,9 @@ pub fn build_select_facts_ann_query(
 pub fn build_select_active_facts_query(cutoff: &str, limit: i32) -> (String, Value) {
     let visibility = build_fact_visibility_clause("$cutoff");
     (
-        format!("SELECT * FROM fact WHERE {visibility} ORDER BY t_valid ASC LIMIT $limit"),
+        format!(
+            "SELECT {NONSEMANTIC_FACT_PROJECTION} FROM fact WHERE {visibility} ORDER BY t_valid ASC LIMIT $limit"
+        ),
         json!({"cutoff": cutoff, "limit": limit}),
     )
 }
@@ -585,9 +587,14 @@ mod tests {
     fn build_select_active_facts_query_uses_full_bitemporal_visibility() {
         let (sql, vars) = build_select_active_facts_query("2026-05-13T00:00:00Z", 5);
 
+        assert!(sql.starts_with(&format!("SELECT {NONSEMANTIC_FACT_PROJECTION} FROM fact ")));
+        assert!(!sql.starts_with("SELECT * FROM fact"));
         assert!(sql.contains("t_valid <= type::datetime($cutoff)"));
         assert!(sql.contains("t_ingested IS NONE OR t_ingested <= type::datetime($cutoff)"));
-        assert!(sql.contains("t_invalid_ingested > type::datetime($cutoff)"));
+        assert!(sql.contains(
+            "(t_invalid IS NONE OR t_invalid > type::datetime($cutoff) OR t_invalid_ingested > type::datetime($cutoff))"
+        ));
+        assert!(sql.ends_with("ORDER BY t_valid ASC LIMIT $limit"), "{sql}");
         assert_eq!(vars["cutoff"], "2026-05-13T00:00:00Z");
         assert_eq!(vars["limit"], 5);
     }
