@@ -189,6 +189,17 @@ pub fn build_select_active_facts_query(cutoff: &str, limit: i32) -> (String, Val
     )
 }
 
+/// Selects the fields consumed by the confidence-decay lifecycle pass.
+pub fn build_select_decay_facts_query(cutoff: &str, limit: i32) -> (String, Value) {
+    let visibility = build_fact_visibility_clause("$cutoff");
+    (
+        format!(
+            "SELECT fact_id, t_valid, t_invalid, confidence, access_count, last_accessed FROM fact WHERE {visibility} ORDER BY t_valid ASC LIMIT $limit"
+        ),
+        json!({"cutoff": cutoff, "limit": limit}),
+    )
+}
+
 pub fn build_select_edges_filtered_page_query(
     cutoff: &str,
     limit: usize,
@@ -579,5 +590,30 @@ mod tests {
         assert!(sql.contains("t_invalid_ingested > type::datetime($cutoff)"));
         assert_eq!(vars["cutoff"], "2026-05-13T00:00:00Z");
         assert_eq!(vars["limit"], 5);
+    }
+
+    #[test]
+    fn decay_candidate_query_preserves_active_visibility_order_and_bindings() {
+        let cutoff = "2026-05-13T00:00:00Z";
+        let (sql, vars) = build_select_decay_facts_query(cutoff, 37);
+        let (active_sql, active_vars) = build_select_active_facts_query(cutoff, 37);
+
+        let projection = sql
+            .strip_prefix("SELECT ")
+            .and_then(|query| query.split_once(" FROM fact"))
+            .map(|(projection, _)| projection);
+        assert_eq!(
+            projection,
+            Some("fact_id, t_valid, t_invalid, confidence, access_count, last_accessed")
+        );
+        assert_eq!(
+            sql.split_once(" FROM fact").map(|(_, remainder)| remainder),
+            active_sql
+                .split_once(" FROM fact")
+                .map(|(_, remainder)| remainder)
+        );
+        assert_eq!(vars, active_vars);
+        assert_eq!(vars["cutoff"], cutoff);
+        assert_eq!(vars["limit"], 37);
     }
 }

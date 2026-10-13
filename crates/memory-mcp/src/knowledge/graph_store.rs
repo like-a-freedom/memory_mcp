@@ -155,6 +155,15 @@ impl KnowledgeGraphStore {
         self.db.query_rows(&sql, Some(vars)).await
     }
 
+    /// Selects only the fields needed to evaluate confidence decay.
+    pub async fn select_decay_candidates(&self, limit: i32) -> Result<Vec<Value>, MemoryError> {
+        let (sql, vars) = crate::knowledge::queries::build_select_decay_facts_query(
+            &crate::shared::temporal::normalize_dt(crate::shared::temporal::now()),
+            limit,
+        );
+        self.db.query_rows(&sql, Some(vars)).await
+    }
+
     /// Edge neighbours reachable from `node_id` in `direction`, as of `cutoff`.
     ///
     /// The edge table is knowledge-owned; this method moved to

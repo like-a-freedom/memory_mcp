@@ -7,13 +7,96 @@
 //! Run with: cargo test lifecycle_decay -- --test-threads=1
 
 use chrono::{Duration, Utc};
+#[cfg(feature = "eval-support")]
+use memory_mcp::eval_support::{QueryObserver, SqlObservation};
 use memory_mcp::models::Provenance;
 use memory_mcp::platform::lifecycle_runtime::decay_pass;
 use memory_mcp::service::memory_container_shims::memory_capabilities_invalidate::InvalidateCapability;
 use memory_mcp::storage::DbClient;
 use serde_json::json;
+#[cfg(feature = "eval-support")]
+use std::sync::{Arc, Mutex};
 
 mod common;
+
+#[cfg(feature = "eval-support")]
+#[derive(Default)]
+struct DecayQueryObserver {
+    observations: Mutex<Vec<SqlObservation>>,
+}
+
+#[cfg(feature = "eval-support")]
+impl QueryObserver for DecayQueryObserver {
+    fn observe(&self, observation: &SqlObservation) {
+        if let Ok(mut observations) = self.observations.lock() {
+            observations.push(observation.clone());
+        }
+    }
+}
+
+#[cfg(feature = "eval-support")]
+#[tokio::test]
+async fn decay_reads_only_lifecycle_fields() {
+    let (service, db_client) = common::make_service_with_client().await;
+    let old_date = Utc::now() - Duration::days(400);
+    let fact_id = service
+        .add_fact(
+            "metric",
+            "old metric with a body decay does not need",
+            "old metric with a body decay does not need",
+            "episode:decay_projection_contract",
+            old_date,
+            0.4,
+            vec![],
+            vec![],
+            Provenance::manual(),
+        )
+        .await
+        .expect("fact added");
+    let observer = Arc::new(DecayQueryObserver::default());
+    db_client.set_eval_query_observer(Arc::clone(&observer) as Arc<dyn QueryObserver>);
+
+    let invalidated = decay_pass(&service, 0.3, 100.0)
+        .await
+        .expect("decay pass completed");
+
+    assert_eq!(invalidated, 1);
+    let stored_fact = db_client
+        .select_one(&fact_id, "org")
+        .await
+        .expect("select fact")
+        .expect("stored fact");
+    assert!(stored_fact["t_invalid"].as_str().is_some());
+    assert!(stored_fact["t_invalid_ingested"].as_str().is_some());
+
+    let observations = observer.observations.lock().expect("observer lock").clone();
+    let query = observations
+        .iter()
+        .map(|observation| observation.sql.as_str())
+        .find(|sql| {
+            sql.starts_with("SELECT ")
+                && sql.contains(" FROM fact WHERE ")
+                && sql.contains("ORDER BY t_valid ASC")
+        })
+        .expect("decay candidate SELECT was observed");
+    let projection = query
+        .strip_prefix("SELECT ")
+        .and_then(|query| query.split_once(" FROM fact WHERE "))
+        .map(|(projection, _)| projection)
+        .expect("observed candidate SELECT has a projection");
+    let selected_columns = projection.split(',').map(str::trim).collect::<Vec<_>>();
+    assert_eq!(
+        selected_columns,
+        [
+            "fact_id",
+            "t_valid",
+            "t_invalid",
+            "confidence",
+            "access_count",
+            "last_accessed"
+        ]
+    );
+}
 
 #[tokio::test]
 async fn decay_pass_invalidates_active_fact_with_absent_t_invalid_field() {
@@ -47,6 +130,126 @@ async fn decay_pass_invalidates_active_fact_with_absent_t_invalid_field() {
         .expect("select fact")
         .expect("stored fact");
     assert!(stored.get("t_invalid").is_some());
+}
+
+#[tokio::test]
+async fn decay_projection_keeps_explicit_null_invalid_date_active() {
+    let (service, db_client) = common::make_service_with_client().await;
+    let old_date = Utc::now() - Duration::days(400);
+    let fact_id = service
+        .add_fact(
+            "metric",
+            "old fact with an explicit null invalid date",
+            "old fact with an explicit null invalid date",
+            "episode:decay_explicit_null",
+            old_date,
+            0.4,
+            vec![],
+            vec![],
+            Provenance::manual(),
+        )
+        .await
+        .expect("fact added");
+    db_client
+        .update(
+            &fact_id,
+            json!({"t_invalid": null}),
+            "org",
+            memory_mcp::knowledge::queries::FACT_TEMPORAL_FIELDS,
+        )
+        .await
+        .expect("set explicit null invalid date");
+
+    let invalidated = decay_pass(&service, 0.3, 100.0)
+        .await
+        .expect("decay pass completed");
+
+    assert_eq!(invalidated, 1, "explicit null must remain visible to decay");
+    let stored_fact = db_client
+        .select_one(&fact_id, "org")
+        .await
+        .expect("select fact")
+        .expect("stored fact");
+    assert!(stored_fact["t_invalid"].as_str().is_some());
+    assert!(stored_fact["t_invalid_ingested"].as_str().is_some());
+}
+
+#[tokio::test]
+async fn decay_projection_closes_derived_claims_after_successful_retraction() {
+    let (service, db_client) = common::make_service_with_client().await;
+    let service = common::exposing_claims(service).expect("evidence-stage service");
+    let old_date = Utc::now() - Duration::days(400);
+    let fact_id = service
+        .add_fact(
+            "note",
+            "Temperature is 36.5 celsius",
+            "Temperature is 36.5 celsius",
+            "episode:decay_claim_projection",
+            old_date,
+            0.4,
+            vec![],
+            vec![],
+            Provenance::manual(),
+        )
+        .await
+        .expect("fact and its claims projected");
+    let claim_sql = "SELECT claim_id, source_fact_id, t_invalid_ingested FROM claim \
+                     WHERE source_fact_id = $fact_id ORDER BY claim_id ASC";
+    let before = db_client
+        .query(claim_sql, Some(json!({"fact_id": fact_id})), "org")
+        .await
+        .expect("read derived claims before decay");
+    let claims_before = before.as_array().expect("claim query returns rows");
+    assert!(!claims_before.is_empty(), "fixture must project a claim");
+    let claim_ids_before = claims_before
+        .iter()
+        .map(|claim| {
+            assert!(
+                claim
+                    .get("t_invalid_ingested")
+                    .is_none_or(serde_json::Value::is_null),
+                "claim starts active: {claim}"
+            );
+            claim["claim_id"]
+                .as_str()
+                .expect("claim id is a string")
+                .to_owned()
+        })
+        .collect::<Vec<_>>();
+
+    let invalidated = decay_pass(&service, 0.3, 100.0)
+        .await
+        .expect("decay pass completed");
+
+    assert_eq!(invalidated, 1);
+    let stored_fact = db_client
+        .select_one(&fact_id, "org")
+        .await
+        .expect("select retracted fact")
+        .expect("fact remains stored for audit");
+    assert!(stored_fact["t_invalid"].as_str().is_some());
+    assert!(stored_fact["t_invalid_ingested"].as_str().is_some());
+    assert_eq!(stored_fact["invalidation_reason"], "confidence_decay");
+
+    let after = db_client
+        .query(claim_sql, Some(json!({"fact_id": fact_id})), "org")
+        .await
+        .expect("read derived claims after decay");
+    let claims_after = after.as_array().expect("claim query returns rows");
+    let claim_ids_after = claims_after
+        .iter()
+        .map(|claim| {
+            assert!(
+                claim["t_invalid_ingested"].as_str().is_some(),
+                "derived claim was closed: {claim}"
+            );
+            claim["claim_id"]
+                .as_str()
+                .expect("claim id is a string")
+                .to_owned()
+        })
+        .collect::<Vec<_>>();
+    assert_eq!(claim_ids_after, claim_ids_before);
 }
 
 #[tokio::test]

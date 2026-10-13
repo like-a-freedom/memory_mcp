@@ -109,7 +109,7 @@ pub(crate) async fn run_decay_pass(
 
     let facts = service
         .knowledge_graph_store()
-        .select_active_facts(DECAY_BATCH_LIMIT)
+        .select_decay_candidates(DECAY_BATCH_LIMIT)
         .await?;
 
     for record in facts {
