@@ -207,14 +207,25 @@ fn validate_quality_coverage(
         let Some(after) = candidate.quality_cases.get(case_id) else {
             return invalid(format!("candidate is missing quality case {id}/{case_id}"));
         };
-        let before_relevant: BTreeSet<_> = before.relevant_ids.iter().collect();
+        let relevant: BTreeSet<_> = before.relevant_ids.iter().collect();
         let after_relevant: BTreeSet<_> = after.relevant_ids.iter().collect();
-        if before_relevant != after_relevant {
+        if relevant != after_relevant {
             return invalid(format!("relevant fact coverage differs for {id}/{case_id}"));
         }
-        let retrieved: BTreeSet<_> = after.retrieved_ids.iter().collect();
-        if !before_relevant.is_subset(&retrieved) {
-            return invalid(format!("candidate lost relevant facts for {id}/{case_id}"));
+        let parent_retrieved_relevant: BTreeSet<_> = before
+            .retrieved_ids
+            .iter()
+            .filter(|fact_id| relevant.contains(fact_id))
+            .collect();
+        let candidate_retrieved_relevant: BTreeSet<_> = after
+            .retrieved_ids
+            .iter()
+            .filter(|fact_id| relevant.contains(fact_id))
+            .collect();
+        if !parent_retrieved_relevant.is_subset(&candidate_retrieved_relevant) {
+            return invalid(format!(
+                "candidate lost previously retrieved relevant facts for {id}/{case_id}"
+            ));
         }
         for (name, old, new) in [
             ("recall", before.recall, after.recall),

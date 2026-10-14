@@ -106,6 +106,46 @@ fn remote_evidence_rejects_missing_relevant_fact() {
 }
 
 #[test]
+fn remote_evidence_accepts_unchanged_partial_recall() {
+    let mut parent = evidence();
+    let mut candidate = evidence();
+    for run in [&mut parent, &mut candidate] {
+        let case = run.scenarios[0]
+            .quality_cases
+            .get_mut("case-a")
+            .expect("case-a fixture exists");
+        case.relevant_ids = vec!["fact:a".to_owned(), "fact:b".to_owned()];
+        case.retrieved_ids = vec!["fact:a".to_owned()];
+        case.recall = 0.5;
+        case.precision = 1.0;
+    }
+    candidate.commit = "2".repeat(40);
+
+    assert!(validate_remote_evidence(&parent, &candidate).is_ok());
+}
+
+#[test]
+fn remote_evidence_rejects_replacing_a_relevant_result() {
+    let mut parent = evidence();
+    let mut candidate = evidence();
+    for run in [&mut parent, &mut candidate] {
+        let case = run.scenarios[0]
+            .quality_cases
+            .get_mut("case-a")
+            .expect("case-a fixture exists");
+        case.relevant_ids = vec!["fact:a".to_owned(), "fact:b".to_owned()];
+    }
+    candidate.scenarios[0]
+        .quality_cases
+        .get_mut("case-a")
+        .expect("case-a fixture exists")
+        .retrieved_ids = vec!["fact:b".to_owned()];
+    candidate.commit = "2".repeat(40);
+
+    assert!(validate_remote_evidence(&parent, &candidate).is_err());
+}
+
+#[test]
 fn remote_evidence_accepts_complete_equivalent_pair() {
     let parent = evidence();
     let mut candidate = evidence();
