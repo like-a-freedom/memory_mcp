@@ -474,8 +474,42 @@ mod tests {
     use async_trait::async_trait;
     use chrono::{TimeZone, Utc};
     use serde_json::{Value, json};
-    use std::sync::Arc;
     use std::sync::atomic::{AtomicUsize, Ordering};
+    use std::sync::{Arc, Mutex};
+
+    fn grouped_rows(sql: &str, mut rows_for_index: impl FnMut(usize) -> Vec<Value>) -> Value {
+        let group_count = sql.matches("(SELECT").count();
+        Value::Array(
+            (0..group_count)
+                .map(|index| Value::Array(rows_for_index(index)))
+                .collect(),
+        )
+    }
+
+    fn grouped_fts_rows(sql: &str, mut rows_for_term: impl FnMut(&str) -> Vec<Value>) -> Value {
+        let grouped_sql = sql
+            .strip_prefix("RETURN [")
+            .expect("FTS groups come from a grouped RETURN query");
+        let terms = grouped_sql
+            .split("(SELECT")
+            .skip(1)
+            .map(|subquery| {
+                subquery
+                    .split("@1@ ")
+                    .nth(1)
+                    .and_then(|literal| literal.strip_prefix('"'))
+                    .and_then(|literal| literal.split('"').next())
+                    .expect("FTS subquery has its escaped term literal")
+            })
+            .collect::<Vec<_>>();
+        assert!(!terms.is_empty(), "grouped FTS query contains subqueries");
+        Value::Array(
+            terms
+                .into_iter()
+                .map(|term| Value::Array(rows_for_term(term)))
+                .collect(),
+        )
+    }
 
     #[test]
     fn only_real_fact_ids_are_access_trackable() {
@@ -507,6 +541,62 @@ mod tests {
                 "{other} is not a fact record id and must not be access-tracked"
             );
         }
+    }
+
+    #[tokio::test]
+    async fn failed_middle_access_does_not_drop_duplicate_or_later_writes() {
+        let attempts = Arc::new(AtomicUsize::new(0));
+        let attempted_fact_ids = Arc::new(Mutex::new(Vec::new()));
+        let responder_attempts = Arc::clone(&attempts);
+        let responder_fact_ids = Arc::clone(&attempted_fact_ids);
+        let db = crate::service::mock_db::MockDbClient::new().expect_query_with(
+            |sql| sql.contains("access_count"),
+            move |_sql, vars| {
+                let fact_id = vars
+                    .and_then(|vars| vars.get("fact_id").cloned())
+                    .and_then(|value| value.as_str().map(str::to_owned))
+                    .expect("access update binds a fact id");
+                responder_fact_ids
+                    .lock()
+                    .unwrap_or_else(|poisoned| poisoned.into_inner())
+                    .push(fact_id);
+                let attempt = responder_attempts.fetch_add(1, Ordering::SeqCst);
+                if attempt == 1 {
+                    Err(crate::error::MemoryError::Storage(
+                        "injected middle access failure".to_string(),
+                    ))
+                } else {
+                    Ok(Value::Array(Vec::new()))
+                }
+            },
+        );
+        let service = crate::service::MemoryService::new(
+            Arc::new(db),
+            "org".to_string(),
+            "warn".to_string(),
+            50,
+            100,
+        )
+        .expect("service");
+        let retrieval = crate::memory::retrieval_deps::AssembleContextDeps::from(&service);
+        let items = ["fact:repeat", "fact:middle", "fact:repeat", "fact:later"]
+            .into_iter()
+            .map(|fact_id| AssembledContextItem {
+                fact_id: fact_id.to_string(),
+                ..AssembledContextItem::default()
+            })
+            .collect::<Vec<_>>();
+
+        track_fact_accesses(&retrieval, &items, &crate::models::AccessPayload::default()).await;
+
+        let attempted_fact_ids = attempted_fact_ids
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        assert_eq!(
+            attempted_fact_ids.as_slice(),
+            ["repeat", "middle", "repeat", "later"]
+        );
+        assert_eq!(attempts.load(Ordering::SeqCst), 4);
     }
 
     /// Seeds a `fact` record the way a real ingestion would, so the real
@@ -568,29 +658,31 @@ mod tests {
         let service = crate::service::MemoryService::new(
             Arc::new(
                 crate::service::mock_db::MockDbClient::new().expect_query_with(
-                    // The context store runs the full-text fact retrieval
-                    // through the core `query` op, and dispatches per term, so
-                    // the responder keys on `vars["query"]` — which is exactly
-                    // what the old fake did, in its `query` body.
+                    // The fallback is one ordered group per term. Return the
+                    // same row only for terms the original per-term query
+                    // would match.
                     |sql| sql.contains("search::score"),
-                    |_sql, vars| {
+                    |sql, vars| {
+                        if sql.starts_with("RETURN [") {
+                            return Ok(grouped_fts_rows(sql, |term| match term {
+                                "atlas" | "launch" | "checklist" => vec![json!({
+                                    "fact_id": "fact:fallback",
+                                    "fact_type": "note",
+                                    "content": "Atlas launch is scheduled.",
+                                    "quote": "Atlas launch is scheduled.",
+                                    "source_episode": "episode:1",
+                                    "t_valid": "2026-01-10T10:30:00Z",
+                                    "t_ingested": "2026-01-10T10:30:00Z",
+                                    "scope": "org"
+                                })],
+                                _ => vec![],
+                            }));
+                        }
                         let query = vars
                             .and_then(|vars| vars.get("query").cloned())
                             .and_then(|v| v.as_str().map(str::to_string));
-                        Ok(Value::Array(match query.as_deref() {
-                            Some("atlas launch checklist") => vec![],
-                            Some("atlas") | Some("launch") | Some("checklist") => vec![json!({
-                                "fact_id": "fact:fallback",
-                                "fact_type": "note",
-                                "content": "Atlas launch is scheduled.",
-                                "quote": "Atlas launch is scheduled.",
-                                "source_episode": "episode:1",
-                                "t_valid": "2026-01-10T10:30:00Z",
-                                "t_ingested": "2026-01-10T10:30:00Z",
-                                "scope": "org"
-                            })],
-                            _ => vec![],
-                        }))
+                        assert_eq!(query.as_deref(), Some("atlas launch checklist"));
+                        Ok(Value::Array(Vec::new()))
                     },
                 ),
             ),
@@ -750,6 +842,9 @@ mod tests {
                 vars: Option<Value>,
                 _namespace: &str,
             ) -> Result<Value, MemoryError> {
+                if sql.starts_with("RETURN [") {
+                    return Ok(grouped_rows(sql, |_| Vec::new()));
+                }
                 // The context store now runs the indexed community lookup and the
                 // entity-link fact expansion through the core `query` op; serve
                 // both here so the test can assert the DB-side paths are used.
@@ -920,7 +1015,10 @@ mod tests {
                     )
                     .expect_query_with(
                         |sql| sql.contains("search::score"),
-                        |_sql, vars| {
+                        |sql, vars| {
+                            if sql.starts_with("RETURN [") {
+                                return Ok(grouped_rows(sql, |_| Vec::new()));
+                            }
                             let query = vars
                                 .and_then(|vars| vars.get("query").cloned())
                                 .and_then(|v| v.as_str().map(str::to_string));
@@ -1316,8 +1414,8 @@ mod tests {
     async fn assemble_context_preserves_timeline_order_after_reranking() {
         let db = crate::service::mock_db::MockDbClient::new().expect_query_with(
             |sql| sql.contains("search::score"),
-            |_sql, _vars| {
-                Ok(json!([
+            |sql, _vars| {
+                let rows = json!([
                     {
                         "fact_id": "fact:timeline-early",
                         "fact_type": "note",
@@ -1346,7 +1444,15 @@ mod tests {
                         "provenance": {"source_episode": "episode:timeline-late"},
                         "ft_score": 9.0
                     }
-                ]))
+                ])
+                .as_array()
+                .expect("timeline fact rows")
+                .clone();
+                if sql.starts_with("RETURN [") {
+                    Ok(grouped_rows(sql, |_| rows.clone()))
+                } else {
+                    Ok(Value::Array(rows))
+                }
             },
         );
 
