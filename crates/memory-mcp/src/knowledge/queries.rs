@@ -211,6 +211,33 @@ pub fn build_select_active_facts_by_episode_query(
     )
 }
 
+/// Selects one independently limited active-fact group for each source episode.
+pub fn build_select_active_facts_by_episodes_query(
+    episode_ids: &[String],
+    cutoff: &str,
+    limit: i32,
+) -> (String, Value) {
+    let visibility = crate::shared::temporal::visibility_clause("$cutoff");
+    let mut vars = serde_json::Map::from_iter([
+        ("cutoff".to_string(), json!(cutoff)),
+        ("limit".to_string(), json!(limit)),
+    ]);
+    let groups = episode_ids
+        .iter()
+        .enumerate()
+        .map(|(index, episode_id)| {
+            vars.insert(format!("episode_{index}"), json!(episode_id));
+            format!(
+                "(SELECT {NONSEMANTIC_FACT_PROJECTION} FROM fact WHERE source_episode = $episode_{index} AND {visibility} LIMIT $limit)"
+            )
+        })
+        .collect::<Vec<_>>();
+    (
+        format!("RETURN [{}]", groups.join(", ")),
+        Value::Object(vars),
+    )
+}
+
 pub fn build_has_active_facts_by_episode_query(episode_id: &str, cutoff: &str) -> (String, Value) {
     let visibility = crate::shared::temporal::visibility_clause("$cutoff");
     let sql = format!(

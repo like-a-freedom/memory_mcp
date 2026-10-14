@@ -80,6 +80,46 @@ impl EpisodeContextStore {
         self.db.query_rows(&sql, Some(vars)).await
     }
 
+    /// Selects one independently limited literal-substring result group for
+    /// each lexical fallback term, preserving the order used by retrieval.
+    pub async fn select_episodes_for_terms(
+        &self,
+        cutoff: &str,
+        terms: &[String],
+        limit_per_term: i32,
+    ) -> Result<Vec<Vec<Value>>, MemoryError> {
+        const MAX_TERMS_PER_RPC: usize = 8;
+
+        let mut result_groups = Vec::with_capacity(terms.len());
+        for term_batch in terms.chunks(MAX_TERMS_PER_RPC) {
+            let mut vars = serde_json::Map::from_iter([
+                ("cutoff".to_string(), json!(cutoff)),
+                ("limit".to_string(), json!(limit_per_term)),
+            ]);
+            let mut subqueries = Vec::with_capacity(term_batch.len());
+            for (index, term) in term_batch.iter().enumerate() {
+                let (sql, term_vars) =
+                    crate::memory::queries::build_select_episodes_by_content_query(
+                        cutoff,
+                        Some(term),
+                        limit_per_term,
+                    );
+                if let Some(query) = term_vars.get("query") {
+                    vars.insert(format!("query_{index}"), query.clone());
+                }
+                let sql = sql.replace("$query", &format!("$query_{index}"));
+                subqueries.push(format!("({sql})"));
+            }
+            let sql = format!("RETURN [{}]", subqueries.join(", "));
+            let groups = self
+                .db
+                .query_row_groups(&sql, Some(Value::Object(vars)), term_batch.len())
+                .await?;
+            result_groups.extend(groups);
+        }
+        Ok(result_groups)
+    }
+
     /// Read one source episode and a bounded, ordered neighborhood from its
     /// producer-declared stream. Both reads stay within the same namespace.
     pub async fn select_episode_by_id(&self, episode_id: &str) -> Result<Vec<Value>, MemoryError> {

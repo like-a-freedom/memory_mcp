@@ -1645,6 +1645,54 @@ async fn batch_candidate_context_uses_four_turn_radius_and_keeps_temporal_bounds
 }
 
 #[tokio::test]
+async fn source_siblings_keep_per_episode_remaining_cap() {
+    let tm = common::TestMemory::new(false).await;
+    let mut anchor_ids = Vec::new();
+    for group in ["stream-a", "stream-b"] {
+        for position in 1..=11 {
+            let source_id = format!("{group}:{position}");
+            let episode_id = ingest_tagged_turn_at(
+                &tm.service,
+                &source_id,
+                group,
+                position,
+                &format!("Mira: {group} turn {position}"),
+                vec![],
+                TurnTimes {
+                    reference: "2023-05-21T12:00:00Z",
+                    ingested: Some("2023-05-21T12:00:00Z"),
+                },
+            )
+            .await;
+            if position == 6 {
+                anchor_ids.push(episode_id);
+            }
+        }
+    }
+
+    let episodes = EpisodeContextStore::new(tm.db_client.clone(), "org")
+        .select_source_neighborhoods_for_episodes(&anchor_ids, "2023-05-22T12:00:00Z", None, None)
+        .await
+        .expect("both bounded source neighborhoods should load");
+
+    assert_eq!(episodes.len(), 18);
+    assert_eq!(
+        episodes
+            .iter()
+            .filter(|episode| episode["source_group"].as_str() == Some("stream-a"))
+            .count(),
+        9
+    );
+    assert_eq!(
+        episodes
+            .iter()
+            .filter(|episode| episode["source_group"].as_str() == Some("stream-b"))
+            .count(),
+        9
+    );
+}
+
+#[tokio::test]
 async fn query_related_answer_keeps_an_earlier_same_speaker_fact_in_the_source_window() {
     let tm = common::TestMemory::new(false).await;
     for (position, content) in [

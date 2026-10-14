@@ -16,6 +16,8 @@ use serde_json::{Value, json};
 use crate::error::MemoryError;
 use crate::storage::{BoundDbClient, DbClient, GraphDirection};
 
+const MAX_SOURCE_EPISODES_PER_RPC: usize = 8;
+
 /// Concrete store for knowledge-owned graph reads and mutations.
 ///
 /// Not a trait: a real struct that owns its queries, so the call
@@ -209,6 +211,30 @@ impl KnowledgeGraphStore {
             episode_id, cutoff, limit,
         );
         self.db.query_rows(&sql, Some(vars)).await
+    }
+
+    /// Selects one independently limited active-fact group per episode in bounded RPC batches.
+    pub async fn select_active_facts_by_episodes(
+        &self,
+        episode_ids: &[String],
+        cutoff: &str,
+        limit: i32,
+    ) -> Result<Vec<Vec<Value>>, MemoryError> {
+        let mut result_groups = Vec::with_capacity(episode_ids.len());
+        for episode_batch in episode_ids.chunks(MAX_SOURCE_EPISODES_PER_RPC) {
+            let (sql, vars) =
+                crate::knowledge::queries::build_select_active_facts_by_episodes_query(
+                    episode_batch,
+                    cutoff,
+                    limit,
+                );
+            result_groups.extend(
+                self.db
+                    .query_row_groups(&sql, Some(vars), episode_batch.len())
+                    .await?,
+            );
+        }
+        Ok(result_groups)
     }
 
     /// Whether the episode has any active fact, without reading its payload.
