@@ -205,6 +205,14 @@ pub fn build_select_active_facts_query(cutoff: &str, limit: i32) -> (String, Val
     )
 }
 
+/// Selects the original table-scan prefix used by the map-view hub ranking.
+pub fn build_select_hub_candidates_query(limit: usize) -> (String, Value) {
+    (
+        "SELECT * FROM entity LIMIT $limit".to_string(),
+        json!({ "limit": limit }),
+    )
+}
+
 pub fn build_select_active_facts_by_episode_query(
     episode_id: &str,
     cutoff: &str,
@@ -253,6 +261,20 @@ pub fn build_has_active_facts_by_episode_query(episode_id: &str, cutoff: &str) -
         "SELECT VALUE id FROM fact WHERE source_episode = $episode_id AND {visibility} LIMIT 1"
     );
     (sql, json!({ "episode_id": episode_id, "cutoff": cutoff }))
+}
+
+/// Selects source episodes with at least one fact visible at the temporal cutoff.
+pub fn build_episode_ids_with_active_facts_query(
+    episode_ids: &[String],
+    cutoff: &str,
+) -> (String, Value) {
+    let visibility = crate::shared::temporal::visibility_clause("$cutoff");
+    (
+        format!(
+            "SELECT source_episode FROM fact WHERE source_episode IN $episode_ids AND {visibility} GROUP BY source_episode"
+        ),
+        json!({ "episode_ids": episode_ids, "cutoff": cutoff }),
+    )
 }
 
 /// Selects the fields consumed by the confidence-decay lifecycle pass.
@@ -525,6 +547,35 @@ mod tests {
             surreal_string_literal("quote\" slash\\ newline\n"),
             "\"quote\\\" slash\\\\ newline\\n\""
         );
+    }
+
+    #[test]
+    fn hub_candidate_query_limits_the_existing_unordered_entity_prefix() {
+        let (sql, vars) = build_select_hub_candidates_query(36);
+
+        assert_eq!(sql, "SELECT * FROM entity LIMIT $limit");
+        assert_eq!(vars["limit"], json!(36));
+    }
+
+    #[test]
+    fn archival_active_episode_query_preserves_full_bitemporal_visibility() {
+        let ids = vec!["episode:one".to_string(), "episode:two".to_string()];
+        let cutoff = "2026-06-01T00:00:00Z";
+        let (sql, vars) = build_episode_ids_with_active_facts_query(&ids, cutoff);
+
+        assert!(sql.contains("source_episode IN $episode_ids"), "{sql}");
+        assert!(sql.contains("t_valid <= type::datetime($cutoff)"), "{sql}");
+        assert!(
+            sql.contains("t_ingested <= type::datetime($cutoff)"),
+            "{sql}"
+        );
+        assert!(
+            sql.contains("t_invalid_ingested > type::datetime($cutoff)"),
+            "{sql}"
+        );
+        assert!(sql.contains("GROUP BY source_episode"), "{sql}");
+        assert_eq!(vars["episode_ids"], json!(ids));
+        assert_eq!(vars["cutoff"], cutoff);
     }
 
     #[test]

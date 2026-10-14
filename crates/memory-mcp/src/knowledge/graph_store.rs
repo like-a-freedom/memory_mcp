@@ -9,6 +9,7 @@
 //! split rather than a rewrite.
 
 use crate::storage::table_scope::{KnowledgeTables, ReleaseOwnedTable};
+use std::collections::BTreeSet;
 use std::sync::Arc;
 
 use serde_json::{Value, json};
@@ -17,6 +18,8 @@ use crate::error::MemoryError;
 use crate::storage::{BoundDbClient, DbClient, GraphDirection};
 
 const MAX_SOURCE_EPISODES_PER_RPC: usize = 8;
+const MAX_HUB_NEIGHBOR_ENTITIES_PER_RPC: usize = 32;
+const MAX_ARCHIVAL_EPISODES_PER_RPC: usize = 64;
 
 /// Concrete store for knowledge-owned graph reads and mutations.
 ///
@@ -42,6 +45,15 @@ impl KnowledgeGraphStore {
 
     pub async fn select_entities(&self) -> Result<Vec<Value>, MemoryError> {
         self.db.select_table(KnowledgeTables::table("entity")).await
+    }
+
+    /// Selects the bounded prefix consumed by the map-view hub scan.
+    pub async fn select_hub_candidates(&self, limit: usize) -> Result<Vec<Value>, MemoryError> {
+        if limit == 0 {
+            return Ok(Vec::new());
+        }
+        let (sql, vars) = crate::knowledge::queries::build_select_hub_candidates_query(limit);
+        self.db.query_rows(&sql, Some(vars)).await
     }
 
     pub async fn select_entity(&self, entity_id: &str) -> Result<Option<Value>, MemoryError> {
@@ -197,6 +209,26 @@ impl KnowledgeGraphStore {
         self.db.query_rows(&sql, Some(vars)).await
     }
 
+    /// Reads active edge rows touching batches of hub candidates.
+    ///
+    /// An edge whose endpoints fall in separate batches can appear twice; callers
+    /// deduplicate logical edge identities per endpoint before computing degree.
+    pub async fn select_hub_neighbor_edges(
+        &self,
+        entity_ids: &[String],
+        cutoff: &str,
+    ) -> Result<Vec<Value>, MemoryError> {
+        let mut edges = Vec::new();
+        for batch in entity_ids.chunks(MAX_HUB_NEIGHBOR_ENTITIES_PER_RPC) {
+            let (sql, vars) =
+                crate::knowledge::queries::build_select_edge_neighbors_for_entities_query(
+                    batch, cutoff,
+                );
+            edges.extend(self.db.query_rows(&sql, Some(vars)).await?);
+        }
+        Ok(edges)
+    }
+
     /// Active (not-yet-invalidated) facts linked to an episode.
     ///
     /// The fact table is knowledge-owned; this method moved to
@@ -246,6 +278,31 @@ impl KnowledgeGraphStore {
         let (sql, vars) =
             crate::knowledge::queries::build_has_active_facts_by_episode_query(episode_id, cutoff);
         Ok(self.db.query_first(&sql, Some(vars)).await?.is_some())
+    }
+
+    /// Returns the distinct source episodes with facts visible at `cutoff`.
+    ///
+    /// The archival worker uses this set-valued read to replace one existence
+    /// query per candidate episode while retaining knowledge's bitemporal rule.
+    pub async fn episode_ids_with_active_facts(
+        &self,
+        episode_ids: &[String],
+        cutoff: &str,
+    ) -> Result<Vec<String>, MemoryError> {
+        let mut active_episode_ids = BTreeSet::new();
+        for batch in episode_ids.chunks(MAX_ARCHIVAL_EPISODES_PER_RPC) {
+            let (sql, vars) =
+                crate::knowledge::queries::build_episode_ids_with_active_facts_query(batch, cutoff);
+            for row in self.db.query_rows(&sql, Some(vars)).await? {
+                if let Some(episode_id) = row
+                    .get("source_episode")
+                    .and_then(crate::storage::value_helpers::string_from_value)
+                {
+                    active_episode_ids.insert(episode_id);
+                }
+            }
+        }
+        Ok(active_episode_ids.into_iter().collect())
     }
 
     /// Communities containing any of the listed member entities.
