@@ -30,6 +30,17 @@ async fn seed_entity_with_bound_key(db: &dyn DbClient, entity_id: &str, label: &
     .expect("bound entity fixture should be written");
 }
 
+struct EdgeFixture<'a> {
+    edge_id: &'a str,
+    from_id: &'a str,
+    to_id: &'a str,
+    relation: &'a str,
+    t_valid: DateTime<Utc>,
+    t_ingested: DateTime<Utc>,
+    t_invalid: Option<DateTime<Utc>>,
+    t_invalid_ingested: Option<DateTime<Utc>>,
+}
+
 async fn seed_edge(
     store: &KnowledgeGraphStore,
     edge_id: &str,
@@ -39,40 +50,40 @@ async fn seed_edge(
 ) {
     let now = Utc::now();
     seed_edge_at(
-        store, edge_id, from_id, to_id, relation, now, now, None, None,
+        store,
+        EdgeFixture {
+            edge_id,
+            from_id,
+            to_id,
+            relation,
+            t_valid: now,
+            t_ingested: now,
+            t_invalid: None,
+            t_invalid_ingested: None,
+        },
     )
     .await;
 }
 
-async fn seed_edge_at(
-    store: &KnowledgeGraphStore,
-    edge_id: &str,
-    from_id: &str,
-    to_id: &str,
-    relation: &str,
-    t_valid: DateTime<Utc>,
-    t_ingested: DateTime<Utc>,
-    t_invalid: Option<DateTime<Utc>>,
-    t_invalid_ingested: Option<DateTime<Utc>>,
-) {
+async fn seed_edge_at(store: &KnowledgeGraphStore, fixture: EdgeFixture<'_>) {
     let mut edge = json!({
-        "edge_id": edge_id,
-        "relation": relation,
+        "edge_id": fixture.edge_id,
+        "relation": fixture.relation,
         "origin": "inferred",
         "strength": 1.0,
         "confidence": 1.0,
         "provenance": {"source": "test"},
-        "t_valid": normalize_dt(t_valid),
-        "t_ingested": normalize_dt(t_ingested),
+        "t_valid": normalize_dt(fixture.t_valid),
+        "t_ingested": normalize_dt(fixture.t_ingested),
     });
-    if let Some(t_invalid) = t_invalid {
+    if let Some(t_invalid) = fixture.t_invalid {
         edge["t_invalid"] = json!(normalize_dt(t_invalid));
     }
-    if let Some(t_invalid_ingested) = t_invalid_ingested {
+    if let Some(t_invalid_ingested) = fixture.t_invalid_ingested {
         edge["t_invalid_ingested"] = json!(normalize_dt(t_invalid_ingested));
     }
     store
-        .relate_edge(edge_id, from_id, to_id, edge)
+        .relate_edge(fixture.edge_id, fixture.from_id, fixture.to_id, edge)
         .await
         .expect("edge fixture should be written");
 }
@@ -94,50 +105,58 @@ async fn batch_graph_lookup_preserves_bitemporal_invalidation_boundaries() {
     let at = |day| Utc.with_ymd_and_hms(2026, 10, day, 0, 0, 0).unwrap();
     seed_edge_at(
         &store,
-        "edge:invalidated_later",
-        "entity:history_anchor",
-        "entity:history_neighbor",
-        "invalidated_later",
-        at(1),
-        at(1),
-        Some(at(10)),
-        Some(at(10)),
+        EdgeFixture {
+            edge_id: "edge:invalidated_later",
+            from_id: "entity:history_anchor",
+            to_id: "entity:history_neighbor",
+            relation: "invalidated_later",
+            t_valid: at(1),
+            t_ingested: at(1),
+            t_invalid: Some(at(10)),
+            t_invalid_ingested: Some(at(10)),
+        },
     )
     .await;
     seed_edge_at(
         &store,
-        "edge:invalidation_learned_later",
-        "entity:history_anchor",
-        "entity:history_neighbor",
-        "invalidation_learned_later",
-        at(1),
-        at(1),
-        Some(at(2)),
-        Some(at(8)),
+        EdgeFixture {
+            edge_id: "edge:invalidation_learned_later",
+            from_id: "entity:history_anchor",
+            to_id: "entity:history_neighbor",
+            relation: "invalidation_learned_later",
+            t_valid: at(1),
+            t_ingested: at(1),
+            t_invalid: Some(at(2)),
+            t_invalid_ingested: Some(at(8)),
+        },
     )
     .await;
     seed_edge_at(
         &store,
-        "edge:invalidation_known_at_cutoff",
-        "entity:history_anchor",
-        "entity:history_neighbor",
-        "invalidation_known_at_cutoff",
-        at(1),
-        at(1),
-        Some(at(5)),
-        Some(at(5)),
+        EdgeFixture {
+            edge_id: "edge:invalidation_known_at_cutoff",
+            from_id: "entity:history_anchor",
+            to_id: "entity:history_neighbor",
+            relation: "invalidation_known_at_cutoff",
+            t_valid: at(1),
+            t_ingested: at(1),
+            t_invalid: Some(at(5)),
+            t_invalid_ingested: Some(at(5)),
+        },
     )
     .await;
     seed_edge_at(
         &store,
-        "edge:invalidation_known_before_cutoff",
-        "entity:history_anchor",
-        "entity:history_neighbor",
-        "invalidation_known_before_cutoff",
-        at(1),
-        at(1),
-        Some(at(2)),
-        Some(at(2)),
+        EdgeFixture {
+            edge_id: "edge:invalidation_known_before_cutoff",
+            from_id: "entity:history_anchor",
+            to_id: "entity:history_neighbor",
+            relation: "invalidation_known_before_cutoff",
+            t_valid: at(1),
+            t_ingested: at(1),
+            t_invalid: Some(at(2)),
+            t_invalid_ingested: Some(at(2)),
+        },
     )
     .await;
 
