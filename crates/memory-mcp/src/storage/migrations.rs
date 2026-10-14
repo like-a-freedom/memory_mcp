@@ -196,6 +196,30 @@ pub fn migration_checksum(sql: &str) -> String {
     hex::encode(hasher.finalize())
 }
 
+/// Stable identity for the catalog slice that makes an HTTP tenant safe to
+/// admit. A process-local successful-verification cache keys on this digest so
+/// a runtime eviction does not replay every migration query for the same
+/// binding. Dimension remains part of the caller's cache key and never causes
+/// an embedding-index rebuild here.
+#[cfg(feature = "control-plane")]
+pub(crate) fn ready_schema_catalog_digest() -> String {
+    let mut hasher = Sha256::new();
+    for migration in versioned_migrations().iter().filter(|migration| {
+        matches!(
+            migration.file_name,
+            "053_context_lookup_indexes.surql"
+                | "054_query_index_coverage.surql"
+                | "055_episode_source_context.surql"
+        )
+    }) {
+        hasher.update(migration.file_name.as_bytes());
+        hasher.update(migration.sql.as_bytes());
+    }
+    hasher.update(b"045_tenant_task_kind.surql");
+    hasher.update(include_str!("../../migrations/045_tenant_task_kind.surql").as_bytes());
+    hex::encode(hasher.finalize())
+}
+
 pub fn migration_has_statements(sql: &str) -> bool {
     sql.lines()
         .map(str::trim)
@@ -514,6 +538,22 @@ async fn verify_schema_postconditions(
                 )));
             }
         }
+        for (field, expected_type) in required_context_field_types(table) {
+            let actual = table_info
+                .get("fields")
+                .and_then(Value::as_object)
+                .and_then(|definitions| definitions.get(*field))
+                .ok_or_else(|| {
+                    MemoryError::Storage(format!(
+                        "schema readiness failed in namespace `{namespace}`: missing field definition `{field}` on table `{table}`"
+                    ))
+                })?;
+            if !optional_field_type_matches(actual, expected_type) {
+                return Err(MemoryError::Storage(format!(
+                    "schema readiness failed in namespace `{namespace}`: field `{field}` on table `{table}` has an incompatible definition"
+                )));
+            }
+        }
         let indexes = info_names(table_info.get("indexes"), "indexes")?;
         for index in required_schema_indexes(table) {
             if !indexes.contains(*index) {
@@ -522,9 +562,128 @@ async fn verify_schema_postconditions(
                 )));
             }
         }
+        for (index, expected) in required_context_index_definitions(table) {
+            let actual = table_info
+                .get("indexes")
+                .and_then(Value::as_object)
+                .and_then(|definitions| definitions.get(*index))
+                .ok_or_else(|| {
+                    MemoryError::Storage(format!(
+                        "schema readiness failed in namespace `{namespace}`: missing index definition `{index}` on table `{table}`"
+                    ))
+                })?;
+            if !schema_definition_matches(actual, table, index, expected) {
+                return Err(MemoryError::Storage(format!(
+                    "schema readiness failed in namespace `{namespace}`: index `{index}` on table `{table}` has an incompatible definition"
+                )));
+            }
+        }
     }
 
     Ok(())
+}
+
+/// Verify the HTTP-only readiness postcondition after the base catalog has
+/// been brought current. This remains separate from `run_migrations`: the
+/// stdio profile intentionally has no `tenant_task` table.
+#[cfg(feature = "control-plane")]
+pub(crate) async fn verify_schema_readiness(
+    client: &SurrealDbClient,
+    namespace: &str,
+) -> Result<(), MemoryError> {
+    verify_schema_postconditions(client, namespace).await?;
+    let info = client
+        .query("INFO FOR TABLE tenant_task", None, namespace)
+        .await?;
+    let info = first_info_object(&info, "tenant_task")?;
+    let fields = info
+        .get("fields")
+        .and_then(Value::as_object)
+        .ok_or_else(|| {
+            MemoryError::Storage(format!(
+                "schema readiness failed in namespace `{namespace}`: INFO FOR tenant_task returned no fields map"
+            ))
+        })?;
+    let Some(kind) = fields.get("kind") else {
+        return Err(MemoryError::Storage(format!(
+            "schema readiness failed in namespace `{namespace}`: missing field `kind` on table `tenant_task`"
+        )));
+    };
+    if !optional_field_type_matches(kind, "string") {
+        return Err(MemoryError::Storage(format!(
+            "schema readiness failed in namespace `{namespace}`: field `kind` on table `tenant_task` has an incompatible definition"
+        )));
+    }
+    Ok(())
+}
+
+fn required_context_index_definitions(table: &str) -> &'static [(&'static str, &'static str)] {
+    match table {
+        "episode" => &[
+            ("episode_episode_id", "fields episode_id"),
+            ("episode_t_ref", "fields t_ref"),
+            (
+                "episode_source_context",
+                "fields source_group, source_position",
+            ),
+        ],
+        "fact" => &[
+            ("fact_source_episode", "fields source_episode"),
+            ("fact_t_valid", "fields t_valid"),
+        ],
+        "edge" => &[("edge_t_valid", "fields t_valid")],
+        "entity" => &[("entity_aliases", "fields aliases.*")],
+        "community" => &[("community_members", "fields member_entities.*")],
+        _ => &[],
+    }
+}
+
+fn required_context_field_types(table: &str) -> &'static [(&'static str, &'static str)] {
+    match table {
+        "episode" => &[("source_group", "string"), ("source_position", "int")],
+        _ => &[],
+    }
+}
+
+fn schema_definition_matches(
+    definition: &Value,
+    table: &str,
+    index: &str,
+    expected_selector: &str,
+) -> bool {
+    let actual = compact_schema_text(definition);
+    let table_token = format!("ontable{}", compact_schema_token(table));
+    let short_table_token = format!("on{}", compact_schema_token(table));
+    let index = compact_schema_token(index);
+    let expected_selector = compact_schema_token(expected_selector);
+    let has_table = actual.contains(&table_token) || actual.contains(&short_table_token);
+    has_table && actual.contains(&index) && actual.contains(&expected_selector)
+}
+
+fn schema_text(value: &Value) -> String {
+    value
+        .as_str()
+        .map(str::to_owned)
+        .unwrap_or_else(|| value.to_string())
+        .to_ascii_lowercase()
+}
+
+fn optional_field_type_matches(definition: &Value, inner_type: &str) -> bool {
+    let text = schema_text(definition);
+    text.contains(&format!("option<{inner_type}>"))
+        || compact_schema_token(&text)
+            .contains(&format!("typenone{}", compact_schema_token(inner_type)))
+}
+
+fn compact_schema_text(value: &Value) -> String {
+    compact_schema_token(&schema_text(value))
+}
+
+fn compact_schema_token(value: &str) -> String {
+    value
+        .chars()
+        .filter(|character| character.is_ascii_alphanumeric() || matches!(character, '_' | '.'))
+        .collect()
 }
 
 async fn apply_versioned_migration(
@@ -541,6 +700,7 @@ async fn apply_versioned_migration(
     // lease path as every other migration.
     let owner = migration_owner();
     let deadline = Instant::now() + Duration::from_secs(MIGRATION_WAIT_SECS);
+    let mut replaying = false;
     loop {
         if let Some(existing) = client.select_one(&record_id, namespace).await? {
             validate_applied_migration_compatibility(&existing, migration.file_name, &checksum)?;
@@ -560,6 +720,8 @@ async fn apply_versioned_migration(
                     if !claim_existing_migration(client, &record_id, &owner, namespace).await? {
                         continue;
                     }
+                    replaying = true;
+                    break;
                 }
                 Some(status) => {
                     return Err(MemoryError::Storage(format!(
@@ -598,6 +760,27 @@ async fn apply_versioned_migration(
         Ok(())
     };
     if let Err(error) = execution {
+        if replaying
+            && migration.file_name == "055_episode_source_context.surql"
+            && is_schema_definition_already_present(&error)
+            && verify_schema_postconditions(client, namespace)
+                .await
+                .is_ok()
+        {
+            // Migration 055 is immutable and predates `IF NOT EXISTS` on its
+            // definitions. If a process crashed after SurrealDB committed the
+            // DDL but before the ledger commit, replay can report duplicate
+            // definitions. Only accept that replay when the complete base
+            // schema postcondition proves the exact definitions are present.
+            return mark_migration_applied(
+                client,
+                &record_id,
+                migration.file_name,
+                &checksum,
+                namespace,
+            )
+            .await;
+        }
         if let Err(mark_error) =
             mark_migration_failed(client, &record_id, &error.to_string(), namespace).await
         {
@@ -614,6 +797,13 @@ async fn apply_versioned_migration(
         namespace,
     )
     .await
+}
+
+fn is_schema_definition_already_present(error: &MemoryError) -> bool {
+    let message = error.to_string().to_ascii_lowercase();
+    message.contains("already exists")
+        || message.contains("already defined")
+        || message.contains("duplicate definition")
 }
 
 async fn create_migration_lease(

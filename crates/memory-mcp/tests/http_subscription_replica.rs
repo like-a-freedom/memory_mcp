@@ -264,11 +264,13 @@ async fn subscription_eviction_releases_unrelated_tenant_runtime_dependencies() 
     use http_body_util::BodyExt;
     use memory_mcp::error::MemoryError;
     use memory_mcp::http::config::HttpConfig;
+    use memory_mcp::http::leases::migration::{ApplyMigrations, SurrealTenantMigrations};
     use memory_mcp::http::principal::AuthenticatedPrincipal;
     use memory_mcp::http::principal::auth::{Authenticator, RateLimiter};
     use memory_mcp::http::principal::cache::PrincipalCache;
     use memory_mcp::http::registry::models::{
-        Account, AccountStatus, ApiKey, ApiKeyStatus, KeyedVerifier,
+        Account, AccountStatus, ApiKey, ApiKeyStatus, KeyedVerifier, NamespaceBinding, Tenant,
+        TenantStatus,
     };
     use memory_mcp::http::registry::storage::{AccountStore, ApiKeyStore, InMemoryStore};
     use memory_mcp::http::subscriptions::SubscriptionStore;
@@ -307,9 +309,43 @@ async fn subscription_eviction_releases_unrelated_tenant_runtime_dependencies() 
 
     let mut http_config = HttpConfig::default_for_test();
     http_config.runtime_idle_ttl = Duration::ZERO;
+    let runtime_registry = RegistryHandle::in_memory_with_default_mem_engine().await;
+    let runtime_tenant = Tenant {
+        id: "tenant_subscription".to_string(),
+        status: TenantStatus::Ready,
+        namespace_binding: NamespaceBinding {
+            namespace: "ns_subscription".to_string(),
+            database: "memory".to_string(),
+        },
+        plan_version: 1,
+        schema_version: 44,
+        retry_stage: None,
+        provisioning_lease: None,
+        created_at: chrono::Utc::now(),
+        version: 1,
+    };
+    runtime_registry
+        .tenants()
+        .write_tenant(&runtime_tenant)
+        .await
+        .expect("register runtime tenant");
+    let migrations = SurrealTenantMigrations::new(
+        runtime_registry
+            .tenant_engine()
+            .expect("runtime tenant engine"),
+    );
+    migrations
+        .ensure_namespace("ns_subscription", "memory")
+        .await
+        .expect("create runtime tenant namespace");
+    migrations
+        .apply_migrations("ns_subscription", "memory")
+        .await
+        .expect("provision runtime tenant schema");
     let state = HttpStateTestBuilder::new()
         .await
         .with_config(http_config)
+        .with_registry(runtime_registry)
         .build()
         .await
         .expect("HTTP test state builds");

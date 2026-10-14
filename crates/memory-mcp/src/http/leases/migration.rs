@@ -152,6 +152,20 @@ impl SurrealTenantMigrations {
         namespace: &str,
         database: &str,
     ) -> Result<crate::storage::client::SurrealDbClient, MemoryError> {
+        self.bound_client_with_dimension(
+            namespace,
+            database,
+            crate::config::DEFAULT_EMBEDDING_DIMENSION,
+        )
+        .await
+    }
+
+    async fn bound_client_with_dimension(
+        &self,
+        namespace: &str,
+        database: &str,
+        dimension: usize,
+    ) -> Result<crate::storage::client::SurrealDbClient, MemoryError> {
         match &self.engine {
             crate::http::registry::PrivilegedEngine::Remote(db) => {
                 let bound = (**db).clone();
@@ -163,8 +177,8 @@ impl SurrealTenantMigrations {
                         MemoryError::Storage(format!("tenant bind failed: {error}"))
                     })?;
                 Ok(
-                    crate::storage::client::SurrealDbClient::from_prebound_remote(
-                        bound, namespace, "info",
+                    crate::storage::client::SurrealDbClient::from_prebound_remote_with_dimension(
+                        bound, namespace, "info", dimension,
                     ),
                 )
             }
@@ -177,9 +191,11 @@ impl SurrealTenantMigrations {
                     .map_err(|error| {
                         MemoryError::Storage(format!("tenant bind failed: {error}"))
                     })?;
-                Ok(crate::storage::client::SurrealDbClient::from_prebound(
-                    bound, namespace, "info",
-                ))
+                Ok(
+                    crate::storage::client::SurrealDbClient::from_prebound_with_dimension(
+                        bound, namespace, "info", dimension,
+                    ),
+                )
             }
             crate::http::registry::PrivilegedEngine::LocalMem(db) => {
                 let bound = (**db).clone();
@@ -190,11 +206,48 @@ impl SurrealTenantMigrations {
                     .map_err(|error| {
                         MemoryError::Storage(format!("tenant bind failed: {error}"))
                     })?;
-                Ok(crate::storage::client::SurrealDbClient::from_prebound_mem(
-                    bound, namespace, "info",
-                ))
+                Ok(
+                    crate::storage::client::SurrealDbClient::from_prebound_mem_with_dimension(
+                        bound, namespace, "info", dimension,
+                    ),
+                )
             }
         }
+    }
+}
+
+#[async_trait::async_trait]
+impl crate::provisioning::api::ReadySchemaUpgradePort for SurrealTenantMigrations {
+    async fn upgrade_ready_schema(
+        &self,
+        binding: &crate::models::registry::NamespaceBinding,
+        dimension: Option<usize>,
+    ) -> Result<(), MemoryError> {
+        if dimension == Some(0) {
+            return Err(MemoryError::ConfigInvalid(
+                "ready-schema embedding dimension must be greater than zero".to_owned(),
+            ));
+        }
+        let dimension = dimension.unwrap_or(crate::config::DEFAULT_EMBEDDING_DIMENSION);
+        let client = self
+            .bound_client_with_dimension(&binding.namespace, &binding.database, dimension)
+            .await?;
+
+        // The base catalog is the leased migration runner. Its checksums and
+        // per-migration leases make upgrades replayable across replicas and
+        // after a process crash. It also verifies the base schema postconditions.
+        client.apply_migrations_impl(&binding.namespace).await?;
+
+        // HTTP 045 is the only expansion a ready HTTP tenant can lack after
+        // the 044 rollout. Replaying 040-044 here would repeat the immutable
+        // 042 outbox initialization on every runtime activation.
+        client
+            .execute_migration_script(
+                include_str!("../../../migrations/045_tenant_task_kind.surql"),
+                &binding.namespace,
+            )
+            .await?;
+        crate::storage::migrations::verify_schema_readiness(&client, &binding.namespace).await
     }
 }
 

@@ -6,7 +6,12 @@
 //! namespace-free adapters. The construction rule is
 //! "clone once, bind once" — see `build_runtime_with_options`.
 
-use std::sync::Arc;
+use std::future::Future;
+use std::num::NonZeroUsize;
+use std::sync::{Arc, Mutex};
+
+use lru::LruCache;
+use tokio::sync::OnceCell;
 
 use crate::embedding::providers::{DisabledEmbeddingProvider, EmbeddingProvider};
 use crate::error::MemoryError;
@@ -56,6 +61,51 @@ pub struct RuntimeOptions {
     pub claim_config: crate::config::claims::ClaimConfig,
     /// One process-owned retry runner shared by every tenant runtime.
     pub background_task_runner: Arc<crate::embedding::providers::task_runner::BackgroundTaskRunner>,
+    ready_schema_upgrades: Arc<ReadySchemaUpgradeCache>,
+}
+
+#[derive(Debug, Hash, PartialEq, Eq)]
+struct ReadySchemaCacheKey {
+    namespace: String,
+    database: String,
+    catalog_digest: String,
+    dimension: Option<usize>,
+}
+
+#[derive(Debug)]
+struct ReadySchemaUpgradeCache {
+    entries: Mutex<LruCache<ReadySchemaCacheKey, Arc<OnceCell<()>>>>,
+}
+
+impl Default for ReadySchemaUpgradeCache {
+    fn default() -> Self {
+        Self {
+            entries: Mutex::new(LruCache::new(
+                NonZeroUsize::new(256).expect("ready schema cache capacity is nonzero"),
+            )),
+        }
+    }
+}
+
+impl ReadySchemaUpgradeCache {
+    async fn run<F, Fut>(&self, key: ReadySchemaCacheKey, upgrade: F) -> Result<(), MemoryError>
+    where
+        F: FnOnce() -> Fut,
+        Fut: Future<Output = Result<(), MemoryError>>,
+    {
+        let cell = {
+            let mut entries = self
+                .entries
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner);
+            entries.get(&key).cloned().unwrap_or_else(|| {
+                let cell = Arc::new(OnceCell::new());
+                entries.put(key, Arc::clone(&cell));
+                cell
+            })
+        };
+        cell.get_or_try_init(upgrade).await.map(|_| ())
+    }
 }
 
 /// The deployment-level embedding identity one tenant runtime starts from.
@@ -124,6 +174,7 @@ impl Default for RuntimeOptions {
             background_task_runner: Arc::new(
                 crate::embedding::providers::task_runner::BackgroundTaskRunner::new(),
             ),
+            ready_schema_upgrades: Arc::new(ReadySchemaUpgradeCache::default()),
         }
     }
 }
@@ -505,6 +556,49 @@ pub async fn build_runtime_with_options(
     tenant: &Tenant,
     options: RuntimeOptions,
 ) -> Result<TenantRuntime, MemoryError> {
+    if tenant.status == crate::http::registry::models::TenantStatus::Ready {
+        let binding = &tenant.namespace_binding;
+        let dimension = options.fact_embedding_dimension();
+        let key = ReadySchemaCacheKey {
+            namespace: binding.namespace.clone(),
+            database: binding.database.clone(),
+            catalog_digest: crate::storage::migrations::ready_schema_catalog_digest(),
+            dimension,
+        };
+        let migrations =
+            crate::http::leases::migration::SurrealTenantMigrations::new(registry.tenant_engine()?);
+        options
+            .ready_schema_upgrades
+            .run(key, || async {
+                crate::provisioning::api::ensure_ready_schema(&migrations, binding, dimension).await
+            })
+            .await?;
+
+        if tenant.schema_version < crate::http::leases::migration::CURRENT_SCHEMA_VERSION {
+            let tenant_store = registry.tenants();
+            let stored = tenant_store
+                .find_tenant_by_id(&tenant.id)
+                .await?
+                .ok_or_else(|| MemoryError::NotFound(format!("tenant {}", tenant.id)))?;
+            if stored.status != crate::http::registry::models::TenantStatus::Ready {
+                return Err(MemoryError::Conflict(format!(
+                    "tenant {} changed lifecycle state during schema upgrade",
+                    tenant.id
+                )));
+            }
+            if stored.schema_version < crate::http::leases::migration::CURRENT_SCHEMA_VERSION {
+                tenant_store
+                    .update_ready_tenant_schema_version(
+                        &tenant.id,
+                        stored.version,
+                        stored.schema_version,
+                        crate::http::leases::migration::CURRENT_SCHEMA_VERSION,
+                    )
+                    .await?;
+            }
+        }
+    }
+
     let plan = crate::operations::quota::QuotaPlan::from(
         &registry.usage().load_plan(tenant.plan_version).await?,
     );

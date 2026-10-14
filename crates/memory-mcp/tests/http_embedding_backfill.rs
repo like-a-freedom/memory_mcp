@@ -214,8 +214,14 @@ async fn activation_does_not_redeclare_the_index_of_a_namespace_that_holds_vecto
     seed_fact_with_vector(&provisioned, &namespace, "fact:one", 1536).await;
     seed_fact_with_vector(&provisioned, &namespace, "fact:two", 1536).await;
 
+    let tenant = tenant(&namespace);
+    registry
+        .tenants()
+        .write_tenant(&tenant)
+        .await
+        .expect("register ready tenant before activation");
     let options = RuntimeOptions::default().with_embedding_policy(embedding_policy(2048));
-    let runtime = build_runtime_with_options(&registry, &tenant(&namespace), options)
+    let runtime = build_runtime_with_options(&registry, &tenant, options)
         .await
         .expect("runtime activation must succeed");
 
@@ -223,6 +229,64 @@ async fn activation_does_not_redeclare_the_index_of_a_namespace_that_holds_vecto
     // re-declaring it would strand the namespace in a state only reembed can exit.
     assert_eq!(
         declared_index_dimension(&runtime.tenant_db, &namespace).await,
+        Some(1536)
+    );
+}
+
+/// A provider change can keep the same vector width. Activation must still
+/// detect the foreign signature and leave the stored vectors for an explicit
+/// reembed operation.
+#[tokio::test]
+async fn same_dimension_foreign_signature_requires_reembed() {
+    let namespace = format!("tns_backfill_same_width_{}", uuid::Uuid::new_v4().simple());
+    let registry = RegistryHandle::in_memory_with_default_mem_engine().await;
+    let provisioned = registry
+        .tenant_engine_optional()
+        .expect("in-memory engine wired")
+        .bind_to_test_namespace(&namespace)
+        .await;
+    provisioned
+        .apply_migrations(&namespace)
+        .await
+        .expect("apply tenant migrations");
+    seed_fact_with_vector(&provisioned, &namespace, "fact:legacy", 1536).await;
+    provisioned
+        .query(
+            "CREATE embedding_state:fact SET status = 'ready', active_signature = 'embsig:foreign-same-width', provider = 'openai-compatible', model = 'previous-model', dimension = 1536, updated_at = time::now()",
+            None,
+            &namespace,
+        )
+        .await
+        .expect("seed foreign embedding signature");
+
+    let tenant = tenant(&namespace);
+    registry
+        .tenants()
+        .write_tenant(&tenant)
+        .await
+        .expect("register ready tenant before activation");
+    let provider = static_provider(1536);
+    let calls = provider.calls.clone();
+    let job = backfill_scheduler_job(deployment_policy_from(
+        embedding_policy_for(provider, 1536),
+        true,
+    ));
+    job(registry).await.expect("one backfill tick");
+
+    assert_eq!(
+        calls.load(std::sync::atomic::Ordering::SeqCst),
+        0,
+        "equal vector width does not make a foreign model signature compatible"
+    );
+
+    let stored = provisioned
+        .select_one("fact:legacy", &namespace)
+        .await
+        .expect("read the preexisting fact")
+        .expect("the fact remains stored");
+    assert_eq!(stored["embedding_signature"], "embsig:legacy");
+    assert_eq!(
+        stored["embedding"].as_array().map(Vec::len),
         Some(1536)
     );
 }

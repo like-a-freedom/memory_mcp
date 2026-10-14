@@ -273,6 +273,17 @@ pub trait TenantStore: Send + Sync + 'static {
         fencing_generation: u64,
     ) -> Result<u64, MemoryError>;
 
+    /// Compare-and-set the schema version for a tenant that remains ready.
+    /// A lifecycle transition increments `version`, so an upgrade racing with
+    /// deletion cannot advance a tombstoned tenant after its schema work ends.
+    async fn update_ready_tenant_schema_version(
+        &self,
+        tenant_id: &str,
+        expected_version: u64,
+        expected_schema_version: u32,
+        new_schema_version: u32,
+    ) -> Result<u64, MemoryError>;
+
     /// Return a bounded page of every durable Tenant binding for reconciliation.
     async fn list_tenants(
         &self,
@@ -1351,6 +1362,35 @@ impl TenantStore for InMemoryStore {
         Ok(t.version)
     }
 
+    async fn update_ready_tenant_schema_version(
+        &self,
+        tenant_id: &str,
+        expected_version: u64,
+        expected_schema_version: u32,
+        new_schema_version: u32,
+    ) -> Result<u64, MemoryError> {
+        let mut tenants = self.lock_tenants();
+        let tenant = tenants
+            .iter_mut()
+            .find(|tenant| tenant.id == tenant_id)
+            .ok_or_else(|| MemoryError::NotFound(format!("tenant {tenant_id}")))?;
+        if tenant.status != super::models::TenantStatus::Ready
+            || tenant.version != expected_version
+            || tenant.schema_version != expected_schema_version
+            || new_schema_version < expected_schema_version
+        {
+            return Err(MemoryError::Conflict(format!(
+                "tenant {tenant_id} ready schema-version CAS failed"
+            )));
+        }
+        tenant.schema_version = new_schema_version;
+        tenant.version = tenant
+            .version
+            .checked_add(1)
+            .ok_or_else(|| MemoryError::Conflict(format!("tenant {tenant_id} version overflow")))?;
+        Ok(tenant.version)
+    }
+
     async fn list_tenants(
         &self,
         limit: usize,
@@ -2292,6 +2332,52 @@ mod tests {
         assert_eq!(got.id, "acct_1");
         let t = s.find_tenant_by_account("acct_1").await.unwrap().unwrap();
         assert_eq!(t.id, "ten_1");
+    }
+
+    #[tokio::test]
+    async fn tenant_deletion_wins_over_ready_schema_version_cas() {
+        let store = InMemoryStore::default();
+        let tenant = Tenant {
+            id: "ten_schema_upgrade".into(),
+            status: TenantStatus::Ready,
+            namespace_binding: NamespaceBinding {
+                namespace: "tns_schema_upgrade".into(),
+                database: "memory".into(),
+            },
+            plan_version: 1,
+            schema_version: 44,
+            retry_stage: None,
+            provisioning_lease: None,
+            created_at: chrono::Utc::now(),
+            version: 7,
+        };
+        store
+            .write_tenant(&tenant)
+            .await
+            .expect("seed ready tenant");
+
+        store
+            .update_tenant_state(
+                &tenant.id,
+                tenant.version,
+                TenantStatus::Ready,
+                TenantStatus::Deleting,
+            )
+            .await
+            .expect("deletion transitions the tenant first");
+
+        let upgrade = store
+            .update_ready_tenant_schema_version(&tenant.id, tenant.version, 44, 45)
+            .await;
+        assert!(matches!(upgrade, Err(MemoryError::Conflict(_))));
+        let persisted = store
+            .find_tenant_by_id(&tenant.id)
+            .await
+            .expect("read tenant after competing transition")
+            .expect("tenant remains stored");
+        assert_eq!(persisted.status, TenantStatus::Deleting);
+        assert_eq!(persisted.schema_version, 44);
+        assert_eq!(persisted.version, tenant.version + 1);
     }
 
     #[tokio::test]
