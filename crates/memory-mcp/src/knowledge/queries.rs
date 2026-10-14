@@ -28,6 +28,15 @@ pub fn build_scan_nonsemantic_facts_query() -> String {
     format!("SELECT id, {NONSEMANTIC_FACT_PROJECTION} FROM fact")
 }
 
+/// Selects every nonsemantic fact visible at a bi-temporal cutoff without returning its vector payload.
+pub fn build_scan_nonsemantic_facts_as_of_query(cutoff: &str) -> (String, Value) {
+    let visibility = build_fact_visibility_clause("$cutoff");
+    (
+        format!("SELECT id, {NONSEMANTIC_FACT_PROJECTION} FROM fact WHERE {visibility}"),
+        json!({ "cutoff": cutoff }),
+    )
+}
+
 /// The temporal columns a fact carries, and an edge's, which are the same.
 pub const FACT_TEMPORAL_FIELDS: &[&str] = &[
     "t_valid",

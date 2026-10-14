@@ -263,24 +263,12 @@ async fn scan_fact_records_by_query_terms(
 ) -> Result<Vec<Value>, MemoryError> {
     let records = service
         .knowledge_store()
-        .scan_facts()
+        .scan_facts_as_of(params.cutoff_iso)
         .await
         .map_err(|err| MemoryError::Storage(format!("SurrealDB query error: {err}")))?;
 
     let filtered = records
         .into_iter()
-        .filter(|record| {
-            raw_object(record)
-                .and_then(|map: &serde_json::Map<String, Value>| map.get("t_valid"))
-                .and_then(json_string)
-                .is_some_and(|value| value <= params.cutoff_iso)
-        })
-        .filter(|record| {
-            raw_object(record)
-                .and_then(|map: &serde_json::Map<String, Value>| map.get("t_invalid"))
-                .and_then(json_string)
-                .is_none_or(|value| value > params.cutoff_iso)
-        })
         .filter(|record| fact_record_matches_type(record, params.fact_types))
         .filter(|record| record_query_overlap(record, query_terms) > 0)
         .map(|mut record| {
@@ -1468,6 +1456,83 @@ mod tests {
             .collect::<Vec<_>>();
 
         assert_eq!(fact_ids.first().copied(), Some("fact:support-group"));
+    }
+
+    #[tokio::test]
+    async fn lexical_scan_fallback_observes_bitemporal_ingestion_and_invalidation() {
+        let query = "Orion launch mission";
+        let cutoff = "2026-01-15T00:00:00Z";
+        let fallback_group_count = build_lexical_fallback_queries(&search_query_terms(query)).len();
+        let future_ingested = json!({
+            "fact_id": "fact:future-ingested",
+            "fact_type": "note",
+            "content": "Orion launch mission begins soon.",
+            "quote": "Orion launch mission begins soon.",
+            "t_valid": "2025-12-01T00:00:00Z",
+            "t_ingested": "2026-04-01T00:00:00Z",
+            "t_invalid": null,
+            "t_invalid_ingested": null,
+        });
+        let invalidation_ingested_later = json!({
+            "fact_id": "fact:late-invalidation",
+            "fact_type": "note",
+            "content": "Orion launch mission remains valid until its invalidation is known.",
+            "quote": "Orion launch mission remains valid until its invalidation is known.",
+            "t_valid": "2025-12-01T00:00:00Z",
+            "t_ingested": "2025-12-01T00:00:00Z",
+            "t_invalid": "2026-01-10T00:00:00Z",
+            "t_invalid_ingested": "2026-04-01T00:00:00Z",
+        });
+        let scan_rows = vec![future_ingested, invalidation_ingested_later.clone()];
+        let db = crate::service::mock_db::MockDbClient::new().expect_query_with(
+            |sql| sql.contains("FROM fact"),
+            move |sql, _vars| {
+                if sql.starts_with("RETURN [") {
+                    return Ok(Value::Array(
+                        (0..fallback_group_count)
+                            .map(|_| Value::Array(Vec::new()))
+                            .collect(),
+                    ));
+                }
+                if sql.contains("search::score") {
+                    return Ok(Value::Array(Vec::new()));
+                }
+                if sql.contains("t_ingested IS NONE")
+                    && sql.contains("t_invalid_ingested > type::datetime($cutoff)")
+                {
+                    return Ok(json!([invalidation_ingested_later]));
+                }
+                Ok(json!(scan_rows))
+            },
+        );
+        let service = crate::service::MemoryService::new(
+            Arc::new(db),
+            "org".to_string(),
+            "warn".to_string(),
+            50,
+            100,
+        )
+        .expect("service");
+        let retrieval = crate::memory::retrieval_deps::AssembleContextDeps::from(&service);
+
+        let result = select_fact_records_for_query(
+            &retrieval,
+            FactQueryParams {
+                cutoff_iso: cutoff,
+                query_opt: Some(query),
+                limit: 10,
+                fact_types: &[],
+            },
+        )
+        .await
+        .expect("select temporal lexical fallback");
+
+        let fact_ids = result
+            .records
+            .iter()
+            .filter_map(|record| record.get("fact_id").and_then(Value::as_str))
+            .collect::<Vec<_>>();
+        assert_eq!(fact_ids, vec!["fact:late-invalidation"]);
     }
 
     #[tokio::test]

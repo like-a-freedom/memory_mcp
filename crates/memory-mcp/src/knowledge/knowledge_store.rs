@@ -218,6 +218,13 @@ impl KnowledgeStoreClient {
         self.db.query_rows(&sql, None).await
     }
 
+    /// Scans the same complete nonsemantic fact set after applying the shared bi-temporal visibility rule.
+    pub async fn scan_facts_as_of(&self, cutoff: &str) -> Result<Vec<Value>, MemoryError> {
+        let (sql, vars) =
+            crate::knowledge::queries::build_scan_nonsemantic_facts_as_of_query(cutoff);
+        self.db.query_rows(&sql, Some(vars)).await
+    }
+
     /// Active (not-yet-invalidated) facts in the bound Active Namespace.
     pub async fn select_active_facts(&self, limit: i32) -> Result<Vec<Value>, MemoryError> {
         let (sql, vars) = crate::knowledge::queries::build_select_active_facts_query(
