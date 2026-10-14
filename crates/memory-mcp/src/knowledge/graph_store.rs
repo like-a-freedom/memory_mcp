@@ -205,12 +205,21 @@ impl KnowledgeGraphStore {
         cutoff: &str,
         limit: i32,
     ) -> Result<Vec<Value>, MemoryError> {
-        let visibility = crate::shared::temporal::visibility_clause("$cutoff");
-        let sql = format!(
-            "SELECT * FROM fact WHERE source_episode = $episode_id AND {visibility} LIMIT $limit"
+        let (sql, vars) = crate::knowledge::queries::build_select_active_facts_by_episode_query(
+            episode_id, cutoff, limit,
         );
-        let vars = json!({ "episode_id": episode_id, "cutoff": cutoff, "limit": limit });
         self.db.query_rows(&sql, Some(vars)).await
+    }
+
+    /// Whether the episode has any active fact, without reading its payload.
+    pub async fn has_active_facts_by_episode(
+        &self,
+        episode_id: &str,
+        cutoff: &str,
+    ) -> Result<bool, MemoryError> {
+        let (sql, vars) =
+            crate::knowledge::queries::build_has_active_facts_by_episode_query(episode_id, cutoff);
+        Ok(self.db.query_first(&sql, Some(vars)).await?.is_some())
     }
 
     /// Communities containing any of the listed member entities.

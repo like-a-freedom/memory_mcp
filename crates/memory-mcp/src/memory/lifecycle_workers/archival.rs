@@ -143,12 +143,12 @@ async fn check_episode_has_active_facts(
     episode_id: &str,
 ) -> Result<bool, MemoryError> {
     let cutoff = crate::shared::temporal::normalize_dt(Utc::now());
-    let facts = service
+    let has_active_facts = service
         .knowledge_graph_store()
-        .select_active_facts_by_episode(episode_id, &cutoff, 1)
+        .has_active_facts_by_episode(episode_id, &cutoff)
         .await?;
 
-    Ok(!facts.is_empty())
+    Ok(has_active_facts)
 }
 
 async fn check_episode_has_recent_fact_access(
