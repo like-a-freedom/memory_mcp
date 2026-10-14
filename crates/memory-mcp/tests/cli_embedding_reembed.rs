@@ -1,6 +1,6 @@
 #![cfg(feature = "eval-support")]
 
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::process::{Command, Output, Stdio};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
@@ -19,6 +19,10 @@ const NAMESPACE: &str = "org";
 const DATABASE: &str = "memory";
 const FACT_ID: &str = "fact:cli-dimension-transition";
 const MODEL: &str = "fixture-model";
+const FIXTURE_DATA_DIR_ENV: &str = "MEMORY_MCP_TEST_REEMBED_DATA_DIR";
+const FIXTURE_DIMENSION_ENV: &str = "MEMORY_MCP_TEST_REEMBED_DIMENSION";
+
+static DIMENSION_TRANSITION_GATE: Mutex<()> = Mutex::const_new(());
 
 fn storage_config(data_dir: &Path, dimension: usize) -> memory_mcp::config::SurrealConfig {
     SurrealConfigBuilder::new()
@@ -165,38 +169,12 @@ async fn spawn_embedding_endpoint(
     (format!("http://{address}/v1"), requests, server)
 }
 
-fn run_reembed_cli_blocking(data_dir: &Path, endpoint: &str, target_dimension: usize) -> Output {
-    let home = data_dir.join("home");
-    std::fs::create_dir_all(&home).expect("create isolated child home");
-    let mut child = Command::new(env!("CARGO_BIN_EXE_memory_mcp"))
-        .env_clear()
-        .env("HOME", home)
-        .env("RUST_LOG", "warn")
-        .env("SURREALDB_EMBEDDED", "true")
-        .env("SURREALDB_DATA_DIR", data_dir)
-        .env("SURREALDB_DB_NAME", DATABASE)
-        .env("SURREALDB_NAMESPACE", NAMESPACE)
-        .env("SURREALDB_USERNAME", "root")
-        .env("SURREALDB_PASSWORD", "root")
-        .env(
-            "SURREALDB_EMBEDDING_DIMENSION",
-            target_dimension.to_string(),
-        )
-        .env("EMBEDDINGS_ENABLED", "true")
-        .env("EMBEDDINGS_PROVIDER", "openai-compatible")
-        .env("EMBEDDINGS_MODEL", MODEL)
-        .env("EMBEDDINGS_BASE_URL", endpoint)
-        .env("EMBEDDINGS_API_KEY", "test-only")
-        .env("EMBEDDINGS_AUTO_RECOVERY", "false")
-        .env("EMBEDDINGS_TIMEOUT_SECS", "5")
-        .env("NER_EXTRACTOR", "anno")
-        .arg("reembed")
-        .arg("--max-failures")
-        .arg("0")
+fn run_bounded_child(mut command: Command) -> Output {
+    let mut child = command
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
         .spawn()
-        .expect("spawn reembed CLI child process");
+        .expect("spawn bounded test child process");
     let mut stdout = child.stdout.take().expect("capture child stdout");
     let mut stderr = child.stderr.take().expect("capture child stderr");
     let stdout_reader = std::thread::spawn(move || {
@@ -236,6 +214,67 @@ fn run_reembed_cli_blocking(data_dir: &Path, endpoint: &str, target_dimension: u
     }
 }
 
+fn seed_stale_fact_in_child_blocking(data_dir: &Path, dimension: usize) -> Output {
+    let mut command =
+        Command::new(std::env::current_exe().expect("locate integration test binary"));
+    command
+        .env_clear()
+        .env(FIXTURE_DATA_DIR_ENV, data_dir)
+        .env(FIXTURE_DIMENSION_ENV, dimension.to_string())
+        .arg("--exact")
+        .arg("seed_stale_fact_in_isolated_process")
+        .arg("--ignored")
+        .arg("--nocapture");
+    run_bounded_child(command)
+}
+
+async fn seed_stale_fact_from_child(data_dir: &Path, dimension: usize) {
+    let data_dir = data_dir.to_path_buf();
+    let output = tokio::task::spawn_blocking(move || {
+        seed_stale_fact_in_child_blocking(&data_dir, dimension)
+    })
+    .await
+    .expect("bounded fixture process worker completes");
+    assert!(
+        output.status.success(),
+        "fixture seeding process failed; stdout={} stderr={}",
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr)
+    );
+}
+
+fn run_reembed_cli_blocking(data_dir: &Path, endpoint: &str, target_dimension: usize) -> Output {
+    let home = data_dir.join("home");
+    std::fs::create_dir_all(&home).expect("create isolated child home");
+    let mut command = Command::new(env!("CARGO_BIN_EXE_memory_mcp"));
+    command
+        .env_clear()
+        .env("HOME", home)
+        .env("RUST_LOG", "warn")
+        .env("SURREALDB_EMBEDDED", "true")
+        .env("SURREALDB_DATA_DIR", data_dir)
+        .env("SURREALDB_DB_NAME", DATABASE)
+        .env("SURREALDB_NAMESPACE", NAMESPACE)
+        .env("SURREALDB_USERNAME", "root")
+        .env("SURREALDB_PASSWORD", "root")
+        .env(
+            "SURREALDB_EMBEDDING_DIMENSION",
+            target_dimension.to_string(),
+        )
+        .env("EMBEDDINGS_ENABLED", "true")
+        .env("EMBEDDINGS_PROVIDER", "openai-compatible")
+        .env("EMBEDDINGS_MODEL", MODEL)
+        .env("EMBEDDINGS_BASE_URL", endpoint)
+        .env("EMBEDDINGS_API_KEY", "test-only")
+        .env("EMBEDDINGS_AUTO_RECOVERY", "false")
+        .env("EMBEDDINGS_TIMEOUT_SECS", "5")
+        .env("NER_EXTRACTOR", "anno")
+        .arg("reembed")
+        .arg("--max-failures")
+        .arg("0");
+    run_bounded_child(command)
+}
+
 async fn run_reembed_cli(data_dir: &Path, endpoint: &str, target_dimension: usize) -> Output {
     let data_dir = data_dir.to_path_buf();
     let endpoint = endpoint.to_string();
@@ -262,8 +301,9 @@ async fn declared_index_dimension(db: &SurrealDbClient) -> Option<usize> {
 }
 
 async fn assert_cli_dimension_transition(from: usize, to: usize) {
+    let _gate = DIMENSION_TRANSITION_GATE.lock().await;
     let temp_dir = tempfile::tempdir().expect("isolated CLI RocksDB root");
-    seed_stale_fact(temp_dir.path(), from).await;
+    seed_stale_fact_from_child(temp_dir.path(), from).await;
     let (endpoint, requests, server) = spawn_embedding_endpoint(to).await;
 
     let output = run_reembed_cli(temp_dir.path(), &endpoint, to).await;
@@ -321,6 +361,19 @@ async fn assert_cli_dimension_transition(from: usize, to: usize) {
         job["namespace_progress"][NAMESPACE]["last_completed_fact_id"],
         FACT_ID
     );
+}
+
+#[tokio::test]
+#[ignore = "fixture seeding runs separately so the CLI can acquire the RocksDB lock"]
+async fn seed_stale_fact_in_isolated_process() {
+    let data_dir = PathBuf::from(
+        std::env::var_os(FIXTURE_DATA_DIR_ENV).expect("fixture process data directory"),
+    );
+    let dimension = std::env::var(FIXTURE_DIMENSION_ENV)
+        .expect("fixture process embedding dimension")
+        .parse::<usize>()
+        .expect("fixture dimension is an integer");
+    seed_stale_fact(&data_dir, dimension).await;
 }
 
 #[tokio::test]
