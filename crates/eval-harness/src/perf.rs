@@ -9,6 +9,7 @@ pub mod db_observer;
 pub mod domain;
 pub mod profile;
 pub mod reducer;
+pub mod remote_evidence;
 pub mod runner;
 pub mod sampler;
 pub mod scenarios;
