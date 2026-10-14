@@ -117,9 +117,9 @@ pub async fn run_backfill_pass(
     // The in-memory registry used by the conformance suite has no privileged
     // tenant engine. Nothing can be bound, so there is nothing to backfill —
     // and saying so is better than reporting an empty pass as a successful one.
-    let Some(engine) = registry.tenant_engine_optional() else {
+    if registry.tenant_engine_optional().is_none() {
         return Ok(());
-    };
+    }
 
     // Measured around the whole pass, like every other maintenance job: a
     // growing backlog shows up here as one rising series rather than as one
@@ -128,14 +128,16 @@ pub async fn run_backfill_pass(
     let mut degraded = false;
 
     for tenant in tenants {
-        let db = match engine.bind(&tenant).await {
-            Ok(db) => db,
+        let lease = match registry.acquire_maintenance_client(&tenant).await {
+            Ok(Some(lease)) => lease,
+            Ok(None) => return Ok(()),
             Err(error) => {
                 degraded = true;
                 log_tenant_failure("http.embedding.backfill_bind_failed", &tenant, &error);
                 continue;
             }
         };
+        let db = lease.client();
         if let Err(error) = backfill_tenant(db, &tenant, embedding, policy).await {
             degraded = true;
             log_tenant_failure("http.embedding.backfill_failed", &tenant, &error);

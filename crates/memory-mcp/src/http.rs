@@ -202,6 +202,13 @@ impl HttpState {
         deployment_policy: Option<runtime::bootstrap::DeploymentPolicy>,
         background_task_runner: Arc<crate::embedding::providers::task_runner::BackgroundTaskRunner>,
     ) -> Result<Arc<Self>, crate::error::MemoryError> {
+        let maintenance_dimension = deployment_policy.as_ref().and_then(|policy| {
+            policy
+                .embedding
+                .as_ref()
+                .map(|embedding| embedding.dimension)
+        });
+        let registry = registry.with_maintenance_dimension(maintenance_dimension);
         // The `free` plan backs the data plane: tenants created by signup, and
         // tenants that predate this change, carry `plan_version 1`, and the data
         // plane resolves that row on every ingest. A `local`-only deployment

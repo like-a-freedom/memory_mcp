@@ -106,8 +106,12 @@ fn record_memory_snapshot(snapshot: HttpMemorySnapshot) {
         METRIC_HTTP_BACKGROUND_EMBEDDING_ADMITTED_TASKS,
         METRIC_HTTP_BACKGROUND_EMBEDDING_RETAINED_BYTES,
         METRIC_HTTP_BACKGROUND_EMBEDDING_RUNNING_TASKS, METRIC_HTTP_CONTEXT_CACHE_ACCOUNTED_BYTES,
-        METRIC_HTTP_PREFLIGHT_RESERVED_BYTES, METRIC_HTTP_PREFLIGHT_RESERVED_REQUESTS,
-        METRIC_HTTP_QUERY_CACHE_ACCOUNTED_BYTES, METRIC_HTTP_TENANT_RUNTIME_COUNT,
+        METRIC_HTTP_MAINTENANCE_ACTIVE_LEASES, METRIC_HTTP_MAINTENANCE_BINDINGS,
+        METRIC_HTTP_MAINTENANCE_BINDS_TOTAL, METRIC_HTTP_MAINTENANCE_EVICTIONS_TOTAL,
+        METRIC_HTTP_MAINTENANCE_METADATA_BYTES, METRIC_HTTP_MAINTENANCE_REUSE_TOTAL,
+        METRIC_HTTP_MAINTENANCE_SESSIONS, METRIC_HTTP_PREFLIGHT_RESERVED_BYTES,
+        METRIC_HTTP_PREFLIGHT_RESERVED_REQUESTS, METRIC_HTTP_QUERY_CACHE_ACCOUNTED_BYTES,
+        METRIC_HTTP_TENANT_RUNTIME_COUNT,
     };
 
     metrics::gauge!(METRIC_HTTP_PREFLIGHT_RESERVED_REQUESTS).set(snapshot.reserved_requests as f64);
@@ -123,6 +127,20 @@ fn record_memory_snapshot(snapshot: HttpMemorySnapshot) {
         .set(snapshot.background_embedding_running_tasks as f64);
     metrics::gauge!(METRIC_HTTP_BACKGROUND_EMBEDDING_RETAINED_BYTES)
         .set(snapshot.background_embedding_retained_bytes as f64);
+    metrics::gauge!(METRIC_HTTP_MAINTENANCE_SESSIONS)
+        .set(snapshot.maintenance_resident_sessions as f64);
+    metrics::gauge!(METRIC_HTTP_MAINTENANCE_BINDINGS)
+        .set(snapshot.maintenance_creating_bindings as f64);
+    metrics::gauge!(METRIC_HTTP_MAINTENANCE_ACTIVE_LEASES)
+        .set(snapshot.maintenance_active_leases as f64);
+    metrics::gauge!(METRIC_HTTP_MAINTENANCE_METADATA_BYTES)
+        .set(snapshot.maintenance_metadata_accounted_bytes as f64);
+    metrics::counter!(METRIC_HTTP_MAINTENANCE_BINDS_TOTAL)
+        .absolute(snapshot.maintenance_bind_attempts as u64);
+    metrics::counter!(METRIC_HTTP_MAINTENANCE_REUSE_TOTAL)
+        .absolute(snapshot.maintenance_reuse_hits as u64);
+    metrics::counter!(METRIC_HTTP_MAINTENANCE_EVICTIONS_TOTAL)
+        .absolute(snapshot.maintenance_evictions as u64);
 
     // The allocator families are set only where the reader produced a value.
     // A `None` means the signal does not exist on this platform (no glibc), so

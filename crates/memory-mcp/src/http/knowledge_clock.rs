@@ -38,15 +38,16 @@ pub(crate) async fn restore_knowledge_clock(registry: &RegistryHandle) {
     // The conformance suite's in-memory registry has no privileged engine;
     // nothing can be bound, so there is nothing to restore — quietly, like
     // the scheduler walks.
-    let Some(engine) = registry.tenant_engine_optional() else {
+    if registry.tenant_engine_optional().is_none() {
         return;
-    };
+    }
 
     let mut newest: Option<f64> = None;
     for tenant in &tenants {
         let namespace = tenant.namespace_binding.namespace.clone();
-        let db = match engine.bind(tenant).await {
-            Ok(db) => db,
+        let lease = match registry.acquire_maintenance_client(tenant).await {
+            Ok(Some(lease)) => lease,
+            Ok(None) => return,
             Err(error) => {
                 log_warn(
                     "http.lifecycle.clock_restore_failed",
@@ -55,6 +56,7 @@ pub(crate) async fn restore_knowledge_clock(registry: &RegistryHandle) {
                 continue;
             }
         };
+        let db = lease.client();
         let store = EpisodeStoreClient::new(
             Arc::clone(&db) as Arc<dyn crate::storage::DbClient>,
             namespace,

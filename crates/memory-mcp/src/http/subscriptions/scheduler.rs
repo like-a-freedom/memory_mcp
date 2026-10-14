@@ -26,11 +26,14 @@ pub fn scheduler_job() -> SchedulerJob {
 /// state is written here.
 pub async fn poll_and_repair_all(registry: &RegistryHandle) -> Result<(), MemoryError> {
     let tenants = registry.tenants().list_ready_tenants(None, 100).await?;
-    let Some(engine) = registry.tenant_engine_optional() else {
+    if registry.tenant_engine_optional().is_none() {
         return Ok(());
-    };
+    }
     for tenant in tenants {
-        let client = engine.bind(&tenant).await?;
+        let Some(lease) = registry.acquire_maintenance_client(&tenant).await? else {
+            return Ok(());
+        };
+        let client = lease.client();
         let db = BoundDbClient::new(client, tenant.namespace_binding.namespace.clone());
         match ensure_tenant_sequence(&db).await {
             Ok(()) => {}

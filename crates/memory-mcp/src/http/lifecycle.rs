@@ -112,15 +112,16 @@ async fn run_walk(
     // The conformance suite's in-memory registry has no privileged engine;
     // nothing can be bound, so there is nothing to maintain — and saying so
     // quietly is better than reporting a failed pass.
-    let Some(engine) = registry.tenant_engine_optional() else {
+    if registry.tenant_engine_optional().is_none() {
         return Ok(());
-    };
+    }
 
     let started = Instant::now();
     let mut degraded = false;
     for tenant in tenants {
-        let db = match engine.bind(&tenant).await {
-            Ok(db) => db,
+        let lease = match registry.acquire_maintenance_client(&tenant).await {
+            Ok(Some(lease)) => lease,
+            Ok(None) => return Ok(()),
             Err(error) => {
                 degraded = true;
                 crate::http::logging::log_warn(
@@ -130,6 +131,7 @@ async fn run_walk(
                 continue;
             }
         };
+        let db = lease.client();
         if let Err(error) = run_tenant(&db, &tenant, policy, pass).await {
             degraded = true;
             crate::http::logging::log_warn(

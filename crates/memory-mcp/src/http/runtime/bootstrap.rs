@@ -47,18 +47,38 @@ impl HttpRuntime {
         &mut self,
         deadline: tokio::time::Instant,
     ) -> Result<(), crate::error::MemoryError> {
+        self.state.registry.begin_maintenance_shutdown();
         let upkeep = self.background_upkeep.take();
         let runner_for_shutdown = self.background_task_runner.clone();
         let coordinator_join = self.background_task_runner.join_until(deadline);
         let upkeep_join = join_upkeep_until(upkeep, deadline);
 
-        join_background_owners(
+        let background_result = join_background_owners(
             &self.background_upkeep_cancel,
             move || runner_for_shutdown.shutdown(),
             coordinator_join,
             upkeep_join,
         )
+        .await;
+        let maintenance_result = match tokio::time::timeout_at(
+            deadline,
+            self.state.registry.shutdown_maintenance_clients(),
+        )
         .await
+        {
+            Ok(()) => Ok(()),
+            Err(_) => Err(crate::error::MemoryError::Storage(
+                "maintenance sessions exceeded shutdown deadline".into(),
+            )),
+        };
+        match (background_result, maintenance_result) {
+            (Ok(()), Ok(())) => Ok(()),
+            (Err(error), Ok(())) | (Ok(()), Err(error)) => Err(error),
+            (Err(error), Err(secondary)) => {
+                log_secondary_cleanup_failure("maintenance_sessions", &secondary);
+                Err(error)
+            }
+        }
     }
 }
 
@@ -424,6 +444,7 @@ pub async fn build_state(
             Arc::clone(&state.pool),
             Arc::clone(&state.preflight_budget),
             Arc::clone(&background_task_runner),
+            state.registry.clone(),
         ),
     );
     #[cfg(feature = "prometheus")]

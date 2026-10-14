@@ -53,6 +53,12 @@ pub(crate) struct RegistryDeletionRecoveryAdapter {
     registry: RegistryHandle,
     tx: Arc<dyn AccountDeletionTx>,
     fault_injector: Arc<dyn FaultInjector>,
+    // The port returns a BoundDbClient, so retain the matching lease here for
+    // the sequential purge step. The next bind happens only after the prior
+    // tenant's purge has completed in recover_tenant.
+    maintenance_lease: std::sync::Mutex<
+        Option<crate::http::registry::maintenance_clients::MaintenanceClientLease>,
+    >,
 }
 
 impl RegistryDeletionRecoveryAdapter {
@@ -63,6 +69,7 @@ impl RegistryDeletionRecoveryAdapter {
             registry,
             tx,
             fault_injector,
+            maintenance_lease: std::sync::Mutex::new(None),
         }
     }
 }
@@ -131,10 +138,20 @@ impl DeletionRecoveryPort for RegistryDeletionRecoveryAdapter {
         // schedulers use. Wrapping the raw client in `BoundDbClient` pins the
         // namespace as an invariant of the handle, so the sweep that follows
         // cannot be re-pointed at a different tenant.
-        let engine = self.registry.tenant_engine()?;
-        let handle = engine
-            .bind_namespace(&tenant.namespace, &tenant.database)
+        let lease = self
+            .registry
+            .acquire_maintenance_namespace(&tenant.namespace, &tenant.database)
             .await?;
+        let Some(lease) = lease else {
+            return Err(MemoryError::Storage(
+                "tenant engine is unavailable for deletion recovery".into(),
+            ));
+        };
+        let handle = lease.client();
+        *self
+            .maintenance_lease
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner) = Some(lease);
         Ok(Arc::new(BoundDbClient::new(
             handle,
             tenant.namespace.clone(),

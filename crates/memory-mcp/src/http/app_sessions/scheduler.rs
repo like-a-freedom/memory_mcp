@@ -41,11 +41,9 @@ pub async fn cleanup_expired_for_all(registry: &RegistryHandle) -> Result<(), Me
         // engine; we skip the delete for tenants whose
         // engine is None (the test path does not seed
         // app_session rows).
-        let Some(engine) = registry.tenant_engine_optional() else {
-            continue;
-        };
-        let db = match engine.bind(&tenant).await {
-            Ok(db) => db,
+        let lease = match registry.acquire_maintenance_client(&tenant).await {
+            Ok(Some(lease)) => lease,
+            Ok(None) => continue,
             Err(error) => {
                 crate::http::logging::log_warn(
                     "http.app_session.bind_failed",
@@ -54,6 +52,7 @@ pub async fn cleanup_expired_for_all(registry: &RegistryHandle) -> Result<(), Me
                 continue;
             }
         };
+        let db = lease.client();
         // `BoundDbClient` pins the namespace as an invariant rather than a
         // per-call argument, so this store physically cannot reach another
         // tenant's rows. `delete_expired` owns the statement and the

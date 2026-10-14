@@ -285,10 +285,7 @@ async fn same_dimension_foreign_signature_requires_reembed() {
         .expect("read the preexisting fact")
         .expect("the fact remains stored");
     assert_eq!(stored["embedding_signature"], "embsig:legacy");
-    assert_eq!(
-        stored["embedding"].as_array().map(Vec::len),
-        Some(1536)
-    );
+    assert_eq!(stored["embedding"].as_array().map(Vec::len), Some(1536));
 }
 
 /// A tenant whose facts were written while the provider was unreachable holds

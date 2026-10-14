@@ -38,11 +38,14 @@ async fn reconcile_all(
     }
     let usage = registry.usage();
     let tenants = registry.tenants().list_ready_tenants(None, 100).await?;
-    let Some(engine) = registry.tenant_engine_optional() else {
+    if registry.tenant_engine_optional().is_none() {
         return Ok(());
-    };
+    }
     for tenant in tenants {
-        let db = engine.bind(&tenant).await?;
+        let Some(lease) = registry.acquire_maintenance_client(&tenant).await? else {
+            return Ok(());
+        };
+        let db = lease.client();
         let aggregate = db
             .query(
                 "SELECT count() AS episode_count, math::sum(string::len(content)) AS ingested_bytes FROM episode GROUP ALL",

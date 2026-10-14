@@ -3702,7 +3702,10 @@ mod tests {
         let store = SurrealRegistryStore::from_local_db(db, "control", "registry")
             .await
             .expect("bind registry store");
-        store.apply_migrations().await.expect("apply registry schema");
+        store
+            .apply_migrations()
+            .await
+            .expect("apply registry schema");
         let mut ready = tenant();
         ready.status = TenantStatus::Ready;
         ready.schema_version = 44;

@@ -162,6 +162,20 @@ pub const METRIC_HTTP_BACKGROUND_EMBEDDING_RUNNING_TASKS: &str =
 /// Retained bytes in the process-wide background embedding coordinator.
 pub const METRIC_HTTP_BACKGROUND_EMBEDDING_RETAINED_BYTES: &str =
     "memory_http_background_embedding_retained_bytes";
+/// Namespace-bound maintenance sessions currently resident or in flight.
+pub const METRIC_HTTP_MAINTENANCE_SESSIONS: &str = "memory_http_maintenance_sessions";
+/// Namespace-bound maintenance session binds currently being created.
+pub const METRIC_HTTP_MAINTENANCE_BINDINGS: &str = "memory_http_maintenance_bindings";
+/// Active operation leases that pin maintenance sessions against eviction.
+pub const METRIC_HTTP_MAINTENANCE_ACTIVE_LEASES: &str = "memory_http_maintenance_active_leases";
+/// Owner-accounted keys and slot metadata retained by maintenance sessions.
+pub const METRIC_HTTP_MAINTENANCE_METADATA_BYTES: &str = "memory_http_maintenance_metadata_bytes";
+/// Maintenance session bind attempts since this registry was composed.
+pub const METRIC_HTTP_MAINTENANCE_BINDS_TOTAL: &str = "memory_http_maintenance_binds_total";
+/// Acquisitions served by a previously bound maintenance session.
+pub const METRIC_HTTP_MAINTENANCE_REUSE_TOTAL: &str = "memory_http_maintenance_reuse_total";
+/// Maintenance sessions retired by TTL, capacity, invalidation or shutdown.
+pub const METRIC_HTTP_MAINTENANCE_EVICTIONS_TOTAL: &str = "memory_http_maintenance_evictions_total";
 
 /// Total non-mmap bytes in glibc arenas, from `mallinfo2.arena`.
 pub const METRIC_ALLOC_ARENA_BYTES: &str = "memory_alloc_arena_bytes";
@@ -517,6 +531,48 @@ pub const DESCRIPTIONS: &[MetricDescription] = &[
         kind: MetricKind::Gauge,
         unit: None,
         help: "Bytes retained by admitted background embedding tasks",
+    },
+    MetricDescription {
+        name: METRIC_HTTP_MAINTENANCE_SESSIONS,
+        kind: MetricKind::Gauge,
+        unit: None,
+        help: "Resident namespace-bound maintenance sessions, including in-flight binds",
+    },
+    MetricDescription {
+        name: METRIC_HTTP_MAINTENANCE_BINDINGS,
+        kind: MetricKind::Gauge,
+        unit: None,
+        help: "Namespace-bound maintenance sessions currently being created",
+    },
+    MetricDescription {
+        name: METRIC_HTTP_MAINTENANCE_ACTIVE_LEASES,
+        kind: MetricKind::Gauge,
+        unit: None,
+        help: "Active operations pinning maintenance sessions against eviction",
+    },
+    MetricDescription {
+        name: METRIC_HTTP_MAINTENANCE_METADATA_BYTES,
+        kind: MetricKind::Gauge,
+        unit: Some(metrics::Unit::Bytes),
+        help: "Accounted key and slot metadata retained by maintenance sessions",
+    },
+    MetricDescription {
+        name: METRIC_HTTP_MAINTENANCE_BINDS_TOTAL,
+        kind: MetricKind::Counter,
+        unit: None,
+        help: "Maintenance session binds attempted since this registry was composed",
+    },
+    MetricDescription {
+        name: METRIC_HTTP_MAINTENANCE_REUSE_TOTAL,
+        kind: MetricKind::Counter,
+        unit: None,
+        help: "Acquisitions served by a previously bound maintenance session",
+    },
+    MetricDescription {
+        name: METRIC_HTTP_MAINTENANCE_EVICTIONS_TOTAL,
+        kind: MetricKind::Counter,
+        unit: None,
+        help: "Maintenance sessions retired by TTL, capacity, invalidation or shutdown",
     },
     MetricDescription {
         name: METRIC_ALLOC_ARENA_BYTES,

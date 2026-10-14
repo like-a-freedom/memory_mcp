@@ -95,9 +95,9 @@ async fn retry_reconcile_and_retain_with_policy(
     embedding: Option<crate::http::runtime::storage::EmbeddingPolicy>,
 ) -> Result<(), MemoryError> {
     let tenants = registry.tenants().list_ready_tenants(None, 100).await?;
-    let Some(engine) = registry.tenant_engine_optional() else {
+    if registry.tenant_engine_optional().is_none() {
         return Ok(());
-    };
+    }
 
     // Measured around the whole pass rather than each step inside it: a tenant
     // loop that grows slow shows up here as one rising series, and the per-step
@@ -107,8 +107,9 @@ async fn retry_reconcile_and_retain_with_policy(
     let mut degraded = false;
 
     for tenant in tenants {
-        let db = match engine.bind(&tenant).await {
-            Ok(db) => db,
+        let lease = match registry.acquire_maintenance_client(&tenant).await {
+            Ok(Some(lease)) => lease,
+            Ok(None) => return Ok(()),
             Err(error) => {
                 degraded = true;
                 crate::http::logging::log_warn(
@@ -118,6 +119,7 @@ async fn retry_reconcile_and_retain_with_policy(
                 continue;
             }
         };
+        let db = lease.client();
         let bound_db = Arc::new(BoundDbClient::new(
             db.clone(),
             tenant.namespace_binding.namespace.clone(),
