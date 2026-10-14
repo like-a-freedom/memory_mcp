@@ -252,7 +252,15 @@ pub(crate) async fn run_backfill(
             .select_facts_missing_embeddings(cursor.as_deref(), batch_size)
             .await?;
         if batch.is_empty() {
-            return Ok(BackfillOutcome::Complete { processed });
+            let remaining = store.count_facts_missing_embeddings().await?;
+            if remaining == 0 {
+                return Ok(BackfillOutcome::Complete { processed });
+            }
+            // A fact can become missing after the prior batch's count and
+            // sort before the cursor. Recheck from the beginning before
+            // declaring the recovery pass complete.
+            cursor = None;
+            continue;
         }
 
         let batch_size = batch.len();
@@ -689,6 +697,41 @@ mod tests {
         assert_eq!(recovery_backoff(20), Duration::from_secs(300));
     }
 
+    #[tokio::test]
+    async fn foreign_dimension_declines_before_provider_creation() {
+        let db = make_in_memory_db("foreign_embedding_dimension").await;
+        db.create(
+            crate::embedding::state_store::EMBEDDING_STATE_RECORD_ID,
+            json!({
+                "status": "ready",
+                "active_signature": "embsig:stored",
+                "dimension": 1536,
+                "updated_at": normalize_dt(Utc::now()),
+            }),
+            "org",
+            crate::embedding::queries::EMBEDDING_STATE_TEMPORAL_FIELDS,
+        )
+        .await
+        .expect("embedding state");
+        let service = make_disabled_service(db);
+        let backend = FakeRecoveryBackend::fail_probes_then_succeed(0, 768);
+
+        let result = run_recovery_cycle(
+            &RecoveryHandles::from(&service),
+            &remote_config(),
+            &backend,
+            &test_settings(),
+        )
+        .await;
+
+        assert!(matches!(
+            result,
+            Err(crate::error::MemoryError::Validation(message))
+                if message.contains("index=1536, probed=768")
+        ));
+        assert_eq!(backend.provider_creation_calls(), 0);
+    }
+
     struct FakeEmbeddingProvider {
         remaining_failures: AtomicUsize,
         dimension: usize,
@@ -880,6 +923,7 @@ mod tests {
     struct FakeRecoveryBackend {
         remaining_probe_failures: AtomicUsize,
         probe_count: AtomicUsize,
+        provider_creation_count: AtomicUsize,
         provider: Arc<dyn EmbeddingProvider>,
     }
 
@@ -888,6 +932,7 @@ mod tests {
             Self {
                 remaining_probe_failures: AtomicUsize::new(failures),
                 probe_count: AtomicUsize::new(0),
+                provider_creation_count: AtomicUsize::new(0),
                 provider: Arc::new(FakeEmbeddingProvider::new(dimension)),
             }
         }
@@ -896,6 +941,7 @@ mod tests {
             Self {
                 remaining_probe_failures: AtomicUsize::new(0),
                 probe_count: AtomicUsize::new(0),
+                provider_creation_count: AtomicUsize::new(0),
                 provider: Arc::new(if failures == 0 {
                     FakeEmbeddingProvider::new(dimension)
                 } else {
@@ -904,8 +950,21 @@ mod tests {
             }
         }
 
+        fn probe_succeeds_with_provider(provider: Arc<dyn EmbeddingProvider>) -> Self {
+            Self {
+                remaining_probe_failures: AtomicUsize::new(0),
+                probe_count: AtomicUsize::new(0),
+                provider_creation_count: AtomicUsize::new(0),
+                provider,
+            }
+        }
+
         fn probe_calls(&self) -> usize {
             self.probe_count.load(Ordering::SeqCst)
+        }
+
+        fn provider_creation_calls(&self) -> usize {
+            self.provider_creation_count.load(Ordering::SeqCst)
         }
     }
 
@@ -927,7 +986,39 @@ mod tests {
             &self,
             _dimension: usize,
         ) -> Result<Arc<dyn EmbeddingProvider>, crate::error::MemoryError> {
+            self.provider_creation_count.fetch_add(1, Ordering::SeqCst);
             Ok(self.provider.clone())
+        }
+    }
+
+    struct FailsOnSecondEmbeddingOnce {
+        calls: AtomicUsize,
+        dimension: usize,
+    }
+
+    #[async_trait]
+    impl EmbeddingProvider for FailsOnSecondEmbeddingOnce {
+        fn is_enabled(&self) -> bool {
+            true
+        }
+
+        fn provider_name(&self) -> &'static str {
+            "openai-compatible"
+        }
+
+        fn dimension(&self) -> usize {
+            self.dimension
+        }
+
+        async fn embed(&self, _input: &str) -> Result<Vec<f64>, crate::error::MemoryError> {
+            if self.calls.fetch_add(1, Ordering::SeqCst) == 1 {
+                return Err(crate::error::MemoryError::Transient(
+                    "synthetic second-fact outage".to_string(),
+                ));
+            }
+            let mut embedding = vec![0.0; self.dimension];
+            embedding[0] = 1.0;
+            Ok(embedding)
         }
     }
 
@@ -1124,6 +1215,50 @@ mod tests {
             fact.get("embedding_signature").and_then(Value::as_str),
             Some(expected_signature.as_str())
         );
+    }
+
+    #[tokio::test]
+    async fn resume_after_fault_keeps_last_successful_fact() {
+        let db = make_in_memory_db("backfill_resume_after_second_fact_fault").await;
+        seed_missing_fact(&db, "fact:a", "first fact").await;
+        seed_missing_fact(&db, "fact:b", "second fact").await;
+        let config = remote_config();
+        let expected_signature = crate::config::build_embedding_signature(
+            config.provider_label(),
+            config.model.as_deref(),
+            config.base_url.as_deref(),
+            DEFAULT_EMBEDDING_DIMENSION,
+        );
+        let provider = Arc::new(FailsOnSecondEmbeddingOnce {
+            calls: AtomicUsize::new(0),
+            dimension: DEFAULT_EMBEDDING_DIMENSION,
+        });
+        let backend = Arc::new(FakeRecoveryBackend::probe_succeeds_with_provider(
+            provider.clone(),
+        ));
+        let service = make_disabled_service(db.clone());
+
+        run_recovery_worker(
+            service,
+            config,
+            backend,
+            test_settings(),
+            CancellationToken::new(),
+        )
+        .await;
+
+        assert_eq!(provider.calls.load(Ordering::SeqCst), 3);
+        for fact_id in ["fact:a", "fact:b"] {
+            let fact = db
+                .select_one(fact_id, "org")
+                .await
+                .expect("read recovered fact")
+                .expect("fact exists");
+            assert_eq!(
+                fact.get("embedding_signature").and_then(Value::as_str),
+                Some(expected_signature.as_str())
+            );
+        }
     }
 
     #[tokio::test]
@@ -1324,6 +1459,77 @@ mod tests {
             stale.get("embedding_signature").and_then(Value::as_str),
             Some("embsig:old")
         );
+    }
+
+    #[tokio::test]
+    async fn new_missing_fact_during_completion_is_not_lost() {
+        let count_reads = Arc::new(AtomicUsize::new(0));
+        let selection_reads = Arc::new(AtomicUsize::new(0));
+        let vector_writes = Arc::new(AtomicUsize::new(0));
+        let count_calls = Arc::clone(&count_reads);
+        let selection_calls = Arc::clone(&selection_reads);
+        let write_calls = Arc::clone(&vector_writes);
+        let late_fact = json!([{
+            "fact_id": "fact:late",
+            "fact_type": "note",
+            "content": "created while the empty page was being observed",
+            "quote": "created while the empty page was being observed"
+        }]);
+        let db = crate::service::mock_db::MockDbClient::new()
+            .expect_query_with(
+                |sql| sql.contains("count() AS count"),
+                move |_, _| {
+                    let call = count_calls.fetch_add(1, Ordering::SeqCst);
+                    let count = match call {
+                        0 => 0,
+                        1 => 1,
+                        _ => 0,
+                    };
+                    Ok(json!([{"count": count}]))
+                },
+            )
+            .expect_query_with(
+                |sql| sql.contains("FROM fact WITH NOINDEX"),
+                move |_, _| {
+                    let call = selection_calls.fetch_add(1, Ordering::SeqCst);
+                    Ok(match call {
+                        0 => json!([]),
+                        1 => late_fact.clone(),
+                        _ => json!([]),
+                    })
+                },
+            )
+            .expect_query_with(
+                |sql| sql.starts_with("SELECT * FROM type::record('fact'"),
+                |_, _| Ok(json!([{"fact_id": "fact:late"}])),
+            )
+            .expect_query_with(
+                |sql| sql.starts_with("UPDATE type::record('fact'"),
+                move |_, _| {
+                    write_calls.fetch_add(1, Ordering::SeqCst);
+                    Ok(json!([{"fact_id": "fact:late"}]))
+                },
+            );
+        let service =
+            MemoryService::new(Arc::new(db), "org".to_string(), "warn".to_string(), 50, 100)
+                .expect("service");
+        let provider = Arc::new(FakeEmbeddingProvider::new(DEFAULT_EMBEDDING_DIMENSION));
+
+        let result = run_backfill(
+            &RecoveryHandles::from(&service),
+            provider,
+            "embsig:target",
+            None,
+            DEFAULT_EMBEDDING_DIMENSION,
+            100,
+        )
+        .await
+        .expect("backfill discovers fact created during the empty-page boundary");
+
+        assert!(matches!(result, BackfillOutcome::Complete { processed: 1 }));
+        assert_eq!(selection_reads.load(Ordering::SeqCst), 3);
+        assert_eq!(count_reads.load(Ordering::SeqCst), 4);
+        assert_eq!(vector_writes.load(Ordering::SeqCst), 1);
     }
 
     #[test]

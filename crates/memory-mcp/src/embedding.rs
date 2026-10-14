@@ -20,3 +20,5 @@ pub(crate) mod reembed_store;
 pub mod runtime;
 pub mod service;
 pub(crate) mod state_store;
+#[cfg(feature = "test-fixtures")]
+pub mod test_fixtures;

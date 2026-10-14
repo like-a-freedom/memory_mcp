@@ -290,3 +290,16 @@ pub async fn generate_and_update(
     };
     update_canonical_vector(port, fact_id, vector, identity, clock_now(), policy).await
 }
+
+#[cfg(test)]
+mod tests {
+    use super::{BatchAdvance, SkipReason, VectorApplication, batch_advance};
+
+    #[test]
+    fn disabled_provider_does_not_advance_backfill_checkpoint() {
+        assert_eq!(
+            batch_advance(VectorApplication::Skipped(SkipReason::ProviderDisabled)),
+            BatchAdvance::Halt(SkipReason::ProviderDisabled)
+        );
+    }
+}

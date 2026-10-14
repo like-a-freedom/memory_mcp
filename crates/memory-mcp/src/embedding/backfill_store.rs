@@ -8,6 +8,7 @@ use crate::error::MemoryError;
 use crate::storage::{BoundDbClient, DbClient};
 
 const DEFAULT_BACKFILL_BATCH_SIZE: i32 = 100;
+const BACKFILL_FACT_PROJECTION: &str = "fact_id, fact_type, content, quote";
 
 #[derive(Clone)]
 pub(crate) struct EmbeddingBackfillStoreClient {
@@ -51,13 +52,23 @@ impl EmbeddingBackfillStoreClient {
         } else {
             DEFAULT_BACKFILL_BATCH_SIZE
         };
+        // SurrealDB 3.3.2 otherwise walks the fact_id cursor index before
+        // checking the optional vector field. WITH NOINDEX enables its
+        // pre-decode missing-field filter; the isolated density/scale matrix
+        // covers empty through fully-pending stores before forcing that plan.
         let sql = if last_completed_fact_id.is_some() {
-            "SELECT * FROM (SELECT * FROM fact WHERE embedding IS NONE) \
-             WHERE fact_id > $last_completed_fact_id ORDER BY fact_id ASC LIMIT $limit"
-                .to_string()
+            format!(
+                "SELECT {BACKFILL_FACT_PROJECTION} \
+                 FROM (SELECT {BACKFILL_FACT_PROJECTION} FROM fact WITH NOINDEX \
+                       WHERE embedding IS NONE) \
+                 WHERE fact_id > $last_completed_fact_id \
+                 ORDER BY fact_id ASC LIMIT $limit"
+            )
         } else {
-            "SELECT * FROM fact WHERE embedding IS NONE ORDER BY fact_id ASC LIMIT $limit"
-                .to_string()
+            format!(
+                "SELECT {BACKFILL_FACT_PROJECTION} FROM fact WITH NOINDEX \
+                 WHERE embedding IS NONE ORDER BY fact_id ASC LIMIT $limit"
+            )
         };
         self.db
             .query_rows(
