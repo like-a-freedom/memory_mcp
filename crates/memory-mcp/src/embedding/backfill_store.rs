@@ -52,21 +52,19 @@ impl EmbeddingBackfillStoreClient {
         } else {
             DEFAULT_BACKFILL_BATCH_SIZE
         };
-        // SurrealDB 3.3.2 otherwise walks the fact_id cursor index before
-        // checking the optional vector field. WITH NOINDEX enables its
-        // pre-decode missing-field filter; the isolated density/scale matrix
-        // covers empty through fully-pending stores before forcing that plan.
+        // Keep SurrealDB's planner choice until the controlled density/scale
+        // matrix proves that a forced full scan wins across realistic stores.
+        // The projection is the measured, semantics-preserving part of this
+        // query change; WITH NOINDEX remains an isolated experiment only.
         let sql = if last_completed_fact_id.is_some() {
             format!(
-                "SELECT {BACKFILL_FACT_PROJECTION} \
-                 FROM (SELECT {BACKFILL_FACT_PROJECTION} FROM fact WITH NOINDEX \
-                       WHERE embedding IS NONE) \
-                 WHERE fact_id > $last_completed_fact_id \
+                "SELECT {BACKFILL_FACT_PROJECTION} FROM fact \
+                 WHERE embedding IS NONE AND fact_id > $last_completed_fact_id \
                  ORDER BY fact_id ASC LIMIT $limit"
             )
         } else {
             format!(
-                "SELECT {BACKFILL_FACT_PROJECTION} FROM fact WITH NOINDEX \
+                "SELECT {BACKFILL_FACT_PROJECTION} FROM fact \
                  WHERE embedding IS NONE ORDER BY fact_id ASC LIMIT $limit"
             )
         };

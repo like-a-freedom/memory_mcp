@@ -66,6 +66,29 @@ HTTP startup logs separately record process RSS, swap and high-water mark at
 fixed startup boundaries. The optional heap-dump route is default-off and
 requires the local-admin surface. Neither is a continuous metric family.
 
+### HTTP maintenance-session pool amendment (2026-10-14)
+
+The bounded namespace-bound maintenance-client pool exports eight families:
+
+| Family | Type | Labels | Meaning |
+| --- | --- | --- | --- |
+| `memory_http_maintenance_events_total` | Counter | `category`, `event`, `outcome` | Scheduler dispatch lifecycle. Categories are `provisioning`, `deletion_recovery`, `task_dispatch`, `runtime_eviction`, `app_session_cleanup`, `physical_cleanup`, `subscription_outbox`, `usage_reconcile`, `registry_namespace_audit`, `registry_rate_bucket_cleanup`, `embedding_backfill`, `lifecycle_decay`, and `lifecycle_archival`; events are `scheduled`, `skipped`, and `executed`; outcomes are `none`, `cadence`, `runtime_shutdown`, `ok`, `degraded`, and `error`. Unknown values collapse to `other`. |
+| `memory_http_maintenance_sessions` | Gauge | none | Resident namespace-bound sessions, including binds in progress. |
+| `memory_http_maintenance_bindings` | Gauge | none | Binds currently in progress; this is a subset of resident sessions. |
+| `memory_http_maintenance_active_leases` | Gauge | none | Active operations pinning resident sessions. |
+| `memory_http_maintenance_metadata_bytes` | Gauge | none | Owner-accounted key and slot metadata only. It excludes the SurrealDB SDK client, socket buffers, allocator retention, RSS, and cgroup memory. |
+| `memory_http_maintenance_binds_total` | Counter | none | Bind attempts since registry composition. |
+| `memory_http_maintenance_reuse_total` | Counter | none | Acquisitions served by an existing bound session. |
+| `memory_http_maintenance_evictions_total` | Counter | none | Sessions retired by TTL, capacity pressure, invalidation, or shutdown. |
+
+The three pool counters use process-owned monotonically increasing values and
+are exported as absolute counter snapshots; they reset when the process
+restarts. The four gauges are current levels refreshed with the existing HTTP
+memory upkeep snapshot. Only the scheduler-events family has labels, and its
+vocabulary is closed in the recorder and covered by the bounded-label tests.
+The Grafana dashboard and scrape-contract checks must include these names and
+must not infer total process memory from `memory_http_maintenance_metadata_bytes`.
+
 The runtime profile determines how the recorder is installed: HTTP's
 `streamable-http` profile installs the recorder for its `/metrics` route;
 stdio/local builds make metric calls no-ops without the `prometheus` feature and

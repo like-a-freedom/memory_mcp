@@ -104,27 +104,32 @@ impl MaintenanceJob {
 /// resets both: the first pass is due and tenant discovery starts at page one.
 #[derive(Default)]
 pub struct MaintenanceSchedule {
-    completed_at: Mutex<HashMap<MaintenanceJob, std::time::Instant>>,
+    last_attempt_started: Mutex<HashMap<MaintenanceJob, std::time::Instant>>,
     tenant_cursors: Mutex<HashMap<MaintenanceJob, Option<String>>>,
 }
 
 impl MaintenanceSchedule {
     pub fn due(&self, job: MaintenanceJob, now: std::time::Instant) -> bool {
-        let completed_at = self
-            .completed_at
+        let last_attempt_started = self
+            .last_attempt_started
             .lock()
             .unwrap_or_else(|error| error.into_inner());
-        completed_at.get(&job).is_none_or(|previous| {
+        last_attempt_started.get(&job).is_none_or(|previous| {
             now.checked_duration_since(*previous)
                 .is_none_or(|elapsed| elapsed >= job.cadence())
         })
     }
 
-    pub fn record_completed(&self, job: MaintenanceJob, now: std::time::Instant) {
-        self.completed_at
+    /// Record when a maintenance attempt starts, not when it finishes. The
+    /// scheduler itself is the cadence clock: a 20 ms job on a one-second
+    /// tick must be due again at the next tick, while a slow job cannot
+    /// overlap because each scheduler cycle awaits its jobs before ticking
+    /// again.
+    pub fn record_attempt_started(&self, job: MaintenanceJob, started_at: std::time::Instant) {
+        self.last_attempt_started
             .lock()
             .unwrap_or_else(|error| error.into_inner())
-            .insert(job, now);
+            .insert(job, started_at);
     }
 
     pub async fn next_ready_tenants(
@@ -375,12 +380,13 @@ async fn run_cycle(registry: RegistryHandle, hooks: &SchedulerHooks, shutdown: C
                     "error"
                 }
             };
-            // Cadence limits attempts, not only successful work. Otherwise a
-            // failed slow job (for example a 60-second audit) is retried on
-            // every one-second scheduler tick and can amplify a database
-            // outage. Recording after the attempt preserves the full interval
-            // between both successful runs and retries.
-            schedule.record_completed(category, std::time::Instant::now());
+            // Cadence limits attempts, not only successful work. Store the
+            // attempt's start time so a fast one-second job is due on the next
+            // scheduler tick rather than one second after its completion.
+            // The cycle awaits every dispatched job, so slow jobs still do
+            // not overlap and failures cannot be retried faster than the
+            // configured interval.
+            schedule.record_attempt_started(category, started);
             crate::observability::record_maintenance_executed(category.label(), outcome);
             if !category.records_background_pass() {
                 record_job_metric(category.label(), outcome, started.elapsed().as_secs_f64());
@@ -417,6 +423,24 @@ fn log_scheduler(op: &'static str, field: &'static str, detail: &str, level: Log
 mod tests {
     use super::*;
     use std::sync::atomic::{AtomicUsize, Ordering};
+
+    #[test]
+    fn fast_one_second_attempt_is_due_on_the_next_scheduler_tick() {
+        let schedule = MaintenanceSchedule::default();
+        let job = MaintenanceJob::TaskDispatch;
+        let started_at = std::time::Instant::now();
+
+        schedule.record_attempt_started(job, started_at);
+        assert!(
+            !schedule.due(job, started_at + Duration::from_millis(20)),
+            "the task must not be dispatched twice in one tick"
+        );
+
+        assert!(
+            schedule.due(job, started_at + Duration::from_secs(1)),
+            "a fast task attempt must not turn the existing one-second tick into a two-second cadence"
+        );
+    }
 
     async fn test_registry() -> RegistryHandle {
         use surrealdb::Surreal;

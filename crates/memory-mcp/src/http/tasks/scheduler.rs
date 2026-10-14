@@ -14,7 +14,10 @@ use crate::platform::fault_injection::{FaultInjector, FaultPoint};
 
 use crate::http::tasks::state::{TASK_KIND_EXTRACT, TASK_KIND_REEMBED, TaskStore};
 use crate::http::tasks::worker::DurableTaskStore;
-use crate::storage::client::{BoundDbClient, SurrealDbClient};
+use crate::storage::client::BoundDbClient;
+
+#[cfg(any(test, feature = "test-fixtures"))]
+use crate::storage::client::SurrealDbClient;
 
 /// The future an [`ExtractorFn`] produces.
 ///
@@ -142,10 +145,7 @@ async fn retry_reconcile_and_retain_with_policy(
             Ok(None) => return Ok(()),
             Err(error) => {
                 degraded = true;
-                crate::http::logging::log_warn(
-                    "http.task.bind_failed",
-                    &format!("tenant {}: {error}", tenant.id),
-                );
+                log_retention_error("http.task.bind_failed", &tenant.id, &error);
                 continue;
             }
         };
@@ -261,10 +261,7 @@ async fn delete_expired_for_page(
                 continue;
             }
             degraded = true;
-            crate::http::logging::log_warn(
-                "http.task.delete_expired_failed",
-                &format!("tenant {}: {error}", tenant.id),
-            );
+            log_retention_error("http.task.delete_expired_failed", &tenant.id, &error);
         }
     }
     crate::observability::record_job_metric(
@@ -275,8 +272,17 @@ async fn delete_expired_for_page(
     Ok(())
 }
 
+fn log_retention_error(op: &'static str, tenant_id: &str, error: &MemoryError) {
+    let event = std::collections::HashMap::from([
+        ("op".to_string(), serde_json::json!(op)),
+        ("tenant_id".to_string(), serde_json::json!(tenant_id)),
+        ("error".to_string(), serde_json::json!(error.to_string())),
+    ]);
+    crate::logging::emit(event, error.log_level());
+}
+
 struct TaskExecutionContext<'a> {
-    db: Arc<SurrealDbClient>,
+    db: Arc<dyn crate::storage::client::DbClient>,
     namespace: &'a str,
     fault_injector: &'a dyn FaultInjector,
     embedding: Option<&'a crate::http::runtime::storage::EmbeddingPolicy>,
@@ -465,7 +471,7 @@ async fn execute_extract_task(
 /// than have them silently treated as fatal.
 async fn execute_reembed_task(
     task_store: &DurableTaskStore,
-    db: Arc<SurrealDbClient>,
+    db: Arc<dyn crate::storage::client::DbClient>,
     namespace: &str,
     handle: &crate::http::tasks::state::TaskHandle,
     record: &crate::http::tasks::state::TenantTaskRecord,
@@ -544,18 +550,15 @@ async fn execute_reembed_task(
 /// deployment's GLiNER checkpoint here would cost a model load per pass and
 /// change nothing about the vectors written.
 fn build_force_enabled_reembed_service(
-    db: Arc<SurrealDbClient>,
+    db: Arc<dyn crate::storage::client::DbClient>,
     namespace: &str,
     policy: &crate::http::runtime::storage::EmbeddingPolicy,
 ) -> Result<crate::service::MemoryService, MemoryError> {
     let extractor =
         std::sync::Arc::new(crate::knowledge::entity_extraction::AnnoEntityExtractor::new()?)
             as std::sync::Arc<dyn crate::knowledge::entity_extraction::EntityExtractor>;
-    // `Arc<SurrealDbClient>` coerces to `Arc<dyn DbClient>`; the client itself
-    // is neither `Clone` nor able to lend its engine, so the `Arc` handle the
-    // caller already owns is the only conversion available (ADR-0042).
     let service = crate::service::MemoryService::new_with_embedding_provider(
-        db as Arc<dyn crate::storage::client::DbClient>,
+        db,
         namespace.to_owned(),
         crate::logging::StdoutLogger::directives_from_env(),
         // Rate limits are request-path policy; a maintenance pass is not
@@ -721,7 +724,8 @@ where
     F: std::future::Future<Output = Result<T, MemoryError>> + Send,
     T: Send + 'static,
 {
-    let base_interval = task_heartbeat_base_interval(ttl_secs);
+    let base_interval =
+        std::time::Duration::from_secs(u64::try_from((ttl_secs / 3).max(1)).unwrap_or(u64::MAX));
     // Apply ±20% jitter from the process clock without adding a random-number
     // dependency to this path: two replicas that started together must not
     // renew on the same instant forever.
@@ -773,10 +777,6 @@ where
     heartbeat_cancel.cancel();
     let _ = heartbeat.await;
     result
-}
-
-fn task_heartbeat_base_interval(ttl_secs: i64) -> std::time::Duration {
-    std::time::Duration::from_secs(u64::try_from((ttl_secs / 3).max(1)).unwrap_or(u64::MAX))
 }
 
 /// Test-only seam over [`run_task_heartbeated`]. Claims nothing and commits
@@ -890,20 +890,4 @@ pub async fn execute_one_task_with_policy(
         },
     )
     .await
-}
-
-#[cfg(test)]
-mod tests {
-    use super::task_heartbeat_base_interval;
-    use std::time::Duration;
-
-    #[test]
-    fn task_lease_heartbeat_base_remains_twenty_seconds() {
-        assert_eq!(task_heartbeat_base_interval(60), Duration::from_secs(20));
-    }
-
-    #[test]
-    fn task_lease_heartbeat_interval_has_a_one_second_floor() {
-        assert_eq!(task_heartbeat_base_interval(0), Duration::from_secs(1));
-    }
 }

@@ -246,6 +246,28 @@ pub enum BatchAdvance {
     Halt(SkipReason),
 }
 
+/// What an embedding backfill does after an empty keyset page and a fresh
+/// count of facts that still need a vector.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum BackfillPageDecision {
+    /// The second read found no remaining facts, so the backfill is complete.
+    Complete,
+    /// A fact appeared before the current cursor after the previous page was
+    /// read. Restart from the beginning so that the new fact is not skipped.
+    RestartFromBeginning,
+}
+
+/// Decide whether an empty backfill page is complete or must restart its
+/// keyset scan. The second count is supplied by the storage adapter so this
+/// policy remains independent of SurrealDB.
+pub fn backfill_page_decision(missing_facts: usize) -> BackfillPageDecision {
+    if missing_facts == 0 {
+        BackfillPageDecision::Complete
+    } else {
+        BackfillPageDecision::RestartFromBeginning
+    }
+}
+
 /// Whether an outcome advances a backfill loop.
 ///
 /// A pure function over the outcome, so the decision can be tested without an
@@ -293,7 +315,23 @@ pub async fn generate_and_update(
 
 #[cfg(test)]
 mod tests {
-    use super::{BatchAdvance, SkipReason, VectorApplication, batch_advance};
+    use super::{
+        BackfillPageDecision, BatchAdvance, SkipReason, VectorApplication, backfill_page_decision,
+        batch_advance,
+    };
+
+    #[test]
+    fn an_empty_backfill_page_with_remaining_facts_restarts_the_scan() {
+        assert_eq!(
+            backfill_page_decision(1),
+            BackfillPageDecision::RestartFromBeginning
+        );
+    }
+
+    #[test]
+    fn an_empty_backfill_page_without_remaining_facts_completes() {
+        assert_eq!(backfill_page_decision(0), BackfillPageDecision::Complete);
+    }
 
     #[test]
     fn disabled_provider_does_not_advance_backfill_checkpoint() {

@@ -24,6 +24,39 @@ pub fn is_transient_db_error(err: &MemoryError) -> bool {
     }
 }
 
+/// Returns `true` only when the storage error indicates that the underlying
+/// client session is no longer usable. Query errors and transaction conflicts
+/// remain attached to the current binding so they do not cause needless
+/// reconnects across every tenant using it.
+#[must_use]
+pub fn is_db_session_failure(err: &MemoryError) -> bool {
+    let MemoryError::Storage(message) = err else {
+        return false;
+    };
+    let message = message.to_ascii_lowercase();
+    if message.contains("transaction conflict")
+        || message.contains("resource busy")
+        || message.contains("would block")
+    {
+        return false;
+    }
+    [
+        "connection lost",
+        "connection reset",
+        "connection closed",
+        "connection refused",
+        "websocket closed",
+        "websocket connection closed",
+        "websocket disconnected",
+        "broken pipe",
+        "not connected",
+        "disconnected from server",
+        "session closed",
+    ]
+    .iter()
+    .any(|signature| message.contains(signature))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -65,5 +98,40 @@ mod tests {
         ] {
             assert!(!is_transient_db_error(&err), "{err} is not a storage error");
         }
+    }
+
+    #[test]
+    fn is_db_session_failure_matches_broken_connections() {
+        for message in [
+            "connection lost",
+            "connection reset by peer",
+            "WebSocket connection closed",
+            "broken pipe while sending query",
+            "not connected to server",
+        ] {
+            assert!(
+                is_db_session_failure(&MemoryError::Storage(message.into())),
+                "{message} should retire its pooled session"
+            );
+        }
+    }
+
+    #[test]
+    fn is_db_session_failure_preserves_query_and_retry_errors() {
+        for message in [
+            "Transaction conflict: Resource busy",
+            "Resource busy: table fact",
+            "syntax error in query",
+            "permission denied for table fact",
+            "connection string is malformed",
+        ] {
+            assert!(
+                !is_db_session_failure(&MemoryError::Storage(message.into())),
+                "{message} must not retire a pooled session"
+            );
+        }
+        assert!(!is_db_session_failure(&MemoryError::Auth(
+            "connection lost".into()
+        )));
     }
 }

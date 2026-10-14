@@ -54,7 +54,7 @@ async fn skipped_jobs_do_not_count_as_executed() {
     let started = Instant::now();
 
     assert!(schedule.due(MaintenanceJob::PhysicalCleanup, started));
-    schedule.record_completed(MaintenanceJob::PhysicalCleanup, started);
+    schedule.record_attempt_started(MaintenanceJob::PhysicalCleanup, started);
     assert!(!schedule.due(
         MaintenanceJob::PhysicalCleanup,
         started + Duration::from_secs(59)
@@ -89,7 +89,7 @@ fn task_recovery_stays_fast_while_physical_cleanup_stays_slow() {
 fn maintenance_is_due_when_the_monotonic_clock_moves_backwards() {
     let schedule = MaintenanceSchedule::default();
     let now = Instant::now();
-    schedule.record_completed(MaintenanceJob::TaskDispatch, now + Duration::from_secs(30));
+    schedule.record_attempt_started(MaintenanceJob::TaskDispatch, now + Duration::from_secs(30));
 
     assert!(schedule.due(MaintenanceJob::TaskDispatch, now));
 }
@@ -97,7 +97,7 @@ fn maintenance_is_due_when_the_monotonic_clock_moves_backwards() {
 #[test]
 fn a_new_schedule_runs_work_after_process_restart() {
     let prior_process = MaintenanceSchedule::default();
-    prior_process.record_completed(MaintenanceJob::PhysicalCleanup, Instant::now());
+    prior_process.record_attempt_started(MaintenanceJob::PhysicalCleanup, Instant::now());
     let restarted_process = MaintenanceSchedule::default();
 
     assert!(restarted_process.due(MaintenanceJob::PhysicalCleanup, Instant::now()));

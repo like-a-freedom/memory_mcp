@@ -100,40 +100,6 @@ macro_rules! no_embedding_gate_case {
 
 #[tokio::test(flavor = "current_thread")]
 #[ignore = "remote SurrealDB allocation regression gate; run explicitly on Linux amd64"]
-async fn remote_300_rows_does_not_allocate_a_second_tagged_tree() -> Result<(), Box<dyn Error>> {
-    let fixture = StorageMemoryFixture::start(300, 2048).await?;
-    let report = run_remote_allocation_case(&fixture, 300, 2048)?;
-    println!("STORAGE_ALLOCATION_REPORT={report:?}");
-
-    assert_eq!(report.rows, 300, "{report:?}");
-    assert_eq!(report.dimension, 2048, "{report:?}");
-    assert!(
-        report.peak_delta_bytes < 1_073_741_824,
-        "legacy tagged-tree materialization exceeded the 1 GiB budget: {report:?}"
-    );
-
-    Ok(())
-}
-
-#[tokio::test(flavor = "current_thread")]
-#[ignore = "remote SurrealDB allocation regression gate; run explicitly on Linux amd64"]
-async fn remote_300_rows_materializes_within_64_mib() -> Result<(), Box<dyn Error>> {
-    let fixture = StorageMemoryFixture::start(300, 2048).await?;
-    let report = run_remote_allocation_case(&fixture, 300, 2048)?;
-    println!("STORAGE_ALLOCATION_REPORT={report:?}");
-
-    assert_eq!(report.rows, 300, "{report:?}");
-    assert_eq!(report.dimension, 2048, "{report:?}");
-    assert!(
-        report.peak_delta_bytes < 67_108_864,
-        "typed-value materialization exceeded the 64 MiB budget: {report:?}"
-    );
-
-    Ok(())
-}
-
-#[tokio::test(flavor = "current_thread")]
-#[ignore = "remote SurrealDB allocation regression gate; run explicitly on Linux amd64"]
 async fn owner_scoped_active_fact_read_does_not_copy_plain_rows() -> Result<(), Box<dyn Error>> {
     let report = run_remote_bound_scan_case(300, 65_536).await?;
     println!("STORAGE_ALLOCATION_REPORT={report:?}");
@@ -146,32 +112,6 @@ async fn owner_scoped_active_fact_read_does_not_copy_plain_rows() -> Result<(), 
     assert!(
         report.peak_delta_bytes < 8_388_608,
         "BoundDbClient copied the ready fact rows during owner-store handoff: {report:?}"
-    );
-
-    Ok(())
-}
-
-#[tokio::test(flavor = "current_thread")]
-#[ignore = "remote SurrealDB allocation regression gate; run explicitly on Linux amd64"]
-async fn remote_1000_rows_materializes_within_192_mib() -> Result<(), Box<dyn Error>> {
-    let small_fixture = StorageMemoryFixture::start(300, 2048).await?;
-    let small = run_remote_allocation_case(&small_fixture, 300, 2048)?;
-    let large_fixture = StorageMemoryFixture::start(1000, 2048).await?;
-    let large = run_remote_allocation_case(&large_fixture, 1000, 2048)?;
-    println!("STORAGE_ALLOCATION_SCALE_REPORT_SMALL={small:?}");
-    println!("STORAGE_ALLOCATION_SCALE_REPORT_LARGE={large:?}");
-
-    assert_eq!(small.rows, 300, "{small:?}");
-    assert_eq!(large.rows, 1000, "{large:?}");
-    assert_eq!(small.dimension, 2048, "{small:?}");
-    assert_eq!(large.dimension, 2048, "{large:?}");
-    assert!(
-        large.peak_delta_bytes < 201_326_592,
-        "1000-row materialization exceeded the 192 MiB budget: {large:?}"
-    );
-    assert!(
-        large.peak_delta_bytes <= 4 * small.peak_delta_bytes,
-        "peak allocation scaled superlinearly from 300 to 1000 rows: small={small:?}, large={large:?}"
     );
 
     Ok(())

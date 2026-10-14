@@ -6,7 +6,6 @@ use memory_mcp::http::registry::{
     PrivilegedEngine,
     maintenance_clients::{MaintenanceClientKey, MaintenanceClientPoolConfig, MaintenanceClients},
 };
-use memory_mcp::storage::DbClient;
 use surrealdb::Surreal;
 use surrealdb::engine::local::Mem;
 use surrealdb::engine::remote::ws::{Client, Ws};

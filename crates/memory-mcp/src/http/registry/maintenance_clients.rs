@@ -4,13 +4,16 @@ use std::{
     collections::HashMap,
     mem::size_of,
     sync::{
-        Arc, Mutex, MutexGuard,
+        Arc, Mutex, MutexGuard, Weak,
         atomic::{AtomicUsize, Ordering},
     },
     time::Duration,
 };
 
-use crate::{error::MemoryError, storage::client::SurrealDbClient};
+use crate::{error::MemoryError, storage::client::DbClient};
+
+#[cfg(test)]
+use crate::storage::client::SurrealDbClient;
 
 const PRODUCTION_CAPACITY: usize = 32;
 const PRODUCTION_METADATA_BYTES: usize = 1024 * 1024;
@@ -57,7 +60,7 @@ impl Default for MaintenanceClientPoolConfig {
 
 #[async_trait::async_trait]
 pub(crate) trait MaintenanceClientFactory: Send + Sync + 'static {
-    async fn bind(&self, key: &MaintenanceClientKey) -> Result<Arc<SurrealDbClient>, MemoryError>;
+    async fn bind(&self, key: &MaintenanceClientKey) -> Result<Arc<dyn DbClient>, MemoryError>;
 }
 
 #[derive(Clone)]
@@ -69,7 +72,90 @@ pub struct MaintenanceClientLease {
     inner: Arc<Inner>,
     key: Arc<MaintenanceClientKey>,
     id: u64,
-    client: Arc<SurrealDbClient>,
+    client: Arc<dyn DbClient>,
+}
+
+/// Shared adapter that retires the exact pool generation when a database
+/// operation proves its session is broken. All maintenance users receive this
+/// adapter, so reconnect behavior cannot depend on each job remembering to
+/// invalidate the pool.
+struct MaintenanceDbClient {
+    delegate: Arc<dyn DbClient>,
+    inner: Weak<Inner>,
+    key: Arc<MaintenanceClientKey>,
+    id: u64,
+}
+
+impl MaintenanceDbClient {
+    fn observe<T>(&self, result: Result<T, MemoryError>) -> Result<T, MemoryError> {
+        if let Err(error) = &result
+            && crate::platform::persistence::db_errors::is_db_session_failure(error)
+            && let Some(inner) = self.inner.upgrade()
+        {
+            invalidate_slot(&inner, &self.key, Some(self.id));
+        }
+        result
+    }
+}
+
+#[async_trait::async_trait]
+impl DbClient for MaintenanceDbClient {
+    async fn select_one(
+        &self,
+        record_id: &str,
+        namespace: &str,
+    ) -> Result<Option<serde_json::Value>, MemoryError> {
+        self.observe(self.delegate.select_one(record_id, namespace).await)
+    }
+
+    async fn select_table(
+        &self,
+        table: crate::storage::table_scope::OwnedTable,
+        namespace: &str,
+    ) -> Result<Vec<serde_json::Value>, MemoryError> {
+        self.observe(self.delegate.select_table(table, namespace).await)
+    }
+
+    async fn create(
+        &self,
+        record_id: &str,
+        content: serde_json::Value,
+        namespace: &str,
+        temporal_fields: &[&str],
+    ) -> Result<serde_json::Value, MemoryError> {
+        self.observe(
+            self.delegate
+                .create(record_id, content, namespace, temporal_fields)
+                .await,
+        )
+    }
+
+    async fn update(
+        &self,
+        record_id: &str,
+        content: serde_json::Value,
+        namespace: &str,
+        temporal_fields: &[&str],
+    ) -> Result<serde_json::Value, MemoryError> {
+        self.observe(
+            self.delegate
+                .update(record_id, content, namespace, temporal_fields)
+                .await,
+        )
+    }
+
+    async fn query(
+        &self,
+        sql: &str,
+        vars: Option<serde_json::Value>,
+        namespace: &str,
+    ) -> Result<serde_json::Value, MemoryError> {
+        self.observe(self.delegate.query(sql, vars, namespace).await)
+    }
+
+    async fn apply_migrations(&self, namespace: &str) -> Result<(), MemoryError> {
+        self.observe(self.delegate.apply_migrations(namespace).await)
+    }
 }
 
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
@@ -117,7 +203,7 @@ enum SlotState {
         invalidated: bool,
     },
     Ready {
-        client: Arc<SurrealDbClient>,
+        client: Arc<dyn DbClient>,
         active_leases: usize,
         last_used: tokio::time::Instant,
         invalidated: bool,
@@ -127,7 +213,7 @@ enum SlotState {
 impl MaintenanceClientLease {
     /// Return an outer `Arc` clone. All clones point at the same permanently
     /// namespace-bound adapter; they cannot select another tenant.
-    pub fn client(&self) -> Arc<SurrealDbClient> {
+    pub fn client(&self) -> Arc<dyn DbClient> {
         Arc::clone(&self.client)
     }
 }
@@ -188,6 +274,7 @@ impl MaintenanceClients {
         engine: super::PrivilegedEngine,
         generation: u64,
         dimension: Option<usize>,
+        config: MaintenanceClientPoolConfig,
     ) -> Self {
         Self::new(
             Arc::new(EngineFactory {
@@ -195,7 +282,7 @@ impl MaintenanceClients {
                 generation,
                 dimension,
             }),
-            MaintenanceClientPoolConfig::default(),
+            config,
         )
     }
 
@@ -321,6 +408,12 @@ impl MaintenanceClients {
                         _ = self.inner.shutdown.cancelled() => Err(shutting_down_error()),
                         result = self.inner.factory.bind(&key) => result,
                     }?;
+                    let bound: Arc<dyn DbClient> = Arc::new(MaintenanceDbClient {
+                        delegate: bound,
+                        inner: Arc::downgrade(&self.inner),
+                        key: Arc::clone(&key),
+                        id,
+                    });
 
                     let published = {
                         let mut state = lock_state(&self.inner.state);
@@ -362,38 +455,6 @@ impl MaintenanceClients {
                 }
             }
         }
-    }
-
-    /// Retire a failed or disconnected binding. Existing users finish with
-    /// their current lease; new users wait for those leases to drain before a
-    /// fresh bound session is created.
-    pub fn invalidate(&self, key: &MaintenanceClientKey) {
-        let mut retired = Vec::new();
-        let mut state = lock_state(&self.inner.state);
-        let remove = match state.slots.get_mut(key) {
-            Some(slot) => match &mut slot.state {
-                SlotState::Creating { invalidated } => {
-                    *invalidated = true;
-                    false
-                }
-                SlotState::Ready {
-                    active_leases,
-                    invalidated,
-                    ..
-                } => {
-                    *invalidated = true;
-                    *active_leases == 0
-                }
-            },
-            None => false,
-        };
-        if remove && let Some(slot) = remove_slot(&mut state, key) {
-            retired.push(slot);
-            self.inner.evictions.fetch_add(1, Ordering::Relaxed);
-        }
-        drop(state);
-        drop(retired);
-        signal_change(&self.inner);
     }
 
     /// Stop admissions, cancel in-flight binds, drop idle sessions and wait
@@ -477,7 +538,7 @@ impl MaintenanceClients {
 }
 
 enum AcquireAction {
-    Lease(u64, Arc<SurrealDbClient>),
+    Lease(u64, Arc<dyn DbClient>),
     Create(u64),
     Retry,
     Wait,
@@ -514,7 +575,7 @@ struct EngineFactory {
 
 #[async_trait::async_trait]
 impl MaintenanceClientFactory for EngineFactory {
-    async fn bind(&self, key: &MaintenanceClientKey) -> Result<Arc<SurrealDbClient>, MemoryError> {
+    async fn bind(&self, key: &MaintenanceClientKey) -> Result<Arc<dyn DbClient>, MemoryError> {
         if key.engine_generation != self.generation || key.migration_dimension != self.dimension {
             return Err(MemoryError::Conflict(
                 "maintenance client key does not match the selected engine generation or embedding dimension".into(),
@@ -534,9 +595,11 @@ impl MaintenanceClientFactory for EngineFactory {
             )
             .await?;
         }
-        self.engine
+        let client = self
+            .engine
             .bind_namespace_with_dimension(&key.namespace, &key.database, key.migration_dimension)
-            .await
+            .await?;
+        Ok(client)
     }
 }
 
@@ -548,10 +611,12 @@ struct TestEngineFactory {
 #[cfg(any(test, feature = "test-fixtures"))]
 #[async_trait::async_trait]
 impl MaintenanceClientFactory for TestEngineFactory {
-    async fn bind(&self, key: &MaintenanceClientKey) -> Result<Arc<SurrealDbClient>, MemoryError> {
-        self.engine
+    async fn bind(&self, key: &MaintenanceClientKey) -> Result<Arc<dyn DbClient>, MemoryError> {
+        let client = self
+            .engine
             .bind_namespace_with_dimension(&key.namespace, &key.database, key.migration_dimension)
-            .await
+            .await?;
+        Ok(client)
     }
 }
 
@@ -629,6 +694,35 @@ fn signal_change(inner: &Inner) {
         .send_modify(|revision| *revision = revision.wrapping_add(1));
 }
 
+fn invalidate_slot(inner: &Arc<Inner>, key: &MaintenanceClientKey, expected_id: Option<u64>) {
+    let mut retired = Vec::new();
+    let mut state = lock_state(&inner.state);
+    let remove = match state.slots.get_mut(key) {
+        Some(slot) if expected_id.is_none_or(|id| slot.id == id) => match &mut slot.state {
+            SlotState::Creating { invalidated } => {
+                *invalidated = true;
+                false
+            }
+            SlotState::Ready {
+                active_leases,
+                invalidated,
+                ..
+            } => {
+                *invalidated = true;
+                *active_leases == 0
+            }
+        },
+        _ => false,
+    };
+    if remove && let Some(slot) = remove_slot(&mut state, key) {
+        retired.push(slot);
+        inner.evictions.fetch_add(1, Ordering::Relaxed);
+    }
+    drop(state);
+    drop(retired);
+    signal_change(inner);
+}
+
 fn shutting_down_error() -> MemoryError {
     MemoryError::Conflict("maintenance client pool is shutting down".into())
 }
@@ -702,10 +796,7 @@ mod tests {
 
     #[async_trait::async_trait]
     impl MaintenanceClientFactory for ControlledFactory {
-        async fn bind(
-            &self,
-            key: &MaintenanceClientKey,
-        ) -> Result<Arc<SurrealDbClient>, MemoryError> {
+        async fn bind(&self, key: &MaintenanceClientKey) -> Result<Arc<dyn DbClient>, MemoryError> {
             self.bind_count.fetch_add(1, Ordering::Relaxed);
             if self.block_binds {
                 self.starts.add_permits(1);
@@ -731,6 +822,83 @@ mod tests {
                 .lock()
                 .unwrap_or_else(std::sync::PoisonError::into_inner) = Some(Arc::downgrade(&client));
             Ok(client)
+        }
+    }
+
+    struct BrokenOnceFactory {
+        binds: AtomicUsize,
+    }
+
+    #[async_trait::async_trait]
+    impl MaintenanceClientFactory for BrokenOnceFactory {
+        async fn bind(
+            &self,
+            _key: &MaintenanceClientKey,
+        ) -> Result<Arc<dyn DbClient>, MemoryError> {
+            let attempt = self.binds.fetch_add(1, Ordering::SeqCst);
+            Ok(Arc::new(ScriptedSessionClient {
+                fail_connection: attempt == 0,
+            }))
+        }
+    }
+
+    struct ScriptedSessionClient {
+        fail_connection: bool,
+    }
+
+    #[async_trait::async_trait]
+    impl DbClient for ScriptedSessionClient {
+        async fn select_one(
+            &self,
+            _record_id: &str,
+            _namespace: &str,
+        ) -> Result<Option<serde_json::Value>, MemoryError> {
+            Ok(None)
+        }
+
+        async fn select_table(
+            &self,
+            _table: crate::storage::table_scope::OwnedTable,
+            _namespace: &str,
+        ) -> Result<Vec<serde_json::Value>, MemoryError> {
+            Ok(Vec::new())
+        }
+
+        async fn create(
+            &self,
+            _record_id: &str,
+            _content: serde_json::Value,
+            _namespace: &str,
+            _temporal_fields: &[&str],
+        ) -> Result<serde_json::Value, MemoryError> {
+            Ok(serde_json::Value::Null)
+        }
+
+        async fn update(
+            &self,
+            _record_id: &str,
+            _content: serde_json::Value,
+            _namespace: &str,
+            _temporal_fields: &[&str],
+        ) -> Result<serde_json::Value, MemoryError> {
+            Ok(serde_json::Value::Null)
+        }
+
+        async fn query(
+            &self,
+            _sql: &str,
+            _vars: Option<serde_json::Value>,
+            _namespace: &str,
+        ) -> Result<serde_json::Value, MemoryError> {
+            if self.fail_connection {
+                Err(MemoryError::Storage("WebSocket connection closed".into()))
+            } else {
+                Ok(serde_json::json!([]))
+            }
+        }
+
+        async fn apply_migrations(&self, _namespace: &str) -> Result<(), MemoryError> {
+            Ok(())
         }
     }
 
@@ -898,28 +1066,87 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn invalidation_drains_active_use_before_single_flight_reconnect() {
-        let pool = MaintenanceClients::with_engine_for_test(
-            test_engine().await,
+    async fn a_session_failure_retires_the_binding_and_reconnects_once() {
+        let factory = Arc::new(BrokenOnceFactory {
+            binds: AtomicUsize::new(0),
+        });
+        let pool = MaintenanceClients::with_factory_for_test(
+            factory.clone(),
             config(2, 4096, Duration::from_secs(300)),
         );
-        let identity = key("tns_reconnect", "memory");
+        let identity = key("tns_session_failure", "memory");
         let first = pool
             .acquire(identity.clone())
             .await
-            .expect("initial session binds");
-        let first_client = first.client();
-        pool.invalidate(&identity);
+            .expect("initial maintenance session binds");
+
+        assert!(matches!(
+            first.client().query("SELECT * FROM fact", None, "tns_session_failure").await,
+            Err(MemoryError::Storage(message)) if message.contains("WebSocket connection closed")
+        ));
         let mut reconnect = Box::pin(pool.acquire(identity));
         assert!(poll_once(reconnect.as_mut()).is_pending());
-        assert_eq!(pool.snapshot().bind_attempts, 1);
+        assert_eq!(factory.binds.load(Ordering::SeqCst), 1);
 
         drop(first);
-        let next = reconnect.await.expect("invalidated session reconnects");
-        assert!(!Arc::ptr_eq(&first_client, &next.client()));
-        assert_eq!(pool.snapshot().bind_attempts, 2);
+        let next = reconnect.await.expect("broken session is rebound");
+        assert_eq!(factory.binds.load(Ordering::SeqCst), 2);
         assert_eq!(pool.snapshot().evictions, 1);
-        drop((first_client, next));
+        assert_eq!(
+            next.client()
+                .query("SELECT * FROM fact", None, "tns_session_failure")
+                .await
+                .expect("new session answers"),
+            serde_json::json!([])
+        );
+        drop(next);
+    }
+
+    #[tokio::test]
+    async fn a_stale_session_failure_cannot_invalidate_its_replacement() {
+        let factory = Arc::new(BrokenOnceFactory {
+            binds: AtomicUsize::new(0),
+        });
+        let pool = MaintenanceClients::with_factory_for_test(
+            factory.clone(),
+            config(2, 4096, Duration::from_secs(300)),
+        );
+        let identity = key("tns_stale_session", "memory");
+        let first = pool
+            .acquire(identity.clone())
+            .await
+            .expect("initial maintenance session binds");
+        let stale_client = first.client();
+        assert!(
+            stale_client
+                .query("SELECT * FROM fact", None, "tns_stale_session")
+                .await
+                .is_err()
+        );
+        drop(first);
+
+        let replacement = pool
+            .acquire(identity.clone())
+            .await
+            .expect("broken binding is replaced");
+        assert_eq!(factory.binds.load(Ordering::SeqCst), 2);
+        assert_eq!(pool.snapshot().evictions, 1);
+
+        assert!(
+            stale_client
+                .query("SELECT * FROM fact", None, "tns_stale_session")
+                .await
+                .is_err()
+        );
+        assert_eq!(pool.snapshot().evictions, 1);
+
+        let mut reuse = Box::pin(pool.acquire(identity));
+        let Poll::Ready(Ok(reused)) = poll_once(reuse.as_mut()) else {
+            panic!("stale binding must not retire its replacement");
+        };
+        assert_eq!(factory.binds.load(Ordering::SeqCst), 2);
+        assert_eq!(pool.snapshot().evictions, 1);
+        drop((replacement, reused, stale_client));
     }
 
     #[tokio::test]

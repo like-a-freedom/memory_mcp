@@ -208,7 +208,15 @@ impl HttpState {
                 .as_ref()
                 .map(|embedding| embedding.dimension)
         });
-        let registry = registry.with_maintenance_dimension(maintenance_dimension);
+        let maintenance_client_pool_config =
+            registry::maintenance_clients::MaintenanceClientPoolConfig {
+                capacity: config.maintenance_client_capacity,
+                max_metadata_bytes: config.maintenance_client_metadata_bytes,
+                idle_ttl: config.maintenance_client_idle_ttl,
+            };
+        let registry = registry
+            .with_maintenance_client_pool_config(maintenance_client_pool_config)
+            .with_maintenance_dimension(maintenance_dimension);
         // The `free` plan backs the data plane: tenants created by signup, and
         // tenants that predate this change, carry `plan_version 1`, and the data
         // plane resolves that row on every ingest. A `local`-only deployment

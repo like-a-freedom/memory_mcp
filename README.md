@@ -1056,6 +1056,9 @@ operator configuration and are listed under
 | `MEMORY_MCP_HTTP_IDENTITY_INDEX_KEY` | HTTP secrets | Conditional | [Streamable HTTP](#streamable-http-environment-variables) |
 | `MEMORY_MCP_HTTP_INGEST_PER_MINUTE` | Plan limits | Conditional | [Streamable HTTP](#streamable-http-environment-variables) |
 | `MEMORY_MCP_HTTP_LOCAL_DEFAULT_PLAN_VERSION` | HTTP auth | Conditional | [Streamable HTTP](#streamable-http-environment-variables) |
+| `MEMORY_MCP_HTTP_MAINTENANCE_CLIENT_CAPACITY` | HTTP limits | No | [Streamable HTTP](#streamable-http-environment-variables) |
+| `MEMORY_MCP_HTTP_MAINTENANCE_CLIENT_IDLE_TTL_SECS` | HTTP limits | No | [Streamable HTTP](#streamable-http-environment-variables) |
+| `MEMORY_MCP_HTTP_MAINTENANCE_CLIENT_METADATA_BYTES` | HTTP limits | No | [Streamable HTTP](#streamable-http-environment-variables) |
 | `MEMORY_MCP_HTTP_MAINTENANCE_PARALLELISM` | HTTP limits | No | [Streamable HTTP](#streamable-http-environment-variables) |
 | `MEMORY_MCP_HTTP_MAX_ACTIVE_API_KEYS` | Plan limits | Conditional | [Streamable HTTP](#streamable-http-environment-variables) |
 | `MEMORY_MCP_HTTP_MAX_EPISODE_COUNT` | Plan limits | Conditional | [Streamable HTTP](#streamable-http-environment-variables) |
@@ -1358,6 +1361,9 @@ seconds — a longer interval would let a revoked authorization keep streaming.
 | `MEMORY_MCP_HTTP_PREFLIGHT_BYTES` | `usize` | `67108864` (64 MiB) | Aggregate accounted raw body bytes copied during preflight; not an RSS limit |
 | `MEMORY_MCP_HTTP_SUBSCRIPTION_LIMIT` | `u32` | `32` | Global concurrent `subscriptions/listen` admission budget (separate from ordinary requests) |
 | `MEMORY_MCP_HTTP_MAINTENANCE_PARALLELISM` | `usize` | `4` | Scheduler maintenance-job concurrency |
+| `MEMORY_MCP_HTTP_MAINTENANCE_CLIENT_CAPACITY` | `usize` | `32` | Maximum cached namespace-bound sessions used by process-level maintenance jobs |
+| `MEMORY_MCP_HTTP_MAINTENANCE_CLIENT_METADATA_BYTES` | bytes | `1048576` (1 MiB) | Accounted budget for maintenance-session keys and pool slots; excludes SDK, socket, allocator and process memory |
+| `MEMORY_MCP_HTTP_MAINTENANCE_CLIENT_IDLE_TTL_SECS` | seconds | `300` (5 min) | Idle time before an unused maintenance session is evicted |
 | `MEMORY_MCP_HTTP_SUBSCRIPTION_QUEUE_CAPACITY` | `usize` | `64` | Bounded per-listener event queue; slow consumers are disconnected |
 | `MEMORY_MCP_HTTP_SUBSCRIPTION_AUTH_RECHECK_SECS` | seconds | `30` | Maximum interval between authorization re-checks for an open stream |
 | `MEMORY_MCP_HTTP_TASK_RETENTION_SECS` | seconds | `604800` (7 days) | How long completed durable Tasks are kept before the scheduler removes them |

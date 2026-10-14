@@ -19,7 +19,7 @@ use crate::http::leases::scheduler::{MaintenanceJob, MaintenanceSchedule, Schedu
 use crate::http::registry::RegistryHandle;
 use crate::http::registry::models::Tenant;
 use crate::http::runtime::bootstrap::DeploymentPolicy;
-use crate::storage::client::SurrealDbClient;
+use crate::storage::client::DbClient;
 
 /// How many ready tenants one walk visits — the same bound every other
 /// maintenance job uses, so a pass never holds the maintenance semaphore for
@@ -140,7 +140,7 @@ async fn run_walk(
             }
         };
         let db = lease.client();
-        if let Err(error) = run_tenant(&db, &tenant, policy, pass).await {
+        if let Err(error) = run_tenant(db, &tenant, policy, pass).await {
             degraded = true;
             crate::http::logging::log_warn(
                 pass.failed_op(),
@@ -163,13 +163,13 @@ async fn run_walk(
 /// needs storage, logging, policy, and the claim store for decay, but not NER,
 /// embedding, retrieval, or request caches.
 async fn run_tenant(
-    db: &Arc<SurrealDbClient>,
+    db: Arc<dyn DbClient>,
     tenant: &Tenant,
     policy: &DeploymentPolicy,
     pass: Pass,
 ) -> Result<(), MemoryError> {
     let namespace = tenant.namespace_binding.namespace.clone();
-    let db_client = Arc::clone(db) as Arc<dyn crate::storage::DbClient>;
+    let db_client = db;
     let log_level = crate::logging::StdoutLogger::directives_from_env();
     let logger = crate::logging::StdoutLogger::new(&log_level);
     let handles = match pass {
@@ -332,7 +332,7 @@ mod tests {
             seed_decayed_fact(&db, namespace, "fact:lifecycle_no_ner").await;
 
             let result = run_tenant(
-                &db,
+                db.clone(),
                 &tenant(namespace),
                 &policy(decay_enabled()),
                 Pass::Decay,
@@ -413,7 +413,7 @@ mod tests {
             }
 
             let result = run_tenant(
-                &db_a,
+                db_a.clone(),
                 &tenant("ns_archive_a"),
                 &policy(decay_enabled()),
                 Pass::ArchivalAndCommunity,
@@ -517,7 +517,7 @@ mod tests {
             }
 
             let result = run_tenant(
-                &db,
+                db.clone(),
                 &tenant(namespace),
                 &policy(decay_enabled()),
                 Pass::ArchivalAndCommunity,
@@ -540,7 +540,7 @@ mod tests {
             assert_eq!(summary, "Alice Smith, Bob Jones, Carol White");
 
             run_tenant(
-                &db,
+                db.clone(),
                 &tenant(namespace),
                 &policy(decay_enabled()),
                 Pass::ArchivalAndCommunity,
@@ -593,7 +593,7 @@ mod tests {
         job.invoke(registry.clone(), Arc::clone(&schedule))
             .await
             .expect("first tick");
-        schedule.record_completed(category, t0);
+        schedule.record_attempt_started(category, t0);
 
         assert!(
             fact_is_invalid(&db, namespace, "fact:old1").await,

@@ -9,7 +9,6 @@
 #[cfg(feature = "streamable-http")]
 use crate::http::leases::scheduler::{MaintenanceJob, MaintenanceSchedule, SchedulerJob};
 #[cfg(feature = "streamable-http")]
-use crate::storage::client::DbClient;
 #[cfg(feature = "streamable-http")]
 use std::sync::Arc;
 

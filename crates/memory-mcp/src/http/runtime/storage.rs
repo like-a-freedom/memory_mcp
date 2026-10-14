@@ -658,8 +658,13 @@ pub async fn build_runtime_with_options(
     // embedding this provider writes, so the mismatch is repaired here, at
     // activation, where a schema change belongs — not on the request path.
     if let Some(policy) = options.embedding_policy.as_ref() {
-        reconcile_tenant_index_dimension(&tenant_db, &tenant.namespace_binding.namespace, policy)
-            .await;
+        let tenant_db_for_index: Arc<dyn crate::storage::client::DbClient> = tenant_db.clone();
+        reconcile_tenant_index_dimension(
+            tenant_db_for_index,
+            &tenant.namespace_binding.namespace,
+            policy,
+        )
+        .await;
     }
     TenantRuntime::from_bound_client_with_runtime_options(tenant, tenant_db, plan, options).await
 }
@@ -695,18 +700,15 @@ pub(crate) enum IndexWriteGate {
 /// must still activate, because lexical retrieval does not depend on the index.
 /// The tenant's embedding decision is separate and degrades on its own.
 pub(crate) async fn reconcile_tenant_index_dimension(
-    tenant_db: &Arc<SurrealDbClient>,
+    tenant_db: Arc<dyn crate::storage::client::DbClient>,
     namespace: &str,
     policy: &EmbeddingPolicy,
 ) -> IndexWriteGate {
     // The index vocabulary lives on `ReembedStoreClient`, the owner of the
-    // reembed-owned DDL. `Arc<SurrealDbClient>` coerces to `Arc<dyn DbClient>`
-    // here; a `&SurrealDbClient` could not, because the client is neither
-    // `Clone` nor able to lend its engine.
-    let store = crate::embedding::reembed_store::ReembedStoreClient::new(
-        Arc::clone(tenant_db) as Arc<dyn crate::storage::client::DbClient>,
-        namespace.to_string(),
-    );
+    // reembed-owned DDL. This accepts the narrow storage port so maintenance
+    // clients can observe and retire broken sessions through the same adapter.
+    let store =
+        crate::embedding::reembed_store::ReembedStoreClient::new(tenant_db, namespace.to_string());
     match store.embedding_index_dimension().await {
         Ok(Some(existing)) if existing != policy.dimension => {
             // Only a namespace that stores no vector may have its index

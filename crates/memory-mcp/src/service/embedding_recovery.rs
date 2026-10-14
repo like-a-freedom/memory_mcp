@@ -253,13 +253,16 @@ pub(crate) async fn run_backfill(
             .await?;
         if batch.is_empty() {
             let remaining = store.count_facts_missing_embeddings().await?;
-            if remaining == 0 {
-                return Ok(BackfillOutcome::Complete { processed });
+            match crate::embedding::api::backfill_page_decision(remaining) {
+                crate::embedding::api::BackfillPageDecision::Complete => {
+                    return Ok(BackfillOutcome::Complete { processed });
+                }
+                crate::embedding::api::BackfillPageDecision::RestartFromBeginning => {
+                    // A fact can become missing after the prior batch's count
+                    // and sort before the cursor. Recheck from the beginning.
+                    cursor = None;
+                }
             }
-            // A fact can become missing after the prior batch's count and
-            // sort before the cursor. Recheck from the beginning before
-            // declaring the recovery pass complete.
-            cursor = None;
             continue;
         }
 
@@ -1489,7 +1492,7 @@ mod tests {
                 },
             )
             .expect_query_with(
-                |sql| sql.contains("FROM fact WITH NOINDEX"),
+                |sql| sql.contains("FROM fact") && !sql.contains("WITH NOINDEX"),
                 move |_, _| {
                     let call = selection_calls.fetch_add(1, Ordering::SeqCst);
                     Ok(match call {

@@ -141,7 +141,7 @@
       "rpcCount": null,
       "signinCount": null,
       "source": "surreal-read-audit-results.jsonl",
-      "disposition": "retain required global/relative-date coverage; task 7"
+      "disposition": "retain full fallback coverage; Task 10 fixes full bi-temporal visibility; no scan-volume reduction claimed"
     },
     {
       "id": "facts_browse",
@@ -241,7 +241,7 @@
       "rpcCount": null,
       "signinCount": null,
       "source": "surreal-read-audit-results.jsonl",
-      "disposition": "absent-term diagnostic only; task 8"
+      "disposition": "Task 8 batches fallback reads with result/cap equivalence tests; production probe is absent-term only"
     },
     {
       "id": "entity_batch",
@@ -313,7 +313,7 @@
       "rpcCount": null,
       "signinCount": null,
       "source": "surreal-read-audit-results.jsonl",
-      "disposition": "absent-term diagnostic only; task 8"
+      "disposition": "Task 8 batches fallback reads with result/cap equivalence tests; production probe is absent-term only"
     },
     {
       "id": "episode_scan",
@@ -433,7 +433,7 @@
       "rpcCount": null,
       "signinCount": null,
       "source": "surreal-read-audit-results.jsonl",
-      "disposition": "retain cursor compatibility until task 9 proves otherwise"
+      "disposition": "retain SurrealDB 3.3.2 cursor form; multi-page no-skip regression passed in Task 9"
     },
     {
       "id": "artifacts_upper",
@@ -551,7 +551,7 @@
       "rpcCount": null,
       "signinCount": null,
       "source": "surreal-read-audit-deep-results.jsonl",
-      "disposition": "baseline shape; task 6"
+      "disposition": "Task 6 baseline retained for comparison; constructed candidate passed semantic equivalence fixture"
     },
     {
       "id": "graph_batch_constructed",
@@ -625,7 +625,7 @@
       "rpcCount": null,
       "signinCount": null,
       "source": "surreal-read-audit-deep-results.jsonl",
-      "disposition": "candidate shape; task 6 semantic regression required"
+      "disposition": "Task 6 constructed endpoint candidate passed semantic equivalence fixture; no all-shapes production profile"
     },
     {
       "id": "episode_id_lookup",
@@ -1297,7 +1297,7 @@
       "rpcCount": null,
       "signinCount": null,
       "source": "surreal-read-audit-backfill-results.jsonl",
-      "disposition": "diagnostic candidate only; task 9 must test dense and mixed workloads"
+      "disposition": "Task 9 shape matrix supports narrow first-page scan; indexed count stays default; embedded timing is not product CPU evidence"
     },
     {
       "id": "unmeasured:http.registry:tenant discovery and pagination",
@@ -1433,7 +1433,7 @@
       "rpcCount": null,
       "signinCount": null,
       "source": null,
-      "disposition": "tasks 7-8; full quality cases required"
+      "disposition": "targeted retrieval and semantic-quality fixture suites passed; real provider/corpus matrix and full pipeline remain unmeasured"
     },
     {
       "id": "unmeasured:knowledge.graph:source siblings, hub, archival, community rebuild",
@@ -1450,7 +1450,7 @@
       "rpcCount": null,
       "signinCount": null,
       "source": null,
-      "disposition": "tasks 7-10"
+      "disposition": "Task 10 fixture regressions passed 10/10 with equivalent outputs and lower RPC counts; production row volume, CPU, latency and community rebuild profile remain unmeasured"
     },
     {
       "id": "unmeasured:embedding:reembed/backfill dimension and model transitions",
@@ -1467,7 +1467,7 @@
       "rpcCount": null,
       "signinCount": null,
       "source": null,
-      "disposition": "tasks 3, 9 and 11"
+      "disposition": "Task 3/9 local transition and backfill tests passed; full provider/corpus quality and resource matrix remain unmeasured"
     },
     {
       "id": "unmeasured:surrealdb.session:RPC attach/use/signin/detach counters",

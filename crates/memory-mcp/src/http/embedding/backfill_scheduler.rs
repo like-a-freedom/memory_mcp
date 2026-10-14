@@ -159,7 +159,7 @@ async fn run_backfill_pass_with_schedule(
 /// a fact's new vector is visible to the next read, which a bare client has no
 /// cache to invalidate.
 async fn backfill_tenant(
-    db: Arc<crate::storage::client::SurrealDbClient>,
+    db: Arc<dyn crate::storage::client::DbClient>,
     tenant: &Tenant,
     embedding: &EmbeddingPolicy,
     policy: &DeploymentPolicy,
@@ -183,9 +183,12 @@ async fn backfill_tenant(
     // tolerates an unreadable index because lexical retrieval does not need
     // it; backfill cannot, because it is about to *write vectors*. The two
     // callers share one reading and draw different consequences from it.
-    let gate =
-        crate::http::runtime::storage::reconcile_tenant_index_dimension(&db, &namespace, embedding)
-            .await;
+    let gate = crate::http::runtime::storage::reconcile_tenant_index_dimension(
+        Arc::clone(&db),
+        &namespace,
+        embedding,
+    )
+    .await;
     if let Some(reason) = declined_reason(gate) {
         log_declined(tenant, embedding.dimension, reason);
         return Ok(());
@@ -196,7 +199,7 @@ async fn backfill_tenant(
             as Arc<dyn crate::knowledge::entity_extraction::EntityExtractor>,
     };
     let service = crate::service::MemoryService::new_with_embedding_provider(
-        Arc::clone(&db) as Arc<dyn crate::storage::DbClient>,
+        Arc::clone(&db),
         namespace.clone(),
         crate::logging::StdoutLogger::directives_from_env(),
         100, // rate_limit_rps; the maintenance pass is not request traffic
@@ -233,15 +236,12 @@ async fn backfill_tenant(
 async fn write_bootstrap_ready(
     namespace: &str,
     embedding: &EmbeddingPolicy,
-    db: &Arc<crate::storage::client::SurrealDbClient>,
+    db: &Arc<dyn crate::storage::client::DbClient>,
 ) -> Result<(), MemoryError> {
     // `BoundDbClient` pins the namespace as an invariant rather than a
     // per-call argument, so this write physically cannot reach another
     // tenant's rows.
-    let bound_db = BoundDbClient::new(
-        Arc::clone(db) as Arc<dyn crate::storage::DbClient>,
-        namespace,
-    );
+    let bound_db = BoundDbClient::new(Arc::clone(db), namespace);
     crate::service::startup::write_bootstrap_ready_state(
         &bound_db,
         &embedding.signature,
@@ -540,7 +540,7 @@ mod tests {
             schedule.due(MaintenanceJob::EmbeddingBackfill, t0),
             "the first run always opens the gate"
         );
-        schedule.record_completed(MaintenanceJob::EmbeddingBackfill, t0);
+        schedule.record_attempt_started(MaintenanceJob::EmbeddingBackfill, t0);
         assert!(
             !schedule.due(
                 MaintenanceJob::EmbeddingBackfill,
@@ -555,7 +555,7 @@ mod tests {
             ),
             "a run at the boundary opens the gate again"
         );
-        schedule.record_completed(
+        schedule.record_attempt_started(
             MaintenanceJob::EmbeddingBackfill,
             t0 + Duration::from_secs(60),
         );
@@ -645,7 +645,7 @@ mod tests {
         job.invoke(registry.clone(), Arc::clone(&schedule))
             .await
             .expect("the first tick runs");
-        schedule.record_completed(MaintenanceJob::EmbeddingBackfill, t0);
+        schedule.record_attempt_started(MaintenanceJob::EmbeddingBackfill, t0);
         let a = db
             .select_one("fact:a", namespace)
             .await

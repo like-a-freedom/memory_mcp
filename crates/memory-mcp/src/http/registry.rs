@@ -378,6 +378,7 @@ pub struct RegistryHandle {
     engine: Option<Arc<PrivilegedEngine>>,
     engine_generation: u64,
     maintenance_dimension: Option<usize>,
+    maintenance_client_pool_config: maintenance_clients::MaintenanceClientPoolConfig,
     maintenance_clients: Option<Arc<maintenance_clients::MaintenanceClients>>,
 }
 
@@ -440,6 +441,8 @@ impl RegistryHandle {
             engine: None,
             engine_generation: 0,
             maintenance_dimension: None,
+            maintenance_client_pool_config:
+                maintenance_clients::MaintenanceClientPoolConfig::default(),
             maintenance_clients: None,
         }
     }
@@ -465,6 +468,8 @@ impl RegistryHandle {
             engine: Some(engine),
             engine_generation,
             maintenance_dimension: None,
+            maintenance_client_pool_config:
+                maintenance_clients::MaintenanceClientPoolConfig::default(),
             maintenance_clients: Some(maintenance_clients),
         }
     }
@@ -517,6 +522,7 @@ impl RegistryHandle {
                 (*engine).clone(),
                 self.engine_generation,
                 None,
+                self.maintenance_client_pool_config,
             ),
         ));
         self.engine = Some(engine);
@@ -532,6 +538,25 @@ impl RegistryHandle {
                 (**engine).clone(),
                 self.engine_generation,
                 dimension,
+                self.maintenance_client_pool_config,
+            ))
+        });
+        self
+    }
+
+    /// Apply the deployment's bounded maintenance-session limits and rebuild
+    /// the engine-owned pool with the same immutable engine/dimension identity.
+    pub(crate) fn with_maintenance_client_pool_config(
+        mut self,
+        config: maintenance_clients::MaintenanceClientPoolConfig,
+    ) -> Self {
+        self.maintenance_client_pool_config = config;
+        self.maintenance_clients = self.engine.as_ref().map(|engine| {
+            Arc::new(maintenance_clients::MaintenanceClients::for_engine(
+                (**engine).clone(),
+                self.engine_generation,
+                self.maintenance_dimension,
+                config,
             ))
         });
         self
@@ -707,6 +732,7 @@ impl RegistryHandle {
             (*engine).clone(),
             engine_generation,
             None,
+            maintenance_clients::MaintenanceClientPoolConfig::default(),
         ));
         Self {
             stores: RegistryStores::from_backend(store.clone()),
@@ -716,6 +742,8 @@ impl RegistryHandle {
             engine: Some(engine),
             engine_generation,
             maintenance_dimension: None,
+            maintenance_client_pool_config:
+                maintenance_clients::MaintenanceClientPoolConfig::default(),
             maintenance_clients: Some(maintenance_clients),
         }
     }
