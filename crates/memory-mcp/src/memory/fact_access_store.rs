@@ -8,12 +8,15 @@
 //!
 //! The method bodies are unchanged from `app_store.rs`.
 
+use std::collections::BTreeSet;
 use std::sync::Arc;
 
 use serde_json::json;
 
 use crate::error::MemoryError;
 use crate::storage::{BoundDbClient, DbClient};
+
+const MAX_ARCHIVAL_EPISODES_PER_RPC: usize = 64;
 
 /// Read-side store for the fact access log.
 #[derive(Clone)]
@@ -92,6 +95,38 @@ impl FactAccessStore {
             )
             .await?;
         Ok(!rows.is_empty())
+    }
+
+    /// Returns distinct source episodes with a fact accessed at or after the
+    /// supplied cutoff, preserving the single-episode heat predicate.
+    pub async fn episode_ids_with_recent_fact_access(
+        &self,
+        episode_ids: &[String],
+        hot_cutoff: &str,
+    ) -> Result<Vec<String>, MemoryError> {
+        let mut hot_episode_ids = BTreeSet::new();
+        for batch in episode_ids.chunks(MAX_ARCHIVAL_EPISODES_PER_RPC) {
+            let rows = self
+                .db
+                .query_rows(
+                    "SELECT source_episode FROM fact \
+                     WHERE source_episode IN $episode_ids \
+                     AND last_accessed IS NOT NONE \
+                     AND last_accessed >= type::datetime($hot_cutoff) \
+                     GROUP BY source_episode",
+                    Some(json!({ "episode_ids": batch, "hot_cutoff": hot_cutoff })),
+                )
+                .await?;
+            for row in rows {
+                if let Some(episode_id) = row
+                    .get("source_episode")
+                    .and_then(crate::storage::value_helpers::string_from_value)
+                {
+                    hot_episode_ids.insert(episode_id);
+                }
+            }
+        }
+        Ok(hot_episode_ids.into_iter().collect())
     }
 }
 
